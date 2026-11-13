@@ -88,13 +88,13 @@ export const START_NOTE_MAX = MAX_NOTE
  * checked again where the card is taken (as it is saved), and before the task is typed in or its agent launched: once
  * it no longer holds, the start is undone as one that fails (the card back where it was, a new agent removed).
  */
-export async function startTask(n: number, target: TaskStartTarget, actor: TaskActor, note?: string, reason?: string, guard?: StartGuard, commit?: () => void): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean; run?: string }> {
+export async function startTask(n: number, target: TaskStartTarget, actor: TaskActor, note?: string, reason?: string, guard?: StartGuard, commit?: () => void, released?: string): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean; run?: string }> {
   if (note && note.length > MAX_NOTE) throw combworkError(msg({ id: 'tasks.start.noteTooLong', defaultMessage: 'The note is too long (at most {max, number} characters).', description: 'An error: the note given with a Start (what the agent should do now) is longer than it may be ({max}, a number of characters).' }), { max: MAX_NOTE }, { kind: 'invalid' })
   const key = `${(workspace.path ?? '').toLowerCase()}#${n}`
   if (starting.has(key)) throw combworkError(msg({ id: 'tasks.start.alreadyStarting', defaultMessage: '{card} is already being started.', description: 'An error: card {card} (its key, such as HI-12) is being started already; a second Start of it is refused.' }), { card: cardRef(n) }, { kind: 'conflict' })
   starting.add(key)
   try {
-    return await startReserved(n, target, actor, note?.trim() || undefined, reason?.trim() || undefined, guard, commit)
+    return await startReserved(n, target, actor, note?.trim() || undefined, reason?.trim() || undefined, guard, commit, released?.trim() || undefined)
   } finally {
     starting.delete(key)
   }
@@ -124,7 +124,7 @@ function startable(card: TaskCard): void {
   if (!card.project) throw combworkError(msg({ id: 'tasks.start.noProject', defaultMessage: '{card} has no project. Give it one first: the agent works in that project.', description: 'An error: card {card} (its key, such as HI-12) belongs to no project (only the workspace), so no agent can start it; give it a project first.' }), { card: cardRef(card.number) }, { kind: 'invalid' })
 }
 
-async function startReserved(n: number, target: TaskStartTarget, actor: TaskActor, note: string | undefined, reason: string | undefined, guard?: StartGuard, commit?: () => void): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean; run?: string }> {
+async function startReserved(n: number, target: TaskStartTarget, actor: TaskActor, note: string | undefined, reason: string | undefined, guard?: StartGuard, commit?: () => void, released?: string): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean; run?: string }> {
   const before = await getTask(n)
   startable(before)
   const p = workspace.assertProject(join(workspace.path!, before.project))
@@ -157,7 +157,7 @@ async function startReserved(n: number, target: TaskStartTarget, actor: TaskActo
   let typed = false
   let slotted = false
   try {
-    const { typed: t, slotted: s, ...result } = await giveCard(n, before, p, agentId, agentName, target.kind !== 'agent', actor, note, reason, guard, commit)
+    const { typed: t, slotted: s, ...result } = await giveCard(n, before, p, agentId, agentName, target.kind !== 'agent', actor, note, reason, guard, commit, released)
     typed = t
     slotted = s
     return result
@@ -184,7 +184,8 @@ async function giveCard(
   note: string | undefined,
   reason?: string,
   guard?: StartGuard,
-  commit?: () => void
+  commit?: () => void,
+  released?: string
 ): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean; typed: boolean; slotted: boolean }> {
   const undoAgent = async (): Promise<void> => {
     if (added) await removeAgent(p, agentId, { deleteWorktree: true }).catch((e) => log.warn(`Could not remove ${userText(agentName)} after #${n} didn't start`, e))
@@ -197,8 +198,11 @@ async function giveCard(
   // this Start read. Anything else is a newer decision (moved, reassigned, put in Done) and stays.
   let card: TaskCard
   try {
-    // The user's reason for a start that skips rules (#1275: the window asked first), kept with its Override.
-    card = await updateTask(n, { agent: agentId, ...(before.column === 'doing' ? {} : { column: 'doing' as const }), ...(reason && actor.kind === 'user' ? { override: { reason } } : {}) }, actor, {
+    // The user's reason for a start that skips rules (#1275: the window asked first), kept with its Override. HI-3148: the
+    // released line confirmed, the user's or the Assistant's (with its reason), for that line only.
+    const overrides = actor.kind === 'user' || actor.kind === 'assistant'
+    const override = overrides && (reason || released) ? { override: { reason: reason ?? '', ...(released ? { released } : {}) } } : {}
+    card = await updateTask(n, { agent: agentId, ...(before.column === 'doing' ? {} : { column: 'doing' as const }), ...override }, actor, {
       check: (now) => {
         startable(now)
         // What the start's caller said must still hold, where the start is written (HI-1990: Combwork's start of a lane's next card).

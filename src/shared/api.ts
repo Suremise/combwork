@@ -572,7 +572,7 @@ export interface CombworkRequests {
    * The user's move of a card to a column through its workflow rules (#1265, SPEC §16.8.4): a move that skips a rule
    * asks first (`ask`, nothing written) unless `confirm`, then records an Override (with `reason`, optional).
    */
-  'tasks:move': (n: number, column: TaskColumn, opts?: { before?: number | null; confirm?: boolean; reason?: string; agent?: string | null; paths?: string[] | null }) => TaskMoveResult
+  'tasks:move': (n: number, column: TaskColumn, opts?: { before?: number | null; confirm?: boolean; reason?: string; agent?: string | null; paths?: string[] | null; released?: string }) => TaskMoveResult
   /** The columns a card can be moved to under its rules (#1275): where a drag may drop it; null: every column (no rule applies). */
   'tasks:columns': (n: number) => TaskColumn[] | null
   /** A card's facts (#1216), oldest first: what each move recorded (none on a board waiting for its upgrade). */
@@ -603,7 +603,7 @@ export interface CombworkRequests {
   /** To the Recycle Bin. */
   'tasks:delete': (n: number) => void
   /** Gives the card to an agent (an existing one, or a new one) with the card as its prompt, and moves it to Doing. */
-  'tasks:start': (n: number, target: TaskStartTarget, opts?: { confirm?: boolean; reason?: string }) => { agentId: string; agentName: string; added: boolean } | { ask: string[] }
+  'tasks:start': (n: number, target: TaskStartTarget, opts?: { confirm?: boolean; reason?: string; released?: string }) => { agentId: string; agentName: string; added: boolean } | { ask: string[]; released?: string }
   /** A card's work (#1223): its facts folded into its line, revisions, verdicts, checks, marks and integration; null with no such card, or on a board not upgraded to 1.0. */
   'tasks:work': (n: number) => WorkView | null
   /** Every live card's badges from its work (#1223), in number order; archived cards aren't read. */

@@ -278,6 +278,7 @@ const MOVE = {
   askTitle: msg({ id: 'board.move.askTitle', defaultMessage: 'Move {card} to {column} anyway?', description: "Title of the question before a move that skips some of the card's workflow rules (glossary: rule). {card} is the card's name (its key, such as AM-12, or #12), {column} the board column it is moved to." }),
   askMessage: msg({ id: 'board.move.askMessage', defaultMessage: '{n, plural, one {This skips a rule of its project:} other {This skips # rules of its project:}}', description: "The question before a move that skips workflow rules (glossary: rule): how many it skips ({n}), listed below by name. Moving anyway records an exception on the card (glossary: override), with the reason the user gives." }),
   detail: msg({ id: 'board.move.askDetail', defaultMessage: 'Moving it anyway records an override on the card, with your reason.', description: "Under the rules a move would skip, in the question before it: making the move records it on the card as an exception to the rules (glossary: override), with the reason the user gives below." }),
+  released: msg({ id: 'board.move.askReleased', defaultMessage: '{branch} is released: start new work on it only for a hotfix. Moving it anyway starts it on {branch}.', description: 'HI-3148: under the question before a start that skips the rule “New work starts only on a branch that isn’t released”: {branch} (as 1.4.0) already shipped (tagged and merged into the default branch).' }),
   reason: msg({ id: 'board.move.reason', defaultMessage: 'Reason (optional)', description: "The label of the field in the question before a move that skips rules: why the user makes the exception, kept with it on the card. Optional." }),
   anyway: msg({ id: 'board.move.anyway', defaultMessage: 'Move Anyway', description: 'The button of the question before a move that skips rules: makes the move, recording it as an override (glossary: override).' }),
   refused: msg({ id: 'board.move.refused', defaultMessage: "{card} can't move to {column}", description: "A toast's title: a card's move was refused for something no exception to the rules can make true (nothing to submit, something Combwork couldn't read). {card} is the card's name, {column} a board column. The toast's text says why and what to do." }),
@@ -323,13 +324,14 @@ const refusalText = (r: Refusal, name: string): string => {
  * The question before a move (or a Start) that skips rules (#1275): the rules by name, a reason, Move Anyway. The reason
  * given (maybe empty), or null when the user cancels.
  */
-function askToSkip(name: string, column: TaskColumn, rules: readonly string[]): Promise<string | null> {
+function askToSkip(name: string, column: TaskColumn, rules: readonly string[], released?: string): Promise<string | null> {
   return prompt({
     title: tr(MOVE.askTitle, { card: name, column: tr(COLUMN_TEXT[column].label) }),
     message: tr(MOVE.askMessage, { n: rules.length }),
     list: rules.map((id) => (RULE_NAMES[id] ? tr(RULE_NAMES[id]) : id)),
     listOnly: true,
-    detail: tr(MOVE.detail),
+    // HI-3148: the released line it would start on, named, as the override confirmed is for it alone.
+    detail: released ? `${tr(MOVE.released, { branch: released })} ${tr(MOVE.detail)}` : tr(MOVE.detail),
     fieldLabel: tr(MOVE.reason),
     confirmLabel: tr(MOVE.anyway)
   })
@@ -356,9 +358,9 @@ export async function moveCard(c: Pick<TaskCard, 'number' | 'project'>, column: 
       r = await call('tasks:move', c.number, column, move)
     }
     if ('ask' in r) {
-      const reason = await askToSkip(name, column, r.ask)
+      const reason = await askToSkip(name, column, r.ask, r.released)
       if (reason === null) return false
-      r = await call('tasks:move', c.number, column, { ...move, confirm: true, ...(reason.trim() ? { reason: reason.trim() } : {}) })
+      r = await call('tasks:move', c.number, column, { ...move, confirm: true, ...(reason.trim() ? { reason: reason.trim() } : {}), ...(r.released ? { released: r.released } : {}) })
     }
     if ('refused' in r) {
       notify('error', tr(MOVE.refused, { card: name, column: where }), refusalText(r.refused, name))
@@ -2597,9 +2599,9 @@ function StartChoices({ project, pick }: { project: ProjectInfo; pick: StartPick
 async function startCard(card: TaskCard, project: ProjectInfo, target: TaskStartTarget): Promise<boolean> {
   let r = await call('tasks:start', card.number, target)
   if ('ask' in r) {
-    const reason = await askToSkip(cardLabel(card), 'doing', r.ask)
+    const reason = await askToSkip(cardLabel(card), 'doing', r.ask, r.released)
     if (reason === null) return false
-    r = await call('tasks:start', card.number, target, { confirm: true, ...(reason.trim() ? { reason: reason.trim() } : {}) })
+    r = await call('tasks:start', card.number, target, { confirm: true, ...(reason.trim() ? { reason: reason.trim() } : {}), ...(r.released ? { released: r.released } : {}) })
     if ('ask' in r) return false
   }
   notify('success', tr(msg({ id: 'board.start.started', defaultMessage: '{card} started on agent {agent}', description: "A toast's title after a card started: its name: its key, such as AM-12, or #12 for a card with none and the agent ({agent}, its name). The card's title follows. A noun before the name (glossary §1 rule 4)." }), { card: cardLabel(card), agent: r.agentName }), card.title, [{ label: tr(msg({ id: 'board.start.show', defaultMessage: 'Show', description: "A button on the toast after a card started: shows the agent it started on." })), command: 'agent.show', args: [project.path, r.agentId] }])

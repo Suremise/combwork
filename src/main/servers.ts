@@ -3256,11 +3256,15 @@ function taskPatch(body: any): TaskPatch {
   return out
 }
 
-/** A move's override (#1265, SPEC §16.8.4): `{ reason }`, the Assistant's, why it moves the card across the rules. */
-export function overrideParam(v: unknown): { reason: string } {
+/**
+ * A move's override (#1265, SPEC §16.8.4): `{ reason }`, the Assistant's, why it moves the card across the rules;
+ * `released` (HI-3148), the released line a start it makes may go onto, as the refusal named it (that line only).
+ */
+export function overrideParam(v: unknown): { reason: string; released?: string } {
   const reason = v && typeof v === 'object' ? (v as { reason?: unknown }).reason : undefined
   if (typeof reason !== 'string' || !reason.trim()) throw new HttpError(400, apiSaid(API.card.overrideArg))
-  return { reason: reason.trim() }
+  const released = (v as { released?: unknown }).released
+  return { reason: reason.trim(), ...(typeof released === 'string' && released.trim() ? { released: released.trim().slice(0, 250) } : {}) }
 }
 
 route('GET', '/v1/tasks', async ({ query }) => {
@@ -4220,7 +4224,10 @@ route('POST', '/v1/tasks/:n/start', async ({ params, body }) => {
   return assistantChange('agents', [API.change.startTask, { card: cardRef(n), on, agent: named?.name ?? '', inProject: card.project ? 'yes' : 'no', project: card.project ?? '' }], { kind: 'start-task', card: n, ...(card.project ? { project: card.project } : {}), ...(named ? { agent: named } : {}) }, async (guard) => {
     // Its guard checked again as the card is taken, and before the task is typed or its agent launched (HI-2420): a
     // revoked start is undone, the card back where it was and a new agent removed.
-    const r = await startTask(n, target, { kind: 'assistant' }, typeof body?.note === 'string' ? body.note : undefined, undefined, undefined, guard)
+    // HI-3148: the Assistant's override of a start onto a released line (`override: { reason, released }`, the line its
+    // refusal named): for that line only. An agent's start never gets here (its intent, above).
+    const o = body?.override !== undefined && body.override !== null ? overrideParam(body.override) : null
+    const r = await startTask(n, target, { kind: 'assistant' }, typeof body?.note === 'string' ? body.note : undefined, o?.reason, undefined, guard, o?.released)
     return {
       done: [API.done.cardStarted, { card: cardRef(n), added: r.added ? 'yes' : 'no', agent: r.agentName, project: card.project ?? '', title: clip(card.title, 80) }],
       act: { agent: { id: r.agentId, name: r.agentName }, column: r.card.column },

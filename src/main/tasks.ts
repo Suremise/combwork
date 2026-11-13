@@ -1835,11 +1835,13 @@ async function moveThroughRules(g: Gate, n: number, patch: TaskPatch, actor: Tas
   const target = patch.column!
   const { column: _column, before, position, override, ...rest } = patch
   const reason = override?.reason.trim()
+  // HI-3148: the released line confirmed (the user's or the Assistant's alone: never an agent's, which never reaches here).
+  const released = typeof override?.released === 'string' && override.released.trim() ? override.released.trim() : undefined
   const { reply, saved } = await runIntent(
     g.wf,
     n,
     actor,
-    (wf) => wf.move(n, g.to, g.by, { confirm, ...(reason ? { reason } : {}), ...(g.builder ? { builder: g.builder } : {}), ...paths }),
+    (wf) => wf.move(n, g.to, g.by, { confirm, ...(reason ? { reason } : {}), ...(released ? { released } : {}), ...(g.builder ? { builder: g.builder } : {}), ...paths }),
     (w, first) => {
       const placed = STAGE_CATEGORY[w.current] === target ? { ...(before !== undefined ? { before } : {}), ...(position !== undefined ? { position } : {}) } : {}
       // A write that takes the card into Active (a start, or back from Review: HI-2062): whether its Override lets the card
@@ -1850,7 +1852,7 @@ async function moveThroughRules(g: Gate, n: number, patch: TaskPatch, actor: Tas
   )
   // A drag that went as far as it could (its start written, its submission refused for what no override makes true).
   if (isRefusal(reply)) return saved ? { moved: saved, stopped: reply } : { refused: reply }
-  if ('ask' in reply) return saved ? { moved: saved } : reply.leftOut ? { leftOut: reply.leftOut } : { ask: reply.rules }
+  if ('ask' in reply) return saved ? { moved: saved } : reply.leftOut ? { leftOut: reply.leftOut } : { ask: reply.rules, ...(reply.released ? { released: reply.released } : {}) }
   if (saved) return { moved: saved }
   // Nothing moved (the card was already there): the rest of the change, as any other.
   const others: TaskPatch = { ...rest, ...(before !== undefined ? { before } : {}), ...(position !== undefined ? { position } : {}) }
@@ -1905,10 +1907,12 @@ async function moveDecidedAgain(g: Gate, n: number, patch: TaskPatch, actor: Tas
  * `paths` (HI-2352): a None code card's submission asks first what its paths leave out (`leftOut`, nothing written);
  * moved again with the paths to submit with (Include Them), or null (Leave Them Out), it doesn't ask.
  */
-export async function moveTask(n: number, column: TaskColumn, o: { before?: number | null; confirm?: boolean; reason?: string; agent?: string | null; paths?: string[] | null } = {}): Promise<MoveResult> {
+export async function moveTask(n: number, column: TaskColumn, o: { before?: number | null; confirm?: boolean; reason?: string; agent?: string | null; paths?: string[] | null; released?: string } = {}): Promise<MoveResult> {
   const actor: TaskActor = { kind: 'user' }
-  // `agent`: the Move to Doing dialog's choice (an agent, or nobody), given with the move.
-  const patch: TaskPatch = { column, ...(o.before !== undefined ? { before: o.before } : {}), ...(o.agent !== undefined ? { agent: o.agent } : {}), ...(o.reason ? { override: { reason: o.reason } } : {}) }
+  // `agent`: the Move to Doing dialog's choice (an agent, or nobody), given with the move. `released` (HI-3148): the
+  // released line the user confirmed starting on, as the ask named it.
+  const released = typeof o.released === 'string' && o.released ? o.released : undefined
+  const patch: TaskPatch = { column, ...(o.before !== undefined ? { before: o.before } : {}), ...(o.agent !== undefined ? { agent: o.agent } : {}), ...(o.reason || released ? { override: { reason: o.reason ?? '', ...(released ? { released } : {}) } } : {}) }
   const gate = await gateOf(workspace, n, patch, actor, { anyStage: true })
   if (!gate) {
     const { override: _o, ...plain } = patch
@@ -1923,12 +1927,13 @@ export async function moveTask(n: number, column: TaskColumn, o: { before?: numb
  * before anything is done (no agent added, nothing launched): none when no rule applies or none is skipped. `agent`: the
  * agent it is given to (null: one not added yet).
  */
-export async function startAsks(n: number, agent: string | null): Promise<string[]> {
+export async function startAsks(n: number, agent: string | null): Promise<{ rules: string[]; released?: string }> {
   const actor: TaskActor = { kind: 'user' }
   const gate = await gateOf(workspace, n, { column: 'doing', ...(agent ? { agent } : {}) }, actor, { anyStage: true })
-  if (!gate) return []
+  if (!gate) return { rules: [] }
   const r = await gate.wf.move(n, gate.to, 'user', { dry: true, ...(gate.builder ? { builder: gate.builder } : {}) })
-  return !isRefusal(r) && 'ask' in r ? r.rules : []
+  // HI-3148: with the released line it would start on, which the confirmed start gives back (that line only).
+  return !isRefusal(r) && 'ask' in r ? { rules: r.rules, ...(r.released ? { released: r.released } : {}) } : { rules: [] }
 }
 
 /**

@@ -1507,9 +1507,10 @@ export interface TaskPatch {
   decisionId?: string
   /**
    * A column move across workflow rules (#1265, SPEC §16.8.4), with why: the Assistant's, required when its move skips
-   * a rule (else refused, naming them); the user's reason, optional. Never an agent's.
+   * a rule (else refused, naming them); the user's reason, optional. Never an agent's. `released` (HI-3148): the released
+   * line a start the move makes may go onto, as the ask or the refusal named it: for that line only.
    */
-  override?: { reason: string }
+  override?: { reason: string; released?: string }
 }
 
 /**
@@ -1518,7 +1519,7 @@ export interface TaskPatch {
  * question first (the rules the move would skip: nothing written; move again with `confirm`), or refused. `leftOut`
  * (HI-2352): a None code card's submission, asked first what its paths leave out: move again with `paths`.
  */
-export type TaskMoveResult = { moved: TaskCard; stopped?: Refusal } | { ask: string[] } | { leftOut: { paths: string[]; files: string[] } } | { refused: Refusal }
+export type TaskMoveResult = { moved: TaskCard; stopped?: Refusal } | { ask: string[]; released?: string } | { leftOut: { paths: string[]; files: string[] } } | { refused: Refusal }
 
 /** Which agent Start gives a card to; a new one runs on `connection` (its id: HI-2121), else the first usable here. */
 /** `worktree` (0.9's own worktree for a new agent) is refused since 1.0 (#1451); the window stops sending it (#1442). */

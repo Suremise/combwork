@@ -981,9 +981,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       // A start that skips rules asks first (#1275), before any agent is added or anything launched.
       if (!opts?.confirm) {
         const ask = await tasks.startAsks(n, target.kind === 'agent' ? target.agentId : null)
-        if (ask.length) return { ask }
+        if (ask.rules.length) return { ask: ask.rules, ...(ask.released ? { released: ask.released } : {}) }
       }
-      const r = await startTask(n, target, { kind: 'user' }, undefined, opts?.reason)
+      const r = await startTask(n, target, { kind: 'user' }, undefined, opts?.reason, undefined, undefined, typeof opts?.released === 'string' ? opts.released : undefined)
       return { agentId: r.agentId, agentName: r.agentName, added: r.added }
     },
     'tasks:work': (n) => {

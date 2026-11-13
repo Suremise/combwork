@@ -78,6 +78,11 @@ export interface Ask {
    * then the unclaimed changes, which may be another card's). Moved again with `paths` to include them, or without asking.
    */
   leftOut?: { paths: string[]; files: string[] }
+  /**
+   * HI-3148: the released line the start among its rules would go onto (`start.released`): the override confirmed is for
+   * this line only, given back with it (`released`); a line changed meanwhile is asked about again.
+   */
+  released?: string
 }
 
 export type Reply = Moved | Refusal
@@ -2693,7 +2698,7 @@ export class Workflow {
    * The user's drag (or menu): never refused. A move that skips rules asks first, then records an `Override`; a move
    * that skips nothing just moves (§16.7.1). The Assistant passes `override: { reason }` or is refused.
    */
-  async move(ref: unknown, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string; dry?: boolean; paths?: string[]; askPaths?: boolean } = {}): Promise<Moved | Ask | Refusal> {
+  async move(ref: unknown, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string; dry?: boolean; paths?: string[]; askPaths?: boolean; released?: string } = {}): Promise<Moved | Ask | Refusal> {
     const card = this.resolve(ref)
     if (isRefusal(card)) return card
     const s = this.state(card)
@@ -2823,7 +2828,7 @@ export class Workflow {
    * checks the rules again: one not decided on undoes it, and asks again. `fromHold`: where the card goes first, in the
    * same write (back from On Hold to where it was; a Done card reopened, to Todo), the drag counted from there.
    */
-  private async dragForward(card: CardRecord, from: StageId, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string; dry?: boolean; paths?: string[]; askPaths?: boolean }, fromHold?: StageId): Promise<Moved | Ask | Refusal> {
+  private async dragForward(card: CardRecord, from: StageId, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string; dry?: boolean; paths?: string[]; askPaths?: boolean; released?: string }, fromHold?: StageId): Promise<Moved | Ask | Refusal> {
     const asking = by === 'user' ? !opts.confirm || !!opts.dry : !opts.reason
     const s0 = this.state(card)
     // Back from On Hold: the drag counts from where the card was.
@@ -2856,6 +2861,11 @@ export class Workflow {
       if (!gs && !gsub && !pastReview && !queueOnly && !fromHold) return this.ok(card, from, s0.stage)
       const rules = new Set<string>()
       if (gs) for (const x of this.failingOf(card, s, gs.r, 'start', gs.ins)) rules.add(x)
+      // HI-3148: a start onto a released line (or one that can't be checked) is a rule the user's or the Assistant's
+      // override can skip, for that line only: confirmed with the line the ask named (`released`), never another.
+      const releasedRule = gs && this.enforced() ? await this.releasedStart(card, gs, by) : { grant: null }
+      const releasedTarget = 'refusal' in releasedRule ? (gs!.data.target ?? null) : null
+      if (releasedTarget) rules.add('start.released')
       if (gsub) for (const x of this.failingOf(gsub.card, gsub.s, gsub.r, 'submit', gsub.inputs, gsub.only)) rules.add(x)
       // Past Review (or the user's OK): the review and approvals are skipped, and the change counts as approved.
       if (pastReview && this.enforced()) rules.add('integrate.approved')
@@ -2866,11 +2876,14 @@ export class Workflow {
       if (nobody) rules.add('move.doingNobody')
       const skipped = [...rules]
       // agent-protocol: who can override a refusal, the Agent API's fixed `override` value (AGENT_API.md, §16.8.3)
-      const needs = (list: string[]): Ask | Refusal => (by === 'user' ? { ask: true, card: card.key, rules: list } : refusal('move.needsOverride', { card: card.key, stage: to, rules: list.join(', ') }, 'the user or the Assistant')) // i18n-ignore: who can override, agent-facing (§16.8.3)
+      const needs = (list: string[]): Ask | Refusal => (by === 'user' ? { ask: true, card: card.key, rules: list, ...(releasedTarget ? { released: releasedTarget } : {}) } : refusal('move.needsOverride', { card: card.key, stage: to, rules: list.join(', ') }, 'the user or the Assistant')) // i18n-ignore: who can override, agent-facing (§16.8.3)
       if (opts.dry && !skipped.length) return this.ok(card, from, s0.stage)
       if (nobody && asking) return (await this.nobodyOn(card, to, by, opts, others))!
       // agent-protocol: who can override a refusal, the Agent API's fixed `override` value (AGENT_API.md, §16.8.3)
       if (skipped.length && asking) return by === 'user' ? needs(skipped) : this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: skipped.join(', ') } }, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
+      // Confirmed for another line than the one it would start on now (it changed since the ask): asked again, the user;
+      // the Assistant's refused with the line's own words, to confirm that line.
+      if (releasedTarget && !opts.dry && opts.released !== releasedTarget) return by === 'user' ? needs(skipped) : this.refuse(card, 'assistant', 'start', (releasedRule as { refusal: GuardRefusal }).refusal, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
       await this.cfg.hooks?.beforeWrite?.('move')
       // A start's passes, as `start`'s (its platform's `startGathers`, HI-2916).
       const gathers = gs ? (this.platform(gs.o).startGathers ?? 1) : 1
@@ -2890,7 +2903,7 @@ export class Workflow {
           if (moved) return moved
           // One Override naming every rule skipped: after the submission when it approves it (past Review: it counts as
           // approved for the latest submission), else first.
-          const override = (): void => void (skipped.length && w.fact('Override', { rules: skipped, move: `${s.stage}→${to}`, by, reason: opts.reason ?? '' })) // i18n-ignore: a fact's kind and codes, not text
+          const override = (): void => void (skipped.length && w.fact('Override', { rules: skipped, move: `${s.stage}→${to}`, by, reason: opts.reason ?? '', ...(releasedTarget ? { target: releasedTarget } : {}) })) // i18n-ignore: a fact's kind and codes, not text
           const approves = pastReview && !!gsub
           if (!approves) override()
           if (fromHold) w.move(fromHold, 'user')
