@@ -431,6 +431,48 @@ const onDb = (fn) => {
     await askForgot.getByRole('button', { name: 'Remove', exact: true }).click()
     check('…removed: the slot and its folder gone, its commit still in jj’s store', !!(await until(async () => !(await inv('slots:list', shop)).some((s) => s.name === slot4) && !fs.existsSync(w4.folder), HUNG_MS)) && id(shop, forgotCommit) === forgotCommit, JSON.stringify(await inv('slots:list', shop)))
 
+    // HI-3096 (Darren's decision (a), 12 Nov): with the repository's snapshot.auto-track narrowed, a new file jj doesn't
+    // track is the slot's work. B1's submission is refused naming the setting; put back, the slot shows it has changes
+    // and the pool's removal (Changes → Unused worktrees' Remove for a colocated slot) refuses it, the file kept.
+    jj(shop, 'config', 'set', '--repo', 'snapshot.auto-track', 'none()')
+    // A card of its own: the shop has no slot now (the last one removed above), so it gets a new one.
+    const n3 = (await inv('tasks:create', { title: 'Shop untracked', project: 'shop', agent: b1.id })).number
+    const key3 = (await card(n3)).key
+    const givenRe3 = new RegExp(`Giving \\S*B1\\S* #${n3} in`, 'g')
+    const given3 = () => (fs.existsSync(appLog) ? (fs.readFileSync(appLog, 'utf8').match(givenRe3) ?? []).length : 0)
+    const started6 = await inv('tasks:move', n3, 'doing', { confirm: true, reason: 'jjwindow: a card with auto-track none()' }).catch((e) => ({ error: String(e) }))
+    const w6 = await until(async () => {
+      const v = await inv('tasks:work', n3)
+      const lent = v?.folder && v.workspace ? (await inv('slots:list', shop)).find((s) => s.folder.toLowerCase() === v.folder.toLowerCase() && s.state === 'lent' && s.lease?.card === n3) : null
+      return lent && given3() > 0 ? v : null
+    }, HUNG_MS)
+    check('a new card started in a slot under auto-track none(), given to B1', !!w6, JSON.stringify({ started6, slots: await inv('slots:list', shop) }))
+    const slot6 = path.basename(w6.folder)
+    fs.writeFileSync(path.join(w6.folder, 'untracked-notes.txt'), 'never tracked\n')
+    const sub6 = await call(await tokenOf(b1.id), 'POST', `/v1/tasks/${encodeURIComponent(key3)}/submit`, { summary: 'Done.' })
+    console.log(`INFO HI-3096 submit under auto-track none(): ${sub6.status} ${JSON.stringify(sub6.body)}`)
+    check('…B1\'s submission refused, naming snapshot.auto-track and none()', sub6.status !== 200 && /snapshot\.auto-track/.test(JSON.stringify(sub6.body)) && /none\(\)/.test(JSON.stringify(sub6.body)), JSON.stringify(sub6.body))
+    const back6 = await inv('tasks:move', n3, 'todo', { confirm: true, reason: 'jjwindow: put back with an untracked file' }).catch((e) => ({ error: String(e) }))
+    await inv('session:stop', shop, b1.id)
+    check('…put back: the slot has changes left in it (the untracked file), not lent', !!(await until(async () => { const s = (await inv('slots:list', shop)).find((x) => x.name === slot6); return s && !s.lease && !s.writer && s.state === 'dirty' ? s : null }, HUNG_MS)), JSON.stringify({ back6, slots: await inv('slots:list', shop) }))
+    await toProject()
+    await section('jjRepo')
+    await section('workflow')
+    const row6 = page.locator(`[data-slot="${slot6}"]`)
+    check('Slots and copies: Has changes left in it', !!(await until(async () => /Has changes left in it/.test(await text(row6)), HUNG_MS)), await text(row6))
+    await row6.scrollIntoViewIfNeeded()
+    await shoot(row6, 'slot-untracked-dirty')
+    const removed6 = await inv('slots:test', shop, { op: 'remove', slot: slot6 })
+    console.log(`INFO HI-3096 the pool's removal: ${JSON.stringify(removed6)}`)
+    check('…the pool\'s removal refuses it as dirty, the untracked file kept', removed6?.why === 'dirty' && fs.existsSync(path.join(w6.folder, 'untracked-notes.txt')), JSON.stringify(removed6))
+    jj(shop, 'config', 'set', '--repo', 'snapshot.auto-track', 'all()')
+    // Tidied for the next step: the file gone, the slot settled ready again (card 2 is lent it next).
+    fs.rmSync(path.join(w6.folder, 'untracked-notes.txt'), { force: true })
+    check('…the file gone: the slot ready again', !!(await until(async () => {
+      await inv('slots:test', shop, { op: 'tidy' })
+      return (await inv('slots:list', shop)).find((s) => s.name === slot6 && s.state === 'ready') ?? null
+    }, HUNG_MS)), JSON.stringify(await inv('slots:list', shop)))
+
     // HI-3099: card 2 afresh in a slot, an unrecorded edit left there, put back; then the user commits twice in the
     // project folder and discards old operations (`jj op abandon`). The slot shows stale with Recover…, which mends it with
     // the edit kept; the project folder's files are as the user left them, and theirs to use.
@@ -477,45 +519,6 @@ const onDb = (fn) => {
     }, HUNG_MS)
     check('…recovered: not stale any more, its edit in the folder', !!recovered5 && fs.existsSync(path.join(w5.folder, 'wip.txt')) && fs.readFileSync(path.join(w5.folder, 'wip.txt'), 'utf8') === 'unrecorded before the abandon\n', JSON.stringify({ slots: await inv('slots:list', shop), toasts: await text(page.locator('.toasts')) }))
     check('…the project folder as the user left it, its bookmarks too, and jj works there', JSON.stringify(shopFiles()) === JSON.stringify(shopBefore) && jj(shop, '--ignore-working-copy', 'bookmark', 'list') === shopBookmarks && /Working copy/.test(jj(shop, 'status')), JSON.stringify({ before: shopBefore, now: shopFiles() }))
-
-    // HI-3096 (Darren's decision (a), 12 Nov): with the repository's snapshot.auto-track narrowed, a new file jj doesn't
-    // track is the slot's work. B1's submission is refused naming the setting; put back, the slot shows it has changes
-    // and the pool's removal (Changes → Unused worktrees' Remove for a colocated slot) refuses it, the file kept.
-    jj(shop, 'config', 'set', '--repo', 'snapshot.auto-track', 'none()')
-    // A card of its own (no slot kept for it), so its slot shows only this. Card 2 to Done first: its kept slot (the
-    // shop's one slot) goes back to the pool for it.
-    const done2 = await inv('tasks:move', n2, 'done', { confirm: true, reason: 'jjwindow: card 2 done, its slot back to the pool' }).catch((e) => ({ error: String(e) }))
-    check('card 2 to Done: its kept slot back in the pool', !!(await until(async () => (await inv('slots:list', shop)).some((s) => s.keptFor === undefined && s.state === 'ready' && !s.lease), HUNG_MS)), JSON.stringify({ done2, slots: await inv('slots:list', shop) }))
-    const n3 = (await inv('tasks:create', { title: 'Shop untracked', project: 'shop', agent: b1.id })).number
-    const key3 = (await card(n3)).key
-    const givenRe3 = new RegExp(`Giving \\S*B1\\S* #${n3} in`, 'g')
-    const given3 = () => (fs.existsSync(appLog) ? (fs.readFileSync(appLog, 'utf8').match(givenRe3) ?? []).length : 0)
-    const started6 = await inv('tasks:move', n3, 'doing', { confirm: true, reason: 'jjwindow: a card with auto-track none()' }).catch((e) => ({ error: String(e) }))
-    const w6 = await until(async () => {
-      const v = await inv('tasks:work', n3)
-      const lent = v?.folder && v.workspace ? (await inv('slots:list', shop)).find((s) => s.folder.toLowerCase() === v.folder.toLowerCase() && s.state === 'lent' && s.lease?.card === n3) : null
-      return lent && given3() > 0 ? v : null
-    }, HUNG_MS)
-    check('a new card started in a slot under auto-track none(), given to B1', !!w6, JSON.stringify({ started6, slots: await inv('slots:list', shop) }))
-    const slot6 = path.basename(w6.folder)
-    fs.writeFileSync(path.join(w6.folder, 'untracked-notes.txt'), 'never tracked\n')
-    const sub6 = await call(await tokenOf(b1.id), 'POST', `/v1/tasks/${encodeURIComponent(key3)}/submit`, { summary: 'Done.' })
-    console.log(`INFO HI-3096 submit under auto-track none(): ${sub6.status} ${JSON.stringify(sub6.body)}`)
-    check('…B1\'s submission refused, naming snapshot.auto-track and none()', sub6.status !== 200 && /snapshot\.auto-track/.test(JSON.stringify(sub6.body)) && /none\(\)/.test(JSON.stringify(sub6.body)), JSON.stringify(sub6.body))
-    const back6 = await inv('tasks:move', n3, 'todo', { confirm: true, reason: 'jjwindow: put back with an untracked file' }).catch((e) => ({ error: String(e) }))
-    await inv('session:stop', shop, b1.id)
-    check('…put back: the slot has changes left in it (the untracked file), not lent', !!(await until(async () => { const s = (await inv('slots:list', shop)).find((x) => x.name === slot6); return s && !s.lease && !s.writer && s.state === 'dirty' ? s : null }, HUNG_MS)), JSON.stringify({ back6, slots: await inv('slots:list', shop) }))
-    await toProject()
-    await section('jjRepo')
-    await section('workflow')
-    const row6 = page.locator(`[data-slot="${slot6}"]`)
-    check('Slots and copies: Has changes left in it', !!(await until(async () => /Has changes left in it/.test(await text(row6)), HUNG_MS)), await text(row6))
-    await row6.scrollIntoViewIfNeeded()
-    await shoot(row6, 'slot-untracked-dirty')
-    const removed6 = await inv('slots:test', shop, { op: 'remove', slot: slot6 })
-    console.log(`INFO HI-3096 the pool's removal: ${JSON.stringify(removed6)}`)
-    check('…the pool\'s removal refuses it as dirty, the untracked file kept', removed6?.why === 'dirty' && fs.existsSync(path.join(w6.folder, 'untracked-notes.txt')), JSON.stringify(removed6))
-    jj(shop, 'config', 'set', '--repo', 'snapshot.auto-track', 'all()')
 
   } finally {
     await app.close().catch(() => undefined)
