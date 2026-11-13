@@ -44,6 +44,7 @@
   "activity.map.noCalls": "Jeszcze nie ma wywołań narzędzi.",
   "activity.map.notLoaded": "niepokazany",
   "activity.map.notReported": "niezgłaszane",
+  "activity.map.notRunning": "{name} nie działa, więc na mapie nie ma nic do pokazania.",
   "activity.map.partial": "Z ostatnio wczytanych wywołań: nie cała historia.",
   "activity.map.pct": "{pct, number}%",
   "activity.map.prompt": "Prompt",

@@ -44,6 +44,7 @@
   "activity.map.noCalls": "Aucun appel d’outil pour l’instant.",
   "activity.map.notLoaded": "non affiché",
   "activity.map.notReported": "non signalé",
+  "activity.map.notRunning": "{name} n’est pas en cours d’exécution : rien à afficher sur la carte.",
   "activity.map.partial": "D’après les derniers appels lus : pas tout l’historique.",
   "activity.map.pct": "{pct, number} %",
   "activity.map.prompt": "Prompt",

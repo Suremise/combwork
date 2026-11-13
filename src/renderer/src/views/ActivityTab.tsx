@@ -12,7 +12,7 @@ import { Icon, IconButton, statusText, useContextMenu, type MenuEntry } from '..
 import { StateMark } from '../components/StateMark'
 import { loadActivityView, loadMapShow, saveActivityView, saveMapShow, type ActivityView, type MapShow } from '../activityView'
 import { ActivityMap, MapToggles, mapSessions, mapStrip, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
-import { mapContextEntries, mapMode, mapReadOrder, type MapContext } from '@shared/activityMap'
+import { mapContextEntries, mapMode, mapReadOrder, shownAlone, type MapContext } from '@shared/activityMap'
 import { cx } from '../util'
 import { boundedQueue, latestOnly } from '@shared/coalesce'
 import { fmt, msg, tr } from '@shared/i18n'
@@ -324,11 +324,12 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
     [mode, view.agents, view.cards, view.hideFinished, view.tab, input]
   )
   // One agent of the selection shown alone (HI-3180, Darren's decision): the strip's click. The selection, its tabs and
-  // the strip stay; a click on another switches, on that one (or Escape) shows them all again. Gone with the agent.
-  const [shownAgent, setShownAgent] = useState<string | null>(null)
+  // the strip stay; a click on another switches, on that one (or Escape) shows them all again. The agent shown alone is
+  // always the current tab's (HI-3186): one shown agent, so the tab and the strip mark the same one.
+  const [showAlone, setShowAlone] = useState(false)
   // The selection chosen again (Agents ▾, even the same): all of it shown again.
-  useEffect(() => setShownAgent(null), [view.agents])
-  const alone = mode === 'shared' && shownAgent && entries.some((e) => e.key === shownAgent) ? shownAgent : null
+  useEffect(() => setShowAlone(false), [view.agents])
+  const alone = shownAlone(showAlone, mode, entries, tab?.agentId ?? null)
   const drawnMode = alone ? 'single' : mode
   const drawnEntries = useMemo(() => (alone ? entries.filter((e) => e.key === alone) : entries), [entries, alone])
   // What the map reads turns and contexts for: the one shown alone first (HR1's round 1: the ninth of ten is read, as a
@@ -346,7 +347,16 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   const strip = useMemo(() => (alone ? mapStrip(entries, drawn.contexts, readEntries) : undefined), [alone, entries, drawn.contexts, readEntries])
   // The sessions the map reads beyond the list's (the shared map's agents' running sessions): none with the map off.
   const mapRead = useMemo(() => (mapOn ? mapSessions(readEntries, mode) : []), [mapOn, readEntries, mode])
-  const pickMapAgent = useCallback((key: string) => setShownAgent(alone === key ? null : key), [alone])
+  // The strip's click (HI-3186): another agent becomes the tab, shown alone; the one shown alone shows them all again.
+  const pickMapAgent = useCallback(
+    (key: string) => {
+      if (alone === key) return setShowAlone(false)
+      setSelected(null)
+      setView({ tab: key })
+      setShowAlone(true)
+    },
+    [alone, setView]
+  )
 
   // The turns of each session shown: read once there (the tick reads live ones again: HR6's round 1, a running
   // subagent's too), and the map's.

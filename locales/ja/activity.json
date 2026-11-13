@@ -44,6 +44,7 @@
   "activity.map.noCalls": "まだツール呼び出しはありません。",
   "activity.map.notLoaded": "非表示",
   "activity.map.notReported": "報告なし",
+  "activity.map.notRunning": "{name} は実行されていないため、マップに表示するものはありません。",
   "activity.map.partial": "最近読み込んだ呼び出しから：全履歴ではありません。",
   "activity.map.pct": "{pct, number}%",
   "activity.map.prompt": "プロンプト",

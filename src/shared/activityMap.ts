@@ -162,6 +162,14 @@ export function mapReadOrder<E extends { key: string }>(entries: readonly E[], s
   return i <= 0 ? entries : [entries[i], ...entries.slice(0, i), ...entries.slice(i + 1)]
 }
 
+/**
+ * The agent the map shows alone (HI-3180), or null for the whole selection: always the current tab's (HI-3186), so the
+ * tab row and the strip mark one shown agent. Only in a shared map, and only while that agent is among its entries.
+ */
+export function shownAlone(on: boolean, mode: 'single' | 'shared', entries: readonly { key: string }[], tab: string | null): string | null {
+  return on && mode === 'shared' && tab !== null && entries.some((e) => e.key === tab) ? tab : null
+}
+
 /** The keys of the agents the map reads (HI-3180): the first MAP_AGENTS in its read order (`mapReadOrder`). */
 export function mapReadKeys(read: readonly { key: string }[]): ReadonlySet<string> {
   return new Set(read.slice(0, MAP_AGENTS).map((e) => e.key))
@@ -326,6 +334,8 @@ export interface MapAgentView {
   load: 'loaded' | 'loading' | 'notLoaded'
   /** Its calls were more than MAP_CALLS: the latest counted. */
   capped: boolean
+  /** It has a running session (HI-3186): without one, one agent's map has nothing to draw. */
+  running: boolean
 }
 
 export interface MapModel {
@@ -402,7 +412,7 @@ export function buildMapModel(agents: readonly MapAgentInput[], at: number): Map
   for (const a of agents) {
     const load: MapAgentView['load'] = a.notLoaded ? 'notLoaded' : a.turns ? 'loaded' : 'loading'
     const { calls, capped, lastTurn } = a.notLoaded ? { calls: [], capped: false, lastTurn: new Set<string>() } : agentCalls(a)
-    views.push({ key: a.key, name: a.name, state: a.state, waiting: a.waiting, doing: a.doing, card: a.card, context: a.context, load, capped })
+    views.push({ key: a.key, name: a.name, state: a.state, waiting: a.waiting, doing: a.doing, card: a.card, context: a.context, load, capped, running: a.sessionKey !== null })
     for (const c of calls) {
       const s = stations[c.station]
       if (lastTurn.has(c.key)) {

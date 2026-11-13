@@ -179,6 +179,10 @@
     "defaultMessage": "not reported",
     "description": "Under a station's name on the Activity map when the agent's CLI doesn't report that kind of call (not an observed zero). Lower case."
   },
+  "activity.map.notRunning": {
+    "defaultMessage": "{name} isn’t running, so there’s nothing to show on the map.",
+    "description": "The Activity map in place of one agent's graph when that agent has no running session (HI-3186): never started since Combwork opened, or stopped. {name} is the agent. The strip of the other agents stays below it."
+  },
   "activity.map.partial": {
     "defaultMessage": "From the latest calls read: not the whole history.",
     "description": "Under the Activity map's feed when its counts are a sample (an agent made more calls than the map counts, or more agents run than it reads)."

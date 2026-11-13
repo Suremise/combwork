@@ -44,6 +44,7 @@
   "activity.map.noCalls": "No tool calls yet.",
   "activity.map.notLoaded": "not shown",
   "activity.map.notReported": "not reported",
+  "activity.map.notRunning": "{name} isn’t running, so there’s nothing to show on the map.",
   "activity.map.partial": "From the latest calls read: not the whole history.",
   "activity.map.pct": "{pct, number}%",
   "activity.map.prompt": "Prompt",
