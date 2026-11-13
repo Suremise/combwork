@@ -301,8 +301,10 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
         return out
       })
     const lastOf = (s) => station(s).locator('.activity-map-station-last').textContent()
-    check('Read shows the file name alone, cut in its middle', (await lastOf('read')) === 'ended-t….png', await lastOf('read'))
-    check('…Edit too', (await lastOf('edit')) === 'interru….ps1', await lastOf('edit'))
+    // Fitted by its drawn width (HR1's round 2): how much of its start shows is the font's; its shape is not.
+    const cutAs = (text, start, end) => typeof text === 'string' && text.startsWith(start) && text.endsWith(`…${end}`) && !text.includes('/')
+    check('Read shows the file name alone, cut in its middle', cutAs(await lastOf('read'), 'ended-t', '.png'), await lastOf('read'))
+    check('…Edit too', cutAs(await lastOf('edit'), 'interru', '.ps1'), await lastOf('edit'))
     check('…a long tool name cut in its middle, its start and end kept', /…/.test(await lastOf('tools')) && /^\S+…\S+$/.test(await lastOf('tools')), await lastOf('tools'))
     check('…the whole on the hover', /lanequeue-shots\/ended-today-long-narrowest\.png/.test(await station('read').locator('title').textContent()))
     const boardBox = () => page.locator('.activity-map-board').boundingBox()
@@ -315,18 +317,26 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
       check(`${label}: Last actions under the graph, at the map's full width`, !!b && !!f && !!m && f.y >= b.y + b.height - 1 && f.width >= m.width - 24 - 2, JSON.stringify({ b, f, m }))
       await shoot(`7-long-names-${label}-light`)
     }
-    // Wide characters (HR1's round 1): a CJK file name and a full-width one, each glyph about two columns wide, cut by
-    // the columns they take, not by their count, and inside their hexes too. (The fake CLI's tool names are ASCII only:
-    // a wide tool name, cut by the same function, is tests/activityMap.test.ts's.)
-    await turn('hb1', `tool Read dir/${'日'.repeat(20)}.ps1 then tool Edit dir/ｆｕｌｌｗｉｄｔｈ${'Ｘ'.repeat(10)}.txt`)
-    check('the wide names reach their stations', !!(await lib.until(async () => ((await station('read').locator('title').textContent()) ?? '').includes('日'.repeat(20)) && ((await station('edit').locator('title').textContent()) ?? '').includes('ｆｕｌｌ'), HUNG_MS, 250)), `${await station('read').locator('title').textContent().catch(() => '')} | ${await station('edit').locator('title').textContent().catch(() => '')}`)
-    check('…the CJK file name cut by its columns, its extension kept', (await lastOf('read')) === '日日日….ps1', await lastOf('read'))
-    check('…the full-width one too', (await lastOf('edit')) === 'ｆｕｌ….txt', await lastOf('edit'))
-    for (const [width, label] of [[1500, 'wide'], [900, 'narrow']]) {
-      await lib.fitWindow(app, page, { width, height: 900 })
-      await page.waitForFunction((w) => window.innerWidth === w, width)
-      check(`${label}: no wide-character text crosses its outline`, !!(await lib.until(async () => (await textsOutside()).length === 0, HUNG_MS, 250)), JSON.stringify(await textsOutside()))
-      await shoot(`7b-wide-names-${label}-light`)
+    // Wide characters (HR1's rounds 1 and 2), drawn by fallback fonts: a CJK file name and a full-width one, then a flag
+    // sequence's and a wide Arabic ligature's, each fitted by its drawn width, never cut inside a character, and inside
+    // its hex. (The fake CLI's tool names are ASCII only: a wide tool name, cut by the same function, is
+    // tests/activityMap.test.ts's.)
+    const titleOf = async (s) => (await station(s).locator('title').textContent().catch(() => '')) ?? ''
+    const wideTurns = [
+      { label: 'CJK and full-width', read: `dir/${'日'.repeat(20)}.ps1`, edit: `dir/ｆｕｌｌｗｉｄｔｈ${'Ｘ'.repeat(10)}.txt`, readStart: '日', readEnd: '.ps1', editStart: 'ｆ', editEnd: '.txt', shot: '7b-wide-names' },
+      { label: 'flags and a ligature', read: `dir/${'🇬🇧'.repeat(20)}.ps1`, edit: `dir/${'ﷺ'.repeat(12)}.md`, readStart: '🇬🇧', readEnd: '.ps1', editStart: 'ﷺ', editEnd: '.md', shot: '7c-flags' }
+    ]
+    for (const w of wideTurns) {
+      await turn('hb1', `tool Read ${w.read} then tool Edit ${w.edit}`)
+      const [readName, editName] = [w.read.split('/').pop(), w.edit.split('/').pop()]
+      check(`${w.label}: the names reach their stations, whole on the hover`, !!(await lib.until(async () => (await titleOf('read')).includes(readName) && (await titleOf('edit')).includes(editName), HUNG_MS, 250)), `${await titleOf('read')} | ${await titleOf('edit')}`)
+      check(`…each cut in its middle between characters, its extension kept`, cutAs(await lastOf('read'), w.readStart, w.readEnd) && cutAs(await lastOf('edit'), w.editStart, w.editEnd) && [...(await lastOf('read')).split('…')[0]].length % [...w.readStart].length === 0, `${await lastOf('read')} | ${await lastOf('edit')}`)
+      for (const [width, label] of [[1500, 'wide'], [900, 'narrow']]) {
+        await lib.fitWindow(app, page, { width, height: 900 })
+        await page.waitForFunction((x) => window.innerWidth === x, width)
+        check(`…${label}: no text crosses its hex's outline`, !!(await lib.until(async () => (await textsOutside()).length === 0, HUNG_MS, 250)), JSON.stringify(await textsOutside()))
+        await shoot(`${w.shot}-${label}-light`)
+      }
     }
     // Wide again: the map beside the list, the split at its right edge.
     await lib.fitWindow(app, page, { width: 1500, height: 900 })

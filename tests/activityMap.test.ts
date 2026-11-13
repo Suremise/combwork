@@ -515,7 +515,23 @@ describe("a station's last call in its hex (HI-3179)", () => {
     expect(emoji).toBe('👩‍💻👩‍💻👩‍💻…👩‍💻👩‍💻')
     expect(textColumns(emoji)).toBeLessThanOrEqual(STATION_LAST_CHARS)
   })
+  it('counts a flag, a letter with a combining accent and any other character a fallback font may draw as two (HR1’s round 2)', () => {
+    expect(textColumns('🇬🇧')).toBe(2)
+    expect(textColumns('é')).toBe(2)
+    expect(textColumns('ق')).toBe(2)
+    expect(textColumns('Ωж—…')).toBe(4)
+    expect(stationLastShown(`dir/${'🇬🇧'.repeat(20)}.ps1`, 'read')).toBe('🇬🇧🇬🇧🇬🇧….ps1')
+  })
+  it('fits by the width the map measures when it gives one, cutting between characters as before', () => {
+    // A font drawing every character the same width: 13 fit.
+    expect(stationLastShown('installer/interrupted.ps1', 'read', (t) => [...t].length <= 13)).toBe('interrup….ps1')
+    expect(stationLastShown('installer/interrupted.ps1', 'read', (t) => [...t].length <= 15)).toBe('interrupted.ps1')
+    // Too narrow for its extension: its start alone, with the ellipsis.
+    expect(stationLastShown('installer/interrupted.ps1', 'read', (t) => [...t].length <= 4)).toBe('int…')
+    // The "+2" counts inside what the map measures.
+    expect(stationLastShown('installer/interrupted.ps1 +2', 'edit', (t) => [...t].length <= 13)).toBe('inter….ps1 +2')
+  })
   it('never shows more than its columns', () => {
-    for (const s of ['x'.repeat(40), 'a.b.c.d.e.f.g.h.i.j.k', 'combwork · cw_wait_for_tasks', 'dir/'.repeat(10) + 'file.tsx', 'émoji-😀-name-that-is-long.md', `${'日'.repeat(20)}.ps1`, `ｆｕｌｌｗｉｄｔｈ${'Ｘ'.repeat(10)}.txt`, `한국어파일이름입니다.ts`, `a${'日'.repeat(9)}b`]) for (const st of ['read', 'tools'] as const) expect(textColumns(stationLastShown(s, st)), s).toBeLessThanOrEqual(STATION_LAST_CHARS)
+    for (const s of ['x'.repeat(40), 'a.b.c.d.e.f.g.h.i.j.k', 'combwork · cw_wait_for_tasks', 'dir/'.repeat(10) + 'file.tsx', 'émoji-😀-name-that-is-long.md', `${'日'.repeat(20)}.ps1`, `ｆｕｌｌｗｉｄｔｈ${'Ｘ'.repeat(10)}.txt`, `한국어파일이름입니다.ts`, `a${'日'.repeat(9)}b`, `${'🇬🇧'.repeat(20)}.ps1`, `${'é'.repeat(20)}.md`, `${'ﷺ'.repeat(10)}`]) for (const st of ['read', 'tools'] as const) expect(textColumns(stationLastShown(s, st)), s).toBeLessThanOrEqual(STATION_LAST_CHARS)
   })
 })

@@ -240,65 +240,64 @@ export function stationTitle(st: Pick<MapStationView, 'status' | 'count' | 'heat
 }
 
 /**
- * The columns a station's last call has inside its hex (HI-3179): its inner width at that line, less a margin, in the
- * map's monospace at its size (ActivityMap's STATION_R and the CSS's 10.5px; tests/e2e/activitymap.cjs measures it). A
- * column is one monospace character; a wide one (CJK, full-width, an emoji) takes two (`textColumns`).
+ * The columns a station's last call has inside its hex when its drawn width can't be measured (HI-3179: tests, no
+ * canvas): its inner width at that line, less a margin, in the map's monospace at its size. The map itself fits by the
+ * drawn width (ActivityMap's `lastFits`); this is the conservative bound beside it (`textColumns`).
  */
 export const STATION_LAST_CHARS = 12
 
+/** Whether a text fits a station's hex: by its drawn width in the map, else by its columns (`textColumns`). */
+export type TextFits = (text: string) => boolean
+const columnsFit: TextFits = (t) => textColumns(t) <= STATION_LAST_CHARS
+
 /**
  * A station's last call as its hex shows it (HI-3179; its hover has it whole): a path's file name alone (Read and Edit,
- * "+2" for more files kept), and anything wider than `max` columns cut in its middle, its start and its end kept (a
- * file's extension, or a tool name's last letters), never inside a character: `interrupted.ps1` → `interru….ps1`.
+ * "+2" for more files kept), and anything that doesn't fit cut in its middle between characters (graphemes), its start
+ * and its end kept (a file's extension, or a tool name's last letters): `interrupted.ps1` → `interru….ps1`.
  */
-export function stationLastShown(last: string, station: MapStation, max = STATION_LAST_CHARS): string {
+export function stationLastShown(last: string, station: MapStation, fits: TextFits = columnsFit): string {
   const more = /^(.*?)( \+\d+)$/.exec(last)
   const label = more ? more[1] : last
   const extra = more ? more[2] : ''
   const shown = (station === 'read' || station === 'edit') && /[\\/]/.test(label) ? (label.split(/[\\/]/).filter(Boolean).pop() ?? label) : label
-  return middleCut(shown, Math.max(4, max - extra.length)) + extra
+  return middleCut(shown, (t) => fits(t + extra)) + extra
+}
+
+/** A text's characters as the reader sees them (graphemes: an emoji with its modifiers, a flag's pair, a letter with its accents). */
+function graphemes(s: string): string[] {
+  return typeof Intl.Segmenter === 'function' ? [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(s)].map((x) => x.segment) : [...s]
 }
 
 /**
- * Wide characters (HR1's HI-3179 round 1): East Asian wide and full-width (Hangul Jamo, CJK and its punctuation, kana,
- * Hangul syllables, compatibility ideographs, full-width forms, the supplementary ideographs) and emoji. Their fallback
- * glyphs are about twice a monospace character's width, so each counts two columns (a little more than they take).
+ * The characters a monospace font draws one column wide (HR1's HI-3179 rounds 1 and 2): a single code point of Latin
+ * (with its supplements and extensions), Greek, Cyrillic, or the dashes, quotes and ellipsis. Any other character (CJK,
+ * full-width, an emoji, a flag, a letter with a combining accent, a script the font hasn't, drawn by a fallback font)
+ * counts two: more than most take, so a bound, never an estimate.
  */
-const WIDE = /[ᄀ-ᅟ⺀-〾ぁ-㏿㐀-䶿一-鿿ꀀ-꓏가-힣豈-﫿︰-﹏＀-｠￠-￦\u{1f300}-\u{1faff}\u{20000}-\u{3fffd}]|\p{Extended_Pictographic}/u
+const NARROW = /^[ -~ -ɏͰ-ӿ‐-‧]$/u
 
-/** A text's characters as the reader sees them (graphemes: an emoji with its modifiers, a letter with its accents), each with its columns. */
-function graphemes(s: string): { g: string; w: number }[] {
-  const parts = typeof Intl.Segmenter === 'function' ? [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(s)].map((x) => x.segment) : [...s]
-  return parts.map((g) => ({ g, w: WIDE.test(g) ? 2 : 1 }))
-}
-
-/** How many monospace columns `s` takes: a wide character two (`WIDE`), any other one. */
+/** How many monospace columns `s` takes at most: a narrow character (`NARROW`) one, any other two. */
 export function textColumns(s: string): number {
-  return graphemes(s).reduce((n, c) => n + c.w, 0)
+  return graphemes(s).reduce((n, g) => n + (NARROW.test(g) ? 1 : 2), 0)
 }
 
-/** `s` in at most `max` columns, cut in the middle between characters: its start, an ellipsis, and its end (its extension, if it has one). */
-function middleCut(s: string, max: number): string {
+/**
+ * `s` as `fits` allows it, cut in the middle between characters: its start (as much as fits), an ellipsis, and its end
+ * (its extension, else its last few characters).
+ */
+function middleCut(s: string, fits: TextFits): string {
+  if (fits(s)) return s
   const all = graphemes(s)
-  if (all.reduce((n, c) => n + c.w, 0) <= max) return s
   const ext = /\.[A-Za-z0-9]{1,5}$/.exec(s)?.[0]
-  // Its end: the extension when it leaves the start room, else up to a few columns of its last characters.
-  const tailBudget = ext && ext.length <= max - 4 ? ext.length : Math.min(4, Math.floor((max - 1) / 2))
-  const tail: string[] = []
-  let used = 0
-  for (let i = all.length - 1; i >= 0 && used + all[i].w <= tailBudget; i--) {
-    tail.unshift(all[i].g)
-    used += all[i].w
+  let tail = ext ?? ''
+  if (!ext) for (let i = all.length - 1; i >= 0 && textColumns(all[i] + tail) <= 4; i--) tail = all[i] + tail
+  if (!fits(`…${tail}`)) tail = ''
+  let head = ''
+  for (const g of all) {
+    if (!fits(`${head}${g}…${tail}`)) break
+    head += g
   }
-  // Its start: whatever fits in the rest, less the ellipsis's column.
-  const head: string[] = []
-  let left = max - 1 - used
-  for (const c of all) {
-    if (c.w > left) break
-    head.push(c.g)
-    left -= c.w
-  }
-  return `${head.join('')}…${tail.join('')}`
+  return `${head}…${tail}`
 }
 
 export interface MapAgentView {
