@@ -91,8 +91,8 @@ export function gitEdges(root, over = {}) {
 /** gitEdges' answers per file, by its text. */
 const parsed = new Map()
 
-/** One file's Git edges (gitEdges'). */
-function fileEdges(root, file, text) {
+/** One file's Git edges (gitEdges'), or, given `target` and `may`, its edges to the modules `target` names (jjEdges'). */
+function fileEdges(root, file, text, target = isGitModule, may = MAY_NAME_GIT) {
   const out = []
   {
     const found = new Map()
@@ -102,14 +102,14 @@ function fileEdges(root, file, text) {
       const path = spec.startsWith('@shared/') ? `src/shared/${spec.slice('@shared/'.length)}` : spec.startsWith('.') ? relative(root, resolve(root, dirname(file), spec)) : null
       if (path === null) return
       const module = path.replace(/\\/g, '/').replace(/\.(tsx?|js)$/, '')
-      if (!isGitModule(module)) return
+      if (!target(module)) return
       const had = found.get(module)
       if (names === null || had === null) found.set(module, null)
       else found.set(module, [...new Set([...(had ?? []), ...names])].sort())
     }
     // TypeScript's own parser (HR1's HI-2792 round 1: a regex missed double quotes, indentation and side-effect imports).
     // Only a file whose text could name a Git module is parsed.
-    if (!MAY_NAME_GIT.test(text)) return out
+    if (!may.test(text)) return out
     const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
     /** The members used through a namespace's name (`wt.createWorktree`), anywhere in the file. */
     const membersOf = (alias) => {
@@ -484,6 +484,57 @@ export function compatImports(root, over = {}) {
   return out
 }
 
+/** jj's platform modules (platform/jj…): reached from outside the platform layer only by a listed edge (HI-3140). */
+export const isJjModule = (m) => /^src\/main\/platform\/jj[A-Z]\w*$/.test(m)
+
+/** A file that could name a jj module (only these are parsed). */
+const MAY_NAME_JJ = new RegExp(String.raw`jj[A-Z]|require\(|import\(\s*[^'"${'`'}\s]`)
+
+/**
+ * Each import of a jj platform module from outside the platform layer, jj's homes (JJ_HOMES) and the test-only paths
+ * (COMPAT_ONLY): `{ file, module, names }` as gitEdges gives them.
+ */
+export function jjEdges(root, over = {}) {
+  const out = []
+  for (const { file, text } of filesOf(root, over)) {
+    const f = file.replace(/\.tsx?$/, '')
+    if (f.startsWith('src/main/platform/') || Object.hasOwn(JJ_HOMES, f) || Object.hasOwn(COMPAT_ONLY, f)) continue
+    const key = `${root}|${file}|jj`
+    const kept = parsed.get(key)
+    if (kept?.text === text) {
+      out.push(...kept.edges)
+      continue
+    }
+    const edges = fileEdges(root, file, text, isJjModule, MAY_NAME_JJ)
+    parsed.set(key, { text, edges })
+    out.push(...edges)
+  }
+  return out.sort((a, b) => (a.file + a.module).localeCompare(b.file + b.module))
+}
+
+/**
+ * The jj edges left outside the platform layer (HI-3140), each with the names it may take and why: composition of jj's
+ * port with the app's services, the workflow's candidate pass's fingerprint, and what jj's runner and tool tell the
+ * diagnostics. A new edge, a name beyond its list, or a listed edge gone fails tests/gitAudit.test.ts.
+ */
+export const JJ_EDGES = [
+  { file: 'src/main/combworkVcs', module: 'src/main/platform/jjKeepOut', class: 'registry', names: ['ensureJjExcluded'], why: "keeping .combwork out of a jj repository: combworkVcs routes to each platform's keep-out (port 1)" },
+  { file: 'src/main/diagnostics', module: 'src/main/platform/jjRunner', class: 'jjUi', names: ['jjRunner'], why: "Copy Diagnostics names jj's tool and its readiness (J0)" },
+  { file: 'src/main/ipc', module: 'src/main/platform/jjOperations', class: 'jjUi', names: ['jjOperationPreview', 'jjOperations'], why: "jj's page's Operations section (jj:… channels)" },
+  { file: 'src/main/ipc', module: 'src/main/platform/jjViews', class: 'jjUi', names: ['jjBookmarks', 'jjCompare', 'jjConflicts', 'jjHistory', 'jjRepoView'], why: "jj's page's read-only views (jj:… channels)" },
+  { file: 'src/main/slotCards', module: 'src/main/platform/jjWorkspacePort', class: 'defect', card: 'HI-3165', names: ['JJ_REFUSED'], why: "a jj preparation's held work said as jj's `unintegrated` refusal (HI-3115): to go behind the workspace port with isJjLineKey's callers" },
+  { file: 'src/main/slotsApp', module: 'src/main/platform/jjRecovery', class: 'registry', names: ['recoverStale'], why: "jj's stale-slot recovery composed with the app's deps (HI-2866, the user's Recover…)" },
+  { file: 'src/main/slotsApp', module: 'src/main/platform/jjRunner', class: 'registry', names: ['storeGitGated'], why: "jj's recovery's git on the store, gated by jj's runner (HI-2866): composition" },
+  { file: 'src/main/slotsApp', module: 'src/main/platform/jjSlotPrep', class: 'registry', names: ['boardPrepStore'], why: "jj's port's preparation records in the workspace database (HI-2866): composition" },
+  { file: 'src/main/slotsApp', module: 'src/main/platform/jjWorkspacePort', class: 'registry', names: ['JjWorkspacePort', 'createJjWorkspacePort', 'generationOf'], why: "jj's workspace port made with the app's dependencies (APP_PORTS' maker) and a slot's generation for Remove…" },
+  { file: 'src/main/slots', module: 'src/main/platform/jjSlotPrep', class: 'defect', card: 'HI-3165', names: ['isJjLineKey'], why: "a target that is a jj preparation's key is no branch to read (HI-2866): to go behind the workspace port" },
+  { file: 'src/main/slotStaleView', module: 'src/main/platform/jjWorkspacePort', class: 'registry', names: ['StaleWhy'], why: "a stale jj slot's reason's type, for the Slots view's read of jj's port (HI-2912)" },
+  { file: 'src/main/workflow/reconcile', module: 'src/main/platform/jjCandidateStep', class: 'impl', names: ['JjCandidateFingerprint', 'JjCandidateOffer', 'JjCandidateStep', 'sameFingerprint'], why: "the candidate pass's fingerprint, offer and step (HI-2871): the reconcile port's own types, and the fingerprint's comparison" },
+  { file: 'src/main/workflow/runtime', module: 'src/main/platform/jjPlatform', class: 'registry', names: ['JjCardDeps'], why: "the type of jj's card work's dependencies, which the app gives each project's workflow (setJjCards, HI-2868)" },
+  { file: 'src/main/workflow/service', module: 'src/main/platform/jjPlatform', class: 'registry', names: ['JjCardDeps'], why: "the type of jj's card work's dependencies, which the app gives each project's workflow (setJjCards, HI-2868)" },
+  { file: 'src/main/workflow/storeSwitch', module: 'src/main/platform/jjStoreSide', class: 'impl', names: ['fallbackOf', 'retryMoved'], why: "re-exported for storeSwitch's callers and tests (HI-3140 moved jj's side of the store switch)" }
+]
+
 /** The audit against the source: what isn't listed, what is listed but gone, and names beyond an edge's list. */
 export function audit(root, over = {}) {
   const found = gitEdges(root, over)
@@ -511,5 +562,18 @@ export function audit(root, over = {}) {
   switches.push(...Object.keys(NOT_PLATFORM).filter((n) => !used.has(n)).map((n) => `NOT_PLATFORM ${n}: no comparison uses it (stale)`))
   switches.push(...Object.keys(JJ_HOMES).filter((f) => !files.has(f)).map((f) => `JJ_HOMES ${f}: no such file (stale)`))
   const compat = compatImports(root, over)
-  return { found, unlisted, stale, extraNames, seams, switches, compat }
+  // HI-3140: jj's modules reached from outside the platform layer, edge by edge and name by name, as Git's are.
+  const jjFound = jjEdges(root, over)
+  const jjListed = new Map(JJ_EDGES.map((e) => [key(e), e]))
+  const jj = [
+    ...jjFound.filter((e) => !jjListed.has(key(e))).map((e) => `${key(e)}: unlisted`),
+    ...JJ_EDGES.filter((e) => !jjFound.some((f) => key(f) === key(e))).map((e) => `${key(e)}: stale`),
+    ...jjFound.flatMap((f) => {
+      const e = jjListed.get(key(f))
+      if (!e) return []
+      if (f.names === null) return [`${key(f)}: imports it whole (namespace or dynamic), not just ${e.names.join(', ')}`]
+      return f.names.filter((n) => !e.names.includes(n)).map((n) => `${key(f)}: ${n}`)
+    })
+  ]
+  return { found, unlisted, stale, extraNames, seams, switches, compat, jj }
 }

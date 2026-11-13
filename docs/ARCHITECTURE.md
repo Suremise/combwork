@@ -345,7 +345,9 @@ composition (platform code imports no app module); `jjWindow.ts`, `views/JjSecti
 history. jj's candidate checks and words moved into the layer (`platform/jjCandidateChecks.ts`, `jjCandidateReturn.ts`):
 the workflow's candidate pass (`reconcile.ts`) gets them through its reconcile port (`CandidateWords`, JjPlatform's), and
 their old `workflow/` paths only re-export them for the tests (the audit's `COMPAT_ONLY` fails a module under `src` that
-imports one). The audit's scan is TypeScript's parser (any comparison, either side, any quotes, a `case`, `'<id>' in`, an id
+imports one). Every import of a jj platform module from outside the layer and jj's homes is an edge in the audit's
+`JJ_EDGES`, with the names it may take, as Git's are in `EDGES` (slot preparation's two jj reads are `defect`s, HI-3165).
+The audit's scan is TypeScript's parser (any comparison, either side, any quotes, a `case`, `'<id>' in`, an id
 given to a descriptor helper or read off `PLATFORMS`), every id read from `PlatformId`. It exempts the platform layer and
 Git's modules, jj's homes above for jj's own id only, and another enum's `none` by the field names `NOT_PLATFORM`
 lists; each exemption no longer used fails as stale. `tests/platformCapabilities.test.ts` pins each answer to the id

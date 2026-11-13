@@ -8,10 +8,10 @@ import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error: a plain .mjs module without types, shared with scripts/gitInventory.mjs
-import { audit, EDGES, JJ_HOMES, NOT_PLATFORM, SEAMS, SWITCHES } from './gitAudit.mjs'
+import { audit, EDGES, JJ_EDGES, JJ_HOMES, NOT_PLATFORM, SEAMS, SWITCHES } from './gitAudit.mjs'
 
 type Edge = { file: string; module: string; class: string; names?: string[]; op?: string; card?: string; why: string }
-type Audit = { found: unknown[]; unlisted: string[]; stale: string[]; extraNames: string[]; seams: string[]; switches: string[]; compat: string[] }
+type Audit = { found: unknown[]; unlisted: string[]; stale: string[]; extraNames: string[]; seams: string[]; switches: string[]; compat: string[]; jj: string[] }
 const root = join(__dirname, '..')
 const run = (over: Record<string, string> = {}): Audit => audit(root, over)
 const text = (file: string): string => readFileSync(join(root, file), 'utf8')
@@ -168,8 +168,27 @@ const r = (platform: string) => platform === 'none'
     expect(run({ [reconcile]: `import { checksKeyOf } from './jjCandidateChecks'\n${text(reconcile)}` }).compat).toEqual(['src/main/workflow/reconcile -> src/main/workflow/jjCandidateChecks'])
     const win = 'src/main/jjWindow.ts'
     expect(run({ [win]: `${text(win)}\nconst later = () => import("./workflow/jjCandidateReturn")\n` }).compat).toEqual(['src/main/jjWindow -> src/main/workflow/jjCandidateReturn'])
-    // The moved modules themselves, by their new paths: allowed.
+    const service = 'src/main/workflow/service.ts'
+    expect(run({ [service]: `${text(service)}\nconst words = require('./jjCandidateReturn')\n` }).compat).toEqual(['src/main/workflow/service -> src/main/workflow/jjCandidateReturn'])
+    // The moved modules themselves, by their new paths: not this check's (the jj edges' below).
     expect(run({ [reconcile]: `import type { ChecksJournal } from '../platform/jjCandidateChecks'\n${text(reconcile)}` }).compat).toEqual([])
+  })
+
+  it("lists each jj module reached from outside the platform layer, edge by edge and name by name (HI-3140)", () => {
+    expect(run().jj).toEqual([])
+    const edges = JJ_EDGES as Edge[]
+    expect(edges.filter((e) => !['impl', 'registry', 'jjUi', 'defect'].includes(e.class) || !e.why || !e.names?.length || (e.class === 'defect' && !e.card)).map((e) => `${e.file} -> ${e.module}`)).toEqual([])
+    // A new edge from the workflow (the moved candidate modules, by their new path), a name beyond its list, one gone.
+    const reconcile = 'src/main/workflow/reconcile.ts'
+    expect(run({ [reconcile]: `import { checksKeyOf } from '../platform/jjCandidateChecks'\n${text(reconcile)}` }).jj).toEqual(['src/main/workflow/reconcile -> src/main/platform/jjCandidateChecks: unlisted'])
+    const t = text(reconcile)
+    expect(t).toContain('type JjCandidateStep } from')
+    expect(run({ [reconcile]: t.replace('type JjCandidateStep } from', 'type JjCandidateStep, candidateNow } from') }).jj).toEqual(['src/main/workflow/reconcile -> src/main/platform/jjCandidateStep: candidateNow'])
+    const diag = 'src/main/diagnostics.ts'
+    expect(run({ [diag]: text(diag).replace(/^import \{ jjRunner \} from '\.\/platform\/jjRunner'\r?\n/m, '') }).jj).toEqual(['src/main/diagnostics -> src/main/platform/jjRunner: stale'])
+    // jj's homes and the platform layer itself are not edges.
+    const cards = 'src/main/jjCards.ts'
+    expect(run({ [cards]: `import { checksKeyOf } from './platform/jjCandidateChecks'\n${text(cards)}` }).jj).toEqual([])
   })
 
   it('fails a new seam call in a listed file, and one in a file with none', () => {
