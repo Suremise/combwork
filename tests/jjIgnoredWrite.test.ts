@@ -51,15 +51,14 @@ describe.skipIf(!jjExe)('HI-3121: a jj builder’s check in its slot that writes
       expect(existsSync(join(slot, '.git'))).toBe(colocate)
       if (colocate) {
         const listed = readRepoRefs(join(resolve(realpathSync.native(project)), '.git'), 100).folders.map((f) => resolve(f.folder).toLowerCase())
-        // jj registers it in .git/worktrees with a relative gitdir; foldersOf resolves that against the process's own
-        // folder, not the git dir, so the folder it watches isn't the slot (HI-3121's finding, carded): the slot's own
-        // folder has no write record, and the stat snapshot decides, as below.
+        // jj registers it in .git/worktrees with a relative gitdir, which foldersOf resolves against that entry, as Git
+        // does (HI-3160): the slot is listed.
         const common = join(resolve(realpathSync.native(project)), '.git')
         const gitdir = readFileSync(join(common, 'worktrees', 'slot-a', 'gitdir'), 'utf8').trim()
         console.log('slot .git is a', statSync(join(slot, '.git')).isDirectory() ? 'folder' : 'file', '; worktrees/slot-a/gitdir:', gitdir, '; the repository lists', listed)
         expect(isAbsolute(gitdir)).toBe(false)
         expect(listed).toContain(resolve(realpathSync.native(project)).toLowerCase())
-        expect(listed).not.toContain(resolve(realpathSync.native(slot)).toLowerCase())
+        expect(listed).toContain(resolve(realpathSync.native(slot)).toLowerCase())
       }
       const root = resolve(realpathSync.native(slot))
       const d = await jjContextOf(root, h.runner)
