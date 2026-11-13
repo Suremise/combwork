@@ -6278,15 +6278,14 @@ touched:
   alone (HI-3125: another git's commit right after it, or just before it, maybe with the same message) nor its message
   (HR1's round 1: a commit-msg hook may rewrite it, a ticket prefix); with no summary to read, the newest there with
   that message. Git saying it committed with none there is said, not credited. Set aside: `stash push --include-untracked` with those paths, named
-  *Combwork: set aside before merging HI-12*, and told by what it made (HI-3125): the newest stash not among those there
-  as it started whose subject is that message, never the stash ref having moved (another git's stash just before or
-  after it moves it too), and each proved by what it holds (HR1's rounds 1 and 2: another git can stash with the same
-  message at that moment): every path set aside, each changed or it wouldn't run (its worktree and index commits against
-  its base, renames as both sides, and its untracked files' commit: `diff-tree`, `ls-tree`; never "nothing else", as a
-  stash's commits hold the whole index, staged changes not set aside too). One proved: that one. None:
-  nothing was made (below). Two proved, or one unreadable with none proved: never guessed, refused (*Git set changes
-  aside, but Combwork can't tell which stash is its own … Check git stash list and the files*), the stashes kept and
-  the real index as it was. A push that saved nothing (another git took the shown changes back, or set them aside, just
+  *Combwork: set aside before merging HI-12 [cw:3fa9c1]*: after the card's words, a mark of this Set Aside's own
+  (`[cw:` six random hex digits `]`), so it is told by what it made (HI-3125): the one stash not among those there as
+  it started whose subject is exactly that message. Never the stash ref having moved (another git's stash just before or
+  after it moves it too), nor a message another git can reuse (HR1's rounds 1 and 2, HR2's round 3: the shown path
+  stashed by another git in Combwork's words just before its push, which then saved nothing, holds every path shown and
+  was taken for it). None: nothing was made (below). The stashes unreadable after the push, or two with its mark: never
+  guessed, refused (*Git set changes aside, but Combwork can't tell which stash is its own … Check git stash list and
+  the files*), the stashes kept and the real index as it was. A push that saved nothing (another git took the shown changes back, or set them aside, just
   before: git says so and exits 0) is never done: refused as the changes not being those shown any more, or as git
   not setting them aside. Git failing
   after it made one is said with that stash, kept. A staged rename (HI-3022): git's stash, given the old side (in

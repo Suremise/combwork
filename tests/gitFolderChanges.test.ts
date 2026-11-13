@@ -212,9 +212,10 @@ describe('another git at the same moment (HI-3125)', () => {
     afterMade = (cwd) => void sh(cwd, 'stash', 'push', '-q', '-m', "the user's own", '--', 'b.txt')
     const done = await settle('setAside', ['a.txt'])
     expect(afterMade).toBeNull()
-    expect(subject(done.made)).toBe('On main: Combwork: set aside before merging AB-1')
+    expect(subject(done.made)).toMatch(/^On main: Combwork: set aside before merging AB-1 \[cw:[0-9a-f]{6}\]$/)
+    expect(subject(done.made)).toBe(`On main: ${done.message}`)
     expect(done.made).not.toBe(sh(proj, 'rev-parse', 'refs/stash'))
-    expect(stashes()).toEqual(["On main: the user's own", 'On main: Combwork: set aside before merging AB-1'])
+    expect(stashes()).toEqual(["On main: the user's own", `On main: ${done.message}`])
   })
 
   it("Set Aside made, the user's stash just before it: Combwork's own named", async () => {
@@ -222,7 +223,7 @@ describe('another git at the same moment (HI-3125)', () => {
     writeFileSync(join(proj, 'b.txt'), "the user's own\n")
     beforeAct = (cwd) => void sh(cwd, 'stash', 'push', '-q', '-m', "the user's own", '--', 'b.txt')
     const done = await settle('setAside', ['a.txt'])
-    expect(subject(done.made)).toBe('On main: Combwork: set aside before merging AB-1')
+    expect(subject(done.made)).toMatch(/^On main: Combwork: set aside before merging AB-1 \[cw:[0-9a-f]{6}\]$/)
     expect(done.made).toBe(sh(proj, 'rev-parse', 'refs/stash'))
   })
 
@@ -286,12 +287,26 @@ describe('another git at the same moment (HI-3125)', () => {
     expect(status()).toBe('')
   })
 
-  it("a stash whose contents can't be read: never taken for its own, said; the stash kept, the real index as it was", async () => {
+  // HR2's round 3: the shown path itself, stashed by another git in Combwork's own words just before its push (which then
+  // saves nothing): that stash holds every path shown, and is still never Combwork's (its name has no mark of this one).
+  it("the shown path stashed by another git in Combwork's words just before its push: refused as changed, never credited", async () => {
+    writeFileSync(join(proj, 'a.txt'), 'shown\n')
+    beforeAct = (cwd) => void sh(cwd, 'stash', 'push', '-q', '-m', 'Combwork: set aside before merging AB-1', '--', 'a.txt')
+    await expect(settle('setAside', ['a.txt'])).rejects.toThrow(/aren't the ones shown any more/)
+    expect(beforeAct).toBeNull()
+    expect(stashes()).toEqual(['On main: Combwork: set aside before merging AB-1'])
+    expect(sh(proj, 'show', 'refs/stash:a.txt')).toBe('shown')
+  })
+
+  it("the stashes unreadable after the push: never taken for its own, said; the stash kept, the real index as it was", async () => {
     writeFileSync(join(proj, 'a.txt'), 'set aside by Combwork\n')
-    failGit = (args) => args[0] === 'diff-tree' && args.some((a) => a.endsWith('^1'))
+    // The stash list read again after the push (the first, before it, as usual).
+    let lists = 0
+    failGit = (args) => args[0] === 'stash' && args[1] === 'list' && ++lists === 2
     await expect(settle('setAside', ['a.txt'])).rejects.toThrow(/^Git set changes aside, but Combwork can't tell which stash is its own/)
     failGit = null
-    expect(stashes()).toEqual(['On main: Combwork: set aside before merging AB-1'])
+    expect(stashes()).toHaveLength(1)
+    expect(stashes()[0]).toMatch(/^On main: Combwork: set aside before merging AB-1 \[cw:[0-9a-f]{6}\]$/)
     expect(sh(proj, 'show', 'refs/stash:a.txt')).toBe('set aside by Combwork')
   })
 
@@ -318,13 +333,13 @@ describe('another git at the same moment (HI-3125)', () => {
     expect(sh(proj, 'show', '--name-only', '--format=', done.made)).toBe('a.txt')
   })
 
-  it('a stash with the same message by another git right after it: its own named, by the paths it holds', async () => {
+  it("a stash in Combwork's words by another git right after it: its own named, by its mark", async () => {
     writeFileSync(join(proj, 'a.txt'), 'set aside by Combwork\n')
     writeFileSync(join(proj, 'b.txt'), "the user's own\n")
     afterMade = (cwd) => void sh(cwd, 'stash', 'push', '-q', '-m', 'Combwork: set aside before merging AB-1', '--', 'b.txt')
     const done = await settle('setAside', ['a.txt'])
     expect(afterMade).toBeNull()
-    expect(stashes()).toEqual(['On main: Combwork: set aside before merging AB-1', 'On main: Combwork: set aside before merging AB-1'])
+    expect(stashes()).toEqual(['On main: Combwork: set aside before merging AB-1', `On main: ${done.message}`])
     expect(done.made).not.toBe(sh(proj, 'rev-parse', 'refs/stash'))
     expect(sh(proj, 'show', `${done.made}:a.txt`)).toBe('set aside by Combwork')
   })
@@ -423,7 +438,7 @@ describe('Set aside', () => {
     const done = await settle('setAside', ['a.txt', 'new.txt'])
     expect(done.made).toBe(sh(proj, 'rev-parse', 'refs/stash'))
     expect(done.made).not.toBe(older)
-    expect(sh(proj, 'stash', 'list', '--format=%s').split('\n')[0]).toMatch(/Combwork: set aside before merging AB-1$/)
+    expect(sh(proj, 'stash', 'list', '--format=%s').split('\n')[0]).toMatch(/Combwork: set aside before merging AB-1 \[cw:[0-9a-f]{6}\]$/)
     expect(read('a.txt')).toBe('a\n')
     expect(existsSync(join(proj, 'new.txt'))).toBe(false)
     expect(status()).toBe('M  b.txt')

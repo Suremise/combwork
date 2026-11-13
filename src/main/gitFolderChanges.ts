@@ -11,6 +11,7 @@
 // signer past its bound never leaves the real index locked; once something is made, its entries for the paths are
 // taken into the real index in one short step.
 import { copyFile, lstat, open, readFile, readdir, rename, rm, writeFile } from 'original-fs/promises'
+import { randomBytes } from 'crypto'
 import { basename, dirname, join, resolve } from 'path'
 import type { FolderChangeAction, FolderChangesDone } from '../shared/types'
 import { withValues, type Text } from '../shared/advanced'
@@ -784,48 +785,25 @@ async function stashesNow(folder: string): Promise<{ oid: string; subject: strin
 }
 
 /**
- * HI-3125: the stash a `stash push -m <message>` made: one not among `before` (the objects there as it started) whose
- * subject is that message (`On <branch>: <message>`), the newest. Never the stash ref having moved: another git's stash
- * just before or after it (the user's own) moves it too, and a push that saved nothing moves it not at all.
+ * HI-3125: the stash this `stash push -m <message>` made, its message carrying this Set Aside's own mark (`[cw:…]`,
+ * settleChanges): the one new stash (not among `before`, the objects there as it started) with exactly that message
+ * (`On <branch>: <message>`). Never the stash ref having moved (another git's stash just before or after it moves it
+ * too; a push that saved nothing moves it not at all), nor a message another git can reuse (HR1's rounds 1 and 2,
+ * HR2's round 3: the shown path stashed in Combwork's words just before its push, which then saved nothing). None: not
+ * made. The stashes unreadable, or two with its mark: not known, never guessed.
  */
-async function ownStash(folder: string, before: ReadonlySet<string>, message: string, paths: readonly string[]): Promise<string | null | 'unproved'> {
+async function ownStash(folder: string, before: ReadonlySet<string>, message: string): Promise<string | null | 'unproved'> {
   const now = await stashesNow(folder)
   if (!now) return 'unproved'
   const mine = now.filter((s) => !before.has(s.oid) && s.subject.endsWith(`: ${message}`))
-  // HR1's rounds 1 and 2: its message alone isn't its own (another git can stash with the same at that moment), so each
-  // is proved by what it holds: every path this one was given (each changed, or it wouldn't run). Never "nothing else":
-  // a stash's commits hold the whole index, staged changes not given too. Not one proved (each read): not made. Two, or
-  // one unreadable with none proved: not known, never guessed.
-  let unread = false
-  const proved: string[] = []
-  for (const s of mine) {
-    const held = await stashPaths(folder, s.oid)
-    if (!held) unread = true
-    else if (paths.length && paths.every((p) => held.has(p))) proved.push(s.oid)
-  }
-  if (proved.length === 1 && !unread) return proved[0]
-  return proved.length || unread ? 'unproved' : null
-}
-
-/**
- * The paths a stash holds: those its worktree commit and its index commit (its second parent: a file added then
- * deleted on disk is only there) change from its base (renames as their two sides), and its untracked files' commit's
- * (its third parent, when it has one). Null: unreadable. Plumbing, as every git has it.
- */
-async function stashPaths(folder: string, oid: string): Promise<Set<string> | null> {
-  const diff = (to: string) => git(folder, ['diff-tree', '-r', '-z', '--no-renames', '--name-only', '--no-commit-id', `${oid}^1`, to])
-  const [work, index] = [await diff(oid), await diff(`${oid}^2`)]
-  if (!work.ok || !index.ok) return null
-  const third = await git(folder, ['rev-parse', '-q', '--verify', `${oid}^3`])
-  const untracked = third.ok && third.out.trim() ? await git(folder, ['ls-tree', '-r', '-z', '--name-only', '--full-tree', third.out.trim()]) : null
-  if (untracked && !untracked.ok) return null
-  return new Set([...work.out.split('\0'), ...index.out.split('\0'), ...(untracked?.out.split('\0') ?? [])].filter(Boolean))
+  if (mine.length > 1) return 'unproved'
+  return mine[0]?.oid ?? null
 }
 
 /**
  * Sets `files` aside as a named stash (`git stash push --include-untracked`, the paths on its input): only those paths, other index
- * entries as they were. The stash made is told by the stash ref moving to a new object (never by its message: an older
- * one can have the same). A failure after git made it is said with the stash, kept: never rolled back. It runs against a
+ * entries as they were. The stash made is told by its message, which carries this Set Aside's own mark (ownStash),
+ * among the new ones. A failure after git made it is said with the stash, kept: never rolled back. It runs against a
  * private copy of the index (withPrivateIndex, HI-3021): once a stash is made, the real index's entries for `files`
  * become what git left them (takeEntries), however far it got; with none made, the real index is as it was.
  */
@@ -854,8 +832,7 @@ async function setAsidePaths(folder: string, files: string[], message: string, r
       if (!out.ok) throw out.timedOut ? combworkError(M.stashTimedOut, { seconds: boundSeconds(), made: 'no', stash: '' }) : failed(M.stashFailed, out.err)
     }
     let pushed = await git(folder, ['stash', 'push', '--include-untracked', '--quiet', '-m', message, ...PATHS_IN], undefined, pathsIn(stashed), { env, timeout: folderChangesBounds.actMs })
-    // Proved by the paths it holds: those it was given, and a rename's other side (HI-3022), all of `files`.
-    const own = await ownStash(folder, before, message, files)
+    const own = await ownStash(folder, before, message)
     if (own === 'unproved') {
       // HR1's round 2: never another git's stash taken for its own, nor its index step run on one; the stashes kept.
       log.warn(`A stash "${userText(message)}" in ${userText(folder)}: which is Combwork's can't be told (another git's of the same name, or one unreadable)`)
@@ -926,7 +903,9 @@ export async function settleChanges(projectPath: string, target: string, shownFo
         // A rename's other side goes with it: committed or set aside, the rename stays whole.
         // HI-3022: either side shown brings the other.
         const files = [...new Set(shown.flatMap((p) => [p, ...(now.get(p)?.from ? [now.get(p)!.from!] : []), ...[...now].filter(([, c]) => c.from === p).map(([q]) => q)]))]
-        const message = action === 'commit' ? `Commit changes ${label}` : `Combwork: set aside ${label}` // i18n-ignore: the commit's or stash's message, in the repository (English, as Combwork's other commits)
+        // HI-3125 (HR2's round 3): a stash's name carries this Set Aside's own mark, so it is told from another git's of the
+        // same words (one made just before, say, of the same file, while this push saves nothing). Still named after the card.
+        const message = action === 'commit' ? `Commit changes ${label}` : `Combwork: set aside ${label} [cw:${randomBytes(3).toString('hex')}]` // i18n-ignore: the commit's or stash's message, in the repository (English, as Combwork's other commits)
         // A folder git lists whole: an untracked repository of its own, never committed or stashed as one (HI-2983).
         const nested = files.find((p) => p.endsWith('/'))
         if (nested) throw combworkError(M.nestedRepo, { folder: nested })
