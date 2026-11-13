@@ -467,7 +467,7 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
       // The head that decision was made at, compared again in the write's recheck (HR1's round 1): moved meanwhile, the
       // decision is made again, never jj's update on a head it wasn't made for.
       const headsNow = await port.headsNow(folder)
-      if (!headsNow) return refuse('unreadable', 'op heads') // i18n-ignore: a refusal's detail (English, for the log)
+      if (!headsNow) return refuse('unreadable', 'op heads') // i18n-ignore: a protocol detail, never wording
       await deps.hooks?.beforeUpdateWrite?.()
       if (!(await mine())) return refuse('fence')
       // The whole proof again under the file gate's admission, right before jj starts (HI-2918; with HI-2913's held path,
@@ -475,7 +475,7 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
       const up = await port.jj(folder, ['workspace', 'update-stale'], { write: true, recheck: async () => (!(await mine()) ? 'fence' : headsNow() !== beside.head ? HEAD_MOVED : null) })
       if (up.refused === HEAD_MOVED) {
         const again = await leftBeside(cur.WS, cur.workspace)
-        return 'ok' in again ? again : refuse('changing', 'the operation head moved before the update') // i18n-ignore: a refusal's detail (English, for the log)
+        return 'ok' in again ? again : refuse('changing', 'the operation head moved before the update') // i18n-ignore: a protocol detail, never wording
       }
       if (up.refused) return refuse('fence')
       if (!up.ok && (await port.stale(folder)) === true) return refuse('update', up.err)
