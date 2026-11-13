@@ -4657,7 +4657,9 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   compare the base ids (`rulesBaseId`): a lane on 1.2.0 isn't on old rules for that. A lane started on the project's
   own records G7 as it was, unmarked, and keeps merging there when G7 moves on (Start the next version: running lanes
   stay on the release), so a lane's target is read in one place (HI-3113, `laneTargetOf`): the mark, else its recorded
-  ruleset's G7. Every check reads it so (a lane named among a branch's uses, a card's target against its lane's, a
+  ruleset's G7. Such a lane isn't on old rules for that either (HI-3142): its unmarked ruleset is compared with the
+  project's rules now compiled with its own G7 (`rulesetNowAt`), so only a real rule change marks it. Every check reads
+  it so (a lane named among a branch's uses, a card's target against its lane's, a
   card brought into it, a lane's restart, the lane's info, which names it when it isn't G7 now, and the options its
   start and slot go by). It is fixed for the lane's life
   (a start naming another is refused), set by the user, the Assistant or a script, never its own builder, and only

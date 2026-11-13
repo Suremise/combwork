@@ -172,6 +172,24 @@ export function resolvedOf(ws: Pick<WorkspaceService, 'config'>, projectPath: st
  * what a card's or a lane's own ruleset is compared with for its old rules mark (#1421). A project whose version control
  * isn't recorded, or whose config can't be read, has none (no mark).
  */
+/**
+ * HI-3142: a project's ruleset now with its Merges into (G7) set to `target`: the id a ruleset recorded on that target
+ * has when no rule has changed since (a lane left on the release by Start the next version keeps its own G7, HI-2807,
+ * which alone isn't old rules). Null: no such project, its version control not recorded, or not readable.
+ */
+export async function rulesetNowAt(ws: Pick<WorkspaceService, 'config' | 'info' | 'projectConfig'>, project: string, target: string): Promise<string | null> {
+  const p = (ws.info()?.projects ?? []).find((x) => x.name.toLowerCase() === project.toLowerCase())
+  if (!p?.platform) return null
+  try {
+    const cfg = await ws.projectConfig(p.path)
+    const c = compile({ ...resolvedOf(ws, p.path, p.platform.id, cfg).options, target })
+    return c.ok ? c.ruleset.id : null
+  } catch (e) {
+    log.warn(`the ruleset now of ${userText(p.name)} on ${userText(target)}`, e)
+    return null
+  }
+}
+
 export async function rulesetsNow(ws: Pick<WorkspaceService, 'config' | 'info' | 'projectConfig'>): Promise<Map<string, string>> {
   const out = new Map<string, string>()
   for (const p of ws.info()?.projects ?? []) {

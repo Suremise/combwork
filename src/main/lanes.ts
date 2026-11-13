@@ -20,7 +20,7 @@ import { openTable, readTable, saveTable, saveTableInBoard } from './storeTables
 import { boardOpen, boardRead, boardWrite, cardOwnersNow, cardPlacesNow, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
 import { FactStore } from './workflow/factStore'
 import { pickTarget, projectTargets, targetExists, type ProjectTargets } from './workflow/targets'
-import { otherThanOwn, targetedOf } from '../shared/workflow/compile'
+import { otherThanOwn, targetedOf, targetOfRulesetId } from '../shared/workflow/compile'
 import { laneTarget } from './laneTarget'
 import { onAction } from './workflow/actionWorker'
 import { foldCard, forYou, SLOT_DIRTY_GATE } from '../shared/workflow/facts'
@@ -35,7 +35,7 @@ import { cardRef } from '../shared/projectKeys'
 import { withCardNames } from './projectKeys'
 import { factHeadsOf, roundLimitCards, rulesetStages } from './workflow/cardWork'
 import { rulesEnforced } from './workflow/recorder'
-import { rulesetsNow } from './workflow/rulesets'
+import { rulesetNowAt, rulesetsNow } from './workflow/rulesets'
 import { laneValues, noteLaneIn, sameValue, type FieldChange } from './assistantChanges'
 import type { workspaceDb } from './boardStore'
 import { lineWaiting, onLineWaitChanged } from './workflow/lineUpdates'
@@ -622,12 +622,20 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   // version names it, though its ruleset id marks none.
   const defaults = new Map<string, string | null>()
   const targets = new Map<string, string | null>()
+  const nowOn = new Map<string, string>()
   for (const l of lanes.filter((x) => running(x) && x.ruleset)) {
     const key = l.project.toLowerCase()
     if (!defaults.has(key)) defaults.set(key, (await projectTargetsOf(ws, l.project))?.default ?? null)
-    targets.set(l.id, otherThanOwn(laneTarget(ws, l), defaults.get(key)))
+    const other = otherThanOwn(laneTarget(ws, l), defaults.get(key))
+    targets.set(l.id, other)
+    // HI-3142: one left on the release by Start the next version, its ruleset unmarked (its G7 the old Work merges into):
+    // compared with the project's rules now on that target, so its Merges into alone isn't old rules.
+    if (other && !targetOfRulesetId(l.ruleset!)) {
+      const at = await rulesetNowAt(ws, l.project, other)
+      if (at) nowOn.set(l.id, at)
+    }
   }
-  return withWaitTimes(ws, lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null, owners, running(l) && ws.path ? startWaits(ws.path, l.id) : null, !!teamPauseOf(ws), deps.get(l.id) ?? null, running(l) ? out(l) : undefined, running(l) ? offSideOf(ws, l) : undefined, targets.has(l.id) ? targets.get(l.id) : undefined)))
+  return withWaitTimes(ws, lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, nowOn.get(l.id) ?? current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null, owners, running(l) && ws.path ? startWaits(ws.path, l.id) : null, !!teamPauseOf(ws), deps.get(l.id) ?? null, running(l) ? out(l) : undefined, running(l) ? offSideOf(ws, l) : undefined, targets.has(l.id) ? targets.get(l.id) : undefined)))
 }
 
 /**
