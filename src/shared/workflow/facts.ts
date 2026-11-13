@@ -365,7 +365,12 @@ export interface FactData {
   /** `cause` and `code`: why a transient failure was one (#1362), as codes; `code` is the network error code found. */
   /** `check`: the merge check that failed (`install` for the install before them), `logPath` its log (#1354). */
   /** `conflicts` (HI-1181): a conflict's files and hunks as the queue's folder had them, bounded (shared/workflow/conflicts.ts). */
-  IntegrationFailed: { entry: string; revision: string; target: string; reason: IntegrationFailReason; files?: string[]; log?: string; transient: boolean; cause?: TransientCause; code?: string; check?: string; logPath?: string; conflicts?: ConflictsRecord; focused?: FocusedReturn }
+  /**
+   * HI-3127: `onto`, under follow mode, the remote's head the attempt was tested on when the local target hadn't it, kept in
+   * the repository at the card's tested pin (written before this fact); `remote`, that branch as `<remote>/<branch>`
+   * (a name, never its address).
+   */
+  IntegrationFailed: { entry: string; revision: string; target: string; reason: IntegrationFailReason; files?: string[]; log?: string; transient: boolean; cause?: TransientCause; code?: string; check?: string; logPath?: string; conflicts?: ConflictsRecord; focused?: FocusedReturn; onto?: string; remote?: string }
   /**
    * G20 (HI-1367): the tests the merge queue picked at a test merge's result for the paths whose change isn't exactly the
    * submission's (`paths`), run with the approved selection there; `tests` empty when the pick needed none.

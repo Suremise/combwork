@@ -1064,3 +1064,149 @@ describe('a published card’s owed catch-up (HI-2988)', () => {
     expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
   })
 })
+describe('HI-3127: a card returned for what only the remote has', () => {
+  /** A card adding `file` in its builder's folder, submitted; the folder too. */
+  async function inFolder(e: Env, title: string, file: string, text: string) {
+    const card = e.wf.createCard({ title })
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    const folder = s.data!.folder as string
+    commit(folder, { [file]: text }, title)
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    return { card, folder }
+  }
+  const failedOf = (e: Env, card: number) => e.store.facts(card).filter((f) => f.kind === 'IntegrationFailed').at(-1)?.data as { onto?: string; remote?: string; reason: string } | undefined
+  const tryGit = (cwd: string, ...args: string[]): boolean => {
+    try {
+      sh(cwd, ...args)
+      return true
+    } catch {
+      return false
+    }
+  }
+  /** Another clone pushes `file` with `text` to the remote main: its commit. */
+  function pushes(bare: string, file: string, text: string): string {
+    const other = join(tempDir('other-'), 'clone')
+    execFileSync('git', ['clone', '-q', bare, other])
+    sh(other, 'config', 'user.email', 'other@example.com')
+    sh(other, 'config', 'user.name', 'Other')
+    commit(other, { [file]: text }, `${file}: ${text.trim()}`)
+    sh(other, 'push', '-q', 'origin', 'main')
+    return head(other)
+  }
+
+  it('a conflict names the remote head it was tested on, kept in the repository; merged there, it conflicts, and resolved it merges', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, bare, queue } = following()
+    const { card, folder } = await inFolder(e, 'A', 'a.txt', 'ours\n')
+    const remote = pushes(bare, 'a.txt', 'theirs\n')
+    const [localMain, tracking] = [head(e.project), head(e.project, 'refs/remotes/origin/main')]
+    expect(await queue().drain('main')).toMatchObject([{ card: card.key, outcome: 'returned', reason: 'conflict' }])
+    expect(failedOf(e, card.id)).toMatchObject({ reason: 'conflict', onto: remote, remote: 'origin/main' })
+    // Kept at the card's tested pin; nothing of the user's moved.
+    expect(head(e.project, `refs/cw/tested/${card.key.toLowerCase()}`)).toBe(remote)
+    expect([head(e.project), head(e.project, 'refs/remotes/origin/main')]).toEqual([localMain, tracking])
+    // The builder is told the commit, and how to merge it.
+    const wake = e.wakes.filter((w) => w.card === card.key).at(-1)?.why ?? ''
+    expect(wake).toContain(`main on its remote (origin/main) is at ${remote}`)
+    expect(wake).toContain(`git merge ${remote}`)
+    // As told: the local main is no help, the named commit shows the conflict.
+    expect(sh(folder, 'merge', 'main')).toMatch(/Already up to date/)
+    expect(tryGit(folder, 'merge', '--no-edit', remote)).toBe(false)
+    writeFileSync(join(folder, 'a.txt'), 'ours and theirs\n')
+    sh(folder, 'add', '-A')
+    sh(folder, 'commit', '-qm', 'Merge the remote main, resolved')
+    moved(await e.wf.submit(card.key, B1, { summary: 'resolved' }))
+    expect(await queue().drain('main')).toMatchObject([{ card: card.key, outcome: 'integrated' }])
+    expect(head(bare)).toBe(head(e.project))
+    expect(sh(bare, 'show', 'main:a.txt')).toBe('ours and theirs')
+  })
+
+  it('a red check says what it was tested with; with nothing newer on the remote, a return names nothing', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, bare, queue } = following({ mergeChecks: ['quick'], commands: { quick: 'quick' } })
+    const { card } = await inFolder(e, 'A', 'a.txt', 'A\n')
+    const remote = pushes(bare, 'b.txt', 'b\n')
+    expect(await queue({ runCheck: async () => ({ ok: false, output: 'red' }) }).drain('main')).toMatchObject([{ outcome: 'returned', reason: 'checks' }])
+    expect(failedOf(e, card.id)).toMatchObject({ onto: remote, remote: 'origin/main' })
+    expect(e.wakes.filter((w) => w.card === card.key).at(-1)?.why).toContain(`It was tested merged with ${remote}, main’s head on its remote (origin/main)`)
+    const { card: b } = await inFolder(e, 'B', 'c.txt', 'C\n')
+    // The local main at the remote's head: nothing to name.
+    sh(e.project, 'fetch', '-q', 'origin')
+    sh(e.project, 'update-ref', 'refs/heads/main', 'refs/remotes/origin/main')
+    expect(await queue({ runCheck: async () => ({ ok: false, output: 'red' }) }).drain('main')).toMatchObject([{ card: b.key, outcome: 'returned', reason: 'checks' }])
+    expect(failedOf(e, b.id)?.onto).toBeUndefined()
+    expect(e.wakes.filter((w) => w.card === b.key).at(-1)?.why).toContain('Fix it in your worktree, commit and submit again (cw_submit).')
+    expect(e.wakes.filter((w) => w.card === b.key).at(-1)?.why).not.toContain('tested merged with')
+  })
+
+  it('a pin that can’t be made is a failed read: nothing returned or said, then paused with git’s words; resumed, it returns with its pin', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, bare, queue } = following()
+    const { card } = await inFolder(e, 'A', 'a.txt', 'ours\n')
+    pushes(bare, 'a.txt', 'theirs\n')
+    let refuse = true
+    const git = gitWith((args, run) => (refuse && args[0] === 'update-ref' && args[1]?.startsWith('refs/cw/tested/') ? Promise.resolve({ ok: false, out: '', err: 'fatal: cannot lock ref: refused', code: 128 }) : run()))
+    expect(await queue({ git }).drain('main')).toMatchObject([{ card: card.key, outcome: 'paused', reason: 'needsYou' }])
+    expect(e.store.queuePause('main')).toMatchObject({ reason: 'needsYou', message: 'fatal: cannot lock ref: refused' })
+    expect(failedOf(e, card.id)).toBeUndefined()
+    expect(e.wakes.filter((w) => w.card === card.key)).toEqual([])
+    expect(e.wf.state(card).stage).toBe('merging')
+    refuse = false
+    const q = queue({ git })
+    q.resume('main')
+    expect(await q.drain('main')).toMatchObject([{ card: card.key, outcome: 'returned', reason: 'conflict' }])
+    const back = failedOf(e, card.id)!
+    expect(back.onto).toBeTruthy()
+    expect(head(e.project, `refs/cw/tested/${card.key.toLowerCase()}`)).toBe(back.onto)
+  })
+
+  it('the lease lost between the pin and the return: nothing recorded, the card still queued; a later return replaces the pin', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, bare, queue } = following()
+    const { card, folder } = await inFolder(e, 'A', 'a.txt', 'ours\n')
+    const first = pushes(bare, 'a.txt', 'theirs\n')
+    let holds = true
+    const git = gitWith(async (args, run) => {
+      const r = await run()
+      if (args[0] === 'update-ref' && args[1]?.startsWith('refs/cw/tested/')) holds = false
+      return r
+    })
+    expect(await queue({ git, holds: () => holds }).drain('main')).toEqual([])
+    expect(failedOf(e, card.id)).toBeUndefined()
+    expect(e.wf.state(card).stage).toBe('merging')
+    expect(head(e.project, `refs/cw/tested/${card.key.toLowerCase()}`)).toBe(first)
+    // The next runner returns it; its builder changes it, someone pushes again, and the next return replaces the pin.
+    expect(await queue().drain('main')).toMatchObject([{ outcome: 'returned', reason: 'conflict' }])
+    commit(folder, { 'a.txt': 'ours, again\n' }, 'again')
+    moved(await e.wf.submit(card.key, B1, { summary: 'again' }))
+    const second = pushes(bare, 'a.txt', 'theirs, again\n')
+    expect(await queue().drain('main')).toMatchObject([{ outcome: 'returned', reason: 'conflict' }])
+    expect(head(e.project, `refs/cw/tested/${card.key.toLowerCase()}`)).toBe(second)
+  })
+
+  it('the pre-P7 stand-in folder keeps its base: a resolution there merges cleanly, comes back naming the remote head, and conflicts once that is merged', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, bare, queue } = following()
+    const { folder } = await inFolder(e, 'A', 'a.txt', 'ours\n')
+    const remote = pushes(bare, 'a.txt', 'theirs\n')
+    const base = head(folder)
+    // Started before the push: the folder's history hasn't the remote's commit, and nothing puts it there.
+    expect(tryGit(folder, 'merge-base', '--is-ancestor', remote, 'HEAD')).toBe(false)
+    expect(await queue().drain('main')).toMatchObject([{ outcome: 'returned', reason: 'conflict' }])
+    expect(head(folder)).toBe(base)
+    expect(tryGit(folder, 'merge', '--no-edit', remote)).toBe(false)
+    expect(sh(folder, 'diff', '--name-only', '--diff-filter=U')).toBe('a.txt')
+  })
+})
+
+describe("HI-3127: a card's tested pin is pruned with its pins", () => {
+  it('listed under its key with its submissions’ pins; never one of its own refs (the own-work proof)', async () => {
+    const { gitIntegration } = await import('../../src/main/platform/gitIntegration')
+    const { ownRefs } = await import('../../src/main/workflow/retargetCard')
+    const { e } = following()
+    const c = head(e.project)
+    sh(e.project, 'update-ref', 'refs/cw/cards/am-1/1', c)
+    sh(e.project, 'update-ref', 'refs/cw/tested/am-1', c)
+    sh(e.project, 'update-ref', 'refs/cw/tested/am-2', c)
+    const pins = await gitIntegration.cardPins(e.project)
+    expect(pins?.get('am-1')?.sort()).toEqual(['refs/cw/cards/am-1/1', 'refs/cw/tested/am-1'])
+    expect(pins?.get('am-2')).toEqual(['refs/cw/tested/am-2'])
+    expect(ownRefs('AM-1', [])('refs/cw/tested/am-1')).toBe(false)
+  })
+})

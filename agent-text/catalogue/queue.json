@@ -163,6 +163,10 @@
     "text": "Merge {target} into your worktree, resolve the conflict, commit and submit again (cw_submit).",
     "note": "The next step after a conflict with {target}, the branch."
   },
+  "queue.next.conflictRemote": {
+    "text": "{target} on its remote ({remote}) is at {commit}, which the queue tested on and your local {target} doesn’t have yet: merge that commit into your worktree (git merge {commit}: it is in the repository already), resolve the conflict, commit and submit again (cw_submit).",
+    "note": "HI-3127: the next step after a conflict with {target} under “The target branch follows its remote”, when the remote’s head the queue tested on ({commit}, a full commit id, kept in the repository) is newer than the local {target}. {remote}: the remote branch, as <remote>/<branch>."
+  },
   "queue.next.direction": {
     "text": "Leave it to the user or the Assistant: Remove from queue ends it (Retry is refused); only a new request with the user’s explicit override merges it.",
     "note": "The next step after a forward merge came back against the release path’s direction (HI-2892)."
@@ -174,6 +178,10 @@
   "queue.next.fix": {
     "text": "Fix it in your worktree, commit and submit again (cw_submit).",
     "note": "The next step after anything else that came back."
+  },
+  "queue.next.fixRemote": {
+    "text": "Fix it in your worktree, commit and submit again (cw_submit). It was tested merged with {commit}, {target}’s head on its remote ({remote}), which your local {target} doesn’t have yet: merge that commit (git merge {commit}: it is in the repository already) to see what the queue saw.",
+    "note": "HI-3127: the next step after a red check or a hook under “The target branch follows its remote”, when the remote’s head the queue tested on ({commit}, a full commit id, kept in the repository) is newer than the local {target}. {remote}: the remote branch, as <remote>/<branch>."
   },
   "queue.next.forward": {
     "text": "A forward merge has no builder, and no agent works on it: the user or the Assistant decides. Retry merge tries again with {from} as it is then; Resolve on a builder ends it and makes a card for a builder to merge {from} into {to} and resolve this there; Remove from queue ends it, nothing merged.",
