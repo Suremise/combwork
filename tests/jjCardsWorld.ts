@@ -18,6 +18,7 @@ import { mergeBundles, type SqlDb } from '../src/main/platform/jjObligations'
 import { boardPrepStore } from '../src/main/platform/jjSlotPrep'
 import type { WorkspaceIdentity } from '../src/main/platform/workspacePort'
 import { commitPublishOff } from '../src/main/jjPublish'
+import { jjReleaseReadsWith } from '../src/main/platform/jjReleaseReads'
 import { attemptsKey, readAttempts, saveAttemptIn, type JjAttemptEntry } from '../src/main/platform/jjCandidateStep'
 import { preset } from '../src/shared/workflow/options'
 import { agentOf } from '../src/shared/workflow/facts'
@@ -123,6 +124,8 @@ export async function world(colocated: boolean, o: { hook?: (point: JjIntegratio
       autoRun: false,
       reconcileActs: true,
       jj: deps,
+      // HI-3164: HI-3148's start check reads releases through the harness's jj (the app's runner can't reach this repository).
+      releaseReads: () => jjReleaseReadsWith(h.runner),
       effects: { wake: () => undefined, notify: () => undefined }
     })
   const wf = make(store)

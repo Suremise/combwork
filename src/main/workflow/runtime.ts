@@ -34,7 +34,7 @@ import { NoneAdapter } from '../platform/none'
 import { readBaseline } from '../noneBaseline'
 import { isUnknown, unknown, withDetail, type Maybe } from '../platform/types'
 import { releaseReadsOf } from '../platform/releaseReadsPorts'
-import { stillAsRead, unreleasedFor } from '../platform/releaseReads'
+import { stillAsRead, unreleasedFor, type ReleaseReads } from '../platform/releaseReads'
 import { declaresPaths, hasCapability, needsRepository, platformName, type PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
 import { finishAccepts, recordFinish } from './finish'
@@ -240,6 +240,8 @@ export interface WorkflowConfig {
    * stored, never a cached copy): read again inside the start's write, so a lane ended or replaced meanwhile grants nothing.
    */
   releaseGrant?: (lane: string) => string | null
+  /** HI-3164: a platform's release reads (default: `releaseReadsOf`, Combwork's own runners). A seam for a test world whose version control runs through its own runner, never a way round the check: null is a platform with nothing released, as the default's. */
+  releaseReads?: (platform: PlatformId) => ReleaseReads | null
   /** HI-3107: a start written with earlier work on another version control's lines: the app comments and tells the user. */
   earlierWork?: (card: CardRecord, lines: EarlierLine[], now: PlatformId) => Promise<void> | void
   /** A lease lent for a start that wasn't written (refused, or undone): given back. */
@@ -1204,7 +1206,7 @@ export class Workflow {
    */
   private async releasedStart(card: CardRecord, g: StartGathered, actor: Actor, given?: { target: string; reason: string }): Promise<{ refusal: GuardRefusal } | { grant: FactData['Override'] | null; bound?: () => boolean }> {
     const target = g.data.target
-    const reads = target ? releaseReadsOf(g.o.platform) : null
+    const reads = target ? (this.cfg.releaseReads ?? releaseReadsOf)(g.o.platform) : null
     if (!target || !reads) return { grant: null }
     const by = actor === 'user' || actor === 'assistant' ? actor : null
     // The user's or the Assistant's for exactly this line: theirs whatever the line is now, so nothing to bind.

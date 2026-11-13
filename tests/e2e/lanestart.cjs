@@ -241,11 +241,16 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     // Back in Todo for what follows, as it was before Combwork's start.
     if (cStarted) await inv('tasks:move', c.number, 'todo', { confirm: true, reason: 'the e2e puts it back' })
 
+    // --- B1's slot freed for the lanes that follow (HI-3162). The first lane ended with its card in Doing, and that card
+    // keeps its lease on slot-a (HI-3118), so every later lane of B1's is refused a slot (one agent, one slot: "this
+    // agent already builds in slot-a for" that card) and waits for one, paused, "waiting for a slot": none of their cards is
+    // started until that card is Done or put back. Put back here, as the user would.
+    if ((await card(chosen[0]))?.column === 'doing') await inv('tasks:move', chosen[0], 'todo', { confirm: true, reason: 'the e2e frees its slot' })
+    check(`the first lane's card ${chosen[0]} is back in Todo, freeing slot-a`, !!(await until(async () => (await card(chosen[0]))?.column === 'todo', HUNG_MS)), JSON.stringify(await card(chosen[0])))
+
     // --- HI-3148: Start Lane… on 1.0.0, released. The dialog says so before Start, naming the tag and main to start on
     // instead; Start Anyway waits for a reason; given one, the lane starts on 1.0.0 and its card is started there by
     // Combwork under the lane's grant (nobody else could: a start onto 1.0.0 is refused).
-    // B1's slot freed first: the first lane's card (in flight when it ended) keeps it, so it goes back to Todo.
-    if ((await card(chosen[0]))?.column === 'doing') await inv('tasks:move', chosen[0], 'todo', { confirm: true, reason: 'the e2e frees its slot' })
     const factsOf = async (n) => (await inv('tasks:facts', n)) ?? []
     const b1Quiet = async () => !(await live(b1.id)) || ['ready', 'finished'].includes((await live(b1.id))?.status)
     await inv('workflow:setOptions', alpha, { preset: null, options: { ...options, otherTargets: ['1.0.0'] } })
@@ -292,7 +297,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await until(quiet, HUNG_MS)
     // HI-2029: nobody starts it: Combwork gives the lane's first card to B1 once B1 is free (the lane started over it).
     const facts = async (n) => (await inv('tasks:facts', n)) ?? []
-    check("…its first card started by Combwork on B1, with no one starting it (HI-2029)", !!(await until(async () => (await facts(d1)).some((f) => f.kind === 'Started' && f.actor === 'combwork') && (await facts(d1)).some((f) => f.kind === 'BuilderPlaced'), HUNG_MS)), JSON.stringify(await facts(d1)))
+    check("…its first card started by Combwork on B1, with no one starting it (HI-2029)", !!(await until(async () => (await facts(d1)).some((f) => f.kind === 'Started' && f.actor === 'combwork') && (await facts(d1)).some((f) => f.kind === 'BuilderPlaced'), HUNG_MS)), JSON.stringify({ facts: (await facts(d1)).map((f) => f.kind), lane: (await lanes()).find((l) => l.id === third?.id)?.status ?? null }))
     await until(quiet, HUNG_MS)
     /** Start Lane from the Todo column with only card n left in its list (the other Todo cards taken out). */
     const openWithOnly = async (n) => {

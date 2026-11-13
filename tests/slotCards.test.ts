@@ -53,6 +53,8 @@ const state = vi.hoisted(() => ({
   noCode: [] as number[],
   /** The pool's own, over the stand-in's (a lend held, say). */
   pool: {} as Record<string, unknown>,
+  /** Every function run under the repository's lock (withRepoLock), in order (HI-3165: which preparations take it). */
+  lockedFns: [] as unknown[],
   /** The slots' log, as `<level> <line>`. */
   logged: [] as string[],
   /** The builder's conversation bound to the card's lease, as sessions.leaseConversation gives it (HI-1746). */
@@ -155,8 +157,14 @@ vi.mock('../src/main/slotsApp', async (orig) => ({
   ...(await orig<object>()),
   holder: { self: async () => ({ pid: process.pid, started: 1 }), alive: async () => false, live: new Set() },
   // The project's pool as the pass reads it: no leases open or ended (what it settles first doesn't come from them).
-  poolFor: async () => ({ closed: false, openLeases: () => [], endedSince: () => [], lease: () => null, renames: () => [], ...state.pool })
+  // Its port's preparation keys (HI-3165): none, as Git's.
+  poolFor: async () => ({ closed: false, openLeases: () => [], endedSince: () => [], lease: () => null, renames: () => [], lineIsKey: () => false, preparesUnderOwnLock: () => false, heldEarly: async () => null, ...state.pool })
 }))
+// The repository's lock as it is, each function it runs recorded (HI-3165).
+vi.mock('../src/main/repoLock', async (orig) => {
+  const real = await orig<typeof import('../src/main/repoLock')>()
+  return { ...real, withRepoLock: (folder: string, fn: () => Promise<unknown>, o?: object) => (state.lockedFns.push(fn), real.withRepoLock(folder, fn, o)) }
+})
 vi.mock('../src/main/lanes', async (orig) => ({
   ...(await orig<object>()),
   rawLanes: async () => (state.lanes ? state.lanes() : []),
@@ -279,7 +287,7 @@ afterEach(() => {
   env?.close()
   env = null
   resetAgentStartsForTests()
-  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], noCode: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false, busy: null, quietAt: null, freeAfterLook: null, held: null, heldLooks: 0, freeAfterHeldLook: false, sessionsIn: [], run: null, quit: null, quits: 0, working: false })
+  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], noCode: [], pool: {}, lockedFns: [], logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false, busy: null, quietAt: null, freeAfterLook: null, held: null, heldLooks: 0, freeAfterHeldLook: false, sessionsIn: [], run: null, quit: null, quits: 0, working: false })
 })
 
 /**
@@ -426,6 +434,26 @@ describe("a finished card's slot (HI-2014, HI-1986)", { timeout: 60_000 }, () =>
     expect(hasLine(e, line)).toBe(false)
   })
 
+  it("HI-3165: a line its pool's port calls a preparation key (jj's): the slot never read, locked or moved; Git's line is", async () => {
+    const { e, n, line, slot } = await doneInSlot('Keyed line')
+    let looks = 0
+    const counted = () => (looks++, view(slot)())
+    expect(await finishedSlot(e.project, e.wf, n, 'l-1', counted, null, () => true, (l) => l === line)).toBe(false)
+    expect(looks).toBe(0)
+    expect(state.lockedFns).toEqual([])
+    expect(branch(slot)).toBe(line)
+    // The pass asks the pool: a key there, left; none, detached under the lock.
+    const lease = { id: 'l-1', agent: 'B1', slot: 'slot-a', kind: 'card', card: n, lane: null, project: 'p', from: '', to: null, why: null, endRev: null }
+    const ws = { path: e.home, lifetime: { aborted: false } } as never
+    const pool = (keyed: boolean) => ({ openLeases: () => [lease], endedSince: () => [], openLease: () => lease, slotOf: () => ({ name: 'slot-a', folder: slot, target: 'main', op: null, writer: null, state: 'lent' }), lineIsKey: (l: string) => keyed && l === line }) as never
+    await finishedSlots(ws, e.project, e.wf, pool(true), new Map())
+    expect(branch(slot)).toBe(line)
+    expect(state.lockedFns).toEqual([])
+    await finishedSlots(ws, e.project, e.wf, pool(false), new Map())
+    expect(branch(slot)).toBe('HEAD')
+    expect(state.lockedFns.length).toBeGreaterThan(0)
+  })
+
   it("a slot made from main whose card targeted another line: detached at that line's head, not main's (HI-2185)", async () => {
     const { e, n, line, slot } = await doneInSlot('Card for 1.0.0', '1.0.0')
     expect(sh(e.project, 'rev-parse', '1.0.0').trim()).not.toBe(sh(e.project, 'rev-parse', 'main').trim())
@@ -526,7 +554,7 @@ describe("a finished card's slot (HI-2014, HI-1986)", { timeout: 60_000 }, () =>
     rmSync(join(slot, 'wip.txt'))
     // The lane's lease ended long ago, and the lane has left the list the pass reads (an empty map).
     const lease = { id: 'l-1', project: 'project', slot: 'slot-a', kind: 'lane', card: null, lane: 'lane-old', agent: 'b1', from: '2026-01-01T00:00:00Z', to: '2026-01-01T01:00:00Z', why: 'laneEnded', endRev: null }
-    const pool = { openLeases: () => [], endedSince: () => [lease], slotOf: () => ({ name: 'slot-a', folder: slot, target: 'main', op: null }), openLease: () => null, lease: () => lease }
+    const pool = { openLeases: () => [], endedSince: () => [lease], slotOf: () => ({ name: 'slot-a', folder: slot, target: 'main', op: null }), openLease: () => null, lease: () => lease, lineIsKey: () => false }
     await finishedSlots({ lifetime: { aborted: false } } as never, e.project, e.wf, pool as never, new Map())
     expect(asked(e, n)).toBe(0)
   })
@@ -562,7 +590,7 @@ describe("a finished card's slot (HI-2014, HI-1986)", { timeout: 60_000 }, () =>
     writeFileSync(join(slot, 'wip.txt'), 'uncommitted')
     const lease = { id: 'l-1', project: 'project', slot: 'slot-a', kind: 'card', card: n, lane: null, agent: 'b1', from: '2026-01-01T00:00:00Z', to: '2026-01-01T01:00:00Z', why: 'done', endRev: null }
     let row: Record<string, unknown> = { name: 'slot-a', folder: slot, target: 'main', state: 'lent', op: null, writer: null }
-    const pool = { openLeases: () => [], endedSince: () => [lease], slotOf: () => row, openLease: () => null, lease: () => lease }
+    const pool = { openLeases: () => [], endedSince: () => [lease], slotOf: () => row, openLease: () => null, lease: () => lease, lineIsKey: () => false }
     const pass = () => finishedSlots({ lifetime: { aborted: false } } as never, e.project, e.wf, pool as never, new Map())
     // Its builder's session still draining there, the pool not having looked since the lease ended.
     row = { ...row, writer: { run: 'r-1', lease: 'l-1', agent: 'b1', pid: 1, started: 1 } }
@@ -589,7 +617,7 @@ describe("a finished card's slot (HI-2014, HI-1986)", { timeout: 60_000 }, () =>
     const next = e.wf.createCard({ title: 'Second of the lane' })
     moved(await e.wf.start(next.key, B1))
     const lease = { id: 'l-1', project: 'project', slot: 'slot-a', kind: 'lane', card: null, lane: 'lane-1', agent: 'b1', from: '2026-01-01T00:00:00Z', to: null, why: null, endRev: null }
-    const pool = { openLeases: () => [lease], endedSince: () => [], slotOf: () => ({ name: 'slot-a', folder: slot, target: 'main', state: 'lent', op: null, writer: null }), openLease: () => lease, lease: () => lease }
+    const pool = { openLeases: () => [lease], endedSince: () => [], slotOf: () => ({ name: 'slot-a', folder: slot, target: 'main', state: 'lent', op: null, writer: null }), openLease: () => lease, lease: () => lease, lineIsKey: () => false }
     const lanes = new Map([['lane-1', { id: 'lane-1', cards: [n, next.id], state: 'active' }]])
     await finishedSlots({ lifetime: { aborted: false } } as never, e.project, e.wf, pool as never, lanes as never)
     expect(asked(e, n)).toBe(0)
@@ -1806,6 +1834,50 @@ describe("HI-3010: a lane's next card, its builder busy in the slot", { timeout:
     writeFileSync(join(slot, 'builder.txt'), 'builder still editing\n')
     sh(slot, 'switch', '-q', '-c', 'cw/AM/AM-9-plain')
     expect(readFileSync(join(slot, 'builder.txt'), 'utf8')).toMatch(/changed by post-checkout/)
+  })
+})
+
+describe("HI-3165: a preparation as its pool's port has the line: in place and under the repository's lock, or its own key", { timeout: 60_000 }, () => {
+  async function preparing(keyed: boolean, early: unknown[] = []) {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    const card = e.wf.createCard({ title: 'Prepared' })
+    const slot = join(tempDir('slot-'), 'slot-a')
+    e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: true })
+    moved(await e.wf.start(card.key, B1))
+    const line = e.wf.state(card).started!.line!
+    const lease = { id: 'l-1', agent: 'B1', slot: 'slot-a', kind: 'card', card: card.id, lane: null, project: 'p', from: '', to: null, why: null, endRev: null }
+    // Each preparation asked: in place or not, and whether its step ran under the repository's lock.
+    const asked: { inPlace: boolean; locked: boolean }[] = []
+    state.pool = {
+      openLeases: () => [lease],
+      lease: () => lease,
+      lineIsKey: (l: string) => keyed && l === line,
+      preparesUnderOwnLock: (l: string) => keyed && l === line,
+      heldEarly: async () => early.shift() ?? null,
+      prepare: async (_id: string, p: { inPlace?: unknown; around: (fn: () => Promise<unknown>) => Promise<unknown> }) => {
+        const step = async () => ({ ok: true, revision: 'r' })
+        const r = await p.around(step)
+        asked.push({ inPlace: !!p.inPlace, locked: state.lockedFns.includes(step) })
+        return r
+      }
+    }
+    const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
+    await settleSlotCards(ws, e.project)
+    await vi.waitFor(() => expect(cycleIn(e.store.facts(card.id))?.prepared).toMatchObject({ revision: 'r' }), { timeout: HUNG_MS })
+    return { e, card, asked }
+  }
+
+  it("Git's line: tried in place first, under the repository's lock", async () => {
+    const { asked } = await preparing(false)
+    expect(asked).toEqual([{ inPlace: true, locked: true }])
+  })
+
+  it("the port's key: never in place, outside the repository's lock (the port takes its own); its early held work said with the port's code", async () => {
+    const work = { why: 'extra', commits: ['c1'], edits: null, select: 'c1', base: 'b', target: 'main' }
+    const { e, card, asked } = await preparing(true, [{ code: 'held (test)', work }])
+    expect(asked).toEqual([{ inPlace: false, locked: false }])
+    expect(e.store.facts(card.id).find((f) => f.kind === 'SlotPrepareHeld')?.data).toMatchObject({ lease: 'l-1', why: 'extra:held (test)' })
   })
 })
 

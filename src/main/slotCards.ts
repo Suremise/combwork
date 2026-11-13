@@ -50,8 +50,7 @@ import { createLogger, userText } from './logger'
 import { lineHistory } from './platform/historyPorts'
 import type { HeldWork, WorkspaceCheckout, WorkspacePort } from './platform/workspacePort'
 import { shellLine } from '../shared/workflow/queue'
-import { gitCantRead, isJjLineKey, slotWorkspaces } from './platform/workspacePorts'
-import { JJ_REFUSED } from './platform/jjWorkspacePort'
+import { gitCantRead, slotWorkspaces } from './platform/workspacePorts'
 import { observer } from './platform/observe'
 import { isUnknown } from './platform/types'
 import { withRepoLock } from './repoLock'
@@ -1038,7 +1037,7 @@ export async function finishedSlots(ws: WorkspaceService, projectPath: string, w
     }
     for (const n of cards) {
       if (ended(ws)) return detached
-      detached = (await finishedSlot(projectPath, wf, n, l.id, slotNow, l.lane, () => !ended(ws))) || detached
+      detached = (await finishedSlot(projectPath, wf, n, l.id, slotNow, l.lane, () => !ended(ws), (line) => pool.lineIsKey(line))) || detached
     }
     // A running lane's slot its builder kept busy: looked at again once it is quiet (as a preparation waits), once per lease.
     const card = cards.map((n) => cardOf(wf, n)).find((c) => !!c && !!wf.state(c).finished && wf.state(c).started?.lease === l.id)
@@ -1093,7 +1092,7 @@ export interface FinishedSlotView {
  * lease's now, or on another line, its question closes; dirty, asked once; clean, an open lease's slot detached at the
  * card's target's head (a released one is the pool's), its question closed.
  */
-export async function finishedSlot(projectPath: string, wf: Workflow, n: number, lease: string, slotNow: () => FinishedSlotView | null, lane: string | null = null, alive: () => boolean = () => true): Promise<boolean> {
+export async function finishedSlot(projectPath: string, wf: Workflow, n: number, lease: string, slotNow: () => FinishedSlotView | null, lane: string | null = null, alive: () => boolean = () => true, keyed: (line: string) => boolean = () => false): Promise<boolean> {
   const card = cardOf(wf, n)
   const s = card ? wf.state(card) : null
   if (!card || !s?.finished || s.started?.lease !== lease || !s.started.line) return false
@@ -1101,7 +1100,8 @@ export async function finishedSlot(projectPath: string, wf: Workflow, n: number,
   const line = s.started.line
   // A jj card's slot (HI-2866) is put back on its target by the pool's own settle, an owned write under the slot's
   // operation (SlotPool.detach); this path holds no such operation, so it never asks Git about a jj slot or acts on one.
-  if (isJjLineKey(line)) return false
+  // `keyed`: whether the line is the pool's port's preparation key (HI-3165, SlotPool.lineIsKey).
+  if (keyed(line)) return false
   // The finish this was for, still the card's: Done in that finish, on that lease and line.
   const own = (): boolean => {
     if (!alive()) return false
@@ -1485,7 +1485,8 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
   // a message) and already at work commits on its line, never on a detached head this preparation would leave behind
   // once the card moved on. Its answer is taken as any other's; a retry (what is left: files, install, a switch) waits
   // for its builder below, as before.
-  let inPlace = !isJjLineKey(st.line)
+  const keyed = pool.lineIsKey(st.line)
+  let inPlace = !keyed
   for (;;) {
     if (!inPlace && !(await until(projectPath, builder, () => quiet(projectPath, builder), gone))) return null
     const tried = inPlace
@@ -1497,11 +1498,11 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
     const r = await changingFolder(st.folder, 'preparing a slot', async (): Promise<PrepareResult> => { // i18n-ignore: what fences the folder, for the log
       // A jj card's (HI-2913): its builder's idle run out of the slot first, under this same fence, so jj's record finds
       // the folder quiet; not now, the fence lifted and looked at again.
-      if (isJjLineKey(st.line)) {
+      if (keyed) {
         // HI-3115 (decision B): committed work over the last card's there, read without recording the folder: held with its
         // builder still running, so the wake reaches it; edits are found by the preparation's own record, after its run ends.
         const early = await pool.heldEarly(l.id, st.line!, st.base!)
-        if (early) return { retry: 'its slot holds work over the last card', held: JJ_REFUSED.unintegrated, heldWork: early } // i18n-ignore: why a preparation waits, for the log
+        if (early) return { retry: 'its slot holds work over the last card', held: early.code, heldWork: early.work } // i18n-ignore: why a preparation waits, for the log
         const free = await freeSlotOfBuilder(projectPath, builder, st.folder, gone)
         if (free !== 'free') return { retry: free === 'gone' ? 'the card moved on' : 'its builder is still in the slot' } // i18n-ignore: why a preparation waits, for the log
       }
@@ -1515,7 +1516,7 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
         ...(tried ? { inPlace: async () => (gone() ? 'the card moved on, or the rules are off' : null) } : {}), // i18n-ignore: why a preparation waits, for the log
         // A jj card's preparation takes its store's lock itself, rechecking its fence and the folder's quiet inside it
         // (HI-2866: the lock isn't re-entrant, and a non-colocated project folder has no Git of its own to lock).
-        around: isJjLineKey(st.line) ? (fn) => fn() : (fn) => withRepoLock(projectPath, fn, { quiet: true, project: projectPath })
+        around: pool.preparesUnderOwnLock(st.line) ? (fn) => fn() : (fn) => withRepoLock(projectPath, fn, { quiet: true, project: projectPath })
       })
     })
     if ('ok' in r) {
