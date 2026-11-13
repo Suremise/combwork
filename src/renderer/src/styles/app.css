@@ -8464,6 +8464,14 @@ button.agent-place:hover {
   height: auto;
   max-height: 46vh;
 }
+/* One agent's map with no running session (HI-3186): a plain line in the graph's place. */
+.activity-map-idle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 120px;
+}
 @container (min-width: 900px) {
   .activity-body.with-map > .activity-map {
     flex: 0 0 var(--activity-map-width, 560px);
@@ -8479,7 +8487,8 @@ button.agent-place:hover {
     flex: 1 1 auto;
     min-height: 0;
   }
-  .activity-map-svg {
+  .activity-map-svg,
+  .activity-map-idle {
     flex: 1 1 0;
     min-height: 0;
     max-height: none;

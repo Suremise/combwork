@@ -11,7 +11,7 @@ import { Icon, IconButton, InfoTip, statusText, Tooltip, useContextMenu, type Me
 import { StateMark } from '../components/StateMark'
 import { loadActivityView, loadMapShow, saveActivityView, saveMapShow, type ActivityView, type MapShow } from '../activityView'
 import { ActivityMap, MapToggles, mapSessions, mapStrip, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
-import { liveIn, mapContextEntries, mapMode, mapReadOrder, type MapContext } from '@shared/activityMap'
+import { liveIn, mapContextEntries, mapMode, mapReadOrder, shownAlone, type MapContext } from '@shared/activityMap'
 import { cx } from '../util'
 import { ACTIVITY_M, Details, FADE_MS, LIST_EVERY, markOf, NO_NOW, PartView, TICK_MS, TURNS_AT_ONCE, usePageVisible } from './ActivityTab'
 
@@ -411,11 +411,12 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
     })
     return mode === 'single' ? out.slice(0, 1) : out
   }, [mode, shownHosts, inputs, inFilter, view.cards, view.hideFinished, view.tab])
-  // One agent of the selection shown alone (HI-3180, Darren's decision): see the project's tab.
-  const [shownAgent, setShownAgent] = useState<string | null>(null)
+  // One agent of the selection shown alone (HI-3180, Darren's decision), always the current tab's (HI-3186): see the
+  // project's tab.
+  const [showAlone, setShowAlone] = useState(false)
   // The selection chosen again (Agents ▾, even the same): all of it shown again.
-  useEffect(() => setShownAgent(null), [view.agents])
-  const alone = mode === 'shared' && shownAgent && entries.some((e) => e.key === shownAgent) ? shownAgent : null
+  useEffect(() => setShowAlone(false), [view.agents])
+  const alone = shownAlone(showAlone, mode, entries, current?.key ?? null)
   const drawnMode = alone ? 'single' : mode
   const drawnEntries = useMemo(() => (alone ? entries.filter((e) => e.key === alone) : entries), [entries, alone])
   // What the map reads turns and contexts for: the one shown alone first (HR1's round 1), then the rest.
@@ -430,7 +431,16 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
   const map = useActivityMap({ active, animate: active && live && !held && mapOn, scope: `${fresh}|${drawnMode}|${filterKey}|${alone ?? ''}`, entries: mapOn ? drawnEntries : NO_ENTRIES, contexts: drawn.contexts, mode: drawnMode, at })
   const strip = useMemo(() => (alone ? mapStrip(entries, drawn.contexts, readEntries) : undefined), [alone, entries, drawn.contexts, readEntries])
   const mapRead = useMemo(() => (mapOn ? mapSessions(readEntries, mode) : []), [mapOn, readEntries, mode])
-  const pickMapAgent = useCallback((key: string) => setShownAgent(alone === key ? null : key), [alone])
+  // The strip's click (HI-3186): another agent becomes the tab, shown alone; the one shown alone shows them all again.
+  const pickMapAgent = useCallback(
+    (key: string) => {
+      if (alone === key) return setShowAlone(false)
+      setSelected(null)
+      setView({ tab: key })
+      setShowAlone(true)
+    },
+    [alone, setView]
+  )
 
   // Turns for the tab shown (its agent's session and running subagents), and the map's agents' sessions.
   const shownSessions = useMemo(() => {

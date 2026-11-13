@@ -44,6 +44,7 @@
   "activity.map.noCalls": "Noch keine Tool-Aufrufe.",
   "activity.map.notLoaded": "nicht gezeigt",
   "activity.map.notReported": "nicht gemeldet",
+  "activity.map.notRunning": "{name} läuft nicht, daher gibt es auf der Karte nichts zu zeigen.",
   "activity.map.partial": "Aus den zuletzt gelesenen Aufrufen: nicht der ganze Verlauf.",
   "activity.map.pct": "{pct, number} %",
   "activity.map.prompt": "Prompt",

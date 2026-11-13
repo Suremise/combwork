@@ -316,6 +316,12 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
     >
       <PaneResizer paneKey={MAP_PANE.key} min={MAP_PANE.min} max={MAP_PANE.max} keep={MAP_PANE.keep} />
       <div className="activity-map-board">
+        {/* One agent's map of an agent with no running session (HI-3186): a plain line, never another agent's graph. */}
+        {one && !one.running ? (
+          <div className="pane-empty activity-map-idle" data-agent={one.key}>
+            {tr(M.notRunning, { name: one.name })}
+          </div>
+        ) : (
         <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={tr(M.mapLabel)} className="activity-map-svg">
           <g className="activity-map-comb" aria-hidden="true">
             {COMB.map((p, i) => (
@@ -353,6 +359,7 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
             })}
           {one ? <Centre agent={one} showContext={show.context} /> : <SharedCentre title={title} agents={model.agents.length} working={working} waiting={waiting} />}
         </svg>
+        )}
         {show.context && ringAgents.length > 0 && (
           <div className="activity-map-strip" role="list" aria-label={tr(M.stripLabel)}>
             {ringAgents.map((a, i) => (
@@ -524,6 +531,7 @@ const M = {
   pct: msg({ id: 'activity.map.pct', defaultMessage: '{pct, number}%', description: "Beside an agent's ring on the Activity map's shared view: how full its context is, in percent." }),
   notLoaded: msg({ id: 'activity.map.notLoaded', defaultMessage: 'not shown', description: "Beside an agent's ring on the Activity map's shared view when it is past the agents the map reads (eight): its calls aren't on the map. Lower case." }),
   ringTip: msg({ id: 'activity.map.ringTipShown', defaultMessage: '{name}: {load, select, notLoaded {past the eight agents the map reads, so its calls aren’t shown} loading {its calls are being read} other {{known, select, no {context not known} other {context {pct, number}%}}}}. {shown, select, yes {Shown on the map: click to show every agent again (or press Escape).} other {Click to show its map; the others stay listed here.}}', description: "Hover of an agent's ring in the Activity map's strip of the agents selected (HI-3180). {name} is the agent; {pct} its context in percent; known no: its context isn't known; shown yes: the map shows this agent alone now (a click shows all of them again), else it shows them all or another one. Keep the select keys." }),
+  notRunning: msg({ id: 'activity.map.notRunning', defaultMessage: '{name} isn’t running, so there’s nothing to show on the map.', description: "The Activity map in place of one agent's graph when that agent has no running session (HI-3186): never started since Combwork opened, or stopped. {name} is the agent. The strip of the other agents stays below it." }),
   stripLabel: msg({ id: 'activity.map.stripLabel', defaultMessage: "Agents' context", description: "The Activity map's strip of the agents' context rings, for screen readers." }),
   feedHeading: msg({ id: 'activity.map.feedHeading', defaultMessage: 'Last actions', description: "The heading of the Activity map's feed: the agents' latest tool calls." }),
   noCalls: msg({ id: 'activity.map.noCalls', defaultMessage: 'No tool calls yet.', description: "The Activity map's feed when the agents shown have made no tool call in the turns read." }),

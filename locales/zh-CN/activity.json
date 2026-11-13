@@ -44,6 +44,7 @@
   "activity.map.noCalls": "还没有工具调用。",
   "activity.map.notLoaded": "未显示",
   "activity.map.notReported": "未报告",
+  "activity.map.notRunning": "{name} 未在运行，因此地图上没有可显示的内容。",
   "activity.map.partial": "来自最近读取的调用：并非完整历史。",
   "activity.map.pct": "{pct, number}%",
   "activity.map.prompt": "提示词",

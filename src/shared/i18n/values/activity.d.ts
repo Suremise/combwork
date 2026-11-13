@@ -46,6 +46,7 @@ interface CombworkMessageValues {
   'activity.map.noCalls': undefined
   'activity.map.notLoaded': undefined
   'activity.map.notReported': undefined
+  'activity.map.notRunning': { name: string | number }
   'activity.map.partial': undefined
   'activity.map.pct': { pct: number }
   'activity.map.prompt': undefined
