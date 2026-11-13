@@ -64,6 +64,9 @@ const recording = new AsyncLocalStorage<Recording | null>()
  * workspace read too. Undo takes it back as a branch (assistantUndo.ts `undoBranch`), never as a setting.
  */
 export const BRANCH_TARGET = 'branch:'
+/** HI-3155: the Assistant's Not now on a project's release offer: the offer id dismissed, and the one it replaced. */
+export const RELEASE_OFFER_TARGET = 'release-offer'
+export const offerDismissChange = (project: string, was: string | null, id: string): { kind: 'setting'; project: string; target: string; fields: { field: string; old: string | null; new: string }[] } => ({ kind: 'setting', project, target: RELEASE_OFFER_TARGET, fields: [{ field: 'dismissed', old: was, new: id }] })
 export const branchChange = (project: string, name: string, commit: string): { kind: 'setting'; project: string; target: string; fields: { field: string; old: null; new: string }[] } => ({ kind: 'setting', project, target: `${BRANCH_TARGET}${name}`, fields: [{ field: 'branch', old: null, new: commit }] })
 
 export function recordingChanges<T>(workspacePath: string, act: ActivityKind, what: string, fn: () => Promise<T>): Promise<T> {

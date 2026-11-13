@@ -43,6 +43,7 @@ import { workflowWrite } from './writes'
 import { withFolderRepoLocks } from '../platform/repoPorts'
 import { exitBy } from '../exitLog'
 import { LEGACY_CONSUMED, legacyPreferences } from '../../shared/workflow/preferences'
+import { checkOffer } from './releaseOffer'
 
 const log = createLogger('workflow')
 
@@ -337,7 +338,7 @@ export class WorkflowRefused extends CombworkError {
  * recorded with an Override naming what changed (OP-38: the user only, per change, the cards listed first). `check`: the
  * caller's, run at the write itself, under its lock (its throw saves nothing). Returns the form as it is now.
  */
-export function setWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; check?: () => void } = {}): Promise<WorkflowForm> {
+export function setWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; check?: () => void; offer?: string } = {}): Promise<WorkflowForm> {
   // Checked against the levels as they are now and written in the same turn of workflow writes (#1422), holding the
   // project's repository lock first (#1642 round 5): its target can't move while a clean-up checks a branch against it,
   // from this Combwork or another.
@@ -378,9 +379,12 @@ export async function chooseMerge(ws: WorkspaceService, projectPath: string, raw
  * follows. The caller holds the repository's lock and this Combwork's turn of workflow writes (`setWorkflowOptions`;
  * HI-2807: Start the next version, in its own hold of both): never called inside another turn, which would wait on itself.
  */
-export async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; answer?: MergeAnswer; check?: () => void }): Promise<WorkflowForm> {
+export async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; answer?: MergeAnswer; check?: () => void; offer?: string }): Promise<WorkflowForm> {
   const project = projectOf(ws, projectPath)
   await settleLocked(ws, project)
+  // HI-3155: a save from a release offer's Move… or Remove…: only on the options that offer was made on (under this
+  // save's locks, where they can't change), else refused with nothing written.
+  if (o.offer) await checkOffer(ws, project.path, o.offer)
   const cfg = await ws.projectConfig(project.path)
   const asking = !!cfg.workflow?.mergeAsk && !mergeChoiceOf(ws, project.name)
   if (o.answer && !asking) throw await refusedAnswer(ws, project, o.answer)

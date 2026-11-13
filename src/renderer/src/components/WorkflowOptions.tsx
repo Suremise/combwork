@@ -14,6 +14,7 @@ import { shownText } from '@shared/advanced'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
 import { agentProviderOf, cardLabelOf, confirm, notify, openVersionControl, set as setStore, setActivity, useStore } from '../store'
+import { loadReleaseOffers, ReleaseOfferRow, useReleaseOffers } from '../releaseOffers'
 import { cx } from '../util'
 import { SlotCopyLevel, SlotsAndCopies } from './SlotsAndCopies'
 import { GithubHosts } from './GithubHosts'
@@ -147,6 +148,8 @@ const T = {
   levelForGit: msg({ id: 'workflow.form.levelForGit', defaultMessage: 'The defaults of Git projects.', description: 'Beside the None · Git choice above workflow defaults, while Git is chosen.' }),
   levelJj: msg({ id: 'workflow.form.levelJj', defaultMessage: 'jj', description: 'The choice of the defaults for projects using jj (Jujutsu, HI-2799). Keep jj: the tool’s name, lower case.' }),
   levelForJj: msg({ id: 'workflow.form.levelForJj', defaultMessage: 'The defaults of jj projects.', description: 'Beside the None · Git · jj choice above workflow defaults, while jj (Jujutsu, HI-2799) is chosen. Keep jj.' }),
+  offerUnsaved: msg({ id: 'workflow.form.offerUnsaved', defaultMessage: 'Workflow has changes you haven’t saved, so the release offer wasn’t filled in. Save or discard them, then choose Move… again.', description: 'HI-3155: a notification: Move… or Remove… on a release offer (For you) found unsaved edits in the Workflow section, which it doesn’t overwrite. Move… and Remove… are the offer’s buttons: as translated there.' }),
+  offerStale: msg({ id: 'workflow.form.offerStale', defaultMessage: 'Work merges into or Other branches work can merge into changed since the release offer was made, so it wasn’t filled in. The offer is read again.', description: 'HI-3155: a notification: a release offer’s Move… or Remove… found the saved options no longer the ones it was made on. Work merges into and Other branches work can merge into are option names: as translated there.' }),
   changedMeanwhile: msg({ id: 'workflow.form.changedMeanwhile', defaultMessage: 'The workflow options changed meanwhile, so nothing was saved. They’re shown as they are now.', description: 'A notification: saving the Workflow section was refused because the options changed after it was read (in another window, or by the Combwork Assistant); the section reloads them.' }),
   loadFailed: msg({ id: 'workflow.form.loadFailed', defaultMessage: 'Couldn’t read the workflow options: {error}', description: 'An error showing Project Settings → Workflow. {error} says why.' })
 }
@@ -172,7 +175,8 @@ export interface FormSource {
   level: WorkflowLevel | null
   read: () => Promise<WorkflowForm>
   check: (change: WorkflowChange) => Promise<WorkflowCheck | WorkflowLevelCheck>
-  save: (change: WorkflowChange, applyTo: number[]) => Promise<WorkflowForm>
+  /** `offer` (HI-3155): a release offer's Move… or Remove…, refused by main once that offer changed. */
+  save: (change: WorkflowChange, applyTo: number[], offer?: string) => Promise<WorkflowForm>
 }
 
 /** The JSON Copy as JSON gives: the version control, the preset and every option in force. */
@@ -214,7 +218,7 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
       level: null,
       read: () => call('workflow:form', path),
       check: (change) => call('workflow:check', path, change),
-      save: (change, applyTo) => call('workflow:setOptions', path, change, { applyTo })
+      save: (change, applyTo, offer) => call('workflow:setOptions', path, change, { applyTo, ...(offer ? { offer } : {}) })
     }),
     [path]
   )
@@ -333,6 +337,8 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
   // "How do you work?"'s Customise… (#1423): the preset filled in once the project's form is read, not saved. A loaded
   // template's workflow (HI-1910): the project's options read again, its section laid over them, not saved either.
   const prefill = useStore((s) => s.workflowPrefill)
+  // HI-3155: the project's release offer, under Work merges into.
+  const offerHere = useReleaseOffers().find((o) => !source.level && o.projectPath.toLowerCase() === source.key.toLowerCase()) ?? null
   const [fromTemplate, setFromTemplate] = useState<{ for: string; name: string; identityOff: boolean; savedMax?: number } | null>(null)
   useEffect(() => {
     if (!prefill || source.level || prefill.path !== source.key || loaded?.for !== source.key) return
@@ -356,9 +362,33 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
       )
       return
     }
+    // HI-3155: a release offer's Move… or Remove…: its change filled in and its Save… opened at once, never over unsaved
+    // edits, and only on the options it was made on (main checks them again under the save's locks).
+    const offer = prefill.offer
+    if (offer) {
+      if (dirtyRef.current) return notify('warning', tr(T.offerUnsaved))
+      const saved = loaded.form.options
+      const sameOthers = [...(saved.otherTargets ?? [])].sort().join('|') === [...offer.basis.otherTargets].sort().join('|')
+      if ((saved.target && saved.target !== offer.basis.target) || !sameOthers) {
+        void loadReleaseOffers()
+        return notify('warning', tr(T.offerStale))
+      }
+      setDraft({ ...loaded.draft, options: { ...loaded.draft.options, ...(offer.options.target ? { target: offer.options.target } : {}), otherTargets: offer.options.otherTargets } })
+      setOfferSave(offer.id)
+      return
+    }
     const p = prefill.preset ? loaded.form.presets.find((x) => x.id === prefill.preset)?.options : null
     if (p) setDraft({ preset: prefill.preset, options: withUnpreset(ownOptions(p), loaded.draft.options) })
   }, [prefill, loaded, source, show, project])
+  // The offer's Save…, once its change is in the draft: the form's own save, with its preview and retarget.
+  const [offerSave, setOfferSave] = useState<string | null>(null)
+  const saveRef = useRef<((offer?: string) => Promise<void>) | null>(null)
+  useEffect(() => {
+    if (!offerSave || !saveRef.current) return
+    const id = offerSave
+    setOfferSave(null)
+    void saveRef.current(id)
+  }, [offerSave])
 
   const effective = useMemo((): WorkflowOptions | null => (form && draft ? ({ ...form.inherited, ...draft.options, platform: form.platform } as WorkflowOptions) : null), [form, draft])
   // HI-2807: a Git project's branches newly named as targets that don't exist yet (each offered to be created), and the
@@ -413,7 +443,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
     return presetOptions && same(presetOptions[key], draft.options[key]) ? 'preset' : source.level ? 'here' : 'project'
   }
 
-  const save = async (): Promise<void> => {
+  const save = async (offer?: string): Promise<void> => {
     // What the form was read with: the save is refused if the project's options are no longer these (#1418).
     const change: WorkflowChange = { ...draft, base: { preset: form.preset, options: form.own } }
     const check = await source.check(change)
@@ -438,7 +468,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
       run: async () => {
         const path = source.key
         try {
-          show(path, await source.save(change, [...picked]))
+          show(path, await source.save(change, [...picked], offer))
           // Saved: then what follows the new target, as previewed, each item rechecked; said whatever came of it.
           if (retargets && retarget.has('on')) {
             const r = await call('workflow:retarget', path, retargets).catch((e: unknown) => {
@@ -459,6 +489,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
     if (stale) notify('warning', tr(T.changedMeanwhile))
     else if (ok) notify('success', tr(T.saved))
   }
+  saveRef.current = (offer) => save(offer).catch((e) => notify('error', errorMessage(e)))
   const copy = (): void => {
     const { platform: p, ...options } = effective
     const out: CopiedOptions = { combworkWorkflow: 1, platform: p, preset: draft.preset, options }
@@ -557,6 +588,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
         <>
           <MissingBranches projectPath={gitProject} missing={here} branches={missingNow?.branches ?? []} from={release || ''} created={() => setBranchesRead((n) => n + 1)} />
           {key === 'target' && isVersionBranch(release) && !source.level && <NextVersionButton from={release} disabled={dirty} onStart={() => void startNextVersion(gitProject, (f) => show(source.key, f))} />}
+          {key === 'target' && offerHere && <ReleaseOfferRow offer={offerHere} />}
         </>
       )
     }

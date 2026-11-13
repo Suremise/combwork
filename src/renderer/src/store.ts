@@ -2,7 +2,7 @@ import { DEFAULT_PERF_FILTERS, type PerfFilters } from '@shared/metricsView'
 import { create } from 'zustand'
 import type { ReactNode } from 'react'
 import type { Period } from '@shared/usageTotals'
-import type { McpCatalogRow } from '@shared/types'
+import type { McpCatalogRow, ReleaseOffer } from '@shared/types'
 import type { StartFailure } from '@shared/startFailure'
 import { cardLabel, setCardNaming } from '@shared/projectKeys'
 import type { AdvancedState } from '@shared/advanced'
@@ -479,7 +479,9 @@ interface State {
    * "How do you work?"'s Customise… (#1423): the Workflow section opens with this preset filled in, not saved. A loaded
    * template's workflow (HI-1910): its section for `platform`, laid over the project's options as the form reads them.
    */
-  workflowPrefill: { path: string; preset: PresetId | null; template?: { name: string; platform: PlatformId; section: TemplateWorkflow; savedMax?: number } } | null
+  /** HI-3155: the workspace's release offers the user hasn't put off (Not now): projects' For you items. */
+  releaseOffers: ReleaseOffer[]
+  workflowPrefill: { path: string; preset: PresetId | null; template?: { name: string; platform: PlatformId; section: TemplateWorkflow; savedMax?: number }; offer?: { id: string; basis: { target: string; otherTargets: string[] }; options: { target?: string; otherTargets: string[] } } } | null
   /**
    * A template waiting for its project's Git (HI-1910): its Load dialog's Set up Git… opened Version Control on Git's
    * page; once Initialise repository… has made the repository and the project is Git, its Load dialog opens again.
@@ -702,6 +704,7 @@ export const useStore = create<State>(() => ({
   changesRoot: {},
   vcSection: {},
   workflowPrefill: null,
+  releaseOffers: NO_RELEASE_OFFERS,
   templatePending: null,
   vcGitPreview: null,
   presetStepShown: [],
@@ -1870,6 +1873,8 @@ setCardNaming(() => (n) => cardLabelOf(get(), n))
 
 /** Stable empty list for selectors — a fresh [] on every call makes zustand re-render forever. */
 export const NO_PROJECTS: ProjectInfo[] = []
+/** No release offers (HI-3155): a stable empty list for selectors. */
+export const NO_RELEASE_OFFERS: ReleaseOffer[] = []
 export const NO_IDS: string[] = []
 
 /**

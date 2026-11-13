@@ -54,6 +54,7 @@ import { useAdvancedValue } from '../advanced'
 import type { StageId } from '@shared/workflow/facts'
 import { parseDocRef, splitDocRefs } from '@shared/docRefs'
 import { gist } from '@shared/gist'
+import { ReleaseOfferRow, useReleaseOffers } from '../releaseOffers'
 
 const NO_TASKS: TaskCard[] = []
 const NO_FOLD: BoardFold = {}
@@ -1387,7 +1388,9 @@ export function BoardToolbar({
   }, [tasks, asideOpen])
   const menu = useContextMenu()
   const waiting = useForYou().summary.items
-  const forYouCount = new Set(waiting.filter((i) => project === null || i.project.toLowerCase() === project.toLowerCase()).map((i) => i.card)).size
+  // HI-3155: a project's release offer is a For you item of its own (not a card's), counted here too.
+  const offers = useReleaseOffers().filter((o) => project === null || o.project.toLowerCase() === project.toLowerCase())
+  const forYouCount = new Set(waiting.filter((i) => project === null || i.project.toLowerCase() === project.toLowerCase()).map((i) => i.card)).size + offers.length
   return (
     <div className="board-toolbar">
       <div className="board-search">
@@ -1735,7 +1738,21 @@ export function BoardView() {
         <span className="faint">{tr(msg({ id: 'board.view.intro', defaultMessage: 'Plan work as cards, start them on agents, and see where each one is on its way to Done.', description: 'Under the Task Board\'s title, whatever the workflow (HI-2341: some have no Review or Approved). Done is the board\'s last column, in every workflow.' }))}</span>
       </div>
       <BoardToolbar project={project} query={query} setQuery={(q) => set({ boardQuery: q })} archived={archived} setArchived={(v) => set({ boardArchived: v })} forYouOnly={forYouOnly} setForYouOnly={(v) => set({ boardForYou: v })} />
+      {forYouOnly && <BoardReleaseOffers project={project} />}
       <Board project={project} query={query} archived={archived} forYouOnly={forYouOnly} />
+    </div>
+  )
+}
+
+/** HI-3155: the projects' release offers above the cards while For you is on (their own For you items, not a card's). */
+function BoardReleaseOffers({ project }: { project: string | null }) {
+  const offers = useReleaseOffers().filter((o) => project === null || o.project.toLowerCase() === project.toLowerCase())
+  if (!offers.length) return null
+  return (
+    <div className="board-release-offers">
+      {offers.map((o) => (
+        <ReleaseOfferRow key={o.id} offer={o} />
+      ))}
     </div>
   )
 }

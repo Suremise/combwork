@@ -91,9 +91,10 @@ function NextVersionForm({ projectPath, plan, retarget, onName }: { projectPath:
 /**
  * Opens Start the next version (HI-2807): the plan read first, then the dialog; its button starts it in one call (the
  * branch, Other branches, Work merges into: main refuses if the release moved or the options changed since), then the
- * retarget as confirmed. `saved` gets the form as saved.
+ * retarget as confirmed. `saved` gets the form as saved. `offer` (HI-3155): opened from a release offer's Start…, which main
+ * refuses once that offer changed.
  */
-export async function startNextVersion(projectPath: string, saved: (form: WorkflowForm) => void): Promise<void> {
+export async function startNextVersion(projectPath: string, saved: (form: WorkflowForm) => void, offer?: string): Promise<void> {
   let plan: NextVersionPlan
   try {
     plan = await call('workflow:nextVersionPlan', projectPath)
@@ -115,7 +116,7 @@ export async function startNextVersion(projectPath: string, saved: (form: Workfl
       if (!draft.name) throw new Error(tr(M.enterName))
       const problem = await call('git:checkBranchName', projectPath, draft.name)
       if (problem) throw new Error(problem)
-      const r = await call('workflow:startNextVersion', projectPath, { name: draft.name, from: { ref: plan.from, commit: plan.start.commit }, base: plan.base })
+      const r = await call('workflow:startNextVersion', projectPath, { name: draft.name, from: { ref: plan.from, commit: plan.start.commit }, base: plan.base, ...(offer ? { offer } : {}) })
       saved(r.form)
       said = { level: 'success', text: tr(M.done, { name: r.name, from: r.from, added: r.added ? 'yes' : 'no' }) }
       if (plan.retarget && draft.retarget.has('on')) {

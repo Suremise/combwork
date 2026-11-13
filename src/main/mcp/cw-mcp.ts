@@ -260,6 +260,9 @@ const T = {
   'branch.description': agentMsg({ id: 'tool.branch.description', text: "Branches, each once the user agrees. create: name at from (a branch, tag or commit), never switching. nextVersion: makes name (default 1.3.0 → 1.4.0) at Work merges into's head, adds that to Other branches and moves Work merges into to it; started cards and lanes stay. Undoable.", note: 'HI-2807. Work merges into and Other branches (work can merge into) are option names.' }),
   'branch.arg.from': agentMsg({ id: 'tool.branch.arg.from', text: 'create: where it starts: a branch, tag or commit. nextVersion: Work merges into as you read it (refused if it moved on).', note: 'HI-3114: required for nextVersion too.' }),
   'branch.arg.commit': agentMsg({ id: 'tool.branch.arg.commit', text: 'The commit you showed the user for from (or the release): refused if it moved since.' }),
+  'branch.arg.offer': agentMsg({ id: 'tool.branch.arg.offer', text: 'A release offer’s id: nextVersion answers it (refused once it changed); dismissOffer changes it: hides it until it changes (the user’s Not now).', note: 'HI-3155: cw_branch’s offer argument.' }),
+  'branch.reply.dismissed': agentMsg({ id: 'tool.branch.reply.dismissed', text: 'Put off release offer {offer} until it changes.', note: 'HI-3155: cw_branch dismissOffer’s reply.' }),
+  'updateSetting.arg.offer': agentMsg({ id: 'tool.updateSetting.arg.offer', text: 'A release offer’s id, when this answers it: refused once the offer changed.', note: 'HI-3155: cw_update_setting’s offer argument (project.workflow.target or otherTargets).' }),
   'branch.reply.created': agentMsg({ id: 'tool.branch.reply.created', text: 'Created {name} from {from} ({commit}).', note: 'HI-2807: cw_branch create. {commit} is a short hash.' }),
   'branch.reply.nextVersion': agentMsg({ id: 'tool.branch.reply.nextVersion', text: 'Started {name} from {from} ({commit}); {added, select, yes {{from} added to other branches; } other {}}target {name}.{retarget, select, yes { Can follow {name}: {move}. Stay: {stay}. To move them, ask the user, then cw_queue retarget with preview {preview} and the items they agree to.} other {}}', note: 'HI-2807: cw_branch nextVersion. {move} and {stay} are lists ("-" for none); {preview} an id.' }),
   'releaseSlot.description': agentMsg({ id: 'tool.releaseSlot.description', text: "Release Slot: slots kept for an agent or held by an ended run. list, then release. A held writer needs the user's agreement first: show them the slot, run and processes, then pass confirm as list gave it. Not undoable. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}" }),
@@ -1045,16 +1048,21 @@ const tools: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['create', 'nextVersion'] },
+        action: { type: 'string', enum: ['create', 'nextVersion', 'dismissOffer'] },
         project: projectArg,
         name: { type: 'string' },
         from: { type: 'string', description: say(T['branch.arg.from']) },
-        commit: { type: 'string', description: say(T['branch.arg.commit']) }
+        commit: { type: 'string', description: say(T['branch.arg.commit']) },
+        offer: { type: 'string', description: say(T['branch.arg.offer']) }
       },
       required: ['action', 'project']
     },
     run: async (a) => {
-      const pick = Object.fromEntries((['project', 'name', 'from', 'commit'] as const).filter((k) => a[k] !== undefined).map((k) => [k, a[k]]))
+      const pick = Object.fromEntries((['project', 'name', 'from', 'commit', 'offer'] as const).filter((k) => a[k] !== undefined).map((k) => [k, a[k]]))
+      if (a.action === 'dismissOffer') {
+        await api('POST', `/v1/projects/${enc(String(a.project))}/release-offer/dismiss`, { id: a.offer })
+        return say(T['branch.reply.dismissed'], { offer: String(a.offer ?? '') })
+      }
       if (a.action === 'create') {
         const r = (await api('POST', '/v1/git/branch', pick)) as { name: string; from: string; commit: string }
         return say(T['branch.reply.created'], r)
@@ -1346,10 +1354,10 @@ const tools: Tool[] = [
       say(T['updateSetting.description']),
     inputSchema: {
       type: 'object',
-      properties: { id: { type: 'string' }, value: { type: ['string', 'number', 'boolean', 'null', 'object', 'array'], description: say(T['updateSetting.arg.value']) }, project: { type: 'string' } },
+      properties: { id: { type: 'string' }, value: { type: ['string', 'number', 'boolean', 'null', 'object', 'array'], description: say(T['updateSetting.arg.value']) }, project: { type: 'string' }, offer: { type: 'string', description: say(T['updateSetting.arg.offer']) } },
       required: ['id', 'value']
     },
-    run: async (a) => settingChangedText((await api('PATCH', `/v1/settings/${enc(a.id)}`, { value: a.value, project: a.project })) as Parameters<typeof settingChangedText>[0])
+    run: async (a) => settingChangedText((await api('PATCH', `/v1/settings/${enc(a.id)}`, { value: a.value, project: a.project, ...(a.offer !== undefined ? { offer: a.offer } : {}) })) as Parameters<typeof settingChangedText>[0])
   },
   {
     name: 'cw_undo',

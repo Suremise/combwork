@@ -1,7 +1,7 @@
 import { join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import type { AgentDef, AgentPatch, AssistantUndoResult, LaneInfo, PageLayout, ProjectConfig, TaskCard, TaskPatch, TaskWaiting, WorkflowForm } from '../shared/types'
-import { AGENT_FIELDS, BRANCH_TARGET, CARD_FIELDS, CONNECTION_ID, cardValue, markUndone, notRecording, PROVIDER_DEPENDENTS, recordedChanges, REVIEW, reviewOf, sameValue, type CardField, type FieldChange, type RecordedChange, type Value } from './assistantChanges'
+import { AGENT_FIELDS, BRANCH_TARGET, RELEASE_OFFER_TARGET, CARD_FIELDS, CONNECTION_ID, cardValue, markUndone, notRecording, PROVIDER_DEPENDENTS, recordedChanges, REVIEW, reviewOf, sameValue, type CardField, type FieldChange, type RecordedChange, type Value } from './assistantChanges'
 import { reconcileAskWaits } from './assistantAsk'
 import * as assistant from './assistantControl'
 import { boardWrite } from './boardStore'
@@ -146,7 +146,7 @@ function undoOne(ws: WorkspaceService, c: RecordedChange, by: UndoBy, guard: Gua
     case 'agent':
       return undoAgent(ws, c, guard)
     case 'setting':
-      return c.target?.startsWith(BRANCH_TARGET) ? undoBranch(ws, c, guard) : undoSetting(ws, c, by, guard)
+      return c.target?.startsWith(BRANCH_TARGET) ? undoBranch(ws, c, guard) : c.target === RELEASE_OFFER_TARGET ? undoOfferDismiss(ws, c, guard) : undoSetting(ws, c, by, guard)
     case 'started':
       return undoStarted(ws, c, guard)
     default:
@@ -598,6 +598,23 @@ async function undoSetting(ws: WorkspaceService, c: RecordedChange, by: UndoBy, 
  * takes, in their order: the repository's lock, the turn of workflow writes, the lanes' lock, the board's write; the
  * guard checked inside. Else it stays, said as changed (or gone).
  */
+/**
+ * HI-3155: the Assistant's Not now on a release offer, undone only while the dismissal it recorded is still the one kept:
+ * a newer dismissal (another offer's, or the user's since) is never cleared.
+ */
+async function undoOfferDismiss(ws: WorkspaceService, c: RecordedChange, guard: Guard): Promise<Outcome> {
+  const v = c.values.find((x) => x.field === 'dismissed')
+  if (!ws.path || !c.project || !v || typeof v.new !== 'string') return goneAll(['dismissed'])
+  const projectPath = join(ws.path, c.project)
+  try {
+    guard?.()
+    const { undoDismiss } = await import('./workflow/releaseOffer')
+    return (await undoDismiss(ws, projectPath, v.new, typeof v.old === 'string' ? v.old : null)) ? { undone: ['dismissed'], skipped: [] } : { undone: [], skipped: changed(['dismissed']) }
+  } catch (e) {
+    return failedOr(['dismissed'], e)
+  }
+}
+
 async function undoBranch(ws: WorkspaceService, c: RecordedChange, guard: Guard): Promise<Outcome> {
   const commit = c.values.find((v) => v.field === 'branch')?.new
   if (!ws.path || !c.project || !c.target || typeof commit !== 'string') return goneAll(['branch'])

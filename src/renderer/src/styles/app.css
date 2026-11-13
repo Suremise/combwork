@@ -10474,6 +10474,42 @@ body.pane-resizing-v .monaco-editor {
   align-items: center;
   gap: 8px 12px;
 }
+/* HI-3155: a project's release offer (For you, not a card's): its words, then Move… / Start… / Not now. */
+.release-offer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent-soft);
+}
+.release-offer-text {
+  flex: 1 1 260px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.release-offer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.release-offer.compact {
+  padding: 0;
+  border: none;
+  background: none;
+}
+.board-release-offers {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0;
+}
+.inbox-row.inbox-offer {
+  cursor: default;
+}
 /* The checkboxes keep their one line; the workflow link (#1420) is cut with "…" (its hover has it whole) only where even
    a line of its own is too narrow for it. */
 .board-toolbar > label {

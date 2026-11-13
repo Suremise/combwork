@@ -152,6 +152,7 @@ import type {
   TranscriptSearchResult,
   TranscriptTool,
   WorkflowChange,
+  ReleaseOffer,
   RetargetPreview,
   RetargetResult,
   NextVersionPlan,
@@ -399,7 +400,7 @@ export interface CombworkRequests {
   /** What saving a change to the project's workflow options would do (§16.6.5's warning): its problems, what changes, what keeps the old rules. */
   'workflow:check': (projectPath: string, change: WorkflowChange) => WorkflowCheck
   /** Saves the project's workflow options, checked again (refused, with every reason); `applyTo`: cards in flight to work under them from now (OP-38). */
-  'workflow:setOptions': (projectPath: string, change: WorkflowChange, opts?: { applyTo?: number[] }) => WorkflowForm
+  'workflow:setOptions': (projectPath: string, change: WorkflowChange, opts?: { applyTo?: number[]; offer?: string }) => WorkflowForm
   /** HI-2680: moves what a confirmed Retarget preview listed, as the user: each item rechecked; what happened to each. */
   'workflow:retarget': (projectPath: string, preview: RetargetPreview) => RetargetResult
   /** HI-2807: what Start the next version's dialog shows: the release, its head, the proposed name, what can follow. */
@@ -407,7 +408,11 @@ export interface CombworkRequests {
   /** HI-2807: what can follow `to` from the release with both going on (the dialog's name edited). */
   'workflow:nextVersionPreview': (projectPath: string, from: string, to: string) => RetargetPreview | null
   /** HI-2807: Start the next version: the branch made at the release's head as shown, the release added to Other branches, Work merges into moved to it. */
-  'workflow:startNextVersion': (projectPath: string, args: { name: string; from: BranchStart; base: NextVersionPlan['base'] }) => NextVersionResult
+  'workflow:startNextVersion': (projectPath: string, args: { name: string; from: BranchStart; base: NextVersionPlan['base']; offer?: string }) => NextVersionResult
+  /** HI-3155: the workspace's release offers the user hasn't put off (Not now), a project's For you items. */
+  'workflow:releaseOffers': () => ReleaseOffer[]
+  /** HI-3155: Not now on a project's release offer `id` (its current one, else refused): hidden until it changes. */
+  'workflow:releaseOfferDismiss': (projectPath: string, id: string) => void
   /** The user's answer to the merge queue's question before an upgraded project's first merge (HI-1697, For you): its merge style and commit message saved, the request answered. */
   'workflow:chooseMerge': (projectPath: string, choice: { card: number; request: string; style: WorkflowOptions['style']; commitMessage: CommitMessage }) => void
   /**
