@@ -11,14 +11,14 @@
 // Colocated and not, the same: the slot's own folder is never watched either way.
 import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'fs'
 import { isAbsolute, join, resolve } from 'path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { Observer } from '../src/main/platform/observe'
 import { readRepoRefs } from '../src/main/platform/repoRefs'
 import { isUnknown } from '../src/main/platform/types'
 import { jjContextOf } from '../src/main/platform/jjDetect'
-import { jjCheckEnd, jjCheckStart, jjCounts, jjCredit, type JjCheckFor } from '../src/main/platform/jjChecks'
-import { entriesChanged, ignoredOnly, jjEntries, RunWatch } from '../src/main/platform/jjIgnoredEntries'
+import { jjCheckEnd, jjCheckStart, jjCounts, jjCredit, type JjCheckFor, type JjCheckStart } from '../src/main/platform/jjChecks'
+import { entriesChanged, ignoredOnly, jjEntries, RunWatch, type Kind, type WatchedNames } from '../src/main/platform/jjIgnoredEntries'
 import type { ViewOf } from '../src/main/platform/jjView'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
@@ -73,10 +73,10 @@ describe.skipIf(!jjExe)('HI-3121: a jj builder’s check in its slot that writes
       expect(isUnknown(await o.changedBetween(root, Date.now(), Date.now(), jjCounts))).toBe(true)
 
       // A builder's check: the repository's scope (no `scope`), as JjPlatform.checkRun brackets it.
-      const run = async (write: (() => void) | null) => {
+      const run = async (write: ((start: JjCheckStart) => void | Promise<void>) | null) => {
         const f: JjCheckFor = { view, folder: root, revision: R, owner: { still: () => true }, lock: (fn) => fn() }
         const start = await jjCheckStart(f, o, { runner: h.runner })
-        write?.()
+        await write?.(start)
         return jjCredit(await jjCheckEnd(f, start, o, { runner: h.runner }))
       }
       const credited = (c: { whyNot?: string; tested: string }) => !c.whyNot && c.tested === R
@@ -154,6 +154,17 @@ describe.skipIf(!jjExe)('HI-3121: a jj builder’s check in its slot that writes
         })
       ).toMatchObject({ whyNot: 'changed', why: 'end:stats' })
       rmSync(join(root, 'src', '__pycache__'), { recursive: true })
+      // HR2's round 2: a file named `out` (the rule is `out/`, folders only) made where out/ was, read as a file by the
+      // watch before it's deleted and out/ made again. (Gone before it's read: the residual, Darren's r36.)
+      expect(
+        await run(async (start) => {
+          rmSync(join(root, 'out'), { recursive: true, force: true })
+          writeFileSync(join(root, 'out'), 'read by the check\n')
+          await vi.waitFor(() => expect(start.watch?.seen().get('.')?.get('out')?.has('f')).toBe(true))
+          rmSync(join(root, 'out'))
+          mkdirSync(join(root, 'out'))
+        })
+      ).toMatchObject({ whyNot: 'changed', why: 'end:stats' })
       expect(credited(await run(() => rmSync(join(root, 'out'), { recursive: true })))).toBe(true)
 
       // The same, asked directly, for a file jj doesn't track (`snapshot.auto-track` narrowed: HI-3096), which no end
@@ -179,19 +190,50 @@ describe.skipIf(!jjExe)('HI-3121: a jj builder’s check in its slot that writes
   }
 })
 
-describe('HI-3158: a moved folder explained only by names jj ignores', () => {
-  const root = tempDir('jjign-unit-')
-  const before = new Map([['.', new Map([['out', 'd:1'], ['k.txt', 'f:2']])]])
-  const ev = (names: string[] | null) => ({ files: ['k.txt'], before, watched: new Map([['.', names ? new Set(names) : null]]) })
-  it('fails closed: a folder unwatched or watched incompletely, no names to explain the move, or a change the watch missed', async () => {
-    // The listing at the end: `k.txt` only (out/ gone). No Git store here: nothing is ignored either way.
+describe('HI-3158: a moved folder explained only by names jj ignores, by every kind each had', () => {
+  /** A jj workspace's root as ignoredOnly reads it: a Git-backed store (no jj, no git run to make it) and `.gitignore`. */
+  const workspace = (store: boolean): string => {
+    const root = tempDir('jjign-unit-')
+    if (store) {
+      const s = join(root, '.jj', 'repo', 'store')
+      mkdirSync(join(s, 'git', 'objects'), { recursive: true })
+      mkdirSync(join(s, 'git', 'refs'))
+      writeFileSync(join(s, 'git', 'HEAD'), 'ref: refs/heads/main\n')
+      writeFileSync(join(s, 'type'), 'git\n')
+      writeFileSync(join(s, 'git_target'), 'git\n')
+    }
+    writeFileSync(join(root, '.gitignore'), 'out/\n*.tmp\n')
     writeFileSync(join(root, 'k.txt'), 'k\n')
-    expect(await ignoredOnly(root, ['.'], ev(null))).toBeNull()
-    expect(await ignoredOnly(root, ['.'], { ...ev([]), watched: null })).toBeNull()
-    expect(await ignoredOnly(root, ['.'], ev([]))).toBeNull()
-    expect(await ignoredOnly(root, ['.'], ev(['k.txt']))).toBeNull()
-    expect(await ignoredOnly(root, ['.'], { ...ev(['out']), before: null })).toBeNull()
-    expect(await ignoredOnly(root, ['.'], ev(['out']))).toBeNull()
+    return root
+  }
+  type Saw = Record<string, Kind[]> | null
+  const kinds = (saw: Saw): WatchedNames => new Map([['.', saw ? new Map(Object.entries(saw).map(([n, k]) => [n, new Set(k)])) : null]])
+  const dir = (r: string, n: string) => mkdirSync(join(r, n))
+  const file = (r: string, n: string) => writeFileSync(join(r, n), 'x\n')
+  const rm = (r: string, n: string) => rmSync(join(r, n), { recursive: true })
+  const rows: { case: string; setup?: (r: string) => void; change: (r: string) => void; saw: Saw; store?: false; credited: boolean }[] = [
+    { case: 'a first build: a new ignored folder', change: (r) => dir(r, 'out'), saw: { out: ['d'] }, credited: true },
+    { case: 'a clean build: the ignored folder made again', setup: (r) => dir(r, 'out'), change: (r) => (rm(r, 'out'), dir(r, 'out')), saw: { out: ['d'] }, credited: true },
+    { case: 'an ignored file made and deleted', change: () => undefined, saw: { 'x.tmp': ['f'] }, credited: true },
+    { case: 'an ignored file deleted (gone when read)', setup: (r) => file(r, 'x.tmp'), change: (r) => rm(r, 'x.tmp'), saw: { 'x.tmp': [] }, credited: true },
+    { case: 'HR1: a file not ignored made and deleted beside a new ignored folder', change: (r) => dir(r, 'out'), saw: { out: ['d'], 'stray.txt': [] }, credited: false },
+    { case: 'HR2: a file named as the folder-only `out/` read while it was there', setup: (r) => dir(r, 'out'), change: (r) => (rm(r, 'out'), dir(r, 'out')), saw: { out: ['f', 'd'] }, credited: false },
+    { case: 'r36’s residual: that file gone before it was read', setup: (r) => dir(r, 'out'), change: (r) => (rm(r, 'out'), dir(r, 'out')), saw: { out: ['d'] }, credited: true },
+    { case: 'a file named as the folder, left there', setup: (r) => dir(r, 'out'), change: (r) => (rm(r, 'out'), file(r, 'out')), saw: { out: ['d'] }, credited: false },
+    { case: 'a new file not ignored', change: (r) => file(r, 'new.txt'), saw: { 'new.txt': ['f'] }, credited: false },
+    { case: 'an entry that couldn’t be read', change: (r) => dir(r, 'out'), saw: { out: ['?'] }, credited: false },
+    { case: 'the watch lost events', change: (r) => dir(r, 'out'), saw: null, credited: false },
+    { case: 'a change the watch didn’t name', change: (r) => (dir(r, 'out'), file(r, 'y.tmp')), saw: { out: ['d'] }, credited: false },
+    { case: 'nothing named but the revision’s own file (its line decides)', change: () => undefined, saw: { 'k.txt': ['f'] }, credited: false },
+    { case: 'no Git store to ask', change: (r) => dir(r, 'out'), saw: { out: ['d'] }, store: false, credited: false }
+  ]
+  it.each(rows)('$case: credited $credited', async (row) => {
+    const root = workspace(row.store !== false)
+    row.setup?.(root)
+    const before = await jjEntries(root, ['.'])
+    row.change(root)
+    const got = await ignoredOnly(root, ['.'], { files: ['.gitignore', 'k.txt'], before, watched: kinds(row.saw) })
+    expect(got).toEqual(row.credited ? ['.'] : null)
   })
 })
 

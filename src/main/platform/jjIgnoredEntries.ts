@@ -12,11 +12,16 @@
 //    --no-index`), colocated or not. jj's and Git's own folders, the revision's files and the snapshot's folders (their
 //    own lines decide) aren't asked.
 // The watch is what sees a file not ignored made and deleted during the run (HR1's round 1): the listings at the ends
-// can't. Anything else (a folder the watch didn't cover, a name not ignored, an unreadable entry or listing, Git failing,
+// can't. Each name is asked about as every kind its entry had: a folder with its slash, a file without. A watch gives
+// names only (a creation and a deletion alike), so each event's entry is stat'ed as it arrives (HR2's round 2: a file made
+// where an ignored `out/` was). The residual, Darren's decision (13 Nov, r36): a file named as an ignored folder, made and
+// deleted while that folder is remade, gone before its event is read (milliseconds), passes as the folder; reading kinds
+// for certain needs the change journal, which needs admin rights. Anything else (a folder the watch didn't cover, a name not ignored, an unreadable entry or listing, Git failing,
 // a folder whose time moved with no name to explain it) still counts.
 
 import { watch, type FSWatcher } from 'original-fs'
-import { lstat, readdir } from 'original-fs/promises'
+import { lstat, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'original-fs/promises'
+import { tmpdir } from 'os'
 import { join } from 'path'
 import { git } from '../git'
 import { isAbsent } from './jjView'
@@ -44,8 +49,14 @@ export type FolderEntries = Map<string, string>
 /** Each folder's entries (workspace-relative, `.` the root); a folder that couldn't be listed is null. */
 export type EntriesOf = Map<string, FolderEntries | null>
 
-/** What a run's watches saw, by folder: the names, or null where the watch wasn't there throughout. */
-export type WatchedNames = Map<string, Set<string> | null>
+/** An entry's kind as read: a folder, a file (anything else), or unreadable. */
+export type Kind = 'd' | 'f' | '?'
+
+/**
+ * What a run's watches saw, by folder: each name with the kinds its entry had when its events were read (none: gone each
+ * time), or null where the watch wasn't there throughout.
+ */
+export type WatchedNames = Map<string, Map<string, Set<Kind>> | null>
 
 /** The folders of a revision's files, `.` (the root) included: the folder lines of jjStats' snapshot, sorted. */
 export function foldersOf(files: string[]): string[] {
@@ -63,8 +74,10 @@ export function foldersOf(files: string[]): string[] {
  * name) is null in what it saw.
  */
 export class RunWatch {
-  private readonly names = new Map<string, Set<string> | null>()
+  private readonly names = new Map<string, Map<string, Set<Kind>> | null>()
   private readonly watches: FSWatcher[] = []
+  /** The kinds being read (each event's entry stat'ed as it arrives): settle waits for them. */
+  private readonly reading = new Set<Promise<void>>()
   private readonly started = Date.now()
   private last = Date.now()
   private closed = false
@@ -72,13 +85,23 @@ export class RunWatch {
 
   private constructor(root: string, folders: string[]) {
     for (const f of folders) {
-      const seen = new Set<string>()
-      this.names.set(f, seen)
+      this.names.set(f, new Map())
       try {
         const w = watch(join(root, f), { persistent: false }, (_evt, name) => {
           this.last = Date.now()
-          if (name === null || name === undefined || /[\\/]/.test(String(name))) this.names.set(f, null)
-          else this.names.get(f)?.add(String(name))
+          if (name === null || name === undefined || /[\\/]/.test(String(name))) return void this.names.set(f, null)
+          const n = String(name)
+          const kinds = this.names.get(f)?.get(n) ?? new Set<Kind>()
+          this.names.get(f)?.set(n, kinds)
+          // Darren's decision on HI-3158 (13 Nov, r36, option 2): its kind as soon as it can be read, so a file made where
+          // an ignored folder was is seen as one unless it's gone within moments (the residual SPEC names). Gone: a
+          // deletion, or an entry gone before it could be read; nothing to add.
+          const p = lstat(join(root, f, n)).then(
+            (s) => void kinds.add(s.isDirectory() ? 'd' : 'f'),
+            (e: unknown) => void (isAbsent(e) ? undefined : kinds.add('?'))
+          )
+          this.reading.add(p)
+          void p.finally(() => this.reading.delete(p))
         })
         w.on('error', () => this.names.set(f, null))
         this.watches.push(w)
@@ -115,6 +138,7 @@ export class RunWatch {
       await new Promise((r) => setTimeout(r, QUIET_MS - quiet + 5))
     }
     this.close()
+    await Promise.all([...this.reading])
     return this.seen()
   }
 
@@ -130,7 +154,8 @@ export class RunWatch {
     this.close()
   }
 
-  private seen(): WatchedNames {
+  /** What the watches have seen so far (their kinds may still be being read). */
+  seen(): WatchedNames {
     return new Map(this.names)
   }
 }
@@ -226,17 +251,53 @@ export async function ignoredOnly(root: string, changed: string[], ev: IgnoredEv
     const diff = entriesChanged(f, was, now)
     if (!diff || !now || !diff.every((n) => saw.has(n))) return null
     const rel = (name: string): string => (f === '.' ? name : `${f}/${name}`)
-    const names = [...saw].filter((n) => !(f === '.' && INTERNAL.has(n)) && !own.has(rel(n)))
+    const names = [...saw.keys()].filter((n) => !(f === '.' && INTERNAL.has(n)) && !own.has(rel(n)))
     // Its time moved, and nothing to say why: something came and went that no event named.
     if (!names.length) return null
     for (const n of names) {
-      // A folder is asked with its slash (Git's rules for folders need it), as it is now or was at the start; one that
-      // came and went unseen by either listing is asked as a file (a folder rule then doesn't match: it counts).
-      const id = now.get(n) ?? was?.get(n)
-      asked.push(`${rel(n)}${id?.startsWith('d:') ? '/' : ''}`)
+      // Every kind its entry had, as its events were read and in the two listings. Unreadable: it counts. A folder is
+      // asked with its slash (Git's rules for folders need it), a file without, both where it was each; never seen as
+      // either (came and went between reads), it is asked as a file, so a folder-only rule doesn't match: it counts.
+      const kinds = new Set(saw.get(n))
+      for (const id of [now.get(n), was?.get(n)]) if (id) kinds.add(id === '?' ? '?' : id.startsWith('d:') ? 'd' : 'f')
+      if (kinds.has('?')) return null
+      if (kinds.has('d')) asked.push(`${rel(n)}/`)
+      if (kinds.has('f') || !kinds.size) asked.push(rel(n))
     }
   }
-  const ignored = await jjIgnored(root, asked)
+  const ignored = await ignoredByKind(root, asked)
   if (!ignored || !asked.every((p) => ignored.has(p))) return null
   return changed
+}
+
+/**
+ * jjIgnored by the kind each path is asked as, never by what is on disk now: Git takes a path without a slash that is a
+ * folder on disk as that folder (HR2's `out` file where `out/` is now), so it's asked in a work tree of its own holding
+ * only the `.gitignore` files on the paths' way (the root's and each folder's down to theirs), where nothing else is: a
+ * path with a slash is a folder, one without a file. Null where it can't say (one of those unreadable, Git failing).
+ */
+async function ignoredByKind(root: string, rels: string[]): Promise<Set<string> | null> {
+  if (!rels.length) return new Set()
+  const gd = await jjGitStoreOf(root)
+  if (!gd) return null
+  const shadow = await mkdtemp(join(tmpdir(), 'combwork-ignore-'))
+  try {
+    const folders = new Set<string>(['.'])
+    for (const p of rels) {
+      const parts = p.replace(/\/$/, '').split('/').slice(0, -1)
+      for (let i = 1; i <= parts.length; i++) folders.add(parts.slice(0, i).join('/'))
+    }
+    for (const f of folders) {
+      const text = await readFile(join(root, f, '.gitignore')).catch((e: unknown) => (isAbsent(e) ? null : undefined))
+      if (text === undefined) return null
+      if (text === null) continue
+      await mkdir(join(shadow, f), { recursive: true })
+      await writeFile(join(shadow, f, '.gitignore'), text)
+    }
+    const r = await git(shadow, [`--git-dir=${gd}`, `--work-tree=${shadow}`, 'check-ignore', '--no-index', '-z', '--stdin'], undefined, rels.join('\0'))
+    if (!r.ok && r.code !== 1) return null
+    return new Set(r.out.split('\0').filter(Boolean))
+  } finally {
+    await rm(shadow, { recursive: true, force: true }).catch(() => undefined)
+  }
 }

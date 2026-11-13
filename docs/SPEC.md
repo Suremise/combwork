@@ -2491,11 +2491,17 @@ so credit is only ever on the exact commit id and its content (R3.1, R3.2), and 
      each one's entries (name and file id). Where only folders' lines moved, a moved folder doesn't count when its watch
      was there throughout and lost nothing, every entry that came, went or was made again between the two listings (a new
      id under its name) is among the names the watch saw, and every name it saw (less jj's and Git's own folders, the
-     revision's files and the snapshot's folders, whose own lines decide) is one jj ignores. So a build's first run that
-     makes its output folder, or one that deletes it and makes it again each run, is credited, and a file not ignored
-     made and deleted during the run (no listing has it: HR1's round 1) still counts. A folder unwatched, a name not
-     ignored, an unreadable listing or entry, Git failing, or a folder whose time moved with no name to explain it is
-     still `changed`. A candidate's merge check in a check copy is decided the same way;
+     revision's files and the snapshot's folders, whose own lines decide) is one jj ignores, as every kind its entry had:
+     each event's entry is stat'ed as it arrives (a watch gives names only), and a folder is asked about with its slash,
+     a file without, in a work tree holding only the `.gitignore` files on its way (Git otherwise takes a path that is a
+     folder on disk as that folder). So a build's first run that makes its output folder, or one that deletes it and
+     makes it again each run, is credited, and a file not ignored made and deleted during the run (no listing has it:
+     HR1's round 1) still counts, as does a file made where a folder-only rule's folder was (`out` for `out/`: HR2's round
+     2). A folder unwatched, a name not ignored, an unreadable listing or entry, Git failing, or a folder whose time moved
+     with no name to explain it is still `changed`. **The residual** (Darren's decision on HI-3158, 13 Nov, r36): a file
+     named as a folder-only rule's folder, made and deleted while that folder is remade and gone before its event is read
+     (milliseconds), passes as the folder; telling kinds for certain needs the change journal, which needs admin rights.
+     A candidate's merge check in a check copy is decided the same way;
   6. the moment before the end boundary: still H1, the same checkout record and Git state, else `moved` (any
      operation by anyone, a bookmark set elsewhere included; a plain Git commit jj hasn't imported shows in Git's
      state);
