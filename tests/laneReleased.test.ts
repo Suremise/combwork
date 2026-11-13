@@ -79,7 +79,7 @@ describe('a lane on a released line (HI-3148)', () => {
   it('is refused, recording nothing, with a line to start on instead; Start Lane… reads the same first', async () => {
     const { w } = await project()
     const c = await card(w, 'New work')
-    await expect(lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [c.number], by: 'You', target: '1.2.0' })).rejects.toThrow(/^1\.2\.0 is released \(v1\.2\.0, tagged .+, merged into main\), so the lane wasn’t started\. Did you mean main\?/)
+    await expect(lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [c.number], by: 'You', target: '1.2.0' })).rejects.toThrow(/^1\.2\.0 is released \(v1\.2\.0, tagged .+, merged into main\)\. Did you mean main\?/)
     expect(await lanes.listLanes(w)).toEqual([])
     const check = await lanes.laneReleaseCheck(w, 'p', 'b1', '1.2.0')
     expect(check?.target).toBe('1.2.0')
