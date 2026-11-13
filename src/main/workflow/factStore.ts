@@ -295,6 +295,21 @@ const COLS = 'number, title, col, stage, pre_workflow, kind, target, paths_decla
  */
 type Scope = { project: string; key: string; projectId?: () => string | null; now?: () => Date }
 
+/**
+ * Whether the lease a card's cycle started on (HI-3118: its Started `lease`, `slot` and `folder`) still holds that slot
+ * for that card now, read on `db`: open, on that slot, the slot still at that folder, and the card's own lease or a lane
+ * lease whose lane lists the card (its list or its queued one). An adopted worktree's carried lease (#1441) holds.
+ */
+export function leaseHoldsIn(db: DatabaseSync, lease: string, slot: string, folder: string, card: number): boolean {
+  const r = db.prepare('SELECT project, slot, kind, card, lane FROM slot_leases WHERE id = ? AND ended_at IS NULL').get(lease) as { project: string; slot: string; kind: string; card: number | null; lane: string | null } | undefined // i18n-ignore: SQL
+  if (!r || r.slot.toLowerCase() !== slot.toLowerCase()) return false
+  const s = db.prepare('SELECT folder FROM slots WHERE project = ? AND name = ?').get(r.project, r.slot) as { folder: string } | undefined // i18n-ignore: SQL
+  if (!s || !samePath(s.folder, folder)) return false
+  if (r.kind === 'carried') return true
+  if (r.kind === 'card') return r.card === card
+  return !!r.lane && !!db.prepare('SELECT 1 FROM lane_cards WHERE lane = ? AND card = ? UNION ALL SELECT 1 FROM lane_pending WHERE lane = ? AND card = ?').get(r.lane, card, r.lane, card) // i18n-ignore: SQL
+}
+
 /** For tests: runs once a read of cards' records has read their rows, before their lists (another connection committing there). */
 export const factStoreTestHooks: { afterCards: (() => void) | null } = { afterCards: null }
 
@@ -471,15 +486,7 @@ export class FactStore {
    */
   leaseHolds(lease: string, slot: string, folder: string, card: number): boolean | null {
     try {
-      return this.conn.read((db) => {
-        const r = db.prepare('SELECT project, slot, kind, card, lane FROM slot_leases WHERE id = ? AND ended_at IS NULL').get(lease) as { project: string; slot: string; kind: string; card: number | null; lane: string | null } | undefined
-        if (!r || r.slot.toLowerCase() !== slot.toLowerCase()) return false
-        const s = db.prepare('SELECT folder FROM slots WHERE project = ? AND name = ?').get(r.project, r.slot) as { folder: string } | undefined
-        if (!s || !samePath(s.folder, folder)) return false
-        if (r.kind === 'carried') return true
-        if (r.kind === 'card') return r.card === card
-        return !!r.lane && !!db.prepare('SELECT 1 FROM lane_cards WHERE lane = ? AND card = ? UNION ALL SELECT 1 FROM lane_pending WHERE lane = ? AND card = ?').get(r.lane, card, r.lane, card)
-      })
+      return this.conn.read((db) => leaseHoldsIn(db, lease, slot, folder, card))
     } catch {
       return null
     }

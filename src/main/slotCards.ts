@@ -64,7 +64,7 @@ import { getTask } from './tasks'
 import { CombworkError } from './combworkError'
 import { onAction } from './workflow/actionWorker'
 import { agentBusy } from './workflow/lineUpdates'
-import { withoutWriteFence, type CardRecord } from './workflow/factStore'
+import { leaseHoldsIn, withoutWriteFence, type CardRecord } from './workflow/factStore'
 import type { SlotForStart, Workflow } from './workflow/runtime'
 import { agentRunsGoing, setJjCards, setSlotStarts, workflowEnforced, workflowFor, ENFORCE } from './workflow/service'
 import { jjCardsFor } from './jjCards'
@@ -773,6 +773,18 @@ function uses(wf: Workflow, l: SlotLease): boolean {
   if (!card) return false
   const s = wf.state(card)
   return s.started?.lease === l.id && KEEPS.has(s.stage)
+}
+
+/**
+ * HI-3118: whether a card's started lease still holds its slot for it (factStore's leaseHoldsIn, on the board's database
+ * the pool's leases are in); null when it can't be read. The submit's own question, through SlotStarts.held.
+ */
+function slotHeldFor(ws: WorkspaceService, _project: string, lease: string, slot: string, folder: string, card: number): boolean | null {
+  try {
+    return boardRead(ws, (db) => leaseHoldsIn(db, lease, slot, folder, card))
+  } catch {
+    return null
+  }
 }
 
 /** Lane leases whose ambiguous end (HI-3118) was logged once already. */
@@ -2224,7 +2236,7 @@ export function startSlotCards(): void {
   }
   onAction('prepareSlot', (a, ws) => ask(a.card, ws))
   onAction('releaseSlot', (a, ws) => ask(a.card, ws))
-  setSlotStarts({ leaseFor: (ws, project, card, builder, o) => leaseForStart(ws, project, card, builder, o), unused: slotUnused, standIn, keptAcross: async (ws, project, card) => (await poolFor(ws, project)).keptAcross(card) })
+  setSlotStarts({ leaseFor: (ws, project, card, builder, o) => leaseForStart(ws, project, card, builder, o), unused: slotUnused, standIn, keptAcross: async (ws, project, card) => (await poolFor(ws, project)).keptAcross(card), held: (ws, project, lease, slot, folder, card) => slotHeldFor(ws, project, lease, slot, folder, card) })
   // jj's card work's dependencies (HI-2868), for each project's workflow.
   setJjCards(jjCardsFor)
   // The pool's size: the project's builders (#1430's roles: builders and either), at least one (slots.ts).
