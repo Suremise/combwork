@@ -20,6 +20,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { FactStore } = await import('../src/main/workflow/factStore')
+const { reconcilersIdle } = await import('../src/main/workflow/reconciler')
 const { advanced } = await import('../src/main/advanced')
 const service = await import('../src/main/workflow/service')
 const { ENFORCE } = service
@@ -147,9 +148,19 @@ describe('a card by intent (#1267)', () => {
     // A comment never moves an Approved card (S2).
     await inWorkspace(w, () => tasks.commentTask(card, 'A thought after the pass', builder))
     expect(foldCard(facts(w, card)).stage).toBe('approved')
-    // The builder merges it and reports the merge: Done, its merge checked.
-    git(repo, 'merge', '-q', '--no-ff', '-m', 'merge card', 'card')
-    const merged = await act(w, card, builder, { kind: 'reportMerge' })
+    // The builder merges it and reports the merge: Done, its merge checked. Combwork's reconciler follows the project from
+    // the approval and, finding the merge first (its watcher's run, 400 ms after it, ahead of a slow report under load),
+    // moves the card to Done itself: the report is then refused from there (HI-3154), as it should be. Held as Repair holds
+    // it (no new run reads a line meanwhile), any run under way finished first, the report is the one this test checks.
+    w.repairingMove = true
+    let merged: Awaited<ReturnType<typeof act>>
+    try {
+      await reconcilersIdle(w)
+      git(repo, 'merge', '-q', '--no-ff', '-m', 'merge card', 'card')
+      merged = await act(w, card, builder, { kind: 'reportMerge' })
+    } finally {
+      w.repairingMove = false
+    }
     expect(merged.done).toMatchObject({ from: 'approved', to: 'done' })
     expect(merged.card.column).toBe('done')
     expect(merged.done.next).toEqual({ step: 'done' })
