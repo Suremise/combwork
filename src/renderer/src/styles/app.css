@@ -11881,6 +11881,7 @@ textarea.input.task-blocked-input {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  margin-bottom: 12px;
 }
 .git-queue-past-bar > label {
   display: flex;
