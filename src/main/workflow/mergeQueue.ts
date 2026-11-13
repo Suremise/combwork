@@ -1613,7 +1613,7 @@ export class MergeQueue {
           }
           updated = up.updated ?? undefined
         }
-        const test = await this.testMerge(card, s, revision, onto, reads, updated, base)
+        const test = await this.testMerge(card, s, target, revision, onto, reads, updated, base)
         if (isAgain(test)) {
           const o = await readFailed(test)
           if (o) return o
@@ -1839,7 +1839,7 @@ export class MergeQueue {
    * worktree is ready, naming the reviewers whose passes count for what is merged (the latest submission, at the current
    * generation) and the queue's update when strict brought it up to date (#1352).
    */
-  private async testMerge(card: CardRecord, s: CardState, revision: string, expected: string, reads: EntryReads, updated?: string, base = ''): Promise<Again | { result: string } | CandidateTestFail | CandidatePause> {
+  private async testMerge(card: CardRecord, s: CardState, target: string, revision: string, expected: string, reads: EntryReads, updated?: string, base = ''): Promise<Again | { result: string } | CandidateTestFail | CandidatePause> {
     const r = this.wf.rulesetOf(card, s)
     const port = this.integration(card, s)
     const h = this.host(reads)
@@ -1850,7 +1850,7 @@ export class MergeQueue {
       if (isUnknown(own)) return again(`Combwork couldn't read the messages of ${revision.slice(0, 7)}'s commits.`) // i18n-ignore: git's side of a pause, in English as git's messages are
       return mergeMessage(how, { card, revision, updated, reviewers, messages: own })
     }
-    return port.candidate(h, { card: card.key, revision, base, key: s.latest?.key, expected, style: r.options.style === 'rebase' ? 'rebase' : r.options.style === 'squash' ? 'squash' : 'merge', ...(updated ? { updated } : {}), message })
+    return port.candidate(h, { card: card.key, revision, base, key: s.latest?.key, expected, target, style: r.options.style === 'rebase' ? 'rebase' : r.options.style === 'squash' ? 'squash' : 'merge', ...(updated ? { updated } : {}), message })
   }
 
   /**

@@ -5858,6 +5858,14 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    - with `commit.gpgsign`, signing runs as configured; if it would wait for a passphrase (a pinentry window), the
      entry pauses with "signing waits for you" rather than failing, and a signing error pauses it with git's message.
      Since HI-1185, a check before each step that signs (§16.9.5) pauses it up front, before anything is committed.
+     HI-3111: as configured *on the target*: the queue's folder and the Merge dialog's temporary worktree are detached,
+     where `includeIf "onbranch:…"` matches nothing, so when any onbranch condition is reachable (one `git config` a
+     round), the signing keys (`commit.gpgsign`, `gpg.*`, `user.signingkey`) are read by git in that same worktree with
+     its HEAD pointed at the target for the read alone (`targetSigning`, branchConfig.ts: its gitdir conditions,
+     config.worktree, scope order and nested includes as git evaluates them) and passed as `-c` to the signing check and
+     every command that commits. The folder must be detached at the expected commit first, and is read back so after
+     (HEAD written back as a detached one when git itself can't); any step failing is `again` (the dialog: nothing
+     merged), never "unsigned", and the next round's `folderAt` detaches the folder before anything.
    **Built [#1350]:**
    - **Identity:** the repository's own (`git config user.name` / `user.email`: local, then
      global), G12 on or off (HI-2266: G12's saved value never stands in for it), passed to the merge with `-c`. With none, the entry pauses `identity`, naming the project folder: the

@@ -92,7 +92,7 @@ export interface CandidateHost {
   signTimeoutMs: number
   identity(): Promise<Maybe<CommitIdentity | null>>
   /** A round's reads, made once in it. */
-  reads: { signs?: Promise<boolean | Again>; signCheck?: Promise<SigningStatus> }
+  reads: { signs?: Promise<boolean | Again>; signCheck?: Promise<SigningStatus>; onTarget?: Promise<string[] | Again> }
   /** HI-1182: whether the queue's checkouts of its folder leave LFS files as pointers (Set up submodules and LFS on: its step fills them). */
   skipSmudge?: () => Promise<boolean>
 }
@@ -123,7 +123,7 @@ export interface IntegrationPort {
    * is ready (a branch's own messages: its read after the workspace's). A failure leaves the workspace clean at the head;
    * the result is kept on the card's queue pin.
    */
-  candidate(h: CandidateHost, c: CandidateOf & { style: 'merge' | 'squash' | 'rebase'; updated?: string; message: () => Promise<string | Again> }): Promise<Again | { result: string } | CandidateTestFail | CandidatePause>
+  candidate(h: CandidateHost, c: CandidateOf & { target: string; style: 'merge' | 'squash' | 'rebase'; updated?: string; message: () => Promise<string | Again> }): Promise<Again | { result: string } | CandidateTestFail | CandidatePause>
 
   // The advance (§16.9.2, R4.1, R4.7): the steps between its journal's phases, and the reads it decides on.
 

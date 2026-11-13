@@ -9,6 +9,7 @@ import { existsSync, readdirSync } from 'original-fs'
 import { resolve } from 'path'
 import { git } from '../git'
 import { again, isAgain } from './again'
+import { targetSigning } from '../branchConfig'
 import { commitEnv, commitFailed, configRead, joined, readCommitStream } from './gitCommits'
 import * as G from './git'
 import { CANDIDATE_TEXT, UPDATE_NOT_SAME } from './candidateText'
@@ -50,11 +51,21 @@ async function mergeBase(h: CandidateHost, a: string, b: string): Promise<string
 }
 
 /**
- * Whether the repository signs commits, as git reads it in the queue's folder. HI-2054: a read git couldn't make is
+ * HI-3111: the target's signing settings as `-c` arguments (`targetSigning`: read in the queue's folder with its HEAD on
+ * the target for the read alone, detached at `at` again and read back so), first in every command that signs; a step
+ * that failed is `again`, before anything is merged or committed (the next round's `folderAt` detaches the folder first).
+ */
+function onTarget(h: CandidateHost, f: string, target: string, at: string): Promise<string[] | Again> {
+  // Once a round (its target's), as `signs`: the round's update and test merge sign alike.
+  return (h.reads.onTarget ??= targetSigning(h.run, f, target, at).then((r) => ('failed' in r ? again(r.failed) : r.args)))
+}
+
+/**
+ * Whether the repository signs commits, as git reads it in the queue's folder, with the target's signing (`onTarget`). HI-2054: a read git couldn't make is
  * `again` with git's words (the round's reads are new each time round, so it is read again), never "unsigned".
  */
-function signs(h: CandidateHost, f: string): Promise<boolean | Again> {
-  return (h.reads.signs ??= h.run(f, ['config', '--type=bool', '--get', 'commit.gpgsign']).then((r) => {
+function signs(h: CandidateHost, f: string, targetArgs: readonly string[]): Promise<boolean | Again> {
+  return (h.reads.signs ??= h.run(f, [...targetArgs, 'config', '--type=bool', '--get', 'commit.gpgsign']).then((r) => {
     const v = configRead(r)
     return typeof v === 'string' ? v === 'true' : again(v.failed)
   }))
@@ -448,9 +459,11 @@ export const gitIntegration: IntegrationPort = {
     const at = await folderAt(h, revision, [expected])
     if (at) return at
     const f = h.folder
-    const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
+    const onIt = await onTarget(h, f, c.target, revision)
+    if (isAgain(onIt)) return onIt
+    const who = [...onIt, '-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
     const rebase = c.how === 'rebase'
-    const signed = await signs(h, f)
+    const signed = await signs(h, f, onIt)
     // HI-2054: whether it signs couldn't be read: again, before anything is merged or committed.
     if (isAgain(signed)) return signed
     const pre = signed ? await preSign(h, f, who) : null
@@ -508,11 +521,13 @@ export const gitIntegration: IntegrationPort = {
     if (at) return at
     const message = await c.message()
     if (isAgain(message)) return message
-    const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
+    const onIt = await onTarget(h, f, c.target, expected)
+    if (isAgain(onIt)) return onIt
+    const who = [...onIt, '-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
     const squash = c.style === 'squash'
-    // Signed as the repository says (never overridden), within a bound when it signs: a signer waiting for a passphrase
-    // is ended with the rest of the commit's tree.
-    const signed = await signs(h, f)
+    // Signed as the repository says on the target (never overridden), within a bound when it signs: a signer waiting
+    // for a passphrase is ended with the rest of the commit's tree.
+    const signed = await signs(h, f, onIt)
     // HI-2054: whether it signs couldn't be read: again, before anything is merged or committed.
     if (isAgain(signed)) return signed
     const pre = signed ? await preSign(h, f, who) : null
@@ -566,7 +581,7 @@ export const gitIntegration: IntegrationPort = {
  * linear, and the same change as reviewed, else the card is returned (`notUpToDate`, saying which); a conflict returns
  * it with its files; a read git couldn't answer pauses (never taken for a pass or a mismatch).
  */
-async function rebaseOnto(h: CandidateHost, c: { card: string; revision: string; base: string; key?: string | null; expected: string }, id: { name: string; email: string }): Promise<Again | { result: string } | CandidateTestFail | CandidatePause> {
+async function rebaseOnto(h: CandidateHost, c: { card: string; revision: string; base: string; key?: string | null; expected: string; target: string }, id: { name: string; email: string }): Promise<Again | { result: string } | CandidateTestFail | CandidatePause> {
   const { revision, base, expected } = c
   const f = h.folder
   const merges = await h.run(h.project, ['rev-list', '--min-parents=2', `${base}..${revision}`])
@@ -580,8 +595,10 @@ async function rebaseOnto(h: CandidateHost, c: { card: string; revision: string;
   if (at) return at
   let result = revision
   if (!linear || onTop.code !== 0) {
-    const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
-    const signed = await signs(h, f)
+    const onIt = await onTarget(h, f, c.target, revision)
+    if (isAgain(onIt)) return onIt
+    const who = [...onIt, '-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
+    const signed = await signs(h, f, onIt)
     // HI-2054: whether it signs couldn't be read: again, before anything is merged or committed.
     if (isAgain(signed)) return signed
     // The rewritten commits are signed: checked first (an on-top linear suffix lands unchanged, signing nothing).

@@ -58,13 +58,14 @@ function second(ran: { kind: string; line: string }[]): { kind: string; line: st
 }
 
 describe("the git a queue step runs for a card (HI-2050)", () => {
-  // Measured before HI-2050 (6e11c0403), card 2: merge 27, squash 28, rebase 34, strict 38.
+  // Measured before HI-2050 (6e11c0403), card 2: merge 27, squash 28, rebase 34, strict 38. HI-3111 adds one git a round
+  // (whether any onbranch condition is set: the target's signing read in the queue's folder only when one is).
   // [what, options, at most, the commits the queue makes for it (each read back by its own git)]
   const styles: [string, Partial<WorkflowOptions>, number, number][] = [
-    ['a merge', {}, 26, 1],
-    ['a squash', { style: 'squash' }, 27, 1],
-    ['Rebase and fast-forward', { style: 'rebase' }, 33, 1],
-    ['strict, the card behind its target', { strict: true }, 37, 2]
+    ['a merge', {}, 27, 1],
+    ['a squash', { style: 'squash' }, 28, 1],
+    ['Rebase and fast-forward', { style: 'rebase' }, 34, 1],
+    ['strict, the card behind its target', { strict: true }, 38, 2]
   ]
   for (const [what, o, most, commits] of styles)
     // GIT_HEAVY_MS: two cards' whole course and drain, about 70 git processes in all.
