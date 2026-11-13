@@ -50,6 +50,7 @@ const T = {
     removing: msg({ id: 'workflow.slots.state.removing', defaultMessage: 'Being removed', description: 'A slot’s state in the list under “Slots and copies”.' })
   } satisfies Record<SlotView['state'], ReturnType<typeof msg>>,
   // HI-2869: a stale jj slot and its recovery (J9a's explicit action).
+  staleAbandoned: msg({ id: 'workflow.slots.staleAbandoned', defaultMessage: 'Stale: its jj operation was abandoned (jj op abandon)', description: 'HI-3135: beside a jj slot in the list under “Slots and copies”, in place of workflow.slots.stale: the operation its folder was last brought to was discarded by the user’s jj op abandon, so jj can’t read it until it is recovered; it isn’t lent until then. jj op abandon is a command: keep it as it is.' }),
   stale: msg({ id: 'workflow.slots.stale', defaultMessage: 'Stale: another jj workspace changed it', description: 'Beside a jj slot in the list under “Slots and copies” (HI-2869): its files are behind its working-copy commit because another jj workspace rewrote it; it isn’t lent until recovered. “workspace” is jj’s term.' }),
   recover: msg({ id: 'workflow.slots.recover', defaultMessage: 'Recover…', description: 'A button beside a stale jj slot (HI-2869): brings it up to date, keeping any edits jj hadn’t recorded (asks first).' }),
   recoverTitle: msg({ id: 'workflow.slots.recoverTitle', defaultMessage: 'Recover {slot}?', description: 'The title of the confirmation before recovering a stale jj slot (HI-2869). {slot} is the slot’s name.' }),
@@ -255,8 +256,8 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
                           {s.stale && (
                             <>
                               {' · '}
-                              <span className="s-desc" data-stale="">
-                                {tr(T.stale)}
+                              <span className="s-desc" data-stale={s.staleWhy ?? 'rewritten'}>
+                                {tr(s.staleWhy === 'abandoned' ? T.staleAbandoned : T.stale)}
                               </span>
                             </>
                           )}

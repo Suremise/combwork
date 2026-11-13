@@ -3,7 +3,7 @@
 // same folder otherwise, never a fresh one; a known Stale never lost to an answer that couldn't be read. Deterministic:
 // each read and generation is a promise the test settles.
 import { describe, expect, it } from 'vitest'
-import { SlotStaleView, type StaleViewRow } from '../src/main/slotStaleView'
+import { SlotStaleView, type Staleness, type StaleViewRow } from '../src/main/slotStaleView'
 
 /** A promise the test settles. */
 function deferred<T>() {
@@ -17,13 +17,13 @@ function world() {
   const rows = new Map<string, StaleViewRow>()
   const owed = new Set<string>()
   const generations = new Map<string, string | null>()
-  const reads: { folder: string; answer: (v: boolean | null) => void }[] = []
+  const reads: { folder: string; answer: (v: Staleness | null) => void }[] = []
   let gate: ReturnType<typeof deferred<void>> | null = null
   const view = new SlotStaleView({
     row: (name) => rows.get(name) ?? null,
     owes: (name) => owed.has(name),
     read: (folder) => {
-      const d = deferred<boolean | null>()
+      const d = deferred<Staleness | null>()
       reads.push({ folder, answer: d.resolve })
       return d.promise
     },
@@ -51,8 +51,8 @@ describe("the slot listing's staleness (HI-2912)", () => {
     const asked = w.view.staleOf('slot-a')
     await w.flush()
     expect(w.reads.map((r) => r.folder)).toEqual(['C:\\ws.worktrees\\shop\\slot-a'])
-    w.reads[0].answer(true)
-    expect(await asked).toBe(true)
+    w.reads[0].answer('rewritten')
+    expect(await asked).toBe('rewritten')
     expect(w.view.size).toBe(1)
   })
 
@@ -61,11 +61,11 @@ describe("the slot listing's staleness (HI-2912)", () => {
     const row = w.slot('slot-a')
     const first = w.view.staleOf('slot-a')
     await w.flush()
-    w.reads[0].answer(true)
-    expect(await first).toBe(true)
+    w.reads[0].answer('rewritten')
+    expect(await first).toBe('rewritten')
     for (const busy of [() => (row.op = { token: 't' }), () => ((row.op = null), (row.job = 'j1')), () => ((row.job = null), w.owed.add('slot-a'))]) {
       busy()
-      expect(await w.view.staleOf('slot-a')).toBe(true)
+      expect(await w.view.staleOf('slot-a')).toBe('rewritten')
     }
     expect(w.reads).toHaveLength(1)
   })
@@ -105,12 +105,12 @@ describe("the slot listing's staleness (HI-2912)", () => {
     w.slot('slot-a')
     const first = w.view.staleOf('slot-a')
     await w.flush()
-    w.reads[0].answer(true)
-    expect(await first).toBe(true)
+    w.reads[0].answer('rewritten')
+    expect(await first).toBe('rewritten')
     const again = w.view.staleOf('slot-a')
     await w.flush()
     w.reads[1].answer(null)
-    expect(await again).toBe(true)
+    expect(await again).toBe('rewritten')
   })
 
   it('stale, then suppressed while recovered, then a fresh read: not stale', async () => {
@@ -118,11 +118,11 @@ describe("the slot listing's staleness (HI-2912)", () => {
     const row = w.slot('slot-a')
     const first = w.view.staleOf('slot-a')
     await w.flush()
-    w.reads[0].answer(true)
-    expect(await first).toBe(true)
+    w.reads[0].answer('rewritten')
+    expect(await first).toBe('rewritten')
     // The user's Recover…: an operation on the slot. Stale shown meanwhile, nothing read.
     row.op = { token: 'recover' }
-    expect(await w.view.staleOf('slot-a')).toBe(true)
+    expect(await w.view.staleOf('slot-a')).toBe('rewritten')
     expect(w.reads).toHaveLength(1)
     row.op = null
     const after = w.view.staleOf('slot-a')
@@ -144,11 +144,11 @@ describe("the slot listing's staleness (HI-2912)", () => {
     const row = w.slot('slot-a')
     const first = w.view.staleOf('slot-a')
     await w.flush()
-    w.reads[0].answer(true)
-    expect(await first).toBe(true)
+    w.reads[0].answer('rewritten')
+    expect(await first).toBe('rewritten')
     // Busy, nothing of the folder is touched: the answer kept for its path.
     w.owed.add('slot-a')
-    expect(await w.view.staleOf('slot-a')).toBe(true)
+    expect(await w.view.staleOf('slot-a')).toBe('rewritten')
     // Readable again, another folder there: its own read decides; one that couldn't be read never shows the old answer.
     w.owed.delete('slot-a')
     w.generations.set(row.folder, 'g2')
@@ -175,17 +175,17 @@ describe("the slot listing's staleness (HI-2912)", () => {
       await w.flush()
       expect(w.reads).toHaveLength(2)
       const ends = order === 'old read ends first' ? [0, 1] : [1, 0]
-      const answers = [false, true]
+      const answers: Staleness[] = [false, 'rewritten']
       for (const i of ends) {
         w.reads[i].answer(answers[i])
         await w.flush()
       }
       // The old read's caller saw g1 before and g2 after: nothing kept, what was known (nothing) returned.
       expect(await old).toBe(false)
-      expect(await fresh).toBe(true)
+      expect(await fresh).toBe('rewritten')
       // Busy now: the kept answer is the new folder's own (Stale), not the old read's.
       w.owed.add('slot-a')
-      expect(await w.view.staleOf('slot-a')).toBe(true)
+      expect(await w.view.staleOf('slot-a')).toBe('rewritten')
     })
   }
 
@@ -195,7 +195,7 @@ describe("the slot listing's staleness (HI-2912)", () => {
     const asked = w.view.staleOf('slot-a')
     await w.flush()
     w.view.keepOnly([])
-    w.reads[0].answer(true)
+    w.reads[0].answer('rewritten')
     await asked
     expect(w.view.size).toBe(0)
     // Even made again under the same name and busy at once: nothing of the old read shows.
@@ -210,7 +210,7 @@ describe("the slot listing's staleness (HI-2912)", () => {
     await w.flush()
     row.state = 'removing'
     expect(await w.view.staleOf('slot-a')).toBe(false)
-    w.reads[0].answer(true)
+    w.reads[0].answer('rewritten')
     expect(await asked).toBe(false)
     expect(w.view.size).toBe(0)
   })
@@ -222,7 +222,7 @@ describe("the slot listing's staleness (HI-2912)", () => {
     for (const n of ['slot-a', 'slot-b']) {
       const p = w.view.staleOf(n)
       await w.flush()
-      w.reads.at(-1)!.answer(true)
+      w.reads.at(-1)!.answer('rewritten')
       await p
     }
     expect(w.view.size).toBe(2)
@@ -243,7 +243,19 @@ describe("the slot listing's staleness (HI-2912)", () => {
     w.owed.delete('slot-a')
     const after = w.view.staleOf('slot-a')
     await w.flush()
-    w.reads[0].answer(true)
-    expect(await after).toBe(true)
+    w.reads[0].answer('rewritten')
+    expect(await after).toBe('rewritten')
+  })
+
+  // HI-3135: why it is stale is what was read, kept and shown as read: an abandoned operation stays abandoned.
+  it('keeps why it is stale as read (its operation abandoned), and shows it while busy', async () => {
+    const w = world()
+    w.slot('slot-a')
+    const asked = w.view.staleOf('slot-a')
+    await w.flush()
+    w.reads[0].answer('abandoned')
+    expect(await asked).toBe('abandoned')
+    w.slot('slot-a', { op: 'settle' })
+    expect(await w.view.staleOf('slot-a')).toBe('abandoned')
   })
 })

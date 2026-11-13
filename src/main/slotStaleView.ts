@@ -17,6 +17,11 @@
 // This only stops the listing from competing with the probe. It is no ordering of Combwork's reads against its writes:
 // the probe samples quiet, and another reader can start after it (HI-2912's follow-up card).
 
+import type { StaleWhy } from './platform/jjWorkspacePort'
+
+/** A slot's staleness as read: why it is stale (HI-3135: rewritten, or its operation abandoned), or false. */
+export type Staleness = StaleWhy | false
+
 /** What the view reads of a slot now (the pool's row). */
 export interface StaleViewRow {
   folder: string
@@ -30,8 +35,8 @@ export interface StaleViewDeps {
   row(name: string): StaleViewRow | null
   /** Whether the slot owes a settle now (HI-2906). Read synchronously. */
   owes(name: string): boolean
-  /** The slot's staleness from jj: true or false, null when it couldn't be read. */
-  read(folder: string): Promise<boolean | null>
+  /** The slot's staleness from jj: why it is stale, false when it isn't, null when it couldn't be read. */
+  read(folder: string): Promise<Staleness | null>
   /** The folder's creation generation (jjWorkspacePort `generationOf`), null when it can't be read. */
   generation(folder: string): Promise<string | null>
 }
@@ -39,20 +44,20 @@ export interface StaleViewDeps {
 interface Seen {
   folder: string
   generation: string
-  stale: boolean
+  stale: Staleness
 }
 
 export class SlotStaleView {
   private readonly seen = new Map<string, Seen>()
   /** Reads under way, by folder and generation: a caller joins only a read of the same folder incarnation. */
-  private readonly reading = new Map<string, Promise<boolean | null>>()
+  private readonly reading = new Map<string, Promise<Staleness | null>>()
   /** Each slot's owner token: replaced when what was kept for it is dropped, so a read begun before can't publish. */
   private readonly owners = new Map<string, object>()
 
   constructor(private readonly deps: StaleViewDeps) {}
 
-  /** Whether to show the slot as stale: true only from an answer read for this folder. */
-  async staleOf(name: string): Promise<boolean> {
+  /** Whether to show the slot as stale, and why: only from an answer read for this folder; else false. */
+  async staleOf(name: string): Promise<Staleness> {
     const first = this.deps.row(name)
     if (!first || first.state === 'gone' || first.state === 'removing') {
       this.drop(name)

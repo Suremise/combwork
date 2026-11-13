@@ -523,6 +523,7 @@
   "workflow.slots.setNone": "Definido para este projeto: nenhum",
   "workflow.slots.setup": "Script de preparação",
   "workflow.slots.setupDesc": "É executado num slot novo e de novo num slot cujos arquivos de lock mudaram desde a última instalação, por exemplo npm ci. As cópias de revisão e de verificação também o executam.",
+  "workflow.slots.staleAbandoned": "Desatualizado: a operação do jj dele foi descartada (jj op abandon)",
   "workflow.slots.stale": "Desatualizado: outro workspace do jj o alterou",
   "workflow.slots.state.creating": "Sendo preparado",
   "workflow.slots.state.dirty": "Tem alterações pendentes",

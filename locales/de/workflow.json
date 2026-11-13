@@ -523,6 +523,7 @@
   "workflow.slots.setNone": "Für dieses Projekt festgelegt: keins",
   "workflow.slots.setup": "Setup-Skript",
   "workflow.slots.setupDesc": "Läuft in einem neuen Slot und erneut in einem Slot, dessen Lock-Dateien sich seit der letzten Installation geändert haben, z. B. npm ci. Review- und Check-Kopien führen es auch aus.",
+  "workflow.slots.staleAbandoned": "Veraltet: seine jj-Operation wurde verworfen (jj op abandon)",
   "workflow.slots.stale": "Veraltet: ein anderer jj-Workspace hat ihn geändert",
   "workflow.slots.state.creating": "Wird eingerichtet",
   "workflow.slots.state.dirty": "Enthält noch Änderungen",

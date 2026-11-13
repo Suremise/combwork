@@ -80,6 +80,8 @@ describe.skipIf(!jjExe)(`a stale jj workspace's recovery (jj ${TESTED_JJ.version
     describe(colocated ? 'colocated' : 'non-colocated', () => {
       it("HI-2781's case: the unrecorded edit is back in the checkout, the earlier recorded file untouched, no divergent revision left", async () => {
         const s = await stale(colocated)
+        // HI-3135: another workspace rewrote its working copy: said so.
+        expect(await s.h.port.staleWhy(s.slot)).toBe('rewritten')
         const r = await run(s, s.deps())
         expect(r).toMatchObject({ ok: true, restored: ['local.txt'], beside: [], late: [], xKept: false, copies: [], asides: [], x: null })
         expect(readFileSync(join(s.slot, 'local.txt'), 'utf8')).toBe('mine\n')

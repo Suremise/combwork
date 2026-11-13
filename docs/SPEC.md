@@ -3897,7 +3897,9 @@ only writes are an acknowledgement, the containment record and the leftovers' pr
 - **Stale after `jj op abandon`** (HI-3099): a folder whose checkout operation is no longer in the head's history (the
   user discarded old operations; jj then refuses to read or record it, "a sibling of the working copy's operation") is
   stale too (`staleAt`'s `inHistory`: the op log read pinned at the head, 200 ids then up to 20,000; only a completed
-  walk proves it outside, a truncated or unreadable one is unknown). A slot so is shown stale with Recover…, which mends
+  walk proves it outside, a truncated or unreadable one is unknown). A slot so is shown stale with Recover…, its badge
+  saying so (HI-3135: the port's `staleWhy`, `abandoned` against `rewritten`, carried by the listing's stale view as read;
+  *Stale: its jj operation was abandoned (jj op abandon)*), which mends
   it: `update-stale` there leaves the working copy U a divergent sibling of X (its preserved snapshot: the same change,
   parents and author time), so the record of the restored files, which would make a commit identical to X within X's
   committer second (Git's whole seconds: jj refuses "already exists"), waits, polled every 50 ms, until the clock's

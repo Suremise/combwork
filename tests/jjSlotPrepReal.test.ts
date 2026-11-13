@@ -186,7 +186,7 @@ describe.skipIf(!jjExe)(`jj slot preparation on the real jj (${TESTED_JJ.version
       // attempt runs, owed after one that found the folder busy, until a settle decides.
       const row: StaleViewRow = { folder: w.slot, state: 'lent', op: null, job: null }
       let owes = false
-      const view = new SlotStaleView({ row: () => row, owes: () => owes, read: async (f) => { const r = await w.port.stale(f); return isUnknown(r) ? null : r }, generation: generationOf })
+      const view = new SlotStaleView({ row: () => row, owes: () => owes, read: async (f) => { const r = await w.port.staleWhy(f); return isUnknown(r) ? null : r }, generation: generationOf })
       const tries: number[] = []
       for (let c = 1; c <= 4; c++) {
         expect((await prepareFor(w, 1, c)).ok).toBe(true)
