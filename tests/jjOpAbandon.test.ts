@@ -83,10 +83,13 @@ describe.skipIf(!jjExe)('jj slots after the user abandons old operations (HI-309
   it.each([true, false])('a slot reads stale; Recover… mends it, its edit kept; the control mended; the user’s folder untouched (colocated: %s)', async (colocated) => {
     const w = await abandoned(colocated)
     expect(await w.h.port.stale(w.slot)).toBe(true)
+    // HI-3135: said as what happened, for the window's badge.
+    expect(await w.h.port.staleWhy(w.slot)).toBe('abandoned')
     const rec = await w.recover()
     expect(rec).toMatchObject({ ok: true, restored: ['wip.txt'] })
     expect(readFileSync(join(w.slot, 'wip.txt'), 'utf8')).toBe('an edit jj has not recorded\n')
     expect(await w.h.port.stale(w.slot)).toBe(false)
+    expect(await w.h.port.staleWhy(w.slot)).toBe(false)
     expect(w.status(w.slot)).toMatch(/^ok: /)
     expect(w.h.jj(w.slot, '--ignore-working-copy', 'log', '--no-graph', '-r', '@', '-T', 'divergent')).toBe('false')
     // The control mended: another slot made, and the first one removed (its edit committed first: a removal keeps work).

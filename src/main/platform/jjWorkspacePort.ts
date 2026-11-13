@@ -153,6 +153,12 @@ export interface JjWorkspacePort extends WorkspacePort {
   /** Whether a folder's workspace is stale (unknown when that can't be read). */
   stale(folder: string): Promise<Maybe<boolean>>
   /**
+   * HI-3135: why a folder's workspace is stale, for the window: `rewritten` (another workspace rewrote its working-copy
+   * commit), `abandoned` (its checkout's operation no longer in the head's history: the user's `jj op abandon`, HI-3099),
+   * or false when it isn't; unknown when that can't be read.
+   */
+  staleWhy(folder: string): Promise<Maybe<StaleWhy | false>>
+  /**
    * `record`, with the new files jj left out of the snapshot for its size limit (HI-2973) apart as well: `files` is
    * `record`'s answer (they are in it), `leftOut` those files alone, as jj named them.
    */
@@ -194,6 +200,9 @@ export interface JjWorkspacePort extends WorkspacePort {
    */
   jj(folder: string, args: readonly string[], o?: { op?: string; write?: boolean; recheck?: () => Promise<string | null> | string | null }): Promise<JjRunResult>
 }
+
+/** HI-3135: why a jj workspace is stale (`staleWhy`). */
+export type StaleWhy = 'rewritten' | 'abandoned'
 
 const SEPARATOR = '\u001f'
 /** How far back the operation log is read for a preparation's marked write, and its records' end. */
@@ -377,20 +386,24 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
 
   /**
    * Whether a folder's files are behind its working-copy commit (another workspace rewrote it): stale. Also stale
-   * (HI-3099): its checkout's operation no longer in the head's history (the user's `jj op abandon`).
+   * (HI-3099): its checkout's operation no longer in the head's history (the user's `jj op abandon`). HI-3135: which.
    */
-  const staleAt = async (folder: string, op: string): Promise<Maybe<boolean>> => {
+  const staleWhyAt = async (folder: string, op: string): Promise<Maybe<StaleWhy | false>> => {
     const co = await checkoutOf(folder)
     if (!co) return unknown(UNREADABLE.state, { folder })
     if (co.op === op) return false
     const known = await inHistory(folder, op, co.op)
     if (isUnknown(known)) return known
-    if (!known) return true
+    if (!known) return 'abandoned'
     const then = await wcAt(folder, co.op, co.name)
     const now = await wcAt(folder, op, co.name)
     if (isUnknown(then)) return then
     if (isUnknown(now)) return now
-    return then.commit !== now.commit
+    return then.commit !== now.commit ? 'rewritten' : false
+  }
+  const staleAt = async (folder: string, op: string): Promise<Maybe<boolean>> => {
+    const why = await staleWhyAt(folder, op)
+    return isUnknown(why) ? why : why !== false
   }
 
   /** What a pinned read of a folder says: its op, name, working-copy commit and staleness; unknown if any can't be read. */
@@ -1228,6 +1241,10 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
     stale: async (folder) => {
       const op = await pinned(folder)
       return isUnknown(op) ? op : staleAt(folder, op)
+    },
+    staleWhy: async (folder) => {
+      const op = await pinned(folder)
+      return isUnknown(op) ? op : staleWhyAt(folder, op)
     },
 
     list: async (repo) => {

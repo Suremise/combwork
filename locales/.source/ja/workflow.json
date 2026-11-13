@@ -561,6 +561,7 @@
   "workflow.slots.setup": "Setup script",
   "workflow.slots.setupDesc": "Runs in a new slot, and again in a slot whose lock files changed since its last install, e.g. npm ci. Review and check copies run it too.",
   "workflow.slots.stale": "Stale: another jj workspace changed it",
+  "workflow.slots.staleAbandoned": "Stale: its jj operation was abandoned (jj op abandon)",
   "workflow.slots.state.creating": "Being set up",
   "workflow.slots.state.dirty": "Has changes left in it",
   "workflow.slots.state.forgotten": "Not listed by jj",

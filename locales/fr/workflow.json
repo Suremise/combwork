@@ -523,6 +523,7 @@
   "workflow.slots.setNone": "Défini pour ce projet : aucun",
   "workflow.slots.setup": "Script de préparation",
   "workflow.slots.setupDesc": "S’exécute dans un nouvel emplacement, puis à nouveau dans un emplacement dont les fichiers de verrouillage ont changé depuis sa dernière installation, par exemple npm ci. Les copies de relecture et de vérification l’exécutent aussi.",
+  "workflow.slots.staleAbandoned": "Périmé : son opération jj a été abandonnée (jj op abandon)",
   "workflow.slots.stale": "Périmé : un autre espace de travail jj l’a modifié",
   "workflow.slots.state.creating": "En préparation",
   "workflow.slots.state.dirty": "Contient encore des modifications",

@@ -523,6 +523,7 @@
   "workflow.slots.setNone": "Ustawione dla tego projektu: brak",
   "workflow.slots.setup": "Skrypt przygotowania",
   "workflow.slots.setupDesc": "Uruchamiany w nowym slocie i ponownie w slocie, którego pliki blokady zmieniły się od ostatniej instalacji, np. npm ci. Kopie do recenzji i sprawdzeń też go uruchamiają.",
+  "workflow.slots.staleAbandoned": "Nieaktualny: jego operacja jj została porzucona (jj op abandon)",
   "workflow.slots.stale": "Nieaktualny: inny obszar roboczy jj go zmienił",
   "workflow.slots.state.creating": "W przygotowaniu",
   "workflow.slots.state.dirty": "Zawiera pozostawione zmiany",

@@ -523,6 +523,7 @@
   "workflow.slots.setNone": "このプロジェクトで設定：なし",
   "workflow.slots.setup": "セットアップスクリプト",
   "workflow.slots.setupDesc": "新しいスロットで実行し、前回のインストール以降にロックファイルが変わったスロットでも再び実行します（例：npm ci）。レビュー用とチェック用のコピーでも実行されます。",
+  "workflow.slots.staleAbandoned": "古くなっています：そのjj操作が破棄されました（jj op abandon）",
   "workflow.slots.stale": "古くなっています：別のjjワークスペースが変更しました",
   "workflow.slots.state.creating": "準備中",
   "workflow.slots.state.dirty": "変更が残っている",

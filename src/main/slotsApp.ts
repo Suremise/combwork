@@ -960,7 +960,7 @@ function staleViewOf(pool: SlotPool): SlotStaleView {
       row: (name) => pool.slots().find((x) => x.name === name) ?? null,
       owes: (name) => pool.owedOf(name) !== null,
       read: async (folder) => {
-        const r = await jjPort().stale(folder)
+        const r = await jjPort().staleWhy(folder)
         return isUnknown(r) ? null : r
       },
       generation: generationOf
@@ -994,7 +994,7 @@ export async function slotViews(pool: SlotPool): Promise<SlotView[]> {
       const keptGone = record && s.state === 'gone' ? { generation: record.generation, commit: pool.keptCommit(s.name), ...((await folderThere(s.folder)) ? { forgotten: true as const } : {}) } : null
       // HI-3103: kept for no card, its workspace forgotten outside Combwork, its folder there: its generation, for Remove….
       const forgotten = jj && !l && s.identity?.generation && (await pool.forgottenFree(s)) ? { generation: s.identity.generation } : null
-      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(jj ? { platform: 'jj' as const } : {}), ...(stale ? { stale: true as const } : {}), ...(keptFor !== null ? { keptFor } : {}), ...(keptGone ? { keptGone } : {}), ...(forgotten ? { forgotten } : {}) }
+      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(jj ? { platform: 'jj' as const } : {}), ...(stale ? { stale: true as const, ...(stale === 'abandoned' ? { staleWhy: 'abandoned' as const } : {}) } : {}), ...(keptFor !== null ? { keptFor } : {}), ...(keptGone ? { keptGone } : {}), ...(forgotten ? { forgotten } : {}) }
     })
   )
 }
