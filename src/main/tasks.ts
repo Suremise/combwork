@@ -143,9 +143,9 @@ export class TaskConflictError extends CombworkError {
  */
 export class WorkflowRefusedError extends TaskConflictError {
   constructor(readonly refusal: Refusal) {
-    // agent-text: REFUSALS
     // HI-3136: its values as the refusal's own sentences fill them (a value that is a message, a cause's why…): never a
     // placeholder left as it is, or a blank.
+    // agent-text: REFUSALS
     super(withValues(REFUSALS[refusal.rule].message, refusalValuesInEnglish(refusal.rule, refusal.values)))
   }
 }
