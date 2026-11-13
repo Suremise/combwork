@@ -563,7 +563,8 @@ const onDb = (fn) => {
     const move7 = page.locator('.dialog', { hasText: `Move ${key2} to Active` })
     check('…the board asks whom to give it to', !!(await until(async () => (await move7.count()) === 1, HUNG_MS)), await text(page.locator('body')))
     await move7.getByText('Assign and start', { exact: true }).click()
-    await move7.getByRole('button', { name: 'Move to Active' }).click()
+    // With Assign and start chosen, the dialog's button is Start.
+    await move7.getByRole('button', { name: 'Start', exact: true }).click()
     const ask7 = page.locator('.dialog', { hasText: 'anyway?' })
     check('…the board asks to start it across the slot rule', !!(await until(async () => (await ask7.count()) === 1, HUNG_MS)), await text(page.locator('body')))
     await shoot(ask7, 'kept-elsewhere-ask')
