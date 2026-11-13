@@ -3372,6 +3372,14 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   as the trash starts (`moved` otherwise). Never journalled, never resumed: a failed trash leaves the slot `gone` and
   kept, and the next Remove… proves it all again. A colocated slot's Git worktree receipt is dropped only after the
   trash, by HI-3046's checks. Remaking the workspace in place isn't offered (jj can't add one at an existing folder).
+  **A slot kept for no card** (HI-3103) goes the same way: such a slot is left `ready` (nothing looks at a ready slot
+  again until a lend tries it), then `creating` with its error once a lend fails it ("not listed"), or `gone` or `dirty`
+  (`forgettable`). Slots and copies shows it "Not listed by jj" with **Remove…** (`SlotView.forgotten`, the slot's
+  generation, read by `SlotPool.forgottenFree`: no kept record, its folder there, `present` positively false), its
+  confirmation `workflow.slots.removeForgottenFree` (the folder to the Recycle Bin with any changes in it);
+  `slots:removeForgotten` → `SlotPool.removeForgotten(name, generation)`: eligible only so, at the generation shown, in
+  the project's own platform, all of it again under the removal's operation (`changed` otherwise: a slot kept since
+  goes through its own Remove…), then `remove`'s forgotten mode and the port's fresh proof, as above.
   **A card with a kept slot is placed only there** (HI-3032), however its start finds a slot (`slotForStart`, the lane's
   own `lendLaneSlot` and waiting lanes' pass): a lane's lease lent for that card (`LeaseRequest.startsCard`: the card
   started, or the lane's first card still to do as the lane gets its slot, sent with every placement whatever an

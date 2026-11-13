@@ -2115,6 +2115,10 @@
     "defaultMessage": "Release…",
     "description": "A button beside a held slot in the list of slots: asks, then frees it for other work (#1506)."
   },
+  "workflow.slots.removeForgottenFree": {
+    "defaultMessage": "jj no longer lists {slot}’s workspace. Its folder goes to the Recycle Bin as it is, with any changes in it.",
+    "description": "HI-3103: the confirmation before removing a jj slot kept for no card whose workspace was forgotten outside Combwork (jj workspace forget), its folder still there: the whole folder, uncommitted changes included, goes to the Recycle Bin. {slot} is the slot’s name."
+  },
   "workflow.slots.removeForgottenMessage": {
     "defaultMessage": "Its folder goes to the Recycle Bin as it is, with any changes in it. {card} then starts again from its target, in another slot. The work it committed here stays in jj’s store{commit, select, none {.} other {: its last commit is {commit}.}}",
     "description": "HI-3097: in place of workflow.slots.removeKeptMessage, the confirmation before removing a jj slot kept for the card {card} (its key, HI-12) whose workspace jj no longer lists, its folder still there: the whole folder, uncommitted edits included, is moved to the Recycle Bin. {commit} is the short id of the last commit of the card’s work (jj keeps it), or none when Combwork has none recorded: keep the select key none."

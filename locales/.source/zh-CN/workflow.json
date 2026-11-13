@@ -528,6 +528,7 @@
   "workflow.slots.recoveredPutBack": "{n, plural, =0 {No other file needed putting back.} one {# other file was put back as it was.} other {# other files were put back as they were.}}",
   "workflow.slots.recoveredTitle": "{slot} is recovered: look at these",
   "workflow.slots.release": "Release…",
+  "workflow.slots.removeForgottenFree": "jj no longer lists {slot}’s workspace. Its folder goes to the Recycle Bin as it is, with any changes in it.",
   "workflow.slots.removeForgottenMessage": "Its folder goes to the Recycle Bin as it is, with any changes in it. {card} then starts again from its target, in another slot. The work it committed here stays in jj’s store{commit, select, none {.} other {: its last commit is {commit}.}}",
   "workflow.slots.removeKept": "Remove…",
   "workflow.slots.removeKeptMessage": "{card} then starts again from its target, in another slot. The work it committed here stays in jj’s store{commit, select, none {.} other {: its last commit is {commit}.}}",

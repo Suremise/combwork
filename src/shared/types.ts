@@ -1959,6 +1959,8 @@ export interface SlotView {
    * HI-3097 `forgotten`: its folder is there, jj no longer listing its workspace (forgotten outside Combwork).
    */
   keptGone?: { generation: string; commit: string | null; forgotten?: true }
+  /** HI-3103: kept for no card, its workspace forgotten outside Combwork, its folder there: its generation, for Remove…. */
+  forgotten?: { generation: string }
 }
 
 /** A slot's writer as Release Slot… shows it (#1506, agentFolders.ts heldWriter). */
