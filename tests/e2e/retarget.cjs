@@ -358,7 +358,7 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
 
     // --- HI-3142: a real rule change since (the merge style) marks the lane left on 1.3.0 old rules, its Merges into kept.
     const now = (await inv('workflow:form', fx.alpha)).options
-    await inv('workflow:setOptions', fx.alpha, { preset: null, options: { ...now, style: now.style === 'squash' ? 'merge' : 'squash' } })
+    await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { target: now.target, otherTargets: now.otherTargets, style: now.style === 'squash' ? 'merge' : 'squash' }) })
     if (!(await panel.isVisible().catch(() => false))) await page.locator('.progress-rail').click()
     await panel.locator('.progress-tab[data-tab="lanes"]').click()
     const marked = await waitHung(async () => ((await top11.locator('[data-mark="old-rules"]').count()) === 1 ? true : null)).catch(() => null)
