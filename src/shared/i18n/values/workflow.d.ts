@@ -194,6 +194,7 @@ interface CombworkMessageValues {
   'workflow.nextVersion.stepTarget': { from: string | number; name: string | number }
   'workflow.nextVersion.tip': { from: string | number }
   'workflow.nextVersion.title': undefined
+  'workflow.nextVersion.upstream': { name: string | number; how: string; remote: string | number; publish: string | number; track1: string | number; track2: string | number }
   'workflow.option.commands.desc': undefined
   'workflow.option.commands.title': undefined
   'workflow.option.commitMessage.desc': undefined
@@ -377,6 +378,8 @@ interface CombworkMessageValues {
   'workflow.refused.platform.keptLine.next': { kept: string | number; target: string | number }
   'workflow.refused.platform.noTarget.message': { card: string | number }
   'workflow.refused.platform.noTarget.next': undefined
+  'workflow.refused.platform.noUpstream.message': { card: string | number; target: string | number }
+  'workflow.refused.platform.noUpstream.next': { how: string; remote: string | number; target: string | number; publish: string | number; track1: string | number; track2: string | number }
   'workflow.refused.platform.offLine.message': { card: string | number; line: string | number; where: string; head: string | number; on: string | number }
   'workflow.refused.platform.offLine.next': { where: string; lineArg: string | number; made: string; start: string | number; onArg: string | number }
   'workflow.refused.platform.slotLeft.message': { unknown: string; card: string | number; slot: string | number; folder: string | number }

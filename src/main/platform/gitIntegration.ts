@@ -17,7 +17,7 @@ import type { Again, CandidateHost, CandidatePause, CandidateTestFail, Integrati
 import { shellLine, type QueueCommand, type QueueFileSide, type QueueStuck } from '../../shared/workflow/queue'
 import { isUnknown, type Unknown } from './types'
 import { readConflicts } from '../workflow/conflictRead'
-import { destinationOf, fetchHeadOf, prePushOf, publishOf, redactTransport } from './gitTransport'
+import { destinationOf, fetchHeadOf, prePushOf, projectHost, publishOf, redactTransport, upstreamRemedyOf } from './gitTransport'
 import { checkSigning } from './gitSigning'
 import type { SigningStatus } from '../../shared/gitSigning'
 import { boundedSpawn } from './boundedSpawn'
@@ -392,6 +392,8 @@ const advanceAndPublish: Omit<IntegrationPort, 'mergeBase' | 'update' | 'candida
     }
     return out
   },
+
+  upstreamRemedy: (project, branch, from) => upstreamRemedyOf(projectHost(project), branch, from),
 
   async keepTested(h, card, commit) {
     const r = await h.run(h.project, ['update-ref', testedPin(card), commit])

@@ -1708,6 +1708,12 @@ export interface NextVersionPlan {
   listed: boolean
   /** What can follow the proposed branch, both going on (started cards and running lanes stay); null: nothing on the release. */
   retarget: RetargetPreview | null
+  /**
+   * HI-3128: under follow mode, the new branch is made here only and tracks no remote branch: the remote Combwork can name
+   * for it (`from`'s, else the only one; null: none), and whether follow mode can use it (`unusable`: several push
+   * addresses, or a shallow clone). The window renders the commands for the name typed (upstreamCommands).
+   */
+  upstream?: { kind: 'ready' | 'choose' | 'unusable'; remote: string | null; why?: 'ambiguous' | 'shallow' }
 }
 
 /** HI-2807: what Start the next version did. */

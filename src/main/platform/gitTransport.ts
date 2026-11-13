@@ -15,7 +15,8 @@ import { delimiter, isAbsolute, join, resolve } from 'path'
 import { git } from '../git'
 import { again } from './again'
 import { configRead } from './gitCommits'
-import type { Again, CandidateHost, FollowSetupPause, PublishReply, QueueGitResult, TransportSnapshot } from './integration'
+import type { Again, CandidateHost, FollowSetupPause, PublishReply, QueueGitResult, TransportSnapshot, UpstreamRemedy } from './integration'
+import { REMOTE_PLACEHOLDER, upstreamCommands } from '../../shared/workflow/queue'
 
 /** A fetch or a publication reaches the remote and may wait on a sign-in window: as G18's push, long but never forever. */
 export const TRANSPORT_MS = 5 * 60_000
@@ -280,6 +281,37 @@ export function publishOf(h: CandidateHost, snap: TransportSnapshot, lease: stri
     if (!line && !r.ok && neverConnected(r.err)) return { failed: words }
     return { unknown: words }
   })
+}
+
+export { REMOTE_PLACEHOLDER }
+
+/**
+ * HI-3128 (UpstreamRemedy): the commands giving `branch` the upstream follow mode needs, read locally only. The remote is
+ * named only when it is known: the branch's own `branch.<b>.remote`, else `from`'s, each one git knows (never `.`), else
+ * the repository's only remote; none, several, or a read that fails: the placeholder. A named remote follow mode can't
+ * use (not exactly one push address) or a shallow repository: `unusable`, no commands.
+ */
+export async function upstreamRemedyOf(h: CandidateHost, branch: string, from?: string): Promise<UpstreamRemedy> {
+  const run = async (args: string[]): Promise<QueueGitResult | null> => {
+    const r = await h.run(h.project, args)
+    return r.ok ? r : null
+  }
+  const listed = await run(['remote'])
+  const remotes = listed ? listed.out.split(/\r?\n/).map((x) => x.trim()).filter(Boolean) : []
+  const tracked = async (b: string): Promise<string | null> => {
+    const r = await h.run(h.project, ['config', '--get', `branch.${b}.remote`])
+    const v = configRead(r)
+    return typeof v === 'string' && v && v !== '.' && remotes.includes(v) ? v : null
+  }
+  const remote = (await tracked(branch)) ?? (from ? await tracked(from) : null) ?? (remotes.length === 1 ? remotes[0] : null)
+  const shallow = await run(['rev-parse', '--is-shallow-repository'])
+  if (shallow?.out.trim() === 'true') return { kind: 'unusable', remote, why: 'shallow' } // i18n-ignore: a remedy's codes, never shown
+  if (remote) {
+    const urls = await run(['remote', 'get-url', '--push', '--all', '--', remote])
+    const n = urls ? urls.out.split(/\r?\n/).map((x) => x.trim()).filter(Boolean).length : 0
+    if (n !== 1) return { kind: 'unusable', remote, why: 'ambiguous' } // i18n-ignore: a remedy's codes, never shown
+  }
+  return { kind: remote ? 'ready' : 'choose', remote, ...upstreamCommands(remote, branch) }
 }
 
 /**

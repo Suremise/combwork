@@ -724,12 +724,13 @@ interface CombworkMessageValues {
   'board.queue.pause.commit': undefined
   'board.queue.pause.commitTip': { files: string | number; target: string | number }
   'board.queue.pause.fetchFailed': { target: string | number }
+  'board.queue.pause.fetchFailedCatchUp': { target: string | number; card: string | number }
   'board.queue.pause.folderBusy': { target: string | number }
   'board.queue.pause.hookTimedOut': undefined
   'board.queue.pause.identity': undefined
   'board.queue.pause.mergeChoice': { card: string | number }
   'board.queue.pause.needsYou': undefined
-  'board.queue.pause.noUpstream': { target: string | number }
+  'board.queue.pause.noUpstream': { target: string | number; files: string }
   'board.queue.pause.other': { reason: string | number }
   'board.queue.pause.publishFailed': { card: string | number; target: string | number }
   'board.queue.pause.publishRefused': { card: string | number; target: string | number }

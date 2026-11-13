@@ -771,6 +771,10 @@
     "defaultMessage": "Start the next version",
     "description": "HI-2807: the title of the Start the next version dialog."
   },
+  "workflow.nextVersion.upstream": {
+    "defaultMessage": "{name} is made here only and tracks no remote branch, which “The target branch follows its remote” needs before its first card starts. {how, select, ready {Publish it to {remote}: {publish}. Or, if {remote} has it already, set what it tracks: {track1}, then {track2}.} choose {This repository has no remote, or several, that Combwork can name: in these commands {remote} stands for the one {name} should follow. Publish it there: {publish}. Or, if it has it already, set what it tracks: {track1}, then {track2}.} shallow {This repository is a shallow clone, which follow mode can’t use: fetch its whole history (git fetch --unshallow) first, then publish {name}.} other {The remote it would follow ({remote}) has several push addresses, or none, and follow mode publishes to exactly one: leave it one, then publish {name}.}}",
+    "description": "HI-3128: under the steps in the Start the next version dialog, with the workflow option “The target branch follows its remote” on (its name: use its words): the new branch {name} isn’t on any remote and tracks none, so its first card can’t start until the user publishes it (Combwork doesn’t). how (select, keep the keys): ready, a remote Combwork can name ({remote}); choose, none it can name ({remote} is a placeholder such as <remote> for the user to replace); shallow, a shallow clone; other, the named remote ({remote}) has several push addresses or none. {publish}, {track1}, {track2} are git commands: keep them exactly as they are."
+  },
   "workflow.option.commands.desc": {
     "defaultMessage": "The command each named check runs. A run counts as the check only when it runs that command.",
     "description": "What the workflow setting “Check commands” does."
@@ -1502,6 +1506,14 @@
   "workflow.refused.platform.noTarget.next": {
     "defaultMessage": "Choose one in Version Control → Workflow (Work merges into), then start it again.",
     "description": "HI-3106: the next step after a start refused for no target bookmark: the user chooses it in the window. Version Control, Workflow and Work merges into are names in the window: as translated there."
+  },
+  "workflow.refused.platform.noUpstream.message": {
+    "defaultMessage": "{card} can’t start: {target} tracks no remote branch, and with “The target branch follows its remote” on each card starts from its remote.",
+    "description": "HI-3128: a refused start under the workflow option “The target branch follows its remote” (its name: use its words): the branch work merges into ({target}) has no upstream, as a new version’s branch made by Start the next version has, so there is no remote head to start from. {card} is a card key like AM-12."
+  },
+  "workflow.refused.platform.noUpstream.next": {
+    "defaultMessage": "{how, select, ready {If {remote} hasn’t got {target} yet, publish it there: {publish}. If it has, set what {target} tracks: {track1}, then {track2}. Then start it again; or turn off “The target branch follows its remote”.} choose {This repository has no remote, or several, that Combwork can name: in these commands {remote} stands for the one {target} should follow. If it hasn’t got {target} yet, publish it there: {publish}. If it has, set what {target} tracks: {track1}, then {track2}. Then start it again; or turn off “The target branch follows its remote”.} shallow {This repository is a shallow clone, which follow mode can’t use: fetch its whole history (git fetch --unshallow), then publish {target} or set what it tracks, and start it again; or turn off “The target branch follows its remote”.} other {The remote {target} would follow ({remote}) has several push addresses, or none, and follow mode publishes to exactly one: leave it one, then publish {target} or set what it tracks, and start it again; or turn off “The target branch follows its remote”.}}",
+    "description": "HI-3128: the next step after a start refused for a target with no upstream under “The target branch follows its remote” (its name: use its words). how (select, keep the keys): ready, a remote Combwork can name ({remote}); choose, none it can name ({remote} is then a placeholder such as <remote>, which the user replaces); shallow, the repository is a shallow clone; other, the named remote ({remote}) has several push addresses or none. {publish}, {track1}, {track2} are git commands: keep them exactly as they are. Combwork runs none of them: the user does."
   },
   "workflow.refused.platform.offLine.message": {
     "defaultMessage": "{card}'s folder isn't on its branch {line}: {where, select, detached {its head is detached at {head}} other {it is on {on}}}, so the work there isn't what the card would merge.",

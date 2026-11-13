@@ -12,6 +12,7 @@
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
+const { execFileSync } = require('child_process')
 const q = require('./queueFixture.cjs')
 
 const PORT = Number(lib.port(47720))
@@ -154,6 +155,39 @@ const isIn = (repo, commit, ref) => {
     commitIn(builder.folder, { 'fwd.txt': 'release and next\n' }, 'Merge 1.4.0 into 1.5.0, resolved')
     check('…resolved, submitted and passed', await pass(resolution.number, 'Resolution'))
     check('…merged and published: origin/1.5.0 has the release fix, resolved', !!(await waitHung(async () => (await h.card(resolution.number))?.column === 'done')) && git(origin, 'show', '1.5.0:fwd.txt') === 'release and next' && isIn(origin, source, '1.5.0'), JSON.stringify(await h.kinds(resolution.number)))
+
+    // --- HI-3128 (D): Start the next version under follow mode, through the window. The dialog says 1.6.0 is made here
+    // only and gives the commands; the first card's start is refused with them; the publish command, run as rendered (in
+    // PowerShell, the folder on main), gives it its upstream; the card then starts, merges and is published.
+    const mainUpstream = [lib.git(fx.alpha, ['config', '--get', 'branch.main.remote']).trim(), lib.git(fx.alpha, ['config', '--get', 'branch.main.merge']).trim()]
+    await h.page.locator('.sidebar').getByText('alpha', { exact: true }).first().click().catch(() => undefined)
+    await waitHung(async () => {
+      if ((await h.page.locator('.tabs .tab', { hasText: 'Version Control' }).count()) > 0) return true
+      await h.page.getByRole('button', { name: 'Projects' }).click()
+      await h.page.locator('.sidebar').getByText('alpha', { exact: true }).first().click().catch(() => undefined)
+      return false
+    })
+    await h.page.locator('.tabs .tab', { hasText: 'Version Control' }).first().click()
+    await h.page.locator('.git-sections [data-section="workflow"]').click()
+    await waitHung(async () => (await h.page.locator('[data-action="next-version"]').count()) === 1 && !(await h.page.locator('[data-action="next-version"]').isDisabled()))
+    await h.page.locator('[data-action="next-version"]').click()
+    const nv = h.page.locator('.dialog', { hasText: 'Start the next version' })
+    await waitHung(async () => (await nv.locator('[data-field="name"]').inputValue().catch(() => '')) === '1.6.0')
+    const publish = 'git push -u origin refs/heads/1.6.0:refs/heads/1.6.0'
+    const note = await waitHung(async () => (await nv.locator('[data-note="upstream"]').innerText().catch(() => '')) || null)
+    check('D: the dialog says 1.6.0 is made here only, with the commands that publish it or set what it tracks', !!note && note.includes('1.6.0 is made here only') && note.includes(publish) && note.includes('git config branch.1.6.0.remote origin'), note)
+    await h.page.mouse.move(5, 5)
+    await nv.screenshot({ path: path.join(fx.shots, 'forwardremote-3-next-version.png') })
+    await nv.getByRole('button', { name: 'Start', exact: true }).click()
+    check('…started: work merges into 1.6.0, which tracks nothing', !!(await waitHung(async () => ((await h.inv('workflow:form', fx.alpha))?.options?.target === '1.6.0' ? true : null))) && (() => { try { lib.git(fx.alpha, ['config', '--get', 'branch.1.6.0.remote']); return false } catch { return true } })())
+    const nD = (await h.inv('tasks:create', { title: 'First of 1.6.0', project: 'alpha' })).number
+    const refused = await q.startCard(fx, h, builder, nD)
+    check("…its first card's start is refused, naming the publish command (not Provider Setup)", refused.status === 409 && refused.body?.rule === 'platform.noUpstream' && String(refused.body?.next).includes(publish) && !String(refused.body?.next).includes('Provider Setup'), JSON.stringify(refused.body))
+    execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `${publish}; if ($LASTEXITCODE) { exit $LASTEXITCODE }`], { cwd: fx.alpha, stdio: 'pipe' })
+    check('…the command, run as rendered, publishes 1.6.0 and sets what it tracks; main untouched', git(origin, 'rev-parse', '1.6.0') === git(fx.alpha, 'rev-parse', '1.6.0') && lib.git(fx.alpha, ['config', '--get', 'branch.1.6.0.merge']).trim() === 'refs/heads/1.6.0' && git(fx.alpha, 'branch', '--show-current') === 'main' && JSON.stringify([lib.git(fx.alpha, ['config', '--get', 'branch.main.remote']).trim(), lib.git(fx.alpha, ['config', '--get', 'branch.main.merge']).trim()]) === JSON.stringify(mainUpstream))
+    const d = await q.approveCard(fx, h, builder, reviewer, nD, 'First of 1.6.0', { 'six.txt': 'six\n' })
+    check('…then it starts, is passed', d.steps.start.status === 200 && d.steps.verdict.status === 200, JSON.stringify(d.steps))
+    check('…merged and published: origin/1.6.0 has it', !!(await waitHung(async () => (await h.card(nD))?.column === 'done')) && git(origin, 'show', '1.6.0:six.txt') === 'six', JSON.stringify(await h.kinds(nD)))
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {
