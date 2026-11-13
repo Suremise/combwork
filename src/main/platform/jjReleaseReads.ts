@@ -55,11 +55,11 @@ export function jjReleaseReadsWith(runner: JjRunner): ReleaseReads {
         for (const name of ['main', 'master', 'trunk'].filter((n) => n !== line)) {
           const t = await reads.run(op, ['log', '--no-graph', '-r', exact('bookmarks', name), '-T', COMMIT_T])
           if (isJjUnknown(t)) return t
-          const at = lines(t)
-          if (at.length === 0) continue
-          if (at.length > 1) return 'unknown'
+          const trunkAt = lines(t)
+          if (trunkAt.length === 0) continue
+          if (trunkAt.length > 1) return 'unknown'
           into = name
-          trunkCommit = at[0].split(SEP)[0]
+          trunkCommit = trunkAt[0].split(SEP)[0]
           break
         }
         if (!into) return null
