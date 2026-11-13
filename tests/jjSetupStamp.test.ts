@@ -4,7 +4,7 @@
 // card asks: a project.json save between two of the runner's polls, with the stamp the checks are given.
 import { renameSync, statSync, writeFileSync, mkdirSync } from 'fs'
 import { join } from 'path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { setupStampOf } from '../src/main/jjSetupStamp'
 import { runCandidateChecks, type CandidateChecksDeps, type CandidateChecksInput } from '../src/main/workflow/jjCandidateChecks'
@@ -108,6 +108,34 @@ describe('HI-3122: the setup stamp a jj candidate’s checks depend on', () => {
     save(p, { worktreeSetup: 'npm ci', agents: [{ id: 'b1', lastSessionId: 'new-conversation' }] })
     expect(await r.out).toEqual({ invalid: true })
     expect(r.log).toEqual(['give invalid'])
+  })
+
+  it("HR3's round 1: a project.json caught mid-save never makes main wait: a stamp of its own, not kept, never a command's", () => {
+    const p = project({ worktreeSetup: 'npm ci' })
+    const good = setupStampOf(p)
+    writeFileSync(join(p, '.combwork', 'project.json'), '{')
+    // The kept-file reader's settling waits on Atomics.wait (up to about a second, on main's thread): never here.
+    const wait = vi.spyOn(Atomics, 'wait')
+    try {
+      const partial = setupStampOf(p)
+      expect(wait).not.toHaveBeenCalled()
+      expect(partial).toMatch(/^unread:/)
+      expect(partial).not.toBe(good)
+      // Not kept: read again, and again its own until the file parses.
+      expect(setupStampOf(p)).toMatch(/^unread:/)
+    } finally {
+      wait.mockRestore()
+    }
+    save(p, { worktreeSetup: 'npm ci' })
+    expect(setupStampOf(p)).toBe(good)
+  })
+
+  it('the runner: project.json unreadable mid-check (a partial save): it fails closed, invalid', async () => {
+    const p = project({ worktreeSetup: 'npm ci' })
+    const r = held(() => setupStampOf(p))
+    await r.inCheck
+    writeFileSync(join(p, '.combwork', 'project.json'), '{"worktreeSetup": "npm')
+    expect(await r.out).toEqual({ invalid: true })
   })
 
   it('the runner: the setup command changed mid-check: invalid, its job ended', async () => {
