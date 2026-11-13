@@ -23,6 +23,9 @@ import type { ViewOf } from '../src/main/platform/jjView'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
 
+/** A bound for a hung run's waits (tests/README.md). */
+const HUNG_MS = 15_000
+
 const profile = tempDir('cw-jjignored-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(profile, 'profile')
 
@@ -160,7 +163,7 @@ describe.skipIf(!jjExe)('HI-3121: a jj builder’s check in its slot that writes
         await run(async (start) => {
           rmSync(join(root, 'out'), { recursive: true, force: true })
           writeFileSync(join(root, 'out'), 'read by the check\n')
-          await vi.waitFor(() => expect(start.watch?.seen().get('.')?.get('out')?.has('f')).toBe(true))
+          await vi.waitFor(() => expect(start.watch?.seen().get('.')?.get('out')?.has('f')).toBe(true), { timeout: HUNG_MS })
           rmSync(join(root, 'out'))
           mkdirSync(join(root, 'out'))
         })
@@ -286,7 +289,7 @@ describe('HI-3158, HR2’s round 3: a run watch’s kind reads are bounded', () 
     // In batches the queue holds, each read before the next.
     for (let i = 0; i < RUN_NAMES_MAX; i += RUN_READS_QUEUED) {
       for (let j = i; j < Math.min(i + RUN_READS_QUEUED, RUN_NAMES_MAX); j++) send(`n${j}`)
-      await vi.waitFor(() => expect(w.reads).toBe(0))
+      await vi.waitFor(() => expect(w.reads).toBe(0), { timeout: HUNG_MS })
     }
     expect(w.seen().get('.')).not.toBeNull()
     send('one-more')
