@@ -27,6 +27,7 @@ import { agentPlaces, launchPlace, legacyWorktree, resumeFolder, resumeHold, slo
 import { agentWorkflowRole } from '../shared/workflow/roles'
 import type { AgentDef, HeldWriter } from '../shared/types'
 import type { AgentProcess } from '../shared/agentProcesses'
+import { isPlatformId, type PlatformId } from '../shared/platform/descriptors'
 
 const log = createLogger('sessions')
 
@@ -178,13 +179,22 @@ export async function agentPlace(projectPath: string, agent: Pick<AgentDef, 'id'
  * lane's), else its carried one, with the slot's folder and the line's target: the card's own (its `Started` fact's,
  * #1627: a lane's slot keeps the target it was lent with), else the slot's; null: none open.
  */
-export function leasedLine(db: DatabaseSync, project: string, agentId: string): { folder: string; target: string | null; line: string | null; carried: boolean } | null {
+export function leasedLine(db: DatabaseSync, project: string, agentId: string): LeasedLine | null {
   const l = db
-    .prepare("SELECT l.id, l.kind, s.folder, s.target FROM slot_leases l JOIN slots s ON s.project = l.project AND s.name = l.slot WHERE l.project = ? AND l.agent = ? AND l.ended_at IS NULL ORDER BY l.kind = 'carried' LIMIT 1") // i18n-ignore: SQL
-    .get(project, agentId) as { id: string; kind: string; folder: string; target: string | null } | undefined
+    .prepare("SELECT l.id, l.kind, s.folder, s.target, s.platform FROM slot_leases l JOIN slots s ON s.project = l.project AND s.name = l.slot WHERE l.project = ? AND l.agent = ? AND l.ended_at IS NULL ORDER BY l.kind = 'carried' LIMIT 1") // i18n-ignore: SQL
+    .get(project, agentId) as { id: string; kind: string; folder: string; target: string | null; platform: string | null } | undefined
   if (!l) return null
   const started = leaseStart(db, l.id)
-  return { folder: l.folder, target: started?.target ?? l.target, line: started?.line ?? null, carried: l.kind === 'carried' }
+  return { folder: l.folder, target: started?.target ?? l.target, line: started?.line ?? null, carried: l.kind === 'carried', ...(l.platform && isPlatformId(l.platform) ? { platform: l.platform } : {}) }
+}
+
+/** An agent's open lease's line (leasedLine): `platform` is its slot's, as its row records it (none on a row that names none). */
+export interface LeasedLine {
+  folder: string
+  target: string | null
+  line: string | null
+  carried: boolean
+  platform?: PlatformId
 }
 
 /** The line of the card last started under a lease and the branch it merges into (its `Started` fact's). */

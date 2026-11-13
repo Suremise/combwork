@@ -287,7 +287,7 @@ describe("a slot's writer: claimed in one write with the resume authority, held 
   it("an agent's watched line (#1451, branchWatch's): its dispatch lease's before its carried one, the card last started there, this project's only", () => {
     const { db } = board()
     // b1's card lease on slot-b, its card not started there yet: no line.
-    expect(leasedLine(db, 'p1', 'b1')).toEqual({ folder: slotFolder('slot-b'), target: null, line: null, carried: false })
+    expect(leasedLine(db, 'p1', 'b1')).toEqual({ folder: slotFolder('slot-b'), target: null, line: null, carried: false, platform: 'git' })
     db.prepare("INSERT INTO cards (number, title, description, project, col, ord, created_at, created_by, updated_at) VALUES (12, 'Fix', '', 'p1', 'doing', 1, ?, 'test', ?)").run(at, at)
     db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (12, 1, 'Started', ?, 'combwork', 'recorded', ?)").run(at, JSON.stringify({ lease: 'l1', line: 'cw/P1/P1-12-fix' }))
     expect(leasedLine(db, 'p1', 'b1')?.line).toBe('cw/P1/P1-12-fix')
@@ -296,7 +296,7 @@ describe("a slot's writer: claimed in one write with the resume authority, held 
     db.prepare("INSERT INTO slot_leases (id, project, slot, kind, agent, from_at) VALUES ('l2', 'p1', 'slot-c', 'carried', 'b1', ?)").run(at)
     expect(leasedLine(db, 'p1', 'b1')).toMatchObject({ folder: slotFolder('slot-b'), carried: false })
     db.prepare("UPDATE slot_leases SET ended_at = ? WHERE id = 'l1'").run(at)
-    expect(leasedLine(db, 'p1', 'b1')).toEqual({ folder: slotFolder('slot-c'), target: 'main', line: null, carried: true })
+    expect(leasedLine(db, 'p1', 'b1')).toEqual({ folder: slotFolder('slot-c'), target: 'main', line: null, carried: true, platform: 'git' })
     // Another project's agent of the same id: none.
     expect(leasedLine(db, 'p2', 'b1')).toBeNull()
   })
