@@ -4,9 +4,10 @@
 // project as the app does. A slot is no Git worktree, so the Observer keeps no write record for it: the credit rests on
 // the stat snapshot of the revision's files and of their folders, the workspace's root included. What that does:
 // - a write inside a folder that is already there (an `out/` an earlier build made) changes none of those: credited;
-// - a run that makes (or removes) an entry in the root or in a folder holding a tracked file changes that folder's time:
-//   not credited (`changed`), whether jj ignores the entry or not. A first build's new `out/`, a `__pycache__/` beside a
-//   tracked `.py`: the run after it is credited. A build that deletes its output folder and makes it again each time never is.
+// - a run that makes (or removes) an entry in the root or in a folder holding a tracked file changes that folder's time.
+//   HI-3158: where every entry that came, went or was made again is one jj ignores (a first build's new `out/`, a
+//   `__pycache__/` beside a tracked `.py`, a build that deletes its output folder and makes it again each time), the run
+//   is credited; a new entry jj doesn't ignore still makes it `changed`.
 // Colocated and not, the same: the slot's own folder is never watched either way.
 import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'fs'
 import { isAbsolute, join, resolve } from 'path'
@@ -17,6 +18,7 @@ import { readRepoRefs } from '../src/main/platform/repoRefs'
 import { isUnknown } from '../src/main/platform/types'
 import { jjContextOf } from '../src/main/platform/jjDetect'
 import { jjCheckEnd, jjCheckStart, jjCounts, jjCredit, type JjCheckFor } from '../src/main/platform/jjChecks'
+import { entriesChanged, ignoredOnly, jjEntries } from '../src/main/platform/jjIgnoredEntries'
 import type { ViewOf } from '../src/main/platform/jjView'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
@@ -30,7 +32,7 @@ describe.skipIf(!jjExe)('HI-3121: a jj builder’s check in its slot that writes
   afterAll(() => o.dispose())
 
   for (const colocate of [true, false]) {
-    it(`${colocate ? 'colocated' : 'not colocated'}: credited for writes into an existing folder; not for a run that makes a new entry where the revision has files`, async () => {
+    it(`${colocate ? 'colocated' : 'not colocated'}: credited for writes jj ignores, a new or remade output folder included; not for a new file it doesn't ignore`, async () => {
       const parent = tempDir('jjign-')
       const project = join(parent, 'project')
       mkdirSync(project)
@@ -79,33 +81,92 @@ describe.skipIf(!jjExe)('HI-3121: a jj builder’s check in its slot that writes
       }
       const credited = (c: { whyNot?: string; tested: string }) => !c.whyNot && c.tested === R
       expect(credited(await run(null))).toBe(true)
-      // A first build: out/ is new in the root. Not credited; the next one, writing into it, is.
+      // A first build: out/ is new in the root, and ignored: credited, as the next one, writing into it, is.
       const first = await run(() => {
         mkdirSync(join(root, 'out'))
         writeFileSync(join(root, 'out', 'bundle.js'), 'built\n')
       })
-      expect(first).toMatchObject({ whyNot: 'changed', why: 'end:stats' })
+      expect(credited(first)).toBe(true)
       expect(credited(await run(() => writeFileSync(join(root, 'out', 'bundle.js'), 'built again\n')))).toBe(true)
       expect(credited(await run(() => writeFileSync(join(root, 'out', 'chunk.js'), 'more\n')))).toBe(true)
-      // A build that removes its output folder and makes it again each time: never credited.
+      // HI-3158: a build that removes its output folder and makes it again each time: credited every time.
       for (let i = 0; i < 2; i++) {
         const clean = await run(() => {
           rmSync(join(root, 'out'), { recursive: true, force: true })
           mkdirSync(join(root, 'out'))
           writeFileSync(join(root, 'out', 'bundle.js'), `clean ${i}\n`)
         })
-        expect(clean).toMatchObject({ whyNot: 'changed', why: 'end:stats' })
+        expect(credited(clean)).toBe(true)
       }
-      // A new ignored file in the root, and a new ignored folder beside a tracked file: not credited; once there, credited.
-      expect(await run(() => writeFileSync(join(root, 'cache.tmp'), 'x\n'))).toMatchObject({ whyNot: 'changed' })
+      // A new ignored file in the root, a new ignored folder beside a tracked file, and either removed: credited.
+      expect(credited(await run(() => writeFileSync(join(root, 'cache.tmp'), 'x\n')))).toBe(true)
       expect(credited(await run(() => writeFileSync(join(root, 'cache.tmp'), 'y\n')))).toBe(true)
+      expect(credited(await run(() => rmSync(join(root, 'cache.tmp'))))).toBe(true)
+      const pyc = (): void => {
+        mkdirSync(join(root, 'src', '__pycache__'))
+        writeFileSync(join(root, 'src', '__pycache__', 'a.pyc'), 'x\n')
+      }
+      expect(credited(await run(pyc))).toBe(true)
+      expect(credited(await run(() => writeFileSync(join(root, 'src', '__pycache__', 'a.pyc'), 'y\n')))).toBe(true)
+      expect(credited(await run(() => rmSync(join(root, 'src', '__pycache__'), { recursive: true })))).toBe(true)
+      // A new file jj doesn't ignore, in the root or beside a tracked file, alone or with ignored ones: not credited. jj's
+      // end boundary records it in @; once it is deleted, the next start records that (`dirty`), and @ is empty again.
+      const resync = async (): Promise<void> => {
+        expect(await run(null)).toMatchObject({ whyNot: 'dirty' })
+        expect(credited(await run(null))).toBe(true)
+      }
+      expect(await run(() => writeFileSync(join(root, 'new.txt'), 'x\n'))).toMatchObject({ whyNot: 'changed' })
+      rmSync(join(root, 'new.txt'))
+      await resync()
       expect(
         await run(() => {
-          mkdirSync(join(root, 'src', '__pycache__'))
-          writeFileSync(join(root, 'src', '__pycache__', 'a.pyc'), 'x\n')
+          writeFileSync(join(root, 'src', 'b.py'), 'x\n')
+          pyc()
         })
       ).toMatchObject({ whyNot: 'changed' })
-      expect(credited(await run(() => writeFileSync(join(root, 'src', '__pycache__', 'a.pyc'), 'y\n')))).toBe(true)
+      rmSync(join(root, 'src', 'b.py'))
+      rmSync(join(root, 'src', '__pycache__'), { recursive: true })
+      await resync()
+      expect(
+        await run(() => {
+          rmSync(join(root, 'out'), { recursive: true, force: true })
+          mkdirSync(join(root, 'out'))
+          writeFileSync(join(root, 'stray.txt'), 'x\n')
+        })
+      ).toMatchObject({ whyNot: 'changed' })
+      rmSync(join(root, 'stray.txt'))
+      await resync()
+      // Those three are also jj's end boundary's (it records a new file it would track). The snapshot's own answer, for a
+      // file jj doesn't track (`snapshot.auto-track` narrowed: HI-3096): the root's move isn't explained by it.
+      const before = await jjEntries(root, ['.', 'src'])
+      writeFileSync(join(root, 'cache2.tmp'), 'x\n')
+      expect(await ignoredOnly(root, ['.'], before)).toEqual(['.'])
+      writeFileSync(join(root, 'untracked.txt'), 'x\n')
+      expect(await ignoredOnly(root, ['.'], before)).toBeNull()
+      rmSync(join(root, 'untracked.txt'))
+      rmSync(join(root, 'cache2.tmp'))
+      // Its time moved, but no entry came, went or was made again: something came and went, so it counts.
+      expect(await ignoredOnly(root, ['.'], before)).toBeNull()
     })
   }
+})
+
+describe('HI-3158: the entries that came, went or were made again in a folder', () => {
+  const was = new Map([
+    ['out', 'd:1'],
+    ['a.txt', 'f:2'],
+    ['.jj', 'd:3']
+  ])
+  it('names each, a folder with its slash, jj’s own folders left out of the root', () => {
+    expect(entriesChanged('.', was, new Map([['a.txt', 'f:2'], ['out', 'd:9'], ['x.tmp', 'f:5']]))).toEqual(['out/', 'x.tmp'])
+    expect(entriesChanged('src', new Map([['p', 'd:1']]), new Map([['p', 'f:2']]))).toEqual(['src/p/', 'src/p'])
+    expect(entriesChanged('.', was, new Map([['a.txt', 'f:2'], ['out', 'd:1']]))).toEqual([])
+    expect(entriesChanged('.', was, new Map(was))).toEqual([])
+  })
+  it('can’t say for an unreadable listing or entry', () => {
+    expect(entriesChanged('.', null, was)).toBeNull()
+    expect(entriesChanged('.', was, null)).toBeNull()
+    expect(entriesChanged('.', was, new Map([...was, ['new', '?']]))).toBeNull()
+    expect(entriesChanged('.', new Map([...was, ['b', '?']]), new Map([...was, ['b', '?']]))).toBeNull()
+  })
 })

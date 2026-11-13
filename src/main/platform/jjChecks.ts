@@ -9,6 +9,7 @@
 //     their folders', off main's thread), and the moment (heads, checkout record, colocated Git state) still B1's;
 //  4. t0, after the write record has settled; the command runs; t1, once the record has settled again;
 //  5. the write record for [t0, t1] (an edit and its undo show), and where it isn't complete, the stat snapshot again;
+//     either way, what jj ignores doesn't count (HI-3158, jjIgnoredEntries.ts);
 //  6. the moment before the end boundary: still H1, the same checkout record and Git state (a plain Git commit or
 //     checkout jj hasn't imported shows there), else `moved`;
 //  7. the end boundary B2, strict (`expect: H1`): an operation by anyone since H1 is `moved`; anything it records is
@@ -36,6 +37,7 @@ import { isJjUnknown, JjReads, type JjCommit } from './jjReads'
 import { snapshotLine } from './snapshotLine'
 import { isAbsent, viewNow, type ViewNow, type ViewOf } from './jjView'
 import { isUnknown, type Maybe } from './types'
+import { foldersOf, ignoredOnly, jjEntries, jjIgnored, type EntriesOf } from './jjIgnoredEntries'
 
 /** What a jj check run is for. */
 export interface JjCheckFor {
@@ -59,6 +61,8 @@ export interface JjCheckStart {
   rev: JjCommit | null
   files: string[] | null
   stats: string | null
+  /** HI-3158: the entries of the snapshot's folders, so a folder's line that moved only for entries jj ignores doesn't count. */
+  entries?: EntriesOf | null
   e1: ViewNow | null
 }
 
@@ -70,6 +74,8 @@ export interface JjCheckRecord {
   seen: Maybe<FolderChanges>
   /** The stat snapshot at the end, read only where the write record wasn't complete. */
   statsEnd: string | null | undefined
+  /** HI-3158: the snapshot's folders whose line moved only for entries jj ignores (jjIgnoredEntries.ts); they don't count. */
+  ignoredOnly?: string[]
   beforeB2: ViewNow | null
   b2: Boundary | BoundaryRefused | null
   final: ViewNow | null
@@ -112,12 +118,7 @@ export const jjCounts = (paths: string[]): string[] => paths.filter((p) => !inte
  */
 export async function jjStats(root: string, files: string[] | null): Promise<string | null> {
   if (!files) return null
-  const dirs = new Set<string>(['.'])
-  for (const f of files) {
-    const i = f.lastIndexOf('/')
-    if (i > 0) for (let d = f.slice(0, i); d; d = d.includes('/') ? d.slice(0, d.lastIndexOf('/')) : '') dirs.add(d)
-  }
-  const all = [...files, ...[...dirs].sort()]
+  const all = [...files, ...foldersOf(files)]
   const out: string[] = Array.from({ length: all.length }, () => '')
   let next = 0
   let unreadable = false
@@ -150,11 +151,12 @@ export async function jjCheckStart(r: JjCheckFor, log: WriteLog, s: JjCheckSeams
   const files = await reads.filesAt(b1.op, r.revision)
   const listed = isJjUnknown(files) ? null : files
   const stats = await jjStats(r.view.root, listed)
+  const entries = listed && stats !== null ? await jjEntries(r.view.root, foldersOf(listed)) : null
   const e1 = viewNow(r.view)
   await s.hooks?.started?.()
   // The boundary's own writes are in the record before t0: they never count against the run.
   await log.settled(r.folder)
-  return { t0: now(), b1, rev: isJjUnknown(rev) ? null : rev, files: listed, stats, e1 }
+  return { t0: now(), b1, rev: isJjUnknown(rev) ? null : rev, files: listed, stats, entries, e1 }
 }
 
 /** The run's end (steps 5–8): everything jjCredit decides from. */
@@ -169,14 +171,62 @@ export async function jjCheckEnd(r: JjCheckFor, start: JjCheckStart, log: WriteL
   await log.settled(r.folder)
   const t1 = now()
   const base = { revision: r.revision, start, t1, ...scope }
-  const seen = await log.changedBetween(r.folder, start.t0, t1, jjCounts)
+  const seen = await withoutIgnored(r.view.root, start.files, await log.changedBetween(r.folder, start.t0, t1, jjCounts))
   const statsEnd = isUnknown(seen) ? await jjStats(r.view.root, start.files) : undefined
+  const explained = statsEnd ? await ignoredOnly(r.view.root, movedFolders(start, statsEnd), start.entries ?? null) : null
   const beforeB2 = viewNow(r.view)
   // A copy's run takes B2 at whatever head there is now (HI-2991); the repository's only at H1.
   const b2 = await jjBoundary({ ...r.view, folder: r.folder }, r.owner, { ...s.boundary, lock: r.lock, hooks: s.boundary?.endHooks, ...(r.scope === 'workspace' ? {} : { expect: start.b1.op }) }, runner)
   await s.hooks?.beforeFinal?.()
   const final = viewNow(r.view)
-  return { ...base, seen, statsEnd, beforeB2, b2, final }
+  return { ...base, seen, statsEnd, ...(explained ? { ignoredOnly: explained } : {}), beforeB2, b2, final }
+}
+
+const slashes = (p: string): string => p.replace(/\\/g, '/')
+
+/**
+ * HI-3158: a write record's paths less those jj ignores (Git's own record filters with check-ignore; jj's is narrowed by
+ * jjCounts alone), the record's paths being the workspace's (a colocated slot's record is its own folder's). Where Git
+ * can't say, the record stands as it is. The revision's own files are never asked: they count.
+ */
+async function withoutIgnored(root: string, tracked: string[] | null, seen: Maybe<FolderChanges>): Promise<Maybe<FolderChanges>> {
+  if (isUnknown(seen) || !seen.changed || !tracked) return seen
+  // The revision's own files always count, whatever a rule says (a tracked file under an ignored folder).
+  const mine = new Set(tracked)
+  const asked = new Set(seen.paths.filter((p) => !p.startsWith(':') && !mine.has(slashes(p))))
+  const ignored = await jjIgnored(root, [...asked].map(slashes))
+  if (!ignored) return seen
+  const paths = seen.paths.filter((p) => !asked.has(p) || !ignored.has(slashes(p)))
+  return { changed: paths.length > 0, paths }
+}
+
+/** The snapshot's lines, the revision's files' first, then their folders' (jjStats' order), each with its path and kind. */
+const linesOf = (files: string[]): { path: string; folder: boolean }[] => [...files.map((path) => ({ path, folder: false })), ...foldersOf(files).map((path) => ({ path, folder: true }))]
+
+/** The lines that differ between the start's snapshot and the end's; null when they can't be lined up. */
+function movedLines(start: JjCheckStart, statsEnd: string): { path: string; folder: boolean }[] | null {
+  if (!start.files || start.stats === null) return null
+  const a = start.stats.split('\n')
+  const b = statsEnd.split('\n')
+  const lines = linesOf(start.files)
+  if (a.length !== lines.length || b.length !== lines.length) return null
+  return lines.filter((l, i) => a[i] !== b[i])
+}
+
+/** The folders whose line moved, where only folders' lines did (a file's line moving leaves nothing to explain). */
+function movedFolders(start: JjCheckStart, statsEnd: string): string[] {
+  const moved = movedLines(start, statsEnd)
+  return !moved || moved.some((l) => !l.folder) ? [] : moved.map((l) => l.path)
+}
+
+/** The snapshots are the same but for the folders' lines jjCheckEnd found moved only by entries jj ignores. */
+function sameStats(rec: JjCheckRecord): boolean {
+  const { start, statsEnd } = rec
+  if (statsEnd === undefined || statsEnd === null || start.stats === null) return false
+  if (statsEnd === start.stats) return true
+  const ok = new Set(rec.ignoredOnly ?? [])
+  const moved = movedLines(start, statsEnd)
+  return !!moved && moved.every((l) => l.folder && ok.has(l.path))
 }
 
 /** The same moment, field by field: head, checkout record, Git state. */
@@ -224,7 +274,7 @@ export function jjCredit(rec: JjCheckRecord): JjCredit {
   // record unchanged from B2's to the final read.
   if (local ? b2.checkout.workspace !== b1.checkout.workspace || !sameCheckout(b2.view, rec.final) : !sameMoment(start.e1, b2.view) || !sameMoment(b2.view, rec.final)) return no('moved', 'end:final', tested)
   if (isUnknown(rec.seen)) {
-    if (rec.statsEnd === undefined || rec.statsEnd === null || rec.statsEnd !== start.stats) return no('changed', 'end:stats', tested)
+    if (!sameStats(rec)) return no('changed', 'end:stats', tested)
   } else if (rec.seen.changed) return no('changed', 'end:written', tested, rec.seen.paths)
   return { revision: rec.revision, tested }
 }

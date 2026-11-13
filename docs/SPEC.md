@@ -2480,13 +2480,19 @@ so credit is only ever on the exact commit id and its content (R3.1, R3.2), and 
      (`tests/jjIgnoredWrite.test.ts`): a slot or a check copy is a jj workspace of its own. Not colocated, it is no Git
      worktree; colocated (the pool adds it `--colocate`), jj registers it in `.git/worktrees` with a relative `gitdir`,
      which the observer's `foldersOf` resolves against the wrong folder (HI-3160), so either way its own folder has no
-     write record today and the stat snapshot decides. (Once HI-3160 is fixed the write record decides there, and
-     `jjCounts` has no ignore filter: HI-3158 adds one to both paths, landing with or before it.) Nothing there knows what jj
-     ignores: a write inside a folder that is already there (an `out/` an earlier build made) changes none of the
-     snapshot's lines and is credited; a run that makes or removes an entry in the workspace's root or in a folder holding
-     a tracked file changes that folder's time and is `changed`, ignored or not. So a build's first run that makes its
-     output folder there isn't credited and the next is; one that deletes its output folder and makes it again each run
-     never is. A candidate's merge check in a check copy is decided the same way (its retry is the run after);
+     write record today and the stat snapshot decides (once HI-3160 is fixed, the write record decides there). Both leave
+     out what jj ignores (HI-3158, `jjIgnoredEntries.ts`), as jj's rules say (the tracked `.gitignore` files, its Git
+     store's `info/exclude`, Git's global excludes), asked of Git with jj's Git-backed store as its folder
+     (`check-ignore --no-index`), colocated or not. The write record: a path jj ignores doesn't count, the revision's own
+     files always do, and where Git can't say the record stands. The stat snapshot: a write inside a folder that is
+     already there (an `out/` an earlier build made) changes none of its lines; a run that makes or removes an entry in the
+     workspace's root or in a folder holding a tracked file changes that folder's line, so the start also keeps each such
+     folder's entries (name and file id), and where only folders' lines moved, each entry that came, went or was made
+     again (a new id under its name) is asked about: all ignored (or jj's and Git's own folders), the folder's line
+     doesn't count, so a build's first run that makes its output folder, or one that deletes it and makes it again each
+     run, is credited. An entry not ignored, an unreadable listing or entry, Git failing, or a folder whose time moved
+     with no entry to explain it (something came and went) is still `changed`. A candidate's merge check in a check copy
+     is decided the same way;
   6. the moment before the end boundary: still H1, the same checkout record and Git state, else `moved` (any
      operation by anyone, a bookmark set elsewhere included; a plain Git commit jj hasn't imported shows in Git's
      state);
