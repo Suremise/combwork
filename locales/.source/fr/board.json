@@ -957,6 +957,8 @@
   "board.strip.runs": "{n, plural, one {# run} other {# runs}}: {states}",
   "board.target.failed": "Where the card merges wasn’t changed",
   "board.target.field": "Merges into",
+  "board.target.kept": "Its work is kept on {branch}: it starts there again, whatever this says.",
+  "board.target.keptUnknown": "Its work is kept in a slot whose branch Combwork can’t read now: it won’t start until it can.",
   "board.target.mark": "Into {branch}",
   "board.target.markTip": "This card’s work is made from {branch} and merges into it, not the project’s Work merges into.",
   "board.target.own": "{branch} (the project’s)",

@@ -1054,6 +1054,16 @@
     "note": "HI-3112: the next step after a start refused because the card’s kept branch ({kept}) isn’t its lane’s ({target}). {kept} and {target} are branch names.",
     "audience": "both"
   },
+  "workflow.refused.platform.keptOnTarget.message": {
+    "text": "{why, select, unread {{card}'s work is kept in slot {slot}, but Combwork can't read which bookmark that work is on.} other {{card}'s earlier work is in slot {slot}, on {target}: it can't start on {now}.}}",
+    "note": "HI-3129: a refused start of a jj card put back with work kept in slot {slot} (a name). why (keep the select keys): unread, Combwork could not prove the bookmark that work is on; mismatch (other), the work is on the bookmark {target} but the card’s own Merges into names {now}. {card} is a card key like AM-12; {target} and {now} are bookmark names.",
+    "audience": "both"
+  },
+  "workflow.refused.platform.keptOnTarget.next": {
+    "text": "{why, select, unread {Look at the slot (Version Control → Slots and copies, or jj itself), then start it again.} other {Set its Merges into back to {target} to go on with it there, or integrate that work first.}}",
+    "note": "HI-3129: the next step after that refusal, by why (keep the select keys). Merges into is the card’s field naming the bookmark its work goes to; {target} a bookmark name.",
+    "audience": "both"
+  },
   "workflow.refused.platform.noTarget.message": {
     "text": "{card} can’t start: its project has no target bookmark chosen, the one its work merges into.",
     "note": "HI-3106: a refused start in a project using jj (Jujutsu): no target bookmark (Work merges into) is chosen, and jj has no default to fall back on, as Git has its default branch. {card} is a card key like AM-12. A bookmark is jj’s name for a branch.",

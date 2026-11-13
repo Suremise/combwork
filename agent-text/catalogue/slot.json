@@ -319,6 +319,10 @@
     "text": "Combwork's process supervisor isn't running, so it can't run a slot's commands",
     "note": "A slot's or copy's setup error: Combwork runs their commands in a job of its own, and can't now."
   },
+  "slot.start.keptMoved": {
+    "text": "{slot}'s kept work changed while the start took it: the start tries again",
+    "note": "HI-3129: a start's wait: the kept slot's binding (the bookmark its work is on) changed, or couldn't be read, between the start resolving its target and recording it on the slot."
+  },
   "slot.start.leaseEnded": {
     "text": "its slot's lease {lease} ended while the start took it: the start tries again",
     "note": "A start's wait: the slot's lease ended between taking it and recording its target."

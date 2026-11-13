@@ -669,5 +669,7 @@
   "workflow.slots.state.forgotten": "jj no lo lista",
   "workflow.slots.removeForgottenFree": "jj ya no lista el workspace de {slot}. Su carpeta va a la Papelera de reciclaje tal como está, con los cambios que tenga.",
   "workflow.refused.platform.keptElsewhere.message": "{card} no puede empezar ahí: el trabajo que confirmó antes de devolverla se guarda en el slot {slot}, y solo empieza en ese slot.",
-  "workflow.refused.platform.keptElsewhere.next": "Espera a que {slot} esté libre y vuelve a empezar {card}: recupera ese slot, con su trabajo."
+  "workflow.refused.platform.keptElsewhere.next": "Espera a que {slot} esté libre y vuelve a empezar {card}: recupera ese slot, con su trabajo.",
+  "workflow.refused.platform.keptOnTarget.message": "{why, select, unread {El trabajo de {card} se guarda en el slot {slot}, pero Combwork no puede leer en qué bookmark está ese trabajo.} other {El trabajo anterior de {card} está en el slot {slot}, en {target}: no puede empezar en {now}.}}",
+  "workflow.refused.platform.keptOnTarget.next": "{why, select, unread {Revisa el slot (Control de versiones → Slots y copias, o con jj) y vuelve a empezarla.} other {Vuelve a poner su Se fusiona en en {target} para seguir con ella ahí, o integra antes ese trabajo.}}"
 }

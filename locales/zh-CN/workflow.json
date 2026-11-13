@@ -669,5 +669,7 @@
   "workflow.slots.state.forgotten": "未被 jj 列出",
   "workflow.slots.removeForgottenFree": "jj 已不再列出 {slot} 的工作区。它的文件夹会原样移到回收站，包括其中的所有更改。",
   "workflow.refused.platform.keptElsewhere.message": "{card} 不能在那里开始：它被放回之前提交的工作保留在槽位 {slot} 中，它只能在那个槽位开始。",
-  "workflow.refused.platform.keptElsewhere.next": "等 {slot} 空闲后再次开始 {card}：它会拿回那个槽位及其中的工作。"
+  "workflow.refused.platform.keptElsewhere.next": "等 {slot} 空闲后再次开始 {card}：它会拿回那个槽位及其中的工作。",
+  "workflow.refused.platform.keptOnTarget.message": "{why, select, unread {{card} 的工作保留在槽位 {slot} 中，但 Combwork 无法读取该工作位于哪个书签上。} other {{card} 之前的工作在槽位 {slot} 中，位于 {target}：它不能在 {now} 上开始。}}",
+  "workflow.refused.platform.keptOnTarget.next": "{why, select, unread {查看该槽位（版本控制 → 槽位和副本，或直接用 jj），然后重新开始它。} other {把它的合并到改回 {target} 以在那里继续，或先集成那项工作。}}"
 }

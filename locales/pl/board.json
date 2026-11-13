@@ -957,6 +957,8 @@
   "board.strip.oneRun": "1 uruchomienie, {state, select, running {trwa} failed {nieudane} stale {brak raportów} passed {udane} other {zatrzymane}}",
   "board.strip.runs": "{n, plural, one {# uruchomienie} few {# uruchomienia} many {# uruchomień} other {# uruchomienia}}: {states}",
   "board.target.failed": "Nie zmieniono, dokąd scalana jest karta",
+  "board.target.kept": "Jej praca jest zachowana na {branch}: tam zacznie się ponownie, niezależnie od tego pola.",
+  "board.target.keptUnknown": "Jej praca jest zachowana w slocie, którego gałęzi Combwork nie może teraz odczytać: nie zacznie się, dopóki nie będzie to możliwe.",
   "board.target.field": "Scalanie do",
   "board.target.mark": "Do {branch}",
   "board.target.markTip": "Praca tej karty powstaje z {branch} i jest do niej scalana zamiast do gałęzi docelowej projektu.",

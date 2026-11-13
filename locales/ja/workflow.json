@@ -669,5 +669,7 @@
   "workflow.slots.state.forgotten": "jj に一覧表示されていない",
   "workflow.slots.removeForgottenFree": "jj は {slot} のワークスペースをもう一覧に表示しません。フォルダーは中の変更も含めてそのままごみ箱に移動されます。",
   "workflow.refused.platform.keptElsewhere.message": "{card} はそこでは開始できません。戻される前にコミットされた作業がスロット {slot} に保持されており、そのスロットでのみ開始します。",
-  "workflow.refused.platform.keptElsewhere.next": "{slot} が空くまで待ってから、{card} をもう一度開始してください。作業とともにそのスロットが戻されます。"
+  "workflow.refused.platform.keptElsewhere.next": "{slot} が空くまで待ってから、{card} をもう一度開始してください。作業とともにそのスロットが戻されます。",
+  "workflow.refused.platform.keptOnTarget.message": "{why, select, unread {{card} の作業はスロット {slot} に保持されていますが、その作業がどのブックマーク上にあるかを Combwork が読み取れません。} other {{card} の以前の作業はスロット {slot} の {target} 上にあります。{now} では開始できません。}}",
+  "workflow.refused.platform.keptOnTarget.next": "{why, select, unread {スロットを確認してから（バージョン管理 → スロットとコピー、または jj で）、もう一度開始してください。} other {そこで続けるにはマージ先を {target} に戻すか、先にその作業を統合してください。}}"
 }

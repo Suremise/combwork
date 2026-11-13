@@ -9,7 +9,8 @@ export type PlatformId = 'none' | 'git' | 'jj'
  * `checkCopies` (HI-2868): a check can run in a copy of its own at the card's revision (`--isolated`). Apart from
  * `isolation` (slots): jj has slots in 1.5.0 but no check copies yet.
  */
-export type Capability = 'revisions' | 'isolation' | 'checkCopies' | 'integration' | 'containment' | 'sameness' | 'authorship' | 'observe'
+/** `retarget` (HI-3129): a card in flight can be moved to another target with its work (HI-2753's, Git's branches). */
+export type Capability = 'revisions' | 'isolation' | 'checkCopies' | 'integration' | 'containment' | 'sameness' | 'authorship' | 'observe' | 'retarget'
 
 /**
  * What the window can change in a platform's repository (SPEC §16.3.6 port 5, HI-2788's R3): an operation is offered only
@@ -117,7 +118,7 @@ const short12 = (id: string): string => id.slice(0, 12)
 
 export const PLATFORMS: Record<PlatformId, PlatformDescriptor> = {
   // Git answers everything: worktrees for isolation, merges for integration, replay for sameness.
-  git: { id: 'git', capabilities: ['revisions', 'isolation', 'checkCopies', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'merge', deliverables: 'commits', repository: true, defaultTarget: true, operations: OPERATIONS, revisionShort: short, remedies: GIT_REMEDIES, gates: [] },
+  git: { id: 'git', capabilities: ['revisions', 'isolation', 'checkCopies', 'integration', 'containment', 'sameness', 'authorship', 'observe', 'retarget'], integration: 'merge', deliverables: 'commits', repository: true, defaultTarget: true, operations: OPERATIONS, revisionShort: short, remedies: GIT_REMEDIES, gates: [] },
   // None: content hashes as revisions, acceptance as integration, no isolation in 1.0 (OP-16). No repository to change:
   // Initialise repository is on Git's page (HI-1905), gated by Git's operations.
   none: { id: 'none', capabilities: ['revisions', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'accept', deliverables: 'paths', repository: false, defaultTarget: false, operations: [], revisionShort: short, gates: [] },

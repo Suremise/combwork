@@ -957,6 +957,8 @@
   "board.strip.oneRun": "実行1件：{state, select, running {実行中} failed {失敗} stale {報告停止} passed {成功} other {停止}}",
   "board.strip.runs": "{n, plural, other {実行#件}}：{states}",
   "board.target.failed": "カードのマージ先を変更できませんでした",
+  "board.target.kept": "このカードの作業は {branch} に保持されています。ここの表示にかかわらず、そこで再開します。",
+  "board.target.keptUnknown": "このカードの作業は、Combwork が現在ブランチを読み取れないスロットに保持されています。読み取れるようになるまで開始しません。",
   "board.target.field": "マージ先",
   "board.target.mark": "{branch}へ",
   "board.target.markTip": "このカードの作業は、プロジェクトのマージ先ブランチではなく{branch}から作成され、そこにマージされます。",

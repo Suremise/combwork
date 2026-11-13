@@ -1244,6 +1244,13 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       }
       return unknown(UNREADABLE.defaultBranch, { folder: repo })
     },
+    targetLines: async (repo) => {
+      const op = await pinned(repo)
+      if (isUnknown(op)) return op
+      const out = await read(repo, op, ['bookmark', 'list', '-T', `if(!remote, name ++ "${SEPARATOR}" ++ conflict ++ "\\n")`], unknown(UNREADABLE.line, { branch: '' }))
+      if (isUnknown(out)) return out
+      return lines(out).map((l) => l.split(SEPARATOR)).filter(([n, c]) => !!n && c !== 'true').map(([n]) => n)
+    },
     lineExists: async (repo, line) => {
       const h = await port.lineHead(repo, line)
       return !isUnknown(h) && !!h
@@ -1376,6 +1383,11 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       if (!identity || !(await owns(folder, identity))) return false
       const b = await bindingNow(folder)
       return !isUnknown(b) && !!b && b.card === card && b.generation === identity.generation
+    },
+    heldTarget: async (folder, identity, card) => {
+      if (!identity || !(await owns(folder, identity))) return null
+      const b = await bindingNow(folder)
+      return !isUnknown(b) && !!b && b.card === card && b.generation === identity.generation ? b.target : null
     },
     heldCard: async (folder, identity) => {
       if (!identity || !(await owns(folder, identity))) return null

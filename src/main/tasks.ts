@@ -8,14 +8,15 @@ import { agentMsg, currentChain, inDefaultDialect, overridesAny } from '../share
 import { RETURNED_COMMENT, returnedCommentFrom } from './workflow/queueState'
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
 import { COLUMN_CHOICES, TASK_COLUMNS, cardMatches, isTaskColumn, restoreOrders, searchedWords, sortCards } from '../shared/tasks'
-import { branchExists, dropEmptyLines, ownWork, pickTarget, projectTargets } from './workflow/targets'
+import { dropEmptyLines, ownWork, pickTarget, projectTargets, targetExists } from './workflow/targets'
 import { checkCardMove, holdChecked, IN_FLIGHT_STAGES, laneOf, laneStill, MoveRefused, moveTestHooks, rulesInto, stillAsChecked, stillHeld, type LaneSeen, type MoveRefusal } from './workflow/retargetCard'
 import type { RefHold } from './platform/repoContext'
 import { HISTORY, setStoredAgentRenderer, setStoredForAgents, storedAgentText, storedIds, storedLineText, storedText } from '../shared/taskHistory'
 import { MAX_CONTEXT, MAX_CONTEXT_REF, parseDocRef } from '../shared/docRefs'
 import { contextProblems } from './docSections'
 import { providerMessage } from '../shared/providers'
-import type { CombworkErrorKind, TaskMoveResult } from '../shared/types'
+import { isUnknown } from './platform/types'
+import type { CombworkErrorKind, KeptTargetShown, TaskMoveResult } from '../shared/types'
 import { workflowMessage } from '../shared/workflow/texts'
 import type { ArchiveBatch, ArchiveRequest, ArchiveResult, ContextProblem, SetAsideCard, StoredText, TaskCard, TaskChanges, TaskCursor, TaskDecision, TaskColumn, TaskComment, TaskHistoryEntry, TaskPatch, TaskWaiting, UnarchiveResult } from '../shared/types'
 import { returnRound } from '../shared/watch'
@@ -2231,12 +2232,14 @@ async function moveInFlight(n: number, target: string | null, def: string, actor
 async function targetPick(project: string, raw: unknown, actor: TaskActor, pin = false): Promise<string | null> {
   if (actor.kind === 'agent') throw new TaskPermissionError(TARGET.agents)
   const t = workspace.path && project ? await projectTargets(workspace, join(workspace.path, project)).catch(() => null) : null
+  // HI-3129: the repository's lines unreadable now: only the default can be named, another refused as unknown.
+  if (t?.othersUnread && typeof raw === 'string' && raw.trim() && raw.trim() !== t.default) throw new TaskConflictError(withValues(TARGET.missing, { target: raw.trim(), unknown: 'yes' }))
   const picked = pickTarget(t, raw)
   // Pinned (HI-2985): the default named is kept as itself, not as none.
   const p = pin && t && 'target' in picked && picked.target === null && typeof raw === 'string' && raw.trim() ? { target: t.default } : picked
   if ('target' in p) {
     // A listed branch work can start from now (HR2's round 1: listed is not made).
-    const there = p.target && workspace.path ? await branchExists(join(workspace.path, project), p.target) : true
+    const there = p.target && workspace.path ? await targetExists(workspace, join(workspace.path, project), p.target) : true
     if (there !== true) throw new TaskConflictError(withValues(TARGET.missing, { target: p.target ?? '', unknown: there === 'unknown' ? 'yes' : 'no' })) // i18n-ignore: select keys
     return p.target
   }
@@ -2259,11 +2262,37 @@ function refuseOtherLaneTarget(wf: Workflow, n: number, target: string | null, d
 }
 
 /**
+ * HI-3129: where card `n`, waiting in On Hold or Todo, would start when that isn't the Merges into its dialog shows (its
+ * own, else its lane's or the project's): a card put back whose work is kept on another branch or bookmark starts there
+ * (its platform's `startTarget`, the start's own rule). `unknown`: where its kept work is can't be read now, so its start
+ * is refused until it can. Null: it starts where it shows. Reads only; the card's own Merges into is never changed by it.
+ */
+export async function keptTarget(n: number): Promise<KeptTargetShown> {
+  const ws = workspace
+  const card = await getTask(n, ws)
+  if (!card.project || card.archived || !ws.path) return null
+  const projectPath = join(ws.path, card.project)
+  const { workflowFor } = await import('./workflow/service')
+  const wf = await workflowFor(ws, projectPath).catch(() => null)
+  if (!wf) return null
+  const rec = wf.store.card(n)
+  const s = wf.state(rec)
+  if (s.stage !== 'todo' && s.stage !== 'hold') return null
+  const options = wf.rulesetOf(rec, s).options
+  if (options.finish === 'committed') return null
+  const t = await wf.platform(options).startTarget?.(rec, options)
+  if (t === undefined || t === null) return null
+  if (isUnknown(t)) return { unknown: true }
+  const def = (await projectTargets(ws, projectPath).catch(() => null))?.default ?? null
+  return t === (rec.target || options.target || def) ? null : { target: t }
+}
+
+/**
  * Sets the branch a card merges into (HI-2556, its Merges into): the user's or the Assistant's; one of the project's
  * targets (null or the default: none of its own). Only while its branch has no work (never started, or nothing of its
  * own on a line it had), and as its running lane's, if any.
  */
-export async function setTarget(n: number, raw: unknown, actor: TaskActor, o: { commit?: () => void; expect?: string | null; expectDefault?: string; expectHead?: string; expectFrom?: string; withLane?: LaneSeen | true } = {}): Promise<TaskCard> {
+export async function setTarget(n: number, raw: unknown, actor: TaskActor, o:{ commit?: () => void; expect?: string | null; expectDefault?: string; expectHead?: string; expectFrom?: string; withLane?: LaneSeen | true } = {}): Promise<TaskCard> {
   if (actor.kind === 'agent') throw new TaskPermissionError(TARGET.agents)
   const ws = workspace
   // Its project's runtime, before the board's lock (made the first time, it takes that lock itself).
@@ -2279,6 +2308,10 @@ export async function setTarget(n: number, raw: unknown, actor: TaskActor, o: { 
   // HI-2753: a card in flight moves with its work kept, when that work is provably its own (its own path and locks).
   if (wf && def && IN_FLIGHT_STAGES.includes(wf.state(wf.store.card(n)).stage)) {
     const target = await targetPick(first.project, raw, actor, !!res)
+    // HI-3129: a platform that can't move started work (jj: its bookmarks, no `retarget`) keeps a card in flight where
+    // it started (Darren's decision (a)): its target and its proof there. Refused as the card's work keeping it.
+    const startedOn = wf.state(wf.store.card(n)).started?.target ?? def
+    if ((await projectTargets(ws, projectPath).catch(() => null))?.fixedInFlight && (target ?? def) !== startedOn) throw new TaskConflictError(withValues(TARGET.started, { card: cardRef(n), target: startedOn, unknown: 'no' }))
     if (res && wf.state(wf.store.card(n)).started?.target === res.to) return first
     // A retarget's move only from the target it was seen on (a stale preview, after an earlier move, moves nothing).
     if (o.expectFrom !== undefined && wf.state(wf.store.card(n)).started?.target !== o.expectFrom) throw new TaskConflictError(withValues(TARGET.changed, { card: cardRef(n) }))

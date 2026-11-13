@@ -669,5 +669,7 @@
   "workflow.slots.state.forgotten": "Não listado pelo jj",
   "workflow.slots.removeForgottenFree": "O jj não lista mais o workspace de {slot}. A pasta dele vai para a Lixeira como está, com as alterações que houver nela.",
   "workflow.refused.platform.keptElsewhere.message": "{card} não pode começar aí: o trabalho commitado antes de ele ser devolvido está reservado no slot {slot}, e ele só começa nesse slot.",
-  "workflow.refused.platform.keptElsewhere.next": "Espere {slot} ficar livre e comece {card} de novo: ele recebe esse slot de volta, com o trabalho."
+  "workflow.refused.platform.keptElsewhere.next": "Espere {slot} ficar livre e comece {card} de novo: ele recebe esse slot de volta, com o trabalho.",
+  "workflow.refused.platform.keptOnTarget.message": "{why, select, unread {O trabalho de {card} está reservado no slot {slot}, mas o Combwork não consegue ler em qual bookmark esse trabalho está.} other {O trabalho anterior de {card} está no slot {slot}, em {target}: ele não pode começar em {now}.}}",
+  "workflow.refused.platform.keptOnTarget.next": "{why, select, unread {Veja o slot (Controle de versão → Slots e cópias, ou no próprio jj) e comece-o de novo.} other {Volte o Mescla em dele para {target} para continuar lá, ou integre esse trabalho primeiro.}}"
 }

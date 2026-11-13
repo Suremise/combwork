@@ -960,6 +960,8 @@ interface CombworkMessageValues {
   'board.strip.runs': { n: number; states: string | number }
   'board.target.failed': undefined
   'board.target.field': undefined
+  'board.target.kept': { branch: string | number }
+  'board.target.keptUnknown': undefined
   'board.target.mark': { branch: string | number }
   'board.target.markTip': { branch: string | number }
   'board.target.own': { branch: string | number }

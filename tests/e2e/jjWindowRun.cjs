@@ -578,6 +578,39 @@ const onDb = (fn) => {
     check('…card 2 not started: still To Do, no Started since, not placed in the project folder', (await card(n2))?.column === 'todo' && !(work7?.folder && work7.folder.toLowerCase() === shop.toLowerCase()), JSON.stringify({ column: (await card(n2))?.column, work7, last: facts7.slice(-3) }))
     check('…its kept work still in the slot, still kept for it', JSON.stringify(fs.readdirSync(kept7.folder).filter((f) => f !== '.jj' && f !== '.git').sort()) === JSON.stringify(keptFiles7) && (await inv('slots:list', shop)).some((s) => s.name === kept7.name && s.keptFor === n2), JSON.stringify(await inv('slots:list', shop)))
 
+    // HI-3129 (Darren's decision (a), 13 Nov): the project's target changed to a new bookmark `next` while card 2's work
+    // is kept in its slot on main. Its dialog's Merges into lists the repository's bookmarks (`release-x`, in no Other
+    // branches), and its start carries on in the kept slot on main, never refused for the target.
+    onDb((db) => db.prepare('UPDATE slots SET writer_run = NULL, writer_lease = NULL, writer_agent = NULL, writer_pid = NULL, writer_started = NULL WHERE name = ?').run(kept7.name))
+    jj(shop, 'bookmark', 'create', 'next', '-r', 'main')
+    jj(shop, 'bookmark', 'create', 'release-x', '-r', 'main')
+    const opts8 = await inv('workflow:setOptions', shop, { preset: null, options: { review: 'you', noSelfReview: false, folder: 'slots', finish: 'userIntegrates', target: 'next' } })
+    check('the project\'s target changed to next', !!opts8 && !opts8.error, JSON.stringify(opts8))
+    await showBoard(page)
+    await openByTitle(page, n2)
+    const field8 = page.locator('#card-target')
+    const options8 = async () => (await field8.locator('option').allInnerTexts().catch(() => [])).map((s) => s.trim())
+    check('card 2\'s Merges into lists the repository\'s bookmarks: main and release-x (in no Other branches), and next', !!(await until(async () => { const o = await options8(); return o.includes('release-x') && o.includes('main') && o.some((x) => /next/.test(x)) && !(await field8.isDisabled()) }, HUNG_MS)), JSON.stringify(await options8()))
+    // HR2's round 1: the field shows the project's next, so beside it the dialog says where the kept card starts: main.
+    const keptNote8 = page.locator('.card-target-kept')
+    check('…and says its work is kept on main, where it starts again', !!(await until(async () => (await keptNote8.getAttribute('data-card-target-kept').catch(() => null)) === 'main' && /kept on main/.test(await text(keptNote8)), HUNG_MS)), await text(page.locator('.dialog')))
+    await shoot(field8.locator('xpath=..'), 'card-target-bookmarks')
+    await inEach(keptNote8, 'card-target-kept', (cat) => (cat['board.target.kept'] ?? '').split('{branch}')[0].trim().slice(0, 12))
+    await page.locator('.dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
+    // A fresh card (no kept work): no such note; it starts on next.
+    const n9 = (await inv('tasks:create', { title: 'Shop fresh after next', project: 'shop', agent: b1.id })).number
+    await openByTitle(page, n9)
+    check('a fresh card\'s dialog: Merges into the project\'s next, no kept note', !!(await until(async () => (await field8.count()) === 1 && /next/.test((await field8.locator('option:checked').innerText().catch(() => '')) ?? ''), HUNG_MS)) && (await page.locator('.card-target-kept').count()) === 0, await text(page.locator('.dialog')))
+    await page.locator('.dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
+    const givenBefore8 = givenCount()
+    const started8 = await inv('tasks:move', n2, 'doing', { confirm: true, reason: 'jjwindow: card 2 after the target changed' }).catch((e) => ({ error: String(e) }))
+    const w8 = await until(async () => {
+      const v = await inv('tasks:work', n2)
+      return v?.folder && v.folder.toLowerCase() === kept7.folder.toLowerCase() && givenCount() > givenBefore8 ? v : null
+    }, HUNG_MS)
+    const startedOn8 = ((await inv('tasks:facts', n2)) ?? []).filter((f) => f.kind === 'Started').pop()?.data?.target
+    check('…card 2 started in its kept slot, on main (the bookmark its work is on), its work there', !!w8 && startedOn8 === 'main' && JSON.stringify(fs.readdirSync(kept7.folder).filter((f) => f !== '.jj' && f !== '.git').sort()) === JSON.stringify(keptFiles7), JSON.stringify({ started8, startedOn8, work: await inv('tasks:work', n2), slots: await inv('slots:list', shop) }))
+
   } finally {
     await app.close().catch(() => undefined)
   }

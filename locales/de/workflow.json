@@ -669,5 +669,7 @@
   "workflow.slots.state.forgotten": "Nicht in jj geführt",
   "workflow.slots.removeForgottenFree": "jj führt den Workspace von {slot} nicht mehr. Sein Ordner kommt so, wie er ist, in den Papierkorb, mit allen Änderungen darin.",
   "workflow.refused.platform.keptElsewhere.message": "{card} kann dort nicht starten: seine committete Arbeit von vor dem Zurücklegen wird im Slot {slot} aufbewahrt, und es startet nur in diesem Slot.",
-  "workflow.refused.platform.keptElsewhere.next": "Warte, bis {slot} frei ist, und starte {card} dann erneut: Es bekommt diesen Slot mit seiner Arbeit zurück."
+  "workflow.refused.platform.keptElsewhere.next": "Warte, bis {slot} frei ist, und starte {card} dann erneut: Es bekommt diesen Slot mit seiner Arbeit zurück.",
+  "workflow.refused.platform.keptOnTarget.message": "{why, select, unread {Die Arbeit von {card} wird im Slot {slot} aufbewahrt, aber Combwork kann nicht lesen, auf welchem Bookmark diese Arbeit liegt.} other {Die frühere Arbeit von {card} liegt im Slot {slot}, auf {target}: Die Karte kann nicht auf {now} starten.}}",
+  "workflow.refused.platform.keptOnTarget.next": "{why, select, unread {Sieh dir den Slot an (Versionsverwaltung → Slots und Kopien, oder mit jj selbst) und starte die Karte dann erneut.} other {Setze ihr Wird gemergt in wieder auf {target}, um dort damit weiterzumachen, oder integriere diese Arbeit zuerst.}}"
 }

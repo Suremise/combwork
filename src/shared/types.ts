@@ -4593,8 +4593,15 @@ export interface LaneStartRequest {
 export interface LaneStartInfo {
   pool: { id: string; name: string }[] | null
   /** The branches its Merges into offers (HI-2556): the project's Work merges into and the others it lists; null: none to pick. */
-  targets: { default: string; others: string[] } | null
+  /** HI-3129: `fixedInFlight`, a card in flight keeps its target (its platform can't move started work). */
+  targets: { default: string; others: string[]; othersUnread?: true; fixedInFlight?: true } | null
 }
+
+/**
+ * HI-3129: where a card waiting to start would start when that isn't the Merges into its dialog shows (main's
+ * `tasks.keptTarget`): its kept work's branch or bookmark, or `unknown` when that can't be read; null: where it shows.
+ */
+export type KeptTargetShown = { target: string } | { unknown: true } | null
 
 /** What Start lane… did: the lane recorded, and how each agent started (failed: the lane stays, why said). */
 export interface LaneStartResult {

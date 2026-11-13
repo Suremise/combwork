@@ -3409,6 +3409,24 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   wait for an agent's or a lane's start (`start.slotAvailable`), but the user's start across that wait, which would
   start the card where its builder is, is refused too, an override included: under jj (whose cards always use slots)
   that drag was the one way a card started in the project folder without its kept work.
+  **A kept jj slot's target** (HI-3129, Darren's decision (a) of 13 Nov): a jj card keeps the bookmark it started on.
+  Its start (jj's `resolveTarget`, read by `startTarget`, `start` and the Todo `prime`, so the evidence, the slot lent
+  and `Started.target` agree) reads the kept slot's binding (the port's `identity` and `binding`) and starts on the
+  binding's target whatever G7 is now; only a fresh start follows G7. Refused before any slot is lent, nothing
+  changed: the binding unproved (unreadable, or not this card's: `platform.keptOnTarget`, `why: unread`), never
+  started on G7 instead; the card's own Merges into naming another bookmark (`platform.keptOnTarget`, `why: mismatch`);
+  its lane merging elsewhere (`platform.keptLine`). The field shows the card's own target or G7, never a kept one, so
+  the card dialog notes beside it where a waiting card would start when that differs (`tasks.keptTarget`: the platform's
+  `startTarget`, read only, the card's own target unchanged; unproved, it says it can't be read; HR2's round 1). The kept target goes with the lease request (`slotFor`'s `kept`:
+  slot, generation, target), and the lease checks it again where the start records it (`SlotPool.keptBindingStill`,
+  the port's `heldTarget` at that generation): failing closed (binding unreadable, another card's, another generation,
+  another target), the slot is given back unused and the start waits (`slot.start.keptMoved`). **A jj project's
+  targets** are its repository's local bookmarks, read through the port (`targetLines`, pinned at the operation head,
+  conflicted ones left out), never Git's history: the card dialog and a lane's start info (`projectTargets`) list them (G7b
+  isn't needed to name one), and a pick is checked through the port (`targetExists`, `lineHead`). The list unreadable
+  (`othersUnread`), only G7 can be picked. jj has no retarget of work in flight (capability `retarget`, Git's only):
+  a started card's Merges into is fixed (`fixedInFlight`, `TARGET.started`). The Assistant's retarget preview for jj
+  is a follow-up.
   **A kept slot of the other version control** (HI-3069): the switch between Git and jj waits for kept slots (§ the
   store switch's `drain.kept`), but one left by a switch made before that is never lent back under the other
   platform. Every start of its card, real or dry, by an agent or the user, in any folder (a slot, the project folder,

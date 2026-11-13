@@ -1886,6 +1886,19 @@ export class SlotPool {
    * HI-3132: a card's committed work kept in a slot of its pool's own version control (HI-2995): its name and folder, so
    * a start placing the card anywhere else is refused naming it (the workflow's `platform.keptElsewhere`). Null with none.
    */
+  /**
+   * HI-3129: whether a kept slot's binding is still as a start proved it (its identity at `generation`, its binding the
+   * card's, naming `target`), read now. False whenever it can't tell: the start's lend then records nothing.
+   */
+  async keptBindingStill(name: string, card: number, generation: string, target: string): Promise<boolean> {
+    const s = this.store.slot(name)
+    if (!s || !this.hasPort(s)) return false
+    const port = this.portOf(s)
+    const identity = port.identity ? await port.identity(s.folder) : null
+    if (!identity || identity.generation !== generation || !port.heldTarget) return false
+    return (await port.heldTarget(s.folder, identity, card)) === target
+  }
+
   keptHere(card: number): { slot: string; folder: string } | null {
     const k = this.store.keptSlotFor(card)
     if (!k || (k.slot.platform ?? 'git') !== this.port.platform) return null
