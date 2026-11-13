@@ -370,7 +370,8 @@ of port 3, unregistered too (J6 composes it): `platform/jjView.ts` (the operatio
 Git state, read from files, bounded, no process), `jjReads.ts` (reads pinned `--at-op` the single head, used only while
 it still is), `jjBoundary.ts` (the one snapshot Combwork takes, under the store's lock and its owner's lease),
 `jjChecks.ts` (a check's bracket and its pure credit decision; `jjIgnoredEntries.ts` leaves out of it what jj ignores,
-asking Git's `check-ignore` on jj's store, HI-3158), `jjAttribution.ts` and `jjFacts.ts` (provenance from
+asking Git's `check-ignore` on jj's store, HI-3158; by kind in `gitShadowIgnore.ts`'s shadow work tree, which Git's
+record shares, `gitIgnoredByKind.ts` with the folder's git dir and index, HI-3175), `jjAttribution.ts` and `jjFacts.ts` (provenance from
 recorded commits and complete evolutions; the ids in `data.platform.jj`) and `jjObserve.ts` (the heads watched, read at
 one head). `tests/jjHistory.test.ts` and, on the pinned jj, `tests/jjHistoryReal.test.ts`. `platform/jjAdvanceProbe.ts`
 (J1, HI-2794) is evidence only, for the closed gate:advance (SPEC §16.3.6, "Open: jj's target advance": Darren decided

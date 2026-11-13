@@ -20,12 +20,11 @@
 // a folder whose time moved with no name to explain it) still counts.
 
 import { watch, type FSWatcher } from 'original-fs'
-import { lstat, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'original-fs/promises'
-import { tmpdir } from 'os'
+import { lstat, readdir } from 'original-fs/promises'
 import { join } from 'path'
-import { git } from '../git'
 import { isAbsent } from './jjView'
 import { jjGitStoreOf } from './jjKeepOut'
+import { shadowCheckIgnore } from './gitShadowIgnore'
 
 /** Entries stat'ed at once (jjStats' bound). */
 const AT_ONCE = 8
@@ -329,33 +328,13 @@ export async function ignoredOnly(root: string, changed: string[], ev: IgnoredEv
 }
 
 /**
- * jjIgnored by the kind each path is asked as, never by what is on disk now: Git takes a path without a slash that is a
- * folder on disk as that folder (HR2's `out` file where `out/` is now), so it's asked in a work tree of its own holding
- * only the `.gitignore` files on the paths' way (the root's and each folder's down to theirs), where nothing else is: a
- * path with a slash is a folder, one without a file. Null where it can't say (one of those unreadable, Git failing).
+ * jjIgnored by the kind each path is asked as, never by what is on disk now (gitShadowIgnore.ts, HI-3175): asked of
+ * Git with jj's Git store as its git dir, `--no-index` (its index isn't the workspace's). Null where it can't say (no
+ * store, a `.gitignore` on the way unreadable, Git failing).
  */
 export async function ignoredByKind(root: string, rels: string[]): Promise<Set<string> | null> {
   if (!rels.length) return new Set()
   const gd = await jjGitStoreOf(root)
   if (!gd) return null
-  const shadow = await mkdtemp(join(tmpdir(), 'combwork-ignore-'))
-  try {
-    const folders = new Set<string>(['.'])
-    for (const p of rels) {
-      const parts = p.replace(/\/$/, '').split('/').slice(0, -1)
-      for (let i = 1; i <= parts.length; i++) folders.add(parts.slice(0, i).join('/'))
-    }
-    for (const f of folders) {
-      const text = await readFile(join(root, f, '.gitignore')).catch((e: unknown) => (isAbsent(e) ? null : undefined))
-      if (text === undefined) return null
-      if (text === null) continue
-      await mkdir(join(shadow, f), { recursive: true })
-      await writeFile(join(shadow, f, '.gitignore'), text)
-    }
-    const r = await git(shadow, [`--git-dir=${gd}`, `--work-tree=${shadow}`, 'check-ignore', '--no-index', '-z', '--stdin'], undefined, rels.join('\0'))
-    if (!r.ok && r.code !== 1) return null
-    return new Set(r.out.split('\0').filter(Boolean))
-  } finally {
-    await rm(shadow, { recursive: true, force: true }).catch(() => undefined)
-  }
+  return shadowCheckIgnore(root, gd, rels, false)
 }
