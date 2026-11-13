@@ -9140,8 +9140,9 @@ where it ran) and counts for a card's submission only if all of these hold; othe
   nor one deleting them (HI-3173, `gitIgnoredByKind.ts`): Git's folder-only rules (`out/`) match a path without a slash
   only when it is a folder on disk, so each path of the record is asked by every kind it had during the run, in a work
   tree of its own holding only the `.gitignore` files on its way, with the folder's git dir and index (a tracked path
-  is never ignored). Its kinds: each event's entry as read soon after the event came (a few reads at a time, at most
-  4096 paths waiting; settling waits for them, up to its cap), a folder where the record has paths under it, and, where
+  is never ignored). Its kinds: each event's entry as read soon after the event came (8 reads at a time, at most 4096
+  events waiting however many name one path, past which an event stays unread; a closed watch drops its queue;
+  settling waits for the reads, up to its cap), a folder where the record has paths under it, and, where
   an event's entry wasn't read or none of those says, what is on disk now and a file too. It is ignored only as every
   one: a deleted `out/` is, a file `out` the run wrote and replaced with an `out/` folder isn't. Its residual is
   HI-3158's (Darren, 13 Nov, option 2): a file named as an ignored folder, made and gone again before its event is

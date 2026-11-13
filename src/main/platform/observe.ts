@@ -54,12 +54,12 @@ const ARM_MS = 250
 /** At most this many working folders per repository are watched (its worktrees): beyond, the rest are unknown. */
 const MAX_FOLDERS = 64
 /**
- * HI-3173, a Git folder's record reads each event's entry kind as it comes (gitIgnoredByKind.ts): a few at a time, and
- * at most this many paths waiting (the service-changes resource rule). Past it, an event's entry is left unread, and
- * its path is asked as a file too (it counts unless that is ignored).
+ * HI-3173, a Git folder's record reads each event's entry kind as it comes (gitIgnoredByKind.ts): `atOnce` at a time,
+ * and at most `queued` events waiting, however many of them name the same path (the service-changes resource rule;
+ * HR2's round 1). Past it, an event's entry is left unread, and its path is asked as a file too (it counts unless that
+ * is ignored). A setting for the tests, as worktreeRetry is.
  */
-export const KIND_READS_AT_ONCE = 8
-export const KIND_READS_QUEUED = 4096
+export const kindReads = { atOnce: 8, queued: 4096 }
 
 // What the watcher tells its subscribers, and how a subscription ends: port 3's types (history.ts, HI-2787).
 export type { Disposable, FolderChanges, ObserveEvent } from './history'
@@ -178,6 +178,9 @@ class FolderLog {
   /** HI-3173: the paths whose kind is still to be read, each with the entries it is for; and the reads under way. */
   private toRead = new Map<string, WriteEntry[]>()
   private reads = 0
+  /** The entries in toRead, all paths' together: at most kindReads.queued. */
+  private waiting = 0
+  private closed = false
 
   constructor(
     readonly folder: string,
@@ -218,19 +221,22 @@ class FolderLog {
 
   /**
    * Reads what an event's entry is (HI-3173), soon after it came: a path already waiting is read once for all its
-   * entries; past KIND_READS_QUEUED paths waiting, it stays unread.
+   * entries; past kindReads.queued entries waiting, it stays unread.
    */
   private readKind(e: WriteEntry): void {
+    if (this.closed || this.waiting >= kindReads.queued) return
     const waiting = this.toRead.get(e.path)
     if (waiting) waiting.push(e)
-    else if (this.toRead.size < KIND_READS_QUEUED) this.toRead.set(e.path, [e])
+    else this.toRead.set(e.path, [e])
+    this.waiting++
     this.pump()
   }
 
   private pump(): void {
-    while (this.reads < KIND_READS_AT_ONCE && this.toRead.size) {
+    while (!this.closed && this.reads < kindReads.atOnce && this.toRead.size) {
       const [path, entries] = this.toRead.entries().next().value!
       this.toRead.delete(path)
+      this.waiting -= entries.length
       this.reads++
       void lstat(join(this.folder, path))
         .then(
@@ -250,6 +256,11 @@ class FolderLog {
   /** Whether every kind read asked for so far is in. */
   get kindsRead(): boolean {
     return !this.reads && !this.toRead.size
+  }
+
+  /** The events whose kind read waits to start (the tests' look at the bound). */
+  get kindsWaiting(): number {
+    return this.waiting
   }
 
   push(e: WriteEntry): void {
@@ -278,6 +289,10 @@ class FolderLog {
 
   close(): void {
     this.watch.close()
+    // Its queued kind reads are dropped; those under way end by themselves.
+    this.closed = true
+    this.toRead.clear()
+    this.waiting = 0
   }
 }
 
@@ -596,6 +611,13 @@ export class Observer implements ObservePort {
     let folders = this.folders.size
     for (const r of this.repos.values()) folders += r.logs.size
     return { repos: this.repos.size, folders }
+  }
+
+  /** HI-3173: the events whose kind read waits to start, in every Git folder (the tests' look at kindReads' bound). */
+  get kindsWaiting(): number {
+    let n = 0
+    for (const r of this.repos.values()) for (const l of r.logs.values()) n += l.kindsWaiting
+    return n
   }
 
   /** A repository's event, to the projects it holds. */
