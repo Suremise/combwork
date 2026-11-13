@@ -315,14 +315,13 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
       check(`${label}: Last actions under the graph, at the map's full width`, !!b && !!f && !!m && f.y >= b.y + b.height - 1 && f.width >= m.width - 24 - 2, JSON.stringify({ b, f, m }))
       await shoot(`7-long-names-${label}-light`)
     }
-    // Wide characters (HR1's round 1): a CJK file name and a full-width tool name, each glyph about two columns wide,
-    // cut by the columns they take, not by their count, and inside their hexes too.
-    const cjkFile = `dir/${'日'.repeat(20)}.ps1`
-    const wideTool = `mcp__srv__${'ツール'.repeat(5)}`
-    await turn('hb1', `tool Read ${cjkFile} then tool ${wideTool}`)
-    check('the wide names reach their stations', !!(await lib.until(async () => ((await station('read').locator('title').textContent()) ?? '').includes('日'.repeat(20)) && ((await station('tools').locator('title').textContent()) ?? '').includes('ツール'), HUNG_MS, 250)), `${await station('read').locator('title').textContent().catch(() => '')} | ${await station('tools').locator('title').textContent().catch(() => '')}`)
+    // Wide characters (HR1's round 1): a CJK file name and a full-width one, each glyph about two columns wide, cut by
+    // the columns they take, not by their count, and inside their hexes too. (The fake CLI's tool names are ASCII only:
+    // a wide tool name, cut by the same function, is tests/activityMap.test.ts's.)
+    await turn('hb1', `tool Read dir/${'日'.repeat(20)}.ps1 then tool Edit dir/ｆｕｌｌｗｉｄｔｈ${'Ｘ'.repeat(10)}.txt`)
+    check('the wide names reach their stations', !!(await lib.until(async () => ((await station('read').locator('title').textContent()) ?? '').includes('日'.repeat(20)) && ((await station('edit').locator('title').textContent()) ?? '').includes('ｆｕｌｌ'), HUNG_MS, 250)), `${await station('read').locator('title').textContent().catch(() => '')} | ${await station('edit').locator('title').textContent().catch(() => '')}`)
     check('…the CJK file name cut by its columns, its extension kept', (await lastOf('read')) === '日日日….ps1', await lastOf('read'))
-    check('…the full-width tool name cut in its middle, its last characters kept', ((await lastOf('tools')) ?? '').endsWith('…ール'), await lastOf('tools'))
+    check('…the full-width one too', (await lastOf('edit')) === 'ｆｕｌ….txt', await lastOf('edit'))
     for (const [width, label] of [[1500, 'wide'], [900, 'narrow']]) {
       await lib.fitWindow(app, page, { width, height: 900 })
       await page.waitForFunction((w) => window.innerWidth === w, width)
