@@ -137,6 +137,7 @@ import { boardSlots, heldWriter, releaseHeldWriter } from './agentFolders'
 import { copyV09Templates, sayV09TemplatesOnce } from './templateUpgrade'
 import { checkWorkflowChange, chooseMerge, presetsNotice, settleMergeChoices, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
 import { checkPlatformSwitch, setPlatform } from './workflow/platformSwitch'
+import { SwitchRefusedError } from './workflow/storeSwitch'
 import { presetNotNow } from './workflow/presetStep'
 import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
 import { rulesetsNow } from './workflow/rulesets'
@@ -1043,6 +1044,15 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'board:stages': async () => Object.fromEntries(await Promise.all((workspace.info()?.projects ?? []).map(async (p) => [p.path.toLowerCase(), await projectStages(workspace, p.path).catch(() => null)] as const))),
     'workflow:checkPlatform': (p, to) => checkPlatformSwitch(workspace, workspace.assertProject(p), to),
     'workflow:setPlatform': (p, to, opts) => setPlatform(workspace, workspace.assertProject(p), to, { expected: opts?.expected, token: opts?.token }),
+    'workflow:switchPlatform': async (p, to, opts) => {
+      try {
+        return { switched: await setPlatform(workspace, workspace.assertProject(p), to, { expected: opts?.expected, token: opts?.token }) }
+      } catch (e) {
+        // Only a repository switch's own refusal is data (HI-3105); anything else (a save that failed, say) still throws.
+        if (e instanceof SwitchRefusedError) return { refused: e.refusal }
+        throw e
+      }
+    },
     'workflow:presetNotNow': (p, platform) => presetNotNow(workspace, workspace.assertProject(p), platform),
     'workflow:presetsNotice': () => presetsNotice(workspace),
     'workflow:presetsNoticeSaid': () => presetsNoticeSaid(workspace),

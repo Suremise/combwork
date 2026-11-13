@@ -321,6 +321,47 @@ describe('a switch between Git and jj is the repository’s (HI-2799)', () => {
     expect(rereadAfterRefusal({ refused: { why: 'drain' } })).toBe(false)
   })
 
+  it("HI-3105 (HR2's round 2): pressing Switch: a refusal re-checked clear gives a fresh look, never a second switch; any other failure stays the error", async () => {
+    const { switchAtConfirm } = await import('../src/shared/platform/switching')
+    const shown = { group: [], token: 't', drain: { lanes: [], cards: [], queue: [], slots: [], copies: [], kept: [] } }
+    const flow = (switchIt: () => Promise<never>, rechecks: unknown[]) => {
+      const calls = { switch: 0, recheck: 0 }
+      const run = switchAtConfirm({
+        switchIt: async () => (calls.switch++, switchIt()),
+        recheck: async () => rechecks[calls.recheck++] as never
+      })
+      return { run, calls }
+    }
+    // A passing race: refused (fallback), the check read again is clear: a fresh look, the switch made once only.
+    const race = flow(async () => ({ refused: { why: 'fallback' } }) as never, [{ refused: null, store: shown }])
+    expect(await race.run).toBe('reread')
+    expect(race.calls).toEqual({ switch: 1, recheck: 1 })
+    // An unrelated failure (a save denied): the error itself, the check not read again, whatever it would say.
+    const denied = flow(async () => {
+      throw new Error('EACCES: permission denied saving project.json')
+    }, [{ refused: null, store: shown }])
+    await expect(denied.run).rejects.toThrow('EACCES: permission denied saving project.json')
+    expect(denied.calls).toEqual({ switch: 1, recheck: 0 })
+    // A refusal whose re-check can't be read: the refusal stays the dialog's error.
+    const unread = flow(async () => ({ refused: { why: 'drain' } }) as never, [null])
+    expect(await unread.run).toEqual({ refused: { why: 'drain' } })
+    // Switched: nothing more.
+    const ok = flow(async () => ({ switched: { from: 'jj', to: 'git' } }) as never, [])
+    expect(await ok.run).toBe('switched')
+    expect(ok.calls).toEqual({ switch: 1, recheck: 0 })
+  })
+
+  it('HI-3105: the switch IPC gives a repository refusal as data, and any other failure as an error', async () => {
+    const { w, p } = await workspace({ p: 'git', q: 'git' })
+    await sw.setPlatform(w, p, 'jj', { expected: 'git', token: (await sw.checkPlatformSwitch(w, p, 'jj')).store!.token })
+    const lease = await new SlotStore(boardConn(w), await idOf(w, p)).take({ agent: 'b-ipc', card: 990 }, { size: 4, root: join(base, 'ipc-slots'), target: 'main', token: 't-ipc', holder: { pid: process.pid, started: 1 }, platform: 'jj' })
+    expect(lease.ok).toBe(true)
+    const { SwitchRefusedError } = ss
+    const refused = await sw.setPlatform(w, p, 'git', { expected: 'jj', token: (await sw.checkPlatformSwitch(w, p, 'git')).store!.token }).then(() => null, (e: unknown) => e)
+    expect(refused).toBeInstanceOf(SwitchRefusedError)
+    expect((refused as InstanceType<typeof SwitchRefusedError>).refusal).toEqual({ why: 'drain' })
+  })
+
   it('a group changed after its warning is refused, and a fresh warning gives the new group (1f)', async () => {
     const { w, p, q } = await workspace({ p: 'git', q: 'none' })
     const first = (await sw.checkPlatformSwitch(w, p, 'jj')).store!

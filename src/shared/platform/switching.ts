@@ -103,6 +103,23 @@ export function rereadAfterRefusal(again: { refused: SwitchRefusal | null; store
   return !!again.store && DETAILED_REFUSALS.has(again.refused.why)
 }
 
+/**
+ * HI-3105: the switch's dialog pressing Switch. `switchIt` makes the switch: a repository switch's refusal comes back as
+ * data (workflow:switchPlatform); any other failure throws, and is the dialog's error as it is (never looked past: a
+ * save that failed stays said). On a refusal the check is read again (`recheck`, null when it couldn't be): reading clear
+ * or refusing with its lists, the dialog gives way to a fresh look (`reread`: a new confirmation, or the refused dialog
+ * with its lists; never a second switch made by itself); else the refusal is the dialog's error (`refused`).
+ */
+export async function switchAtConfirm(o: {
+  switchIt: () => Promise<{ switched: unknown } | { refused: SwitchRefusal }>
+  recheck: () => Promise<{ refused: SwitchRefusal | null; store?: unknown } | null>
+}): Promise<'switched' | 'reread' | { refused: SwitchRefusal }> {
+  const r = await o.switchIt()
+  if ('switched' in r) return 'switched'
+  const again = await o.recheck().catch(() => null)
+  return rereadAfterRefusal(again) ? 'reread' : { refused: r.refused }
+}
+
 /** A refusal's message and values. */
 export function switchRefusalText(r: SwitchRefusal): { m: Msg; values?: Record<string, string> } {
   switch (r.why) {

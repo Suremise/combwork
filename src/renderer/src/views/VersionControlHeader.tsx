@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { PlatformSwitchCheck, ProjectInfo, WorkflowForm } from '@shared/types'
 import { needsRepository, type PlatformId, type PlatformOffer, type ProjectPlatform } from '@shared/platform/descriptors'
-import { DETAILED_REFUSALS as DETAILED, PLATFORM_NAME, rereadAfterRefusal, switchRefused, switchRefusalText } from '@shared/platform/switching'
+import { DETAILED_REFUSALS as DETAILED, PLATFORM_NAME, switchAtConfirm, switchRefused, switchRefusalText } from '@shared/platform/switching'
 import { StoreSwitchDetails } from './StoreSwitchDetails'
 import { FORM_OPTIONS } from '@shared/workflow/options'
 import { PRESET_TEXT } from '@shared/workflow/optionTexts'
@@ -108,7 +108,8 @@ export async function switchPlatform(project: ProjectInfo, from: PlatformId, to:
   // HI-3105: a switch of the repository refused as Switch is pressed (what its warning lists changed since it was read):
   // the check is read again, and when that refuses with lists, or reads clear now (HR1's round 1: a passing race), this
   // dialog gives way to a fresh look (the refused one showing them, or a fresh confirmation), never a refusal pointing
-  // at a list the dialog doesn't have; never a switch made by itself.
+  // at a list the dialog doesn't have; never a switch made by itself. Only a refusal does (HR2's round 2): any other
+  // failure (a save that failed) is the dialog's error as it is.
   let reread = false
   const ok = await confirm({
     title: tr(S.title, { project: project.name, platform: names.to }),
@@ -117,15 +118,14 @@ export async function switchPlatform(project: ProjectInfo, from: PlatformId, to:
     content: <SwitchDetails project={project} check={check} names={names} />,
     confirmLabel: tr(S.confirm),
     run: async () => {
-      try {
-        await call('workflow:setPlatform', project.path, to, { expected: from, ...(check.store ? { token: check.store.token } : {}) })
-      } catch (e) {
-        const again = check.store ? await call('workflow:checkPlatform', project.path, to).catch(() => null) : null
-        if (rereadAfterRefusal(again)) {
-          reread = true
-          return
-        }
-        throw e
+      const r = await switchAtConfirm({
+        switchIt: () => call('workflow:switchPlatform', project.path, to, { expected: from, ...(check.store ? { token: check.store.token } : {}) }),
+        recheck: () => call('workflow:checkPlatform', project.path, to)
+      })
+      if (r === 'reread') reread = true
+      else if (r !== 'switched') {
+        const t = switchRefusalText(r.refused)
+        throw new Error(tr(t.m, t.values))
       }
     }
   })

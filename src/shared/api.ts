@@ -166,6 +166,7 @@ import type {
   WorkspaceInfo
 } from './types'
 import type { PlatformId } from './platform/descriptors'
+import type { SwitchRefusal } from './platform/switching'
 import type { SlotLevelForm, SlotOptionOrigin } from './slotDefaults'
 import type { GithubHostChange, GithubHostsForm } from './githubHost'
 import type { MetricsQuery, MetricsReport } from './metrics'
@@ -426,6 +427,8 @@ export interface CombworkRequests {
    */
   /** `token` (HI-2799): a switch between Git and jj, the group its warning showed (`PlatformSwitchCheck.store.token`). */
   'workflow:setPlatform': (projectPath: string, to: PlatformId, opts: { expected: PlatformId; token?: string }) => { from: PlatformId; to: PlatformId }
+  /** HI-3105: as workflow:setPlatform, but a repository switch's refusal returned as data (its reason), for the dialog to look again; every other failure still throws. */
+  'workflow:switchPlatform': (projectPath: string, to: PlatformId, opts: { expected: PlatformId; token?: string }) => { switched: { from: PlatformId; to: PlatformId } } | { refused: SwitchRefusal }
   /**
    * "How do you work?" answered Not now (#1423) for the platform the step showed: no preset, the options inherited, not
    * asked again for it. Ignored if the project uses another platform now, or was answered meanwhile.
