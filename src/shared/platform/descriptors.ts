@@ -137,10 +137,10 @@ const short12 = (id: string): string => id.slice(0, 12)
 
 export const PLATFORMS: Record<PlatformId, PlatformDescriptor> = {
   // Git answers everything: worktrees for isolation, merges for integration, replay for sameness.
-  git: { id: 'git', name: 'Git', ownedWorkspaces: false, detectionSteady: false, capabilities: ['revisions', 'isolation', 'checkCopies', 'integration', 'containment', 'sameness', 'authorship', 'observe', 'retarget'], integration: 'merge', deliverables: 'commits', repository: true, defaultTarget: true, operations: OPERATIONS, revisionShort: short, remedies: GIT_REMEDIES, gates: [] },
+  git: { id: 'git', name: 'Git', ownedWorkspaces: false, detectionSteady: false, capabilities: ['revisions', 'isolation', 'checkCopies', 'integration', 'containment', 'sameness', 'authorship', 'observe', 'retarget'], integration: 'merge', deliverables: 'commits', repository: true, defaultTarget: true, operations: OPERATIONS, revisionShort: short, remedies: GIT_REMEDIES, gates: [] }, // i18n-ignore: a product name, the same in every language
   // None: content hashes as revisions, acceptance as integration, no isolation in 1.0 (OP-16). No repository to change:
   // Initialise repository is on Git's page (HI-1905), gated by Git's operations.
-  none: { id: 'none', name: 'None', ownedWorkspaces: false, detectionSteady: false, capabilities: ['revisions', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'accept', deliverables: 'paths', repository: false, defaultTarget: false, operations: [], revisionShort: short, gates: [] },
+  none: { id: 'none', name: 'None', ownedWorkspaces: false, detectionSteady: false, capabilities: ['revisions', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'accept', deliverables: 'paths', repository: false, defaultTarget: false, operations: [], revisionShort: short, gates: [] }, // i18n-ignore: a product name, the same in every language
   // jj (HI-2799, J6; SPEC §16.3.6): workspaces for isolation (J2), pinned history and attribution (J3). No integration, ever,
   // under Darren's option A (HI-2794: no automatic advance, the user integrates), and no operation in the window (R5.2):
   // jj itself changes bookmarks. Every gate is closed until its J card's evidence opens it.
