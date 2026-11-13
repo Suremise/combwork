@@ -50,8 +50,8 @@ import type { FactData } from '../../shared/workflow/facts'
 import { CW_RUNS } from '../progress'
 import { createLogger, userText } from '../logger'
 import { mergeMessage, updateMessage } from '../workflow/mergeMessage'
-import { jjCandidateNow, type JjCandidateDeps } from './jjCandidates'
-import { cleanCycle, cycleLive, readAttemptsValue, jjCandidateStep, sameFingerprint, type JjCandidateOffer, type JjAttemptEntry, type JjCandidateFingerprint, type JjCandidateStep } from './jjCandidateStep'
+import { jjCandidateNow, visibleCommits, type JjCandidateDeps } from './jjCandidates'
+import { cleanCycle, cycleLive, readAttemptsValue, reviveDropped, jjCandidateStep, sameFingerprint, type JjCandidateOffer, type JjAttemptEntry, type JjCandidateFingerprint, type JjCandidateStep } from './jjCandidateStep'
 import { randomUUID } from 'crypto'
 import { isJjUnknown, JjReads, parseCommitLine, type JjCommit } from './jjReads'
 import { jjRunner, storeGatedHistory, type JjRunner } from './jjRunner'
@@ -1196,8 +1196,12 @@ export class JjPlatform implements PlatformAdapter {
     const all = scan(after, `${prefix}\uffff`, SWEEP_SCAN)
     const passEnds = all.length < SWEEP_SCAN
     const byKey = (k: string): CardRecord | null => wf.store.cardByKey(k)
-    type Due = { key: string; cardKey: string; cycle: number }
-    const due: Due[] = []
+    type Due = { key: string; cardKey: string; cycle: number; revive?: true }
+    // HI-3150: every scanned row's dropped attempts may be back in view, whether the row is due for something else or
+    // otherwise settled (HR2's round 1: a retained checks journal or a live sibling made it due, and cleanCycle skips a
+    // dropped entry): their owned commits are nominees for one batched read below; a row of a card gone from the board
+    // isn't (no lock, nobody to revive it for).
+    const listed: (Due & { live: boolean; nominee?: string[] })[] = []
     for (const row of all) {
       const m = /^jj_attempts:[^:]+:(.+):(\d+)$/.exec(row.key)
       if (!m) continue
@@ -1207,9 +1211,18 @@ export class JjPlatform implements PlatformAdapter {
       if (card && !cycleOver(card, wf.state(card), cycle)) continue
       const entries = readAttemptsValue(row.value)
       const rows = rec.read((db) => (db.prepare('SELECT COUNT(*) AS n FROM board_meta WHERE key = ? OR (key > ? AND key < ?)').get(candidateKey(project, cardKey, cycle), `jj_candidate_checks:${project}:${cardKey}:${cycle}:`, `jj_candidate_checks:${project}:${cardKey}:${cycle}:\uffff`) as { n: number }).n) // i18n-ignore: SQL
-      if (!cycleLive(entries) && !rows) continue
-      due.push({ key: row.key, cardKey, cycle })
+      const live = cycleLive(entries) || rows > 0
+      const owned = card ? entries.filter((e) => e.state === 'dropped' && !e.failure).flatMap((e) => e.record.commits) : []
+      if (live || owned.length) listed.push({ key: row.key, cardKey, cycle, live, ...(owned.length ? { nominee: owned } : {}) })
     }
+    // One visibility read of every nominee's commits, in chunks (visibleCommits): evidence only, the revival under the card's
+    // lock reads again. Unknown admits none of them; the next run reads them again.
+    const nominated = listed.flatMap((x) => x.nominee ?? [])
+    const back = nominated.length ? await visibleCommits({ runner: integ.runner, view: { jjRepo: integ.view.jjRepo, store: integ.view.store }, folder: integ.folder, ...(signal ? { signal } : {}) }, [...new Set(nominated)], () => !signal?.aborted) : null
+    const due: Due[] = listed.flatMap((x) => {
+      const revive = !!x.nominee?.some((c) => back?.has(c))
+      return x.live || revive ? [{ key: x.key, cardKey: x.cardKey, cycle: x.cycle, ...(revive ? { revive: true as const } : {}) }] : []
+    })
     // Fair: in key order after the cursor, the cursor past each row scanned, due or not (a page short of the due rows
     // stops at its last one, so the rest come first next run).
     const page = due.slice(0, SWEEP_PAGE)
@@ -1227,6 +1240,8 @@ export class JjPlatform implements PlatformAdapter {
         const j4 = { runner: integ.runner, view: { jjRepo: integ.view.jjRepo, store: integ.view.store }, folder: integ.folder, git: integ.git, lock: integ.lock, sameChange: async () => false, ...(d.candidateHook ? { hook: d.candidateHook } : {}) }
         const keyOf = card?.key ?? x.cardKey
         const park = d.candidateChecks?.parkCopies
+        // HI-3150: a nominated row's dropped attempts revived first, read again here under the card's lock.
+        if (x.revive && card) await reviveDropped({ j4, entries: () => rec.attempts!(keyOf, x.cycle), save: (e) => rec.saveAttempt!(keyOf, x.cycle, e), still, log: (w) => checksLog.info(`#${userText(keyOf)} cycle ${x.cycle}: ${w}`) }) // i18n-ignore: a log line, English
         const out = await cleanCycle({ j4, entries: () => rec.attempts!(keyOf, x.cycle), save: (e) => rec.saveAttempt!(keyOf, x.cycle, e), still, ...(park ? { park } : {}), log: (w) => checksLog.info(`#${userText(keyOf)} cycle ${x.cycle}: ${w}`) }) // i18n-ignore: a log line, English
         if (out.unresolved) unresolved = true
         // Its checks journals: each deleted only once its lease is freed (its tree can't still write; HR1's gap 2).

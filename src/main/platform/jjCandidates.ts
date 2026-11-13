@@ -292,6 +292,33 @@ const set = (ids: readonly string[]): string => (ids.length ? `(${ids.join(' | '
 const visibleOf = (ids: readonly string[]): string => `${set(ids)} & ::visible_heads()`
 const sameSet = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && [...a].sort().join() === [...b].sort().join()
 
+/** HI-3150: how many commits one visibility read names. */
+export const VISIBLE_CHUNK = 256
+
+/**
+ * HI-3150: which of `ids` jj shows now (visible at the single operation head), read in chunks of VISIBLE_CHUNK; null when
+ * it can't be told (several heads, a read jj couldn't make, cancelled, `still` false between chunks): never "none".
+ */
+export async function visibleCommits(deps: Pick<JjCandidateDeps, 'runner' | 'view' | 'folder' | 'signal' | 'timeout'>, ids: readonly string[], still: () => boolean = () => true, chunkSize = VISIBLE_CHUNK): Promise<Set<string> | null> {
+  const out = new Set<string>()
+  if (!ids.length) return out
+  const h = readOpHeads(deps.view.jjRepo)
+  if (!h || h.length !== 1) return null
+  const reads = new JjReads({ folder: deps.folder, jjRepo: deps.view.jjRepo }, deps.runner, { signal: deps.signal, timeout: deps.timeout })
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    if (deps.signal?.aborted || !still()) return null
+    const chunk = ids.slice(i, i + chunkSize)
+    const r = await reads.run(h[0], ['log', '--no-graph', '-r', visibleOf(chunk), '-n', String(chunk.length + 1), '-T', COMMIT_T])
+    if (isJjUnknown(r)) return null
+    for (const l of lines(r)) {
+      const c = parseCommitLine(l)
+      if (!c) return null
+      out.add(c.commit)
+    }
+  }
+  return out
+}
+
 /** The prefix an attempt's pins live under: a namespace, never proof of who wrote a ref there. */
 export const pinPrefix = (card: string, attempt: string): string => `refs/cw/jj/${refSafe(card)}/${attempt}/`
 
@@ -1098,7 +1125,8 @@ export async function recoverJjAttempt(deps: JjCandidateDeps, record: JjAttemptR
 /** What a drop did: the refs it deleted, those it kept and why, the commits it abandoned and those it kept. */
 export interface JjDropped {
   /** `keptSuccessors` (HI-3045): its hidden commits' visible successors left alone, as the user's or unclassifiable. */
-  dropped: { refs: string[]; keptRefs: { ref: string; why: 'reached' | 'kept' | 'notOwned' }[]; abandoned: string[]; kept: string[]; keptSuccessors?: JjKeptSuccessor[] }
+  /** `reached` (HI-3150): the attempt's own visible commits the target reaches, left as they are (none pinned: a revived drop's). */
+  dropped: { refs: string[]; keptRefs: { ref: string; why: 'reached' | 'kept' | 'notOwned' }[]; abandoned: string[]; kept: string[]; keptSuccessors?: JjKeptSuccessor[]; reached?: string[] }
   record: JjAttemptRecord
 }
 
@@ -1301,6 +1329,20 @@ export async function dropJjAttempt(deps: JjCandidateDeps, record: JjAttemptReco
     const ids = [...ids0, ...adopt]
     const { op, reached } = adopt.length ? await reachedNow(a, target, ids) : r0
     const visible = (await a.commits(op, visibleOf(ids))).map((c) => c.commit)
+    // HI-3150: an owned commit visible again with no pin holding it (a dropped attempt the user's `jj op restore` brought
+    // back: its pins were deleted with the drop) is pinned again first, as HI-2990's adopted successors are, so the
+    // guarded abandon below may take it; what the target reaches is never pinned or abandoned.
+    const held = new Set(rec.pins.filter((p) => p.state === 'created').map((p) => p.oid))
+    const repin = visible.filter((c) => !reached.has(c) && rec.commits.includes(c) && !held.has(c))
+    if (repin.length) {
+      const prefix = pinPrefix(rec.card, rec.attempt)
+      let n = rec.pins.length
+      for (const c of repin) {
+        let ref = `${prefix}r${n++}`
+        while (rec.pins.some((p) => p.ref === ref)) ref = `${prefix}r${n++}`
+        await a.pin(ref, c)
+      }
+    }
     const kept = visible.length ? await a.abandon(visible.filter((c) => !reached.has(c) && rec.commits.includes(c))) : []
     const keptRefs: JjDropped['dropped']['keptRefs'] = []
     const dropped: string[] = []
@@ -1329,7 +1371,8 @@ export async function dropJjAttempt(deps: JjCandidateDeps, record: JjAttemptReco
       })
     }
     await a.phase('dropped')
-    return { dropped: { refs: dropped, keptRefs, abandoned: [...(rec.abandoned ?? [])], kept, ...(keptSuccessors.length ? { keptSuccessors } : {}) }, record: structuredClone(rec) }
+    const reachedOwn = visible.filter((c) => reached.has(c) && rec.commits.includes(c))
+    return { dropped: { refs: dropped, keptRefs, abandoned: [...(rec.abandoned ?? [])], kept, ...(keptSuccessors.length ? { keptSuccessors } : {}), ...(reachedOwn.length ? { reached: reachedOwn } : {}) }, record: structuredClone(rec) }
   } catch (e) {
     if (e instanceof Stop) return a.interrupted(e)
     throw e
