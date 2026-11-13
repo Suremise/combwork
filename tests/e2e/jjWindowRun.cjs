@@ -492,8 +492,9 @@ const onDb = (fn) => {
     check('…removed: the slot and its folder gone', !!(await until(async () => {
       if (!(await inv('slots:list', shop)).some((s) => s.name === slot6) && !fs.existsSync(w6.folder)) return true
       if ((await row6.locator('[data-action="remove-forgotten"]').count()) === 1 && (await page.locator('.dialog').count()) === 0) {
-        await row6.locator('[data-action="remove-forgotten"]').click()
-        await page.locator('.dialog').filter({ hasText: `Remove ${slot6}?` }).getByRole('button', { name: 'Remove', exact: true }).click().catch(() => undefined)
+        // The row may go as it is clicked (the removal under way): a short try, never a wait.
+        await row6.locator('[data-action="remove-forgotten"]').click({ timeout: 2000 }).catch(() => undefined)
+        await page.locator('.dialog').filter({ hasText: `Remove ${slot6}?` }).getByRole('button', { name: 'Remove', exact: true }).click({ timeout: 2000 }).catch(() => undefined)
       }
       return null
     }, HUNG_MS)), JSON.stringify(await inv('slots:list', shop)))
