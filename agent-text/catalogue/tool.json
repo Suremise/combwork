@@ -47,8 +47,8 @@
     "text": "The project's MCP servers it gets: [] none, [\"*\"] all (default). combwork is always given."
   },
   "tool.arg.override": {
-    "text": "Moves it past the rules the move skips: reason is the user's own why, never made up. released: the released branch its refusal named, once the user OKs work there.",
-    "note": "HI-3148: released added."
+    "text": "Past the rules the move skips: reason is the user's own why, never made up. released: the branch its refusal named.",
+    "note": "HI-3148: released added (HI-3155: within 120 characters)."
   },
   "tool.arg.project": {
     "text": "A project's name."
@@ -95,7 +95,7 @@
     "note": "HI-3114: required for nextVersion too."
   },
   "tool.branch.arg.offer": {
-    "text": "A release offer’s id: nextVersion answers it (refused once it changed); dismissOffer changes it: hides it until it changes (the user’s Not now).",
+    "text": "A release offer’s id: nextVersion answers it; dismissOffer puts it off (the user’s Not now).",
     "note": "HI-3155: cw_branch’s offer argument."
   },
   "tool.branch.description": {
@@ -340,7 +340,7 @@
     "text": "start: reviewed by the project's reviewer pool."
   },
   "tool.lane.arg.released": {
-    "text": "start: target and reason: a lane on the released branch its refusal named, only once the user OKs it (a hotfix); reason is theirs.",
+    "text": "start: target and reason: the released branch its refusal named, once the user OKs a hotfix there.",
     "note": "HI-3148: the Assistant’s override of a new lane on a released line."
   },
   "tool.lane.arg.reviewer": {
@@ -698,7 +698,7 @@
     "text": "Change an agent's name, role, MCP servers or connection. A running agent takes them when restarted; another CLI's connection only while it is stopped."
   },
   "tool.updateSetting.arg.offer": {
-    "text": "A release offer’s id, when this answers it: refused once the offer changed.",
+    "text": "The release offer this answers (its id).",
     "note": "HI-3155: cw_update_setting’s offer argument (project.workflow.target or otherTargets)."
   },
   "tool.updateSetting.arg.value": {
