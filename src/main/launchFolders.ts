@@ -2,10 +2,10 @@ import { randomBytes } from 'crypto'
 import { join } from 'path'
 import { lstat, readdir, rename, stat } from 'original-fs/promises'
 import { CW_DIR } from '../shared/defaults'
-import { launchFolderAgent, launchFolderName, launchFolderOf, SET_ASIDE } from './launchFolderNames'
+import { launchFolderAgent, launchFolderName, launchFolderOf, SET_ASIDE, whileRemovingLaunchFolder } from './launchFolderNames'
 import { removePath } from './fsutil'
 import { createLogger, userText } from './logger'
-import { trash } from './trash'
+import { trash, TrashNoLonger } from './trash'
 import { WorkspaceService, workspace } from './workspace'
 
 const log = createLogger('launch-folders')
@@ -67,21 +67,35 @@ export async function staleLaunchFolders(projectPath: string): Promise<StaleLaun
 }
 
 /**
- * Removes a removed agent's launch folder, checked just before: the agent isn't the project's (its project.json read
- * now), nor starting or running. Deleted, it is renamed aside first, so a launch starting meanwhile makes a fresh one
- * rather than write into one going away; to the Recycle Bin (`trash`, as Clean Up does), it is moved there at once, under
- * its own name. Whether it went.
+ * Removes a removed agent's launch folder. It qualifies when it is a real folder, its agent isn't the project's (its
+ * project.json read now) and isn't starting or running, that last checked with nothing awaited before the move. Once it
+ * qualifies, the removal runs under the guard a launch shares (whileRemovingLaunchFolder: a launch of that agent waits for
+ * its end), and qualifies again before each move it makes, the Recycle Bin's retries of a held folder too (HR2's round
+ * 1): an agent added back or started meanwhile stops it, nothing changed. Deleted, it is renamed aside first, then
+ * removed under a name no launch uses; to the Recycle Bin (`trash`, as Clean Up does), it is moved there under its own
+ * name. Whether it went.
  */
 export async function removeLaunchFolder(projectPath: string, agentId: string, how: 'delete' | 'trash' = 'delete'): Promise<boolean> {
   if (launchFolderAgent(launchFolderName(agentId)) !== agentId) return false
   const path = launchFolderOf(projectPath, agentId)
-  if (!(await isFolder(path))) return false
-  const agents = await currentAgents(projectPath)
-  // After the read: nothing is awaited between this check and the rename.
-  if (!agents || agents.has(agentId.toLowerCase()) || busy(projectPath, agentId)) return false
-  // To the Recycle Bin: one move, under its own name (what the Bin shows and restores).
-  if (how === 'trash') await trash(path)
-  else {
+  const qualifies = async (): Promise<boolean> => {
+    if (!(await isFolder(path))) return false
+    const agents = await currentAgents(projectPath)
+    // Last, after every read: nothing is awaited between this and the move that follows a yes.
+    return !!agents && !agents.has(agentId.toLowerCase()) && !busy(projectPath, agentId)
+  }
+  if (!(await qualifies())) return false
+  const removed = await whileRemovingLaunchFolder(projectPath, agentId, async () => {
+    if (how === 'trash') {
+      try {
+        await trash(path, { still: qualifies })
+        return true
+      } catch (e) {
+        if (e instanceof TrashNoLonger) return false
+        throw e
+      }
+    }
+    if (!(await qualifies())) return false
     const aside = `${path}.removing-${randomBytes(4).toString('hex')}`
     try {
       await rename(path, aside)
@@ -90,9 +104,10 @@ export async function removeLaunchFolder(projectPath: string, agentId: string, h
       return false
     }
     await removePath(aside)
-  }
-  log.info(`Removed the launch folder of ${userText(agentId)}, no longer an agent of ${userText(projectPath)}`)
-  return true
+    return true
+  })
+  if (removed) log.info(`Removed the launch folder of ${userText(agentId)}, no longer an agent of ${userText(projectPath)}`)
+  return removed
 }
 
 /** Folders set aside by a removal that stopped part way: no launch uses one, so they go. */

@@ -42,7 +42,7 @@ import { atMost } from '../../../shared/atMost'
 import { joined } from '../../../shared/coalesce'
 import { advanced } from '../../advanced'
 import { launchOverrides } from '../../advancedValues'
-import { launchFolderOf } from '../../launchFolderNames'
+import { launchFolderFree, launchFolderOf } from '../../launchFolderNames'
 
 const log = createLogger('claude-code')
 /** Transcripts whose sub-agent check is remembered (by path and mtime). */
@@ -507,6 +507,8 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
       Object.assign(ctx.env, got.env)
       ctx.localLimits = got.record
     }
+    // A removal of this agent's folder under way (HI-3144: one that qualified before this agent was added back) ends first.
+    await launchFolderFree(ctx.projectPath, ctx.agentId)
     const dir = this.launchDir(ctx.projectPath, ctx.agentId)
     const pluginDir = join(dir, 'plugin')
     const skillsDir = join(pluginDir, 'skills')

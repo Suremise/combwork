@@ -15,6 +15,32 @@ export const launchFolderName = (agentId: string): string => `launch-${agentId}`
 /** An agent's launch folder in a project. */
 export const launchFolderOf = (projectPath: string, agentId: string): string => join(projectPath, CW_DIR, launchFolderName(agentId))
 
+/** Removals of launch folders under way, by folder (lower-cased): a launch of that agent waits for its end (launchFolderFree). */
+const removing = new Map<string, Promise<unknown>>()
+const keyOf = (projectPath: string, agentId: string): string => launchFolderOf(projectPath, agentId).toLowerCase()
+
+/**
+ * Runs a removal of an agent's launch folder, registered before it returns (nothing awaited first), so a launch of that
+ * agent starting from then on waits for it to end before it writes the folder (HI-3144, HR2's round 1: launch and
+ * clean-up share this guard). The removal checks again before each move it makes.
+ */
+export function whileRemovingLaunchFolder<T>(projectPath: string, agentId: string, fn: () => Promise<T>): Promise<T> {
+  const key = keyOf(projectPath, agentId)
+  const before = removing.get(key) ?? Promise.resolve()
+  const run = before.catch(() => undefined).then(fn)
+  const settled = run.catch(() => undefined)
+  removing.set(key, settled)
+  void settled.then(() => {
+    if (removing.get(key) === settled) removing.delete(key)
+  })
+  return run
+}
+
+/** Once no removal of the agent's launch folder is under way: a launch waits for this before it writes the folder. */
+export async function launchFolderFree(projectPath: string, agentId: string): Promise<void> {
+  for (let r = removing.get(keyOf(projectPath, agentId)); r; r = removing.get(keyOf(projectPath, agentId))) await r
+}
+
 /** The agent id a `.combwork` entry's name says it is the launch folder of; null for any other name. */
 export function launchFolderAgent(name: string): string | null {
   return NAME.exec(name)?.[1] ?? null

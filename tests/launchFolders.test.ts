@@ -4,7 +4,7 @@
 // any when the project's agents can't be read.
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { DEFAULT_CLEANUP } from '../src/shared/storage'
 import type { CleanupOptions } from '../src/shared/types'
@@ -17,7 +17,7 @@ const base = tempDir('cw-launch-folders-')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const lf = await import('../src/main/launchFolders')
-const { launchFolderAgent, launchFolderName } = await import('../src/main/launchFolderNames')
+const { launchFolderAgent, launchFolderFree, launchFolderName } = await import('../src/main/launchFolderNames')
 const { cleanup, cleanupPreview } = await import('../src/main/storage')
 const { removeAgent } = await import('../src/main/projectAgents')
 
@@ -133,11 +133,103 @@ describe('HI-3144: launch folders of removed agents', () => {
     expect(existsSync(outside)).toBe(true)
   })
 
-  it('a removal racing a start: the folder is set aside before it is deleted, so a launch makes a fresh one', async () => {
+  it('deleted: renamed aside, then removed, so nothing is left under its own name or the set-aside one', async () => {
     agents(p, ['a-keep', 'a-busy0'])
     launchFolder(p, 'launch-a-gone4')
-    // Renamed aside, then deleted: nothing of it is left under its own name or the set-aside one.
     expect(await run(() => lf.removeLaunchFolder(p, 'a-gone4'))).toBe(true)
     expect(readdirSync(cw(p)).filter((n) => n.startsWith('launch-a-gone4'))).toEqual([])
+  })
+
+  // HR2's round 1: a start or a re-add after the removal qualified, before its move, or between a held move's tries,
+  // stops it: each move qualifies again (the agent read, then its starting or running state, nothing awaited before the
+  // move). Ordered by the Recycle Bin stand-in and the busy check, never by time.
+  describe('a start or a re-add while a removal is under way', () => {
+    const shell = electron.shell as unknown as { trashItem: (p: string) => Promise<void> }
+    const realTrash = shell.trashItem
+    afterEach(() => {
+      shell.trashItem = realTrash
+      lf.initLaunchFolders((_project, id) => busy.has(id))
+      agents(p, ['a-keep', 'a-busy0'])
+    })
+    /** busy answers no `free` times for `id`, then yes (its agent started after that many checks). */
+    const startsAfter = (id: string, free: number): void => {
+      let n = 0
+      lf.initLaunchFolders((_project, a) => (a === id ? n++ >= free : busy.has(a)))
+    }
+
+    it('the delete path: started after it qualified, before the rename: nothing moves', async () => {
+      const dir = launchFolder(p, 'launch-a-race1')
+      startsAfter('a-race1', 1)
+      expect(await run(() => lf.removeLaunchFolder(p, 'a-race1'))).toBe(false)
+      expect(existsSync(join(dir, 'sync.json'))).toBe(true)
+      expect(readdirSync(cw(p)).filter((n) => n.startsWith('launch-a-race1.'))).toEqual([])
+      rmSync(dir, { recursive: true, force: true })
+    })
+
+    it('to the Recycle Bin: started after it qualified, before the first move: never moved', async () => {
+      const dir = launchFolder(p, 'launch-a-race2')
+      let calls = 0
+      shell.trashItem = async (x) => {
+        calls++
+        rmSync(x, { recursive: true, force: true })
+      }
+      startsAfter('a-race2', 1)
+      expect(await run(() => lf.removeLaunchFolder(p, 'a-race2', 'trash'))).toBe(false)
+      expect([calls, existsSync(join(dir, 'sync.json'))]).toEqual([0, true])
+      rmSync(dir, { recursive: true, force: true })
+    })
+
+    it('to the Recycle Bin: the folder held at the first try, its agent added back and started before the retry: not moved', async () => {
+      const dir = launchFolder(p, 'launch-a-race3')
+      let calls = 0
+      shell.trashItem = async (x) => {
+        calls++
+        if (calls === 1) {
+          // Windows refuses for a moment (something has it open); meanwhile the agent comes back and starts.
+          agents(p, ['a-keep', 'a-busy0', 'a-race3'])
+          busy.add('a-race3')
+          throw new Error('held')
+        }
+        rmSync(x, { recursive: true, force: true })
+      }
+      try {
+        expect(await run(() => lf.removeLaunchFolder(p, 'a-race3', 'trash'))).toBe(false)
+        expect([calls, existsSync(join(dir, 'sync.json'))]).toEqual([1, true])
+      } finally {
+        busy.delete('a-race3')
+        rmSync(dir, { recursive: true, force: true })
+      }
+    })
+
+    it('a launch of that agent waits for a removal under way, then makes a fresh folder that stays', async () => {
+      const dir = launchFolder(p, 'launch-a-race4')
+      let release = (): void => undefined
+      let moving = (): void => undefined
+      const moved = new Promise<void>((r) => (moving = r))
+      shell.trashItem = (x) =>
+        new Promise<void>((r) => {
+          moving()
+          release = () => {
+            rmSync(x, { recursive: true, force: true })
+            r()
+          }
+        })
+      const removal = run(() => lf.removeLaunchFolder(p, 'a-race4', 'trash'))
+      await moved
+      let free = false
+      const waited = launchFolderFree(p, 'a-race4').then(() => (free = true))
+      // The move hasn't ended: the launch still waits (every queued step has run).
+      await new Promise((r) => setImmediate(r))
+      expect(free).toBe(false)
+      release()
+      expect(await removal).toBe(true)
+      await waited
+      expect(free).toBe(true)
+      // What the launch then makes is its own: nothing removes it.
+      launchFolder(p, 'launch-a-race4')
+      await new Promise((r) => setImmediate(r))
+      expect(existsSync(join(dir, 'sync.json'))).toBe(true)
+      rmSync(dir, { recursive: true, force: true })
+    })
   })
 })
