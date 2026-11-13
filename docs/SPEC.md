@@ -4928,6 +4928,19 @@ An unreadable membership or fence refuses (`switching`). A never-switched projec
   else says to check out or make one; an unreadable branch or head stays unknown, never taken for detached. Combwork
   never checks one out itself. The switch back to Git lists each member read as detached (`StoreSwitch.detached`, through
   the platform's port; a failed read lists none) as a caution under its warning; the switch still goes.
+  HI-3107 (design HI-3107/s7): a card's committed work from cycles under a version control whose lines are branches (the
+  descriptor's `defaultTarget`: Git's), left on its line when the repository switched to another (jj), is said, never
+  carried or refused: `earlierWork` (workflow/earlierWork.ts) reads the card's recorded starts (`Started`, `Adopted`, each
+  by the ruleset it was decided under; one whose ruleset can't be read is listed `unknown`, its version control null, never
+  guessed; a later start under the one in force on the same line, or the line of the start being made, is the card's own), each line once against the target
+  its last start recorded, through that version control's own ports (`lineHead`, the history's `mergeBase` and
+  `contains`): gone or held by its target is no work; work its target lacks is `ahead`; anything unread or unproved is
+  `unknown`, said with that doubt, never dropped; the card's starts unread is `UNREAD` (line null), said as such (HR2).
+  The texts never claim the new folder lacks the work (its new target, or a kept folder, may hold it): they say it is
+  left on its line, not carried in, and to check the folder first. The switch's warning lists such cards not in flight (code cards, Todo
+  or On hold; `StoreSwitch.carried`); a start under the new version control warns its actor, and once written comments
+  on the card as Combwork (its builder's start task carries the card) and tells the user (`workflow.earlierWork.*`). jj's
+  line keys and kept work aren't read (HI-3069 holds those).
 - **After a switch:** the project is read again (its offer gone), and `workflow-changed` and `queue-changed` tell the
   windows. A card in flight keeps its own ruleset in the runtime (each card's adapter is its ruleset's platform), and
   the merge queue starts a workspace's queues with open entries for a None project too, so an old Git queue drains

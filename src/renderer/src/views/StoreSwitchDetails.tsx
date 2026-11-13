@@ -38,6 +38,7 @@ const M = {
   notExported: msg({ id: 'git.vc.store.notExported', defaultMessage: 'Bookmark {name} isn’t the same in Git: run jj git export, or check it.', description: 'Why a jj project can’t go back to Git yet (HI-2799): a bookmark and its Git branch differ. Keep jj git export (a command).' }),
   conflictedCommit: msg({ id: 'git.vc.store.conflictedCommit', defaultMessage: 'Commit {commit} stores conflicts: resolve them with jj.', description: 'Why a jj project can’t go back to Git yet (HI-2799): a commit on a bookmark stores unresolved conflicts. {commit} is a short id. Keep jj.' }),
   fallbackUnknown: msg({ id: 'git.vc.store.fallbackUnknown', defaultMessage: 'Couldn’t read the repository ({detail}).', description: 'Why a jj project can’t go back to Git yet (HI-2799): jj couldn’t be read. {detail} is a short code, kept in English.' }),
+  carried: msg({ id: 'git.vc.store.carried', defaultMessage: '{what, select, line {{project}: {card}’s work from before is on {line}{state, select, ahead {, with commits its target doesn’t hold} other {, and Combwork couldn’t tell whether its target holds it}}. After the switch {card} starts from its target, not that line: if its target doesn’t hold that work by then, bring it in yourself.} card {{project}: Combwork couldn’t read {card}’s earlier starts, so it can’t tell whether work from before is left on a line of its own. After the switch {card} starts from its target: check before you start it.} other {{project}: Combwork couldn’t read its cards’ earlier starts, so it can’t tell whether any has work from before left on a line of its own. After the switch they start from their target: check before you start them.}}', description: 'HI-3107: a hint in the warning before switching to jj. line: a card not in flight ran before under Git, and its branch from then has (ahead) or may have (other: it couldn’t be read) work its target lacks; the card will start from its target, not that branch. card: that card’s earlier starts couldn’t be read; other: the project’s board couldn’t be read. Keep the select keys. {card} is a card key; {line} a branch name.' }),
   detached: msg({ id: 'git.vc.store.detached', defaultMessage: '{project}: its folder is on no branch (its head is detached at {head}), and stays so after the switch. Check out the branch its work goes on there (git switch) before its cards start in the project folder.', description: 'HI-3104: a hint in the warning before switching back to Git: a project’s folder has no branch checked out (a detached head, as a jj repository colocated with Git leaves it). Combwork doesn’t check one out; a card started in that folder is refused until the user does. {head} is a short commit id. git switch is a command: keep it.' }),
   toGit: msg({ id: 'git.vc.store.toGit', defaultMessage: 'Combwork leaves .jj in place: remove it with jj if you no longer want it.', description: 'In the warning before switching a jj project back to Git (HI-2799). Keep .jj and jj.' })
 }
@@ -111,6 +112,15 @@ export function StoreSwitchDetails({ store, to }: { store: StoreSwitch; to: Plat
           </ul>
           <p className="hint">{tr(M.toJj)}</p>
         </>
+      )}
+      {store.carried && store.carried.length > 0 && (
+        <ul data-vc-store-carried="">
+          {store.carried.map((x) => (
+            <li key={`${x.project}${x.card}${x.line}`} className="caution">
+              <Icon name="warning" /> {tr(M.carried, { what: x.line !== null ? 'line' : x.card !== null ? 'card' : 'other', project: x.project, card: x.card !== null ? cardLabelOf({ tasks }, x.card) : '', line: x.line ?? '', state: x.state })}
+            </li>
+          ))}
+        </ul>
       )}
       {store.fallback && (
         <>

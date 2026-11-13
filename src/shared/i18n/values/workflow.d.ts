@@ -15,6 +15,8 @@ interface CombworkMessageValues {
   'workflow.contradiction.selfReview': undefined
   'workflow.contradiction.subfolderTarget': undefined
   'workflow.contradiction.upToDateNeedsSlots': undefined
+  'workflow.earlierWork.message': { read: string; n: number; lines: string | number }
+  'workflow.earlierWork.title': { read: string; card: string | number; line: string | number }
   'workflow.forYou.decidedAfterMerge': { card: string | number }
   'workflow.forYou.focusedSkip': { card: string | number; tests: string | number }
   'workflow.forYou.lineAsk': { line: string | number; card: string | number; target: string | number; next: string | number }

@@ -65,6 +65,21 @@
       "why": "plain"
     }
   },
+  "runtime.start.earlierUnread": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "runtime.start.earlierWork": {
+    "placeholders": {
+      "card": "plain",
+      "line": "plain",
+      "from": "select",
+      "now": "plain",
+      "state": "select",
+      "target": "plain"
+    }
+  },
   "runtime.start.laneStarted": {
     "placeholders": {
       "card": "plain"
