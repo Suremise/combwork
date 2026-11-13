@@ -145,7 +145,7 @@ export class WorkflowRefusedError extends TaskConflictError {
   constructor(readonly refusal: Refusal) {
     // HI-3136: its values as the refusal's own sentences take them (a value that is a message, a cause's why…), kept as
     // messages, so the window says them in its language too: never a placeholder left as it is, or a blank.
-    // agent-text: REFUSALS
+    // agent-text: refusalText
     super(refusalText(refusal.rule, refusal.values))
   }
 }
