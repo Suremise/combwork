@@ -1244,7 +1244,7 @@ export class Workflow {
       log.info(`#${card.id} not started: ${userText(plan.what)}${plan.detail ? ` (${userText(plan.detail)})` : ''}`)
       return { rule: 'platform.unknown', values: { card: card.key, what: plan.whatText ?? plan.what, rule: 'start' } }
     }
-    const { existing, slotWait, fresh, baselineGen, carried, ...planned } = plan
+    const { existing, slotWait, acrossWait, fresh, baselineGen, carried, ...planned } = plan
     // A slot lent for this start (#1438) is given back if the start isn't written (refused, gathered again, undone).
     const lent = fresh && plan.lease ? plan.lease : null
     // HI-3132: its work kept in a slot of the project's own version control: it starts there or not at all. A plan
@@ -1256,6 +1256,12 @@ export class Workflow {
     if (here && elsewhere && (!slotWait || actor === 'user')) {
       if (lent) await this.slotUnused(card, lent)
       return { rule: 'platform.keptElsewhere', values: { card: card.key, slot: here.slot } }
+    }
+    // HI-3141: a user's start across a slot wait is built where the card's agent is; the platform's reason it can't be
+    // built there (a project folder on no branch) refuses that start, never a card on no branch.
+    if (slotWait && actor === 'user' && acrossWait) {
+      if (lent) await this.slotUnused(card, lent)
+      return { rule: acrossWait.rule, values: { card: card.key, ...acrossWait.ruleValues } }
     }
     // Its target resolved again as it was planned (the builder worktree's base moved meanwhile): not what the evidence
     // covers, so a change to it before the write would go unseen (#1401 round 2).
