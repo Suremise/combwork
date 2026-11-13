@@ -1557,6 +1557,17 @@ describe('a submodule remedy\'s command', () => {
     expect(changes.commandPath("it's $x")).toBe("'it''s $x'")
   })
 
+  // HR3's round 2: and literal to git's pathspec too, where a glob character or a leading : would read otherwise.
+  it('gives git the path literally: :(literal) where it has a glob character or starts with :, quoted for the shell', () => {
+    expect(changes.gitPathArg('sub')).toBe('sub')
+    expect(changes.gitPathArg('libs/my sub')).toBe('"libs/my sub"')
+    expect(changes.gitPathArg('libs/[ab]')).toBe('":(literal)libs/[ab]"')
+    expect(changes.gitPathArg('a*b')).toBe('":(literal)a*b"')
+    expect(changes.gitPathArg('a?b')).toBe('":(literal)a?b"')
+    expect(changes.gitPathArg(':sub')).toBe('":(literal):sub"')
+    expect(changes.gitPathArg('$[x]')).toBe("':(literal)$[x]'")
+  })
+
   /** A submodule at `path` (one added beside sub), committed. */
   const addSub = (path: string): void => {
     const src = join(base, `sub-src${n}-${path.replace(/[^a-z]/gi, '')}`)
@@ -1576,41 +1587,52 @@ describe('a submodule remedy\'s command', () => {
     execFileSync(join(bin!, 'sh.exe'), ['-c', cmd], { cwd: proj, env: baseEnv(), stdio: 'pipe' })
   }
 
-  for (const path of ['libs/my sub', '-lead sub'])
-    it(`at ${JSON.stringify(path)}: each remedy's command, run as said, clears what it names`, async () => {
+  // `libs/[ab]` beside an unrelated staged `libs/a` it matches as a glob (HR3's round 2): its staging must survive.
+  for (const [path, lookalike] of [['libs/my sub', null], ['-lead sub', null], ['libs/[ab]', 'libs/a']] as const)
+    it(`at ${JSON.stringify(path)}: each remedy's command, run as said, clears what it names${lookalike ? `, ${lookalike}'s staging kept` : ''}`, async () => {
       addSub(path)
+      if (lookalike) {
+        writeFileSync(join(proj, lookalike), 'staged by the user\n')
+        sh(proj, 'add', '--', lookalike)
+      }
+      // The folder as clear as the remedy leaves it: nothing but the unrelated path, still staged as it was.
+      const clear = (): void => {
+        expect(status().split('\n').filter((l) => l && (!lookalike || !l.endsWith(` ${lookalike}`)))).toEqual([])
+        if (lookalike) expect(sh(proj, 'show', `:${lookalike}`)).toBe('staged by the user')
+      }
       const inside = join(proj, path)
       const recorded = head(inside)
+      const addSubmodule = (): void => void sh(proj, 'add', '--', `:(literal)${path}`)
       // Staged back at its recorded commit: refused by both, and the command said clears it.
       writeFileSync(join(inside, 's.txt'), 'new submodule commit\n')
       sh(inside, 'commit', '-q', '-am', 'inside')
-      sh(proj, 'add', '--', path)
+      addSubmodule()
       sh(inside, 'checkout', '-q', recorded)
       const back = await settle('commit', [path]).catch((e: Error) => e.message)
       const unstage = /Unstage it with (git restore --staged -- .+)\.$/.exec(String(back))?.[1]
-      expect(unstage).toBe(`git restore --staged -- ${changes.commandPath(path)}`)
+      expect(unstage).toBe(`git restore --staged -- ${changes.gitPathArg(path)}`)
       runIn(unstage!)
-      expect(status()).toBe('')
+      clear()
       // Staged: Set Aside's command, then the recorded commit checked out inside.
       sh(inside, 'checkout', '-q', '-')
-      sh(proj, 'add', '--', path)
+      addSubmodule()
       const staged = await settle('setAside', [path]).catch((e: Error) => e.message)
       const unstage2 = /\((git restore --staged -- .+)\) and check out/.exec(String(staged))?.[1]
       expect(unstage2).toBe(unstage)
       runIn(unstage2!)
       sh(inside, 'checkout', '-q', recorded)
-      expect(status()).toBe('')
+      clear()
       // Its folder deleted: Set Aside's command brings it back.
       rmSync(inside, { recursive: true, force: true })
       const deleted = await settle('setAside', [path]).catch((e: Error) => e.message)
       const update = /bring it back with (git submodule update -- .+)\.$/.exec(String(deleted))?.[1]
-      expect(update).toBe(`git submodule update -- ${changes.commandPath(path)}`)
+      expect(update).toBe(`git submodule update -- ${changes.gitPathArg(path)}`)
       // git's submodule commands ignore a submodule whose path could be read as an option ("warning: ignoring
       // 'submodule.….path' which may be interpreted as a command-line option", CVE-2018-17456), whatever the quoting:
       // there, the command said is one argument after -- all the same, and nothing of git's brings it back.
       if (path.startsWith('-')) return
       runIn(update!)
-      expect(status()).toBe('')
+      clear()
       expect(head(inside)).toBe(recorded)
     })
 })

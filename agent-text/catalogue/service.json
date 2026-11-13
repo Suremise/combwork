@@ -446,7 +446,7 @@
   },
   "service.folderChanges.submoduleDeleted": {
     "text": "{folder} is a submodule whose folder was deleted, which Git can't set aside. Commit its removal instead, or bring it back with git submodule update -- {path}.",
-    "note": "HI-3124: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule whose folder was deleted (not through git); git's stash can't set that aside, so nothing was done. Committing records its removal; git submodule update checks it out again. Keep git submodule update as it is: a command. {path} is that path as the command takes it (quoted when it needs to be): keep it as it is, right after the command's --.",
+    "note": "HI-3124: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule whose folder was deleted (not through git); git's stash can't set that aside, so nothing was done. Committing records its removal; git submodule update checks it out again. Keep git submodule update as it is: a command. {path} is that path as the command takes it (quoted, or written as :(literal)<path> for git, when it needs to be): keep it as it is, right after the command's --.",
     "audience": "both"
   },
   "service.folderChanges.submoduleInside": {
@@ -471,12 +471,12 @@
   },
   "service.folderChanges.submoduleStaged": {
     "text": "{folder} is a submodule whose new commit is staged, which Git can't set aside. Commit it instead, or unstage it (git restore --staged -- {path}) and check out its recorded commit inside {folder} yourself.",
-    "note": "HI-3124: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule with a new commit staged (git add of the submodule); git's stash can't set it aside, so nothing was done. Commit works for it; unstaging it and checking out the recorded commit inside it clears it. Keep git restore --staged as it is: a command. {path} is that path as the command takes it (quoted when it needs to be): keep it as it is, right after the command's --.",
+    "note": "HI-3124: an error from Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule with a new commit staged (git add of the submodule); git's stash can't set it aside, so nothing was done. Commit works for it; unstaging it and checking out the recorded commit inside it clears it. Keep git restore --staged as it is: a command. {path} is that path as the command takes it (quoted, or written as :(literal)<path> for git, when it needs to be): keep it as it is, right after the command's --.",
     "audience": "both"
   },
   "service.folderChanges.submoduleStagedBack": {
     "text": "{folder} is a submodule with a new commit staged, but its recorded commit is checked out in it again, so there's nothing to commit or set aside. Unstage it with git restore --staged -- {path}.",
-    "note": "HI-3124: an error from Commit or Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule whose new commit is staged while the commit already recorded is checked out inside it again; git has nothing to commit and can't stash it, so nothing was done. Unstaging it clears the change. Keep git restore --staged as it is: a command. {path} is that path as the command takes it (quoted when it needs to be): keep it as it is, right after the command's --.",
+    "note": "HI-3124: an error from Commit or Set Aside (a paused merge, a start's warning): one of the changes shown ({folder}, a folder path) is a submodule whose new commit is staged while the commit already recorded is checked out inside it again; git has nothing to commit and can't stash it, so nothing was done. Unstaging it clears the change. Keep git restore --staged as it is: a command. {path} is that path as the command takes it (quoted, or written as :(literal)<path> for git, when it needs to be): keep it as it is, right after the command's --.",
     "audience": "both"
   },
   "service.folderChanges.tooManyToSetAside": {
