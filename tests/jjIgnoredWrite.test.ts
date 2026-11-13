@@ -18,7 +18,7 @@ import { readRepoRefs } from '../src/main/platform/repoRefs'
 import { isUnknown } from '../src/main/platform/types'
 import { jjContextOf } from '../src/main/platform/jjDetect'
 import { jjCheckEnd, jjCheckStart, jjCounts, jjCredit, type JjCheckFor } from '../src/main/platform/jjChecks'
-import { entriesChanged, ignoredOnly, jjEntries } from '../src/main/platform/jjIgnoredEntries'
+import { entriesChanged, ignoredOnly, jjEntries, RunWatch } from '../src/main/platform/jjIgnoredEntries'
 import type { ViewOf } from '../src/main/platform/jjView'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
@@ -136,19 +136,63 @@ describe.skipIf(!jjExe)('HI-3121: a jj builder’s check in its slot that writes
       ).toMatchObject({ whyNot: 'changed' })
       rmSync(join(root, 'stray.txt'))
       await resync()
-      // Those three are also jj's end boundary's (it records a new file it would track). The snapshot's own answer, for a
-      // file jj doesn't track (`snapshot.auto-track` narrowed: HI-3096): the root's move isn't explained by it.
-      const before = await jjEntries(root, ['.', 'src'])
-      writeFileSync(join(root, 'cache2.tmp'), 'x\n')
-      expect(await ignoredOnly(root, ['.'], before)).toEqual(['.'])
-      writeFileSync(join(root, 'untracked.txt'), 'x\n')
-      expect(await ignoredOnly(root, ['.'], before)).toBeNull()
+      // HR1's round 1: a file jj doesn't ignore made and deleted during the run, beside a new ignored folder: neither
+      // listing has it, and jj's end boundary finds nothing, but the run's watch saw it.
+      expect(
+        await run(() => {
+          rmSync(join(root, 'out'), { recursive: true, force: true })
+          mkdirSync(join(root, 'out'))
+          writeFileSync(join(root, 'stray.txt'), 'read by the check\n')
+          rmSync(join(root, 'stray.txt'))
+        })
+      ).toMatchObject({ whyNot: 'changed', why: 'end:stats' })
+      expect(
+        await run(() => {
+          pyc()
+          writeFileSync(join(root, 'src', 'gen.py'), 'x\n')
+          rmSync(join(root, 'src', 'gen.py'))
+        })
+      ).toMatchObject({ whyNot: 'changed', why: 'end:stats' })
+      rmSync(join(root, 'src', '__pycache__'), { recursive: true })
+      expect(credited(await run(() => rmSync(join(root, 'out'), { recursive: true })))).toBe(true)
+
+      // The same, asked directly, for a file jj doesn't track (`snapshot.auto-track` narrowed: HI-3096), which no end
+      // boundary would record.
+      const files = ['.gitignore', 'k.txt', 'src/a.py']
+      const watched = async (change: () => void) => {
+        const before = await jjEntries(root, ['.', 'src'])
+        const w = RunWatch.start(root, ['.', 'src'])!
+        await w.armed()
+        change()
+        return ignoredOnly(root, ['.'], { files, before, watched: await w.settle() })
+      }
+      expect(await watched(() => writeFileSync(join(root, 'cache2.tmp'), 'x\n'))).toEqual(['.'])
+      expect(await watched(() => writeFileSync(join(root, 'untracked.txt'), 'x\n'))).toBeNull()
       rmSync(join(root, 'untracked.txt'))
-      rmSync(join(root, 'cache2.tmp'))
-      // Its time moved, but no entry came, went or was made again: something came and went, so it counts.
-      expect(await ignoredOnly(root, ['.'], before)).toBeNull()
+      // A write to a tracked file named by the watch is its own line's to decide.
+      const tracked = (): void => {
+        writeFileSync(join(root, 'k.txt'), 'card K\n')
+        rmSync(join(root, 'cache2.tmp'))
+      }
+      expect(await watched(tracked)).toEqual(['.'])
     })
   }
+})
+
+describe('HI-3158: a moved folder explained only by names jj ignores', () => {
+  const root = tempDir('jjign-unit-')
+  const before = new Map([['.', new Map([['out', 'd:1'], ['k.txt', 'f:2']])]])
+  const ev = (names: string[] | null) => ({ files: ['k.txt'], before, watched: new Map([['.', names ? new Set(names) : null]]) })
+  it('fails closed: a folder unwatched or watched incompletely, no names to explain the move, or a change the watch missed', async () => {
+    // The listing at the end: `k.txt` only (out/ gone). No Git store here: nothing is ignored either way.
+    writeFileSync(join(root, 'k.txt'), 'k\n')
+    expect(await ignoredOnly(root, ['.'], ev(null))).toBeNull()
+    expect(await ignoredOnly(root, ['.'], { ...ev([]), watched: null })).toBeNull()
+    expect(await ignoredOnly(root, ['.'], ev([]))).toBeNull()
+    expect(await ignoredOnly(root, ['.'], ev(['k.txt']))).toBeNull()
+    expect(await ignoredOnly(root, ['.'], { ...ev(['out']), before: null })).toBeNull()
+    expect(await ignoredOnly(root, ['.'], ev(['out']))).toBeNull()
+  })
 })
 
 describe('HI-3158: the entries that came, went or were made again in a folder', () => {
@@ -157,9 +201,9 @@ describe('HI-3158: the entries that came, went or were made again in a folder', 
     ['a.txt', 'f:2'],
     ['.jj', 'd:3']
   ])
-  it('names each, a folder with its slash, jj’s own folders left out of the root', () => {
-    expect(entriesChanged('.', was, new Map([['a.txt', 'f:2'], ['out', 'd:9'], ['x.tmp', 'f:5']]))).toEqual(['out/', 'x.tmp'])
-    expect(entriesChanged('src', new Map([['p', 'd:1']]), new Map([['p', 'f:2']]))).toEqual(['src/p/', 'src/p'])
+  it('names each, jj’s own folders left out of the root', () => {
+    expect(entriesChanged('.', was, new Map([['a.txt', 'f:2'], ['out', 'd:9'], ['x.tmp', 'f:5']]))).toEqual(['out', 'x.tmp'])
+    expect(entriesChanged('src', new Map([['p', 'd:1']]), new Map([['p', 'f:2']]))).toEqual(['p'])
     expect(entriesChanged('.', was, new Map([['a.txt', 'f:2'], ['out', 'd:1']]))).toEqual([])
     expect(entriesChanged('.', was, new Map(was))).toEqual([])
   })

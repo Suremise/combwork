@@ -37,7 +37,7 @@ import { isJjUnknown, JjReads, type JjCommit } from './jjReads'
 import { snapshotLine } from './snapshotLine'
 import { isAbsent, viewNow, type ViewNow, type ViewOf } from './jjView'
 import { isUnknown, type Maybe } from './types'
-import { foldersOf, ignoredOnly, jjEntries, jjIgnored, type EntriesOf } from './jjIgnoredEntries'
+import { foldersOf, ignoredOnly, jjEntries, jjIgnored, RunWatch, type EntriesOf } from './jjIgnoredEntries'
 
 /** What a jj check run is for. */
 export interface JjCheckFor {
@@ -63,6 +63,8 @@ export interface JjCheckStart {
   stats: string | null
   /** HI-3158: the entries of the snapshot's folders, so a folder's line that moved only for entries jj ignores doesn't count. */
   entries?: EntriesOf | null
+  /** HI-3158: the run's watches on those folders (what came and went during it); jjCheckEnd closes them. */
+  watch?: RunWatch | null
   e1: ViewNow | null
 }
 
@@ -150,13 +152,21 @@ export async function jjCheckStart(r: JjCheckFor, log: WriteLog, s: JjCheckSeams
   const rev = await reads.commitAt(b1.op, r.revision)
   const files = await reads.filesAt(b1.op, r.revision)
   const listed = isJjUnknown(files) ? null : files
-  const stats = await jjStats(r.view.root, listed)
-  const entries = listed && stats !== null ? await jjEntries(r.view.root, foldersOf(listed)) : null
-  const e1 = viewNow(r.view)
-  await s.hooks?.started?.()
-  // The boundary's own writes are in the record before t0: they never count against the run.
-  await log.settled(r.folder)
-  return { t0: now(), b1, rev: isJjUnknown(rev) ? null : rev, files: listed, stats, entries, e1 }
+  // HI-3158: the snapshot's folders watched from before the snapshot until the end (jjIgnoredEntries.ts).
+  const watch = listed ? RunWatch.start(r.view.root, foldersOf(listed)) : null
+  try {
+    const stats = await jjStats(r.view.root, listed)
+    const entries = listed && stats !== null ? await jjEntries(r.view.root, foldersOf(listed)) : null
+    const e1 = viewNow(r.view)
+    await s.hooks?.started?.()
+    // The boundary's own writes are in the record before t0: they never count against the run.
+    await log.settled(r.folder)
+    await watch?.armed()
+    return { t0: now(), b1, rev: isJjUnknown(rev) ? null : rev, files: listed, stats, entries, watch, e1 }
+  } catch (e) {
+    watch?.close()
+    throw e
+  }
 }
 
 /** The run's end (steps 5–8): everything jjCredit decides from. */
@@ -164,16 +174,29 @@ export async function jjCheckEnd(r: JjCheckFor, start: JjCheckStart, log: WriteL
   const runner = s.runner ?? jjRunner
   const now = s.now ?? Date.now
   const scope = r.scope === 'workspace' ? { scope: 'workspace' as const } : {}
-  if (isRefused(start.b1) || start.b1.recorded || !start.e1) return { revision: r.revision, start, t1: now(), seen: { changed: false, paths: [] }, statsEnd: undefined, beforeB2: null, b2: null, final: null, ...scope }
-  await s.hooks?.beforeEnd?.()
-  // The run's writes reach the record after they happen: it settles first, and the window ends after that (nothing of
-  // Combwork's writes in between: the end boundary comes after), so a write just before the command ended is in it.
-  await log.settled(r.folder)
-  const t1 = now()
+  if (isRefused(start.b1) || start.b1.recorded || !start.e1) {
+    start.watch?.close()
+    return { revision: r.revision, start, t1: now(), seen: { changed: false, paths: [] }, statsEnd: undefined, beforeB2: null, b2: null, final: null, ...scope }
+  }
+  let explained: string[] | null = null
+  let seen: Maybe<FolderChanges>
+  let statsEnd: string | null | undefined
+  let t1: number
+  try {
+    await s.hooks?.beforeEnd?.()
+    // The run's writes reach the record after they happen: it settles first, and the window ends after that (nothing of
+    // Combwork's writes in between: the end boundary comes after), so a write just before the command ended is in it.
+    await log.settled(r.folder)
+    t1 = now()
+    seen = await withoutIgnored(r.view.root, start.files, await log.changedBetween(r.folder, start.t0, t1, jjCounts))
+    statsEnd = isUnknown(seen) ? await jjStats(r.view.root, start.files) : undefined
+    const moved = statsEnd && start.files ? movedFolders(start, statsEnd) : []
+    // The run's watches settle before the end boundary, whose own writes (in `.jj`) they'd otherwise see.
+    if (moved.length && start.files) explained = await ignoredOnly(r.view.root, moved, { files: start.files, before: start.entries ?? null, watched: (await start.watch?.settle()) ?? null })
+  } finally {
+    start.watch?.close()
+  }
   const base = { revision: r.revision, start, t1, ...scope }
-  const seen = await withoutIgnored(r.view.root, start.files, await log.changedBetween(r.folder, start.t0, t1, jjCounts))
-  const statsEnd = isUnknown(seen) ? await jjStats(r.view.root, start.files) : undefined
-  const explained = statsEnd ? await ignoredOnly(r.view.root, movedFolders(start, statsEnd), start.entries ?? null) : null
   const beforeB2 = viewNow(r.view)
   // A copy's run takes B2 at whatever head there is now (HI-2991); the repository's only at H1.
   const b2 = await jjBoundary({ ...r.view, folder: r.folder }, r.owner, { ...s.boundary, lock: r.lock, hooks: s.boundary?.endHooks, ...(r.scope === 'workspace' ? {} : { expect: start.b1.op }) }, runner)
