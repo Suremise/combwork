@@ -4627,6 +4627,28 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   the card's), HI-3017: setting cards before their project pinned them unnoticed. `cw_create_task` with such a target
   says the same (HI-3043), and the reply says the target as stored, so a forward's resolution pinned to G7's own
   branch (HI-2985) is said to merge into that branch, with no note: it never follows another. Both name only
+- **Starting on a released line (HI-3148, design s15, Darren's decisions of 13 Nov: 1A, 2A, 3A, split).** A line is
+  **released** when a tag named exactly `v<line>` or `<line>` (peeled to its commit) is in its history and the line is
+  in the default line's (Git: `main`, else `master`; jj: the first local bookmark of `main`, `master`, `trunk`), read
+  locally through the platform's release reads port (`releaseReadsOf(platform)`: `released()` gives `{ tag, into,
+  date }`, the date only from an annotated tag's tagger; `null`; or unknown, never "not released"; None has none). A
+  **fresh start** (Todo or On Hold → Active, a reopened Done card, a put-back card started again) onto a released line
+  is refused (`start.released`), naming the tag and where it went, and a line to start on instead only when it exists
+  and is known not released (Work merges into, else the next version's: `unreleasedFor`); an unreadable one is refused
+  as `start.releaseUnknown`. Both before anything is written (no `Started`, lease or lane). A card already in a cycle,
+  its resubmits, reviews and merges are never refused for it. **Who may start there anyway:** the user (the board's
+  Start and drag ask, `board.move.askReleased`, and Move Anyway gives back the line asked about) or the Assistant
+  (`override: { reason, released: <line> }` on a move or `cw_start_task`), for exactly the line its refusal named: a
+  start whose line differs asks again. It is recorded with that start (`Override { rules: ['start.released'], target }`)
+  and covers that start only. **A lane:** a new lane on a released line is refused the same way; the user's Start Anyway
+  (Start Lane… reads the refusal first, `lanes:releaseCheck`) or the Assistant's `released: { target, reason }` starts
+  it and is kept on the lane (`releasedOverride`), so its cards' fresh starts onto that line go through while it is
+  active; given to a running lane (its list change), it is that lane's grant for its own fixed line, another line
+  refused. It ends with the lane. A running lane whose line is released meanwhile has its next fresh start refused
+  until then. Project agents and scripts can't give either (`403`, or refused as an agent's start). A card's Merges
+  into set to a released line (`cw_update_task`/`cw_create_task` `target`) is changed, and the reply says its start
+  there will be refused (`api.card.targetReleased`); the change grants nothing. Offering to move Work merges into after
+  a release (HI-3155) and RELEASING.md's step (HI-3156) are cards of their own.
 - **A card in flight moved to another target (HI-2753, designs s8 → s11 → s15 → s18, HR1 and HR2).** An integration
   branch ends (RELEASING.md: merged into `main`, then deleted), so the cards and lanes started on it need a way on. A card
   in Doing, Review, Passed or Merging, on a line of its own (a slot), moves from `from` (its `Started.target`) to `to`

@@ -4,7 +4,9 @@
 // stopped, is started), the lane shows in the Progress panel, its menu has End Lane and Abandon Lane…, Abandon asks
 // first, End ends it; the Lanes tab's Start Lane… starts another, which Abandon ends. B1 is given its first card and its
 // brief in one task, one turn, with no "end your turn, it's coming" round (HI-2558). Screenshots of the dialog and the
-// lane's menu in both themes. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// lane's menu in both themes. HI-3148: Start Lane… on a released branch (1.0.0, tagged v1.0.0 and in main) says so,
+// its Start Anyway needs a reason, and the lane's card is then started on 1.0.0 under the lane's grant. Dev build,
+// throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -32,6 +34,9 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
   lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   lib.git(alpha, ['branch', '-M', 'main'])
+  // HI-3148: 1.0.0 released: a branch whose annotated tag v1.0.0 is in its history, its head in main's.
+  lib.git(alpha, ['branch', '1.0.0'])
+  lib.git(alpha, ['-c', 'user.name=t', '-c', 'user.email=t@t', 'tag', '-a', 'v1.0.0', '-m', 'release 1.0.0', '1.0.0'])
   // The lane's slot too (#1438): its builder works in slot-a, a new branch per card.
   const slotA = path.join(`${ws}.worktrees`, 'alpha', 'slot-a')
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), alpha.toLowerCase(), slotA.toLowerCase()]))
@@ -54,7 +59,8 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await lib.openWorkspace(inv, page, ws)
     await page.getByText('alpha', { exact: true }).first().click()
     // A reviewer agent reviews each card: the brief says so.
-    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'agentMerges', folder: 'slots', preChecks: ['typecheck'], commands: { typecheck: 'npm run typecheck' } } })
+    const options = { review: 'agent', noSelfReview: true, finish: 'agentMerges', folder: 'slots', preChecks: ['typecheck'], commands: { typecheck: 'npm run typecheck' } }
+    await inv('workflow:setOptions', alpha, { preset: null, options })
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1' })
     const r1 = await lib.addAgent(inv, alpha, { name: 'R1' })
     const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
@@ -335,6 +341,32 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
       return id && id !== before ? id : null
     }, 2 * 30000 + HUNG_MS)
     check('…Retry: B1 is given its new conversation once free, and the row no longer offers it', !!fresh && !!(await until(async () => (await retry.count()) === 0 && (await apiLaneNow())?.status?.why !== 'fresh', HUNG_MS)), JSON.stringify({ before, fresh, status: (await apiLaneNow())?.status ?? null }))
+
+    // --- HI-3148: Start Lane… on 1.0.0, released. The dialog says so before Start, naming the tag and main to start on
+    // instead; Start Anyway waits for a reason; given one, the lane starts on 1.0.0 and its card is started there by
+    // Combwork under the lane's grant (nobody else could: a start onto 1.0.0 is refused).
+    await inv('lanes:end', owedLane.id, true)
+    await inv('tasks:move', f1, 'todo', { confirm: true, reason: 'the e2e puts it back' })
+    await inv('workflow:setOptions', alpha, { preset: null, options: { ...options, otherTargets: ['1.0.0'] } })
+    const h1 = (await inv('tasks:create', { title: 'Hotfix 1.0.1', project: 'alpha' })).number
+    await until(quiet, HUNG_MS)
+    await openWithOnly(h1)
+    const pickTarget = dialog.locator('#lane-start-target')
+    check('Start Lane offers Merges into 1.0.0', !!(await until(async () => (await pickTarget.count()) === 1 && (await pickTarget.locator('option[value="1.0.0"]').count()) === 1, HUNG_MS)), await dialog.innerText().catch(() => ''))
+    await pickTarget.selectOption('1.0.0')
+    const warn = dialog.locator('[data-lane-released="1.0.0"]')
+    check('…picked, it says 1.0.0 is released, naming its tag and main to start on instead', !!(await until(async () => (await warn.count()) === 1 && /^1\.0\.0 is released \(v1\.0\.0, tagged .+, merged into main\), so the lane wasn’t started\. Did you mean main\?/.test(await warn.innerText()), HUNG_MS)), await dialog.innerText().catch(() => ''))
+    const anyway = dialog.getByRole('button', { name: 'Start Anyway' })
+    check('…its button is Start Anyway, off until a reason is given', (await anyway.count()) === 1 && (await anyway.isDisabled()), await dialog.innerText().catch(() => ''))
+    await dialog.locator('[data-lane-released-reason]').fill('hotfix 1.0.1')
+    check('…on with a reason', !(await anyway.isDisabled()))
+    await shoot('released', dialog)
+    await anyway.click()
+    check('…Start Anyway closes the dialog', !!(await until(async () => (await dialog.count()) === 0, HUNG_MS)), await dialog.innerText().catch(() => ''))
+    const hot = await until(async () => (await lanes()).find((l) => l.builder.id === b1.id && l.cards.some((x) => x.number === h1)) ?? null, HUNG_MS)
+    check('…the lane is recorded on 1.0.0', hot?.target === '1.0.0', JSON.stringify(hot))
+    const hotStart = await until(async () => (await facts(h1)).find((f) => f.kind === 'Started' && f.actor === 'combwork') ?? null, 2 * 30000 + HUNG_MS)
+    check("…and its card is started on 1.0.0 by Combwork, under the lane's grant", hotStart?.data?.target === '1.0.0', JSON.stringify({ hotStart, facts: (await facts(h1)).map((f) => f.kind) }))
   } finally {
     await app.close().catch(() => undefined)
   }

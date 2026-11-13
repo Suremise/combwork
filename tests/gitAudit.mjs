@@ -163,7 +163,7 @@ export const SEAM_CALLS = ['lineHistory', 'lineRepoReads', 'lineRepoOps', 'queue
 export function seamCounts(root, over = {}) {
   const out = {}
   for (const { file, text } of filesOf(root, over)) {
-    if (/^src\/main\/platform\/(historyPorts|repoReadsPorts|repoOpsPorts|integrationPorts|workspacePorts)\.ts$/.test(file)) continue
+    if (/^src\/main\/platform\/(historyPorts|repoReadsPorts|repoOpsPorts|integrationPorts|workspacePorts|releaseReadsPorts)\.ts$/.test(file)) continue
     for (const s of SEAM_CALLS) {
       const n = [...text.matchAll(new RegExp(`\\b${s}\\(`, 'g'))].length
       if (n) (out[file.replace(/\.tsx?$/, '')] ??= {})[s] = n
@@ -214,6 +214,7 @@ export const EDGES = [
   { file: 'src/main/platform/repoPorts', module: 'src/main/repoLock', class: 'common', names: ['withStoreLocks'], why: "every context's store locked by the repository lock's one owner, whatever platform named it (HI-2896, s13 §2)" },
   { file: 'src/main/platform/repoReads', module: 'src/shared/gitRepo', class: 'gitUi', why: "RepoReads' view types keep their Git names (§16.3.6 port 5)" },
   { file: 'src/main/platform/repoReadsPorts', module: 'src/main/platform/gitRepoReads', class: 'registry', names: ['gitRepoReads'], why: "the repository reads port's map (R2)" },
+  { file: 'src/main/platform/releaseReadsPorts', module: 'src/main/platform/gitReleaseReads', class: 'registry', names: ['gitReleaseReads'], why: "the release reads port's map (HI-3148)" },
   { file: 'src/main/platform/workspacePorts', module: 'src/main/platform/gitWorkspacePort', class: 'registry', names: ['gitWorkspacePort'], why: "the workspace port's map (R4)" },
   { file: 'src/main/projectAgents', module: 'src/main/branchWatch', class: 'gitUi', why: "an agent's branch card checked again" },
   { file: 'src/main/projectAgents', module: 'src/main/gitTool', class: 'gitUi', why: "Add Agent's 0.9 worktree choice says why git can't run" },

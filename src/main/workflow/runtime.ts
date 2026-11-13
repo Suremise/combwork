@@ -1098,6 +1098,7 @@ export class Workflow {
     try {
       // HI-3148: never new work on a released line, unless the user or the Assistant says so (a hotfix).
       const rel = this.enforced() ? await this.releasedStart(card, g, actor, opts.released) : { grant: null }
+      // agent-protocol: who can override, the refusal's override field (§16.8.3)
       if ('refusal' in rel) return await this.refuse(card, actor, 'start', rel.refusal, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
       // HI-2985: a forward's resolution starts only on the branch it resolves (one made unpinned, or Work merges into moved).
       const res = from.resolves
@@ -2867,6 +2868,7 @@ export class Workflow {
       if (skipped.length && asking) return by === 'user' ? needs(skipped) : this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: skipped.join(', ') } }, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
       // Confirmed for another line than the one it would start on now (it changed since the ask): asked again, the user;
       // the Assistant's refused with the line's own words, to confirm that line.
+      // agent-protocol: who can override, the refusal's override field (§16.8.3)
       if (releasedTarget && !opts.dry && opts.released !== releasedTarget) return by === 'user' ? needs(skipped) : this.refuse(card, 'assistant', 'start', (releasedRule as { refusal: GuardRefusal }).refusal, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
       await this.cfg.hooks?.beforeWrite?.('move')
       // A start's passes, as `start`'s (its platform's `startGathers`, HI-2916).
