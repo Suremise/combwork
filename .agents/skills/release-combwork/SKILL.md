@@ -78,6 +78,7 @@ RELEASING.md's **The user's OK** lists the decisions that are the user's. Do eac
 
 ## Stage 5: after the release
 
+- Once the release is tagged and merged into `main`, **Work merges into** must be the next version (RELEASING, stage 5): new work on a released branch is refused, except by the user's or the Assistant's override for a hotfix. If it still names the release, Start the next version (`cw_branch` `nextVersion`), or answer Combwork's release offer (For you: Move…, Start…), with the user's OK; then take the release out of Other branches work can merge into once nothing uses it (the offer's Remove…).
 - Merging `main` into the next version's branch is the user's OK; retarget what's still on the release branch before it is deleted (RELEASING, stage 5).
 - A patch (`x.y.1`) comes from `main` with the fix-round budget, on a patch branch made from it that its fix cards merge into (their **Merges into**, never `main`); its version card goes on that branch, and it reaches `main` by its pull request, CI green, merged as a merge commit (their OK), before the publish card builds from the merged `main` commit. A dialect-only patch goes the same way. A bug found in a release gets its GitHub issue only when the user asks.
 
