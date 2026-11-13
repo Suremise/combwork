@@ -59,6 +59,10 @@ let gitCalls: { args: string[]; timeout?: number }[] | null = null
 let failHeadOnce = false
 /** HI-3053: run with the folder once the next commit or `stash push` is made, before Combwork takes its entries in. */
 let afterMade: ((cwd: string) => void) | null = null
+/** HI-3125: run with the folder just before the next commit or `stash push` (another git's work at that moment). */
+let beforeAct: ((cwd: string) => void) | null = null
+/** HI-3125 (HR1's round 2): a git command that fails as unreadable, while it matches (null: none). */
+let failGit: ((args: string[]) => boolean) | null = null
 /** HI-3056: run with the folder before each refresh of the entries taken in (another git writing the real index then). */
 let beforeRefresh: ((cwd: string) => void) | null = null
 /** A folder whose `rev-parse --show-toplevel` fails (HI-2962): `empty`, answered ok with nothing. */
@@ -87,6 +91,12 @@ vi.mock('../src/main/git', async (original) => {
         lateFile = null
       }
       if (beforeRefresh && args.includes('add') && args.includes('--refresh')) beforeRefresh(cwd)
+      if (failGit?.(args)) return { ok: false, code: 128, out: '', err: 'fatal: unable to read the object', buf: Buffer.alloc(0) }
+      if (beforeAct && (args[0] === 'commit' || (args[0] === 'stash' && args[1] === 'push'))) {
+        const then = beforeAct
+        beforeAct = null
+        then(cwd)
+      }
       const r = await real.git(cwd, args, max, input, opts)
       if (afterMade && r.ok && (args[0] === 'commit' || (args[0] === 'stash' && args[1] === 'push'))) {
         // HI-3053: another git's work once the commit or stash is made, before its entries are taken into the real index.
@@ -94,7 +104,8 @@ vi.mock('../src/main/git', async (original) => {
         afterMade = null
         then(cwd)
       }
-      if (failStashAfter && args[0] === 'stash') {
+      // The push itself (HI-3125: Set Aside lists the stashes first, a stash command too).
+      if (failStashAfter && args[0] === 'stash' && args[1] === 'push') {
         failStashAfter = false
         return { ...r, ok: false, code: 1, err: 'error: could not write index' }
       }
@@ -172,6 +183,175 @@ beforeEach(() => {
   lateFile = null
   afterMade = null
   beforeRefresh = null
+  beforeAct = null
+  failGit = null
+})
+
+// HI-3125 (hunt 7's round 3): another git (the user's terminal, an agent) at the very moment of the commit or stash.
+// What Combwork made is told by what it made (its message, on the branch since it started; among the new stashes),
+// never by HEAD or the stash ref having moved; an index flag set meanwhile is a change of that entry, kept.
+describe('another git at the same moment (HI-3125)', () => {
+  const subject = (oid: string): string => sh(proj, 'show', '-s', '--format=%s', oid)
+  const stashes = (): string[] => sh(proj, 'stash', 'list', '--format=%s').split('\n').filter(Boolean)
+
+  it("Set Aside whose push saves nothing, the shown edit taken back and another file stashed by the user just before: refused as changed, the user's stash never named as Combwork's", async () => {
+    writeFileSync(join(proj, 'a.txt'), 'shown, then taken back by the user\n')
+    writeFileSync(join(proj, 'b.txt'), "the user's own\n")
+    beforeAct = (cwd) => {
+      sh(cwd, 'checkout', '--', 'a.txt')
+      sh(cwd, 'stash', 'push', '-q', '-m', "the user's own", '--', 'b.txt')
+    }
+    await expect(settle('setAside', ['a.txt'])).rejects.toThrow(/aren't the ones shown any more/)
+    expect(beforeAct).toBeNull()
+    expect(stashes()).toEqual(["On main: the user's own"])
+  })
+
+  it("Set Aside made, the user's stash right after it: Combwork's own named", async () => {
+    writeFileSync(join(proj, 'a.txt'), 'set aside by Combwork\n')
+    writeFileSync(join(proj, 'b.txt'), "the user's own\n")
+    afterMade = (cwd) => void sh(cwd, 'stash', 'push', '-q', '-m', "the user's own", '--', 'b.txt')
+    const done = await settle('setAside', ['a.txt'])
+    expect(afterMade).toBeNull()
+    expect(subject(done.made)).toMatch(/^On main: Combwork: set aside before merging AB-1 \[cw:[0-9a-f]{6}\]$/)
+    expect(subject(done.made)).toBe(`On main: ${done.message}`)
+    expect(done.made).not.toBe(sh(proj, 'rev-parse', 'refs/stash'))
+    expect(stashes()).toEqual(["On main: the user's own", `On main: ${done.message}`])
+  })
+
+  it("Set Aside made, the user's stash just before it: Combwork's own named", async () => {
+    writeFileSync(join(proj, 'a.txt'), 'set aside by Combwork\n')
+    writeFileSync(join(proj, 'b.txt'), "the user's own\n")
+    beforeAct = (cwd) => void sh(cwd, 'stash', 'push', '-q', '-m', "the user's own", '--', 'b.txt')
+    const done = await settle('setAside', ['a.txt'])
+    expect(subject(done.made)).toMatch(/^On main: Combwork: set aside before merging AB-1 \[cw:[0-9a-f]{6}\]$/)
+    expect(done.made).toBe(sh(proj, 'rev-parse', 'refs/stash'))
+  })
+
+  it("Commit made, the user's commit right after it: Combwork's own named, never HEAD", async () => {
+    writeFileSync(join(proj, 'a.txt'), 'committed by Combwork\n')
+    writeFileSync(join(proj, 'b.txt'), "the user's own\n")
+    afterMade = (cwd) => void sh(cwd, 'commit', '-q', '-m', "the user's own", '--', 'b.txt')
+    const done = await settle('commit', ['a.txt'])
+    expect(afterMade).toBeNull()
+    expect(subject(done.made)).toBe('Commit changes before merging AB-1')
+    expect(done.made).not.toBe(head())
+    expect(sh(proj, 'rev-parse', 'HEAD~1')).toBe(done.made)
+  })
+
+  it("Commit made on top of the user's commit just before it: its own named", async () => {
+    writeFileSync(join(proj, 'a.txt'), 'committed by Combwork\n')
+    writeFileSync(join(proj, 'b.txt'), "the user's own\n")
+    beforeAct = (cwd) => void sh(cwd, 'commit', '-q', '-m', "the user's own", '--', 'b.txt')
+    const done = await settle('commit', ['a.txt'])
+    expect(done.made).toBe(head())
+    expect(subject(done.made)).toBe('Commit changes before merging AB-1')
+    expect(subject('HEAD~1')).toBe("the user's own")
+  })
+
+  // HR1's round 1: the commit is the one git's own summary names, never matched by its message alone.
+  it("reads the commit git's summary names: the last summary line, whatever a hook printed before it", () => {
+    expect(changes.reportedCommit('[main 1a2b3c4] Commit changes before merging AB-1\n 1 file changed, 1 insertion(+)\n')).toBe('1a2b3c4')
+    expect(changes.reportedCommit('[main (root-commit) 1a2b3c4d] first\n')).toBe('1a2b3c4d')
+    // Detached (its words in the user's language): never read, as Commit refuses a detached HEAD before it runs.
+    expect(changes.reportedCommit('[detached HEAD 0123456789abcdef] x\n')).toBeUndefined()
+    expect(changes.reportedCommit('[hook] said this\n[main abcdef1] ours\n')).toBe('abcdef1')
+    expect(changes.reportedCommit('')).toBeUndefined()
+    // HR1's round 2: as short as core.abbrev allows; a branch name with `]` in it; a subject that looks like one.
+    expect(changes.reportedCommit('[main 97f0] checked: work\n')).toBe('97f0')
+    expect(changes.reportedCommit('[feat]x 1a2b3c4] y\n')).toBe('1a2b3c4')
+    expect(changes.reportedCommit('[main 1a2b3c4] fix deadbeef] x\n')).toBe('1a2b3c4')
+  })
+
+  it('the hook rewriting the message with core.abbrev=4 (a four-character summary): the commit made, named', async () => {
+    sh(proj, 'config', 'core.abbrev', '4')
+    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+    writeFileSync(join(proj, '.git', 'hooks', 'commit-msg'), '#!/bin/sh\nprintf "checked: %s\\n" "$(head -n 1 "$1")" > "$1.new" && mv "$1.new" "$1"\n')
+    writeFileSync(join(proj, 'a.txt'), 'committed by Combwork\n')
+    const done = await settle('commit', ['a.txt'])
+    expect(done.made).toBe(head())
+    expect(subject(done.made)).toBe('checked: Commit changes before merging AB-1')
+    expect(status()).toBe('')
+  })
+
+  it("Set Aside saving nothing while another git makes two stashes of its name, neither holding the paths shown: never credited", async () => {
+    writeFileSync(join(proj, 'a.txt'), 'shown, then taken back\n')
+    writeFileSync(join(proj, 'b.txt'), 'b\nchanged\n')
+    writeFileSync(join(proj, '.gitignore'), 'node_modules/\nc/\n')
+    beforeAct = (cwd) => {
+      sh(cwd, 'checkout', '--', 'a.txt')
+      sh(cwd, 'stash', 'push', '-q', '-m', 'Combwork: set aside before merging AB-1', '--', 'b.txt')
+      sh(cwd, 'stash', 'push', '-q', '-m', 'Combwork: set aside before merging AB-1', '--', '.gitignore')
+    }
+    await expect(settle('setAside', ['a.txt'])).rejects.toThrow(/aren't the ones shown any more/)
+    expect(stashes()).toEqual(['On main: Combwork: set aside before merging AB-1', 'On main: Combwork: set aside before merging AB-1'])
+    expect(status()).toBe('')
+  })
+
+  // HR2's round 3: the shown path itself, stashed by another git in Combwork's own words just before its push (which then
+  // saves nothing): that stash holds every path shown, and is still never Combwork's (its name has no mark of this one).
+  it("the shown path stashed by another git in Combwork's words just before its push: refused as changed, never credited", async () => {
+    writeFileSync(join(proj, 'a.txt'), 'shown\n')
+    beforeAct = (cwd) => void sh(cwd, 'stash', 'push', '-q', '-m', 'Combwork: set aside before merging AB-1', '--', 'a.txt')
+    await expect(settle('setAside', ['a.txt'])).rejects.toThrow(/aren't the ones shown any more/)
+    expect(beforeAct).toBeNull()
+    expect(stashes()).toEqual(['On main: Combwork: set aside before merging AB-1'])
+    expect(sh(proj, 'show', 'refs/stash:a.txt')).toBe('shown')
+  })
+
+  it("the stashes unreadable after the push: never taken for its own, said; the stash kept, the real index as it was", async () => {
+    writeFileSync(join(proj, 'a.txt'), 'set aside by Combwork\n')
+    // The stash list read again after the push (the first, before it, as usual).
+    let lists = 0
+    failGit = (args) => args[0] === 'stash' && args[1] === 'list' && ++lists === 2
+    await expect(settle('setAside', ['a.txt'])).rejects.toThrow(/^Git set changes aside, but Combwork can't tell which stash is its own/)
+    failGit = null
+    expect(stashes()).toHaveLength(1)
+    expect(stashes()[0]).toMatch(/^On main: Combwork: set aside before merging AB-1 \[cw:[0-9a-f]{6}\]$/)
+    expect(sh(proj, 'show', 'refs/stash:a.txt')).toBe('set aside by Combwork')
+  })
+
+  it("a commit-msg hook rewriting the message (a ticket prefix): the commit made, named, and its entries taken in", async () => {
+    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+    writeFileSync(join(proj, '.git', 'hooks', 'commit-msg'), '#!/bin/sh\nprintf "checked: %s\\n" "$(head -n 1 "$1")" > "$1.new" && mv "$1.new" "$1"\n')
+    writeFileSync(join(proj, 'a.txt'), 'committed by Combwork\n')
+    const done = await settle('commit', ['a.txt'])
+    expect(done.made).toBe(head())
+    expect(subject(done.made)).toBe('checked: Commit changes before merging AB-1')
+    expect(done.warning).toBeUndefined()
+    // Its entries taken into the real index: nothing left staged or changed.
+    expect(status()).toBe('')
+  })
+
+  it('a commit with the same message by another git right after it: its own named, from git', async () => {
+    writeFileSync(join(proj, 'a.txt'), 'committed by Combwork\n')
+    writeFileSync(join(proj, 'b.txt'), "the user's own\n")
+    afterMade = (cwd) => void sh(cwd, 'commit', '-q', '-m', 'Commit changes before merging AB-1', '--', 'b.txt')
+    const done = await settle('commit', ['a.txt'])
+    expect(afterMade).toBeNull()
+    expect(subject('HEAD')).toBe('Commit changes before merging AB-1')
+    expect(done.made).toBe(sh(proj, 'rev-parse', 'HEAD~1'))
+    expect(sh(proj, 'show', '--name-only', '--format=', done.made)).toBe('a.txt')
+  })
+
+  it("a stash in Combwork's words by another git right after it: its own named, by its mark", async () => {
+    writeFileSync(join(proj, 'a.txt'), 'set aside by Combwork\n')
+    writeFileSync(join(proj, 'b.txt'), "the user's own\n")
+    afterMade = (cwd) => void sh(cwd, 'stash', 'push', '-q', '-m', 'Combwork: set aside before merging AB-1', '--', 'b.txt')
+    const done = await settle('setAside', ['a.txt'])
+    expect(afterMade).toBeNull()
+    expect(stashes()).toEqual(['On main: Combwork: set aside before merging AB-1', `On main: ${done.message}`])
+    expect(done.made).not.toBe(sh(proj, 'rev-parse', 'refs/stash'))
+    expect(sh(proj, 'show', `${done.made}:a.txt`)).toBe('set aside by Combwork')
+  })
+
+  it('a skip-worktree flag another git sets on a shown path once the commit is made is kept, and said', async () => {
+    writeFileSync(join(proj, 'a.txt'), 'edit a\n')
+    afterMade = (cwd) => void sh(cwd, 'update-index', '--skip-worktree', 'a.txt')
+    const done = await settle('commit', ['a.txt'])
+    expect(afterMade).toBeNull()
+    expect(sh(proj, 'ls-files', '-v', '--', 'a.txt')).toBe('S a.txt')
+    expect(englishText(done.warning!)).toMatch(/another git command staged a\.txt meanwhile, so Combwork kept that staging as it was/)
+  })
 })
 
 describe('Commit', () => {
@@ -258,7 +438,7 @@ describe('Set aside', () => {
     const done = await settle('setAside', ['a.txt', 'new.txt'])
     expect(done.made).toBe(sh(proj, 'rev-parse', 'refs/stash'))
     expect(done.made).not.toBe(older)
-    expect(sh(proj, 'stash', 'list', '--format=%s').split('\n')[0]).toMatch(/Combwork: set aside before merging AB-1$/)
+    expect(sh(proj, 'stash', 'list', '--format=%s').split('\n')[0]).toMatch(/Combwork: set aside before merging AB-1 \[cw:[0-9a-f]{6}\]$/)
     expect(read('a.txt')).toBe('a\n')
     expect(existsSync(join(proj, 'new.txt'))).toBe(false)
     expect(status()).toBe('M  b.txt')

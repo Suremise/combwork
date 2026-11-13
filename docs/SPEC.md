@@ -6309,8 +6309,23 @@ touched:
   too). Commit: `add --intent-to-add` for
   untracked ones, then `commit --only -- <paths>` (their working-tree content; every other index entry kept; a
   rename's both sides), message *Commit changes before merging HI-12*; a failure (a hook, signing) loses nothing,
-  its intent-to-add entries only ever in the private index (below). Set aside: `stash push --include-untracked` with those paths, named
-  *Combwork: set aside before merging HI-12* and told by the stash ref's new object (never its message); git failing
+  its intent-to-add entries only ever in the private index (below). The commit made is the one git's own summary
+  names (`[main 1a2b3c4] …`, its last such line, the object as short as `core.abbrev` allows (4) and the branch one
+  word, `]` and all: git prints it after the post-commit hook; the commit is run without
+  `--quiet` for it), found on the branch since the HEAD it started from (first parents, at most 50 back), never HEAD
+  alone (HI-3125: another git's commit right after it, or just before it, maybe with the same message) nor its message
+  (HR1's round 1: a commit-msg hook may rewrite it, a ticket prefix); with no summary to read, the newest there with
+  that message. Git saying it committed with none there is said, not credited. Set aside: `stash push --include-untracked` with those paths, named
+  *Combwork: set aside before merging HI-12 [cw:3fa9c1]*: after the card's words, a mark of this Set Aside's own
+  (`[cw:` six random hex digits `]`), so it is told by what it made (HI-3125): the one stash not among those there as
+  it started whose subject is exactly that message. Never the stash ref having moved (another git's stash just before or
+  after it moves it too), nor a message another git can reuse (HR1's rounds 1 and 2, HR2's round 3: the shown path
+  stashed by another git in Combwork's words just before its push, which then saved nothing, holds every path shown and
+  was taken for it). None: nothing was made (below). The stashes unreadable after the push, or two with its mark: never
+  guessed, refused (*Git set changes aside, but Combwork can't tell which stash is its own … Check git stash list and
+  the files*), the stashes kept and the real index as it was. A push that saved nothing (another git took the shown changes back, or set them aside, just
+  before: git says so and exits 0) is never done: refused as the changes not being those shown any more, or as git
+  not setting them aside. Git failing
   after it made one is said with that stash, kept. A staged rename (HI-3022): git's stash, given the old side (in
   neither the index nor the folder), made the stash then died on it, every try; it is given the new side alone, which
   stashes the rename whole (the stash's index and folder both without the old side, so `git stash pop --index` gives
@@ -6353,7 +6368,8 @@ touched:
   git's staging meanwhile is kept** (HI-3053): the real index being free while the commit or stash runs, the user's own
   `git add` of a path being committed can land before that step. So the new index made in the scratch (`update-index`
   with `GIT_INDEX_FILE`) compares each path's real entries, in the bytes it is made from, with those it had when the
-  copy was taken; and it goes in under the real index's lock taken as git takes it (`index.lock`, made only if none is
+  copy was taken, flags and all (HI-3125: `ls-files -s -v`, so a skip-worktree or assume-unchanged flag another git sets
+  meanwhile is a change of that entry, kept and said, where `--index-info` would remake it without); and it goes in under the real index's lock taken as git takes it (`index.lock`, made only if none is
   there; tried again briefly while another git holds it, and only that lock ever removed), renamed in through the lock
   as git commits a lock, only while the real index is still those bytes. A path whose real entries changed meanwhile keeps them, never written over; the others are taken
   in, and the result's warning names the commit or stash made and the path kept (*Git made the commit (…), but another git
