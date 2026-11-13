@@ -68,8 +68,9 @@ export async function staleLaunchFolders(projectPath: string): Promise<StaleLaun
 
 /**
  * Removes a removed agent's launch folder, checked just before: the agent isn't the project's (its project.json read
- * now), nor starting or running. It is renamed aside first, so a launch starting meanwhile makes a fresh one rather than
- * write into one going away; then deleted (`trash`: to the Recycle Bin, as Clean Up does). Whether it went.
+ * now), nor starting or running. Deleted, it is renamed aside first, so a launch starting meanwhile makes a fresh one
+ * rather than write into one going away; to the Recycle Bin (`trash`, as Clean Up does), it is moved there at once, under
+ * its own name. Whether it went.
  */
 export async function removeLaunchFolder(projectPath: string, agentId: string, how: 'delete' | 'trash' = 'delete'): Promise<boolean> {
   if (launchFolderAgent(launchFolderName(agentId)) !== agentId) return false
@@ -78,14 +79,18 @@ export async function removeLaunchFolder(projectPath: string, agentId: string, h
   const agents = await currentAgents(projectPath)
   // After the read: nothing is awaited between this check and the rename.
   if (!agents || agents.has(agentId.toLowerCase()) || busy(projectPath, agentId)) return false
-  const aside = `${path}.removing-${randomBytes(4).toString('hex')}`
-  try {
-    await rename(path, aside)
-  } catch (e) {
-    log.warn(`Could not set aside the launch folder of ${userText(agentId)} in ${userText(projectPath)}`, e)
-    return false
+  // To the Recycle Bin: one move, under its own name (what the Bin shows and restores).
+  if (how === 'trash') await trash(path)
+  else {
+    const aside = `${path}.removing-${randomBytes(4).toString('hex')}`
+    try {
+      await rename(path, aside)
+    } catch (e) {
+      log.warn(`Could not set aside the launch folder of ${userText(agentId)} in ${userText(projectPath)}`, e)
+      return false
+    }
+    await removePath(aside)
   }
-  await (how === 'trash' ? trash(aside) : removePath(aside))
   log.info(`Removed the launch folder of ${userText(agentId)}, no longer an agent of ${userText(projectPath)}`)
   return true
 }
