@@ -9,7 +9,8 @@ import { describe, expect, it } from 'vitest'
 import { tempDir } from './tempDir'
 import { gitWorkspacePort } from '../src/main/platform/gitWorkspacePort'
 import { gitHistory } from '../src/main/platform/gitHistory'
-import { earlierWork, type EarlierWorkSource } from '../src/main/workflow/earlierWork'
+import { earlierWork, UNREAD, type EarlierWorkSource } from '../src/main/workflow/earlierWork'
+import { earlierWorkText } from '../src/main/workflow/runtime'
 import type { Fact } from '../src/shared/workflow/facts'
 
 void gitWorkspacePort
@@ -62,12 +63,46 @@ describe('HI-3107: earlier work on lines of another version control', () => {
     expect((await earlierWork(source([started('ahead', 'main', 'rs-git')]), 1, 'jj', notRepo)).map((e) => e.state)).toEqual(['unknown'])
   })
 
-  it("only lines of a version control left behind whose lines are branches: the one in force, jj's preparation keys and an unreadable ruleset are left out", async () => {
+  it("only lines of a version control left behind whose lines are branches: the one in force and jj's preparation keys are left out", async () => {
     const r = repo()
     expect(await earlierWork(source([started('ahead', 'main', 'rs-git')]), 1, 'git', r)).toEqual([])
     expect(await earlierWork(source([started('jj:cw-x-slot-a/1.1', 'main', 'rs-jj')]), 1, 'git', r)).toEqual([])
-    expect(await earlierWork(source([started('ahead', 'main', 'rs-gone')]), 1, 'jj', r)).toEqual([])
     expect(await earlierWork(source([started(null, 'main', 'rs-git')]), 1, 'jj', r)).toEqual([])
+    // A later start under the one in force on the same line, or the line the start being made works on: the card's own.
+    expect(await earlierWork(source([started('ahead', 'main', 'rs-git'), started('ahead', 'main', 'rs-jj')]), 1, 'jj', r)).toEqual([])
+    expect(await earlierWork(source([started('ahead', 'main', 'rs-gone')]), 1, 'jj', r, 'ahead')).toEqual([])
+  })
+
+  it("HR2's controls: a start's ruleset unreadable says its line as unknown (its version control unread, never guessed); the card's starts unreadable say so", async () => {
+    const r = repo()
+    // A real Git branch ahead of main, its start's ruleset failing (EIO): never dropped.
+    expect(await earlierWork(source([started('ahead', 'main', 'rs-gone')]), 1, 'jj', r)).toEqual([{ line: 'ahead', target: 'main', platform: null, state: 'unknown' }])
+    const noRuleset = { ...started('ahead', 'main', 'rs-git'), ruleset: undefined } as unknown as Fact
+    expect(await earlierWork(source([noRuleset]), 1, 'jj', r)).toEqual([{ line: 'ahead', target: 'main', platform: null, state: 'unknown' }])
+    const unread: EarlierWorkSource = {
+      facts: () => {
+        throw new Error('EIO')
+      },
+      ruleset: () => ({ options: { platform: 'git' } })
+    }
+    expect(await earlierWork(unread, 1, 'jj', r)).toEqual([UNREAD])
+    // Each said to the builder: the line, or that the starts couldn't be read.
+    expect(earlierWorkText('SH-1', { line: 'ahead', target: 'main', platform: null, state: 'unknown' }, 'jj')).toMatch(/SH-1 has earlier work on ahead, from a start whose version control Combwork couldn't read: Combwork couldn't tell/)
+    expect(earlierWorkText('SH-1', UNREAD, 'jj')).toMatch(/couldn't read SH-1's earlier starts/)
+  })
+
+  it("never says the work is missing from the new start: a new target already holding it (or a kept folder that brought it in) is allowed for", async () => {
+    const r = repo()
+    // The jj start's target is at the old work's head: its slot has b.txt. The reader still compares with the old target
+    // (main), so the line is ahead; the text says the target may hold it by now, and to check before bringing it in.
+    g(r, 'branch', 'new-target', 'ahead')
+    expect(g(r, 'show', 'new-target:b.txt')).toBe('b')
+    const lines = await earlierWork(source([started('ahead', 'main', 'rs-git')]), 1, 'jj', r)
+    expect(lines).toEqual([{ line: 'ahead', target: 'main', platform: 'git', state: 'ahead' }])
+    const text = earlierWorkText('SH-1', lines[0], 'jj')
+    expect(text).toMatch(/from before its project switched to jj: commits its target main doesn't hold/)
+    expect(text).toMatch(/this start's target may hold it by now: check whether your folder has it before bringing in what you need/)
+    expect(text).not.toMatch(/isn't in the folder|without it|afresh/)
   })
 
   it('a line started on more than once is read once, against the target its last start recorded', async () => {

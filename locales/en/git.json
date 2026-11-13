@@ -1736,8 +1736,8 @@
     "description": "A card started and not done, in the switch’s warning (HI-2799). {card} is its key."
   },
   "git.vc.store.carried": {
-    "defaultMessage": "{project}: {card}’s work from before is on {line}{state, select, ahead {, with commits its target doesn’t hold} other {, and Combwork couldn’t tell whether its target holds it}}. After the switch {card} starts afresh from its target: bring that work in yourself if you want it.",
-    "description": "HI-3107: a hint in the warning before switching to jj: a card not in flight ran before under Git, and its branch from then has (ahead) or may have (other: it couldn’t be read) work its target lacks; the card will start without it. {card} is a card key; {line} a branch name."
+    "defaultMessage": "{what, select, line {{project}: {card}’s work from before is on {line}{state, select, ahead {, with commits its target doesn’t hold} other {, and Combwork couldn’t tell whether its target holds it}}. After the switch {card} starts from its target, not that line: if its target doesn’t hold that work by then, bring it in yourself.} card {{project}: Combwork couldn’t read {card}’s earlier starts, so it can’t tell whether work from before is left on a line of its own. After the switch {card} starts from its target: check before you start it.} other {{project}: Combwork couldn’t read its cards’ earlier starts, so it can’t tell whether any has work from before left on a line of its own. After the switch they start from their target: check before you start them.}}",
+    "description": "HI-3107: a hint in the warning before switching to jj. line: a card not in flight ran before under Git, and its branch from then has (ahead) or may have (other: it couldn’t be read) work its target lacks; the card will start from its target, not that branch. card: that card’s earlier starts couldn’t be read; other: the project’s board couldn’t be read. Keep the select keys. {card} is a card key; {line} a branch name."
   },
   "git.vc.store.clear": {
     "defaultMessage": "{gate}: not used",

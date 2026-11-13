@@ -476,7 +476,7 @@
   "git.vc.store.conflictedCommit": "提交 {commit} 中存有冲突：请用 jj 解决。",
   "git.vc.store.copy": "{project}：{kind, select, review {评审副本} other {检查副本}} {copy}",
   "git.vc.store.kept": "{project}：{card} 已提交的工作保留在槽位 {slot} 中，供其再次开始时使用：请开始 {card} 并完成它",
-  "git.vc.store.carried": "{project}：{card} 之前的工作在 {line} 上{state, select, ahead {，其中有目标未包含的提交} other {，Combwork 无法确定其目标是否包含它}}。切换后，{card} 将从其目标重新开始：如需这些工作，请自行引入。",
+  "git.vc.store.carried": "{what, select, line {{project}：{card} 之前的工作在 {line} 上{state, select, ahead {，其中有目标未包含的提交} other {，Combwork 无法确定其目标是否包含它}}。切换后，{card} 将从其目标开始，而不是从该线开始：如果届时其目标仍不包含这些工作，请自行引入。} card {{project}：Combwork 无法读取 {card} 之前的开始记录，因此无法判断之前的工作是否留在单独的线上。切换后，{card} 将从其目标开始：请在开始前检查。} other {{project}：Combwork 无法读取其卡片之前的开始记录，因此无法判断是否有卡片的之前工作留在单独的线上。切换后，这些卡片将从其目标开始：请在开始前检查。}}",
   "git.vc.store.detached": "{project}：它的文件夹不在任何分支上（HEAD 分离在 {head}），切换后仍会如此。在其卡片于项目文件夹中开始之前，请在那里检出其工作所在的分支（git switch）。",
   "git.vc.store.drain": "此仓库上仍有内容在运行（全部结束后才会切换）：",
   "git.vc.store.fallback": "切换回 Git 之前：",

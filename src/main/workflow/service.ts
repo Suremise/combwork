@@ -30,7 +30,7 @@ import { locksSettled } from './lockRecord'
 import { checksSettled } from './runChecks'
 import { resolvedOf, type ResolvedOptions } from './rulesets'
 import { lastActionId, noteRequestsSince } from '../workflowNotices'
-import { earlierWorkText, shownPlatform, Workflow, type KeptAcross, type SlotForStart } from './runtime'
+import { earlierWorkText, Workflow, type KeptAcross, type SlotForStart } from './runtime'
 import type { EarlierLine } from './earlierWork'
 import { tell } from '../notify'
 import { commentAsCombwork } from '../tasks'
@@ -92,8 +92,8 @@ export interface SlotStarts {
 }
 let slotStarts: SlotStarts | null = null
 const EARLIER = {
-  title: msg({ id: 'workflow.earlierWork.title', defaultMessage: '{card} started afresh: its earlier work is on {line}', description: 'HI-3107: a notice when a card starts: it ran before under another version control (Git, before the repository switched to jj), and its line from then still has work the new start doesn’t include. {card} is a card key; {line} a branch or bookmark name.' }),
-  message: msg({ id: 'workflow.earlierWork.message', defaultMessage: '{n, plural, one {Its line from before the switch to {now}, {lines}, has} other {Its lines from before the switch to {now}, {lines}, have}} work its target may not hold. The card starts from its target without it: look at that work and bring in what you need, or leave it. Its builder is told on the card.', description: 'HI-3107: the notice’s text: {lines} lists branch or bookmark names, {n} how many; {now} is the version control in force (Git, jj). The builder gets the same as a comment on the card.' })
+  title: msg({ id: 'workflow.earlierWork.title', defaultMessage: '{read, select, yes {{card}: its earlier work is on {line}} other {{card}: its earlier work couldn’t be read}}', description: 'HI-3107: a notice when a card starts: it ran before under another version control (Git, before the repository switched to jj), and its line from then may still have work (yes); or its earlier starts couldn’t be read, so that can’t be told (other). Keep the select keys. {card} is a card key; {line} a branch or bookmark name.' }),
+  message: msg({ id: 'workflow.earlierWork.message', defaultMessage: '{read, select, yes {{n, plural, one {Its earlier line, {lines}, may hold work its target lacked:} other {Its earlier lines, {lines}, may hold work their target lacked:}} Combwork leaves that work there and doesn’t carry it in.} other {Combwork couldn’t read the card’s earlier starts, so it can’t tell whether work from before was left on a line of its own.}} Check what the card’s folder has (its target may hold that work by now), then bring in what you need, or leave it. Its builder is told on the card.', description: 'HI-3107: the notice’s text. yes: {lines} lists branch or bookmark names, {n} how many; other: the card’s starts couldn’t be read. Keep the select keys. Never says the folder lacks the work: its target may hold it. The builder gets the same as a comment on the card.' })
 }
 
 /**
@@ -102,9 +102,10 @@ const EARLIER = {
  */
 async function sayEarlierWork(ws: WorkspaceService, projectPath: string, card: CardRecord, lines: EarlierLine[], now: PlatformId): Promise<void> {
   const text = lines.map((e) => earlierWorkText(card.key, e, now)).join('\n\n')
+  const named = lines.flatMap((e) => (e.line === null ? [] : [e.line]))
   const starts = (await workflowFor(ws, projectPath).catch(() => null))?.store.facts(card.id).filter((f) => f.kind === 'Started').length ?? 0
   await commentAsCombwork(card.id, text, ws, () => true, `earlier-work:${card.id}:${starts}`)
-  tell({ kind: 'warning', level: 'warning', title: tr(EARLIER.title, { card: card.key, line: lines[0].line }), message: tr(EARLIER.message, { n: lines.length, lines: fmt.list(lines.map((e) => e.line)), now: shownPlatform(now) }), apiTitle: EARLIER.title.defaultMessage, projectPath })
+  tell({ kind: 'warning', level: 'warning', title: tr(EARLIER.title, { read: named.length ? 'yes' : 'no', card: card.key, line: named[0] ?? '' }), message: tr(EARLIER.message, { read: named.length ? 'yes' : 'no', n: named.length, lines: fmt.list(named) }), apiTitle: EARLIER.title.defaultMessage, projectPath })
 }
 
 export function setSlotStarts(s: SlotStarts | null): void {

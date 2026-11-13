@@ -27,7 +27,7 @@ import { needsRepository, PLATFORMS, type PlatformId } from '../../shared/platfo
 import { drainEmpty, PLATFORM_NAME, SWITCH_REFUSED, switchRefusalText, type FallbackProblem, type GateCheck, type StoreSwitch, type SwitchDrain, type SwitchRefusal } from '../../shared/platform/switching'
 import { setKept } from '../../shared/workflow/projectWorkflow'
 import { workspacePortOf } from '../platform/workspacePorts'
-import { earlierWork } from './earlierWork'
+import { earlierWork, UNREAD } from './earlierWork'
 import { withValues } from '../../shared/advanced'
 import type { ProjectConfig, ProjectWorkflow } from '../../shared/types'
 import { onAfterRefresh, openWorkspaces, type WorkspaceService } from '../workspace'
@@ -399,18 +399,21 @@ async function detachedMembers(members: readonly Member[], to: PlatformId): Prom
 /**
  * HI-3107: each member's cards not in flight (not started, or put back), code cards not archived, whose earlier lines
  * hold work its target may lack (earlierWork: read through the version control that made them). Said under the warning,
- * never a refusal: the work stays on its line, and the card starts afresh under `to`. A card that can't be read lists
- * nothing of it.
+ * never a refusal: the work stays on its line, and the card starts from its target under `to`. What can't be read is said
+ * as such, never taken for no work (HR2): a card's starts unread, `line` null; a member's board unread, `card` null too.
  */
 async function carriedWork(ws: WorkspaceService, members: readonly Member[], to: PlatformId): Promise<NonNullable<StoreSwitch['carried']>> {
   const out: NonNullable<StoreSwitch['carried']> = []
   for (const m of members) {
     const wf = await workflowFor(ws, m.path).catch(() => null)
-    if (!wf) continue
+    if (!wf) {
+      out.push({ project: m.name, card: null, line: null, state: 'unknown' })
+      continue
+    }
     for (const c of wf.store.cards()) {
       const s = wf.state(c)
       if (c.kind === 'no-code' || (s.stage !== 'todo' && s.stage !== 'hold')) continue
-      const lines = await earlierWork({ facts: (id) => wf.store.facts(id), ruleset: (id) => wf.store.ruleset(id) }, c.id, to, m.path).catch(() => [])
+      const lines = await earlierWork({ facts: (id) => wf.store.facts(id), ruleset: (id) => wf.store.ruleset(id) }, c.id, to, m.path).catch(() => [UNREAD])
       for (const e of lines) out.push({ project: m.name, card: c.id, line: e.line, state: e.state })
     }
   }
