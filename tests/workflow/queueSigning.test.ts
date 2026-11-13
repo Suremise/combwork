@@ -38,10 +38,12 @@ beforeAll(async () => {
 })
 const sshKeygen = (): string => keygen
 
-/** An ed25519 key pair in a folder of its own: with a passphrase when given. */
-function keyPair(passphrase = ''): { key: string; pub: string } {
+/** Windows' own ssh-keygen (OpenSSH for Windows), where it is installed. */
+const SYS_KEYGEN = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'OpenSSH', 'ssh-keygen.exe')
+/** An ed25519 key pair in a folder of its own: with a passphrase when given, made by `maker` (Git's unless said). */
+function keyPair(passphrase = '', maker = sshKeygen()): { key: string; pub: string } {
   const key = slash(join(tempDir('key-'), 'id_ed25519'))
-  execFileSync(sshKeygen(), ['-q', '-t', 'ed25519', '-N', passphrase, '-C', 'combwork-test', '-f', key])
+  execFileSync(maker, ['-q', '-t', 'ed25519', '-N', passphrase, '-C', 'combwork-test', '-f', key])
   return { key, pub: `${key}.pub` }
 }
 
@@ -180,13 +182,13 @@ describe('the merge queue checks signing before it signs (HI-1185)', () => {
 describe('the signing check (HI-1185)', () => {
   /** A recording spawn: the argv each signer run got, answered `reply`. */
   function deps(cwd: string, over: Partial<SignDeps> = {}, reply: Partial<QueueGitResult> = { ok: true, code: 0 }) {
-    const ran: { file: string; args: string[]; input?: string; argv0?: string; verbatim?: boolean }[] = []
+    const ran: { file: string; args: string[]; input?: string; argv0?: string; verbatim?: boolean; noConsole?: boolean }[] = []
     const d: SignDeps = {
       git: async (c, args) => {
         const r = await git(c, args)
         return { ok: r.ok, out: r.out, err: r.err, code: r.code }
       },
-      spawn: async (file, args, o) => (ran.push({ file, args, ...(o.input !== undefined ? { input: o.input } : {}), argv0: o.argv0, verbatim: o.verbatim }), { ok: false, out: '', err: '', code: 1, ...reply }),
+      spawn: async (file, args, o) => (ran.push({ file, args, ...(o.input !== undefined ? { input: o.input } : {}), argv0: o.argv0, verbatim: o.verbatim, noConsole: o.noConsole }), { ok: false, out: '', err: '', code: 1, ...reply }),
       cwd,
       who: [],
       env: gitEnv(),
@@ -233,7 +235,8 @@ describe('the signing check (HI-1185)', () => {
     expect(slash(r2.ran[0].file).toLowerCase()).toBe(b.toLowerCase())
     // HI-2947: as git starts it: its words quoted as git quotes them (quote_arg_msvc), passed verbatim, its first word given.
     expect(r2.ran[0].args).toEqual(['--batch', '--no-tty', '--pinentry-mode', 'error', '--no-autostart', '--status-fd=2', '-bsau', '"Queue Bot <queue@example.invalid>"'])
-    expect(r2.ran[0]).toMatchObject({ argv0: quoteArgMsvc(b), verbatim: true })
+    // HI-3208: with no console, as cw-sign runs it (Windows' own ssh-keygen waits on any console it has).
+    expect(r2.ran[0]).toMatchObject({ argv0: quoteArgMsvc(b), verbatim: true, noConsole: true })
     expect(r2.ran[0].input).toContain('Combwork checks that signing works')
     expect(info.status).toEqual({ kind: 'unattended' })
     // gpg.program set while the format is ssh: not ssh's program.
@@ -271,6 +274,16 @@ describe('the signing check (HI-1185)', () => {
     const real = (k: { key: string }) => deps(repo({ 'commit.gpgsign': 'true', 'gpg.format': 'ssh', 'user.signingkey': k.key }), { spawn: (f, a, o) => boundedSpawn(f, a, o) })
     expect((await checkSigning(real(keyPair()).d)).status).toEqual({ kind: 'unattended' })
     expect((await checkSigning(real(keyPair('secret-passphrase-4')).d)).status).toMatchObject({ kind: 'needsSomeone', format: 'ssh' })
+  })
+
+  // HI-3208: CI's runner found Windows' own ssh-keygen first on PATH, and the check (started with a console, a hidden one
+  // where its parent has none, as Electron's main) waited there for the passphrase until its bound: couldNotComplete.
+  it.skipIf(!existsSync(SYS_KEYGEN))("HI-3208: Windows' own ssh-keygen, which asks on any console it has: a locked key needs someone, at once", async () => {
+    // Its own keys: it refuses a key file another tool made when the folder's permissions are wider than it allows.
+    const real = (k: { key: string }) => deps(repo({ 'commit.gpgsign': 'true', 'gpg.format': 'ssh', 'gpg.ssh.program': slash(SYS_KEYGEN), 'user.signingkey': k.key }), { spawn: (f, a, o) => boundedSpawn(f, a, o) })
+    expect((await checkSigning(real(keyPair('', SYS_KEYGEN)).d)).status).toEqual({ kind: 'unattended' })
+    // Its own words, not the bound (couldNotComplete): it never got a console to wait on.
+    expect((await checkSigning(real(keyPair('secret-passphrase-5', SYS_KEYGEN)).d)).status).toMatchObject({ kind: 'needsSomeone', format: 'ssh' })
   })
 
   it("HI-2947: a key path holding ' and { reaches Git's ssh-keygen as git passes it (quote_arg_msvc), and one holding * too", async () => {

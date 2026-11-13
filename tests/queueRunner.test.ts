@@ -661,6 +661,28 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     }
   })
 
+  // HI-3208: the merge queue's signing check runs its signer through the launcher, which has no console: a command started
+  // without noConsole would get a hidden one of its own, where Windows' own ssh-keygen asks a locked key's passphrase and waits.
+  const sysKeygen = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'OpenSSH', 'ssh-keygen.exe')
+  it.skipIf(!existsSync(sysKeygen))("HI-3208: a command run with noConsole gets no console: Windows' own ssh-keygen says a locked key's passphrase is wanted, never waits", async () => {
+    const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target: 'noconsole', root: w.root, profile: 'A' })) as { ok: true; runner: QueueRunner }
+    try {
+      const dir = tempDir('qr-key-')
+      const key = join(dir, 'id_ed25519')
+      const keyMade = await a.runner.run('testMerge', sysKeygen, ['-q', '-t', 'ed25519', '-N', 'secret', '-C', 'test', '-f', key], { timeoutMs: 30_000, noConsole: true })
+      expect(keyMade).toMatchObject({ ok: true, code: 0 })
+      const payload = join(dir, 'payload')
+      writeFileSync(payload, 'x\n')
+      // Bounded well past the check's few seconds: a run that waited would end there, timed out.
+      const r = await a.runner.run('testMerge', sysKeygen, ['-Y', 'sign', '-n', 'git', '-f', key, payload], { env: { ...baseEnv(), SSH_ASKPASS_REQUIRE: 'never' }, timeoutMs: 30_000, noConsole: true })
+      expect(r.timedOut).toBeUndefined()
+      expect(r).toMatchObject({ ok: false })
+      expect(r.err).toMatch(/passphrase/i)
+    } finally {
+      await a.runner.release()
+    }
+  })
+
   it("HI-2042: a command ended by a signal is never code 1 (git's \"no\"): the launcher says so by its nonce; a real exit 1, and a look-alike line, stay the command's", async () => {
     const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target: 'signal', root: w.root, profile: 'A' })) as { ok: true; runner: QueueRunner }
     // Released however the test ends (its job, and anything still in it, ended), so a failing check leaves nothing running.
