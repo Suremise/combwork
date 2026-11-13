@@ -28,6 +28,7 @@ import { isAgain } from './again'
 import { destinationOf, fetchHeadOf, projectHost } from './gitTransport'
 import { CW_DIR } from '../../shared/defaults'
 import type { TargetChanges } from '../../shared/types'
+import { shellLine } from '../../shared/workflow/queue'
 
 /** How long a slotted card's start waits on fetching the remote its target follows (HI-1183). */
 const SLOT_FETCH_MS = 60_000
@@ -462,7 +463,14 @@ export class GitPlatform implements PlatformAdapter {
       // fails): not known to be on its line, so refused as unknown rather than let through.
       if (line) {
         if (isUnknown(on)) return { ok: false, refusal: unknownRefusal(card, on, 'submit') }
-        if (on !== line) return { ok: false, refusal: { rule: 'platform.offLine', values: { card: card.key, line, on: on ?? '', where: on === null ? 'detached' : 'other', head: h.slice(0, 7) } } } // i18n-ignore: codes
+        if (on !== line) {
+          // HI-3116: whether the card's line exists (its advice never names a branch there isn't), read in the folder,
+          // unreadable as unknown; the commands' arguments for PowerShell as typed (shellLine), the start a full commit id.
+          const made = await G.resolve(folder, `refs/heads/${line}`)
+          if (isUnknown(made)) return { ok: false, refusal: unknownRefusal(card, made, 'submit') }
+          const values = { card: card.key, line, on: on ?? '', where: on === null ? 'detached' : 'other', head: h.slice(0, 7), made: made ? 'yes' : 'no', lineArg: shellLine([line]), onArg: shellLine([on ?? '']), start: s.started!.base ?? '' }
+          return { ok: false, refusal: { rule: 'platform.offLine', values } } // i18n-ignore: codes
+        }
       }
       const mismatch = args.revision ? await notTheHead(folder, args.revision, h) : null
       if (mismatch) return { ok: false, refusal: mismatch }

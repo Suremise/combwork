@@ -7516,8 +7516,21 @@ Whether a conversation may resume there is its **hold** (none: it may):
     counted as before it) must be the base or behind it, else the preparation that waits for its builder runs. A free
     slot waits at its last target's head, which can be past the base with another target's work (an integration branch
     over main; a local target ahead of the remote in follow mode), and a stray commit on a free slot is no card's; no
-    reflog (turned off, expired) is a refusal too. What is left (a line made before, another line there, submodules and LFS files, an
-    install) waits for its builder as above. Before, a builder told of its lane's next card another way (a wake, the
+    reflog (turned off, expired) is a refusal too. **On the last card's line** (HI-3116; design HI-3116/s19, agreed with
+    HR1 and HR3), as when that card went Done while its builder was in a turn, the next line is made at the base by ref
+    transactions alone (`lineAtBase`), never a checkout: only while HEAD names a branch whose commit's tree is the base's
+    (the last card's work merged, by merge, squash or fast-forward; equal content, the old line and any commit on it kept).
+    T1 (`update-ref --stdin`, reflog message `combwork: next line for lease <id>`) creates the line at the base while the
+    old line is still where it was read; T2 (`--no-deref`) attaches HEAD while it still names the old line and the new one
+    is still at the base (git can't take both in one transaction). Each is all or nothing; read back after, never
+    "prepared" otherwise. A line already there is carried on only when provably that lease's (its reflog's one entry ours,
+    still at the base); anything else is left exactly as it is. A commit landing on the old line between T1 and T2 stays
+    there, its changes staged on the new line. Hooks and fsmonitor off as for `branchHere`. Below git 2.46 (no
+    `symref-update`), nothing is tried: it waits for its builder, logged once. What is left (a line made before and not
+    provably the lease's, another line whose files aren't the base's, submodules and LFS files, an install) waits for its
+    builder as above. **A submit off the card's line** (`platform.offLine`) says how to make the line from the card's own
+    start (`git switch -c <line> <start>`, its Started base) when it doesn't exist yet, and to switch back when it does;
+    its commands' arguments as typed in PowerShell (`shellLine`). Before, a builder told of its lane's next card another way (a wake, the
     Assistant's message) worked and committed on the detached head while the preparation waited for it to be quiet; its
     submission moved the card on, the preparation gave up, and the line never existed (HI-2997: passed, then stale at
     the merge). With
