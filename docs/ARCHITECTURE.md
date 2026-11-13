@@ -342,8 +342,10 @@ finish and folder choices are `formFinishes`/`formFolders` (`shared/workflow/opt
 layer stay where they are, each for its reason: `jjCards.ts`, `jjSetupStamp.ts`, `jjPublish.ts` and its worker are
 composition (platform code imports no app module); `jjWindow.ts`, `views/JjSections.tsx`, `shared/jjViews.ts` and
 `shared/jjTool.ts` are jj's page, its reads and its types, as Git's are; `schema/jjPublishStep.ts` is the database's
-history; `workflow/jjCandidateChecks.ts` and `jjCandidateReturn.ts` are the workflow's pass for a platform its user
-integrates. The audit's scan is TypeScript's parser (any comparison, either side, any quotes, a `case`, `'<id>' in`, an id
+history. jj's candidate checks and words moved into the layer (`platform/jjCandidateChecks.ts`, `jjCandidateReturn.ts`):
+the workflow's candidate pass (`reconcile.ts`) gets them through its reconcile port (`CandidateWords`, JjPlatform's), and
+their old `workflow/` paths only re-export them for the tests (the audit's `COMPAT_ONLY` fails a module under `src` that
+imports one). The audit's scan is TypeScript's parser (any comparison, either side, any quotes, a `case`, `'<id>' in`, an id
 given to a descriptor helper or read off `PLATFORMS`), every id read from `PlatformId`. It exempts the platform layer and
 Git's modules, jj's homes above for jj's own id only, and another enum's `none` by the field names `NOT_PLATFORM`
 lists; each exemption no longer used fails as stale. `tests/platformCapabilities.test.ts` pins each answer to the id

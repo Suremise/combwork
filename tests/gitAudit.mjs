@@ -460,6 +460,30 @@ export const SWITCHES = {
   'src/renderer/src/views/VersionControlHeader': { n: 1, class: 'gitUi', why: "Initialise repository… switches the project to Git by name once Git's page made it one (switchAfterInit): Git's page" }
 }
 
+/**
+ * Modules kept at an old path for the tests' imports alone (HI-3140: jj's candidate checks and words moved into the
+ * platform layer, reached by the workflow through its reconcile port): no module under src may import one.
+ */
+export const COMPAT_ONLY = {
+  'src/main/workflow/jjCandidateChecks': 'src/main/platform/jjCandidateChecks',
+  'src/main/workflow/jjCandidateReturn': 'src/main/platform/jjCandidateReturn'
+}
+
+/** Each import of a COMPAT_ONLY module from src (`file -> module`), static, dynamic or required. */
+export function compatImports(root, over = {}) {
+  const out = []
+  for (const { file, text } of filesOf(root, over)) {
+    const f = file.replace(/\.tsx?$/, '')
+    if (Object.hasOwn(COMPAT_ONLY, f)) continue
+    for (const m of text.matchAll(/(?:\bfrom|\bimport\s*\(|\brequire\s*\(|^\s*import)\s*['"]([^'"]+)['"]/gm)) {
+      if (!m[1].startsWith('.')) continue
+      const module = relative(root, resolve(root, dirname(file), m[1])).replace(/\\/g, '/').replace(/\.(tsx?|js)$/, '')
+      if (Object.hasOwn(COMPAT_ONLY, module)) out.push(`${f} -> ${module}`)
+    }
+  }
+  return out
+}
+
 /** The audit against the source: what isn't listed, what is listed but gone, and names beyond an edge's list. */
 export function audit(root, over = {}) {
   const found = gitEdges(root, over)
@@ -486,5 +510,6 @@ export function audit(root, over = {}) {
   // HI-3140: an exemption nothing uses any more is stale: a NOT_PLATFORM name no comparison has, a jj home that is gone.
   switches.push(...Object.keys(NOT_PLATFORM).filter((n) => !used.has(n)).map((n) => `NOT_PLATFORM ${n}: no comparison uses it (stale)`))
   switches.push(...Object.keys(JJ_HOMES).filter((f) => !files.has(f)).map((f) => `JJ_HOMES ${f}: no such file (stale)`))
-  return { found, unlisted, stale, extraNames, seams, switches }
+  const compat = compatImports(root, over)
+  return { found, unlisted, stale, extraNames, seams, switches, compat }
 }

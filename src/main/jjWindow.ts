@@ -10,7 +10,7 @@ import type { JjLeftover, JjToCheckRow, JjWaitingCandidate, JjWaitingCard } from
 import { boardRead } from './boardStore'
 import { boardConn, jjPort } from './slotsApp'
 import { CANDIDATE_MISSES, candidateShown, containedKey, type JjContained } from './workflow/reconcile'
-import { checksKeyOf } from './workflow/jjCandidateChecks'
+import { checksKeyOf } from './platform/jjCandidateChecks'
 import { JjPlatform } from './platform/jjPlatform'
 import { workflowFor } from './workflow/service'
 import type { Workflow } from './workflow/runtime'

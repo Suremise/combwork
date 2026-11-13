@@ -40,9 +40,9 @@ import { ensureRetained, isRefused as integrationRefused, jjContains, jjTargetHe
 import { jjUnknown } from './jjReads'
 import { anyRetainedDue, dueRetained, markRetainedDue, publishTargets, recordIntegration, retainedVisited, sqlObligations, type SqlDb } from './jjObligations'
 import { folderIdentity, type PublishCommitAnswer, type PublishCommitRequest } from './jjPublishCommit'
-import { candidateFingerprint, candidateKey, candidateShown, checksAgain, clearEndedCycle, cycleOver, publishCandidateChecks, reconcileJj, type JjChecksUpdate } from '../workflow/reconcile'
-import { checksJournalKey, checksKeyOf, readChecksJournal, runCandidateChecks, writeChecksJournal, type CandidateChecksDeps, type ChecksJournal } from '../workflow/jjCandidateChecks'
-import { jjCandidateEntry } from '../workflow/jjCandidateReturn'
+import { candidateFingerprint, candidateKey, candidateShown, checksAgain, clearEndedCycle, cycleOver, publishCandidateChecks, reconcileJj, type CandidateWords, type JjChecksUpdate } from '../workflow/reconcile'
+import { checksJournalKey, checksKeyOf, readChecksJournal, runCandidateChecks, writeChecksJournal, type CandidateChecksDeps, type ChecksJournal } from './jjCandidateChecks'
+import { jjCandidateEntry, jjReturnedComment, jjReturnedWake } from './jjCandidateReturn'
 import type { Spawn } from '../workflow/queueChecks'
 import type { CheckContext, CheckResult } from '../workflow/mergeQueue'
 import type { CheckWhyNot } from '../../shared/types'
@@ -61,6 +61,9 @@ import { readCheckout, singleHead, viewNow } from './jjView'
 import type { JjWorkspacePort } from './jjWorkspacePort'
 
 /** What jj's adapter can't answer, for agents and the log (the start's guard words it for the window first). */
+/** HI-3140: a jj candidate's words and keys, given to the workflow through the reconcile port (CandidateWords). */
+const JJ_CANDIDATE_WORDS: CandidateWords = { checksKey: checksKeyOf, entry: jjCandidateEntry, wake: jjReturnedWake, comment: jjReturnedComment }
+
 const NOT_YET_TEXT = agentMsg({ id: 'workflow.jj.notYet', text: "a jj project's card work (not enabled yet)", note: "HI-2799: what Combwork couldn't read for a card of a project using jj: its card work isn't enabled yet." })
 const notYet = (): Unknown => ({ unknown: true, what: say(NOT_YET_TEXT) })
 /** HI-2868: containment, decided by J9b2's proof; until then typed unknown, never a guess either way. */
@@ -740,6 +743,7 @@ export class JjPlatform implements PlatformAdapter {
     if (!this.wf || !d?.records) return
     const rec = d.records
     await reconcileJj(this.wf, card, hooks, {
+      words: JJ_CANDIDATE_WORDS,
       headNow: (_c, s) => this.revisionNow(card, s),
       same: async (_c, s, approved, head) => {
         // Every read that can't be made (no context, the target refused or unknown, no merge base, a commit unread, the
@@ -839,7 +843,7 @@ export class JjPlatform implements PlatformAdapter {
     const shown = candidateShown(this.wf, card, s, project, undefined, true)
     const fp = candidateFingerprint(this.wf, card, s)
     if (!shown?.offer || !fp) return false
-    const ok = await checksAgain(this.wf, card, project, (await host.setup()).setup, await this.offerCurrent(fp.target, shown.offer))
+    const ok = await checksAgain(this.wf, card, project, (await host.setup()).setup, await this.offerCurrent(fp.target, shown.offer), JJ_CANDIDATE_WORDS)
     if (ok) this.checksWanted()
     return ok
   }
@@ -879,7 +883,7 @@ export class JjPlatform implements PlatformAdapter {
       let misses = shown.checks.misses ?? 0
       // Other checks, commands, install or setup since (finding 3): they start anew under the key now.
       if (key !== shown.checks.key) {
-        if (!o.mergeChecks.length || !(await publishCandidateChecks(wf, wf.store.card(card0.id), project, at, { restart: [...o.mergeChecks] }, await this.offerCurrent(fp.target, offer)))) continue
+        if (!o.mergeChecks.length || !(await publishCandidateChecks(wf, wf.store.card(card0.id), project, at, { restart: [...o.mergeChecks] }, await this.offerCurrent(fp.target, offer), JJ_CANDIDATE_WORDS))) continue
         misses = 0
       } else {
         // HI-2991: a waiting or failing set under the same key runs again only at its retry time (SPEC's 30 s doubling to
@@ -890,7 +894,7 @@ export class JjPlatform implements PlatformAdapter {
           continue
         }
       }
-      const publish = async (u: JjChecksUpdate): Promise<boolean> => publishCandidateChecks(wf, wf.store.card(card0.id), project, at, u, await this.offerCurrent(fp.target, offer))
+      const publish = async (u: JjChecksUpdate): Promise<boolean> => publishCandidateChecks(wf, wf.store.card(card0.id), project, at, u, await this.offerCurrent(fp.target, offer), JJ_CANDIDATE_WORDS)
       const jkey = checksJournalKey(project, card0.key, fp.cycle, offer.attempt)
       const valid = async (): Promise<boolean> => {
         const c = wf.store.card(card0.id)

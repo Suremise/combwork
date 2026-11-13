@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest'
 import { audit, EDGES, JJ_HOMES, NOT_PLATFORM, SEAMS, SWITCHES } from './gitAudit.mjs'
 
 type Edge = { file: string; module: string; class: string; names?: string[]; op?: string; card?: string; why: string }
-type Audit = { found: unknown[]; unlisted: string[]; stale: string[]; extraNames: string[]; seams: string[]; switches: string[] }
+type Audit = { found: unknown[]; unlisted: string[]; stale: string[]; extraNames: string[]; seams: string[]; switches: string[]; compat: string[] }
 const root = join(__dirname, '..')
 const run = (over: Record<string, string> = {}): Audit => audit(root, over)
 const text = (file: string): string => readFileSync(join(root, file), 'utf8')
@@ -160,6 +160,16 @@ const r = (platform: string) => platform === 'none'
     expect(Object.keys(JJ_HOMES as Record<string, unknown>).every((f) => existsSync(join(root, `${f}.ts`)) || existsSync(join(root, `${f}.tsx`)))).toBe(true)
     expect(Object.values(SWITCHES as Record<string, { class?: string }>).filter((s) => !['data', 'historic', 'gitUi', 'schema'].includes(s.class ?? '')).length).toBe(0)
     expect(Object.values(NOT_PLATFORM as Record<string, string>).every((why) => !!why)).toBe(true)
+  })
+
+  it("fails a production import of a path kept only for the tests (HI-3140: jj's candidate modules moved to the platform layer)", () => {
+    expect(run().compat).toEqual([])
+    const reconcile = 'src/main/workflow/reconcile.ts'
+    expect(run({ [reconcile]: `import { checksKeyOf } from './jjCandidateChecks'\n${text(reconcile)}` }).compat).toEqual(['src/main/workflow/reconcile -> src/main/workflow/jjCandidateChecks'])
+    const win = 'src/main/jjWindow.ts'
+    expect(run({ [win]: `${text(win)}\nconst later = () => import("./workflow/jjCandidateReturn")\n` }).compat).toEqual(['src/main/jjWindow -> src/main/workflow/jjCandidateReturn'])
+    // The moved modules themselves, by their new paths: allowed.
+    expect(run({ [reconcile]: `import type { ChecksJournal } from '../platform/jjCandidateChecks'\n${text(reconcile)}` }).compat).toEqual([])
   })
 
   it('fails a new seam call in a listed file, and one in a file with none', () => {
