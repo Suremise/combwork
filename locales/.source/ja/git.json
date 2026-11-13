@@ -288,7 +288,7 @@
   "git.signing.formatName": "{format, select, ssh {SSH} x509 {X.509} other {OpenPGP (gpg)}}",
   "git.signing.heading": "Signing",
   "git.signing.howGpg": "To sign unattended with gpg, let gpg-agent keep the passphrase: set default-cache-ttl and max-cache-ttl in gpg-agent.conf, then sign once by hand (a commit of your own) to unlock it for that long.",
-  "git.signing.howSsh": "To sign unattended with SSH, keep the key in the Windows OpenSSH agent: set the OpenSSH Authentication Agent service to start automatically and start it, run ssh-add with your key once, and point user.signingkey at its .pub file.",
+  "git.signing.howSsh": "To sign unattended with SSH, keep the key in the Windows OpenSSH agent: set the OpenSSH Authentication Agent service to start automatically and start it, run ssh-add with your key once, point user.signingkey at its .pub file, and set gpg.ssh.program to C:/Windows/System32/OpenSSH/ssh-keygen.exe (Git for Windows’ own ssh-keygen can’t reach that agent).",
   "git.signing.key": "Key",
   "git.signing.limits": "A check that succeeds says only that this signer signed just now. An agent already running, a smartcard or a hardware key may still ask in its own way.",
   "git.signing.needsSomeone": "Would ask for a passphrase: signing needs someone there now, so the merge queue pauses before each signed merge until you unlock the key.",

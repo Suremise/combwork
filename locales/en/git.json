@@ -1156,8 +1156,8 @@
     "description": "How-to under a Signing check that needs someone, for OpenPGP signing. Keep gpg-agent, default-cache-ttl, max-cache-ttl and gpg-agent.conf as they are."
   },
   "git.signing.howSsh": {
-    "defaultMessage": "To sign unattended with SSH, keep the key in the Windows OpenSSH agent: set the OpenSSH Authentication Agent service to start automatically and start it, run ssh-add with your key once, and point user.signingkey at its .pub file.",
-    "description": "How-to under a Signing check that needs someone, for SSH signing. Keep ssh-add, user.signingkey and .pub as they are; OpenSSH Authentication Agent is the Windows service’s name."
+    "defaultMessage": "To sign unattended with SSH, keep the key in the Windows OpenSSH agent: set the OpenSSH Authentication Agent service to start automatically and start it, run ssh-add with your key once, point user.signingkey at its .pub file, and set gpg.ssh.program to C:/Windows/System32/OpenSSH/ssh-keygen.exe (Git for Windows’ own ssh-keygen can’t reach that agent).",
+    "description": "How-to under a Signing check that needs someone, for SSH signing. Keep ssh-add, user.signingkey, .pub, gpg.ssh.program and the path as they are; OpenSSH Authentication Agent is the Windows service’s name. HI-3110: Git for Windows’ ssh-keygen (its default) reads only SSH_AUTH_SOCK, never the Windows agent, so Windows’ own ssh-keygen must be the program."
   },
   "git.signing.key": {
     "defaultMessage": "Key",

@@ -262,7 +262,7 @@
   "git.signing.formatName": "{format, select, ssh {SSH} x509 {X.509} other {OpenPGP (gpg)}}",
   "git.signing.heading": "Signieren",
   "git.signing.howGpg": "Um mit gpg unbeaufsichtigt zu signieren, lass gpg-agent die Passphrase vorhalten: Setze default-cache-ttl und max-cache-ttl in gpg-agent.conf und signiere dann einmal von Hand (einen eigenen Commit), um den Schlüssel für diese Dauer zu entsperren.",
-  "git.signing.howSsh": "Um mit SSH unbeaufsichtigt zu signieren, halte den Schlüssel im OpenSSH-Agenten von Windows: Stelle den Dienst „OpenSSH Authentication Agent“ auf automatischen Start und starte ihn, führe ssh-add einmal mit deinem Schlüssel aus und lass user.signingkey auf dessen .pub-Datei zeigen.",
+  "git.signing.howSsh": "Um mit SSH unbeaufsichtigt zu signieren, halte den Schlüssel im OpenSSH-Agenten von Windows: Stelle den Dienst „OpenSSH Authentication Agent“ auf automatischen Start und starte ihn, führe ssh-add einmal mit deinem Schlüssel aus, lass user.signingkey auf dessen .pub-Datei zeigen und setze gpg.ssh.program auf C:/Windows/System32/OpenSSH/ssh-keygen.exe (das ssh-keygen von Git for Windows erreicht diesen Agenten nicht).",
   "git.signing.key": "Schlüssel",
   "git.signing.limits": "Eine erfolgreiche Prüfung sagt nur, dass dieses Signaturprogramm gerade eben signiert hat. Ein bereits laufender Agent, eine Smartcard oder ein Hardwareschlüssel kann trotzdem auf eigene Weise nachfragen.",
   "git.signing.needsSomeone": "Würde nach einer Passphrase fragen: Das Signieren braucht jetzt jemanden, daher hält die Merge-Warteschlange vor jedem signierten Merge an, bis du den Schlüssel entsperrst.",

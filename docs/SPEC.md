@@ -6957,8 +6957,9 @@ isn't checked). Once per entry pass; Resume is a new one. `needsSomeone` and `co
 
 **The Git view** (Version Control → Branches & remotes → **Signing**, under Commit identity, read-only): the settings
 above and the check's outcome, checked when shown at most once a minute per folder (callers share one), and **Check
-again**; with `needsSomeone` or `couldNotComplete`, how to sign unattended (an ssh key in the Windows OpenSSH agent;
-gpg-agent's cache). It reads as an agent's commit there would (no overrides). Reached through the repository reads port's
+again**; with `needsSomeone` or `couldNotComplete`, how to sign unattended (an ssh key in the Windows OpenSSH agent,
+signed with Windows' own `ssh-keygen` as `gpg.ssh.program`: Git for Windows' reads only `SSH_AUTH_SOCK`, never that agent's
+pipe, measured by Darren on 13 Nov, HI-3110; gpg-agent's cache). It reads as an agent's commit there would (no overrides). Reached through the repository reads port's
 optional `signing` (jj has none, so nothing is shown).
 
 **The view's checks, their lifecycle** (HR1's round 1):
