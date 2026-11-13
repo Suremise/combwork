@@ -4744,6 +4744,16 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   (`offerRetarget`: kept in memory, the newest 50 for a day), applied with `cw_queue` `retarget` (`POST
   /v1/workflow/retarget`, the id and the items named: only those that preview listed, each as it was seen then; `from`
   and `to` alone make a new preview, moving nothing).
+  **On jj** (HI-3152, after HI-3129; a platform without the capability `retarget`): work can't move between bookmarks,
+  so the preview is read through the platform, never Git's history (`keptPreview`). Running lanes on `A` stay (`lane`;
+  with a card in flight, `started`), and so do cards in flight started on `A` (`started`). A waiting card is asked for
+  its kept work (`keptWork`: its kept slot's binding, proved as a start proves it): kept on `A`, it and its slot stay
+  (`kept`, Darren's decision (a)); unproved, both stay, named (`cantCheck`), never left out; with none, a card set to `A`
+  can move. Free slots aren't listed: a jj slot is prepared at its card's bookmark as it is lent. The apply skips any
+  lane, started card or slot a preview lists (an old or forged one, or the platform changed since) as `fixed`, the
+  platform read again at each, nothing of it changed. `tasks.setTarget` on such a platform reads a waiting card's work
+  the same way (its kept slot, never Git's lines nor `dropEmptyLines`): kept on another bookmark, refused naming it (set
+  back to it, allowed); unproved, refused as unknown.
   the default (stored as none) or a branch G7b lists that exists now (`pickTarget`, `branchExists`). A lane start's
   target is checked before anything changes (an `applyNow` put back included), and again under the lanes' lock.
 - **A target that doesn't exist, and Start the next version (HI-2807, design s10 after s7).** A save naming a branch in

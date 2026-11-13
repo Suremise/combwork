@@ -25,7 +25,7 @@ import { UNREADABLE } from '../../shared/workflow/texts'
 import type { CardRecord } from '../workflow/factStore'
 import type { ReconcileHooks } from '../workflow/reconcile'
 import type { Workflow } from '../workflow/runtime'
-import type { CheckBracket, FinishInputs, HeadMove, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
+import type { CheckBracket, FinishInputs, HeadMove, KeptWork, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
 import type { HistoryPort } from './history'
 import { historyFor, observePort } from './historyPorts'
 import type { Disposable, ObserveEvent } from './observe'
@@ -367,14 +367,30 @@ export class JjPlatform implements PlatformAdapter {
     const kept = card.kind === 'no-code' || !this.wf ? null : await this.wf.cfg.keptHere?.(card)
     if (!kept) return { target: follows }
     const refuse = (why: 'unread' | 'mismatch', target = '', now = ''): Unknown => ({ ...unknown(UNREADABLE.target, { target: target || follows || '' }), rule: 'platform.keptOnTarget', ruleValues: { why, slot: kept.slot, target, now } })
-    const port = this.deps?.port() ?? null
-    const identity = port ? await port.identity!(kept.folder) : null
-    const b = port && identity ? await port.binding(kept.folder) : null
-    if (!identity || !b || isUnknown(b) || b.card !== card.id || b.generation !== identity.generation || !b.target) return refuse('unread')
+    const proved = await this.provedKept(card, kept.folder)
+    if (!proved) return refuse('unread')
+    const { b, identity } = proved
     if (card.target && card.target !== b.target) return refuse('mismatch', b.target, card.target)
     const lane = card.lane ? this.wf!.lane(card.lane) : null
     if (lane && !lane.ended && o.target && o.target !== b.target) return { ...unknown(UNREADABLE.target, { target: b.target }), rule: 'platform.keptLine', ruleValues: { kept: b.target, target: o.target } }
     return { target: b.target, kept: { slot: kept.slot, generation: identity.generation, target: b.target } }
+  }
+
+  /** A kept slot's binding, proved for `card`: the slot's identity read and its binding this card's at that generation, with a target. */
+  private async provedKept(card: CardRecord, folder: string): Promise<{ b: { target: string }; identity: { generation: string } } | null> {
+    const port = this.deps?.port() ?? null
+    const identity = port ? await port.identity!(folder) : null
+    const b = port && identity && !isUnknown(identity) ? await port.binding(folder) : null
+    if (!identity || isUnknown(identity) || !b || isUnknown(b) || b.card !== card.id || b.generation !== identity.generation || !b.target) return null
+    return { b: { target: b.target }, identity: { generation: identity.generation } }
+  }
+
+  async keptWork(card: CardRecord): Promise<KeptWork> {
+    if (card.kind === 'no-code' || !this.wf) return null
+    const kept = await this.wf.cfg.keptHere?.(card)
+    if (!kept) return null
+    const proved = await this.provedKept(card, kept.folder)
+    return proved ? { slot: kept.slot, target: proved.b.target } : { unproved: true, slot: kept.slot }
   }
 
   async start(card: CardRecord, o: WorkflowOptions, builder?: string, dry = false): Promise<Maybe<StartPlan>> {

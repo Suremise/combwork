@@ -584,6 +584,11 @@ const onDb = (fn) => {
     onDb((db) => db.prepare('UPDATE slots SET writer_run = NULL, writer_lease = NULL, writer_agent = NULL, writer_pid = NULL, writer_started = NULL WHERE name = ?').run(kept7.name))
     jj(shop, 'bookmark', 'create', 'next', '-r', 'main')
     jj(shop, 'bookmark', 'create', 'release-x', '-r', 'main')
+    // HI-3152: Save…'s preview of that change (the window's `workflow:check`) lists card 2 and its kept slot as staying on
+    // main (`kept`), read through jj, and nothing that jj can't move.
+    const check8 = await inv('workflow:check', shop, { preset: null, options: { review: 'you', noSelfReview: false, folder: 'slots', finish: 'userIntegrates', target: 'next' } })
+    const rt8 = check8?.retarget
+    check("Save…'s preview: card 2 and its slot stay on main (kept), no lane, started card or slot moved", !!rt8 && rt8.cards.keep.some((c) => c.number === n2 && c.why === 'kept') && rt8.slots.keep.some((s) => s.name === kept7.name && s.why === 'kept') && !(rt8.laneMoves ?? []).length && !rt8.slots.move.length && !rt8.cards.move.some((c) => c.started), JSON.stringify(rt8))
     const opts8 = await inv('workflow:setOptions', shop, { preset: null, options: { review: 'you', noSelfReview: false, folder: 'slots', finish: 'userIntegrates', target: 'next' } })
     check('the project\'s target changed to next', !!opts8 && !opts8.error, JSON.stringify(opts8))
     await showBoard(page)

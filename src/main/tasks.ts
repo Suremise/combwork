@@ -15,6 +15,9 @@ import { HISTORY, setStoredAgentRenderer, setStoredForAgents, storedAgentText, s
 import { MAX_CONTEXT, MAX_CONTEXT_REF, parseDocRef } from '../shared/docRefs'
 import { contextProblems } from './docSections'
 import { providerMessage } from '../shared/providers'
+import type { KeptWork } from './platform/adapter'
+import type { CardState } from '../shared/workflow/facts'
+import { hasCapability } from '../shared/platform/descriptors'
 import { isUnknown } from './platform/types'
 import type { CombworkErrorKind, KeptTargetShown, TaskMoveResult } from '../shared/types'
 import { workflowMessage } from '../shared/workflow/texts'
@@ -2261,6 +2264,18 @@ function refuseOtherLaneTarget(wf: Workflow, n: number, target: string | null, d
   throw new TaskConflictError(withValues(TARGET.inLane, { card: cardRef(n), builder: (builder && names.get(builder)) ?? builder ?? '', target: theirs ?? '' }))
 }
 
+/** HI-3152: whether card `n`'s platform can move work between targets (`retarget`, Git's); a waiting card's work is read so. */
+function platformMoves(wf: Workflow, n: number, s: CardState): boolean {
+  return hasCapability(wf.platformOf(wf.store.card(n), s).id, 'retarget')
+}
+
+/** HI-3152: card `n`'s kept work through its platform (`keptWork`); a platform that can't say is unproved, never none. */
+async function keptWorkOf(wf: Workflow, n: number, s: CardState): Promise<KeptWork> {
+  const rec = wf.store.card(n)
+  const p = wf.platformOf(rec, s)
+  return p.keptWork ? await p.keptWork(rec) : { unproved: true, slot: null }
+}
+
 /**
  * HI-3129: where card `n`, waiting in On Hold or Todo, would start when that isn't the Merges into its dialog shows (its
  * own, else its lane's or the project's): a card put back whose work is kept on another branch or bookmark starts there
@@ -2329,16 +2344,22 @@ export async function setTarget(n: number, raw: unknown, actor: TaskActor, o:{ c
       if (o.expect !== undefined && (store.card(n).target ?? null) !== o.expect) throw new TaskConflictError(withValues(TARGET.changed, { card: cardRef(n) }))
       if ((store.card(n).target ?? null) === target) return card
       const s = wf ? wf.state(wf.store.card(n)) : null
+      const waiting = !!s && WAITING_STAGES.includes(s.stage)
+      // HI-3152: where work can't move between targets (its platform lacks `retarget`: jj), a waiting card's work is its
+      // kept slot (Darren's decision (a)), read through its platform, never Git's lines (`ownWork`, `dropEmptyLines`).
+      const viaKept = !!wf && !!s && !platformMoves(wf, n, s)
+      const kept = viaKept && waiting ? await keptWorkOf(wf!, n, s!) : null
       // No work of its own (HR2's round 1: its slot's changes not committed too), read here under the board's lock, where
       // a start or a put back of it would be written.
       // HI-2825: On Hold as well as Todo (a card never started, or put back there); a card past them has work.
-      const own = s && WAITING_STAGES.includes(s.stage) ? await ownWork(projectPath, s, wf!.folderOf(s)) : null
-      const work = !s ? false : own ? own.work : true
+      const own = !viaKept && waiting ? await ownWork(projectPath, s!, wf!.folderOf(s!)) : null
+      const work = !s ? false : viaKept ? (!waiting ? true : kept === null ? false : 'unproved' in kept ? 'unknown' : true) : own ? own.work : true
       // HI-3112: set back to the branch its line was made from (a put back card): its work's own branch, so nothing of it
-      // changes and its line stays, work or not.
-      const pinBack = !!s && WAITING_STAGES.includes(s.stage) && !!target && target === s.started?.target
+      // changes and its line stays, work or not. HI-3152: on jj, the bookmark its kept work is on.
+      const pinBack = waiting && (viaKept ? !!kept && 'target' in kept && (target ?? def) === kept.target : !!target && target === s!.started?.target)
       // The branch its work was made from, else the one it merges into now: never an empty name (HI-2825).
-      if (work !== false && !pinBack) throw new TaskConflictError(withValues(TARGET.started, { unknown: work === 'unknown' ? 'yes' : 'no', card: cardRef(n), target: s?.started?.target || store.card(n).target || def || '' })) // i18n-ignore: select keys
+      const keptOn = kept && 'target' in kept ? kept.target : ''
+      if (work !== false && !pinBack) throw new TaskConflictError(withValues(TARGET.started, { unknown: work === 'unknown' ? 'yes' : 'no', card: cardRef(n), target: keptOn || s?.started?.target || store.card(n).target || def || '' })) // i18n-ignore: select keys
       if (wf) refuseOtherLaneTarget(wf, n, target, def, names)
       // Its old lines go (nothing of its own on them), so its next start makes a fresh one from the new target, never
       // carrying the old target's history; refused while one is checked out somewhere.

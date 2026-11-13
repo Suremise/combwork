@@ -171,6 +171,13 @@ export interface PlatformAdapter {
    * the target says a running lane's cards still to start keep). Absent: a platform with no targets.
    */
   startTarget?(card: CardRecord, o: WorkflowOptions, builder?: string): Promise<Maybe<string | null>>
+  /**
+   * HI-3152: a waiting card's own work on a platform that can't move work between targets (no `retarget`: jj), where its
+   * work is its kept slot (Darren's decision (a), 13 Nov): null when no slot is kept for it; the slot and the target its
+   * binding names, proved; unknown (with the slot, when one is kept) when the binding can't be proved. Read only. Absent
+   * on such a platform: its card work can't be read, so a change of its target is refused.
+   */
+  keptWork?(card: CardRecord): Promise<KeptWork>
   evidence(card: CardRecord, s: CardState, o: WorkflowOptions, primed: unknown): string | null
   /**
    * The platform's own answer about the same evidence, by content (#1206), read with processes (never in the
@@ -201,3 +208,6 @@ export interface PlatformAdapter {
    */
   invalidated?(what: string): Promise<boolean>
 }
+
+/** HI-3152: a waiting card's kept work (`keptWork`): none, proved on `target`, or unproved (`slot` named when one is kept). */
+export type KeptWork = null | { slot: string; target: string } | { unproved: true; slot: string | null }
