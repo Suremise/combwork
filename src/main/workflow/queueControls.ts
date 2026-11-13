@@ -64,6 +64,8 @@ interface QueueScope {
   inFlight: Map<string, number[]>
   /** The target the project's current options have Combwork merge into (null: they don't, or it can't be read). */
   current: string | null
+  /** HI-3169: the project's cards not Done, by number, read once for the listing (each target's queue order, the open pairs). */
+  open: ReadonlyMap<number, CardRecord>
 }
 
 /**
@@ -143,7 +145,7 @@ async function makeViews(ws: WorkspaceService, projectPath: string, target: stri
   const sources = window && targets.length ? await forwardSources(ws, projectPath, targets) : []
   const main = sources.length > 1 ? await defaultBranch(ws, projectPath) : null
   // HI-3000: the pairs' open work, read once for the listing (the open cards alone folded), not per pair.
-  const open = sources.length ? openPairs(wf) : new Map<string, CardRecord>()
+  const open = sources.length ? openPairs(wf, scope.open.values()) : new Map<string, CardRecord>()
   for (const v of views) {
     if (!targets.includes(v.target)) continue
     const f = await forwardOfTarget(wf, open, projectPath, v.target, sources.filter((b) => b !== v.target && forwardDirection(b, v.target, main).dir === 'forward'))
@@ -196,9 +198,9 @@ const pairKey = (from: string, to: string): string => `${from}\n${to}` // i18n-i
  * on a builder: the forward Done, its resolution not yet), while that isn't Done; the first by number when there are
  * several. Only the cards not Done are read and folded (`cardsOpen`): a board's Done cards cost nothing here.
  */
-export function openPairs(wf: Workflow): Map<string, CardRecord> {
+export function openPairs(wf: Workflow, open: Iterable<CardRecord> = wf.store.cardsOpen()): Map<string, CardRecord> {
   const out = new Map<string, CardRecord>()
-  for (const c of wf.store.cardsOpen()) {
+  for (const c of open) {
     const st = wf.state(c)
     const pair = st.forward ?? st.resolves
     if (!pair || st.stage === 'done') continue
@@ -251,7 +253,7 @@ async function queueScope(wf: Workflow, projectPath: string): Promise<QueueScope
     const def = o.target ? o.target : await lineHistory().defaultTarget(projectPath).catch(() => null)
     current = def && !isUnknown(def) ? def : null
   }
-  return { inFlight, current }
+  return { inFlight, current, open: new Map(wf.store.cardsOpen().map((c) => [c.id, c])) }
 }
 
 /** One target's queue: what tests now, what waits in order, the latest outcomes, the pause and who runs it. */
@@ -260,7 +262,7 @@ export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: strin
   // The entries for this target in the order queued, the one testing now and those waiting (queueState.ts: the order
   // card reads and refusals give agents too).
   const live = queueLive(ws, projectPath, target)
-  const { open, entries, cards, testing, queued } = queueOrder(wf, target, live)
+  const { open, entries, cards, testing, queued } = queueOrder(wf, target, live, scope?.open)
   const lease = store.queueLease(target)
   // The cards in the queue again (queued or testing): their older returns aren't the panel's to show (HR3's #1356 round 3).
   const again = new Set([...open.map((o) => o.card.id), ...(testing ? [testing.card] : [])])
