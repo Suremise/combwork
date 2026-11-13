@@ -64,8 +64,8 @@ function onTarget(h: CandidateHost, f: string, target: string, at: string): Prom
  * Whether the repository signs commits, as git reads it in the queue's folder, with the target's signing (`onTarget`). HI-2054: a read git couldn't make is
  * `again` with git's words (the round's reads are new each time round, so it is read again), never "unsigned".
  */
-function signs(h: CandidateHost, f: string, onTarget: readonly string[]): Promise<boolean | Again> {
-  return (h.reads.signs ??= h.run(f, [...onTarget, 'config', '--type=bool', '--get', 'commit.gpgsign']).then((r) => {
+function signs(h: CandidateHost, f: string, targetArgs: readonly string[]): Promise<boolean | Again> {
+  return (h.reads.signs ??= h.run(f, [...targetArgs, 'config', '--type=bool', '--get', 'commit.gpgsign']).then((r) => {
     const v = configRead(r)
     return typeof v === 'string' ? v === 'true' : again(v.failed)
   }))

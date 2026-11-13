@@ -23,7 +23,7 @@ const failedOf = (r: { err: string }, command: string): { failed: string } => ({
 async function headOf(run: BranchConfigRun, folder: string): Promise<{ gitDir: string; head: string; on: string } | { failed: string }> {
   const r = await run(folder, ['rev-parse', '--absolute-git-dir', 'HEAD', '--symbolic-full-name', 'HEAD'])
   const [gitDir, head, on] = r.out.split(/\r?\n/).map((l) => l.trim())
-  if (!r.ok || !gitDir || !head || !on) return failedOf(r, 'git rev-parse')
+  if (!r.ok || !gitDir || !head || !on) return failedOf(r, 'git rev-parse') // i18n-ignore: a git command, as it is
   return { gitDir, head, on }
 }
 /** Why `h` isn't HEAD detached at `at` (null: it is). */
@@ -39,18 +39,18 @@ const notDetachedAt = (h: { head: string; on: string }, folder: string, at: stri
 export async function targetSigning(run: BranchConfigRun, folder: string, target: string, at: string): Promise<{ args: string[] } | { failed: string }> {
   const any = await run(folder, ['config', '--null', '--get-regexp', ONBRANCH])
   if (any.code === 1) return { args: [] }
-  if (!any.ok) return failedOf(any, 'git config')
+  if (!any.ok) return failedOf(any, 'git config') // i18n-ignore: a git command, as it is
   const before = await headOf(run, folder)
   if ('failed' in before) return before
   const not = notDetachedAt(before, folder, at)
   if (not) return { failed: not }
   let read: { args: string[] } | { failed: string }
   const attached = await run(folder, ['symbolic-ref', 'HEAD', `refs/heads/${target}`])
-  if (!attached.ok) read = failedOf(attached, 'git symbolic-ref')
+  if (!attached.ok) read = failedOf(attached, 'git symbolic-ref') // i18n-ignore: a git command, as it is
   else {
     const r = await run(folder, ['config', '--null', '--get-regexp', SIGNING])
     if (r.code === 1) read = { args: [] }
-    else if (!r.ok) read = failedOf(r, 'git config')
+    else if (!r.ok) read = failedOf(r, 'git config') // i18n-ignore: a git command, as it is
     else {
       // --null: each entry "key\nvalue\0" ("key\0": no value, true); the last value of a key is its effective one.
       const values = new Map<string, string>()
@@ -69,9 +69,9 @@ export async function targetSigning(run: BranchConfigRun, folder: string, target
     try {
       await writeFile(join(before.gitDir, 'HEAD'), `${at}\n`)
     } catch (e) {
-      return { failed: `${failedOf(restored, 'git update-ref').failed}; ${(e as Error).message}` }
+      return { failed: `${failedOf(restored, 'git update-ref').failed}; ${(e as Error).message}` } // i18n-ignore: a git command, as it is
     }
-    if ('args' in read) read = failedOf(restored, 'git update-ref')
+    if ('args' in read) read = failedOf(restored, 'git update-ref') // i18n-ignore: a git command, as it is
   }
   const after = await headOf(run, folder)
   if ('failed' in after) return after
