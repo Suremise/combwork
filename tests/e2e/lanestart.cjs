@@ -241,6 +241,41 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     // Back in Todo for what follows, as it was before Combwork's start.
     if (cStarted) await inv('tasks:move', c.number, 'todo', { confirm: true, reason: 'the e2e puts it back' })
 
+    // --- HI-3148: Start Lane… on 1.0.0, released. The dialog says so before Start, naming the tag and main to start on
+    // instead; Start Anyway waits for a reason; given one, the lane starts on 1.0.0 and its card is started there by
+    // Combwork under the lane's grant (nobody else could: a start onto 1.0.0 is refused).
+    // B1's slot freed first: the first lane's card (in flight when it ended) keeps it, so it goes back to Todo.
+    if ((await card(chosen[0]))?.column === 'doing') await inv('tasks:move', chosen[0], 'todo', { confirm: true, reason: 'the e2e frees its slot' })
+    const factsOf = async (n) => (await inv('tasks:facts', n)) ?? []
+    const b1Quiet = async () => !(await live(b1.id)) || ['ready', 'finished'].includes((await live(b1.id))?.status)
+    await inv('workflow:setOptions', alpha, { preset: null, options: { ...options, otherTargets: ['1.0.0'] } })
+    const h1 = (await inv('tasks:create', { title: 'Hotfix 1.0.1', project: 'alpha' })).number
+    await until(b1Quiet, HUNG_MS)
+    // Start Lane from Todo with only the hotfix card in its list.
+    await openFromTodo()
+    await until(async () => (await order()).length > 0, HUNG_MS)
+    for (const x of await order()) if (x !== h1) await dialog.locator(`.lane-start-cards > li[data-card="${x}"] button[aria-label^="Take"]`).click()
+    await until(async () => JSON.stringify(await order()) === JSON.stringify([h1]), HUNG_MS)
+    const pickTarget = dialog.locator('#lane-start-target')
+    check('Start Lane offers Merges into 1.0.0', !!(await until(async () => (await pickTarget.count()) === 1 && (await pickTarget.locator('option[value="1.0.0"]').count()) === 1, HUNG_MS)), await dialog.innerText().catch(() => ''))
+    await pickTarget.selectOption('1.0.0')
+    const warn = dialog.locator('[data-lane-released="1.0.0"]')
+    check('…picked, it says 1.0.0 is released, naming its tag and main to start on instead', !!(await until(async () => (await warn.count()) === 1 && /^1\.0\.0 is released \(v1\.0\.0, tagged .+, merged into main\), so the lane wasn’t started\. Did you mean main\?/.test(await warn.innerText()), HUNG_MS)), await dialog.innerText().catch(() => ''))
+    const anyway = dialog.getByRole('button', { name: 'Start Anyway' })
+    check('…its button is Start Anyway, off until a reason is given', (await anyway.count()) === 1 && (await anyway.isDisabled()), await dialog.innerText().catch(() => ''))
+    await dialog.locator('[data-lane-released-reason]').fill('hotfix 1.0.1')
+    check('…on with a reason', !(await anyway.isDisabled()))
+    await shoot('released', dialog)
+    await anyway.click()
+    check('…Start Anyway closes the dialog', !!(await until(async () => (await dialog.count()) === 0, HUNG_MS)), await dialog.innerText().catch(() => ''))
+    const hot = await until(async () => (await lanes()).find((l) => l.builder.id === b1.id && l.cards.some((x) => x.number === h1)) ?? null, HUNG_MS)
+    check('…the lane is recorded on 1.0.0', hot?.target === '1.0.0', JSON.stringify(hot))
+    const hotStart = await until(async () => (await factsOf(h1)).find((f) => f.kind === 'Started' && f.actor === 'combwork') ?? null, 2 * 30000 + HUNG_MS)
+    check("…and its card is started on 1.0.0 by Combwork, under the lane's grant", hotStart?.data?.target === '1.0.0', JSON.stringify({ hotStart, facts: (await factsOf(h1)).map((f) => f.kind) }))
+    // Back as it was for what follows: the lane abandoned, its card in Todo.
+    if (hot) await inv('lanes:end', hot.id, true)
+    if ((await card(h1))?.column === 'doing') await inv('tasks:move', h1, 'todo', { confirm: true, reason: 'the e2e puts it back' })
+
     // --- HI-1995: Apply now. A lane of two, its first card started (B1 placed in the lane's slot); Start Lane for B1 with
     // the other card offers Apply now, which puts the first back in Todo and applies the new order.
     // Then, that second card in Review, the dialog says why it can't apply now. Screenshots of both.
@@ -341,32 +376,6 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
       return id && id !== before ? id : null
     }, 2 * 30000 + HUNG_MS)
     check('…Retry: B1 is given its new conversation once free, and the row no longer offers it', !!fresh && !!(await until(async () => (await retry.count()) === 0 && (await apiLaneNow())?.status?.why !== 'fresh', HUNG_MS)), JSON.stringify({ before, fresh, status: (await apiLaneNow())?.status ?? null }))
-
-    // --- HI-3148: Start Lane… on 1.0.0, released. The dialog says so before Start, naming the tag and main to start on
-    // instead; Start Anyway waits for a reason; given one, the lane starts on 1.0.0 and its card is started there by
-    // Combwork under the lane's grant (nobody else could: a start onto 1.0.0 is refused).
-    await inv('lanes:end', owedLane.id, true)
-    await inv('tasks:move', f1, 'todo', { confirm: true, reason: 'the e2e puts it back' })
-    await inv('workflow:setOptions', alpha, { preset: null, options: { ...options, otherTargets: ['1.0.0'] } })
-    const h1 = (await inv('tasks:create', { title: 'Hotfix 1.0.1', project: 'alpha' })).number
-    await until(quiet, HUNG_MS)
-    await openWithOnly(h1)
-    const pickTarget = dialog.locator('#lane-start-target')
-    check('Start Lane offers Merges into 1.0.0', !!(await until(async () => (await pickTarget.count()) === 1 && (await pickTarget.locator('option[value="1.0.0"]').count()) === 1, HUNG_MS)), await dialog.innerText().catch(() => ''))
-    await pickTarget.selectOption('1.0.0')
-    const warn = dialog.locator('[data-lane-released="1.0.0"]')
-    check('…picked, it says 1.0.0 is released, naming its tag and main to start on instead', !!(await until(async () => (await warn.count()) === 1 && /^1\.0\.0 is released \(v1\.0\.0, tagged .+, merged into main\), so the lane wasn’t started\. Did you mean main\?/.test(await warn.innerText()), HUNG_MS)), await dialog.innerText().catch(() => ''))
-    const anyway = dialog.getByRole('button', { name: 'Start Anyway' })
-    check('…its button is Start Anyway, off until a reason is given', (await anyway.count()) === 1 && (await anyway.isDisabled()), await dialog.innerText().catch(() => ''))
-    await dialog.locator('[data-lane-released-reason]').fill('hotfix 1.0.1')
-    check('…on with a reason', !(await anyway.isDisabled()))
-    await shoot('released', dialog)
-    await anyway.click()
-    check('…Start Anyway closes the dialog', !!(await until(async () => (await dialog.count()) === 0, HUNG_MS)), await dialog.innerText().catch(() => ''))
-    const hot = await until(async () => (await lanes()).find((l) => l.builder.id === b1.id && l.cards.some((x) => x.number === h1)) ?? null, HUNG_MS)
-    check('…the lane is recorded on 1.0.0', hot?.target === '1.0.0', JSON.stringify(hot))
-    const hotStart = await until(async () => (await facts(h1)).find((f) => f.kind === 'Started' && f.actor === 'combwork') ?? null, 2 * 30000 + HUNG_MS)
-    check("…and its card is started on 1.0.0 by Combwork, under the lane's grant", hotStart?.data?.target === '1.0.0', JSON.stringify({ hotStart, facts: (await facts(h1)).map((f) => f.kind) }))
   } finally {
     await app.close().catch(() => undefined)
   }
