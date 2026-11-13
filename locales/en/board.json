@@ -3199,6 +3199,42 @@
     "defaultMessage": "This board was saved by a newer version of Combwork: it is read-only here.",
     "description": "Tooltip on what changes cards (the board's add-card buttons, the card dialog's Save, comments and decisions), disabled while the board was saved by a newer Combwork (whose format this one can't change); also a banner in the card dialog."
   },
+  "board.releaseOffer.drop": {
+    "defaultMessage": "{n, plural, one {{branches} is released and nothing uses it: take it off Other branches work can merge into?} other {{branches} are released and nothing uses them: take them off Other branches work can merge into?}}",
+    "description": "HI-3155: the cleanup part of a release offer: branches listed under Other branches work can merge into that are released and unused ({branches}: their names, joined; {n} how many). Other branches work can merge into is an option’s name: as translated there."
+  },
+  "board.releaseOffer.failed": {
+    "defaultMessage": "The release offer couldn’t be put off",
+    "description": "HI-3155: a notification’s title: Not now on a release offer failed; the reason follows."
+  },
+  "board.releaseOffer.kept": {
+    "defaultMessage": "{n, plural, one {{branches} is released but still in use, so it stays.} other {{branches} are released but still in use, so they stay.}}",
+    "description": "HI-3155: released branches under Other branches work can merge into that cards, lanes or slots still use ({branches}: each name with what uses it, joined; {n} how many)."
+  },
+  "board.releaseOffer.move": {
+    "defaultMessage": "{project}: {target} is released ({dated, select, yes {{tag}, tagged {date, date, medium}} other {{tag}}}, merged into {into}). {how, select, move {Move Work merges into to {next}?} start {Start {next}, the next version?} other {}}",
+    "description": "HI-3155: a release offer (For you, a project’s own item): the project’s Work merges into ({target}) is released: a tag named after it ({tag}, as v1.4.0) and merged into the default branch ({into}). dated yes: the tag’s own date. how move: offers to move Work merges into to the next version ({next}, which exists); start: offers to start it ({next} doesn’t exist yet); other: no next version. Work merges into is an option’s name: as translated there."
+  },
+  "board.releaseOffer.moveButton": {
+    "defaultMessage": "Move…",
+    "description": "HI-3155: a release offer’s button: fills the change into Version Control → Workflow and opens its Save… (with what can follow). The ellipsis: a dialog follows."
+  },
+  "board.releaseOffer.notNow": {
+    "defaultMessage": "Not now",
+    "description": "HI-3155: a release offer’s button: hides it until it changes (a new release, the next version made)."
+  },
+  "board.releaseOffer.removeButton": {
+    "defaultMessage": "Remove…",
+    "description": "HI-3155: a release offer’s button when it only takes released branches off Other branches work can merge into: opens Workflow’s Save… with that change."
+  },
+  "board.releaseOffer.stale": {
+    "defaultMessage": "The release offer changed since it was shown: here it is as it is now.",
+    "description": "HI-3155: a notification: a release offer’s button found the offer changed (or gone); the offers are read again."
+  },
+  "board.releaseOffer.startButton": {
+    "defaultMessage": "Start {next}…",
+    "description": "HI-3155: a release offer’s button: opens Start the next version for {next} (a branch name, as 1.5.0)."
+  },
   "board.restore09.done": {
     "defaultMessage": "The 0.9 board is back",
     "description": "A notification after the 0.9 board backup was put back."

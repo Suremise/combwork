@@ -337,6 +337,9 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
   // "How do you work?"'s Customise… (#1423): the preset filled in once the project's form is read, not saved. A loaded
   // template's workflow (HI-1910): the project's options read again, its section laid over them, not saved either.
   const prefill = useStore((s) => s.workflowPrefill)
+  // HI-3155: a release offer's Save… to open once its change is in the draft (the offer's id), and the form's save.
+  const [offerSave, setOfferSave] = useState<string | null>(null)
+  const saveRef = useRef<((offer?: string) => Promise<void>) | null>(null)
   // HI-3155: the project's release offer, under Work merges into.
   const offerHere = useReleaseOffers().find((o) => !source.level && o.projectPath.toLowerCase() === source.key.toLowerCase()) ?? null
   const [fromTemplate, setFromTemplate] = useState<{ for: string; name: string; identityOff: boolean; savedMax?: number } | null>(null)
@@ -381,8 +384,6 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
     if (p) setDraft({ preset: prefill.preset, options: withUnpreset(ownOptions(p), loaded.draft.options) })
   }, [prefill, loaded, source, show, project])
   // The offer's Save…, once its change is in the draft: the form's own save, with its preview and retarget.
-  const [offerSave, setOfferSave] = useState<string | null>(null)
-  const saveRef = useRef<((offer?: string) => Promise<void>) | null>(null)
   useEffect(() => {
     if (!offerSave || !saveRef.current) return
     const id = offerSave

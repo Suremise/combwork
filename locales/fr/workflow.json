@@ -105,6 +105,8 @@
   "workflow.form.noneValue": "Aucun",
   "workflow.form.notEnforced": "Les règles du flux de travail ne sont pas appliquées (Paramètres → Avancé). Ces options sont enregistrées et s’appliqueront dès que les règles seront de nouveau appliquées.",
   "workflow.form.off": "Désactivé",
+  "workflow.form.offerStale": "« Le travail est fusionné dans » ou « Autres branches dans lesquelles le travail peut être fusionné » a changé depuis la proposition de version, elle n’a donc pas été remplie. La proposition est relue.",
+  "workflow.form.offerUnsaved": "Le flux de travail a des modifications non enregistrées, la proposition de version n’a donc pas été remplie. Enregistre-les ou annule-les, puis choisis à nouveau « Changer… ».",
   "workflow.form.on": "Activé",
   "workflow.form.openAdvanced": "Ouvrir Avancé",
   "workflow.form.otherTargets": "Branches séparées par des virgules (comme 1.2.0)",

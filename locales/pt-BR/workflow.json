@@ -105,6 +105,8 @@
   "workflow.form.noneValue": "Nenhum",
   "workflow.form.notEnforced": "As regras do fluxo de trabalho não são aplicadas (Configurações → Avançado). Estas opções são salvas e passam a valer quando as regras voltarem a ser aplicadas.",
   "workflow.form.off": "Desativado",
+  "workflow.form.offerStale": "“O trabalho é mesclado em” ou “Outros branches em que o trabalho pode ser mesclado” mudou desde que a oferta de versão foi feita, então ela não foi preenchida. A oferta é lida de novo.",
+  "workflow.form.offerUnsaved": "O fluxo de trabalho tem alterações não salvas, então a oferta de versão não foi preenchida. Salve ou descarte-as e escolha “Mudar…” de novo.",
   "workflow.form.on": "Ativado",
   "workflow.form.openAdvanced": "Abrir Avançado",
   "workflow.form.otherTargets": "Branches separados por vírgulas (como 1.2.0)",

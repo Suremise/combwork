@@ -105,6 +105,8 @@
   "workflow.form.noneValue": "无",
   "workflow.form.notEnforced": "未强制执行工作流程规则（“设置”→“高级”）。这些选项会保存，并在重新强制执行规则后生效。",
   "workflow.form.off": "关",
+  "workflow.form.offerStale": "发布建议创建后，“工作合并到”或“工作可合并到的其他分支”已更改，因此未填入。将重新读取建议。",
+  "workflow.form.offerUnsaved": "工作流程有未保存的更改，因此未填入发布建议。请保存或放弃这些更改，然后再次选择“更改…”。",
   "workflow.form.on": "开",
   "workflow.form.openAdvanced": "打开“高级”",
   "workflow.form.otherTargets": "分支，用逗号分隔（例如 1.2.0）",

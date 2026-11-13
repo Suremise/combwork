@@ -470,6 +470,8 @@ interface CombworkMessageValues {
   'tips.quitWhenDone.title': undefined
   'tips.recentWorkspaces.text': undefined
   'tips.recentWorkspaces.title': undefined
+  'tips.releaseOffer.text': undefined
+  'tips.releaseOffer.title': undefined
   'tips.removeAll.text': undefined
   'tips.removeAll.title': undefined
   'tips.resolveOnBuilder.text': undefined

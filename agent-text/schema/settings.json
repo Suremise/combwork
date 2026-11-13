@@ -2330,6 +2330,11 @@
       "id": "plain"
     }
   },
+  "settings.agent.tool.offerNotHere": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
   "settings.agent.tool.optionsRefused": {
     "placeholders": {
       "problems": "plain"

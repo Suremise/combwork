@@ -448,6 +448,8 @@
   "tips.quitWhenDone.title": "Quitter quand les agents ont fini",
   "tips.recentWorkspaces.text": "Retire un espace de travail de Fichier → Ouvrir un élément récent ou de la page d’accueil avec son ✕, ou par clic droit. Effacer les éléments récents les oublie tous ; les dossiers disparus s’affichent comme introuvables.",
   "tips.recentWorkspaces.title": "Faire le tri dans tes espaces de travail récents",
+  "tips.releaseOffer.text": "Dès que « Le travail est fusionné dans » est publiée (étiquetée v1.4.0 et fusionnée dans main), Pour toi propose de la passer à 1.5.0 ou de démarrer 1.5.0, et de retirer les branches publiées que rien n’utilise. « Changer… » ouvre « Enregistrer… » avec ce qui peut suivre ; « Pas maintenant » la masque jusqu’à un changement.",
+  "tips.releaseOffer.title": "Passer à la suite une fois une version sortie",
   "tips.removeAll.text": "Tout retirer, dans l’en-tête du projet, retire tous les agents du projet après une seule question. Les worktrees sont conservés sauf si tu coches la case, qui ne supprime que ceux qui sont fusionnés et propres.",
   "tips.removeAll.title": "Retirer tous les agents d’un coup",
   "tips.resolveOnBuilder.text": "Mettre à jour… est revenue avec un conflit ? Faire résoudre par un auteur… sur sa carte crée une carte ordinaire pour qu’un auteur fusionne à la main et résolve le conflit ; elle est relue et fusionnée en commit de fusion, comme toute carte.",

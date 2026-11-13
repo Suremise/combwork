@@ -448,6 +448,8 @@
   "tips.quitWhenDone.title": "Sair quando os agentes terminarem",
   "tips.recentWorkspaces.text": "Remova um espaço de trabalho de Arquivo → Abrir recente ou da página de boas-vindas com o ✕ dele, ou clicando nele com o botão direito. Limpar abertos recentemente esquece todos; pastas que sumiram aparecem como não encontradas.",
   "tips.recentWorkspaces.title": "Organize seus espaços de trabalho recentes",
+  "tips.releaseOffer.text": "Quando “O trabalho é mesclado em” já foi lançado (marcado v1.4.0 e mesclado em main), Para você oferece mudá-lo para 1.5.0 ou iniciar 1.5.0, e tirar os branches lançados que nada usa. “Mudar…” abre “Salvar…” com o que pode seguir; “Agora não” oculta até algo mudar.",
+  "tips.releaseOffer.title": "Seguir em frente quando uma versão sai",
   "tips.removeAll.text": "Remover todos, no cabeçalho do projeto, remove todos os agentes de um projeto depois de uma pergunta. Os worktrees são mantidos, a menos que você marque a caixa, que exclui só os mesclados e limpos.",
   "tips.removeAll.title": "Remova todos os agentes de uma vez",
   "tips.resolveOnBuilder.text": "Atualizar… voltou com um conflito? Resolver com um executor… no cartão dele cria um cartão comum para um executor fazer o merge à mão e resolver o conflito; ele é revisado e entra como um commit de merge, como qualquer cartão.",

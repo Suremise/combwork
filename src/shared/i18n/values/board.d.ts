@@ -801,6 +801,15 @@ interface CombworkMessageValues {
   'board.queue.transient': { why: string | number }
   'board.queue.waitingOn': { cards: string | number }
   'board.readOnly.newer': undefined
+  'board.releaseOffer.drop': { n: number; branches: string | number }
+  'board.releaseOffer.failed': undefined
+  'board.releaseOffer.kept': { n: number; branches: string | number }
+  'board.releaseOffer.move': { project: string | number; target: string | number; dated: string; tag: string | number; date: Date | number; into: string | number; how: string; next: string | number }
+  'board.releaseOffer.moveButton': undefined
+  'board.releaseOffer.notNow': undefined
+  'board.releaseOffer.removeButton': undefined
+  'board.releaseOffer.stale': undefined
+  'board.releaseOffer.startButton': { next: string | number }
   'board.restore09.done': undefined
   'board.restore09.doneDetail': { file: string | number }
   'board.restore09.message': { when: string | number }

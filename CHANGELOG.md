@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Combwork offers to move on once a release ships** (HI-3155). When a project's Work merges into is released (tagged, as `v1.4.0`, and merged into `main`), For you offers to move it to the next version, or to start it, and to take released branches nothing uses off Other branches work can merge into. Move… opens Workflow's Save… with what can follow; Not now hides it until something changes. The Assistant sees it too, and acts only once you say so. Git and jj projects.
+
 - **jj (Jujutsu) as a project's version control** (HI-2799). In a jj repository colocated with Git, the Version Control tab offers **jj** beside None and Git; Combwork never takes it by itself, never creates a jj repository and never changes its colocation.
   - **Read-only views**: **Repository** (where it is, the jj version, its workspaces, what isn't supported), **History** (each change id beside its commit id, *conflicted*, *divergent*, *working copy*), **Compare** (an id naming several commits lists them all, never one picked), **Bookmarks** (conflicted ones with their sides, ones not the same in Git marked) and **Conflicts**. Every read is pinned at jj's single operation head and changes nothing; with more than one head, nothing is read until jj reconciles them.
   - **You integrate reviewed work yourself**: Combwork never merges under jj. **Waiting for you to integrate** lists the passed cards, each with the commands to start from (Cards on jj, below). The commands Waiting shows copy every commit of a card, not only its last (HI-3094).

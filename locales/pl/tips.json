@@ -448,6 +448,8 @@
   "tips.quitWhenDone.title": "Zakończ, gdy agenci skończą",
   "tips.recentWorkspaces.text": "Usuń obszar roboczy z Plik → Otwórz ostatnie lub ze strony powitalnej jego ✕ albo kliknij go prawym przyciskiem. Wyczyść ostatnio otwierane zapomina wszystkie; foldery, których już nie ma, są oznaczone jako nieznalezione.",
   "tips.recentWorkspaces.title": "Uporządkuj ostatnie obszary robocze",
+  "tips.releaseOffer.text": "Gdy „Praca jest scalana do” jest już wydana (otagowana v1.4.0 i scalona do main), Dla Ciebie proponuje zmianę na 1.5.0 lub rozpoczęcie 1.5.0 oraz usunięcie wydanych, nieużywanych gałęzi. „Zmień…” otwiera „Zapisz…” z tym, co może podążyć; „Nie teraz” ukrywa ją, dopóki coś się nie zmieni.",
+  "tips.releaseOffer.title": "Dalej, gdy wydanie jest gotowe",
   "tips.removeAll.text": "Usuń wszystkich w nagłówku projektu usuwa wszystkich agentów projektu po jednym pytaniu. Worktree zostają, chyba że zaznaczysz pole – wtedy usuwane są tylko scalone i czyste.",
   "tips.removeAll.title": "Usuń wszystkich agentów naraz",
   "tips.resolveOnBuilder.text": "Zaktualizuj… wróciło z konfliktem? Rozwiąż przez wykonawcę… na jego karcie tworzy zwykłą kartę, na której wykonawca scala ręcznie i rozwiązuje konflikt; jest przeglądana i scalana jako commit scalający, jak każda karta.",

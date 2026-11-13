@@ -468,6 +468,8 @@
   "tips.quitWhenDone.title": "Quit when agents finish",
   "tips.recentWorkspaces.text": "Remove a workspace from File → Open Recent or the welcome page with its ✕, or right-click it. Clear Recently Opened forgets them all; folders that are gone show as not found.",
   "tips.recentWorkspaces.title": "Tidy your recent workspaces",
+  "tips.releaseOffer.text": "Once Work merges into is released (tagged v1.4.0 and merged into main), For you offers to move it to 1.5.0 or start 1.5.0, and to drop released branches nothing uses. Move… opens Save… with what can follow; Not now hides it until something changes.",
+  "tips.releaseOffer.title": "Moving on once a release ships",
   "tips.removeAll.text": "Remove All in the project header removes all of a project's agents after one question. Worktrees are kept unless you tick the box, which deletes only merged, clean ones.",
   "tips.removeAll.title": "Remove every agent at once",
   "tips.resolveOnBuilder.text": "Bring Up to Date… came back with a conflict? Its card’s Resolve on a Builder… makes an ordinary card for a builder to merge it by hand and resolve the conflict; it is reviewed and merged as a merge commit, like any card.",

@@ -75,7 +75,7 @@ export async function offerFor(ws: WorkspaceService, projectPath: string, name: 
     move = { target: t.default, tag: g7.tag, into: g7.into, date: g7.date, moveTo, startNext }
   }
   // The cleanup part: each released G7b, removable when nothing uses it (as the save's own check would find), else kept.
-  const drop: { branch: string; tag: string }[] = []
+  const removable: { branch: string; tag: string }[] = []
   const kept: { branch: string; tag: string; uses: string[] }[] = []
   const released: { branch: string; tag: string }[] = []
   for (const b of t.others) {
@@ -87,12 +87,12 @@ export async function offerFor(ws: WorkspaceService, projectPath: string, name: 
     for (const r of released) {
       const uses = await referencesTo(ws, projectPath, r.branch, () => slots.inUse(), t.default)
       if (uses.length) kept.push({ ...r, uses })
-      else drop.push(r)
+      else removable.push(r)
     }
   }
-  if (!move && !drop.length && !kept.length) return null
-  const cleanup = drop.length || kept.length ? { drop, kept } : null
-  const id = `ro-${createHash('sha1').update(JSON.stringify({ basis, move, drop: drop.map((d) => d.branch), kept: kept.map((k) => [k.branch, k.uses]) })).digest('hex').slice(0, 12)}`
+  if (!move && !removable.length && !kept.length) return null
+  const cleanup = removable.length || kept.length ? { drop: removable, kept } : null
+  const id = `ro-${createHash('sha1').update(JSON.stringify({ basis, move, drop: removable.map((d) => d.branch), kept: kept.map((k) => [k.branch, k.uses]) })).digest('hex').slice(0, 12)}`
   return { id, project: name, projectPath, basis, move, cleanup, since: new Date().toISOString() }
 }
 
@@ -284,7 +284,7 @@ async function tellAssistant(ws: WorkspaceService, offer: ReleaseOffer): Promise
   const home = ws.assistantHome
   if (!home || !existsSync(join(home, CW_DIR, 'project.json'))) return
   const { createDelivery } = await import('../deliveries')
-  await createDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: { kind: 'combwork', name: 'Combwork' }, body: releaseOfferSaid(offer, 'delivery') }).catch((e) => log.warn('telling the Assistant of a release offer', e))
+  await createDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: { kind: 'combwork', name: 'Combwork' }, body: releaseOfferSaid(offer, 'delivery') }).catch((e) => log.warn('telling the Assistant of a release offer', e)) // i18n-ignore: the sender's name, as every delivery of Combwork's names it
 }
 
 /** Follows the open workspaces' projects: one for each new one, the ones gone let go. */

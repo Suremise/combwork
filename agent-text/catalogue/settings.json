@@ -3414,6 +3414,10 @@
     "text": "No setting \"{id}\": cw_list_settings lists them (query narrows it).",
     "note": "cw_read_setting or cw_update_setting naming no setting there is. {id} is the id as given."
   },
+  "settings.agent.tool.offerNotHere": {
+    "text": "offer answers a release offer: only with project.workflow.target or project.workflow.otherTargets, not {path}.",
+    "note": "HI-3155: cw_update_setting given a release offer’s id for another setting."
+  },
   "settings.agent.tool.optionsRefused": {
     "text": "These workflow options can't be saved: {problems} Change the other options first, or tell the user.",
     "note": "A project's workflow option that contradicts the others (#1278). {problems} are the reasons, each a sentence."

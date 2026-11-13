@@ -4696,6 +4696,35 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   the card's), HI-3017: setting cards before their project pinned them unnoticed. `cw_create_task` with such a target
   says the same (HI-3043), and the reply says the target as stored, so a forward's resolution pinned to G7's own
   branch (HI-2985) is said to merge into that branch, with no note: it never follows another. Both name only
+- **The release offer (HI-3155, design s7 → s11 with HR1; Darren's 1A and 2A of 13 Nov).** A project's own For you item,
+  not a card's (`ReleaseOffer`, `workflow/releaseOffer.ts`), with two parts, either alone:
+  - **move:** G7 released (HI-3148's port) → `moveTo`, its `nextVersionName` when it exists and is known not released,
+    else `startNext`, its name when it doesn't exist; neither when the next is released too or the name isn't a version;
+  - **cleanup:** each released G7b, in `drop` when nothing uses it (`referencesTo`, the save's own check) or in `kept`
+    with its uses.
+  Unknown reads offer nothing and leave the project due. Its `basis` is G7 and G7b as read; its id is a fingerprint of
+  basis and parts. Move… and Remove… apply `offerOptions`: G7 to `moveTo` with the old G7 joining G7b, and `drop` taken
+  off.
+
+  **Followed per open workspace** (`startReleaseOffers`, stopped with it): an admission key (the port's `watch` answers
+  for G7, its next version and each G7b; platform, G7 and G7b; a generation bumped by card and lane changes) is looked at
+  every 60 s, on `lineMoved`, on `workflow-changed` and at open. The full read runs only when the key moved or the last
+  read was unknown, one per project at a time, coalesced, and is published only if the key didn't move while it read.
+
+  **Acting on it:** every action is bound to the offer's id and checked (`checkOffer`: still the current offer, and G7
+  and G7b still its basis) under the action's own locks:
+  - the window's save from Move…/Remove… (`workflow:setOptions` `offer`; the form fills it in only with nothing unsaved
+    and the saved options matching its basis);
+  - Start the next version from Start… (`offer`);
+  - the Assistant's `cw_update_setting` `offer` and `cw_branch nextVersion` `offer`;
+  - a changed offer refuses with nothing written.
+
+  **Not now:** board_meta `release.offerDismissed.<projectId>` holds the dismissed id (another offer shows again). The
+  user's is IPC; the Assistant's is `cw_branch dismissOffer` (`POST /v1/projects/{name}/release-offer/dismiss`, Control's
+  agents level, recorded with undo that clears only the value it set).
+
+  **Seeing it:** the Assistant reads it in `GET /v1/projects/{name}` (`releaseOffer`, its alone) and is told once per
+  offer id in its inbox; project agents never see it.
 - **Starting on a released line (HI-3148, design s15, Darren's decisions of 13 Nov: 1A, 2A, 3A, split).** A line is
   **released** when a tag named exactly `v<line>` or `<line>` (peeled to its commit) is in its history and the line is
   in the default line's (Git: `main`, else `master`; jj: the first local bookmark of `main`, `master`, `trunk`), read

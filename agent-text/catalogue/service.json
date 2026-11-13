@@ -1239,6 +1239,31 @@
     "note": "HI-2944: an error from Commit or Set aside on a paused merge from before Combwork recorded the folder of such a pause: Resume makes the queue look again, and its new pause names the folder.",
     "audience": "both"
   },
+  "service.releaseOffer.drop": {
+    "text": "Released and unused, can come off Other branches work can merge into: {branches} (cw_update_setting project.workflow.otherTargets with offer {id}).",
+    "note": "HI-3155: the cleanup part of a release offer, for the Assistant: released branches nothing uses ({branches}: their names, joined)."
+  },
+  "service.releaseOffer.head": {
+    "text": "Release offer {id} for {project}, the user’s to decide:",
+    "note": "HI-3155: the first line of a release offer told to the Assistant (its inbox, its project status)."
+  },
+  "service.releaseOffer.kept": {
+    "text": "Released but still used, kept: {kept}.",
+    "note": "HI-3155: released Other branches still in use, each with what uses it ({kept}: \"1.3.0 (AM-12, B1’s lane)\", joined by \"; \")."
+  },
+  "service.releaseOffer.move": {
+    "text": "{target} is released ({tag}, merged into {into}). {how, select, move {Moving Work merges into to {next}: cw_update_setting project.workflow.target {next} with offer {id}, then its retarget preview.} start {{next} doesn’t exist yet: cw_branch nextVersion with offer {id} starts it.} other {No next version to move to.}}",
+    "note": "HI-3155: the move part of a release offer, for the Assistant. {next}: the next version’s branch (how move: it exists and isn’t released; how start: it doesn’t exist yet)."
+  },
+  "service.releaseOffer.stale": {
+    "text": "The release offer for {project} has changed since it was shown, so nothing was changed. Look at it again.",
+    "note": "HI-3155: an action on a release offer (Move…, Start…, Not now, or the Assistant’s answer) refused: the project’s Work merges into or Other branches work can merge into, or what is released, changed after the offer was shown. {project}: the project’s name.",
+    "audience": "both"
+  },
+  "service.releaseOffer.tail": {
+    "text": "Tell the user; act only on their answer. cw_branch dismissOffer {id} puts it off (their Not now).",
+    "note": "HI-3155: the last line of a release offer told to the Assistant."
+  },
   "service.repoOps.notOffered": {
     "text": "Version control ({platform}) doesn’t offer that here.",
     "note": "HI-2788: an error when the window asks to change a repository in a way its version control ({platform}: a version control’s name, as Combwork names it) doesn’t list. Not reached in 1.4.0: Git lists every operation.",

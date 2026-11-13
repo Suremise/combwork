@@ -1291,6 +1291,10 @@
     "defaultMessage": "Combwork doesn't know which folder these changes were in. Resume the queue: it looks again and says where.",
     "description": "HI-2944: an error from Commit or Set aside on a paused merge from before Combwork recorded the folder of such a pause: Resume makes the queue look again, and its new pause names the folder."
   },
+  "service.releaseOffer.stale": {
+    "defaultMessage": "The release offer for {project} has changed since it was shown, so nothing was changed. Look at it again.",
+    "description": "HI-3155: an action on a release offer (Move…, Start…, Not now, or the Assistant’s answer) refused: the project’s Work merges into or Other branches work can merge into, or what is released, changed after the offer was shown. {project}: the project’s name."
+  },
   "service.repoOps.notOffered": {
     "defaultMessage": "Version control ({platform}) doesn’t offer that here.",
     "description": "HI-2788: an error when the window asks to change a repository in a way its version control ({platform}: a version control’s name, as Combwork names it) doesn’t list. Not reached in 1.4.0: Git lists every operation."

@@ -448,6 +448,8 @@
   "tips.quitWhenDone.title": "Salir cuando terminen los agentes",
   "tips.recentWorkspaces.text": "Quita un espacio de trabajo de Archivo → Abrir reciente o de la página de bienvenida con su ✕, o haciendo clic derecho en él. Borrar los abiertos recientemente los olvida todos; las carpetas que ya no existen aparecen como no encontradas.",
   "tips.recentWorkspaces.title": "Ordena tus espacios de trabajo recientes",
+  "tips.releaseOffer.text": "Cuando «El trabajo se fusiona en» ya está publicada (etiquetada v1.4.0 y fusionada en main), Para ti ofrece cambiarla a 1.5.0 o iniciar 1.5.0, y quitar las ramas publicadas que nada usa. «Cambiar…» abre «Guardar…» con lo que puede seguir; «Ahora no» la oculta hasta que algo cambie.",
+  "tips.releaseOffer.title": "Seguir adelante cuando sale una versión",
   "tips.removeAll.text": "Quitar todos, en el encabezado del proyecto, quita todos los agentes de un proyecto tras una pregunta. Los worktrees se conservan salvo que marques la casilla, que elimina solo los fusionados y limpios.",
   "tips.removeAll.title": "Quita todos los agentes a la vez",
   "tips.resolveOnBuilder.text": "¿Poner al día… volvió con un conflicto? Resolver con un autor… en su tarjeta crea una tarjeta normal para que un autor fusione a mano y resuelva el conflicto; se revisa y se fusiona como un commit de fusión, como cualquier tarjeta.",
