@@ -177,10 +177,17 @@ async function makeViews(ws: WorkspaceService, projectPath: string, target: stri
  * default unreadable) mark none past: unknown isn't "no targets".
  */
 export function markPast(views: QueueView[], named: ProjectTargets | null): void {
-  if (!named) return
-  const current = [named.default, ...named.others]
+  const current = knownTargets(named)
+  if (!current) return
   for (const v of views) if (!current.includes(v.target) && !v.testing && !v.queued.length && !v.inFlight.length && !v.paused && !v.runBy) v.past = true
 }
+
+/**
+ * The project's targets, when all of them are known: null when they can't be read, or only partly (HI-3177, HR2's round
+ * 2: a jj project whose bookmarks couldn't be listed has its default alone, `othersUnread`), so nothing is judged past
+ * or purged against a list that may be missing a current target.
+ */
+export const knownTargets = (named: ProjectTargets | null): string[] | null => (named && !named.othersUnread ? [named.default, ...named.others] : null)
 
 /** The project's targets that exist now (HI-2679): Work merges into and the others listed; none without a Git workflow. */
 async function existingTargets(ws: WorkspaceService, projectPath: string): Promise<string[]> {
@@ -486,9 +493,8 @@ export async function purgeQueueHistory(ws: WorkspaceService, projectPath: strin
   if (!wanted.length) return
   const wf = await needWorkflow(ws, projectPath)
   await wf.locked(() => withFileLock(join(projectPath, CW_DIR, 'project.json'), async () => {
-    const named = await projectTargets(ws, projectPath).catch(() => null)
-    if (!named) throw combworkError(PURGE_UNKNOWN)
-    const current = [named.default, ...named.others]
+    const current = knownTargets(await projectTargets(ws, projectPath).catch(() => null))
+    if (!current) throw combworkError(PURGE_UNKNOWN)
     // Read in this write, never from a kept listing (viewsKept): the board as it is now.
     const listed = new Set(queueTargets(wf))
     const inFlight = cardsInFlightByTarget(wf)

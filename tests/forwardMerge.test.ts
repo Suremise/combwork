@@ -8,6 +8,17 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
+// HI-3177 (HR2's round 2): the project's targets as a jj project's are when its bookmarks can't be listed (targets.ts:
+// the default alone, `othersUnread`), switched on by a test; otherwise the real ones.
+const partlyRead = vi.hoisted(() => ({ on: false }))
+vi.mock('../src/main/workflow/targets', async (real) => {
+  const m = await real<typeof import('../src/main/workflow/targets')>()
+  return { ...m, projectTargets: async (...a: Parameters<typeof m.projectTargets>) => {
+    const t = await m.projectTargets(...a)
+    return partlyRead.on && t ? { default: t.default, others: [], othersUnread: true as const } : t
+  } }
+})
+
 const base = tempDir('cw-forward-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -1024,6 +1035,30 @@ describe("HI-3177: purging a past branch's merge queue history", () => {
     await expect(purge(w, repo, list)).rejects.toThrow(/Nothing was purged/)
     expect([wf.store.meta(purgedKey('1.1.0')), wf.store.meta(purgedKey('1.2.0'))]).toEqual([null, null])
     expect(await pastOf(w, repo)).toEqual(['1.1.0', '1.2.0'])
+  })
+
+  it('targets read only in part (a jj project’s bookmarks unlisted) mark nothing past and refuse a purge, nothing written (HR2’s round 2)', async () => {
+    const { purgedKey, pauseLogKey } = await import('../src/main/workflow/queueLogs')
+    const { w, repo } = await pastTwo()
+    const wf = (await workflowFor(w, repo))!
+    await inWorkspace(w, () => controls.pauseQueue(w, repo, '1.1.0', 'user'))
+    await inWorkspace(w, () => wf.locked(() => wf.store.setQueuePause('1.1.0', null)))
+    const log = wf.store.meta(pauseLogKey('1.1.0'))
+    expect(log).not.toBeNull()
+    expect(await pastOf(w, repo)).toEqual(['1.1.0', '1.2.0'])
+    partlyRead.on = true
+    try {
+      // 1.1.0 may be one of the bookmarks not listed: no queue is judged past, in the listing (the window's, not read
+      // above, so not a listing kept from before) or for a purge.
+      expect(await pastOf(w, repo, true)).toEqual([])
+      await expect(purge(w, repo, ['1.1.0', '1.2.0'])).rejects.toThrow("Nothing was purged: Combwork can't read which branches this project merges into right now.")
+    } finally {
+      partlyRead.on = false
+    }
+    expect([wf.store.meta(purgedKey('1.1.0')), wf.store.meta(purgedKey('1.2.0')), wf.store.meta(pauseLogKey('1.1.0'))]).toEqual([null, null, log])
+    // The pure rule: a partly read list is unknown, as an unreadable one is.
+    expect(controls.knownTargets({ default: 'main', others: [], othersUnread: true })).toBeNull()
+    expect(controls.knownTargets({ default: 'main', others: ['1.4.0'] })).toEqual(['main', '1.4.0'])
   })
 
   it("refuses when the project's targets can't be read, nothing written", async () => {

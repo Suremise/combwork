@@ -6952,7 +6952,7 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
   write, holding project.json's lock too (the lock order: the board, then the file) while it reads the project's
   targets, so no change of them lands between the check and the write, checks each is still a past branch's queue (none of the project's targets, nothing
   queued or testing, no card in flight, no pause, no Combwork running it, no push of its merges pending, a history to
-  purge; targets unreadable refuse it), or writes nothing and says which and why. Purged, a branch gets a mark (board
+  purge; targets unreadable, or read only in part, refuse it), or writes nothing and says which and why. Purged, a branch gets a mark (board
   meta `queue.purged:<branch>`, the time): its requests and outcomes at or before it are no longer its queue's (not
   listed, not in its history, before any bound or count), its queue-only logs (the pause log, the settled pushes, the
   returns seen) are deleted, and the catch-up state and pending pushes (operational) are never touched. Its cards'
@@ -9326,7 +9326,7 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   or queued, HI-2927: no card in flight into it (HI-3177: a card On Hold isn't, though it started into that branch: a
   held card works toward no queue until it is taken out; HI-1758 and HI-1901, held, kept 1.0.0's queue live), no pause, a stuck one too, and no Combwork running it, so those stay
   controllable) is a past branch's (`QueueView.past`, set in every listing); targets that can't be read (the project not
-  Git now, git's default unreadable) make none past. It never shows here, whatever else it has (a return), so the panel and Version Control's Merge queue show the same live queues. Its
+  Git now, git's default unreadable), or only in part (HI-3177: a jj project's bookmarks unlisted), make none past. It never shows here, whatever else it has (a return), so the panel and Version Control's Merge queue show the same live queues. Its
   history stays in Version Control's Merge queue section under **Past branches** (below), and the Agent API lists it
   only on request. Under **All projects** (HI-2165, Darren 30 Oct: "we shouldn't show details
   from inactive projects") a queue shows only for a project being worked on (the sidebar's Working on) or while it is
