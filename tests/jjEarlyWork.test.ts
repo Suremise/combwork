@@ -81,10 +81,10 @@ async function card1(w: ReturnType<typeof world>, integrate: 'move' | 'squash' |
 }
 
 /** Runs a printed command in `cwd` through PowerShell, exactly as printed (the jj on its PATH being the tested one). */
-function ps(cwd: string, printed: string): string {
-  const cmd = printed.replace(/^jj /, `& '${jjExe!.replace(/'/g, "''")}' --config user.name=t --config user.email=t@t.invalid `)
+function ps(cwd: string, line: string): string {
+  const cmd = line.replace(/^jj /, `& '${jjExe!.replace(/'/g, "''")}' --config user.name=t --config user.email=t@t.invalid `)
   const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], { cwd, encoding: 'utf8', windowsHide: true })
-  if (r.status !== 0) throw new Error(`${printed}: ${r.stderr}`)
+  if (r.status !== 0) throw new Error(`${line}: ${r.stderr}`)
   return r.stdout
 }
 /** The commands a hold's advice prints, as printed (its English, the builder's). */
