@@ -480,7 +480,7 @@
   "main.update.offline": "Impossible de joindre GitHub pour rechercher les mises à jour. Vérifie ta connexion internet.",
   "main.update.openReleasePage": "Ouvrir la page de la version",
   "main.update.ready": "{app} {version} est prêt",
-  "main.update.readyAuto": "Elle s’installera quand tu quitteras Combwork. Tu peux aussi redémarrer maintenant.",
+  "main.update.readyAuto": "Combwork te proposera de l’installer quand tu le quitteras. Tu peux aussi redémarrer maintenant.",
   "main.update.readyManual": "Redémarre Combwork pour l’installer.",
   "main.update.restart": "Redémarrer et mettre à jour",
   "main.update.sameVersion": "Une version publiée de {app} {version} est disponible",

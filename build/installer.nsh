@@ -17,6 +17,23 @@
   !endif
 !macroend
 
+; HI-3167: an update Combwork runs as it quits (electron-updater: --updated, shown, not silent) shows only its progress and
+; finish page. The "who should this be installed for" page (perMachine: false) would stop it half way, a question nobody
+; expects as they quit: an update keeps the scope of the one copy installed (.onInit read the registry), so the page is
+; skipped. With both or neither installed, the page asks, as for a first install. (The template looks the macro up as
+; customInstallmode and inserts customInstallMode: NSIS macro names are case-insensitive.)
+!macro customInstallMode
+  ${if} ${isUpdated}
+    ${if} $hasPerUserInstallation == "1"
+    ${andIf} $hasPerMachineInstallation == "0"
+      StrCpy $isForceCurrentInstall "1"
+    ${elseIf} $hasPerUserInstallation == "0"
+    ${andIf} $hasPerMachineInstallation == "1"
+      StrCpy $isForceMachineInstall "1"
+    ${endIf}
+  ${endIf}
+!macroend
+
 !if "$%CW_LOCAL_BUILD%" == "1"
   !define CW_LOCAL_BUILD
 !endif

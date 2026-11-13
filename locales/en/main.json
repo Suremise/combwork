@@ -1924,8 +1924,8 @@
     "description": "A notice: an update was downloaded. {app} is Combwork's name, {version} the new version."
   },
   "main.update.readyAuto": {
-    "defaultMessage": "It installs when you quit Combwork, or restart now.",
-    "description": "The notice that an update is ready, with updates installed automatically."
+    "defaultMessage": "Combwork asks to install it when you quit, or restart now.",
+    "description": "The notice that an update is ready, with updates installed automatically: quitting asks Install now or Next time (HI-3167)."
   },
   "main.update.readyManual": {
     "defaultMessage": "Restart Combwork to install it.",

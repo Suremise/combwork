@@ -480,7 +480,7 @@
   "main.update.offline": "无法连接 GitHub 检查更新。请检查网络连接。",
   "main.update.openReleasePage": "打开发布页面",
   "main.update.ready": "{app} {version} 已就绪",
-  "main.update.readyAuto": "退出 Combwork 时会自动安装，也可以立即重启。",
+  "main.update.readyAuto": "退出 Combwork 时会询问是否安装，也可以立即重启。",
   "main.update.readyManual": "重启 Combwork 以安装更新。",
   "main.update.restart": "重启并更新",
   "main.update.sameVersion": "已发布的 {app} {version} 可用",

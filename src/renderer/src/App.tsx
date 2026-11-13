@@ -241,7 +241,7 @@ function handleEvent(e: CombworkEvent): void {
       } else runCommand(e.command, ...(e.args ?? []))
       break
     case 'quit-request':
-      set({ quitRequest: e.sessions, quitUnsaved: e.unsaved, quitScope: e.scope ?? 'app' })
+      set({ quitRequest: e.sessions, quitUnsaved: e.unsaved, quitScope: e.scope ?? 'app', quitUpdate: e.update ?? null })
       break
     case 'quit-pending':
       set({ quitPending: e.pending ? { working: e.working } : null })
@@ -467,7 +467,7 @@ export function App() {
       set(more)
       const q = await call('app:quitState')
       if (!early.active()) return
-      set({ quitRequest: q.request, quitUnsaved: q.unsaved, quitScope: q.scope, quitPending: q.pending ? { working: q.working } : null })
+      set({ quitRequest: q.request, quitUnsaved: q.unsaved, quitScope: q.scope, quitUpdate: q.update, quitPending: q.pending ? { working: q.working } : null })
       // And its close command's panel (HI-1368), when it reloaded while one ran.
       const closing = await call('closeCommand:state')
       if (!early.active()) return

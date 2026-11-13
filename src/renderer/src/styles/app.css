@@ -5384,6 +5384,16 @@ h2.section#unused-worktrees {
 .quit-unsaved-choice {
   margin: 8px 0 14px;
 }
+/* HI-3167: the update a quit offers to install now. */
+.quit-update {
+  margin-bottom: 14px;
+}
+.quit-update-choice {
+  margin: 8px 0;
+}
+.dialog-body .detail.quit-update-warn {
+  color: var(--warning);
+}
 .error-boundary {
   display: flex;
   flex-direction: column;

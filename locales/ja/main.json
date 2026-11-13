@@ -480,7 +480,7 @@
   "main.update.offline": "GitHubに接続できず、更新を確認できませんでした。インターネット接続を確認してください。",
   "main.update.openReleasePage": "リリースページを開く",
   "main.update.ready": "{app} {version}の準備ができました",
-  "main.update.readyAuto": "Combworkの終了時にインストールされます。今すぐ再起動することもできます。",
+  "main.update.readyAuto": "Combworkの終了時にインストールするか確認します。今すぐ再起動することもできます。",
   "main.update.readyManual": "インストールするにはCombworkを再起動してください。",
   "main.update.restart": "再起動して更新",
   "main.update.sameVersion": "公開済みの{app} {version}があります",

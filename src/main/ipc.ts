@@ -329,7 +329,7 @@ export interface QuitControl {
   quit: () => void
   /** Quits as quit does (asking about running agents), then starts Combwork again (#676). */
   restart: () => void
-  decide: (from: BrowserWindow, choice: QuitChoice, dontAskAgain: boolean) => void
+  decide: (from: BrowserWindow, choice: QuitChoice, dontAskAgain: boolean, install: string | null) => void
   cancelPending: () => void
   state: (from: BrowserWindow) => ReturnType<CombworkRequests['app:quitState']>
   setUnsaved: (from: BrowserWindow, paths: string[]) => void
@@ -522,7 +522,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'app:connectionPlanUsage': () => config.get().connectionPlanUsage ?? {},
     'app:quit': () => quitControl.quit(),
     'app:restart': () => quitControl.restart(),
-    'app:quitDecision': (choice, dontAskAgain) => quitControl.decide(win(), choice, dontAskAgain),
+    'app:quitDecision': (choice, dontAskAgain, install) => quitControl.decide(win(), choice, dontAskAgain, typeof install === 'string' ? install : null),
     'app:cancelPendingQuit': () => quitControl.cancelPending(),
     'closeCommand:state': () => closeCommandState(win()),
     'closeCommand:dontWait': (id) => dontWait(win(), String(id)),

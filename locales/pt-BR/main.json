@@ -480,7 +480,7 @@
   "main.update.offline": "Não foi possível acessar o GitHub para verificar atualizações. Verifique sua conexão com a internet.",
   "main.update.openReleasePage": "Abrir página da versão",
   "main.update.ready": "{app} {version} está pronto",
-  "main.update.readyAuto": "Ela será instalada quando você sair do Combwork. Ou reinicie agora.",
+  "main.update.readyAuto": "O Combwork vai perguntar se deve instalá-la quando você sair. Ou reinicie agora.",
   "main.update.readyManual": "Reinicie o Combwork para instalá-la.",
   "main.update.restart": "Reiniciar e atualizar",
   "main.update.sameVersion": "Há uma versão publicada de {app} {version} disponível",

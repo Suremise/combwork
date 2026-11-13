@@ -130,6 +130,11 @@ export type TileOrder = 'panes' | 'urgency'
 export type QuitChoice = 'now' | 'wait' | 'cancel' | 'window'
 /** What the quit dialog is for: quitting, closing a window, closing its workspace, or switching the window to another workspace. */
 export type QuitScope = 'app' | 'window' | 'workspace' | 'switch'
+/** HI-3167: the downloaded update a quit offers to install now: its version, and about how long installing takes. */
+export interface QuitUpdate {
+  version: string
+  seconds: number
+}
 
 /** A running session listed in the quit dialog. */
 export interface QuitSession {
@@ -4333,7 +4338,7 @@ export type CombworkEvent =
   /** The workspace's task board changed (its path names the window). */
   | { type: 'tasks-changed'; workspacePath: string }
   /** Quitting needs the user's decision: the renderer shows the quit dialog and answers with app:quitDecision. */
-  | { type: 'quit-request'; sessions: QuitSession[]; unsaved: string[]; /** Anything but 'app' stops only this window's workspace's sessions. */ scope?: QuitScope }
+  | { type: 'quit-request'; sessions: QuitSession[]; unsaved: string[]; /** Anything but 'app' stops only this window's workspace's sessions. */ scope?: QuitScope; /** HI-3167: the update it offers to install now. */ update?: QuitUpdate }
   /** Combwork is waiting for working agents to finish before quitting (or stopped waiting). */
   | { type: 'quit-pending'; pending: boolean; working: number }
   /** This window's close command (HI-1368): the panel shows it while it runs or failed; null: none (the panel goes). */

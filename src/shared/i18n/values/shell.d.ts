@@ -296,6 +296,10 @@ interface CombworkMessageValues {
   'shell.quit.changedWhileSavingDetail': undefined
   'shell.quit.discard': undefined
   'shell.quit.dontAsk': undefined
+  'shell.quit.installLater': undefined
+  'shell.quit.installLaterDetail': { app: string | number }
+  'shell.quit.installNow': undefined
+  'shell.quit.installNowDetail': { app: string | number; seconds: number }
   'shell.quit.kept': undefined
   'shell.quit.now': { action: string }
   'shell.quit.saveFailed': { n: number }
@@ -309,6 +313,7 @@ interface CombworkMessageValues {
   'shell.quit.stops': { how: string; busy: string; n: number; windows: number }
   'shell.quit.title': { how: string; windows: string | number }
   'shell.quit.unsaved': { n: number }
+  'shell.quit.updateReady': { app: string | number; version: string | number }
   'shell.quit.when': { action: string; working: number }
   'shell.quit.whenTip': undefined
   'shell.quit.windowOnly': { named: string; workspace: string | number; others: number }

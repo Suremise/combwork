@@ -62,6 +62,14 @@ export interface RestartRecord {
 
 const REASONS: readonly RestartReason[] = ['install', 'update', 'restart', 'quit']
 
+/**
+ * Why Combwork's own quit closes it (an installer's request aside): Restart and Update's install is an update's
+ * (`install` 'restart'), Restart Combwork a restart, and anything else a quit, including a plain quit that installs the
+ * update on its way out with Install now (`install` 'quit', HI-3167): the user quit, and Combwork doesn't restart itself,
+ * so its agents are offered back at the next start, never told it restarted for an update.
+ */
+export const closeReason = (install: 'quit' | 'restart' | null, relaunch: boolean): RestartReason => (install === 'restart' ? 'update' : relaunch ? 'restart' : 'quit')
+
 /** How long an entry no start has taken up is kept, then skipped. */
 export const ENTRY_EXPIRY_MS = 24 * 60 * 60 * 1000
 /** How long a lane's "isn't running" stall is held for an agent queued to resume, at most. */

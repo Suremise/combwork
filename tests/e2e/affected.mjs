@@ -507,7 +507,7 @@ export const AREAS = [
   // One notification system (HI-2320): the routing table, tell(), the pop-ups, the bell and its buttons.
   { paths: ['src/shared/notify.ts', 'src/main/notify.ts', 'src/main/outcomes.ts', 'src/renderer/src/components/Popups.tsx', 'src/renderer/src/entryConditions.ts', 'tests/e2e/notifyonce.cjs'], suites: ['notifyonce', 'banners', 'bell', 'bursts', 'notifytarget'] },
   { paths: ['tests/e2e/notifytarget.cjs', 'src/renderer/src/noticeTarget.ts', 'src/renderer/src/components/Overlays.tsx', 'src/main/events.ts'], suites: ['notifytarget'] },
-  { paths: ['src/main/updater.ts', 'src/main/updateFeed.ts', 'src/renderer/src/components/Updates.tsx', 'src/main/buildIdentity.ts', 'src/shared/updates.ts', 'tests/e2e/fakeInstall.cjs'], suites: ['update', 'about'] },
+  { paths: ['src/main/updater.ts', 'src/main/updateConsent.ts', 'src/main/updateFeed.ts', 'src/renderer/src/components/Updates.tsx', 'src/main/buildIdentity.ts', 'src/shared/updates.ts', 'tests/e2e/fakeInstall.cjs'], suites: ['update', 'about'] },
   { paths: ['src/shared/workflow/roles.ts', 'tests/e2e/agentrole.cjs'], suites: ['agentrole', 'agentstable', 'lanestart'] },
   { paths: ['src/shared/launchPolicy.ts', 'src/main/connectionLaunch.ts', 'src/main/independent.ts', 'src/renderer/src/components/LaunchSettings.tsx', 'tests/e2e/launchsettings.cjs'], suites: ['launchsettings', 'agentrole'] },
   { paths: ['src/renderer/src/components/AgentDialogs.tsx', 'src/renderer/src/components/PermissionMode.tsx'], suites: ['agentrole', 'agents-ui', 'agents', 'mode', 'context', 'codex-handover', 'footerfit', 'dialogs', 'mcpagents'] },
