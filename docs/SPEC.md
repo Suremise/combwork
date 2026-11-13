@@ -2492,7 +2492,8 @@ so credit is only ever on the exact commit id and its content (R3.1, R3.2), and 
      was there throughout and lost nothing, every entry that came, went or was made again between the two listings (a new
      id under its name) is among the names the watch saw, and every name it saw (less jj's and Git's own folders, the
      revision's files and the snapshot's folders, whose own lines decide) is one jj ignores, as every kind its entry had:
-     each event's entry is stat'ed as it arrives (a watch gives names only), and a folder is asked about with its slash,
+     each event's entry is stat'ed as it arrives (a watch gives names only; eight at a time, a name once however many its
+     events, at most 256 waiting and 4096 names a folder, past which that folder's watch is incomplete), and a folder is asked about with its slash,
      a file without, in a work tree holding only the `.gitignore` files on its way (Git otherwise takes a path that is a
      folder on disk as that folder). So a build's first run that makes its output folder, or one that deletes it and
      makes it again each run, is credited, and a file not ignored made and deleted during the run (no listing has it:

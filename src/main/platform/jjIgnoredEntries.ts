@@ -42,6 +42,20 @@ const QUIET_MS = 150
 const SETTLE_MAX_MS = 2000
 /** A watch left open (a bracket whose end never came) closes itself after this long, incomplete. */
 const LIFETIME_MS = 12 * 60 * 60 * 1000
+/**
+ * HR2's round 3, the service-changes resource rule: a run's kind reads are a few at a time (jjStats' bound), at most this
+ * many names wait to be read, and a folder keeps at most this many names. Past either, that folder's watch is
+ * incomplete (its line counts) and nothing more of it is read.
+ */
+export const RUN_READS_AT_ONCE = 8
+export const RUN_READS_QUEUED = 256
+export const RUN_NAMES_MAX = 4096
+
+/** The tests' seams: the watch (a name per event, null for lost events) and the stat. */
+export interface RunWatchSeams {
+  watch?: (path: string, onEvent: (name: string | null) => void) => Pick<FSWatcher, 'on' | 'close'>
+  lstat?: (path: string) => Promise<{ isDirectory(): boolean }>
+}
 
 /** One folder's entries: name → its identity (`d:` or `f:` and the file id), `?` where it couldn't be stat'ed. */
 export type FolderEntries = Map<string, string>
@@ -75,35 +89,31 @@ export function foldersOf(files: string[]): string[] {
  */
 export class RunWatch {
   private readonly names = new Map<string, Map<string, Set<Kind>> | null>()
-  private readonly watches: FSWatcher[] = []
-  /** The kinds being read (each event's entry stat'ed as it arrives): settle waits for them. */
-  private readonly reading = new Set<Promise<void>>()
+  private readonly watches: Pick<FSWatcher, 'on' | 'close'>[] = []
+  /**
+   * The kinds still to read (HR2's round 3: bounded): each folder and name once (`folder\0name`), at most
+   * RUN_READS_QUEUED waiting and RUN_READS_AT_ONCE read at once. An event for a name being read reads it once more after.
+   */
+  private readonly queued = new Set<string>()
+  private readonly inFlight = new Set<string>()
+  private readonly again = new Set<string>()
+  private idleWaiters: (() => void)[] = []
   private readonly started = Date.now()
   private last = Date.now()
   private closed = false
   private readonly life: NodeJS.Timeout
 
-  private constructor(root: string, folders: string[]) {
+  private constructor(
+    private readonly root: string,
+    folders: string[],
+    private readonly seams: RunWatchSeams
+  ) {
+    const watchOf = seams.watch ?? ((path, onEvent) => watch(path, { persistent: false }, (_evt, name) => onEvent(name === null || name === undefined ? null : String(name))))
     for (const f of folders) {
       this.names.set(f, new Map())
       try {
-        const w = watch(join(root, f), { persistent: false }, (_evt, name) => {
-          this.last = Date.now()
-          if (name === null || name === undefined || /[\\/]/.test(String(name))) return void this.names.set(f, null)
-          const n = String(name)
-          const kinds = this.names.get(f)?.get(n) ?? new Set<Kind>()
-          this.names.get(f)?.set(n, kinds)
-          // Darren's decision on HI-3158 (13 Nov, r36, option 2): its kind as soon as it can be read, so a file made where
-          // an ignored folder was is seen as one unless it's gone within moments (the residual SPEC names). Gone: a
-          // deletion, or an entry gone before it could be read; nothing to add.
-          const p = lstat(join(root, f, n)).then(
-            (s) => void kinds.add(s.isDirectory() ? 'd' : 'f'),
-            (e: unknown) => void (isAbsent(e) ? undefined : kinds.add('?'))
-          )
-          this.reading.add(p)
-          void p.finally(() => this.reading.delete(p))
-        })
-        w.on('error', () => this.names.set(f, null))
+        const w = watchOf(join(root, f), (name) => this.event(f, name))
+        w.on('error', () => this.incomplete(f))
         this.watches.push(w)
       } catch {
         this.names.set(f, null)
@@ -113,9 +123,71 @@ export class RunWatch {
     this.life.unref?.()
   }
 
-  /** Watches these folders under root; null when there are more than RUN_WATCH_MAX. */
-  static start(root: string, folders: string[]): RunWatch | null {
-    return folders.length > RUN_WATCH_MAX ? null : new RunWatch(root, folders)
+  /** Watches these folders under root; null when there are more than RUN_WATCH_MAX. Seams: the tests'. */
+  static start(root: string, folders: string[], seams: RunWatchSeams = {}): RunWatch | null {
+    return folders.length > RUN_WATCH_MAX ? null : new RunWatch(root, folders, seams)
+  }
+
+  /** Reads going on now (the tests'). */
+  get reads(): number {
+    return this.inFlight.size
+  }
+
+  private event(f: string, name: string | null): void {
+    this.last = Date.now()
+    const seen = this.names.get(f)
+    // Already incomplete: nothing more is read for it.
+    if (!seen) return
+    if (name === null || /[\\/]/.test(name)) return this.incomplete(f)
+    if (!seen.has(name)) {
+      if (seen.size >= RUN_NAMES_MAX) return this.incomplete(f)
+      seen.set(name, new Set())
+    }
+    // Darren's decision on HI-3158 (13 Nov, r36, option 2): its kind as soon as it can be read, so a file made where an
+    // ignored folder was is seen as one unless it's gone within moments (the residual SPEC names).
+    const key = `${f}\0${name}`
+    if (this.queued.has(key)) return
+    if (this.inFlight.has(key)) return void this.again.add(key)
+    if (this.queued.size >= RUN_READS_QUEUED) return this.incomplete(f)
+    this.queued.add(key)
+    this.pump()
+  }
+
+  private pump(): void {
+    for (const key of this.queued) {
+      if (this.inFlight.size >= RUN_READS_AT_ONCE) return
+      this.queued.delete(key)
+      this.inFlight.add(key)
+      void this.read(key)
+    }
+    if (!this.inFlight.size) for (const w of this.idleWaiters.splice(0)) w()
+  }
+
+  private async read(key: string): Promise<void> {
+    const [f, n] = key.split('\0')
+    const lstatOf = this.seams.lstat ?? ((p: string) => lstat(p))
+    // Gone: a deletion, or an entry gone before it could be read; nothing to add.
+    const kind = await lstatOf(join(this.root, f, n)).then(
+      (s): Kind | null => (s.isDirectory() ? 'd' : 'f'),
+      (e: unknown): Kind | null => (isAbsent(e) ? null : '?')
+    )
+    if (kind) this.names.get(f)?.get(n)?.add(kind)
+    this.inFlight.delete(key)
+    if (this.again.delete(key) && this.names.get(f)) this.queued.add(key)
+    this.pump()
+  }
+
+  /** A folder whose watch can't be complete: null, and its reads dropped. */
+  private incomplete(f: string): void {
+    this.names.set(f, null)
+    for (const key of this.queued) if (key.startsWith(`${f}\0`)) this.queued.delete(key)
+    this.pump()
+  }
+
+  /** Resolves once no read is waiting or going on. */
+  private idle(): Promise<void> {
+    if (!this.inFlight.size && !this.queued.size) return Promise.resolve()
+    return new Promise((r) => this.idleWaiters.push(r))
   }
 
   /** Resolves once the watches are armed (ARM_MS after they started). */
@@ -138,7 +210,7 @@ export class RunWatch {
       await new Promise((r) => setTimeout(r, QUIET_MS - quiet + 5))
     }
     this.close()
-    await Promise.all([...this.reading])
+    await this.idle()
     return this.seen()
   }
 
@@ -150,8 +222,8 @@ export class RunWatch {
   }
 
   private lost(): void {
-    for (const f of this.names.keys()) this.names.set(f, null)
     this.close()
+    for (const f of this.names.keys()) this.incomplete(f)
   }
 
   /** What the watches have seen so far (their kinds may still be being read). */

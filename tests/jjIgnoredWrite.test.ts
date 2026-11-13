@@ -18,7 +18,7 @@ import { readRepoRefs } from '../src/main/platform/repoRefs'
 import { isUnknown } from '../src/main/platform/types'
 import { jjContextOf } from '../src/main/platform/jjDetect'
 import { jjCheckEnd, jjCheckStart, jjCounts, jjCredit, type JjCheckFor, type JjCheckStart } from '../src/main/platform/jjChecks'
-import { entriesChanged, ignoredOnly, jjEntries, RunWatch, type Kind, type WatchedNames } from '../src/main/platform/jjIgnoredEntries'
+import { entriesChanged, ignoredOnly, jjEntries, RUN_NAMES_MAX, RUN_READS_AT_ONCE, RUN_READS_QUEUED, RunWatch, type Kind, type WatchedNames } from '../src/main/platform/jjIgnoredEntries'
 import type { ViewOf } from '../src/main/platform/jjView'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
@@ -234,6 +234,64 @@ describe('HI-3158: a moved folder explained only by names jj ignores, by every k
     row.change(root)
     const got = await ignoredOnly(root, ['.'], { files: ['.gitignore', 'k.txt'], before, watched: kinds(row.saw) })
     expect(got).toEqual(row.credited ? ['.'] : null)
+  })
+})
+
+describe('HI-3158, HR2’s round 3: a run watch’s kind reads are bounded', () => {
+  /** A watch whose events the test sends, and a stat that answers only when the test lets it. */
+  const fakes = () => {
+    const emit = new Map<string, (name: string | null) => void>()
+    const pending: (() => void)[] = []
+    const seams = {
+      watch: (path: string, onEvent: (name: string | null) => void) => {
+        emit.set(path, onEvent)
+        return { on: () => undefined, close: () => undefined } as never
+      },
+      lstat: () => new Promise<{ isDirectory(): boolean }>((r) => pending.push(() => r({ isDirectory: () => false })))
+    }
+    return { emit, pending, seams, release: () => pending.splice(0).forEach((p) => p()) }
+  }
+  it('reads a few at a time, a name once however many its events; past the queue its folder is incomplete and nothing more of it is read', async () => {
+    const root = tempDir('jjign-burst-')
+    const f = fakes()
+    const w = RunWatch.start(root, ['.', 'src'], f.seams)!
+    const send = f.emit.get(join(root, '.'))!
+    for (let i = 0; i < 1000; i++) send('same.tmp')
+    expect([w.reads, f.pending.length]).toEqual([1, 1])
+    // Seven more read at once (eight with same.tmp), and a full queue behind them.
+    for (let i = 0; i < RUN_READS_AT_ONCE - 1 + RUN_READS_QUEUED; i++) send(`n${i}.tmp`)
+    expect(w.reads).toBe(RUN_READS_AT_ONCE)
+    expect(w.seen().get('.')).not.toBeNull()
+    // One more waiting than the queue holds: the root's watch can't be complete.
+    send('one-too-many.tmp')
+    expect(w.seen().get('.')).toBeNull()
+    expect(f.pending.length).toBe(RUN_READS_AT_ONCE)
+    send('after.tmp')
+    expect(f.pending.length).toBe(RUN_READS_AT_ONCE)
+    // Another folder's watch is still whole, and its reads wait for room.
+    f.emit.get(join(root, 'src'))!('gen.tmp')
+    for (let i = 0; i < 5 && f.pending.length; i++) {
+      f.release()
+      await new Promise<void>((r) => setImmediate(r))
+    }
+    const seen = await w.settle()
+    expect(seen.get('.')).toBeNull()
+    expect([...(seen.get('src')?.get('gen.tmp') ?? [])]).toEqual(['f'])
+  })
+  it('a folder past its names limit is incomplete', async () => {
+    const root = tempDir('jjign-names-')
+    const f = fakes()
+    const w = RunWatch.start(root, ['.'], { ...f.seams, lstat: () => Promise.resolve({ isDirectory: () => false }) })!
+    const send = f.emit.get(join(root, '.'))!
+    // In batches the queue holds, each read before the next.
+    for (let i = 0; i < RUN_NAMES_MAX; i += RUN_READS_QUEUED) {
+      for (let j = i; j < Math.min(i + RUN_READS_QUEUED, RUN_NAMES_MAX); j++) send(`n${j}`)
+      await vi.waitFor(() => expect(w.reads).toBe(0))
+    }
+    expect(w.seen().get('.')).not.toBeNull()
+    send('one-more')
+    expect(w.seen().get('.')).toBeNull()
+    w.close()
   })
 })
 
