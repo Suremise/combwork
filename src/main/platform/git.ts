@@ -698,8 +698,9 @@ export async function commitIds(repo: string, range: string, max: number): Promi
  * The commits of a range, oldest first, with their author emails and `Combwork-Card` trailers. `firstParent`: only the line's
  * own commits, its merges included but not the commits a merge brought in (HI-2382).
  */
-export async function commits(repo: string, range: string, opts: { firstParent?: boolean } = {}): Promise<Maybe<CommitInfo[]>> {
-  const r = await git(repo, ['log', '--reverse', ...(opts.firstParent ? ['--first-parent'] : []), '--format=%H%x1f%ae%x1f%(trailers:key=Combwork-Card,valueonly,separator=%x2C)%x1f%s%x1e', range])
+export async function commits(repo: string, range: string, opts: { firstParent?: boolean; except?: readonly string[] } = {}): Promise<Maybe<CommitInfo[]>> {
+  // `except`: revisions whose history is left out (HI-3145: a forward resolution's source), as git log's ^rev.
+  const r = await git(repo, ['log', '--reverse', ...(opts.firstParent ? ['--first-parent'] : []), '--format=%H%x1f%ae%x1f%(trailers:key=Combwork-Card,valueonly,separator=%x2C)%x1f%s%x1e', range, ...(opts.except ?? []).map((x) => `^${x}`)])
   if (!r.ok) return unknown(U.commitsOf, { range })
   return r.out
     .split('\x1e')

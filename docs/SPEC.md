@@ -6099,7 +6099,9 @@ a Remove or another Resolve meanwhile leaves no card. `source` is that attempt's
 now. The new card is an ordinary card: agents start it (it has no `ForwardRequested`), its review, checks and merge
 queue are its rules', except that a card with a `ForwardResolution` merges as a merge commit always
 (`mergeCommitOf`: G6 merge, its id the base's marked `~mergeCommit`, `rulesBaseId` reading through it), so a squash or
-rebase project never drops the source's history from the destination.
+rebase project never drops the source's history from the destination. Its checks of its own commits leave out the
+source's (HI-3145): G12's identity check reads `base..revision` without `source`'s history (`git log … ^source`), so a
+teammate's commit on the release isn't counted as the card's; its merge commit and any commit it makes are checked.
 
 It merges into its `to` alone (HI-2985): Work merges into moving on after it is made (Start the next version) leaves it
 there. Its Merges into set to any other branch is refused (`tasks.setTarget`), a version retarget keeps it and its lane

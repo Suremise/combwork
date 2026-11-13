@@ -564,7 +564,7 @@ export class GitPlatform implements PlatformAdapter {
     }
     if (args.guards.includes('submit.ready')) inputs.conflicts = [] // a Git commit can't store unresolved conflicts
     if (args.guards.includes('submit.trailer')) inputs.untrailered = await this.untrailered(card, s)
-    if (args.guards.includes('submit.identity')) inputs.badIdentity = await this.badIdentity(base!, revision, commits, o)
+    if (args.guards.includes('submit.identity')) inputs.badIdentity = await this.badIdentity(base!, revision, commits, o, s.resolves?.source)
     const warnings = o.sharedFolderWarning && shared ? othersFiles(others, files.map((f) => f.path)) : []
     return { ok: true, revision, base, key, files, ...(commits ? { commits } : {}), inputs, warnings }
   }
@@ -709,12 +709,14 @@ export class GitPlatform implements PlatformAdapter {
    * G12: the first commit not authored with the project's identity, as git reads it now (HI-2266: G12's saved value only
    * means "on"; the Git tab or git config changes the identity, and the guard expects the new one), or `missing`.
    */
-  private async badIdentity(base: string, revision: string, commits: string[] | undefined, o: WorkflowOptions): Promise<Maybe<{ commit: string; email: string } | 'missing' | null>> {
+  private async badIdentity(base: string, revision: string, commits: string[] | undefined, o: WorkflowOptions, source?: string): Promise<Maybe<{ commit: string; email: string } | 'missing' | null>> {
     if (!o.identity) return null
     const id = await G.identity(this.project)
     if (isUnknown(id)) return id
     if (!id) return 'missing'
-    const list = await G.commits(this.project, `${base}..${revision}`)
+    // HI-3145: a forward's resolution merges its source, as its builder is told to: the source's own commits (another
+    // author's on the release, say) aren't this card's work. Its merge commit, and any commit it makes, are still checked.
+    const list = await G.commits(this.project, `${base}..${revision}`, source ? { except: [source] } : {})
     if (isUnknown(list)) return list
     const mine = commits ? list.filter((c) => commits.includes(c.commit)) : list
     const bad = mine.find((c) => c.email.toLowerCase() !== id.email.toLowerCase())
