@@ -5391,7 +5391,7 @@ h2.section#unused-worktrees {
 .quit-update-choice {
   margin: 8px 0;
 }
-.quit-update-warn {
+.dialog-body .detail.quit-update-warn {
   color: var(--warning);
 }
 .error-boundary {

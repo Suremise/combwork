@@ -353,7 +353,7 @@ export function initUpdater(opts: { restart: (version: string) => void }): void 
     toast(
       'info',
       tr(msg({ id: 'main.update.ready', defaultMessage: '{app} {version} is ready', description: "A notice: an update was downloaded. {app} is Combwork's name, {version} the new version." }), { app: APP_NAME, version: info.version }),
-      auto ? tr(msg({ id: 'main.update.readyAuto', defaultMessage: 'It installs when you quit Combwork, or restart now.', description: 'The notice that an update is ready, with updates installed automatically.' })) : tr(msg({ id: 'main.update.readyManual', defaultMessage: 'Restart Combwork to install it.', description: 'The notice that an update is ready, with updates installed manually.' })),
+      auto ? tr(msg({ id: 'main.update.readyAuto', defaultMessage: 'Combwork asks to install it when you quit, or restart now.', description: 'The notice that an update is ready, with updates installed automatically: quitting asks Install now or Next time (HI-3167).' })) : tr(msg({ id: 'main.update.readyManual', defaultMessage: 'Restart Combwork to install it.', description: 'The notice that an update is ready, with updates installed manually.' })),
       [{ label: tr(msg({ id: 'main.update.restart', defaultMessage: 'Restart and Update', description: "The notice's button: restarts Combwork and installs the update." })), command: 'update.install', args: [info.version] }],
       undefined,
       undefined,
