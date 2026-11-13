@@ -2,7 +2,7 @@
 // under the card's ruleset, and where the rule is changed. Three whole sentences, each its own message, never glued from
 // pieces; agents get them in English (`refusal`), the window shows them translated (`refusalLines`), each a line.
 
-import { agentText, englishText } from '../advanced'
+import { agentText, englishText, withValues, type Text, type TextPart, type TextValues } from '../advanced'
 import { currentChain } from '../agentText'
 import { msg, type Msg } from '../i18n/msg'
 import type { StoredText } from '../types'
@@ -495,8 +495,25 @@ export function refusalValues(rule: RuleId, values: RefusalValues, f: RefusalFor
   return vals
 }
 
-/** A refusal's values filled in English (the text a WorkflowRefusedError carries for the log and the window, HI-3136). */
-export const refusalValuesInEnglish = (rule: RuleId, values: RefusalValues): Record<string, string | number> => refusalValues(rule, values, IN_ENGLISH)
+/**
+ * A refusal's message as data (HI-3136, HR1's round 1): what a WorkflowRefusedError carries, for the log and agents in
+ * English and for the window in the language it shows. Its values as `refusalValues` takes them, but kept as messages
+ * (a value that is a message of its own, a stage, a cause's {why}), so each follows the language of the sentence around
+ * it, never left a placeholder or a blank. The window reads it as the user does, agents and the log as an agent.
+ */
+export function refusalText(rule: RuleId, values: RefusalValues): Text {
+  const vals: TextValues = { ...VALUES_BEFORE[rule] }
+  // A stored message (and the messages inside its values) as a message with its values: storedLineText's own reading of
+  // a stored line, whose ids it knows, giving data here rather than words.
+  const asData = ((m: Msg, v?: Record<string, string | number>) => (v ? { m, values: v } : m)) as unknown as RefusalFormat['one']
+  for (const [k, v] of Object.entries(values)) vals[k] = typeof v === 'object' ? ((workflowLine(v, asData) as unknown as Text | null) ?? '') : v
+  const stage = (x: string): TextPart => (isStageId(x) ? STAGE_TEXT[x] : x)
+  if (typeof vals.stage === 'string') vals.stage = stage(vals.stage)
+  if (vals.stages !== undefined) vals.stages = { list: String(vals.stages).split(', ').filter(Boolean).map(stage) }
+  if (typeof values.cause === 'string' && Object.hasOwn(WHY, values.cause)) vals.why = { m: WHY[values.cause as keyof typeof WHY], values: { n: (vals.n as number | undefined) ?? 0, q: (vals.q as number | undefined) ?? 0 } }
+  const m = REFUSALS[rule].message
+  return { shown: withValues(m, { ...vals, reader: 'you' }), agent: withValues(m, { ...vals, reader: 'agent' }) }
+}
 
 /** The three sentences of a refusal, formatted by `f`: `change` null when the rule has none. */
 export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalFormat): { message: string; next: string; change: string | null } {

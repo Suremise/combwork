@@ -36,7 +36,7 @@ import { isStageId, STAGE_TEXT, stageName, type StageNames } from '../shared/wor
 import { answerFits, approveNote, ASK_ACTIONS, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, foldCard, openEntry, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type RoundChoice, type StageId } from '../shared/workflow/facts'
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
-import { REFUSALS, refusal as refusalOf, refusalValuesInEnglish, type Refusal } from '../shared/workflow/refusals'
+import { refusal as refusalOf, refusalText, type Refusal } from '../shared/workflow/refusals'
 import { archiveBatchDocs, boardReadToken, boardGeneration, boardSavepoint, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, headChanges, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, cardRevs, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, archiveComments, archivedComments, commentArchiveOf, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, decisionChanges, cardsOnBoard, inBoardWrite, type CardQuery } from './boardStore'
 import type { Evicted } from './schema/commentArchive'
 import { keysForSearch } from './projectKeys'
@@ -143,10 +143,10 @@ export class TaskConflictError extends CombworkError {
  */
 export class WorkflowRefusedError extends TaskConflictError {
   constructor(readonly refusal: Refusal) {
-    // HI-3136: its values as the refusal's own sentences fill them (a value that is a message, a cause's why…): never a
-    // placeholder left as it is, or a blank.
+    // HI-3136: its values as the refusal's own sentences take them (a value that is a message, a cause's why…), kept as
+    // messages, so the window says them in its language too: never a placeholder left as it is, or a blank.
     // agent-text: REFUSALS
-    super(withValues(REFUSALS[refusal.rule].message, refusalValuesInEnglish(refusal.rule, refusal.values)))
+    super(refusalText(refusal.rule, refusal.values))
   }
 }
 
