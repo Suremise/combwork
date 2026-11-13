@@ -3421,7 +3421,8 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   card's record goes; the binding unreadable, for the recorded card as before. The record follows the binding while the
   lane still works there too (HI-3130): each preparation of the lane's next card in that slot (`keptFollows`, after the
   port's prepare, under its operation's fence, only a record at the slot's generation) rewrites it to the card the
-  binding names, so the earlier card (its work in the target: the lane can't prepare another over it, HI-3057) starts
+  binding names, and again on a preparation finding the slot already on that line (a retry: a move cut short or its
+  binding unread is repaired then), so the earlier card (its work in the target: the lane can't prepare another over it, HI-3057) starts
   elsewhere at once, dry or real, never refused as kept in a slot another card works in.
   **A kept slot of the same version control** (HI-3132): every start is placed in it. A plan placing the card anywhere
   else (the project folder, its builder's own worktree) is refused naming the slot (`platform.keptElsewhere`, the
