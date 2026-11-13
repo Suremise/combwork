@@ -108,6 +108,10 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     // --- The thresholds: amber from 70 %, red from 90 %.
     await turn('hb1', 'window 100000 then context 70000 then tool Read src/alpha/c.ts')
     check('context 70 %: amber', !!(await lib.until(async () => (await level()) === 'amber', HUNG_MS, 250)), String(await level()))
+    // HI-3190: an amber ring is a stroke only; its warning fill once painted the centre hex (and the strip's marks) solid.
+    const ringFills = await page.locator('.activity-map-context .fill, .activity-map-ring-mark.amber .fill').evaluateAll((els) => els.map((e) => getComputedStyle(e).fill))
+    check('…the amber ring and its strip mark are strokes, never a filled hex', ringFills.length >= 1 && ringFills.every((f) => f === 'none'), JSON.stringify(ringFills))
+    await shoot('2-single-amber-dark')
     await turn('hb1', 'window 100000 then context 90000 then tool Read src/alpha/d.ts')
     check('context 90 %: red', !!(await lib.until(async () => (await level()) === 'red', HUNG_MS, 250)), String(await level()))
     await shoot('2-single-red-dark')
@@ -365,6 +369,9 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     await page.keyboard.press('Escape')
     await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'single', HUNG_MS, 250)
     await shoot('5-single-light')
+    await turn('hb1', 'window 100000 then context 75000 then tool Read src/alpha/f.ts')
+    check('light, context 75 %: amber, its ring a stroke and the centre its own face', !!(await lib.until(async () => (await level()) === 'amber', HUNG_MS, 250)) && (await ctx.locator('.fill').evaluate((e) => getComputedStyle(e).fill)) === 'none', String(await level()))
+    await shoot('5a-single-amber-light')
 
     // --- HI-3179: the long names of Darren's screenshot. Each hex's text stays inside its outline (a path by its file
     // name, cut in its middle; the whole on hover); Last actions under the graph at full width; the split beside the
