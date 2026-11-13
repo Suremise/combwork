@@ -11,7 +11,27 @@ Unicode true
 !include "LogicLib.nsh"
 !include "FileFunc.nsh"
 !include "UAC.nsh"
+!include "StdUtils.nsh"
+; What electron-builder's generated header and template give installer.nsh (HI-3172's recovery uses them): its command
+; line flags (as nsisScriptGenerator defines them), the scope variable, the uninstall key and the exe's name. Stand-ins:
+; the harness never arms a recovery (no --updated install, nothing in its folder under these names).
+!macro _isUpdated _a _b _t _f
+  ${StdUtils.TestParameter} $R9 "updated"
+  StrCmp "$R9" "true" `${_t}` `${_f}`
+!macroend
+!define isUpdated `"" isUpdated ""`
+!macro _isForceRun _a _b _t _f
+  ${StdUtils.TestParameter} $R9 "force-run"
+  StrCmp "$R9" "true" `${_t}` `${_f}`
+!macroend
+!define isForceRun `"" isForceRun ""`
+Var installMode
+!define UNINSTALL_REGISTRY_KEY "Software\combwork-test-1647-uninstall"
+!define APP_EXECUTABLE_FILENAME "combwork-test-1647-none.exe"
 !include "${__FILEDIR__}\..\..\build\installer.nsh"
+!ifmacrodef customHeader
+  !insertmacro customHeader
+!endif
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "English"
 !insertmacro MUI_LANGUAGE "German"
@@ -34,6 +54,7 @@ Function .onInit
   ; installer.nsh's request to a running Combwork to close (HI-1707), as the template inserts it after initMultiUser: here
   ; the stand-in install folder (C:\stand\Combwork), where run.ps1 starts a stand-in Combwork for its cases, or none.
   StrCpy $INSTDIR "C:\stand\Combwork"
+  StrCpy $installMode "CurrentUser"
   !ifmacrodef customInit
     !insertmacro customInit
   !endif
@@ -53,4 +74,8 @@ Section
   System::Call 'kernel32::GetTickCount() i.r7'
   FileWrite $8 "end $7$\r$\n"
   FileClose $8
+  ; As the template's install section ends (customInstall): nothing armed here, so nothing to do.
+  !ifmacrodef customHeader
+    Call cwDisarmRecovery
+  !endif
 SectionEnd
