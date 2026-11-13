@@ -902,8 +902,10 @@
   "workflow.refused.platform.offLine.next": {
     "placeholders": {
       "where": "select",
-      "line": "plain",
-      "on": "plain"
+      "lineArg": "plain",
+      "made": "select",
+      "start": "plain",
+      "onArg": "plain"
     }
   },
   "workflow.refused.platform.slotLeft.message": {

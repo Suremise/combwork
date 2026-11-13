@@ -23,6 +23,11 @@ const WINDOW: RefusalFormat = { one: (m, values) => tr(m, values), list: (items)
 /** A value for every placeholder the refusals have. */
 const SAMPLE: RefusalValues = {
   card: 'AM-12',
+  // platform.offLine (HI-3116): whether the card's line exists, its commands' arguments, the card's start.
+  made: 'no',
+  lineArg: 'cw/b1',
+  onArg: 'main',
+  start: 'a3f2c1d4e5f60718293a4b5c6d7e8f9012345678',
   // platform.changed (HI-2799): the version control the project uses now.
   platform: 'jj',
   revision: 'a3f2c1d',
@@ -148,16 +153,22 @@ describe('the workflow text in every locale', () => {
   })
 
   it("renders both branches of platform.offLine's {where} select in every locale: a detached head at its commit, another branch by its name (HI-3010, HI-3006)", async () => {
-    const detached = { card: 'AM-12', line: 'cw/b1', where: 'detached', head: 'bd6ff9d', on: '' }
-    const other = { card: 'AM-12', line: 'cw/b1', where: 'other', head: '', on: 'main' }
+    const start = 'a3f2c1d4e5f60718293a4b5c6d7e8f9012345678'
+    const detached = { card: 'AM-12', line: 'cw/b1', lineArg: 'cw/b1', where: 'detached', head: 'bd6ff9d', on: '', onArg: "''", made: 'yes', start }
+    const other = { card: 'AM-12', line: 'cw/b1', lineArg: 'cw/b1', where: 'other', head: '', on: 'main', onArg: 'main', made: 'yes', start }
+    // HI-3116: on another branch with the card's line not made yet: make it from the card's start, never "switch back".
+    const missing = { ...other, made: 'no' }
     for (const code of LOCALES) {
       setLanguage(code, await loadCatalogue(code), code)
-      const [a, b] = [refusalLines('platform.offLine', detached, WINDOW), refusalLines('platform.offLine', other, WINDOW)]
-      for (const line of [a.message, a.next, b.message, b.next]) expect(line, code).not.toMatch(/[{}]/)
+      const [a, b, c] = [refusalLines('platform.offLine', detached, WINDOW), refusalLines('platform.offLine', other, WINDOW), refusalLines('platform.offLine', missing, WINDOW)]
+      for (const line of [a.message, a.next, b.message, b.next, c.next]) expect(line, code).not.toMatch(/[{}]/)
       expect(a.message, code).toContain('bd6ff9d')
       expect(b.message, code).toContain('main')
       expect(a.next, code).toContain('git switch -c cw/b1')
       expect(a.next, code).not.toBe(b.next)
+      expect(b.next, code).toContain('git switch cw/b1')
+      expect(c.next, code).toContain(`git switch -c cw/b1 ${start}`)
+      expect(c.next, code).not.toBe(b.next)
     }
   })
 

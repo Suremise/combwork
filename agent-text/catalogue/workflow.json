@@ -1060,8 +1060,8 @@
     "audience": "both"
   },
   "workflow.refused.platform.offLine.next": {
-    "text": "{where, select, detached {Put the commits on the card's branch: git switch -c {line} if it doesn't exist yet, else git switch {line} and git cherry-pick the commits made off it. Then submit again.} other {Switch back with git switch {line}, and git cherry-pick there any commits of the card's made on {on}. Then submit again.}}",
-    "note": "HI-3010: the next step after a submit refused because the card’s folder isn’t on its branch, by where it is (where, select: a detached head, or another branch). git switch -c, git switch and git cherry-pick are commands: keep them as they are. {line} and {on} are branch names.",
+    "text": "{where, select, detached {Put the commits on the card's branch: git switch -c {lineArg} if it doesn't exist yet, else git switch {lineArg} and git cherry-pick the commits made off it. Then submit again.} other {{made, select, no {The card's branch doesn't exist yet: make it from where the card started with git switch -c {lineArg} {start}, then git cherry-pick there the card's own commits made on {onArg}. Then submit again.} other {Switch back with git switch {lineArg}, and git cherry-pick there any commits of the card's made on {onArg}. Then submit again.}}}}",
+    "note": "HI-3010, HI-3116: the next step after a submit refused because the card’s folder isn’t on its branch, by where it is (where, select: a detached head, or another branch) and, on another branch, whether the card’s branch exists yet (made, select: no, or yes). git switch -c, git switch and git cherry-pick are commands: keep them and their arguments exactly as they are. {lineArg} and {onArg} are branch names as typed in a shell (possibly in quotes); {start} is a commit id.",
     "audience": "both"
   },
   "workflow.refused.platform.slotLeft.message": {

@@ -15,6 +15,11 @@ import { clearSubmoduleCheckouts, GIT_FILES_TITLE, gitFilesNeeded, gitFilesStatu
 import { gitFilesExec } from './gitModulesRun'
 import { asideOf, entryIdSync, linksTo, provedSync, worktreesOf, type GitLinkReceipt } from './jjGitLink'
 import type { CheckoutOptions, WorkspacePort, WorkspaceStep } from './workspacePort'
+import { gitTool } from '../gitTool'
+import { compareGitVersions } from '../../shared/gitTool'
+import { createLogger, userText } from '../logger'
+
+const log = createLogger('slots')
 
 /** A git command's answer as a step's: done, or git's own words. */
 const step = async (r: Promise<{ ok: boolean; err: string }>): Promise<WorkspaceStep> => {
@@ -122,6 +127,73 @@ async function clearSlotSubmodules(folder: string, revision: string): Promise<st
   return clearSubmoduleCheckouts(gitReads, folder, [revision], { keepChanged: true })
 }
 
+/** HI-3116: test seams in `lineAtBase`: between T1 (its line made) and T2 (HEAD attached). */
+export const lineAtBaseHooks: { beforeCreate: (() => Promise<void>) | null; afterCreate: (() => Promise<void>) | null } = { beforeCreate: null, afterCreate: null }
+/** HI-3116: the git `update-ref --stdin` first takes `symref-update` in (Combwork supports git from 2.38). */
+export const LINE_AT_BASE_GIT = '2.46'
+/** Folders (and git versions) whose too-old git `lineAtBase` has logged once already. */
+const oldGitSaid = new Set<string>()
+/** The reflog message of a line `lineAtBase` made for a lease: what proves a line its own on a later pass. */
+const madeFor = (lease: string): string => `combwork: next line for lease ${lease}` // i18n-ignore: a reflog message, never shown
+
+/**
+ * HI-3116 (design HI-3116/s19): a lane's next card's `line`, made at `base` and checked out where the slot is on the last
+ * card's line, changing no file and no index entry: only while HEAD names a branch whose commit's tree is `base`'s (the
+ * last card's work merged into the target, nothing more on that line in content). Two ref transactions (git can't take
+ * them as one: "multiple updates for HEAD … via its referent"), each atomic, with the message `madeFor(lease)`:
+ * T1 makes the line at `base` while the old line is still where it was read; T2 attaches HEAD while it still names the
+ * old line and the new line is still at `base`. Read back after. A line already there is carried on only when provably
+ * this lease's own (its reflog's one entry `madeFor(lease)`, still at `base`); anything else is left exactly as it is.
+ * A commit landing on the old line between T1 and T2 stays there, its changes staged on the new line (logged). Hooks and
+ * fsmonitor are off for each command, as `branchHere`'s. Refused (nothing written) below git 2.46.
+ */
+export async function lineAtBase(folder: string, line: string, base: string, lease: string): Promise<WorkspaceStep> {
+  const no = (err: string): WorkspaceStep => ({ ok: false, err })
+  const version = gitTool().version
+  if (!version || compareGitVersions(version, LINE_AT_BASE_GIT) < 0) {
+    const key = `${folder.toLowerCase()}|${version ?? ''}`
+    if (!oldGitSaid.has(key)) {
+      oldGitSaid.add(key)
+      log.info(`${userText(folder)}: a lane's next line is made in place on a branch only with git ${LINE_AT_BASE_GIT} or later (this is ${version ?? 'unknown'}): it waits for its builder instead`)
+    }
+    return no(`in place on a branch needs git ${LINE_AT_BASE_GIT}`) // i18n-ignore: a log line's detail, never shown
+  }
+  const quiet = ['-c', `core.hooksPath=${noHooks(folder)}`, '-c', 'core.fsmonitor=false']
+  const read = async (args: string[]): Promise<string | null> => {
+    const r = await git(folder, args)
+    return r.ok ? r.out.trim() : null
+  }
+  const target = `refs/heads/${line}`
+  const headRef = await read(['symbolic-ref', '-q', 'HEAD'])
+  if (!headRef?.startsWith('refs/heads/') || headRef === target) return no("HEAD isn't on another branch") // i18n-ignore: a log line's detail, never shown
+  const oldOid = await read(['rev-parse', '--verify', '-q', `${headRef}^{commit}`])
+  const baseOid = await read(['rev-parse', '--verify', '-q', `${base}^{commit}`])
+  const trees = oldOid && baseOid ? await Promise.all([read(['rev-parse', `${oldOid}^{tree}`]), read(['rev-parse', `${baseOid}^{tree}`])]) : null
+  if (!oldOid || !baseOid || !trees?.[0] || !trees[1]) return no("its branch or the base can't be read") // i18n-ignore: a log line's detail, never shown
+  if (trees[0] !== trees[1]) return no(`${headRef}'s files aren't the base's: the last card's work isn't merged, or more is on that line`) // i18n-ignore: a log line's detail, never shown
+  const note = madeFor(lease)
+  const there = await read(['rev-parse', '--verify', '-q', target])
+  if (there) {
+    // A line already there (T1 done, T2 not): carried on only when provably this lease's, at the base.
+    const reflog = await read(['reflog', 'show', '--format=%H%x09%gs', target, '--'])
+    const entries = reflog ? reflog.split(/\r?\n/).filter(Boolean) : []
+    if (there !== baseOid || entries.length !== 1 || entries[0] !== `${baseOid}\t${note}`) return no(`${line} is there already, not provably this lease's`) // i18n-ignore: a log line's detail, never shown
+  } else {
+    await lineAtBaseHooks.beforeCreate?.()
+    const t1 = await git(folder, [...quiet, 'update-ref', '-m', note, '--stdin'], undefined, `start\ncreate ${target} ${baseOid}\nverify ${headRef} ${oldOid}\nprepare\ncommit\n`)
+    if (!t1.ok) return no(gitErrorLine(t1.err) || 'its line could not be made') // i18n-ignore: a log line's detail, never shown
+    await lineAtBaseHooks.afterCreate?.()
+  }
+  const t2 = await git(folder, [...quiet, 'update-ref', '--no-deref', '-m', note, '--stdin'], undefined, `start\nverify ${target} ${baseOid}\nsymref-update HEAD ${target} ref ${headRef}\nprepare\ncommit\n`)
+  if (!t2.ok) return no(gitErrorLine(t2.err) || 'HEAD could not be attached') // i18n-ignore: a log line's detail, never shown
+  // Read back: never "prepared" unless HEAD names the line and the line is at the base.
+  const [now, at] = await Promise.all([read(['symbolic-ref', '-q', 'HEAD']), read(['rev-parse', '--verify', '-q', target])])
+  if (now !== target || at !== baseOid) return no(`read back: HEAD names ${now ?? 'nothing'}, ${line} is at ${at ?? 'nothing'}`) // i18n-ignore: a log line's detail, never shown
+  const oldNow = await read(['rev-parse', '--verify', '-q', headRef])
+  if (oldNow !== oldOid) log.warn(`${userText(headRef)} moved between making ${userText(line)} and attaching HEAD to it: its commit stays there, its changes staged on ${userText(line)}`)
+  return { ok: true, err: '' }
+}
+
 export const gitWorkspacePort: WorkspacePort = {
   platform: 'git',
   list: async (repo) => (await listWorktreesOrNull(repo))?.map((w) => ({ path: w.path, line: w.branch })) ?? null,
@@ -173,6 +245,7 @@ export const gitWorkspacePort: WorkspacePort = {
     if (!own.ok) return { ok: false, err: own.err.trim() || `HEAD was past ${base} before its lease began` } // i18n-ignore: a log line's detail, never shown
     return step(git(folder, ['-c', `core.hooksPath=${noHooks(folder)}`, '-c', 'core.fsmonitor=false', 'switch', '--no-guess', '-c', line]))
   },
+  lineAtBase: (folder, line, base, lease) => lineAtBase(folder, line, base, lease),
   detach: async (folder, revision, o) => {
     const cleared = await clearSlotSubmodules(folder, revision)
     if (cleared) return { ok: false, err: cleared }
