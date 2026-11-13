@@ -6281,8 +6281,9 @@ touched:
   *Combwork: set aside before merging HI-12*, and told by what it made (HI-3125): the newest stash not among those there
   as it started whose subject is that message, never the stash ref having moved (another git's stash just before or
   after it moves it too), and each proved by what it holds (HR1's rounds 1 and 2: another git can stash with the same
-  message at that moment): something, and nothing but the paths set aside (its worktree and index commits against its
-  base, renames as both sides, and its untracked files' commit: `diff-tree`, `ls-tree`). One proved: that one. None:
+  message at that moment): every path set aside, each changed or it wouldn't run (its worktree and index commits against
+  its base, renames as both sides, and its untracked files' commit: `diff-tree`, `ls-tree`; never "nothing else", as a
+  stash's commits hold the whole index, staged changes not set aside too). One proved: that one. None:
   nothing was made (below). Two proved, or one unreadable with none proved: never guessed, refused (*Git set changes
   aside, but Combwork can't tell which stash is its own … Check git stash list and the files*), the stashes kept and
   the real index as it was. A push that saved nothing (another git took the shown changes back, or set them aside, just

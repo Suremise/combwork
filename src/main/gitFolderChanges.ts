@@ -793,15 +793,15 @@ async function ownStash(folder: string, before: ReadonlySet<string>, message: st
   if (!now) return 'unproved'
   const mine = now.filter((s) => !before.has(s.oid) && s.subject.endsWith(`: ${message}`))
   // HR1's rounds 1 and 2: its message alone isn't its own (another git can stash with the same at that moment), so each
-  // is proved by what it holds: something, and nothing but the paths this one was given (git stashes only those). Not
-  // one proved (none readable as such): not made. Two, or one unreadable with none proved: not known, never guessed.
-  const allowed = new Set(paths)
+  // is proved by what it holds: every path this one was given (each changed, or it wouldn't run). Never "nothing else":
+  // a stash's commits hold the whole index, staged changes not given too. Not one proved (each read): not made. Two, or
+  // one unreadable with none proved: not known, never guessed.
   let unread = false
   const proved: string[] = []
   for (const s of mine) {
     const held = await stashPaths(folder, s.oid)
     if (!held) unread = true
-    else if (held.length && held.every((p) => allowed.has(p))) proved.push(s.oid)
+    else if (paths.length && paths.every((p) => held.has(p))) proved.push(s.oid)
   }
   if (proved.length === 1 && !unread) return proved[0]
   return proved.length || unread ? 'unproved' : null
@@ -812,14 +812,14 @@ async function ownStash(folder: string, before: ReadonlySet<string>, message: st
  * deleted on disk is only there) change from its base (renames as their two sides), and its untracked files' commit's
  * (its third parent, when it has one). Null: unreadable. Plumbing, as every git has it.
  */
-async function stashPaths(folder: string, oid: string): Promise<string[] | null> {
+async function stashPaths(folder: string, oid: string): Promise<Set<string> | null> {
   const diff = (to: string) => git(folder, ['diff-tree', '-r', '-z', '--no-renames', '--name-only', '--no-commit-id', `${oid}^1`, to])
   const [work, index] = [await diff(oid), await diff(`${oid}^2`)]
   if (!work.ok || !index.ok) return null
   const third = await git(folder, ['rev-parse', '-q', '--verify', `${oid}^3`])
   const untracked = third.ok && third.out.trim() ? await git(folder, ['ls-tree', '-r', '-z', '--name-only', '--full-tree', third.out.trim()]) : null
   if (untracked && !untracked.ok) return null
-  return [...new Set([...work.out.split('\0'), ...index.out.split('\0'), ...(untracked?.out.split('\0') ?? [])].filter(Boolean))]
+  return new Set([...work.out.split('\0'), ...index.out.split('\0'), ...(untracked?.out.split('\0') ?? [])].filter(Boolean))
 }
 
 /**
