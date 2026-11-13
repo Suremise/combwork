@@ -347,21 +347,49 @@ export class JjPlatform implements PlatformAdapter {
   }
 
   async startTarget(card: CardRecord, o: WorkflowOptions): Promise<Maybe<string | null>> {
-    return card.target || o.target || null
+    const r = await this.resolveTarget(card, o)
+    return isUnknown(r) ? r : r.target
+  }
+
+  /**
+   * HI-3129 (Darren's decision (a), 13 Nov: a card keeps the bookmark it started on): a start's target. No kept slot (a
+   * fresh start): the card's own, else the project's (a lane's: its Merges into). A kept slot (its committed work from
+   * before it was put back, HI-2995): the target its binding names, proved (the slot's identity read, its binding this
+   * card's at that generation), never the project's; unproved (anything unknown, missing or another card's) refused
+   * `platform.keptOnTarget` `unread`, unknown never taken for fresh. Its own Merges into naming another bookmark is
+   * refused (`mismatch`), and a lane card whose lane merges into another (`platform.keptLine`, as HI-3112's Git), both
+   * before any slot is lent. `kept`: what the lend checks again before it records the target on the slot (`slotFor`).
+   */
+  private async resolveTarget(card: CardRecord, o: WorkflowOptions): Promise<Maybe<{ target: string | null; kept?: { slot: string; generation: string; target: string } }>> {
+    const follows = card.target || o.target || null
+    const kept = card.kind === 'no-code' || !this.wf ? null : await this.wf.cfg.keptHere?.(card)
+    if (!kept) return { target: follows }
+    const refuse = (why: 'unread' | 'mismatch', target = '', now = ''): Unknown => ({ ...unknown(UNREADABLE.target, { target: target || follows || '' }), rule: 'platform.keptOnTarget', ruleValues: { why, slot: kept.slot, target, now } })
+    const port = this.deps?.port() ?? null
+    const identity = port ? await port.identity!(kept.folder) : null
+    const b = port && identity ? await port.binding(kept.folder) : null
+    if (!identity || !b || isUnknown(b) || b.card !== card.id || b.generation !== identity.generation || !b.target) return refuse('unread')
+    if (card.target && card.target !== b.target) return refuse('mismatch', b.target, card.target)
+    const lane = card.lane ? this.wf!.lane(card.lane) : null
+    if (lane && !lane.ended && o.target && o.target !== b.target) return { ...unknown(UNREADABLE.target, { target: b.target }), rule: 'platform.keptLine', ruleValues: { kept: b.target, target: o.target } }
+    return { target: b.target, kept: { slot: kept.slot, generation: identity.generation, target: b.target } }
   }
 
   async start(card: CardRecord, o: WorkflowOptions, builder?: string, dry = false): Promise<Maybe<StartPlan>> {
     const d = this.deps
     if (!this.wf) return notYet()
-    const target = card.target || o.target || null
     // A no-code card changes nothing: it starts where its agent is, with no line (as under Git).
-    if (card.kind === 'no-code') return { folder: 'project', line: null, base: null, target }
+    if (card.kind === 'no-code') return { folder: 'project', line: null, base: null, target: card.target || o.target || null }
+    // HI-3129: its kept slot's bookmark, proved, before any slot is lent; else the card's or the project's.
+    const resolved = await this.resolveTarget(card, o)
+    if (isUnknown(resolved)) return resolved
+    const target = resolved.target
     if (o.folder !== 'slots' || !this.wf.cfg.slotFor) return withDetail(unknown(UNREADABLE.folderFor, { branch: card.key }), say(START_TEXT.slots))
     // HI-3106: no target bookmark chosen (jj resolves no default): refused saying so, never "couldn't read" a blank name.
     // Asked before jj's card work is needed: what the project's options lack is said first.
     if (!target) return { ...withDetail(unknown(UNREADABLE.target, { target: '' }), say(START_TEXT.target)), rule: 'platform.noTarget' }
     if (!d) return notYet()
-    const got = builder ? await this.wf.cfg.slotFor(card, builder, { dry, target }) : null
+    const got = builder ? await this.wf.cfg.slotFor(card, builder, { dry, target, ...(resolved.kept ? { kept: resolved.kept } : {}) }) : null
     if (!got) return withDetail(unknown(UNREADABLE.folderFor, { branch: card.key }), say(START_TEXT.noSlot))
     if ('wait' in got) return { folder: 'project', line: null, base: null, target, slotWait: got.wait }
     const port = d.port()
@@ -381,7 +409,8 @@ export class JjPlatform implements PlatformAdapter {
     if (isUnknown(b)) return b
     let base = th.head
     if (b && b.card === card.id && b.key && b.generation === identity.generation && this.ownKeys(card).has(b.key)) {
-      if (b.target !== target) return withDetail(unknown(UNREADABLE.target, { target }), say(START_TEXT.carryTarget, { slot: got.slot, target: b.target ?? '?' }))
+      // Its own binding on another bookmark than the start's (changed since it was resolved): refused as that, never "couldn't read".
+      if (b.target !== target) return { ...withDetail(unknown(UNREADABLE.target, { target }), say(START_TEXT.carryTarget, { slot: got.slot, target: b.target ?? '?' })), rule: 'platform.keptOnTarget', ruleValues: { why: 'mismatch', slot: got.slot, target: b.target ?? '', now: target ?? '' } } // i18n-ignore: a select's value, not text
       base = b.base
     }
     return { folder: got.folder, line: key, base, target, slot: got.slot, lease: got.lease, fresh: got.fresh, platform: { jj: { workspace: identity.workspace, store: identity.store, generation: identity.generation } } }
@@ -394,7 +423,12 @@ export class JjPlatform implements PlatformAdapter {
 
   async prime(card: CardRecord, s: CardState, o: WorkflowOptions): Promise<unknown> {
     if (!this.wf) return null
-    if (!s.started || s.stage === 'todo') return { view: null, folder: null, lease: null, holder: null, target: card.target || o.target || null, project: await this.ctxOf(this.wf.cfg.project) } satisfies Primed
+    if (!s.started || s.stage === 'todo') {
+      // HI-3129: the target the start will take (a kept slot's bookmark), else what it would follow; refused: as before.
+      const r = card.kind === 'no-code' ? null : await this.resolveTarget(card, o)
+      const target = r && !isUnknown(r) ? r.target : card.target || o.target || null
+      return { view: null, folder: null, lease: null, holder: null, target, project: await this.ctxOf(this.wf.cfg.project) } satisfies Primed
+    }
     const folder = this.wf.folderOf(s)
     return { view: s.started.line ? await this.ctxOf(folder) : null, folder, lease: s.started.lease ?? null, holder: this.holderOf(card, s), target: s.started.target ?? null, project: null } satisfies Primed
   }

@@ -69,7 +69,8 @@ export function TargetField(props: { card: TaskCard | null; b: WorkBadge | undef
   const flying = !!card && !!b?.startedOn
   const own = card ? (flying ? (b!.startedOn === targets?.default ? '' : b!.startedOn!) : (b?.target ?? '')) : value
   if (!targets && !own) return null
-  const open = !card || !b || b.stage === 'hold' || b.stage === 'todo' || flying
+  // HI-3129: a card in flight keeps its target where its platform can't move started work (jj): shown, not changed.
+  const open = !card || !b || b.stage === 'hold' || b.stage === 'todo' || (flying && !targets?.fixedInFlight)
   const save = async (to: string): Promise<void> => {
     if (!card) return setValue(to)
     let failed: string | null = null

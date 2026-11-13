@@ -212,9 +212,15 @@ function current(wf: Workflow, n: number, seq: number, lease: string): { card: C
  * the builder a reviewer (a carried slot, #1441, extends this). However it got its slot, a real start records its
  * target on it then, by the lease chosen (startServes).
  */
-export async function leaseForStart(ws: WorkspaceService, projectPath: string, card: Pick<CardRecord, 'id' | 'lane'>, builder: string, o: { dry: boolean; target: string | null }): Promise<SlotForStart> {
+export async function leaseForStart(ws: WorkspaceService, projectPath: string, card: Pick<CardRecord, 'id' | 'lane'>, builder: string, o: { dry: boolean; target: string | null; kept?: { slot: string; generation: string; target: string } }): Promise<SlotForStart> {
   const r = await slotForStart(ws, projectPath, card, builder, o)
   if (o.dry || !r || !('lease' in r)) return r
+  // HI-3129: a kept slot's target was resolved from its binding: read again before the target goes on its row. Changed
+  // or unreadable since: its lease given back as not started, its row as it was, and the start waits (it resolves again).
+  if (o.kept && r.slot === o.kept.slot && !(await (await poolFor(ws, projectPath)).keptBindingStill(o.kept.slot, card.id, o.kept.generation, o.kept.target))) {
+    await slotUnused(ws, projectPath, r.lease)
+    return { wait: say(T.keptMoved, { slot: o.kept.slot }) }
+  }
   const lost = await startServes(ws, projectPath, r.lease, builder, o.target)
   return lost ? { wait: lost } : r
 }
@@ -227,6 +233,7 @@ export async function leaseForStart(ws: WorkspaceService, projectPath: string, c
  */
 /** A card's slot's agent text (dialects, HI-2447): a start's waits, and why a builder isn't placed in its slot yet. */
 const T = {
+  keptMoved: agentMsg({ id: 'slot.start.keptMoved', text: "{slot}'s kept work changed while the start took it: the start tries again", note: "HI-3129: a start's wait: the kept slot's binding (the bookmark its work is on) changed, or couldn't be read, between the start resolving its target and recording it on the slot." }),
   leaseEnded: agentMsg({ id: 'slot.start.leaseEnded', text: "its slot's lease {lease} ended while the start took it: the start tries again", note: "A start's wait: the slot's lease ended between taking it and recording its target." }),
   ownSlotWaits: agentMsg({ id: 'slot.start.ownSlotWaits', text: "{agent}'s own slot {slot}, its run still there, {because}: this start waits for it rather than take a second slot", note: "A start's wait (HI-1762): the builder's own run still writes in a slot that can't be taken over now. {because} is one of slot.takeover.*." }),
   changed: agentMsg({ id: 'slot.takeover.changed', text: 'changed while it was taken over', note: 'As slot.takeover.gone: the slot changed while the start took it over, twice.' }),

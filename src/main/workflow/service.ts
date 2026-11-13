@@ -80,7 +80,7 @@ export function setQueueLive(fn: ((ws: WorkspaceService, project: string, target
  * written (slotCards.ts's). Given by the app as it starts (none in unit tests: no slots, a card starts where its agent is).
  */
 export interface SlotStarts {
-  leaseFor: (ws: WorkspaceService, project: string, card: CardRecord, builder: string, o: { dry: boolean; target: string | null }) => Promise<SlotForStart>
+  leaseFor: (ws: WorkspaceService, project: string, card: CardRecord, builder: string, o: { dry: boolean; target: string | null; kept?: { slot: string; generation: string; target: string } }) => Promise<SlotForStart>
   unused: (ws: WorkspaceService, project: string, lease: string) => Promise<void>
   /** HI-3069: a card's kept slot of the other version control (SlotPool.keptAcross), else null. */
   keptAcross?: (ws: WorkspaceService, project: string, card: number) => Promise<KeptAcross | null>

@@ -894,6 +894,21 @@
       "target": "plain"
     }
   },
+  "workflow.refused.platform.keptOnTarget.message": {
+    "placeholders": {
+      "why": "select",
+      "card": "plain",
+      "slot": "plain",
+      "target": "plain",
+      "now": "plain"
+    }
+  },
+  "workflow.refused.platform.keptOnTarget.next": {
+    "placeholders": {
+      "why": "select",
+      "target": "plain"
+    }
+  },
   "workflow.refused.platform.noTarget.message": {
     "placeholders": {
       "card": "plain"

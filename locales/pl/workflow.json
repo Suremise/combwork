@@ -669,5 +669,7 @@
   "workflow.slots.state.forgotten": "Niewymieniony przez jj",
   "workflow.slots.removeForgottenFree": "jj nie wymienia już workspace’u {slot}. Jego folder trafia do Kosza w obecnym stanie, ze wszystkimi zmianami w nim.",
   "workflow.refused.platform.keptElsewhere.message": "Karta {card} nie może się tam rozpocząć: jej zatwierdzona praca sprzed odłożenia jest zachowana w slocie {slot} i karta zaczyna się tylko w tym slocie.",
-  "workflow.refused.platform.keptElsewhere.next": "Poczekaj, aż slot {slot} będzie wolny, a potem uruchom kartę {card} ponownie: dostanie z powrotem ten slot razem ze swoją pracą."
+  "workflow.refused.platform.keptElsewhere.next": "Poczekaj, aż slot {slot} będzie wolny, a potem uruchom kartę {card} ponownie: dostanie z powrotem ten slot razem ze swoją pracą.",
+  "workflow.refused.platform.keptOnTarget.message": "{why, select, unread {Praca karty {card} jest zachowana w slocie {slot}, ale Combwork nie może odczytać, na którym bookmarku ta praca jest.} other {Wcześniejsza praca karty {card} jest w slocie {slot}, na {target}: karta nie może zacząć na {now}.}}",
+  "workflow.refused.platform.keptOnTarget.next": "{why, select, unread {Sprawdź slot (Kontrola wersji → Sloty i kopie albo w samym jj), a potem uruchom kartę ponownie.} other {Ustaw jej Scalanie do z powrotem na {target}, żeby kontynuować tam, albo najpierw zintegruj tę pracę.}}"
 }

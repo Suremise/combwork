@@ -8,7 +8,7 @@ import { agentMsg, currentChain, inDefaultDialect, overridesAny } from '../share
 import { RETURNED_COMMENT, returnedCommentFrom } from './workflow/queueState'
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
 import { COLUMN_CHOICES, TASK_COLUMNS, cardMatches, isTaskColumn, restoreOrders, searchedWords, sortCards } from '../shared/tasks'
-import { branchExists, dropEmptyLines, ownWork, pickTarget, projectTargets } from './workflow/targets'
+import { dropEmptyLines, ownWork, pickTarget, projectTargets, targetExists } from './workflow/targets'
 import { checkCardMove, holdChecked, IN_FLIGHT_STAGES, laneOf, laneStill, MoveRefused, moveTestHooks, rulesInto, stillAsChecked, stillHeld, type LaneSeen, type MoveRefusal } from './workflow/retargetCard'
 import type { RefHold } from './platform/repoContext'
 import { HISTORY, setStoredAgentRenderer, setStoredForAgents, storedAgentText, storedIds, storedLineText, storedText } from '../shared/taskHistory'
@@ -2229,12 +2229,14 @@ async function moveInFlight(n: number, target: string | null, def: string, actor
 async function targetPick(project: string, raw: unknown, actor: TaskActor, pin = false): Promise<string | null> {
   if (actor.kind === 'agent') throw new TaskPermissionError(TARGET.agents)
   const t = workspace.path && project ? await projectTargets(workspace, join(workspace.path, project)).catch(() => null) : null
+  // HI-3129: the repository's lines unreadable now: only the default can be named, another refused as unknown.
+  if (t?.othersUnread && typeof raw === 'string' && raw.trim() && raw.trim() !== t.default) throw new TaskConflictError(withValues(TARGET.missing, { target: raw.trim(), unknown: 'yes' }))
   const picked = pickTarget(t, raw)
   // Pinned (HI-2985): the default named is kept as itself, not as none.
   const p = pin && t && 'target' in picked && picked.target === null && typeof raw === 'string' && raw.trim() ? { target: t.default } : picked
   if ('target' in p) {
     // A listed branch work can start from now (HR2's round 1: listed is not made).
-    const there = p.target && workspace.path ? await branchExists(join(workspace.path, project), p.target) : true
+    const there = p.target && workspace.path ? await targetExists(workspace, join(workspace.path, project), p.target) : true
     if (there !== true) throw new TaskConflictError(withValues(TARGET.missing, { target: p.target ?? '', unknown: there === 'unknown' ? 'yes' : 'no' })) // i18n-ignore: select keys
     return p.target
   }
@@ -2277,6 +2279,10 @@ export async function setTarget(n: number, raw: unknown, actor: TaskActor, o: { 
   // HI-2753: a card in flight moves with its work kept, when that work is provably its own (its own path and locks).
   if (wf && def && IN_FLIGHT_STAGES.includes(wf.state(wf.store.card(n)).stage)) {
     const target = await targetPick(first.project, raw, actor, !!res)
+    // HI-3129: a platform that can't move started work (jj: its bookmarks, no `retarget`) keeps a card in flight where
+    // it started (Darren's decision (a)): its target and its proof there. Refused as the card's work keeping it.
+    const startedOn = wf.state(wf.store.card(n)).started?.target ?? def
+    if ((await projectTargets(ws, projectPath).catch(() => null))?.fixedInFlight && (target ?? def) !== startedOn) throw new TaskConflictError(withValues(TARGET.started, { card: cardRef(n), target: startedOn, unknown: 'no' }))
     if (res && wf.state(wf.store.card(n)).started?.target === res.to) return first
     // A retarget's move only from the target it was seen on (a stale preview, after an earlier move, moves nothing).
     if (o.expectFrom !== undefined && wf.state(wf.store.card(n)).started?.target !== o.expectFrom) throw new TaskConflictError(withValues(TARGET.changed, { card: cardRef(n) }))

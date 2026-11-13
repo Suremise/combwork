@@ -221,6 +221,12 @@ export interface WorkspacePort {
   lineHead(repo: string, line: string): Promise<Maybe<string | null>>
   /** The repository's default target line (Git: main, else master). */
   defaultLine(repo: string): Promise<Maybe<string>>
+  /**
+   * HI-3129 (Darren's decision (a), 13 Nov): the lines a card or lane may name as its Merges into, read from the
+   * repository (jj: its local bookmarks, conflicted ones left out), for a platform whose targets are its repository's.
+   * Absent (Git): the project's configured Other branches are its list. Unknown when it can't be read.
+   */
+  targetLines?(repo: string): Promise<Maybe<string[]>>
   /** Whether a line exists (false also when the tool can't say: a 0.9 worktree's recreation chooses by it, as before). */
   lineExists(repo: string, line: string): Promise<boolean>
   /** The workspaces whose registrations a prune would drop (their folders gone), by where each was. */
@@ -270,6 +276,11 @@ export interface WorkspacePort {
    * to another card leaves the slot bound to that card), or null: none, or it can't tell. Git has none.
    */
   heldCard?(folder: string, identity: WorkspaceIdentity | null): Promise<number | null>
+  /**
+   * HI-3129: the target the folder's binding names while it is `card`'s at the folder's generation, else null (another
+   * card's, none, or it can't tell). A kept slot's start checks it again before recording its target on the slot.
+   */
+  heldTarget?(folder: string, identity: WorkspaceIdentity | null, card: number): Promise<string | null>
   /**
    * HI-3010: a new `line` made at the folder's own head and checked out there, changing no file, only while the folder
    * is detached at `base` or a commit past it (a builder already at work commits on it before its slot is prepared).

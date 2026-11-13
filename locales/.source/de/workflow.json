@@ -375,6 +375,8 @@
   "workflow.refused.platform.keptElsewhere.next": "Wait until {slot} is free, then start {card} again: it gets that slot back, with its work.",
   "workflow.refused.platform.keptLine.message": "{card} can’t start: its branch was made from {kept} and still holds history {target} lacks, but its lane merges into {target}.",
   "workflow.refused.platform.keptLine.next": "Take it out of the lane and start it on its own, to merge into {kept}; or make a new card for {target}.",
+  "workflow.refused.platform.keptOnTarget.message": "{why, select, unread {{card}'s work is kept in slot {slot}, but Combwork can't read which bookmark that work is on.} other {{card}'s earlier work is in slot {slot}, on {target}: it can't start on {now}.}}",
+  "workflow.refused.platform.keptOnTarget.next": "{why, select, unread {Look at the slot (Version Control → Slots and copies, or jj itself), then start it again.} other {Set its Merges into back to {target} to go on with it there, or integrate that work first.}}",
   "workflow.refused.platform.noTarget.message": "{card} can’t start: its project has no target bookmark chosen, the one its work merges into.",
   "workflow.refused.platform.noTarget.next": "Choose one in Version Control → Workflow (Work merges into), then start it again.",
   "workflow.refused.platform.offLine.message": "{card}'s folder isn't on its branch {line}: {where, select, detached {its head is detached at {head}} other {it is on {on}}}, so the work there isn't what the card would merge.",

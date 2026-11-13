@@ -380,6 +380,11 @@
   "slot.run.noSupervisor": {
     "placeholders": {}
   },
+  "slot.start.keptMoved": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
   "slot.start.leaseEnded": {
     "placeholders": {
       "lease": "plain"

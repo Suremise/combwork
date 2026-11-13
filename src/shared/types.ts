@@ -4593,7 +4593,8 @@ export interface LaneStartRequest {
 export interface LaneStartInfo {
   pool: { id: string; name: string }[] | null
   /** The branches its Merges into offers (HI-2556): the project's Work merges into and the others it lists; null: none to pick. */
-  targets: { default: string; others: string[] } | null
+  /** HI-3129: `fixedInFlight`, a card in flight keeps its target (its platform can't move started work). */
+  targets: { default: string; others: string[]; othersUnread?: true; fixedInFlight?: true } | null
 }
 
 /** What Start lane… did: the lane recorded, and how each agent started (failed: the lane stays, why said). */

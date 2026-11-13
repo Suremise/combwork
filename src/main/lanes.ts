@@ -19,7 +19,7 @@ import { placeKey, renameRetrying, withFileLock } from './fsutil'
 import { openTable, readTable, saveTable, saveTableInBoard } from './storeTables'
 import { boardOpen, boardRead, boardWrite, cardOwnersNow, cardPlacesNow, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
 import { FactStore } from './workflow/factStore'
-import { branchExists, pickTarget, projectTargets, type ProjectTargets } from './workflow/targets'
+import { pickTarget, projectTargets, targetExists, type ProjectTargets } from './workflow/targets'
 import { otherThanOwn, targetedOf } from '../shared/workflow/compile'
 import { laneTarget } from './laneTarget'
 import { onAction } from './workflow/actionWorker'
@@ -1302,7 +1302,7 @@ async function targetChangesWarning(ws: WorkspaceService, projectPath: string, t
   return wf ? wf.targetChangesWarning(target) : null
 }
 
-/** A project's targets (HI-2556), or null: not a Git project, or none readable. */
+/** A project's targets (HI-2556), or null: none readable. */
 async function projectTargetsOf(ws: WorkspaceService, project: string): Promise<ProjectTargets | null> {
   return ws.path ? await projectTargets(ws, join(ws.path, project)).catch(() => null) : null
 }
@@ -1318,7 +1318,7 @@ async function lanePick(ws: WorkspaceService, project: string, raw: unknown): Pr
   const p = pickTarget(t, raw)
   if ('target' in p) {
     // A listed branch work can start from now (HR2's round 1: listed is not made).
-    const there = p.target && ws.path ? await branchExists(join(ws.path, project), p.target) : true
+    const there = p.target && ws.path ? await targetExists(ws, join(ws.path, project), p.target) : true
     if (there !== true) throw new LaneError(409, withValues(M.targetMissing, { target: p.target ?? '', unknown: there === 'unknown' ? 'yes' : 'no' })) // i18n-ignore: select keys
     return p.target
   }

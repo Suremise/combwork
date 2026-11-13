@@ -378,6 +378,8 @@ interface CombworkMessageValues {
   'workflow.refused.platform.keptElsewhere.next': { slot: string | number; card: string | number }
   'workflow.refused.platform.keptLine.message': { card: string | number; kept: string | number; target: string | number }
   'workflow.refused.platform.keptLine.next': { kept: string | number; target: string | number }
+  'workflow.refused.platform.keptOnTarget.message': { why: string; card: string | number; slot: string | number; target: string | number; now: string | number }
+  'workflow.refused.platform.keptOnTarget.next': { why: string; target: string | number }
   'workflow.refused.platform.noTarget.message': { card: string | number }
   'workflow.refused.platform.noTarget.next': undefined
   'workflow.refused.platform.noUpstream.message': { card: string | number; target: string | number }
