@@ -389,16 +389,6 @@
     "note": "HI-2944: an error from Commit or Set aside: git's index is locked by another git command.",
     "audience": "both"
   },
-  "service.folderChanges.indexKept": {
-    "text": "{action, select, commit {Git made the commit ({made})} other {Git set the changes aside in a stash ({made})}}, but another git command staged {file}{others, plural, =0 {} one { and one other file} other { and # other files}} meanwhile, so Combwork kept that staging as it was. Check git status before going on.",
-    "note": "HI-3053: an error from Commit or Set aside (a paused merge, a start's warning) or Files' Commit it: git committed (or stashed) the files ({made}, a commit or stash id), but while it ran another git command (the user's git add, say) changed git's index (staging area) for {file} (a path) and {others} more files; Combwork left those as that command staged them rather than writing over them. {action} is commit or setAside. Keep git status as it is: a command.",
-    "audience": "both"
-  },
-  "service.folderChanges.indexNotTaken": {
-    "text": "{action, select, commit {Git made the commit ({made})} other {Git set the changes aside in a stash ({made})}}, but Combwork couldn't update the index for those files afterwards: {why}. Until it's updated, git status may show them as changed in the index: once no git command is running, run git reset on them.",
-    "note": "HI-3021: an error from Commit or Set aside (a paused merge, a start's warning): git committed (or stashed) the files ({made}, a commit or stash id), but updating git's index (staging area) for them afterwards failed; {why} is git's own message (English), often another git command holding the index. {action} is commit or setAside. Keep git status and git reset as they are: commands.",
-    "audience": "both"
-  },
   "service.folderChanges.midOperation": {
     "text": "Git is in the middle of {state, select, merge {a merge} rebase {a rebase} cherryPick {a cherry-pick} other {a revert}} in {folder}. Finish or abort it first.",
     "note": "HI-2944: an error from Commit or Set aside: a git operation is under way in the folder ({folder}, a path); nothing was done.",
@@ -537,6 +527,11 @@
   "service.forward.resolveRaced": {
     "text": "{card} changed while it was being handed to a builder (a Retry, a Remove or another Resolve), so nothing was made: look at the card, then ask again if needed.",
     "note": "HI-2959: Resolve on a builder stopped part way because the forward merge card ({card}: its key) changed meanwhile; nothing was kept.",
+    "audience": "both"
+  },
+  "service.forward.unreadable": {
+    "text": "{to} isn’t brought up to date with {from}: Combwork couldn’t read {what}, so nothing was queued.{detail, select, none {} other { Git said: {detail}}}",
+    "note": "HI-3126: a forward merge (bringing branch {to} up to date with branch {from}) refused under “The target branch follows its remote”: Combwork reads both branches’ remote heads first, and one couldn’t be read. {what} says what (a phrase of its own, already translated); {detail} is Git’s own words in English, or “none” (keep the select keys). Branch names stay as they are.",
     "audience": "both"
   },
   "service.fsutil.keptBusy": {

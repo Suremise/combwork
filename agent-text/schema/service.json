@@ -336,21 +336,6 @@
   "service.folderChanges.indexBusy": {
     "placeholders": {}
   },
-  "service.folderChanges.indexKept": {
-    "placeholders": {
-      "action": "select",
-      "made": "plain",
-      "file": "plain",
-      "others": "plural"
-    }
-  },
-  "service.folderChanges.indexNotTaken": {
-    "placeholders": {
-      "action": "select",
-      "made": "plain",
-      "why": "plain"
-    }
-  },
   "service.folderChanges.midOperation": {
     "placeholders": {
       "state": "select",
@@ -505,6 +490,14 @@
   "service.forward.resolveRaced": {
     "placeholders": {
       "card": "plain"
+    }
+  },
+  "service.forward.unreadable": {
+    "placeholders": {
+      "to": "plain",
+      "from": "plain",
+      "what": "plain",
+      "detail": "select"
     }
   },
   "service.fsutil.keptBusy": {

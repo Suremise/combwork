@@ -712,15 +712,16 @@
     "text": "Created the project {name}"
   },
   "api.done.forwardQueued": {
-    "text": "{queued, select, yes {Queued {card}: bringing {to} up to date with {from}, through {to}'s merge queue{override, select, yes {, with the user’s override of the release path’s direction} other {}}} other {{override, select, yes {Recorded the user’s override on {card}, the resolution bringing {to} up to date with {from}: its builder is told to submit it again} other {{card} is bringing {to} up to date with {from} already}}}}",
-    "note": "HI-2892: override yes when the request overrode the release path’s direction (the user’s explicit choice), recorded on its card. HI-3040: queued no with override yes: the override was recorded on the resolution the queue returned for its direction."
+    "text": "{queued, select, yes {Queued {card}: bringing {to} up to date with {from}, through {to}'s merge queue{override, select, yes {, with the user’s override of the release path’s direction} other {}}} other {{override, select, yes {Recorded the user’s override on {card}, the resolution bringing {to} up to date with {from}: its builder is told to submit it again} other {{card} is bringing {to} up to date with {from} already}}}}{ahead, plural, =0 {} one {. # commit of the local {from} isn't on its remote, so it wasn't brought in: publish it first if it should be} other {. # commits of the local {from} aren't on its remote, so they weren't brought in: publish them first if they should be}}",
+    "note": "HI-3126: ahead, under follow mode, the commits of the local branch {from} its remote lacks, left out (0: none). HI-2892: override yes when the request overrode the release path’s direction (the user’s explicit choice), recorded on its card. HI-3040: queued no with override yes: the override was recorded on the resolution the queue returned for its direction."
   },
   "api.done.forwardResolved": {
     "text": "Made {card} for a builder to merge {from} ({source}) into {to} and resolve it; {forward} is Done, nothing merged",
     "note": "HI-2959: Resolve on a builder’s reply. {card}: the new card; {forward}: the forward merge card it ended; {source}: a short commit id."
   },
   "api.done.forwardUpToDate": {
-    "text": "{to} has everything of {from} already: nothing queued"
+    "text": "{to} has everything of {from} already: nothing queued{ahead, plural, =0 {} one {. # commit of the local {from} isn't on its remote, so it wasn't brought in: publish it first if it should be} other {. # commits of the local {from} aren't on its remote, so they weren't brought in: publish them first if they should be}}",
+    "note": "HI-3126: ahead, under follow mode, the commits of the local branch its remote lacks (0: none)."
   },
   "api.done.freshRetried": {
     "text": "{retried, plural, =0 {Lane {lane}: no new conversation was waiting to be retried} one {Lane {lane}: {total} new conversation tried again} other {Lane {lane}: {total} new conversations tried again}}"

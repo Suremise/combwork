@@ -93,8 +93,9 @@ describe("a card's save writes what changed (#1210)", () => {
     // With its project's id, as Combwork saves a card (one saved without would take it, and its number there, #1219, now).
     const projectId = [...(await w.projectIds()).byId.keys()][0]
     await inWorkspace(w, () => writeCard(w, 1, { ...bigCard(1), blockedBy: [], links: [], projectId }))
-    // Its comment and the card's own row (its time): never its 600 other entries.
-    expect(await rowsWritten(ws, () => inWorkspace(w, () => tasks.commentTask(1, 'Through the board', user)))).toBe(2)
+    // Its comment, the card's own row (its time) and the user's comment's fact (its comment generation, HI-2854): never
+    // its 600 other entries.
+    expect(await rowsWritten(ws, () => inWorkspace(w, () => tasks.commentTask(1, 'Through the board', user)))).toBe(3)
   })
 
   it('after any mix of edits the card composes back to the bytes it was saved as', async () => {

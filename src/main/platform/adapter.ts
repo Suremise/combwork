@@ -22,6 +22,8 @@ export interface StartPlan {
   target: string | null
   /** The folder is there already (an agent's own worktree standing in for a slot): nothing to prepare. */
   existing?: boolean
+  /** Slots (HI-3112): the card's line from an earlier start is there already and carries on, not made from the target. */
+  carried?: boolean
   /** Slots (#1438): the slot lent for it and its lease (`fresh`: lent for this start, given back if it isn't written). */
   slot?: string
   lease?: string

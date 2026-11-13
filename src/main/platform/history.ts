@@ -154,6 +154,13 @@ export interface HistoryPort {
    * kept a minute per repository and target). Unknown when it can't be read. Absent: a platform with no remote to look at.
    */
   remoteHas?(repo: string, target: string, revision: string): Promise<Maybe<boolean>>
+  /**
+   * HI-3126: the head of the remote branch `line` tracks, fetched now (sealed, within `timeoutMs`) and pinned at `pin`;
+   * `untracked` only when it tracks none at all (neither its remote nor its merge setting set). Tracking set up any other
+   * way (half of it, another local branch, a remote that isn't there), a read or a fetch that fails: unknown, saying why.
+   * Absent: a platform with no remote to look at.
+   */
+  trackedHead?(repo: string, line: string, pin: string, timeoutMs: number): Promise<Maybe<string | 'untracked'>>
   /** A line's own revisions since a base, newest first (its first parents). */
   firstParents(repo: string, base: string, head: string): Promise<Maybe<readonly string[]>>
   /** A range's commits, oldest first, with their authors and card trailers (attribution's read). */

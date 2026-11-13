@@ -75,6 +75,11 @@ export interface PlatformDescriptor {
    * without one, and a project using it whose repository is gone is offered a switch. None works in any folder.
    */
   repository: boolean
+  /**
+   * HI-3106: whether an empty target means the repository's default line (Git's default branch). jj resolves none, so a
+   * switch to it seeds the target from the platform left; None has no target to resolve.
+   */
+  defaultTarget: boolean
   /** What the window can change in its repository (port 5's operations, HI-2788); None has none. */
   operations: readonly Operation[]
   /** A revision as shown: Git's 7 characters; None's content hash shortened the same way. */
@@ -112,14 +117,14 @@ const short12 = (id: string): string => id.slice(0, 12)
 
 export const PLATFORMS: Record<PlatformId, PlatformDescriptor> = {
   // Git answers everything: worktrees for isolation, merges for integration, replay for sameness.
-  git: { id: 'git', capabilities: ['revisions', 'isolation', 'checkCopies', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'merge', deliverables: 'commits', repository: true, operations: OPERATIONS, revisionShort: short, remedies: GIT_REMEDIES, gates: [] },
+  git: { id: 'git', capabilities: ['revisions', 'isolation', 'checkCopies', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'merge', deliverables: 'commits', repository: true, defaultTarget: true, operations: OPERATIONS, revisionShort: short, remedies: GIT_REMEDIES, gates: [] },
   // None: content hashes as revisions, acceptance as integration, no isolation in 1.0 (OP-16). No repository to change:
   // Initialise repository is on Git's page (HI-1905), gated by Git's operations.
-  none: { id: 'none', capabilities: ['revisions', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'accept', deliverables: 'paths', repository: false, operations: [], revisionShort: short, gates: [] },
+  none: { id: 'none', capabilities: ['revisions', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'accept', deliverables: 'paths', repository: false, defaultTarget: false, operations: [], revisionShort: short, gates: [] },
   // jj (HI-2799, J6; SPEC §16.3.6): workspaces for isolation (J2), pinned history and attribution (J3). No integration, ever,
   // under Darren's option A (HI-2794: no automatic advance, the user integrates), and no operation in the window (R5.2):
   // jj itself changes bookmarks. Every gate is closed until its J card's evidence opens it.
-  jj: { id: 'jj', capabilities: ['revisions', 'isolation', 'containment', 'sameness', 'authorship', 'observe'], integration: 'user', deliverables: 'commits', repository: true, operations: [], revisionShort: short12, changeShort: short12, gates: GATES }
+  jj: { id: 'jj', capabilities: ['revisions', 'isolation', 'containment', 'sameness', 'authorship', 'observe'], integration: 'user', deliverables: 'commits', repository: true, defaultTarget: false, operations: [], revisionShort: short12, changeShort: short12, gates: GATES }
 }
 
 export const hasCapability = (platform: PlatformId, c: Capability): boolean => PLATFORMS[platform].capabilities.includes(c)

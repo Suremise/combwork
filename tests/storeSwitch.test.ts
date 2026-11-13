@@ -199,6 +199,169 @@ describe('a switch between Git and jj is the repository’s (HI-2799)', () => {
     expect(await startCard(w, q, 'q')).not.toMatchObject({ refused: true, rule: expect.stringMatching(/^platform\./) })
   })
 
+  it("HI-3106: a switch to jj gives a project with no jj target Git's: the repository's default branch, or the one Git's options name; one jj already names is kept", async () => {
+    const { w, p, q } = await workspace({ p: 'git', q: 'git' })
+    // P's Git options name a target of their own; Q's name none (its default branch, main).
+    await w.mutateProjectConfig(p, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, target: 'integration' } } }), { existing: true })
+    await sw.setPlatform(w, p, 'jj', { expected: 'git', token: (await sw.checkPlatformSwitch(w, p, 'jj')).store!.token })
+    expect([await platformIn(w, p), await platformIn(w, q)]).toEqual(['jj', 'jj'])
+    expect((await w.projectConfig(p)).workflow?.options?.target).toBe('integration')
+    expect((await w.projectConfig(q)).workflow?.options?.target).toBe('main')
+    // Back to Git and to jj again: jj's own target, kept from before, isn't replaced.
+    await w.mutateProjectConfig(q, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, target: 'trunk' } } }), { existing: true })
+    await sw.setPlatform(w, p, 'git', { expected: 'jj', token: (await sw.checkPlatformSwitch(w, p, 'git')).store!.token })
+    await sw.setPlatform(w, p, 'jj', { expected: 'git', token: (await sw.checkPlatformSwitch(w, p, 'jj')).store!.token })
+    expect((await w.projectConfig(q)).workflow?.options?.target).toBe('trunk')
+  })
+
+  it("HI-3106: a jj start with no target chosen is refused saying so (platform.noTarget), never as an unreadable blank", async () => {
+    const { w, q } = await workspace({ p: 'git', q: 'git' })
+    await sw.setPlatform(w, q, 'jj', { expected: 'git', token: (await sw.checkPlatformSwitch(w, q, 'jj')).store!.token })
+    await w.mutateProjectConfig(q, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, folder: 'slots', target: '' } } }), { existing: true })
+    const r = await startCard(w, q, 'q')
+    expect(r).toMatchObject({ refused: true, rule: 'platform.noTarget' })
+    expect(JSON.stringify(r)).toContain('has no target bookmark chosen')
+    expect(JSON.stringify(r)).toContain('Choose one in Version Control → Workflow (Work merges into)')
+    expect(JSON.stringify(r)).not.toContain('Provider Setup')
+  })
+
+  describe('HI-3104: a Git start in a project folder on no branch', () => {
+    const wsOf = (p: string) => join(p, '..')
+    it('detached, its branch proved: refused naming it; checked out: it starts', async () => {
+      const { w, p } = await workspace({ p: 'git', q: 'git' })
+      git(wsOf(p), 'checkout', '-q', '--detach')
+      const head = git(wsOf(p), 'rev-parse', '--short=7', 'HEAD')
+      const r = await startCard(w, p, 'p')
+      expect(r).toMatchObject({ refused: true, rule: 'platform.detachedFolder' })
+      expect(JSON.stringify(r)).toContain(`the project folder is on no branch (its head is detached at ${head})`)
+      expect(JSON.stringify(r)).toContain('Check out its branch in the project folder (git switch main)')
+      git(wsOf(p), 'checkout', '-q', 'main')
+      expect(await startCard(w, p, 'p')).not.toMatchObject({ rule: 'platform.detachedFolder' })
+    })
+
+    it('detached with no local branch to name: the general instruction, never a guessed branch', async () => {
+      const { w, p } = await workspace({ p: 'git', q: 'git' })
+      git(wsOf(p), 'checkout', '-q', '--detach')
+      git(wsOf(p), 'branch', '-q', '-D', 'main')
+      const r = await startCard(w, p, 'p')
+      expect(r).toMatchObject({ refused: true, rule: 'platform.detachedFolder' })
+      expect(JSON.stringify(r)).toContain('Check out a branch in the project folder (an existing one with git switch, or a new one with git switch -c)')
+      expect(JSON.stringify(r)).not.toMatch(/git switch (main|undefined|null|HEAD)\b/)
+    })
+
+    it('a no-code card, and a slots start waiting for a slot: never refused for the project folder’s head', async () => {
+      const { w, p } = await workspace({ p: 'git', q: 'git' })
+      git(wsOf(p), 'checkout', '-q', '--detach')
+      const noCode = await inWorkspace(w, () => tasks.createTask({ title: 'Look only', project: 'p', kind: 'no-code' }, user))
+      const wf = (await workflowFor(w, p))!
+      expect(await store.boardWrite(w, async () => wf.start(`#${noCode.number}`, agentActor('b-p')))).not.toMatchObject({ rule: 'platform.detachedFolder' })
+      await w.mutateProjectConfig(p, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, folder: 'slots' } } }), { existing: true })
+      const service = await import('../src/main/workflow/service')
+      service.setSlotStarts({ leaseFor: async () => ({ wait: 'every slot is in use' }), unused: async () => undefined })
+      try {
+        const busy = await startCard(w, p, 'p')
+        expect(busy).not.toMatchObject({ rule: 'platform.detachedFolder' })
+        // As before this card (the provisional plan's target is the folder's line, none when detached, so the evidence
+        // read first differs: evidence.changed, carded separately); never the detached refusal.
+        expect(busy).toMatchObject({ refused: true, rule: 'evidence.changed' })
+        git(wsOf(p), 'checkout', '-q', 'main')
+        expect(await startCard(w, p, 'p')).toMatchObject({ refused: true, rule: 'start.slotAvailable' })
+      } finally {
+        service.setSlotStarts(null)
+      }
+    })
+  })
+
+  it('HI-3104: the switch back to Git lists each member whose folder is on no branch, with its head', async () => {
+    const { w, p, q } = await workspace({ p: 'git', q: 'git' })
+    await sw.setPlatform(w, p, 'jj', { expected: 'git', token: (await sw.checkPlatformSwitch(w, p, 'jj')).store!.token })
+    expect((await sw.checkPlatformSwitch(w, p, 'git')).store?.detached).toBeUndefined()
+    git(join(p, '..'), 'checkout', '-q', '--detach')
+    const head = git(join(p, '..'), 'rev-parse', '--short=7', 'HEAD')
+    const back = await sw.checkPlatformSwitch(w, p, 'git')
+    expect(back.store?.detached?.map((d) => [d.project, d.head]).sort()).toEqual([['p', head], ['q', head]])
+    expect(back.refused).toBeNull()
+    void q
+  })
+
+  it('HI-3105: a fallback read that only raced a moving operation head is read again; anything else is the answer at once', async () => {
+    const moved = [{ code: 'unknown' as const, detail: 'moved' }]
+    const ready: { code: 'notExported'; name: string }[] = []
+    const seq = (answers: unknown[]) => {
+      let i = 0
+      const read = async () => answers[Math.min(i++, answers.length - 1)] as never
+      return { read, count: () => i }
+    }
+    const a = seq([moved, moved, ready])
+    expect(await ss.retryMoved(a.read)).toEqual([])
+    expect(a.count()).toBe(3)
+    const b = seq([moved, moved, moved, ready])
+    expect(await ss.retryMoved(b.read)).toEqual(moved)
+    expect(b.count()).toBe(3)
+    const other = [{ code: 'unknown' as const, detail: 'heads: 2' }]
+    const c = seq([other, ready])
+    expect(await ss.retryMoved(c.read)).toEqual(other)
+    expect(c.count()).toBe(1)
+    const d = seq([[{ code: 'notExported', name: 'main' }]])
+    expect(await ss.retryMoved(d.read)).toEqual([{ code: 'notExported', name: 'main' }])
+    expect(d.count()).toBe(1)
+  })
+
+  it("HI-3105 (HR1's round 1): after a refusal at Switch, the dialog gives way to a fresh look when the check reads clear or refuses with lists, else keeps the error", async () => {
+    const { rereadAfterRefusal } = await import('../src/shared/platform/switching')
+    const shown = { group: [], token: 't', drain: { lanes: [], cards: [], queue: [], slots: [], copies: [], kept: [] } }
+    // The race passed: clear now, a fresh confirmation (no switch made by itself).
+    expect(rereadAfterRefusal({ refused: null, store: shown })).toBe(true)
+    // What the warning lists changed: the refused dialog with its lists.
+    expect(rereadAfterRefusal({ refused: { why: 'drain' }, store: shown })).toBe(true)
+    expect(rereadAfterRefusal({ refused: { why: 'fallback' }, store: shown })).toBe(true)
+    // The check itself couldn't be read, or refuses for something with no list: the original error stays.
+    expect(rereadAfterRefusal(null)).toBe(false)
+    expect(rereadAfterRefusal({ refused: { why: 'noGit' } })).toBe(false)
+    expect(rereadAfterRefusal({ refused: { why: 'drain' } })).toBe(false)
+  })
+
+  it("HI-3105 (HR2's round 2): pressing Switch: a refusal re-checked clear gives a fresh look, never a second switch; any other failure stays the error", async () => {
+    const { switchAtConfirm } = await import('../src/shared/platform/switching')
+    const shown = { group: [], token: 't', drain: { lanes: [], cards: [], queue: [], slots: [], copies: [], kept: [] } }
+    const flow = (switchIt: () => Promise<never>, rechecks: unknown[]) => {
+      const calls = { switch: 0, recheck: 0 }
+      const run = switchAtConfirm({
+        switchIt: async () => (calls.switch++, switchIt()),
+        recheck: async () => rechecks[calls.recheck++] as never
+      })
+      return { run, calls }
+    }
+    // A passing race: refused (fallback), the check read again is clear: a fresh look, the switch made once only.
+    const race = flow(async () => ({ refused: { why: 'fallback' } }) as never, [{ refused: null, store: shown }])
+    expect(await race.run).toBe('reread')
+    expect(race.calls).toEqual({ switch: 1, recheck: 1 })
+    // An unrelated failure (a save denied): the error itself, the check not read again, whatever it would say.
+    const denied = flow(async () => {
+      throw new Error('EACCES: permission denied saving project.json')
+    }, [{ refused: null, store: shown }])
+    await expect(denied.run).rejects.toThrow('EACCES: permission denied saving project.json')
+    expect(denied.calls).toEqual({ switch: 1, recheck: 0 })
+    // A refusal whose re-check can't be read: the refusal stays the dialog's error.
+    const unread = flow(async () => ({ refused: { why: 'drain' } }) as never, [null])
+    expect(await unread.run).toEqual({ refused: { why: 'drain' } })
+    // Switched: nothing more.
+    const ok = flow(async () => ({ switched: { from: 'jj', to: 'git' } }) as never, [])
+    expect(await ok.run).toBe('switched')
+    expect(ok.calls).toEqual({ switch: 1, recheck: 0 })
+  })
+
+  it('HI-3105: the switch IPC gives a repository refusal as data, and any other failure as an error', async () => {
+    const { w, p } = await workspace({ p: 'git', q: 'git' })
+    await sw.setPlatform(w, p, 'jj', { expected: 'git', token: (await sw.checkPlatformSwitch(w, p, 'jj')).store!.token })
+    const lease = await new SlotStore(boardConn(w), await idOf(w, p)).take({ agent: 'b-ipc', card: 990 }, { size: 4, root: join(base, 'ipc-slots'), target: 'main', token: 't-ipc', holder: { pid: process.pid, started: 1 }, platform: 'jj' })
+    expect(lease.ok).toBe(true)
+    const { SwitchRefusedError } = ss
+    const refused = await sw.setPlatform(w, p, 'git', { expected: 'jj', token: (await sw.checkPlatformSwitch(w, p, 'git')).store!.token }).then(() => null, (e: unknown) => e)
+    expect(refused).toBeInstanceOf(SwitchRefusedError)
+    expect((refused as InstanceType<typeof SwitchRefusedError>).refusal).toEqual({ why: 'drain' })
+  })
+
   it('a group changed after its warning is refused, and a fresh warning gives the new group (1f)', async () => {
     const { w, p, q } = await workspace({ p: 'git', q: 'none' })
     const first = (await sw.checkPlatformSwitch(w, p, 'jj')).store!

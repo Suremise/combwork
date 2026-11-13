@@ -26,13 +26,14 @@ import { foundKey, platformIdOf, projectPlatform } from '../platform/registry'
 import { needsRepository, PLATFORMS, type PlatformId } from '../../shared/platform/descriptors'
 import { drainEmpty, PLATFORM_NAME, SWITCH_REFUSED, switchRefusalText, type FallbackProblem, type GateCheck, type StoreSwitch, type SwitchDrain, type SwitchRefusal } from '../../shared/platform/switching'
 import { setKept } from '../../shared/workflow/projectWorkflow'
+import { workspacePortOf } from '../platform/workspacePorts'
 import { withValues } from '../../shared/advanced'
-import type { ProjectConfig } from '../../shared/types'
+import type { ProjectConfig, ProjectWorkflow } from '../../shared/types'
 import { onAfterRefresh, openWorkspaces, type WorkspaceService } from '../workspace'
 import { cardsInFlight } from './optionsForm'
 import { workflowFor } from './service'
 import { queueChanged } from './queueHost'
-import { workflowChanged } from './rulesets'
+import { resolvedOf, workflowChanged } from './rulesets'
 import { workflowWrite } from './writes'
 import { withFolderRepoLocks } from '../platform/repoPorts'
 import { commonGitDir } from '../repoLock'
@@ -307,6 +308,28 @@ const UNSUPPORTED = PLATFORMS.jj.gates.filter((g) => !(REPO_GATES as readonly st
  * Git's branch both its commit), no conflicted commit among the bookmarks' history. Read pinned.
  */
 export async function fallbackOf(path: string, runner: JjRunner = jjRunner): Promise<FallbackProblem[]> {
+  return retryMoved(() => fallbackOnce(path, runner))
+}
+
+/** How many times a fallback read that raced a moving operation head is made (HI-3105). */
+const MOVED_TRIES = 3
+
+/**
+ * HI-3105: a fallback read that only raced jj's operation head moving (its own work after a put-back, the user's command:
+ * its sole problem `unknown` `moved`) made again, at most `tries` times in all, before it is shown as a problem; any other
+ * answer is the answer at once.
+ */
+export async function retryMoved(read: () => Promise<FallbackProblem[]>, tries = MOVED_TRIES): Promise<FallbackProblem[]> {
+  let problems: FallbackProblem[] = []
+  for (let attempt = 0; attempt < tries; attempt++) {
+    problems = await read()
+    if (!(problems.length === 1 && problems[0].code === 'unknown' && /^moved\b/.test(problems[0].detail))) return problems
+  }
+  return problems
+}
+
+/** One fallback read (fallbackOf's). */
+async function fallbackOnce(path: string, runner: JjRunner): Promise<FallbackProblem[]> {
   // Confirmed pinned at the single head (never a merge of diverged ones), the heads read again after.
   const d = await pinnedContextOf(path, runner)
   if ('jjUnknown' in d && d.jjUnknown === 'heads') return [{ code: 'heads', n: Number(d.detail) || 0 }]
@@ -353,6 +376,25 @@ export async function storeRunsOther(ws: WorkspaceService, path: string, to: Pla
   return used.size && !used.has(to) ? [...used][0] : null
 }
 
+/**
+ * HI-3104: the members whose folder, read by the platform switched to (its port: the line checked out, null when
+ * detached), is on no branch now, with its head. Only those read as detached: a read that fails names none (HR2's design:
+ * never claimed), and a platform whose folders check out no branch (no default target) lists none.
+ */
+async function detachedMembers(members: readonly Member[], to: PlatformId): Promise<{ project: string; head: string }[]> {
+  const port = PLATFORMS[to].defaultTarget ? workspacePortOf(to) : null
+  if (!port) return []
+  const out: { project: string; head: string }[] = []
+  for (const m of members) {
+    // Detached only when read as such (null); a failed read or an unknown is no claim.
+    const line = await port.line(m.path).catch(() => 'unread' as const)
+    if (line !== null) continue
+    const head = await port.head(m.path).catch(() => null)
+    if (typeof head === 'string' && head) out.push({ project: m.name, head: head.slice(0, 7) })
+  }
+  return out
+}
+
 /** A store-wide switch's warning and its refusal, read without changing anything (the dialog's, and the switch's own). */
 export async function checkStoreSwitch(ws: WorkspaceService, path: string, to: PlatformId): Promise<{ refused: SwitchRefusal | null; store: StoreSwitch }> {
   const g = await groupOf(ws, path)
@@ -372,6 +414,9 @@ export async function checkStoreSwitch(ws: WorkspaceService, path: string, to: P
   } else {
     // The repository's jj state, whichever member asks (HI-3034): a member with no .jj of its own reads none.
     store.fallback = await (storeSwitchSeams.repo?.fallback ?? fallbackOf)(await jjSideOf(path, g.members))
+    // HI-3104: the members whose folder is on no branch now (a colocated jj repository's head is detached), said beside.
+    const detached = await detachedMembers(g.members, to)
+    if (detached.length) store.detached = detached
     // jj missing or not the tested version (HI-2975): the repository's readiness can't be checked, so the switch is
     // refused saying the way out (install the tested jj, or remove .jj once done with it), not as a list's `unknown`.
     if (!refused && store.fallback.some((f) => f.code === 'unknown' && /^tool(:|$)/.test(f.detail))) refused = { why: 'jjToolBack', state: jjRunner.readinessNow().state } // i18n-ignore: a code or SQL, never shown as text
@@ -384,11 +429,16 @@ export async function checkStoreSwitch(ws: WorkspaceService, path: string, to: P
   return { refused, store }
 }
 
-const refusalError = (r: SwitchRefusal): CombworkError => {
-  const t = switchRefusalText(r)
-  // agent-text: switchRefusalText
-  return new CombworkError(t.values ? withValues(t.m, t.values) : t.m, { kind: 'conflict' })
+/** HI-3105: a repository switch refused, its reason kept as data beside its text (the window's dialog looks again by it). */
+export class SwitchRefusedError extends CombworkError {
+  constructor(readonly refusal: SwitchRefusal) {
+    const t = switchRefusalText(refusal)
+    // agent-text: switchRefusalText
+    super(t.values ? withValues(t.m, t.values) : t.m, { kind: 'conflict' })
+  }
 }
+
+const refusalError = (r: SwitchRefusal): CombworkError => new SwitchRefusedError(r)
 
 /** Runs one fence write in the workspace database. */
 const fenceWrite = <T>(ws: WorkspaceService, fn: (meta: Meta) => T): Promise<T> => boardWrite(ws, async () => boardWriteOp(ws, (db) => fn(metaOf(db))))
@@ -431,7 +481,8 @@ async function switchLocked(ws: WorkspaceService, path: string, from: PlatformId
     const cfg = await ws.projectConfig(m.path)
     const before = snapOf(cfg, m.path)
     const mDetected = projectPlatform(m.path, to).detected
-    const after: Snap = { platform: to, platformFound: foundKey(mDetected), ...(before.workflow !== undefined ? { workflow: JSON.parse(JSON.stringify(setKept(cfg.workflow!, to))) as unknown } : {}) }
+    const next = before.workflow !== undefined ? await seedJjTarget(ws, m.path, cfg.workflow!, setKept(cfg.workflow!, to)) : undefined
+    const after: Snap = { platform: to, platformFound: foundKey(mDetected), ...(next !== undefined ? { workflow: JSON.parse(JSON.stringify(next)) as unknown } : {}) }
     begin.push({ id: m.id, path: m.path, before, after })
   }
   const owner = await fenceOwner(ws)
@@ -507,6 +558,20 @@ async function settleFromDisk(ws: WorkspaceService, store: string, generation: n
   const currents = Object.fromEntries(Object.entries(f.members).filter(([, m]) => participates(f, m)).map(([id, m]) => [id, 'forward' in r ? m.attempt!.after : m.attempt!.before]))
   await fenceWrite(ws, (meta) => settle(meta, store, generation, currents))
   return 'forward' in r ? 'forward' : 'back'
+}
+
+/**
+ * HI-3106: a project switched to a platform with no default target (jj: its descriptor's `defaultTarget` false) whose
+ * options there, as they resolve (its own, the workspace's, Combwork's), name none gets the platform left's as its own:
+ * the target its options resolve to, else its repository's default line (its port's `defaultLine`; Git's default branch,
+ * which a colocated jj repository has as a bookmark of the same name). Without one no card could start there. Nothing
+ * changes when the options already name one, or the platform left's target can't be read.
+ */
+async function seedJjTarget(ws: WorkspaceService, path: string, was: ProjectWorkflow, next: ProjectWorkflow): Promise<ProjectWorkflow> {
+  if (!needsRepository(next.platform) || PLATFORMS[next.platform].defaultTarget || resolvedOf(ws, path, next.platform, { workflow: next }).options.target) return next
+  const leftTarget = needsRepository(was.platform) ? resolvedOf(ws, path, was.platform, { workflow: was }).options.target : ''
+  const line = leftTarget || (needsRepository(was.platform) ? await workspacePortOf(was.platform)?.defaultLine(path).catch(() => null) : null)
+  return typeof line === 'string' && line ? { ...next, options: { ...next.options, target: line } } : next
 }
 
 /** A switch's owner: this process, by its id and (HI-3073) its start time, as slots record their holders'. */

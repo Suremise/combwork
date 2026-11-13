@@ -495,7 +495,8 @@ export async function mergeWorktree(projectPath: string, wt: WorktreeRef, opts: 
   // Any other failure means this git can't do the check (older than 2.38); the merge itself still refuses to lose work.
 
   if (opts.squash) {
-    const m = await git(projectPath, ['merge', '--squash', source])
+    // HI-3108: --ff, so the repository's merge.ff never refuses a squash (it makes no merge commit).
+    const m = await git(projectPath, ['merge', '--squash', '--ff', source])
     if (!m.ok) {
       await git(projectPath, ['reset', '--merge'])
       return { ok: false, error: m.err || m.out || tr(M.gitFailed, { command: 'git merge --squash' }) } // i18n-ignore: a git command, as it is
@@ -597,7 +598,8 @@ async function mergeElsewhere(projectPath: string, wt: WorktreeRef, into: string
     return { ok: false, error: left ? `${tr(M.nothingMerged, { why })}\n${left}` : tr(M.nothingMerged, { why }) }
   }
   if (squash) {
-    const m = await git(tmp, ['merge', '--squash', tip.out.trim()])
+    // HI-3108: --ff, as above: the repository's merge.ff has nothing to say about a squash.
+    const m = await git(tmp, ['merge', '--squash', '--ff', tip.out.trim()])
     if (!m.ok) return refused(m, 'git merge --squash', ['reset', '--merge']) // i18n-ignore: a git command, as it is
     const c = await git(tmp, ['commit', '-m', message])
     if (!c.ok) return refused(c, 'git commit', ['reset', '--merge']) // i18n-ignore: a git command, as it is

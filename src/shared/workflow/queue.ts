@@ -178,6 +178,8 @@ export interface QueueForward {
   others: string[]
   /** HI-3000: `resolving`, the card resolving that pair (Resolve on a builder) while it is open: nothing more is offered for it. */
   behind: { from: string; commits: number | null; resolving?: { card: number; key: string } }[]
+  /** HI-3126: the targets follow their remotes: every source is offered, whatever its local count (a request reads the remotes). */
+  follows?: true
 }
 
 export interface QueueView {

@@ -824,12 +824,25 @@
       "platform": "plain"
     }
   },
+  "workflow.refused.platform.detachedFolder.message": {
+    "placeholders": {
+      "card": "plain",
+      "head": "plain"
+    }
+  },
+  "workflow.refused.platform.detachedFolder.next": {
+    "placeholders": {
+      "has": "select",
+      "branch": "plain"
+    }
+  },
   "workflow.refused.platform.jjRefused.message": {
     "placeholders": {
       "why": "select",
       "card": "plain",
       "count": "plural",
       "files": "plain",
+      "setting": "plain",
       "base": "plain",
       "commit": "plain",
       "other": "plain",
@@ -855,6 +868,27 @@
       "card": "plain",
       "platform": "plain"
     }
+  },
+  "workflow.refused.platform.keptLine.message": {
+    "placeholders": {
+      "card": "plain",
+      "kept": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.refused.platform.keptLine.next": {
+    "placeholders": {
+      "kept": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.refused.platform.noTarget.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.platform.noTarget.next": {
+    "placeholders": {}
   },
   "workflow.refused.platform.offLine.message": {
     "placeholders": {
@@ -1504,6 +1538,11 @@
   "workflow.unreadable.target": {
     "placeholders": {
       "target": "plain"
+    }
+  },
+  "workflow.unreadable.tracking": {
+    "placeholders": {
+      "branch": "plain"
     }
   },
   "workflow.unreadable.uncommitted": {

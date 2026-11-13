@@ -20,7 +20,8 @@ import { openTable, readTable, saveTable, saveTableInBoard } from './storeTables
 import { boardOpen, boardRead, boardWrite, cardOwnersNow, cardPlacesNow, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
 import { FactStore } from './workflow/factStore'
 import { branchExists, pickTarget, projectTargets, type ProjectTargets } from './workflow/targets'
-import { targetedOf, targetOfRulesetId } from '../shared/workflow/compile'
+import { otherThanOwn, targetedOf } from '../shared/workflow/compile'
+import { laneTarget } from './laneTarget'
 import { onAction } from './workflow/actionWorker'
 import { foldCard, forYou, SLOT_DIRTY_GATE } from '../shared/workflow/facts'
 import { createDelivery, offerNow } from './deliveries'
@@ -617,7 +618,16 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   const owned = ws.path ? cardOwnersNow(ws, [...new Set(lanes.filter(running).flatMap((l) => l.cards))]) : new Map<number, { lane: string | null }>()
   const owners = new Map([...owned].map(([n, o]) => [n, o.lane]))
   const deps = await dueDepsOf(ws, lanes, cards)
-  return withWaitTimes(ws, lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null, owners, running(l) && ws.path ? startWaits(ws.path, l.id) : null, !!teamPauseOf(ws), deps.get(l.id) ?? null, running(l) ? out(l) : undefined, running(l) ? offSideOf(ws, l) : undefined)))
+  // Each running lane's Merges into against its project's own now (HI-3113): one left on the release by Start the next
+  // version names it, though its ruleset id marks none.
+  const defaults = new Map<string, string | null>()
+  const targets = new Map<string, string | null>()
+  for (const l of lanes.filter((x) => running(x) && x.ruleset)) {
+    const key = l.project.toLowerCase()
+    if (!defaults.has(key)) defaults.set(key, (await projectTargetsOf(ws, l.project))?.default ?? null)
+    targets.set(l.id, otherThanOwn(laneTarget(ws, l), defaults.get(key)))
+  }
+  return withWaitTimes(ws, lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null, owners, running(l) && ws.path ? startWaits(ws.path, l.id) : null, !!teamPauseOf(ws), deps.get(l.id) ?? null, running(l) ? out(l) : undefined, running(l) ? offSideOf(ws, l) : undefined, targets.has(l.id) ? targets.get(l.id) : undefined)))
 }
 
 /**
@@ -1385,7 +1395,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   const defaultTarget = ws.path ? ((await projectTargetsOf(ws, s.project))?.default ?? null) : null
   if (ws.path) {
     const running0 = (await read(ws)).find((l) => running(l) && same(l.project, s.project) && l.builder.id === builder.id)
-    const target0 = running0?.ruleset ? targetOfRulesetId(running0.ruleset) : null
+    const target0 = running0 ? otherThanOwn(laneTarget(ws, running0), defaultTarget) : null
     if (running0 && on && pick !== undefined && (pick ?? null) !== target0) throw new LaneError(409, withValues(M.targetFixed, { builder: running0.builder.name, target: target0 ?? defaultTarget ?? '' }))
     refuseOtherTargets(ws, s.project, s.cards, running0 && on ? target0 : (pick ?? null), defaultTarget, s.ownBuilder ? s.project : null)
   }
@@ -1426,7 +1436,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     const cards = kept.length ? [...given, ...kept] : given
     // HI-2556: a running lane's Merges into is fixed for its life, and a lane is one target: a card of its own other target
     // is refused into it.
-    const wasTarget = was?.ruleset ? targetOfRulesetId(was.ruleset) : null
+    const wasTarget = was ? otherThanOwn(laneTarget(ws, was), defaultTarget) : null
     if (was && pick !== undefined && (pick ?? null) !== wasTarget) throw new LaneError(409, withValues(M.targetFixed, { builder: was.builder.name, target: wasTarget ?? defaultTarget ?? '' }))
     refuseOtherTargets(ws, s.project, cards, was ? wasTarget : (pick ?? null), defaultTarget, scope)
     shared = sharedCards(ws, lanes, s.project, builder.id, cards)
@@ -1522,7 +1532,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   const gone = leftOut.length ? withCardNames(ws, () => say(A.leftOut, { cards: leftOut.map(cardRef).join(', '), n: leftOut.length }), scope) : null
   const stays = kept.length ? withCardNames(ws, () => say(A.stays, { cards: kept.map(cardRef).join(', '), n: kept.length }), scope) : null
   // HI-2944: the folder its target is checked out in has uncommitted changes: said before its first card starts.
-  const dirty = r.did === 'started' && ws.path ? await targetChangesWarning(ws, join(ws.path, s.project), (r.rec.ruleset ? targetOfRulesetId(r.rec.ruleset) : null) ?? defaultTarget) : null
+  const dirty = r.did === 'started' && ws.path ? await targetChangesWarning(ws, join(ws.path, s.project), laneTarget(ws, r.rec) ?? defaultTarget) : null
   const note = [applied, carriedText, gone, stays, queued, shared, dirty].filter(Boolean).join(' ') || undefined
   return { lane, did: r.did, replaced: replaced ?? null, ...(note ? { note } : {}) }
 }
@@ -1766,7 +1776,8 @@ export async function laneNext(ws: WorkspaceService, project: string, agentId: s
  * from the same inputs read synchronously (its record, its cards' rows, their facts while the rules are enforced, the
  * round limit, its agents' hooks, its slot, its line, the cards' owners), so it pauses for what the lane view pauses for
  * (a request for the user, a block, a merge, a slot…). Only the names it shows aren't read (agents' new names, the old
- * rules mark): nothing that decides whether it waits. With a list change queued, its cards are that list, which applies
+ * rules mark, its Merges into beyond its ruleset id's mark: HI-3113's needs the project's options): nothing that decides
+ * whether it waits. With a list change queued, its cards are that list, which applies
  * once no card is in flight. Read inside a write's transaction it is what that write sees, so a check there can't be
  * undone by a lane or card change. By its id, or the builder's lane holding `card`. `as`: a card as the caller has it
  * (a start's write moves its card in the same transaction: the lane is read as it stood for that start). Null: no such
@@ -1822,14 +1833,15 @@ export async function lanesHolding(ws: WorkspaceService, cards: readonly number[
 }
 
 /**
- * HI-2556: the running lanes holding any of `cards`, each with its builder's name and its Merges into: the target its
- * recorded ruleset marks (`targetOfRulesetId`), null for the project's own.
+ * HI-2556: the running lanes holding any of `cards`, each with its builder's name and its Merges into (`laneTarget`,
+ * HI-3113), null for the project's own.
  */
 export async function laneTargetsHolding(ws: WorkspaceService, cards: readonly number[]): Promise<{ id: string; builder: string; target: string | null }[]> {
   if (!ws.path || !cards.length) return []
-  return (await read(ws))
-    .filter((l) => running(l) && cards.some((n) => l.cards.includes(n) || !!l.pending?.includes(n)))
-    .map((l) => ({ id: l.id, builder: l.builder.name, target: l.ruleset ? targetOfRulesetId(l.ruleset) : null }))
+  const holding = (await read(ws)).filter((l) => running(l) && cards.some((n) => l.cards.includes(n) || !!l.pending?.includes(n)))
+  const out: { id: string; builder: string; target: string | null }[] = []
+  for (const l of holding) out.push({ id: l.id, builder: l.builder.name, target: otherThanOwn(laneTarget(ws, l), (await projectTargetsOf(ws, l.project))?.default) })
+  return out
 }
 
 /** A workspace's lanes: those listed (running, or ended lately), or with `all` every one kept; `project` narrows them. */

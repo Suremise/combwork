@@ -1,9 +1,11 @@
 {
   "folderChanges.commitFailed": "Não foi possível fazer commit",
   "folderChanges.committed": "{count, plural, one {Commit de # arquivo} other {Commit de # arquivos}} em {branch}.",
+  "folderChanges.committedWarning": "{count, plural, one {Commit de # arquivo} other {Commit de # arquivos}} em {branch}, com um aviso",
   "folderChanges.resumed": "O merge continua.",
   "folderChanges.setAside": "{count, plural, one {# arquivo deixado de lado} other {# arquivos deixados de lado}} em {branch}.",
   "folderChanges.setAsideDetail": "O Git as guarda em um stash chamado “{name}”: git stash pop as traz de volta.",
   "folderChanges.setAsideFailed": "Não foi possível deixar as alterações de lado",
+  "folderChanges.setAsideWarning": "{count, plural, one {# arquivo deixado de lado} other {# arquivos deixados de lado}} em {branch}, com um aviso",
   "folderChanges.stillPaused": "O merge continua pausado: veja o motivo nele."
 }

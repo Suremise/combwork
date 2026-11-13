@@ -18,9 +18,10 @@ import { boardChanged, boardWrite, cardKeys } from '../boardStore'
 import { cardLabel } from '../../shared/projectKeys'
 import { listLanes, withLanesLock } from '../lanes'
 import { projectAgents } from '../../shared/defaults'
-import { targetedOf, targetOfRulesetId } from '../../shared/workflow/compile'
+import { laneTargetOf, targetedOf } from '../../shared/workflow/compile'
 import { workflowFor } from './service'
 import { hasOwnWork, projectTargets } from './targets'
+import { keptLineTarget } from './keptLine'
 import { checkCardMove, IN_FLIGHT_STAGES, laneOf, laneStill, type MoveWhy } from './retargetCard'
 import type { RetargetPreview, RetargetResult } from '../../shared/types'
 import { combworkError } from '../combworkError'
@@ -52,7 +53,7 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
   const running = (await listLanes(ws, { project: wf.store.scope.project })).filter((x) => x.state === 'active' || x.state === 'paused')
   const laneTarget = (id: string): string | null => {
     const rec = wf.lane(id)
-    return rec?.ruleset ? (targetOfRulesetId(rec.ruleset) ?? store.ruleset(rec.ruleset).options.target ?? null) : null
+    return laneTargetOf(rec?.ruleset, (r) => store.ruleset(r).options)
   }
   const onFrom = new Set(running.filter((l) => (laneTarget(l.id) || null) === from && !wf.lane(l.id)?.ended).map((l) => l.id))
   // Only once `from` has ended (HI-2753): gone, or all of it in `to` (merged, as an integration branch is at its release).
@@ -112,6 +113,15 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
       if (checked?.ok) out.cards.move.push({ ...row(c), started: { head: checked.check.head, own } })
       else out.cards.keep.push({ ...row(c), why: checked ? keepOf(checked.why) : 'started' }) // i18n-ignore: a reason's code, said in words where it is shown
       continue
+    }
+    // HI-3112: put back with its line from `from`, holding history `to` lacks: it keeps merging into `from` (its start
+    // does too); one that can't be checked stays as well, never left out.
+    if (own === null && s.started?.target === from) {
+      // Start the next version (`ongoing`): `to` is made at `from`'s head after this preview, so read against that.
+      const kept = await keptLineTarget(projectPath, s, c, wf.cfg.projectKey, to, o.ongoing ? from : to)
+      if (kept === 'unknown') out.cards.keep.push({ ...row(c), why: 'cantCheck' }) // i18n-ignore: a reason's code, said in words where it is shown
+      else if (kept) out.cards.keep.push({ ...row(c), why: 'line' }) // i18n-ignore: a reason's code, said in words where it is shown
+      if (kept) continue
     }
     if (own !== from) continue
     const w = await hasOwnWork(projectPath, s, wf.folderOf(s))
@@ -267,23 +277,33 @@ async function moveLaneAlone(ws: WorkspaceService, projectPath: string, l: NonNu
  * `slots` gives (read when called: inside the caller's board write). Read as the board is; the save's guard reads it
  * inside its board write.
  */
-export async function referencesTo(ws: WorkspaceService, projectPath: string, branch: string, slots: () => readonly { name: string; target: string | null }[]): Promise<string[]> {
+export async function referencesTo(ws: WorkspaceService, projectPath: string, branch: string, slots: () => readonly { name: string; target: string | null }[], dest?: string | null): Promise<string[]> {
   const wf = await workflowFor(ws, projectPath)
   if (!wf) return []
   const out: string[] = []
   const cards = wf.store.cards()
   const keys = cardKeys(ws, cards.map((c) => c.id))
+  // HI-3112: where a put-back card would go instead, `dest` (a save's new Work merges into), else the project's now.
+  const to = dest ?? (await projectTargets(ws, projectPath).catch(() => null))?.default ?? null
   for (const c of cards) {
     const s = wf.state(c)
     if (s.stage === 'done') continue
-    const named = (c.target ?? null) === branch || (s.stage !== 'todo' && s.started?.target === branch) || s.entries.some((e) => (e.state === 'open' || e.state === 'started') && e.target === branch)
+    let named = (c.target ?? null) === branch || (s.stage !== 'todo' && s.started?.target === branch) || s.entries.some((e) => (e.state === 'open' || e.state === 'started') && e.target === branch)
+    // A card put back whose line from `branch` holds history `to` lacks keeps merging there (HI-3112), as does one that
+    // can't be checked: counted, so the branch isn't taken away from it. Its line is read against `to`, never `branch`,
+    // which an untouched line is always in.
+    if (!named && s.stage === 'todo' && !c.target && s.started?.target === branch) {
+      const kept = to ? await keptLineTarget(projectPath, s, c, wf.cfg.projectKey, to) : 'unknown'
+      named = kept === 'unknown' || kept?.target === branch
+    }
     if (named) out.push(cardLabel({ number: c.id, key: keys.get(c.id) }))
   }
   // The runtime's own lane records (board reads): never lanes.ts's listing, whose views wait on the board's lock.
   const names = new Map(projectAgents(await ws.projectConfig(projectPath)).map((a) => [a.id, a.name] as const))
   for (const id of wf.store.runningLanes()) {
     const rec = wf.lane(id)
-    if (!rec || rec.ended || !rec.ruleset || targetOfRulesetId(rec.ruleset) !== branch) continue
+    // Its branch, marked or as its ruleset recorded it (HI-3113): a lane left on the release by Start the next version too.
+    if (!rec || rec.ended || laneTargetOf(rec.ruleset, (r) => wf.store.ruleset(r).options) !== branch) continue
     const builder = wf.store.laneBuilder(id)
     out.push(builder ? (names.get(builder) ?? builder) : id)
   }
@@ -340,7 +360,7 @@ const IN_USE = msg({ id: 'service.workflow.targetInUse', defaultMessage: '{branc
  */
 export async function refuseRemovedTargets(ws: WorkspaceService, projectPath: string, before: readonly string[], after: readonly string[], keep: string | null, slots: SlotUses): Promise<void> {
   for (const branch of before.filter((b) => !after.includes(b) && b !== keep)) {
-    const uses = await referencesTo(ws, projectPath, branch, () => slots.inUse())
+    const uses = await referencesTo(ws, projectPath, branch, () => slots.inUse(), keep)
     if (uses.length) throw combworkError(IN_USE, { branch, uses: fmt.list(uses) }, { kind: 'conflict' })
   }
 }

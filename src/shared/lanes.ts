@@ -276,8 +276,9 @@ const unrecordedCard = (n: number, card: TaskCard | null): LaneCard => ({ number
  * (currentCard); an ended lane without its record has none. A card held elsewhere (HI-1821: another agent's, or, given
  * to none, another lane's: `owners`, main's owner lane by card) is never its current card nor why it waits.
  */
-export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null, rulesetStages?: StageId[] | null, slot?: { slot: string | null; waiting: boolean; info?: LaneSlotInfo | null; held?: LaneSlotHeld | null } | null, owners?: ReadonlyMap<number, string | null>, startWait?: LaneStartWait | null, teamPaused = false, dueDeps?: DueDeps | null, outOfWorkflow?: ReadonlySet<string>, offSide?: ReadonlyMap<string, 'builder' | 'reviewer'>): LaneInfo {
+export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null, rulesetStages?: StageId[] | null, slot?: { slot: string | null; waiting: boolean; info?: LaneSlotInfo | null; held?: LaneSlotHeld | null } | null, owners?: ReadonlyMap<number, string | null>, startWait?: LaneStartWait | null, teamPaused = false, dueDeps?: DueDeps | null, outOfWorkflow?: ReadonlySet<string>, offSide?: ReadonlyMap<string, 'builder' | 'reviewer'>, target?: string | null): LaneInfo {
   const unrecorded = !running(rec) && !rec.frozen
+  const ownTarget = target === undefined ? (rec.ruleset ? targetOfRulesetId(rec.ruleset) : null) : target
   // A card at its round limit waits for the user's answer (§16.11.4, `atLimit`: the main side's facts): it pauses the lane.
   const live = (n: number): LaneCard => ({ ...laneCard(n, cards.get(n) ?? null, { lane: rec.id, builder: rec.builder.id, owner: owners?.get(n) }), ...(atLimit?.has(n) ? { roundLimit: true } : {}) })
   const list = isFrozen(rec) ? rec.frozen! : rec.cards.map((n) => (unrecorded ? unrecordedCard(n, cards.get(n) ?? null) : live(n)))
@@ -348,8 +349,9 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
     queued: running(rec) && rec.pending ? [...rec.pending] : null,
     listRev: rec.listRev ?? 0,
     oldRules: laneOldRules(rec, rulesetNow),
-    // Its Merges into (HI-2556): the other target its recorded ruleset marks; absent for the project's own.
-    ...(rec.ruleset && targetOfRulesetId(rec.ruleset) ? { target: targetOfRulesetId(rec.ruleset)! } : {}),
+    // Its Merges into (HI-2556): absent for the project's own. `target` as the caller read it (HI-3113: marked, or as its
+    // ruleset recorded it, against the project's own); not given, the other target its ruleset id marks.
+    ...(ownTarget ? { target: ownTarget } : {}),
     stages: running(rec) && rec.ruleset && rulesetStages ? [...rulesetStages] : null,
     slot: running(rec) ? (slot?.slot ?? null) : null,
     slotInfo: running(rec) ? (slot?.info ?? null) : null,

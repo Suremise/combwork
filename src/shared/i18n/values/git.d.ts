@@ -439,6 +439,7 @@ interface CombworkMessageValues {
   'git.vc.store.conflictedBookmark': { name: string | number }
   'git.vc.store.conflictedCommit': { commit: string | number }
   'git.vc.store.copy': { project: string | number; kind: string; copy: string | number }
+  'git.vc.store.detached': { project: string | number; head: string | number }
   'git.vc.store.drain': undefined
   'git.vc.store.fallback': undefined
   'git.vc.store.fallbackUnknown': { detail: string | number }

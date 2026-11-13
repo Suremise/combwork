@@ -88,6 +88,38 @@ export function switchRefused(to: PlatformId, found: Detection): SwitchRefusal |
 /** A repository platform's name as a refusal's value (product names, the same in every language: HI-3072's `storeRuns`). */
 const REPO_PLATFORM_NAME: Record<PlatformId, string> = { none: 'None', git: 'Git', jj: 'jj' } // i18n-ignore: product names, kept in every language
 
+/** The refusals a switch's dialog shows with their lists (the warning's details), Check Again reading them afresh. */
+export const DETAILED_REFUSALS: ReadonlySet<SwitchRefusal['why']> = new Set<SwitchRefusal['why']>(['gates', 'fallback', 'drain', 'memberDrain', 'memberNoJj', 'otherWorkspace', 'switching'])
+
+/**
+ * HI-3105: after a repository switch was refused as Switch was pressed, whether the dialog gives way to a fresh look
+ * (the check read again): when that check reads clear now (the refusal was a passing race: a fresh confirmation, never a
+ * switch made by itself), or refuses with its lists. Not when it couldn't be read (null) or refuses for another reason:
+ * the original error stays shown.
+ */
+export function rereadAfterRefusal(again: { refused: SwitchRefusal | null; store?: unknown } | null): boolean {
+  if (!again) return false
+  if (!again.refused) return true
+  return !!again.store && DETAILED_REFUSALS.has(again.refused.why)
+}
+
+/**
+ * HI-3105: the switch's dialog pressing Switch. `switchIt` makes the switch: a repository switch's refusal comes back as
+ * data (workflow:switchPlatform); any other failure throws, and is the dialog's error as it is (never looked past: a
+ * save that failed stays said). On a refusal the check is read again (`recheck`, null when it couldn't be): reading clear
+ * or refusing with its lists, the dialog gives way to a fresh look (`reread`: a new confirmation, or the refused dialog
+ * with its lists; never a second switch made by itself); else the refusal is the dialog's error (`refused`).
+ */
+export async function switchAtConfirm(o: {
+  switchIt: () => Promise<{ switched: unknown } | { refused: SwitchRefusal }>
+  recheck: () => Promise<{ refused: SwitchRefusal | null; store?: unknown } | null>
+}): Promise<'switched' | 'reread' | { refused: SwitchRefusal }> {
+  const r = await o.switchIt()
+  if ('switched' in r) return 'switched'
+  const again = await o.recheck().catch(() => null)
+  return rereadAfterRefusal(again) ? 'reread' : { refused: r.refused }
+}
+
 /** A refusal's message and values. */
 export function switchRefusalText(r: SwitchRefusal): { m: Msg; values?: Record<string, string> } {
   switch (r.why) {
@@ -145,4 +177,6 @@ export interface StoreSwitch {
   unsupported?: Gate[]
   /** Back to Git: what isn't ready. */
   fallback?: FallbackProblem[]
+  /** HI-3104: to a platform whose folders check out a branch, each member whose folder is on none now (head detached). */
+  detached?: { project: string; head: string }[]
 }

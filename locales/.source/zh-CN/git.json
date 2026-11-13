@@ -438,6 +438,7 @@
   "git.vc.store.conflictedBookmark": "Bookmark {name} is conflicted: resolve it with jj.",
   "git.vc.store.conflictedCommit": "Commit {commit} stores conflicts: resolve them with jj.",
   "git.vc.store.copy": "{project}: {kind, select, review {review copy} other {check copy}} {copy}",
+  "git.vc.store.detached": "{project}: its folder is on no branch (its head is detached at {head}), and stays so after the switch. Check out the branch its work goes on there (git switch) before its cards start in the project folder.",
   "git.vc.store.drain": "Still running on this repository (the switch waits until all of it has finished):",
   "git.vc.store.fallback": "Before going back to Git:",
   "git.vc.store.fallbackUnknown": "Couldn’t read the repository ({detail}).",

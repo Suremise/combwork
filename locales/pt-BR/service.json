@@ -114,6 +114,7 @@
   "service.forward.resolveRaced": "{card} mudou enquanto era entregue a um executor (um Tentar de novo, um Remover ou outro Resolver), então nada foi criado: veja o cartão e peça de novo se for preciso.",
   "service.forward.resolveTitle": "Resolver: atualizar {to} com {from}",
   "service.forward.title": "Atualizar {to} com {from}",
+  "service.forward.unreadable": "{to} não é atualizado com {from}: o Combwork não conseguiu ler {what}, então nada foi posto na fila.{detail, select, none {} other { O Git disse: {detail}}}",
   "service.fsutil.keptBusy": "{file} está sendo salvo por outro programa: nada foi alterado. Tente de novo em instantes.",
   "service.fsutil.keptUnreadable": "Não foi possível ler {file}: nada foi alterado. Tente de novo em instantes.",
   "service.fsutil.notCopied": "Não foi possível copiar {name}",
