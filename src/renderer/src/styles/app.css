@@ -11876,8 +11876,18 @@ textarea.input.task-blocked-input {
 .git-queue-past[open] > summary {
   margin-bottom: 12px;
 }
-.git-queue-past > .git-queue-target + .git-queue-target {
-  margin-top: 16px;
+.git-queue-past-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.git-queue-past-bar > label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
 }
 /* Its history (#1641): a data table as the archived cards' one, a line a row. The title takes the room left and is
    ellipsised (its tooltip has it whole); the other columns never wrap, and a table narrower than them scrolls sideways

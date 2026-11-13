@@ -396,6 +396,8 @@
   "tips.palette.title": "Tout est dans la palette de commandes",
   "tips.paneCells.text": "Fais glisser un volet par son en-tête sur un volet vide pour l’y déplacer, ou sur un autre pour les échanger. Chaque disposition retient où tu les as mis : change de disposition puis reviens, tout est à sa place.",
   "tips.paneCells.title": "Placer un agent dans n’importe quel volet",
+  "tips.pastBranches.text": "Gestion de versions → File de fusion garde sous Anciennes branches l’historique des branches où le travail n’est plus fusionné : choisis-en une pour voir ce que sa file a fusionné. Purger l’historique… supprime celui d’une branche, Tout purger… celui de toutes, après confirmation.",
+  "tips.pastBranches.title": "L’historique de fusion des anciennes branches, une à la fois",
   "tips.pasteScreenshot.text": "Appuie sur Ctrl+V dans le terminal d’un agent avec une image dans le presse-papiers, ou dépose une image dessus : l’agent la voit, et Combwork en garde une copie.",
   "tips.pasteScreenshot.title": "Coller une capture d’écran dans une session",
   "tips.pathsLeftOut.text": "Sans gestion de versions, le travail d’une carte se limite aux fichiers que listent ses chemins. Quand tu en fais glisser une vers Relecture et que d’autres fichiers ont changé depuis son début, Combwork les liste d’abord : inclus-les dans son travail, ou laisse-les de côté.",

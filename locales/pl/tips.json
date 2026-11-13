@@ -396,6 +396,8 @@
   "tips.palette.title": "Wszystko jest w palecie poleceń",
   "tips.paneCells.text": "Przeciągnij panel za nagłówek na pusty panel, żeby go tam przenieść, albo na inny, żeby je zamienić. Każdy układ pamięta, gdzie je umieszczono, więc po zmianie układu i powrocie wszystko jest na swoim miejscu.",
   "tips.paneCells.title": "Umieść agenta w dowolnym panelu",
+  "tips.pastBranches.text": "Kontrola wersji → Kolejka scalania przechowuje w Dawnych gałęziach historię gałęzi, do których praca nie jest już scalana: wybierz jedną, żeby zobaczyć, co scaliła jej kolejka. Wyczyść historię… usuwa historię jednej gałęzi, a Wyczyść wszystko… wszystkich, po potwierdzeniu.",
+  "tips.pastBranches.title": "Historia scaleń dawnych gałęzi, po jednej",
   "tips.pasteScreenshot.text": "Naciśnij Ctrl+V w terminalu agenta, mając obraz w schowku, albo upuść na niego obraz: agent go zobaczy, a Combwork zachowa kopię.",
   "tips.pasteScreenshot.title": "Wklej zrzut ekranu do sesji",
   "tips.pathsLeftOut.text": "Bez kontroli wersji praca karty to tylko pliki z jej ścieżek. Gdy przeciągniesz kartę do kolumny Recenzja, a od jej rozpoczęcia zmieniły się inne pliki, Combwork najpierw je wymieni: dołącz je do jej pracy albo je pomiń.",

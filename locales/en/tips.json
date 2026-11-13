@@ -1659,6 +1659,14 @@
     "defaultMessage": "Put an agent in any pane",
     "description": "A tip's title."
   },
+  "tips.pastBranches.text": {
+    "defaultMessage": "Version Control → Merge queue keeps the history of branches work no longer merges into under Past branches: pick one to see what its queue merged. Purge history… removes one branch’s, Purge all… every one’s, asked first.",
+    "description": "A tip (HI-3177). Names of Combwork's views, sections and buttons (Version Control, Merge queue, Past branches, Purge history…, Purge all…): keep them as Combwork shows them. Glossary: merge queue."
+  },
+  "tips.pastBranches.title": {
+    "defaultMessage": "Old branches’ merge history, one at a time",
+    "description": "A tip's title (HI-3177): the merge queue history of branches the project no longer merges into, under Past branches."
+  },
   "tips.pasteScreenshot.text": {
     "defaultMessage": "Press Ctrl+V in an agent's terminal with an image on the clipboard, or drop an image onto it: the agent sees it, and Combwork keeps a copy.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

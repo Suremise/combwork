@@ -1239,6 +1239,16 @@
     "note": "HI-2944: an error from Commit or Set aside on a paused merge from before Combwork recorded the folder of such a pause: Resume makes the queue look again, and its new pause names the folder.",
     "audience": "both"
   },
+  "service.queue.purgeRefused": {
+    "text": "Nothing was purged: {target} {why, select, current {is a branch work merges into now} live {has work in its merge queue again} pushes {still has merges waiting to be pushed} other {has no merge queue history to purge}}.",
+    "note": "HI-3177: an error from Version Control → Merge queue → Past branches' Purge: a branch's queue ({target}: its name) can't be purged now, and why; nothing was purged, the other branches asked for included. Keep the select keys.",
+    "audience": "both"
+  },
+  "service.queue.purgeUnknown": {
+    "text": "Nothing was purged: Combwork can't read which branches this project merges into right now. Try again in a moment.",
+    "note": "HI-3177: an error from Version Control → Merge queue → Past branches' Purge when the project's target branches can't be read (no Git workflow now, or git's default branch unreadable for a moment).",
+    "audience": "both"
+  },
   "service.releaseOffer.drop": {
     "text": "Released and unused, can come off Other branches work can merge into: {branches} (cw_update_setting project.workflow.otherTargets with offer {id}).",
     "note": "HI-3155: the cleanup part of a release offer, for the Assistant: released branches nothing uses ({branches}: their names, joined)."

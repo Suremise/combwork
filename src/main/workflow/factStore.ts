@@ -875,6 +875,20 @@ export class FactStore {
     this.conn.write((db) => db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(this.metaKey(key), value))
   }
 
+  /** HI-3177: removes one of this project's values (none: nothing happens). */
+  deleteMeta(key: string): void {
+    this.conn.write((db) => db.prepare('DELETE FROM board_meta WHERE key = ?').run(this.metaKey(key)))
+  }
+
+  /** HI-3177: forgets when returned entries were seen (a purged queue's history), for these entries only. */
+  forgetQueueSeen(entries: readonly string[]): void {
+    if (!entries.length) return
+    this.conn.write((db) => {
+      const del = db.prepare('DELETE FROM workflow_queue_seen WHERE project = ? AND entry = ?')
+      for (const e of entries) del.run(this.scope.project, e)
+    })
+  }
+
   /** The provenance epoch's key: the project's stable id (never its name or key, which a rename changes), else its scope. */
   private epochKey(): string {
     return `provenance_epoch:${(this.scope.projectId?.() ?? this.scope.project).toLowerCase()}`

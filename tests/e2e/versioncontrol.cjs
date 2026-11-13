@@ -179,12 +179,13 @@ function board(sql, ...args) {
     // as each step sets it. A read of plain's can be held, to see what shows meanwhile.
     await app.evaluate(({ ipcMain }, d) => {
       const view = (p, over = {}) => ({ project: p === d.alpha ? 'alpha' : 'plain', projectPath: p, target: 'main', paused: null, runBy: null, runHere: false, testing: null, queued: [], recent: [], returns: [], returnsMore: 0, pauses: [], combworkMerges: false, inFlight: [], ...over })
-      globalThis.__vc = { hold: false, held: [], asked: 0, plain: [], alphaMore: [], history: [] }
+      globalThis.__vc = { hold: false, held: [], asked: 0, plain: [], alphaMore: [], history: [], purged: [] }
       ipcMain.removeHandler('queue:list')
       ipcMain.handle('queue:list', (_e, p) => {
         const s = globalThis.__vc
-        // HI-2893: and a past branch's (1.0.0: not a target now, nothing in it), with an outcome in its history.
-        if (p === d.alpha) return [view(p, { paused: { reason: 'user', card: null, files: [], by: 'user', at: new Date().toISOString() } }), view(p, { target: '1.0.0', past: true, recent: [{ card: 3, key: 'AL-3', title: 'Old', entry: 'al/3', outcome: 'merged', at: new Date(Date.now() - 86_400_000).toISOString() }] }), ...s.alphaMore.map((o) => view(p, o))]
+        // HI-2893: and past branches' (1.0.0 and 1.1.0: not targets now, nothing in them), each with an outcome in its history.
+        const old = (target, card) => view(p, { target, past: true, recent: [{ card, key: `AL-${card}`, title: 'Old', entry: `al/${card}`, outcome: 'merged', at: new Date(Date.now() - 86_400_000).toISOString() }] })
+        if (p === d.alpha) return [view(p, { paused: { reason: 'user', card: null, files: [], by: 'user', at: new Date().toISOString() } }), old('1.0.0', 3), old('1.1.0', 4), ...s.alphaMore.map((o) => view(p, o))]
         if (p !== d.plain) return []
         if (s.hold) {
           s.asked++
@@ -194,6 +195,9 @@ function board(sql, ...args) {
       })
       ipcMain.removeHandler('queue:history')
       ipcMain.handle('queue:history', () => globalThis.__vc.history)
+      // HI-3177: Purge, recorded: the branches it was sent.
+      ipcMain.removeHandler('queue:purgeHistory')
+      ipcMain.handle('queue:purgeHistory', (_e, p, targets) => void globalThis.__vc.purged.push({ p, targets }))
     }, { alpha, plain })
     const said = (projectPath) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'queue-changed', workspacePath: ws, projectPath })
     const plainQueue = (models) => app.evaluate((_, m) => (globalThis.__vc.plain = m), models)
@@ -209,10 +213,26 @@ function board(sql, ...args) {
     // HI-2893: no link to the page it's on; a past branch's queue only as its history, under Past branches, folded.
     check('…with no "Queue in Version Control" link there', (await page.locator('.vc-view [data-queue="alpha#main"] .progress-queue-link').count()) === 0)
     const pastPart = page.locator('.vc-view .git-queue-past')
-    check("1.0.0, a past branch, isn't a live queue: no card, no Pause queue; it is under Past branches, folded", (await page.locator('.vc-view [data-queue="alpha#1.0.0"]').count()) === 0 && (await pastPart.count()) === 1 && (await pastPart.evaluate((d) => d.open)) === false && /Past branches \(1 branch\)/.test(await pastPart.locator('summary').innerText()), await page.locator('.vc-view .git-queue').innerText())
+    check("1.0.0, a past branch, isn't a live queue: no card, no Pause queue; it is under Past branches, folded", (await page.locator('.vc-view [data-queue="alpha#1.0.0"]').count()) === 0 && (await pastPart.count()) === 1 && (await pastPart.evaluate((d) => d.open)) === false && /Past branches \(2 branches\)/.test(await pastPart.locator('summary').innerText()), await page.locator('.vc-view .git-queue').innerText())
     await pastPart.locator('summary').click()
-    check('…unfolded: its history, with no card', !!(await lib.until(async () => (await pastPart.locator('[data-target="1.0.0"] .git-queue-history').count()) === 1 && (await pastPart.locator('.progress-queue-card').count()) === 0, HUNG_MS)))
+    // HI-3177: one past branch at a time, picked from a drop-down, the newest version first.
+    const pastPick = pastPart.locator('[data-past-pick]')
+    check('…unfolded: the newest past branch picked, its history alone, with no card', !!(await lib.until(async () => (await pastPick.count()) === 1 && (await pastPick.inputValue()) === '1.1.0' && (await pastPart.locator('[data-target="1.1.0"] .git-queue-history').count()) === 1 && (await pastPart.locator('.git-queue-history').count()) === 1 && (await pastPart.locator('.progress-queue-card').count()) === 0, HUNG_MS)), await pastPart.innerText())
+    await pastPick.selectOption('1.0.0')
+    check('HI-3177: 1.0.0 picked, its history shows instead', !!(await lib.until(async () => (await pastPart.locator('[data-target="1.0.0"] .git-queue-history').count()) === 1 && (await pastPart.locator('.git-queue-history').count()) === 1, HUNG_MS)))
     await shots('queue-past', page.locator('.vc-view'))
+    // Purge history… asks first, naming the branch; Cancel sends nothing, Purge sends exactly it.
+    const dialog = page.locator('.dialog[role="dialog"]')
+    await pastPart.locator('[data-action="purge"]').click()
+    check('HI-3177: Purge history… asks first, naming 1.0.0', !!(await lib.until(async () => (await dialog.count()) === 1 && (await dialog.innerText()).includes('Purge the merge queue history of 1.0.0?') && (await dialog.innerText()).includes("can't be undone"), HUNG_MS)), await dialog.innerText().catch(() => ''))
+    await shots('queue-purge', dialog)
+    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+    check('…cancelled: nothing sent', !!(await lib.until(async () => (await dialog.count()) === 0, HUNG_MS)) && (await app.evaluate(() => globalThis.__vc.purged.length)) === 0)
+    await pastPart.locator('[data-action="purge-all"]').click()
+    check('HI-3177: Purge all… names both past branches', !!(await lib.until(async () => (await dialog.count()) === 1 && (await dialog.innerText()).includes('Purge the merge queue history of 2 past branches?'), HUNG_MS)), await dialog.innerText().catch(() => ''))
+    await dialog.getByRole('button', { name: 'Purge', exact: true }).click()
+    const sent = await lib.until(async () => ((await dialog.count()) === 0 ? app.evaluate(() => globalThis.__vc.purged) : null), HUNG_MS)
+    check('…Purge sends exactly the branches it named', JSON.stringify(sent) === JSON.stringify([{ p: alpha, targets: ['1.1.0', '1.0.0'] }]), JSON.stringify(sent))
 
     // --- HI-2894: a page of queues taller than the tab scrolls, to its last queue, with the wheel and the keyboard, at a
     // small window and a large one: six more live queues, each with a page of history.

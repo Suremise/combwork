@@ -396,6 +396,8 @@
   "tips.palette.title": "Alles ist in der Befehlspalette",
   "tips.paneCells.text": "Ziehe einen Bereich an seiner Kopfzeile auf einen leeren Bereich, um ihn dorthin zu verschieben, oder auf einen anderen, um beide zu tauschen. Jedes Layout merkt sich, wo du sie platziert hast: Wechselst du das Layout und wieder zurück, ist alles an seinem Platz.",
   "tips.paneCells.title": "Einen Agenten in einen beliebigen Bereich setzen",
+  "tips.pastBranches.text": "Versionsverwaltung → Merge-Warteschlange behält den Verlauf von Branches, in die keine Arbeit mehr gemergt wird, unter „Frühere Branches“: Wähle einen aus, um zu sehen, was seine Warteschlange gemergt hat. „Verlauf löschen…“ entfernt den eines Branches, „Alle löschen…“ den aller, jeweils nach Rückfrage.",
+  "tips.pastBranches.title": "Merge-Verlauf früherer Branches, einer nach dem anderen",
   "tips.pasteScreenshot.text": "Drück Strg+V im Terminal eines Agenten, während ein Bild in der Zwischenablage ist, oder zieh ein Bild darauf: Der Agent sieht es, und Combwork behält eine Kopie.",
   "tips.pasteScreenshot.title": "Einen Screenshot in eine Sitzung einfügen",
   "tips.pathsLeftOut.text": "Ohne Versionsverwaltung besteht die Arbeit einer Karte nur aus den Dateien, die ihre Pfade nennen. Ziehst du eine nach Review und haben sich seit ihrem Beginn andere Dateien geändert, listet Combwork sie zuerst auf: Nimm sie in ihre Arbeit auf oder lass sie weg.",

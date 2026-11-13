@@ -396,6 +396,8 @@
   "tips.palette.title": "命令面板里什么都有",
   "tips.paneCells.text": "按住标题把窗格拖到空窗格即可移过去，拖到另一个窗格则两者互换。每种布局都会记住你的摆放，切换布局再切回来时一切照旧。",
   "tips.paneCells.title": "把智能体放进任意窗格",
+  "tips.pastBranches.text": "“版本控制”→“合并队列”会在“过去的分支”下保留不再合并工作的分支的历史：选择一个即可查看其队列合并的内容。“清除历史…”清除一个分支的历史，“全部清除…”清除所有分支的历史，清除前都会先询问。",
+  "tips.pastBranches.title": "逐个查看旧分支的合并历史",
   "tips.pasteScreenshot.text": "剪贴板中有图片时，在智能体的终端中按 Ctrl+V，或把图片拖到终端上：智能体就能看到它，Combwork 也会保存一份副本。",
   "tips.pasteScreenshot.title": "把截图粘贴到会话中",
   "tips.pathsLeftOut.text": "没有版本控制时，卡片的工作只包括其路径列出的文件。当你把卡片拖到“评审”，而它开始后其他文件有改动时，Combwork 会先列出它们：把它们加入卡片的工作，或不包含它们。",

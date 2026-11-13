@@ -396,6 +396,8 @@
   "tips.palette.title": "Tudo está na paleta de comandos",
   "tips.paneCells.text": "Arraste um painel pelo cabeçalho até um painel vazio para movê-lo para lá, ou até outro para trocá-los. Cada layout guarda onde você os colocou: troque de layout e volte, e tudo estará no lugar.",
   "tips.paneCells.title": "Coloque um agente em qualquer painel",
+  "tips.pastBranches.text": "Controle de versão → Fila de merge guarda em Branches anteriores o histórico dos branches em que o trabalho não é mais mesclado: escolha um para ver o que a fila dele mesclou. Apagar histórico… remove o de um branch, Apagar tudo… o de todos, depois de perguntar.",
+  "tips.pastBranches.title": "O histórico de merge de branches antigos, um por vez",
   "tips.pasteScreenshot.text": "Pressione Ctrl+V no terminal de um agente com uma imagem na área de transferência, ou solte uma imagem nele: o agente a vê, e o Combwork guarda uma cópia.",
   "tips.pasteScreenshot.title": "Cole uma captura de tela em uma sessão",
   "tips.pathsLeftOut.text": "Sem controle de versão, o trabalho de um cartão são só os arquivos que os caminhos dele listam. Quando você arrasta um para Revisão e outros arquivos mudaram desde que ele começou, o Combwork os lista primeiro: inclua-os no trabalho dele ou deixe-os de fora.",
