@@ -63,6 +63,9 @@ import { withAction } from '@shared/assistantChangeList'
 import { sessionEndBook, type EndsChange, type SessionEnd } from '@shared/sessionEnd'
 import { rememberTab, shownTab } from '@shared/tabs'
 
+/** No release offers (HI-3155): a stable empty list for selectors (before the store, whose first state uses it). */
+export const NO_RELEASE_OFFERS: ReleaseOffer[] = []
+
 export type Activity = 'projects' | 'overview' | 'activity' | 'performance' | 'board' | 'notes' | 'skills' | 'dialects' | 'templates' | 'mcp' | 'assistant' | 'docs' | 'settings'
 export type { ProjectTab } from '@shared/projectTabs'
 
@@ -1873,8 +1876,6 @@ setCardNaming(() => (n) => cardLabelOf(get(), n))
 
 /** Stable empty list for selectors — a fresh [] on every call makes zustand re-render forever. */
 export const NO_PROJECTS: ProjectInfo[] = []
-/** No release offers (HI-3155): a stable empty list for selectors. */
-export const NO_RELEASE_OFFERS: ReleaseOffer[] = []
 export const NO_IDS: string[] = []
 
 /**
