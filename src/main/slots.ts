@@ -53,7 +53,6 @@ import { lineHistory } from './platform/historyPorts'
 import { isUnknown, type Maybe } from './platform/types'
 import type { FenceDb, HeldWork, SlotWord, WorkspaceFence, WorkspaceFiles, WorkspaceFilesStep, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort, WorkspaceRefusal, WorkspaceStep } from './platform/workspacePort'
 import { slotWorkspaces, workspacePortOf } from './platform/workspacePorts'
-import { isJjLineKey } from './platform/jjSlotPrep'
 import { isPlatformId, ownsWorkspaces, platformName } from '../shared/platform/descriptors'
 import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { idleKey } from '../shared/laneBar'
@@ -2097,13 +2096,24 @@ export class SlotPool {
    */
   /**
    * HI-3115: committed work over the last card's in a lease's jj slot while its builder still runs there (the port's
-   * read-only `heldEarly`); null when there's none, the port has no such read, or the lease is over.
+   * read-only `heldEarly`), with the port's refusal code for it; null when there's none, the port has no such read, or the
+   * lease is over.
    */
-  async heldEarly(lease: string, line: string, base: string): Promise<HeldWork | null> {
+  async heldEarly(lease: string, line: string, base: string): Promise<{ code: string; work: HeldWork } | null> {
     const l = this.store.lease(lease)
     const slot = l && !l.to ? this.store.slot(l.slot) : null
     if (!slot || !this.port.heldEarly) return null
     return this.port.heldEarly(slot.folder, line, base, { identity: slot.identity ?? null })
+  }
+
+  /** HI-3165: whether a card's line is the pool's port's own preparation key (jj's, HI-2866), never a line with a head. */
+  lineIsKey(line: string | null | undefined): boolean {
+    return !!line && !!this.port.lineIsKey?.(line)
+  }
+
+  /** HI-3165: whether preparing `line` takes the port's own lock (jj's key), so the pool doesn't hold the repository's around it. */
+  preparesUnderOwnLock(line: string | null | undefined): boolean {
+    return this.lineIsKey(line) && !!this.port.ownPreparationLock
   }
 
   async releaseLane(lease: string, why: string, decide: Parameters<SlotStore['laneOver']>[2]): Promise<Awaited<ReturnType<SlotStore['laneOver']>>> {
@@ -3561,7 +3571,7 @@ export class SlotPool {
     // HI-2928: a free slot's own target deleted since it waited there (gone, not unreadable): it is checked against the
     // default target instead, so work in it that isn't there still keeps it (unmerged), and a slot with none is freed.
     // Never for a preparation's key (a jj slot's), which has no head by design (HI-2866): only a deleted line.
-    if (t === null && s.target && !isJjLineKey(s.target) && !this.store.openLease(s.name)) {
+    if (t === null && s.target && !port.lineIsKey?.(s.target) && !this.store.openLease(s.name)) {
       const def = await this.defaultTarget()
       if (def && def !== s.target) {
         target = def

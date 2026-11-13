@@ -335,9 +335,21 @@ export interface WorkspacePort {
   lineAtBase?(folder: string, line: string, base: string, lease: string): Promise<WorkspaceStep>
   /**
    * HI-3115: committed work over the last card's in a slot whose builder still runs there, read without recording the
-   * folder; null when there's none or it can't be read. jj's only: absent, the preparation decides after its record.
+   * folder, with the port's own refusal code for it (one its `refusal` reads as held, HI-3165); null when there's none or
+   * it can't be read. jj's only: absent, the preparation decides after its record.
    */
-  heldEarly?(folder: string, line: string, base: string, o: { identity: WorkspaceIdentity | null }): Promise<HeldWork | null>
+  heldEarly?(folder: string, line: string, base: string, o: { identity: WorkspaceIdentity | null }): Promise<{ code: string; work: HeldWork } | null>
+  /**
+   * HI-3165: whether `line` is one of this port's preparation keys (jj's, HI-2866): a locator with no head of its own,
+   * never prepared in place (HI-3010), prepared once its builder has left the slot (HI-2913). Absent (Git's): no line is.
+   */
+  lineIsKey?(line: string): boolean
+  /**
+   * HI-3165: the port takes its store's lock itself when it prepares one of its keys (jj's, HI-2866: that lock isn't
+   * re-entrant, and a non-colocated project folder has no Git to lock), so the pool prepares them outside the repository
+   * lock. Absent (Git's): the pool prepares under the repository lock.
+   */
+  ownPreparationLock?: true
   /** The folder detached at `revision` (`quiet`: without the tool's notices). Refused by the tool rather than lose files. */
   detach(folder: string, revision: string, o?: { quiet?: boolean } & OwnedWrite): Promise<WorkspaceStep>
 
