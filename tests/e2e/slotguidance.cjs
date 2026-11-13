@@ -41,7 +41,8 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').
 const readOr = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
 // The lines P7 changed (#1444), as agents are given them.
 const SLOT_LINE = /that folder is the slot: work and run checks there, never in another one/
-const ISOLATED = /with `--isolated` it runs in a check copy of its own/
+// HI-2854 reworded the --isolated line: "with `--isolated`, in a check copy at the card's revision".
+const ISOLATED = /with `--isolated`, in a check copy at the card's revision/
 const COPY_LINE = /the review copy holding that revision when the project has them\. Review there, never in the builder's slot or folder/
 const CONTRACT = /Combwork sets your folder \(the project's, a card's or lane's slot, or the review copy a review names\)/
 // What nothing delivered may say any more: a worktree of an agent's own (tests/guidance.test.ts has the same).

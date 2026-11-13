@@ -101,13 +101,14 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').
     // 2. Alt+Enter: as written, in one prompt.
     await inv('advanced:set', NEWLINE, 'alt-enter')
     r = await startCard('Card two', written)
-    check('with Alt+Enter, Codex gets the prompt as written: line breaks, the blank line and indentation kept', r.got.length === 1 && r.got[0].endsWith('Card two\n\nPlan one:\n  step A\n\nstep B'), JSON.stringify(r.got))
+    // A card Combwork started says so after its title (HI-2854).
+    check('with Alt+Enter, Codex gets the prompt as written: line breaks, the blank line and indentation kept', r.got.length === 1 && r.got[0].endsWith('Card two\n\nIt is in Doing and yours.\n\nPlan one:\n  step A\n\nstep B'), JSON.stringify(r.got))
     check('…in one prompt: nothing was sent early', prompts().filter((t) => /Plan one|step A|step B/.test(t) && !t.includes('Card one')).length === 1, JSON.stringify(prompts()))
 
     // 3. The switch off: one line again, whatever the line-break choice.
     await inv('advanced:set', AS_TYPED, false)
     r = await startCard('Card three', written)
-    check('with Send prompts as typed off, one line again', r.got.length === 1 && !r.got[0].includes('\n') && r.got[0].includes('Card three Plan one: step A step B'), JSON.stringify(r.got))
+    check('with Send prompts as typed off, one line again', r.got.length === 1 && !r.got[0].includes('\n') && r.got[0].includes('Card three It is in Doing and yours. Plan one: step A step B'), JSON.stringify(r.got))
   } catch (e) {
     check('the suite ran to its end', false, e.stack)
   } finally {

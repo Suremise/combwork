@@ -35,7 +35,9 @@ const heads = () => git(fx.alpha, 'for-each-ref', '--format=%(refname)', 'refs/h
   q.prepare(fx)
   // cw/hb3: an agent's branch from before slots, at integration's commit (merged). A tag named as integration.
   git(fx.alpha, 'branch', 'cw/hb3', 'integration')
-  git(fx.alpha, 'tag', 'integration', 'main')
+  // On a commit of its own, outside integration's history: a tag named as a line, in its history, with the line in main
+  // is that line's release (HI-3148), and cards can't start on a released line.
+  git(fx.alpha, 'tag', 'integration', git(fx.alpha, 'commit-tree', 'main^{tree}', '-m', 'a tag named as integration'))
   const h = await q.startCombwork(fx, { port: PORT })
   const { page, inv } = h
   try {
