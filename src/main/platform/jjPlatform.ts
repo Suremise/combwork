@@ -25,7 +25,7 @@ import { UNREADABLE } from '../../shared/workflow/texts'
 import type { CardRecord } from '../workflow/factStore'
 import type { ReconcileHooks } from '../workflow/reconcile'
 import type { Workflow } from '../workflow/runtime'
-import type { CheckBracket, FinishInputs, HeadMove, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
+import type { CheckBracket, FinishInputs, HeadMove, KeptWork, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
 import type { HistoryPort } from './history'
 import { historyFor, observePort } from './historyPorts'
 import type { Disposable, ObserveEvent } from './observe'
@@ -50,8 +50,8 @@ import type { FactData } from '../../shared/workflow/facts'
 import { CW_RUNS } from '../progress'
 import { createLogger, userText } from '../logger'
 import { mergeMessage, updateMessage } from '../workflow/mergeMessage'
-import { jjCandidateNow, type JjCandidateDeps } from './jjCandidates'
-import { cleanCycle, cycleLive, readAttemptsValue, jjCandidateStep, sameFingerprint, type JjCandidateOffer, type JjAttemptEntry, type JjCandidateFingerprint, type JjCandidateStep } from './jjCandidateStep'
+import { jjCandidateNow, visibleCommits, type JjCandidateDeps } from './jjCandidates'
+import { cleanCycle, cycleLive, readAttemptsValue, reviveDropped, jjCandidateStep, sameFingerprint, type JjCandidateOffer, type JjAttemptEntry, type JjCandidateFingerprint, type JjCandidateStep } from './jjCandidateStep'
 import { randomUUID } from 'crypto'
 import { isJjUnknown, JjReads, parseCommitLine, type JjCommit } from './jjReads'
 import { jjRunner, storeGatedHistory, type JjRunner } from './jjRunner'
@@ -179,6 +179,8 @@ export interface JjChecksHost {
    */
   setup(): Promise<{ setup: string; stamp: string }>
   setupStamp(): string
+  /** HI-3122: whether a stamp is a read setup command's (false: unread now, which nothing may be made under). Absent: all are. */
+  knownStamp?(stamp: string): boolean
   lease(card: number, revision: string): Promise<{ id: string; folder: string; spawn: Spawn; give(why: string, end?: boolean): Promise<void> } | { wait: string } | { refused: string }>
   /**
    * HI-2950: the free check copies still at a candidate's commit moved onto the head it was built on, so it can be dropped
@@ -295,6 +297,26 @@ export class JjPlatform implements PlatformAdapter {
     return d && 'jj' in d ? d.jj : null
   }
 
+  /**
+   * HI-3115: where the card's cycle (its last Started) stands with its slot's preparation, for a submit's `unbound`
+   * advice: `pending` (no `SlotPrepared` yet: end the turn, the slot is prepared once the builder is idle), `held` (its
+   * preparation waits on what the slot holds: the hold's own sentence, its last `SlotPrepareHeld`), else `other` (bound
+   * to another card since: today's advice). Unreadable: `other`.
+   */
+  private slotState(card: CardRecord): { state: 'pending' | 'held' | 'other'; told: string } {
+    try {
+      const facts = this.wf?.store.facts(card.id) ?? []
+      const at = facts.findLastIndex((f) => f.kind === 'Started')
+      if (at < 0) return { state: 'other', told: '' }
+      const since = facts.slice(at + 1)
+      if (since.some((f) => f.kind === 'SlotPrepared')) return { state: 'other', told: '' }
+      const held = since.findLast((f) => f.kind === 'SlotPrepareHeld')
+      return held ? { state: 'held', told: (held.data as FactData['SlotPrepareHeld']).told } : { state: 'pending', told: '' }
+    } catch {
+      return { state: 'other', told: '' }
+    }
+  }
+
   private refused(card: CardRecord, why: JjWhy, values: Record<string, string | number> = {}): GuardRefusal {
     return { rule: 'platform.jjRefused', values: { card: card.key, why, ...values } }
   }
@@ -347,21 +369,65 @@ export class JjPlatform implements PlatformAdapter {
   }
 
   async startTarget(card: CardRecord, o: WorkflowOptions): Promise<Maybe<string | null>> {
-    return card.target || o.target || null
+    const r = await this.resolveTarget(card, o)
+    return isUnknown(r) ? r : r.target
+  }
+
+  /**
+   * HI-3129 (Darren's decision (a), 13 Nov: a card keeps the bookmark it started on): a start's target. No kept slot (a
+   * fresh start): the card's own, else the project's (a lane's: its Merges into). A kept slot (its committed work from
+   * before it was put back, HI-2995): the target its binding names, proved (the slot's identity read, its binding this
+   * card's at that generation), never the project's; unproved (anything unknown, missing or another card's) refused
+   * `platform.keptOnTarget` `unread`, unknown never taken for fresh. Its own Merges into naming another bookmark is
+   * refused (`mismatch`), and a lane card whose lane merges into another (`platform.keptLine`, as HI-3112's Git), both
+   * before any slot is lent. `kept`: what the lend checks again before it records the target on the slot (`slotFor`).
+   */
+  private async resolveTarget(card: CardRecord, o: WorkflowOptions): Promise<Maybe<{ target: string | null; kept?: { slot: string; generation: string; target: string } }>> {
+    const follows = card.target || o.target || null
+    const kept = card.kind === 'no-code' || !this.wf ? null : await this.wf.cfg.keptHere?.(card)
+    if (!kept) return { target: follows }
+    const refuse = (why: 'unread' | 'mismatch', target = '', now = ''): Unknown => ({ ...unknown(UNREADABLE.target, { target: target || follows || '' }), rule: 'platform.keptOnTarget', ruleValues: { why, slot: kept.slot, target, now } })
+    const proved = await this.provedKept(card, kept.folder)
+    if (!proved) return refuse('unread')
+    const { b, identity } = proved
+    if (card.target && card.target !== b.target) return refuse('mismatch', b.target, card.target)
+    const lane = card.lane ? this.wf!.lane(card.lane) : null
+    if (lane && !lane.ended && o.target && o.target !== b.target) return { ...unknown(UNREADABLE.target, { target: b.target }), rule: 'platform.keptLine', ruleValues: { kept: b.target, target: o.target } }
+    return { target: b.target, kept: { slot: kept.slot, generation: identity.generation, target: b.target } }
+  }
+
+  /** A kept slot's binding, proved for `card`: the slot's identity read and its binding this card's at that generation, with a target. */
+  private async provedKept(card: CardRecord, folder: string): Promise<{ b: { target: string }; identity: { generation: string } } | null> {
+    const port = this.deps?.port() ?? null
+    const identity = port ? await port.identity!(folder) : null
+    const b = port && identity && !isUnknown(identity) ? await port.binding(folder) : null
+    if (!identity || isUnknown(identity) || !b || isUnknown(b) || b.card !== card.id || b.generation !== identity.generation || !b.target) return null
+    return { b: { target: b.target }, identity: { generation: identity.generation } }
+  }
+
+  async keptWork(card: CardRecord): Promise<KeptWork> {
+    if (card.kind === 'no-code' || !this.wf) return null
+    const kept = await this.wf.cfg.keptHere?.(card)
+    if (!kept) return null
+    const proved = await this.provedKept(card, kept.folder)
+    return proved ? { slot: kept.slot, target: proved.b.target } : { unproved: true, slot: kept.slot }
   }
 
   async start(card: CardRecord, o: WorkflowOptions, builder?: string, dry = false): Promise<Maybe<StartPlan>> {
     const d = this.deps
     if (!this.wf) return notYet()
-    const target = card.target || o.target || null
     // A no-code card changes nothing: it starts where its agent is, with no line (as under Git).
-    if (card.kind === 'no-code') return { folder: 'project', line: null, base: null, target }
+    if (card.kind === 'no-code') return { folder: 'project', line: null, base: null, target: card.target || o.target || null }
+    // HI-3129: its kept slot's bookmark, proved, before any slot is lent; else the card's or the project's.
+    const resolved = await this.resolveTarget(card, o)
+    if (isUnknown(resolved)) return resolved
+    const target = resolved.target
     if (o.folder !== 'slots' || !this.wf.cfg.slotFor) return withDetail(unknown(UNREADABLE.folderFor, { branch: card.key }), say(START_TEXT.slots))
     // HI-3106: no target bookmark chosen (jj resolves no default): refused saying so, never "couldn't read" a blank name.
     // Asked before jj's card work is needed: what the project's options lack is said first.
     if (!target) return { ...withDetail(unknown(UNREADABLE.target, { target: '' }), say(START_TEXT.target)), rule: 'platform.noTarget' }
     if (!d) return notYet()
-    const got = builder ? await this.wf.cfg.slotFor(card, builder, { dry, target }) : null
+    const got = builder ? await this.wf.cfg.slotFor(card, builder, { dry, target, ...(resolved.kept ? { kept: resolved.kept } : {}) }) : null
     if (!got) return withDetail(unknown(UNREADABLE.folderFor, { branch: card.key }), say(START_TEXT.noSlot))
     if ('wait' in got) return { folder: 'project', line: null, base: null, target, slotWait: got.wait }
     const port = d.port()
@@ -381,7 +447,8 @@ export class JjPlatform implements PlatformAdapter {
     if (isUnknown(b)) return b
     let base = th.head
     if (b && b.card === card.id && b.key && b.generation === identity.generation && this.ownKeys(card).has(b.key)) {
-      if (b.target !== target) return withDetail(unknown(UNREADABLE.target, { target }), say(START_TEXT.carryTarget, { slot: got.slot, target: b.target ?? '?' }))
+      // Its own binding on another bookmark than the start's (changed since it was resolved): refused as that, never "couldn't read".
+      if (b.target !== target) return { ...withDetail(unknown(UNREADABLE.target, { target }), say(START_TEXT.carryTarget, { slot: got.slot, target: b.target ?? '?' })), rule: 'platform.keptOnTarget', ruleValues: { why: 'mismatch', slot: got.slot, target: b.target ?? '', now: target ?? '' } } // i18n-ignore: a select's value, not text
       base = b.base
     }
     return { folder: got.folder, line: key, base, target, slot: got.slot, lease: got.lease, fresh: got.fresh, platform: { jj: { workspace: identity.workspace, store: identity.store, generation: identity.generation } } }
@@ -394,7 +461,12 @@ export class JjPlatform implements PlatformAdapter {
 
   async prime(card: CardRecord, s: CardState, o: WorkflowOptions): Promise<unknown> {
     if (!this.wf) return null
-    if (!s.started || s.stage === 'todo') return { view: null, folder: null, lease: null, holder: null, target: card.target || o.target || null, project: await this.ctxOf(this.wf.cfg.project) } satisfies Primed
+    if (!s.started || s.stage === 'todo') {
+      // HI-3129: the target the start will take (a kept slot's bookmark), else what it would follow; refused: as before.
+      const r = card.kind === 'no-code' ? null : await this.resolveTarget(card, o)
+      const target = r && !isUnknown(r) ? r.target : card.target || o.target || null
+      return { view: null, folder: null, lease: null, holder: null, target, project: await this.ctxOf(this.wf.cfg.project) } satisfies Primed
+    }
     const folder = this.wf.folderOf(s)
     return { view: s.started.line ? await this.ctxOf(folder) : null, folder, lease: s.started.lease ?? null, holder: this.holderOf(card, s), target: s.started.target ?? null, project: null } satisfies Primed
   }
@@ -528,7 +600,7 @@ export class JjPlatform implements PlatformAdapter {
       at = got.value
     } else {
       const owner = this.ownerOf(card, s, true)
-      if (!owner) return { ok: false, refusal: this.refused(card, 'unbound') }
+      if (!owner) return { ok: false, refusal: this.refused(card, 'unbound', this.slotState(card)) }
       const b = await jjBoundary({ ...ctx, folder }, owner, { lock: d.lock(ctx.store) }, this.runner())
       // New files jj left out for its size limit (HI-2973): the work isn't all recorded, named for the agent to commit
       // (raising the limit) or ignore.
@@ -556,7 +628,7 @@ export class JjPlatform implements PlatformAdapter {
     // The slot's binding: still this card's line, at its generation, its base an ancestor of P.
     const bound = await port.binding(folder)
     if (isUnknown(bound)) return { ok: false, refusal: this.unknownRefusal(card, bound, 'submit') }
-    if (!bound || bound.key !== s.started.line) return { ok: false, refusal: this.refused(card, 'unbound') }
+    if (!bound || bound.key !== s.started.line) return { ok: false, refusal: this.refused(card, 'unbound', this.slotState(card)) }
     const base0 = bound.base
     if (P.commit === base0) return { ok: false, refusal: { rule: 'submit.empty', values: { card: card.key, changes: 'none' } } }
     const chainOut = await reads.run(op, ['log', '--no-graph', '--reversed', '-r', `(${base0}::${P.commit}) ~ ${base0}`, '-n', String(CHAIN_MAX + 1), '-T', COMMIT_TEMPLATE])
@@ -798,7 +870,10 @@ export class JjPlatform implements PlatformAdapter {
       const setup = read.setup
       const o = wf.rulesetOf(card0, s).options
       const key = checksKeyOf(o, setup)
-      const at = { fp, attempt: offer.attempt, key, setup, setupStill: () => host.setupStamp() === read.stamp }
+      // HI-3122 (HR3's round 2): a setup command read as unknown (project.json caught mid-save) never stands for itself:
+      // nothing is made or published under it.
+      const setupNow = (): boolean => host.knownStamp?.(read.stamp) !== false && host.setupStamp() === read.stamp
+      const at = { fp, attempt: offer.attempt, key, setup, setupStill: setupNow }
       // The misses in a row before this run (kept while it ran: HI-2991), so its retry doubles with each; none after a
       // restart under a new key (HR1's round 1: the restart clears them, so the delay counts from there too).
       let misses = shown.checks.misses ?? 0
@@ -822,7 +897,7 @@ export class JjPlatform implements PlatformAdapter {
         const st = wf.state(c)
         // The offer's state read unknown (an operation during its read) isn't invalid (HI-2991): only a definite answer ends
         // a check; what it comes to is published only while the offer is read current.
-        return sameFingerprint(candidateFingerprint(wf, c, st), fp) && checksKeyOf(wf.rulesetOf(c, st).options, (await host.setup()).setup) === key && host.setupStamp() === read.stamp && (await this.offerState(fp.target, offer)) !== 'not'
+        return sameFingerprint(candidateFingerprint(wf, c, st), fp) && checksKeyOf(wf.rulesetOf(c, st).options, (await host.setup()).setup) === key && setupNow() && (await this.offerState(fp.target, offer)) !== 'not'
       }
       let done = 0
       const out = await runCandidateChecks(
@@ -864,6 +939,18 @@ export class JjPlatform implements PlatformAdapter {
         await publish({ failing: `${out.transient.check}: ${out.transient.why}`.slice(0, 500), retryMs })
         later = Math.min(later ?? Infinity, retryMs)
       }
+    }
+    // HI-3122 (the Assistant's note after HR3's round 3): whatever ended a card's turn in this pass (an invalid run, a
+    // restart refused for an unknown or changed setup, or any early exit to come), a card whose checks are still unsettled
+    // (shown running, waiting or failing) gets its next look at its retry time, or at the bounded retry (`againMs(0)`)
+    // when it has none ahead: never only when something else asks for one, which left its checks shown running.
+    for (const card0 of wf.store.cards()) {
+      if (host.signal?.aborted) return
+      if (card0.stage !== 'approved') continue
+      const c = candidateShown(wf, card0, wf.state(card0), project, undefined, true)?.checks
+      if (!c || (c.state !== 'running' && c.state !== 'waiting' && c.state !== 'failing')) continue
+      const ahead = c.state === 'running' ? undefined : c.retryAt
+      later = Math.min(later ?? Infinity, ahead !== undefined && ahead > Date.now() ? ahead - Date.now() : (host.againMs?.(0) ?? 30_000))
     }
     if (later !== null && Number.isFinite(later) && !host.signal?.aborted) {
       if (r.timer) clearTimeout(r.timer)
@@ -1109,8 +1196,12 @@ export class JjPlatform implements PlatformAdapter {
     const all = scan(after, `${prefix}\uffff`, SWEEP_SCAN)
     const passEnds = all.length < SWEEP_SCAN
     const byKey = (k: string): CardRecord | null => wf.store.cardByKey(k)
-    type Due = { key: string; cardKey: string; cycle: number }
-    const due: Due[] = []
+    type Due = { key: string; cardKey: string; cycle: number; revive?: true }
+    // HI-3150: every scanned row's dropped attempts may be back in view, whether the row is due for something else or
+    // otherwise settled (HR2's round 1: a retained checks journal or a live sibling made it due, and cleanCycle skips a
+    // dropped entry): their owned commits are nominees for one batched read below; a row of a card gone from the board
+    // isn't (no lock, nobody to revive it for).
+    const listed: (Due & { live: boolean; nominee?: string[] })[] = []
     for (const row of all) {
       const m = /^jj_attempts:[^:]+:(.+):(\d+)$/.exec(row.key)
       if (!m) continue
@@ -1120,9 +1211,18 @@ export class JjPlatform implements PlatformAdapter {
       if (card && !cycleOver(card, wf.state(card), cycle)) continue
       const entries = readAttemptsValue(row.value)
       const rows = rec.read((db) => (db.prepare('SELECT COUNT(*) AS n FROM board_meta WHERE key = ? OR (key > ? AND key < ?)').get(candidateKey(project, cardKey, cycle), `jj_candidate_checks:${project}:${cardKey}:${cycle}:`, `jj_candidate_checks:${project}:${cardKey}:${cycle}:\uffff`) as { n: number }).n) // i18n-ignore: SQL
-      if (!cycleLive(entries) && !rows) continue
-      due.push({ key: row.key, cardKey, cycle })
+      const live = cycleLive(entries) || rows > 0
+      const owned = card ? entries.filter((e) => e.state === 'dropped' && !e.failure).flatMap((e) => e.record.commits) : []
+      if (live || owned.length) listed.push({ key: row.key, cardKey, cycle, live, ...(owned.length ? { nominee: owned } : {}) })
     }
+    // One visibility read of every nominee's commits, in chunks (visibleCommits): evidence only, the revival under the card's
+    // lock reads again. Unknown admits none of them; the next run reads them again.
+    const nominated = listed.flatMap((x) => x.nominee ?? [])
+    const back = nominated.length ? await visibleCommits({ runner: integ.runner, view: { jjRepo: integ.view.jjRepo, store: integ.view.store }, folder: integ.folder, ...(signal ? { signal } : {}) }, [...new Set(nominated)], () => !signal?.aborted) : null
+    const due: Due[] = listed.flatMap((x) => {
+      const revive = !!x.nominee?.some((c) => back?.has(c))
+      return x.live || revive ? [{ key: x.key, cardKey: x.cardKey, cycle: x.cycle, ...(revive ? { revive: true as const } : {}) }] : []
+    })
     // Fair: in key order after the cursor, the cursor past each row scanned, due or not (a page short of the due rows
     // stops at its last one, so the rest come first next run).
     const page = due.slice(0, SWEEP_PAGE)
@@ -1140,6 +1240,8 @@ export class JjPlatform implements PlatformAdapter {
         const j4 = { runner: integ.runner, view: { jjRepo: integ.view.jjRepo, store: integ.view.store }, folder: integ.folder, git: integ.git, lock: integ.lock, sameChange: async () => false, ...(d.candidateHook ? { hook: d.candidateHook } : {}) }
         const keyOf = card?.key ?? x.cardKey
         const park = d.candidateChecks?.parkCopies
+        // HI-3150: a nominated row's dropped attempts revived first, read again here under the card's lock.
+        if (x.revive && card) await reviveDropped({ j4, entries: () => rec.attempts!(keyOf, x.cycle), save: (e) => rec.saveAttempt!(keyOf, x.cycle, e), still, log: (w) => checksLog.info(`#${userText(keyOf)} cycle ${x.cycle}: ${w}`) }) // i18n-ignore: a log line, English
         const out = await cleanCycle({ j4, entries: () => rec.attempts!(keyOf, x.cycle), save: (e) => rec.saveAttempt!(keyOf, x.cycle, e), still, ...(park ? { park } : {}), log: (w) => checksLog.info(`#${userText(keyOf)} cycle ${x.cycle}: ${w}`) }) // i18n-ignore: a log line, English
         if (out.unresolved) unresolved = true
         // Its checks journals: each deleted only once its lease is freed (its tree can't still write; HR1's gap 2).

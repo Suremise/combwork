@@ -16,7 +16,7 @@
 //    fingerprint, its owner the fingerprint still being the card's (`still`, read from the board before every write).
 // The caller publishes what this answers only while the fingerprint and the head are still these (reconcile.ts).
 
-import { dropJjAttempt, isCandidate, isInterrupted, jjCandidateNow, prepareJjCandidate, prepareJjUpdate, recoverJjAttempt, type JjAttemptRecord, type JjCandidateDeps, type JjCandidateStyle, type JjDropped } from './jjCandidates'
+import { dropJjAttempt, isCandidate, isInterrupted, jjCandidateNow, prepareJjCandidate, prepareJjUpdate, recoverJjAttempt, visibleCommits, type JjAttemptRecord, type JjCandidateDeps, type JjCandidateStyle, type JjDropped } from './jjCandidates'
 import { isJjUnknown, type JjReadUnknown } from './jjReads'
 import type { ConflictsRecord } from '../../shared/workflow/conflicts'
 import type { SqlDb } from './jjObligations'
@@ -202,6 +202,10 @@ export async function jjCandidateStep(deps: JjCandidateStepDeps, card: string, f
     break
   }
 
+  // HI-3150: a dropped attempt the user's operation brought back into view is live again first (under this step's card
+  // lock), so the drops below take it as any other.
+  await reviveDropped({ j4: deps.j4, entries: deps.entries, save: deps.save, still: deps.still, ...(deps.log ? { log: deps.log } : {}) })
+
   // 4. Everything else superseded: dropped, keeping what the target reaches. The current candidate's update stays. A drop
   // held back before is tried again (HI-2990), and candidates go before the updates they were built on.
   const keep = new Set(current ? [current.record.attempt, ...(current.record.updated ? [current.record.updated.attempt] : [])] : [])
@@ -319,13 +323,42 @@ export async function cleanCycle(deps: Pick<JjCandidateStepDeps, 'j4' | 'entries
 }
 
 /**
+ * HI-3150 (design HI-3150/s10, s13): dropped entries any of whose owned commits jj shows again (the user's `jj op
+ * restore` to before the drop) are saved live again, `state` removed and the record as it was (`phase: 'dropped'`), so
+ * the ordinary drop paths (the step's, cleanCycle's) take them, re-pinning what they own before the guarded abandon, and
+ * an interruption anywhere after is resumed by those paths (the entry is live; nothing gates it on visibility again).
+ * Called under the card's lock; whatever nominated the cycle (the sweep's batched read) is evidence only: the entries are
+ * read again here, their visibility read again here, and an entry is revived only while it is still the one read (the
+ * same attempt and record, still `dropped`) and its owner still holds. How many were revived.
+ */
+export async function reviveDropped(deps: { j4: Pick<JjCandidateDeps, 'runner' | 'view' | 'folder' | 'signal' | 'timeout'>; entries: () => JjAttemptEntry[]; save: (e: JjAttemptEntry) => Promise<void> | void; still: () => boolean; log?: (what: string) => void }): Promise<number> {
+  const dropped = deps.entries().filter((e) => e.state === 'dropped' && !e.failure && e.record.commits.length)
+  if (!dropped.length || !deps.still()) return 0
+  const visible = await visibleCommits(deps.j4, [...new Set(dropped.flatMap((e) => e.record.commits))], deps.still)
+  if (!visible?.size) return 0
+  let n = 0
+  for (const e of dropped) {
+    if (!e.record.commits.some((c) => visible.has(c))) continue
+    if (!deps.still()) return n
+    const now = deps.entries().find((x) => x.record.attempt === e.record.attempt)
+    if (!now || now.state !== 'dropped' || JSON.stringify(now.record) !== JSON.stringify(e.record)) continue
+    const { state: _was, ...live } = now
+    await deps.save(live)
+    deps.log?.(`${e.record.attempt}: brought back by an operation of the user's, dropped again`)
+    n++
+  }
+  return n
+}
+
+/**
  * What a drop settles an entry to (HR1's round 1, finding 1): `kept` when the target reaches what it kept (for good);
  * none when it kept anything else back (a working copy or a bookmark on it: a hold that can pass, so the entry stays live
  * and is dropped again later); else `dropped`.
  */
 export function dropState(d: JjDropped): 'kept' | 'dropped' | null {
   if (d.dropped.keptRefs.some((k) => k.why === 'kept') || d.dropped.kept.length) return null
-  return d.dropped.keptRefs.some((k) => k.why === 'reached') ? 'kept' : 'dropped'
+  // HI-3150: a revived drop's own commit the target reaches holds no pin to say so: it is kept for good too, never revived again.
+  return d.dropped.keptRefs.some((k) => k.why === 'reached') || d.dropped.reached?.length ? 'kept' : 'dropped'
 }
 
 /**

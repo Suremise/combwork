@@ -302,6 +302,20 @@ describe('a lane left on the release by Start the next version (HI-3113)', () =>
     await expect(lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [la, lb, fix, next], by: 'You' })).rejects.toThrow(/merges into 1\.4\.0, and this lane into 1\.3\.0/)
   })
 
+  it('is not old rules for its Merges into alone (HI-3142); a real rule change since still is', async () => {
+    const { w, repo } = await project()
+    const la = await card(w, 'Lane A')
+    const started = await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [la], by: 'You' })
+    await inWorkspace(w, () => nv.startNextVersion(w, repo, { from: { ref: '1.3.0', commit: '' }, preview: true }))
+    const view = async () => (await lanes.listLanes(w, { project: 'p' })).find((l) => l.id === started.lane.id)!
+    // Its ruleset differs from the project's now (G7 1.3.0 against 1.4.0) by its target alone: only "into 1.3.0".
+    expect([(await view()).target, (await view()).oldRules]).toEqual(['1.3.0', false])
+    // A rule changed since (the merge style): old rules, its Merges into still named.
+    const f = await inWorkspace(w, () => form.workflowForm(w, repo))
+    await inWorkspace(w, () => form.setWorkflowOptions(w, repo, { preset: f.preset, options: { ...f.own, style: f.options.style === 'squash' ? 'merge' : 'squash' } }))
+    expect([(await view()).target, (await view()).oldRules]).toEqual(['1.3.0', true])
+  })
+
   it("counts a lane started on the next version's branch as using it, so the start's undo check finds it", async () => {
     const { w, repo } = await project()
     await inWorkspace(w, () => nv.startNextVersion(w, repo, { from: { ref: '1.3.0', commit: '' }, preview: true }))

@@ -19,7 +19,7 @@ export interface Unknown {
    * HI-3106: not a read that failed but a refusal of its own the platform knows (a start with no target chosen): the
    * runtime refuses with this rule, the card its value, rather than `platform.unknown`'s "couldn't read".
    */
-  rule?: 'platform.noTarget' | 'platform.detachedFolder' | 'platform.keptLine' | 'platform.noUpstream'
+  rule?: 'platform.noTarget' | 'platform.detachedFolder' | 'platform.keptLine' | 'platform.noUpstream' | 'platform.keptOnTarget'
   /** The rule's values beside the card's key (HI-3104's head and branch). */
   ruleValues?: Record<string, string>
 }

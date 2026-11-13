@@ -12,6 +12,10 @@ import { randomBytes } from 'crypto'
 import { samePlace } from '../places'
 import { lineHistory } from '../platform/historyPorts'
 import { isUnknown } from '../platform/types'
+import type { KeptWork } from '../platform/adapter'
+import type { Workflow } from './runtime'
+import type { CardRecord } from './factStore'
+import { hasCapability } from '../../shared/platform/descriptors'
 import type { WorkspaceService } from '../workspace'
 import type { TaskActor } from '../tasks'
 import { boardChanged, boardWrite, cardKeys } from '../boardStore'
@@ -56,6 +60,8 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
     return laneTargetOf(rec?.ruleset, (r) => store.ruleset(r).options)
   }
   const onFrom = new Set(running.filter((l) => (laneTarget(l.id) || null) === from && !wf.lane(l.id)?.ended).map((l) => l.id))
+  // HI-3152: a platform that can't move work between targets (no `retarget`: jj) reads its own way, never Git's history.
+  if (!movesWork(wf)) return keptPreview(wf, out, cards, row, running.filter((l) => onFrom.has(l.id)), from)
   // Only once `from` has ended (HI-2753): gone, or all of it in `to` (merged, as an integration branch is at its release).
   // A change between branches that both go on leaves started cards and running lanes on their own (HI-2674).
   // HI-2807: `ongoing` (Start the next version): both go on by the user's word, whatever their heads say (a new branch is
@@ -166,6 +172,58 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
   return out
 }
 
+/** HI-3152: whether the project's platform, as its options are now, moves work between targets (`retarget`, Git's). */
+function movesWork(wf: Workflow): boolean {
+  return hasCapability(wf.platform(wf.currentRuleset(false).options).id, 'retarget')
+}
+
+/**
+ * HI-3152: the preview on a platform that can't move work between targets (jj), read through the platform, never Git's
+ * history (Darren's decision (a), 13 Nov: a card keeps the bookmark it started on). Running lanes on `from` stay (`lane`;
+ * with a card in flight, `started`), their cards in flight too; cards in flight started on `from` stay (`started`); a
+ * waiting card whose work is kept (its kept slot, `keptWork`) stays when that work is on `from` or can't be proved (with
+ * the slot named staying, `kept` or `cantCheck`); a waiting card set to `from` with no kept work can move. Nothing else
+ * moves: no lane, started card or slot (a jj slot is prepared at its card's bookmark as it is lent, HI-2906).
+ */
+export async function keptPreview(wf: Workflow, out: RetargetPreview, cards: readonly CardRecord[], row: (c: CardRecord) => { number: number; key: string; title: string }, lanes: readonly { id: string; name: string | null; builder: { name: string } }[], from: string): Promise<RetargetPreview> {
+  out.laneMoves = []
+  const grouped = new Set<number>()
+  for (const l of lanes) {
+    const flying = cards.filter((c) => c.lane === l.id && IN_FLIGHT_STAGES.includes(wf.state(c).stage))
+    for (const c of flying) {
+      grouped.add(c.id)
+      out.cards.keep.push({ ...row(c), why: 'started' }) // i18n-ignore: a reason's code, said in words where it is shown
+    }
+    out.lanes.push({ id: l.id, name: l.name, builder: l.builder.name, why: flying.length ? 'started' : 'lane' }) // i18n-ignore: a reason's code, said in words where it is shown
+  }
+  for (const c of cards) {
+    const s = wf.state(c)
+    if (s.stage === 'done' || grouped.has(c.id)) continue
+    const own = c.target ?? null
+    if (s.resolves?.to === from && (own === from || s.started?.target === from)) {
+      out.cards.keep.push({ ...row(c), why: 'refused' }) // i18n-ignore: a reason's code, said in words where it is shown
+      continue
+    }
+    if (s.stage !== 'todo' && s.stage !== 'hold') {
+      if (s.started?.target === from) out.cards.keep.push({ ...row(c), why: 'started' }) // i18n-ignore: a reason's code, said in words where it is shown
+      continue
+    }
+    // Only a card about `from`: set to it, or following the project's target (which a kept slot may hold otherwise).
+    if (own !== null && own !== from) continue
+    const p = wf.platformOf(c, s)
+    const kept: KeptWork = p.keptWork ? await p.keptWork(c) : { unproved: true, slot: null }
+    if (kept && 'unproved' in kept) {
+      out.cards.keep.push({ ...row(c), why: 'cantCheck' }) // i18n-ignore: a reason's code, said in words where it is shown
+      if (kept.slot) out.slots.keep.push({ name: kept.slot, why: 'cantCheck' }) // i18n-ignore: a reason's code, said in words where it is shown
+    } else if (kept) {
+      if (kept.target !== from && own === null) continue
+      out.cards.keep.push({ ...row(c), why: kept.target === from ? 'kept' : 'work' }) // i18n-ignore: a reason's code, said in words where it is shown
+      if (kept.target === from) out.slots.keep.push({ name: kept.slot, why: 'kept' }) // i18n-ignore: a reason's code, said in words where it is shown
+    } else if (own === from) out.cards.move.push(row(c))
+  }
+  return out
+}
+
 /**
  * Moves what a confirmed preview listed (HI-2680), each only as it was seen: a card from `from` (its own target as
  * expected, under the board's lock: `tasks.setTarget`'s), a slot from its recorded target, folder and head (the pool's
@@ -189,6 +247,12 @@ export async function retargetApply(ws: WorkspaceService, projectPath: string, p
   }
   let stop: 'targetChanged' | 'refused' | null = null
   const { setTarget } = await import('../tasks')
+  // HI-3152: on a platform that can't move work between targets (jj), no lane, started card or slot moves, whatever the
+  // preview lists (an old or forged one, or the platform changed since): each skipped as `fixed`, read again at each.
+  const moves = async (): Promise<boolean> => {
+    const wf = await workflowFor(ws, projectPath).catch(() => null)
+    return !!wf && movesWork(wf)
+  }
   // HI-2753: running lanes first, each with its card in flight in one write (the card's), or alone: its cards then follow.
   for (const l of preview.laneMoves ?? []) {
     const name = l.name ?? l.builder
@@ -196,6 +260,10 @@ export async function retargetApply(ws: WorkspaceService, projectPath: string, p
     if (!stop && !allowed()) stop = 'refused'
     if (stop) {
       out.skipped.push({ lane: name, ...(l.card ? { card: l.card.number, key: l.card.key } : {}), why: stop })
+      continue
+    }
+    if (!(await moves())) {
+      out.skipped.push({ lane: name, ...(l.card ? { card: l.card.number, key: l.card.key } : {}), why: 'fixed' }) // i18n-ignore: a reason's code, said in words where it is shown
       continue
     }
     try {
@@ -217,6 +285,10 @@ export async function retargetApply(ws: WorkspaceService, projectPath: string, p
       out.skipped.push({ card: c.number, key: c.key, why: stop })
       continue
     }
+    if (c.started && !(await moves())) {
+      out.skipped.push({ card: c.number, key: c.key, why: 'fixed' }) // i18n-ignore: a reason's code, said in words where it is shown
+      continue
+    }
     try {
       await setTarget(c.number, to, actor, c.started ? { commit: still, expect: c.started.own, expectDefault: to, expectHead: c.started.head, expectFrom: from } : { commit: still, expect: from, expectDefault: to })
       out.moved.cards.push({ number: c.number, key: c.key })
@@ -234,6 +306,10 @@ export async function retargetApply(ws: WorkspaceService, projectPath: string, p
     if (!stop && !allowed()) stop = 'refused'
     if (stop || !pool) {
       out.skipped.push({ slot: s.name, why: stop ?? 'changed' }) // i18n-ignore: a reason's code, said in words where it is shown
+      continue
+    }
+    if (!(await moves())) {
+      out.skipped.push({ slot: s.name, why: 'fixed' }) // i18n-ignore: a reason's code, said in words where it is shown
       continue
     }
     const end = await pool.retarget(s.name, { folder: s.folder, target: s.target, head: s.head }, from, to, async () => allowed() && (await targetNow())).catch((e: Error): RetargetEnd => {

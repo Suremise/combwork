@@ -98,9 +98,27 @@ export interface WorkspaceHeads {
 }
 
 /** What a step that changes a workspace or a line answered: done, or not with the tool's own words (`err`, as it said them). */
+/**
+ * HI-3115 (decision B, design HI-3115/s42): what keeps a jj card's slot from being prepared, frozen at the operation it was
+ * read at, so the advice built from it still names the same work after the slot changes. `extra`: commits over the last
+ * card's that are neither in its target nor any of its submitted commits (`commits`, oldest first), and the working
+ * copy's own commit when it holds edits (`edits`); `select` the frozen revset of them all (full ids only). `notIntegrated`:
+ * the last card's work isn't in its target yet. `cantInspect`: what it holds couldn't be read (no ids, no commands).
+ */
+export interface HeldWork {
+  why: 'extra' | 'notIntegrated' | 'cantInspect'
+  commits: string[]
+  edits: string | null
+  select: string | null
+  base: string
+  target: string | null
+}
+
 export interface WorkspaceStep {
   ok: boolean
   err: string
+  /** HI-3115: a jj preparation refused for what the slot holds: the evidence for its wait's advice. */
+  held?: HeldWork
   /**
    * A refused detach because the slot holds its binding's own work not in the target yet (HI-2995; jj: the chain not
    * integrated, or not the binding's): kept for its card, not a refusal to retry. Never set for a transient one (the
@@ -221,6 +239,12 @@ export interface WorkspacePort {
   lineHead(repo: string, line: string): Promise<Maybe<string | null>>
   /** The repository's default target line (Git: main, else master). */
   defaultLine(repo: string): Promise<Maybe<string>>
+  /**
+   * HI-3129 (Darren's decision (a), 13 Nov): the lines a card or lane may name as its Merges into, read from the
+   * repository (jj: its local bookmarks, conflicted ones left out), for a platform whose targets are its repository's.
+   * Absent (Git): the project's configured Other branches are its list. Unknown when it can't be read.
+   */
+  targetLines?(repo: string): Promise<Maybe<string[]>>
   /** Whether a line exists (false also when the tool can't say: a 0.9 worktree's recreation chooses by it, as before). */
   lineExists(repo: string, line: string): Promise<boolean>
   /** The workspaces whose registrations a prune would drop (their folders gone), by where each was. */
@@ -271,6 +295,11 @@ export interface WorkspacePort {
    */
   heldCard?(folder: string, identity: WorkspaceIdentity | null): Promise<number | null>
   /**
+   * HI-3129: the target the folder's binding names while it is `card`'s at the folder's generation, else null (another
+   * card's, none, or it can't tell). A kept slot's start checks it again before recording its target on the slot.
+   */
+  heldTarget?(folder: string, identity: WorkspaceIdentity | null, card: number): Promise<string | null>
+  /**
    * HI-3010: a new `line` made at the folder's own head and checked out there, changing no file, only while the folder
    * is detached at `base` or a commit past it (a builder already at work commits on it before its slot is prepared).
    * HI-3031: and only while every commit past `base` was made since `since` (the lease's start, ISO): a free slot waits
@@ -286,6 +315,11 @@ export interface WorkspacePort {
    * Git's only: absent, the pool waits for the slot's builder and prepares it as before.
    */
   lineAtBase?(folder: string, line: string, base: string, lease: string): Promise<WorkspaceStep>
+  /**
+   * HI-3115: committed work over the last card's in a slot whose builder still runs there, read without recording the
+   * folder; null when there's none or it can't be read. jj's only: absent, the preparation decides after its record.
+   */
+  heldEarly?(folder: string, line: string, base: string, o: { identity: WorkspaceIdentity | null }): Promise<HeldWork | null>
   /** The folder detached at `revision` (`quiet`: without the tool's notices). Refused by the tool rather than lose files. */
   detach(folder: string, revision: string, o?: { quiet?: boolean } & OwnedWrite): Promise<WorkspaceStep>
 

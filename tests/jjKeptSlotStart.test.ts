@@ -4,7 +4,9 @@
 // - its lane gets its slot for it (Start Lane…'s lendLane, the lane's first card the kept one): the kept slot, its work;
 // - a lane already working in another slot: the card's start refused naming both, nothing lent;
 // - a lane's card started with no lane slot yet: the kept slot, dry and for real;
-// - its builder's run still writing in another slot: waited for, and that slot's takeover refused in its write.
+// - its builder's run still writing in another slot: waited for, and that slot's takeover refused in its write;
+// - HI-3129: the kept target its start resolved, no longer its binding's when the lease is taken (another target, another
+//   generation): the lease given back, the slot's row, binding and kept record as they were, and the start waits.
 // Skipped without the fetched jj (npm run jj:fetch).
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -79,7 +81,8 @@ async function setup(name: string) {
     await disposeWorkspaceService(ws)
   })
   const card = async (title: string): Promise<number> => (await run(() => tasks.createTask({ title, project: 'alpha', agent: 'b1' }, { kind: 'user' }))).number
-  const start = (n: number, lane: string | null, dry = false) => run(() => leaseForStart(ws, project, { id: n, ...(lane ? { lane } : {}) }, 'b1', { dry, target: 'main' }))
+  type Kept = { slot: string; generation: string; target: string }
+  const start = (n: number, lane: string | null, dry = false, kept?: Kept) => run(() => leaseForStart(ws, project, { id: n, ...(lane ? { lane } : {}) }, 'b1', { dry, target: kept?.target ?? 'main', ...(kept ? { kept } : {}) }))
   /**
    * Card `n` lent a slot, a commit made there, put back: kept for it. `unsettled`: its lease ended in the board alone,
    * no look of the slot yet (its kept record written only by the pool's next refresh).
@@ -104,7 +107,7 @@ async function setup(name: string) {
     expect(pool.keptCard(row.name)).toBe(n)
     return { name: row.name, folder: row.folder, R }
   }
-  return { ws, project, run, pool, store, h, card, start, putBack, setRun: (r: string | null) => void (runNow = r) }
+  return { ws, project, run, pool, store, h, port, card, start, putBack, setRun: (r: string | null) => void (runNow = r) }
 }
 
 describe.skipIf(!jjExe)('a card with a kept jj slot, started (HI-3032)', { timeout: REAL_JJ_MS }, () => {
@@ -174,5 +177,30 @@ describe.skipIf(!jjExe)('a card with a kept jj slot, started (HI-3032)', { timeo
     expect(await t.pool.takeWrittenSlot(w.slot.name, { card: n, agent: 'b1' }, 'run-b1')).toBeNull()
     expect(t.store.openLease(w.slot.name)).toBeNull()
     expect(t.pool.keptCard(k.name)).toBe(n)
+  })
+
+  // HI-3129 (s16, HR1's addition): the start resolved the card's target from the kept slot's binding; the lease checks it
+  // again where the start records the target on the slot. Resolved as another target or generation than the binding has
+  // now (it changed in between), the start waits: the lease given back, nothing of the slot changed, the card not started.
+  it.each(['target', 'generation'] as const)('HI-3129: the kept binding changed after its target was resolved (%s): the lease given back, the slot as it was, the start waits', async (what) => {
+    const t = await setup(`kept-moved-${what}`)
+    const n = await t.card('kept')
+    const k = await t.putBack(n)
+    const generation = t.store.slot(k.name)!.identity!.generation
+    const row = t.store.slot(k.name)!
+    const binding = await t.port.binding(k.folder)
+    expect(binding).toMatchObject({ card: n, target: 'main' })
+    const kept = what === 'target' ? { slot: k.name, generation, target: 'next' } : { slot: k.name, generation: `${generation}-before`, target: 'main' }
+    expect(await t.start(n, null, false, kept)).toEqual({ wait: expect.stringMatching(new RegExp(`${k.name}'s kept work changed while the start took it`)) })
+    expect(t.store.openLease(k.name)).toBeNull()
+    expect(t.store.slot(k.name)).toMatchObject({ target: row.target, identity: row.identity })
+    expect(await t.port.binding(k.folder)).toEqual(binding)
+    expect(t.pool.keptCard(k.name)).toBe(n)
+    expect(t.h.id(k.folder, '@-')).toBe(k.R)
+    expect((await t.run(() => tasks.getTask(n))).column).toBe('todo')
+    // Resolved again as the binding has it: lent, its work there.
+    expect(await t.start(n, null, false, { slot: k.name, generation, target: 'main' })).toMatchObject({ slot: k.name })
+    expect(t.store.openLease(k.name)).not.toBeNull()
+    expect(t.h.id(k.folder, '@-')).toBe(k.R)
   })
 })

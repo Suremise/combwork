@@ -960,6 +960,8 @@
   "board.strip.oneRun": "1 execução, {state, select, running {em execução} failed {com falha} stale {parou de informar} passed {passou} other {parada}}",
   "board.strip.runs": "{n, plural, =0 {# execuções} one {# execução} other {# execuções}}: {states}",
   "board.target.failed": "O destino do merge do cartão não foi alterado",
+  "board.target.kept": "O trabalho dele está reservado em {branch}: ele recomeça lá, seja o que for que este campo diga.",
+  "board.target.keptUnknown": "O trabalho dele está reservado em um slot cujo branch o Combwork não consegue ler agora: ele não começa até conseguir.",
   "board.target.field": "Mescla em",
   "board.target.mark": "Em {branch}",
   "board.target.markTip": "O trabalho deste cartão é criado a partir de {branch} e mesclado nele, não no branch de destino do projeto.",

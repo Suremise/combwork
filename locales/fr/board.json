@@ -960,6 +960,8 @@
   "board.strip.oneRun": "1 exécution, {state, select, running {en cours} failed {échouée} stale {plus de rapport} passed {réussie} other {arrêtée}}",
   "board.strip.runs": "{n, plural, one {# exécution} many {# exécutions} other {# exécutions}} : {states}",
   "board.target.failed": "La branche de fusion de la carte n’a pas été modifiée",
+  "board.target.kept": "Son travail est gardé sur {branch} : elle redémarre là, quoi qu’indique ce champ.",
+  "board.target.keptUnknown": "Son travail est gardé dans un emplacement dont Combwork ne peut pas lire la branche pour l’instant : elle ne démarrera pas avant que ce soit possible.",
   "board.target.field": "Fusion dans",
   "board.target.mark": "Dans {branch}",
   "board.target.markTip": "Le travail de cette carte part de {branch} et y est fusionné, au lieu de la branche cible du projet.",

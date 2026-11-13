@@ -2476,7 +2476,17 @@ so credit is only ever on the exact commit id and its content (R3.1, R3.2), and 
      moment still B1's;
   4. t0 once the write record has settled; the command; t1 once it has settled again;
   5. the write record for [t0, t1], jj's and Git's own folders left out (an edit and its undo show); where it isn't
-     complete, the stat snapshot again (unequal or unreadable: `changed`);
+     complete, the stat snapshot again (unequal or unreadable: `changed`). HI-3121, settled on real jj
+     (`tests/jjIgnoredWrite.test.ts`): a slot or a check copy is a jj workspace of its own. Not colocated, it is no Git
+     worktree; colocated (the pool adds it `--colocate`), jj registers it in `.git/worktrees` with a relative `gitdir`,
+     which the observer's `foldersOf` resolves against the wrong folder (HI-3160), so either way its own folder has no
+     write record today and the stat snapshot decides. (Once HI-3160 is fixed the write record decides there, and
+     `jjCounts` has no ignore filter: HI-3158 adds one to both paths, landing with or before it.) Nothing there knows what jj
+     ignores: a write inside a folder that is already there (an `out/` an earlier build made) changes none of the
+     snapshot's lines and is credited; a run that makes or removes an entry in the workspace's root or in a folder holding
+     a tracked file changes that folder's time and is `changed`, ignored or not. So a build's first run that makes its
+     output folder there isn't credited and the next is; one that deletes its output folder and makes it again each run
+     never is. A candidate's merge check in a check copy is decided the same way (its retry is the run after);
   6. the moment before the end boundary: still H1, the same checkout record and Git state, else `moved` (any
      operation by anyone, a bookmark set elsewhere included; a plain Git commit jj hasn't imported shows in Git's
      state);
@@ -3157,7 +3167,23 @@ jj card's line is a key, Combwork's jj writes are owned writes in its own worksp
   unintegrated work, a lost fence, a replaced folder, a binding changed meanwhile (`superseded`), the head or target
   moved. A fence lost after the write keeps the journal at `written`, for the holder's next attempt to confirm and
   publish. A crash resumes from the journal's phase by the same reading; a retry after publication recognises its own
-  binding and writes nothing.
+  binding and writes nothing. **Work found there early** (HI-3115; Darren's decision B of 13 Nov, design HI-3115/s42 agreed
+  with HR1): the protection of extra work stands (HI-2913, HI-2923, HI-2924, HI-2980 A, HI-2981): a slot holding more
+  than the previous binding is never prepared over. Its refusal (`unintegrated`, `notIntegrated`, `divergent`, `notEmpty`,
+  `journal`) is the pending cycle's wait, never `SlotPrepareFailed`: nothing there is changed, and once the slot is clear
+  the next pass prepares the same cycle, with no put-back. With it comes the evidence, frozen at the inspected operation
+  (`HeldWork`): the commits over the previous binding's base up to the working copy that are neither in its target (its
+  commit there) nor any of its submitted commits, and the working copy's own commit when it holds edits; `select` the
+  same set as a revset of full ids only, never `@` or a bookmark. A builder idle in the slot is checked first without
+  recording the folder (`heldEarly`: committed work only), so a hold for it doesn't end its run; edits are found by the
+  preparation's own record, after its run is ended. The hold is said once per cycle and reason (a `SlotPrepareHeld`
+  fact, with the sentence said), on the card and in the builder's wake: what is there, `jj new <base>` to set it aside
+  where it is, and once prepared `jj rebase -r <frozen selection> -B '@'` (or `jj squash --from <edits> --into '@'`) to
+  bring back what belongs to the card, its arguments as typed in PowerShell; more than 20 commits are counted and
+  selectable with `jj log -r <frozen selection>`. Not integrated: integrate it, or the user's own Done on exactly that
+  cycle (HI-2924). Unreadable: no ids or commands. A builder stopped for the record is named, with how to resume it. A
+  submit before the slot is prepared is told to end its turn (`unbound`, `pending`), or, held, the hold's own sentence
+  (`held`); one bound to another card since keeps today's refusal.
 - **Composition:** jj's port is registered by the app with its dependencies (`slotsApp.ts`: the control workspace's
   record and the bindings in the workspace database, the store's repository lock, re-entrant within one async context so
   a jj write inside a held lock runs straight through, the Recycle Bin, the project folder's quiet, containment on the
@@ -3399,6 +3425,24 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   wait for an agent's or a lane's start (`start.slotAvailable`), but the user's start across that wait, which would
   start the card where its builder is, is refused too, an override included: under jj (whose cards always use slots)
   that drag was the one way a card started in the project folder without its kept work.
+  **A kept jj slot's target** (HI-3129, Darren's decision (a) of 13 Nov): a jj card keeps the bookmark it started on.
+  Its start (jj's `resolveTarget`, read by `startTarget`, `start` and the Todo `prime`, so the evidence, the slot lent
+  and `Started.target` agree) reads the kept slot's binding (the port's `identity` and `binding`) and starts on the
+  binding's target whatever G7 is now; only a fresh start follows G7. Refused before any slot is lent, nothing
+  changed: the binding unproved (unreadable, or not this card's: `platform.keptOnTarget`, `why: unread`), never
+  started on G7 instead; the card's own Merges into naming another bookmark (`platform.keptOnTarget`, `why: mismatch`);
+  its lane merging elsewhere (`platform.keptLine`). The field shows the card's own target or G7, never a kept one, so
+  the card dialog notes beside it where a waiting card would start when that differs (`tasks.keptTarget`: the platform's
+  `startTarget`, read only, the card's own target unchanged; unproved, it says it can't be read; HR2's round 1). The kept target goes with the lease request (`slotFor`'s `kept`:
+  slot, generation, target), and the lease checks it again where the start records it (`SlotPool.keptBindingStill`,
+  the port's `heldTarget` at that generation): failing closed (binding unreadable, another card's, another generation,
+  another target), the slot is given back unused and the start waits (`slot.start.keptMoved`). **A jj project's
+  targets** are its repository's local bookmarks, read through the port (`targetLines`, pinned at the operation head,
+  conflicted ones left out), never Git's history: the card dialog and a lane's start info (`projectTargets`) list them (G7b
+  isn't needed to name one), and a pick is checked through the port (`targetExists`, `lineHead`). The list unreadable
+  (`othersUnread`), only G7 can be picked. jj has no retarget of work in flight (capability `retarget`, Git's only):
+  a started card's Merges into is fixed (`fixedInFlight`, `TARGET.started`). The Assistant's retarget preview for jj
+  is a follow-up.
   **A kept slot of the other version control** (HI-3069): the switch between Git and jj waits for kept slots (§ the
   store switch's `drain.kept`), but one left by a switch made before that is never lent back under the other
   platform. Every start of its card, real or dry, by an agent or the user, in any folder (a slot, the project folder,
@@ -3670,9 +3714,20 @@ and s11 (HR1's OK).
   (`offerState`, HI-2991) is read up to 3 times while it reads unknown (an operation landing during a pinned read); still
   unknown, it isn't invalid (only a definite answer ends a check), and a result is published only while it reads
   current.
-- **The setup command** is read with a stamp of project.json's identity (its file id, size and time); the publishing
-  transaction reads the stamp again and refuses a result made under a setup since changed, and the next look starts the
-  checks anew under the new key (`restart`).
+- **The setup command** is read with a stamp of the setup command itself (HI-3122, `jjSetupStamp.ts`: a hash of
+  project.json's `worktreeSetup`, read synchronously only when the file's identity changed since the last look, by one
+  plain read and parse that never waits: HR3's round 1, no kept-file recovery on main's thread; a file caught mid-save
+  gives an unread stamp, new each time, never kept and never equal to any (HR3's round 2), and nothing is made or
+  published under one (`knownStamp`), so a check started or published across it fails closed and is looked at again); the
+  publishing transaction reads the stamp again and refuses a result made under a setup since changed, and the next look
+  starts the checks anew under the new key (`restart`). Before HI-3122 the stamp was the file's identity, so any save of
+  project.json (an agent's new conversation records its `lastSessionId`; any agent or project setting) ended a running
+  check as invalid.
+- **Unsettled checks are always looked at again** (HI-3122): at the end of each pass, every candidate whose checks are
+  still shown running, waiting or failing gets its next look at its retry time, or at the bounded retry (`againMs(0)`,
+  30 s) when it has none ahead, whatever ended its turn (an invalid run, a restart refused for an unknown or changed setup,
+  any early exit): the look runs the checks anew under the key then, or not at all once the candidate has gone. Before,
+  nothing asked again, and the checks stayed shown running.
 - **Validity** (s11 §2), read before the lease and before each check, and checked again in the write that publishes
   progress, passed, stopped, waiting, failing or a red return (`publishCandidateChecks`): the fingerprint still the
   card's, the key the options' now with the setup command, the record still this attempt's under this key, the target at
@@ -3769,6 +3824,18 @@ without Integrated, not only when it is superseded (HI-2871) or after Integrated
   (concurrent history) or with the root as its parent (history abandoned below it) can't be classified: kept, and the
   drop finishes (`keptSuccessors`, logged); a read that fails interrupts the drop with nothing adopted, read again on
   the next pass. Reads only until every group is decided; none at all without a hidden commit with a successor.
+- **Brought back** (HI-3150, design HI-3150/s7, s10, s13): the user's `jj op restore` to before a drop shows the
+  dropped attempt's commits again, without its pins (Git refs jj doesn't restore). A `dropped` entry with an owned commit
+  visible again is **revived** (`reviveDropped`, jjCandidateStep.ts): under the card's lock, its row's journal and its
+  commits' visibility read again there, and saved live (`state` removed) only while it is the entry read (the same
+  attempt and record, still `dropped`) and its owner holds; nothing pinned or abandoned in that pass before the save, so
+  any interruption after it is resumed by the ordinary drop paths. The drop (`dropJjAttempt`) pins again each owned
+  visible commit no pin holds (`<prefix>r<n>`, as adopted successors are) before its guarded abandon: what the target
+  reaches is kept (and settles `kept` for good: `JjDropped.dropped.reached`), as is anything the user built on it.
+  **Where it is noticed:** the live cycle's step, before its drops; ended cycles through the sweep, every row the page already scanned with dropped entries (settled or due for
+  something else, a retained checks journal or a live sibling: HR2's round 1) nominated by one visibility read of
+  the owned commits of every such row, in chunks of 256 (`visibleCommits`), evidence only: a
+  read jj can't make admits none, read again next run. No new scan or timer; journals cleared since are out of reach.
 - **Tests:** `tests/jjEndedCycles.test.ts` (the predicate); `tests/jjCandidateRuntime.test.ts` (both modes: put back and
   restarted, the user's Done; and put back alone, the Integrated candidate kept, a reopen mid-drop (a new cycle), a
   candidate attempt in flight, a crashed drop completed by the next sweep, all through `afterRun`; HI-2990, both modes:
@@ -4602,7 +4669,9 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   compare the base ids (`rulesBaseId`): a lane on 1.2.0 isn't on old rules for that. A lane started on the project's
   own records G7 as it was, unmarked, and keeps merging there when G7 moves on (Start the next version: running lanes
   stay on the release), so a lane's target is read in one place (HI-3113, `laneTargetOf`): the mark, else its recorded
-  ruleset's G7. Every check reads it so (a lane named among a branch's uses, a card's target against its lane's, a
+  ruleset's G7. Such a lane isn't on old rules for that either (HI-3142): its unmarked ruleset is compared with the
+  project's rules now compiled with its own G7 (`rulesetNowAt`), so only a real rule change marks it. Every check reads
+  it so (a lane named among a branch's uses, a card's target against its lane's, a
   card brought into it, a lane's restart, the lane's info, which names it when it isn't G7 now, and the options its
   start and slot go by). It is fixed for the lane's life
   (a start naming another is refused), set by the user, the Assistant or a script, never its own builder, and only
@@ -4732,6 +4801,16 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   (`offerRetarget`: kept in memory, the newest 50 for a day), applied with `cw_queue` `retarget` (`POST
   /v1/workflow/retarget`, the id and the items named: only those that preview listed, each as it was seen then; `from`
   and `to` alone make a new preview, moving nothing).
+  **On jj** (HI-3152, after HI-3129; a platform without the capability `retarget`): work can't move between bookmarks,
+  so the preview is read through the platform, never Git's history (`keptPreview`). Running lanes on `A` stay (`lane`;
+  with a card in flight, `started`), and so do cards in flight started on `A` (`started`). A waiting card is asked for
+  its kept work (`keptWork`: its kept slot's binding, proved as a start proves it): kept on `A`, it and its slot stay
+  (`kept`, Darren's decision (a)); unproved, both stay, named (`cantCheck`), never left out; with none, a card set to `A`
+  can move. Free slots aren't listed: a jj slot is prepared at its card's bookmark as it is lent. The apply skips any
+  lane, started card or slot a preview lists (an old or forged one, or the platform changed since) as `fixed`, the
+  platform read again at each, nothing of it changed. `tasks.setTarget` on such a platform reads a waiting card's work
+  the same way (its kept slot, never Git's lines nor `dropEmptyLines`): kept on another bookmark, refused naming it (set
+  back to it, allowed); unproved, refused as unknown.
   the default (stored as none) or a branch G7b lists that exists now (`pickTarget`, `branchExists`). A lane start's
   target is checked before anything changes (an `applyNow` put back included), and again under the lanes' lock.
 - **A target that doesn't exist, and Start the next version (HI-2807, design s10 after s7).** A save naming a branch in

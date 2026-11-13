@@ -578,6 +578,77 @@ const onDb = (fn) => {
     check('…card 2 not started: still To Do, no Started since, not placed in the project folder', (await card(n2))?.column === 'todo' && !(work7?.folder && work7.folder.toLowerCase() === shop.toLowerCase()), JSON.stringify({ column: (await card(n2))?.column, work7, last: facts7.slice(-3) }))
     check('…its kept work still in the slot, still kept for it', JSON.stringify(fs.readdirSync(kept7.folder).filter((f) => f !== '.jj' && f !== '.git').sort()) === JSON.stringify(keptFiles7) && (await inv('slots:list', shop)).some((s) => s.name === kept7.name && s.keptFor === n2), JSON.stringify(await inv('slots:list', shop)))
 
+    // HI-3129 (Darren's decision (a), 13 Nov): the project's target changed to a new bookmark `next` while card 2's work
+    // is kept in its slot on main. Its dialog's Merges into lists the repository's bookmarks (`release-x`, in no Other
+    // branches), and its start carries on in the kept slot on main, never refused for the target.
+    onDb((db) => db.prepare('UPDATE slots SET writer_run = NULL, writer_lease = NULL, writer_agent = NULL, writer_pid = NULL, writer_started = NULL WHERE name = ?').run(kept7.name))
+    jj(shop, 'bookmark', 'create', 'next', '-r', 'main')
+    jj(shop, 'bookmark', 'create', 'release-x', '-r', 'main')
+    // HI-3152: the user changes Work merges into to next in the Workflow tab and opens Save…: its Retarget lists card 2 and
+    // its kept slot as staying on main, each with its reason (`kept`), read through jj, and nothing that jj can't move.
+    // Screenshots in both themes, and in each language. Then Save.
+    await toProject()
+    await section('jjRepo')
+    await section('workflow')
+    const form8 = page.locator('.workflow-form')
+    const targetInput8 = form8.locator('.workflow-option[data-option="target"] input')
+    await targetInput8.waitFor({ timeout: HUNG_MS })
+    await targetInput8.fill('next')
+    await targetInput8.press('Enter')
+    await form8.locator('[data-action="save"]').click()
+    const save8 = page.locator('.dialog', { has: page.locator('.workflow-save') })
+    await save8.waitFor({ timeout: HUNG_MS })
+    const retarget8 = save8.locator('[data-retarget]')
+    const keptCard8 = retarget8.locator(`[data-retarget-keep="${key2}"]`)
+    const keptSlot8 = retarget8.locator(`[data-retarget-keep="${kept7.name}"]`)
+    check("Save…'s Retarget: card 2 and its slot listed as staying on main, its work kept there", !!(await until(async () => /These stay on main/.test(await text(retarget8)) && /its work is kept on main/.test(await text(keptCard8)) && (await text(keptCard8)).includes(key2) && /its work is kept on main/.test(await text(keptSlot8)), HUNG_MS)), await text(save8))
+    check('…nothing listed to move (no lane, started card or slot)', (await retarget8.locator('[data-retarget-move]').count()) === 0, await text(retarget8))
+    await shoot(retarget8, 'retarget-kept')
+    // A translated screen: Save… shows the language it was opened in, so it is closed, the window spoken to in German,
+    // and opened again; then back in English for the save.
+    const reopen8 = async () => {
+      await page.keyboard.press('Escape')
+      await save8.waitFor({ state: 'detached', timeout: HUNG_MS })
+      await form8.locator('[data-action="save"]').click()
+      await save8.waitFor({ timeout: HUNG_MS })
+    }
+    const de8 = catalogue('de')
+    const deKept8 = (/\bkept \{([^}]*)\{from\}/.exec(de8['workflow.form.retargetKeep'] ?? '') ?? [])[1]?.trim() ?? ''
+    await speak({ ...english, code: 'de', locale: 'de', messages: de8 })
+    await reopen8()
+    check('de: Save…\'s Retarget, card 2 and its slot staying, in German', !!deKept8 && !!(await until(async () => (await text(keptCard8)).includes(deKept8) && (await text(keptSlot8)).includes(deKept8), HUNG_MS)), await text(retarget8))
+    await shoot(retarget8, 'retarget-kept-de')
+    await speak(english)
+    await reopen8()
+    check('…in English again', !!(await until(async () => /its work is kept on main/.test(await text(keptCard8)), HUNG_MS)), await text(retarget8))
+    await save8.getByRole('button', { name: 'Save', exact: true }).click()
+    await save8.waitFor({ state: 'detached', timeout: HUNG_MS })
+    check('the project\'s target changed to next, saved from Save…', !!(await until(async () => (await inv('workflow:form', shop))?.options?.target === 'next' || (await inv('workflow:form', shop))?.effective?.target === 'next', HUNG_MS)), JSON.stringify(await inv('workflow:form', shop)).slice(0, 400))
+    await showBoard(page)
+    await openByTitle(page, n2)
+    const field8 = page.locator('#card-target')
+    const options8 = async () => (await field8.locator('option').allInnerTexts().catch(() => [])).map((s) => s.trim())
+    check('card 2\'s Merges into lists the repository\'s bookmarks: main and release-x (in no Other branches), and next', !!(await until(async () => { const o = await options8(); return o.includes('release-x') && o.includes('main') && o.some((x) => /next/.test(x)) && !(await field8.isDisabled()) }, HUNG_MS)), JSON.stringify(await options8()))
+    // HR2's round 1: the field shows the project's next, so beside it the dialog says where the kept card starts: main.
+    const keptNote8 = page.locator('.card-target-kept')
+    check('…and says its work is kept on main, where it starts again', !!(await until(async () => (await keptNote8.getAttribute('data-card-target-kept').catch(() => null)) === 'main' && /kept on main/.test(await text(keptNote8)), HUNG_MS)), await text(page.locator('.dialog')))
+    await shoot(field8.locator('xpath=..'), 'card-target-bookmarks')
+    await inEach(keptNote8, 'card-target-kept', (cat) => (cat['board.target.kept'] ?? '').split('{branch}')[0].trim().slice(0, 12))
+    await page.locator('.dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
+    // A fresh card (no kept work): no such note; it starts on next.
+    const n9 = (await inv('tasks:create', { title: 'Shop fresh after next', project: 'shop', agent: b1.id })).number
+    await openByTitle(page, n9)
+    check('a fresh card\'s dialog: Merges into the project\'s next, no kept note', !!(await until(async () => (await field8.count()) === 1 && /next/.test((await field8.locator('option:checked').innerText().catch(() => '')) ?? ''), HUNG_MS)) && (await page.locator('.card-target-kept').count()) === 0, await text(page.locator('.dialog')))
+    await page.locator('.dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
+    const givenBefore8 = givenCount()
+    const started8 = await inv('tasks:move', n2, 'doing', { confirm: true, reason: 'jjwindow: card 2 after the target changed' }).catch((e) => ({ error: String(e) }))
+    const w8 = await until(async () => {
+      const v = await inv('tasks:work', n2)
+      return v?.folder && v.folder.toLowerCase() === kept7.folder.toLowerCase() && givenCount() > givenBefore8 ? v : null
+    }, HUNG_MS)
+    const startedOn8 = ((await inv('tasks:facts', n2)) ?? []).filter((f) => f.kind === 'Started').pop()?.data?.target
+    check('…card 2 started in its kept slot, on main (the bookmark its work is on), its work there', !!w8 && startedOn8 === 'main' && JSON.stringify(fs.readdirSync(kept7.folder).filter((f) => f !== '.jj' && f !== '.git').sort()) === JSON.stringify(keptFiles7), JSON.stringify({ started8, startedOn8, work: await inv('tasks:work', n2), slots: await inv('slots:list', shop) }))
+
   } finally {
     await app.close().catch(() => undefined)
   }

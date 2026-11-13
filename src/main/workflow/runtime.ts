@@ -219,7 +219,8 @@ export interface WorkflowConfig {
    * its lease (a lane's, kept for the lane; else the card's own, `fresh` when lent now), or why none can be now (`wait`,
    * English). `dry`: only whether one could be, nothing lent. Null: no slot here (the rules off, the builder a reviewer).
    */
-  slotFor?: (card: CardRecord, builder: string, o: { dry: boolean; target: string | null }) => Promise<SlotForStart>
+  /** HI-3129: `kept`, a kept slot's proved binding the start resolved its target from: checked again before the lend records it. */
+  slotFor?: (card: CardRecord, builder: string, o: { dry: boolean; target: string | null; kept?: { slot: string; generation: string; target: string } }) => Promise<SlotForStart>
   /**
    * HI-3069: the card's committed work kept in a slot of the other version control (a switch since it was put back): the
    * slot, its platform, the project's now, and whether its folder is gone. Every start asks it before its folder is

@@ -846,12 +846,15 @@
       "base": "plain",
       "commit": "plain",
       "other": "plain",
-      "max": "number"
+      "max": "number",
+      "state": "select"
     }
   },
   "workflow.refused.platform.jjRefused.next": {
     "placeholders": {
-      "why": "select"
+      "why": "select",
+      "state": "select",
+      "told": "plain"
     }
   },
   "workflow.refused.platform.keptAcross.message": {
@@ -891,6 +894,21 @@
   "workflow.refused.platform.keptLine.next": {
     "placeholders": {
       "kept": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.refused.platform.keptOnTarget.message": {
+    "placeholders": {
+      "why": "select",
+      "card": "plain",
+      "slot": "plain",
+      "target": "plain",
+      "now": "plain"
+    }
+  },
+  "workflow.refused.platform.keptOnTarget.next": {
+    "placeholders": {
+      "why": "select",
       "target": "plain"
     }
   },
