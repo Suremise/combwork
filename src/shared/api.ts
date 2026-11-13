@@ -128,6 +128,7 @@ import type {
   QuitChoice,
   QuitScope,
   QuitSession,
+  QuitUpdate,
   SessionBulkAction,
   SessionBulkResult,
   SessionAttachmentGroup,
@@ -210,7 +211,8 @@ export interface CombworkRequests {
   'app:quit': () => void
   /** Restarts Combwork: quits as app:quit does (asking about running agents), then starts it again (#676). */
   'app:restart': () => void
-  'app:quitDecision': (choice: QuitChoice, dontAskAgain: boolean) => void
+  /** `install`: the version the dialog showed, when Install now was chosen (HI-3167); null or absent: not installed. */
+  'app:quitDecision': (choice: QuitChoice, dontAskAgain: boolean, install?: string | null) => void
   'app:cancelPendingQuit': () => void
   /** This window's close command (HI-1368), for a window that reloads while its panel is up; null: none. */
   'closeCommand:state': () => CloseCommandRun | null
@@ -227,7 +229,7 @@ export interface CombworkRequests {
   /** Runs one command by hand in this window (HI-1954): its panel, as a point's, with one step. */
   'commands:run': (ref: CommandRef) => void
   /** Current quit state, for a window that reloads while a quit dialog or pending quit is open. */
-  'app:quitState': () => { request: QuitSession[] | null; unsaved: string[]; scope: QuitScope; pending: boolean; working: number }
+  'app:quitState': () => { request: QuitSession[] | null; unsaved: string[]; scope: QuitScope; update: QuitUpdate | null; pending: boolean; working: number }
   'app:openExternal': (url: string) => void
   'app:openPath': (path: string) => void
   'app:showInFolder': (path: string) => void

@@ -1179,6 +1179,22 @@
     "defaultMessage": "Don't ask again about sessions",
     "description": "A box in the quit dialog: next time, quit without asking about running sessions."
   },
+  "shell.quit.installLater": {
+    "defaultMessage": "Next time",
+    "description": "The quit dialog's choice: don't install the downloaded update now; Combwork asks again the next time it quits."
+  },
+  "shell.quit.installLaterDetail": {
+    "defaultMessage": "It stays downloaded, and {app} asks again the next time you quit.",
+    "description": "Under the quit dialog's Next time. {app} is Combwork's name."
+  },
+  "shell.quit.installNow": {
+    "defaultMessage": "Install now",
+    "description": "The quit dialog's choice: install the downloaded update as Combwork quits."
+  },
+  "shell.quit.installNowDetail": {
+    "defaultMessage": "Its installer opens as {app} quits and takes about {seconds, plural, one {# second} other {# seconds}}. Don't shut down or restart the PC until the installer says it has finished: its Finish button opens {app} again.",
+    "description": "Under the quit dialog's Install now. {seconds} is about how long installing takes; {app} is Combwork's name. Finish is the installer's own button (Windows installer's wording)."
+  },
   "shell.quit.kept": {
     "defaultMessage": "Conversations are kept. Resume them from the project or its Sessions tab next time.",
     "description": "At the bottom of the quit dialog."
@@ -1230,6 +1246,10 @@
   "shell.quit.unsaved": {
     "defaultMessage": "{n, plural, one {# file has unsaved changes.} other {# files have unsaved changes.}}",
     "description": "The quit dialog: how many open files have unsaved edits (listed under it)."
+  },
+  "shell.quit.updateReady": {
+    "defaultMessage": "{app} {version} is ready to install.",
+    "description": "The quit dialog, when an update has been downloaded: install it as Combwork quits, or next time. {app} is Combwork's name, {version} the new version."
   },
   "shell.quit.when": {
     "defaultMessage": "{action, select, saveAndClose {Save and close} closeWorkspace {Close workspace} switchWorkspace {Switch workspace} closeWindow {Close window} saveAndQuit {Save and quit} other {Quit}} when {working, plural, one {the agent finishes} other {agents finish}}",

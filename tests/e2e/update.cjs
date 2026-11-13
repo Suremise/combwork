@@ -74,10 +74,16 @@ const exits = (a) => {
   a.process().once('exit', () => (gone = true))
   return () => lib.until(async () => gone, HUNG_MS)
 }
+/** Sets the fake agent working for `secs` seconds ("please work N"), waited for (HI-3167). */
+const busy = async (inv, proj, agent, secs) => {
+  const working = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)?.status === 'working'
+  await lib.sendPrompt(inv, lib.ptyKey(proj, agent.id), `please work ${secs}`, { submitted: working })
+  return lib.until(working, HUNG_MS)
+}
 const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profile, 'logs', 'combwork.log'), 'utf8') } catch { return '' } }
 
 ;(async () => {
-  for (const d of ['upd-a', 'upd-b', 'upd-c', 'upd-d', 'upd-e', 'upd-f', 'upd-g', 'upd-g-ws', 'upd-g-claude', 'res-older', 'res-local', 'res-same']) fs.rmSync(path.join(scratch, d), { recursive: true, force: true })
+  for (const d of ['upd-a', 'upd-b', 'upd-c', 'upd-d', 'upd-e', 'upd-f', 'upd-g', 'upd-g-ws', 'upd-g-claude', 'upd-h', 'upd-h-ws', 'upd-h-claude', 'res-older', 'res-local', 'res-same']) fs.rmSync(path.join(scratch, d), { recursive: true, force: true })
   // The installed copy an install would replace (#1647): an older release, unless a case says otherwise.
   const older = fakeInstall(path.join(scratch, 'res-older'), { version: '9.1.0' })
   fs.rmSync(cache, { recursive: true, force: true })
@@ -117,7 +123,8 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   const closed = new Promise((r) => app.process().once('exit', r))
   await inv('update:install')
   await Promise.race([closed, sleep(10000)])
-  check('Restart and Update quits (test mode: no install)', /Test mode: would install 9.1.1 and restart/.test(log('upd-a')))
+  // HI-3167: asks nothing more (no agent working), and the installer would be shown, never silent.
+  check('Restart and Update quits (test mode: no install), the installer shown', /Test mode: would install 9.1.1 \(Restart and Update\), the installer shown/.test(log('upd-a')))
 
   // 2. Manual download, and install mode manual.
   fs.mkdirSync(path.join(scratch, 'upd-b'), { recursive: true })
@@ -256,12 +263,59 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   check('HI-2427: Restart and Update during an open quit dialog asks nothing more', await waitFor(async () => /Restart and Update while a question is open/.test(log('upd-g')), HUNG_MS) && (await page.locator('.dialog', { hasText: 'Quit Combwork?' }).count()) === 1)
   await page.locator('.dialog button', { hasText: 'Cancel' }).click()
   check('HI-2427: cancelled, nothing installs and Combwork goes on', await waitFor(async () => (await inv('app:quitState')).request === null, HUNG_MS) && !/would install/.test(log('upd-g')) && (await inv('session:live')).length === 1)
+  // HI-3167: the quit that goes ahead asks about the update in its dialog, beside the agents (Install now chosen to begin
+  // with); Install now is kept through Quit when the agent finishes, then installs it over the older copy (test mode: none).
+  check('HI-3167: the agent is set working', await busy(inv, path.join(gWs, 'alpha'), agent, 6))
   const exitedG = exits(app)
   await inv('app:quit')
-  await waitFor(async () => (await page.locator('.dialog', { hasText: 'Quit Combwork?' }).count()) === 1, HUNG_MS)
-  await inv('app:quitDecision', 'now', false).catch(() => undefined)
+  const gDialog = page.locator('.dialog', { hasText: 'Quit Combwork?' })
+  await waitFor(async () => (await gDialog.count()) === 1, HUNG_MS)
+  check('HI-3167: the quit dialog offers the update, beside the agents, Install now chosen', await waitFor(async () => (await gDialog.locator('.quit-update').innerText().catch(() => '')).includes('Combwork 9.1.1 is ready to install.'), HUNG_MS) && (await gDialog.locator('.quit-update-choice button.active').innerText()).includes('Install now') && (await gDialog.locator('.quit-agents').isVisible()))
+  check('HI-3167: …and says not to shut down until the installer says it has finished', (await gDialog.locator('.quit-update').innerText()).includes("Don't shut down or restart the PC until the installer says it has finished"))
+  await page.screenshot({ path: path.join(scratch, 'upd-9-quit-update.png') })
+  await gDialog.locator('button', { hasText: 'Quit when' }).click()
   await exitedG()
-  check('#1647, HI-2427: the quit that goes ahead installs it over the older copy, on quit only (test mode: no install)', /Test mode: would install 9.1.1 \(on quit\)/.test(log('upd-g')) && !/would install 9.1.1 and restart/.test(log('upd-g')), log('upd-g').split('\n').filter((l) => /updates\]|exit\]/.test(l)).slice(-5).join(' | '))
+  check('#1647, HI-3167: Install now, kept through Quit when the agent finishes, installs it over the older copy (test mode: no install)', /Test mode: would install 9.1.1 \(Install now\), the installer shown/.test(log('upd-g')), log('upd-g').split('\n').filter((l) => /updates\]|exit\]/.test(l)).slice(-5).join(' | '))
+
+  // 9. HI-3167: an update ready only after the quit was asked for (Quit when the agent finishes) was never offered, so it
+  // isn't installed; the next start asks, with no agent running: Next time installs nothing, Install now installs it.
+  const hProfile = path.join(scratch, 'upd-h')
+  const hWs = path.join(scratch, 'upd-h-ws')
+  fs.mkdirSync(path.join(hWs, 'alpha'), { recursive: true })
+  fs.mkdirSync(hProfile, { recursive: true })
+  const hClaude = lib.fakeClaude(hProfile, path.join(scratch, 'upd-h-claude'), [path.join(hWs, 'alpha')])
+  ;({ app, page, inv } = await launch('upd-h', { CW_UPDATE_FEED: feed, CW_UPDATE_DELAY: '600000', CW_TEST_RESOURCES: older, ...hClaude }))
+  await lib.openWorkspace(inv, page, hWs)
+  await lib.waitForProvider(inv)
+  const hAgent = await lib.addAgent(inv, path.join(hWs, 'alpha'))
+  await inv('session:start', path.join(hWs, 'alpha'), { agentId: hAgent.id })
+  await lib.acceptClaudeTrust(inv, path.join(hWs, 'alpha'), hAgent.id)
+  check('HI-3167: no update yet, the agent working', (await inv('update:state')).status !== 'ready' && (await busy(inv, path.join(hWs, 'alpha'), hAgent, 12)))
+  const exitedH = exits(app)
+  await inv('app:quit')
+  const hDialog = page.locator('.dialog', { hasText: 'Quit Combwork?' })
+  check('HI-3167: the quit dialog has no update to offer', (await waitFor(async () => (await hDialog.count()) === 1, HUNG_MS)) && (await hDialog.locator('.quit-update').count()) === 0)
+  await hDialog.locator('button', { hasText: 'Quit when' }).click()
+  await inv('update:check')
+  check('HI-3167: the update downloaded while the quit waits', await waitFor(async () => (await inv('update:state').catch(() => null))?.status === 'ready', HUNG_MS))
+  await exitedH()
+  check('HI-3167: …and the quit, never asked about it, installs nothing', !/would install/.test(log('upd-h')) && /Leaving by app\.quit/.test(log('upd-h')), log('upd-h').split('\n').filter((l) => /updates\]|exit\]/.test(l)).slice(-5).join(' | '))
+  for (const answer of ['Next time', 'Install now']) {
+    ;({ app, page, inv } = await launch('upd-h', { CW_UPDATE_FEED: feed, CW_UPDATE_DELAY: '1000', CW_TEST_RESOURCES: older, ...hClaude }))
+    await waitFor(async () => (await inv('update:state')).status === 'ready', HUNG_MS)
+    const before = log('upd-h').length
+    const exited = exits(app)
+    await inv('app:quit')
+    const d = page.locator('.dialog', { hasText: 'Quit Combwork?' })
+    check(`HI-3167 (${answer}): with no agent running, the quit still asks, about the update alone`, (await waitFor(async () => (await d.locator('.quit-update').count()) === 1, HUNG_MS)) && !(await d.locator('.quit-agents').isVisible()))
+    await d.locator('.quit-update-choice button', { hasText: answer }).click()
+    if (answer === 'Next time') check('HI-3167: Next time says it stays downloaded and is asked again', (await d.locator('.quit-update').innerText()).includes('asks again the next time you quit'))
+    await page.screenshot({ path: path.join(scratch, `upd-10-${answer === 'Next time' ? 'later' : 'now'}.png`) })
+    await d.locator('button.btn.primary').click()
+    await exited()
+    const said = log('upd-h').slice(before)
+    check(`HI-3167 (${answer}): ${answer === 'Next time' ? 'quits without installing' : 'installs it, the installer shown (test mode: no install)'}`, answer === 'Next time' ? !/would install/.test(said) : /Test mode: would install 9.1.1 \(Install now\), the installer shown/.test(said), said.split('\n').filter((l) => /updates\]|exit\]/.test(l)).slice(-4).join(' | '))
+  }
 
   server.close()
   // The download cache is outside combwork-test (no housekeeping there), so it goes, but never at the cost of a suite whose

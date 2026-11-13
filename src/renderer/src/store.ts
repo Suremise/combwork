@@ -27,7 +27,7 @@ import type { RunsFilter } from '@shared/progressTabs'
 import { loadActivityView, saveActivityView, type ActivityView } from './activityView'
 import { currentCard, type ActivityCardAgent } from '@shared/activity'
 import { boardReader } from './boardReads'
-import type { AgentBranchStatus, AgentStart, AssistantPanelSide, BoardFold, BoardState, PageLayout, ProjectStages, QuitScope, SessionBulkProgress, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkflowForm, WorkspaceUsage, RecentWorkspace } from '@shared/types'
+import type { AgentBranchStatus, AgentStart, AssistantPanelSide, BoardFold, BoardState, PageLayout, ProjectStages, QuitScope, QuitUpdate, SessionBulkProgress, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkflowForm, WorkspaceUsage, RecentWorkspace } from '@shared/types'
 import type { PresetId } from '@shared/workflow/options'
 import type { TemplateWorkflow, TemplateWorkflows } from '@shared/workflow/templateOptions'
 import type { PlatformId } from '@shared/platform/descriptors'
@@ -409,6 +409,8 @@ interface State {
   quitUnsaved: string[]
   /** 'window': the dialog is for closing this window (its workspace's sessions), not quitting Combwork. */
   quitScope: QuitScope
+  /** HI-3167: the update the quit dialog offers to install now (Install now or Next time). */
+  quitUpdate: QuitUpdate | null
   /** Combwork will quit once no agent is working. */
   quitPending: { working: number } | null
   /** How many Combwork windows are open (File → Exit closes them all). */
@@ -677,6 +679,7 @@ export const useStore = create<State>(() => ({
   quitRequest: null,
   quitUnsaved: [],
   quitScope: 'app',
+  quitUpdate: null,
   quitPending: null,
   windowCount: 1,
   keepAwake: 0,
