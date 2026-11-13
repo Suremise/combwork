@@ -149,7 +149,8 @@ function release(repo, line) {
     check('…started: the cleanup-only offer, 1.4.0 to come off and 1.3.0 kept', !!b2, JSON.stringify(await offerOf(beta)))
     const b2Row = page.locator(`.board-release-offers [data-release-offer="${b2?.id}"]`)
     if (await until(async () => (await b2Row.count()) === 1)) await shoot('after-start', b2Row)
-    check(`…its card stays on 1.3.0`, (await inv('tasks:list')).find((c) => c.number === card.number)?.target === '1.3.0')
+    // The card on 1.3.0 is what keeps it: named among its uses.
+    check('…1.3.0 kept, named with the card that uses it', !!b2?.cleanup?.kept.find((k) => k.branch === '1.3.0')?.uses.some((u) => u.includes(String(card.number)) || (card.key && u.includes(card.key))), JSON.stringify(b2?.cleanup))
   } finally {
     await app.close().catch(() => undefined)
   }
