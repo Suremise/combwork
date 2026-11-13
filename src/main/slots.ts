@@ -2963,11 +2963,15 @@ export class SlotPool {
             return { error: isUnknown(d) ? sayFor(this.port, 'filesUnread', { slot: name }) : sayStored(T.uncommitted, { slot: name }) }
           }
         }
-        const had = there ? null : await this.port.lineHead(slot.folder, p.line)
-        if (isUnknown(had)) {
+        const head = there && !this.port.lineAtBase ? null : await this.port.lineHead(slot.folder, p.line)
+        // HEAD naming the line (HI-3116: a pass's T2 applied, its answer lost, say) is prepared only while that line
+        // resolves: absent or unreadable, never "prepared" (HR2's round 1), nothing written. Only where a line is a branch
+        // (a port with `lineAtBase`: Git's); jj's preparation keys have no head of their own (lineHead: null).
+        if (isUnknown(head) || (there && !head && !!this.port.lineAtBase)) {
           await end()
           return { error: sayFor(this.port, 'lineUnread', { what: p.line }) }
         }
+        const had = there ? null : head
         // A line made before (a card started again) is switched to, which can change files: that waits for its builder.
         // On the last card's line (HI-3116), `lineAtBase` decides: its own line from a pass cut short is carried on.
         if (inPlace && had && !onLine) {

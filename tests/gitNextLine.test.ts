@@ -199,6 +199,29 @@ describe("a Git lane's next line made in place on the last card's line (HI-3116)
     expect(w.bytes()).toEqual(before)
   })
 
+  it("HEAD already naming the line (T2 applied, its answer lost): prepared only while that line resolves (HR2's round 1)", async () => {
+    const w = await world('merge')
+    expect(await w.inPlace()).toMatchObject({ ok: true })
+    // The valid case: the line there at the base, or past it by B1's commits: prepared, its head the revision.
+    commit(w.folder, { 'two.txt': 'two\n' }, 'card 2 work')
+    const tip = ref(w.folder, w.line2)
+    expect(await w.inPlace()).toEqual({ ok: true, revision: tip })
+    // The line gone (HEAD still names it): never prepared, nothing written.
+    git(w.folder, 'update-ref', '-d', w.line2)
+    const before = w.bytes()
+    const gone = await w.inPlace()
+    expect(gone).toHaveProperty('error')
+    expect(gone).not.toHaveProperty('ok')
+    expect([sh(w.folder, 'symbolic-ref', 'HEAD'), ref(w.folder, w.line2)]).toEqual([w.line2, null])
+    expect(w.bytes()).toEqual(before)
+    // Unreadable (a ref file that isn't a ref): an error too, never prepared.
+    const refFile = join(sh(w.folder, 'rev-parse', '--git-common-dir'), ...w.line2.split('/'))
+    writeFileSync(refFile, 'not a ref\n')
+    const unreadable = await w.inPlace()
+    expect(unreadable).toHaveProperty('error')
+    expect(unreadable).not.toHaveProperty('ok')
+  })
+
   it('below git 2.46: no git run, nothing written; the waiting preparation, its builder quiet, makes the line', async () => {
     const w = await world('merge')
     setGitToolForTests({ state: 'ok', version: '2.45.2' })
