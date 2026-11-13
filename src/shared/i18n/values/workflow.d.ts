@@ -524,6 +524,7 @@ interface CombworkMessageValues {
   'workflow.slots.held': { agent: string | number }
   'workflow.slots.inUse': undefined
   'workflow.slots.inherit': undefined
+  'workflow.slots.keptEditFor': { card: string | number }
   'workflow.slots.keptFor': { card: string | number }
   'workflow.slots.keptForgottenFor': { card: string | number }
   'workflow.slots.keptGoneFor': { card: string | number }
@@ -569,6 +570,7 @@ interface CombworkMessageValues {
   'workflow.slots.state.forgotten': undefined
   'workflow.slots.state.gone': undefined
   'workflow.slots.state.kept': undefined
+  'workflow.slots.state.keptEdit': undefined
   'workflow.slots.state.lent': undefined
   'workflow.slots.state.ready': undefined
   'workflow.slots.state.removing': undefined

@@ -68,6 +68,8 @@ const T = {
   divergentNext: msg({ id: 'workflow.slots.divergentNext', defaultMessage: 'Look at both versions in jj (jj log -r "{folder} | {head}", and jj diff --from {head} --to {folder}), choose the one the slot should have, keeping anything in its folder you want, then choose Recover… again.', description: 'HI-3134: the second paragraph of the window after Recover… was refused (divergentTitle): what to do next. {folder} and {head} are short jj commit ids; the jj commands are commands: keep them as they are.' }),
   notRecovered: msg({ id: 'workflow.slots.notRecovered', defaultMessage: '{slot} wasn’t recovered: {why, select, busy {something works in it (an agent working there: stop it first)} preparing {its card is still being prepared there} notStale {it isn’t stale any more} identity {its folder isn’t the workspace Combwork made} other {jj couldn’t do it}}.', description: 'A notice after recovering a stale jj slot was refused (HI-2869, HI-2913). {why} picks the reason: busy (something works in the slot, such as the agent of the lane holding it, which the user stops first), preparing (the card the slot is lent to is still being prepared there), and the others. Keep the select keys.' }),
   keptState: msg({ id: 'workflow.slots.state.kept', defaultMessage: 'Holds a card’s commits', description: 'HI-2995: a jj slot’s state in the list under “Slots and copies”, in place of “Has changes left in it”: it holds the commits of a card that was put back (named beside it, workflow.slots.keptFor), not uncommitted files.' }),
+  keptEditState: msg({ id: 'workflow.slots.state.keptEdit', defaultMessage: 'Holds a card’s uncommitted changes', description: 'HI-3143: a jj slot’s state in the list under “Slots and copies”, in place of workflow.slots.state.kept: it holds a put-back card’s changes that aren’t committed yet (edits, or new files jj doesn’t track), kept for that card (named beside it, workflow.slots.keptEditFor).' }),
+  keptEditFor: msg({ id: 'workflow.slots.keptEditFor', defaultMessage: 'Kept for {card}: its changes aren’t committed yet', description: 'HI-3143: beside a jj slot in the list under “Slots and copies”, in place of workflow.slots.keptFor: the card {card} (its key, HI-12) was put back with changes in the slot that aren’t committed yet, so the slot is kept for that card and given back to it when it starts again; no other card is lent it.' }),
   keptFor: msg({ id: 'workflow.slots.keptFor', defaultMessage: 'Kept for {card}: its committed work isn’t in the target yet', description: 'HI-2995: beside a jj slot in the list under “Slots and copies”: the card {card} (its key, HI-12) was put back with commits that aren’t in its target yet, and the slot holds them, so it is kept for that card and given back to it when it starts again; no other card is lent it.' }),
   keptGoneFor: msg({ id: 'workflow.slots.keptGoneFor', defaultMessage: 'Kept for {card}, but its folder is missing', description: 'HI-3032: beside a jj slot in the list under “Slots and copies”, in place of workflow.slots.keptFor: the slot was kept for the card {card} (its key, HI-12), which was put back with commits not in its target yet, but its folder has been deleted, so the card can’t get it back. Remove… beside it ends it.' }),
   forgottenState: msg({ id: 'workflow.slots.state.forgotten', defaultMessage: 'Not listed by jj', description: 'HI-3097: a jj slot’s state in the list under “Slots and copies”, in place of “Folder missing” (workflow.slots.state.gone): its folder is there, but its jj workspace was forgotten outside Combwork, so jj no longer lists it (workflow.slots.keptForgottenFor beside it).' }),
@@ -110,7 +112,7 @@ const copyOrigin = (o: SlotOptionOrigin) => (o === 'default' ? 'platform' : o)
 /** A slot's line in the list: what it is lent to (or carries), in words. */
 function lentText(s: SlotView, agentName: (id: string) => string, card: (n: number) => string): string | null {
   const l = s.lease
-  if (!l) return s.keptFor !== undefined ? tr(s.keptGone ? (s.keptGone.forgotten ? T.keptForgottenFor : T.keptGoneFor) : T.keptFor, { card: card(s.keptFor) }) : null
+  if (!l) return s.keptFor !== undefined ? tr(s.keptGone ? (s.keptGone.forgotten ? T.keptForgottenFor : T.keptGoneFor) : s.keptEdit ? T.keptEditFor : T.keptFor, { card: card(s.keptFor) }) : null
   if (l.kind === 'carried') return tr(T.carried, { agent: agentName(l.agent) })
   if (l.card !== null) return tr(T.lentCard, { agent: agentName(l.agent), card: card(l.card) })
   return tr(T.lentLane, { agent: agentName(l.agent) })
@@ -252,7 +254,7 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
                       <tr key={s.name} data-slot={s.name} data-state={s.state}>
                         <td className="mono">{s.name}</td>
                         <td>
-                          {s.keptFor !== undefined && !s.keptGone ? tr(T.keptState) : s.keptGone?.forgotten || s.forgotten ? tr(T.forgottenState) : tr(T.state[s.state])}
+                          {s.keptFor !== undefined && !s.keptGone ? tr(s.keptEdit ? T.keptEditState : T.keptState) : s.keptGone?.forgotten || s.forgotten ? tr(T.forgottenState) : tr(T.state[s.state])}
                           {s.stale && (
                             <>
                               {' · '}
