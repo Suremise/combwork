@@ -30,8 +30,8 @@ function Say($ok, $what, $detail) {
 }
 function Log($what) { Add-Content $out "  $what"; Write-Output "  $what" }
 
-function Hive($scope) { if ($scope -eq 'machine') { 'HKLM:' } else { 'HKCU:' } }
-function RunValue($scope) { (Get-ItemProperty -Path "$(Hive $scope)\$runKey" -Name $value -ErrorAction SilentlyContinue).$value }
+function RegRoot($scope) { if ($scope -eq 'machine') { 'HKLM:' } else { 'HKCU:' } }
+function RunValue($scope) { (Get-ItemProperty -Path "$(RegRoot $scope)\$runKey" -Name $value -ErrorAction SilentlyContinue).$value }
 function RecDir($scope) { if ($scope -eq 'machine') { $machineRec } else { $userRec } }
 function Payload($scope) { Join-Path (RecDir $scope) 'Combwork-Setup.exe' }
 function PayloadHash($scope) { $p = Payload $scope; if (Test-Path -LiteralPath $p) { (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash } else { $null } }
@@ -125,7 +125,7 @@ function Reset {
     if ($un) { $p = Start-Process -FilePath $un.FullName -ArgumentList '/S', "_?=$d" -PassThru; $p.WaitForExit(120000) | Out-Null }
     if (Test-Path -LiteralPath $d) { Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue }
   }
-  foreach ($s in 'user', 'machine') { Remove-ItemProperty -Path "$(Hive $s)\$runKey" -Name $value -ErrorAction SilentlyContinue }
+  foreach ($s in 'user', 'machine') { Remove-ItemProperty -Path "$(RegRoot $s)\$runKey" -Name $value -ErrorAction SilentlyContinue }
   Remove-Item -LiteralPath $userRec -Recurse -Force -ErrorAction SilentlyContinue
   Remove-Item -LiteralPath (Join-Path $env:ProgramData 'Combwork') -Recurse -Force -ErrorAction SilentlyContinue
 }
