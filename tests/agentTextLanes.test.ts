@@ -225,7 +225,7 @@ describe('the canary dialect over the lanes service (main/lanes.ts)', () => {
       }
       const lane = await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c1.number, c3.number], by: 'B1 (alpha)' })
       outputs.leftOut = lane.note ?? ''
-      // While c1 is still its own (HI-3117: once B2's lane below owns it, B1's lane has none left and may end).
+      // While c1 is plainly its own, before B2's lane below lists it too.
       outputs.endNotDone = await said(lanes.endLane(w, lane.lane.id, { project: 'alpha', agent: 'b1' }))
       outputs.abandonNotOurs = await said(lanes.endLane(w, lane.lane.id, { project: 'alpha', agent: 'b1', abandoned: true }))
       outputs.stays = await start({ cards: [c2.number], ownBuilder: true })

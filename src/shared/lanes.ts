@@ -189,7 +189,8 @@ export const laneBuilds = (lanes: readonly Pick<LaneRecord, 'state' | 'project' 
 export function laneCard(n: number, card: TaskCard | null, of?: { lane: string; builder: string; owner?: string | null }): LaneCard {
   if (!card) return { number: n, title: '', column: 'gone', blocked: null, round: 1, reviewing: false }
   const elsewhere = !of || card.column === 'done' ? null : card.agent ? (card.agent !== of.builder ? card.agent : null) : of.owner && of.owner !== of.lane ? of.owner : null
-  return { number: n, title: card.title, column: card.column, blocked: card.blocked || null, round: card.history.filter((h) => VERDICT_FAILED.test(h.what)).length + 1, reviewing: !!card.review, ...(elsewhere ? { elsewhere } : {}) }
+  const givenAway = !!elsewhere && !!card.agent && elsewhere === card.agent
+  return { number: n, title: card.title, column: card.column, blocked: card.blocked || null, round: card.history.filter((h) => VERDICT_FAILED.test(h.what)).length + 1, reviewing: !!card.review, ...(elsewhere ? { elsewhere } : {}), ...(givenAway ? { givenAway: true as const } : {}) }
 }
 
 /** Whether a lane's card is finished for the loop: passed review, merged, or gone. */
@@ -601,10 +602,11 @@ export function laneStatusText(s: LaneStatus): string {
 
 /**
  * Whether a lane has no card of its own left to do, so it ends: each card merged (Done), gone (archived, deleted, moved
- * to another project) or held elsewhere (HI-3117: given to another agent, HI-1821). A lane whose cards are all gone
- * ends too, rather than holding its builder and slot with nothing to do.
+ * to another project) or given to another agent (HI-3117). A card given to none that a newer lane lists (held elsewhere
+ * by HI-1821) still keeps it running (HI-3118: a lane is never ended because another lists its cards). A lane whose
+ * cards are all gone ends too, rather than holding its builder and slot with nothing to do.
  */
-export const allDone = (cards: readonly LaneCard[]): boolean => cards.every((c) => c.column === 'done' || c.column === 'gone' || !!c.elsewhere)
+export const allDone = (cards: readonly LaneCard[]): boolean => cards.every((c) => c.column === 'done' || c.column === 'gone' || !!c.givenAway)
 
 /**
  * The lanes listed (the window's panel, the Agent API without `all`): running ones, and ended ones until their builder

@@ -853,9 +853,10 @@ function placesOf(ws: WorkspaceService, l: LaneRecord, cards: readonly number[] 
 const stillAllDone = (ws: WorkspaceService, l: LaneRecord, cards: readonly number[]) => (): void => {
   const places = placesOf(ws, l, cards)
   const owners = cardOwnersNow(ws, cards)
+  // Given to another agent (allDone's givenAway): a card given to none stays the lane's to wait for (HI-3118).
   const others = (n: number): boolean => {
     const o = owners.get(n)
-    return o?.agent ? o.agent !== l.builder.id : !!o?.lane && o.lane !== l.id
+    return !!o?.agent && o.agent !== l.builder.id
   }
   if (!places.every((c, i) => c === 'done' || c === 'gone' || others(cards[i]))) throw new StaleLane(`lane ${l.id}: its cards moved on`) // i18n-ignore: internal, caught and retried (never shown)
 }
@@ -1659,7 +1660,7 @@ export async function endLane(ws: WorkspaceService, id: string, o: { abandoned?:
       // Combwork owns the lane (#1270, §16.8.2): with rules enforced, an agent ends it only once its cards are all Done,
       // and only the user and the Assistant abandon it; its merge commit is the cards' facts', not the agent's say-so.
       if (on && o.agent && o.abandoned) throw new LaneError(403, say(A.abandonNotOurs))
-      if (on && o.agent && !allDone(ev.cards)) throw new LaneError(409, withCardNames(ws, () => say(A.endNotDone, { cards: ev.cards.filter((c) => c.column !== 'done' && c.column !== 'gone' && !c.elsewhere).map((c) => cardRef(c.number)).join(', ') })))
+      if (on && o.agent && !allDone(ev.cards)) throw new LaneError(409, withCardNames(ws, () => say(A.endNotDone, { cards: ev.cards.filter((c) => c.column !== 'done' && c.column !== 'gone' && !c.givenAway).map((c) => cardRef(c.number)).join(', ') })))
       // An agent's say-so isn't a merge (§16.8.2): the user's, the Assistant's or a script's is kept where facts name none.
       const given = on && o.agent ? null : (o.mergeCommit ?? null)
       if (!o.abandoned && allDone(ev.cards)) {
@@ -1714,12 +1715,21 @@ export async function laneNext(ws: WorkspaceService, project: string, agentId: s
     const gone = (await read(ws))
       .filter((l) => !running(l) && same(l.project, project) && (l.builder.id === agentId || l.reviewer?.id === agentId) && !!l.endedAt && Date.parse(l.endedAt) >= Date.now() - LANE_CARRY_MS)
       .sort((a, b) => Date.parse(b.endedAt!) - Date.parse(a.endedAt!))[0]
-    // HI-3118: "all its cards are Done" only when its kept snapshot says so; ended with cards open (the user's End),
-    // which; nothing kept (or a card's place unrecorded), nothing claimed.
+    // HI-3118: "all its cards are Done" only when they were: its kept snapshot, or, with none (the runtime's own end, as
+    // its last card finished), its cards' places on the board now; ended with cards open (the user's End), which; a
+    // place unrecorded or unreadable, nothing claimed.
     if (gone?.state === 'ended') {
-      const kept = gone.frozen
-      if (!kept || kept.some((c) => c.column === 'unrecorded')) throw new LaneError(404, say(A.nextEndedUnknown, { lane: gone.id }))
-      const open = kept.filter((c) => c.column !== 'done' && c.column !== 'gone')
+      let columns: { number: number; column: string }[] | null = gone.frozen ?? null
+      if (!columns) {
+        try {
+          const places = placesOf(ws, gone, gone.cards)
+          columns = gone.cards.map((n, i) => ({ number: n, column: places[i] }))
+        } catch {
+          columns = null
+        }
+      }
+      if (!columns || columns.some((c) => c.column === 'unrecorded')) throw new LaneError(404, say(A.nextEndedUnknown, { lane: gone.id }))
+      const open = columns.filter((c) => c.column !== 'done' && c.column !== 'gone')
       if (open.length) throw new LaneError(404, withCardNames(ws, () => say(A.nextEndedOpen, { lane: gone.id, cards: open.map((c) => cardRef(c.number)).join(', '), n: open.length })))
       throw new LaneError(404, say(A.nextEnded, { lane: gone.id }))
     }
