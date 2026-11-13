@@ -398,7 +398,7 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
     if (!ws.ok) return refuse('unreadable', ws.err)
     const wsChange = ws.out.trim()
     if (!wsChange) return null
-    return { ok: false, why: 'divergent', divergent: { folder: WS, head: HW, same: wsChange === hwChange } }
+    return { ok: false, why: 'divergent', divergent: { folder: WS, head: HW, same: wsChange === hwChange } } // i18n-ignore: a refusal's code, said in words in the window
   }
 
   // 1. planned
