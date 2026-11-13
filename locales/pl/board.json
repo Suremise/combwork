@@ -698,6 +698,7 @@
   "board.queue.filesMore": "{n, plural, one {# inny} few {# inne} many {# innych} other {# innego}}",
   "board.queue.forward": "Zaktualizuj…",
   "board.queue.forwardAlready": "{to} jest już aktualizowana względem {from}",
+  "board.queue.forwardLocalAhead": "{n, plural, one {# commit z Twojej lokalnej gałęzi {from} nie jest w jej zdalnym repozytorium, więc nie został przeniesiony do {to}: najpierw go opublikuj, jeśli powinien się tam znaleźć.} few {# commity z Twojej lokalnej gałęzi {from} nie są w jej zdalnym repozytorium, więc nie zostały przeniesione do {to}: najpierw je opublikuj, jeśli powinny się tam znaleźć.} many {# commitów z Twojej lokalnej gałęzi {from} nie jest w jej zdalnym repozytorium, więc nie zostały przeniesione do {to}: najpierw je opublikuj, jeśli powinny się tam znaleźć.} other {# commita z Twojej lokalnej gałęzi {from} nie jest w jej zdalnym repozytorium, więc nie zostały przeniesione do {to}: najpierw je opublikuj, jeśli powinny się tam znaleźć.}}",
   "board.queue.forwardResolving": "Karta {card} to rozwiązuje: „Zaktualizuj” czeka na nią",
   "board.queue.forwardAskConfirm": "Dodaj do kolejki",
   "board.queue.forwardAskMessage": "{from} w obecnym stanie zostanie scalona z {to} przez kolejkę scalania {to}, ze sprawdzeniami przed scaleniem, jako commit scalający. Sama {from} się nie zmienia. Jeśli wystąpi konflikt lub sprawdzenie się nie powiedzie, jej karta wróci, a Ty wybierzesz Ponów scalanie albo Usuń.",

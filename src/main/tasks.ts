@@ -31,7 +31,7 @@ import type { CardKind, Fact } from '../shared/workflow/facts'
 import { alongside, isRefusal, type Reply, type Workflow, type Write } from './workflow/runtime'
 import { linkToComment, moveCardFolder, publish, removeCardAttachments, trashCardFolder, type CleanupFile, type Staging } from './cardAttachments'
 import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } from '../shared/cardAttachments'
-import { hasStage, skipReviewOf, targetOfRulesetId } from '../shared/workflow/compile'
+import { hasStage, laneTargetOf, skipReviewOf } from '../shared/workflow/compile'
 import { isStageId, STAGE_TEXT, stageName, type StageNames } from '../shared/workflow/stages'
 import { answerFits, approveNote, ASK_ACTIONS, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, foldCard, openEntry, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type RoundChoice, type StageId } from '../shared/workflow/facts'
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
@@ -2249,7 +2249,8 @@ function refuseOtherLaneTarget(wf: Workflow, n: number, target: string | null, d
   const lane = wf.store.card(n).lane
   const rec = lane ? wf.lane(lane) : null
   if (!rec || rec.ended) return
-  const theirs = (rec.ruleset ? targetOfRulesetId(rec.ruleset) : null) ?? def
+  // Its branch, marked or as its ruleset recorded it (HI-3113): a lane left on the release by Start the next version too.
+  const theirs = laneTargetOf(rec.ruleset, (r) => wf.store.ruleset(r).options) ?? def
   if ((target ?? def) === theirs) return
   const builder = wf.store.laneBuilder(rec.id)
   throw new TaskConflictError(withValues(TARGET.inLane, { card: cardRef(n), builder: (builder && names.get(builder)) ?? builder ?? '', target: theirs ?? '' }))
@@ -2298,8 +2299,11 @@ export async function setTarget(n: number, raw: unknown, actor: TaskActor, o: { 
       // HI-2825: On Hold as well as Todo (a card never started, or put back there); a card past them has work.
       const own = s && WAITING_STAGES.includes(s.stage) ? await ownWork(projectPath, s, wf!.folderOf(s)) : null
       const work = !s ? false : own ? own.work : true
+      // HI-3112: set back to the branch its line was made from (a put back card): its work's own branch, so nothing of it
+      // changes and its line stays, work or not.
+      const pinBack = !!s && WAITING_STAGES.includes(s.stage) && !!target && target === s.started?.target
       // The branch its work was made from, else the one it merges into now: never an empty name (HI-2825).
-      if (work !== false) throw new TaskConflictError(withValues(TARGET.started, { unknown: work === 'unknown' ? 'yes' : 'no', card: cardRef(n), target: s?.started?.target || store.card(n).target || def || '' })) // i18n-ignore: select keys
+      if (work !== false && !pinBack) throw new TaskConflictError(withValues(TARGET.started, { unknown: work === 'unknown' ? 'yes' : 'no', card: cardRef(n), target: s?.started?.target || store.card(n).target || def || '' })) // i18n-ignore: select keys
       if (wf) refuseOtherLaneTarget(wf, n, target, def, names)
       // Its old lines go (nothing of its own on them), so its next start makes a fresh one from the new target, never
       // carrying the old target's history; refused while one is checked out somewhere.
@@ -2308,7 +2312,7 @@ export async function setTarget(n: number, raw: unknown, actor: TaskActor, o: { 
       // it was made for, read here under the board's lock, which every save changing it holds while it writes, before
       // anything of the card's is changed.
       if (o.expectDefault !== undefined && targets?.default !== o.expectDefault) throw new TaskConflictError(withValues(TARGET.defaultMoved, { card: cardRef(n) }))
-      const dropped = s && own && s.lines.length ? await dropEmptyLines(projectPath, s, targets ? [targets.default, ...targets.others] : [], own.heads) : null
+      const dropped = s && own && s.lines.length && !pinBack ? await dropEmptyLines(projectPath, s, targets ? [targets.default, ...targets.others] : [], own.heads) : null
       if (dropped === 'moved') throw new TaskConflictError(withValues(TARGET.moved, { card: cardRef(n) }))
       if (dropped) throw new TaskConflictError(withValues(TARGET.checkedOut, { unknown: dropped === 'unknown' ? 'yes' : 'no', card: cardRef(n), folder: typeof dropped === 'object' ? dropped.checkedOut : '' })) // i18n-ignore: select keys
       const before = structuredClone(card)

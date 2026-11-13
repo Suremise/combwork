@@ -372,7 +372,7 @@ const W = {
   targetChanges: agentMsg({ id: 'runtime.start.targetChanges', text: "{target}'s folder {folder} has uncommitted changes ({files}): a merge into {target} that changes them pauses until they are committed or set aside. Combwork tells the user in its window; leave them as they are.", note: "HI-2944: a start's warning (never a refusal): the folder the target is checked out in has uncommitted changes; the user's window shows a notification with Commit and Set Aside. {files}: up to three paths, then how many more." }),
   moreFiles: agentMsg({ id: 'runtime.start.moreFiles', text: '{files} and {more} more', note: 'HI-2944: a list of paths cut at three, and how many more there are.' }),
   slotWait: agentMsg({ id: 'runtime.start.slotWait', text: '{card} waits for a slot: {why}', note: "A start's warning beside its refusal (#1438): why no slot is free." }),
-  slotMove: agentMsg({ id: 'runtime.start.slotMove', text: "You'll continue in {slot}, on {line}: Combwork makes the line there from {target}, then gives you {card} there (a new conversation unless you already work there; your old one is kept). End your turn now.", note: "A start given a slot (#1438): the card's line is made there and the card given to the agent there, so it ends its turn now." }),
+  slotMove: agentMsg({ id: 'runtime.start.slotMove', text: "You'll continue in {slot}, on {line}: Combwork {carried, select, yes {carries the line on there, as it was (it merges into {target})} other {makes the line there from {target}}}, then gives you {card} there (a new conversation unless you already work there; your old one is kept). End your turn now.", note: "A start given a slot (#1438): the card's line is made there and the card given to the agent there, so it ends its turn now. HI-3112: carried, a line from an earlier start that carries on (never said to be made from the target)." }),
   staleChange: agentMsg({ id: 'runtime.wake.stalePaths', text: 'stale: your paths changed since the pass, submit again', note: "The builder's wake when its declared paths changed after its pass." }),
   approvedMerge: agentMsg({ id: 'runtime.wake.approvedMerge', text: 'approved: merge it and report the merge', note: "The builder's wake when its card passed and the builder merges it." }),
   movedAhead: agentMsg({ id: 'runtime.submit.movedAhead', text: 'moved ahead of {cards} (not started); its reviewer is told', note: "A submit's lane field: the card was moved before its lane's cards nobody has started. {cards}: their keys." }),
@@ -1156,13 +1156,13 @@ export class Workflow {
       // A refusal of the platform's own (HI-3106: no target chosen), not a read that failed.
       if (plan.rule) {
         log.info(`#${card.id} not started: ${userText(plan.what)}${plan.detail ? ` (${userText(plan.detail)})` : ''}`)
-        return { rule: plan.rule, values: { card: card.key } }
+        return { rule: plan.rule, values: { card: card.key, ...plan.ruleValues } }
       }
       // Which read and why (HI-2916): the refusal says only what couldn't be read.
       log.info(`#${card.id} not started: ${userText(plan.what)}${plan.detail ? ` (${userText(plan.detail)})` : ''}`)
       return { rule: 'platform.unknown', values: { card: card.key, what: plan.whatText ?? plan.what, rule: 'start' } }
     }
-    const { existing, slotWait, fresh, baselineGen, ...planned } = plan
+    const { existing, slotWait, fresh, baselineGen, carried, ...planned } = plan
     // A slot lent for this start (#1438) is given back if the start isn't written (refused, gathered again, undone).
     const lent = fresh && plan.lease ? plan.lease : null
     // Its target resolved again as it was planned (the builder worktree's base moved meanwhile): not what the evidence
@@ -1176,7 +1176,7 @@ export class Workflow {
     if (dry) delete data.lease
     if (slotWait) warnings.push(say(W.slotWait, { card: card.key, why: slotWait }))
     // Where it is built (#1438): its builder is given it there once its line is made, so a builder starting it ends its turn.
-    if (data.lease && data.slot) warnings.push(say(W.slotMove, { slot: String(data.slot), line: String(data.line), target: String(data.target), card: card.key }))
+    if (data.lease && data.slot) warnings.push(say(W.slotMove, { slot: String(data.slot), line: String(data.line), target: String(data.target), card: card.key, carried: carried ? 'yes' : 'no' })) // i18n-ignore: select keys
     // HI-2944: its target's folder with uncommitted changes, said before the start is written or any work is dispatched:
     // a merge into it that changes them pauses. A warning only; never asked of a dry run (a drag's plan). HI-2984: only
     // where something merges into the target, from another folder than the one the card is built in.

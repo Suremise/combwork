@@ -125,6 +125,7 @@
   "service.forward.resolveRaced": "{card} changed while it was being handed to a builder (a Retry, a Remove or another Resolve), so nothing was made: look at the card, then ask again if needed.",
   "service.forward.resolveTitle": "Resolve: bring {to} up to date with {from}",
   "service.forward.title": "Bring {to} up to date with {from}",
+  "service.forward.unreadable": "{to} isn’t brought up to date with {from}: Combwork couldn’t read {what}, so nothing was queued.{detail, select, none {} other { Git said: {detail}}}",
   "service.fsutil.keptBusy": "{file} is being saved by something else: nothing was changed. Try again in a moment.",
   "service.fsutil.keptUnreadable": "{file} couldn't be read: nothing was changed. Try again in a moment.",
   "service.fsutil.notCopied": "{name} could not be copied",

@@ -365,10 +365,14 @@ interface CombworkMessageValues {
   'workflow.refused.paths.excluded.next': { folder: string | number }
   'workflow.refused.platform.changed.message': { card: string | number; platform: string | number }
   'workflow.refused.platform.changed.next': { platform: string | number }
+  'workflow.refused.platform.detachedFolder.message': { card: string | number; head: string | number }
+  'workflow.refused.platform.detachedFolder.next': { has: string; branch: string | number }
   'workflow.refused.platform.jjRefused.message': { why: string; card: string | number; count: number; files: string | number; setting: string | number; base: string | number; commit: string | number; other: string | number; max: number }
   'workflow.refused.platform.jjRefused.next': { why: string }
   'workflow.refused.platform.keptAcross.message': { card: string | number; slot: string | number; platform: string | number; now: string | number }
   'workflow.refused.platform.keptAcross.next': { gone: string; card: string | number; platform: string | number }
+  'workflow.refused.platform.keptLine.message': { card: string | number; kept: string | number; target: string | number }
+  'workflow.refused.platform.keptLine.next': { kept: string | number; target: string | number }
   'workflow.refused.platform.noTarget.message': { card: string | number }
   'workflow.refused.platform.noTarget.next': undefined
   'workflow.refused.platform.offLine.message': { card: string | number; line: string | number; where: string; head: string | number; on: string | number }
@@ -602,6 +606,7 @@ interface CombworkMessageValues {
   'workflow.unreadable.revisionIn': { folder: string | number }
   'workflow.unreadable.state': { folder: string | number }
   'workflow.unreadable.target': { target: string | number }
+  'workflow.unreadable.tracking': { branch: string | number }
   'workflow.unreadable.uncommitted': { folder: string | number }
   'workflow.unreadable.worktrees': { folder: string | number }
   'workflow.unreadable.writes': { folder: string | number }

@@ -1004,6 +1004,16 @@
     "note": "HI-2799: the next step after a start refused because the project switched version control meanwhile. {platform} is None, Git or jj.",
     "audience": "both"
   },
+  "workflow.refused.platform.detachedFolder.message": {
+    "text": "{card} can’t start: the project folder is on no branch (its head is detached at {head}), so what its builder commits would be on none.",
+    "note": "HI-3104: a refused start in a Git project whose cards are built in the project folder: the folder has no branch checked out (a detached head, as a jj repository colocated with Git leaves it after switching back to Git), so commits made there would belong to no branch. {card} is a card key like AM-12; {head} a short commit id.",
+    "audience": "both"
+  },
+  "workflow.refused.platform.detachedFolder.next": {
+    "text": "{has, select, yes {Check out its branch in the project folder (git switch {branch}), then start it again.} other {Check out a branch in the project folder (an existing one with git switch, or a new one with git switch -c), then start it again.}}",
+    "note": "HI-3104: the next step after a start refused because the project folder is on no branch. has (select): yes when Combwork found the branch to check out ({branch}, its name), other when it found none it could name. git switch and git switch -c are commands: keep them as they are. Translate both whole sentences.",
+    "audience": "both"
+  },
   "workflow.refused.platform.jjRefused.message": {
     "text": "{why, select, tooLarge {{card}: jj left {count, plural, one {a new file} other {# new files}} out of its snapshot for being over its size limit for new files (snapshot.max-new-file-size), so the work isn't all recorded: {files}.} autoTrack {{card}: jj's setting snapshot.auto-track is {setting} here, not all(), so jj doesn't record new files by itself and the work may not all be recorded.} mergeWorkingCopy {{card}: the slot's working copy has more than one parent, so its work isn't one line of commits.} notFromBase {{card}: the work in its slot doesn't start from the card's base {base}.} otherCard {{card}: commit {commit} is {other}'s work.} divergent {{card}: commit {commit} is divergent in jj (its change has more than one visible commit).} conflicted {{card}: commit {commit} has unresolved conflicts.} tooLong {{card}: its work has more than {max, number} commits.} unbound {{card}: its slot isn't prepared for this card any more.} isolated {{card}: jj projects have no check copies yet.} recovered {{card}: commits of its work hold copies that Recover… wrote beside the original files: {files}.} other {{card}: jj refused it.}}",
     "note": "HI-2868: a refused move on a card of a project using jj (Jujutsu): why its work can't be taken as it is. {card} is a card key like AM-12; {commit} and {base} are short commit ids; {other} is another card's key; {max} is a number; {files} is a list of file paths and {count} their number (HI-2973). 'working copy', 'divergent' and 'snapshot' are jj's terms; snapshot.max-new-file-size is jj's setting: keep it as it is. Translate each sentence. autoTrack (HI-3096): the user's jj setting snapshot.auto-track ({setting}, its value) isn't all(), so jj leaves new files untracked; snapshot.auto-track and all() are jj's: keep them. recovered (HI-2996): Recover… (a button of a stale slot, as the window names it) wrote a copy of the user's version beside a file that had changed meanwhile, and commits of the card's work hold that copy; {files} is a list of file paths, as they are.",
@@ -1022,6 +1032,16 @@
   "workflow.refused.platform.keptAcross.next": {
     "text": "{gone, select, yes {Its folder is gone, so nothing of it is left to go on with: remove the slot (Version Control → Slots and copies, Remove…), and {card} starts afresh from its target.} other {Switch the repository back to {platform} to go on with {card} in that slot.}}",
     "note": "HI-3069: the next step after a start refused because the card’s kept slot is of the other version control. gone (select): yes when the slot’s folder was deleted, so removing the slot lets the card start afresh; other: switching back is the way on. Version Control, Slots and copies and Remove… are names in the window: as translated there. {platform} is Git or jj; {card} a card key.",
+    "audience": "both"
+  },
+  "workflow.refused.platform.keptLine.message": {
+    "text": "{card} can’t start: its branch was made from {kept} and still holds history {target} lacks, but its lane merges into {target}.",
+    "note": "HI-3112: a refused start: the card was started before, put back, and its branch (made from {kept}, the branch it merged into then) is kept, so it keeps merging into {kept}; but the card is in a lane whose cards merge into {target}. {card} is a card key like AM-12; {kept} and {target} are branch names.",
+    "audience": "both"
+  },
+  "workflow.refused.platform.keptLine.next": {
+    "text": "Take it out of the lane and start it on its own, to merge into {kept}; or make a new card for {target}.",
+    "note": "HI-3112: the next step after a start refused because the card’s kept branch ({kept}) isn’t its lane’s ({target}). {kept} and {target} are branch names.",
     "audience": "both"
   },
   "workflow.refused.platform.noTarget.message": {
@@ -1752,6 +1772,11 @@
   "workflow.unreadable.target": {
     "text": "the target branch {target}",
     "note": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": the branch the work merges into. {target} is its name.",
+    "audience": "both"
+  },
+  "workflow.unreadable.tracking": {
+    "text": "which remote branch {branch} tracks (its upstream must be a branch on a remote, or it must track none)",
+    "note": "What Combwork couldn’t read, the object of \"Combwork couldn’t read …\" (HI-3126, “The target branch follows its remote”): how the branch {branch} tracks a remote branch. Its Git settings name only half of one, another local branch, or a remote that isn’t there, or they couldn’t be read.",
     "audience": "both"
   },
   "workflow.unreadable.uncommitted": {

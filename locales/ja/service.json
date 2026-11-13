@@ -114,6 +114,7 @@
   "service.forward.resolveRaced": "ビルダーに渡す間に{card}が変わった（再試行、キューからの除外、または別の解決）ため、何も作りませんでした。カードを確認し、必要ならもう一度依頼してください。",
   "service.forward.resolveTitle": "解決：{to}を{from}で最新にする",
   "service.forward.title": "{to}を{from}で最新にする",
+  "service.forward.unreadable": "{to}は{from}で最新にされません。Combworkが{what}を読み取れなかったため、何もキューに追加しませんでした。{detail, select, none {} other { Gitの出力: {detail}}}",
   "service.fsutil.keptBusy": "{file}は別のプログラムが保存中です。何も変更していません。少し待ってからもう一度お試しください。",
   "service.fsutil.keptUnreadable": "{file}を読み込めませんでした。何も変更していません。少し待ってからもう一度お試しください。",
   "service.fsutil.notCopied": "{name}をコピーできませんでした",

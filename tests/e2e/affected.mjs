@@ -339,6 +339,8 @@ export const AREAS = [
   { paths: ['src/main/platform/integration.ts', 'src/main/platform/integrationPorts.ts', 'src/main/platform/gitIntegration.ts', 'src/main/platform/gitCommits.ts', 'src/main/platform/gitTransport.ts', 'src/main/workflow/transportSnapshots.ts', 'src/main/platform/gitSigning.ts', 'src/main/platform/signerRules.ts', 'src/main/platform/boundedSpawn.ts', 'src/main/platform/ownedWork.ts', 'src/main/platform/again.ts'], suites: ['mergequeue', 'mergequeuecrash', 'mergequeuefolder', 'queueagents', 'queuecontrols', 'queuelease', 'queueupgrade'] },
   // Agents under Combwork merges (#1354): the refusals, the wakes and the card's queue state.
   { paths: ['src/main/workflow/queueState.ts', 'src/shared/workflow/refusals.ts', 'src/main/mergeSlots.ts', 'tests/e2e/queueagents.cjs'], suites: ['queueagents'] },
+  // HI-3126: Bring Up to Date… under follow mode: the forward request's remote reads, the window's offer, a forward published.
+  { paths: ['tests/e2e/forwardremote.cjs', 'src/main/workflow/queueControls.ts', 'src/main/platform/gitHistory.ts', 'src/main/platform/gitTransport.ts', 'src/renderer/src/components/ProgressQueue.tsx'], suites: ['forwardremote'] },
   // Each card's focused tests (G20, HI-1367): chosen at submit, run by the merge queue; this repository's picker and runner.
   { paths: ['tests/e2e/queuefocused.cjs', 'scripts/focusedTests.mjs'], suites: ['queuefocused'] },
   // The queue's controls (#1353): its model, Pause/Resume, Remove from queue and Retry merge, cw_queue.
@@ -355,6 +357,8 @@ export const AREAS = [
   // Lanes (#483): the card loop registers its lane; replysize measures cw_lane; the Progress panel shows them (#484).
   { paths: ['src/main/lanes.ts', 'src/shared/lanes.ts', 'src/main/workflow/lineUpdates.ts'], suites: ['cardloop', 'lanestages', 'progresslanes', 'replysize'] },
   { paths: ['src/main/laneEdits.ts', 'src/renderer/src/laneEdits.ts', 'src/shared/laneQueueEdit.ts', 'src/shared/laneDay.ts', 'tests/e2e/lanequeue.cjs'], suites: ['lanequeue'] },
+  // HI-3113: a lane's Merges into, read in one place: a branch's uses, a lane's start and slot, its edits, its view.
+  { paths: ['src/main/laneTarget.ts'], suites: ['retarget', 'lanestart', 'lanequeue', 'progresslanes'] },
   // HI-1990: Combwork starts a lane's next card once the one before it is Done: the suites whose lanes go on from a Done card.
   { paths: ['src/main/laneStarts.ts', 'src/main/laneDeps.ts'], suites: ['p4lane', 'p5lane', 'p6lane', 'p7lane', 'linecarried', 'reviewerpool', 'slotcards', 'slotswitches', 'slotupgrade', 'cardloop'] },
   // HI-2081: pausing the team before an update: its holds, what still runs, Install Now, the Assistants' authority.
@@ -363,6 +367,8 @@ export const AREAS = [
   { paths: ['tests/e2e/p5lane.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueHost.ts', 'src/main/workflow/lineUpdates.ts', 'src/main/laneStart.ts', 'src/main/workflow/optionsForm.ts'], suites: ['p5lane'] },
   // P6's acceptance (#1425): a project from added to Done through the Version Control tab, Solo, all off, S19 and S20.
   { paths: ['src/main/workflow/retarget.ts', 'src/renderer/src/components/WorkflowOptions.tsx', 'tests/e2e/retarget.cjs'], suites: ['retarget'] },
+  // HI-3112: a put-back card's kept line target: its start in a slot, the change's preview and a branch's uses.
+  { paths: ['src/main/workflow/keptLine.ts'], suites: ['retarget', 'slotcards'] },
   // HI-3017: cw_update_task's note under a card's own target (the suite sets one by PATCH).
   { paths: ['src/main/cardTargetReply.ts'], suites: ['retarget', 'replysize'] },
   { paths: ['tests/e2e/p6lane.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/workflow/presetStep.ts', 'src/renderer/src/components/PresetStep.tsx', 'src/main/workflow/platformSwitch.ts', 'src/renderer/src/boardStages.ts', 'src/main/laneStart.ts', 'src/main/workflow/optionsForm.ts'], suites: ['p6lane'] },

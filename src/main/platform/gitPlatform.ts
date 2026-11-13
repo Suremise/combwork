@@ -15,8 +15,10 @@ import type { CardRecord } from '../workflow/factStore'
 import { attributeFolder, reconcileHistory, sharesFolder, type ReconcileHooks } from '../workflow/reconcile'
 import { snapshot } from '../workflow/checks'
 import { lineName, type Workflow } from '../workflow/runtime'
+import { keptLineTarget } from '../workflow/keptLine'
 import type { CheckBracket, FinishInputs, HeadMove, LineNow, PlatformAdapter, RunRevision, StartPlan, SubmitPlan, Unsubmitted } from './adapter'
 import * as G from './git'
+import { listWorktreesOrNull } from '../worktrees'
 import type { Disposable, ObserveEvent } from './history'
 import { historyFor, observePort } from './historyPorts'
 import { UNREADABLE } from '../../shared/workflow/texts'
@@ -147,16 +149,19 @@ export class GitPlatform implements PlatformAdapter {
     }
     // A no-code card takes no slot (HI-2335): it changes nothing, so it starts where its agent is (`project`: no folder
     // of its own, its agent left where it runs, a lane's kept slot included), as with no slot here. Code cards go on.
-    if (o.folder === 'slots' && this.wf.cfg.slotFor && card.kind === 'no-code') return this.start(card, { ...o, folder: 'project' })
+    if (o.folder === 'slots' && this.wf.cfg.slotFor && card.kind === 'no-code') return this.projectPlan(card, o, false)
     if (o.folder === 'slots' && this.wf.cfg.slotFor) {
       // Slots (#1438, SPEC §16.10): the card's own line from the target's head, in the slot its builder is lent (its
       // lane's, kept for the lane, else the card's own). None free: it waits for one (refused `start.slotAvailable`;
       // the user's start across it works where the agent is). No slot here (the rules off): where the agent is, as P3.
-      const target = card.target || o.target || (await G.defaultBranch(this.project))
+      // HI-3112: a card put back keeps the branch its line was made from (`slotTarget`), here as in `startTarget`.
+      const target = await this.slotTarget(card, o)
       if (isUnknown(target)) return target
       const got = builder ? await this.wf.cfg.slotFor(card, builder, { dry, target }) : null
       if (!got || 'wait' in got) {
-        const here = await this.start(card, { ...o, folder: 'project' })
+        // A slot waited for: the plan is provisional, the card isn't built in the project folder (HR2's HI-3104 design:
+        // never refused for that folder's head). No slot here at all: it is built there, so its head is checked.
+        const here = await this.projectPlan(card, o, !got)
         return got && !isUnknown(here) ? { ...here, slotWait: got.wait } : here
       }
       // G21 (HI-1183): a target that follows its remote starts each card from the remote's head (never silently the local one).
@@ -173,10 +178,10 @@ export class GitPlatform implements PlatformAdapter {
       const base = had && had !== th ? await G.mergeBase(this.project, had, th) : th
       if (isUnknown(base)) return base
       if (!base) return unknown(UNREADABLE.branchedOff, { a: line, b: target })
-      return { folder: got.folder, line, base, target, slot: got.slot, lease: got.lease, fresh: got.fresh }
+      return { folder: got.folder, line, base, target, slot: got.slot, lease: got.lease, fresh: got.fresh, ...(had ? { carried: true } : {}) }
     }
     if (o.folder === 'slots') {
-      const target = card.target || o.target || (await G.defaultBranch(this.project))
+      const target = await this.slotTarget(card, o)
       if (isUnknown(target)) return target
       const base = await G.lineHead(this.project, target)
       if (isUnknown(base)) return base
@@ -185,12 +190,62 @@ export class GitPlatform implements PlatformAdapter {
       if (isUnknown(line)) return line
       return { folder: join(this.wf.cfg.slots ?? join(this.project, CW_DIR, 'slots'), card.key), line, base, target }
     }
+    return this.projectPlan(card, o, true)
+  }
+
+  /**
+   * A start in the project folder: its line the folder's branch, its base the folder's head. HI-3104: `built` (the card is
+   * built there: a code card, not a provisional plan while a slot is waited for) and the folder on no branch (a detached
+   * head, as a colocated jj repository leaves it) is refused `platform.detachedFolder`: its commits would be on none.
+   * An unreadable branch or head stays unknown, never taken for detached.
+   */
+  private async projectPlan(card: CardRecord, o: WorkflowOptions, built: boolean): Promise<Maybe<StartPlan>> {
     const line = await G.branch(this.project)
     const base = await G.head(this.project)
     if (isUnknown(line)) return line
     if (isUnknown(base)) return base
+    if (built && card.kind !== 'no-code' && line === null && base) return this.detachedRefusal(card, o, base)
     // Committed is done: the target is the line the folder works on.
     return { folder: 'project', line, base, target: o.finish === 'committed' ? line : card.target || o.target || line }
+  }
+
+  /**
+   * HI-3104: why a start in a detached project folder is refused, and the branch to check out when one is proved usable
+   * (HR2's design: never a guess): the card's or project's target, else the default branch, only when it is a local
+   * branch and no other worktree has it checked out. Else no branch named: the next step says to choose or make one.
+   */
+  private async detachedRefusal(card: CardRecord, o: WorkflowOptions, head: string): Promise<Unknown> {
+    const named = card.target || o.target || (await G.defaultBranch(this.project).catch(() => null))
+    let branch = ''
+    if (typeof named === 'string' && named) {
+      const at = await G.lineHead(this.project, named).catch(() => null)
+      const trees = await listWorktreesOrNull(this.project).catch(() => null)
+      const elsewhere = !trees || trees.some((t) => t.branch === named && !samePath(t.path, this.project))
+      if (typeof at === 'string' && at && !elsewhere) branch = named
+    }
+    const u = unknown(UNREADABLE.head, { where: this.project })
+    return { ...u, rule: 'platform.detachedFolder', ruleValues: { head: head.slice(0, 7), branch, has: branch ? 'yes' : 'no' } }
+  }
+
+  /**
+   * A slotted start's target (HI-3112): the card's own, else the branch its line was made from while a put-back card's
+   * line holds history the target it would follow lacks (`keptLineTarget`: its work, or the old branch's commits, which
+   * a reuse on the new target would merge there), else G7's (a lane's: its Merges into), else the default branch. A lane
+   * card whose kept branch isn't its lane's is refused (`platform.keptLine`): the lane's target stays its cards'. Unknown
+   * when the line or a head can't be read: never started on a guess.
+   */
+  private async slotTarget(card: CardRecord, o: WorkflowOptions): Promise<Maybe<string>> {
+    const follows = card.target || o.target || (await G.defaultBranch(this.project))
+    if (isUnknown(follows) || card.target) return follows
+    const kept = await keptLineTarget(this.project, this.wf.state(card), card, this.wf.cfg.projectKey, follows)
+    if (kept === 'unknown') {
+      const line = await this.lineFor(card)
+      return unknown(UNREADABLE.contains, { revision: isUnknown(line) ? card.key : line, target: follows })
+    }
+    if (!kept) return follows
+    const lane = card.lane ? this.wf.lane(card.lane) : null
+    if (lane && !lane.ended && kept.target !== follows) return { ...unknown(UNREADABLE.target, { target: kept.target }), rule: 'platform.keptLine', ruleValues: { kept: kept.target, target: follows } }
+    return kept.target
   }
 
   /**
@@ -202,7 +257,7 @@ export class GitPlatform implements PlatformAdapter {
   async startTarget(card: CardRecord, o: WorkflowOptions, builder?: string): Promise<Maybe<string | null>> {
     const own = builder && this.wf.cfg.agentFolder ? await this.wf.cfg.agentFolder(builder) : null
     if (own) return card.target || o.target || own.base || G.defaultBranch(this.project)
-    if (o.folder === 'slots' && !(card.kind === 'no-code' && this.wf.cfg.slotFor) && (this.slotsHere() || !this.wf.cfg.agentFolder)) return card.target || o.target || G.defaultBranch(this.project)
+    if (o.folder === 'slots' && !(card.kind === 'no-code' && this.wf.cfg.slotFor) && (this.slotsHere() || !this.wf.cfg.agentFolder)) return this.slotTarget(card, o)
     if (o.finish !== 'committed' && (card.target || o.target)) return card.target || o.target
     return G.branch(this.project)
   }

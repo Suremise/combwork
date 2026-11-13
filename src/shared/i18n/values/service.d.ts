@@ -127,6 +127,7 @@ interface CombworkMessageValues {
   'service.forward.resolveRaced': { card: string | number }
   'service.forward.resolveTitle': { to: string | number; from: string | number }
   'service.forward.title': { to: string | number; from: string | number }
+  'service.forward.unreadable': { to: string | number; from: string | number; what: string | number; detail: string }
   'service.fsutil.keptBusy': { file: string | number }
   'service.fsutil.keptUnreadable': { file: string | number }
   'service.fsutil.notCopied': { name: string | number }

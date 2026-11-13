@@ -1751,6 +1751,10 @@
     "defaultMessage": "{project}: {kind, select, review {review copy} other {check copy}} {copy}",
     "description": "In the switch’s warning (HI-2799): a review or check copy still in use."
   },
+  "git.vc.store.detached": {
+    "defaultMessage": "{project}: its folder is on no branch (its head is detached at {head}), and stays so after the switch. Check out the branch its work goes on there (git switch) before its cards start in the project folder.",
+    "description": "HI-3104: a hint in the warning before switching back to Git: a project’s folder has no branch checked out (a detached head, as a jj repository colocated with Git leaves it). Combwork doesn’t check one out; a card started in that folder is refused until the user does. {head} is a short commit id. git switch is a command: keep it."
+  },
   "git.vc.store.drain": {
     "defaultMessage": "Still running on this repository (the switch waits until all of it has finished):",
     "description": "In the warning before switching between Git and jj (HI-2799): above what still uses the repository. Nothing of it is stopped by Combwork."

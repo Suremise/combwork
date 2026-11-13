@@ -80,6 +80,7 @@
     "placeholders": {
       "slot": "plain",
       "line": "plain",
+      "carried": "select",
       "target": "plain",
       "card": "plain"
     }

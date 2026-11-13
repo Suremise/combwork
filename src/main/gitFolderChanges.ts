@@ -13,6 +13,7 @@
 import { copyFile, lstat, open, readFile, readdir, rename, rm, writeFile } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
 import type { FolderChangeAction, FolderChangesDone } from '../shared/types'
+import { withValues, type Text } from '../shared/advanced'
 import { agentMsg, say } from '../shared/agentText'
 import { msg } from '../shared/i18n'
 import { combworkError } from './combworkError'
@@ -44,8 +45,8 @@ const M = {
   commitFailed: msg({ id: 'service.folderChanges.commitFailed', defaultMessage: 'Git did not commit: {why}', description: "HI-2944: an error from Commit: git (or a hook, or signing) refused the commit; {why} is its own message (English). The files are as they were." }),
   commitTimedOut: msg({ id: 'service.folderChanges.commitTimedOut', defaultMessage: "Git didn't finish the commit in {seconds, number} seconds (a hook still running, or signing waiting for an answer), so Combwork ended it and everything it had started. The files and the index are as they were.", description: "HI-3021: an error from Commit (a paused merge, a start's warning) or Files' Commit it: git's commit ran past its time limit ({seconds}) and Combwork ended it with its hook; nothing was committed, and the files and git's index (staging area) are unchanged. Keep git as it is." }),
   commitTimedOutMoved: msg({ id: 'service.folderChanges.commitTimedOutMoved', defaultMessage: "Git didn't finish the commit in {seconds, number} seconds (a hook still running, or signing waiting for an answer), so Combwork ended it and everything it had started. {head, select, none {Combwork couldn't read the branch's commit afterwards} other {The branch moved meanwhile, to {head}, and Combwork can't tell that it is this commit}}, so it left the index as it was. Check git log and git status before going on.", description: "HI-3075: an error from Commit (a paused merge, a start's warning) or Files' Commit it: git's commit ran past its time limit ({seconds}) and Combwork ended it, but the branch's commit changed meanwhile ({head}, a commit id; none when it couldn't be read), which may or may not be this commit; git's index (staging area) wasn't updated. Keep git log and git status as they are: commands." }),
-  indexNotTaken: msg({ id: 'service.folderChanges.indexNotTaken', defaultMessage: "{action, select, commit {Git made the commit ({made})} other {Git set the changes aside in a stash ({made})}}, but Combwork couldn't update the index for those files afterwards: {why}. Until it's updated, git status may show them as changed in the index: once no git command is running, run git reset on them.", description: "HI-3021: an error from Commit or Set aside (a paused merge, a start's warning): git committed (or stashed) the files ({made}, a commit or stash id), but updating git's index (staging area) for them afterwards failed; {why} is git's own message (English), often another git command holding the index. {action} is commit or setAside. Keep git status and git reset as they are: commands." }),
-  indexKept: msg({ id: 'service.folderChanges.indexKept', defaultMessage: "{action, select, commit {Git made the commit ({made})} other {Git set the changes aside in a stash ({made})}}, but another git command staged {file}{others, plural, =0 {} one { and one other file} other { and # other files}} meanwhile, so Combwork kept that staging as it was. Check git status before going on.", description: "HI-3053: an error from Commit or Set aside (a paused merge, a start's warning) or Files' Commit it: git committed (or stashed) the files ({made}, a commit or stash id), but while it ran another git command (the user's git add, say) changed git's index (staging area) for {file} (a path) and {others} more files; Combwork left those as that command staged them rather than writing over them. {action} is commit or setAside. Keep git status as it is: a command." }),
+  indexNotTaken: msg({ id: 'service.folderChanges.indexNotTaken', defaultMessage: "{action, select, commit {Git made the commit ({made})} other {Git set the changes aside in a stash ({made})}}, but Combwork couldn't update the index for those files afterwards: {why}. Until it's updated, git status may show them as changed in the index: once no git command is running, run git reset on them.", description: "HI-3021, HI-3059: the text under a warning notification after Commit or Set aside (a paused merge, a start's warning, Files' Commit it), titled as done: git committed (or stashed) the files ({made}, a commit or stash id), but updating git's index (staging area) for them afterwards failed; {why} is git's own message (English), often another git command holding the index. {action} is commit or setAside. Keep git status and git reset as they are: commands." }),
+  indexKept: msg({ id: 'service.folderChanges.indexKept', defaultMessage: "{action, select, commit {Git made the commit ({made})} other {Git set the changes aside in a stash ({made})}}, but another git command staged {file}{others, plural, =0 {} one { and one other file} other { and # other files}} meanwhile, so Combwork kept that staging as it was. Check git status before going on.", description: "HI-3053, HI-3059: the text under a warning notification after Commit or Set aside (a paused merge, a start's warning) or Files' Commit it, titled as done: git committed (or stashed) the files ({made}, a commit or stash id), but while it ran another git command (the user's git add, say) changed git's index (staging area) for {file} (a path) and {others} more files; Combwork left those as that command staged them rather than writing over them. {action} is commit or setAside. Keep git status as it is: a command." }),
   stashTimedOut: msg({ id: 'service.folderChanges.stashTimedOut', defaultMessage: "Git didn't finish setting the changes aside in {seconds, number} seconds, so Combwork ended it and everything it had started.{made, select, yes { It had kept them in a stash ({stash}) by then.} other {}} Check git stash list and the files before going on.", description: "HI-3021: an error from Set aside (a paused merge, a start's warning): git stash ran past its time limit ({seconds}) and Combwork ended it. {made} is yes when git had made a stash ({stash}, its id) by then. Keep git stash list as it is: a command." }),
   stashFailed: msg({ id: 'service.folderChanges.stashFailed', defaultMessage: 'Git did not set the changes aside: {why}', description: "HI-2944: an error from Set aside: git refused to stash the changes; {why} is its own message (English). The files are as they were." }),
   deletedKept: msg({ id: 'service.folderChanges.deletedKept', defaultMessage: "{file} is staged for removal from Git: commit it yourself in Git; Combwork won't add it back.", description: "HI-2982: an error from Commit or Set aside (a paused merge, a start's warning): the file ({file}, a path) had its removal from Git staged (Files' Stop Tracking) and is still on disk; git's commit or stash would put it back, so nothing was done. The user commits the removal in Git themselves." }),
@@ -471,10 +472,28 @@ function failed(m: (typeof M)['commitFailed'] | (typeof M)['stashFailed'], err: 
   return combworkError(m, { why: gitErrorLine(err) || err.trim().slice(0, 400) })
 }
 
-/** HI-3053: the commit or stash made, said with the paths another git staged meanwhile, kept as it staged them. */
-function indexKept(action: FolderChangeAction, made: string, kept: string[]): Error {
-  log.warn(`${action === 'commit' ? 'A commit' : 'A stash'} was made (${made}), and ${kept.length} paths staged meanwhile by another git were kept`)
-  return combworkError(M.indexKept, { action, made: made.slice(0, 12), file: kept[0], others: kept.length - 1 })
+/**
+ * A commit or stash made (its id), with what its index step left for the user to check, if anything (HI-3059: a
+ * warning on a success, never an error: the window says it was made).
+ */
+interface MadeWith {
+  made: string
+  warning?: Text
+}
+
+/**
+ * What taking a made commit's or stash's entries into the real index gave: nothing to say, or the warning. HI-3053: the
+ * paths another git staged meanwhile, kept as it staged them; HI-3021: the step failed.
+ */
+function indexWarning(action: FolderChangeAction, made: string, took: Taken): Text | undefined {
+  const what = action === 'commit' ? 'A commit' : 'A stash' // i18n-ignore: part of a log line
+  if (!took.ok) {
+    log.warn(`${what} was made (${made}), but its entries weren't taken into the index: ${userText(took.why)}`)
+    return withValues(M.indexNotTaken, { action, made: made.slice(0, 12), why: took.why })
+  }
+  if (!took.kept.length) return undefined
+  log.warn(`${what} was made (${made}), and ${took.kept.length} paths staged meanwhile by another git were kept`)
+  return withValues(M.indexKept, { action, made: made.slice(0, 12), file: took.kept[0], others: took.kept.length - 1 })
 }
 
 const samePlace = (a: string, b: string): boolean => resolve(a).toLowerCase() === resolve(b).toLowerCase()
@@ -511,7 +530,7 @@ async function assertQuiet(projectPath: string, folder: string, branch: string |
  * A refused commit leaves the real index as it was, intent-to-add entries never in it. Never given a path whose removal
  * is staged while its file is still in the folder (settleChanges and commitIgnore refuse it first, keptDeleted).
  */
-async function commitPaths(folder: string, files: string[], untracked: string[], message: string, byIndex?: { removed: string[]; staged: string[] }): Promise<string> {
+async function commitPaths(folder: string, files: string[], untracked: string[], message: string, byIndex?: { removed: string[]; staged: string[] }): Promise<MadeWith> {
   // What the branch was, to tell whether a commit ended at its bound moved it; unreadable, nothing runs.
   const before = await headOf(folder)
   if (before === undefined) throw failed(M.commitFailed, "git couldn't read HEAD") // i18n-ignore: stands in for git's own (English) words
@@ -531,11 +550,9 @@ async function commitPaths(folder: string, files: string[], untracked: string[],
     // HI-3074: from the commit, never the private index: a pre-commit hook's `git add` (a formatter, a generated file)
     // goes into what git commits, not into the private index.
     const entries = await entriesOfCommit(folder, made, before, files)
-    if (!entries.ok) throw combworkError(M.indexNotTaken, { action: 'commit', made: made.slice(0, 12), why: entries.why })
-    const took = await take(entries)
-    if (!took.ok) throw combworkError(M.indexNotTaken, { action: 'commit', made: made.slice(0, 12), why: took.why })
-    if (took.kept.length) throw indexKept('commit', made, took.kept)
-    return made
+    // HI-3059: from here the commit is made, whatever its index step gives: said with it, never as a failure.
+    const took = entries.ok ? await take(entries) : entries
+    return { made, warning: indexWarning('commit', made, took) }
   })
 }
 
@@ -658,7 +675,7 @@ async function stashTop(folder: string): Promise<string | null> {
  * private copy of the index (withPrivateIndex, HI-3021): once a stash is made, the real index's entries for `files`
  * become what git left them (takeEntries), however far it got; with none made, the real index is as it was.
  */
-async function setAsidePaths(folder: string, files: string[], message: string, renamedFrom: string[] = [], ita: string[] = []): Promise<string> {
+async function setAsidePaths(folder: string, files: string[], message: string, renamedFrom: string[] = [], ita: string[] = []): Promise<MadeWith> {
   // HI-3081: git's stash on a branch with no commit yet fails, saying why only without --quiet: said here instead.
   if ((await headOf(folder)) === null) throw failed(M.stashFailed, "the branch has no commit yet, and git can't set changes aside before its first one") // i18n-ignore: stands in for git's own (English) words
   const before = await stashTop(folder)
@@ -669,7 +686,7 @@ async function setAsidePaths(folder: string, files: string[], message: string, r
   const stashed = files.filter((p) => !renamedFrom.includes(p))
   // Never a stash with no paths: it would take every change in the folder.
   if (!stashed.length) throw failed(M.stashFailed, 'nothing to set aside but a rename\'s old side') // i18n-ignore: stands in for git's own (English) words
-  const { r, made } = await withPrivateIndex(folder, files, M.stashFailed, async (env, copy, take) => {
+  const { r, made, warning } = await withPrivateIndex(folder, files, M.stashFailed, async (env, copy, take) => {
     // HI-3081: git's stash can't take an intent-to-add entry ("Entry … not uptodate. Cannot merge"): taken out of the
     // private index first, the file is set aside as the untracked file it is (and comes back untracked). Combwork's own
     // step: nothing of the repository's run, bounded.
@@ -683,12 +700,10 @@ async function setAsidePaths(folder: string, files: string[], message: string, r
     const after = await stashTop(folder)
     const stash = after && after !== before ? after : null
     if (stash && pushed.ok && renamedFrom.length) pushed = await restoreOldSides(folder, env, renamedFrom)
-    if (stash) {
-      const took = await take()
-      if (!took.ok) throw combworkError(M.indexNotTaken, { action: 'setAside', made: stash.slice(0, 12), why: took.why })
-      if (took.kept.length) throw indexKept('setAside', stash, took.kept)
-    }
-    return { r: pushed, made: stash }
+    // HI-3059: a stash made is said made, whatever its index step gives (logged there too, should git's own failure be
+    // what is said below).
+    const said = stash ? indexWarning('setAside', stash, await take()) : undefined
+    return { r: pushed, made: stash, warning: said }
   })
   if (!r.ok && r.timedOut) {
     // HI-3021: ended at its bound, part way: the stash it made by then named, kept.
@@ -699,7 +714,7 @@ async function setAsidePaths(folder: string, files: string[], message: string, r
   // back what it has none of. With the stash made and none of the paths changed any more, that is the job done.
   if (!r.ok && made && /No valid patches in input/.test(r.err) && (await leftUnchanged(folder, files))) {
     log.warn(`git stash reported a problem in ${userText(folder)} after setting the paths aside (${made}), all of them left unchanged: ${userText(gitErrorLine(r.err))}`)
-    return made
+    return { made, warning }
   }
   if (!r.ok) {
     if (made) {
@@ -709,7 +724,7 @@ async function setAsidePaths(folder: string, files: string[], message: string, r
     throw failed(M.stashFailed, r.err)
   }
   if (!made) throw failed(M.stashFailed, r.err || r.out || 'no stash was made') // i18n-ignore: stands in for git's own (English) words
-  return made
+  return { made, warning }
 }
 
 /**
@@ -778,9 +793,9 @@ export async function settleChanges(projectPath: string, target: string, shownFo
         // HI-3024: git's partial commit can't take a case-only rename ("will not add file alias") nor a removal whose path is
         // now a folder ("does not have a commit checked out"): those are built in the private index (byIndex).
         const byIndex = [...removed.values()].some((k) => k === 'alias' || k === 'folder') ? { removed: [...removed.keys()], staged: [...now].filter(([p, c]) => (c.staged || c.unmerged) && !files.includes(p)).map(([p]) => p) } : undefined
-        const made = action === 'commit' ? await commitPaths(folder, files, files.filter((p) => now.get(p)?.untracked && !now.get(p)?.deleted), message, byIndex) : await setAsidePaths(folder, files, message, [...removed.keys()].filter((p) => [...now.values()].some((c) => c.from === p)), files.filter((p) => now.get(p)?.ita))
+        const { made, warning } = action === 'commit' ? await commitPaths(folder, files, files.filter((p) => now.get(p)?.untracked && !now.get(p)?.deleted), message, byIndex) : await setAsidePaths(folder, files, message, [...removed.keys()].filter((p) => [...now.values()].some((c) => c.from === p)), files.filter((p) => now.get(p)?.ita))
         log.info(`${action === 'commit' ? 'Committed' : 'Set aside'} ${files.length} paths in ${userText(folder)} on ${userText(branch)}`)
-        return { action, folder, branch, files, message, made }
+        return { action, folder, branch, files, message, made, ...(warning ? { warning } : {}) }
       }),
     { project: projectPath }
   )
@@ -832,9 +847,9 @@ export async function commitIgnore(projectPath: string): Promise<FolderChangesDo
         if (now.get(file)?.unmerged) throw combworkError(M.unmerged, { file })
         const kept = await keptDeleted(await removedIn(repo.top, [file], now))
         if (kept) throw combworkError(M.deletedKept, { file: kept })
-        const made = await commitPaths(repo.top, [file], now.get(file)!.untracked ? [file] : [], message)
+        const { made, warning } = await commitPaths(repo.top, [file], now.get(file)!.untracked ? [file] : [], message)
         log.info(`Committed .gitignore in ${userText(repo.top)} on ${userText(branch)}`)
-        return { action: 'commit', folder: repo.top, branch, files: [file], message, made }
+        return { action: 'commit', folder: repo.top, branch, files: [file], message, made, ...(warning ? { warning } : {}) }
       }),
     { project: repo.cwd }
   )

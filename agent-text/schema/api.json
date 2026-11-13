@@ -1019,7 +1019,8 @@
       "card": "plain",
       "to": "plain",
       "from": "plain",
-      "override": "select"
+      "override": "select",
+      "ahead": "plural"
     }
   },
   "api.done.forwardResolved": {
@@ -1034,7 +1035,8 @@
   "api.done.forwardUpToDate": {
     "placeholders": {
       "to": "plain",
-      "from": "plain"
+      "from": "plain",
+      "ahead": "plural"
     }
   },
   "api.done.freshRetried": {

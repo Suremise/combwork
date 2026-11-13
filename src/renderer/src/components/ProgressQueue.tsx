@@ -59,6 +59,7 @@ const FORWARD_T = {
   failed: msg({ id: 'board.queue.forwardFailed', defaultMessage: 'Couldn’t bring the branch up to date', description: 'HI-2679: an error’s title: the forward merge couldn’t be queued. Its text says why.' }),
   upToDate: msg({ id: 'board.queue.forwardUpToDate', defaultMessage: '{to} already has everything of {from}', description: 'HI-2679: a notification: nothing to bring in, so nothing was queued.' }),
   resolving: msg({ id: 'board.queue.forwardResolving', defaultMessage: '{card} is resolving it: Bring Up to Date waits for it', description: 'HI-3000: on a merge queue’s card, after the line saying how far its branch is behind another: a card ({card}: its key, such as HI-12) made by Resolve on a builder is merging that branch in by hand, so Bring Up to Date (the button’s name: as translated there) isn’t offered for that branch until the card is Done.' }),
+  localAhead: msg({ id: 'board.queue.forwardLocalAhead', defaultMessage: '{n, plural, one {# commit of your local {from} isn’t on its remote, so it wasn’t brought into {to}: publish it first if it should be.} other {# commits of your local {from} aren’t on its remote, so they weren’t brought into {to}: publish them first if they should be.}}', description: 'HI-3126: a notification after Bring Up to Date under “The target branch follows its remote”: Combwork brings in branch {from} as its remote has it, and the local branch {from} has {n} commits (counted along its history) its remote lacks, which were left out. {to} is the branch being brought up to date. Branch names.' }),
   already: msg({ id: 'board.queue.forwardAlready', defaultMessage: '{to} is being brought up to date with {from} already', description: 'HI-2679: a notification: a forward merge for this pair is queued or waiting already; nothing new was queued.' })
 }
 
@@ -92,8 +93,10 @@ export function QueueCard({ view: v, runs, now, showProject, inVersionControl = 
   const nothing = !v.testing && !v.queued.length && !v.paused && !merged.length && !returns.length
   // HI-2679: what this target lacks of the project's other targets, and the button that brings it up to date.
   const behind = (v.forward?.behind ?? []).filter((b) => b.commits !== 0)
+  // HI-3126: under follow mode, a branch whose local count is 0 is offered too: its remote may have more (the request reads it).
+  const offerable = (v.forward?.behind ?? []).filter((b) => b.commits !== null && !b.resolving && (b.commits !== 0 || v.forward?.follows))
   const forward = async (): Promise<void> => {
-    const offered = behind.filter((b) => b.commits !== null && !b.resolving).map((b) => b.from)
+    const offered = offerable.map((b) => b.from)
     if (!offered.length) return
     const from =
       offered.length === 1
@@ -105,6 +108,7 @@ export function QueueCard({ view: v, runs, now, showProject, inVersionControl = 
       const r = await attempt(tr(FORWARD_T.failed), () => call('queue:forward', v.projectPath, from, v.target))
       if (r?.upToDate) notify('info', tr(FORWARD_T.upToDate, { to: v.target, from }))
       else if (r && !r.queued) notify('info', tr(FORWARD_T.already, { to: v.target, from }))
+      if (r?.localAhead) notify('warning', tr(FORWARD_T.localAhead, { n: r.localAhead, from, to: v.target }))
     } finally {
       setBusy(false)
     }
@@ -206,7 +210,7 @@ export function QueueCard({ view: v, runs, now, showProject, inVersionControl = 
           )}
         </Fragment>
       ))}
-      {behind.some((b) => b.commits !== null && !b.resolving) && (
+      {offerable.length > 0 && (
         <button type="button" className="btn small" disabled={busy} data-action="forward" onClick={() => void forward()}>
           <Icon name="git-merge" /> {tr(FORWARD_T.button)}
         </button>

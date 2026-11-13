@@ -2672,7 +2672,10 @@ merges under jj.
   for a non-colocated jj repository the store its `.jj` names, HI-2896)
   whose choice is Git or jj, plus the project switched (None → jj too); the warning names them, and its `token` (a hash
   of each member, its choice and options, the fence's generation and the store) must still match at the switch, else
-  `groupChanged`. Refused, each with its list and Check Again reading it afresh: `drain` (active or paused lanes, cards
+  `groupChanged`. Refused, each with its list and Check Again reading it afresh (HI-3105: also when refused only as Switch
+  is pressed, the warning having been read clear: the check is read again and the refused dialog shows its lists, never
+  a refusal pointing at a list the dialog doesn't have; and back to Git, a fallback read that only raced jj's operation
+  head moving, `unknown` `moved`, is made again up to three times before it is shown): `drain` (active or paused lanes, cards
   in flight, a member's merge queue with work, open slot leases, unfreed copy leases, and (HI-3069) each slot kept for
   a card, `drain.kept`, that isn't of the platform switched to: it could never be lent back after the switch, so its
   card is started and finished first; one already of that platform, left by a switch made before this, never refuses
@@ -4581,7 +4584,12 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   else G7. From then on that one value is the branch it is made from, its queue and merge, its dependency check and its
   slot. A **lane's** target is recorded in its ruleset: a lane started on another branch records the rules in force with
   G7 set to it (`targetedOf`, id the base's with `~target:<branch>`), so its cards take it as any rule, and old rules
-  compare the base ids (`rulesBaseId`): a lane on 1.2.0 isn't on old rules for that. It is fixed for the lane's life
+  compare the base ids (`rulesBaseId`): a lane on 1.2.0 isn't on old rules for that. A lane started on the project's
+  own records G7 as it was, unmarked, and keeps merging there when G7 moves on (Start the next version: running lanes
+  stay on the release), so a lane's target is read in one place (HI-3113, `laneTargetOf`): the mark, else its recorded
+  ruleset's G7. Every check reads it so (a lane named among a branch's uses, a card's target against its lane's, a
+  card brought into it, a lane's restart, the lane's info, which names it when it isn't G7 now, and the options its
+  start and slot go by). It is fixed for the lane's life
   (a start naming another is refused), set by the user, the Assistant or a script, never its own builder, and only
   with the rules enforced. **A lane is one target**: a card whose own target isn't its lane's is refused into it (on a
   start, an edit or a placement), and a lane's card can't be set to another. A **card's** own target is the user's or the
@@ -4592,7 +4600,14 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   each only at the head `ownWork` found empty, compare and swap: one moved since is refused and kept; refused while a
   folder has one checked out; only its own slot lines, never a target), so its next start makes a fresh line from the
   new target. Refused otherwise, the refusal names the branch its work was made from, else the one it merges into now,
-  never an empty name (HI-2825). A card set to one of the project's other targets keeps it through any later change of
+  never an empty name (HI-2825). A card put back with no target of its own keeps the one its line was made from
+  (`Started.target`) while that line (its own, built in a slot) holds history the target it would follow lacks, work or
+  not (HI-3112, `keptLineTarget`): its start (the git platform's `startTarget` and `start`, so the evidence, the slot
+  lent, the plan and `Started.target` agree) carries the line on there, said so (`slotMove`'s `carried`); a change of
+  G7's preview keeps it (`line`) and `referencesTo` counts it, read against the destination (an untouched line is in its
+  own branch, never in the new one); setting it back to that branch is accepted, its line kept. Unreadable, it is kept
+  (`cantCheck`, counted) and its start refused; in a lane merging elsewhere its start is refused (`platform.keptLine`).
+  Its line gone, or all of it in the new target, it follows. A card set to one of the project's other targets keeps it through any later change of
   G7, even to that branch; `cw_update_task`'s reply says so, and how to follow G7 instead (change it first, then clear
   the card's), HI-3017: setting cards before their project pinned them unnoticed. `cw_create_task` with such a target
   says the same (HI-3043), and the reply says the target as stored, so a forward's resolution pinned to G7's own
@@ -4897,6 +4912,14 @@ An unreadable membership or fence refuses (`switching`). A never-switched projec
   replaced; Git's unreadable, nothing is seeded. A jj start that still has none (the user cleared it) is refused
   `platform.noTarget` ("no target bookmark chosen"; next step Version Control → Workflow, Work merges into), never
   `platform.unknown` with a blank name and "Check Provider Setup".
+  HI-3104: a Git card built in the project folder (a code card; not a provisional plan while a slot is waited for, nor
+  the builder's own worktree, nor a no-code card) while that folder is on no branch (its head detached, as a colocated
+  jj repository leaves Git's after the switch back) is refused `platform.detachedFolder`, naming the head: its commits
+  would be on no branch. Its next step names the branch to check out (`git switch <branch>`) only when one is proved
+  usable (the card's or project's target, else the default branch, a local branch no other worktree has checked out),
+  else says to check out or make one; an unreadable branch or head stays unknown, never taken for detached. Combwork
+  never checks one out itself. The switch back to Git lists each member read as detached (`StoreSwitch.detached`, through
+  the platform's port; a failed read lists none) as a caution under its warning; the switch still goes.
 - **After a switch:** the project is read again (its offer gone), and `workflow-changed` and `queue-changed` tell the
   windows. A card in flight keeps its own ruleset in the runtime (each card's adapter is its ruleset's platform), and
   the merge queue starts a workspace's queues with open entries for a None project too, so an old Git queue drains
@@ -6294,14 +6317,20 @@ touched:
   copy was taken; and it goes in under the real index's lock taken as git takes it (`index.lock`, made only if none is
   there; tried again briefly while another git holds it, and only that lock ever removed), renamed in through the lock
   as git commits a lock, only while the real index is still those bytes. A path whose real entries changed meanwhile keeps them, never written over; the others are taken
-  in, and the refusal names the commit or stash made and the path kept (*Git made the commit (…), but another git
+  in, and the result's warning names the commit or stash made and the path kept (*Git made the commit (…), but another git
   command staged a.txt meanwhile, so Combwork kept that staging as it was …*). That step runs nothing of the repository's (HR2's rounds 3 and
   4: `core.hooksPath` a folder never made; each hook set in git's config, `hook.<name>.command`, made `true` for it,
   as the last value wins and `core.hooksPath` doesn't reach them; `core.fsmonitor=false`; refused when git's config
   can't be read), so it waits only on git's own work, and it is **never bounded**: a bound could end git while it
   holds the real index's lock, which on Windows it then never removes. That step failing is said with the commit or stash made (*Git made
-  the commit (…), but Combwork couldn't update the index for those files afterwards …*). Nothing made: the real index
-  is as it was. **A commit ended at its bound is never credited** (HI-3075; Darren, 12 Nov: the plain answer over
+  the commit (…), but Combwork couldn't update the index for those files afterwards …*). **Made with a warning, never
+  a failure** (HI-3059): from the moment git has made the commit or stash, it is done: either of those two is a warning
+  on the result (`FolderChangesDone.warning`), not an error, and the window titles it as made (*Committed 1 file on
+  main, with a warning*, *Set 2 files aside on main, with a warning*, a warning notification), the warning under it;
+  never *Could not commit*. On a paused merge the queue is then resumed as after any Commit or Set aside: Resume's own
+  check of the folder decides (the index left differing from the commit, staged by another git, keeps it paused,
+  naming the file), never the warning itself. Should git also fail after making a stash (its own error, which names
+  the stash, is said), the warning is in the log. Nothing made: the real index is as it was. **A commit ended at its bound is never credited** (HI-3075; Darren, 12 Nov: the plain answer over
   more proof), even one made before its post-commit hook was ended: the real index being free, another git can commit
   meanwhile (HR2's round 3), and a hook's own git, which inherits everything the commit's has, can move HEAD or commit
   before or after the commit's write (HR2's rounds 1-3 on HI-3075), so nothing proves which made the commit now there.
@@ -6787,6 +6816,31 @@ each secret value of the snapshot, its URL's query values included). Where it ca
 **Slots** (§16.10.1): with G21 on, a slotted card starts from the remote's head (fetched in the sealed context within 60
 seconds, pinned at `refs/cw/fetch/<target>`). A remote it can't use, a failed fetch, or a local target with commits the
 remote lacks refuses the start with why: never the local head instead.
+
+**Forward merges** (§16.9's Bring Up to Date, HI-3126; the design agreed with HR2 on the card, s7 and s11). With G21 on,
+a forward request reads both branches' remotes, each fetched now in the sealed context (within 60 seconds, the window or
+the Assistant waiting on the reply; pinned at `refs/cw/forward/<branch>`; no checkout, the local branches never moved):
+- **The source** is the head of the remote branch `from` tracks, frozen on the card as any forward's source is. It is
+  never the local `from`, which may lack what someone else published (hunt 7's S1: a release hotfix pushed from another
+  clone, which the request answered "up to date" and the next version never got) or hold commits never published
+  (P2: published to the next version's remote though the release's never had them). The local `from`'s commits the
+  remote lacks are left out and counted (`localAhead`, along its first parents): the window's notification and the
+  Agent API's reply say so, in every outcome (queued, already open, up to date).
+- **"Up to date"** is said only when the head of the remote branch `to` tracks, fetched too, has the source: a local `to`
+  holding it unpublished doesn't count, and one behind its remote isn't asked. The card's base is where the source and
+  that head meet. The queue then tests on `to`'s remote head as for any card (step 1 above).
+- **A branch that tracks none** (neither `branch.<b>.remote` nor `branch.<b>.merge` set, as git says it, exit 1: `main`
+  set up without an upstream, say) is read locally, as with G21 off; a setting set to nothing is set (HR2's round 1).
+  Tracking set up any other way (one of the two settings only, either set to nothing, another
+  local branch, `.`, a merge ref that isn't a branch, a remote git doesn't know, several push addresses, a shallow
+  repository), a setting git can't read, or a fetch that fails refuses the request with nothing queued, saying what
+  couldn't be read and git's words (`service.forward.unreadable`): never the local head instead.
+- **Retry merge** freezes its new source by the same rules, refused the same way.
+- **The window** (`QueueForward.follows`) offers Bring Up to Date… for every source it may take, even one whose local
+  count is 0 (its "N commits behind" line, a local count read without fetching, isn't shown then): only the request,
+  once chosen and confirmed, reaches the remotes. Off G21, everything is as before: both branches read locally.
+Seen in the real app at 295e8e59a (HG1, hunt 7: `queue:forward` answered `upToDate` while `origin/1.4.0` had a hotfix
+`origin/1.5.0` lacked) and checked again with the change in the `forwardremote` e2e suite.
 
 **The one residue:** a hook is the user's own code, run in the project with the project's configuration.
 
