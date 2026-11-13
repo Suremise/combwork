@@ -154,13 +154,17 @@ export interface QueueOrder {
  * step; else an advance begun (its recovery finishes it), or, when another Combwork runs the queue, its first entry (its
  * step isn't known here).
  */
-export function queueOrder(wf: Workflow, target: string, live: QueueLive = wf.queueLive(target)): QueueOrder {
+export function queueOrder(wf: Workflow, target: string, live: QueueLive = wf.queueLive(target), openCards?: ReadonlyMap<number, CardRecord>): QueueOrder {
   const store = wf.store
+  // HI-3169: a Done card holds no open entry (merged, or moved there, which cancels it: queueStateOf), so only the cards
+  // not Done are read and folded, all in one read (`openCards`: a listing's, read once for all its targets): the target's
+  // history, all Done, costs nothing here.
+  const notDone = openCards ?? new Map(store.cardsOpen().map((c) => [c.id, c]))
   const states = new Map<number, { card: CardRecord; s: CardState }>()
   const of = (id: number): { card: CardRecord; s: CardState } => {
     let x = states.get(id)
     if (!x) {
-      const card = store.card(id)
+      const card = notDone.get(id) ?? store.card(id)
       states.set(id, (x = { card, s: wf.state(card) }))
     }
     return x
@@ -173,6 +177,7 @@ export function queueOrder(wf: Workflow, target: string, live: QueueLive = wf.qu
     if (d.target !== target) continue
     entries.add(d.entry)
     cards.add(f.card)
+    if (!notDone.has(f.card)) continue
     const { card, s } = of(f.card)
     const e = s.entries.find((x) => x.id === d.entry)
     if (e && (e.state === 'open' || e.state === 'started')) open.push({ f, card, state: e.state })

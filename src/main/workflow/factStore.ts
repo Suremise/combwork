@@ -401,6 +401,13 @@ export class FactStore {
     })
   }
 
+  /** These cards' records, by number, in one read (HI-3169: a listing's rows named together); a number with no card is left out. */
+  cardsNumbered(ids: Iterable<number>): Map<number, CardRecord> {
+    const list = [...new Set(ids)]
+    if (!list.length) return new Map()
+    return new Map(this.records('number IN (SELECT value FROM json_each(?))', [JSON.stringify(list)]).map((c) => [c.id, c]))
+  }
+
   card(id: number): CardRecord {
     const c = this.records('number = ?', [id])[0]
     if (!c) throw new Error(`no card ${id}`) // i18n-ignore: a programming error, never shown

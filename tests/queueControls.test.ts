@@ -9,7 +9,7 @@ import { join, resolve } from 'path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
-import type { QueueRecent, QueueView } from '../src/shared/workflow/queue'
+import { RECENT_MAX, type QueueRecent, type QueueView } from '../src/shared/workflow/queue'
 import type { KeptReturn } from '../src/shared/progressQueue'
 
 const host = vi.hoisted(() => ({ kicked: [] as string[], changed: [] as string[], stamp: '' }))
@@ -799,6 +799,64 @@ describe("the window's merge queues and badges on a board shaped like a long-use
     }
     console.log('#1629 timings (median of 7, ms):', JSON.stringify(Object.fromEntries(Object.entries(timed).map(([name, v]) => [name, Math.round(v * 10) / 10]))))
     for (const v of Object.values(timed)) expect(v).toBeLessThan(50)
+  })
+})
+
+describe("a queue listing's cost doesn't grow with the queue's history (HI-3169)", () => {
+  it("reads the same cards' records with 50 or 450 merged cards behind it, and names the rows it lists", { timeout: 120_000 }, async () => {
+    const { w, wt, repo } = await workspace()
+    const store_ = FactStore.forBoard(w, { project: 'p', key: 'p' })
+    const queued = await approved(w, wt)
+    /** `count` more cards merged through the queue into main, Done, newest last. */
+    const history = async (count: number): Promise<number[]> => {
+      const made: number[] = []
+      await store.boardWrite(w, async () =>
+        store_.tx((tx) => {
+          for (let i = 0; i < count; i++) {
+            const c = store_.createCard({ title: `Merged ${i}`, kind: 'code', labels: [], blockedBy: [], stage: 'done' }).id
+            const entry = `e-${c}`
+            tx.append(c, { kind: 'IntegrationRequested', actor: 'combwork', source: 'recorded', data: { entry, revision: 'a'.repeat(40), key: null, target: 'main', style: 'merge' } })
+            tx.append(c, { kind: 'Integrated', actor: 'combwork', source: 'recorded', data: { entry, revision: 'a'.repeat(40), target: 'main', result: 'b'.repeat(40), method: 'merge', by: 'combwork' } })
+            made.push(c)
+          }
+        })
+      )
+      return made
+    }
+    const reads = { card: 0, records: 0 }
+    const proto = FactStore.prototype as unknown as Record<'card' | 'records', (...a: unknown[]) => unknown>
+    const counted = (k: 'card' | 'records') => {
+      const orig = proto[k]
+      return vi.spyOn(proto, k).mockImplementation(function (this: unknown, ...a: unknown[]) {
+        reads[k]++
+        return orig.apply(this, a)
+      })
+    }
+    const listed = async () => {
+      reads.card = reads.records = 0
+      const card = counted('card')
+      const records = counted('records')
+      try {
+        // The window's listing, made afresh (a board change between: none kept).
+        return { view: (await inWorkspace(w, () => queueViews(w, repo, undefined, true))).find((v) => v.target === 'main')!, ...reads }
+      } finally {
+        card.mockRestore()
+        records.mockRestore()
+      }
+    }
+    await history(50)
+    // Once first: what a project's first listing reads once (its workflow) isn't counted.
+    await listed()
+    await history(1)
+    const small = await listed()
+    const newest = (await history(400)).slice(-RECENT_MAX).reverse()
+    const named = newest.map((c) => store_.card(c)).map((c) => [c.id, c.key, c.title])
+    const large = await listed()
+    // The same reads whatever the history: no card of it read, but those listed, read together.
+    expect({ card: large.card, records: large.records }).toEqual({ card: small.card, records: small.records })
+    // And the listing as before: the card queued, and the newest outcomes (one instant: the later card first), each named.
+    expect(large.view.queued.map((q) => q.card)).toEqual([queued])
+    expect(large.view.recent.map((r) => [r.card, r.key, r.title])).toEqual(named)
   })
 })
 

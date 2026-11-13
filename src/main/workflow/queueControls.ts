@@ -64,6 +64,8 @@ interface QueueScope {
   inFlight: Map<string, number[]>
   /** The target the project's current options have Combwork merge into (null: they don't, or it can't be read). */
   current: string | null
+  /** HI-3169: the project's cards not Done, by number, read once for the listing (each target's queue order, the open pairs). */
+  open: ReadonlyMap<number, CardRecord>
 }
 
 /**
@@ -143,7 +145,7 @@ async function makeViews(ws: WorkspaceService, projectPath: string, target: stri
   const sources = window && targets.length ? await forwardSources(ws, projectPath, targets) : []
   const main = sources.length > 1 ? await defaultBranch(ws, projectPath) : null
   // HI-3000: the pairs' open work, read once for the listing (the open cards alone folded), not per pair.
-  const open = sources.length ? openPairs(wf) : new Map<string, CardRecord>()
+  const open = sources.length ? openPairs(wf, scope.open.values()) : new Map<string, CardRecord>()
   for (const v of views) {
     if (!targets.includes(v.target)) continue
     const f = await forwardOfTarget(wf, open, projectPath, v.target, sources.filter((b) => b !== v.target && forwardDirection(b, v.target, main).dir === 'forward'))
@@ -196,9 +198,9 @@ const pairKey = (from: string, to: string): string => `${from}\n${to}` // i18n-i
  * on a builder: the forward Done, its resolution not yet), while that isn't Done; the first by number when there are
  * several. Only the cards not Done are read and folded (`cardsOpen`): a board's Done cards cost nothing here.
  */
-export function openPairs(wf: Workflow): Map<string, CardRecord> {
+export function openPairs(wf: Workflow, open: Iterable<CardRecord> = wf.store.cardsOpen()): Map<string, CardRecord> {
   const out = new Map<string, CardRecord>()
-  for (const c of wf.store.cardsOpen()) {
+  for (const c of open) {
     const st = wf.state(c)
     const pair = st.forward ?? st.resolves
     if (!pair || st.stage === 'done') continue
@@ -251,7 +253,7 @@ async function queueScope(wf: Workflow, projectPath: string): Promise<QueueScope
     const def = o.target ? o.target : await lineHistory().defaultTarget(projectPath).catch(() => null)
     current = def && !isUnknown(def) ? def : null
   }
-  return { inFlight, current }
+  return { inFlight, current, open: new Map(wf.store.cardsOpen().map((c) => [c.id, c])) }
 }
 
 /** One target's queue: what tests now, what waits in order, the latest outcomes, the pause and who runs it. */
@@ -260,11 +262,11 @@ export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: strin
   // The entries for this target in the order queued, the one testing now and those waiting (queueState.ts: the order
   // card reads and refusals give agents too).
   const live = queueLive(ws, projectPath, target)
-  const { open, entries, cards, testing, queued } = queueOrder(wf, target, live)
+  const { open, entries, cards, testing, queued } = queueOrder(wf, target, live, scope?.open)
   const lease = store.queueLease(target)
   // The cards in the queue again (queued or testing): their older returns aren't the panel's to show (HR3's #1356 round 3).
   const again = new Set([...open.map((o) => o.card.id), ...(testing ? [testing.card] : [])])
-  const outcomes = recentOutcomes(wf, target, entries, cards, (id) => store.card(id), store.queueSeen(), again, window ? testSize('CW_TEST_QUEUE_RETURNS', RETURNS_MAX) : RETURNS_MAX)
+  const outcomes = recentOutcomes(wf, target, entries, cards, store.queueSeen(), again, window ? testSize('CW_TEST_QUEUE_RETURNS', RETURNS_MAX) : RETURNS_MAX)
   const { returns, returnsMore } = outcomes
   const recent = historyOf(wf, target, outcomes.recent)
   const p = store.queuePause(target)
@@ -314,12 +316,10 @@ export function historyOf(wf: Workflow, target: string, recent: QueueRecent[]): 
  * exactly. Only rows the panel shows get seen, and it shows only `returns`, so kept rows never outnumber the bound and
  * nothing displaces them: the next unseen ones come as they fold (the window reads again then).
  */
-function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, cards: Set<number>, card: (id: number) => CardRecord, seen: Map<string, string>, again: Set<number>, bound: number, latest = RECENT_MAX): Pick<QueueView, 'recent' | 'returns' | 'returnsMore'> {
+function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, cards: Set<number>, seen: Map<string, string>, again: Set<number>, bound: number, latest = RECENT_MAX): Pick<QueueView, 'recent' | 'returns' | 'returnsMore'> {
   const out: (QueueRecent & { seq: number })[] = []
-  const named = (f: Fact) => {
-    const c = card(f.card)
-    return { card: c.id, key: c.key, title: c.title, at: f.at, seq: f.seq }
-  }
+  // HI-3169: each outcome's card named only if it is listed (below), all in one read: never the whole history's cards.
+  const named = (f: Fact) => ({ card: f.card, key: '', title: '', at: f.at, seq: f.seq })
   for (const f of wf.store.factsOfKind('Integrated')) { // i18n-ignore: a fact's kind, not text
     const d = f.data as FactData['Integrated']
     // A card of this queue merged into its target (by the queue, or seen merged outside it).
@@ -357,7 +357,14 @@ function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, card
   kept.sort((a, b) => (a.seen === b.seen ? newer(a, b) : a.seen! < b.seen! ? 1 : -1))
   const shownKept = kept.slice(0, bound)
   const slots = bound - shownKept.length
-  return { recent: out.slice(0, latest).map(strip), returns: [...shownKept, ...unseen.slice(0, slots)].map(strip), returnsMore: Math.max(0, unseen.length - slots) }
+  const recent = out.slice(0, latest)
+  const returns = [...shownKept, ...unseen.slice(0, slots)]
+  const names = wf.store.cardsNumbered([...recent, ...returns].map((r) => r.card))
+  const name = (r: QueueRecent & { seq: number }): QueueRecent => {
+    const c = names.get(r.card)
+    return { ...strip(r), key: c?.key ?? '', title: c?.title ?? '' }
+  }
+  return { recent: recent.map(name), returns: returns.map(name), returnsMore: Math.max(0, unseen.length - slots) }
 }
 
 /**
@@ -473,7 +480,7 @@ export async function queueHistory(ws: WorkspaceService, projectPath: string, ta
   const wf = await workflowFor(ws, projectPath)
   if (!wf) return []
   const { entries, cards } = queueOrder(wf, target, queueLive(ws, projectPath, target))
-  return recentOutcomes(wf, target, entries, cards, (id) => wf.store.card(id), wf.store.queueSeen(), new Set(), 0, HISTORY_MAX).recent
+  return recentOutcomes(wf, target, entries, cards, wf.store.queueSeen(), new Set(), 0, HISTORY_MAX).recent
 }
 
 /**
