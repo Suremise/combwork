@@ -171,6 +171,9 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
   const how = signingBox.locator('.git-signing-how')
   const howText = (await signingIs('needsSomeone')) ? await lib.until(async () => ((await how.count()) ? text(how) : null), HUNG_MS) : null
   check('HI-3110: a key that needs someone shows the SSH how-to, naming gpg.ssh.program as Windows’ ssh-keygen', !!howText && howText.includes('set gpg.ssh.program to C:/Windows/System32/OpenSSH/ssh-keygen.exe (Git for Windows’ own ssh-keygen can’t reach that agent).'), (await text(signingBox)) || '')
+  // An earlier step's notification (Added gh.) sits over the section's end: closed first.
+  for (const close of await page.locator('.toast .toast-close, .toast button[aria-label="Close"]').all()) await close.click().catch(() => undefined)
+  await lib.until(async () => (await page.locator('.toast').count()) === 0, HUNG_MS)
   await page.mouse.move(5, 5)
   for (const t of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme: t } })
