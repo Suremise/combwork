@@ -154,7 +154,7 @@ import { checkRepoTools } from './platform/repoPorts'
 import { gitCantRead, slotWorkspaces } from './platform/workspacePorts'
 import { opsAt, refuseUnoffered, repoOpHandlers } from './repoOpsIpc'
 import { nextVersionPlan, previewFor, startNextVersion } from './workflow/nextVersion'
-import { dismissOffer, releaseOffers } from './workflow/releaseOffer'
+import { checkOffer, dismissOffer, releaseOffers } from './workflow/releaseOffer'
 import { branchStartArg } from '../shared/nextVersion'
 import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resolveForward, resumeQueue, settleQueueChanges } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
@@ -1041,6 +1041,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'workflow:nextVersionPreview': (p, from, to) => previewFor(workspace, workspace.assertProject(p), String(from ?? ''), String(to ?? '')),
     'workflow:startNextVersion': (p, a) => startNextVersion(workspace, workspace.assertProject(p), { name: String(a?.name ?? ''), ...(branchStartArg(a?.from) ? { from: branchStartArg(a?.from)! } : {}), ...(a?.base ? { base: a.base } : {}), ...(typeof a?.offer === 'string' && a.offer ? { offer: a.offer.slice(0, 64) } : {}) }),
     'workflow:releaseOffers': () => releaseOffers(currentWorkspace()),
+    'workflow:releaseOfferCurrent': (p, id) => checkOffer(currentWorkspace(), workspace.assertProject(p), String(id ?? '')).then(() => true, () => false),
     'workflow:releaseOfferDismiss': async (p, id) => void (await dismissOffer(currentWorkspace(), workspace.assertProject(p), String(id ?? ''))),
     'workflow:setOptions': (p, change, opts) => setWorkflowOptions(workspace, workspace.assertProject(p), change, { applyTo: Array.isArray(opts?.applyTo) ? opts.applyTo.filter((n) => Number.isInteger(n)) : [], ...(typeof opts?.offer === 'string' && opts.offer ? { offer: opts.offer.slice(0, 64) } : {}) }),
     'workflow:stages': (p) => projectStages(workspace, workspace.assertProject(p)),

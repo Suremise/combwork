@@ -413,6 +413,8 @@ export interface CombworkRequests {
   'workflow:releaseOffers': () => ReleaseOffer[]
   /** HI-3155: Not now on a project's release offer `id` (its current one, else refused): hidden until it changes. */
   'workflow:releaseOfferDismiss': (projectPath: string, id: string) => void
+  /** HI-3155: whether offer `id` is still the project's, read afresh (the repository and the options now), before a button acts on it. */
+  'workflow:releaseOfferCurrent': (projectPath: string, id: string) => boolean
   /** The user's answer to the merge queue's question before an upgraded project's first merge (HI-1697, For you): its merge style and commit message saved, the request answered. */
   'workflow:chooseMerge': (projectPath: string, choice: { card: number; request: string; style: WorkflowOptions['style']; commitMessage: CommitMessage }) => void
   /**

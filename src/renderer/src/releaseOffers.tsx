@@ -54,10 +54,9 @@ export function releaseOfferText(o: ReleaseOffer): string {
   return parts.join(' ')
 }
 
-/** Still the current offer (read again first): else said, and the offers shown as they are now. */
+/** Still the current offer (read afresh by main): else said, and the offers shown as they are now. */
 async function stillCurrent(o: ReleaseOffer): Promise<boolean> {
-  const got = await call('workflow:releaseOffers').catch(() => null)
-  const ok = !!got?.some((x) => x.id === o.id)
+  const ok = await call('workflow:releaseOfferCurrent', o.projectPath, o.id).catch(() => false)
   if (!ok) {
     notify('warning', tr(M.stale))
     await loadReleaseOffers()

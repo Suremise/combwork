@@ -16,7 +16,6 @@ import { CW_DIR } from '../../shared/defaults'
 import { nextVersionName } from '../../shared/nextVersion'
 import type { ReleaseOffer, ReleaseOfferPart } from '../../shared/types'
 import { msg } from '../../shared/i18n'
-import { sameBasis } from '../../shared/releaseOffer'
 import { combworkError } from '../combworkError'
 import { boardValue, boardWrite, setBoardValue } from '../boardStore'
 import { emit, onCombworkEvent } from '../events'
@@ -29,6 +28,7 @@ import { isUnknown } from '../platform/types'
 import { openWorkspaces, WorkspaceService } from '../workspace'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import { projectTargets } from './targets'
+import { resolvedOf } from './rulesets'
 import { referencesTo, slotUses } from './retarget'
 import { releaseOfferSaid } from './releaseOfferText'
 
@@ -112,17 +112,21 @@ export function dismissedOffer(ws: WorkspaceService, projectPath: string): strin
 const STALE = msg({ id: 'service.releaseOffer.stale', defaultMessage: 'The release offer for {project} has changed since it was shown, so nothing was changed. Look at it again.', description: 'HI-3155: an action on a release offer (Move…, Start…, Not now, or the Assistant’s answer) refused: the project’s Work merges into or Other branches work can merge into, or what is released, changed after the offer was shown. {project}: the project’s name.' })
 
 /**
- * HI-3155: an action on offer `id` (a save from Move…, Start the next version from Start…, the Assistant's setting
- * change): refused, nothing changed, unless it is the project's current offer and the options are still the ones it was
- * made on. Called by those actions under their own locks (the repository's, the turn of workflow writes), where the
- * options can't change.
+ * HI-3155: an action on offer `id` (a save from Move… or Remove…, Start the next version from Start…, the Assistant's
+ * setting change, Not now): refused, nothing changed, unless the offer read afresh now is that one. Read from the
+ * repository and the options as they are (HR2's round 1: never the followed copy, which a tag made meanwhile leaves
+ * behind until its next look): the release, the next version, the uses and the options all go into its id. Unknown
+ * refuses too. Called by those actions under their own locks (the repository's, the turn of workflow writes), where the
+ * options can't change. The followed copy is read again after (`lookAgain`).
  */
 export async function checkOffer(ws: WorkspaceService, projectPath: string, id: string): Promise<ReleaseOffer> {
-  const cur = currentOffer(ws, projectPath)
-  const t = await projectTargets(ws, projectPath).catch(() => null)
-  const name = cur?.project ?? basename(projectPath)
-  if (!cur || cur.id !== id || !t || !sameBasis(cur, { target: t.default, otherTargets: t.others })) throw combworkError(STALE, { project: name }, { kind: 'conflict' })
-  return cur
+  const name = currentOffer(ws, projectPath)?.project ?? basename(projectPath)
+  const fresh = await offerFor(ws, projectPath, name).catch(() => null)
+  if (!fresh || fresh.id !== id) {
+    lookAgain(projectPath)
+    throw combworkError(STALE, { project: name }, { kind: 'conflict' })
+  }
+  return fresh
 }
 
 /**
@@ -130,9 +134,9 @@ export async function checkOffer(ws: WorkspaceService, projectPath: string, id: 
  * it replaced, for the Assistant's undo (`undoDismiss`).
  */
 export async function dismissOffer(ws: WorkspaceService, projectPath: string, id: string): Promise<string | null> {
+  // The offer as it is now (as every action on it), then the dismissal in the board's write.
+  await checkOffer(ws, projectPath, id)
   const was = await boardWrite(ws, async () => {
-    const cur = currentOffer(ws, projectPath)
-    if (!cur || cur.id !== id) throw combworkError(STALE, { project: cur?.project ?? basename(projectPath) }, { kind: 'conflict' })
     const before = dismissedOffer(ws, projectPath)
     setBoardValue(ws, dismissKey(ws, projectPath), id)
     return before
@@ -170,6 +174,8 @@ interface Followed {
   offer: ReleaseOffer | null
   /** The offer id last told to the Assistant (one per project: bounded). */
   delivered: string | null
+  /** Not before this (ms), a due project's next full read (once a tick while its key is unreadable). */
+  nextTry: number
   /** The checkers per line, made once each. */
   checkers: Map<string, (() => string | null) | null>
 }
@@ -178,7 +184,14 @@ const followed = new Map<string, Followed>()
 const keyOf = (path: string): string => path.toLowerCase()
 
 /** For tests: how many full reads each project had (by path, lower-cased). */
-export const releaseOfferTestHooks: { reads: Map<string, number> } = { reads: new Map() }
+export const releaseOfferTestHooks: { reads: Map<string, number>; look: (projectPath: string) => void } = {
+  reads: new Map(),
+  // An ordinary look (not forced): its key first, a full read only when it moved or is due.
+  look: (projectPath) => {
+    const f = followed.get(keyOf(projectPath))
+    if (f) look(f)
+  }
+}
 
 /** The project's current offer, dismissed or not (null: none, or not followed). */
 export function currentOffer(ws: WorkspaceService, projectPath: string): ReleaseOffer | null {
@@ -197,17 +210,26 @@ export function releaseOffers(ws: WorkspaceService): ReleaseOffer[] {
 }
 
 /**
- * What the offer rests on now, cheaply (no process): the platform and the options' targets, the refs of G7, of its next
- * version and of each G7b, and the uses' generation. Null when a checker can't be made or answers unknown (due).
+ * What the offer rests on now, cheaply (no process: project.json and the port's `watch` checkers, which read files): the
+ * platform and the options' targets as saved, the refs of G7, of its next version and of each G7b, and the uses'
+ * generation. Null when a checker can't be made or answers unknown (due: read again at the next tick, never at once).
+ * An empty G7 is the default line, which is never released (nothing is released into itself): no refs of its own.
  */
 async function admissionKey(f: Followed): Promise<string | null> {
-  const t = await projectTargets(f.ws, f.path).catch(() => null)
+  const cfg = await f.ws.projectConfig(f.path).catch(() => null)
   const reads = releaseReadsOf(f.platform)
-  if (!t || !reads) return JSON.stringify({ none: true, platform: f.platform })
-  const lines = [t.default, nextVersionName(t.default), ...t.others].filter((x): x is string => !!x)
+  if (!cfg || !reads) return JSON.stringify({ none: true, platform: f.platform })
+  const o = resolvedOf(f.ws, f.path, f.platform, cfg).options
+  const target = o.target || ''
+  const others = [...(o.otherTargets ?? [])]
+  const lines = [target, nextVersionName(target), ...others].filter((x): x is string => !!x)
   const refs: (string | null)[] = []
   for (const line of lines) {
-    if (!f.checkers.has(line)) f.checkers.set(line, await reads.watch(f.path, line).catch(() => null))
+    // A checker that couldn't be made isn't kept: made again at the next look.
+    if (!f.checkers.get(line)) {
+      const made = await reads.watch(f.path, line).catch(() => null)
+      if (made) f.checkers.set(line, made)
+    }
     const c = f.checkers.get(line)
     let v: string | null = null
     try {
@@ -218,7 +240,7 @@ async function admissionKey(f: Followed): Promise<string | null> {
     if (v === null) return null
     refs.push(v)
   }
-  return JSON.stringify({ platform: f.platform, target: t.default, others: t.others, refs, uses: f.usesGen })
+  return JSON.stringify({ platform: f.platform, target, others, refs, uses: f.usesGen })
 }
 
 /** Looks at the project again: its key, and a full read when the key moved or it is due. One at a time, coalesced. */
@@ -232,6 +254,9 @@ function look(f: Followed, force = false): void {
     const key = await admissionKey(f)
     if (!f.alive()) return
     if (!force && key !== null && key === f.readOn) return
+    // Due but unreadable (no checker, an unknown answer, an unknown read before): read again at most once a tick.
+    if (!force && (key === null || f.readOn === null) && Date.now() < f.nextTry) return
+    f.nextTry = Date.now() + releaseOfferTiming.tickMs
     releaseOfferTestHooks.reads.set(keyOf(f.path), (releaseOfferTestHooks.reads.get(keyOf(f.path)) ?? 0) + 1)
     let offer: ReleaseOffer | null
     try {
@@ -246,12 +271,14 @@ function look(f: Followed, force = false): void {
     // What it read may have moved while it read: published only when the key is still the one it started on.
     const after = await admissionKey(f)
     if (!f.alive()) return
-    if (after === null || after !== key) {
+    // Moved while it read: looked at again (its key now differs, so once). Still unreadable: kept as read, due at the
+    // next tick (every action reads the offer afresh anyway, `checkOffer`), never looked at again at once.
+    if (after !== null && after !== key) {
       f.readOn = null
       f.again = true
       return
     }
-    f.readOn = key
+    f.readOn = after
     publish(f, offer)
   })()
     .catch((e) => log.warn('release offer', e))
@@ -303,7 +330,7 @@ function follow(): void {
     if (!releaseReadsOf(n.platform)) continue
     const life = n.ws.lifetime
     const wsPath = n.ws.path
-    const f: Followed = { ...n, alive: () => !life.aborted && n.ws.lifetime === life && n.ws.path === wsPath, watch: { dispose: () => undefined }, readOn: null, usesGen: 0, running: null, again: false, offer: null, delivered: null, checkers: new Map() }
+    const f: Followed = { ...n, alive: () => !life.aborted && n.ws.lifetime === life && n.ws.path === wsPath, watch: { dispose: () => undefined }, readOn: null, usesGen: 0, running: null, again: false, offer: null, delivered: null, nextTry: 0, checkers: new Map() }
     f.watch = observePort.subscribe(n.path, (e) => {
       if (e.kind === 'lineMoved') look(f)
     })
@@ -351,14 +378,20 @@ export function startReleaseOffers(): void {
     for (const [k, f] of followed) if (f.ws.path?.toLowerCase() === path.toLowerCase()) drop(k)
   }
   WorkspaceService.closingListeners.add(closing)
-  const tick = setInterval(() => {
-    for (const f of followed.values()) look(f)
-  }, releaseOfferTiming.tickMs)
-  tick.unref?.()
+  // Each tick armed with the timing as it is then.
+  let tick: ReturnType<typeof setTimeout> | null = null
+  const arm = (): void => {
+    tick = setTimeout(() => {
+      for (const f of followed.values()) look(f)
+      arm()
+    }, releaseOfferTiming.tickMs)
+    tick.unref?.()
+  }
+  arm()
   follow()
   stop = () => {
     off()
-    clearInterval(tick)
+    if (tick) clearTimeout(tick)
     WorkspaceService.closingListeners.delete(closing)
     for (const k of [...followed.keys()]) drop(k)
   }

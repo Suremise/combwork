@@ -14,7 +14,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
 // The real Git reads, with a switch making `released` unknown (an unreadable repository, for the recovery case).
-const flaky = vi.hoisted(() => ({ unknown: false }))
+const flaky = vi.hoisted(() => ({ unknown: false, watchNull: false }))
 vi.mock('../src/main/platform/releaseReadsPorts', async (orig) => {
   const real = await orig<typeof import('../src/main/platform/releaseReadsPorts')>()
   return {
@@ -22,7 +22,7 @@ vi.mock('../src/main/platform/releaseReadsPorts', async (orig) => {
     releaseReadsOf: (p: Parameters<typeof real.releaseReadsOf>[0]) => {
       const r = real.releaseReadsOf(p)
       if (!r) return r
-      return { ...r, released: async (path: string, line: string) => (flaky.unknown ? { unknown: true, what: 'stubbed', whatText: undefined } : r.released(path, line)) }
+      return { ...r, released: async (path: string, line: string) => (flaky.unknown ? { unknown: true, what: 'stubbed', whatText: undefined } : r.released(path, line)), watch: async (path: string, line: string) => (flaky.watchNull ? null : r.watch(path, line)) }
     }
   }
 })
@@ -54,6 +54,7 @@ afterAll(async () => {
 })
 afterEach(() => {
   flaky.unknown = false
+  flaky.watchNull = false
 })
 
 const git = (cwd: string, ...args: string[]): string => execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.invalid', ...args], { cwd, stdio: 'pipe', encoding: 'utf8' }).trim()
@@ -230,5 +231,59 @@ describe('acting on a release offer (HI-3155)', () => {
     // The current offer, B: applied.
     await inWorkspace(w, () => applySetting(target, '1.5.0', repo, undefined, undefined, b.id))
     expect((await workflowForm(w, repo)).options.target).toBe('1.5.0')
+  })
+
+  it('HR2’s round 1: a release made with the options unchanged refuses every action on the old offer at once, nothing written', async () => {
+    const { w, repo } = await project()
+    const a = (await offerSoon(w, repo, (o) => o?.move?.moveTo === '1.5.0'))!
+    // 1.5.0 (its head already in main) tagged now: released, before any look of the follower's.
+    git(repo, 'tag', '-a', 'v1.5.0', '-m', 'release 1.5.0', '1.5.0')
+    const target = entryOf('project.workflow.target')
+    const err = await inWorkspace(w, () => applySetting(target, '1.5.0', repo, undefined, undefined, a.id)).catch((e) => e)
+    expect((err as InstanceType<typeof SettingRefused>).status).toBe(409)
+    const f = await workflowForm(w, repo)
+    await expect(setWorkflowOptions(w, repo, { preset: f.preset, options: { ...f.own, ...offerOptions(a) }, base: { preset: f.preset, options: f.own } }, { offer: a.id })).rejects.toThrow(/changed since it was shown/)
+    await expect(dismissOffer(w, repo, a.id)).rejects.toThrow(/changed since it was shown/)
+    expect((await workflowForm(w, repo)).options.target).toBe('1.4.0')
+    expect(dismissedOffer(w, repo)).toBeNull()
+  })
+
+  it('a use changed with the options unchanged: Start the next version from the old offer refused, no branch made; an unknown read refuses too', async () => {
+    const { w, repo } = await project({ noNext: true })
+    const a = (await offerSoon(w, repo, (o) => o?.move?.startNext === '1.5.0'))!
+    await inWorkspace(w, () => tasks.createTask({ title: 'On 1.3.0', project: 'p', target: '1.3.0' }, user))
+    await expect(startNextVersion(w, repo, { name: '1.5.0', offer: a.id })).rejects.toThrow(/changed since it was shown/)
+    expect(git(repo, 'branch', '--list', '1.5.0')).toBe('')
+    const b = (await offerSoon(w, repo, (o) => !!o?.cleanup?.kept.length))!
+    flaky.unknown = true
+    const err = await inWorkspace(w, () => applySetting(entryOf('project.workflow.otherTargets'), [], repo, undefined, undefined, b.id)).catch((e) => e)
+    expect((err as InstanceType<typeof SettingRefused>).status).toBe(409)
+  })
+})
+
+describe('a release offer whose refs can’t be watched (HR2’s round 1)', () => {
+  it('reads at most once a tick, never in a loop; once watchable, its checkers are made and the key holds', async () => {
+    releaseOfferTiming.tickMs = 60_000
+    flaky.watchNull = true
+    const { w, repo } = await project()
+    // Its first read (made once, at once); then nothing more for a while, whatever the follower is told.
+    const until = Date.now() + 2000
+    while (Date.now() < until) {
+      releaseOfferTestHooks.look(repo)
+      await new Promise((r) => setTimeout(r, 100))
+    }
+    expect(readsOf(repo)).toBe(1)
+    expect(currentOffer(w, repo)?.move?.moveTo).toBe('1.5.0')
+    // Watchable again: forced once (as a workflow change would), its checkers made; an ordinary look then reads nothing.
+    flaky.watchNull = false
+    lookAgain(repo)
+    const end = Date.now() + 20_000
+    while (readsOf(repo) < 2 && Date.now() < end) await new Promise((r) => setTimeout(r, 50))
+    const now = readsOf(repo)
+    for (let i = 0; i < 5; i++) {
+      releaseOfferTestHooks.look(repo)
+      await new Promise((r) => setTimeout(r, 100))
+    }
+    expect(readsOf(repo)).toBe(now)
   })
 })
