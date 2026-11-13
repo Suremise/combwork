@@ -906,6 +906,19 @@
       "on": "plain"
     }
   },
+  "workflow.refused.platform.slotLeft.message": {
+    "placeholders": {
+      "unknown": "select",
+      "card": "plain",
+      "slot": "plain",
+      "folder": "plain"
+    }
+  },
+  "workflow.refused.platform.slotLeft.next": {
+    "placeholders": {
+      "unknown": "select"
+    }
+  },
   "workflow.refused.platform.switching.message": {
     "placeholders": {
       "card": "plain"

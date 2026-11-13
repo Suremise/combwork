@@ -64,7 +64,7 @@ import { getTask } from './tasks'
 import { CombworkError } from './combworkError'
 import { onAction } from './workflow/actionWorker'
 import { agentBusy } from './workflow/lineUpdates'
-import { withoutWriteFence, type CardRecord } from './workflow/factStore'
+import { leaseHoldsIn, withoutWriteFence, type CardRecord } from './workflow/factStore'
 import type { SlotForStart, Workflow } from './workflow/runtime'
 import { agentRunsGoing, setJjCards, setSlotStarts, workflowEnforced, workflowFor, ENFORCE } from './workflow/service'
 import { jjCardsFor } from './jjCards'
@@ -775,6 +775,53 @@ function uses(wf: Workflow, l: SlotLease): boolean {
   return s.started?.lease === l.id && KEEPS.has(s.stage)
 }
 
+/**
+ * HI-3118: whether a card's started lease still holds its slot for it (factStore's leaseHoldsIn, on the board's database
+ * the pool's leases are in); null when it can't be read. The submit's own question, through SlotStarts.held.
+ */
+function slotHeldFor(ws: WorkspaceService, _project: string, lease: string, slot: string, folder: string, card: number): boolean | null {
+  try {
+    return boardRead(ws, (db) => leaseHoldsIn(db, lease, slot, folder, card))
+  } catch {
+    return null
+  }
+}
+
+/** Lane leases whose ambiguous end (HI-3118) was logged once already. */
+const ambiguousSaid = new Set<string>()
+
+/**
+ * Whether a lane is over, and its cards whose current cycle runs on its lease (HI-3118), read in the lease's release
+ * write: the lane's row (none: gone, so over), and every card started on that lease whose cycle keeps it now (its Started
+ * cycle's lease that one, its stage one that keeps a slot), whoever it is given to now. Null when it can't be read.
+ */
+export function laneOverIn(db: DatabaseSync, wf: Workflow, lane: string, lease: string): { over: boolean; cards: number[] } | null {
+  try {
+    const row = db.prepare('SELECT state FROM lanes WHERE id = ?').get(lane) as { state: string } | undefined // i18n-ignore: SQL
+    if (row?.state === 'active') return { over: false, cards: [] }
+    const kind = 'Started' as const // i18n-ignore: a fact kind, not text
+    const started = new Set(wf.store.factsOfKind(kind).filter((f) => (f.data as StartedData).lease === lease).map((f) => f.card))
+    const cards: number[] = []
+    for (const n of started) {
+      // Read for real, never cardOf (which takes any failure for "no card"): a card that can't be read keeps the lease
+      // (HR2's round 1: an unreadable live card released its slot). Only a card the board has no row of is absent.
+      let card: ReturnType<Workflow['store']['card']>
+      try {
+        card = wf.store.card(n)
+      } catch (e) {
+        if (!db.prepare('SELECT 1 FROM cards WHERE number = ?').get(n)) continue // i18n-ignore: SQL
+        throw e
+      }
+      const s = wf.state(card)
+      if (s.started?.lease === lease && KEEPS.has(s.stage)) cards.push(n)
+    }
+    return { over: true, cards }
+  } catch (e) {
+    log.warn(`lane ${lane}'s end couldn't read its cards on ${lease}: ${userText(e instanceof Error ? e.message : String(e))}`)
+    return null
+  }
+}
+
 // --- The window's Start hands its prompt to the placement.
 
 /** Window Starts handing their card's prompt to the slot's placement (startTask), by project and card. */
@@ -1159,12 +1206,17 @@ async function settleOnce(ws: WorkspaceService, projectPath: string, life: Abort
       if (await pool.release(l.id, stage === 'done' ? 'done' : 'putBack', () => !uses(wf, l))) log.info(`#${l.card}'s lease ${l.id} on ${userText(l.slot)} ended (${stage ?? 'gone'})`)
     } else if (l.kind === 'lane' && l.lane) {
       const lane = lanes.get(l.lane)
-      const over = (): boolean => {
-        const now = lanes.get(l.lane!)
-        return !now || now.state !== 'active'
+      if (lane && lane.state === 'active') continue
+      // HI-3118: decided in the release's own write, from the lane's row and the cards' cycles there: a card of it still
+      // in flight on this lease keeps the slot (the lease becomes its own), else the lease ends.
+      const r = await pool.releaseLane(l.id, lane?.state === 'abandoned' ? 'laneAbandoned' : 'laneEnded', (db, id) => laneOverIn(db, wf, id, l.id))
+      if (!r) continue
+      if ('ended' in r) log.info(`Lane ${l.lane} ended: its lease ${l.id} on ${userText(l.slot)} ended`)
+      else if ('card' in r) log.info(`Lane ${l.lane} ended with #${r.card.card} in flight: its lease ${l.id} on ${userText(l.slot)} is that card's now`)
+      else if (!ambiguousSaid.has(l.id)) {
+        ambiguousSaid.add(l.id)
+        log.warn(`Lane ${l.lane} ended with ${r.ambiguous.map((n) => `#${n}`).join(', ')} all started on its lease ${l.id} on ${userText(l.slot)}: the slot stays protected until one of them leaves it`)
       }
-      if (!over()) continue
-      if (await pool.release(l.id, lane?.state === 'abandoned' ? 'laneAbandoned' : 'laneEnded', over)) log.info(`Lane ${l.lane} ended: its lease ${l.id} on ${userText(l.slot)} ended`)
     } else if (l.kind === 'carried') {
       // An adopted worktree (#1441) kept for the lane or card in flight at the upgrade: released once that has ended (its
       // lane over, its card Done or put back). One kept for nothing stays (a handoff, or the user, ends it).
@@ -2184,7 +2236,7 @@ export function startSlotCards(): void {
   }
   onAction('prepareSlot', (a, ws) => ask(a.card, ws))
   onAction('releaseSlot', (a, ws) => ask(a.card, ws))
-  setSlotStarts({ leaseFor: (ws, project, card, builder, o) => leaseForStart(ws, project, card, builder, o), unused: slotUnused, standIn, keptAcross: async (ws, project, card) => (await poolFor(ws, project)).keptAcross(card) })
+  setSlotStarts({ leaseFor: (ws, project, card, builder, o) => leaseForStart(ws, project, card, builder, o), unused: slotUnused, standIn, keptAcross: async (ws, project, card) => (await poolFor(ws, project)).keptAcross(card), held: (ws, project, lease, slot, folder, card) => slotHeldFor(ws, project, lease, slot, folder, card) })
   // jj's card work's dependencies (HI-2868), for each project's workflow.
   setJjCards(jjCardsFor)
   // The pool's size: the project's builders (#1430's roles: builders and either), at least one (slots.ts).

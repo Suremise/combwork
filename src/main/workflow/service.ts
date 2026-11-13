@@ -86,6 +86,11 @@ export interface SlotStarts {
    * the upgrade, or its card then in flight) goes on, so those finish where they started (the stand-in path).
    */
   standIn?: (ws: WorkspaceService, project: string, agent: string) => Promise<{ path: string; base: string | null } | null>
+  /**
+   * HI-3118: whether the lease a card's cycle started on still holds its slot for it, from the same pool `leaseFor` lends
+   * from (null: can't be read). Left out, a submit doesn't ask.
+   */
+  held?: (ws: WorkspaceService, project: string, lease: string, slot: string, folder: string, card: number) => boolean | null
 }
 let slotStarts: SlotStarts | null = null
 export function setSlotStarts(s: SlotStarts | null): void {
@@ -214,6 +219,8 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // Slots (#1438, SPEC §16.10): the card's builder's slot, lent by slotCards.ts (none set: no slots).
     slotFor: (card, builder, o) => slotStarts?.leaseFor(ws, project.path, card, builder, o) ?? Promise.resolve(null),
     slotUnused: (lease) => slotStarts?.unused(ws, project.path, lease) ?? Promise.resolve(),
+    // HI-3118: a submit from a slot asks whether its lease still holds it for the card, of the pool that lent it.
+    slotHeld: (lease, slot, folder, card) => (slotStarts?.held ? slotStarts.held(ws, project.path, lease, slot, folder, card) : true),
     keptAcross: (card) => slotStarts?.keptAcross?.(ws, project.path, card.id) ?? Promise.resolve(null),
     // HI-2944: a start's warning of its target's uncommitted changes, in the project's window too.
     targetChanges: (changes) => noticeTargetChanges(ws, project.path, changes),

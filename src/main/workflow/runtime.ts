@@ -216,6 +216,12 @@ export interface WorkflowConfig {
   keptAcross?: (card: CardRecord) => Promise<KeptAcross | null>
   /** A lease lent for a start that wasn't written (refused, or undone): given back. */
   slotUnused?: (lease: string) => Promise<void>
+  /**
+   * HI-3118: whether the lease a card's cycle started on still holds its slot for it (FactStore.leaseHolds: open, that
+   * slot at that folder, the card's own or a lane's listing it); null when it can't be read. The app's; left out (tests
+   * of a slot made by hand), a submit doesn't ask.
+   */
+  slotHeld?: (lease: string, slot: string, folder: string, card: number) => boolean | null
   /** HI-2944: a start found its target's folder with uncommitted changes (warned, never refused): the app tells the window. */
   targetChanges?: (changes: TargetChanges, card: string) => void
   /** jj's card work's dependencies (HI-2868, the app's jjCards.ts): absent where jj's adapter answers nothing. */
@@ -3472,8 +3478,13 @@ export class Workflow {
         const l = this.lane(card.lane)
         if (!l || l.ended) return
         const cards = l.pending ?? l.cards
-        // A card given to another agent (HI-3117, HI-1821) isn't the lane's to wait for, as lanes.ts's allDone reads it.
-        if (!cards.every((c) => this.laneDone(c) || !this.laneOwn(l.id, c))) return
+        // A card given to another agent (HI-3117) isn't the lane's to wait for, as lanes.ts's allDone reads it; one given to
+        // none that a newer lane lists still is (HI-3118).
+        const givenAway = (c: number): boolean => {
+          const agent = this.store.cardAgent(c)
+          return !!agent && agent !== this.store.laneBuilder(l.id)
+        }
+        if (!cards.every((c) => this.laneDone(c) || givenAway(c))) return
         const results = cards.map((c) => this.state(c).integrated?.result ?? null)
         this.saveLane({ ...l, ended: true, current: null })
         this.store.deliver({ action: id, kind: 'laneEnded', target: l.id, payload: { results } })

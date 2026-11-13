@@ -189,7 +189,8 @@ export const laneBuilds = (lanes: readonly Pick<LaneRecord, 'state' | 'project' 
 export function laneCard(n: number, card: TaskCard | null, of?: { lane: string; builder: string; owner?: string | null }): LaneCard {
   if (!card) return { number: n, title: '', column: 'gone', blocked: null, round: 1, reviewing: false }
   const elsewhere = !of || card.column === 'done' ? null : card.agent ? (card.agent !== of.builder ? card.agent : null) : of.owner && of.owner !== of.lane ? of.owner : null
-  return { number: n, title: card.title, column: card.column, blocked: card.blocked || null, round: card.history.filter((h) => VERDICT_FAILED.test(h.what)).length + 1, reviewing: !!card.review, ...(elsewhere ? { elsewhere } : {}) }
+  const givenAway = !!elsewhere && !!card.agent && elsewhere === card.agent
+  return { number: n, title: card.title, column: card.column, blocked: card.blocked || null, round: card.history.filter((h) => VERDICT_FAILED.test(h.what)).length + 1, reviewing: !!card.review, ...(elsewhere ? { elsewhere } : {}), ...(givenAway ? { givenAway: true as const } : {}) }
 }
 
 /** Whether a lane's card is finished for the loop: passed review, merged, or gone. */
@@ -534,6 +535,8 @@ const L = {
   carryOn: agentMsg({ id: 'lane.next.carryOn', text: 'Carry on with {card}{also}.', note: 'cw_lane next: the card in flight (Doing or Review) to carry on; {card} is its key and title; {also} is " (why the lane waits)" or nothing.' }),
   carryOnIn: agentMsg({ id: 'lane.next.carryOnIn', text: 'Carry on with {card} in {slot}{also}.', note: 'cw_lane next: the card in flight to carry on, in the slot its lane builds in (#1438); {also} as in lane.next.carryOn.' }),
   afterQueue: agentMsg({ id: 'lane.next.afterQueue', text: 'Next: {card}, once {n, plural, one {it is} other {they are}} Done.', note: "cw_lane next, after its passed cards' places in the merge queue (#1354): the next card waits for them to be Done (one card at a time); {n} is how many." }),
+  reviewNext: agentMsg({ id: 'lane.next.reviewNext', text: '{card} waits for your review (lane {lane}): review it.', note: "cw_lane next (HI-3118), for an agent that reviews a running lane and builds none: the first card of its lanes in Review. {card} is its key and title." }),
+  reviewNone: agentMsg({ id: 'lane.next.reviewNone', text: 'No card of your lanes waits for your review now: end your turn; Combwork wakes you when one is submitted.', note: 'cw_lane next (HI-3118), for an agent that reviews a running lane and builds none, with no card of its lanes in Review.' }),
   start: agentMsg({ id: 'lane.next.start', text: 'Next: {card}. Start it.', note: 'cw_lane next: the card to start next; {card} is its key and title.' }),
   startIn: agentMsg({ id: 'lane.next.startIn', text: 'Next: {card}. Start it: it is built in {slot}, on a new branch Combwork makes there.', note: "cw_lane next: the card to start next, built in the lane's slot (#1438), where Combwork makes its line as it starts." }),
   cardsNone: agentMsg({ id: 'lane.args.cardsNone', text: 'cards must be the card numbers, in order (at least one)', note: "cw_lane start's refusal of its cards argument: none given, or not a list." }),
@@ -601,10 +604,11 @@ export function laneStatusText(s: LaneStatus): string {
 
 /**
  * Whether a lane has no card of its own left to do, so it ends: each card merged (Done), gone (archived, deleted, moved
- * to another project) or held elsewhere (HI-3117: given to another agent, HI-1821). A lane whose cards are all gone
- * ends too, rather than holding its builder and slot with nothing to do.
+ * to another project) or given to another agent (HI-3117). A card given to none that a newer lane lists (held elsewhere
+ * by HI-1821) still keeps it running (HI-3118: a lane is never ended because another lists its cards). A lane whose
+ * cards are all gone ends too, rather than holding its builder and slot with nothing to do.
  */
-export const allDone = (cards: readonly LaneCard[]): boolean => cards.every((c) => c.column === 'done' || c.column === 'gone' || !!c.elsewhere)
+export const allDone = (cards: readonly LaneCard[]): boolean => cards.every((c) => c.column === 'done' || c.column === 'gone' || !!c.givenAway)
 
 /**
  * The lanes listed (the window's panel, the Agent API without `all`): running ones, and ended ones until their builder
@@ -786,7 +790,9 @@ export function laneEndText(l: LaneInfo & { note?: string }): string {
  * `queue`: the lane's passed cards Combwork merges, each with where it is in the merge queue (#1354): the lane takes one card
  * at a time, so the next waits for them to be Done.
  */
-export function laneNextText(r: { lane: LaneInfo; next: { card: number; title: string; carryOn: boolean } | null; waits: LaneStatus | null; queue?: { card: number; line: string }[]; unsubmitted?: UnsubmittedCard[] }): string {
+export function laneNextText(r: { lane: LaneInfo; next: { card: number; title: string; carryOn: boolean } | null; waits: LaneStatus | null; queue?: { card: number; line: string }[]; unsubmitted?: UnsubmittedCard[]; review?: { card: number; title: string } | null }): string {
+  // An agent that only reviews (HI-3118): a reviewer's answer, never a card to start.
+  if (r.review !== undefined) return r.review ? say(L.reviewNext, { card: `${cardRef(r.review.card)} ${r.review.title}`, lane: r.lane.id }) : say(L.reviewNone)
   if (r.lane.state === 'paused' && r.waits) return say(L.nextWaits, { why: laneStatusText(r.waits) })
   // Each passed card's place in the merge queue (#1354): its key, then the queue's own line.
   const queued = r.queue?.length ? r.queue.map((q) => `${cardRef(q.card)}: ${q.line}`).join(' ') : ''

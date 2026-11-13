@@ -365,6 +365,8 @@
   "workflow.refused.platform.targetGone.next": "ユーザーまたはAssistantが、作業をそのままにして別のブランチへ移せます。カードの「マージ先」を設定するか、「マージ先」を移し替えてください。",
   "workflow.refused.platform.offLine.message": "{card} のフォルダーはブランチ {line} 上にありません（{where, select, detached {HEAD が {head} でデタッチされています} other {{on} 上にあります}}）。そのため、そこにある作業はカードがマージする内容ではありません。",
   "workflow.refused.platform.offLine.next": "{where, select, detached {コミットをカードのブランチに載せてください。ブランチがまだなければ git switch -c {line}、あれば git switch {line} のうえで、ブランチ外で作ったコミットを git cherry-pick します。その後、もう一度提出してください。} other {git switch {line} で戻り、{on} 上で作ったカードのコミットをそこで git cherry-pick してください。その後、もう一度提出してください。}}",
+  "workflow.refused.platform.slotLeft.message": "{unknown, select, yes {スロット {slot}（{folder}）がまだ{card}のものかどうか Combwork が判断できなかったため、提出されませんでした。} other {スロット {slot}（{folder}）はもう{card}のものではありません。Combwork がそこでの貸し出しを終えたため、そのフォルダーの作業は今は別のカードのものかもしれません。}}",
+  "workflow.refused.platform.slotLeft.next": "{unknown, select, yes {少し待ってからもう一度試してください。} other {カードを戻してから、もう一度開始してください。専用のスロットが割り当てられ、スロットが保持されていればコミット済みの作業も引き継がれます。}}",
   "workflow.refused.platform.unknown.nextGone": "{reader, select, you {プロジェクトのGitリポジトリが見つかりません。復元するか、「バージョン管理」タブでプロジェクトを「なし」に切り替えてください（次のカードから適用）。} other {プロジェクトのGitリポジトリが見つかりません。ユーザーに復元を依頼するか、「バージョン管理」タブでプロジェクトを「なし」に切り替えるよう依頼してください（次のカードから適用）。}}",
   "workflow.refused.queue.advancing.message": "{card}は今{target}にマージされています。もうマージキューから外せません。",
   "workflow.refused.queue.advancing.next": "マージが終わるまで待ってください。変更が不要なら、{target}で元に戻してください。",

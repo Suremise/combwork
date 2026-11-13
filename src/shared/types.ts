@@ -4400,6 +4400,11 @@ export interface LaneCard {
    * builder has it, else the newest). Its lane shows it but never takes it, waits on it or keys a queued list change to it.
    */
   elsewhere?: string
+  /**
+   * HI-3118: held elsewhere because it is given to another agent than the lane's builder (not merely listed by a newer
+   * lane): the lane has given it up, so it doesn't keep the lane from ending (allDone).
+   */
+  givenAway?: true
 }
 
 export interface LaneInfo {

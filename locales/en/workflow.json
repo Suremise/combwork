@@ -1503,6 +1503,14 @@
     "defaultMessage": "{where, select, detached {Put the commits on the card's branch: git switch -c {line} if it doesn't exist yet, else git switch {line} and git cherry-pick the commits made off it. Then submit again.} other {Switch back with git switch {line}, and git cherry-pick there any commits of the card's made on {on}. Then submit again.}}",
     "description": "HI-3010: the next step after a submit refused because the card’s folder isn’t on its branch, by where it is (where, select: a detached head, or another branch). git switch -c, git switch and git cherry-pick are commands: keep them as they are. {line} and {on} are branch names."
   },
+  "workflow.refused.platform.slotLeft.message": {
+    "defaultMessage": "{unknown, select, yes {Combwork couldn't tell whether {card}'s slot {slot} ({folder}) is still the card's, so it wasn't submitted.} other {{card}'s slot {slot} ({folder}) isn't the card's any more: Combwork ended its lease there, so the work in that folder may be another card's now.}}",
+    "description": "HI-3118: a refused submit: the card was started in a slot (a working folder Combwork lends to one card or lane at a time), and Combwork no longer holds that slot for it (its lane ended, say), so the folder may have been lent to another card since. unknown yes: whether it still holds it couldn't be read. {card} is a card key like AM-12; {slot} a slot's name like slot-a; {folder} its path. Translate each branch of the select."
+  },
+  "workflow.refused.platform.slotLeft.next": {
+    "defaultMessage": "{unknown, select, yes {Try again in a moment.} other {Put the card back and start it again: it gets a slot of its own, with its committed work if the slot was kept for it.}}",
+    "description": "HI-3118: the next step after a submit refused because the card’s slot is no longer held for it (unknown yes: that couldn’t be read). Put back and start are actions on the card."
+  },
   "workflow.refused.platform.switching.message": {
     "defaultMessage": "{card} can't start now: its repository's version control is being switched.",
     "description": "HI-2799: a refused start: the project’s repository is switching between Git and jj, and nothing starts on it meanwhile. {card} is a card key like AM-12."
