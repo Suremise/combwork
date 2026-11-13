@@ -2699,7 +2699,7 @@ route('POST', '/v1/queue/forward', async ({ body }) => {
     const made = 'upToDate' in r ? null : r
     // HI-3126: under follow mode, the local source's commits its remote lacks, left out.
     const ahead = r.localAhead ?? 0
-    const done: Said = made ? [API.done.forwardQueued, { from, to, card: cardName(made.card), queued: made.queued ? 'yes' : 'no', override: made.overridden ? 'yes' : 'no', ahead }] : [API.done.forwardUpToDate, { from, to, ahead }]
+    const done: Said = made ? [API.done.forwardQueued, { from, to, card: cardName(made.card), queued: made.queued ? 'yes' : 'no', override: made.overridden ? 'yes' : 'no', ahead, aheadTotal: String(ahead) }] : [API.done.forwardUpToDate, { from, to, ahead, aheadTotal: String(ahead) }]
     return { done, ...(made ? { act: { card: made.card.number, column: made.card.column, project: basename(p) } } : {}), result: { upToDate: !made, card: made?.card.number ?? null, key: made?.card.key ?? null, queued: made?.queued ?? false, from, to, ...(made?.overridden ? { overridden: true } : {}), ...(ahead ? { localAhead: ahead } : {}) } }
   })
 })
