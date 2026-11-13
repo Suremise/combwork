@@ -2476,7 +2476,14 @@ so credit is only ever on the exact commit id and its content (R3.1, R3.2), and 
      moment still B1's;
   4. t0 once the write record has settled; the command; t1 once it has settled again;
   5. the write record for [t0, t1], jj's and Git's own folders left out (an edit and its undo show); where it isn't
-     complete, the stat snapshot again (unequal or unreadable: `changed`);
+     complete, the stat snapshot again (unequal or unreadable: `changed`). HI-3121, settled on real jj
+     (`tests/jjIgnoredWrite.test.ts`): a slot or a check copy is a jj workspace of its own, no Git worktree, so the
+     observer keeps no write record for it and the stat snapshot decides, colocated or not. Nothing there knows what jj
+     ignores: a write inside a folder that is already there (an `out/` an earlier build made) changes none of the
+     snapshot's lines and is credited; a run that makes or removes an entry in the workspace's root or in a folder holding
+     a tracked file changes that folder's time and is `changed`, ignored or not. So a build's first run that makes its
+     output folder there isn't credited and the next is; one that deletes its output folder and makes it again each run
+     never is. A candidate's merge check in a check copy is decided the same way (its retry is the run after);
   6. the moment before the end boundary: still H1, the same checkout record and Git state, else `moved` (any
      operation by anyone, a bookmark set elsewhere included; a plain Git commit jj hasn't imported shows in Git's
      state);
