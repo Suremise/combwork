@@ -6271,13 +6271,17 @@ touched:
   too). Commit: `add --intent-to-add` for
   untracked ones, then `commit --only -- <paths>` (their working-tree content; every other index entry kept; a
   rename's both sides), message *Commit changes before merging HI-12*; a failure (a hook, signing) loses nothing,
-  its intent-to-add entries only ever in the private index (below). The commit made is the newest commit with that
-  message on the branch since the HEAD it started from (first parents, at most 50 back), never HEAD alone (HI-3125:
-  another git's commit right after it, or just before it); git saying it committed with none there is said, not
-  credited. Set aside: `stash push --include-untracked` with those paths, named
+  its intent-to-add entries only ever in the private index (below). The commit made is the one git's own summary
+  names (`[main 1a2b3c4] …`, its last such line: git prints it after the post-commit hook; the commit is run without
+  `--quiet` for it), found on the branch since the HEAD it started from (first parents, at most 50 back), never HEAD
+  alone (HI-3125: another git's commit right after it, or just before it, maybe with the same message) nor its message
+  (HR1's round 1: a commit-msg hook may rewrite it, a ticket prefix); with no summary to read, the newest there with
+  that message. Git saying it committed with none there is said, not credited. Set aside: `stash push --include-untracked` with those paths, named
   *Combwork: set aside before merging HI-12*, and told by what it made (HI-3125): the newest stash not among those there
   as it started whose subject is that message, never the stash ref having moved (another git's stash just before or
-  after it moves it too). A push that saved nothing (another git took the shown changes back, or set them aside, just
+  after it moves it too); no hook rewrites a stash's message, and Combwork's own run one at a time under the
+  repository's lock, so two such new stashes are another git's at that moment: then the one holding exactly the paths
+  set aside (`stash show --name-only --include-untracked`). A push that saved nothing (another git took the shown changes back, or set them aside, just
   before: git says so and exits 0) is never done: refused as the changes not being those shown any more, or as git
   not setting them aside. Git failing
   after it made one is said with that stash, kept. A staged rename (HI-3022): git's stash, given the old side (in

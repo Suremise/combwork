@@ -614,8 +614,8 @@ async function commitPaths(folder: string, files: string[], untracked: string[],
       throw combworkError(M.commitTimedOutMoved, { seconds: boundSeconds(), head: typeof now === 'string' ? now.slice(0, 12) : 'none' })
     }
     if (!r.ok) throw failed(M.commitFailed, `${r.err}\n${r.out}`)
-    // HI-3125: this commit, never whatever HEAD is now (another git can commit right after it).
-    const made = await ownCommit(folder, before, message)
+    // HI-3125: this commit, never whatever HEAD is now (another git can commit right after it): the one git says it made.
+    const made = await ownCommit(folder, before, message, r.out)
     if (made === undefined) throw failed(M.commitFailed, "git couldn't read the branch after the commit") // i18n-ignore: stands in for git's own (English) words
     if (made === null) {
       log.warn(`git committed in ${userText(folder)}, but no commit "${userText(message)}" is on the branch since ${before ?? '(none)'}: not credited`)
@@ -631,19 +631,35 @@ async function commitPaths(folder: string, files: string[], untracked: string[],
 }
 
 /**
- * HI-3125: the commit a commit of `message` made, git having said it did: on the branch since `before` (first parents,
- * from HEAD back; the branch's whole history when it had none), the newest with that message. Never HEAD alone: another
- * git (the user's terminal, an agent) can commit right after it, or just before it. Null: none there; undefined: the
- * branch unreadable. Bounded to the branch's last 50 commits: no more land in a moment.
+ * HI-3125 (HR1's round 1): the commit a `git commit` says it made, from its summary (`[main 1a2b3c4] …`, or
+ * `[main (root-commit) …]`, `[detached HEAD …]`), which git prints last, after its post-commit hook: the last such line's
+ * object, abbreviated as git makes it unique. Undefined: none printed.
  */
-async function ownCommit(folder: string, before: string | null, message: string): Promise<string | null | undefined> {
+export function reportedCommit(out: string): string | undefined {
+  const all = [...out.matchAll(/^\[[^\]\n]* ([0-9a-f]{7,64})\] /gm)]
+  return all.at(-1)?.[1]
+}
+
+/**
+ * HI-3125: the commit this `git commit` made, git having said it did, on the branch since `before` (first parents, from
+ * HEAD back; the branch's whole history when it had none). Never HEAD alone: another git (the user's terminal, an agent)
+ * can commit right after it, or just before it. The commit git's own summary named (its `out`): a hook may rewrite the
+ * message (HR1's round 1: a ticket prefix), and another commit can have the same one. With no summary to read, the
+ * newest there with `message`. Null: none there; undefined: the branch unreadable. Bounded to the branch's last 50
+ * commits: no more land in a moment.
+ */
+async function ownCommit(folder: string, before: string | null, message: string, out: string): Promise<string | null | undefined> {
   const r = await git(folder, ['log', '--first-parent', '-n', '50', '--format=%H%x00%s', before ? `${before}..HEAD` : 'HEAD', '--'])
   if (!r.ok) return undefined
-  for (const line of r.out.split('\n')) {
-    const at = line.indexOf('\0')
-    if (at > 0 && line.slice(at + 1) === message) return line.slice(0, at).trim()
+  const since = r.out.split('\n').map((line) => ({ oid: line.slice(0, Math.max(0, line.indexOf('\0'))).trim(), subject: line.slice(line.indexOf('\0') + 1) })).filter((c) => c.oid)
+  const said = reportedCommit(out)
+  if (said) {
+    // Resolved as it was printed (unique then); unresolvable, none.
+    const full = await git(folder, ['rev-parse', '-q', '--verify', `${said}^{commit}`])
+    const oid = full.ok ? full.out.trim() : ''
+    return since.some((c) => c.oid === oid) ? oid : null
   }
-  return null
+  return since.find((c) => c.subject === message)?.oid ?? null
 }
 
 /** The commit as git's own partial commit makes it, in the private index: untracked paths as intent-to-add first. */
@@ -657,7 +673,8 @@ async function commitOnly(folder: string, env: NodeJS.ProcessEnv, copy: string, 
     if (!add.ok && add.timedOut) throw combworkError(M.commitTimedOut, { seconds: boundSeconds() })
     if (!add.ok) throw failed(M.commitFailed, add.err)
   }
-  return git(folder, ['commit', '--only', '--quiet', '-m', message, ...PATHS_IN], undefined, pathsIn(files), { env, timeout: folderChangesBounds.actMs })
+  // Not --quiet (HI-3125): its summary names the commit it made (reportedCommit).
+  return git(folder, ['commit', '--only', '-m', message, ...PATHS_IN], undefined, pathsIn(files), { env, timeout: folderChangesBounds.actMs })
 }
 
 /**
@@ -678,7 +695,8 @@ async function commitByIndex(folder: string, env: NodeJS.ProcessEnv, files: stri
   const added = files.filter((p) => !by.removed.includes(p))
   const failedStep = (await step(['reset', '-q'], by.staged)) ?? (await step(['rm', '--cached', '-q', '--ignore-unmatch'], by.removed)) ?? (await step(['add', '-A'], added))
   if (failedStep) return failedStep
-  return git(folder, ['commit', '--quiet', '-m', message], undefined, undefined, bound)
+  // Not --quiet (HI-3125): its summary names the commit it made (reportedCommit).
+  return git(folder, ['commit', '-m', message], undefined, undefined, bound)
 }
 
 /**
@@ -767,9 +785,18 @@ async function stashesNow(folder: string): Promise<{ oid: string; subject: strin
  * subject is that message (`On <branch>: <message>`), the newest. Never the stash ref having moved: another git's stash
  * just before or after it (the user's own) moves it too, and a push that saved nothing moves it not at all.
  */
-async function ownStash(folder: string, before: ReadonlySet<string>, message: string): Promise<string | null> {
+async function ownStash(folder: string, before: ReadonlySet<string>, message: string, paths: readonly string[]): Promise<string | null> {
   const now = await stashesNow(folder)
-  return now?.find((s) => !before.has(s.oid) && s.subject.endsWith(`: ${message}`))?.oid ?? null
+  const mine = (now ?? []).filter((s) => !before.has(s.oid) && s.subject.endsWith(`: ${message}`))
+  if (mine.length < 2) return mine[0]?.oid ?? null
+  // HR1's round 1: another stash with the same message at the same moment (no hook rewrites a stash's, and Combwork's
+  // own are one at a time under the repository's lock): the one that holds exactly the paths this one set aside.
+  const want = [...paths].sort().join('\0')
+  for (const s of mine) {
+    const r = await git(folder, ['stash', 'show', '--name-only', '--include-untracked', '-z', s.oid])
+    if (r.ok && r.out.split('\0').filter(Boolean).sort().join('\0') === want) return s.oid
+  }
+  return mine[0].oid
 }
 
 /**
@@ -804,7 +831,7 @@ async function setAsidePaths(folder: string, files: string[], message: string, r
       if (!out.ok) throw out.timedOut ? combworkError(M.stashTimedOut, { seconds: boundSeconds(), made: 'no', stash: '' }) : failed(M.stashFailed, out.err)
     }
     let pushed = await git(folder, ['stash', 'push', '--include-untracked', '--quiet', '-m', message, ...PATHS_IN], undefined, pathsIn(stashed), { env, timeout: folderChangesBounds.actMs })
-    const stash = await ownStash(folder, before, message)
+    const stash = await ownStash(folder, before, message, stashed)
     if (stash && pushed.ok && renamedFrom.length) pushed = await restoreOldSides(folder, env, renamedFrom)
     // HI-3059: a stash made is said made, whatever its index step gives (logged there too, should git's own failure be
     // what is said below).

@@ -243,6 +243,49 @@ describe('another git at the same moment (HI-3125)', () => {
     expect(subject('HEAD~1')).toBe("the user's own")
   })
 
+  // HR1's round 1: the commit is the one git's own summary names, never matched by its message alone.
+  it("reads the commit git's summary names: the last summary line, whatever a hook printed before it", () => {
+    expect(changes.reportedCommit('[main 1a2b3c4] Commit changes before merging AB-1\n 1 file changed, 1 insertion(+)\n')).toBe('1a2b3c4')
+    expect(changes.reportedCommit('[main (root-commit) 1a2b3c4d] first\n')).toBe('1a2b3c4d')
+    expect(changes.reportedCommit('[detached HEAD 0123456789abcdef] x\n')).toBe('0123456789abcdef')
+    expect(changes.reportedCommit('[hook] said this\n[main abcdef1] ours\n')).toBe('abcdef1')
+    expect(changes.reportedCommit('')).toBeUndefined()
+  })
+
+  it("a commit-msg hook rewriting the message (a ticket prefix): the commit made, named, and its entries taken in", async () => {
+    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+    writeFileSync(join(proj, '.git', 'hooks', 'commit-msg'), '#!/bin/sh\nprintf "checked: %s\\n" "$(head -n 1 "$1")" > "$1.new" && mv "$1.new" "$1"\n')
+    writeFileSync(join(proj, 'a.txt'), 'committed by Combwork\n')
+    const done = await settle('commit', ['a.txt'])
+    expect(done.made).toBe(head())
+    expect(subject(done.made)).toBe('checked: Commit changes before merging AB-1')
+    expect(done.warning).toBeUndefined()
+    // Its entries taken into the real index: nothing left staged or changed.
+    expect(status()).toBe('')
+  })
+
+  it('a commit with the same message by another git right after it: its own named, from git', async () => {
+    writeFileSync(join(proj, 'a.txt'), 'committed by Combwork\n')
+    writeFileSync(join(proj, 'b.txt'), "the user's own\n")
+    afterMade = (cwd) => void sh(cwd, 'commit', '-q', '-m', 'Commit changes before merging AB-1', '--', 'b.txt')
+    const done = await settle('commit', ['a.txt'])
+    expect(afterMade).toBeNull()
+    expect(subject('HEAD')).toBe('Commit changes before merging AB-1')
+    expect(done.made).toBe(sh(proj, 'rev-parse', 'HEAD~1'))
+    expect(sh(proj, 'show', '--name-only', '--format=', done.made)).toBe('a.txt')
+  })
+
+  it('a stash with the same message by another git right after it: its own named, by the paths it holds', async () => {
+    writeFileSync(join(proj, 'a.txt'), 'set aside by Combwork\n')
+    writeFileSync(join(proj, 'b.txt'), "the user's own\n")
+    afterMade = (cwd) => void sh(cwd, 'stash', 'push', '-q', '-m', 'Combwork: set aside before merging AB-1', '--', 'b.txt')
+    const done = await settle('setAside', ['a.txt'])
+    expect(afterMade).toBeNull()
+    expect(stashes()).toEqual(['On main: Combwork: set aside before merging AB-1', 'On main: Combwork: set aside before merging AB-1'])
+    expect(done.made).not.toBe(sh(proj, 'rev-parse', 'refs/stash'))
+    expect(sh(proj, 'show', `${done.made}:a.txt`)).toBe('set aside by Combwork')
+  })
+
   it('a skip-worktree flag another git sets on a shown path once the commit is made is kept, and said', async () => {
     writeFileSync(join(proj, 'a.txt'), 'edit a\n')
     afterMade = (cwd) => void sh(cwd, 'update-index', '--skip-worktree', 'a.txt')
