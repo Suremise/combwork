@@ -952,8 +952,10 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
   }
   // In a lane Tester reviews (#1382: a design needs a reviewer to check it), ended once the design is measured. The card
   // is started first (HI-2082): a card in Doing is never a lane's to start, so Combwork's own look can't start it first.
+  // The lane is the starter's, the same agent's (asCoder's token: alpha's latest launch, Starter's since cw_start_task):
+  // a lane whose cards another agent holds ends by itself (HI-3118), and its card then has no reviewer (HI-3163).
   const startedOwn = measure('cw_start_card', intent('cw_start_card', { card: `#${todo[40]}` }), 400)
-  const designStart = tool('cw_lane', { action: 'start', cards: [todo[40]], reviewer: 'Tester', name: 'design step' }, 'own').text
+  const designStart = intent('cw_lane', { action: 'start', cards: [todo[40]], reviewer: 'Tester', name: 'design step' }).text
   const designLane = designStart.match(/lane-[0-9a-f]+$/)?.[0]
   check('a lane for the design step, Tester reviewing', !!designLane, designStart)
   check('an intent says where the card went', new RegExp(`^[A-Z]+-\\d+: todo → active\\. folder: `).test(startedOwn), startedOwn)
