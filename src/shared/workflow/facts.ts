@@ -410,7 +410,7 @@ export interface FactData {
   Moved: { from: StageId; to: StageId; cause: 'intent' | 'user' | 'derived' | 'override' | 'repair'; why?: string }
   /** The refusal's English (agents read it) and its rule and values, which the window shows translated (refusalLines). */
   Refused: { move: string; rule: string; message: string; next: string; values?: Record<string, string | number | StoredText> }
-  Override: { rules: string[]; move: string; by: 'user' | 'assistant'; reason: string }
+  Override: { rules: string[]; move: string; by: 'user' | 'assistant'; reason: string; /** HI-3148: the released line a `start.released` override was given for. */ target?: string }
   /** A project agent proposed the card's kind when it made it (§16.7.3, OP-6/OP-7, #1277): no code, until confirmed. */
   KindProposed: { kind: CardKind }
   /** The user or the Assistant answered a proposed kind (#1277): `kind` is the card's kind from now on. */

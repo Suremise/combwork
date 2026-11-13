@@ -2283,6 +2283,10 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
   if (place) args.cards = [place.card]
   if (!args.cards) throw new HttpError(400, apiSaid(API.lane.cardsArg))
   const a = agentCaller()
+  // HI-3148: a hotfix lane's override of its released line, `released: { target, reason }`: the Assistant's alone (the
+  // user's is the window's); a project agent's or a script's is refused before anything.
+  const released = body?.released !== undefined && body.released !== null ? releasedLaneArg(body.released) : undefined
+  if (released && !assistantCaller()) throw new HttpError(403, apiSaid(API.lane.releasedNotYours))
   // A project agent registers its own lane: it is the builder.
   const builder = a ? (body?.builder !== undefined && body.builder !== '' && (await agentParam(p, body.builder)) !== a.agentId ? null : a.agentId) : await agentParam(p, body?.builder)
   if (!builder) throw new HttpError(403, apiSaid(API.lane.agentStartsOwn))
@@ -2321,7 +2325,7 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
     }
   }
   const started = async (commit?: () => void) => {
-    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, ...(unknownReviewer !== undefined ? { unknownReviewer } : {}), cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, ...(args.target !== undefined ? { target: args.target } : {}), briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}), ...(a ? { ownBuilder: true } : {}), ...(commit ? { commit } : {}) })
+    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, ...(unknownReviewer !== undefined ? { unknownReviewer } : {}), cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, ...(args.target !== undefined ? { target: args.target } : {}), briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}), ...(a ? { ownBuilder: true } : {}), ...(commit ? { commit } : {}), ...(released ? { released: { ...released, by: 'assistant' as const } } : {}) })
     // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
     // A new lane's brief carried from the builder's lane that had just ended (HI-2097) too.
     const rec = (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id)
@@ -3256,11 +3260,22 @@ function taskPatch(body: any): TaskPatch {
   return out
 }
 
-/** A move's override (#1265, SPEC §16.8.4): `{ reason }`, the Assistant's, why it moves the card across the rules. */
-export function overrideParam(v: unknown): { reason: string } {
+/** HI-3148: a lane start's `released`: the released line and the user's reason, both given. */
+function releasedLaneArg(v: unknown): { target: string; reason: string } {
+  const o = v && typeof v === 'object' ? (v as { target?: unknown; reason?: unknown }) : {}
+  if (typeof o.target !== 'string' || !o.target.trim() || typeof o.reason !== 'string' || !o.reason.trim()) throw new HttpError(400, apiSaid(API.lane.releasedArg))
+  return { target: o.target.trim().slice(0, 250), reason: o.reason.trim() }
+}
+
+/**
+ * A move's override (#1265, SPEC §16.8.4): `{ reason }`, the Assistant's, why it moves the card across the rules;
+ * `released` (HI-3148), the released line a start it makes may go onto, as the refusal named it (that line only).
+ */
+export function overrideParam(v: unknown): { reason: string; released?: string } {
   const reason = v && typeof v === 'object' ? (v as { reason?: unknown }).reason : undefined
   if (typeof reason !== 'string' || !reason.trim()) throw new HttpError(400, apiSaid(API.card.overrideArg))
-  return { reason: reason.trim() }
+  const released = (v as { released?: unknown }).released
+  return { reason: reason.trim(), ...(typeof released === 'string' && released.trim() ? { released: released.trim().slice(0, 250) } : {}) }
 }
 
 route('GET', '/v1/tasks', async ({ query }) => {
@@ -4220,7 +4235,10 @@ route('POST', '/v1/tasks/:n/start', async ({ params, body }) => {
   return assistantChange('agents', [API.change.startTask, { card: cardRef(n), on, agent: named?.name ?? '', inProject: card.project ? 'yes' : 'no', project: card.project ?? '' }], { kind: 'start-task', card: n, ...(card.project ? { project: card.project } : {}), ...(named ? { agent: named } : {}) }, async (guard) => {
     // Its guard checked again as the card is taken, and before the task is typed or its agent launched (HI-2420): a
     // revoked start is undone, the card back where it was and a new agent removed.
-    const r = await startTask(n, target, { kind: 'assistant' }, typeof body?.note === 'string' ? body.note : undefined, undefined, undefined, guard)
+    // HI-3148: the Assistant's override of a start onto a released line (`override: { reason, released }`, the line its
+    // refusal named): for that line only. An agent's start never gets here (its intent, above).
+    const o = body?.override !== undefined && body.override !== null ? overrideParam(body.override) : null
+    const r = await startTask(n, target, { kind: 'assistant' }, typeof body?.note === 'string' ? body.note : undefined, o?.reason, undefined, guard, o?.released)
     return {
       done: [API.done.cardStarted, { card: cardRef(n), added: r.added ? 'yes' : 'no', agent: r.agentName, project: card.project ?? '', title: clip(card.title, 80) }],
       act: { agent: { id: r.agentId, name: r.agentName }, column: r.card.column },

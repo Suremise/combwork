@@ -1675,6 +1675,22 @@
     "defaultMessage": "Work on it outside Combwork’s cards, or switch the project to Git in Version Control.",
     "description": "The next step after a refused start in a jj project (HI-2799). Version Control is the tab’s name (glossary 2.1). Keep Git and jj."
   },
+  "workflow.refused.start.releaseUnknown.message": {
+    "defaultMessage": "Combwork couldn’t check whether {target} is released ({what}), so {card} wasn’t started.",
+    "description": "HI-3148: a refused start: whether the branch the card would start on ({target}) has already shipped couldn’t be read ({what}: what couldn’t be read). {card} is a card key like AM-12."
+  },
+  "workflow.refused.start.releaseUnknown.next": {
+    "defaultMessage": "Try again once the repository can be read; for work that has to go on now, ask the user: the user or the Assistant can start it anyway.",
+    "description": "HI-3148: the next step after a start refused because whether its branch is released couldn’t be read."
+  },
+  "workflow.refused.start.released.message": {
+    "defaultMessage": "{card} can’t start on {target}: {target} is released ({dated, select, yes {{tag}, tagged {date, date, medium}} other {{tag}}}, merged into {into}).",
+    "description": "HI-3148: a refused start: the branch the card would start on and merge into ({target}) already shipped: a tag named after it ({tag}, as v1.4.0) is in its history and it is merged into the default branch ({into}, as main). With dated yes, the tag’s own date ({date}: an annotated tag’s date, never claimed as the publication date). {card} is a card key like AM-12."
+  },
+  "workflow.refused.start.released.next": {
+    "defaultMessage": "{has, select, yes {Did you mean {suggest}? Set its Merges into to {suggest}; or, for hotfix work on {target}, ask the user: the user or the Assistant can start it there anyway.} other {Start it on a branch that isn’t released; or, for hotfix work on {target}, ask the user: the user or the Assistant can start it there anyway.}}",
+    "description": "HI-3148: the next step after a start refused on a released branch ({target}). With has yes, {suggest} is a branch that exists and isn’t released (the project’s Work merges into, or the next version’s). Merges into is the card’s option of that name: as translated there."
+  },
   "workflow.refused.start.slotAvailable.change": {
     "defaultMessage": "This is set in Version Control → Where cards are built.",
     "description": "Where the rule that refused starting for want of a slot is changed."
@@ -1922,6 +1938,10 @@
   "workflow.rule.start.platformReady": {
     "defaultMessage": "Cards run only where Combwork supports the version control",
     "description": "A rule of the workflow, named where a move skips or can’t check it (HI-2799): cards don’t start in a project using jj (Jujutsu) yet."
+  },
+  "workflow.rule.start.released": {
+    "defaultMessage": "New work starts only on a branch that isn’t released",
+    "description": "HI-3148: a rule of the workflow, named where a start skips it (the user’s Start anyway on a released branch, for a hotfix): a card doesn’t start on a branch already released (tagged and merged into the default branch)."
   },
   "workflow.rule.start.slotAvailable": {
     "defaultMessage": "Each card in its own folder",

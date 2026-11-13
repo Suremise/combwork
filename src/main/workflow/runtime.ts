@@ -33,6 +33,8 @@ import { historyOf } from '../platform/historyPorts'
 import { NoneAdapter } from '../platform/none'
 import { readBaseline } from '../noneBaseline'
 import { isUnknown, unknown, withDetail, type Maybe } from '../platform/types'
+import { releaseReadsOf } from '../platform/releaseReadsPorts'
+import { stillAsRead, unreleasedFor } from '../platform/releaseReads'
 import { declaresPaths, hasCapability, needsRepository, type PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
 import { finishAccepts, recordFinish } from './finish'
@@ -75,6 +77,11 @@ export interface Ask {
    * then the unclaimed changes, which may be another card's). Moved again with `paths` to include them, or without asking.
    */
   leftOut?: { paths: string[]; files: string[] }
+  /**
+   * HI-3148: the released line the start among its rules would go onto (`start.released`): the override confirmed is for
+   * this line only, given back with it (`released`); a line changed meanwhile is asked about again.
+   */
+  released?: string
 }
 
 export type Reply = Moved | Refusal
@@ -226,6 +233,12 @@ export interface WorkflowConfig {
    * wait) is refused naming it (`platform.keptElsewhere`). Left out, none.
    */
   keptHere?: (card: CardRecord) => Promise<{ slot: string; folder: string } | null>
+  /**
+   * HI-3148: the released line a running lane's starts may go onto, by the user's or the Assistant's override given with
+   * the lane's start (its record's, for its fixed Merges into while it runs), or null: none. Synchronous (the lanes as
+   * stored, never a cached copy): read again inside the start's write, so a lane ended or replaced meanwhile grants nothing.
+   */
+  releaseGrant?: (lane: string) => string | null
   /** HI-3107: a start written with earlier work on another version control's lines: the app comments and tells the user. */
   earlierWork?: (card: CardRecord, lines: EarlierLine[], now: PlatformId) => Promise<void> | void
   /** A lease lent for a start that wasn't written (refused, or undone): given back. */
@@ -1050,7 +1063,7 @@ export class Workflow {
   // --- Intents and moves (§16.7.2).
 
   /** start: Todo → Active, the card's line and base recorded, its folder prepared (slots). */
-  async start(ref: unknown, actor: Actor, opts: { builder?: string; drag?: Drag; reopen?: boolean } = {}): Promise<Reply> {
+  async start(ref: unknown, actor: Actor, opts: { builder?: string; drag?: Drag; reopen?: boolean; released?: { target: string; reason: string } } = {}): Promise<Reply> {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
@@ -1085,6 +1098,10 @@ export class Workflow {
     const g = await this.gatherStart(card, from, actor, opts.builder)
     if (!('data' in g)) return this.refuse(card, actor, 'start', g)
     try {
+      // HI-3148: never new work on a released line, unless the user or the Assistant says so (a hotfix).
+      const rel = this.enforced() ? await this.releasedStart(card, g, actor, opts.released) : { grant: null }
+      // agent-protocol: who can override, the refusal's override field (§16.8.3)
+      if ('refusal' in rel) return await this.refuse(card, actor, 'start', rel.refusal, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
       // HI-2985: a forward's resolution starts only on the branch it resolves (one made unpinned, or Work merges into moved).
       const res = from.resolves
       if (res && g.data.target !== res.to) return await this.refuse(card, actor, 'start', { rule: 'forward.resolutionTarget', values: { card: card.key, from: res.from, to: res.to, target: g.data.target ?? '' } })
@@ -1100,6 +1117,7 @@ export class Workflow {
       let laneMoved = false
       let baselineMoved = false
       let evidenceMoved = false
+      let releaseMoved = false
       const out = await this.writeWhole(card, g.r, actor, (w) => {
         const moved = this.stillAt(w, s, 'start')
         if (moved) return moved
@@ -1137,13 +1155,20 @@ export class Workflow {
         }
         const waits = (this.enforced() && !opts.drag ? this.laneRefusal(this.store.card(card.id)) : null) ?? moving()
         if (waits) return undone(waits)
+        // HI-3148: what let it through onto its line still holds here (no tag made, no lane's grant ended): else decided again.
+        if ('bound' in rel && rel.bound && !rel.bound()) {
+          releaseMoved = true
+          return undone({ rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal)
+        }
         // The user's Start across a rule: the rules skipped are recorded, and the start's own facts still are.
         const bad = opts.drag ? this.across(w, 'start', 'active', g.ins, opts.drag) : this.check(w, 'start', g.ins)
         if (bad) return undone(bad)
+        // The release override it was given, recorded with the start it lets through, for the line it was given for.
+        if (rel.grant) w.fact('Override', rel.grant) // i18n-ignore: a fact's kind and codes, not text
         this.applyStart(w, g, w.written.some((f) => f.kind === 'Override') ? 'override' : actor === 'user' ? 'user' : 'intent')
         return null
       })
-      if (out && (laneMoved || baselineMoved) && !this.gathering.depth(card.id)) return await this.regather(card, () => this.start(ref, actor, opts))
+      if (out && (laneMoved || baselineMoved || releaseMoved) && !this.gathering.depth(card.id)) return await this.regather(card, () => this.start(ref, actor, opts))
       // Its fingerprint moved again between the last gather and the write, its answer by content still the same, or the
       // fingerprint unreadable at that instant (HI-2972): gathered again from the top while its platform allows more
       // passes (none beyond #1206's one unless it says so), else refused.
@@ -1154,7 +1179,7 @@ export class Workflow {
           return await this.regather(card, () => this.start(ref, actor, opts))
         }
       }
-      if (out?.rule === 'evidence.changed') this.startRefusedLog(card, laneMoved ? 'lane' : baselineMoved ? 'baseline' : 'write', gathers, evidenceMoved ? this.noPassWhy(card, gathers) : undefined)
+      if (out?.rule === 'evidence.changed') this.startRefusedLog(card, laneMoved ? 'lane' : baselineMoved ? 'baseline' : releaseMoved ? 'release' : 'write', gathers, evidenceMoved ? this.noPassWhy(card, gathers) : undefined)
       if (out) return (out.rule === 'move.notFromHere' ? forIt(this.state(this.store.card(card.id))) : null) ?? this.refuse(card, actor, 'start', out)
       const moved = this.ok(card, s.stage, 'active', { folder: this.folderOf(this.state(card)), line: g.data.line, base: g.data.base, target: g.data.target }, g.warnings)
       // HI-3107: written, its earlier work is said where the user and its builder read it (a comment, a notice).
@@ -1164,6 +1189,34 @@ export class Workflow {
       // A slot lent for it and not started with (refused, undone): given back (#1438).
       if (g.lent) await this.slotUnused(card, g.lent)
     }
+  }
+
+  /**
+   * HI-3148: a fresh start onto a released line (its platform's release reads: a tag named after it, the line in the main
+   * line) is refused, with the line to start on instead where one is known (`start.released`); one that can't be read is
+   * refused too (`start.releaseUnknown`), never taken for unreleased. Let through by the user's or the Assistant's override
+   * for exactly this line (`given`, the grant written with the start), or the card's running lane's (`releaseGrant`).
+   *
+   * Bound to the write (HR2's round 1): what let it through without the start's own override (the line not released, or
+   * the lane's grant) is `bound`, which the write asks again synchronously: the release reads' refs as they were before
+   * this read (`watch`), or the lane's grant as stored now. Moved, the start is gathered again and decided afresh.
+   */
+  private async releasedStart(card: CardRecord, g: StartGathered, actor: Actor, given?: { target: string; reason: string }): Promise<{ refusal: GuardRefusal } | { grant: FactData['Override'] | null; bound?: () => boolean }> {
+    const target = g.data.target
+    const reads = target ? releaseReadsOf(g.o.platform) : null
+    if (!target || !reads) return { grant: null }
+    const by = actor === 'user' || actor === 'assistant' ? actor : null
+    // The user's or the Assistant's for exactly this line: theirs whatever the line is now, so nothing to bind.
+    if (given && by && given.target === target) return { grant: { rules: ['start.released'], move: 'start', by, reason: given.reason, target } }
+    const check = await reads.watch(this.cfg.project, target).catch(() => null)
+    const first = check ? check() : null
+    const r = first === null ? unknown(UNREADABLE.line, { branch: target }) : await reads.released(this.cfg.project, target)
+    if (!isUnknown(r) && !r) return { grant: null, bound: () => stillAsRead(check, first) }
+    const laneId = card.lane ?? null
+    if (laneId && this.cfg.releaseGrant?.(laneId) === target) return { grant: null, bound: () => this.cfg.releaseGrant?.(laneId) === target && (this.store.card(card.id).lane ?? null) === laneId }
+    if (isUnknown(r)) return { refusal: { rule: 'start.releaseUnknown', values: { card: card.key, target, what: r.whatText ?? r.what } } }
+    const suggest = await unreleasedFor(reads, this.cfg.project, target, this.cfg.options().target)
+    return { refusal: { rule: 'start.released', values: { card: card.key, target, tag: r.tag, into: r.into, dated: r.date ? 'yes' : 'no', date: r.date ? Date.parse(r.date) : 0, has: suggest ? 'yes' : 'no', suggest: suggest ?? '' } } } // i18n-ignore: select keys
   }
 
   /** A start's slow part, outside the lock: its folder, line, base and target, the cards it waits for, its evidence. */
@@ -2645,7 +2698,7 @@ export class Workflow {
    * The user's drag (or menu): never refused. A move that skips rules asks first, then records an `Override`; a move
    * that skips nothing just moves (§16.7.1). The Assistant passes `override: { reason }` or is refused.
    */
-  async move(ref: unknown, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string; dry?: boolean; paths?: string[]; askPaths?: boolean } = {}): Promise<Moved | Ask | Refusal> {
+  async move(ref: unknown, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string; dry?: boolean; paths?: string[]; askPaths?: boolean; released?: string } = {}): Promise<Moved | Ask | Refusal> {
     const card = this.resolve(ref)
     if (isRefusal(card)) return card
     const s = this.state(card)
@@ -2775,7 +2828,7 @@ export class Workflow {
    * checks the rules again: one not decided on undoes it, and asks again. `fromHold`: where the card goes first, in the
    * same write (back from On Hold to where it was; a Done card reopened, to Todo), the drag counted from there.
    */
-  private async dragForward(card: CardRecord, from: StageId, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string; dry?: boolean; paths?: string[]; askPaths?: boolean }, fromHold?: StageId): Promise<Moved | Ask | Refusal> {
+  private async dragForward(card: CardRecord, from: StageId, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string; dry?: boolean; paths?: string[]; askPaths?: boolean; released?: string }, fromHold?: StageId): Promise<Moved | Ask | Refusal> {
     const asking = by === 'user' ? !opts.confirm || !!opts.dry : !opts.reason
     const s0 = this.state(card)
     // Back from On Hold: the drag counts from where the card was.
@@ -2808,6 +2861,11 @@ export class Workflow {
       if (!gs && !gsub && !pastReview && !queueOnly && !fromHold) return this.ok(card, from, s0.stage)
       const rules = new Set<string>()
       if (gs) for (const x of this.failingOf(card, s, gs.r, 'start', gs.ins)) rules.add(x)
+      // HI-3148: a start onto a released line (or one that can't be checked) is a rule the user's or the Assistant's
+      // override can skip, for that line only: confirmed with the line the ask named (`released`), never another.
+      const releasedRule = gs && this.enforced() ? await this.releasedStart(card, gs, by) : { grant: null }
+      const releasedTarget = 'refusal' in releasedRule ? (gs!.data.target ?? null) : null
+      if (releasedTarget) rules.add('start.released')
       if (gsub) for (const x of this.failingOf(gsub.card, gsub.s, gsub.r, 'submit', gsub.inputs, gsub.only)) rules.add(x)
       // Past Review (or the user's OK): the review and approvals are skipped, and the change counts as approved.
       if (pastReview && this.enforced()) rules.add('integrate.approved')
@@ -2818,11 +2876,15 @@ export class Workflow {
       if (nobody) rules.add('move.doingNobody')
       const skipped = [...rules]
       // agent-protocol: who can override a refusal, the Agent API's fixed `override` value (AGENT_API.md, §16.8.3)
-      const needs = (list: string[]): Ask | Refusal => (by === 'user' ? { ask: true, card: card.key, rules: list } : refusal('move.needsOverride', { card: card.key, stage: to, rules: list.join(', ') }, 'the user or the Assistant')) // i18n-ignore: who can override, agent-facing (§16.8.3)
+      const needs = (list: string[]): Ask | Refusal => (by === 'user' ? { ask: true, card: card.key, rules: list, ...(releasedTarget ? { released: releasedTarget } : {}) } : refusal('move.needsOverride', { card: card.key, stage: to, rules: list.join(', ') }, 'the user or the Assistant')) // i18n-ignore: who can override, agent-facing (§16.8.3)
       if (opts.dry && !skipped.length) return this.ok(card, from, s0.stage)
       if (nobody && asking) return (await this.nobodyOn(card, to, by, opts, others))!
       // agent-protocol: who can override a refusal, the Agent API's fixed `override` value (AGENT_API.md, §16.8.3)
       if (skipped.length && asking) return by === 'user' ? needs(skipped) : this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: skipped.join(', ') } }, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
+      // Confirmed for another line than the one it would start on now (it changed since the ask): asked again, the user;
+      // the Assistant's refused with the line's own words, to confirm that line.
+      // agent-protocol: who can override, the refusal's override field (§16.8.3)
+      if (releasedTarget && !opts.dry && opts.released !== releasedTarget) return by === 'user' ? needs(skipped) : this.refuse(card, 'assistant', 'start', (releasedRule as { refusal: GuardRefusal }).refusal, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
       await this.cfg.hooks?.beforeWrite?.('move')
       // A start's passes, as `start`'s (its platform's `startGathers`, HI-2916).
       const gathers = gs ? (this.platform(gs.o).startGathers ?? 1) : 1
@@ -2836,13 +2898,14 @@ export class Workflow {
       }
       let out: GuardRefusal | null
       let startMoved = false
+      let releaseMoved = false
       try {
         out = await this.write(card, r, by, (w) => {
           const moved = this.stillAt(w, s0, 'move')
           if (moved) return moved
           // One Override naming every rule skipped: after the submission when it approves it (past Review: it counts as
           // approved for the latest submission), else first.
-          const override = (): void => void (skipped.length && w.fact('Override', { rules: skipped, move: `${s.stage}→${to}`, by, reason: opts.reason ?? '' })) // i18n-ignore: a fact's kind and codes, not text
+          const override = (): void => void (skipped.length && w.fact('Override', { rules: skipped, move: `${s.stage}→${to}`, by, reason: opts.reason ?? '', ...(releasedTarget ? { target: releasedTarget } : {}) })) // i18n-ignore: a fact's kind and codes, not text
           const approves = pastReview && !!gsub
           if (!approves) override()
           if (fromHold) w.move(fromHold, 'user')
@@ -2850,6 +2913,12 @@ export class Workflow {
           const changed = gs ? this.evidenceChanged(w, gs.o, gs.before) : gsub ? this.evidenceChanged(w, gsub.o, gsub.before, gsub.card) : null
           startMoved = !!changed && !!gs
           if (changed) throw new DragUndone(changed)
+          // HI-3148: a start let onto its line without the user's confirmation (not released, or its lane's grant), as
+          // `start`'s: what let it through still holds here, else decided again.
+          if (gs && 'bound' in releasedRule && releasedRule.bound && !releasedRule.bound()) {
+            releaseMoved = true
+            throw new DragUndone({ rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal)
+          }
           if (gs) {
             decided(this.failingIn(w, 'start', gs.ins))
             this.applyStart(w, gs, cause)
@@ -2871,6 +2940,7 @@ export class Workflow {
         })
       } catch (e) {
         if (!(e instanceof DragUndone)) throw e
+        if (releaseMoved && !this.gathering.depth(card.id)) return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
         // The start's fingerprint moved again before the write, its content the same: gathered again while its platform
         // allows more passes (`start`'s rule, HI-2916).
         const again = startMoved && gs && gathers > 1 && this.gathering.depth(card.id) < gathers ? await this.startAgain(card, s, gs.o, gs.before) : null

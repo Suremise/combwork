@@ -271,6 +271,8 @@
   "service.laneStarts.freshBlockedBody": "{why, select, timeout {未能在 {minutes, plural, other {# 分钟}}内空闲。} uncertain {启动时 Combwork 已关闭，因此可能未能开始。} other {{reason}}} 请在进度面板中通道的行上重试，或结束通道。在此之前其卡片会等待。",
   "service.laneStarts.freshBlockedTitle": "{agent} 的新对话未能开始",
   "service.lanes.noWorkspace": "未打开工作区",
+  "service.lanes.releaseUnknown": "Combwork 无法检查 {target} 是否已发布（{what}）。请在仓库可读后重试；对于必须现在继续的工作，用户或助手仍可启动它。",
+  "service.lanes.released": "{target} 已发布（{dated, select, yes {{tag}，于 {date, date, medium} 打标签} other {{tag}}}，已合并到 {into}）。{has, select, yes {你是指 {suggest} 吗？请在 {suggest} 上启动；或者，对于 {target} 上的热修复工作，用户或助手仍可在那里启动它。} other {请在未发布的分支上启动；或者，对于 {target} 上的热修复工作，用户或助手仍可在那里启动它。}}",
   "service.lanes.targetBuilder": "通道的“合并到”只能由你或助手设置，不能由它的构建者设置。",
   "service.lanes.targetCard": "{card} 合并到 {cardTarget}，而此通道合并到 {target}：通道中的卡片与通道合并到同一分支。请不要把它放进此通道，或在单独的通道中启动它。",
   "service.lanes.targetFixed": "{builder} 的通道在结束前都合并到 {target}：要使用其他分支，请启动新的通道。{target} 合并到其他分支后，更改“工作合并到”的目标即可把通道及其卡片移到那里（“同时为可移动的内容更改目标”）。",

@@ -631,12 +631,12 @@ describe('the window asks before a move that skips rules (#1275)', () => {
     const card = await create(w)
     await update(w, card, { blocked: 'Needs a design decision' })
     const before = kinds(w, card)
-    expect(await inWorkspace(w, () => tasks.startAsks(card, 'a1'))).toEqual(['start.notBlocked'])
+    expect(await inWorkspace(w, () => tasks.startAsks(card, 'a1'))).toEqual({ rules: ['start.notBlocked'] })
     expect(kinds(w, card)).toEqual(before)
     expect((await inWorkspace(w, () => tasks.getTask(card, w))).column).toBe('todo')
     // A card nothing blocks asks nothing.
     const free = await create(w, 'Free')
-    expect(await inWorkspace(w, () => tasks.startAsks(free, 'a1'))).toEqual([])
+    expect(await inWorkspace(w, () => tasks.startAsks(free, 'a1'))).toEqual({ rules: [] })
     // Started with the user's reason (the question answered), as Start makes its move (taskStart's giveCard; the launch
     // itself is boardgates'): one Override carrying it, then its start.
     await update(w, card, { agent: 'a1', column: 'doing', override: { reason: 'Decided in the call' } })

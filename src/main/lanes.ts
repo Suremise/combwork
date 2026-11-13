@@ -22,6 +22,12 @@ import { FactStore } from './workflow/factStore'
 import { pickTarget, projectTargets, targetExists, type ProjectTargets } from './workflow/targets'
 import { otherThanOwn, targetedOf, targetOfRulesetId } from '../shared/workflow/compile'
 import { laneTarget } from './laneTarget'
+import { releaseReadsOf } from './platform/releaseReadsPorts'
+import { isUnknown, unknown } from './platform/types'
+import type { PlatformId } from '../shared/platform/descriptors'
+import { stillAsRead, unreleasedFor } from './platform/releaseReads'
+import { storedAsText } from '../shared/workflow/refusals'
+import { UNREADABLE } from '../shared/workflow/texts'
 import { onAction } from './workflow/actionWorker'
 import { foldCard, forYou, SLOT_DIRTY_GATE } from '../shared/workflow/facts'
 import { createDelivery, offerNow } from './deliveries'
@@ -83,6 +89,8 @@ const M = {
   noWorkspace: msg({ id: 'service.lanes.noWorkspace', defaultMessage: 'No workspace is open', description: "An error changing a workspace's lanes (card loops) while no workspace is open in the window." }),
   unknown: msg({ id: 'service.lanes.unknown', defaultMessage: 'Unknown lane {id}', description: 'An error: there is no lane (a card loop) with the id {id}, perhaps removed meanwhile.' }),
   targetNotListed: msg({ id: 'service.lanes.targetNotListed', defaultMessage: '{hasTargets, select, yes {{target} isn’t a branch work can merge into here: name {default}{hasOthers, select, yes { or one of {others}} other {}}, or add it under Other branches work can merge into (Version Control → Workflow).} other {This project merges work into no branch Combwork can pick: a lane’s Merges into is for Git projects.}}', description: 'HI-2556: an error starting a lane (a card loop) whose Merges into is a branch the project doesn’t list. {target} is the branch named, {default} the project’s Work merges into, {others} the others listed (a list). Other branches work can merge into and Version Control → Workflow are names in the window: as translated there. Keep the select keys.' }),
+  released: msg({ id: 'service.lanes.released', defaultMessage: '{target} is released ({dated, select, yes {{tag}, tagged {date, date, medium}} other {{tag}}}, merged into {into}). {has, select, yes {Did you mean {suggest}? Start it on {suggest}; or, for hotfix work on {target}, the user or the Assistant can start it there anyway.} other {Start it on a branch that isn’t released; or, for hotfix work on {target}, the user or the Assistant can start it there anyway.}}', description: 'HI-3148: a lane’s start refused: the branch it would work on and merge into ({target}) already shipped: a tag named after it ({tag}, as v1.4.0) is in its history and it is merged into the default branch ({into}). With dated yes, the tag’s own date. With has yes, {suggest} is a branch that exists and isn’t released.' }),
+  releaseUnknown: msg({ id: 'service.lanes.releaseUnknown', defaultMessage: 'Combwork couldn’t check whether {target} is released ({what}). Try again once the repository can be read; for work that has to go on now, the user or the Assistant can start it anyway.', description: 'HI-3148: a lane’s start refused: whether its branch ({target}) has already shipped couldn’t be read ({what}: what couldn’t be read).' }),
   targetMissing: msg({ id: 'service.lanes.targetMissing', defaultMessage: '{unknown, select, yes {Combwork can’t tell whether the branch {target} exists, so the lane wasn’t started.} other {There is no branch {target} in this repository: make it first, then start the lane on it.}}', description: 'HI-2556: an error starting a lane (a card loop) on a branch the project lists under Other branches work can merge into but which doesn’t exist (yet) in the repository. {target} is the branch name. unknown yes: git couldn’t say. Keep the select keys.' }),
   targetFixed: msg({ id: 'service.lanes.targetFixed', defaultMessage: '{builder}’s lane merges into {target} until it ends: start a new lane for another branch. Once {target} has been merged into another branch, a retarget of Work merges into moves the lane and its card there (Also retarget what can move).', description: 'HI-2556, HI-2753: an error changing a running lane’s Merges into (fixed for its life, except through a retarget once its branch has been merged into another). {builder} is the lane’s builder agent, {target} its branch. Work merges into and Also retarget what can move are names in the window (Version Control → Workflow, Save…): as translated there.' }),
   targetCard: msg({ id: 'service.lanes.targetCard', defaultMessage: '{card} merges into {cardTarget}, and this lane into {target}: a lane’s cards merge where it does. Leave it out, or start it in a lane of its own.', description: 'HI-2556: an error putting a card whose own Merges into is another branch than the lane’s into that lane. {card} is the card’s key (HI-12); {cardTarget} and {target} are branch names.' }),
@@ -1132,6 +1140,11 @@ export interface StartLane {
    */
   applyNow?: boolean
   /**
+   * HI-3148: the user's or the Assistant's override of a new lane on a released line (a hotfix lane): the line it is given
+   * for (the lane's Merges into as the refusal named it; another is refused again), why, and who.
+   */
+  released?: { target: string; reason: string; by: 'user' | 'assistant' }
+  /**
    * A new card placed on the builder's lane as it is made (HI-2167, cw_create_task's lane): the list is the running
    * lane's, as read under the lock (its queued list when it has one), with the card added last or `next` (before its first
    * card still in Todo); with no running lane, a new lane of the card alone, or refused when `needsLane`. `cards` is
@@ -1334,6 +1347,48 @@ async function lanePick(ws: WorkspaceService, project: string, raw: unknown): Pr
 }
 
 /**
+ * HI-3148: a new lane's line released (its platform's release reads), or unreadable: refused with what to do, unless the
+ * user's or the Assistant's override names exactly that line, which is then its grant (kept on the lane). Null: the line
+ * isn't released (or its platform has no release reads).
+ */
+async function laneReleased(projectPath: string, platform: PlatformId | null, target: string | null, workTarget: string | null, given?: StartLane['released']): Promise<{ grant: LaneRecord['releasedOverride'] | null; bound?: () => boolean }> {
+  const reads = target && platform ? releaseReadsOf(platform) : null
+  if (!target || !reads) return { grant: null }
+  // The user's or the Assistant's for exactly this line: theirs whatever the line is now.
+  if (given && given.target === target) return { grant: { target, by: given.by, reason: given.reason.slice(0, 4000), at: new Date().toISOString() } }
+  // What `released` rests on, read before it: asked again in the lanes' save (HR2's round 1), moved, decided again.
+  const check = await reads.watch(projectPath, target).catch(() => null)
+  const first = check ? check() : null
+  const r = first === null ? unknown(UNREADABLE.line, { branch: target }) : await reads.released(projectPath, target)
+  if (!isUnknown(r) && !r) return { grant: null, bound: () => stillAsRead(check, first) }
+  if (isUnknown(r)) throw new LaneError(409, withValues(M.releaseUnknown, { target, what: r.whatText ? storedAsText(r.whatText) : r.what }))
+  const suggest = await unreleasedFor(reads, projectPath, target, workTarget)
+  throw new LaneError(409, withValues(M.released, { target, tag: r.tag, into: r.into, dated: r.date ? 'yes' : 'no', date: r.date ? Date.parse(r.date) : 0, has: suggest ? 'yes' : 'no', suggest: suggest ?? '' })) // i18n-ignore: select keys
+}
+
+/**
+ * HI-3148, for Start Lane…: whether a new lane of `builder` on `target` (null: the project's Work merges into) would be
+ * refused for its line being released or unreadable: the line and the refusal's words, or null (it wouldn't, the rules are
+ * off, or the builder's lane is running, whose list change isn't a new start). The start checks again as it records.
+ */
+export async function laneReleaseCheck(ws: WorkspaceService, project: string, builder: string, target: string | null): Promise<{ target: string; text: Text } | null> {
+  if (!ws.path || !(await enforced())) return null
+  if ((await read(ws)).some((l) => running(l) && same(l.project, project) && l.builder.id === builder)) return null
+  const projectPath = join(ws.path, project)
+  const cfg = await ws.projectConfig(projectPath).catch(() => null)
+  const defaultTarget = (await projectTargetsOf(ws, project))?.default ?? null
+  const line = target ? await lanePick(ws, project, target) : defaultTarget
+  if (!line) return null
+  try {
+    await laneReleased(projectPath, platformIdOf(projectPath, cfg?.platform), line, defaultTarget)
+    return null
+  } catch (e) {
+    if (e instanceof LaneError && e.status === 409) return { target: line, text: e.text }
+    throw e
+  }
+}
+
+/**
  * HI-2556: a lane is one target: refused when a card of `cards` has its own Merges into (the board's `target`) and it isn't
  * the lane's (`target`, null: the project's). Read under the lanes' lock, as the list is.
  */
@@ -1401,8 +1456,13 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   if (pick && s.ownBuilder) throw new LaneError(403, M.targetBuilder)
   if (pick && !on) throw new LaneError(409, M.targetRulesOff)
   const defaultTarget = ws.path ? ((await projectTargetsOf(ws, s.project))?.default ?? null) : null
+  // HI-3148: a new lane's grant to start on a released line (its record's), or null.
+  let releasedGrant: LaneRecord['releasedOverride'] | null = null
   if (ws.path) {
     const running0 = (await read(ws)).find((l) => running(l) && same(l.project, s.project) && l.builder.id === builder.id)
+    // A new lane on a released line (or one that can't be checked) is refused, unless the user's or the Assistant's
+    // override names that line; a running lane's list change isn't a new start of its line (its cards' starts are checked).
+    if (!running0 && on) await laneReleased(projectPath, admission.platform, pick ?? defaultTarget, defaultTarget, s.released)
     const target0 = running0 ? otherThanOwn(laneTarget(ws, running0), defaultTarget) : null
     if (running0 && on && pick !== undefined && (pick ?? null) !== target0) throw new LaneError(409, withValues(M.targetFixed, { builder: running0.builder.name, target: target0 ?? defaultTarget ?? '' }))
     refuseOtherTargets(ws, s.project, s.cards, running0 && on ? target0 : (pick ?? null), defaultTarget, s.ownBuilder ? s.project : null)
@@ -1446,6 +1506,9 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     // is refused into it.
     const wasTarget = was ? otherThanOwn(laneTarget(ws, was), defaultTarget) : null
     if (was && pick !== undefined && (pick ?? null) !== wasTarget) throw new LaneError(409, withValues(M.targetFixed, { builder: was.builder.name, target: wasTarget ?? defaultTarget ?? '' }))
+    // HI-3148: the user's or the Assistant's override given to a running lane: its grant for its own line (fixed for its
+    // life), as read under this lock; given for another line, refused (its line moved, or it was never that one).
+    if (was && on && s.released && s.released.target !== (wasTarget ?? defaultTarget)) throw new LaneError(409, withValues(M.targetFixed, { builder: was.builder.name, target: wasTarget ?? defaultTarget ?? '' }))
     refuseOtherTargets(ws, s.project, cards, was ? wasTarget : (pick ?? null), defaultTarget, scope)
     shared = sharedCards(ws, lanes, s.project, builder.id, cards)
     // As it was under this lock, for the Assistant's change (#1282): recorded with the save, in its transaction.
@@ -1463,6 +1526,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
         ...(s.rounds !== undefined ? { rounds: s.rounds } : {}),
         ...(s.waitMinutes !== undefined ? { waitMinutes: s.waitMinutes } : {}),
         ...(named !== null ? { name: named } : {}),
+        ...(on && s.released ? { releasedOverride: { target: s.released.target, by: s.released.by, reason: s.released.reason.slice(0, 4000), at: t } } : {}),
         updatedAt: t
       })
       // Its brief under the same lock (HI-1795): kept unless the start gives one; a queued list change keeps it too.
@@ -1475,6 +1539,19 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
       } else if (pool === false) delete was.pool
       also.push((db) => noteLaneIn(db, ws.path!, before, was))
       return { rec: was, did: 'updated' as const, replaced: null }
+    }
+    // HI-3148: a new lane's line, decided again under the lanes' lock (refused as above), and what let it through bound
+    // to the save (its checks, run just before it): a tag made meanwhile throws it back to be decided again, so it is refused then.
+    releasedGrant = null
+    if (on) {
+      const rel = await laneReleased(projectPath, admission.platform, pick ?? defaultTarget, defaultTarget, s.released)
+      releasedGrant = rel.grant
+      if (rel.bound) {
+        const stillBound = rel.bound
+        checks.push(() => {
+          if (!stillBound()) throw new StaleLane()
+        })
+      }
     }
     let replaced: LaneRecord | null = null
     if (was) {
@@ -1507,7 +1584,8 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
       endedAt: null,
       mergeCommit: null,
       ...(ruleset ? { ruleset } : {}),
-      ...(pool ? { pool: true as const } : {})
+      ...(pool ? { pool: true as const } : {}),
+      ...(releasedGrant ? { releasedOverride: releasedGrant } : {})
     }
     const brief = nextBrief(undefined, carried?.brief?.text ?? s.brief, s.briefNotIn)
     if (brief) rec.brief = brief

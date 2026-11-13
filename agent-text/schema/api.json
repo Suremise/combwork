@@ -445,6 +445,16 @@
       "project": "plain"
     }
   },
+  "api.card.targetReleased": {
+    "placeholders": {
+      "target": "plain",
+      "tag": "plain",
+      "into": "plain",
+      "card": "plain",
+      "has": "select",
+      "suggest": "plain"
+    }
+  },
   "api.card.titleRequired": {
     "placeholders": {}
   },
@@ -1455,6 +1465,12 @@
     "placeholders": {}
   },
   "api.lane.projectRequired": {
+    "placeholders": {}
+  },
+  "api.lane.releasedArg": {
+    "placeholders": {}
+  },
+  "api.lane.releasedNotYours": {
     "placeholders": {}
   },
   "api.lane.targetText": {

@@ -379,6 +379,9 @@
   "tool.lane.arg.pool": {
     "placeholders": {}
   },
+  "tool.lane.arg.released": {
+    "placeholders": {}
+  },
   "tool.lane.arg.reviewer": {
     "placeholders": {}
   },

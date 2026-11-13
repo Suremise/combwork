@@ -50,7 +50,7 @@ import { progress, progressSeq } from './progressService'
 import { mergeSlots, recoverMergeSlots, workspaceSlots } from './mergeSlotHost'
 import { followNames } from './projectRename'
 import { slotBranch } from './mergeSlots'
-import { endLane, lanesEndedSince, listLanes, stampLaneProjects } from './lanes'
+import { endLane, laneReleaseCheck, lanesEndedSince, listLanes, stampLaneProjects } from './lanes'
 import { editLanes, endedSinceOf, laneEditOf } from './laneEdits'
 import { laneStartInfo, oweFreshForTest, retryFreshStart, startLaneFromWindow } from './laneStart'
 import { loopChecksOf } from './loopCheck'
@@ -982,9 +982,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       // A start that skips rules asks first (#1275), before any agent is added or anything launched.
       if (!opts?.confirm) {
         const ask = await tasks.startAsks(n, target.kind === 'agent' ? target.agentId : null)
-        if (ask.length) return { ask }
+        if (ask.rules.length) return { ask: ask.rules, ...(ask.released ? { released: ask.released } : {}) }
       }
-      const r = await startTask(n, target, { kind: 'user' }, undefined, opts?.reason)
+      const r = await startTask(n, target, { kind: 'user' }, undefined, opts?.reason, undefined, undefined, typeof opts?.released === 'string' ? opts.released : undefined)
       return { agentId: r.agentId, agentName: r.agentName, added: r.added }
     },
     'tasks:work': (n) => {
@@ -1640,9 +1640,10 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       const r = req && typeof req === 'object' ? req : ({} as LaneStartRequest)
       const cards = Array.isArray(r.cards) ? r.cards.filter((n: unknown): n is number => Number.isInteger(n) && (n as number) > 0).slice(0, 200) : []
       if (typeof r.builder !== 'string' || !r.builder) throw combworkError(M.laneBuilderRequired, undefined, { kind: 'invalid' })
-      return startLaneFromWindow(currentWorkspace(), workspace.assertProject(p), { builder: r.builder, reviewer: typeof r.reviewer === 'string' && r.reviewer ? r.reviewer : null, pool: r.pool === true, cards, note: typeof r.note === 'string' ? r.note.slice(0, 4000) : '', name: typeof r.name === 'string' ? r.name.slice(0, 200) : null, ...(r.applyNow === true ? { applyNow: true } : {}), ...(typeof r.target === 'string' && r.target ? { target: r.target.slice(0, 250) } : {}) })
+      return startLaneFromWindow(currentWorkspace(), workspace.assertProject(p), { builder: r.builder, reviewer: typeof r.reviewer === 'string' && r.reviewer ? r.reviewer : null, pool: r.pool === true, cards, note: typeof r.note === 'string' ? r.note.slice(0, 4000) : '', name: typeof r.name === 'string' ? r.name.slice(0, 200) : null, ...(r.applyNow === true ? { applyNow: true } : {}), ...(typeof r.target === 'string' && r.target ? { target: r.target.slice(0, 250) } : {}), ...(r.released && typeof r.released.target === 'string' && r.released.target && typeof r.released.reason === 'string' && r.released.reason.trim() ? { released: { target: r.released.target.slice(0, 250), reason: r.released.reason.trim().slice(0, 4000) } } : {}) })
     },
     'lanes:startInfo': (p) => laneStartInfo(currentWorkspace(), workspace.assertProject(p)),
+    'lanes:releaseCheck': (p, builder, target) => laneReleaseCheck(currentWorkspace(), basename(workspace.assertProject(p)), typeof builder === 'string' ? builder : '', typeof target === 'string' && target ? target.slice(0, 250) : null),
     'costs:cards': (q) => {
       if (!workspace.path) return []
       const numbers = Array.isArray(q?.numbers) ? q.numbers.filter((n) => Number.isInteger(n) && n > 0).slice(0, 1000) : undefined

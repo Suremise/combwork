@@ -106,6 +106,7 @@ export const API = {
     saidReviewed: agentMsg({ id: 'api.card.saidReviewed', text: 'Reviewed' }),
     saidSkipsReview: agentMsg({ id: 'api.card.saidSkipsReview', text: 'Skips review' }),
     saidTarget: agentMsg({ id: 'api.card.saidTarget', text: "{own, select, yes {Merges into {target}} other {Merges into the project's branch}}", note: 'HI-2556: a card update set its Merges into: own yes, {target} (a branch); else the project\'s Work merges into.' }),
+    targetReleased: agentMsg({ id: 'api.card.targetReleased', text: "{target} is released ({tag}, merged into {into}): {card}'s start there is refused unless the user OKs work on {target} (a hotfix), given as override.released {target}.{has, select, yes { Did you mean {suggest}?} other {}}", note: 'HI-3148: below a card update or new card whose Merges into ({target}) is already released: tagged ({tag}) and merged into the default branch ({into}). {suggest}: a branch that exists and isn’t released.' }),
     ownTarget: agentMsg({ id: 'api.card.ownTarget', text: "{card} now has a target of its own, {target}: it stays on {target} when the project's target (project.workflow.target, now {default}) changes, even to {target}. To have it follow the project's instead, change project.workflow.target first, then set the card's target to \"\" (its project's).", note: 'HI-3017: below a card update (HI-3043: or a new card) that gave the card a target other than its project\'s ({default}). Setting cards before the project pinned them, unnoticed (HI-3004\'s trials of assistant-retarget-release).' }),
     setReviewed: agentMsg({ id: 'api.card.setReviewed', text: 'set it to be reviewed' }),
     setSkipReview: agentMsg({ id: 'api.card.setSkipReview', text: 'set it to skip review' }),
@@ -325,6 +326,8 @@ export const API = {
     onlyAssistant: agentMsg({ id: 'api.journal.onlyAssistant', text: 'Only the Assistant keeps a journal.' })
   },
   lane: {
+    releasedArg: agentMsg({ id: 'api.lane.releasedArg', text: 'released takes target and reason: the released branch the lane starts on, as its refusal named it, and the user’s reason', note: 'HI-3148: POST /v1/lanes with a released that isn’t one.' }),
+    releasedNotYours: agentMsg({ id: 'api.lane.releasedNotYours', text: 'Only the user or the Assistant starts work on a released branch: ask the user', note: 'HI-3148: a project agent or a script passing released.' }),
     agentStartsOwn: agentMsg({ id: 'api.lane.agentStartsOwn', text: 'An agent starts its own lane, as its builder: a reviewer joins its builder\'s lane (join)' }),
     applyNowArg: agentMsg({ id: 'api.lane.applyNowArg', text: 'applyNow must be true or false' }),
     briefMax: agentMsg({ id: 'api.lane.briefMax', text: 'brief is at most {max} characters' }),

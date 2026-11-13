@@ -169,7 +169,7 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
   const release = holdLaneStart(ws, project, builder.id)
   starting.add(key)
   try {
-    const recorded = await startLane(ws, { project, builder: builder.id, reviewer: reviewer?.id ?? null, ...(pool ? { pool: true } : {}), cards: cards.map((c) => c.number), name: req.name?.trim() || null, by: inDefaultDialect(() => say(A.byUser)), ...(req.applyNow ? { applyNow: true } : {}), ...(req.target !== undefined ? { target: req.target } : {}) })
+    const recorded = await startLane(ws, { project, builder: builder.id, reviewer: reviewer?.id ?? null, ...(pool ? { pool: true } : {}), cards: cards.map((c) => c.number), name: req.name?.trim() || null, by: inDefaultDialect(() => say(A.byUser)), ...(req.applyNow ? { applyNow: true } : {}), ...(req.target !== undefined ? { target: req.target } : {}), ...(req.released ? { released: { ...req.released, by: 'user' as const } } : {}) })
     // From here, the lane's own Merges into (HI-2832), as it was recorded.
     options = laneOptions(options, recorded.lane, storedRulesets(ws, project))
     const where = await builderWhere(projectPath, builder, options, noCodeOnly(ws, cards.map((c) => c.number)))

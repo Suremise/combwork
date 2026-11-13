@@ -179,7 +179,7 @@ import type { ConnectionAnswers, ConnectionsApplied, ConnectionsPlan } from './t
 import type { TemplateWorkflow } from './workflow/templateOptions'
 import type { ProjectPref, ProjectPrefValue } from './uiPrefs'
 import type { TipsChange, TipsState } from './tips'
-import type { AdvancedState } from './advanced'
+import type { AdvancedState, Text } from './advanced'
 import type { GitTool } from './gitTool'
 import type { GitInitCheck, GitInitOptions } from './gitInit'
 import type { BranchAt, BranchDrops, BranchUpdateHow, BranchUpdatePlan, CompareLines, GitComparison, LeftoverInfo, GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
@@ -574,7 +574,7 @@ export interface CombworkRequests {
    * The user's move of a card to a column through its workflow rules (#1265, SPEC §16.8.4): a move that skips a rule
    * asks first (`ask`, nothing written) unless `confirm`, then records an Override (with `reason`, optional).
    */
-  'tasks:move': (n: number, column: TaskColumn, opts?: { before?: number | null; confirm?: boolean; reason?: string; agent?: string | null; paths?: string[] | null }) => TaskMoveResult
+  'tasks:move': (n: number, column: TaskColumn, opts?: { before?: number | null; confirm?: boolean; reason?: string; agent?: string | null; paths?: string[] | null; released?: string }) => TaskMoveResult
   /** The columns a card can be moved to under its rules (#1275): where a drag may drop it; null: every column (no rule applies). */
   'tasks:columns': (n: number) => TaskColumn[] | null
   /** A card's facts (#1216), oldest first: what each move recorded (none on a board waiting for its upgrade). */
@@ -605,7 +605,7 @@ export interface CombworkRequests {
   /** To the Recycle Bin. */
   'tasks:delete': (n: number) => void
   /** Gives the card to an agent (an existing one, or a new one) with the card as its prompt, and moves it to Doing. */
-  'tasks:start': (n: number, target: TaskStartTarget, opts?: { confirm?: boolean; reason?: string }) => { agentId: string; agentName: string; added: boolean } | { ask: string[] }
+  'tasks:start': (n: number, target: TaskStartTarget, opts?: { confirm?: boolean; reason?: string; released?: string }) => { agentId: string; agentName: string; added: boolean } | { ask: string[]; released?: string }
   /** A card's work (#1223): its facts folded into its line, revisions, verdicts, checks, marks and integration; null with no such card, or on a board not upgraded to 1.0. */
   'tasks:work': (n: number) => WorkView | null
   /** Every live card's badges from its work (#1223), in number order; archived cards aren't read. */
@@ -992,6 +992,11 @@ export interface CombworkRequests {
   'lanes:start': (projectPath: string, req: LaneStartRequest) => LaneStartResult
   /** What Start Lane… offers for a project (#1443): the reviewer pool's agents when its rules have G17 a shared pool, else null. */
   'lanes:startInfo': (projectPath: string) => LaneStartInfo
+  /**
+   * HI-3148: whether Start lane… for this builder on `target` (null: the project's Work merges into) would be refused for
+   * its line being released or unreadable: the line and the refusal, for Start Anyway; null, it wouldn't.
+   */
+  'lanes:releaseCheck': (projectPath: string, builder: string, target: string | null) => { target: string; text: Text } | null
   /**
    * Cost per card (#602): the cards named, or every card (a project's, by its folder name) held at some time in [from, to)
    * (ms since the epoch).
