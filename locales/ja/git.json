@@ -262,7 +262,7 @@
   "git.signing.formatName": "{format, select, ssh {SSH} x509 {X.509} other {OpenPGP (gpg)}}",
   "git.signing.heading": "署名",
   "git.signing.howGpg": "gpgで無人署名するには、gpg-agentにパスフレーズを保持させます。gpg-agent.confでdefault-cache-ttlとmax-cache-ttlを設定し、手動で一度署名して（自分のコミットで）、その期間ロックを解除してください。",
-  "git.signing.howSsh": "SSHで無人署名するには、キーをWindowsのOpenSSHエージェントに保持させます。「OpenSSH Authentication Agent」サービスを自動起動に設定して開始し、自分のキーでssh-addを一度実行し、user.signingkeyでそのキーの.pubファイルを指定してください。",
+  "git.signing.howSsh": "SSHで無人署名するには、キーをWindowsのOpenSSHエージェントに保持させます。「OpenSSH Authentication Agent」サービスを自動起動に設定して開始し、自分のキーでssh-addを一度実行し、user.signingkeyでそのキーの.pubファイルを指定し、gpg.ssh.programをC:/Windows/System32/OpenSSH/ssh-keygen.exeに設定してください（Git for Windows自身のssh-keygenはこのエージェントに接続できません）。",
   "git.signing.key": "キー",
   "git.signing.limits": "確認が成功しても、この署名プログラムがたった今署名できたことしか分かりません。すでに動作中のエージェント、スマートカード、ハードウェアキーは、独自の方法で入力を求める場合があります。",
   "git.signing.needsSomeone": "パスフレーズを求められます。現在、署名には人の操作が必要なため、キーのロックを解除するまで、マージキューは署名付きマージのたびにその前で一時停止します。",

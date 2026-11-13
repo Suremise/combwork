@@ -106,6 +106,21 @@ describe.skipIf(!ready)('ssh signing through cw-sign', () => {
     expect(heads(r)).toBe(0)
   })
 
+  it('fails at once, saying why, for a literal key (key:: or bare) with no agent: git asks ssh-keygen -U, which only an agent can answer (HI-3110)', () => {
+    const k = sshKey(join(GB, 'ssh-keygen.exe'), '')
+    const literal = readFileSync(`${k}.pub`, 'utf8').trim()
+    for (const key of [`key::${literal}`, literal]) {
+      const r = repo('ssh', key)
+      // No agent anywhere: SSH_AUTH_SOCK isn't in the test's environment (an allowlist).
+      const c = commit(r, session())
+      expect(c.status).not.toBe(0)
+      expect(c.ms).toBeLessThan(FAST_MS)
+      expect(c.err).toMatch(/couldn't get agent socket|couldn't find key in agent/i)
+      expect(c.err).toContain(NEEDS_LINE)
+      expect(heads(r)).toBe(0)
+    }
+  })
+
   it.skipIf(!existsSync(SYS_KEYGEN))("fails at once with Windows' own ssh-keygen too, which reads the console when it has one (measured: it waits)", () => {
     // Its own key: it refuses a key file another tool made when the folder's permissions are wider than it allows.
     const r = repo('ssh', slash(sshKey(SYS_KEYGEN, 'secret')))

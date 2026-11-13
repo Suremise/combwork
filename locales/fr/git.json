@@ -262,7 +262,7 @@
   "git.signing.formatName": "{format, select, ssh {SSH} x509 {X.509} other {OpenPGP (gpg)}}",
   "git.signing.heading": "Signature",
   "git.signing.howGpg": "Pour signer sans surveillance avec gpg, laisse gpg-agent garder la phrase secrète : définis default-cache-ttl et max-cache-ttl dans gpg-agent.conf, puis signe une fois à la main (un commit à toi) pour la déverrouiller pendant cette durée.",
-  "git.signing.howSsh": "Pour signer sans surveillance avec SSH, garde la clé dans l’agent OpenSSH de Windows : règle le service « OpenSSH Authentication Agent » sur un démarrage automatique et démarre-le, exécute ssh-add une fois avec ta clé, et fais pointer user.signingkey vers son fichier .pub.",
+  "git.signing.howSsh": "Pour signer sans surveillance avec SSH, garde la clé dans l’agent OpenSSH de Windows : règle le service « OpenSSH Authentication Agent » sur un démarrage automatique et démarre-le, exécute ssh-add une fois avec ta clé, fais pointer user.signingkey vers son fichier .pub, et règle gpg.ssh.program sur C:/Windows/System32/OpenSSH/ssh-keygen.exe (le ssh-keygen de Git for Windows n’atteint pas cet agent).",
   "git.signing.key": "Clé",
   "git.signing.limits": "Une vérification réussie dit seulement que ce programme de signature vient de signer. Un agent déjà lancé, une carte à puce ou une clé matérielle peut quand même demander quelque chose à sa façon.",
   "git.signing.needsSomeone": "Demanderait une phrase secrète : la signature a besoin de quelqu’un maintenant, donc la file de fusion se met en pause avant chaque fusion signée jusqu’à ce que tu déverrouilles la clé.",
