@@ -101,7 +101,8 @@ vi.mock('../src/main/git', async (original) => {
         afterMade = null
         then(cwd)
       }
-      if (failStashAfter && args[0] === 'stash') {
+      // The push itself (HI-3125: Set Aside lists the stashes first, a stash command too).
+      if (failStashAfter && args[0] === 'stash' && args[1] === 'push') {
         failStashAfter = false
         return { ...r, ok: false, code: 1, err: 'error: could not write index' }
       }
