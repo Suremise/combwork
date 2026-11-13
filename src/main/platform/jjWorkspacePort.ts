@@ -31,6 +31,7 @@ import { jjRunner, type JjRunner, type JjRunResult } from './jjRunner'
 import { jjFileGate, pathKey, rootKey, storeKey } from './jjFileGate'
 import { asideOf, asReceipt, entryIdSync, linksTo, provedSync, receiptOf, residuesOf, worktreesOf, type GitLinkReceipt } from './jjGitLink'
 import { refusedDetail, snapshotRefused } from './jjSnapshotRefused'
+import { untrackedPaths } from './jjUntracked'
 import type { OwnedWrite, SlotWord, WorkspaceFence, WorkspaceHeads, WorkspaceIdentity, WorkspaceJournal, WorkspaceListing, WorkspacePort, WorkspaceStep } from './workspacePort'
 import { agentMsg, type AgentMsg } from '../../shared/agentText'
 import { carriesBinding, chainIsBinding, forgetBindingIn, isJjLineKey, parseJjLineKey, sameBinding, type JjBinding, type JjPrepJournal, type JjPrepStore } from './jjSlotPrep'
@@ -1501,7 +1502,11 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       // a reuse, a removal or a copy's check sees it as an uncommitted edit, as Git's would an untracked file.
       const leftOut = snapshotRefused(snap.err)?.files ?? []
       const files = lines(out).map((l) => l.replace(/^[A-Z] /, ''))
-      return { files: [...files, ...leftOut.filter((f) => !files.includes(f))], leftOut }
+      // Files jj doesn't track (HI-3096: `snapshot.auto-track` narrowed), listed by the snapshot's own `status`: on disk,
+      // in no commit, the slot's uncommitted work all the same (Darren's decision, 12 Nov).
+      const untracked = untrackedPaths(snap.out)
+      const all = [...files, ...leftOut.filter((f) => !files.includes(f))]
+      return { files: [...all, ...untracked.filter((f) => !all.includes(f))], leftOut }
     },
     copyIntact: async (folder, revision, fence, identity) => {
       const files = await port.record!(folder, fence, identity)

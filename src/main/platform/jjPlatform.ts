@@ -225,7 +225,7 @@ export const RETAIN_PAGE = 8
 export const RETAIN_EVERY_MS = 6 * 60 * 60 * 1000
 
 /** A jj refusal of a card's move, worded by its code (`platform.jjRefused`). */
-type JjWhy = 'tooLarge' | 'mergeWorkingCopy' | 'notFromBase' | 'otherCard' | 'divergent' | 'conflicted' | 'isolated' | 'tooLong' | 'unbound' | 'recovered'
+type JjWhy = 'tooLarge' | 'autoTrack' | 'mergeWorkingCopy' | 'notFromBase' | 'otherCard' | 'divergent' | 'conflicted' | 'isolated' | 'tooLong' | 'unbound' | 'recovered'
 
 /**
  * A file Recover… of a stale slot wrote beside another (HI-2996, jjRecovery.ts): its copy of the user's version, or the
@@ -533,6 +533,9 @@ export class JjPlatform implements PlatformAdapter {
       // New files jj left out for its size limit (HI-2973): the work isn't all recorded, named for the agent to commit
       // (raising the limit) or ignore.
       if (boundaryRefused(b) && b.refused === 'tooLarge') return { ok: false, refusal: this.refused(card, 'tooLarge', { files: (b.files ?? []).slice(0, 10).join(', '), count: (b.files ?? []).length }) }
+      // The user's snapshot.auto-track narrowed (HI-3096): new files aren't recorded by themselves, so the boundary
+      // can't vouch the work is all recorded. Said as that, naming the setting, never "couldn't read the folder".
+      if (boundaryRefused(b) && b.refused === 'autoTrack') return { ok: false, refusal: this.refused(card, 'autoTrack', { setting: b.detail ?? '' }) }
       if (boundaryRefused(b)) return { ok: false, refusal: b.refused === 'moved' || b.refused === 'owner' ? { rule: 'evidence.changed', values: { card: card.key } } : this.unknownRefusal(card, withDetail(unknown(UNREADABLE.state, { folder }), b.detail ?? b.refused), 'submit') }
       // Something recorded: the folder had changes jj hadn't seen (an uncommitted edit): commit them first.
       if (b.recorded) return { ok: false, refusal: { rule: 'submit.empty', values: { card: card.key, changes: 'yes' } } }

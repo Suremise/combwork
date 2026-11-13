@@ -2458,6 +2458,13 @@ so credit is only ever on the exact commit id and its content (R3.1, R3.2), and 
   other edit, ignores them when deciding whether X is exactly the preserved delta, and names them. Combwork never raises
   the limit itself: the agent or user commits the file with the limit raised (`jj config set --repo
   snapshot.max-new-file-size <bytes>`) or leaves it out with `.gitignore`.
+- **Files jj doesn't track** (HI-3096; Darren's decision, 12 Nov, option (a)). With the user's `snapshot.auto-track`
+  narrowed (`none()`: jj's own setting for adding files by hand) a new file is on disk, in no commit, and the snapshot
+  says nothing of it. It is a slot's uncommitted work all the same: the pool's record also lists `jj status`'s
+  "Untracked paths" (`platform/jjUntracked.ts`; a block of an unknown form is still not clean), so a slot holding one
+  is never settled ready, lent to the next card or removed with it. A submission under such a setting is refused as
+  `platform.jjRefused` `autoTrack` naming the setting (the boundary's `autoTrack`, no longer `platform.unknown`), the
+  way out being the setting back to `all()` for the repository (`jj config set --repo snapshot.auto-track 'all()'`).
 - **A check run's credit** (`platform/jjChecks.ts`, the jj side of §16.13's bracket), decided by a pure function
   (`jjCredit`) from the captures, in order:
   1. the start boundary B1: anything recorded means disk wasn't @, so `dirty`;
