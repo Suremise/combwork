@@ -405,6 +405,16 @@ describe('the plan usage Combwork keeps from its sessions (#383)', () => {
       expect(weekly(kept)).toBe(79)
     })
 
+    it('a session changing its figure on the very next report is shown, with no repeat between (HR3, round 2)', () => {
+      for (const steps of [[['A', 96], ['A', 77]], [['A', 95], ['A', 96], ['A', 77]]] as [string, number][][]) {
+        const memo = new Map()
+        let kept = run(undefined, steps, memo)
+        expect(weekly(kept)).toBe(77)
+        kept = run(kept, [['A', 77], ['A', 77]], memo, at + steps.length * 60_000)
+        expect(weekly(kept)).toBe(77)
+      }
+    })
+
     it('a figure kept before HI-3181, with no ages, gives way to a session reading lower since it was reported', () => {
       const old = mergePlanUsage(undefined, claude(96), at, 'HB5')
       expect(old.limits.find((l) => l.id === 'seven_day')!.firstSeenAt).toBeUndefined()

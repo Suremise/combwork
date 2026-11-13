@@ -52,7 +52,9 @@ function mergeLimit(kept: PlanLimit | undefined, next: PlanLimit, now: number): 
  */
 function newer(kept: PlanLimit, next: PlanLimit): 'kept' | 'next' | null {
   const takenBy = (l: PlanLimit): string | undefined => l.firstSeenAt ?? l.reportedAt
-  const after = (a: string | undefined, b: string | undefined): boolean => !!a && !!b && Date.parse(a) > Date.parse(b)
+  // A reading taken after a report that came at or after the other was taken (HR3's round 2: equal is a session changing
+  // its figure on the report right after the one that gave the kept one).
+  const after = (a: string | undefined, b: string | undefined): boolean => !!a && !!b && Date.parse(a) >= Date.parse(b)
   if (after(next.changedAfter, takenBy(kept))) return 'next'
   if (after(kept.changedAfter, takenBy(next))) return 'kept'
   return null
