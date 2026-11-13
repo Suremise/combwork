@@ -105,7 +105,11 @@ function mapInputs(entries: readonly MapEntry[], contexts: ReadonlyMap<string, M
  * Null for one not known (no usage yet): never a zero.
  */
 export function useMapContexts(on: boolean, entries: readonly MapEntry[]): ReadonlyMap<string, MapContext | null> {
-  const versions = useStore((s) => s.usageVersion)
+  // Taken in only while on: hidden (or the context off), a project's usage changing draws nothing (HI-3182), and it is
+  // read again as it comes on.
+  const kept = useRef<Record<string, number> | null>(null)
+  const versions = useStore((s) => (on || !kept.current ? s.usageVersion : kept.current))
+  kept.current = versions
   const [got, setGot] = useState<ReadonlyMap<string, { at: string; ctx: MapContext | null }>>(new Map())
   const queue = useRef(boundedQueue(2))
   const wanted = entries.slice(0, MAP_AGENTS).flatMap((e) => (e.live && !e.live.settingUp ? [{ key: e.key, path: e.path, live: e.live, at: `${mapContextKey(e.live)}:${versions[e.path] ?? 0}` }] : []))
