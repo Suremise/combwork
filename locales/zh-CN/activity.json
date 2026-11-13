@@ -47,7 +47,7 @@
   "activity.map.partial": "来自最近读取的调用：并非完整历史。",
   "activity.map.pct": "{pct, number}%",
   "activity.map.prompt": "提示词",
-  "activity.map.ringTip": "{name}：{load, select, notLoaded {超出地图读取的八个智能体，因此不显示它的调用} loading {正在读取它的调用} other {{known, select, no {上下文未知} other {上下文 {pct, number}%}}}}。点击只显示这个智能体。",
+  "activity.map.ringTipShown": "{name}：{load, select, notLoaded {超出地图读取的八个智能体，因此不显示它的调用} loading {正在读取它的调用} other {{known, select, no {上下文未知} other {上下文 {pct, number}%}}}}。{shown, select, yes {已在地图上显示：点击可重新显示所有智能体（或按 Esc）。} other {点击显示它的地图；其他智能体仍列在这里。}}",
   "activity.map.show": "显示",
   "activity.map.state": "{state, select, working {工作中} waiting {等待你} failed {失败或停滞} done {已结束} other {空闲}}",
   "activity.map.station": "{station, select, you {你} read {读取} edit {编辑} shell {命令行} agents {智能体} other {工具}}",

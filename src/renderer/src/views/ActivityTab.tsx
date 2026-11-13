@@ -11,7 +11,7 @@ import { confirm, isAssistantPath, notify, openInSessionsTab, revealAgent, set, 
 import { Icon, IconButton, statusText, useContextMenu, type MenuEntry } from '../components/ui'
 import { StateMark } from '../components/StateMark'
 import { loadActivityView, loadMapShow, saveActivityView, saveMapShow, type ActivityView, type MapShow } from '../activityView'
-import { ActivityMap, MapToggles, mapSessions, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
+import { ActivityMap, MapToggles, mapSessions, mapStrip, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
 import { mapContextEntries, mapMode, type MapContext } from '@shared/activityMap'
 import { cx } from '../util'
 import { boundedQueue, latestOnly } from '@shared/coalesce'
@@ -329,12 +329,29 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => setMapEntries(forContexts.entries), [forContexts.key])
   const mapOn = mapShow.map
+  // One agent of the selection shown alone (HI-3180, Darren's decision): the strip's click. The selection, its tabs and
+  // the strip stay; a click on another switches, on that one (or Escape) shows them all again. Gone with the agent.
+  const [shownAgent, setShownAgent] = useState<string | null>(null)
+  // The selection chosen again (Agents ▾, even the same): all of it shown again.
+  useEffect(() => setShownAgent(null), [view.agents])
+  const alone = mode === 'shared' && shownAgent && entries.some((e) => e.key === shownAgent) ? shownAgent : null
+  const drawnMode = alone ? 'single' : mode
+  const drawnEntries = useMemo(() => (alone ? entries.filter((e) => e.key === alone) : entries), [entries, alone])
   // Animated once live and the snapshot released (HI-2939): its first pulses' baseline is then the live reads, never the
   // held ones (from those, what came while frozen was sent as a burst).
-  const map = useActivityMap({ active, animate: active && live && !held && mapOn, scope: `${fresh}|${mode}|${filterKey}`, entries: mapOn ? entries : NO_ENTRIES, contexts: drawn.contexts, mode, at: input.at })
+  const map = useActivityMap({ active, animate: active && live && !held && mapOn, scope: `${fresh}|${drawnMode}|${filterKey}|${alone ?? ''}`, entries: mapOn ? drawnEntries : NO_ENTRIES, contexts: drawn.contexts, mode: drawnMode, at: input.at })
+  const strip = useMemo(() => (alone ? mapStrip(entries, drawn.contexts) : undefined), [alone, entries, drawn.contexts])
   // The sessions the map reads beyond the list's (the shared map's agents' running sessions): none with the map off.
   const mapRead = useMemo(() => (mapOn ? mapSessions(entries, mode) : []), [mapOn, entries, mode])
-  const pickMapAgent = useCallback((key: string) => setView({ agents: [key] }), [setView])
+  // Its tab in the list too, so the list beside shows its work.
+  const pickMapAgent = useCallback(
+    (key: string) => {
+      if (alone === key) return setShownAgent(null)
+      setShownAgent(key)
+      setView({ tab: key })
+    },
+    [alone, setView]
+  )
 
   // The turns of each session shown: read once there (the tick reads live ones again: HR6's round 1, a running
   // subagent's too), and the map's.
@@ -445,7 +462,7 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
           </div>
         )}
         <div className={cx('activity-body', mapOn && entries.length > 0 && 'with-map')}>
-          {mapOn && entries.length > 0 && <ActivityMap mode={mode} title={project.name} model={map.model} pulses={map.pulses} endPulse={map.endPulse} show={mapShow} onPick={pickMapAgent} />}
+          {mapOn && entries.length > 0 && <ActivityMap mode={drawnMode} title={project.name} model={map.model} pulses={map.pulses} endPulse={map.endPulse} show={mapShow} onPick={pickMapAgent} strip={strip} picked={alone} />}
         {!parts.length ? (
           <div className="pane-empty">{reading ? null : tr(filtered ? M.emptyFiltered : M.empty)}</div>
         ) : (

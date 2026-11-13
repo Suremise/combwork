@@ -191,9 +191,9 @@
     "defaultMessage": "Prompt",
     "description": "On the Activity map and its feed: a prompt the agent was given (at the You station), named by this word only, never its text."
   },
-  "activity.map.ringTip": {
-    "defaultMessage": "{name}: {load, select, notLoaded {past the eight agents the map reads, so its calls aren’t shown} loading {its calls are being read} other {{known, select, no {context not known} other {context {pct, number}%}}}}. Click to show only this agent.",
-    "description": "Hover of an agent's ring on the Activity map's shared view. {name} is the agent; {pct} its context in percent; known no: its context isn't known. Keep the select keys."
+  "activity.map.ringTipShown": {
+    "defaultMessage": "{name}: {load, select, notLoaded {past the eight agents the map reads, so its calls aren’t shown} loading {its calls are being read} other {{known, select, no {context not known} other {context {pct, number}%}}}}. {shown, select, yes {Shown on the map: click to show every agent again (or press Escape).} other {Click to show its map; the others stay listed here.}}",
+    "description": "Hover of an agent's ring in the Activity map's strip of the agents selected (HI-3180). {name} is the agent; {pct} its context in percent; known no: its context isn't known; shown yes: the map shows this agent alone now (a click shows all of them again), else it shows them all or another one. Keep the select keys."
   },
   "activity.map.show": {
     "defaultMessage": "Show",

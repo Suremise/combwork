@@ -47,7 +47,7 @@
   "activity.map.partial": "Pelas últimas chamadas lidas: não é o histórico inteiro.",
   "activity.map.pct": "{pct, number}%",
   "activity.map.prompt": "Prompt",
-  "activity.map.ringTip": "{name}: {load, select, notLoaded {além dos oito agentes que o mapa lê, então suas chamadas não aparecem} loading {suas chamadas estão sendo lidas} other {{known, select, no {contexto desconhecido} other {contexto {pct, number}%}}}}. Clique para mostrar só este agente.",
+  "activity.map.ringTipShown": "{name}: {load, select, notLoaded {além dos oito agentes que o mapa lê, então suas chamadas não aparecem} loading {suas chamadas estão sendo lidas} other {{known, select, no {contexto desconhecido} other {contexto {pct, number}%}}}}. {shown, select, yes {Mostrado no mapa: clique para mostrar todos os agentes de novo (ou pressione Esc).} other {Clique para mostrar o mapa dele; os outros continuam listados aqui.}}",
   "activity.map.show": "Mostrar",
   "activity.map.state": "{state, select, working {Trabalhando} waiting {Aguardando você} failed {Com falha ou travado} done {Finalizado} other {Ocioso}}",
   "activity.map.station": "{station, select, you {Você} read {Ler} edit {Editar} shell {Shell} agents {Agentes} other {Ferramentas}}",

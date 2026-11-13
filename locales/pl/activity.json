@@ -47,7 +47,7 @@
   "activity.map.partial": "Z ostatnio wczytanych wywołań: nie cała historia.",
   "activity.map.pct": "{pct, number}%",
   "activity.map.prompt": "Prompt",
-  "activity.map.ringTip": "{name}: {load, select, notLoaded {poza ośmioma agentami, które wczytuje mapa, więc jego wywołania nie są pokazane} loading {jego wywołania są wczytywane} other {{known, select, no {kontekst nieznany} other {kontekst {pct, number}%}}}}. Kliknij, aby pokazać tylko tego agenta.",
+  "activity.map.ringTipShown": "{name}: {load, select, notLoaded {poza ośmioma agentami, które wczytuje mapa, więc jego wywołania nie są pokazane} loading {jego wywołania są wczytywane} other {{known, select, no {kontekst nieznany} other {kontekst {pct, number}%}}}}. {shown, select, yes {Pokazany na mapie: kliknij, aby znów pokazać wszystkich agentów (lub naciśnij Esc).} other {Kliknij, aby pokazać jego mapę; pozostali zostają na tej liście.}}",
   "activity.map.show": "Pokaż",
   "activity.map.state": "{state, select, working {Pracuje} waiting {Czeka na Ciebie} failed {Błąd lub zastój} done {Zakończone} other {Bezczynny}}",
   "activity.map.station": "{station, select, you {Ty} read {Odczyt} edit {Edycja} shell {Powłoka} agents {Agenci} other {Narzędzia}}",

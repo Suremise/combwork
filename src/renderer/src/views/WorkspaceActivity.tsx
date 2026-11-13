@@ -10,7 +10,7 @@ import { NO_PROJECTS, activityAgentKey, cardActivityAgents, openActivity, set, u
 import { Icon, IconButton, InfoTip, statusText, Tooltip, useContextMenu, type MenuEntry } from '../components/ui'
 import { StateMark } from '../components/StateMark'
 import { loadActivityView, loadMapShow, saveActivityView, saveMapShow, type ActivityView, type MapShow } from '../activityView'
-import { ActivityMap, MapToggles, mapSessions, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
+import { ActivityMap, MapToggles, mapSessions, mapStrip, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
 import { liveIn, mapContextEntries, mapMode, type MapContext } from '@shared/activityMap'
 import { cx } from '../util'
 import { ACTIVITY_M, Details, FADE_MS, LIST_EVERY, markOf, NO_NOW, PartView, TICK_MS, TURNS_AT_ONCE, usePageVisible } from './ActivityTab'
@@ -417,10 +417,26 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => setMapEntries(forContexts.entries), [forContexts.key])
   const mapOn = mapShow.map
+  // One agent of the selection shown alone (HI-3180, Darren's decision): see the project's tab.
+  const [shownAgent, setShownAgent] = useState<string | null>(null)
+  // The selection chosen again (Agents ▾, even the same): all of it shown again.
+  useEffect(() => setShownAgent(null), [view.agents])
+  const alone = mode === 'shared' && shownAgent && entries.some((e) => e.key === shownAgent) ? shownAgent : null
+  const drawnMode = alone ? 'single' : mode
+  const drawnEntries = useMemo(() => (alone ? entries.filter((e) => e.key === alone) : entries), [entries, alone])
   // Animated once live and the snapshot released (HI-2939): see the project's tab.
-  const map = useActivityMap({ active, animate: active && live && !held && mapOn, scope: `${fresh}|${mode}|${filterKey}`, entries: mapOn ? entries : NO_ENTRIES, contexts: drawn.contexts, mode, at })
+  const map = useActivityMap({ active, animate: active && live && !held && mapOn, scope: `${fresh}|${drawnMode}|${filterKey}|${alone ?? ''}`, entries: mapOn ? drawnEntries : NO_ENTRIES, contexts: drawn.contexts, mode: drawnMode, at })
+  const strip = useMemo(() => (alone ? mapStrip(entries, drawn.contexts) : undefined), [alone, entries, drawn.contexts])
   const mapRead = useMemo(() => (mapOn ? mapSessions(entries, mode) : []), [mapOn, entries, mode])
-  const pickMapAgent = useCallback((key: string) => setView({ agents: [key], forCard: undefined }), [setView])
+  // Its tab in the list too (the tab's key is the agent's host-qualified key, as the map's).
+  const pickMapAgent = useCallback(
+    (key: string) => {
+      if (alone === key) return setShownAgent(null)
+      setShownAgent(key)
+      setView({ tab: key })
+    },
+    [alone, setView]
+  )
 
   // Turns for the tab shown (its agent's session and running subagents), and the map's agents' sessions.
   const shownSessions = useMemo(() => {
@@ -555,7 +571,7 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
           </div>
         )}
         <div className={cx('activity-body', mapOn && entries.length > 0 && 'with-map')}>
-          {mapOn && entries.length > 0 && <ActivityMap mode={mode} title={workspaceName} model={map.model} pulses={map.pulses} endPulse={map.endPulse} show={mapShow} onPick={pickMapAgent} />}
+          {mapOn && entries.length > 0 && <ActivityMap mode={drawnMode} title={workspaceName} model={map.model} pulses={map.pulses} endPulse={map.endPulse} show={mapShow} onPick={pickMapAgent} strip={strip} picked={alone} />}
         {!parts.length || !current ? (
           <div className="pane-empty">{reading ? null : forCardLabel ? tr(M.cardNobody, { card: forCardLabel }) : tr(filtered ? ACTIVITY_M.emptyFiltered : M.empty)}</div>
         ) : (
