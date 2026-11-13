@@ -1096,7 +1096,8 @@ describe('HI-3127: a card returned for what only the remote has', () => {
   }
 
   it('a conflict names the remote head it was tested on, kept in the repository; merged there, it conflicts, and resolved it merges', { timeout: GIT_HEAVY_MS }, async () => {
-    const { e, bare, queue } = following()
+    // G12 on: the remote's commit (someone else's) merged as told is never counted as the card's own (its base moves up).
+    const { e, bare, queue } = following({ identity: { name: 'Combwork Test', email: 'test@example.invalid' } })
     const { card, folder } = await inFolder(e, 'A', 'a.txt', 'ours\n')
     const remote = pushes(bare, 'a.txt', 'theirs\n')
     const [localMain, tracking] = [head(e.project), head(e.project, 'refs/remotes/origin/main')]
@@ -1116,6 +1117,8 @@ describe('HI-3127: a card returned for what only the remote has', () => {
     sh(folder, 'add', '-A')
     sh(folder, 'commit', '-qm', 'Merge the remote main, resolved')
     moved(await e.wf.submit(card.key, B1, { summary: 'resolved' }))
+    // Its submission's base is the remote head it merged, so its change is its own: a.txt, from theirs to the resolution.
+    expect(e.store.facts(card.id).filter((f) => f.kind === 'Submitted').at(-1)?.data).toMatchObject({ base: remote })
     expect(await queue().drain('main')).toMatchObject([{ card: card.key, outcome: 'integrated' }])
     expect(head(bare)).toBe(head(e.project))
     expect(sh(bare, 'show', 'main:a.txt')).toBe('ours and theirs')
