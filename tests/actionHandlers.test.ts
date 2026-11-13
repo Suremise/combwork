@@ -730,7 +730,7 @@ describe('notices (#1266, §16.11.4)', () => {
   it("#1645: a card's events name the running lane that holds it, never an abandoned lane that once listed it", async () => {
     const agents = [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'b4', name: 'B4' }, { id: 'r4', name: 'R4' }]
     // Each way in a workspace of its own: the wrong lane abandoned before the round (seen by a look in between), or still
-    // running when the right one starts and abandoned in the same look as the failure.
+    // running when the right one starts and ended by itself once its card is the other lane's (HI-3118), before the failure.
     for (const between of [true, false]) {
       const { w, ws, alpha } = await open({ agents })
       const st = fake(alpha, { b1: 'working', r1: 'working', b4: 'working', r4: 'working' })
@@ -751,7 +751,11 @@ describe('notices (#1266, §16.11.4)', () => {
       await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
       await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
       await notices.checkLanesNow(w)
-      if (!between) await lanes.endLane(w, wrong.id, { abandoned: true })
+      // Still running, its card now the other lane's agents' (HI-3118): it ends by itself at the lanes' next look, which
+      // ran on a 300 ms timer here before (HI-3159's flake, the test abandoning it first or not). Looked at now, before
+      // the failure; the abandoned case is the first pass's.
+      await lanes.refresh(w)
+      if (!between) expect((await lanes.listLanes(w, { all: true })).find((l) => l.id === wrong.id)?.state).toBe('ended')
       const told = st.notices.length
       await inWorkspace(w, () => tasks.updateTask(c, { review: 'failed' }, r1, { comment: 'FAILED' }))
       await vi.waitFor(async () => {
@@ -766,7 +770,7 @@ describe('notices (#1266, §16.11.4)', () => {
       // The card's history names the running lane too.
       const card = await inWorkspace(w, () => tasks.getTask(c, w))
       expect(JSON.stringify(card.history.filter((h) => /failed/i.test(JSON.stringify(h))))).not.toContain('Narrow card chips')
-      expect((await lanesOf(c)).map((l) => l.state).sort()).toEqual(['abandoned', 'active'])
+      expect((await lanesOf(c)).map((l) => l.state).sort()).toEqual(between ? ['abandoned', 'active'] : ['active', 'ended'])
       // Closed with its test (HI-1946): its failed card is back in Doing, its builder's, and a later test's stand-in
       // sessions don't run that builder, so the lane's next look would tell its card stalled in that test.
       await disposeWorkspaceService(w)
