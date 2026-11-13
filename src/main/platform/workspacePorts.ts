@@ -24,9 +24,6 @@ export function registerWorkspacePort(platform: PlatformId, port: WorkspacePort)
 /** A platform's workspace lifecycle port, or null for one without isolation (None) or not registered. */
 export const workspacePortOf = (platform: PlatformId): WorkspacePort | null => PORTS[platform] ?? null
 
-/** Whether a card's line is a jj preparation's key (HI-2866): a locator, never a Git branch or a bookmark. */
-export { isJjLineKey } from './jjSlotPrep'
-
 /**
  * The relocation of the repository platform holding `folder` (HI-2792: Repair after a move), read from its folders; null
  * when none holds it or its platform has no relocation (§16.3.6's gate: relocation).
