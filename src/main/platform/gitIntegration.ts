@@ -510,7 +510,9 @@ export const gitIntegration: IntegrationPort = {
       await h.run(f, ['clean', '-fdq'])
     }
     // Its output read with git's own trace in it (commitEnv), so a failure is told by who said what, never by words.
-    const m = await h.run(f, [...who, 'merge', squash ? '--squash' : '--no-ff', ...(squash ? [] : ['--no-edit', '-m', message]), revision], opts)
+    // HI-3108: a squash says --ff, so the repository's merge.ff (false: "--squash and --no-ff"; only: refused once the
+    // target moved on) never decides it: a squash makes no merge commit, so the setting has nothing to say about it.
+    const m = await h.run(f, [...who, 'merge', ...(squash ? ['--squash', '--ff'] : ['--no-ff', '--no-edit', '-m', message]), revision], opts)
     // HI-2020: git never started (nothing ran, so nothing to tell a hook or a conflict from), or HI-2042 a signal ended it
     // (no answer of git's to tell them from): put back, and again.
     if (m.notRun || m.signal) {
