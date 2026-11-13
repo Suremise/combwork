@@ -1155,7 +1155,7 @@ export class Workflow {
         const bad = opts.drag ? this.across(w, 'start', 'active', g.ins, opts.drag) : this.check(w, 'start', g.ins)
         if (bad) return undone(bad)
         // The release override it was given, recorded with the start it lets through, for the line it was given for.
-        if (rel.grant) w.fact('Override', rel.grant)
+        if (rel.grant) w.fact('Override', rel.grant) // i18n-ignore: a fact's kind and codes, not text
         this.applyStart(w, g, w.written.some((f) => f.kind === 'Override') ? 'override' : actor === 'user' ? 'user' : 'intent')
         return null
       })

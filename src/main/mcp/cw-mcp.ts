@@ -122,7 +122,7 @@ const T = {
   'waitForTasks.arg.usage': agentMsg({ id: 'tool.waitForTasks.arg.usage', text: "With wake: also when an account's use reaches percent." }),
   'mergeSlot.description': agentMsg({ id: 'tool.mergeSlot.description', text: "Your project's merge slot: one merge at a time into a branch. claim waits for it; release gives it up. (detail: use-cw-api, tools.md)" }),
   'lane.arg.builder': agentMsg({ id: 'tool.lane.arg.builder', text: 'Agent name or id.' }),
-  'lane.arg.released': agentMsg({ id: 'tool.lane.arg.released', text: "start: { target, reason }: a lane on the released branch its refusal named, only once the user OKs it (a hotfix); reason is theirs.", note: 'HI-3148: the Assistant’s override of a new lane on a released line.' }),
+  'lane.arg.released': agentMsg({ id: 'tool.lane.arg.released', text: "start: target and reason: a lane on the released branch its refusal named, only once the user OKs it (a hotfix); reason is theirs.", note: 'HI-3148: the Assistant’s override of a new lane on a released line.' }),
   'lane.arg.pool': agentMsg({ id: 'tool.lane.arg.pool', text: "start: reviewed by the project's reviewer pool." }),
   'lane.arg.builderJoin': agentMsg({ id: 'tool.lane.arg.builderJoin', text: "join: the builder's name." }),
   'lane.arg.reviewer': agentMsg({ id: 'tool.lane.arg.reviewer', text: 'Agent name or id.' }),

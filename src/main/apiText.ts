@@ -326,7 +326,7 @@ export const API = {
     onlyAssistant: agentMsg({ id: 'api.journal.onlyAssistant', text: 'Only the Assistant keeps a journal.' })
   },
   lane: {
-    releasedArg: agentMsg({ id: 'api.lane.releasedArg', text: 'released is { target, reason }: the released branch the lane starts on, as its refusal named it, and the user’s reason', note: 'HI-3148: POST /v1/lanes with a released that isn’t one.' }),
+    releasedArg: agentMsg({ id: 'api.lane.releasedArg', text: 'released takes target and reason: the released branch the lane starts on, as its refusal named it, and the user’s reason', note: 'HI-3148: POST /v1/lanes with a released that isn’t one.' }),
     releasedNotYours: agentMsg({ id: 'api.lane.releasedNotYours', text: 'Only the user or the Assistant starts work on a released branch: ask the user', note: 'HI-3148: a project agent or a script passing released.' }),
     agentStartsOwn: agentMsg({ id: 'api.lane.agentStartsOwn', text: 'An agent starts its own lane, as its builder: a reviewer joins its builder\'s lane (join)' }),
     applyNowArg: agentMsg({ id: 'api.lane.applyNowArg', text: 'applyNow must be true or false' }),

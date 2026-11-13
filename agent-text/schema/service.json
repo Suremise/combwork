@@ -1059,6 +1059,23 @@
   "service.lanes.noWorkspace": {
     "placeholders": {}
   },
+  "service.lanes.releaseUnknown": {
+    "placeholders": {
+      "target": "plain",
+      "what": "plain"
+    }
+  },
+  "service.lanes.released": {
+    "placeholders": {
+      "target": "plain",
+      "dated": "select",
+      "tag": "plain",
+      "date": "date",
+      "into": "plain",
+      "has": "select",
+      "suggest": "plain"
+    }
+  },
   "service.lanes.targetBuilder": {
     "placeholders": {}
   },

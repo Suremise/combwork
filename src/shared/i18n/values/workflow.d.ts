@@ -418,6 +418,10 @@ interface CombworkMessageValues {
   'workflow.refused.start.notBlocked.next': undefined
   'workflow.refused.start.platformReady.message': { card: string | number }
   'workflow.refused.start.platformReady.next': undefined
+  'workflow.refused.start.releaseUnknown.message': { target: string | number; what: string | number; card: string | number }
+  'workflow.refused.start.releaseUnknown.next': undefined
+  'workflow.refused.start.released.message': { card: string | number; target: string | number; dated: string; tag: string | number; date: Date | number; into: string | number }
+  'workflow.refused.start.released.next': { has: string; suggest: string | number; target: string | number }
   'workflow.refused.start.slotAvailable.change': undefined
   'workflow.refused.start.slotAvailable.message': { card: string | number }
   'workflow.refused.start.slotAvailable.next': undefined
@@ -480,6 +484,7 @@ interface CombworkMessageValues {
   'workflow.rule.start.dependenciesIntegrated': undefined
   'workflow.rule.start.notBlocked': undefined
   'workflow.rule.start.platformReady': undefined
+  'workflow.rule.start.released': undefined
   'workflow.rule.start.slotAvailable': undefined
   'workflow.rule.submit.checksPassed': undefined
   'workflow.rule.submit.clean': undefined

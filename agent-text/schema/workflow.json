@@ -1092,6 +1092,33 @@
   "workflow.refused.start.platformReady.next": {
     "placeholders": {}
   },
+  "workflow.refused.start.releaseUnknown.message": {
+    "placeholders": {
+      "target": "plain",
+      "what": "plain",
+      "card": "plain"
+    }
+  },
+  "workflow.refused.start.releaseUnknown.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.start.released.message": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain",
+      "dated": "select",
+      "tag": "plain",
+      "date": "date",
+      "into": "plain"
+    }
+  },
+  "workflow.refused.start.released.next": {
+    "placeholders": {
+      "has": "select",
+      "suggest": "plain",
+      "target": "plain"
+    }
+  },
   "workflow.refused.start.slotAvailable.change": {
     "placeholders": {}
   },
@@ -1341,6 +1368,9 @@
     "placeholders": {}
   },
   "workflow.rule.start.platformReady": {
+    "placeholders": {}
+  },
+  "workflow.rule.start.released": {
     "placeholders": {}
   },
   "workflow.rule.start.slotAvailable": {

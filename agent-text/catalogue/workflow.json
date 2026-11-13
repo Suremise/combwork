@@ -1249,6 +1249,26 @@
     "note": "The next step after a refused start in a jj project (HI-2799). Version Control is the tab’s name (glossary 2.1). Keep Git and jj.",
     "audience": "both"
   },
+  "workflow.refused.start.releaseUnknown.message": {
+    "text": "Combwork couldn’t check whether {target} is released ({what}), so {card} wasn’t started.",
+    "note": "HI-3148: a refused start: whether the branch the card would start on ({target}) has already shipped couldn’t be read ({what}: what couldn’t be read). {card} is a card key like AM-12.",
+    "audience": "both"
+  },
+  "workflow.refused.start.releaseUnknown.next": {
+    "text": "Try again once the repository can be read; for work that has to go on now, ask the user: the user or the Assistant can start it anyway.",
+    "note": "HI-3148: the next step after a start refused because whether its branch is released couldn’t be read.",
+    "audience": "both"
+  },
+  "workflow.refused.start.released.message": {
+    "text": "{card} can’t start on {target}: {target} is released ({dated, select, yes {{tag}, tagged {date, date, medium}} other {{tag}}}, merged into {into}).",
+    "note": "HI-3148: a refused start: the branch the card would start on and merge into ({target}) already shipped: a tag named after it ({tag}, as v1.4.0) is in its history and it is merged into the default branch ({into}, as main). With dated yes, the tag’s own date ({date}: an annotated tag’s date, never claimed as the publication date). {card} is a card key like AM-12.",
+    "audience": "both"
+  },
+  "workflow.refused.start.released.next": {
+    "text": "{has, select, yes {Did you mean {suggest}? Set its Merges into to {suggest}; or, for hotfix work on {target}, ask the user: the user or the Assistant can start it there anyway.} other {Start it on a branch that isn’t released; or, for hotfix work on {target}, ask the user: the user or the Assistant can start it there anyway.}}",
+    "note": "HI-3148: the next step after a start refused on a released branch ({target}). With has yes, {suggest} is a branch that exists and isn’t released (the project’s Work merges into, or the next version’s). Merges into is the card’s option of that name: as translated there.",
+    "audience": "both"
+  },
   "workflow.refused.start.slotAvailable.change": {
     "text": "This is set in Version Control → Where cards are built.",
     "note": "Where the rule that refused starting for want of a slot is changed.",
@@ -1547,6 +1567,11 @@
   "workflow.rule.start.platformReady": {
     "text": "Cards run only where Combwork supports the version control",
     "note": "A rule of the workflow, named where a move skips or can’t check it (HI-2799): cards don’t start in a project using jj (Jujutsu) yet.",
+    "audience": "both"
+  },
+  "workflow.rule.start.released": {
+    "text": "New work starts only on a branch that isn’t released",
+    "note": "HI-3148: a rule of the workflow, named where a start skips it (the user’s Start anyway on a released branch, for a hotfix): a card doesn’t start on a branch already released (tagged and merged into the default branch).",
     "audience": "both"
   },
   "workflow.rule.start.slotAvailable": {

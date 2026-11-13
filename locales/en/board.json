@@ -2007,6 +2007,10 @@
     "defaultMessage": "Project",
     "description": "A field label in the Start Lane dialog: the project whose cards the lane works through."
   },
+  "board.laneStart.releasedReason": {
+    "defaultMessage": "Why start it there anyway (a hotfix, say)",
+    "description": "HI-3148: a field label in the Start Lane dialog, shown when the branch the lane would merge into is already released (or Combwork couldn’t check): the user’s reason for starting on it anyway, recorded with the lane."
+  },
   "board.laneStart.remove": {
     "defaultMessage": "Take {card} out of the lane",
     "description": "Tooltip of a button in the Start Lane dialog: removes the card ({card}, its key) from the lane's list (the card stays on the board)."
@@ -2022,6 +2026,10 @@
   "board.laneStart.start": {
     "defaultMessage": "Start Lane",
     "description": "Button of the Start Lane dialog: records the lane and starts both agents."
+  },
+  "board.laneStart.startAnyway": {
+    "defaultMessage": "Start Anyway",
+    "description": "HI-3148: the Start Lane dialog’s button when the lane’s branch is already released (or couldn’t be checked): starts the lane there anyway, with the reason given. Enabled once a reason is written."
   },
   "board.laneStart.started": {
     "defaultMessage": "Lane started: {pair}",
@@ -2454,6 +2462,10 @@
   "board.move.askMessage": {
     "defaultMessage": "{n, plural, one {This skips a rule of its project:} other {This skips # rules of its project:}}",
     "description": "The question before a move that skips workflow rules (glossary: rule): how many it skips ({n}), listed below by name. Moving anyway records an exception on the card (glossary: override), with the reason the user gives."
+  },
+  "board.move.askReleased": {
+    "defaultMessage": "{branch} is released: start new work on it only for a hotfix. Moving it anyway starts it on {branch}.",
+    "description": "HI-3148: under the question before a start that skips the rule “New work starts only on a branch that isn’t released”: {branch} (as 1.4.0) already shipped (tagged and merged into the default branch)."
   },
   "board.move.askTitle": {
     "defaultMessage": "Move {card} to {column} anyway?",

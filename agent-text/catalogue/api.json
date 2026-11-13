@@ -336,6 +336,10 @@
   "api.card.stayInProject": {
     "text": "Cards stay in your project ({project})."
   },
+  "api.card.targetReleased": {
+    "text": "{target} is released ({tag}, merged into {into}): {card}'s start there is refused unless the user OKs work on {target} (a hotfix), given as override.released {target}.{has, select, yes { Did you mean {suggest}?} other {}}",
+    "note": "HI-3148: below a card update or new card whose Merges into ({target}) is already released: tagged ({tag}) and merged into the default branch ({into}). {suggest}: a branch that exists and isn’t released."
+  },
   "api.card.titleRequired": {
     "text": "title is required"
   },
@@ -979,6 +983,14 @@
   },
   "api.lane.projectRequired": {
     "text": "project is required"
+  },
+  "api.lane.releasedArg": {
+    "text": "released takes target and reason: the released branch the lane starts on, as its refusal named it, and the user’s reason",
+    "note": "HI-3148: POST /v1/lanes with a released that isn’t one."
+  },
+  "api.lane.releasedNotYours": {
+    "text": "Only the user or the Assistant starts work on a released branch: ask the user",
+    "note": "HI-3148: a project agent or a script passing released."
   },
   "api.lane.targetText": {
     "text": "target must be a branch name, or null for the project's own"

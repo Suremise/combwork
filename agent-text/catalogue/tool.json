@@ -47,7 +47,8 @@
     "text": "The project's MCP servers it gets: [] none, [\"*\"] all (default). combwork is always given."
   },
   "tool.arg.override": {
-    "text": "Moves it past the rules the move skips: reason is the user's own why, never made up."
+    "text": "Moves it past the rules the move skips: reason is the user's own why, never made up. released: the released branch its refusal named, once the user OKs work there.",
+    "note": "HI-3148: released added."
   },
   "tool.arg.project": {
     "text": "A project's name."
@@ -329,6 +330,10 @@
   },
   "tool.lane.arg.pool": {
     "text": "start: reviewed by the project's reviewer pool."
+  },
+  "tool.lane.arg.released": {
+    "text": "start: target and reason: a lane on the released branch its refusal named, only once the user OKs it (a hotfix); reason is theirs.",
+    "note": "HI-3148: the Assistant’s override of a new lane on a released line."
   },
   "tool.lane.arg.reviewer": {
     "text": "Agent name or id."

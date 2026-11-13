@@ -503,10 +503,12 @@ interface CombworkMessageValues {
   'board.laneStart.pool': { agents: string | number }
   'board.laneStart.poolNobody': undefined
   'board.laneStart.project': undefined
+  'board.laneStart.releasedReason': undefined
   'board.laneStart.remove': { card: string | number }
   'board.laneStart.reviewer': undefined
   'board.laneStart.show': undefined
   'board.laneStart.start': undefined
+  'board.laneStart.startAnyway': undefined
   'board.laneStart.started': { pair: string | number }
   'board.laneStart.startedText': { n: number }
   'board.laneStart.starting': undefined
@@ -615,6 +617,7 @@ interface CombworkMessageValues {
   'board.move.anyway': undefined
   'board.move.askDetail': undefined
   'board.move.askMessage': { n: number }
+  'board.move.askReleased': { branch: string | number }
   'board.move.askTitle': { card: string | number; column: string | number }
   'board.move.notMoved': { column: string | number }
   'board.move.reason': undefined

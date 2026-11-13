@@ -273,6 +273,8 @@ interface CombworkMessageValues {
   'service.laneStarts.freshBlockedBody': { why: string; minutes: number; reason: string | number }
   'service.laneStarts.freshBlockedTitle': { agent: string | number }
   'service.lanes.noWorkspace': undefined
+  'service.lanes.releaseUnknown': { target: string | number; what: string | number }
+  'service.lanes.released': { target: string | number; dated: string; tag: string | number; date: Date | number; into: string | number; has: string; suggest: string | number }
   'service.lanes.targetBuilder': undefined
   'service.lanes.targetCard': { card: string | number; cardTarget: string | number; target: string | number }
   'service.lanes.targetFixed': { builder: string | number; target: string | number }
