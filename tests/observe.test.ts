@@ -212,6 +212,38 @@ describe('the watcher on a Git repository', () => {
     expect((await between(t2)).paths).toEqual(['a.txt'])
   })
 
+  it('an ignored folder deleted, or deleted and made again, does not count (HI-3173)', async () => {
+    mkdirSync(join(p, 'out', 'chunks'), { recursive: true })
+    writeFileSync(join(p, 'out', 'bundle.js'), 'x')
+    writeFileSync(join(p, 'out', 'chunks', 'a.js'), 'x')
+    await armed(o, p)
+    const t0 = Date.now()
+    // `rm -rf out` with no rebuild: the folder's own path, gone, is in the record.
+    rmSync(join(p, 'out'), { recursive: true })
+    await seen({ kind: 'written', folder: p, paths: ['out'] })
+    expect(await between(t0)).toEqual({ changed: false, paths: [] })
+    // A clean build: deleted and made again.
+    await armed(o, p)
+    const t1 = Date.now()
+    mkdirSync(join(p, 'out'))
+    writeFileSync(join(p, 'out', 'bundle.js'), 'y')
+    rmSync(join(p, 'out'), { recursive: true })
+    mkdirSync(join(p, 'out'))
+    writeFileSync(join(p, 'out', 'bundle.js'), 'z')
+    expect(await between(t1)).toEqual({ changed: false, paths: [] })
+  })
+
+  it('a file named as an ignored folder, replaced by that folder, still counts (HI-3173)', async () => {
+    const t0 = Date.now()
+    writeFileSync(join(p, 'out'), 'an input, not ignored\n')
+    // Its event is read while it is a file (it lasts longer than a moment: Darren's decision on HI-3158).
+    await o.settled(p)
+    rmSync(join(p, 'out'))
+    mkdirSync(join(p, 'out'))
+    writeFileSync(join(p, 'out', 'bundle.js'), 'x')
+    expect((await between(t0)).paths).toEqual(['out'])
+  })
+
   it('a tracked file in node_modules counts, its edit undone too', async () => {
     mkdirSync(join(p, 'node_modules'))
     writeFileSync(join(p, 'node_modules', 'vendored.js'), 'v\n')
