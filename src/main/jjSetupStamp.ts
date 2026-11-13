@@ -8,10 +8,12 @@
 //
 // HR3's round 1: main's thread reads it, inside a write transaction too, so the read never waits: one plain read and
 // parse, no kept-file recovery (readKeptJsonSync's settling waits up to about a second on a file caught mid-save). A file
-// that can't be read or parsed now gives a stamp of its own (`unread:<identity>`), never kept and never equal to a
-// command's: a check made or published across it fails closed (invalid, and its next look decides again).
+// that can't be read or parsed now gives an unread stamp (`unread:<unique>`), new each time, never kept and never equal
+// to any other stamp, its own included (HR3's round 2: one per identity let a run that started unreadable match itself);
+// knownStamp says which are unread, and the checks reject them: a check made or published across one fails closed
+// (invalid, and its next look decides again).
 
-import { createHash } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import { readFileSync, statSync } from 'original-fs'
 import { join } from 'path'
 
@@ -34,6 +36,9 @@ export function setupCommandNow(projectPath: string): string | null {
   }
 }
 
+/** HR3's round 2: whether a stamp is a read setup command's, not an unread one (which no check may be made or published under). */
+export const knownStamp = (stamp: string): boolean => !stamp.startsWith('unread:')
+
 /** HI-3122: the stamp of the project's setup command now: equal whatever else project.json gains or loses. */
 export function setupStampOf(projectPath: string): string {
   const file = join(projectPath, '.combwork', 'project.json')
@@ -53,7 +58,7 @@ export function setupStampOf(projectPath: string): string {
   // Unreadable now (caught mid-save, say): a stamp of its own, never kept, so the next read decides.
   if (setup === null) {
     kept.delete(key)
-    return `unread:${id}`
+    return `unread:${randomUUID()}`
   }
   const stamp = stampOf(setup)
   if (settled || id === 'none') kept.set(key, { id, stamp })

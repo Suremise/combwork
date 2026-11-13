@@ -3666,7 +3666,8 @@ and s11 (HR1's OK).
 - **The setup command** is read with a stamp of the setup command itself (HI-3122, `jjSetupStamp.ts`: a hash of
   project.json's `worktreeSetup`, read synchronously only when the file's identity changed since the last look, by one
   plain read and parse that never waits: HR3's round 1, no kept-file recovery on main's thread; a file caught mid-save
-  gives a stamp of its own, never kept and never a command's, so a check across it fails closed and is looked at again); the
+  gives an unread stamp, new each time, never kept and never equal to any (HR3's round 2), and nothing is made or
+  published under one (`knownStamp`), so a check started or published across it fails closed and is looked at again); the
   publishing transaction reads the stamp again and refuses a result made under a setup since changed, and the next look
   starts the checks anew under the new key (`restart`). Before HI-3122 the stamp was the file's identity, so any save of
   project.json (an agent's new conversation records its `lastSessionId`; any agent or project setting) ended a running

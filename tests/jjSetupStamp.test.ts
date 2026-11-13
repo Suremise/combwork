@@ -6,7 +6,7 @@ import { renameSync, statSync, writeFileSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
-import { setupStampOf } from '../src/main/jjSetupStamp'
+import { knownStamp, setupStampOf } from '../src/main/jjSetupStamp'
 import { runCandidateChecks, type CandidateChecksDeps, type CandidateChecksInput } from '../src/main/workflow/jjCandidateChecks'
 import type { JjCandidateFingerprint } from '../src/main/platform/jjCandidateStep'
 
@@ -57,7 +57,8 @@ function held(stamp: () => string) {
     },
     install: async () => ({ ok: true, output: '' }),
     bracket: async (_f, revision) => ({ end: async () => ({ counted: true, tested: revision }) }),
-    valid: async () => (polls++, stamp() === before),
+    // As JjPlatform's validity reads it (HR3's round 2): an unread stamp never stands, then equality.
+    valid: async () => (polls++, knownStamp(before) && stamp() === before),
     checkRan: async () => undefined,
     stopped: () => false,
     watchMs: 10
@@ -121,8 +122,12 @@ describe('HI-3122: the setup stamp a jj candidate’s checks depend on', () => {
       expect(wait).not.toHaveBeenCalled()
       expect(partial).toMatch(/^unread:/)
       expect(partial).not.toBe(good)
-      // Not kept: read again, and again its own until the file parses.
-      expect(setupStampOf(p)).toMatch(/^unread:/)
+      // Not kept, and never equal to another, its own read included (HR3's round 2): an unknown never matches an unknown.
+      const again = setupStampOf(p)
+      expect(again).toMatch(/^unread:/)
+      expect(again).not.toBe(partial)
+      expect(knownStamp(partial)).toBe(false)
+      expect(knownStamp(good)).toBe(true)
     } finally {
       wait.mockRestore()
     }
@@ -136,6 +141,15 @@ describe('HI-3122: the setup stamp a jj candidate’s checks depend on', () => {
     await r.inCheck
     writeFileSync(join(p, '.combwork', 'project.json'), '{"worktreeSetup": "npm')
     expect(await r.out).toEqual({ invalid: true })
+  })
+
+  it("HR3's round 2: project.json unreadable before the run starts, and all through it: nothing passes under the unknown stamp", async () => {
+    const p = project({ worktreeSetup: 'npm ci' })
+    writeFileSync(join(p, '.combwork', 'project.json'), '{')
+    const r = held(() => setupStampOf(p))
+    // Invalid before the lease: no check is even started.
+    expect(await r.out).toEqual({ invalid: true })
+    expect(r.log).toEqual([])
   })
 
   it('the runner: the setup command changed mid-check: invalid, its job ended', async () => {

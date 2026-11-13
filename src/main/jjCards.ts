@@ -10,7 +10,7 @@
 // - the card's lease and slot rows, read synchronously in the write under way (the final Submitted transaction's);
 // - the pins' ownership records in board_meta.
 
-import { setupStampOf } from './jjSetupStamp'
+import { knownStamp, setupStampOf } from './jjSetupStamp'
 import { basename } from 'path'
 import { git } from './git'
 import { jjRunner, storeGatedHistory, storeGitGated } from './platform/jjRunner'
@@ -133,6 +133,7 @@ export function jjCardsFor(ws: WorkspaceService, projectPath: string, projectId:
         return { setup, stamp }
       },
       setupStamp: () => setupStamp(),
+      knownStamp: (stamp) => knownStamp(stamp),
       lease: async (card, revision) => {
         const r = await candidateCheckLease(ws, projectPath, card, revision)
         if (!('lease' in r)) return r

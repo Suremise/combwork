@@ -485,6 +485,24 @@ describe.skipIf(!jjExe)(`merge checks on a jj card's candidate (jj ${TESTED_JJ.v
       await vi.waitFor(() => expect(shown(w, card, cycle)?.checks?.state).toBe('passed'), { timeout: REAL_JJ_MS, interval: 100 })
       expect(x.leases.map((l) => l.given)).toContain('invalid')
     })
+
+    it("HI-3122 (HR3's round 2): a setup command read as unknown: nothing run or passed under it; known again, the next look passes", async () => {
+      const w = await world(true, { candidates: true })
+      const x = host(w)
+      withChecks(w, { typecheck: PASS, lint: PASS })
+      x.h.againMs = () => 50
+      let known = false
+      x.h.knownStamp = () => known
+      const { card } = await approved(w)
+      const jjp = new JjPlatform(w.wf)
+      await jjp.reconcile(card, {})
+      await vi.waitFor(() => expect(jjp.checksBusy()).toBe(false), { timeout: REAL_JJ_MS, interval: 100 })
+      const cycle = w.wf.state(card).cycle
+      expect(shown(w, card, cycle)?.checks?.state).not.toBe('passed')
+      expect(x.leases).toEqual([])
+      known = true
+      await vi.waitFor(() => expect(shown(w, card, cycle)?.checks?.state).toBe('passed'), { timeout: REAL_JJ_MS, interval: 100 })
+    })
   })
 
   describe.runIf(process.platform === 'win32')("HR1's round 1, in real jobs (colocated)", () => {

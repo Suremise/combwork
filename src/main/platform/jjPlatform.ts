@@ -179,6 +179,8 @@ export interface JjChecksHost {
    */
   setup(): Promise<{ setup: string; stamp: string }>
   setupStamp(): string
+  /** HI-3122: whether a stamp is a read setup command's (false: unread now, which nothing may be made under). Absent: all are. */
+  knownStamp?(stamp: string): boolean
   lease(card: number, revision: string): Promise<{ id: string; folder: string; spawn: Spawn; give(why: string, end?: boolean): Promise<void> } | { wait: string } | { refused: string }>
   /**
    * HI-2950: the free check copies still at a candidate's commit moved onto the head it was built on, so it can be dropped
@@ -798,7 +800,10 @@ export class JjPlatform implements PlatformAdapter {
       const setup = read.setup
       const o = wf.rulesetOf(card0, s).options
       const key = checksKeyOf(o, setup)
-      const at = { fp, attempt: offer.attempt, key, setup, setupStill: () => host.setupStamp() === read.stamp }
+      // HI-3122 (HR3's round 2): a setup command read as unknown (project.json caught mid-save) never stands for itself:
+      // nothing is made or published under it.
+      const setupNow = (): boolean => host.knownStamp?.(read.stamp) !== false && host.setupStamp() === read.stamp
+      const at = { fp, attempt: offer.attempt, key, setup, setupStill: setupNow }
       // The misses in a row before this run (kept while it ran: HI-2991), so its retry doubles with each; none after a
       // restart under a new key (HR1's round 1: the restart clears them, so the delay counts from there too).
       let misses = shown.checks.misses ?? 0
@@ -822,7 +827,7 @@ export class JjPlatform implements PlatformAdapter {
         const st = wf.state(c)
         // The offer's state read unknown (an operation during its read) isn't invalid (HI-2991): only a definite answer ends
         // a check; what it comes to is published only while the offer is read current.
-        return sameFingerprint(candidateFingerprint(wf, c, st), fp) && checksKeyOf(wf.rulesetOf(c, st).options, (await host.setup()).setup) === key && host.setupStamp() === read.stamp && (await this.offerState(fp.target, offer)) !== 'not'
+        return sameFingerprint(candidateFingerprint(wf, c, st), fp) && checksKeyOf(wf.rulesetOf(c, st).options, (await host.setup()).setup) === key && setupNow() && (await this.offerState(fp.target, offer)) !== 'not'
       }
       let done = 0
       const out = await runCandidateChecks(
