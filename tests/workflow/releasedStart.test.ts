@@ -64,6 +64,21 @@ describe('a start onto a released line (HI-3148)', () => {
     expect(isRefusal(other) && other.rule).toBe('start.released')
   })
 
+  it('the user’s drag asks, naming the line; confirmed for another line it asks again; for that line, started with the Override naming it', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = released()
+    const card = e.wf.createCard({ title: 'Dragged' })
+    const ask = await e.wf.move(card.key, 'active', 'user', { builder: 'b1' })
+    expect(ask).toMatchObject({ ask: true, rules: ['start.released'], released: '1.4.0' })
+    expect(await e.wf.move(card.key, 'active', 'user', { builder: 'b1', confirm: true, reason: 'hotfix', released: '1.3.0' })).toMatchObject({ ask: true, released: '1.4.0' })
+    expect(e.wf.state(card).stage).toBe('todo')
+    moved(await e.wf.move(card.key, 'active', 'user', { builder: 'b1', confirm: true, reason: 'hotfix', released: '1.4.0' }))
+    expect(e.store.facts(card.id).findLast((f) => f.kind === 'Override')?.data).toMatchObject({ rules: ['start.released'], by: 'user', target: '1.4.0' })
+    // The Assistant's move with a reason but no line named: refused with the line's own words.
+    const c2 = e.wf.createCard({ title: 'Assistant' })
+    const r = await e.wf.move(c2.key, 'active', 'assistant', { builder: 'b1', reason: 'the user asked' })
+    expect(isRefusal(r) && r.rule).toBe('start.released')
+  })
+
   it('the Assistant’s override counts as the user’s does', { timeout: GIT_HEAVY_MS }, async () => {
     const e = released()
     const card = e.wf.createCard({ title: 'Hotfix' })
