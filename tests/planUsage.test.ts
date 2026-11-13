@@ -477,6 +477,17 @@ describe('the plan usage Combwork keeps from its sessions (#383)', () => {
         expect(weekly(run(undefined, [['A', 98], ['E', 96], ['A', 98], ['E', 96]], new Map(), at, { A: at, E: at }))).toBe(98)
       })
 
+      it("a run launched later but before the kept reading was taken can't raise it back with a reading from before the reset (HR1's round 1)", () => {
+        // Old 96%; A launches, then B, which calls before the reset (96%); the reset; A's first report, 77%, then B's, 96%.
+        const old = mergePlanUsage(undefined, claude(96, at), at, 'HB5')
+        const memo = new Map()
+        const launched = { A: at + min / 6, B: at + min / 3 }
+        let kept = run(old, [['A', 77]], memo, at + 5 * min, launched)
+        expect(weekly(kept)).toBe(77)
+        kept = run(kept, [['B', 96], ['A', 77], ['B', 96]], memo, at + 6 * min, launched)
+        expect(weekly(kept)).toBe(77)
+      })
+
       it('two live sessions interleaving 95% and 96% within one period never take the figure down (#383)', () => {
         // B launched with A, or after A's 95% but before its 96%: B, not calling since, keeps reporting 95%.
         for (const bLaunch of [at, at + 1.5 * min]) {
