@@ -415,6 +415,8 @@ describe('HI-2892: forward merges only in the release path’s direction', () =>
     // A card started on 1.4.0 (listed then), and 1.4.0 dropped from the project's targets since: in flight into an old branch.
     const c = await inWorkspace(w, () => tasks.createTask({ title: 'Release fix', project: 'p', target: '1.4.0' }, user))
     const wf = (await workflowFor(w, repo))!
+    // Started in the project folder, which is on a branch for that (HI-3104 refuses a start in one on no branch): 1.4.0's.
+    git(repo, 'checkout', '-q', '1.4.0')
     expect(await store.boardWrite(w, async () => wf.start(`#${c.number}`, agentActor('b1')))).toMatchObject({ ok: true })
     expect(wf.state(wf.store.card(c.number)).started?.target).toBe('1.4.0')
     await inWorkspace(w, () => w.mutateProjectConfig(repo, (now) => ({ workflow: { ...now.workflow!, options: { ...now.workflow!.options, otherTargets: ['next'] } } })))
@@ -598,6 +600,8 @@ describe('HI-2959: Resolve on a builder, on the real board', () => {
     await expect(lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [rc], by: 'You' })).rejects.toThrow(/merges into 1\.2\.0, and this lane into 1\.3\.0/)
     // A lane on 1.2.0 takes it, and it starts from 1.2.0.
     expect((await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [rc], by: 'You', target: '1.2.0' })).lane.target).toBe('1.2.0')
+    // Started in the project folder, which is on a branch for that (HI-3104 refuses a start in one on no branch): 1.2.0's.
+    git(repo, 'checkout', '-q', '1.2.0')
     expect(await store.boardWrite(w, async () => wf.start(`#${rc}`, agentActor('b1')))).toMatchObject({ ok: true })
     expect(wf.state(wf.store.card(rc)).started).toMatchObject({ target: '1.2.0', base: git(repo, 'rev-parse', '1.2.0') })
   })
