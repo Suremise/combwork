@@ -117,6 +117,21 @@ describe('a lane on a released line (HI-3148)', () => {
     expect(await start(w, repo, a.number)).toMatchObject({ ok: true })
   })
 
+  it('a tag made as the lane is saved (HR2’s round 1): decided again under the lock and refused, nothing recorded', async () => {
+    const { w, repo } = await project()
+    const c = await card(w, 'Late tag')
+    let made = false
+    // The save's own check, just before it is written: the release tag lands after the decision.
+    const commit = (): void => {
+      if (made) return
+      made = true
+      git(repo, 'tag', '-a', 'v1.3.0', '-m', 'release 1.3.0', '1.3.0')
+    }
+    await expect(lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [c.number], by: 'You', target: '1.3.0', commit })).rejects.toThrow(/^1\.3\.0 is released \(v1\.3\.0/)
+    expect(made).toBe(true)
+    expect(await lanes.listLanes(w)).toEqual([])
+  })
+
   it('a card’s Merges into set to a released line says its start there will be refused', async () => {
     const { w } = await project()
     const c = await card(w, 'Retargeted')

@@ -23,10 +23,11 @@ import { branchExists, pickTarget, projectTargets, type ProjectTargets } from '.
 import { otherThanOwn, targetedOf } from '../shared/workflow/compile'
 import { laneTarget } from './laneTarget'
 import { releaseReadsOf } from './platform/releaseReadsPorts'
-import { isUnknown } from './platform/types'
+import { isUnknown, unknown } from './platform/types'
 import type { PlatformId } from '../shared/platform/descriptors'
-import { unreleasedFor } from './platform/releaseReads'
+import { stillAsRead, unreleasedFor } from './platform/releaseReads'
 import { storedAsText } from '../shared/workflow/refusals'
+import { UNREADABLE } from '../shared/workflow/texts'
 import { onAction } from './workflow/actionWorker'
 import { foldCard, forYou, SLOT_DIRTY_GATE } from '../shared/workflow/facts'
 import { createDelivery, offerNow } from './deliveries'
@@ -1342,12 +1343,16 @@ async function lanePick(ws: WorkspaceService, project: string, raw: unknown): Pr
  * user's or the Assistant's override names exactly that line, which is then its grant (kept on the lane). Null: the line
  * isn't released (or its platform has no release reads).
  */
-async function laneReleased(projectPath: string, platform: PlatformId | null, target: string | null, workTarget: string | null, given?: StartLane['released']): Promise<LaneRecord['releasedOverride'] | null> {
+async function laneReleased(projectPath: string, platform: PlatformId | null, target: string | null, workTarget: string | null, given?: StartLane['released']): Promise<{ grant: LaneRecord['releasedOverride'] | null; bound?: () => boolean }> {
   const reads = target && platform ? releaseReadsOf(platform) : null
-  if (!target || !reads) return null
-  const r = await reads.released(projectPath, target)
-  if (!isUnknown(r) && !r) return null
-  if (given && given.target === target) return { target, by: given.by, reason: given.reason.slice(0, 4000), at: new Date().toISOString() }
+  if (!target || !reads) return { grant: null }
+  // The user's or the Assistant's for exactly this line: theirs whatever the line is now.
+  if (given && given.target === target) return { grant: { target, by: given.by, reason: given.reason.slice(0, 4000), at: new Date().toISOString() } }
+  // What `released` rests on, read before it: asked again in the lanes' save (HR2's round 1), moved, decided again.
+  const check = await reads.watch(projectPath, target).catch(() => null)
+  const first = check ? check() : null
+  const r = first === null ? unknown(UNREADABLE.line, { branch: target }) : await reads.released(projectPath, target)
+  if (!isUnknown(r) && !r) return { grant: null, bound: () => stillAsRead(check, first) }
   if (isUnknown(r)) throw new LaneError(409, withValues(M.releaseUnknown, { target, what: r.whatText ? storedAsText(r.whatText) : r.what }))
   const suggest = await unreleasedFor(reads, projectPath, target, workTarget)
   throw new LaneError(409, withValues(M.released, { target, tag: r.tag, into: r.into, dated: r.date ? 'yes' : 'no', date: r.date ? Date.parse(r.date) : 0, has: suggest ? 'yes' : 'no', suggest: suggest ?? '' })) // i18n-ignore: select keys
@@ -1449,7 +1454,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     const running0 = (await read(ws)).find((l) => running(l) && same(l.project, s.project) && l.builder.id === builder.id)
     // A new lane on a released line (or one that can't be checked) is refused, unless the user's or the Assistant's
     // override names that line; a running lane's list change isn't a new start of its line (its cards' starts are checked).
-    if (!running0 && on) releasedGrant = await laneReleased(projectPath, admission.platform, pick ?? defaultTarget, defaultTarget, s.released)
+    if (!running0 && on) await laneReleased(projectPath, admission.platform, pick ?? defaultTarget, defaultTarget, s.released)
     const target0 = running0 ? otherThanOwn(laneTarget(ws, running0), defaultTarget) : null
     if (running0 && on && pick !== undefined && (pick ?? null) !== target0) throw new LaneError(409, withValues(M.targetFixed, { builder: running0.builder.name, target: target0 ?? defaultTarget ?? '' }))
     refuseOtherTargets(ws, s.project, s.cards, running0 && on ? target0 : (pick ?? null), defaultTarget, s.ownBuilder ? s.project : null)
@@ -1526,6 +1531,19 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
       } else if (pool === false) delete was.pool
       also.push((db) => noteLaneIn(db, ws.path!, before, was))
       return { rec: was, did: 'updated' as const, replaced: null }
+    }
+    // HI-3148: a new lane's line, decided again under the lanes' lock (refused as above), and what let it through bound
+    // to the save (its checks, run just before it): a tag made meanwhile throws it back to be decided again, so it is refused then.
+    releasedGrant = null
+    if (on) {
+      const rel = await laneReleased(projectPath, admission.platform, pick ?? defaultTarget, defaultTarget, s.released)
+      releasedGrant = rel.grant
+      if (rel.bound) {
+        const stillBound = rel.bound
+        checks.push(() => {
+          if (!stillBound()) throw new StaleLane()
+        })
+      }
     }
     let replaced: LaneRecord | null = null
     if (was) {

@@ -16,7 +16,7 @@ afterEach(() => {
 
 /** A Pair project merging into 1.4.0, which is released: tagged v1.4.0 (annotated) and merged into main. */
 function released(o: { grant?: string | null } = {}) {
-  const e = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], target: '1.4.0' }, { releaseGrant: async () => o.grant ?? null }))
+  const e = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], target: '1.4.0' }, { releaseGrant: () => o.grant ?? null }))
   sh(e.project, 'checkout', '-q', '-b', '1.4.0')
   commit(e.project, { 'release.txt': '1.4.0\n' }, '1.4.0')
   sh(e.project, '-c', 'user.name=T', '-c', 'user.email=t@example.invalid', 'tag', '-a', 'v1.4.0', '-m', 'release 1.4.0')

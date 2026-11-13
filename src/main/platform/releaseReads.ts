@@ -26,6 +26,23 @@ export interface ReleaseReads {
   released(projectPath: string, line: string): Promise<Maybe<ReleaseInfo | null>>
   /** Whether `line` is a line of the repository now (a suggestion is only ever one that is). */
   exists(projectPath: string, line: string): Promise<Maybe<boolean>>
+  /**
+   * What `released(line)` rests on, read synchronously (HR2's HI-3148 round 1): asked before `released`, its checker's
+   * answer at the write that acts on the decision must be the same as before the read, else something it read may have
+   * moved (a tag made, a line merged) and the decision is made again. Its answer null, or no checker (it can't be read
+   * without a process), is unknown: never taken as unchanged.
+   */
+  watch(projectPath: string, line: string): Promise<(() => string | null) | null>
+}
+
+/** The checker's answer now matches `first`, a readable one (unknown never matches). */
+export const stillAsRead = (check: (() => string | null) | null, first: string | null): boolean => {
+  if (!check || first === null) return false
+  try {
+    return check() === first
+  } catch {
+    return false
+  }
 }
 
 /**

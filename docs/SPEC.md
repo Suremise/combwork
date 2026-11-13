@@ -4635,7 +4635,12 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   **fresh start** (Todo or On Hold → Active, a reopened Done card, a put-back card started again) onto a released line
   is refused (`start.released`), naming the tag and where it went, and a line to start on instead only when it exists
   and is known not released (Work merges into, else the next version's: `unreleasedFor`); an unreadable one is refused
-  as `start.releaseUnknown`. Both before anything is written (no `Started`, lease or lane). A card already in a cycle,
+  as `start.releaseUnknown`. Both before anything is written (no `Started`, lease or lane). What lets a start through
+  without the user's or the Assistant's word (the line not released, or its lane's grant) is bound to the write (HR2's
+  round 1): the port's `watch` (Git: the exact tag refs, the line's and the main line's heads, read from the common dir;
+  jj: the single operation head), taken before the read, and the lane's grant as stored, are read again synchronously in
+  the start's transaction (the drag's too) and the lanes' save; moved, the start is gathered again and decided afresh,
+  so a tag made meanwhile refuses it. A card already in a cycle,
   its resubmits, reviews and merges are never refused for it. **Who may start there anyway:** the user (the board's
   Start and drag ask, `board.move.askReleased`, and Move Anyway gives back the line asked about) or the Assistant
   (`override: { reason, released: <line> }` on a move or `cw_start_task`), for exactly the line its refusal named: a

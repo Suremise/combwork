@@ -11,7 +11,8 @@ import { UNREADABLE } from '../../src/shared/workflow/texts'
 vi.mock('../../src/main/platform/releaseReadsPorts', () => ({
   releaseReadsOf: () => ({
     released: async () => unknown(UNREADABLE.line, { branch: 'refs/tags/v1.4.0' }),
-    exists: async () => true
+    exists: async () => true,
+    watch: async () => () => 'refs as read'
   })
 }))
 

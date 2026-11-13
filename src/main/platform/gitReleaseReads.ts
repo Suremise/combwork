@@ -4,6 +4,7 @@
 
 import { git } from '../git'
 import * as G from './git'
+import { refSync } from './repoRefs'
 import { releaseTagNames, type ReleaseInfo, type ReleaseReads } from './releaseReads'
 import { isUnknown, unknown, withDetail, type Maybe } from './types'
 import { UNREADABLE as U } from '../../shared/workflow/texts'
@@ -28,6 +29,14 @@ async function tag(repo: string, name: string): Promise<Maybe<{ commit: string; 
 }
 
 export const gitReleaseReads: ReleaseReads = {
+  // The refs `released` reads, from the repository's common dir with no git process: the exact tags, the line's head and
+  // the main line's (main, master). A pack of loose refs (git gc) changes nothing it reads: refSync reads both.
+  async watch(projectPath, line) {
+    const common = G.commonDirSync(projectPath)
+    if (!common) return null
+    const refs = [...releaseTagNames(line).map((n) => `refs/tags/${n}`), `refs/heads/${line}`, 'refs/heads/main', 'refs/heads/master']
+    return () => refs.map((r) => `${r}=${refSync(common, r) ?? '-'}`).join('|')
+  },
   async exists(projectPath, line): Promise<Maybe<boolean>> {
     const h = await G.lineHead(projectPath, line)
     return isUnknown(h) ? h : !!h

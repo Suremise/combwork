@@ -109,7 +109,7 @@ export interface Env {
 }
 
 /** A scenario's world: Git (a repository) or None (a folder), with these options. */
-export function setup(options: Partial<WorkflowOptions> & { platform: PlatformId }, extra: { releaseGrant?: (lane: string) => Promise<string | null>; runsOf?: (a: string) => string[]; autoRun?: boolean; files?: Record<string, string>; enforced?: () => boolean; queueLive?: (target: string) => QueueLive; checksSettled?: () => Promise<void>; focused?: WorkflowConfig['focused']; hooks?: WorkflowConfig['hooks']; reviewersPresent?: WorkflowConfig['reviewersPresent'] } = {}): Env {
+export function setup(options: Partial<WorkflowOptions> & { platform: PlatformId }, extra: { releaseGrant?: (lane: string) => string | null; runsOf?: (a: string) => string[]; autoRun?: boolean; files?: Record<string, string>; enforced?: () => boolean; queueLive?: (target: string) => QueueLive; checksSettled?: () => Promise<void>; focused?: WorkflowConfig['focused']; hooks?: WorkflowConfig['hooks']; reviewersPresent?: WorkflowConfig['reviewersPresent'] } = {}): Env {
   const home = tempDir('wf-')
   const project = join(home, 'project')
   if (options.platform === 'git') gitRepo(project)

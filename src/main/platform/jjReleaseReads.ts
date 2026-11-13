@@ -6,6 +6,7 @@
 import { jjContextOf } from './jjDetect'
 import { isJjUnknown, JjReads, type JjMaybe, type JjReadUnknown } from './jjReads'
 import { jjRunner, type JjRunner } from './jjRunner'
+import { singleHead } from './jjView'
 import { releaseTagNames, type ReleaseInfo, type ReleaseReads } from './releaseReads'
 import { unknown, withDetail, type Maybe } from './types'
 import { UNREADABLE as U } from '../../shared/workflow/texts'
@@ -35,6 +36,14 @@ export function jjReleaseReadsWith(runner: JjRunner): ReleaseReads {
   }
   return {
     exists: existsAt,
+    // Every read is pinned to one operation: any jj operation since (a tag or bookmark moved, Git's refs imported) moves
+    // the single operation head, read from its files; several heads (unsettled) are unknown.
+    async watch(projectPath) {
+      const ctx = await jjContextOf(projectPath, runner)
+      if (!('jj' in ctx)) return null
+      const repo = ctx.jj.jjRepo
+      return () => singleHead(repo)
+    },
     async released(projectPath, line): Promise<Maybe<ReleaseInfo | null>> {
       const what = (u?: JjReadUnknown) => withDetail(unknown(U.line, { branch: line }), u ? (u.detail ?? u.jjUnknown) : undefined)
       const ctx = await jjContextOf(projectPath, runner)

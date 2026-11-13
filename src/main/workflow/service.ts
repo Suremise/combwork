@@ -38,6 +38,8 @@ import type { CardRecord } from './factStore'
 import { legacyWorktree, slotsMigrated } from '../agentFolders'
 import { NOT_RUN_HERE, type QueueLive } from './queueState'
 import { noticeTargetChanges } from '../targetChangesNotice'
+import { readTable } from '../storeTables'
+import { readLanes } from '../../shared/lanes'
 
 /** The Advanced switch every gate answers to at once (#1120's table): off, nothing is refused and reconciliation records only. */
 export const ENFORCE = WORKFLOW_ENFORCE
@@ -246,9 +248,10 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     keptAcross: (card) => slotStarts?.keptAcross?.(ws, project.path, card.id) ?? Promise.resolve(null),
     keptHere: (card) => slotStarts?.keptHere?.(ws, project.path, card.id) ?? Promise.resolve(null),
     // HI-3148: a running lane's grant to start on a released line (its record's, given with its start), for its cards' starts.
-    releaseGrant: async (lane) => {
-      const { rawLanes } = await import('../lanes')
-      const l = (await rawLanes(ws)).find((x) => x.id === lane && x.state === 'active')
+    // Read from the lanes as stored, synchronously (inside the start's write too): an ended or replaced lane grants nothing.
+    releaseGrant: (lane) => {
+      if (!ws.path) return null
+      const l = readLanes({ version: 1, lanes: readTable(ws.path, 'lanes').docs as Record<string, unknown>[] }).find((x) => x.id === lane && x.state === 'active')
       return l?.releasedOverride?.target ?? null
     },
     earlierWork: (card, lines, now) => sayEarlierWork(ws, project.path, card, lines, now),

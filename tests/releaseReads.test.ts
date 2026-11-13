@@ -64,6 +64,24 @@ describe('Git: whether a line is released (HI-3148)', () => {
     expect(await reads.released(r, 'nosuch')).toBeNull()
   })
 
+  it('watch (HR2’s round 1): its answer moves with a tag made, the line or main moved; not with an unrelated tag', async () => {
+    const r = repo()
+    const check = (await reads.watch(r, '1.4.0'))!
+    const first = check()
+    expect(first).toBeTruthy()
+    git(r, 'tag', 'unrelated', 'main')
+    expect(check()).toBe(first)
+    git(r, 'tag', '-a', 'v1.4.0', '-m', 'release', '1.4.0')
+    const tagged = check()
+    expect(tagged).not.toBe(first)
+    git(r, 'merge', '-q', '--no-ff', '-m', 'release 1.4.0', '1.4.0')
+    expect(check()).not.toBe(tagged)
+    // Packed (git gc): the same refs, the same answer.
+    const before = check()
+    git(r, 'pack-refs', '--all')
+    expect(check()).toBe(before)
+  })
+
   it('a repository it can’t read: unknown, never "not released"', async () => {
     const r = repo()
     writeFileSync(join(r, '.git', 'HEAD'), 'garbage\n')
@@ -86,6 +104,13 @@ describe.skipIf(!jjExe)('jj: whether a line is released, pinned to one operation
     h.jj(d, 'bookmark', 'set', 'main', '-r', '1.4.0')
     expect(await jjReads.released(d, '1.4.0')).toEqual({ tag: 'v1.4.0', into: 'main', date: null })
     expect(await jjReads.released(d, 'nosuch')).toBeNull()
+    // watch (HR2's round 1): the operation head, moved by any jj operation (a tag set).
+    const check = (await jjReads.watch(d, '1.4.0'))!
+    const first = check()
+    expect(first).toBeTruthy()
+    expect(check()).toBe(first)
+    h.jj(d, '--ignore-working-copy', 'tag', 'set', 'v9', '-r', 'main')
+    expect(check()).not.toBe(first)
     // The tag made conflicted: two operations from the same one each set it elsewhere; jj merges their heads, and the
     // tag then names two commits. Unknown, never one picked.
     const op = h.jj(d, '--ignore-working-copy', 'op', 'log', '-n', '1', '--no-graph', '-T', 'id').trim()
