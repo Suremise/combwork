@@ -462,7 +462,7 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
 
     // --- More agents than the map reads (HI-3180, HR1's round 1): ten running, the map reading eight. The last one,
     // shown alone from the strip, is read (its calls and its context), and keeps being read as it works, the selection
-    // and the list's tab unchanged; in the project's tab and the workspace's view.
+    // unchanged and its tab the list's (HI-3186); in the project's tab and the workspace's view.
     await lib.fitWindow(app, page, { width: 1500, height: 900 })
     const more = []
     for (let i = 4; i <= 11; i++) more.push(await lib.addAgent(inv, alpha, { name: `HB${i}` }))
@@ -497,7 +497,9 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
       const vCentre = () => page.locator(`${v.scope} .activity-map-centre`).evaluate((e) => e.textContent).catch(() => '')
       check(`…a click on HB11 shows its map, read: its call and its context (55 %)`, !!(await lib.until(async () => (await vMap.getAttribute('data-mode').catch(() => null)) === 'single' && /HB11/.test(await vCentre()) && ((await vStation('read').textContent().catch(() => '')) ?? '').includes('late/eleven.ts') && (await page.locator(`${v.scope} .activity-map-context`).getAttribute('data-pct').catch(() => null)) === '55', HUNG_MS, 250)), `${await vCentre()} | ${await vStation('read').textContent().catch(() => '')} | ${await page.locator(`${v.scope} .activity-map-context`).getAttribute('data-pct').catch(() => null)}`)
       check('…its ring read now, marked; the other rings still listed', (await lastRing.getAttribute('data-load')) === 'loaded' && (await lastRing.getAttribute('aria-current')) === 'true' && (await vRings.count()) >= 10)
-      check('…the selection and the list\'s tab unchanged', (await vHead.locator('.activity-pick').first().innerText()) === vPick && (await page.locator(`${v.scope} .activity-agent-tab[aria-selected="true"]`).innerText().catch(() => '')) === vTab, `${await vHead.locator('.activity-pick').first().innerText()} / ${vTab}`)
+      // The selection kept; the list's tab is HB11's now, the one agent shown (HI-3186: the tab and the strip agree).
+      const vTabNow = () => page.locator(`${v.scope} .activity-agent-tab[aria-selected="true"]`).innerText().catch(() => '')
+      check("…the selection unchanged, and the list's tab is HB11's", (await vHead.locator('.activity-pick').first().innerText()) === vPick && !!(await lib.until(async () => /HB11/.test(await vTabNow()), HUNG_MS, 250)), `${await vHead.locator('.activity-pick').first().innerText()} / ${vTab} → ${await vTabNow()}`)
       edits++
       // Its context as before, so the next view reads the same 55 % (a turn without one reports none: 0 %).
       await turn(last.id, `window 100000 then context 55000 then tool Edit src/late/edit${edits}.ts`)
