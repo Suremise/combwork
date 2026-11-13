@@ -305,11 +305,11 @@ export async function upstreamRemedyOf(h: CandidateHost, branch: string, from?: 
   }
   const remote = (await tracked(branch)) ?? (from ? await tracked(from) : null) ?? (remotes.length === 1 ? remotes[0] : null)
   const shallow = await run(['rev-parse', '--is-shallow-repository'])
-  if (shallow?.out.trim() === 'true') return { kind: 'unusable', remote, why: 'shallow' }
+  if (shallow?.out.trim() === 'true') return { kind: 'unusable', remote, why: 'shallow' } // i18n-ignore: a remedy's codes, never shown
   if (remote) {
     const urls = await run(['remote', 'get-url', '--push', '--all', '--', remote])
     const n = urls ? urls.out.split(/\r?\n/).map((x) => x.trim()).filter(Boolean).length : 0
-    if (n !== 1) return { kind: 'unusable', remote, why: 'ambiguous' }
+    if (n !== 1) return { kind: 'unusable', remote, why: 'ambiguous' } // i18n-ignore: a remedy's codes, never shown
   }
   return { kind: remote ? 'ready' : 'choose', remote, ...upstreamCommands(remote, branch) }
 }
