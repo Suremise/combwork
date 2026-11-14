@@ -68,6 +68,37 @@ describe('a run’s process tree (HI-3206)', () => {
     expect(tree.get(keyOf(stranger))).toBeUndefined()
   })
 
+  // HI-3273: the host gives a parent's pid with the creation time of whatever holds that pid now. A holder created after the
+  // child is another process given the pid again (isOrphan's rule): the child is an orphan, never that process's child.
+  it('an orphan whose exited parent’s pid now belongs to the run’s tree joins no tree, at any look', () => {
+    // A server started with & at T - 1000 from a shell (pid 25) since exited; the run's command then got pid 25.
+    const server = proc(90, T - 1000, 25, T + 100)
+    const command25 = proc(25, T + 100, 40, T - 80)
+    const run = [{ runId: 'run-1', reporter: keyOf(reporter) }]
+    const first = runTrees([wrapper, reporter, command25, server], run, new Map())
+    expect(first.get(keyOf(command25))).toBe('run-1')
+    expect(first.get(keyOf(server))).toBeUndefined()
+    // The command exits (the server's parent gone): still no run's, then or later.
+    const second = runTrees([wrapper, reporter, { ...server, parentCreated: '0' }], run, first)
+    expect(second.get(keyOf(server))).toBeUndefined()
+  })
+
+  it('…nor when the reporter itself reuses the pid, nor above it: a reporter’s parent reused later isn’t its wrapper', () => {
+    const server = proc(90, T - 1000, 40, T - 80)
+    expect(runTrees([reporter, server], [{ runId: 'run-1', reporter: keyOf(reporter) }], new Map()).get(keyOf(server))).toBeUndefined()
+    // The reporter names pid 35 as its parent, and pid 35 is now a process started after it.
+    const late = proc(35, T + 50, 20, '0')
+    const orphanedReporter = proc(40, T - 80, 35, T + 50)
+    const tree = runTrees([orphanedReporter, late], [{ runId: 'run-1', reporter: keyOf(orphanedReporter) }], new Map())
+    expect(tree.get(keyOf(late))).toBeUndefined()
+    expect(tree.get(keyOf(orphanedReporter))).toBe('run-1')
+  })
+
+  it('a parent created in the same 100 ns as its child is still its parent', () => {
+    const same = proc(50, T - 80, 40, T - 80)
+    expect(runTrees([reporter, same], [{ runId: 'run-1', reporter: keyOf(reporter) }], new Map()).get(keyOf(same))).toBe('run-1')
+  })
+
   it('two runs at once with the same title: each tree its own, by its reporter', () => {
     const r2 = proc(41, T - 70, 31, '0')
     const c2 = proc(51, T + 150, 41, T - 70)

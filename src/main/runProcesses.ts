@@ -2,7 +2,7 @@
 // time overlap, agent or title. A run's reporter (the cw-progress process, ProgressRun.pid) is bound once, by the rule
 // bindReporter states, to its pid and creation time; its tree is the reporter, its ancestors (a wrapper started before
 // the run registered is the reporter's parent) and its descendants, linked by each process's parent id and that parent's
-// creation time, so a reused pid never joins a tree. Descendants are remembered from look to look (bounded), so a child
+// creation time, never by a process given its parent's pid since (created after it: HI-3273), so a reused pid never joins a tree. Descendants are remembered from look to look (bounded), so a child
 // whose parent, or the reporter, has exited is still the run's. Pure: orphanProcesses.ts reads the lineage and the runs.
 
 import type { Lineage } from './orphanProcesses'
@@ -45,7 +45,9 @@ export interface RunReporter {
 export function runTrees(lineage: readonly Lineage[], runs: readonly RunReporter[], remembered: ReadonlyMap<string, string>, cap = MAX_REMEMBERED): Map<string, string> {
   const byKey = new Map(lineage.map((l) => [keyOf(l), l]))
   const children = new Map<string, Lineage[]>()
-  const parentOf = (l: Lineage): Lineage | undefined => (/^\d+$/.test(l.parentCreated) && l.parentCreated !== '0' ? byKey.get(`${l.parent}:${l.parentCreated}`) : undefined)
+  // The host gives the creation time of whatever holds the parent's pid now: one created after the process is another,
+  // given the pid again (isOrphan's rule), never its parent (HI-3273).
+  const parentOf = (l: Lineage): Lineage | undefined => (/^\d+$/.test(l.parentCreated) && l.parentCreated !== '0' && /^\d+$/.test(l.created) && BigInt(l.parentCreated) <= BigInt(l.created) ? byKey.get(`${l.parent}:${l.parentCreated}`) : undefined)
   for (const l of lineage) {
     const p = parentOf(l)
     if (!p) continue
