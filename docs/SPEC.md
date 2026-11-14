@@ -6155,7 +6155,10 @@ moved on.
   started; a start (`Started`, `Adopted`) makes `(its seq, 1)`; the card given to another agent (or to nobody) while in
   Active, Review or Approved writes `AttemptBound` in that board change and moves the generation on; the attempt **ending**
   (the card leaving Active, Review, Approved or Merging for Todo, On Hold or Done, by any route) moves it on again, read from
-  that move's `Moved`. Keys are ordered and never go back, so Todo → start → Todo never looks unchanged.
+  that move's `Moved`. A started card **entering** one of those stages again with no `Started` of its own (resumed from On
+  Hold, a recorded move) moves it on once more (HI-3263): a launch bound while it was out of an attempt (a read while held,
+  the card given to another agent there, which writes nothing) is stale once it is live again. Keys are ordered and never
+  go back, so Todo → start → Todo never looks unchanged.
 - **The consumer generation is the launch**: each agent launch has its own Agent API token, which a restart, a lane
   renewal's new conversation or a switch replaces; a write is checked again, in its transaction, against the agent's current
   launch (`attempt.staleLaunch`), not only as the request arrives.

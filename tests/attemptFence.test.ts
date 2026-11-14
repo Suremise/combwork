@@ -258,6 +258,32 @@ describe('the fence on an agent write (HI-3194)', () => {
     expect(await refused(update(w, card, arrive(l), { labels: ['y'] }))).toBeNull()
   })
 
+  it('HI-3263: a card resumed from On Hold is a new attempt key: a launch bound while it was held is refused until it reads the card', async () => {
+    const { w, repo, wt } = await workspace()
+    const card = await create(w)
+    const l1 = await launch(repo, 'a1', 'r1')
+    await act(w, card, arrive(l1), { kind: 'start' })
+    commit(wt, 'b.txt')
+    const started = key(w, card)
+    await update(w, card, user, { column: 'hold' })
+    expect(key(w, card)).toEqual({ id: started.id, generation: 2 })
+    // The old builder reads the card while it is held (bound to its key there); the user gives it away there, then resumes it.
+    await read(w, l1, card)
+    await update(w, card, user, { agent: 'a3' })
+    await update(w, card, user, { column: 'doing' })
+    expect(foldCard(facts(w, card)).stage).toBe('active')
+    expect(key(w, card)).toEqual({ id: started.id, generation: 3 })
+    const old = arrive(l1)
+    expect(await refused(act(w, card, old, { kind: 'putBack', why: 'Stale' }))).toBe('attempt.moved')
+    expect(await refused(comment(w, card, old))).toBe('attempt.moved')
+    expect(await refused(update(w, card, old, { labels: ['x'] }))).toBe('attempt.moved')
+    expect(foldCard(facts(w, card)).stage).toBe('active')
+    // Its new builder, once it has read the card, works on it.
+    const l3 = await launch(repo, 'a3', 'r3')
+    await read(w, l3, card)
+    expect((await act(w, card, arrive(l3), { kind: 'submit', summary: 'Mine' })).done).toMatchObject({ to: 'review' })
+  })
+
   it('a comment queued behind a board change that restarts the card is refused in its own transaction', async () => {
     const { w, repo, wt } = await workspace()
     const card = await create(w)

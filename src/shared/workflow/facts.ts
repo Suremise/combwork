@@ -911,6 +911,8 @@ export function countsChurn(f: Pick<Fact, 'kind' | 'data'>): boolean {
 export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): CardState {
   const s = emptyState()
   s.stage = initial
+  // HI-3263: a cycle's Started (or Adopted) not yet followed by a move: its own move into Active begins its attempt at (S,1).
+  let fresh = false
   for (const f of facts) {
     s.lastSeq = Math.max(s.lastSeq, f.seq)
     const by = agentOf(f.actor)
@@ -929,6 +931,7 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         for (const r of limit) s.made[r.request] = r
         s.cycle = f.seq
         s.attempt = { id: f.seq, generation: 1 }
+        fresh = true
         s.lastHeadFact = f.seq
         s.started = { ...d, seq: f.seq, adopted: f.kind === 'Adopted' }
         if (d.line) s.lines = addOnce(s.lines, d.line)
@@ -1162,7 +1165,12 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         if ((f.data as FactData['Moved']).to !== 'done') s.finished = null
         // HI-3194: out of an attempt (put back, done, on hold): the attempt ends, its key moves on.
         const to = (f.data as FactData['Moved']).to
-        if (ATTEMPT_STAGES.includes((f.data as FactData['Moved']).from) && !ATTEMPT_STAGES.includes(to)) s.attempt = { ...s.attempt, generation: s.attempt.generation + 1 }
+        const from = (f.data as FactData['Moved']).from
+        if (ATTEMPT_STAGES.includes(from) && !ATTEMPT_STAGES.includes(to)) s.attempt = { ...s.attempt, generation: s.attempt.generation + 1 }
+        // HI-3263: into an attempt with no Started of its own (resumed from On Hold, a recorded move): a live attempt again,
+        // under a key no launch was handed while the card was out of one (a read on hold, a reassignment there).
+        else if (!ATTEMPT_STAGES.includes(from) && ATTEMPT_STAGES.includes(to) && !fresh && s.attempt.id > 0) s.attempt = { ...s.attempt, generation: s.attempt.generation + 1 }
+        fresh = false
         s.stage = to
         // A gate's request belongs to the stage it was asked in: the card leaving it retires the request.
         s.requests = s.requests.filter((r) => !isGateRequest(r) || r.stage === undefined || r.stage === s.stage)
