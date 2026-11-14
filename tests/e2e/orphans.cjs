@@ -161,7 +161,7 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
     const leftByRun = () => (fs.existsSync(runFile) ? fs.readFileSync(runFile, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l).pid) : [])
     const mark = (await toasts()).length
     // Its left-running notices only (an agent's turn ending says so in a notice of its own).
-    const leftNotices = async () => (await toasts()).slice(mark).filter((t) => /^HB2 left /.test(t.title ?? ''))
+    const leftNotices = async () => (await toasts()).slice(mark).filter((t) => (t.title ?? '').startsWith('HB2 left '))
     await lib.sendPrompt(inv, lib.ptyKey(alpha, hb2.id), 'progress-orphan 14', { submitted: async () => leftByRun().length > 0 })
     await until(async () => (await liveOf())?.status === 'finished')
     const lpid = leftByRun()[0]
