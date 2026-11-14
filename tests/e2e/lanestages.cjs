@@ -333,7 +333,8 @@ const beta = path.join(fx.ws, 'beta')
     const rowJa = await waitHung(async () => (await panelJa.locator(`.progress-lane[data-lane="${l2}"]`).count()) === 1)
     if (!rowJa) await page.screenshot({ path: path.join(fx.shots, 'ja-no-lane.png') })
     const tagJa = panelJa.locator(`.progress-lane[data-lane="${l2}"] .progress-lane-state.old-rules`)
-    check('ja: the old rules mark in Japanese', !!(await waitHung(async () => (await tagJa.innerText().catch(() => '')) === '旧ルール')), await panelJa.innerText().catch(() => ''))
+    // Its words (a narrow panel shows its icon instead, HI-3209: the words are still its text).
+    check('ja: the old rules mark in Japanese', !!(await waitHung(async () => ((await tagJa.textContent().catch(() => '')) ?? '').trim() === '旧ルール')), await panelJa.innerText().catch(() => ''))
     const barJa = panelJa.locator('.progress-lanes-bar')
     check('ja: the legend in Japanese', !!(await hover(barJa, (t) => t.includes('各色はカテゴリ'))), await tipText())
     const shootJa = async (name, show) => {
