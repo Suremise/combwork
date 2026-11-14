@@ -1315,6 +1315,10 @@
     "defaultMessage": "{cli} signs in per account, and none is on in this workspace: {n, plural, one {{names} is off here.} other {{names} are off here.}} Turn one on with On here.",
     "description": "Provider Setup (HI-2650), for a coding agent CLI ({cli}: \"Claude Code\") that signs in per account, when it has accounts but none is on in the open workspace. {names}: their names, joined (\"Work and Personal\"); {n}: how many. On here is the switch on each account's row in Settings → Accounts & Connections, which the button beside it opens."
   },
+  "shell.setup.connectionsSignedOut": {
+    "defaultMessage": "{cli} signs in per account, and {n, plural, one {the one on in this workspace is not signed in: sign it in.} other {none of the # on in this workspace is signed in: sign one in.}}",
+    "description": "Provider Setup (HI-3278), for a coding agent CLI ({cli}: \"Codex\") that signs in per account (Settings → Accounts & Connections), when every account of it on in the open workspace is signed out, so its agents can't start. {n}: how many are on. The button beside it opens Settings → Accounts & Connections."
+  },
   "shell.setup.docs": {
     "defaultMessage": "{provider} docs",
     "description": "Provider Setup's button: opens the coding agent's own documentation. {provider} is its name."

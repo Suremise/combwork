@@ -36,6 +36,7 @@ import { permissionsMenuLabel, permissionsMenuNumber } from './permissionsMenu'
 import { strayCodexWarning } from './strayFolder'
 import { advanced } from '../../advanced'
 import { launchOverrides } from '../../advancedValues'
+import { connectionsManaged } from '../../connectionSeam'
 import { codexListedHooks } from './hookListing'
 import type { HookListing, HookRow } from '../../../shared/hooks'
 import { withoutCombworkAuth } from '../../../shared/hooks'
@@ -727,7 +728,9 @@ export class CodexAdapter implements ProviderAdapter {
       break
     }
     if (!info.found) info.editorExtensionOnly = await this.editorExtensionPresent()
-    if (info.path) {
+    // Its sign-in is its connections' (HI-1757, HI-3278), as Claude Code's is: ~/.codex's own login is never what its
+    // agents use, so it is never checked (it said "not signed in" to a user signed in only through a connection).
+    if (info.path && !connectionsManaged(this.id)) {
       const s = await run(info.path, ['login', 'status'], 10000)
       const text = `${s.stdout}\n${s.stderr}`
       if (/not logged in|logged out/i.test(text)) info.loggedIn = false

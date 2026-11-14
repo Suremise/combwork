@@ -87,6 +87,17 @@ export function offHereChoice(view: Pick<ConnectionsView, 'connections' | 'homes
 }
 
 /**
+ * Whether every account of `cli` on in the workspace is known to be signed out (HI-3278): each a sign-in account whose
+ * latest check said not signed in. One signed in, a server account (no sign-in), or one not checked yet (unknown) says no,
+ * as does none on (Provider Setup says that its own way). From the checks Combwork already keeps: no CLI is run for it.
+ */
+export function noneSignedInHere(view: Pick<ConnectionsView, 'connections' | 'workspace'>, cli: ProviderId): boolean {
+  const on = view.workspace[cli]?.on ?? []
+  const accounts = on.map((id) => view.connections.find((a) => a.id === id))
+  return !!accounts.length && accounts.every((a) => !!a && a.kind !== 'server' && a.observed?.loggedIn === false)
+}
+
+/**
  * Whether a CLI can run a new agent now, as Combwork's detection says (decision A: on and installed): `yes`, installed;
  * `no`, not found; `checking`, not known yet (detection under way).
  */
