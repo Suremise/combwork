@@ -1574,8 +1574,6 @@ async function createTaskLocked(
   // merges into moves (a forward's resolution, which merges into the branch it resolves and nowhere else).
   const target = input.target === undefined ? null : await targetPick(project, input.target, actor, !!opts.pinTarget)
   const n = await nextNumber(ws)
-  // HI-3195: a keyed create's marker keeps the card it made, so a retry of it is told which card (requestReceipts.ts).
-  noteProduced({ created: n })
   const card: TaskCard = {
     number: n,
     title,
@@ -1607,6 +1605,9 @@ async function createTaskLocked(
   // A revocable caller's authority checked as it is written (HI-2415: saveCard's `commit`), so a revoked one makes no card.
   const kept = { ...(kind === 'no-code' && !proposes ? { kind } : {}), ...(target ? { target } : {}) }
   await saveCard(ws, n, card, null, store && Object.keys(kept).length ? () => store.updateCard(n, kept) : undefined, opts.commit)
+  // HI-3195: a keyed create's marker keeps the card it made, by its key (saveCard gave it), so a retry is told which card;
+  // still in the change's transaction, which the marker commits with (requestReceipts.ts).
+  noteProduced({ created: card.key ?? cardRef(n) })
   if (store && proposes) store.tx((tx) => tx.append(n, { kind: 'KindProposed', actor: actorOf(actor), source: 'recorded', data: { kind } }))
   // HI-3188: its churn starts where its parent's is now, with the parent's bases, in the creation's transaction.
   if (parent && card.project) FactStore.forBoard(ws, { project: card.project, key: '' }).tx((tx) => tx.append(n, { kind: 'SplitFrom', actor: actorOf(actor), source: 'recorded', data: { parent: parent.n, total: churnTotal(parent.state), stop: parent.state.churnStop, simplifyBase: parent.state.simplifyBase } })) // i18n-ignore: a fact's kind and codes, not text

@@ -9,7 +9,7 @@ import type { WorkspaceService } from './workspace'
  * (`X-Combwork-Request`, which cw-mcp makes for each write tool call and sends again on its own retry) is applied once.
  * The write's own board transaction saves a durable "applied" marker for (launch, key) just before it commits (the board's
  * commit hook): the write and its marker commit together, or neither. A retry with the same key then gets "already
- * applied" with what the write produced (a created card's number), never a second write: after a lost reply, a crash or a
+ * applied" with what the write produced (a created card's key), never a second write: after a lost reply, a crash or a
  * restart alike. The original reply isn't replayed (Darren's (b)); while Combwork runs, a retry of a request still in
  * flight waits for it and gets its reply. A write of several steps counts as applied at its first board commit.
  *
@@ -41,7 +41,7 @@ export interface KeyedRequest {
 export interface Applied {
   replayed: true
   applied: true
-  /** What the write produced: a created card's number (`card`), the card it was about. */
+  /** What the write produced: a created card's key (`created`), the card it was about (`card`). */
   produced: Record<string, unknown>
 }
 
@@ -69,7 +69,7 @@ interface Scope extends KeyedRequest {
 }
 const scope = new AsyncLocalStorage<Scope>()
 
-/** What the running keyed write produced (a created card's number), saved with its marker; nothing outside one. */
+/** What the running keyed write produced (a created card's key), saved with its marker; nothing outside one. */
 export function noteProduced(o: Record<string, unknown>): void {
   const s = scope.getStore()
   if (s && !s.written) Object.assign(s.produced, o)

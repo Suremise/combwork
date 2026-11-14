@@ -1781,7 +1781,7 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
       try {
         const result = await callKey.run(call, () => notices.run(said, () => tool.run(args)).catch((e: unknown) => {
           // Applied earlier: the call's outcome is recovered, said as such (what it made, to read).
-          if (e instanceof AppliedEarlier) return say(T['call.appliedEarlier'], { made: e.produced.created !== undefined ? `#${String(e.produced.created)}` : typeof e.produced.card === 'string' ? e.produced.card : 'none' })
+          if (e instanceof AppliedEarlier) return say(T['call.appliedEarlier'], { made: typeof e.produced.created === 'string' ? e.produced.created : typeof e.produced.card === 'string' ? e.produced.card : 'none' })
           throw e
         }))
         unresolved.delete(hash)

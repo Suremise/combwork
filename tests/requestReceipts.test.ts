@@ -72,9 +72,12 @@ describe('a keyed write is applied once (HI-3195)', () => {
     const { w } = await workspace()
     const create = () => inWorkspace(w, () => tasks.createTask({ title: 'Made once', project: 'p' }, agent))
     const r = { run: 'run-1', key: KEY(3), fingerprint: receipts.fingerprintOf('POST', '/v1/tasks', [], { title: 'Made once' }), route: 'POST /v1/tasks' }
-    const made = (await inWorkspace(w, () => receipts.onceFor(w, r, create))) as { number: number }
+    const made = (await inWorkspace(w, () => receipts.onceFor(w, r, create))) as { number: number; key: string }
     const again = await inWorkspace(w, () => receipts.onceFor(w, r, create))
-    expect(again).toEqual({ replayed: true, applied: true, produced: { created: made.number } })
+    // The card it made, by its key (or #n, a card with none, as this project's are): the same card, not another.
+    const created = (again as unknown as { produced: { created: string } }).produced.created
+    expect(again).toMatchObject({ replayed: true, applied: true })
+    expect(created === made.key || created === `#${made.number}`).toBe(true)
     expect((await inWorkspace(w, () => tasks.listTasks())).filter((c) => c.title === 'Made once')).toHaveLength(1)
   })
 
