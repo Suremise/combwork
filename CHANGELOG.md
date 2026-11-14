@@ -90,6 +90,8 @@
 
 ### Fixed
 
+- **A crowded lane header keeps its project's link** (HI-3209). In Progress → Lanes, a running lane showing *into <branch>* beside old rules, its card and count could squeeze the project's name to nothing in a narrow panel, so it couldn't be seen or clicked. The name now keeps a few letters, *into <branch>* is cut short before it, and in a narrow panel **old rules** and *into <branch>* show as icons (hover over one for what it says), so the name, the card and the count stay in view.
+
 - **A card waiting for Done cards of another project starts** (HI-3233). With *Cards start only when the cards they wait for are merged* on, Combwork looked for the other project's merge in this card's repository, couldn't read it, and refused the start. A card from another project now counts once it's Done. When Combwork can't read whether a card's work is in the target, the refusal names that card.
 
 - **An agent told of its inbox while it works names cards by key** (HI-3226). The notice Combwork adds to a working agent's tool calls and turn end named a card by its workspace-wide number (`#3170`), which finds another card, where the doorbell typed as its prompt said `HI-2911`. Both now name it by key.

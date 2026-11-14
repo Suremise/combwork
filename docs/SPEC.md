@@ -9568,7 +9568,8 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
     segment a hollow square, each saying what it means in its hover and accessible name. An ended or abandoned lane,
     a card in Todo or Done, and a lane or card with no ruleset recorded have none. A rename never sets it (names
     aren't in the ruleset). With `cw.workflow.enforce` off it still shows, and its hover says the rules aren't
-    enforced.
+    enforced. The header's project link keeps a few letters however crowded the row (HI-3209); in a narrow panel
+    (under 360px) the *old rules* and *into <branch>* tags show as icons, their hovers and accessible names the same.
 - **P7** [#1123 c]: lane rows name their slot ("HI-B1 / HI-R1 · slot-b"); pooled reviewers ("HI-B1 / pool"); review
   copies' runs as checks of the revision; slot warming as runs; "waiting for a slot". **Built [#1446]:**
   - **The lane row's slot:** "HI-B1 / HI-R1 · slot-b" (its builder's carried slot, #1441: "· hb2"), a link to Version
