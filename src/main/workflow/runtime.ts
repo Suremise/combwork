@@ -2235,7 +2235,8 @@ export class Workflow {
       if (e) w.fact('IntegrationCancelled', { entry: e.id, reason: 'feedback' }) // i18n-ignore: a fact's kind and codes, not text
       const latest = st.latest!
       const round = st.rounds + 1
-      const verdict = w.fact('Verdict', { reviewer: 'user', submission: latest.id, revision: latest.revision, pass: false, round, generation: st.generation, comment: args.message(chosen, { id: latest.id, revision: latest.revision }) })
+      // agent-protocol: a fact's kind and codes; its comment is agent text, made in feedbackText.ts
+      const verdict = w.fact('Verdict', { reviewer: 'user', submission: latest.id, revision: latest.revision, pass: false, round, generation: st.generation, comment: args.message(chosen, { id: latest.id, revision: latest.revision }) }) // i18n-ignore: a fact's kind and codes; its comment is agent text (feedbackText.ts)
       w.fact('FeedbackSent', { batch: args.batch, submission: latest.id, round, items: args.items.map(({ id, version }) => ({ id, version })) })
       w.move('active', 'intent')
       // Its wake names the user's verdict, not the move: a verdict of the user's reaches the builder whether or not the
