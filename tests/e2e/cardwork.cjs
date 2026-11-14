@@ -315,8 +315,8 @@ const commit = (dir, file, text, message) => {
   // --- HI-3274: a + elsewhere while a draft has text opens another draft beside it, never in its place; an empty draft
   // gives way; and a draft or an edit on the original side keeps its text while the diff shows inline, and back.
   const ktComposers = ktRev.locator('[data-comment-composer]')
-  const plusAt = async (side, text) => {
-    await ktRev.locator(`[data-revision-diff="lines.ts"] .editor.${side} .view-line`, { hasText: text }).hover()
+  const plusAt = async (side, lineText) => {
+    await ktRev.locator(`[data-revision-diff="lines.ts"] .editor.${side} .view-line`, { hasText: lineText }).hover()
     const p = ktRev.locator(`[data-revision-diff="lines.ts"] .editor.${side} .cw-comment-add`)
     if (!(await lib.until(async () => (await p.count()) === 1, HUNG_MS))) await ktRev.screenshot({ path: path.join(lib.WORK, `cardwork-no-plus-${side}.png`) })
     await p.click()
