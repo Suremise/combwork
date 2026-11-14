@@ -145,6 +145,8 @@
   "tips.cardLinks.title": "Ctrl+klik na numerze karty w terminalu",
   "tips.cardLoop.text": "Powiedz jednemu agentowi, żeby jako wykonawca przerobił kilka kart, a drugiemu, żeby je recenzował: każdy czeka na drugiego bez kosztów, a Combwork wybudza go, gdy karta się zmieni.",
   "tips.cardLoop.title": "Dwaj agenci na zmianę: praca i recenzja",
+  "tips.cardLoopChurn.text": "Z agentem recenzentem Combwork liczy rundy uzgodnień każdej karty i przy 12 pyta, czy uprościć, a przy 30, jak dalej. Oba ustawisz w Pętle kart, w Kontrola wersji → Przepływ pracy.",
+  "tips.cardLoopChurn.title": "Karta, która kręci się w kółko, zatrzymuje się",
   "tips.cardMove.text": "Przeciągnij dowolne okno dialogowe za nagłówek (kartę, Dodaj agenta, Ustawienia agenta…), żeby zobaczyć, co jest pod nim; Escape w trakcie przeciągania odkłada je z powrotem.",
   "tips.cardMove.title": "Odsuń okno dialogowe",
   "tips.cardReadFirst.text": "W polu „Przeczytaj najpierw” karty wypisz potrzebne jej sekcje dokumentów, np. docs/PLAN.md#setup: prompt startowy agenta je wymienia, więc czyta te sekcje zamiast całego planu. Kliknij jedną, żeby ją przeczytać w Combwork.",

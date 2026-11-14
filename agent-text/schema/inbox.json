@@ -52,6 +52,13 @@
       "ids": "plain"
     }
   },
+  "inbox.churn.simplify": {
+    "placeholders": {
+      "key": "plain",
+      "churn": "plain",
+      "request": "plain"
+    }
+  },
   "inbox.create.badKey": {
     "placeholders": {}
   },

@@ -16,6 +16,8 @@ import { initDecisionWakes } from './decisionWakes'
 // The user's answers given to the Assistant too (HI-1734): its delivery source, registered at start.
 import './answerRelay'
 import './assistantAsk'
+// A card's simplify check told to the Assistant first (HI-3188): its delivery source, registered at start.
+import './churnAssistant'
 import { initWorkflowNotices } from './workflowNotices'
 import { initDevConsole } from './devConsoleSources'
 import { flightRecorder } from './flightRecorder'

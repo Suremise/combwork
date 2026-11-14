@@ -591,6 +591,14 @@
     "defaultMessage": "Let two agents build and review in turn",
     "description": "A tip's title."
   },
+  "tips.cardLoopChurn.text": {
+    "defaultMessage": "With a reviewer agent, Combwork counts each card’s back-and-forth and asks you whether to simplify at 12, and how to go on at 30. Set both under Card loops in Version Control → Workflow.",
+    "description": "A tip (HI-3188): a card's back-and-forth is its failed reviews, designs, requests and questions. Names of Combwork's menus, views, settings and commands (Card loops, Version Control, Workflow): keep them as Combwork shows them."
+  },
+  "tips.cardLoopChurn.title": {
+    "defaultMessage": "A card that goes round in circles stops",
+    "description": "A tip's title (HI-3188)."
+  },
   "tips.cardMove.text": {
     "defaultMessage": "Drag any dialog by its header (a card, Add Agent, Agent Settings…) to see what's behind it; Escape while dragging puts it back.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

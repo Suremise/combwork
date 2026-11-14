@@ -36,6 +36,8 @@ interface CombworkMessageValues {
   'tasks.error.emptyComment': undefined
   'tasks.error.emptyDecision': undefined
   'tasks.error.failedToDoing': { card: string | number }
+  'tasks.error.followUpArchived': { card: string | number }
+  'tasks.error.followUpOtherProject': { card: string | number }
   'tasks.error.holdCard': { card: string | number }
   'tasks.error.holdNew': undefined
   'tasks.error.inDoingWith': { card: string | number; active: string | number; agent: string | number; stage: string | number; review: string | number }

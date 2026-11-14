@@ -8,7 +8,8 @@ module.exports = {
   parameter: 120,
   /** A role's descriptions and parameter descriptions together, every tool it is offered (the Assistant: all of its own). */
   // HI-3219 (14 Nov): cw_read_task's lineComments and offset (a card's line comments, a page at a time): agent raised to match.
-  total: { agent: 11100, assistant: 19000 },
+  // HI-3188 (14 Nov): cw_create_task's followUpOf (a continuation keeps the card's count): agent raised to match.
+  total: { agent: 11200, assistant: 19000 },
   /**
    * A role's whole tool list as the CLI gets it (HI-2553): the tools array's JSON, UTF-8 bytes (names, descriptions,
    * schemas), every tool it is offered but cw_console. Set 7 Nov 2026 at about 6% over the list then (agent 24,571 bytes,
@@ -16,7 +17,8 @@ module.exports = {
    */
   // HI-2664 (7 Nov): the Assistant lost its ten worker-only tools, about 36,800 bytes without cw_console: lowered to match.
   // HI-3219 (14 Nov): cw_read_task's lineComments and offset, about 230 bytes: the Assistant's raised to match.
-  listBytes: { agent: 26000, assistant: 39300 },
+  // HI-3188 (14 Nov): the Assistant's cw_answer_simplify (Darren's Q4) and followUpOf, about 610 bytes: raised to match.
+  listBytes: { agent: 26000, assistant: 40000 },
   /**
    * A protected rule (a safety or damage boundary, HI-2009's Protected table) that can't be said clearly within the limit
    * keeps its words: its tool's own limit here, with why. None yet.

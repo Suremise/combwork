@@ -28,7 +28,7 @@ import { holdsOf, trackHolds } from '../shared/cardCosts'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName, type ProjectIdIndex } from '../shared/projectIds'
 import { actorOf, cardFacts, changeByRuntime, commentGenerations, commentReceiptFor, decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
 import { noteCard } from './assistantChanges'
-import { FactStore } from './workflow/factStore'
+import { FactStore, type CardRecord } from './workflow/factStore'
 import type { AttemptGuard } from './attemptFence'
 import { writeReadiness } from './workflow/dependencyReadiness'
 import { loopReviewerOf } from './loopReviewer'
@@ -39,7 +39,7 @@ import { linkToComment, moveCardFolder, publish, removeCardAttachments, trashCar
 import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } from '../shared/cardAttachments'
 import { hasStage, laneTargetOf, skipReviewOf } from '../shared/workflow/compile'
 import { isStageId, STAGE_TEXT, stageName, type StageNames } from '../shared/workflow/stages'
-import { answerFits, approveNote, ASK_ACTIONS, ATTEMPT_STAGES, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, foldCard, openEntry, type Actor, type AttemptKey, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type RoundChoice, type StageId } from '../shared/workflow/facts'
+import { answerFits, CHURN_GATES, churnTotal, approveNote, ASK_ACTIONS, ATTEMPT_STAGES, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, foldCard, openEntry, type Actor, type AttemptKey, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type PauseChoice, type StageId } from '../shared/workflow/facts'
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { refusal as refusalOf, refusalText, type Refusal } from '../shared/workflow/refusals'
@@ -1118,7 +1118,7 @@ function queueDependencyEdit(ws: WorkspaceService, card: TaskCard, had: number[]
  * The cards a list names (blockedBy, links), checked. A confined agent can only name its project's cards; when it
  * changes a card's list, the cards from other projects already on it (`kept`, which it sees only as numbers) stay.
  */
-async function cardRefs(v: unknown, self: number | null, what: 'blockedBy' | 'links', scope: string | null = null, kept: number[] = []): Promise<number[]> {
+async function cardRefs(v: unknown, self: number | null, what: 'blockedBy' | 'links' | 'followUpOf', scope: string | null = null, kept: number[] = []): Promise<number[]> {
   // `what` is the call's field, named as it is in every language.
   if (!Array.isArray(v)) throw combworkError(msg({ id: 'tasks.error.refsList', defaultMessage: '{field} must be a list of card numbers', description: 'An error: the call gave {field} (the name of its field: blockedBy or links, kept as it is) as something other than a list of card numbers.' }), { field: what }, { kind: 'invalid' })
   const nums = [...new Set(v.map((x) => Number(String(x).replace(/^#/, ''))))]
@@ -1131,6 +1131,64 @@ async function cardRefs(v: unknown, self: number | null, what: 'blockedBy' | 'li
     if (!hidden.includes(n) && !inScope(await getTask(n), scope)) throw noCard(n)
   }
   return [...nums, ...hidden.filter((n) => !nums.includes(n))]
+}
+
+/**
+ * HI-3188: the card's runtime and whether a churn question holds on it now, or null (no project, no workflow, no record).
+ */
+async function churnRuntime(ws: WorkspaceService, card: Pick<TaskCard, 'project' | 'number'>): Promise<{ wf: Workflow; rec: CardRecord; held: boolean } | null> {
+  if (!card.project || !ws.path) return null
+  const { workflowFor } = await import('./workflow/service')
+  const wf = await workflowFor(ws, join(ws.path, card.project)).catch(() => null)
+  if (!wf) return null
+  try {
+    const rec = wf.store.card(card.number)
+    return { wf, rec, held: wf.churnHeld(rec) }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * HI-3188 (HR3's round 1): a lane reviewer's comment recorded as its request (recorder.ts' ReviewerRequest) counts: the
+ * churn question it makes due is asked in the same board change, as a runtime write's is.
+ */
+async function askChurnAfterRequest(ws: WorkspaceService, card: TaskCard, said: StoredText | null | undefined): Promise<void> {
+  if (said?.id !== HISTORY.reviewerRequest.id) return
+  const r = await churnRuntime(ws, card)
+  if (r) await r.wf.askChurnNow(r.rec)
+}
+
+/** HI-3188: a follow-up's errors. */
+const FOLLOW_UP = {
+  otherProject: msg({ id: 'tasks.error.followUpOtherProject', defaultMessage: 'followUpOf: {card} is another project’s card; a follow-up continues a card of its own project.', description: 'An error (HI-3188): a new card named a card of another project as the card it continues (followUpOf, a field’s name: keep it as it is). {card} is a card key.' }),
+  archived: msg({ id: 'tasks.error.followUpArchived', defaultMessage: 'followUpOf: {card} is archived; bring it back first, or make the card without followUpOf.', description: 'An error (HI-3188): a new card named an archived card as the card it continues (followUpOf, a field’s name: keep it as it is). {card} is a card key.' })
+}
+
+/**
+ * HI-3188: the card a new card continues (`followUpOf`): its number and its state now, to inherit its churn. Its own
+ * project's, not archived; an agent's or the Assistant's refused while a churn question holds on it (answered first: only
+ * an answer gives a chain more room). A card with no workflow record continues nothing countable: an empty state.
+ */
+async function followUpParent(v: unknown, project: string, actor: TaskActor, scope: string | null): Promise<{ n: number; state: CardState }> {
+  const [n] = await cardRefs([v], null, 'followUpOf', scope)
+  const c = await getTask(n)
+  if (c.project !== project) throw combworkError(FOLLOW_UP.otherProject, { card: cardRef(n) }, { kind: 'invalid' })
+  if (c.archived) throw combworkError(FOLLOW_UP.archived, { card: cardRef(n) }, { kind: 'conflict' })
+  const { workflowFor } = await import('./workflow/service')
+  const wf = project && workspace.path ? await workflowFor(workspace, join(workspace.path, project)).catch(() => null) : null
+  let state: CardState | null = null
+  try {
+    state = wf ? wf.state(wf.store.card(n)) : null
+  } catch {
+    state = null
+  }
+  if (!state) return { n, state: foldCard([]) }
+  if (wf && actor.kind !== 'user') {
+    const held = state.requests.find((r) => CHURN_GATES.includes(r.gate) && wf.churnGateHolds(state!, r.gate))
+    if (held) throw new WorkflowRefusedError(refusalOf('loop.churnPending', { card: cardRef(n), request: held.request }))
+  }
+  return { n, state }
 }
 
 /** The order that puts a card before `before` in `column` (at the end without one). */
@@ -1324,7 +1382,8 @@ export const replyNote = (said: string): StoredText => storedText(HISTORY.builde
  * builder's reply to its reviewer (HI-2302). Null: only a comment.
  */
 async function commentNote(ws: WorkspaceService, card: TaskCard, patch: TaskPatch, actor: TaskActor, said: StoredText[], comment: string): Promise<StoredText | null> {
-  if (await laneReviewerAsks(ws, card, patch, actor, said)) return requestNote(comment)
+  // HI-3188: while the card's churn question holds, a lane reviewer's comment is a plain comment: no request, no more loop work.
+  if (await laneReviewerAsks(ws, card, patch, actor, said)) return (await churnRuntime(ws, card))?.held ? null : requestNote(comment)
   if (await builderReplies(ws, card, patch, actor, said)) return replyNote(comment)
   return null
 }
@@ -1470,7 +1529,7 @@ export async function createTask(...args: Parameters<typeof createTaskLocked>): 
 export const DOING_NOBODY_NEW = msg({ id: 'tasks.error.doingNobodyNew', defaultMessage: 'A card made in Active needs an agent on it (agent). Ask the user which they want: an agent on it, an agent started on it (make it in Todo, then cw_start_task), or nobody on it (make it in Todo, then move it with override and their reason).', description: "An error said to the Combwork Assistant (HI-2062): it made a card straight into the Active stage with no agent on it. agent, override and cw_start_task are names of a call's fields and a tool: keep them as they are. Active and Todo are stage names." })
 
 async function createTaskLocked(
-  input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; blocked?: string | null; blockedBy?: number[]; links?: number[]; context?: string[]; kind?: CardKind; skipReview?: string; target?: string | null },
+  input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; blocked?: string | null; blockedBy?: number[]; links?: number[]; context?: string[]; kind?: CardKind; skipReview?: string; target?: string | null; followUpOf?: number },
   actor: TaskActor,
   opts: { commit?: () => void; pinTarget?: boolean } = {}
 ): Promise<TaskCard> {
@@ -1494,7 +1553,10 @@ async function createTaskLocked(
   const by = actorName(actor)
   const now = new Date().toISOString()
   const blockedBy = input.blockedBy ? await cardRefs(input.blockedBy, null, 'blockedBy', scope) : []
-  const links = input.links ? await cardRefs(input.links, null, 'links', scope) : []
+  // HI-3188: a continuation of a card (a split, follow-ups the user accepted) keeps its count; linked to it too.
+  const parent = input.followUpOf === undefined ? null : await followUpParent(input.followUpOf, project, actor, scope)
+  const links0 = input.links ? await cardRefs(input.links, null, 'links', scope) : []
+  const links = parent && !links0.includes(parent.n) ? [...links0, parent.n] : links0
   const context = input.context ? contextOf(input.context) : []
   const problems = context.length ? await contextProblems(project && workspace.path ? join(workspace.path, project) : null, workspace.sharedDir, context) : []
   // Its kind (#1277, §16.7.3): the user's or the Assistant's from the start; a project agent's only proposed (OP-6/OP-7).
@@ -1543,6 +1605,8 @@ async function createTaskLocked(
   const kept = { ...(kind === 'no-code' && !proposes ? { kind } : {}), ...(target ? { target } : {}) }
   await saveCard(ws, n, card, null, store && Object.keys(kept).length ? () => store.updateCard(n, kept) : undefined, opts.commit)
   if (store && proposes) store.tx((tx) => tx.append(n, { kind: 'KindProposed', actor: actorOf(actor), source: 'recorded', data: { kind } }))
+  // HI-3188: its churn starts where its parent's is now, with the parent's bases, in the creation's transaction.
+  if (parent && card.project) FactStore.forBoard(ws, { project: card.project, key: '' }).tx((tx) => tx.append(n, { kind: 'SplitFrom', actor: actorOf(actor), source: 'recorded', data: { parent: parent.n, total: churnTotal(parent.state), stop: parent.state.churnStop, simplifyBase: parent.state.simplifyBase } })) // i18n-ignore: a fact's kind and codes, not text
   if (skipReason !== null) {
     const facts = store ?? FactStore.forBoard(ws, { project: card.project, key: '' })
     const setBy = actor.kind === 'assistant' ? 'assistant' : 'user'
@@ -2583,7 +2647,7 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
   const decision = !asked && !one && req.kind === 'approve' && a.outcome === 'approved' && reply && approveNote(req) === 'decision' ? text(reply, MAX_DECISION, 'decision') : decided
   // What each kind takes (answerFits): an approval is approved or declined; at the round limit, a choice (a carry on with
   // its rounds); any other question, a reply or a decision. Checked before anything is written.
-  const choice = a.choice as RoundChoice | undefined
+  const choice = a.choice as PauseChoice | undefined
   if (!answerFits(req, { outcome, reply: !!reply, decision: !!decision, choice, rounds: a.rounds, ...(action ? { action } : {}) }, LANE_MAX_ROUNDS)) throw bad()
   const answerIt = async (): Promise<TaskCard> => {
     const { reply: r } = await runIntent(
@@ -2615,6 +2679,28 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
     await doAskAction(n, action, reason)
     return getTask(n, ws)
   })
+}
+
+/**
+ * HI-3188 (Darren's Q4, 14 Nov): the Assistant's answer to a card's simplify check, told to it first: carry on or simplify,
+ * nothing else (cutting scope, and the hard stop's question, are the user's: `loop.usersChoice`). `why`, if given, is its
+ * comment on the card. Through runIntent as the user's answer is, the runtime checking the request still open and the
+ * choice in the write; `commit` is assistantChange's guard (its Control, its session), checked in that write.
+ */
+export async function assistantAnswerSimplify(n: number, request: string, choice: unknown, why: unknown, actor: TaskActor, commit?: () => void): Promise<TaskCard> {
+  const ws = workspace
+  if (actor.kind !== 'assistant') throw new TaskPermissionError(DECIDE.agents)
+  if (typeof request !== 'string' || !request) throw combworkError(BAD_ANSWER, { max: LANE_MAX_ROUNDS }, { kind: 'invalid' })
+  const head = ws.path ? cardHeads(ws, [n])[0] : undefined
+  if (!head) throw unknownTask(n)
+  if (choice !== 'carryOn' && choice !== 'simplify') throw new WorkflowRefusedError(refusalOf('loop.usersChoice', { card: cardRef(n), request }))
+  const reason = typeof why === 'string' && why.trim() ? text(why.trim(), MAX_TEXT, 'comment') : undefined
+  const { workflowFor } = await import('./workflow/service')
+  const wf = typeof head.project === 'string' && head.project && ws.path ? await workflowFor(ws, join(ws.path, head.project)).catch(() => null) : null
+  if (!wf) throw new WorkflowRefusedError(refusalOf('move.notFromHere', { card: cardRef(n), stage: CATEGORY_STAGE[head.column as TaskColumn] ?? 'todo', move: 'answer', moves: '' }))
+  const { reply } = await runIntent(wf, n, actor, (w) => w.answer(n, request, 'answered', { choice, by: 'assistant', ...(reason ? { note: reason } : {}) }), (_w, first) => (first && reason ? { opts: { comment: reason } } : {}), commit)
+  if (isRefusal(reply)) throw new WorkflowRefusedError(reply)
+  return getTask(n, ws)
 }
 
 const DECIDE = {
@@ -2992,6 +3078,8 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     // while those awaits run (the Assistant's control and session) checks it there, so a revoked change saves nothing.
     // Unlike `check`, it doesn't see the card as it was before this change.
     await saveCard(ws, n, card, before, undefined, opts.commit)
+    // HI-3188: a lane reviewer's request recorded with it counts, and may make a churn question due.
+    await askChurnAfterRequest(ws, card, said.find((x) => x.id === HISTORY.reviewerRequest.id))
     // Nobody on it, by the user's reason: recorded as an override is (setKind's), with the rule it passes.
     if (nobody) FactStore.forBoard(ws, { project: card.project, key: '' }).tx((tx) => tx.append(n, { kind: 'Override', actor: actorOf(actor), source: 'recorded', data: { rules: ['move.doingNobody'], move: `${CATEGORY_STAGE[before.column]}→active`, by: 'assistant', reason: nobody } })) // i18n-ignore: a fact's kind and codes, not text
     // HI-3194: given to another agent (or nobody) during an attempt: its attempt moves on, in this change.
@@ -3368,6 +3456,8 @@ export async function commentTask(n: number, comment: string, actor: TaskActor, 
     if (own) note(c, by, own, at)
     addComment(c, by, t, undefined, undefined, at)
     await saveCard(ws, n, c, undefined, undefined, opts.commit)
+    // HI-3188: a request it recorded counts, and may make a churn question due.
+    await askChurnAfterRequest(ws, c, own)
     // Written: its launch is bound to the card's attempt (a first contact's binding, HI-3194).
     if (g && pre) g.accepted(n, pre, (fn) => afterBoardWrite(ws, fn))
     changed(ws)

@@ -10,7 +10,7 @@
 
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
-import { ADVANCE_GATES, ADVANCE_STOPPED_GATE, agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, overridableEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
+import { ADVANCE_GATES, ADVANCE_STOPPED_GATE, agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, overridableEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type StageId, CHURN_GATES, CHURN_LIMIT_GATE, PAUSE_GATES, SIMPLIFY_GATE, churnDue, churnTotal, countsChurn, type PauseChoice } from '../../shared/workflow/facts'
 import { awaitsAgentMerge, baseRulesetId, compile, hasStage, mergeCommitOf, skipReviewOf, targetedOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
@@ -343,6 +343,13 @@ export interface WorkflowConfig {
   enforced?: () => boolean
   /** What runs a target's queue in this Combwork now (queueHost's queueLive, #1354); left out, nothing here runs one. */
   queueLive?: (target: string) => QueueLive
+  /**
+   * HI-3188: the churn's levels now (the project's preferences, `simplifyAt` and `churnStopAt`, 0 = off), read at each
+   * check so a change applies to cards in flight. Left out, both off.
+   */
+  churnLevels?: () => { simplifyAt: number; churnStopAt: number }
+  /** HI-3188: a churn question asked, once its write is committed (the app tells the Assistant of a simplify check). */
+  churnAsked?: (card: CardRecord, request: string, gate: string, churn: number) => void
 }
 
 /** A branch name's slug from a card title (§16.10.1): lower case ASCII letters, digits and hyphens, at most 40. */
@@ -401,6 +408,9 @@ const W = {
   choiceSplit: agentMsg({ id: 'runtime.choice.split', text: 'split it', note: "The user's choice at a lane's round limit, as its answer's wake says it." }),
   choiceAccept: agentMsg({ id: 'runtime.choice.accept', text: 'accept it with follow-ups', note: "The user's choice at a lane's round limit, as its answer's wake says it." }),
   choiceTakeOver: agentMsg({ id: 'runtime.choice.takeOver', text: 'the user takes it over', note: "The user's choice at a lane's round limit, as its answer's wake says it." }),
+  choiceSimplify: agentMsg({ id: 'runtime.choice.simplify', text: "simplify: drop what isn't worth handling and finish what the card needs", note: "HI-3188: the choice at a card's simplify check (the user's or the Assistant's), as its answer's wake says it." }),
+  choiceCutScope: agentMsg({ id: 'runtime.choice.cutScope', text: 'cut scope: finish what the card has, and put the rest on follow-up cards', note: "HI-3188: the user's choice at a card's simplify check, as its answer's wake says it." }),
+  followUpsOf: agentMsg({ id: 'runtime.wake.followUpsOf', text: '{said}. Make each follow-up with cw_create_task and followUpOf: {card}, so it keeps this card\'s count', note: "HI-3188: added to the wake of a split, accept or cut-scope answer. {said}: the wake so far; {card}: the card's key. followUpOf is cw_create_task's argument." }),
   actionDone: agentMsg({ id: 'runtime.action.done', text: 'moved it to Done', note: 'What the user did with an action a question offered (#1630), as its answer\'s wake says it.' }),
   actionNoCode: agentMsg({ id: 'runtime.action.noCode', text: 'made it no code', note: 'What the user did with an action a question offered (#1630), as its answer\'s wake says it.' }),
   actionUnblock: agentMsg({ id: 'runtime.action.unblock', text: 'unblocked it', note: 'What the user did with an action a question offered (#1630), as its answer\'s wake says it.' }),
@@ -456,7 +466,10 @@ const W = {
 const stored = (m: AgentMsg, values?: AgentValues): string => inDefaultDialect(() => say(m, values))
 
 /** The user's choice at the round limit, as an agent's wake says it. */
-const CHOICE_WORDS: Record<RoundChoice, AgentMsg> = { carryOn: W.choiceCarryOn, split: W.choiceSplit, accept: W.choiceAccept, takeOver: W.choiceTakeOver }
+const CHOICE_WORDS: Record<PauseChoice, AgentMsg> = { carryOn: W.choiceCarryOn, split: W.choiceSplit, accept: W.choiceAccept, takeOver: W.choiceTakeOver, simplify: W.choiceSimplify, cutScope: W.choiceCutScope }
+
+/** HI-3188: the moves a card's open churn question pauses (an agent's or the Assistant's: churnPending). */
+const CHURN_PAUSED: readonly MoveId[] = ['start', 'submit', 'requeue', 'startReview', 'verdict', 'reportMerge']
 /** What the user did with an action a question offered (#1630), as its answer's wake says it. */
 const ACTION_WORDS: Record<AskActionKind, AgentMsg> = { done: W.actionDone, noCode: W.actionNoCode, unblock: W.actionUnblock, skipReview: W.actionSkipReview }
 
@@ -777,6 +790,7 @@ export class Workflow {
   async write<T, P = undefined>(card: CardRecord, ruleset: Ruleset | null, actor: Actor, fn: (w: Write, prepared: P) => T, prepare?: () => Promise<P>, opts: { runActions?: boolean } = {}): Promise<T> {
     const also = alongsideOf.getStore()
     let movedTo: { from: StageId; to: StageId } | null = null
+    const asked: string[] = []
     const out = await this.locked(async () => {
       const prepared = (prepare ? await prepare() : undefined) as P
       let w: Write | null = null
@@ -790,6 +804,8 @@ export class Workflow {
         also?.before?.(w)
         const written = fn(w, prepared)
         this.closeSettled(w)
+        // HI-3188: the churn's questions, in the write that counted (or that left one no longer holding).
+        this.churnAfter(w)
         // Into Done by whatever route: its finish, once, in the move's own transaction (HI-2014).
         if (w.current === 'done' && w.was !== 'done') {
           recordFinish(tx, w.card.id, w.actor, w.ruleset?.id ?? null, w.written, { claimed: w.claimed })
@@ -803,8 +819,22 @@ export class Workflow {
       if (also && w && (w as Write).written.length) await also.written(w)
       const done = w as Write | null
       if (done && done.current !== done.was) movedTo = { from: done.was, to: done.current }
+      if (done) asked.push(...done.written.filter((f) => f.kind === 'ApprovalRequested' && CHURN_GATES.includes((f.data as FactData['ApprovalRequested']).gate)).map((f) => (f.data as FactData['ApprovalRequested']).request))
       return r
     })
+    // HI-3188: a churn question asked, once committed (a simplify check's goes to the Assistant first).
+    if (asked.length && this.cfg.churnAsked) {
+      const st = this.state(card)
+      for (const request of asked) {
+        const q = st.requests.find((x) => x.request === request)
+        if (!q) continue
+        try {
+          this.cfg.churnAsked(card, request, q.gate, churnTotal(st))
+        } catch {
+          // A hook's own failure never undoes or fails the committed write.
+        }
+      }
+    }
     // Set in the write's continuation above (TypeScript can't see it there).
     const m = movedTo as { from: StageId; to: StageId } | null
     if (m && this.cfg.moved) {
@@ -1020,9 +1050,109 @@ export class Workflow {
     return { ok: true, card: card.key, from, to, ...(data ? { data } : {}), ...(warnings?.length ? { warnings } : {}) }
   }
 
-  /** Guards evaluated inside the transaction, on the card's facts as they are now. */
+  /**
+   * Guards evaluated inside the transaction, on the card's facts as they are now. HI-3188: the loop's own moves first wait
+   * for an open churn question (churnPending).
+   */
   private check(w: Write, move: MoveId, inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'>, only?: (id: GuardId) => boolean): GuardRefusal | null {
+    if (CHURN_PAUSED.includes(move)) {
+      const paused = this.churnPending(w)
+      if (paused) return paused
+    }
     return evaluate(this.guardIds(w, move, only), this.guardInputs(w, inputs))
+  }
+
+  /** HI-3188: the churn's levels now (cfg.churnLevels; both off when it is left out). */
+  private churnLevels(): { simplifyAt: number; churnStopAt: number } {
+    return this.cfg.churnLevels?.() ?? { simplifyAt: 0, churnStopAt: 0 }
+  }
+
+  /**
+   * HI-3188: whether churn question `gate` holds on a card (§16.11.5): the rules enforced, the project's options with an
+   * agent reviewer now, and its count at its setting (churnDue). One that doesn't refuses nothing, and is closed.
+   */
+  churnGateHolds(s: CardState, gate: string): boolean {
+    if (!this.enforced() || !reviewerAgent(this.cfg.options().review)) return false
+    const l = this.churnLevels()
+    return churnDue(s, gate, gate === CHURN_LIMIT_GATE ? l.churnStopAt : l.simplifyAt)
+  }
+
+  /**
+   * HI-3188: after each write that wrote something, in its transaction: an open churn question that no longer holds (its
+   * setting 0 or raised, no agent reviewer, the rules off) is closed (`settingChanged`), never its count; and a write that
+   * counted asks one now due (askAtChurn).
+   */
+  private churnAfter(w: Write): void {
+    if (!w.written.length) return
+    const s = w.state()
+    for (const r of s.requests) if (CHURN_GATES.includes(r.gate) && !this.churnGateHolds(s, r.gate)) w.fact('RequestClosed', { request: r.request, why: 'settingChanged' }) // i18n-ignore: a fact's kind and codes, not text
+    if (w.written.some(countsChurn)) this.askAtChurn(w)
+  }
+
+  /**
+   * HI-3188 (§16.11.5): at its hard stop Combwork asks the round limit's question on the churn; else, at its simplify check,
+   * whether what still comes up is worth handling. Unbound (a new submission can't retire them), each once while open.
+   */
+  askAtChurn(w: Write): void {
+    const s = w.state()
+    const open = (gate: string): boolean => s.requests.some((r) => r.gate === gate)
+    if (open(CHURN_LIMIT_GATE)) return
+    const churn = churnTotal(s)
+    if (this.churnGateHolds(s, CHURN_LIMIT_GATE)) {
+      this.askUser(w, 'decide', CHURN_LIMIT_GATE, workflowText(FOR_YOU.churnLimit, { card: w.card.key, churn }), { unbound: true })
+      return
+    }
+    if (!open(SIMPLIFY_GATE) && this.churnGateHolds(s, SIMPLIFY_GATE)) this.askUser(w, 'decide', SIMPLIFY_GATE, workflowText(FOR_YOU.simplify, { card: w.card.key, churn }), { unbound: true })
+  }
+
+  /**
+   * HI-3188: the project's churn questions that no longer hold (a setting changed, the rules turned off, review no longer
+   * an agent's), closed (`settingChanged`), a write each, so For you and its lane let go at once rather than at the card's
+   * next write. Their counts stay. The number closed.
+   */
+  async closeStaleChurn(): Promise<number> {
+    let closed = 0
+    // HR3's round 1: the cards with an open churn question, whatever their stage (a stopped card the user finished, one
+    // put back), found by the board's requests, not by folding every unfinished card.
+    for (const card of this.store.cardsAsking(CHURN_GATES)) {
+      const s = this.state(card)
+      if (!s.requests.some((r) => CHURN_GATES.includes(r.gate) && !this.churnGateHolds(s, r.gate))) continue
+      await this.write(card, null, 'combwork', (w) => {
+        const st = w.state()
+        for (const r of st.requests) {
+          if (!CHURN_GATES.includes(r.gate) || this.churnGateHolds(st, r.gate)) continue
+          w.fact('RequestClosed', { request: r.request, why: 'settingChanged' }) // i18n-ignore: a fact's kind and codes, not text
+          closed++
+        }
+      })
+    }
+    return closed
+  }
+
+  /**
+   * HI-3188: a churn question asked now if one is due (askAtChurn), in a write of its own (joining the caller's board
+   * change): for counted facts written outside the runtime's writes (a lane reviewer's comment, recorder.ts).
+   */
+  async askChurnNow(card: CardRecord): Promise<void> {
+    await this.write(card, null, 'combwork', (w) => this.askAtChurn(w))
+  }
+
+  /** HI-3188: whether a churn question holds on the card now (its loop paused). */
+  churnHeld(card: CardRecord): boolean {
+    const s = this.state(card)
+    return s.requests.some((r) => CHURN_GATES.includes(r.gate) && this.churnGateHolds(s, r.gate))
+  }
+
+  /**
+   * HI-3188: refused while a churn question holds on the card: the loop's work (a step, a request, a question, a review, a
+   * verdict, a forward move) by an agent or the Assistant. The user and Combwork go on; reading, comments and asking the
+   * Assistant aren't writes this guards.
+   */
+  private churnPending(w: Write): GuardRefusal | null {
+    if (w.actor === 'user' || w.actor === 'combwork' || w.actor === 'outside') return null
+    const s = w.state()
+    const q = s.requests.find((r) => CHURN_GATES.includes(r.gate) && this.churnGateHolds(s, r.gate))
+    return q ? ({ rule: 'loop.churnPending', values: { card: w.card.key, request: q.request } } as GuardRefusal) : null
   }
 
   /**
@@ -1684,8 +1814,11 @@ export class Workflow {
    * limit (§16.11.4): only the user's answer resumes its loop. The user's own moves go on.
    */
   private atLimit(card: CardRecord, s: CardState, actor: Actor): GuardRefusal | null {
-    if (actor === 'user' || !this.enforced() || !s.requests.some((r) => r.gate === ROUND_LIMIT_GATE)) return null
-    return { rule: 'loop.roundLimit', values: { card: card.key } } as GuardRefusal
+    if (actor === 'user' || actor === 'combwork' || !this.enforced()) return null
+    if (s.requests.some((r) => r.gate === ROUND_LIMIT_GATE)) return { rule: 'loop.roundLimit', values: { card: card.key } } as GuardRefusal
+    // HI-3188: a churn question that holds pauses it too (checked again in the write: churnPending).
+    const q = s.requests.find((r) => CHURN_GATES.includes(r.gate) && this.churnGateHolds(s, r.gate))
+    return q ? ({ rule: 'loop.churnPending', values: { card: card.key, request: q.request } } as GuardRefusal) : null
   }
 
   /**
@@ -2348,14 +2481,19 @@ export class Workflow {
    * a Decide answer, or an agent's question approved with a note, HI-2286) is the board's to record, beside this. The agent waiting on it is woken: whoever asked (an agent's own question), else the builder;
    * at the round limit the builder and the reviewer, whose lane paused for it.
    */
-  async answer(ref: unknown, request: string, answer: 'approved' | 'declined' | 'answered', opts: { note?: string; choice?: RoundChoice; rounds?: number; decided?: boolean; action?: AskActionKind; /** HI-3235: who answers (the window: the user): an advance's question takes only the user's. */ by?: string } = {}): Promise<Reply> {
+  async answer(ref: unknown, request: string, answer: 'approved' | 'declined' | 'answered', opts: { note?: string; choice?: PauseChoice; rounds?: number; decided?: boolean; action?: AskActionKind; /** HI-3235: who answers (the window: the user): an advance's question takes only the user's; HI-3188: 'assistant' answers a simplify check (carry on or simplify). */ by?: string } = {}): Promise<Reply> {
     const card = this.resolve(ref)
     if (isRefusal(card)) return card
     const s = this.state(card)
+    // HI-3188: the Assistant answers only a simplify check, and only carry on or simplify; the rest is the user's.
+    const by: Actor = opts.by === 'assistant' ? 'assistant' : 'user'
     const req = s.requests.find((x) => x.request === request)
-    if (!req) return this.refuse(card, 'user', 'answer', { rule: 'move.notFromHere', values: { card: card.key, stage: s.stage, move: 'answer', moves: '' } })
+    if (!req) return this.refuse(card, by, 'answer', { rule: 'move.notFromHere', values: { card: card.key, stage: s.stage, move: 'answer', moves: '' } })
+    const usersOnly = (gate: string): GuardRefusal | null => (by === 'assistant' && (gate !== SIMPLIFY_GATE || (opts.choice !== 'carryOn' && opts.choice !== 'simplify')) ? ({ rule: 'loop.usersChoice', values: { card: card.key, request } } as GuardRefusal) : null)
+    const notTheirs = usersOnly(req.gate)
+    if (notTheirs) return this.refuse(card, by, 'answer', notTheirs)
     // HI-3235: an advance's question is the user's alone (its Approve can be an attestation): only the window's answer.
-    if (ADVANCE_GATES.includes(req.gate) && ((opts.by ?? 'user') !== 'user' || (answer !== 'approved' && answer !== 'declined'))) return this.refuse(card, 'user', 'answer', { rule: 'move.notFromHere', values: { card: card.key, stage: s.stage, move: 'answer', moves: '' } })
+    if (ADVANCE_GATES.includes(req.gate) && ((opts.by ?? 'user') !== 'user' || (answer !== 'approved' && answer !== 'declined'))) return this.refuse(card, by, 'answer', { rule: 'move.notFromHere', values: { card: card.key, stage: s.stage, move: 'answer', moves: '' } })
     const r = this.rulesetOf(card, s)
     const before = await this.evidenceOf(card, s, r.options)
     const fin = await this.finishInputs(card, s, r, s.approved?.revision ?? s.latest?.revision)
@@ -2366,7 +2504,7 @@ export class Workflow {
     const rounds = choice === 'carryOn' ? opts.rounds : undefined
     await this.cfg.hooks?.beforeWrite?.('answer')
     if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.answer(ref, request, answer, opts))
-    const out = await this.write(card, r, 'user', (w) => {
+    const out = await this.write(card, r, by, (w) => {
       // Under the transaction: the request still open (a newer submission retires the old one's), the card where it was.
       const changed = this.stillAt(w, s, 'answer') ?? this.evidenceChanged(w, r.options, before)
       if (changed) return changed
@@ -2382,6 +2520,8 @@ export class Workflow {
         let t = say(W.answered, { card: card.key, answer: answer === 'approved' || answer === 'declined' ? answer : 'other', question: quoted })
         if (choice) t = say(W.answeredChoice, { said: t, choice: say(CHOICE_WORDS[choice]) })
         if (choice && rounds) t = say(W.moreRounds, { said: t, rounds })
+        // HI-3188: a split or follow-ups the user accepted continue this card: made with followUpOf, they keep its count.
+        if (choice === 'split' || choice === 'accept' || choice === 'cutScope') t = say(W.followUpsOf, { said: t, card: card.key })
         if (action) {
           t = say(W.answeredAction, { said: t, action: say(ACTION_WORDS[action]) })
           if (note) t = say(W.answeredNote, { said: t, note })
@@ -2389,7 +2529,7 @@ export class Workflow {
         return t
       })
       w.answer = said
-      if (req.gate === ROUND_LIMIT_GATE) {
+      if (PAUSE_GATES.includes(req.gate)) {
         this.wake(w, builder, said, 'answer')
         // Its lane's reviewer, which paused with it.
         if (card.reviewer && card.reviewer !== builder) this.wake(w, card.reviewer, said, 'answer')
@@ -2444,7 +2584,7 @@ export class Workflow {
       if (!w.woken.includes(builder ?? '')) this.wake(w, builder, said)
       return null
     })
-    if (out) return this.refuse(card, 'user', 'answer', out)
+    if (out) return this.refuse(card, by, 'answer', out)
     return this.ok(card, from, this.state(card).stage)
   }
 
@@ -2608,9 +2748,15 @@ export class Workflow {
     const reviews = this.reviewedRuleset(card, s).options.review !== 'none'
     const actions = (args.actions ?? []).filter((a) => a.kind !== 'skipReview' || reviews)
     let request = ''
-    await this.write(card, s.started ? this.rulesetOf(card, s) : null, actor, (w) => {
+    const out = await this.write(card, s.started ? this.rulesetOf(card, s) : null, actor, (w): GuardRefusal | null => {
+      // HI-3188: an agent's or the Assistant's question waits while its card's churn question is open (that one is the
+      // user's to answer); the user and Combwork go on (churnPending's own exceptions).
+      const paused = this.churnPending(w)
+      if (paused) return paused
       request = this.askUser(w, args.kind, 'ask', args.text, { asker: agentOf(actor), ...(args.revision ? { revision: args.revision } : {}), ...(args.checklist?.length ? { checklist: args.checklist } : {}), ...(actions.length ? { actions } : {}) })
+      return null
     })
+    if (out) return this.refuse(card, actor, 'ask', out)
     return this.ok(card, s.stage, s.stage, { request })
   }
 
@@ -2633,10 +2779,14 @@ export class Workflow {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
-    await this.write(card, this.rulesetOf(card, s), actor, (w) => {
+    const out = await this.write(card, this.rulesetOf(card, s), actor, (w): GuardRefusal | null => {
+      const paused = this.churnPending(w)
+      if (paused) return paused
       w.fact('ReviewerRequest', { text })
       this.wake(w, s.started?.builder, stored(W.reviewerAsks, { card: card.key, text }))
+      return null
     })
+    if (out) return this.refuse(card, actor, 'request', out)
     return this.ok(card, s.stage, s.stage)
   }
 
@@ -2668,6 +2818,9 @@ export class Workflow {
         const side = loopStepSide(step)
         const at = opts.now ?? Date.now()
         if (this.enforced()) {
+          // HI-3188: no step while the card's churn question is open.
+          const paused = this.churnPending(w)
+          if (paused) return paused
           const builder = now.started?.builder ?? null
           // An answer or going ahead names a step waiting: none waiting, or an earlier one, is said first (HI-3011), so a
           // reviewer the pool gave a design that has since closed (the card put back) hears that, not that it isn't its.

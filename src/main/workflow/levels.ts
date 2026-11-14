@@ -16,7 +16,7 @@ import type { PlatformId } from '../../shared/platform/descriptors'
 import type { OwnWorkflowProblem, WorkflowChange, WorkflowDefaults, WorkflowForm, WorkflowLevel, WorkflowLevelCheck, WorkflowProblem } from '../../shared/types'
 import { openWorkspaces, type WorkspaceService } from '../workspace'
 import { checkOptions, resolveOptions, workflowChanged, type OptionLevels } from './rulesets'
-import { workflowEnforced } from './service'
+import { closeStaleChurn, workflowEnforced } from './service'
 import { cardsInFlight, keptNames, problemEnglish, WorkflowRefused, WorkflowStale } from './optionsForm'
 import { workflowWrite } from './writes'
 import { hasRepository, withFolderRepoLocks } from '../platform/repoPorts'
@@ -162,7 +162,12 @@ async function saveLevelOptions(ws: WorkspaceService, rawLevel: unknown, rawPlat
     void ws.refresh().catch((e: unknown) => log.warn('reading the workspace again after its workflow defaults changed', e))
   }
   log.info(`the ${level} workflow defaults for ${platform} changed: ${check.changed.join(', ') || 'none'}`)
-  for (const p of check.projects ?? []) workflowChanged(reached(ws, level).find((w) => w.info()?.projects.some((x) => x.path === p.path)) ?? ws, p.path)
+  for (const p of check.projects ?? []) {
+    const at = reached(ws, level).find((w) => w.info()?.projects.some((x) => x.path === p.path)) ?? ws
+    workflowChanged(at, p.path)
+    // HI-3188: a churn question the level's new preferences no longer hold is closed now.
+    await closeStaleChurn(at, p.path)
+  }
   return levelForm(ws, level, platform)
 }
 

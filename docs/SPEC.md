@@ -9289,6 +9289,55 @@ the lane (`resumeLaneBuilder`: `cw_lane next` names its card) [HR2's round 1: ei
   it started with. The user can **apply an option change to cards in flight**, recorded as an override on each; whether
   to offer that against "from the next card" is OP-38.
 
+#### 16.11.5 A card's back-and-forth: the simplify check and the hard stop (HI-3188)
+
+Darren, 13 Nov: "we have a rule… on number of rounds of review which indicates to simplify and one on rounds of review for
+a hard stop. Why are they never being triggered?" The round limit counts failed reviews only, while most of a spiral is
+inside one round (MC-1488's design reached s52, CL-8's requests r897), and a split card started again at zero. His
+decisions of 13 and 14 Nov (r14, Q1 to Q6):
+
+- **The count** (`CardState.churn`, folded from facts the card already has, nothing stored for it): each failed review
+  and each decline of a gate's request (as `rounds`), each design and follow-up step (`LoopStep`), each reviewer
+  request (`ReviewerRequest`) and each agent's question or test ask to the user (`ApprovalRequested` with an `asker`),
+  1 each, over the card's whole history (a new start keeps it). Merge-queue returns and Combwork's own questions aren't
+  counted. The board's card shows it once past 0, with each kind on hover (`WorkBadges`).
+- **Two levels**, preferences under Workflow → Card loops beside Rounds: **Simplify check after** (`simplifyAt`, 12)
+  and **Hard stop after** (`churnStopAt`, 30), each 0 to 999, 0 = off. Read when they are checked (the project's
+  preferences now, never a lane's own), so a change applies to cards in flight. Solo sets both to 0; the presets with an
+  agent reviewer keep the defaults. They apply only with an agent reviewer in the project's options and the rules
+  enforced, to any card, in a lane or not; the lane's Rounds and its question stay as §16.11.4 has them.
+- **The questions** (Decide, under For you, unbound like the round limit's, each once while open), asked in the write
+  that counted: at the hard stop (`churnLimit`, the count at `churnStopAt` past its base) the round limit's four
+  choices, a carry on adding 1 to 999 more; else at the simplify check (`simplify`, `simplifyAt` past the count at the
+  last answer) "worth handling, or simplify or cut scope?". An answer moves the bases to the count then: the next stop
+  is the carry on's amount past it (split, accept or take over: `churnStopAt` past it), and the simplify check counts
+  again from it. A split, accept or cut-scope answer's wake tells the agents to make the follow-ups with `followUpOf`.
+- **While one holds** an agent's or the Assistant's loop work on the card is refused, `loop.churnPending`, in the
+  write's transaction: loop steps, reviewer requests, questions to the user, starting a review, a verdict, submit and
+  the other forward moves. Reading, comments, `cw_ask_assistant`, `cw_cannot_within_rules`, putting the card back and
+  declaring paths go on, as do the user's moves and answers; a lane reviewer's comment is then a plain comment, not a
+  request (HR3's round 1: one recorded as a request counts, and asks in its board change too). The lane shows it waiting
+  for you (`roundLimitCards`).
+- **Lifetime:** open churn questions survive a new start, a put-back and a restart. One that no longer holds (its setting
+  0 or raised past the count, the options without an agent reviewer, the rules off) refuses nothing and is closed
+  (`RequestClosed`, `settingChanged`), its count kept: when the project's options or a level above them are saved, when
+  the rules are turned on or off, and at the card's next write. Setting a level back asks again only at the next
+  counted write.
+- **Following a split** (Q3 as Darren changed it): a card made with `followUpOf` (cw_create_task, the Agent API's
+  create; the parent its own project's, not archived) gets a `SplitFrom` fact in its creation: its count starts at the
+  parent's total exactly (what the parent inherited counted once), with the parent's bases, and it is linked to the
+  parent. An agent's or the Assistant's `followUpOf` on a card whose churn question holds is refused until it is
+  answered: only an answer gives a chain more room. Other cards, a separate bug found while working included, get a
+  plain link and start at zero.
+- **The Assistant first** (Q4): a simplify check is told to the Assistant (a `churn-simplify` delivery, while it can
+  act on cards); it may answer carry on or simplify with `cw_answer_simplify` (`POST /v1/tasks/{n}/answer-simplify`,
+  through `assistantChange`), and anything else, the hard stop's question and cutting scope, is refused
+  `loop.usersChoice`. The question stays under For you meanwhile; the first answer wins.
+- **Guidance** (Q6): the reviewer's skill holds the rule: after 2 or 3 rounds of different new edge cases, ask whether
+  it's worth handling, or to simplify or cut scope (`cw_ask_assistant`, else `cw_ask_user`; Combwork's own question
+  instead, when it has asked), with no ok, gaps, request or verdict until it is answered. card-loop's builder page
+  points to it. Per-project "what we defend against" notes are HI-3242.
+
 ### 16.12 Project keys and card references
 
 [#704, #1025, #1119] Built in P3 in one migration:

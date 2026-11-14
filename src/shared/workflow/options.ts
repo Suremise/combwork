@@ -8,7 +8,7 @@
 import { msg, type Msg } from '../i18n/msg'
 import { accepts, hasCapability, hasGate, merges, PLATFORMS, type PlatformId } from '../platform/descriptors'
 import type { FileLockMode } from '../types'
-import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from '../loopLimits'
+import { CHURN_MAX, LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from '../loopLimits'
 import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX } from '../agentLimits'
 import type { StageId } from './facts'
 import type { ReviewerMode } from './roles'
@@ -164,6 +164,14 @@ export interface WorkflowOptions {
    * preferences and not a rule, but set by the presets and All off (`PRESET_PREFERENCES`), never making them Custom.
    */
   maxAgents?: number
+  /**
+   * HI-3188 (§16.11.5): a card's churn, its counted loop work: at `simplifyAt` past its last churn answer Combwork asks
+   * "worth handling, or simplify or cut scope?"; at `churnStopAt` (past a carry on's base) it asks the round limit's
+   * question. 0 turns either off. Preferences, read when they are checked (never a lane's own), so a change applies to
+   * cards in flight. Solo sets both to 0 (`PRESET_PREFERENCES`), the presets with an agent reviewer keep the defaults.
+   */
+  simplifyAt?: number
+  churnStopAt?: number
 }
 
 /** G20's picker and runner, in `commands` (HI-1367): reserved names, never a check's. */
@@ -184,14 +192,21 @@ export const BRANCH_OPTIONS: readonly OptionKey[] = ['otherTargets']
  * nothing "old rules"), never set by a preset or All off (but Maximum agents, `PRESET_PREFERENCES`), never making the
  * options Custom. A lane keeps the rounds and wait it registered with.
  */
-export const PREFERENCE_OPTIONS = ['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes', 'assistantWakes', 'fileLocks', 'maxAgents'] as const satisfies readonly OptionKey[]
+export const PREFERENCE_OPTIONS = ['loopWakes', 'loopRounds', 'simplifyAt', 'churnStopAt', 'loopWaitHours', 'loopStepWaitMinutes', 'assistantWakes', 'fileLocks', 'maxAgents'] as const satisfies readonly OptionKey[]
 export type PreferenceKey = (typeof PREFERENCE_OPTIONS)[number]
 
 /**
- * The preferences a preset and All off do set (HI-2001): Maximum agents, the team each is for. They still never make
- * the options Custom: a team of another size works the same way.
+ * The preferences a preset and All off do set (HI-2001): Maximum agents, the team each is for; and the churn's two
+ * levels (HI-3188: Solo turns them off, a solo user never feels them). They still never make the options Custom: a team
+ * of another size works the same way.
  */
-export const PRESET_PREFERENCES: readonly OptionKey[] = ['maxAgents']
+export const PRESET_PREFERENCES: readonly OptionKey[] = ['maxAgents', 'simplifyAt', 'churnStopAt']
+
+/**
+ * HI-3188: the churn's levels for Solo: off (Darren, 14 Nov: a solo user never feels them). All off and the presets with
+ * an agent reviewer set none, so they inherit the levels above (the defaults: SIMPLIFY_AT, CHURN_STOP_AT).
+ */
+const SOLO_CHURN = { simplifyAt: 0, churnStopAt: 0 } as const
 
 /** The options no preset sets (names and preferences): a choice of preset keeps a project's or level's own. */
 export const UNPRESET_OPTIONS: readonly OptionKey[] = [...NAME_OPTIONS, ...BRANCH_OPTIONS, ...PREFERENCE_OPTIONS.filter((k) => !PRESET_PREFERENCES.includes(k))]
@@ -302,20 +317,20 @@ export function preset(platform: PlatformId, id: PresetId, checks: PresetInputs 
   const commandsOf = (names: string[]): Record<string, string> => Object.fromEntries(names.filter((n) => checks.commands?.[n]).map((n) => [n, checks.commands![n]]))
   // Accepted where it is (None): the presets differ only in their review and checks.
   if (accepts(platform)) {
-    const solo: WorkflowOptions = { ...allOff(platform), dependenciesDone: true, maxAgents: PRESET_TEAM.solo }
+    const solo: WorkflowOptions = { ...allOff(platform), dependenciesDone: true, maxAgents: PRESET_TEAM.solo, ...SOLO_CHURN }
     if (id === 'solo') return solo
-    if (id === 'pair' || id === 'pairAgent') return { ...solo, review: 'agent', noSelfReview: true, preChecks: checks.quick, commands: commandsOf(checks.quick), maxAgents: PRESET_TEAM.pair }
-    return { ...solo, review: 'agentThenYou', noSelfReview: true, preChecks: quickAndTests, commands: commandsOf(quickAndTests), maxAgents: PRESET_TEAM.team }
+    if (id === 'pair' || id === 'pairAgent') return { ...solo, review: 'agent', noSelfReview: true, preChecks: checks.quick, commands: commandsOf(checks.quick), maxAgents: PRESET_TEAM.pair, simplifyAt: undefined, churnStopAt: undefined }
+    return { ...solo, review: 'agentThenYou', noSelfReview: true, preChecks: quickAndTests, commands: commandsOf(quickAndTests), maxAgents: PRESET_TEAM.team, simplifyAt: undefined, churnStopAt: undefined }
   }
   // jj (HI-2799): each card in a slot (a jj workspace), the user integrating what passed (option A); Pair a reviewer agent
   // with the quick checks, Team review by an agent then you, with the tests too. No merge step: no merge checks or style.
   if (!merges(platform)) {
-    const solo: WorkflowOptions = { ...allOff(platform), target: checks.target || 'main', identity: checks.identity ?? null, stopOwnRuns: true, dependenciesDone: true, maxAgents: PRESET_TEAM.solo }
+    const solo: WorkflowOptions = { ...allOff(platform), target: checks.target || 'main', identity: checks.identity ?? null, stopOwnRuns: true, dependenciesDone: true, maxAgents: PRESET_TEAM.solo, ...SOLO_CHURN }
     if (id === 'solo') return solo
-    if (id === 'pair' || id === 'pairAgent') return { ...solo, review: 'agent', noSelfReview: true, preChecks: checks.quick, commands: commandsOf(checks.quick), maxAgents: PRESET_TEAM.pair }
-    return { ...solo, review: 'agentThenYou', noSelfReview: true, preChecks: quickAndTests, commands: commandsOf(quickAndTests), maxAgents: PRESET_TEAM.team }
+    if (id === 'pair' || id === 'pairAgent') return { ...solo, review: 'agent', noSelfReview: true, preChecks: checks.quick, commands: commandsOf(checks.quick), maxAgents: PRESET_TEAM.pair, simplifyAt: undefined, churnStopAt: undefined }
+    return { ...solo, review: 'agentThenYou', noSelfReview: true, preChecks: quickAndTests, commands: commandsOf(quickAndTests), maxAgents: PRESET_TEAM.team, simplifyAt: undefined, churnStopAt: undefined }
   }
-  if (id === 'solo') return { ...allOff(platform), finish: 'committed', folder: 'project', dependenciesDone: true, sharedFolderWarning: true, maxAgents: PRESET_TEAM.solo }
+  if (id === 'solo') return { ...allOff(platform), finish: 'committed', folder: 'project', dependenciesDone: true, sharedFolderWarning: true, maxAgents: PRESET_TEAM.solo, ...SOLO_CHURN }
   // §16.19.1: a reviewer agent, the agent merges (merge-ready, then reported), each card in the agent's worktree, the
   // quick checks before review; the repository's default branch as the target.
   if (id === 'pairAgent')
@@ -484,6 +499,11 @@ const whole =
   (max: number) =>
   (v: unknown): boolean =>
     typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= max
+/** HI-3188: a whole number from 0 (off) to `max` (the churn's levels). */
+const wholeOrOff =
+  (max: number) =>
+  (v: unknown): boolean =>
+    typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= max
 
 /**
  * What each option takes: its type and, for a choice, one of its values (HR2's #1263 round 1: compiling checks only
@@ -520,6 +540,8 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
   stageNames: (v) => isRecord(v) && Object.entries(v).every(([k, x]) => (STAGE_IDS as readonly string[]).includes(k) && typeof x === 'string'),
   loopWakes: bool,
   loopRounds: whole(LANE_MAX_ROUNDS),
+  simplifyAt: wholeOrOff(CHURN_MAX),
+  churnStopAt: wholeOrOff(CHURN_MAX),
   loopWaitHours: whole(LOOP_WAIT_MAX_HOURS),
   loopStepWaitMinutes: whole(LOOP_STEP_WAIT_MAX_MINUTES),
   assistantWakes: takesAssistantWakes,
@@ -534,7 +556,7 @@ const STAGE_IDS: readonly StageId[] = ['hold', 'todo', 'active', 'review', 'appr
 export const takesOption = (key: string, v: unknown): boolean => Object.hasOwn(OPTION_TAKES, key) && OPTION_TAKES[key as OptionKey](v)
 
 /** Card loops' options (HI-1766), a group of their own for both platforms. */
-const LOOP_OPTIONS: OptionKey[] = ['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes', 'assistantWakes']
+const LOOP_OPTIONS: OptionKey[] = ['loopWakes', 'loopRounds', 'simplifyAt', 'churnStopAt', 'loopWaitHours', 'loopStepWaitMinutes', 'assistantWakes']
 
 /** The Workflow section's groups (#1418), each a heading with its options. */
 export type FormGroupId = 'team' | 'review' | 'checks' | 'merging' | 'where' | 'work' | 'loops' | 'stages'

@@ -47,4 +47,4 @@ Read one only when it applies. Each is in this skill's own folder, beside this S
 
 - [other-targets.md](other-targets.md): not a card, a card with no workflow, a pool's card, work sent uncommitted.
 - [checks.md](checks.md): what you run, screenshots to look at, or proof you can't open.
-- [verdict.md](verdict.md): giving the verdict on a card, or reviewing work again.
+- [verdict.md](verdict.md): the verdict, reviewing again, or new edge cases piling up.

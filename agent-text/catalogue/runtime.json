@@ -23,6 +23,14 @@
     "text": "carry on",
     "note": "The user's choice at a lane's round limit, as its answer's wake says it."
   },
+  "runtime.choice.cutScope": {
+    "text": "cut scope: finish what the card has, and put the rest on follow-up cards",
+    "note": "HI-3188: the user's choice at a card's simplify check, as its answer's wake says it."
+  },
+  "runtime.choice.simplify": {
+    "text": "simplify: drop what isn't worth handling and finish what the card needs",
+    "note": "HI-3188: the choice at a card's simplify check (the user's or the Assistant's), as its answer's wake says it."
+  },
   "runtime.choice.split": {
     "text": "split it",
     "note": "The user's choice at a lane's round limit, as its answer's wake says it."
@@ -174,6 +182,10 @@
   "runtime.wake.followUp": {
     "text": "{card}: follow-up submitted for review at {revision} (submission {submission}). Start your review again (cw_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused",
     "note": "HI-1832: the reviewer's wake for a follow-up (the card stays in Review, so no arrival wakes it). {revision}: short. {submission}: its number."
+  },
+  "runtime.wake.followUpsOf": {
+    "text": "{said}. Make each follow-up with cw_create_task and followUpOf: {card}, so it keeps this card's count",
+    "note": "HI-3188: added to the wake of a split, accept or cut-scope answer. {said}: the wake so far; {card}: the card's key. followUpOf is cw_create_task's argument."
   },
   "runtime.wake.inReview": {
     "text": "{card} is in Review",

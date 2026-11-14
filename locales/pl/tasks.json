@@ -34,6 +34,8 @@
   "tasks.error.emptyComment": "Komentarz jest pusty.",
   "tasks.error.emptyDecision": "Decyzja jest pusta.",
   "tasks.error.failedToDoing": "Po nieudanej recenzji karta {card} wraca do kolumny Aktywne, do swojego wykonawcy: podaj werdykt bez column.",
+  "tasks.error.followUpArchived": "followUpOf: karta {card} jest zarchiwizowana; najpierw ją przywróć albo utwórz kartę bez followUpOf.",
+  "tasks.error.followUpOtherProject": "followUpOf: karta {card} należy do innego projektu; dalsza karta kontynuuje kartę ze swojego projektu.",
   "tasks.error.holdCard": "Tylko użytkownik lub Asystent przenosi karty do Wstrzymanych. Jeśli użytkownik postanowił odłożyć kartę {card}, poproś o to Asystenta (cw_ask_assistant); w przeciwnym razie zapytaj użytkownika.",
   "tasks.error.holdNew": "Tylko użytkownik lub Asystent umieszcza karty we Wstrzymanych. Utwórz ją w Do zrobienia; jeśli użytkownik postanowił ją odłożyć, poproś o to Asystenta (cw_ask_assistant), a w przeciwnym razie zapytaj użytkownika.",
   "tasks.error.inDoingWith": "Karta {card} jest w kolumnie {active} u agenta {agent}, który nad nią pracuje: trwa nowsza praca, więc inny agent nie może przenieść jej do kolumny {stage}. Zostaw ją tam, gdzie jest; agent {agent} przeniesie ją do kolumny {review} po skończeniu, a użytkownik może ją przenieść.",

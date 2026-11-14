@@ -145,6 +145,8 @@
   "tips.cardLinks.title": "Ctrl+clique em um número de cartão no terminal",
   "tips.cardLoop.text": "Diga a um agente para trabalhar em alguns cartões como executor e a outro para revisá-los: cada um espera pelo outro sem custo, e o Combwork o acorda quando o cartão muda.",
   "tips.cardLoop.title": "Deixe dois agentes executarem e revisarem alternadamente",
+  "tips.cardLoopChurn.text": "Com um agente revisor, o Combwork conta as idas e vindas de cada cartão e pergunta se deve simplificar aos 12, e como seguir aos 30. Ajuste os dois em Ciclos de cartões, em Controle de versão → Fluxo de trabalho.",
+  "tips.cardLoopChurn.title": "Um cartão que anda em círculos para",
   "tips.cardMove.text": "Arraste qualquer diálogo pelo cabeçalho (um cartão, Adicionar agente, Configurações do agente…) para ver o que está atrás dele; Esc durante o arraste o põe de volta.",
   "tips.cardMove.title": "Tire um diálogo do caminho",
   "tips.cardReadFirst.text": "Em “Ler primeiro” de um cartão, liste as seções de documentos de que ele precisa, como docs/PLAN.md#setup: o prompt inicial do agente as lista, então ele lê essas seções em vez de um plano inteiro. Clique em uma para lê-la no Combwork.",

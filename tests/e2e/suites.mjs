@@ -90,6 +90,7 @@ export const SUITES = [
   { name: 'changesleftovers' },
   { name: 'changespicker' },
   { name: 'chooseconnections' },
+  { name: 'churn' },
   { name: 'claude-real', needs: ['claude'], claudeHome: 'own' },
   { name: 'claudehome', needs: ['claude'], claudeHome: 'own' },
   { name: 'claudemanaged' },

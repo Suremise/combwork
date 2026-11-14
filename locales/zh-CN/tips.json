@@ -145,6 +145,8 @@
   "tips.cardLinks.title": "在终端中 Ctrl+单击卡片编号",
   "tips.cardLoop.text": "让一个智能体作为构建者处理一些卡片，另一个负责评审：双方互相等待时不产生费用，卡片有变化时 Combwork 会唤醒它们。",
   "tips.cardLoop.title": "让两个智能体轮流构建和评审",
+  "tips.cardLoopChurn.text": "有评审智能体时，Combwork 会统计每张卡片的来回轮数，到 12 时问你是否简化，到 30 时问你如何继续。两者都在 版本控制 → 工作流程 的 卡片循环 中设置。",
+  "tips.cardLoopChurn.title": "原地打转的卡片会停下",
   "tips.cardMove.text": "拖动任意对话框的标题栏（卡片、“添加智能体”、“智能体设置”…）即可看到它后面的内容；拖动时按 Escape 可将其放回原处。",
   "tips.cardMove.title": "把对话框移开",
   "tips.cardReadFirst.text": "在卡片的“先读”中列出它需要的文档章节，比如 docs/PLAN.md#setup：智能体的启动提示会列出它们，这样它只读这些章节，而不是整份计划。点击一个即可在 Combwork 中阅读。",

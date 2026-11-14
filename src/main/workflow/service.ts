@@ -9,6 +9,9 @@
 // here; and whether reconciliation acts on what it observes is the Advanced switch "Workflow rules are enforced"
 // (`cw.workflow.enforce`), read at each use: off, Combwork is as P3 left it (facts recorded, nothing refused or moved).
 
+import { PREFERENCE_DEFAULTS } from '../../shared/workflow/preferences'
+import { createLogger, userText } from '../logger'
+import { SIMPLIFY_GATE } from '../../shared/workflow/facts'
 import type { JjCardDeps } from '../platform/jjPlatform'
 import { basename, resolve as resolvePath } from 'path'
 import { projectAgents } from '../../shared/defaults'
@@ -144,7 +147,32 @@ interface Instance {
   sync: Promise<void>
 }
 
+const log = createLogger('workflowService')
 const instances = new WeakMap<WorkspaceService, Map<string, Instance>>()
+
+/**
+ * HI-3188: a project's churn questions that no longer hold, closed (Runtime.closeStaleChurn): after its options or a level
+ * above them is saved, and when the rules are turned on or off. Never throws.
+ */
+export async function closeStaleChurn(ws: WorkspaceService, projectPath: string): Promise<void> {
+  try {
+    const wf = await workflowFor(ws, projectPath)
+    if (wf) await wf.closeStaleChurn()
+  } catch (e) {
+    log.warn(`closing the churn questions that no longer hold in ${userText(projectPath)}`, e)
+  }
+}
+
+/** HI-3188: the rules turned on or off: every open workspace's projects' churn questions looked at again. */
+let enforcedWas: boolean | null = null
+advanced.onChange(() => {
+  const now = advanced.get<boolean>(ENFORCE) !== false
+  if (enforcedWas === null || enforcedWas === now) return void (enforcedWas = now)
+  enforcedWas = now
+  void import('../workspace').then((m) => {
+    for (const ws of m.openWorkspaces()) for (const p of ws.info()?.projects ?? []) void closeStaleChurn(ws, p.path)
+  })
+})
 const keyOf = (path: string): string => path.toLowerCase()
 
 /** The project of a workspace a path names, with its platform: null for one it doesn't have (or the Assistant's home). */
@@ -272,6 +300,16 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
       // never a window's proxy of it, which this workflow may have been made from.
       // HI-2950: and one put back or Done, so an ended cycle's candidate is cleaned up soon (JjPlatform's sweep).
       if ((to === 'approved' || to === 'todo' || to === 'done') && alive()) void Promise.all([import('./reconciler'), import('../workspace')]).then(([m, w]) => m.reconcileCard(w.workspaceOf(project.path), card.id, project.name)).catch(() => undefined)
+    },
+    // HI-3188: the churn's levels as the project's preferences say now, and a simplify check told to the Assistant first.
+    // The resolved options (read afresh by each workflowFor) carry the preferences, the defaults filled in.
+    churnLevels: () => {
+      const o = options()
+      return { simplifyAt: o.simplifyAt ?? PREFERENCE_DEFAULTS.simplifyAt, churnStopAt: o.churnStopAt ?? PREFERENCE_DEFAULTS.churnStopAt }
+    },
+    churnAsked: (card, request, gate, churn) => {
+      if (gate !== SIMPLIFY_GATE || !alive()) return
+      void import('../churnAssistant').then((m) => m.tellAssistantSimplify(ws, { card: card.id, key: card.key, project: project.name, request, churn })).catch(() => undefined)
     },
     runsOf: (agent) => runsGoing?.(project.path, agent) ?? [],
     // HI-2487: the project's agents whose sessions run, who may have a review in progress that another's start waits for.
