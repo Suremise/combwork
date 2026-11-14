@@ -1,5 +1,5 @@
 import type { AgentInstallInfo, AppSettings, CatalogModel, Account, Connection, EffortLevel, EffortOption, FallbackModel, ModelAlias, ModelCatalog, ModelSwitch, ProviderId } from './types'
-import { EFFORT_TEXT, OLDER_VERSIONS } from './claude'
+import { EFFORT_TEXT, OLDER_VERSIONS } from './providers/common'
 import { fmt } from './i18n'
 import { msg } from './i18n/msg'
 import { serverDefaultModel } from './serverConnection'

@@ -6,7 +6,7 @@ import { copilot, copilotHooks, copilotMcpServer, toolNamesLine } from '../src/m
 import { COPILOT_ENV_STRIP, copilotEnv } from '../src/main/providers/copilot/home'
 import { parseCopilotModels } from '../src/main/providers/copilot/models'
 import type { LaunchContext } from '../src/main/providers/types'
-import { COPILOT_DESCRIPTOR, copilotCanApproveEdits, copilotCanSwitchLive, copilotFooterMode, copilotModeFlags, copilotModelLabel, copilotPathGlob } from '../src/shared/copilot'
+import { COPILOT_DESCRIPTOR, copilotCanApproveEdits, copilotCanSwitchLive, copilotFooterMode, copilotModeFlags, copilotModelLabel, copilotPathGlob } from '../src/shared/providers/copilot'
 import { isKnownProvider, providerDescriptor } from '../src/shared/providers'
 import { tempDir } from './tempDir'
 import { resolveGithubHosts } from '../src/shared/githubHost'

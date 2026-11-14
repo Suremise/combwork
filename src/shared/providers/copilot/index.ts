@@ -1,11 +1,11 @@
-import { footerPatterns, lastFooterMode, type FooterModeDef, type FooterPatterns } from './footerModes'
-import type { PermissionMode } from './types'
-import type { ModeOption, ModelGroup, ProviderDescriptor } from './providers'
-import { codexModelLabel } from './codex'
-import { EFFORT_TEXT, OLDER_VERSIONS } from './claude'
-import { withCliOwn } from './cliOwnMode'
-import { msg } from './i18n/msg'
-import { agentMsg, say } from './agentText'
+import { footerPatterns, lastFooterMode, type FooterModeDef, type FooterPatterns } from '../../footerModes'
+import type { PermissionMode } from '../../types'
+import type { ModeOption, ModelGroup, ProviderDescriptor } from '..'
+import { OLDER_VERSIONS, effortLevels, gptModelLabel } from '../common'
+import { withCliOwn } from '../../cliOwnMode'
+import { msg } from '../../i18n/msg'
+import { agentMsg, say } from '../../agentText'
+import { defineProvider } from '../parts'
 
 /**
  * GitHub Copilot's side of the shared provider data (the Copilot CLI, `copilot`): its modes, reasoning levels and models.
@@ -197,7 +197,7 @@ const WORDS: Record<string, string> = { gpt: 'GPT', mai: 'MAI', k3: 'K3' }
 /** "claude-sonnet-5.5" → "Claude Sonnet 5.5", "gpt-6-luna" → "GPT-6 Luna", "auto" → "Auto"; anything else word by word. */
 export function copilotModelLabel(model: string): string {
   const m = model.trim()
-  if (/^gpt-/i.test(m)) return codexModelLabel(m)
+  if (/^gpt-/i.test(m)) return gptModelLabel(m)
   if (!/^[a-z0-9][a-z0-9.-]*$/i.test(m)) return m
   return m
     .split('-')
@@ -243,15 +243,7 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
   defaultPermissionMode: 'accept-edits',
   // Reads are approved by Copilot itself, and Combwork's own tools are pre-approved (the Assistant's: trustedCombworkTools).
   assistantMode: 'ask',
-  effortLevels: [
-    { value: 'none', label: 'None', text: EFFORT_TEXT.none }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'minimal', label: 'Minimal', text: EFFORT_TEXT.minimal }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'low', label: 'Low', text: EFFORT_TEXT.low }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'medium', label: 'Medium', text: EFFORT_TEXT.medium }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'high', label: 'High', text: EFFORT_TEXT.high }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'xhigh', label: 'Extra high', text: EFFORT_TEXT.xhigh }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'max', label: 'Max', text: EFFORT_TEXT.max } // i18n-ignore: agent-facing English (text is the window's)
-  ],
+  effortLevels: effortLevels('none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'),
   modelGroups: COPILOT_MODEL_GROUPS,
   modelPlaceholder: 'Model ID, e.g. claude-sonnet-5.5 or auto', // i18n-ignore: English (text.modelPlaceholder is the window's)
   capabilities: {
@@ -307,3 +299,6 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
   modelLabel: copilotModelLabel,
   canSwitchLive: copilotCanSwitchLive
 }
+
+/** GitHub Copilot's shared half, as the registry lists it (HI-3201). */
+export default defineProvider({ descriptor: COPILOT_DESCRIPTOR })

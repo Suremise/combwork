@@ -1,5 +1,5 @@
 import type { CompactionEvent, DayUsage, PlanLimit, PlanUsage, SessionUsage, TranscriptImageRef, TranscriptItem, TranscriptTool, UsageTokens } from '../../../shared/types'
-import { OPENCODE } from '../../../shared/opencode'
+import { OPENCODE } from '../../../shared/providers/opencode'
 import { isoTime } from '../../../shared/planLimits'
 import { emptyDay, localDay } from '../../../shared/usageDays'
 import { TimelineBuilder } from '../../../shared/usageTimeline'

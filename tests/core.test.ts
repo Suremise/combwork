@@ -618,7 +618,7 @@ describe('toolSummary', () => {
 
 describe('model choices', () => {
   it('knows older models, with or without the 1M suffix', async () => {
-    const { isOlderModel, baseModel } = await import('../src/shared/claude')
+    const { isOlderModel, baseModel } = await import('../src/shared/providers/claude')
     expect(baseModel('opus[1m]')).toBe('opus')
     expect(baseModel('claude-opus-4-6')).toBe('claude-opus-4-6')
     expect(isOlderModel('claude-opus-4-8[1m]')).toBe(true)
@@ -802,7 +802,7 @@ describe('sessionLabel', () => {
 
 describe('permission modes in a running session', () => {
   it('reads the mode from Claude Code footer output', async () => {
-    const { footerMode } = await import('../src/shared/claude')
+    const { footerMode } = await import('../src/shared/providers/claude')
     expect(footerMode(' ⏵⏵ accept edits on (shift+tab to cycle) · ← for agents ')).toBe('acceptEdits')
     expect(footerMode('⏸ plan mode on (shift+tab o cycle) · ←foragents')).toBe('plan')
     expect(footerMode('x ⏵⏵ auto mode on (shift+tab to cycle) y ⏸ manual mode on · ← for agents')).toBe('manual')
@@ -815,7 +815,7 @@ describe('permission modes in a running session', () => {
     expect(footerMode('⏸ manual mode on    ⏵⏵  accept edits  on (shift+tab to cycle)')).toBe('acceptEdits')
   })
   it('reads a footer redrawn in part (NO_COLOR) from the rendered screen, not the output stream', async () => {
-    const { footerMode } = await import('../src/shared/claude')
+    const { footerMode } = await import('../src/shared/providers/claude')
     const { TerminalScreen } = await import('../src/main/terminalScreen')
     // Without colours Claude Code redraws only the characters that changed: "⏸ m", a cursor move over the
     // unchanged "a", then "nual mode on" and an erase to the end of the line (Claude Code 2.1.289).
@@ -855,7 +855,7 @@ describe('permission modes in a running session', () => {
     expect(modeCaveat('codex', 'approve-for-me', 'gpt-5.5')).toBeNull()
   })
   it('maps hook modes and knows what Shift+Tab can reach', async () => {
-    const { hookMode, canSwitchLive } = await import('../src/shared/claude')
+    const { hookMode, canSwitchLive } = await import('../src/shared/providers/claude')
     expect(hookMode('default')).toBe('manual')
     expect(hookMode('acceptEdits')).toBe('acceptEdits')
     expect(hookMode('nonsense')).toBeNull()

@@ -87,7 +87,7 @@ export const EVERYTHING = [
   'src/shared/defaults.ts',
   'src/shared/dates.ts',
   'src/shared/units.ts',
-  'src/shared/providers.ts',
+  'src/shared/providers/',
   // Coalesces reads for sessions.ts and the renderer's api.ts (#1629, #1646), both above.
   'src/shared/coalesce.ts',
   'src/main/providers/',
@@ -165,8 +165,8 @@ export const AREAS = [
   // The Combwork tools' description limits (HI-2012): replysize checks them.
   { paths: ['tests/e2e/toolLimits.cjs'], suites: ['replysize'] },
   { paths: ['tests/e2e/toolsides.cjs', 'src/shared/assistantTools.ts', 'src/main/mcp/cw-mcp.ts', 'src/main/sessions.ts', 'src/shared/workflow/roles.ts', 'src/main/launchSides.ts', 'src/main/workflowTools.ts', 'src/renderer/src/components/AgentDialogs.tsx'], suites: ['toolsides', 'replysize'] },
-  { paths: ['src/main/providers/opencode/', 'src/shared/opencode.ts', 'src/main/opencodeHistoryHost.ts', 'src/main/opencodeHistoryWorker.ts', 'tests/e2e/fake-opencode/'], suites: ['opencode', 'opencode-assistant', 'opencode-history', 'opencode-isolation', 'opencode-launch', 'opencode-providers', 'opencode-status', 'opencode-tools', 'opencodereal', 'opencodereal-dirs'] },
-  { paths: ['src/main/providers/antigravity/', 'src/main/statusLineState.ts', 'src/shared/antigravity.ts', 'tests/e2e/fake-agy/'], suites: ['antigravity', 'antigravity-windows', 'antigravityreal'] },
+  { paths: ['src/main/providers/opencode/', 'src/shared/providers/opencode/', 'src/main/opencodeHistoryHost.ts', 'src/main/opencodeHistoryWorker.ts', 'tests/e2e/fake-opencode/'], suites: ['opencode', 'opencode-assistant', 'opencode-history', 'opencode-isolation', 'opencode-launch', 'opencode-providers', 'opencode-status', 'opencode-tools', 'opencodereal', 'opencodereal-dirs'] },
+  { paths: ['src/main/providers/antigravity/', 'src/main/statusLineState.ts', 'src/shared/providers/antigravity/', 'tests/e2e/fake-agy/'], suites: ['antigravity', 'antigravity-windows', 'antigravityreal'] },
   { paths: ['src/main/assistantMemory.ts', 'src/shared/assistantMemory.ts', 'src/renderer/src/components/AssistantMemory.tsx', 'src/renderer/src/components/AssistantView.tsx'], suites: ['assistantmemory', 'assistantimages'] },
   { paths: ['src/main/journal.ts', 'src/main/journalService.ts', 'src/main/walCheckpoint.ts', 'src/main/walCheckpointWorker.ts','src/shared/journal.ts', 'src/renderer/src/components/JournalSettings.tsx', 'tests/e2e/journal.cjs'], suites: ['journal', 'replysize'] },
   { paths: ['src/main/startView.ts', 'src/shared/startView.ts'], suites: ['journal', 'assistantcompact', 'assistantresume'] },
@@ -252,7 +252,7 @@ export const AREAS = [
   { paths: ['src/main/connectionSeam.ts', 'src/main/connectionSwitch.ts', 'src/renderer/src/components/ConnectionChoice.tsx', 'tests/e2e/connections.cjs'], suites: ['connections', 'connectionrows', 'connections-codex', 'assistantcodex'] },
   // HI-2899: the Assistant's CLI as its launch picks it, its account banner and its home's migration (unpinned), on the fake Codex.
   { paths: ['tests/e2e/assistantcodex.cjs', 'src/shared/connectionLabel.ts', 'src/main/connectionMoves.ts', 'src/shared/connectionDefaults.ts'], suites: ['assistantcodex'] },
-  { paths: ['tests/e2e/connections-codex.cjs', 'tests/e2e/fake-codex/', 'src/main/providers/codex/', 'src/shared/codex.ts'], suites: ['connections-codex'] },
+  { paths: ['tests/e2e/connections-codex.cjs', 'tests/e2e/fake-codex/', 'src/main/providers/codex/', 'src/shared/providers/codex/'], suites: ['connections-codex'] },
   // Plan usage per connection, the status bar's and Overview's (HI-1756).
   { paths: ['src/main/planUsage.ts', 'src/shared/planLimits.ts', 'src/renderer/src/connectionUsage.ts', 'tests/e2e/connectionusage.cjs'], suites: ['connectionusage', 'planusage', 'antigravity'] },
   { paths: ['src/main/usageMoves.ts', 'src/shared/usageMoves.ts', 'src/main/connectionSwitch.ts', 'src/main/agentChoice.ts', 'src/renderer/src/components/UsageMoveRule.tsx', 'tests/e2e/usagemove.cjs'], suites: ['usagemove'] },
@@ -301,7 +301,7 @@ export const AREAS = [
   // MCP catalogues (HI-545): reading, checking and installing their servers, the Catalogue tab and Settings → MCP Catalogues.
   { paths: ['src/main/mcpCatalog.ts', 'src/shared/mcpCatalog.ts', 'src/renderer/src/components/McpCatalog.tsx', 'tests/e2e/mcpcatalog.cjs'], suites: ['mcpcatalog', 'mcpfile'] },
   { paths: ['src/main/notes.ts'], suites: ['drafts', 'codex-handover'] },
-  { paths: ['src/main/planUsage.ts', 'src/renderer/src/components/ModelPicker.tsx', 'src/shared/claude.ts', 'src/shared/codex.ts', 'src/shared/prices.ts'], suites: ['plan', 'planusage', 'providers', 'codex-setup', 'context', 'unpricedcost', 'models'] },
+  { paths: ['src/main/planUsage.ts', 'src/renderer/src/components/ModelPicker.tsx', 'src/shared/providers/claude/', 'src/shared/providers/codex/', 'src/shared/prices.ts'], suites: ['plan', 'planusage', 'providers', 'codex-setup', 'context', 'unpricedcost', 'models'] },
   // Models and capabilities from the CLIs, and their fallbacks (#125).
   { paths: ['src/shared/models.ts', 'tests/fixtures/claude-initialize.json', 'tests/fixtures/codex-debug-models.json'], suites: ['models', 'assistant', 'footerfit', 'agents-ui', 'automode'] },
   { paths: ['src/main/power.ts', 'src/shared/keepAwake.ts'], suites: ['quitwait', 'quit'] },
@@ -609,14 +609,14 @@ export const AREAS = [
   { paths: ['src/main/providers/claude/'], suites: ['agents', 'agentview', 'launchrace', 'restart', 'resume', 'mode', 'compact', 'image', 'plan', 'claude-real', 'claudehome', 'claudesettings', 'assistantmode', 'assistantresume'] },
   { paths: ['src/main/providers/codex/'], suites: ['codex', 'codex-background', 'codex-extra', 'codex-handover', 'codex-mcpapproval', 'codex-setup', 'codex-storepwsh', 'attention', 'skilldelivery', 'sessiontree', 'codexfolder'] },
   // Copilot's offline suite (the real CLI against the stand-in model), the provider pages and the skill copies it shares with Codex.
-  { paths: ['src/main/providers/copilot/', 'src/shared/copilot.ts', 'src/main/exitKeys.ts'], suites: ['copilot', 'copilotsize', 'copilotcopy', 'providers', 'skilldelivery', 'models'] },
+  { paths: ['src/main/providers/copilot/', 'src/shared/providers/copilot/', 'src/main/exitKeys.ts'], suites: ['copilot', 'copilotsize', 'copilotcopy', 'providers', 'skilldelivery', 'models'] },
   { paths: ['tests/e2e/fake-copilot-api.cjs'], suites: ['copilot', 'copilotsize', 'copilotcopy', 'workspacenotes', 'slotguidance'] },
   // A folder being changed under its agents (#646): the Git view takes it; deliveries and starts wait for it.
   { paths: ['src/main/folderFence.ts'], suites: ['gitview', 'deliveries', 'inbox', 'agentmessage', 'background'] },
   // How Combwork's lines reach a busy real Codex or Copilot (#600): their runner, and what they check.
   { paths: ['tests/e2e/wakepaste-cli/', 'src/main/terminalScreen.ts', 'src/main/lineWriter.ts', 'src/main/deliveries.ts'], suites: ['wakepaste-codex', 'wakepaste-copilot'] },
-  { paths: ['src/shared/copilot.ts', 'tests/e2e/fake-copilot-api.cjs'], suites: ['wakepaste-copilot'] },
-  { paths: ['src/main/providers/codex/', 'src/shared/codex.ts'], suites: ['wakepaste-codex'] },
+  { paths: ['src/shared/providers/copilot/', 'tests/e2e/fake-copilot-api.cjs'], suites: ['wakepaste-copilot'] },
+  { paths: ['src/main/providers/codex/', 'src/shared/providers/codex/'], suites: ['wakepaste-codex'] },
   // What a Codex launch through its app server would rely on (#653): checked against the installed Codex.
   { paths: ['src/main/providers/codex/'], suites: ['codex-appserver'] },
   // Codex's Advanced switches (#1167): right-click passed to Codex, and its terminal title left to the user's config.
@@ -725,7 +725,7 @@ export const REAL_TIER = [
   'src/main/transcripts.ts',
   'src/main/transcriptDisplay.ts',
   'src/main/transcriptFiles.ts',
-  'src/shared/providers.ts',
+  'src/shared/providers/',
   'tests/e2e/lib.cjs',
   // The environment the real CLIs are started in.
   'tests/e2e/runContext.cjs',

@@ -1,8 +1,9 @@
-import { EFFORT_TEXT, OLDER_VERSIONS } from './claude'
-import { withCliOwn } from './cliOwnMode'
-import { msg } from './i18n/msg'
-import { agentMsg, say } from './agentText'
-import type { ModeOption, ModelGroup, ProviderDescriptor } from './providers'
+import { OLDER_VERSIONS, effortLevels, gptModelLabel } from '../common'
+import { withCliOwn } from '../../cliOwnMode'
+import { msg } from '../../i18n/msg'
+import { agentMsg, say } from '../../agentText'
+import type { ModeOption, ModelGroup, ProviderDescriptor } from '..'
+import { defineProvider } from '../parts'
 
 /**
  * Codex's side of the shared provider data: its permission presets (the /permissions menu), reasoning
@@ -89,19 +90,7 @@ export const CODEX_MODE_FLAGS: Record<string, string[]> = {
   'cli-own': []
 }
 
-/** "gpt-6-luna" → "GPT-6 Luna", "gpt-5.6-terra" → "GPT-5.6 Terra"; anything else as it is. */
-export function codexModelLabel(model: string): string {
-  const m = /^gpt-(\d+(?:\.\d+)?)(?:-(.+))?$/i.exec(model.trim())
-  if (!m) return model
-  const rest = (m[2] ?? '')
-    .split('-')
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ')
-  return `GPT-${m[1]}${rest ? ` ${rest}` : ''}`
-}
-
-const models = (...ids: string[]) => ids.map((id) => ({ value: id, label: codexModelLabel(id) }))
+const models = (...ids: string[]) => ids.map((id) => ({ value: id, label: gptModelLabel(id) }))
 
 /**
  * Models offered in the pickers when Codex can't be asked (codex debug models gives the real list, #125): the starting
@@ -126,14 +115,7 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
   permissionModes: withCliOwn(CODEX_PERMISSION_MODES),
   defaultPermissionMode: 'approve-for-me',
   assistantMode: 'approve-for-me',
-  effortLevels: [
-    { value: 'low', label: 'Low', text: EFFORT_TEXT.low }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'medium', label: 'Medium', text: EFFORT_TEXT.medium }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'high', label: 'High', text: EFFORT_TEXT.high }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'xhigh', label: 'Extra high', text: EFFORT_TEXT.xhigh }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'max', label: 'Max', text: EFFORT_TEXT.max }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'ultra', label: 'Ultra', text: EFFORT_TEXT.ultra } // i18n-ignore: agent-facing English (text is the window's)
-  ],
+  effortLevels: effortLevels('low', 'medium', 'high', 'xhigh', 'max', 'ultra'),
   modelGroups: CODEX_MODEL_GROUPS,
   modelPlaceholder: 'Model ID, e.g. gpt-6-sol', // i18n-ignore: English (text.modelPlaceholder is the window's)
   capabilities: {
@@ -193,7 +175,11 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
     safeguardHelp: msg({ id: 'agents.codex.safeguardHelp', defaultMessage: 'Codex sends a request it flags to another model, or stops the turn. For security work, OpenAI’s Trusted Access for Cyber program lifts that.', description: "What happens after Codex's safety check flags a request (an agent's safeguard note). Trusted Access for Cyber is the name of OpenAI's program: keep it." }),
     modelPlaceholder: msg({ id: 'agents.codex.modelPlaceholder', defaultMessage: 'Model ID, e.g. gpt-6-sol', description: 'Placeholder of the custom model ID box (Codex). Keep the model ID exactly as it is.' })
   },
-  modelLabel: codexModelLabel,
+  modelLabel: gptModelLabel,
   // Every preset is in Codex's /permissions menu, so each can be switched to in a running session.
   canSwitchLive: () => true
 }
+
+/** Codex's shared half, as the registry lists it (HI-3201). */
+// agent-text: CODEX_DESCRIPTOR.text.safeguardHelp (a CLI's sentence stored by id in a card comment, said when read: providerMessage)
+export default defineProvider({ descriptor: CODEX_DESCRIPTOR })

@@ -1,7 +1,8 @@
-import type { ModeOption, ModelGroup, ProviderDescriptor } from './providers'
-import { withCliOwn } from './cliOwnMode'
-import { msg } from './i18n/msg'
-import { agentMsg, say } from './agentText'
+import type { ModeOption, ModelGroup, ProviderDescriptor } from '..'
+import { withCliOwn } from '../../cliOwnMode'
+import { msg } from '../../i18n/msg'
+import { agentMsg, say } from '../../agentText'
+import { defineProvider } from '../parts'
 
 /**
  * OpenCode (Anomaly's anomalyco/opencode **V2**, the `@opencode/cli` package, executable `opencode`), Combwork's fifth
@@ -177,3 +178,6 @@ export const OPENCODE_DESCRIPTOR: ProviderDescriptor = {
   modelLabel: opencodeModelLabel,
   canSwitchLive: () => false
 }
+
+/** OpenCode's shared half, as the registry lists it (HI-3201). */
+export default defineProvider({ descriptor: OPENCODE_DESCRIPTOR })

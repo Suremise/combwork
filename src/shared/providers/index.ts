@@ -1,19 +1,15 @@
-import type { AgentDef, AppSettings, AutoCompactSetting, EffortLevel, LaunchValues, ModelAlias, PermissionMode, ProjectConfig, ProjectProviderConfig, ProviderId, ProviderSettings, ServerModel } from './types'
-import type { AttachmentKind } from './attachments'
-import type { MapStation } from './activityMap'
-import type { TypedNewline } from './terminalInput'
-import { msg, type Msg } from './i18n/msg'
-import type { Tr } from './tasks'
-import { CLAUDE_CODE, CLAUDE_DESCRIPTOR } from './claude'
-import { CODEX_DESCRIPTOR } from './codex'
-import { COPILOT_DESCRIPTOR } from './copilot'
-import { ANTIGRAVITY_DESCRIPTOR } from './antigravity'
-import { OPENCODE_DESCRIPTOR } from './opencode'
+import type { AgentDef, AppSettings, AutoCompactSetting, EffortLevel, LaunchValues, ModelAlias, PermissionMode, ProjectConfig, ProjectProviderConfig, ProviderId, ProviderSettings, ServerModel } from '../types'
+import type { AttachmentKind } from '../attachments'
+import type { MapStation } from '../activityMap'
+import type { TypedNewline } from '../terminalInput'
+import { msg, type Msg } from '../i18n/msg'
+import type { Tr } from '../tasks'
+import { PROVIDER_MODULES } from './registry'
 
 /**
- * Providers: the coding-agent CLIs Combwork can run (Claude Code, Codex, GitHub Copilot, Antigravity CLI, OpenCode). Everything the UI and the shared
- * settings logic need to know about one lives in its descriptor, so a new provider needs a descriptor
- * here and an adapter in src/main/providers — nothing else checks which provider an agent uses.
+ * Providers: the coding-agent CLIs Combwork can run. Everything the UI and the shared settings logic need to know about one
+ * lives in its shared half (src/shared/providers/<folder>/, listed in registry.ts), and its adapter in
+ * src/main/providers/<folder>/ (HI-3201): nothing else checks which provider an agent uses.
  */
 
 /**
@@ -376,13 +372,17 @@ export interface ProviderDescriptor {
   canSwitchLive: (target: PermissionMode, current: PermissionMode | undefined, launched: PermissionMode | null | undefined) => boolean
 }
 
-export const DEFAULT_PROVIDER: ProviderId = CLAUDE_CODE
+/** Every provider Combwork knows, in display order (the registry's). */
+export const PROVIDERS: ProviderDescriptor[] = PROVIDER_MODULES.map((m) => m.descriptor)
 
-/** Every provider Combwork knows, in display order. */
-export const PROVIDERS: ProviderDescriptor[] = [CLAUDE_DESCRIPTOR, CODEX_DESCRIPTOR, COPILOT_DESCRIPTOR, ANTIGRAVITY_DESCRIPTOR, OPENCODE_DESCRIPTOR]
+/** The default provider: the registry's first. */
+export const DEFAULT_PROVIDER: ProviderId = PROVIDERS[0].id
 
+export { LEGACY_PROVIDER } from './registry'
+
+/** A provider id this version doesn't know: the default's descriptor, with nothing of its own (no modes, no models). */
 const UNKNOWN: ProviderDescriptor = {
-  ...CLAUDE_DESCRIPTOR,
+  ...PROVIDERS[0],
   id: 'unknown',
   name: 'Unknown provider', // i18n-ignore: a stand-in name for a provider id Combwork doesn't know (agents read names as they are)
   assistant: 'Agent', // i18n-ignore: a stand-in name for a provider id Combwork doesn't know
@@ -485,7 +485,7 @@ export function contextLines(u: { provider: ProviderId; contextTokens: number; c
 }
 
 /** A message of a provider's own text (`text`) by its id, or null: a comment Combwork wrote on a card names one (#866). */
-// agent-text: CLAUDE_DESCRIPTOR.text.safeguardHelp, CODEX_DESCRIPTOR.text.safeguardHelp (a CLI's sentences stored by id in a card comment, said when read)
+// Each provider's sentences a card comment stores by id are marked agent-text in its own module (HI-3201).
 export const providerMessage = (id: string): Msg | null => PROVIDERS.flatMap((p) => Object.values(p.text ?? {})).find((m): m is Msg => !!m && m.id === id) ?? null
 
 export function providerDescriptor(id: ProviderId | null | undefined): ProviderDescriptor {

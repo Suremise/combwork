@@ -1,5 +1,5 @@
 import type { CatalogModel } from '../../../shared/types'
-import { isClaudeAgentModel, isOpencodeModelId, opencodeModelLabel } from '../../../shared/opencode'
+import { isClaudeAgentModel, isOpencodeModelId, opencodeModelLabel } from '../../../shared/providers/opencode'
 import { advanced } from '../../advanced'
 
 /**

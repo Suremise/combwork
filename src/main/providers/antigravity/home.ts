@@ -3,7 +3,7 @@ import { app } from 'electron'
 import { profileFolder } from '../../../shared/appName'
 import { localProfileInUse } from '../../profileFolders'
 import { join, resolve } from 'path'
-import { ANTIGRAVITY } from '../../../shared/antigravity'
+import { ANTIGRAVITY } from '../../../shared/providers/antigravity'
 import { overrides } from '../../advancedValues'
 
 // The Antigravity CLI's environment and its agents' private profiles (HI-2544, from HI-2543's runs on 1.5.0).

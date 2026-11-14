@@ -1,5 +1,5 @@
 import { join } from 'path'
-import { OPENCODE } from '../../../shared/opencode'
+import { OPENCODE } from '../../../shared/providers/opencode'
 import { overrides } from '../../advancedValues'
 import { advanced } from '../../advanced'
 import { testHomeSeam } from '../../connectionSeam'

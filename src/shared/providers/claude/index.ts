@@ -1,10 +1,12 @@
-import { withCliOwn } from './cliOwnMode'
-import { footerPatterns, lastFooterMode, type FooterModeDef, type FooterPatterns } from './footerModes'
-import { msg } from './i18n/msg'
-import { agentMsg, say } from './agentText'
-import type { Tr } from './tasks'
-import type { PermissionMode } from './types'
-import type { ModeCaveatFacts, ModeOption, ModelGroup, ModelOption, ProviderDescriptor } from './providers'
+import { OLDER_VERSIONS, effortLevels } from '../common'
+import { withCliOwn } from '../../cliOwnMode'
+import { footerPatterns, lastFooterMode, type FooterModeDef, type FooterPatterns } from '../../footerModes'
+import { msg } from '../../i18n/msg'
+import { agentMsg, say } from '../../agentText'
+import type { Tr } from '../../tasks'
+import type { PermissionMode } from '../../types'
+import type { ModeCaveatFacts, ModeOption, ModelGroup, ModelOption, ProviderDescriptor } from '..'
+import { defineProvider } from '../parts'
 
 /**
  * Claude Code's side of the shared provider data: its permission modes, effort levels and models,
@@ -12,25 +14,6 @@ import type { ModeCaveatFacts, ModeOption, ModelGroup, ModelOption, ProviderDesc
  */
 
 export const CLAUDE_CODE = 'claude-code'
-
-/**
- * Effort levels' names in the window's words (#800), every provider's: the descriptors' effortLevels keep the English
- * for agents and the Agent API. Here, in the first descriptor's module, so codex.ts and copilot.ts take them without a
- * cycle.
- */
-export const EFFORT_TEXT = {
-  none: msg({ id: 'agents.efforts.none', defaultMessage: 'None', description: 'An effort level (how hard the model thinks) in the effort picker: no reasoning. Keep it short.' }),
-  minimal: msg({ id: 'agents.efforts.minimal', defaultMessage: 'Minimal', description: 'An effort level (how hard the model thinks) in the effort picker. Keep it short.' }),
-  low: msg({ id: 'agents.efforts.low', defaultMessage: 'Low', description: 'An effort level (how hard the model thinks) in the effort picker. Keep it short.' }),
-  medium: msg({ id: 'agents.efforts.medium', defaultMessage: 'Medium', description: 'An effort level (how hard the model thinks) in the effort picker. Keep it short.' }),
-  high: msg({ id: 'agents.efforts.high', defaultMessage: 'High', description: 'An effort level (how hard the model thinks) in the effort picker. Keep it short.' }),
-  xhigh: msg({ id: 'agents.efforts.xhigh', defaultMessage: 'Extra high', description: 'An effort level (how hard the model thinks) in the effort picker, between High and Max. Keep it short.' }),
-  max: msg({ id: 'agents.efforts.max', defaultMessage: 'Max', description: 'The highest effort level (how hard the model thinks) of most models, in the effort picker. Keep it short.' }),
-  ultra: msg({ id: 'agents.efforts.ultra', defaultMessage: 'Ultra', description: "Codex's effort level above Max (how hard the model thinks), in the effort picker. Keep it short." })
-}
-
-/** The model pickers' group of older models, every provider's (#800). */
-export const OLDER_VERSIONS = msg({ id: 'agents.models.olderGroup', defaultMessage: 'Older versions', description: 'A group of the model picker: earlier models, hidden until shown.' })
 
 /** Claude Code's permission modes as agents and the Agent API read them (dialects, HI-2065): said when read (the getters below), so in the reader's dialect. The window has its own messages (`text`). */
 const M = {
@@ -282,13 +265,7 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
   // Plan mode would block the Combwork tools.
   assistantMode: 'auto',
   modeCaveat: claudeModeCaveat,
-  effortLevels: [
-    { value: 'low', label: 'Low', text: EFFORT_TEXT.low }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'medium', label: 'Medium', text: EFFORT_TEXT.medium }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'high', label: 'High', text: EFFORT_TEXT.high }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'xhigh', label: 'Extra high', text: EFFORT_TEXT.xhigh }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'max', label: 'Max', text: EFFORT_TEXT.max } // i18n-ignore: agent-facing English (text is the window's)
-  ],
+  effortLevels: effortLevels('low', 'medium', 'high', 'xhigh', 'max'),
   modelGroups: CLAUDE_MODEL_GROUPS,
   modelPlaceholder: 'Full model ID, e.g. claude-opus-5-5 or claude-opus-4-6[1m]', // i18n-ignore: English (text.modelPlaceholder is the window's)
   capabilities: {
@@ -415,3 +392,7 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
   modelLabel: claudeModelLabel,
   canSwitchLive
 }
+
+/** Claude Code's shared half, as the registry lists it (HI-3201). */
+// agent-text: CLAUDE_DESCRIPTOR.text.safeguardHelp (a CLI's sentence stored by id in a card comment, said when read: providerMessage)
+export default defineProvider({ descriptor: CLAUDE_DESCRIPTOR })

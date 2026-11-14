@@ -1,8 +1,9 @@
-import type { ModeOption, ModelGroup, ProviderDescriptor } from './providers'
-import { COPILOT_DESCRIPTOR } from './copilot'
-import { withCliOwn } from './cliOwnMode'
-import { msg } from './i18n/msg'
-import { agentMsg, say } from './agentText'
+import type { ModeOption, ModelGroup, ProviderDescriptor } from '..'
+import { effortLevels } from '../common'
+import { withCliOwn } from '../../cliOwnMode'
+import { msg } from '../../i18n/msg'
+import { agentMsg, say } from '../../agentText'
+import { defineProvider } from '../parts'
 
 /**
  * Google's Antigravity CLI (`agy`), Combwork's fourth provider (HI-2544; the research HI-2448, the runtime facts HI-2543,
@@ -137,7 +138,7 @@ export const ANTIGRAVITY_DESCRIPTOR: ProviderDescriptor = {
   // Combwork's own tools are pre-approved for its sessions (the Assistant's: trustedCombworkTools); the rest asks.
   assistantMode: 'ask',
   // 1.5.0's --effort: low|medium|high|xhigh|max (the levels Combwork already names for the other CLIs).
-  effortLevels: COPILOT_DESCRIPTOR.effortLevels.filter((e) => ['low', 'medium', 'high', 'xhigh', 'max'].includes(e.value)),
+  effortLevels: effortLevels('low', 'medium', 'high', 'xhigh', 'max'),
   modelGroups: ANTIGRAVITY_MODEL_GROUPS,
   modelPlaceholder: 'Model ID, e.g. gemini-3.8-flash-medium', // i18n-ignore: English (text.modelPlaceholder is the window's)
   capabilities: {
@@ -185,3 +186,6 @@ export const ANTIGRAVITY_DESCRIPTOR: ProviderDescriptor = {
   // No live switching (liveModeSwitch: none): a change of mode restarts the session.
   canSwitchLive: () => false
 }
+
+/** The Antigravity CLI's shared half, as the registry lists it (HI-3201). */
+export default defineProvider({ descriptor: ANTIGRAVITY_DESCRIPTOR })

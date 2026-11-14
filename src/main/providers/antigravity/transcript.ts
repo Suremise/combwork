@@ -1,7 +1,7 @@
 import type { CompactionEvent, DayUsage, SessionUsage, TranscriptImageRef, TranscriptItem, TranscriptTool, UsageTokens } from '../../../shared/types'
 import { emptyDay, localDay } from '../../../shared/usageDays'
 import { TimelineBuilder } from '../../../shared/usageTimeline'
-import { ANTIGRAVITY } from '../../../shared/antigravity'
+import { ANTIGRAVITY } from '../../../shared/providers/antigravity'
 import { formatToolInput } from '../claude/conversation'
 import { firstLine, shortPath, type NewItem } from '../conversation'
 import type { ConversationParserLike, ImageLocation } from '../types'

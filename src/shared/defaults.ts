@@ -1,5 +1,5 @@
 import type { AgentBranchStatus, AgentDef, AppConfig, AppSettings, CompactionEvent, KeybindingOverrides, FileLockMode, PageLayout, PlanLimit, PlanUsage, ProjectConfig, ProjectProviderConfig, ProviderId, ProviderSettings, LaunchedLimits, SessionLayout, SessionRecord, SessionStatus, SessionView, WorkspaceConfig } from './types'
-import { CLAUDE_CODE } from './claude'
+import { CLAUDE_CODE } from './providers/claude'
 import { MIGRATED_QUIT, migrateCombworkCommands } from './commands'
 import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX } from './agentLimits'
 import { DEFAULT_COLUMN_COLORS } from './tasks'

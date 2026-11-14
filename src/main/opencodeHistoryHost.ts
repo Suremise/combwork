@@ -1,5 +1,5 @@
 import { join } from 'path'
-import { OPENCODE } from '../shared/opencode'
+import { OPENCODE } from '../shared/providers/opencode'
 import { onAccountRemoving } from './accounts'
 import { localDataRoot } from './providers/antigravity/home'
 import { opencode } from './providers/opencode/adapter'
