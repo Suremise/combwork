@@ -1379,6 +1379,54 @@
     "defaultMessage": "Assistant and scripts",
     "description": "A choice of the Progress panel's project filter: the runs of the Combwork Assistant and of scripts, which belong to no project."
   },
+  "board.forYou.advanceAttest": {
+    "defaultMessage": "It’s integrated",
+    "description": "A button on a For you item about Combwork’s jj advance whose outcome it couldn’t prove (HI-3236): the user says the card’s work is in its target."
+  },
+  "board.forYou.advanceAttestTip": {
+    "defaultMessage": "Done on your word: Combwork marks the card Done without proving its integration.",
+    "description": "Tooltip of the It’s integrated button (HI-3236): recorded as the user’s override, never as a checked integration."
+  },
+  "board.forYou.advanceIntegrate": {
+    "defaultMessage": "Integrate",
+    "description": "A button on a For you preview of Combwork’s jj advance (HI-3236): Combwork moves the target bookmark to the card’s candidate now, as the preview shows."
+  },
+  "board.forYou.advanceIntegrateTip": {
+    "defaultMessage": "Combwork moves the target to the candidate now, checking first that nothing changed since this preview.",
+    "description": "Tooltip of the Integrate button on a For you preview of Combwork’s jj advance (HI-3236). The target: the bookmark the card merges into."
+  },
+  "board.forYou.advanceLeave": {
+    "defaultMessage": "Leave it to me",
+    "description": "A button on a For you item about Combwork’s jj advance that stopped (HI-3236): the user settles it themselves."
+  },
+  "board.forYou.advanceLeaveTip": {
+    "defaultMessage": "Combwork changes nothing. It asks you next whether the card is integrated.",
+    "description": "Tooltip of the Leave it to me button on a stopped Combwork jj advance (HI-3236)."
+  },
+  "board.forYou.advanceNotThisPlan": {
+    "defaultMessage": "Not for this plan",
+    "description": "A button on a For you preview of Combwork’s jj advance (HI-3236): dismisses this preview until the plan changes."
+  },
+  "board.forYou.advanceNotThisPlanTip": {
+    "defaultMessage": "Dismisses this preview until the plan changes (a new candidate after the target moves or new work). You can still integrate it yourself.",
+    "description": "Tooltip of the Not for this plan button on a For you preview of Combwork’s jj advance (HI-3236). Never promise to ask again later for the same plan."
+  },
+  "board.forYou.advanceStartAgain": {
+    "defaultMessage": "Not integrated, start again",
+    "description": "A button on a For you item about Combwork’s jj advance whose outcome it couldn’t prove (HI-3236): start again with a new candidate."
+  },
+  "board.forYou.advanceStartAgainTip": {
+    "defaultMessage": "Only once the target is known not to contain the work: then a new candidate and its checks.",
+    "description": "Tooltip of the Not integrated, start again button (HI-3236)."
+  },
+  "board.forYou.advanceUndo": {
+    "defaultMessage": "Undo Combwork’s move",
+    "description": "A button on a For you item about Combwork’s jj advance that stopped (HI-3236): reverts Combwork’s own jj operation, checking again first."
+  },
+  "board.forYou.advanceUndoTip": {
+    "defaultMessage": "Combwork reverts its own jj operation, after checking again that nothing else changed, and frees the card.",
+    "description": "Tooltip of the Undo button on a stopped Combwork jj advance (HI-3236)."
+  },
   "board.forYou.agree": {
     "defaultMessage": "{action, select, done {Move to Done With This Reply} noCode {Make It No Code With This Reply} skipReview {Skip Review With This Reply} other {Unblock With This Reply}}",
     "description": "A button under an agent's question for the user (For you), beside Send, when the question offers one action: does that action as the user, with the reply typed in the box as its reason, and answers the question. Keep the select keys as they are; translate each choice."

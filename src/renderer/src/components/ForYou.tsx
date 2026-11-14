@@ -328,12 +328,12 @@ function ForYouRequest({ card, kind, item, reply, setReply, setAnswering }: { ca
       {ADVANCE_ACTIONS[item.gate] ? (
         <div className="for-you-actions" data-advance={item.gate}>
           <Tooltip content={tr(ADVANCE_ACTIONS[item.gate].yesTip)}>
-            <BusyButton className="primary" data-action="advance-yes" busy={busy('advanceYes')} busyLabel={tr(M.answering)} disabled={!!action.busy} onClick={() => void answer('advanceYes', { outcome: 'approved' })}>
+            <BusyButton className="primary" busy={busy('advanceYes')} busyLabel={tr(M.answering)} disabled={!!action.busy} onClick={() => void answer('advanceYes', { outcome: 'approved' })}>
               {tr(ADVANCE_ACTIONS[item.gate].yes)}
             </BusyButton>
           </Tooltip>
           <Tooltip content={tr(ADVANCE_ACTIONS[item.gate].noTip)}>
-            <BusyButton data-action="advance-no" busy={busy('advanceNo')} busyLabel={tr(M.answering)} disabled={!!action.busy} onClick={() => void answer('advanceNo', { outcome: 'declined' })}>
+            <BusyButton busy={busy('advanceNo')} busyLabel={tr(M.answering)} disabled={!!action.busy} onClick={() => void answer('advanceNo', { outcome: 'declined' })}>
               {tr(ADVANCE_ACTIONS[item.gate].no)}
             </BusyButton>
           </Tooltip>

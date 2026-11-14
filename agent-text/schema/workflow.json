@@ -66,6 +66,18 @@
       "project": "plain"
     }
   },
+  "workflow.forYou.advancePreview": {
+    "placeholders": {
+      "again": "select",
+      "card": "plain",
+      "target": "plain",
+      "expected": "plain",
+      "result": "plain",
+      "style": "select",
+      "commits": "plain",
+      "more": "plural"
+    }
+  },
   "workflow.forYou.advanceRefused": {
     "placeholders": {
       "target": "plain",
@@ -1431,6 +1443,9 @@
       "choice": "select"
     }
   },
+  "workflow.rule.advance.verified": {
+    "placeholders": {}
+  },
   "workflow.rule.approval.given": {
     "placeholders": {}
   },
@@ -1771,6 +1786,9 @@
     "placeholders": {}
   },
   "workflow.value.finish.notChecked": {
+    "placeholders": {}
+  },
+  "workflow.value.finish.previewAdvance": {
     "placeholders": {}
   },
   "workflow.value.finish.userIntegrates": {

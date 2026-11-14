@@ -298,6 +298,8 @@
   "tips.jjCards.title": "Karty w projekcie jj",
   "tips.jjOperations.text": "W projekcie jj Kontrola wersji → Operacje wyświetla operacje jj według nazw. Podgląd cofnięcia pokazuje, co zmieniłoby cofnięcie jednej z nich, i podaje polecenie do uruchomienia, gdy nic innego by się nie zmieniło. Combwork nigdy go nie uruchamia.",
   "tips.jjOperations.title": "Podgląd cofnięcia operacji jj",
+  "tips.jjPreview.text": "W projekcie jj wybierz Combwork włącza po Twoim kliknięciu w Kontrola wersji → Przepływ pracy → Kto włącza: Dla Ciebie pokaże wtedy podgląd każdego przesunięcia, a Combwork wykona je dopiero, gdy klikniesz Włącz.",
+  "tips.jjPreview.title": "Włącz kartę jj jednym kliknięciem",
   "tips.keepAwake.text": "Gdy agent pracuje, Combwork nie pozwala Windows przejść w uśpienie (ekran nadal może się zablokować), a pozwala, gdy agenci skończą. Kiedy – wybierzesz w Ustawienia → Ogólne.",
   "tips.keepAwake.title": "Agenci pracują, komputer nie zasypia",
   "tips.laneApplyNow.text": "W oknie Uruchom tor dla wykonawcy toru opcja Zastosuj teraz od razu zmienia kolejność: karta w toku wraca do Do zrobienia, a jej praca zostaje na jej gałęzi, i wykonawca jest o tym informowany.",

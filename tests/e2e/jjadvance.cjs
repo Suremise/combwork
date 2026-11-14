@@ -165,7 +165,7 @@ const id = (cwd, rev, t = 'commit_id') => jj(cwd, '--ignore-working-copy', 'log'
     const actions = section.locator('[data-advance="advancePreview"]')
     check('…its buttons: Integrate and Not for this plan', !!(await until(async () => (await actions.count()) === 1, HUNG_MS)) && (await text(actions)).includes('Integrate') && (await text(actions)).includes('Not for this plan'), await text(section))
     await shoot(section, 'preview')
-    await actions.locator('[data-action="advance-yes"]').click()
+    await actions.locator('button').first().click()
     check('…Integrate: Done, main at the candidate', !!(await until(async () => (await card(a.n))?.column === 'done', HUNG_MS)) && id(shop, 'main') !== E, JSON.stringify({ column: (await card(a.n))?.column }))
     await closeDialog()
 
@@ -178,7 +178,7 @@ const id = (cwd, rev, t = 'commit_id') => jj(cwd, '--ignore-working-copy', 'log'
     jj(shop, 'bookmark', 'set', 'main', '-r', '@-')
     const moved = id(shop, 'main')
     section = await forYouSection(b.n)
-    await section.locator('[data-advance="advancePreview"] [data-action="advance-yes"]').click()
+    await section.locator('[data-advance="advancePreview"] button').first().click()
     const fresh = await until(async () => {
       const p = await forYouOf(b.n, 'advancePreview')
       return p && p.request !== p1?.request ? p : null
@@ -186,7 +186,7 @@ const id = (cwd, rev, t = 'commit_id') => jj(cwd, '--ignore-working-copy', 'log'
     check('(b) the stale Integrate ran nothing: main where jj moved it, the card still waiting; a fresh preview for the new candidate', !!fresh && (await card(b.n))?.column === 'passed' && id(shop, 'main') === moved, JSON.stringify({ fresh, column: (await card(b.n))?.column }))
     await closeDialog()
     section = await forYouSection(b.n)
-    await section.locator('[data-advance="advancePreview"] [data-action="advance-yes"]').click()
+    await section.locator('[data-advance="advancePreview"] button').first().click()
     check('…its Integrate: Done', !!(await until(async () => (await card(b.n))?.column === 'done', HUNG_MS)), (await card(b.n))?.column)
     await closeDialog()
 
@@ -211,7 +211,7 @@ const id = (cwd, rev, t = 'commit_id') => jj(cwd, '--ignore-working-copy', 'log'
     const named = section.locator('[data-advance="advanceUncertain"]')
     check("…its buttons: It's integrated and Not integrated, start again", !!(await until(async () => (await named.count()) === 1, HUNG_MS)) && (await text(named)).includes('It’s integrated') && (await text(named)).includes('Not integrated, start again'), await text(section))
     await shoot(section, 'uncertain')
-    await named.locator('[data-action="advance-yes"]').click()
+    await named.locator('button').first().click()
     check("…It's integrated: Done on your word", !!(await until(async () => (await card(c.n))?.column === 'done', HUNG_MS)), (await card(c.n))?.column)
     await closeDialog()
     await openByTitle(page, c.n)
@@ -224,7 +224,7 @@ const id = (cwd, rev, t = 'commit_id') => jj(cwd, '--ignore-working-copy', 'log'
     const before = id(shop, 'main')
     const pd = await until(() => forYouOf(d.n, 'advancePreview'), HUNG_MS)
     section = await forYouSection(d.n)
-    await section.locator('[data-advance="advancePreview"] [data-action="advance-yes"]').click()
+    await section.locator('[data-advance="advancePreview"] button').first().click()
     const stopped = await until(() => forYouOf(d.n, 'advanceStopped'), HUNG_MS)
     check('(d) the move ran, then the seam recorded it stopped with its undo offered', !!pd && !!stopped && id(shop, 'main') !== before, JSON.stringify({ stopped, main: id(shop, 'main'), before }))
     await closeDialog()
@@ -232,7 +232,7 @@ const id = (cwd, rev, t = 'commit_id') => jj(cwd, '--ignore-working-copy', 'log'
     const undo = section.locator('[data-advance="advanceStopped"]')
     check("…its buttons: Undo Combwork's move and Leave it to me", !!(await until(async () => (await undo.count()) === 1, HUNG_MS)) && (await text(undo)).includes('Undo Combwork’s move') && (await text(undo)).includes('Leave it to me'), await text(section))
     await shoot(section, 'stopped')
-    await undo.locator('[data-action="advance-yes"]').click()
+    await undo.locator('button').first().click()
     check('…Undo: main back where it was, the card still Approved, nothing integrated, nothing waiting', !!(await until(async () => id(shop, 'main') === before && !(await forYouOf(d.n, 'advanceStopped')), HUNG_MS)) && (await card(d.n))?.column === 'passed', JSON.stringify({ main: id(shop, 'main'), before, column: (await card(d.n))?.column }))
     await closeDialog()
   } finally {

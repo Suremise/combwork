@@ -127,6 +127,9 @@
   "brief.rule.finish.notChecked": {
     "placeholders": {}
   },
+  "brief.rule.finish.previewAdvance": {
+    "placeholders": {}
+  },
   "brief.rule.finish.userIntegrates": {
     "placeholders": {}
   },

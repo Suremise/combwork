@@ -302,6 +302,8 @@ interface CombworkMessageValues {
   'tips.jjCards.title': undefined
   'tips.jjOperations.text': undefined
   'tips.jjOperations.title': undefined
+  'tips.jjPreview.text': undefined
+  'tips.jjPreview.title': undefined
   'tips.keepAwake.text': undefined
   'tips.keepAwake.title': undefined
   'tips.laneApplyNow.text': undefined
