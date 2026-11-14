@@ -237,7 +237,7 @@
   "project.leftovers.unmerged": "Não estão em {target}",
   "project.limit.counts": "{used, number} de {entitlement, number} usados",
   "project.limit.heading": "{plan, select, none {Limites do plano, em toda a conta, informados {when}} other {Limites do plano ({plan}), em toda a conta, informados {when}}}",
-  "project.limit.models": "{models, select, gemini {Modelos Gemini} otherModels {Outros modelos} premium {Solicitações premium} chat {Mensagens de chat} completions {Conclusões de código} other {{models}}}{window, select, weekly {, semanal} other {}}",
+  "project.limit.models": "{models, select, gemini {Modelos Gemini} otherModels {Outros modelos} premium {Solicitações premium} chat {Mensagens de chat} completions {Conclusões de código} other {{models}}}{window, select, weekly {, semanal} fiveHour {, 5 horas} hours {, {hours, plural, one {# hora} many {# horas} other {# horas}}} other {}}",
   "project.limit.noConnections": "Nenhuma conta do {provider} está ativada neste espaço de trabalho. Ative uma em Configurações → Contas e conexões para ver os limites do plano aqui.",
   "project.limit.noneConnection": "Os limites dela aparecem depois da próxima mensagem em uma sessão em {name}.",
   "project.limit.notIncluded": "Não incluído no seu plano",

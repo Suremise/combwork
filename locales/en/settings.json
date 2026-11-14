@@ -1379,12 +1379,36 @@
     "defaultMessage": "Don't offer a cheaper model near the limit",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork (HI-2609): Codex's offer to switch to a cheaper model when the account nears its usage limit."
   },
+  "settings.advanced.codex.rateLimits.defaultLimitId.desc": {
+    "defaultMessage": "The id of Codex's own plan limits (its 5-hour and weekly ones). A reading with another id is a limit of its own, shown by its name. Wrong, Codex's own limits are shown as a separate limit, and their earlier readings and warnings start again.",
+    "description": "What the advanced setting \"Session file: Codex's own limit id\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.codex.rateLimits.defaultLimitId.title": {
+    "defaultMessage": "Session file: Codex's own limit id",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
   "settings.advanced.codex.rateLimits.field.desc": {
     "defaultMessage": "The field of Codex's token counts with a subscription's limits. Wrong, Combwork shows no plan limits for Codex.",
     "description": "What the advanced setting \"Session file: plan limits field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
   },
   "settings.advanced.codex.rateLimits.field.title": {
     "defaultMessage": "Session file: plan limits field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.codex.rateLimits.limitId.desc": {
+    "defaultMessage": "The plan limits' field naming which of Codex's limits they are. Wrong, Combwork takes every reading for Codex's own limit, and a second limit's figures are mixed into it.",
+    "description": "What the advanced setting \"Session file: limit's id field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.codex.rateLimits.limitId.title": {
+    "defaultMessage": "Session file: limit's id field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.codex.rateLimits.limitName.desc": {
+    "defaultMessage": "The plan limits' field with the name Codex gives a limit other than its own. Wrong, Combwork names such a limit by its id.",
+    "description": "What the advanced setting \"Session file: limit's name field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.codex.rateLimits.limitName.title": {
+    "defaultMessage": "Session file: limit's name field",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.rateLimits.usedPercent.desc": {

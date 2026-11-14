@@ -239,7 +239,7 @@ interface CombworkMessageValues {
   'project.leftovers.unmerged': { target: string | number }
   'project.limit.counts': { used: number; entitlement: number }
   'project.limit.heading': { plan: string; when: string | number }
-  'project.limit.models': { models: string; window: string }
+  'project.limit.models': { models: string; window: string; hours: number }
   'project.limit.noConnections': { provider: string | number }
   'project.limit.noneConnection': { name: string | number }
   'project.limit.notIncluded': undefined

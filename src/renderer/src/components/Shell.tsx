@@ -20,7 +20,7 @@ import { useForYou } from '../forYou'
 import { GitStatusBarItem } from '../views/GitTab'
 import { AGENT_LIMIT_MAX } from '@shared/defaults'
 import { AgentRowsTable, CARD_COLUMN, PROJECT_COLUMN, STATE_COLUMN, WAITING_COLUMN, agentRow, tableText, type AgentTableData, type AgentTableRow } from './AgentsTable'
-import { hasShare, limitName, limitWindow } from '@shared/planLimits'
+import { hasShare, limitName, limitWindow, nameWindow } from '@shared/planLimits'
 import { useConnections, useProviderWarnings } from './ConnectionChoice'
 import { connectionsApply, planUsageItems } from '@shared/accounts'
 import { useConnectionsInUse } from '../connectionUsage'
@@ -60,7 +60,7 @@ const M = {
   planLine: msg({ id: 'workspace.statusBar.planLine', defaultMessage: '{provider}{hasPlan, select, yes { ({plan} plan)} other {}}', description: "The first line of the status bar's plan limits tooltip (GitHub issue #1): the coding agent ({provider}: Claude Code) and its plan's name ({plan}: max, pro…)." }),
   limitLine: msg({ id: 'workspace.statusBar.limitLine', defaultMessage: '{window, select, fiveHour {5-hour limit} weekly {Weekly limit} other {{label} limit}}: {used, number, ::percent} used{hasReset, select, yes {, resets {when}} other {}}', description: 'A line of the status bar\'s plan limits tooltip (GitHub issue #1): a rolling usage window, how much of it is used, and when it resets ({when}: "in 2 h 5 min", or a weekday and time).' }),
   reportedBy: msg({ id: 'workspace.statusBar.reportedBy', defaultMessage: 'Reported by {agent}, {when}', description: 'Under a line of the status bar\'s plan limits tooltip (#383): which agent\'s session reported the figure of the limit above ({agent}: its name) and when ({when}: "4 minutes ago").' }),
-  shortModels: msg({ id: 'workspace.statusBar.shortModels', defaultMessage: '{models, select, gemini {Gemini} otherModels {Other} premium {Premium} chat {Chat} completions {Completions} other {{models}}}{window, select, weekly { wk} other {}}', description: "The status bar's plan limits (HI-2734), before the percent of a limit that covers part of a plan: which models or requests (Antigravity's Gemini models or its other providers' models; Copilot's premium requests, chat messages or code completions; else the provider's own word, {models}), and \"wk\" for a weekly one. Keep it very short." }),
+  shortModels: msg({ id: 'workspace.statusBar.shortModels', defaultMessage: '{models, select, gemini {Gemini} otherModels {Other} premium {Premium} chat {Chat} completions {Completions} other {{models}}}{window, select, weekly { wk} fiveHour { 5h} hours { {hours, number}h} other {}}', description: "The status bar's plan limits (HI-2734), before the percent of a limit that covers part of a plan: which models or requests (Antigravity's Gemini models or its other providers' models; Copilot's premium requests, chat messages or code completions; else the provider's own word, {models}, such as the name Codex gives one of its limits, HI-1125), and its window: \"wk\" for a weekly one, \"5h\" for a 5-hour one, else its hours ({hours}h). Keep it very short." }),
   notIncludedLine: msg({ id: 'workspace.statusBar.notIncludedLine', defaultMessage: '{label}: not in your plan', description: "A line of the status bar's plan limits tooltip (HI-2734) for a limit the plan doesn't include (its allowance is 0): its name ({label}: \"Premium requests\")." }),
   unlimitedShort: msg({ id: 'workspace.statusBar.unlimitedShort', defaultMessage: 'unlimited', description: "The status bar's plan limits (HI-2734), after a limit's short name, in place of its percent, when the plan has no limit on it. Keep it short." }),
   unlimitedLine: msg({ id: 'workspace.statusBar.unlimitedLine', defaultMessage: '{label} limit: unlimited{hasReset, select, yes {, its period resets {when}} other {}}', description: "A line of the status bar's plan limits tooltip (HI-2734) for a limit the plan has no cap on: its name ({label}: \"Premium requests\"), and when its period resets ({when})." }),
@@ -270,7 +270,7 @@ function KeepAwakeStatusItem() {
 
 /** "5h" / "Week" for the status bar; a limit of part of a plan by its models (HI-2734: "Gemini wk"); others by their label. */
 function shortLimit(l: PlanLimit): string {
-  if (l.models) return tr(M.shortModels, { models: l.models, window: l.windowMinutes === 7 * 24 * 60 ? 'weekly' : 'other' })
+  if (l.models) return tr(M.shortModels, { models: l.models, ...nameWindow(l.windowMinutes) })
   return tr(M.shortLimit, { window: limitWindow(l), label: l.label })
 }
 

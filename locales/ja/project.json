@@ -237,7 +237,7 @@
   "project.leftovers.unmerged": "{target}にない",
   "project.limit.counts": "{entitlement, number}中{used, number}を使用",
   "project.limit.heading": "{plan, select, none {プランの上限（アカウント全体、{when}の時点）} other {プランの上限（{plan}、アカウント全体、{when}の時点）}}",
-  "project.limit.models": "{models, select, gemini {Geminiモデル} otherModels {その他のモデル} premium {プレミアムリクエスト} chat {チャットメッセージ} completions {コード補完} other {{models}}}{window, select, weekly {（週間）} other {}}",
+  "project.limit.models": "{models, select, gemini {Geminiモデル} otherModels {その他のモデル} premium {プレミアムリクエスト} chat {チャットメッセージ} completions {コード補完} other {{models}}}{window, select, weekly {（週間）} fiveHour {（5時間）} hours {（{hours, plural, other {#時間}}）} other {}}",
   "project.limit.noConnections": "このワークスペースで有効な{provider}のアカウントがありません。「設定」→「アカウントと接続」でどれかをオンにすると、ここにプランの上限が表示されます。",
   "project.limit.noneConnection": "{name}のセッションで次のメッセージを送ると、上限がここに表示されます。",
   "project.limit.notIncluded": "プランに含まれていません",

@@ -17,8 +17,8 @@ export function isoTime(v: unknown): string | null {
 
 const MODELS_NAME = msg({
   id: 'project.limit.models',
-  defaultMessage: '{models, select, gemini {Gemini models} otherModels {Other models} premium {Premium requests} chat {Chat messages} completions {Code completions} other {{models}}}{window, select, weekly {, weekly} other {}}',
-  description: "The name of a plan limit that covers part of a plan (HI-2734), shown where Combwork says \"{name} limit\": which models or requests it is for (Antigravity's Gemini models, or its other providers' models; Copilot's premium requests, chat messages or code completions; else the provider's own word, {models}), and, for a weekly one, that it is weekly. \"Other models\" are the models of providers other than Google."
+  defaultMessage: '{models, select, gemini {Gemini models} otherModels {Other models} premium {Premium requests} chat {Chat messages} completions {Code completions} other {{models}}}{window, select, weekly {, weekly} fiveHour {, 5-hour} hours {, {hours, plural, one {#-hour} other {#-hour}}} other {}}',
+  description: "The name of a plan limit that covers part of a plan (HI-2734), shown where Combwork says \"{name} limit\": which models or requests it is for (Antigravity's Gemini models, or its other providers' models; Copilot's premium requests, chat messages or code completions; else the provider's own word, {models}, such as the name Codex gives one of its limits, HI-1125), and its window: weekly, 5-hour, or another number of hours ({hours}). \"Other models\" are the models of providers other than Google."
 })
 
 /**
@@ -38,7 +38,13 @@ export function limitNameText(l: Pick<PlanLimit, 'label' | 'models' | 'windowMin
   return l.models ? { m: MODELS_NAME, values: limitNameValues(l) } : l.label
 }
 
-const limitNameValues = (l: Pick<PlanLimit, 'models' | 'windowMinutes'>): { models: string; window: string } => ({ models: l.models ?? '', window: l.windowMinutes === 7 * 24 * 60 ? 'weekly' : 'other' })
+/** The window a part-of-plan limit's name says (HI-1125: Codex's limits other than its own have 5-hour and other windows): weekly, 5-hour, whole hours, else none. */
+export const nameWindow = (minutes: number | null): { window: 'weekly' | 'fiveHour' | 'hours' | 'other'; hours: number } => ({
+  window: minutes === 7 * 24 * 60 ? 'weekly' : minutes === 300 ? 'fiveHour' : minutes && minutes % 60 === 0 ? 'hours' : 'other',
+  hours: minutes ? minutes / 60 : 0
+})
+
+const limitNameValues = (l: Pick<PlanLimit, 'models' | 'windowMinutes'>): { models: string; window: string; hours: number } => ({ models: l.models ?? '', ...nameWindow(l.windowMinutes) })
 
 /** Whether a limit has a share used to show and warn of (HI-2734): not an unlimited one, nor one the plan doesn't include. */
 export const hasShare = (l: Pick<PlanLimit, 'unlimited' | 'notIncluded'>): boolean => !l.unlimited && !l.notIncluded
