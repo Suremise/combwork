@@ -5594,7 +5594,12 @@ set it and why; the Agent API's card adds `reviewSkipped: { by, reason }` and `r
 - **Your approvals carry over** by the same rule as passes (G4): a clean rebase by the queue keeps them.
 - **Dependencies and per-card targets** (OP-12): `start.dependenciesIntegrated` checks each `blockedBy` card in **the
   dependent card's target**: integrated into that target, or found in it by containment (merged into `release`,
-  then `release` into `main`); a card integrated only elsewhere still blocks [P2, #1118 20 Oct].
+  then `release` into `main`); a card integrated only elsewhere still blocks [P2, #1118 20 Oct]. **A card of another
+  project** counts once it is Done, its merge never looked up: its work is in its own repository, never this card's
+  target [HI-3233: on 14 Nov CL-265 (cli) couldn't start while MC-1503 and MC-1504 (mcp) were Done, as MC-1503's
+  commit was looked up in cli's repository and couldn't be read]. Containment that can't be read still refuses the start
+  (`platform.unknown`, never started on doubt), naming the card it waits for: *whether HI-12's work is in the target
+  (whether a1b2c3d is in e4f5a6b)*.
 - **A new project before a preset is chosen:** the detected platform's all-off options (§16.6.4), the free flow of
   today, until the user picks a preset or sets an option.
 

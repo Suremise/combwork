@@ -436,6 +436,11 @@ export class FactStore {
     return ofThis(Number(m[2]))
   }
 
+  /** HI-3233: whether card `id` is this project's (one of another project's has its work in another repository). */
+  isOwn(id: number): boolean {
+    return this.conn.read((db) => !!db.prepare('SELECT 1 FROM cards WHERE number = ? AND project = ?').get(id, this.scope.project))
+  }
+
   /** HI-2709: the cards blocked by a card (their `blockedBy` names it), by number, any project's: the links' own index. */
   dependents(id: number): number[] {
     return this.conn.read((db) => (db.prepare("SELECT card FROM card_links WHERE target = ? AND kind = 'blockedBy' ORDER BY card").all(id) as { card: number }[]).map((r) => r.card))

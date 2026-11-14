@@ -555,6 +555,7 @@
   "workflow.summary.none.pair": "クイックチェックに合格した後、レビュアーエージェントが各カードを確認します。",
   "workflow.summary.none.solo": "レビューなし。ビルダーが提出した時点でカードは完了です。",
   "workflow.summary.none.team": "クイックチェックとテストに合格した後、レビュアーエージェント、その後に自分が各カードを確認します。",
+  "workflow.unreadable.blockerWork": "{card} の作業がターゲットに含まれるかどうか（{what}）",
   "workflow.unreadable.branch": "{folder}でチェックアウトされているブランチ",
   "workflow.unreadable.branchedOff": "{a}と{b}の分岐点",
   "workflow.unreadable.branchedOffTarget": "作業がマージ先から分岐した地点",

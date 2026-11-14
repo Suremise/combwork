@@ -8,6 +8,8 @@ import { preset } from '../../src/shared/workflow/options'
 import type { FactData } from '../../src/shared/workflow/facts'
 import { boardFile } from '../../src/main/boardStore'
 import { DatabaseSync } from 'node:sqlite'
+import { unknown } from '../../src/main/platform/types'
+import { UNREADABLE } from '../../src/shared/workflow/texts'
 
 let env: Env | null = null
 afterEach(() => {
@@ -18,7 +20,7 @@ afterEach(() => {
 const pairOpts = { ...preset('git', 'pair'), preChecks: [], mergeChecks: [] }
 
 /** A card started, committed, submitted and passed: Approved, or waiting for its builder's merge. */
-async function passed(e: Env, title: string, file: string) {
+async function passed(e: Pick<Env, 'wf'>, title: string, file: string) {
   const card = e.wf.createCard({ title })
   const s = await e.wf.start(card.key, B1)
   moved(s)
@@ -168,6 +170,32 @@ describe('what a finish counts for', () => {
     moved(await e.wf.reportMerge(a.key, B1, { result: 'abc1234' }))
     const b = e.wf.createCard({ title: 'Needs A', blockedBy: [a.id] })
     expect(await e.wf.start(b.key, B2)).toMatchObject({ refused: true, rule: 'start.dependenciesIntegrated' })
+  })
+
+  // HI-3233: CL-265 (cli) wouldn't start while MC-1503 (mcp) was Done: its merge was looked up in cli's repository.
+  it("another project's Done card counts (its work is in its own repository); this project's, not in the target, still holds the start", async () => {
+    const e = (env = setup({ ...pairOpts, finish: 'agentMerges', target: 'main' }))
+    const mcp = e.sibling('mcp', 'MC')
+    const theirs = await passed(mcp, 'In mcp', 'a.txt')
+    sh(mcp.project, 'merge', '-q', '--no-ff', '-m', 'mcp', mcp.wf.state(theirs).latest!.revision!)
+    moved(await mcp.wf.reportMerge(theirs.key, B1))
+    expect(mcp.wf.doneByFacts(theirs.id)).toBe(true)
+    // This project's: merged and reported Done, then its target reset, so its work isn't there.
+    const before = sh(e.project, 'rev-parse', 'main')
+    const ours = await passed(e, 'Here', 'b.txt')
+    sh(e.project, 'merge', '-q', '--no-ff', '-m', 'here', e.wf.state(ours).latest!.revision!)
+    moved(await e.wf.reportMerge(ours.key, B1))
+    sh(e.project, 'reset', '-q', '--hard', before)
+    const both = e.wf.createCard({ title: 'Needs both', blockedBy: [theirs.id, ours.id] })
+    expect(await e.wf.start(both.key, B2)).toMatchObject({ refused: true, rule: 'start.dependenciesIntegrated', message: expect.stringContaining(`${ours.key} isn't done yet`) })
+    // Its merge unreadable: still refused, naming the card it waits for, not only the commits.
+    const p = e.wf.platform(e.options)
+    const contains = p.contains
+    p.contains = async () => unknown(UNREADABLE.contains, { revision: 'b964131', target: '098128c' })
+    expect(await e.wf.start(both.key, B2)).toMatchObject({ refused: true, rule: 'platform.unknown', message: expect.stringContaining(`whether ${ours.key}'s work is in the target (whether b964131 is in 098128c)`) })
+    p.contains = contains
+    const cli = e.wf.createCard({ title: 'Needs mcp only', blockedBy: [theirs.id] })
+    moved(await e.wf.start(cli.key, B2))
   })
 })
 
