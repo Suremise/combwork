@@ -87,6 +87,9 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     const tokens = { builder: await tokenOf(builder.id), reviewer: await tokenOf(reviewer.id), second: await tokenOf(second.id) }
     check('each agent has its own token', !!tokens.builder && !!tokens.reviewer && !!tokens.second && new Set([tokens.builder, tokens.reviewer, tokens.second]).size === 3)
     const call = async (token, p, body) => {
+      // HI-3194: an agent reads a card before it changes it (its session is then handed the card's current attempt).
+      const card0 = typeof p === 'string' ? p.match(/^\/v1\/tasks\/([^/?]+)(?:\/[a-z-]+)?$/)?.[1] : null
+      if (card0 && card0 !== 'wait') await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${card0}`, { headers: { Authorization: `Bearer ${token}` } })
       const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body ?? {}) })
       return { status: res.status, body: await res.json().catch(() => null) }
     }
@@ -159,7 +162,8 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     await until(async () => (await live(reviewer.id))?.status === 'ready' && (await live(builder.id))?.status === 'ready', HUNG_MS)
     const [reviewerWakes, builderWakes] = [wakesOf('Reviewer').length, wakesOf('Builder').length]
     const notYours = await asReviewer(`/v1/tasks/${ref}/loop-step`, { step: 'design', text: 'Mine?' })
-    check("the reviewer can't post the builder's design (409, loop.stepNotYours)", notYours.status === 409 && notYours.body?.rule === 'loop.stepNotYours', JSON.stringify(notYours.body))
+    // HI-3194: a design is the builder's own move, refused for an agent not building the card before its loop rules are asked.
+    check("the reviewer can't post the builder's design (409, attempt.notAssignee)", notYours.status === 409 && notYours.body?.rule === 'attempt.notAssignee', JSON.stringify(notYours.body))
     const designed = await asBuilder(`/v1/tasks/${ref}/loop-step`, { step: 'design', text: 'Design: greet with Hi, tested by b.test.' })
     const designId = designed.body?.data?.design
     check('the builder posts a design in Doing: it stays, and the reply names it and when its check is due', designed.status === 200 && designed.body?.to === 'active' && /\/s\d+$/.test(designId ?? '') && designed.body.data.waitMinutes === 30 && Date.parse(designed.body.data.until) > Date.now() && (await card(n))?.column === 'doing', JSON.stringify(designed.body))
