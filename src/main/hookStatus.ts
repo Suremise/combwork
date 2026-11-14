@@ -194,6 +194,16 @@ export interface StartupState {
 export interface StartupScreen {
   readyOutput?: RegExp | null
   startupQuestion?: RegExp | null
+  /** Read from its whole rendered screen (HI-3196), where what came before stays: the one matched last counts (HI-3246). */
+  startupOnScreen?: boolean
+}
+
+/** A pattern's last match in a text (where, and what), at -1 when it has none. */
+function lastMatchIn(re: RegExp | null | undefined, text: string): { at: number; text: string } {
+  let last = { at: -1, text: '' }
+  if (!re) return last
+  for (const m of text.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`))) last = { at: m.index, text: m[0] }
+  return last
 }
 
 /**
@@ -209,6 +219,15 @@ export function startupWatched(s: StartupState, screen: StartupScreen): boolean 
 /** What the start's screen text means now: its question (the agent waits for you), its prompt (ready), or nothing yet. */
 export function startupScreen(s: StartupState, text: string, screen: StartupScreen): { asked: string } | 'ready' | null {
   if (!startupWatched(s, screen)) return null
+  // A whole screen keeps an old prompt above its question, and an answered question above its new prompt (HI-3246): the
+  // later of the two says where its start is, its question on a tie (as the terminal reader's latest). A streamed tail is
+  // emptied when its question is seen, so it has no such past.
+  if (screen.startupOnScreen) {
+    const q = lastMatchIn(screen.startupQuestion, text)
+    const r = lastMatchIn(screen.readyOutput, text)
+    if (q.at >= 0 && q.at >= r.at) return s.askedAtStart ? null : { asked: q.text }
+    return r.at > q.at && (s.status === 'starting' || s.askedAtStart) ? 'ready' : null
+  }
   const asked = s.askedAtStart ? null : screen.startupQuestion?.exec(text)
   if (asked) return { asked: asked[0] }
   if ((s.status === 'starting' || s.askedAtStart) && screen.readyOutput?.test(text)) return 'ready'
