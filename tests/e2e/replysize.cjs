@@ -1132,8 +1132,9 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
   // submits a card with a 60-line file, and the user leaves 30 comments on it, each with a body at the limit.
   const lcCard = await inv('tasks:create', { title: 'Line comments', project: 'alpha', agent: coder.id, column: 'todo' })
   const lcKey = lcCard.key || `#${lcCard.number}`
-  const lcStart = tool('cw_start_card', { card: lcKey })
-  check('line comments: Coder starts the card', !lcStart.isError, lcStart.text)
+  // Started as the user does from the board (an agent can't start a card on itself through the Agent API).
+  const lcStart = await inv('tasks:start', lcCard.number, { kind: 'agent', agentId: coder.id }).then(() => null, (e) => String(e?.message ?? e))
+  check('line comments: the card is started on Coder', lcStart === null, String(lcStart))
   fs.writeFileSync(path.join(alpha, 'lines.txt'), Array.from({ length: 60 }, (_, i) => `line ${i + 1}: ${'w'.repeat(150)}`).join('\n') + '\n')
   lib.git(alpha, ['add', 'lines.txt'])
   lib.git(alpha, ['commit', '-qm', 'Lines to comment on'])

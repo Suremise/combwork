@@ -67,8 +67,8 @@
   },
   "board.work.comments.lines": {
     "placeholders": {
-      "from": "number",
-      "to": "number",
+      "from": "plain",
+      "to": "plain",
       "path": "plain"
     }
   },

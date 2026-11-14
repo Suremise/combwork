@@ -161,8 +161,8 @@ const T = {
   // HI-2641: a card's oldest comments past the 500 it keeps, its archive, read from an offset (commentsArchived counts them).
   // Within HI-2012's agent total: the description's forYou gloss and summary's "and its length" were cut to pay for it.
   'readTask.arg.archived': agentMsg({ id: 'tool.readTask.arg.archived', text: 'Archived older comments from this offset.' }),
-  'readTask.arg.lineComments': agentMsg({ id: 'tool.readTask.arg.lineComments', text: "The user's line comments on its revisions' diffs, as rows: open ones, or all." }),
-  'readTask.arg.offset': agentMsg({ id: 'tool.readTask.arg.offset', text: "With lineComments: the previous reply's next." }),
+  'readTask.arg.lineComments': agentMsg({ id: 'tool.readTask.arg.lineComments', text: 'Its line comments as rows.' }),
+  'readTask.arg.offset': agentMsg({ id: 'tool.readTask.arg.offset', text: "With lineComments: the reply's next." }),
   // HI-2561: Codex asked for the history to see why an agent stopped, which forYou already says. Within HI-2012's
   // total (toolLimits.cjs): the description dropped its history clause, and summary's words were cut, to pay for it.
   'readTask.arg.history': agentMsg({ id: 'tool.readTask.arg.history', text: 'Long; rarely needed.' }),
