@@ -13606,13 +13606,19 @@ button.progress-run-show:focus-visible {
   max-height: 180px;
   overflow-y: auto;
 }
+/* Each result a little card of its own (HI-3217): a thin line between them. */
+.progress-lane-picker-list > li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+/* Two rows: the key and the title on the first, the title given the width; the lane that has it under them. */
 .progress-lane-picker-card {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
   width: 100%;
   min-width: 0;
-  padding: 2px 4px;
+  padding: 4px 6px;
   border: 0;
   border-radius: 3px;
   background: none;
@@ -13625,6 +13631,17 @@ button.progress-run-show:focus-visible {
 .progress-lane-picker-card:hover,
 .progress-lane-picker-card:focus-visible {
   background: var(--bg-hover);
+}
+.progress-lane-picker-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+/* Wrapped when long (a long translation in a narrow panel): the builder's name is what it says. */
+.progress-lane-picker-status {
+  font-size: 11px;
+  overflow-wrap: anywhere;
 }
 .progress-lane-picker-none {
   flex: 1 1 100%;

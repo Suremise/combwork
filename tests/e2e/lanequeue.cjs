@@ -252,6 +252,52 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
   await lane(la).locator('[data-action="lane-add-card"]').click()
   await picker.locator('input').fill(K(c2))
   check("Add Card… says a card is on another lane", !!(await until(async () => /on the lane of B2/.test(await picker.innerText().catch(() => '')), HUNG_MS)), await picker.innerText().catch(() => ''))
+  // HI-3217: every result two rows, the key and title on the first (one line), the lane that has it under them, a line
+  // between results; with the longest translation of that lane's words, the status wraps inside its result, never past it.
+  await picker.locator('input').fill('')
+  await until(async () => (await picker.locator('.progress-lane-picker-card').count()) > 1, HUNG_MS)
+  const longestOnOther = fs
+    .readdirSync(path.join(lib.ROOT, 'locales'))
+    .filter((c) => fs.existsSync(path.join(lib.ROOT, 'locales', c, 'board.json')))
+    .map((c) => JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', c, 'board.json'), 'utf8'))['board.laneEdit.onOther'])
+    .map((v) => (typeof v === 'string' ? v : v?.defaultMessage ?? '').replace('{builder}', 'HI-B2'))
+    .sort((a, b) => b.length - a.length)[0]
+  const results = () =>
+    picker.locator('.progress-lane-picker-card').evaluateAll((cards) =>
+      cards.map((c) => {
+        const head = c.querySelector('.progress-lane-picker-head')
+        const s = c.querySelector('.progress-lane-picker-status')?.getBoundingClientRect()
+        const box = c.getBoundingClientRect()
+        const h = head.getBoundingClientRect()
+        const lineH = parseFloat(getComputedStyle(head).lineHeight) || 16
+        return { card: c.dataset.card, headOneLine: h.height <= lineH * 1.5, statusUnder: !s || s.top >= h.bottom - 0.5, inside: !s || (s.right <= box.right + 0.5 && s.bottom <= box.bottom + 0.5), line: getComputedStyle(c.parentElement).borderTopStyle }
+      })
+    )
+  const laid = await results()
+  check('HI-3217: each result is two rows, the title on one line, the lane that has it under it', laid.length > 1 && laid.every((r) => r.headOneLine && r.statusUnder && r.inside) && laid.some((r) => r.card === String(c2)), JSON.stringify(laid))
+  check('…a line between results', laid.slice(1).every((r) => r.line === 'solid') && laid[0].line === 'none', JSON.stringify(laid.map((r) => r.line)))
+  const longLaid = await picker.locator('.progress-lane-picker-card').evaluateAll((cards, said) => {
+    const c = cards.find((x) => x.querySelector('.progress-lane-picker-status'))
+    const status = c?.querySelector('.progress-lane-picker-status')
+    if (!c || !status) return null
+    const was = status.textContent
+    status.textContent = said
+    const box = c.getBoundingClientRect()
+    const s = status.getBoundingClientRect()
+    const ok = s.right <= box.right + 0.5 && s.bottom <= box.bottom + 0.5 && c.scrollWidth <= c.clientWidth + 1
+    status.textContent = was
+    return ok
+  }, longestOnOther)
+  check('…the longest translation of its status stays inside its result', longLaid === true, `${longestOnOther} ${longLaid}`)
+  for (const theme of ['dark', 'light']) {
+    await inv('settings:update', { appearance: { theme } })
+    await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+    await painted()
+    await picker.screenshot({ path: path.join(shots, `picker-${theme}.png`) })
+  }
+  await inv('settings:update', { appearance: { theme: 'dark' } })
+  await picker.locator('input').fill(K(c2))
+  await until(async () => (await picker.locator('.progress-lane-picker-card').count()) === 1, HUNG_MS)
   await picker.locator(`.progress-lane-picker-card[data-card="${c2}"]`).click()
   check('…adding it is refused, naming that lane, with Move Here', !!(await until(async () => (await refusal.count()) === 1 && /on the lane of B2/.test(await refusal.innerText()) && (await refusal.locator('[data-action="lane-move-here"]').count()) === 1, HUNG_MS)), await refusal.innerText().catch(() => ''))
   await refusal.locator('[data-action="lane-move-here"]').click()
