@@ -28,7 +28,7 @@ import { holdsOf, trackHolds } from '../shared/cardCosts'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName, type ProjectIdIndex } from '../shared/projectIds'
 import { actorOf, cardFacts, changeByRuntime, commentGenerations, commentReceiptFor, decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
 import { noteCard } from './assistantChanges'
-import { FactStore } from './workflow/factStore'
+import { FactStore, type CardRecord } from './workflow/factStore'
 import type { AttemptGuard } from './attemptFence'
 import { writeReadiness } from './workflow/dependencyReadiness'
 import { loopReviewerOf } from './loopReviewer'
@@ -1133,6 +1133,32 @@ async function cardRefs(v: unknown, self: number | null, what: 'blockedBy' | 'li
   return [...nums, ...hidden.filter((n) => !nums.includes(n))]
 }
 
+/**
+ * HI-3188: the card's runtime and whether a churn question holds on it now, or null (no project, no workflow, no record).
+ */
+async function churnRuntime(ws: WorkspaceService, card: Pick<TaskCard, 'project' | 'number'>): Promise<{ wf: Workflow; rec: CardRecord; held: boolean } | null> {
+  if (!card.project || !ws.path) return null
+  const { workflowFor } = await import('./workflow/service')
+  const wf = await workflowFor(ws, join(ws.path, card.project)).catch(() => null)
+  if (!wf) return null
+  try {
+    const rec = wf.store.card(card.number)
+    return { wf, rec, held: wf.churnHeld(rec) }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * HI-3188 (HR3's round 1): a lane reviewer's comment recorded as its request (recorder.ts' ReviewerRequest) counts: the
+ * churn question it makes due is asked in the same board change, as a runtime write's is.
+ */
+async function askChurnAfterRequest(ws: WorkspaceService, card: TaskCard, said: StoredText | null | undefined): Promise<void> {
+  if (said?.id !== HISTORY.reviewerRequest.id) return
+  const r = await churnRuntime(ws, card)
+  if (r) await r.wf.askChurnNow(r.rec)
+}
+
 /** HI-3188: a follow-up's errors. */
 const FOLLOW_UP = {
   otherProject: msg({ id: 'tasks.error.followUpOtherProject', defaultMessage: 'followUpOf: {card} is another project’s card; a follow-up continues a card of its own project.', description: 'An error (HI-3188): a new card named a card of another project as the card it continues (followUpOf, a field’s name: keep it as it is). {card} is a card key.' }),
@@ -1356,7 +1382,8 @@ export const replyNote = (said: string): StoredText => storedText(HISTORY.builde
  * builder's reply to its reviewer (HI-2302). Null: only a comment.
  */
 async function commentNote(ws: WorkspaceService, card: TaskCard, patch: TaskPatch, actor: TaskActor, said: StoredText[], comment: string): Promise<StoredText | null> {
-  if (await laneReviewerAsks(ws, card, patch, actor, said)) return requestNote(comment)
+  // HI-3188: while the card's churn question holds, a lane reviewer's comment is a plain comment: no request, no more loop work.
+  if (await laneReviewerAsks(ws, card, patch, actor, said)) return (await churnRuntime(ws, card))?.held ? null : requestNote(comment)
   if (await builderReplies(ws, card, patch, actor, said)) return replyNote(comment)
   return null
 }
@@ -3051,6 +3078,8 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     // while those awaits run (the Assistant's control and session) checks it there, so a revoked change saves nothing.
     // Unlike `check`, it doesn't see the card as it was before this change.
     await saveCard(ws, n, card, before, undefined, opts.commit)
+    // HI-3188: a lane reviewer's request recorded with it counts, and may make a churn question due.
+    await askChurnAfterRequest(ws, card, said.find((x) => x.id === HISTORY.reviewerRequest.id))
     // Nobody on it, by the user's reason: recorded as an override is (setKind's), with the rule it passes.
     if (nobody) FactStore.forBoard(ws, { project: card.project, key: '' }).tx((tx) => tx.append(n, { kind: 'Override', actor: actorOf(actor), source: 'recorded', data: { rules: ['move.doingNobody'], move: `${CATEGORY_STAGE[before.column]}→active`, by: 'assistant', reason: nobody } })) // i18n-ignore: a fact's kind and codes, not text
     // HI-3194: given to another agent (or nobody) during an attempt: its attempt moves on, in this change.
@@ -3427,6 +3456,8 @@ export async function commentTask(n: number, comment: string, actor: TaskActor, 
     if (own) note(c, by, own, at)
     addComment(c, by, t, undefined, undefined, at)
     await saveCard(ws, n, c, undefined, undefined, opts.commit)
+    // HI-3188: a request it recorded counts, and may make a churn question due.
+    await askChurnAfterRequest(ws, c, own)
     // Written: its launch is bound to the card's attempt (a first contact's binding, HI-3194).
     if (g && pre) g.accepted(n, pre, (fn) => afterBoardWrite(ws, fn))
     changed(ws)

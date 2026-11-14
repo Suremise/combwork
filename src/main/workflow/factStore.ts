@@ -472,6 +472,17 @@ export class FactStore {
     return this.records("project = ? AND archived = 0 AND coalesce(stage, CASE col WHEN 'todo' THEN 'todo' WHEN 'done' THEN 'done' END, '') <> 'done'", [this.scope.project])
   }
 
+  /**
+   * HI-3188: this project's cards (not archived) that were asked a request under one of `gates`, in any stage, by number:
+   * those the caller folds to see which are still open (a card is asked few, so this reads far fewer than every card).
+   */
+  cardsAsking(gates: readonly string[]): CardRecord[] {
+    if (!gates.length) return []
+    const asked = this.conn.read((db) => db.prepare(`SELECT DISTINCT f.card AS card FROM card_facts f JOIN cards c ON c.number = f.card WHERE c.project = ? AND c.archived = 0 AND f.kind = 'ApprovalRequested' AND json_extract(f.data, '$.gate') IN (${gates.map(() => '?').join(', ')})`).all(this.scope.project, ...gates) as { card: number }[]).map((r) => r.card) // i18n-ignore: SQL
+    const wanted = new Set(asked)
+    return this.cards().filter((c) => wanted.has(c.id))
+  }
+
   /** This project's cards (not archived) in a stage, by number (#1443: whom each card in Review has reviewing it). */
   cardsAt(stage: StageId): number[] {
     return this.conn.read((db) => (db.prepare('SELECT number FROM cards WHERE project = ? AND archived = 0 AND (stage = ? OR (stage IS NULL AND col = ?)) ORDER BY number').all(this.scope.project, stage, STAGE_CATEGORY[stage]) as { number: number }[]).map((r) => r.number))

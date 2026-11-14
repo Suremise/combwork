@@ -231,7 +231,7 @@ const T = {
   'lane.arg.cards': agentMsg({ id: 'tool.lane.arg.cards', text: 'Cards, in the order they are done.' }),
   'createTask.arg.blockedBy': agentMsg({ id: 'tool.createTask.arg.blockedBy', text: 'Cards that have to be done first.' }),
   'createTask.arg.links': agentMsg({ id: 'tool.createTask.arg.links', text: 'Related cards.' }),
-  'createTask.arg.followUpOf': agentMsg({ id: 'tool.createTask.arg.followUpOf', text: "The card this continues (its key), only for a split or follow-ups the user accepted of that card's own scope: it keeps that card's count. A separate bug or discovery: links instead.", note: 'HI-3188: cw_create_task’s followUpOf.' }),
+  'createTask.arg.followUpOf': agentMsg({ id: 'tool.createTask.arg.followUpOf', text: 'The card this continues, for a split or accepted follow-ups: it keeps its count. Separate finds: links.', note: 'HI-3188: cw_create_task’s followUpOf.' }),
   'updateTask.arg.blockedBy': agentMsg({ id: 'tool.updateTask.arg.blockedBy', text: 'Cards that have to be done first (replaces the list).' }),
   'updateTask.arg.links': agentMsg({ id: 'tool.updateTask.arg.links', text: 'Related cards (replaces the list).' }),
   'updateTasks.arg.numbers': agentMsg({ id: 'tool.updateTasks.arg.numbers', text: 'The cards to change, up to 100.' }),

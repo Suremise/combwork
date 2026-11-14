@@ -223,7 +223,7 @@
     "text": "What to do and how to tell it is done, in full: whoever starts it reads only the card."
   },
   "tool.createTask.arg.followUpOf": {
-    "text": "The card this continues (its key), only for a split or follow-ups the user accepted of that card's own scope: it keeps that card's count. A separate bug or discovery: links instead.",
+    "text": "The card this continues, for a split or accepted follow-ups: it keeps its count. Separate finds: links.",
     "note": "HI-3188: cw_create_task’s followUpOf."
   },
   "tool.createTask.arg.kind": {

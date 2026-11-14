@@ -1107,7 +1107,9 @@ export class Workflow {
    */
   async closeStaleChurn(): Promise<number> {
     let closed = 0
-    for (const card of this.store.cardsOpen()) {
+    // HR3's round 1: the cards with an open churn question, whatever their stage (a stopped card the user finished, one
+    // put back), found by the board's requests, not by folding every unfinished card.
+    for (const card of this.store.cardsAsking(CHURN_GATES)) {
       const s = this.state(card)
       if (!s.requests.some((r) => CHURN_GATES.includes(r.gate) && !this.churnGateHolds(s, r.gate))) continue
       await this.write(card, null, 'combwork', (w) => {
@@ -1120,6 +1122,20 @@ export class Workflow {
       })
     }
     return closed
+  }
+
+  /**
+   * HI-3188: a churn question asked now if one is due (askAtChurn), in a write of its own (joining the caller's board
+   * change): for counted facts written outside the runtime's writes (a lane reviewer's comment, recorder.ts).
+   */
+  async askChurnNow(card: CardRecord): Promise<void> {
+    await this.write(card, null, 'combwork', (w) => this.askAtChurn(w))
+  }
+
+  /** HI-3188: whether a churn question holds on the card now (its loop paused). */
+  churnHeld(card: CardRecord): boolean {
+    const s = this.state(card)
+    return s.requests.some((r) => CHURN_GATES.includes(r.gate) && this.churnGateHolds(s, r.gate))
   }
 
   /**
@@ -2713,8 +2729,9 @@ export class Workflow {
     const actions = (args.actions ?? []).filter((a) => a.kind !== 'skipReview' || reviews)
     let request = ''
     const out = await this.write(card, s.started ? this.rulesetOf(card, s) : null, actor, (w): GuardRefusal | null => {
-      // HI-3188: an agent's question waits while its card's churn question is open (that one is the user's to answer).
-      const paused = agentOf(actor) ? this.churnPending(w) : null
+      // HI-3188: an agent's or the Assistant's question waits while its card's churn question is open (that one is the
+      // user's to answer); the user and Combwork go on (churnPending's own exceptions).
+      const paused = this.churnPending(w)
       if (paused) return paused
       request = this.askUser(w, args.kind, 'ask', args.text, { asker: agentOf(actor), ...(args.revision ? { revision: args.revision } : {}), ...(args.checklist?.length ? { checklist: args.checklist } : {}), ...(actions.length ? { actions } : {}) })
       return null

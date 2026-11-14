@@ -3215,6 +3215,43 @@ module.exports.SCENARIOS = [
     fakeSkips: ['the verdict says the finding came back']
   },
   {
+    id: 'card-loop-edge-cases-review',
+    title: "A card loop reviewer on its third round, each round a different new edge case (HI-3188: verdict.md's simplify rule): asks whether it's worth handling before another failed round",
+    // Two rounds failed, each on a new edge case of its own (an empty last name, a blank name); the work fixes both and has
+    // a third (a first name with spaces around it), which a reviewer would raise as another round.
+    async setup(c) {
+      await reviewedWork(
+        c,
+        'q',
+        {
+          title: 'Display names',
+          description: 'names.js: the display name from a first and a last name, for the member list.',
+          files: { 'names.js': "module.exports = (first, last) => {\n  const name = [first, last].filter((x) => x && x.trim()).join(' ')\n  return name.trim() ? name : 'Unknown'\n}\n" },
+          after: [
+            'Done: names.js joins first and last. Ready for review.',
+            'Review round 1: FAILED. 1. An empty last name leaves a trailing space ("Ann ").',
+            'Fixed: empty parts are left out. Ready for review.',
+            'Review round 2: FAILED. 1. A name of only spaces gives an empty string; the list needs "Unknown".',
+            'Fixed: a blank name is "Unknown". Ready for review.'
+          ]
+        },
+        'implementer'
+      )
+    },
+    prompt: (c) => `Review card #${c.cards.q} as the reviewer of a card loop (rounds: 10). It is back for its third review; the earlier reviews and fixes are in its comments.`,
+    fake: (c) => `skill card-loop then skill review-agent-work then ${fakeStartReview(c.cards.q)} then cw cw_ask_user {"card":"#${c.cards.q}","kind":"decide","text":"Round 3 would be a third new edge case in a row (a first name with spaces around it keeps them: \\"  Ann  Lee\\"). Worth handling, or simplify or cut scope?"}`,
+    expect: (o, c) => {
+      const asked = called(o, 'cw_ask_assistant').length > 0 || called(o, 'cw_ask_user').length > 0
+      const failedAgain = history(o.cards.q).filter((h) => h === 'Review failed').length > 2
+      return [
+        ['read the review-agent-work skill', read(o, 'review-agent-work'), o.skillsRead.join(',')],
+        ['asked whether another edge case is worth handling (cw_ask_assistant or cw_ask_user), or passed it', asked || history(o.cards.q).includes('Review passed'), o.combworkCalls.map((x) => x.tool).join(',')],
+        ["didn't fail it a third time for another new edge case", !failedAgain, history(o.cards.q).join(' | ')],
+        ['changed no files (a review only reads)', o.gitStatus.trim() === '', o.gitStatus]
+      ]
+    }
+  },
+  {
     id: 'card-loop-return',
     title: 'A card loop builder fixing a failed card: it comes back into Review for round two, so the waiting reviewer is woken (#214)',
     files: { 'sync.js': SYNC_JS },

@@ -9230,7 +9230,9 @@ decisions of 13 and 14 Nov (r14, Q1 to Q6):
 - **While one holds** an agent's or the Assistant's loop work on the card is refused, `loop.churnPending`, in the
   write's transaction: loop steps, reviewer requests, questions to the user, starting a review, a verdict, submit and
   the other forward moves. Reading, comments, `cw_ask_assistant`, `cw_cannot_within_rules`, putting the card back and
-  declaring paths go on, as do the user's moves and answers. The lane shows it waiting for you (`roundLimitCards`).
+  declaring paths go on, as do the user's moves and answers; a lane reviewer's comment is then a plain comment, not a
+  request (HR3's round 1: one recorded as a request counts, and asks in its board change too). The lane shows it waiting
+  for you (`roundLimitCards`).
 - **Lifetime:** open churn questions survive a new start, a put-back and a restart. One that no longer holds (its setting
   0 or raised past the count, the options without an agent reviewer, the rules off) refuses nothing and is closed
   (`RequestClosed`, `settingChanged`), its count kept: when the project's options or a level above them are saved, when

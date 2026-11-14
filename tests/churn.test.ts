@@ -20,6 +20,7 @@ const { advanced } = await import('../src/main/advanced')
 const service = await import('../src/main/workflow/service')
 const { ENFORCE } = service
 const { runCardIntent } = await import('../src/main/cardIntents')
+const lanes = await import('../src/main/lanes')
 const { allOff } = await import('../src/shared/workflow/options')
 const facts = await import('../src/shared/workflow/facts')
 const { foldCard, churnTotal, churnDue, CHURN_LIMIT_GATE, SIMPLIFY_GATE } = facts
@@ -42,6 +43,8 @@ let n = 0
 /** "Pair (the agent merges)": a reviewer agent, the agent merges, agents' worktrees. */
 const PAIR = { ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'agentMerges', folder: 'slots' } as const
 const NO_REVIEW = { ...allOff('git'), review: 'none', finish: 'agentMerges', folder: 'slots' } as const
+/** A reviewer agent, everyone in the project folder, committed is done: a lane needs no slots. */
+const PAIR_HERE = { ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project' } as const
 
 async function workspace(options: Record<string, unknown>): Promise<{ w: WS; repo: string; wt: string }> {
   const ws = join(base, `ws-${++n}`)
@@ -211,6 +214,64 @@ describe('the simplify check and the hard stop (HI-3188)', () => {
     for (let i = 0; i < 3; i++) await request(off.w, b)
     expect(churnTotal(stateOf(off.w, b))).toBe(3)
     expect(stateOf(off.w, b).requests.filter((r) => r.gate === SIMPLIFY_GATE || r.gate === CHURN_LIMIT_GATE)).toHaveLength(0)
+  })
+})
+
+describe("the questions' guard reaches every caller and path (HR3's round 1)", () => {
+  it("a lane reviewer's comments recorded as its requests count and stop the loop; while it waits a comment is a plain one", async () => {
+    const { w, wt } = await workspace({ ...PAIR_HERE, simplifyAt: 0, churnStopAt: 2 })
+    const card = await create(w)
+    await inWorkspace(w, () => lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a2', cards: [card], by: 'Builder (p)' }))
+    if (stateOf(w, card).stage === 'todo') await act(w, card, builder, { kind: 'start' })
+    // Its builder's own worktree is the card's folder.
+    commit(wt, 'lane.txt')
+    await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
+    expect(stateOf(w, card).stage).toBe('review')
+    await comment(w, card, reviewer)
+    expect(stateOf(w, card).churn.requests).toBe(1)
+    await comment(w, card, reviewer)
+    expect(stateOf(w, card).churn.requests).toBe(2)
+    expect(open(w, card, CHURN_LIMIT_GATE)).toHaveLength(1)
+    // Waiting: another comment is kept, as a plain comment that adds no loop work.
+    await comment(w, card, reviewer)
+    expect(stateOf(w, card).churn.requests).toBe(2)
+    expect((await inWorkspace(w, () => tasks.getTask(card))).comments.filter((c) => c.text === 'A note')).toHaveLength(3)
+  })
+
+  it("the Assistant's question waits too, at both levels; the user's own moves go on", async () => {
+    const { w } = await workspace({ ...PAIR, simplifyAt: 1, churnStopAt: 2 })
+    const card = await create(w)
+    await act(w, card, builder, { kind: 'start' })
+    await request(w, card)
+    expect(open(w, card, SIMPLIFY_GATE)).toHaveLength(1)
+    const askAs = (a: Actor) => act(w, card, a, { kind: 'ask', askKind: 'decide', text: 'Which way?' })
+    expect(await refused(askAs(builder))).toBe('loop.churnPending')
+    expect(await refused(askAs(assistant))).toBe('loop.churnPending')
+    const [check] = open(w, card, SIMPLIFY_GATE)
+    await inWorkspace(w, () => tasks.assistantAnswerSimplify(card, check.request, 'carryOn', 'Worth it', assistant))
+    await request(w, card)
+    expect(open(w, card, CHURN_LIMIT_GATE)).toHaveLength(1)
+    expect(await refused(askAs(builder))).toBe('loop.churnPending')
+    expect(await refused(askAs(assistant))).toBe('loop.churnPending')
+    expect(await refused(askAs(user))).toBeNull()
+  })
+
+  it('a question on a card the user finished, or put back, is closed once its level no longer holds it', async () => {
+    const { w, repo } = await workspace({ ...PAIR, simplifyAt: 0, churnStopAt: 1 })
+    const done = await create(w)
+    const back = await create(w)
+    for (const c of [done, back]) {
+      await act(w, c, builder, { kind: 'start' })
+      await request(w, c)
+      expect(open(w, c, CHURN_LIMIT_GATE)).toHaveLength(1)
+    }
+    await update(w, done, user, { column: 'done' })
+    await update(w, back, user, { column: 'todo' })
+    expect([open(w, done, CHURN_LIMIT_GATE).length, open(w, back, CHURN_LIMIT_GATE).length]).toEqual([1, 1])
+    await levels(w, repo, { churnStopAt: 0 })
+    await inWorkspace(w, () => service.closeStaleChurn(w, repo))
+    expect([open(w, done, CHURN_LIMIT_GATE).length, open(w, back, CHURN_LIMIT_GATE).length]).toEqual([0, 0])
+    expect([churnTotal(stateOf(w, done)), churnTotal(stateOf(w, back))]).toEqual([1, 1])
   })
 })
 
