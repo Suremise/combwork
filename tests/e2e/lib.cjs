@@ -20,6 +20,7 @@ require('../testArea.cjs').assertReady()
 const ELECTRON = require('electron')
 const { windowsCodesIn } = require('./windowsExits.cjs')
 const { readDocs, writeDoc } = require('./boardRows.cjs')
+const { renderScreen, drawnCount } = require('./drawnScreen.cjs')
 // WORK: where suites keep their profiles, workspaces and screenshots. Stable, so Claude Code trusts its folders once.
 fs.mkdirSync(WORK, { recursive: true })
 
@@ -1364,12 +1365,21 @@ const pasteOn = (raw) => raw.lastIndexOf('\x1b[?2004h') > raw.lastIndexOf('\x1b[
  * - Typed: a CLI can take typing read in one go as a paste, and the Enter right after it as a new line in it (#190):
  *   when this attempt's text was drawn, the next attempt is Enter alone (typed again, the prompt would follow that new
  *   line); when it wasn't (dropped while the CLI drew), or on the last attempt, it is typed again.
+ * Enter follows once the CLI has drawn the text on its screen as rendered (drawnScreen.cjs), as Combwork waits (#600,
+ * HI-3210), at most DRAWN_MS.
  * ready(), if given, is waited for (within waitMs) before the first attempt: the CLI able to take a prompt
  * (combworkToolsConnected); not ready by then, it is typed anyway and said. Up to `tries` times; returns the attempt that
  * worked (1 = the first), or 0.
  */
 async function sendPrompt(inv, key, text, { submitted, ready = null, tries = 3, waitMs = 20000 } = {}) {
   const raw = async () => (await inv('pty:buffer', key).catch(() => '')) ?? ''
+  // The screen as drawn (drawnScreen.cjs), never the raw output's plain text: Codex redraws only the cells that changed,
+  // so that text lacks letters its input has (HI-3210).
+  const screen = async () => {
+    const size = await inv('pty:size', key).catch(() => null)
+    return renderScreen(await raw(), size?.cols, size?.rows)
+  }
+  const shown = async () => drawnCount(await screen(), text)
   if (ready && !(await until(ready, waitMs, 250))) console.log(`INFO sendPrompt: not ready within ${waitMs / 1000} s, typed anyway`)
   let echoed = false
   for (let attempt = 1; attempt <= tries; attempt++) {
@@ -1377,28 +1387,39 @@ async function sendPrompt(inv, key, text, { submitted, ready = null, tries = 3, 
     // A slash command is typed (pasted, it would be sent as a message), as is any prompt to a CLI without it on.
     const paste = pasteOn(await raw()) && !text.startsWith('/')
     const enterOnly = !paste && echoed && attempt < tries
-    const mark = (await raw()).length
+    let before = 0
     if (!enterOnly) {
+      const left = await shown()
       await inv('pty:write', key, '\x15')
       await sleep(150)
+      // An attempt not taken left its text in the input: once Ctrl+U has cleared it, the count is the screen's without it.
+      if (left > 0) await until(async () => (await shown()) < left, DRAWN_MS, 250)
+      before = await shown()
       await inv('pty:write', key, paste ? `\x1b[200~${text}\x1b[201~` : text)
     }
     // Deliberate pause, not a wait for a state: a CLI takes an Enter that comes within its paste window as part of the
     // text (a new line, not a submit), and nothing on screen says when that window ends: Copilot shows the line at once
     // and still takes an Enter right after it as part of the paste (tried in #527). submitted() is the check.
     await sleep(400)
-    // Whether the CLI drew the text after this attempt's write (#981's evidence; for a typed prompt, what the next
-    // attempt does), and whether it is on the screen's last input line ("> …") now: read from the output as drawn, so a
-    // guess at the screen, said for an attempt not taken.
-    echoed = !enterOnly && plainText((await raw()).slice(mark)).includes(text.slice(0, 30))
+    // Enter once the CLI has drawn the text, as Combwork does (enterOnceDrawn, #600): a busy Codex reads the text and an
+    // Enter in one go, takes them as a paste burst and drops the Enter, pasted or typed (HI-3210: under load, all three
+    // attempts of a scenario's prompt were lost so). Not drawn within DRAWN_MS: Enter anyway, and said. Also what the next
+    // attempt of a typed prompt does (#981's evidence).
+    const t = Date.now()
+    echoed = !enterOnly && (await until(async () => (await shown()) > before, DRAWN_MS, 250))
+    if (!enterOnly) console.log(`INFO sendPrompt attempt ${attempt}: ${echoed ? `drawn ${Date.now() - t + 400} ms after it was written` : `not drawn within ${(DRAWN_MS + 400) / 1000} s: Enter anyway`}`)
     await inv('pty:write', key, '\r')
     if (await until(submitted, waitMs, 500)) return attempt
-    const screen = plainText(await raw())
-    const input = screen.slice(screen.lastIndexOf('> ') + 2)
-    console.log(`INFO sendPrompt attempt ${attempt} not taken: ${enterOnly ? 'Enter only (typed, its text drawn before)' : `${paste ? 'pasted' : 'typed'}, echoed ${echoed ? 'yes' : 'no'}`}, ${input.includes(text.slice(0, 30)) ? 'its text on the last input line' : 'its text not on the last input line'}; screen ends: ${JSON.stringify(screen.slice(-300))}`)
+    const drawn = await screen()
+    const input = drawn.slice(drawn.lastIndexOf('› ') >= 0 ? drawn.lastIndexOf('› ') : drawn.lastIndexOf('> '))
+    const lines = drawn.split('\n').filter((l) => l.trim())
+    console.log(`INFO sendPrompt attempt ${attempt} not taken: ${enterOnly ? 'Enter only (typed, its text drawn before)' : `${paste ? 'pasted' : 'typed'}, drawn ${echoed ? 'yes' : 'no'}`}, ${drawnCount(input, text) > 0 ? 'its end on the last input line' : 'its end not on the last input line'}; screen ends: ${JSON.stringify(lines.slice(-8).join('\n'))}`)
   }
   return 0
 }
+
+/** The longest sendPrompt waits for a CLI to draw what it wrote, or to clear it: a bound for a CLI that never does, not how long it takes. */
+const DRAWN_MS = 10000
 
 /**
  * Whether Combwork's log in a test profile (CW_USER_DATA) says an agent's Combwork tools connected (#865), at or after
