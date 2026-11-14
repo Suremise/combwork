@@ -14,7 +14,7 @@
 import { statSync } from 'original-fs'
 import { join } from 'path'
 import { advanceUnresolved, approvedByUser, foldCard, openEntry, passingReviewers, type CardState, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
-import { finishAdvances } from '../../shared/workflow/options'
+import { finishAdvances, finishPreviews } from '../../shared/workflow/options'
 import { okBeforeApplies } from '../../shared/workflow/guards'
 import { advanceHostOf } from './advanceHost'
 import { awaitsAgentMerge, hasStage, type Ruleset } from '../../shared/workflow/compile'
@@ -285,11 +285,16 @@ export async function advanceStep(wf: Workflow, card0: CardRecord): Promise<void
   const s = wf.state(card)
   if (!wf.cfg.reconcileActs || card.stage !== 'approved' || !s.started || s.integrated || s.stale) return
   const p = wf.platformOf(card, s)
-  if (!p.advance) return
+  if (!p.advance && !p.advancePreview) return
   const r = wf.rulesetOf(card, s)
-  if (!finishAdvances(r.options.finish)) return
+  const advances = finishAdvances(r.options.finish)
+  // HI-3236: a finish that previews asks the adapter for its preview (never an attempt: only the user's Integrate starts one).
+  if (!advances && !(finishPreviews(r.options.finish) && p.advancePreview)) return
   if (wf.enforced() && okBeforeApplies(r, card.labels) && !approvedByUser(s, 'okBefore')) return
-  await p.advance(card, s, advanceHostOf(wf))
+  if (advances) {
+    if (!p.advance) return
+    await p.advance(card, s, advanceHostOf(wf))
+  } else await p.advancePreview!(card, s, advanceHostOf(wf))
   // Its records' actions: the runtime's own runner only where it runs them (a harness); in the app, the actions worker,
   // which runs a change's actions once it commits (HR1's round 1, finding 1).
   if (wf.cfg.autoRun !== false) await wf.runActions()

@@ -4186,7 +4186,7 @@ On jj 0.47.1, a read is a write when operation heads have diverged: any command 
 
 **Decided since** (Darren, 14 Nov [HI-2840]: "yes default frictionless, keep the other two as options"; the residual races
 accepted, (A)): jj projects integrate a passed card by **Combwork's advance** by default (`combworkAdvances`), with *You
-integrate it yourself* (`userIntegrates`) as the other finish, and Preview and click to come (HI-3236). J1's protocol is
+integrate it yourself* (`userIntegrates`) and **preview and click** (`previewAdvance`, HI-3236) as the other finishes. J1's protocol is
 the base; what J1 showed it can't do is now stated as the guarantee's limits, never as safety. The design is HI-2840/s30
 with s34, its mapping HI-3235/s7, s10, s13 and s16. gate:advance is open.
 
@@ -4232,7 +4232,19 @@ with s34, its mapping HI-3235/s7, s10, s13 and s16. gate:advance is open.
   moved; any later phase without a fact, or a fact without a journal, is uncertain; an `…ing` phase is classified on
   the state now (before an integrate, no marked operation in any history is nothing moved); `verified` without its
   Integrated records it once. Nothing is ever run again blind.
-- **For you** (the user's alone: an agent's or the Assistant's answer is refused). A stop whose undo conditions hold
+- **Preview and click** (HI-3236; its mapping HI-3236/s7, s10, s13). A finish that previews (`finishPreviews`) asks the
+  adapter's optional `advancePreview` port, never `advance`: once the plan is ready (as an automatic attempt's would be,
+  not dismissed), For you previews it (gate `advancePreview`, bound to the plan id: the move E → R, the candidate's style,
+  the commits added, read pinned). **Integrate** starts HI-3235's attempt only when, read again under the card and
+  repository locks, the finish still previews, the OK holds, the card is in Approved with nothing unsettled, the plan
+  rebuilt has the same id and its offer is current in jj (T at E, the candidate the visible commit): anything else runs
+  nothing, and a fresh preview comes once the new plan is ready. A card has one open preview or one pending answer
+  while its plan is actionable; a reconcile never replaces a preview whose click is queued; only the card's newest
+  preview (by its fact's seq) can start an attempt; **Not for this plan** dismisses that plan (project meta) until the
+  plan changes. Same residual races as automatic once clicked.
+- **For you** (the user's alone: an agent's or the Assistant's answer is refused). The window names each answer: the
+  preview's Integrate / Not for this plan, a stop's Undo Combwork's move / Leave it to me, an uncertain attempt's It's
+  integrated / Not integrated, start again (an attested card shows *Done by you, integration not proved*). A stop whose undo conditions hold
   (s30 §2: Combwork's operations alone since P0, one head, T = R in jj and Git, the rest as at the base, T checked out
   nowhere) asks *advanceStopped*: Approve undoes it (each Approve its own undo: `--at-op H --no-integrate-operation op
   revert O`, its delta exactly T: R → E, integrate, export, observe; verified, `undone`), Decline leaves it to the user.
@@ -7448,6 +7460,9 @@ never invoked; so are `gpg.ssh.defaultKeyCommand`, x509 and hardware ssh keys (`
 - ssh: `ssh-keygen -Y sign -n git -f <key> <payload>`, a literal key (after `key::`, or a value starting `ssh-`, as git reads one)
   written to a temp file as git does, a path's
   `~/` expanded and a relative one resolved against the commit's folder, `SSH_ASKPASS_REQUIRE=never`, no stdin.
+- Either runs with no console (detached, HI-3208), as cw-sign runs it: Windows' own ssh-keygen asks a locked key's
+  passphrase on any console it has, a hidden one too (what Windows gives a console program started by Electron's main or
+  by the merge queue's launcher), and waited there until the bound (`couldNotComplete` where `needsSomeone` was right).
 - Either is started as git starts it (HI-2947): git's command line written out as is, each word quoted with
   `quote_arg_msvc`, so Git's own MSYS2 gpg and ssh-keygen get a `'`, `*`, `?` or `{` (a key or temp folder under
   `C:\Users\O'Brien`) as a commit would give it, never as Node's quoting would. The same in the merge queue's run and in

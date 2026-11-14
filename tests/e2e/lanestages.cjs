@@ -263,8 +263,10 @@ const beta = path.join(fx.ws, 'beta')
     await inv('advanced:set', 'cw.workflow.enforce', true)
 
     // --- Links: the lane header's project opens its Version Control tab at Workflow; the queue card at Merge queue.
-    const link = row(l2).locator('.progress-lane-project')
-    check("the lane header names its project, with its accessible name", (await link.innerText()) === 'alpha' && /open its workflow in Version Control/.test((await link.getAttribute('aria-label')) ?? ''), await row(l2).innerText())
+    // On l3, the fresh lane: l2's header also says "into integration" since HI-3113, which leaves its project's name no
+    // room (HI-3209).
+    const link = row(l3).locator('.progress-lane-project')
+    check("the lane header names its project, with its accessible name", (await link.innerText()) === 'alpha' && /open its workflow in Version Control/.test((await link.getAttribute('aria-label')) ?? ''), await row(l3).innerText())
     await link.click()
     const section = (id) => page.locator(`[role="tab"][data-section="${id}"][aria-selected="true"]`)
     check("…a click opens alpha's Version Control tab at Workflow", !!(await waitHung(async () => (await section('workflow').count()) === 1)))

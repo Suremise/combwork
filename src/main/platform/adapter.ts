@@ -222,6 +222,11 @@ export interface PlatformAdapter {
    * settles the card's earlier attempts it finds. Called by the generic reconcile, never by a platform check.
    */
   advance?(card: CardRecord, s: CardState, host: AdvanceHost): Promise<AdvanceStep>
+  /**
+   * HI-3236: where the finish previews (`finishPreviews`), the card in Approved with its OK given: its preview asked for
+   * the plan now once its platform finds it ready (one open preview, or one pending answer, per card), never an attempt.
+   */
+  advancePreview?(card: CardRecord, s: CardState, host: AdvanceHost): Promise<AdvanceStep>
   /** HI-3235: the user's answer to an advance's question (ADVANCE_GATES), as its durable action carries it. */
   advanceAnswer?(card: CardRecord, answer: AdvanceAnswer, host: AdvanceHost): Promise<void>
   /** HI-3235: the project's journaled advances settled, after a reconciliation run's cards (a crash, a card out of reach). */
@@ -238,7 +243,7 @@ export interface AdvanceAnswer {
   attempt: string
   plan: string
   cycle: number
-  state: 'stopped' | 'uncertain'
+  state: 'stopped' | 'uncertain' | 'preview'
   answer: 'approved' | 'declined'
   /** The project the request was asked in (its workspace's path for it). */
   project: string
@@ -254,6 +259,20 @@ export interface AdvanceWords {
   op?: string
   /** Asked again after an answer that couldn't be acted on: why, as a code the question's message words (FOR_YOU.advance*). */
   again?: string
+}
+
+/** HI-3236: what a preview says: the move (target, from, to), how the candidate was built, and the commits it adds. */
+export interface PreviewWords {
+  target: string
+  expected: string
+  result: string
+  style: string
+  /** The commits added, a line each (a short id and its first line), at most a few. */
+  commits: string
+  /** How many more commits there are beyond those listed. */
+  more: number
+  /** Asked again because the plan changed since the last preview. */
+  again?: 'planChanged'
 }
 
 /** HI-3235: an advance's identity on its card: the cycle it belongs to and its attempt. */
@@ -283,6 +302,15 @@ export interface AdvanceHost {
   askAgain(card: CardRecord, ref: AdvanceRef, plan: string, state: 'stopped' | 'uncertain', words: AdvanceWords, answer: AdvanceAnswer | null): Promise<boolean>
   /** Refused at the base (nothing written): the card's comment saying why, once per cycle, plan and reason. */
   refused(card: CardRecord, cycle: number, plan: string, words: AdvanceWords): Promise<boolean>
+  /**
+   * HI-3236: the card's preview for `plan` (gate advancePreview, bound to the plan), any earlier preview of the card closed
+   * in the same write: false when the card isn't in Approved at `cycle`, or an advance is unsettled.
+   */
+  askPreview(card: CardRecord, cycle: number, plan: string, words: PreviewWords): Promise<boolean>
+  /** HI-3236: the user dismissed the preview of `plan` (Not for this plan): that plan isn't previewed again in this cycle. */
+  declinePreview(card: CardRecord, cycle: number, plan: string): Promise<boolean>
+  /** HI-3236: whether the user dismissed the preview of `plan` in `cycle`. */
+  previewDeclined(card: CardRecord, cycle: number, plan: string): boolean
   /** The one-time note that the project's default finish is Combwork's advance (once per project). */
   noteDefault(card: CardRecord): Promise<void>
 }

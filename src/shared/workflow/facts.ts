@@ -202,8 +202,14 @@ export const ADVANCE_STOPPED_GATE = 'advanceStopped'
  * not to contain the card's work). Bound like ADVANCE_STOPPED_GATE.
  */
 export const ADVANCE_UNCERTAIN_GATE = 'advanceUncertain'
-/** HI-3235: the advance's two gates, whose answers only the user gives and whose handling is the platform adapter's. */
-export const ADVANCE_GATES: readonly string[] = [ADVANCE_STOPPED_GATE, ADVANCE_UNCERTAIN_GATE]
+/**
+ * HI-3236 (HI-3236/s7, s10, s13): Combwork's preview of an advance, where the finish is preview and click: Approve is
+ * Integrate, bound to the plan shown (`entry` and `result`: its id); Decline dismisses that plan until it changes. Only the
+ * card's newest such request (by its fact's seq) can start an attempt.
+ */
+export const ADVANCE_PREVIEW_GATE = 'advancePreview'
+/** HI-3235/HI-3236: the advance's gates, whose answers only the user gives and whose handling is the platform adapter's. */
+export const ADVANCE_GATES: readonly string[] = [ADVANCE_STOPPED_GATE, ADVANCE_UNCERTAIN_GATE, ADVANCE_PREVIEW_GATE]
 
 /** A follow-mode attempt's endpoint as a fact keeps it (HI-1183): never a credential. */
 export interface PublishFact {
@@ -235,7 +241,7 @@ export const ASK_ACTIONS_MAX = 3
  * A request under any other gate is a question someone asked: an agent, the Assistant (`ask`), or a rule it couldn't
  * keep. A question settled another way is closed (#1638); Combwork's own requests stay until met.
  */
-const CW_GATES: ReadonlySet<string> = new Set(['review', 'okBefore', ROUND_LIMIT_GATE, CHURN_LIMIT_GATE, SIMPLIFY_GATE, LINE_GATE, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, QUEUE_PUBLISH_GATE, FOCUSED_SKIP_GATE, SLOT_DIRTY_GATE, ADVANCE_STOPPED_GATE, ADVANCE_UNCERTAIN_GATE, 'decision'])
+const CW_GATES: ReadonlySet<string> = new Set(['review', 'okBefore', ROUND_LIMIT_GATE, CHURN_LIMIT_GATE, SIMPLIFY_GATE, LINE_GATE, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, QUEUE_PUBLISH_GATE, FOCUSED_SKIP_GATE, SLOT_DIRTY_GATE, ADVANCE_STOPPED_GATE, ADVANCE_UNCERTAIN_GATE, ADVANCE_PREVIEW_GATE, 'decision'])
 export const askedQuestion = (r: Pick<FactData['ApprovalRequested'], 'gate'>): boolean => !CW_GATES.has(r.gate)
 
 /** An answer as the user gives it (§16.8.5): its outcome, whether it has a reply or a decision, a choice and its rounds, or an action offered (#1630). */
@@ -1100,6 +1106,8 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'Integrated': {
         const d = f.data as FactData['Integrated']
         s.integrated = d
+        // HI-3236: integrated, however: nothing is left to preview.
+        s.requests = s.requests.filter((r) => r.gate !== ADVANCE_PREVIEW_GATE)
         // HI-3235: Combwork's verified advance settles its attempt, and retires the attempt's questions.
         if (s.advance && d.platform?.attempt === s.advance.attempt) settleAdvance(s, 'integrated')
         const e = d.entry ? s.entries.find((x) => x.id === d.entry) : undefined
@@ -1127,6 +1135,8 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'AdvanceAttempted': {
         const d = f.data as FactData['AdvanceAttempted']
         s.advance = { attempt: d.attempt, plan: d.plan, state: 'attempted' }
+        // HI-3236: an attempt under way retires the card's preview (its outcome asks whatever follows).
+        s.requests = s.requests.filter((r) => r.gate !== ADVANCE_PREVIEW_GATE)
         break
       }
       case 'AdvanceStopped': {
@@ -1156,6 +1166,8 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         s.stage = to
         // A gate's request belongs to the stage it was asked in: the card leaving it retires the request.
         s.requests = s.requests.filter((r) => !isGateRequest(r) || r.stage === undefined || r.stage === s.stage)
+        // HI-3236: a preview is Approved's alone: the card leaving Approved retires it (a new one is asked when it's back).
+        s.requests = s.requests.filter((r) => r.gate !== ADVANCE_PREVIEW_GATE || s.stage === 'approved')
         break
       }
       case 'AttemptBound':

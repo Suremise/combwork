@@ -300,6 +300,8 @@
   "tips.jjCards.title": "Les cartes dans un projet jj",
   "tips.jjOperations.text": "Dans un projet jj, Gestion de versions → Opérations liste les opérations de jj par leur nom. Aperçu de l’annulation montre ce que l’annulation de l’une d’elles changerait, et te donne la commande à exécuter quand rien d’autre ne changerait. Combwork ne l’exécute jamais.",
   "tips.jjOperations.title": "Prévisualiser l’annulation d’une opération jj",
+  "tips.jjPreview.text": "Dans un projet jj, choisis Combwork intègre quand tu cliques dans Gestion de versions → Flux de travail → Qui intègre : Pour toi montre alors chaque déplacement à l’avance, et Combwork ne le fait que quand tu cliques sur Intégrer.",
+  "tips.jjPreview.title": "Intégrer une carte jj en un clic",
   "tips.keepAwake.text": "Pendant qu’un agent travaille, Combwork empêche Windows de se mettre en veille (l’écran peut toujours se verrouiller), et le laisse se mettre en veille une fois les agents terminés. Choisis quand dans Paramètres → Général.",
   "tips.keepAwake.title": "Laisse les agents travailler, le PC reste éveillé",
   "tips.laneApplyNow.text": "Dans Démarrer un couloir pour l’auteur d’un couloir, Appliquer maintenant change l’ordre tout de suite : la carte en cours revient dans À faire, son travail gardé sur sa branche, et l’auteur est prévenu.",

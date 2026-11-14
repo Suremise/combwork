@@ -80,6 +80,10 @@ const transcripts = () => {
     await lib.typeLine(inv, lib.ptyKey(alpha, b1.id), home, null, 'holduntil lane-go', { live: () => live(b1.id) })
     check('B1 is in a turn', !!(await until(async () => (await live(b1.id))?.status === 'working', HUNG_MS)))
     const since = Math.max(0, log().length - 1) // the last element is the empty one after the final newline
+    // Its card out of flight first, while the lease is still the lane's (HI-3118): a lane ended with its card in flight
+    // gives that card the lease in place, and no lane end (no note, no /exit) follows. Done, the lane ends by itself and
+    // its lease ends laneEnded, the gentle end tested here; lanes:end stays, as the user's end (nothing more to end then).
+    await inv('tasks:move', c1, 'done', { confirm: true, reason: 'laneend takes its card out of flight' })
     await inv('lanes:end', lane.lane.id)
     check("the lane's lease ends", !!(await until(() => log().slice(since).some((l) => l.includes(`Lane ${lane.lane.id} ended: its lease`)), HUNG_MS)), log().slice(since).join('\n'))
     check('…and Combwork waits for B1\'s turn, its session still running', !!(await until(() => log().slice(since).some((l) => l.includes("'s end, ") && l.includes('waiting: it is in a turn')), HUNG_MS)) && (await live(b1.id))?.status === 'working', log().slice(since).join('\n'))

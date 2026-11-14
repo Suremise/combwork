@@ -25,7 +25,7 @@ const { workflowFor } = await import('../src/main/workflow/service')
 const { registerAdvanceAnswers } = await import('../src/main/workflow/queueHost')
 const { advanceHostOf } = await import('../src/main/workflow/advanceHost')
 const { allOff } = await import('../src/shared/workflow/options')
-const { ADVANCE_UNCERTAIN_GATE } = await import('../src/shared/workflow/facts')
+const { ADVANCE_PREVIEW_GATE, ADVANCE_UNCERTAIN_GATE } = await import('../src/shared/workflow/facts')
 type AdvanceAnswer = import('../src/main/platform/adapter').AdvanceAnswer
 type AdvanceHost = import('../src/main/platform/adapter').AdvanceHost
 
@@ -68,7 +68,7 @@ const actions = (w: WS, card: number): { kind: string; state: string; payload: R
   (store.workspaceDb(w.path!).reader.prepare('SELECT kind, state, payload FROM card_actions WHERE card = ? ORDER BY id').all(card) as { kind: string; state: string; payload: string }[]).map((r) => ({ ...r, payload: JSON.parse(r.payload) }))
 
 /** A card in Approved (Passed on the board) after the user's review, with an advance stopped as uncertain on it. */
-async function stoppedCard(w: WS, wt: string, repo: string) {
+async function stoppedCard(w: WS, wt: string, repo: string, stop = true) {
   const card = await inWorkspace(w, async () => (await tasks.createTask({ title: 'Work', project: 'p' }, user)).number)
   await inWorkspace(w, () => tasks.updateTask(card, { column: 'doing', agent: 'a1' }, user))
   writeFileSync(join(wt, 'b.txt'), 'b\n')
@@ -82,6 +82,7 @@ async function stoppedCard(w: WS, wt: string, repo: string) {
   const rec = wf.store.card(card)
   const s = wf.state(rec)
   expect(rec.stage).toBe('approved')
+  if (!stop) return { card, wf }
   expect(await host.attempted(rec, s.cycle, 'plan-1', 'att-1')).toBe(true)
   expect(await host.stopped(wf.store.card(card), { cycle: s.cycle, attempt: 'att-1' }, 'plan-1', { code: 'x', undo: false, uncertain: true }, { target: 'main', result: 'r'.repeat(40), why: 'other', detail: 'test' })).toBe(true)
   return { card, wf }
@@ -117,6 +118,27 @@ describe("an advance question's answer through the app's actions worker (HI-3235
       await worker.runActions(w)
       await worker.actionsSettled()
       expect(actions(w, card).filter((a) => a.state === 'pending')).toEqual([])
+    } finally {
+      delete port.advanceAnswer
+    }
+  })
+
+  it("HI-3236: a preview's Integrate, through the window's path and the worker, reaches the adapter bound to its plan", async () => {
+    const { w, wt, repo } = await workspace()
+    const { card, wf } = await stoppedCard(w, wt, repo, false)
+    const s = wf.state(wf.store.card(card))
+    expect(await advanceHostOf(wf).askPreview(wf.store.card(card), s.cycle, 'plan-9', { target: 'main', expected: 'e'.repeat(40), result: 'f'.repeat(40), style: 'merge', commits: 'ffffffffffff one', more: 0 })).toBe(true)
+    const req = forYou(w).items.find((i) => i.card === card && i.gate === ADVANCE_PREVIEW_GATE)!
+    expect(req).toBeTruthy()
+    const got: AdvanceAnswer[] = []
+    const port = Object.getPrototypeOf(wf.platformOf(wf.store.card(card))) as { advanceAnswer?: (c: unknown, a: AdvanceAnswer) => Promise<void> }
+    port.advanceAnswer = async (_c, a) => void got.push(a)
+    try {
+      await inWorkspace(w, () => tasks.answerTask(card, req.request, { outcome: 'approved' }))
+      expect(got).toEqual([])
+      await worker.runActions(w)
+      await worker.actionsSettled()
+      expect(got).toMatchObject([{ request: req.request, gate: ADVANCE_PREVIEW_GATE, attempt: 'plan-9', plan: 'plan-9', state: 'preview', answer: 'approved' }])
     } finally {
       delete port.advanceAnswer
     }
