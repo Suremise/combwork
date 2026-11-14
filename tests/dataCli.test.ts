@@ -97,6 +97,9 @@ describe('the generic adapter’s command line', () => {
   it('leaves out a value the launch hasn’t, with its option; a prompt by argument goes last', () => {
     expect(cliArgs(cli, { ...ctx, model: null })).toEqual(['--yolo', '--session-id', 'S1', '--x'])
     expect(fillArgs(['--a', '{model}', '--b'], { model: null })).toEqual(['--b'])
+    // A left-out --opt={x} is an option of its own: the flag before it stays (HI-3268).
+    expect(fillArgs(['--no-banner', '--model={model}'], { model: null })).toEqual(['--no-banner'])
+    expect(fillArgs(['-y', '--ctx={context}', '--url', '{baseUrl}'], { context: null, baseUrl: 'http://h' })).toEqual(['-y', '--url', 'http://h'])
     const byArg = ok(desc({ launch: { prompt: { arg: ['-p', '{prompt}'] } } }))
     expect(cliArgs(byArg, ctx)).toEqual(['--session-id', 'S1', '--x', '-p', 'hi'])
     expect(cliArgs(byArg, { ...ctx, initialPrompt: undefined })).toEqual(['--session-id', 'S1', '--x'])
