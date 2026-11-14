@@ -1774,6 +1774,12 @@
   "settings.advanced.muse.override.stripAccountVars.title": {
     "placeholders": {}
   },
+  "settings.advanced.muse.ready.input.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.ready.input.title": {
+    "placeholders": {}
+  },
   "settings.advanced.muse.sandbox.setupRequired.desc": {
     "placeholders": {}
   },

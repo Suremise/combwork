@@ -10,7 +10,8 @@
 //   1.4.20: a quoted path breaks), Muse's hook environment (Windows' own variables and its ids only) and the event's JSON
 //   on stdin; SessionStart's plain stdout becomes a developer context block, whole when it is at most 16384 bytes, else
 //   none (1.4.20 fails such a hook); a PreToolUse exit 2 or {"decision":"block"} blocks the tool.
-// - In its pane: a composer `› `; each line a turn: `edit <path>` (a write, through PreToolUse), `call <tool> [json]` (an
+// - A new session runs SessionStart as it starts; a resumed one only with its first prompt (1.4.20).
+// - In its pane: its input box's top line, then a composer `› `; each line a turn: `edit <path>` (a write, through PreToolUse), `call <tool> [json]` (an
 //   MCP tool), `ask` (a Notification, then a y/n line), else `echo: <line>`; `/exit` ends it.
 // - FAKE_MUSE_SANDBOX_FILE (existing, without --disable-sandbox): Muse's Windows sandbox screen first, never passed by itself.
 // Every launch, hook, MCP server, tool call and file write or block goes to FAKE_MUSE_LOG (JSON lines).
@@ -212,11 +213,14 @@ async function startServers() {
 }
 
 // ---- Its pane.
-const prompt = () => out('\r\n› ')
+// Its input box: the top line 1.4.20 draws over it (muse.ready.input), then the composer.
+const prompt = () => out('\r\n── Voice input (Alt+V to start) ──\r\n› ')
 let busy = false
 let asking = null
 async function turn(text) {
   busy = true
+  // A resumed session's SessionStart (and the context it gives) waits for its first prompt (1.4.20, the Sandbox check).
+  await sessionStart()
   const runId = uuid7()
   const turnId = uuid7()
   await hook('UserPromptSubmit', { prompt: text, turn_id: turnId })
@@ -292,8 +296,20 @@ async function main() {
     return // waits there: Combwork never answers it
   }
   await startServers()
-  const started = await hook('SessionStart', { source: opts.resume ? 'resume' : 'startup' })
-  for (const r of started) {
+  // A new session's start hook runs as it starts; a resumed one's only with its first prompt (1.4.20: `resume <id>` with
+  // no prompt ran no hook in 120 s; `exec --session-id` ran SessionStart, then UserPromptSubmit, with its prompt).
+  if (!opts.resume) await sessionStart()
+  out(`\x1b]0;${path.basename(process.cwd())}\x07Muse Code 1.4.20 · ${opts.model ?? 'muse-spark-1.2'} · ${process.cwd()}\r\n`)
+  ready = true
+  if (opts.prompt) await turn(opts.prompt)
+  else prompt()
+}
+
+let started = false
+async function sessionStart() {
+  if (started) return
+  started = true
+  for (const r of await hook('SessionStart', { source: opts.resume ? 'resume' : 'startup' })) {
     // 1.4.20 (tests/fixtures/muse/guidance-limit-1.4.20.json): 16384 bytes kept whole (its trailing newline trimmed); one
     // byte more fails the hook, and nothing of it is kept. A hook that fails adds nothing either.
     const bytes = Buffer.byteLength(r.stdout)
@@ -301,10 +317,6 @@ async function main() {
     if (text) runEvent(uuid7(), { kind: 'context_block_updated', id: 'hook:session_start:session:0', role: 'developer', source: 'runtime_hook', lifecycle: 'session_start', text })
     log({ kind: 'context', exit: r.code, bytes, kept: Buffer.byteLength(text), head: text.slice(0, 200), text })
   }
-  out(`\x1b]0;${path.basename(process.cwd())}\x07Muse Code 1.4.20 · ${opts.model ?? 'muse-spark-1.2'} · ${process.cwd()}\r\n`)
-  ready = true
-  if (opts.prompt) await turn(opts.prompt)
-  else prompt()
 }
 
 let line = ''

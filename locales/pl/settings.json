@@ -667,6 +667,8 @@
   "settings.advanced.muse.override.stripAccountVars.title": "Nie przekazuj Muse kluczy API Meta ze środowiska",
   "settings.advanced.muse.sandbox.setupRequired.desc": "Co wypisuje muse sandbox windows check, gdy piaskownica Windows Muse nie jest skonfigurowana. Combwork mówi wtedy o tym w Konfiguracji dostawców, a także że każdy nowy agent pokaże ekran konfiguracji Muse. Jeśli jest złe, Combwork nie informuje o tym, a agenci czekają na tym ekranie.",
   "settings.advanced.muse.sandbox.setupRequired.title": "Piaskownica nieskonfigurowana (muse sandbox windows check)",
+  "settings.advanced.muse.ready.input.desc": "Górna krawędź pola, w którym Muse przyjmuje prompty. Wznowiony Muse zgłasza start dopiero przy pierwszym prompcie, więc Combwork uznaje to pole na ekranie za znak gotowości i wtedy wpisuje prompt, z którym został wznowiony. Jeśli jest błędny, wznowiony agent pozostaje w trakcie uruchamiania, a jego prompt nigdy nie zostaje wpisany.",
+  "settings.advanced.muse.ready.input.title": "Pole wprowadzania",
   "settings.advanced.muse.sandbox.setupScreen.desc": "Ekran, który Muse pokazuje przed sesją, gdy jego piaskownica Windows nie jest skonfigurowana, prosząc o uprawnienia administratora. Combwork nigdy na niego nie odpowiada: pokazuje agenta jako czekającego na Ciebie. Jeśli jest zły, agent wygląda, jakby wciąż się uruchamiał.",
   "settings.advanced.muse.sandbox.setupScreen.title": "Ekran konfiguracji piaskownicy",
   "settings.advanced.off": "wyłączone",

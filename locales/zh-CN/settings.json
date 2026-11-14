@@ -667,6 +667,8 @@
   "settings.advanced.muse.override.stripAccountVars.title": "不向 Muse 传递环境中的 Meta API 密钥",
   "settings.advanced.muse.sandbox.setupRequired.desc": "Muse 的 Windows 沙盒尚未设置时 muse sandbox windows check 输出的内容。此时 Combwork 会在“配置提供方”中说明这一点，并说明每个新智能体都会显示 Muse 的设置界面。若设置有误，Combwork 不会告诉你，智能体会停在该界面等待。",
   "settings.advanced.muse.sandbox.setupRequired.title": "沙盒未设置（muse sandbox windows check）",
+  "settings.advanced.muse.ready.input.desc": "Muse 接收提示词的输入框顶部。恢复的 Muse 只有在收到第一条提示词时才报告已启动，因此 Combwork 将屏幕上出现此输入框视为已就绪，然后输入恢复时附带的提示词。如果设置错误，恢复的代理会一直停在启动中，其提示词永远不会被输入。",
+  "settings.advanced.muse.ready.input.title": "输入框",
   "settings.advanced.muse.sandbox.setupScreen.desc": "Windows 沙盒尚未设置时，Muse 在会话前显示并请求管理员权限的界面。Combwork 从不回答它：会将智能体显示为等待你。若设置有误，智能体看起来像仍在启动。",
   "settings.advanced.muse.sandbox.setupScreen.title": "沙盒设置界面",
   "settings.advanced.off": "关",

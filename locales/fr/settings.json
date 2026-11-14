@@ -667,6 +667,8 @@
   "settings.advanced.muse.override.stripAccountVars.title": "Tenir les clés d’API Meta de l’environnement à l’écart de Muse",
   "settings.advanced.muse.sandbox.setupRequired.desc": "Ce qu’affiche muse sandbox windows check quand le bac à sable Windows de Muse n’est pas configuré. Combwork le signale alors dans Configuration des fournisseurs, en précisant que chaque nouvel agent affichera l’écran de configuration de Muse. Si c’est faux, Combwork ne te prévient pas, et les agents attendent sur cet écran.",
   "settings.advanced.muse.sandbox.setupRequired.title": "Bac à sable non configuré (muse sandbox windows check)",
+  "settings.advanced.muse.ready.input.desc": "Le haut de la zone où Muse reçoit les prompts. Un Muse repris ne signale son démarrage qu’avec son premier prompt : Combwork considère donc cette zone à l’écran comme le signe qu’il est prêt, puis tape le prompt avec lequel il a été repris. Si c’est faux, un agent repris reste en démarrage et son prompt n’est jamais tapé.",
+  "settings.advanced.muse.ready.input.title": "Zone de saisie",
   "settings.advanced.muse.sandbox.setupScreen.desc": "L’écran que Muse affiche avant une session quand son bac à sable Windows n’est pas configuré, et qui demande des droits d’administrateur. Combwork n’y répond jamais : il affiche l’agent comme t’attendant. Si c’est faux, l’agent semble encore en train de démarrer.",
   "settings.advanced.muse.sandbox.setupScreen.title": "Écran de configuration du bac à sable",
   "settings.advanced.off": "désactivé",

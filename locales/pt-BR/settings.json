@@ -667,6 +667,8 @@
   "settings.advanced.muse.override.stripAccountVars.title": "Manter as chaves de API da Meta do ambiente longe do Muse",
   "settings.advanced.muse.sandbox.setupRequired.desc": "O que muse sandbox windows check imprime quando a sandbox do Windows do Muse não está configurada. O Combwork então avisa disso na Configuração de provedores, e que cada novo agente vai mostrar a tela de configuração do Muse. Se estiver errado, o Combwork não avisa você, e os agentes esperam nessa tela.",
   "settings.advanced.muse.sandbox.setupRequired.title": "Sandbox não configurada (muse sandbox windows check)",
+  "settings.advanced.muse.ready.input.desc": "O topo da caixa onde o Muse recebe prompts. Um Muse retomado só informa que iniciou com o primeiro prompt, então o Combwork considera essa caixa na tela como sinal de que está pronto e então digita o prompt com que foi retomado. Se estiver errado, um agente retomado continua iniciando e seu prompt nunca é digitado.",
+  "settings.advanced.muse.ready.input.title": "Caixa de entrada",
   "settings.advanced.muse.sandbox.setupScreen.desc": "A tela que o Muse mostra antes de uma sessão quando a sandbox do Windows dele não está configurada, pedindo direitos de administrador. O Combwork nunca responde a ela: mostra o agente aguardando você. Se estiver errado, o agente parece ainda estar iniciando.",
   "settings.advanced.muse.sandbox.setupScreen.title": "Tela de configuração da sandbox",
   "settings.advanced.off": "desativado",

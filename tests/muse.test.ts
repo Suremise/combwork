@@ -205,4 +205,14 @@ describe("Muse's environment, install and sandbox", () => {
     expect(classifySandbox({ stdout: 'status=ready\n', stderr: '', code: 0 }, /^status=setup_required\s*$/m)).toBe('ready')
     expect(classifySandbox({ stdout: '', stderr: 'boom', code: 1 }, /^status=setup_required\s*$/m)).toBe('unknown')
   })
+
+  it('is ready once its input box shows (a resume runs no hook before its first prompt), its sandbox screen first', async () => {
+    const { startupScreen } = await import('../src/main/hookStatus')
+    const { MuseAdapter } = await import('../src/main/providers/muse/adapter')
+    const a = new MuseAdapter()
+    const starting = { status: 'starting' as const, askedAtStart: false, settled: false }
+    for (const f of ['ready', 'resume']) expect(startupScreen(starting, fixture(`advanced/screen-muse-1.4.20-${f}.txt`), a), f).toBe('ready')
+    expect(startupScreen(starting, fixture('advanced/screen-muse-1.4.20-sandbox-setup.txt'), a)).toEqual({ asked: 'Set up the Windows sandbox' })
+    expect(startupScreen(starting, 'Muse Code 1.4.20\nloading…', a)).toBeNull()
+  })
 })

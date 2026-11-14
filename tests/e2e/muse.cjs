@@ -184,7 +184,7 @@ const under = (p, dir) => !!p && path.resolve(p).toLowerCase().startsWith(path.r
     check('…`muse resume <id>` with no prompt on its command line', !!resumed && resumed.args[0] === 'resume' && resumed.args[1] === session.sessionId && resumed.prompt === null, JSON.stringify(resumed?.args?.slice(0, 3)))
     const typed = await lib.until(async () => ((await inv('transcript:read', alpha, session.sessionId).catch(() => null))?.items ?? []).some((i) => i.kind === 'assistant' && i.text === 'echo: after resume'), HUNG_MS)
     check('…the prompt typed once it was up, and answered', !!typed)
-    check("…its guidance given again at the resume's start", entries('context').filter((c) => c.kept > 0).length >= 3)
+    check("…its guidance given again with the resume's first prompt (its SessionStart waits for it, as 1.4.20's does)", entries('context').filter((c) => c.kept > 0).length >= 3)
     await inv('session:stop', alpha, agent.id)
     await lib.until(async () => !(await live(agent.id)), HUNG_MS)
 

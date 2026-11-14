@@ -261,6 +261,15 @@ export class MuseAdapter implements ProviderAdapter {
   }
 
   /** Muse's sandbox setup screen, never answered by Combwork: the agent waits for the user there. */
+  // A resumed 1.4.20 runs its SessionStart hook only with its first prompt (the Sandbox check, 14 Nov): its input box on
+  // screen means it is up, and its typed first prompt (resumePromptTyped) follows from that (an advanced value, #367).
+  get readyOutput(): RegExp | undefined {
+    try {
+      return advanced.pattern('muse.ready.input')
+    } catch {
+      return undefined
+    }
+  }
   get startupQuestion(): RegExp | undefined {
     try {
       return advanced.pattern('muse.sandbox.setupScreen')

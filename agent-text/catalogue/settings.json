@@ -2775,7 +2775,7 @@
     "audience": "both"
   },
   "settings.advanced.muse.guidance.maxBytes.desc": {
-    "text": "The most of a start hook's output Muse keeps as the session's context (1.4.20 cuts the rest off). Combwork's guidance, the agent's instructions and the Workspace notes go in whole when they fit; when they don't, Combwork gives a short pointer to the file that holds them instead. Too large, Muse cuts them off unseen.",
+    "text": "The most of a start hook's output Muse keeps as the session's context (1.4.20 keeps none of a longer one). Combwork's guidance, the agent's instructions and the Workspace notes go in whole when they fit; when they don't, Combwork gives a short pointer to the file that holds them instead. Too large, Muse drops them, and the agent starts without them.",
     "note": "What the advanced setting \"Guidance: most Muse takes at start\" is for, and what goes wrong when it is wrong (Settings → Advanced). Workspace notes is a place in Combwork.",
     "audience": "both"
   },
@@ -2842,6 +2842,16 @@
   "settings.advanced.muse.override.stripAccountVars.title": {
     "text": "Keep Meta API keys in the environment away from Muse",
     "note": "An advanced setting's title (Settings → Advanced, under Muse Code): one of Combwork's overrides of the CLI, on by default.",
+    "audience": "both"
+  },
+  "settings.advanced.muse.ready.input.desc": {
+    "text": "The top of the box Muse types prompts in. A resumed Muse says it has started only with its first prompt, so Combwork takes this box on screen to mean it is ready, and then types the prompt it was resumed with. Wrong, a resumed agent stays starting and its prompt is never typed.",
+    "note": "What the advanced setting \"Input box\" is for, and what goes wrong when it is wrong (Settings → Advanced, under Muse Code).",
+    "audience": "both"
+  },
+  "settings.advanced.muse.ready.input.title": {
+    "text": "Input box",
+    "note": "An advanced setting's title (Settings → Advanced, under Muse Code): the pattern of the CLI's input box, which shows once it is ready for a prompt.",
     "audience": "both"
   },
   "settings.advanced.muse.sandbox.setupRequired.desc": {

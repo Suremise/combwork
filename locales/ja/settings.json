@@ -667,6 +667,8 @@
   "settings.advanced.muse.override.stripAccountVars.title": "環境内のMeta APIキーをMuseに渡さない",
   "settings.advanced.muse.sandbox.setupRequired.desc": "MuseのWindowsサンドボックスがセットアップされていないときにmuse sandbox windows checkが出力する内容です。その場合Combworkは「プロバイダーのセットアップ」でそれを知らせ、新しいエージェントがそれぞれMuseのセットアップ画面を表示することも伝えます。誤っていると、Combworkは知らせず、エージェントはその画面で待ちます。",
   "settings.advanced.muse.sandbox.setupRequired.title": "サンドボックス未セットアップ（muse sandbox windows check）",
+  "settings.advanced.muse.ready.input.desc": "Museがプロンプトを受け付けるボックスの上端です。再開したMuseは最初のプロンプトまで起動したことを知らせないため、Combworkは画面上のこのボックスを準備完了とみなし、再開時のプロンプトを入力します。誤っていると、再開したエージェントは起動中のままになり、プロンプトが入力されません。",
+  "settings.advanced.muse.ready.input.title": "入力ボックス",
   "settings.advanced.muse.sandbox.setupScreen.desc": "Windowsサンドボックスがセットアップされていないときに、Museがセッションの前に表示して管理者権限を求める画面です。Combworkはこれに答えず、エージェントを応答待ちと表示します。誤っていると、エージェントがまだ起動中のように見えます。",
   "settings.advanced.muse.sandbox.setupScreen.title": "サンドボックスのセットアップ画面",
   "settings.advanced.off": "オフ",

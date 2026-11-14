@@ -667,6 +667,8 @@
   "settings.advanced.muse.override.stripAccountVars.title": "Meta-API-Schlüssel aus der Umgebung von Muse fernhalten",
   "settings.advanced.muse.sandbox.setupRequired.desc": "Was muse sandbox windows check ausgibt, wenn die Windows-Sandbox von Muse nicht eingerichtet ist. Combwork sagt das dann in der Anbieter-Einrichtung, und dass jeder neue Agent den Einrichtungsbildschirm von Muse zeigen wird. Ist er falsch, sagt Combwork es dir nicht, und Agenten warten an diesem Bildschirm.",
   "settings.advanced.muse.sandbox.setupRequired.title": "Sandbox nicht eingerichtet (muse sandbox windows check)",
+  "settings.advanced.muse.ready.input.desc": "Der obere Rand des Felds, in das Muse Prompts aufnimmt. Ein fortgesetztes Muse meldet seinen Start erst mit dem ersten Prompt, deshalb wertet Combwork dieses Feld auf dem Bildschirm als bereit und tippt dann den Prompt, mit dem es fortgesetzt wurde. Ist er falsch, bleibt ein fortgesetzter Agent beim Starten und sein Prompt wird nie getippt.",
+  "settings.advanced.muse.ready.input.title": "Eingabefeld",
   "settings.advanced.muse.sandbox.setupScreen.desc": "Der Bildschirm, den Muse vor einer Sitzung zeigt, wenn seine Windows-Sandbox nicht eingerichtet ist, und der nach Administratorrechten fragt. Combwork beantwortet ihn nie: Es zeigt den Agenten als auf dich wartend an. Ist er falsch, sieht der Agent aus, als würde er noch starten.",
   "settings.advanced.muse.sandbox.setupScreen.title": "Einrichtungsbildschirm der Sandbox",
   "settings.advanced.off": "aus",

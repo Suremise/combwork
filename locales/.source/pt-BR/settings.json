@@ -680,6 +680,8 @@
   "settings.advanced.muse.override.keepProjectConfigOut.title": "Keep the project's own Muse MCP servers and hooks out",
   "settings.advanced.muse.override.stripAccountVars.desc": "Muse uses META_API_KEY over an account's own sign-in, and sends the headers in MUSE_CUSTOM_HEADERS with its requests. Combwork leaves both out wherever Muse runs on an account (its sessions, sign-in and checks), so each agent runs as the account it was given. Turned off, a key or header set in Combwork's environment applies to every Muse agent.",
   "settings.advanced.muse.override.stripAccountVars.title": "Keep Meta API keys in the environment away from Muse",
+  "settings.advanced.muse.ready.input.desc": "The top of the box Muse types prompts in. A resumed Muse says it has started only with its first prompt, so Combwork takes this box on screen to mean it is ready, and then types the prompt it was resumed with. Wrong, a resumed agent stays starting and its prompt is never typed.",
+  "settings.advanced.muse.ready.input.title": "Input box",
   "settings.advanced.muse.sandbox.setupRequired.desc": "What muse sandbox windows check prints when Muse's Windows sandbox isn't set up. Combwork then says so in Provider Setup, and that each new agent will show Muse's setup screen. Wrong, Combwork doesn't tell you, and agents wait at that screen.",
   "settings.advanced.muse.sandbox.setupRequired.title": "Sandbox not set up (muse sandbox windows check)",
   "settings.advanced.muse.sandbox.setupScreen.desc": "The screen Muse shows before a session when its Windows sandbox isn't set up, asking for administrator rights. Combwork never answers it: it shows the agent as waiting for you. Wrong, the agent looks as if it is still starting.",

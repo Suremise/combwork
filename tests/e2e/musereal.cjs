@@ -184,7 +184,7 @@ const blocks = (file, source) => records(file).map((r) => r.payload?.event).filt
       return t.some((i) => i.kind === 'assistant' && i.text === 'echo: after resume') ? t : null
     }, HUNG_MS)
     check('…the prompt typed once it was up, and answered in the same session', !!again)
-    check("…Combwork's guidance given again at the resume's start", blocks(file, 'runtime_hook').filter((b) => /cw_inbox/.test(b.text ?? '')).length > startsBefore, String(blocks(file, 'runtime_hook').length))
+    check("…Combwork's guidance given again with the resume's first prompt", blocks(file, 'runtime_hook').filter((b) => /cw_inbox/.test(b.text ?? '')).length > startsBefore, String(blocks(file, 'runtime_hook').length))
     await inv('session:stop', alpha, agent.id)
     await lib.until(async () => !(await live(agent.id)), HUNG_MS)
     // Muse's own processes of this test: those whose command line names this test copy's data (its hooks' auth file).

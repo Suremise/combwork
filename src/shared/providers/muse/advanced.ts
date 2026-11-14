@@ -127,5 +127,19 @@ export const ADVANCED: readonly AdvancedSource[] = [
     flags: '',
     applies: 'sessions',
     samples: [{ from: `${FIX}/advanced/screen-muse-1.4.20-sandbox-setup.txt`, version: '1.4.20', text: 'Set up the Windows sandbox', shows: 'Its first screen on a PC without the sandbox' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'muse.ready.input',
+    group: 'muse',
+    title: msg({ id: 'settings.advanced.muse.ready.input.title', defaultMessage: 'Input box', description: "An advanced setting's title (Settings → Advanced, under Muse Code): the pattern of the CLI's input box, which shows once it is ready for a prompt." }),
+    desc: msg({ id: 'settings.advanced.muse.ready.input.desc', defaultMessage: "The top of the box Muse types prompts in. A resumed Muse says it has started only with its first prompt, so Combwork takes this box on screen to mean it is ready, and then types the prompt it was resumed with. Wrong, a resumed agent stays starting and its prompt is never typed.", description: 'What the advanced setting "Input box" is for, and what goes wrong when it is wrong (Settings → Advanced, under Muse Code).' }),
+    kind: 'pattern',
+    default: String.raw`Voice input \(Alt\+V to start\)`,
+    flags: '',
+    applies: 'sessions',
+    samples: [
+      { from: `${FIX}/advanced/screen-muse-1.4.20-ready.txt`, version: '1.4.20', text: 'Voice input (Alt+V to start)', shows: 'A new session, ready' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/screen-muse-1.4.20-resume.txt`, version: '1.4.20', text: 'Voice input (Alt+V to start)', shows: 'A resumed session, ready (no hook yet)' } // i18n-ignore: a CLI's recorded text (#367)
+    ]
   }
 ]

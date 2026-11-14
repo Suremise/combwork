@@ -682,6 +682,8 @@ interface CombworkMessageValues {
   'settings.advanced.muse.override.keepProjectConfigOut.title': undefined
   'settings.advanced.muse.override.stripAccountVars.desc': undefined
   'settings.advanced.muse.override.stripAccountVars.title': undefined
+  'settings.advanced.muse.ready.input.desc': undefined
+  'settings.advanced.muse.ready.input.title': undefined
   'settings.advanced.muse.sandbox.setupRequired.desc': undefined
   'settings.advanced.muse.sandbox.setupRequired.title': undefined
   'settings.advanced.muse.sandbox.setupScreen.desc': undefined
