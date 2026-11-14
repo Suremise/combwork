@@ -15,9 +15,9 @@ import { localDataRoot } from '../localData'
 import { ACCOUNT_VARS, DATA_ENV, museConfigDir, museEnv, museHome } from './home'
 import { checkHome, checkSandbox, locateMuse, museLoginCommand, museReadiness, museSandboxSetupCommand, type SandboxState } from './install'
 import { guidancePaths, hookPath, launchGuidance, launchServers, museArgs, museHooks, startContext, windowsShortName } from './launch'
-import { museLockReply, normalizeMuseHook, type EditTools } from './hooks'
+import { canonicalMuseHook, museLockReply, normalizeMuseHook, type EditTools } from './hooks'
 import { judgeProject, projectConfig, UnreadableConfig, type ProjectConfig } from './projectConfig'
-import { launchNames, type MuseNames } from './names'
+import { DEFAULT_NAMES, launchNames, type MuseNames } from './names'
 import { MuseConversationParser, MuseUsageParser, isMuseSessionId, museSessionFile, parseMuseTranscript } from './transcript'
 
 // Meta's Muse Code as a Combwork provider (HI-3202, against 1.4.20; the spike HI-2895). Each launch runs on its account's
@@ -293,8 +293,13 @@ export class MuseAdapter implements ProviderAdapter {
   }
 
   // ---- Hooks.
+  /** Its hooks in 1.4.20's names, which shared code reads (HI-3202): from the names this launch gave Muse. */
+  canonicalHook(body: Record<string, any>): Record<string, any> {
+    return canonicalMuseHook(body, this.names)
+  }
+  /** A hook as Combwork tracks it: the body sessions.canonicalHook gave (or one as Muse sent it, made so here). */
   normalizeHook(body: Record<string, any>): NormalizedHook {
-    return normalizeMuseHook(body, this.editTools(), this.names)
+    return normalizeMuseHook(canonicalMuseHook(body, this.names), this.editTools(), DEFAULT_NAMES)
   }
 
   lockReply(d: LockDecision): Record<string, unknown> {

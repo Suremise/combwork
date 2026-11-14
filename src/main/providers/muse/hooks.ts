@@ -60,6 +60,50 @@ function asking(tool: string, input: Record<string, unknown>, edit: EditTools, p
   return tool ? say(ASKS.use, { tool }) : say(ASKS.continue)
 }
 
+/** A body canonicalMuseHook made: already in 1.4.20's names. */
+const CANONICAL = Symbol('muse.canonicalHook')
+
+/** Sets a key as data (a name such as `__proto__` stays a key, never the prototype). */
+const put = (o: Record<string, unknown>, k: string, v: unknown): void => {
+  Object.defineProperty(o, k, { value: v, enumerable: true, writable: true, configurable: true })
+}
+
+/** `from`'s own keys under `to`'s names: a key a role's launch name, under that role's default; another default name dropped. */
+function renamed(from: Record<string, unknown>, launch: Readonly<Record<string, string>>, defaults: Readonly<Record<string, string>>): Record<string, unknown> {
+  const roles = new Map<string, string[]>()
+  for (const [role, name] of Object.entries(launch)) roles.set(name, [...(roles.get(name) ?? []), defaults[role]])
+  const taken = new Set(Object.values(defaults))
+  const out: Record<string, unknown> = {}
+  for (const k of Object.keys(from)) {
+    const to = roles.get(k)
+    if (to) for (const t of to) put(out, t, from[k])
+    // A key under a default name that isn't its role's here is something else of this Muse's: never read as that role.
+    else if (!taken.has(k)) put(out, k, from[k])
+  }
+  return out
+}
+
+/**
+ * A hook's body in 1.4.20's names (HI-3202): the vocabulary Combwork's shared hook code reads (sessions.canonicalHook), from
+ * the names the launch gave Muse (`names`). Its fields, its event (an unknown one never standing for another role's) and
+ * apply_patch's patch field within its tool's input; everything else as it came. 1.4.20's own names give the body back
+ * as it is, copied.
+ */
+export function canonicalMuseHook(body: Record<string, any>, names: MuseNames): Record<string, any> {
+  if ((body as Record<symbol, unknown>)[CANONICAL]) return body
+  const d = DEFAULT_NAMES
+  const out = renamed(body, names.fields, d.fields)
+  const input = out[d.fields.input]
+  if (input && typeof input === 'object' && !Array.isArray(input) && names.fields.patch !== d.fields.patch) put(out, d.fields.input, renamed(input as Record<string, unknown>, { patch: names.fields.patch }, { patch: d.fields.patch }))
+  if (Object.hasOwn(out, d.fields.event)) {
+    const role = roleOf(String(out[d.fields.event] ?? ''), names.events)
+    const given = out[d.fields.event]
+    put(out, d.fields.event, role ? d.events[role] : Object.values(d.events).includes(String(given)) ? '' : given)
+  }
+  Object.defineProperty(out, CANONICAL, { value: true })
+  return out
+}
+
 /** The role a hook's event name stands for in a launch's names (each name one role's: muse.names.hookEvents is distinct). */
 function roleOf(event: string, events: MuseNames['events']): MuseEvent | null {
   for (const [role, name] of Object.entries(events)) if (name === event) return role as MuseEvent
