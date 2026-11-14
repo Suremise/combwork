@@ -12,6 +12,7 @@ import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from
 import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX } from '../agentLimits'
 import type { StageId } from './facts'
 import type { ReviewerMode } from './roles'
+import { takesAssistantWakes, type AssistantWakes } from '../laneEvents'
 
 /** G1 / N1: who checks the work before it's done. */
 export type ReviewBy = 'none' | 'agent' | 'agentThenYou' | 'you'
@@ -141,6 +142,11 @@ export interface WorkflowOptions {
   loopRounds?: number
   loopWaitHours?: number
   loopStepWaitMinutes?: number
+  /**
+   * Wake the Assistant for (HI-3211): what the Assistant's lane watch counts of this project's lanes when it names no
+   * events, a level or Custom's events (laneEvents.ts).
+   */
+  assistantWakes?: AssistantWakes
   /** File locks between agents in the same folder, outside a slot (HI-1766, before 1.0 Settings → Agents). */
   fileLocks?: FileLockMode
   /**
@@ -169,7 +175,7 @@ export const BRANCH_OPTIONS: readonly OptionKey[] = ['otherTargets']
  * nothing "old rules"), never set by a preset or All off (but Maximum agents, `PRESET_PREFERENCES`), never making the
  * options Custom. A lane keeps the rounds and wait it registered with.
  */
-export const PREFERENCE_OPTIONS = ['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes', 'fileLocks', 'maxAgents'] as const satisfies readonly OptionKey[]
+export const PREFERENCE_OPTIONS = ['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes', 'assistantWakes', 'fileLocks', 'maxAgents'] as const satisfies readonly OptionKey[]
 export type PreferenceKey = (typeof PREFERENCE_OPTIONS)[number]
 
 /**
@@ -507,6 +513,7 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
   loopRounds: whole(LANE_MAX_ROUNDS),
   loopWaitHours: whole(LOOP_WAIT_MAX_HOURS),
   loopStepWaitMinutes: whole(LOOP_STEP_WAIT_MAX_MINUTES),
+  assistantWakes: takesAssistantWakes,
   fileLocks: oneOf<FileLockMode>(['off', 'warn', 'block', 'ask']),
   maxAgents: whole(AGENT_LIMIT_MAX)
 }
@@ -518,7 +525,7 @@ const STAGE_IDS: readonly StageId[] = ['hold', 'todo', 'active', 'review', 'appr
 export const takesOption = (key: string, v: unknown): boolean => Object.hasOwn(OPTION_TAKES, key) && OPTION_TAKES[key as OptionKey](v)
 
 /** Card loops' options (HI-1766), a group of their own for both platforms. */
-const LOOP_OPTIONS: OptionKey[] = ['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes']
+const LOOP_OPTIONS: OptionKey[] = ['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes', 'assistantWakes']
 
 /** The Workflow section's groups (#1418), each a heading with its options. */
 export type FormGroupId = 'team' | 'review' | 'checks' | 'merging' | 'where' | 'work' | 'loops' | 'stages'

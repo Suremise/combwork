@@ -42,8 +42,10 @@ export interface ForYouItem {
   shown?: StoredText
   /** When it was asked. */
   since: string
-  /** The agent who asked; null: Combwork. */
+  /** The agent who asked; null: Combwork, or the Assistant (`byAssistant`). */
   asker: string | null
+  /** HI-3211: the Assistant asked it (the request's fact's actor). */
+  byAssistant?: true
   /** Whom it waits on: the user (a person later, #439). */
   for: 'user'
   /** A Test request's checklist: what to try (#1267). */
@@ -110,6 +112,7 @@ export function forYouItems(card: { card: number; project: string; stage: StageI
     ...(r.requestText ? { shown: r.requestText } : {}),
     since: r.at,
     asker: r.asker ?? null,
+    ...(r.byAssistant ? { byAssistant: true as const } : {}),
     for: r.for ?? 'user',
     ...(r.checklist?.length ? { checklist: r.checklist } : {}),
     ...(r.actions?.length ? { actions: r.actions } : {})

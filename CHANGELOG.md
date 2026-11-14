@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Choose what wakes the Assistant** (HI-3211). **Wake the Assistant for**, under Card loops in a project's Version Control → Workflow (or the Combwork and workspace defaults), sets which events in that project's lanes wake the Assistant: Everything, Standard (the default, as before), Important only, Quiet, or the events you tick. Each project can have its own, and a change applies to the watch the Assistant already has. A question the Assistant asked you no longer wakes it as an echo, and a card loop's wake says when the agent's own wait is still on.
+
 - **A CLI from a description can run on a model server of yours** (HI-3197). A description's `server` section says the protocol (OpenAI's or Anthropic's) and how a launch gets the server: variables and arguments naming its address, key, model and the model's context and output. Add the server in **Settings → Accounts & Connections** (presets for Ollama, LM Studio, llama.cpp and vLLM), then give an agent a connection on it. The values go into that launch alone, never the CLI's own config; the key stays encrypted and hidden in logs.
 
 - **Run a CLI Combwork has no provider for, from a description** (HI-3196). A JSON file in the `clis` folder of your Combwork profile says how to find and start the CLI, how its first prompt goes in, its permission modes, how a session resumes by its id, and how to read its status from its screen; **Settings → Providers → Your own CLIs** opens the folder and reloads it, and lists each file it can't use with the reasons. Such a CLI runs your agents with its status read from its screen, and resumes a session once it has had a prompt. It gets none of Combwork's tools, hooks, transcript or cost: Provider Setup and Agent Settings say what it lacks.

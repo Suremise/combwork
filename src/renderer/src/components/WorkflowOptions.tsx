@@ -2,7 +2,8 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import type { OwnWorkflowProblem, ProjectInfo, RetargetPreview, RetargetResult, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowLevel, WorkflowLevelCheck, WorkflowOptionOrigin, WorkflowProblem } from '@shared/types'
 import { accepts, hasCapability, hasOperation, merges, type PlatformId } from '@shared/platform/descriptors'
 import { allOff, formFinishes, formFolders, CONTRADICTIONS, FOCUSED_PICK, FOCUSED_RUN, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, identityShown, isAllOff, liveContradictions, previewRows, reviewerAgent, setOption, withUnpreset, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
-import { GROUP_TEXT, optionDesc, optionTitle, OPTION_TEXT, OPTION_WHY, PRESET_NOTE_TEXT, PRESET_SUMMARY, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
+import { GROUP_TEXT, optionDesc, optionTitle, OPTION_TEXT, OPTION_WHY, PRESET_NOTE_TEXT, PRESET_SUMMARY, PRESET_TEXT, VALUE_TEXT, WAKE_EVENT_TEXT, WAKE_LEVEL_TEXT } from '@shared/workflow/optionTexts'
+import { ASSISTANT_WAKES_DEFAULT, LANE_EVENTS, WAKE_EVENT_ORDER, WAKE_LEVELS, wakeEventsOf, type AssistantWakes, type WakeLevel } from '@shared/laneEvents'
 import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX, FILE_LOCK_MODES } from '@shared/defaults'
 import { ManyAgentsNote } from './ManyAgentsNote'
 import { NumberField } from './NumberField'
@@ -94,6 +95,7 @@ const T = {
   readOnly: msg({ id: 'workflow.form.readOnly', defaultMessage: '{agents} can’t be given review copies by their coding agent, so they review the builder’s folder read-only.', description: 'Under “Reviewers” (G17) when some reviewing agents use a coding agent that Combwork can’t give review copies (folders at the exact revision, glossary 2.5: review copy). {agents} is a list of agent names.' }),
   stageName: msg({ id: 'workflow.form.stageName', defaultMessage: 'Name of the stage {stage}', description: 'Accessible name of a stage’s name box under “Stage names” (glossary 2.2: stage). {stage} is its default name.' }),
   stageNamesValue: msg({ id: 'workflow.form.stageNamesValue', defaultMessage: '{n, plural, =0 {The default names} one {# stage renamed} other {# stages renamed}}', description: 'A value of “Stage names” in the list of what changes before saving workflow options, and in a preset’s preview (glossary 2.2: stage).' }),
+  customWakesValue: msg({ id: 'workflow.form.customWakesValue', defaultMessage: 'Custom: {events}', description: 'An inherited value of the workflow option “Wake the Assistant for” (HI-3211) set to Custom: the events ticked, joined as a list (e.g. “A card fails review and A lane ends”).' }),
   fileLocksNote: msg({ id: 'workflow.form.fileLocksNote', defaultMessage: 'Applies to agents working in the same folder, outside a slot.', description: 'Under the workflow option “File locks”: a slot is a folder Combwork lends to a card or its lane (glossary 2.5: slot), so agents in different slots never share a file.' }),
   loopsReadNote: msg({ id: 'workflow.form.loopsReadNote', defaultMessage: 'Read when a loop starts: a loop already running keeps its own, and one started with its own (“rounds: 5, wait: 2h”) keeps those.', description: 'Under the workflow options “Rounds” and “Wait (hours)” (Card loops), when a change applies. “rounds: 5, wait: 2h” is what the user types to an agent: keep it in English.' }),
   overMax: msg({ id: 'workflow.form.overMax', defaultMessage: 'This project has {count, plural, one {# agent} other {# agents}}: none is removed, but no agent can be added until it has fewer than {max, number}.', description: 'Under the workflow option “Maximum agents” (HI-2001) when the project already has more agents ({count}) than it is set to ({max}): nobody can add one (HI-2058), neither the user nor the Assistant.' }),
@@ -603,6 +605,8 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
     if (key === 'fileLocks') return <div className="s-desc" data-note="file-locks">{tr(T.fileLocksNote)}</div>
     if (key === 'loopRounds' || key === 'loopWaitHours') return <div className="s-desc" data-note="loop-read">{tr(T.loopsReadNote)}</div>
     if (key === 'loopStepWaitMinutes') return <div className="s-desc" data-note="step-wait">{tr(T.stepWaitNote)}</div>
+    // Wake the Assistant for (HI-3211): what the chosen level wakes it for, in full (Darren: each level clearly described).
+    if (key === 'assistantWakes') return <div className="s-desc" data-note="assistant-wakes">{tr(WAKE_LEVEL_TEXT[(effective.assistantWakes ?? ASSISTANT_WAKES_DEFAULT).level])}</div>
     // Maximum agents (HI-2001): above the default, what more agents cost here; below the agents there are, that none go.
     if (key === 'maxAgents') {
       const max = effective.maxAgents ?? AGENT_LIMIT_DEFAULT
@@ -678,6 +682,33 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
         return <Switch checked={effective.loopWakes !== false} onChange={(v) => set('loopWakes', v)} />
       case 'fileLocks':
         return select('fileLocks', FILE_LOCK_MODES.map((m) => [m.value, tr(m.text.label)]))
+      case 'assistantWakes': {
+        // HI-3211: a level, or Custom's ticks (starting from the level it leaves, the first time). A question for the
+        // user is always counted: its tick is on and can't be changed.
+        const w: AssistantWakes = effective.assistantWakes ?? ASSISTANT_WAKES_DEFAULT
+        const level = (l: WakeLevel): void => set('assistantWakes', { level: l, events: l === 'custom' && !w.events.length ? wakeEventsOf(w) : w.events })
+        const tick = (e: (typeof LANE_EVENTS)[number], on: boolean): void => set('assistantWakes', { level: 'custom', events: LANE_EVENTS.filter((x) => (x === e ? on : w.events.includes(x))) })
+        return (
+          <div className="workflow-stack">
+            <select className="select" value={w.level} aria-label={tr(optionTitle('assistantWakes', platform)!)} onChange={(e) => level(e.target.value as WakeLevel)}>
+              {WAKE_LEVELS.map((l) => (
+                <option key={l} value={l}>
+                  {tr(VALUE_TEXT.assistantWakes[l])}
+                </option>
+              ))}
+            </select>
+            {w.level === 'custom' && (
+              <div className="choice-list" role="group" aria-label={tr(optionTitle('assistantWakes', platform)!)} data-note="assistant-wake-events">
+                {WAKE_EVENT_ORDER.map((e) => (
+                  <label key={e} className="flex">
+                    <input type="checkbox" className="checkbox" checked={e === 'paused-user' || w.events.includes(e)} disabled={e === 'paused-user'} onChange={(x) => tick(e, x.target.checked)} /> {tr(WAKE_EVENT_TEXT[e])}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      }
       case 'loopRounds':
       case 'loopWaitHours':
       case 'loopStepWaitMinutes':
@@ -886,6 +917,10 @@ export function optionValueText(key: OptionKey, v: unknown, platform: PlatformId
   if (key === 'reviewers' || key === 'loopRounds' || key === 'maxAgents') return fmt.number(v as number)
   if (key === 'loopWaitHours') return tr(T.hoursValue, { n: v as number })
   if (key === 'loopStepWaitMinutes') return tr(T.minutesValue, { n: v as number })
+  if (key === 'assistantWakes') {
+    const w = v as AssistantWakes
+    return w.level === 'custom' ? tr(T.customWakesValue, { events: w.events.length ? fmt.list(w.events.map((e) => tr(WAKE_EVENT_TEXT[e]))) : tr(T.noneValue) }) : tr(VALUE_TEXT.assistantWakes[w.level])
+  }
   if (key === 'fileLocks') {
     const mode = FILE_LOCK_MODES.find((m) => m.value === v)
     return mode ? tr(mode.text.label) : String(v)

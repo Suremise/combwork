@@ -14,7 +14,7 @@ import { getTask, noteOnCard } from './tasks'
 import { actionsRunning, actionsSettled, onAction } from './workflow/actionWorker'
 import type { ActionRow } from './workflow/factStore'
 import { cardFacts } from './workflow/recorder'
-import { inFlightNow as watchesInFlight, itsBuilder, onWatchStarted, settled as watchesSettled, watchCovers, watchTold } from './watches'
+import { inFlightNow as watchesInFlight, itsBuilder, onWatchStarted, settled as watchesSettled, watchCovers, watchStillOn, watchTold } from './watches'
 import { agentMsg, inDialectOf, say, type AgentMsg } from '../shared/agentText'
 import { actionDelivered, cancelFromSource, createDelivery, everyFromSource, offerNow, registerSource } from './deliveries'
 import { isWaiting, type DeliveryRecord } from '../shared/deliveries'
@@ -243,7 +243,7 @@ async function enqueue(ws: WorkspaceService, projectPath: string, card: TaskCard
     // The user's answer is an answer from them (#1626: acked, never coalesced into the card's events), each its own (a
     // later handoff of the card, or another answer, doesn't replace it); the rest, Combwork's card events, the latest per card.
     const ref = answer ? `#${card.number}/answer${action ? `/${action}` : ''}` : `#${card.number}`
-    await createDelivery(projectPath, { agentId: to.id, agentName: to.name, kind: answer ? 'answer' : 'card-event', from: answer ? USER : COMBWORK, card: card.number, body: loopWakeLine({ ...cardChange(card.number, card, kinds), about: await wakeAboutFor(ws, projectPath, card, w.kind, to.id) }, w.kind, w.text), expiresMs: KEEP_MS, source: 'loop', ref, replace: true, meta, ...(action ? { action } : {}) })
+    await createDelivery(projectPath, { agentId: to.id, agentName: to.name, kind: answer ? 'answer' : 'card-event', from: answer ? USER : COMBWORK, card: card.number, body: loopWakeLine({ ...cardChange(card.number, card, kinds), about: await wakeAboutFor(ws, projectPath, card, w.kind, to.id) }, w.kind, w.text, undefined, watchStillOn(projectPath, to.id, card.number)), expiresMs: KEEP_MS, source: 'loop', ref, replace: true, meta, ...(action ? { action } : {}) })
     await offerNow(projectPath, to.id)
   }, scopeOfHost(projectPath)))
 }
@@ -452,7 +452,7 @@ registerSource('loop', {
     // In the dialect of the agent it is for; laneNextOf first, without waiting (HI-1990).
     return inDialectOf({ projectPath: host, agentId: r.agentId }, async () => {
       const next = laneNextOf(ws, card, r.agentId, p.kind)
-      return { body: loopWakeLine({ ...cardChange(p.n, card, kinds), about: await wakeAboutFor(ws, host, card, p.kind, r.agentId) }, p.kind, p.text, next), meta: { ...r.meta, v } }
+      return { body: loopWakeLine({ ...cardChange(p.n, card, kinds), about: await wakeAboutFor(ws, host, card, p.kind, r.agentId) }, p.kind, p.text, next, watchStillOn(host, r.agentId, p.n)), meta: { ...r.meta, v } }
     })
   },
   // Its version made, its watch not telling it, and its own card, lanes and project settings unchanged. The same check

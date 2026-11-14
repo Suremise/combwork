@@ -83,6 +83,8 @@
   "tips.assistantUndo.title": "Deshacer los cambios del Asistente",
   "tips.assistantWaits.text": "Pide al Asistente que te avise cuando un agente termine una compilación o una ejecución de pruebas: espera sin ir comprobando, y Combwork lo despierta cuando el agente termina, te necesita o se detiene.",
   "tips.assistantWaits.title": "Que el Asistente te avise cuando un agente termine",
+  "tips.assistantWakes.text": "Despertar al Asistente por, en Ciclos de tarjetas de Control de versiones → Flujo de trabajo, decide qué eventos de los carriles de un proyecto despiertan al Asistente: Todo, Estándar, Solo lo importante, Tranquilo o tu propia lista. Cada despertar le cuesta tokens.",
+  "tips.assistantWakes.title": "Elige qué despierta al Asistente",
   "tips.attachFiles.text": "Suelta un PDF, un registro o cualquier archivo en la terminal de un agente: Combwork guarda una copia con la sesión y pega su ruta. Una etiqueta muestra lo adjunto, y avisa cuando la CLI del agente no lee ese tipo de archivo por sí misma, para que el agente lo abra por su ruta.",
   "tips.attachFiles.title": "Adjunta cualquier archivo a un prompt",
   "tips.attachmentsTabs.text": "La pestaña Adjuntos tiene Adjuntos de paneles y Adjuntos de tarjetas. Mostrar en Adjuntos, junto a los adjuntos de una tarjeta, abre Adjuntos de tarjetas en esa tarjeta; Mostrar los adjuntos de la sesión, en el menú ⋯ de un agente, abre Adjuntos de paneles en su sesión.",

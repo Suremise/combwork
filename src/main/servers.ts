@@ -60,7 +60,7 @@ import { buildFactOf } from '../shared/buildFacts'
 import type { JournalSettings } from '../shared/journal'
 import { emit, onCombworkEvent, toast } from './events'
 import { msg, tr } from '../shared/i18n'
-import { addUsageToWatch, cancelWatch, encodeSince, onWatchPlacing, registerAgentWatch, registerLaneWatch, registerUsageWatch, registerWatch, scopedCard } from './watches'
+import { addUsageToWatch, cancelWatch, encodeSince, onWatchPlacing, isAssistantWatch, registerAgentWatch, registerLaneWatch, registerUsageWatch, registerWatch, scopedCard } from './watches'
 import { USAGE_WATCH_MAX, type UsageWatch } from '../shared/usageWatch'
 import { readLaneCards, readLaneCondition } from '../shared/laneWatch'
 import { agentBusy, AGENT_WATCH_MAX_AGENTS, type AgentNow, type WatchedAgent } from '../shared/agentWatch'
@@ -3938,7 +3938,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     })
     // HI-2521: a named lane that has already ended is the answer at once; no watch started, so no usage beside it.
     if ('already' in r) return { lanesAlready: r.already, ...(r.replaced ? { replaced: r.replaced } : {}) }
-    return { watching: await withUsage(r.watching.label), limitAt: r.watching.limitAt, events: lc.events,...(r.replaced ? { replaced: r.replaced } : {}), ...(r.cards ? { cards: r.cards, ...withNames([...r.cards.now, ...(r.cards.replaced ?? []), ...(r.cards.dropped ?? [])]) } : {}), ...(r.agents ? { agents: r.agents } : {}) }
+    return { watching: await withUsage(r.watching.label), limitAt: r.watching.limitAt, events: lc.events, ...(lc.follow && isAssistantWatch(ws, who) ? { follows: true } : {}), ...(r.replaced ? { replaced: r.replaced } : {}), ...(r.cards ? { cards: r.cards, ...withNames([...r.cards.now, ...(r.cards.replaced ?? []), ...(r.cards.dropped ?? [])]) } : {}), ...(r.agents ? { agents: r.agents } : {}) }
   }
   if (body?.agents !== undefined) throw new HttpError(400, apiSaid(API.watch.agentsWithLanes))
   const cond = readCondition(body ?? {})

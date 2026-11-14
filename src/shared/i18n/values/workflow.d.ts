@@ -52,6 +52,7 @@ interface CombworkMessageValues {
   'workflow.form.confirmTitle': undefined
   'workflow.form.copied': undefined
   'workflow.form.copy': undefined
+  'workflow.form.customWakesValue': { events: string | number }
   'workflow.form.defaultBranch': undefined
   'workflow.form.discard': undefined
   'workflow.form.fileLocksNote': undefined
@@ -197,6 +198,8 @@ interface CombworkMessageValues {
   'workflow.nextVersion.tip': { from: string | number }
   'workflow.nextVersion.title': undefined
   'workflow.nextVersion.upstream': { name: string | number; how: string; remote: string | number; publish: string | number; track1: string | number; track2: string | number }
+  'workflow.option.assistantWakes.desc': undefined
+  'workflow.option.assistantWakes.title': undefined
   'workflow.option.commands.desc': undefined
   'workflow.option.commands.title': undefined
   'workflow.option.commitMessage.desc': undefined
@@ -642,6 +645,11 @@ interface CombworkMessageValues {
   'workflow.unreadable.uncommitted': { folder: string | number }
   'workflow.unreadable.worktrees': { folder: string | number }
   'workflow.unreadable.writes': { folder: string | number }
+  'workflow.value.assistantWakes.custom': undefined
+  'workflow.value.assistantWakes.everything': undefined
+  'workflow.value.assistantWakes.important': undefined
+  'workflow.value.assistantWakes.quiet': undefined
+  'workflow.value.assistantWakes.standard': undefined
   'workflow.value.commitMessage.branch': undefined
   'workflow.value.commitMessage.cw': undefined
   'workflow.value.finish.agentMerges': undefined
@@ -669,6 +677,24 @@ interface CombworkMessageValues {
   'workflow.value.style.merge': undefined
   'workflow.value.style.rebase': undefined
   'workflow.value.style.squash': undefined
+  'workflow.wakeEvent.abandoned': undefined
+  'workflow.wakeEvent.blocked': undefined
+  'workflow.wakeEvent.ended': undefined
+  'workflow.wakeEvent.failed': undefined
+  'workflow.wakeEvent.mergeDue': undefined
+  'workflow.wakeEvent.moved': undefined
+  'workflow.wakeEvent.passed': undefined
+  'workflow.wakeEvent.pausedMerge': undefined
+  'workflow.wakeEvent.pausedUser': undefined
+  'workflow.wakeEvent.reblocked': undefined
+  'workflow.wakeEvent.stalled': undefined
+  'workflow.wakeEvent.unblocked': undefined
+  'workflow.wakeEvent.waiting': undefined
+  'workflow.wakeLevel.custom': undefined
+  'workflow.wakeLevel.everything': undefined
+  'workflow.wakeLevel.important': undefined
+  'workflow.wakeLevel.quiet': undefined
+  'workflow.wakeLevel.standard': undefined
   'workflow.why.commitMessage': undefined
   'workflow.why.dependenciesDone': undefined
   'workflow.why.excluded': undefined
