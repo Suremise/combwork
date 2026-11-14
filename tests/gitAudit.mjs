@@ -570,7 +570,8 @@ const FINISHERS = 'src/shared/workflow/options'
 
 /** The modes, read from `Finisher`'s union by TypeScript's parser (a new one is looked for without editing this file). */
 function finisherValues(root, over) {
-  const file = `${FINISHERS}.ts`
+  // Found by its folder's listing, as platformIds finds the descriptors (a source path in this text reads as a script).
+  const file = `${dirname(FINISHERS)}/${readdirSync(join(root, dirname(FINISHERS))).find((e) => e.startsWith(`${basename(FINISHERS)}.`))}`
   const sf = ts.createSourceFile(file, over[file] ?? readFileSync(join(root, file), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
   const decl = sf.statements.find((st) => ts.isTypeAliasDeclaration(st) && st.name.text === 'Finisher')
   const members = !decl ? [] : ts.isUnionTypeNode(decl.type) ? decl.type.types : [decl.type]

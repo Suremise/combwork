@@ -104,7 +104,7 @@ describe('the Git/None cutover audit', () => {
     const runtime = 'src/main/workflow/runtime.ts'
     const form = 'src/renderer/src/components/WorkflowOptions.tsx'
     const adapter = 'src/main/platform/jjPlatform.ts'
-    const over = {
+    const over: Record<string, string> = {
       [runtime]: `${text(runtime)}
 const modes = { finishes: ['userIntegrates'] as const }
 `,
