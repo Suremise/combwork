@@ -79,7 +79,7 @@ import { provider as providerAdapter, allProviders } from './providers'
 import { runSwitch, SlotHeld, SwitchIntents, type SwitchOp, type UsageIntent } from './connectionSwitch'
 import { agentLaunchView, allAccounts, allConnections, checkAccount, getConnection, launchCli, launchOnChosen, onConnectionSignedIn, setAccountSessions, type LaunchConnection } from './accounts'
 import { effortUsable, ensureMigrated, migrationDue } from './connectionMoves'
-import { resolveAgentConnection } from '../shared/accounts'
+import { cleanTag, resolveAgentConnection } from '../shared/accounts'
 import { connectionSwitchDue } from '../shared/connectionLabel'
 import { ptyArgs, recacheEstimate, withoutAccountEnv, withServerEnv } from './providers/common'
 import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcriptFiles'
@@ -206,6 +206,7 @@ const M = {
   assistantCliOwn: msg({ id: 'session.mode.assistantCliOwn', defaultMessage: "The Assistant can't use the CLI's own setting: its Control setting relies on knowing the mode it runs in. Choose one of the CLI's modes.", description: "Switching the Combwork Assistant to the permission choice \"The CLI's own setting\" is refused. Control is the name of an Assistant setting." }),
   connectionFallbackTitle: msg({ id: 'session.connection.fallbackTitle', defaultMessage: '{agent} runs on another connection', description: "A notice's title (HI-2108): an agent started on another connection than its own (its own is off in this workspace, or was removed). {agent} is the agent." }),
   connectionFallback: msg({ id: 'session.connection.fallback', defaultMessage: "{why, select, missing {The connection chosen for it was removed} other {Its connection {wanted} is off in this workspace}}, so it started on {name}, its CLI's first usable one here. Choose another in its Agent Settings.", description: "A notice (HI-2108) when an agent starts on another connection than its own: its own was removed, or is on an account turned off in this workspace ({wanted}: its name). {name} is the account it started on. Agent Settings names a dialog." }),
+  connectionOffMatched: msg({ id: 'session.connection.offMatched', defaultMessage: "Its connection {wanted} is on an account that's off in this workspace, so it started on {name} ({account}): {by, select, tag {the connection there with the same tag, {tag}} name {the connection there with the same name} other {that account's first connection, as none there has its tag or name}}. Choose another in its Agent Settings.", description: "A notice (HI-3213) when an agent starts on another connection than its own because its own ({wanted}: its name) is on an account turned off in this workspace. {name} is the connection it started on, {account} that connection's account (\"Anthropic-2\"), the first account on here. {by}: how that connection was matched: tag (the same tag as its own, {tag}: the tag, such as Builders), name (the same name), other (neither matched, so that account's first connection). Agent Settings names a dialog." }),
   noSession: msg({ id: 'session.error.noSession', defaultMessage: 'No session is running for this agent.', description: "An action on an agent's session is refused: the agent isn't running." }),
   moveFailed: msg({ id: 'session.start.moveFailed', defaultMessage: "Combwork couldn't move {project}'s model settings to its agents: {error}. Start it again.", description: "Starting an agent is refused (HI-1770): moving its project's own model, effort and context settings onto the project's agents (connections now hold the defaults) failed. {project} is the project's name, {error} why (often in English). It is tried again at the next start." }),
   independentNoTask: msg({ id: 'session.start.independentTask', defaultMessage: '{agent} is Independent: Combwork gives it no tasks. Start it and work with it in its pane.', description: "Starting an agent on a task is refused (HI-2670): the agent's role is Independent (its own, or its connection launches it without Combwork's tools), so Combwork never types a task into it. {agent} is the agent's name." }),
@@ -1260,6 +1261,17 @@ const USER_REPLY_MS = 15_000
 
 /** How long a prompt Combwork typed counts as pending (the agent just given a task) while its CLI hasn't taken it (#416). */
 const PENDING_MS = 30_000
+
+/** How often a connection switch waiting for its safe point looks again with no event (HI-3213: as a lane's end does). */
+const SWITCH_RECHECK_MS = 5000
+
+/**
+ * Whether a user's key not sent leaves a draft in an agent's prompt (HI-3213), from its CLI's input as read on its screen
+ * (promptText: '' empty, null unreadable): only an empty input says there is none; unreadable, it may be one.
+ */
+export function userDraftShown(input: string | null): boolean {
+  return input !== ''
+}
 
 /** Settings → Advanced: how long a Ctrl+U clearing Claude Code's input has to be answered on its screen (HI-1979). */
 const CLEAR_KEY_WAIT = 'claude-code.prompt.clearKeySeconds'
@@ -2703,9 +2715,17 @@ class SessionManager {
     const running = (): boolean => this.live.get(id)?.state.runId === runId
     /** The slot its resume was refused for (HI-2304), while it waits for it. */
     let heldSlot: string | null = null
+    /** What held it at the last look (HI-3213: each new reason logged, so a switch that waits says why). */
+    let heldFor: string | null = null
+    const heldNow = (): string | null => {
+      const why = this.inputHeld(projectPath, agentId) ?? this.safePointHeld(projectPath, agentId, runId)
+      if (why && why !== heldFor) log.info(`${label}: connection switch: waits, ${why}`)
+      heldFor = why
+      return why
+    }
     const op = runSwitch({
       running,
-      heldNow: () => this.safePointHeld(projectPath, agentId, runId),
+      heldNow,
       // A usage move's write, once (HR1: checked under the agent's lock then); rejected, it is dropped alone.
       commit: () => intents.commit(),
       quit: () => this.quit(projectPath, agentId, runId, { fenced: hostOpen, why: 'a switch of connection', ready: () => this.safePointHeld(projectPath, agentId, runId) }), // i18n-ignore: for the log
@@ -2733,16 +2753,21 @@ class SessionManager {
       waits: (e) => (e instanceof SlotHeld ? e.why : null),
       told: (why) => toast('warning', tr(msg({ id: 'session.switch.waitsTitle', defaultMessage: "{agent}'s switch of connection waits for {slot}", description: "A notice's title (HI-2304): an agent was stopped to switch it to another connection (account), and Combwork can't resume it yet because its slot (a worktree Combwork lends it, \"slot-a\") is still held. {agent} is the agent's name." }), { agent: l.state.agentName ?? this.label(l.state), slot: heldSlot ?? '' }), tr(msg({ id: 'session.switch.waits', defaultMessage: '{why}. Combwork resumes it once the slot is free.', description: "The notice that an agent's switch of connection waits (HI-2304): {why} says what holds its slot, in English (\"slot-a is held by WindowsSandboxServer, left running by MB1's last run\"), without its full stop." }), { why }), undefined, projectPath, agentTarget(projectPath, l.state.agentId, l.state.agentName ?? this.label(l.state))),
       // A slot of its project freed (HI-2304): what its resume waits for, when it does.
+      // Its progress runs too, and a look every SWITCH_RECHECK_MS (HI-3213, as a lane's end does): a hold that ends with no
+      // event of its own (a line's wait, the typing pause, a delivery reaching it) is seen without one.
       watch: (look) => {
         const offEvents = onCombworkEvent((e) => {
-          if ((e.type === 'session-status' && e.state.projectPath === projectPath && e.state.agentId === agentId) || (e.type === 'session-exit' && e.projectPath === projectPath && e.agentId === agentId)) look()
+          if ((e.type === 'session-status' && e.state.projectPath === projectPath && e.state.agentId === agentId) || (e.type === 'session-exit' && e.projectPath === projectPath && e.agentId === agentId) || e.type === 'progress-changed') look()
         })
         const offFreed = this.slotFreedWatch((p) => {
           if (heldSlot && samePlace(p, projectPath)) look()
         })
+        const recheck = setInterval(look, SWITCH_RECHECK_MS)
+        recheck.unref?.()
         return () => {
           offEvents()
           offFreed()
+          clearInterval(recheck)
         }
       },
       log: (line) => log.info(`${label}: connection switch: ${line}`)
@@ -3118,7 +3143,12 @@ class SessionManager {
     state.launchedConnection = conn ? { id: conn.id, name: conn.name, ...named, ...(conn.note ? { note: conn.note } : {}), ...(conn.login ? { login: conn.login } : {}), ...(conn.server ? { server: { models: conn.server.models, local: conn.server.local } } : {}) } : undefined
     if (conn?.server && state.sessionId) (l.serverSids ??= new Set()).add(state.sessionId)
     // Decision H (HI-2108): its connection is off here or gone, so it runs on its CLI's first usable one: said once a launch.
-    if (conn?.note === 'offFallback' || conn?.note === 'missing') toast('warning', tr(M.connectionFallbackTitle, { agent: this.label(state) }), tr(M.connectionFallback, { why: conn.note, wanted: getConnection(agent.connection)?.name ?? '', name: conn.name }), undefined, projectPath, agentTarget(projectPath, state.agentId, this.label(state))) // i18n-ignore: select keys, never shown
+    // Its account off here (HI-3213): the connection matched on the account it runs on, and how (the same tag, name, or its first).
+    if (conn?.note === 'offFallback' || conn?.note === 'missing') {
+      const own = getConnection(agent.connection)
+      const body = conn.note === 'offFallback' && named.connection ? tr(M.connectionOffMatched, { wanted: own?.name ?? '', name: named.connection.name, account: conn.name, by: conn.by ?? 'default', tag: cleanTag(own?.tag) ?? '' }) : tr(M.connectionFallback, { why: conn.note, wanted: own?.name ?? '', name: conn.name }) // i18n-ignore: select keys, never shown
+      toast('warning', tr(M.connectionFallbackTitle, { agent: this.label(state) }), body, undefined, projectPath, agentTarget(projectPath, state.agentId, this.label(state)))
+    }
     if (!isProviderEnabled(config.settings, adapter.id)) throw combworkError(msg({ id: 'session.start.turnedOff', defaultMessage: '{provider} was turned off while {agent} was starting.', description: "Starting an agent failed: its coding agent was turned off in Settings meanwhile. {provider} is the coding agent's name, {agent} the agent's." }), { provider: adapter.descriptor.name, agent: agent.name }, { kind: 'conflict' })
     l.startAllowed?.()
     const cmd = adapter.buildCommand(info.path, ctx)
@@ -3404,7 +3434,9 @@ class SessionManager {
   /**
    * Why nothing may be typed into an agent's prompt now (HI-1706's quit), or null: Combwork typing into it, a line of Combwork's
    * not taken yet (#430: or confirming, or the user's draft over it), the user typing within the pause, or what the user
-   * typed last not sent (a draft of theirs in its prompt).
+   * typed last not sent (a draft of theirs in its prompt). That draft is read from its screen where its CLI's input can
+   * be (HI-3213: a last key that wasn't Enter, such as Esc, Shift+Tab or an arrow, leaves an empty prompt, which holds
+   * nothing); unreadable (a dialog, a CLI that can't say), a key not sent still holds it.
    */
   inputHeld(projectPath: string, agentId: string): string | null {
     const l = this.live.get(liveId(projectPath, agentId))
@@ -3414,7 +3446,7 @@ class SessionManager {
     if (this.lineBlocked(l)) return "a line Combwork typed isn't taken yet" // i18n-ignore: a reason for the log
     if (this.userMayBeTyping(projectPath, agentId)) return 'the user is typing there' // i18n-ignore: a reason for the log
     const u = this.userInput.get(key)
-    if (u && !u.enter) return "the user's draft is in its prompt" // i18n-ignore: a reason for the log
+    if (u && !u.enter && userDraftShown(l.adapter.promptText && l.screen ? l.adapter.promptText(l.screen.textWithoutDim()) : null)) return "the user's draft is in its prompt" // i18n-ignore: a reason for the log
     return null
   }
 

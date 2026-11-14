@@ -16,7 +16,7 @@
   "connections.mark.anotherMark": "Se ejecuta en una conexión distinta de la elegida",
   "connections.mark.none": "Sin conexión",
   "connections.mark.noneUsable": "No hay ninguna cuenta de {cli} activada en este espacio de trabajo: el agente no puede iniciarse hasta que haya una (Configuración → Cuentas y conexiones).",
-  "connections.mark.offHere": "{wanted} está en una cuenta desactivada en este espacio de trabajo: el agente se ejecuta con {name}, la primera conexión utilizable de su CLI",
+  "connections.mark.offHere": "{wanted} está en una cuenta desactivada en este espacio de trabajo: el agente se ejecuta con {name}, la conexión que le corresponde en la primera cuenta activada aquí",
   "connections.mark.offNoDefault": "{wanted} está desactivada aquí",
   "connections.mark.offNoDefaultUsable": "{wanted} está desactivada en este espacio de trabajo y no hay ninguna otra cuenta de {cli} activada: el agente no puede iniciarse hasta que haya una (Configuración → Cuentas y conexiones).",
   "connections.mark.other": "Se ejecuta en {running} hasta que se reinicie. Elegida ahora: {chosen}",

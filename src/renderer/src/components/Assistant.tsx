@@ -262,7 +262,7 @@ export async function restartInMode(p: Pick<ModeInfo, 'id' | 'name' | 'bundled'>
   await actions.attempt(tr(M.stopFailed), () => call('session:stop', a.path, AGENT))
   await actions.waitForStop(a.path, AGENT)
   await actions.refreshWorkspace()
-  await actions.resumeSession(a.path, { id: live.sessionId, recache: null, title: null, name: item?.name, agentId: AGENT, cwd: item?.cwd }, AGENT)
+  await actions.resumeSession(a.path, actions.restartItem({ sessionId: live.sessionId, agentId: AGENT }, item), AGENT)
 }
 
 // ---------------------------------------------------------------------------

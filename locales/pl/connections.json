@@ -16,7 +16,7 @@
   "connections.mark.anotherMark": "Działa na innym połączeniu niż wybrane",
   "connections.mark.none": "Brak połączenia",
   "connections.mark.noneUsable": "W tym obszarze roboczym nie jest włączone żadne konto {cli}: agent nie może się uruchomić, dopóki któreś nie zostanie włączone (Ustawienia → Konta i połączenia).",
-  "connections.mark.offHere": "{wanted} należy do konta wyłączonego w tym obszarze roboczym: agent działa na {name}, pierwszym dostępnym połączeniu swojego CLI",
+  "connections.mark.offHere": "{wanted} należy do konta wyłączonego w tym obszarze roboczym: agent działa na {name}, połączeniu dopasowanym na pierwszym włączonym tu koncie",
   "connections.mark.offNoDefault": "{wanted} jest tu wyłączone",
   "connections.mark.offNoDefaultUsable": "{wanted} jest wyłączone w tym obszarze roboczym, a żadne inne konto {cli} nie jest włączone: agent nie może się uruchomić, dopóki któreś nie zostanie włączone (Ustawienia → Konta i połączenia).",
   "connections.mark.other": "Działa na {running} do ponownego uruchomienia. Wybrane teraz: {chosen}",

@@ -21,6 +21,7 @@
   "session.compact.userTyped": "Combworkがコンパクト化を送信している間にエージェントのターミナルで入力したため、送信しませんでした。入力した内容はそのまま残ります。",
   "session.compact.waiting": "エージェントが回答を待っています。終わってからコンパクト化してください。",
   "session.connection.fallback": "{why, select, missing {選ばれた接続が削除された} other {接続{wanted}がこのワークスペースでは無効な}}ため、ここでCLIが最初に使える接続{name}で起動しました。「エージェント設定」で別の接続を選んでください。",
+  "session.connection.offMatched": "接続{wanted}のアカウントはこのワークスペースでは無効なため、{name}（{account}）で起動しました: {by, select, tag {そのアカウントで同じタグ「{tag}」を持つ接続} name {そのアカウントで同じ名前の接続} other {そのアカウントの最初の接続（タグも名前も一致する接続がないため）}}。「エージェント設定」で別の接続を選んでください。",
   "session.connection.fallbackTitle": "{agent}は別の接続で動いています",
   "session.error.agentGone": "そのエージェントはもう存在しません。",
   "session.error.inUseElsewhere": "別のプログラムがトランスクリプトを開いています。閉じてからもう一度お試しください。",

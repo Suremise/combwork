@@ -46,7 +46,7 @@
   "panes.footer.compactions": "{n, plural, one {# compaction so far} other {# compactions so far}}{over, select, yes { — consider compacting} other {}}",
   "panes.footer.connectionChanged": "Its login changed since it was added: see Settings → Accounts & Connections.",
   "panes.footer.connectionEmail": "Signed in as {email}.",
-  "panes.footer.connectionOffHere": "The connection chosen for it is on an account that's off in this workspace, so it runs on its CLI's first usable connection.",
+  "panes.footer.connectionOffHere": "The connection chosen for it is on an account that's off in this workspace, so it runs on the first account that's on here: on the connection there with the same tag, else the same name, else that account's first.",
   "panes.footer.connectionRemoved": "The connection chosen for it was removed, so it runs on its CLI's first usable connection. Choose another in its Agent Settings.",
   "panes.footer.connectionSwitching": "switches once its turn is over",
   "panes.footer.connectionSwitchingTip": "Once its turn is over, it ends and carries on, on the connection chosen for it now.",
