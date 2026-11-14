@@ -176,6 +176,11 @@
       "name": "plain"
     }
   },
+  "tool.call.keyNotKept": {
+    "placeholders": {
+      "message": "plain"
+    }
+  },
   "tool.cannotWithinRules.arg.rule": {
     "placeholders": {}
   },

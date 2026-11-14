@@ -143,6 +143,10 @@
   "tool.call.error.unknownTool": {
     "text": "Unknown tool: {name}"
   },
+  "tool.call.keyNotKept": {
+    "text": "Not sent: Combwork's tools couldn't keep this write's request key ({message}), so a retry after a restart could apply it twice. Nothing was written; try the call again.",
+    "note": "HI-3195 (HR3's round 2): a keyed write's key is kept in the agent's file before it is sent; when that fails, the write isn't sent. {message}: the file system's error."
+  },
   "tool.cannotWithinRules.arg.rule": {
     "text": "The rule, as a refusal named it."
   },

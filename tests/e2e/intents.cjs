@@ -355,6 +355,37 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     const base = (k) => (k ?? '').replace(/-\d+$/, '')
     check("…and the agent's next launch (another cw-mcp) sends the same call with that key, told it was applied earlier", later.calls.length === 1 && base(later.calls[0].key) === base(lost.calls[0].key) && /already applied/.test(relaunched.content?.[0]?.text ?? ''), JSON.stringify({ first: lost.calls[0], later: later.calls, relaunched }))
 
+    // HR3's round 2: the launch ends while its write is on its way (the server applied it, its reply not yet sent): nothing
+    // more runs in it, so the key must already be kept; the next launch's same call sends it with that key.
+    const crashKeys = path.join(lib.probeDir('request-keys-crash'), 'agent-keys.json')
+    const held = []
+    let child1
+    const holding = http.createServer((q, r) => {
+      if (q.method === 'GET') return r.end('{}')
+      held.push({ key: q.headers['x-combwork-request'], kept: fs.existsSync(crashKeys) ? fs.readFileSync(crashKeys, 'utf8') : null })
+      child1.kill()
+    })
+    await new Promise((res) => holding.listen(0, '127.0.0.1', res))
+    await new Promise((resolve) => {
+      child1 = spawn(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { env: { ...lib.childEnv(builderCombwork.env), CW_API_URL: `http://127.0.0.1:${holding.address().port}`, CW_REQUEST_KEYS_FILE: crashKeys }, windowsHide: true })
+      child1.on('exit', resolve)
+      child1.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_update_task', arguments: { number: key, comment: 'Ended mid-write.' } } }) + '\n')
+    })
+    holding.close()
+    const keptAtEnd = held[0]?.kept && held[0].key ? JSON.parse(held[0].kept).entries?.some((e) => held[0].key.startsWith(e.base)) : false
+    check("a keyed write's key is kept in the agent's file before it is sent (a launch ended while it is on its way)", held.length === 1 && keptAtEnd, JSON.stringify(held))
+    const afterCrash = await dropping(0)
+    const resumed = await runMcp(afterCrash.port, 'cw_update_task', { number: key, comment: 'Ended mid-write.' }, { CW_REQUEST_KEYS_FILE: crashKeys })
+    afterCrash.server.close()
+    check("…and the agent's next launch sends the same call with that key, told it was applied earlier", afterCrash.calls.length === 1 && base(afterCrash.calls[0].key) === base(held[0]?.key) && /already applied/.test(resumed.content?.[0]?.text ?? ''), JSON.stringify({ held, later: afterCrash.calls, resumed }))
+    // …and one whose key can't be kept (the file's folder is a file) isn't sent at all.
+    const blocker = path.join(lib.probeDir('request-keys-blocked'), 'a-file')
+    fs.writeFileSync(blocker, '')
+    const unkept = await dropping(0)
+    const refusedSend = await runMcp(unkept.port, 'cw_update_task', { number: key, comment: 'Never sent.' }, { CW_REQUEST_KEYS_FILE: path.join(blocker, 'agent-keys.json') })
+    unkept.server.close()
+    check("a keyed write whose key can't be kept isn't sent, and says so", unkept.calls.length === 0 && refusedSend.isError && /Not sent/.test(refusedSend.content?.[0]?.text ?? ''), JSON.stringify({ calls: unkept.calls, refusedSend }))
+
     await inv('session:stop', alpha)
     await until(async () => (await inv('session:live')).length === 0, HUNG_MS)
   } finally {

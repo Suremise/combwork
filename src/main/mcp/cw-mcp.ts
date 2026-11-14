@@ -212,6 +212,7 @@ const T = {
   'updateSetting.arg.value': agentMsg({ id: 'tool.updateSetting.arg.value', text: 'What cw_read_setting says it takes.' }),
   'answerSimplify.description': agentMsg({ id: 'tool.answerSimplify.description', text: "Answer a card's simplify check, which Combwork told you of: carryOn (what still comes up is worth handling) or simplify (drop what isn't). Cutting scope, and the hard stop's question, are the user's: leave those. why: your reason, a comment on the card.", note: 'HI-3188: the Assistant-only tool for a simplify check (Workflow → Card loops).' }),
   'answerSimplify.done': agentMsg({ id: 'tool.answerSimplify.done', text: '{card}: answered {request}, {choice, select, carryOn {carry on} other {simplify}}; its agents are woken.', note: "HI-3188: cw_answer_simplify's reply." }),
+  'call.keyNotKept': agentMsg({ id: 'tool.call.keyNotKept', text: "Not sent: Combwork's tools couldn't keep this write's request key ({message}), so a retry after a restart could apply it twice. Nothing was written; try the call again.", note: "HI-3195 (HR3's round 2): a keyed write's key is kept in the agent's file before it is sent; when that fails, the write isn't sent. {message}: the file system's error." }),
   'call.appliedEarlier': agentMsg({ id: 'tool.call.appliedEarlier', text: "Done earlier: Combwork had already applied this call ({made, select, other {{made}} none {its card}}), whose reply was lost. Read the card for its state now; don't send it again.", note: 'HI-3195: a retried write Combwork had already applied (its first reply lost). {made}: the card it made or was about (a key or #n), or none.' }),
   'undo.description': agentMsg({ id: 'tool.undo.description', text: 'Undo changes of your own (kept 7 days, grouped by the user\'s message): list, then change or group ("latest": your newest). What someone changed since stays. Only your own: never the user\'s or agents\'. (detail: use-cw-api, tools.md)' }),
   'undo.arg.change': agentMsg({ id: 'tool.undo.arg.change', text: "A change's id, from list with its group." }),
@@ -383,7 +384,7 @@ const notices = new AsyncLocalStorage<Set<string>>()
  * retries one whose reply was lost. Combwork applies a keyed write once (requestReceipts.ts). `lost`: a write of the call
  * got no reply after its retries.
  */
-const callKey = new AsyncLocalStorage<{ base: string; n: number; lost: boolean }>()
+const callKey = new AsyncLocalStorage<{ base: string; n: number; lost: boolean; hash: string; kept: boolean }>()
 /** A lost write's retries: how many more tries, each with the same key. */
 const LOST_RETRIES = 2
 /**
@@ -410,15 +411,32 @@ function loadUnresolved(): void {
     // None kept, or unreadable: nothing to reuse.
   }
 }
-function saveUnresolved(): void {
-  if (!KEYS_FILE) return
+/** Writes the agent's file whole; the error when it couldn't (null when kept, or there is no file). */
+function saveUnresolved(): Error | null {
+  if (!KEYS_FILE) return null
   try {
     mkdirSync(dirname(KEYS_FILE), { recursive: true })
     const tmp = `${KEYS_FILE}.${process.pid}.tmp`
     writeFileSync(tmp, JSON.stringify({ entries: [...unresolved].map(([hash, u]) => ({ hash, ...u })) }))
     renameSync(tmp, KEYS_FILE)
-  } catch {
-    // Not kept: a retry after a restart may write again, as before.
+    return null
+  } catch (e) {
+    return e instanceof Error ? e : new Error(String(e))
+  }
+}
+/**
+ * HR3's round 2: a keyed call's key kept as unresolved, in the agent's file, before its first write is sent, so a launch
+ * that ends while the write is on its way (no reply, no error: nothing more runs) leaves its next launch the key. It is
+ * cleared once the call has an answer. Throws, sending nothing, when the file can't be written.
+ */
+function keepPending(call: { base: string; hash: string }): void {
+  unresolved.delete(call.hash)
+  unresolved.set(call.hash, { base: call.base, at: Date.now() })
+  while (unresolved.size > UNRESOLVED_MAX) unresolved.delete(unresolved.keys().next().value!)
+  const failed = saveUnresolved()
+  if (failed) {
+    unresolved.delete(call.hash)
+    throw new Error(say(T['call.keyNotKept'], { message: failed.message }))
   }
 }
 loadUnresolved()
@@ -448,6 +466,10 @@ async function api(method: string, path: string, body?: unknown, replyMs?: numbe
   // Only a project agent's writes Combwork applies once by their key (shared/requestKeys.ts): any other is sent once.
   const call = !ASSISTANT && keyedWrite(method, path) ? callKey.getStore() : undefined
   const requestKey = call ? `${call.base}-${++call.n}` : undefined
+  if (call && !call.kept) {
+    keepPending(call)
+    call.kept = true
+  }
   // agent-protocol: an HTTP header
   const headers = { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json', ...(WORKSPACE ? { 'X-Combwork-Workspace': encodeURIComponent(WORKSPACE) } : {}), ...(requestKey ? { 'X-Combwork-Request': requestKey } : {}) }
   let res: Awaited<ReturnType<typeof agentApiCall>> | undefined
@@ -1807,7 +1829,7 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
       const said = new Set<string>()
       // HI-3195: this call's request key: an unresolved earlier call's of the same tool and arguments, else a new one.
       const hash = callHash(tool.name, args)
-      const call = { base: keyBaseFor(hash), n: 0, lost: false }
+      const call = { base: keyBaseFor(hash), n: 0, lost: false, hash, kept: false }
       try {
         const result = await callKey.run(call, () => notices.run(said, () => tool.run(args)).catch((e: unknown) => {
           // Applied earlier: the call's outcome is recovered, said as such (what it made, to read).
@@ -1828,13 +1850,9 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
         const hint = argumentHint(tool.name, tool.inputSchema, args)
         text = `${say(T['call.error'], { message: (e as Error).message })}${hint ? `\n${hint}` : ''}`
         testId = testLog(tool.name, params?.arguments, (e as Error).message, { mode: modeOf(args), chars: text.length, bytes: Buffer.byteLength(text, 'utf8') })
-        // HI-3195: a write that got no reply is remembered, so the model's retry of the same call reuses its key: kept before the reply goes, so a launch ended right after it still has it.
-        if (call.lost) {
-          unresolved.delete(hash)
-          unresolved.set(hash, { base: call.base, at: Date.now() })
-          while (unresolved.size > UNRESOLVED_MAX) unresolved.delete(unresolved.keys().next().value!)
-          saveUnresolved()
-        } else if (kind !== 'failed' && unresolved.delete(hash)) saveUnresolved()
+        // HI-3195: a write that got no reply stays kept (keepPending kept it before it was sent), so the model's retry of the
+        // same call reuses its key; a call Combwork answered is cleared, before the reply goes.
+        if (!call.lost && kind !== 'failed' && unresolved.delete(hash)) saveUnresolved()
         reply(id, { content: [{ type: 'text', text }], isError: true })
       }
       // After the reply: the model's text exactly as sent (characters as UTF-16 code units, and UTF-8 bytes).
