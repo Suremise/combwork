@@ -1579,6 +1579,7 @@ export class Workflow {
       }
       const c = asCardCounts(d, await this.platform(o).contains(target, { base, revision, key: d.latest?.key }))
       // Unknown still refuses (never started on doubt), naming the card it waits for, not only its commit.
+      // agent-stored: refusalBody says whatText again for each reader (refusals' values take whatText before what)
       if (isUnknown(c)) return { ...c, what: englishText({ m: UNREADABLE.blockerWork, values: { card: key, what: c.what } }), whatText: { id: UNREADABLE.blockerWork.id, values: { card: key, what: c.whatText ?? c.what } } }
       if (!c) out.push(key)
     }
