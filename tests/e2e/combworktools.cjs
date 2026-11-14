@@ -125,7 +125,7 @@ const check = (name, ok, extra = '') => {
     await until(() => idle(builder.id), HUNG_MS)
 
     // --- 2. Only the launch's own token says it has connected.
-    const nowToken = JSON.parse(fs.readFileSync(path.join(tokenDir, fs.readdirSync(tokenDir)[0]), 'utf8')).token
+    const nowToken = lib.launchToken(userData, (await live(builder.id)).runId)
     const own = await call('POST', '/v1/launch/connected', {}, nowToken)
     check("the launch's own token is taken", own.status === 200 && own.body?.ok === true, JSON.stringify(own))
     const script = await call('POST', '/v1/launch/connected', {})

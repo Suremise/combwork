@@ -158,7 +158,7 @@ import { agentTempSetting, prepareAgentTemp, protectedFolders, withAgentTemp } f
 import { ServerMarks } from './serverMarks'
 import { usageHistory, type StoredUsage } from './usageHistory'
 import { journalSettingsOf } from './journalService'
-import { endAgentToken, newAgentToken } from './agentTokens'
+import { endAgentToken, launchTokenFile, newAgentToken } from './agentTokens'
 import { endHookToken, hooksRefused, newHookToken } from './hookTokens'
 import { lookAtTurns, type TurnsReading } from './turnsReader'
 import { hookSeen, hookTurn, hooksMissing, newHooksWatch, noteHooksMissing, promptSent, SeenOnce, transcriptReset, transcriptTurns, turnHeard, typedPending, type HooksWatch } from './hooksHealth'
@@ -3033,7 +3033,11 @@ class SessionManager {
     l.policy = policy
     // Its own Agent API token for this launch, which confines its board calls to its project (the Assistant has its own).
     // None without Combwork's tools (HI-2670): nothing of Combwork's to call it with.
-    if (!workspace.isAssistantHome(projectPath) && policy.tools) await newAgentToken({ workspace: workspaceOf(projectPath).path!, projectPath, agentId: agent.id }, state.runId)
+    const ownToken = !workspace.isAssistantHome(projectPath) && policy.tools
+    if (ownToken) await newAgentToken({ workspace: workspaceOf(projectPath).path!, projectPath, agentId: agent.id }, state.runId)
+    // HI-3195: its combwork server names this launch's own token file (its run's folder), set here once the token is made:
+    // its settings may have been read while an earlier launch's token was the agent's.
+    const tokenEnv: Record<string, string> = ownToken ? { CW_API_TOKEN_FILE: launchTokenFile(state.runId) } : {}
     const assistantText = workspace.isAssistantHome(projectPath) ? await this.assistantInstructions(projectPath, agent).catch(() => null) : null
     // A new conversation starts in its mode; a resumed one is told it if it was last given another (below).
     l.mode = !resume ? assistantText?.modeId || undefined : undefined
@@ -3087,7 +3091,7 @@ class SessionManager {
       resume,
       name: opts.name,
       skills: eff.skills,
-      mcpServers: eff.mcpServers[TOOLS_SERVER] && dialectEnv.CW_DIALECT_FILE ? { ...eff.mcpServers, [TOOLS_SERVER]: { ...eff.mcpServers[TOOLS_SERVER], env: { ...eff.mcpServers[TOOLS_SERVER].env, ...dialectEnv } } } : eff.mcpServers,
+      mcpServers: eff.mcpServers[TOOLS_SERVER] && (dialectEnv.CW_DIALECT_FILE || tokenEnv.CW_API_TOKEN_FILE) ? { ...eff.mcpServers, [TOOLS_SERVER]: { ...eff.mcpServers[TOOLS_SERVER], env: { ...eff.mcpServers[TOOLS_SERVER].env, ...dialectEnv, ...tokenEnv } } } : eff.mcpServers,
       model: eff.model,
       // An effort the model that runs doesn't take (HI-1770: one moved onto it, or a connection's default) is kept, not used.
       effort: eff.effort && eff.connection && !eff.connection.startsWith('!') && !effortUsable(adapter.id, eff.model, modelAccount, eff.effort) ? null : eff.effort,
