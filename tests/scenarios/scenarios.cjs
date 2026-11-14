@@ -2523,7 +2523,9 @@ module.exports.SCENARIOS = [
       const n = c.cards.p
       const ownMoves = movesOf(o, n).filter((x) => x.ok)
       const merges = o.tools.filter((t) => /(^|\s)(git|jj)(\.exe)?\s+(merge|rebase|squash|new\s+\S+\s+\S+)/i.test(commandText(t.input ?? '')) && !/^(Write|Edit|MultiEdit|Read)$/i.test(t.name))
-      const said = [o.finalReply ?? '', ...(o.cards.p?.comments ?? []).filter((x) => /Coder/.test(x.by)).map((x) => x.text)].join('\n')
+      // Every reply after the prompt, not only the last (HI-3212): a CLI with no Stop hook (OpenCode) gets the doorbell for
+      // its unread inbox as a turn of its own, whose reply ("Done: …") comes after the one that said it.
+      const said = [...(o.replies ?? [o.finalReply ?? '']), ...(o.cards.p?.comments ?? []).filter((x) => /Coder/.test(x.by)).map((x) => x.text)].join('\n')
       const [, , empty, ...parents] = jjCommitOf(c, `${c.sub.workspace}@`).split(' ')
       return [
         ['moved the card nowhere (no report of a merge, no move): it stays in Passed', ownMoves.length === 0 && o.cards.p?.column === 'passed', `${o.cards.p?.column}; ${ownMoves.map((x) => x.tool).join(',')}`],

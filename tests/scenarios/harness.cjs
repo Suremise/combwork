@@ -103,6 +103,16 @@ const PROVIDERS = {
   'fake-opencode': { provider: 'opencode', fake: true, executable: path.join(lib.ROOT, 'tests', 'e2e', 'fake-opencode', 'opencode.cmd'), mode: 'build', model: 'opencode/big-pickle' }
 }
 
+/**
+ * Each provider's short tag in a scenario's folder name (HI-3212). A jj project's deepest file is its operation store's
+ * `.jj\repo\op_store\operations\<128 hex>`, and jj fails past Windows' 260 characters ("Failed to commit new operation"):
+ * with the provider's whole key, `jj-card-submit-nc-fake-opencode` reached 260 under lane 0. tests/scenarioFolders.test.ts
+ * holds every jj scenario on every provider to it.
+ */
+const PROVIDER_TAGS = { fake: 'fake', 'fake-codex': 'fcx', 'claude-code': 'cc', codex: 'cx', 'fake-copilot': 'fcp', 'fake-antigravity': 'fagy', 'fake-opencode': 'foc' }
+/** The folder (under its lane's) a run of scenario `scId` with `providerKey` works in. */
+const scenarioFolder = (scId, providerKey) => `${scId}-${PROVIDER_TAGS[providerKey] ?? providerKey}`
+
 const sleep = lib.sleep
 // The longest the harness waits for something it is waiting on (a file, a session, a report): a bound for a hung run,
 // never how long the step should take.
@@ -477,7 +487,7 @@ function forgetClaudeMemory(home, root) {
  */
 async function runScenario(sc, providerKey, opts = {}) {
   const p = PROVIDERS[providerKey]
-  const id = `${sc.id}-${providerKey}`
+  const id = scenarioFolder(sc.id, providerKey)
   // A folder of its own, made fresh (#253: evidence.cjs keeps an earlier one a card cites, or every earlier one while the
   // board can't be read, and takes `<id>-2`… instead).
   const base = path.join(opts.workRoot ?? path.join(lib.WORK, '..', 'scenarios'), id)
@@ -1239,4 +1249,4 @@ async function runScenario(sc, providerKey, opts = {}) {
   return result
 }
 
-module.exports = { runScenario, dialectForRun, dialectRecord,forgetClaudeMemory, observeTranscript, tokenSightings, knownTokens, maskTokens, retainedObserved, skillRefsOf, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, relaunchTrust, keptReply, REPLY_KEPT, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }
+module.exports = { runScenario, scenarioFolder, PROVIDER_TAGS, dialectForRun, dialectRecord,forgetClaudeMemory, observeTranscript, tokenSightings, knownTokens, maskTokens, retainedObserved, skillRefsOf, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, relaunchTrust, keptReply, REPLY_KEPT, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }
