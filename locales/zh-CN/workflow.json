@@ -200,7 +200,7 @@
   "workflow.nextVersion.upstream": "{name} 仅在本地创建，没有跟踪任何远程分支，而“目标分支跟随其远程仓库”要求在其第一张卡片开始前设置好。{how, select, ready {请将它发布到 {remote}：{publish}。或者，如果 {remote} 已有它，请设置它跟踪的分支：{track1}，然后 {track2}。} choose {此仓库没有 Combwork 能确定的远程仓库，或有多个：在这些命令中，{remote} 代表 {name} 应跟随的远程仓库。请将它发布到那里：{publish}。或者，如果已有它，请设置它跟踪的分支：{track1}，然后 {track2}。} shallow {此仓库是浅克隆，跟随模式无法使用：请先获取其完整历史（git fetch --unshallow），然后发布 {name}。} other {它将跟随的远程仓库（{remote}）有多个推送地址或没有推送地址，而跟随模式只发布到一个地址：请只保留一个，然后发布 {name}。}}",
   "workflow.option.churnStopAt.desc": "有评审智能体时，一张卡片的来回总计达到此数（包括拆分出它的卡片）后，Combwork 会停止它的循环，询问你是继续、拆分、接受并添加后续卡片，还是由你接手（0 表示关闭）。",
   "workflow.option.churnStopAt.title": "强制停止的来回轮数",
-  "workflow.option.assistantWakes.desc": "助手关注此项目的通道时，哪些事件会唤醒它；每次唤醒都要消耗它的 token。通道卡片上向你提出的问题总会唤醒它，除非是助手自己提出的。任何级别都不会拦下发给它的消息和决定，也不会拦下它为特定卡片或智能体开始的关注。",
+  "workflow.option.assistantWakes.desc": "助手关注此项目的通道时，哪些事件会唤醒它（向你提出的问题总会唤醒它），每次唤醒都要消耗它的 token。",
   "workflow.option.assistantWakes.title": "唤醒助手的事件",
   "workflow.option.commands.desc": "每个命名检查运行的命令。只有运行该命令时，才算作该检查。",
   "workflow.option.commands.title": "检查命令",

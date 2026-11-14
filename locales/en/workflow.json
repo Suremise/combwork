@@ -812,8 +812,8 @@
     "description": "HI-3128: under the steps in the Start the next version dialog, with the workflow option “The target branch follows its remote” on (its name: use its words): the new branch {name} isn’t on any remote and tracks none, so its first card can’t start until the user publishes it (Combwork doesn’t). how (select, keep the keys): ready, a remote Combwork can name ({remote}); choose, none it can name ({remote} is a placeholder such as <remote> for the user to replace); shallow, a shallow clone; other, the named remote ({remote}) has several push addresses or none. {publish}, {track1}, {track2} are git commands: keep them exactly as they are."
   },
   "workflow.option.assistantWakes.desc": {
-    "defaultMessage": "Which events in this project’s lanes wake the Assistant while it watches them; each wake costs it tokens. A question for you on a lane’s card always wakes it, unless the Assistant asked it itself. No level stops messages and decisions sent to it, or watches it starts on particular cards or agents.",
-    "description": "What the workflow option “Wake the Assistant for” does (HI-3211). A lane: a builder and a reviewer taking cards in turn (glossary: lane). Tokens: what the Assistant’s coding agent uses up."
+    "defaultMessage": "Which events in this project’s lanes wake the Assistant while it watches them (a question for you always does), each wake costing it tokens.",
+    "description": "What the workflow option “Wake the Assistant for” does (HI-3211), in one sentence, as every option’s is (HI-3253). A lane: a builder and a reviewer taking cards in turn (glossary: lane). A question for you: one an agent asks the user on a lane’s card. Tokens: what the Assistant’s coding agent uses up."
   },
   "workflow.option.assistantWakes.title": {
     "defaultMessage": "Wake the Assistant for",
