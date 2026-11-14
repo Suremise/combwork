@@ -302,6 +302,8 @@
   "tips.jjCards.title": "Cards in a jj project",
   "tips.jjOperations.text": "In a jj project, Version Control → Operations lists jj’s operations by name. Preview Undo shows what undoing one would change, and gives you the command to run when nothing else would change. Combwork never runs it.",
   "tips.jjOperations.title": "Preview undoing a jj operation",
+  "tips.jjPreview.text": "In a jj project, choose Combwork integrates when you click under Version Control → Workflow → Who integrates: For you then previews each move, and Combwork makes it only when you click Integrate.",
+  "tips.jjPreview.title": "Integrate a jj card with one click",
   "tips.keepAwake.text": "While an agent works, Combwork stops Windows from sleeping (the screen can still lock), and lets it sleep once they're done. Choose when in Settings → General.",
   "tips.keepAwake.title": "Leave agents working, the PC stays awake",
   "tips.laneApplyNow.text": "In Start Lane for a lane's builder, Apply now changes the order at once: the card being worked goes back to Todo with its work kept on its branch, and the builder is told.",

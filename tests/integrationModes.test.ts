@@ -28,11 +28,11 @@ afterEach(() => {
 })
 
 describe("a platform's integration modes are its descriptor's (HI-2840)", () => {
-  it('declares each platform its finishes and a default among them: Git its four, None acceptance, jj Combwork’s advance (the default, HI-3235) and the user integrating', () => {
+  it('declares each platform its finishes and a default among them: Git its four, None acceptance, jj Combwork’s advance (the default, HI-3235), its preview and click (HI-3236) and the user integrating', () => {
     expect(Object.fromEntries(PLATFORM_IDS.map((p) => [p, { finishes: PLATFORMS[p].finishes, defaultFinish: PLATFORMS[p].defaultFinish }]))).toEqual({
       git: { finishes: ['combworkMerges', 'agentMerges', 'committed', 'notChecked'], defaultFinish: 'notChecked' },
       none: { finishes: ['accept'], defaultFinish: 'accept' },
-      jj: { finishes: ['combworkAdvances', 'userIntegrates'], defaultFinish: 'combworkAdvances' }
+      jj: { finishes: ['combworkAdvances', 'previewAdvance', 'userIntegrates'], defaultFinish: 'combworkAdvances' }
     })
     for (const p of PLATFORM_IDS) expect(PLATFORMS[p].finishes).toContain(PLATFORMS[p].defaultFinish)
   })
@@ -66,6 +66,8 @@ describe("a platform's integration modes are its descriptor's (HI-2840)", () => 
     expect(finishing('git', 'combworkAdvances')).toEqual(['jjYouIntegrate'])
     expect(finishing('none', 'combworkAdvances')).toEqual(['combworkMergesNeedsGit'])
     expect(finishing('jj', 'userIntegrates')).toEqual([])
+    expect(finishing('jj', 'previewAdvance')).toEqual([])
+    expect(finishing('git', 'previewAdvance')).toEqual(['jjYouIntegrate'])
     for (const p of ['git', 'none', 'jj'] as const) expect(finishing(p, allOff(p).finish)).toEqual([])
   })
 })

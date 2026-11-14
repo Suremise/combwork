@@ -300,6 +300,8 @@
   "tips.jjCards.title": "Karten in einem jj-Projekt",
   "tips.jjOperations.text": "In einem jj-Projekt listet Versionsverwaltung → Operationen die Operationen von jj nach Namen auf. „Rückgängig-Vorschau“ zeigt, was das Rückgängigmachen einer davon ändern würde, und gibt dir den auszuführenden Befehl, wenn sich sonst nichts ändern würde. Combwork führt ihn nie aus.",
   "tips.jjOperations.title": "Das Rückgängigmachen einer jj-Operation vorab ansehen",
+  "tips.jjPreview.text": "Wähle in einem jj-Projekt Combwork integriert auf deinen Klick unter Versionsverwaltung → Workflow → Wer integriert: Für dich zeigt dann jede Verschiebung vorab, und Combwork führt sie erst aus, wenn du auf Integrieren klickst.",
+  "tips.jjPreview.title": "Eine jj-Karte mit einem Klick integrieren",
   "tips.keepAwake.text": "Während ein Agent arbeitet, verhindert Combwork den Ruhezustand von Windows (der Bildschirm kann trotzdem sperren) und erlaubt ihn wieder, sobald alle fertig sind. Wann, wählst du unter Einstellungen → Allgemein.",
   "tips.keepAwake.title": "Agenten arbeiten lassen, der PC bleibt wach",
   "tips.laneApplyNow.text": "In „Lane starten“ für den Bearbeiter einer Lane ändert „Jetzt anwenden“ die Reihenfolge sofort: Die Karte in Arbeit geht zurück nach „Offen“, ihre Arbeit bleibt auf ihrem Branch, und der Bearbeiter wird informiert.",

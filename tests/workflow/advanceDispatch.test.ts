@@ -10,16 +10,16 @@ import { setup, put, B1, moved } from './harness'
 import { reconcile } from '../../src/main/workflow/reconcile'
 import { isRefusal } from '../../src/main/workflow/runtime'
 import { advanceHostOf } from '../../src/main/workflow/advanceHost'
-import { ADVANCE_STOPPED_GATE, ADVANCE_UNCERTAIN_GATE, type CardState } from '../../src/shared/workflow/facts'
+import { ADVANCE_PREVIEW_GATE, ADVANCE_STOPPED_GATE, ADVANCE_UNCERTAIN_GATE, type CardState } from '../../src/shared/workflow/facts'
 import type { AdvanceAnswer, AdvanceHost } from '../../src/main/platform/adapter'
 import type { CardRecord } from '../../src/main/workflow/factStore'
 
-const stand = vi.hoisted(() => ({ on: false }))
+const stand = vi.hoisted(() => ({ on: false, finish: 'combworkAdvances' as string }))
 
 vi.mock('../../src/shared/platform/descriptors', async (importOriginal) => {
   const real = await importOriginal<typeof import('../../src/shared/platform/descriptors')>()
   // None's descriptor as it is, its finishes Combwork's advance while a test turns the stand-in on.
-  const none = new Proxy(real.PLATFORMS.none, { get: (t, k) => (stand.on && k === 'finishes' ? ['combworkAdvances'] : stand.on && k === 'defaultFinish' ? 'combworkAdvances' : Reflect.get(t, k)) })
+  const none = new Proxy(real.PLATFORMS.none, { get: (t, k) => (stand.on && k === 'finishes' ? [stand.finish] : stand.on && k === 'defaultFinish' ? stand.finish : Reflect.get(t, k)) })
   return { ...real, PLATFORMS: { ...real.PLATFORMS, none } }
 })
 
@@ -29,12 +29,14 @@ afterEach(() => {
   env?.close()
   env = null
   stand.on = false
+  stand.finish = 'combworkAdvances'
 })
 
 /** A None project whose finish is the stand-in advance (OK before merging for the labels given), and a card in Approved. */
-async function inApproved(o: { ok?: boolean } = {}) {
+async function inApproved(o: { ok?: boolean; finish?: 'combworkAdvances' | 'previewAdvance' } = {}) {
   stand.on = true
-  env = setup({ platform: 'none', review: 'none', finish: 'combworkAdvances', ...(o.ok ? { okBefore: { mode: 'every', labels: [] } } : {}) }, { enforced: () => true })
+  stand.finish = o.finish ?? 'combworkAdvances'
+  env = setup({ platform: 'none', review: 'none', finish: stand.finish as 'combworkAdvances', ...(o.ok ? { okBefore: { mode: 'every', labels: [] } } : {}) }, { enforced: () => true })
   const e = env
   const card = e.wf.createCard({ title: 'work', paths: ['w.md'] })
   moved(await e.wf.start(card.key, B1))
@@ -146,6 +148,32 @@ describe("the advance's generic dispatch (HI-3235)", () => {
     const host = advanceHostOf(e.wf)
     expect(await host.attested(e.wf.store.card(card.id), { cycle: answers[0].cycle, attempt: 'att-1' }, answers[0], 'again')).toBe(false)
     expect(e.store.facts(card.id).length).toBe(n)
+  })
+
+  it('HI-3236: a previewing finish asks the adapter’s advancePreview, never advance; the preview is bound to its plan, and its click reaches advanceAnswer as a preview answer', async () => {
+    const { e, card } = await inApproved({ finish: 'previewAdvance' })
+    const calls: string[] = []
+    const answers: AdvanceAnswer[] = []
+    const p = e.wf.platformOf(e.wf.store.card(card.id)) as unknown as Record<string, unknown>
+    p.advance = async () => (calls.push('advance'), 'notReady')
+    p.advancePreview = async (c: CardRecord, s: CardState, host: AdvanceHost) => {
+      calls.push('advancePreview')
+      if (!e.wf.state(c).requests.length) await host.askPreview(c, s.cycle, 'plan-1', { target: 'main', expected: 'e'.repeat(40), result: 'r'.repeat(40), style: 'merge', commits: 'r1 one', more: 0 })
+      return 'notReady'
+    }
+    p.advanceAnswer = async (_c: CardRecord, a: AdvanceAnswer) => void answers.push(a)
+    await pass(e, card)
+    expect(calls).toEqual(['advancePreview'])
+    const req = e.wf.state(card).requests.find((r) => r.gate === ADVANCE_PREVIEW_GATE)!
+    expect(req).toMatchObject({ entry: 'plan-1', result: 'plan-1', kind: 'approve' })
+    expect(isRefusal(await e.wf.answer(card.key, req.request, 'approved', { by: 'agent' }))).toBe(true)
+    moved(await e.wf.answer(card.key, req.request, 'approved', { by: 'user' }))
+    await e.wf.runActions()
+    expect(answers).toMatchObject([{ request: req.request, gate: ADVANCE_PREVIEW_GATE, plan: 'plan-1', state: 'preview', answer: 'approved' }])
+    // Another finish (Combwork's advance): advance, never advancePreview.
+    stand.finish = 'combworkAdvances'
+    Object.assign(e.options, { finish: 'combworkAdvances' })
+    expect(calls).not.toContain('advance')
   })
 
   it('a stop with its undo offered asks the stopped question; asked again, the consumed question is retired and one stays open', async () => {
