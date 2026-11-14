@@ -3,7 +3,7 @@ import type { StoredText, TaskCard, TaskPatch } from '../shared/types'
 import type { IntentDone } from '../shared/toolReplies'
 import type { AskAction, ForYouKind, LoopStepId } from '../shared/workflow/facts'
 import type { FocusedTest } from '../shared/workflow/focused'
-import { boardLock, getTask, loopStepNote, readTask, requestNote, runIntent, WorkflowRefusedError, type TaskActor } from './tasks'
+import { boardLock, fenceNow, getTask, loopStepNote, readTask, requestNote, runIntent, WorkflowRefusedError, type TaskActor } from './tasks'
 import { actorOf } from './workflow/recorder'
 import { isRefusal, type Moved, type Reply, type Workflow } from './workflow/runtime'
 import { refusal } from '../shared/workflow/refusals'
@@ -139,7 +139,11 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
 
   // Declaring paths moves nothing: the runtime's own change of the card, in a change of the board.
   if (intent.kind === 'declarePaths') {
-    const r = await boardLock(ws, () => wf.declarePaths(named, who, intent.paths, opts.commit))
+    const r = await boardLock(ws, () => {
+      // HI-3194: the builder's own, fenced as every agent write is, in this board change before the runtime writes.
+      fenceNow(wf, ref.n, actor)
+      return wf.declarePaths(named, who, intent.paths, opts.commit)
+    })
     if (isRefusal(r)) throw new WorkflowRefusedError(r)
     const card = await readTask(ref.n, actor)
     return { done: { ok: true, card: card.key ?? `#${ref.n}`, from: '', to: '', data: { prefill: r.prefill, unclaimed: r.unclaimed, revision: r.revision } }, card }
@@ -183,7 +187,9 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
   }
   if (intent.kind === 'loopStep') await testHooks.beforeDesignWrite?.()
   // `commit` (HI-2420): the Assistant's guard, checked again in each write as the card is saved (runIntent).
-  const { reply, saved } = await runIntent(wf, ref.n, actor, call, zero9, opts.commit)
+  // HI-3194: the builder's own moves are only its attempt's builder's (tasks.ts assigneeOrThrow).
+  const builder = intent.kind === 'submit' || intent.kind === 'reportMerge' || (intent.kind === 'loopStep' && (intent.step === 'design' || intent.step === 'proceed' || intent.step === 'followUp'))
+  const { reply, saved } = await runIntent(wf, ref.n, actor, call, zero9, opts.commit, { builder, start: intent.kind === 'start' })
   if (isRefusal(reply)) throw new WorkflowRefusedError(reply)
   const card = saved ?? (await readTask(ref.n, actor))
   const m = reply as Moved

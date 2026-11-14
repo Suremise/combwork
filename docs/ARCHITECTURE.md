@@ -263,6 +263,23 @@ diverge. Git runs through `git()` (`git.ts`); `mergeWorktree` (`worktrees.ts`) r
 target and returns the merge commit (#1347). The Git view's actions fence the folder (`folderFence.ts`, `gitRepo.ts`)
 and take the repository lock (`repoLock.ts`).
 
+**Attempts and their fences** (HI-3194, SPEC §16.8.7). A card's attempt key is folded from its facts
+(`CardState.attempt`, `shared/workflow/facts.ts`): `Started`/`Adopted` start one, `AttemptBound` (written by `tasks.ts`
+`attemptReassigned` in the board change that gives an attempt's card to another agent) and a `Moved` out of
+`ATTEMPT_STAGES` move its generation on. `main/attemptFence.ts` keeps each launch's bindings (in memory, by run id, dropped
+by `onAgentTokenEnded`): `issueAttempt` moves one forward only, and is called by the card read (`GET /v1/tasks/:n`, from
+`readTaskSeen`'s snapshot), an inbox read (`readInbox`'s `receivedAbout`, each delivery's `attempt` stamp, which
+`deliveries.ts` `checkedNew` takes through `setAttemptStamp` as it makes the delivery), an agent's card creation, and
+`AttemptGuard.accepted` after an accepted write. `servers.ts` captures a request's fence (`captureFence`) as it identifies
+the caller, before anything is awaited, and `taskActor()` gives the actor an `AttemptGuard` over it. The guard is asked
+in each write: `runIntent` gives the runtime an `Alongside.before`, which `runtime.write` (and `refuse`, before its
+`Refused`) calls inside the transaction before the write decides anything, with the builder's-move flag for
+`attempt.notAssignee`; `updateTaskAs`, `commentTask`, `fenceNow` (declaring paths) and `fenceCommit` (a kind, review skip or
+target, through their `commit`) check plain changes. The launch check reads `agentTokens.currentAgentRun`. **Readiness**:
+`runtime.write`'s choke point for Done calls `workflow/dependencyReadiness.ts` `writeReadiness` on each dependent
+(`store.dependents`) as a card moves into or out of Done, and `tasks.ts` calls it for a blockedBy edit, in the same
+transaction; `laneStarts.dependencyWait` reads `CardState.ready`.
+
 **The core spike (P2, #1118)** built the platform adapters, `shared/workflow`, the runtime, reconciliation, the queue
 and checks in isolation, with `tests/workflow/` running SPEC §16.18's scenarios on real temporary repositories (still
 the workflow's scenario tests); P3 put its fact store in `combwork.db`, written inside `boardWrite`, and later phases

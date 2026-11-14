@@ -91,7 +91,7 @@ import { agentNowOf, cardStall, laneOrderView, reviewDueOf, stepWaitOf, type Sta
 import { forwardWaitOf } from './queueReturn'
 import { cancelMessages, leaveMessage, MESSAGE_MAX_CHARS } from './agentMessages'
 import { giveUnseen } from './cardFreshness'
-import { ackCardTask, ackDeliveries, ackThenRead, onCardTaskReceived, deliveriesOf, deliverNow, deliveryView, inboxSwitch, launchWith, NotGiven, readInbox } from './deliveries'
+import { ackCardTask, ackDeliveries, ackThenRead, onCardTaskReceived, deliveriesOf, deliverNow, deliveryView, inboxSwitch, launchWith, NotGiven, readInbox, setAttemptStamp } from './deliveries'
 import { INBOX_SWITCHES, type InboxSwitch } from '../shared/inboxSwitches'
 import { isDoorbell } from '../shared/doorbell'
 import type { DeliverySender, InboxItem } from '../shared/deliveries'
@@ -137,6 +137,7 @@ import { metricsReport } from './metricsUsage'
 import { apiLabel, beginWork, hookLabel } from './mainStalls'
 import type { GuidanceSeries, MetricOutcome, MetricsPart, MetricsQuery, MetricsReport } from '../shared/metrics'
 import { agentForToken, agentToken, agentTokenFile, onAgentTokenEnded, type AgentIdentity, type EndedLaunch } from './agentTokens'
+import { AttemptGuard, captureFence, issueAttempt, type RequestFence } from './attemptFence'
 import { API_EVENTS, apiEventFor, publicRun } from './apiEvents'
 import { clearDiscovery, writeDiscovery } from './apiDiscovery'
 import { createViewerToken, loadViewerTokens, revokeViewerToken, viewerForToken, viewerTokens } from './viewerTokens'
@@ -157,6 +158,17 @@ import { pauseTeam, resumeTeam } from './teamPause'
 import { scanWorkspace } from './teamParked'
 
 const log = createLogger('servers')
+
+// HI-3194: a new delivery about a card is stamped with the card's attempt as it is made (deliveries.ts), read from the
+// board of the workspace its host is in (a host with none, or a card with no workflow record: no stamp).
+setAttemptStamp((host, card) => {
+  try {
+    const ws = workspaceOf(host)
+    return ws?.path ? tasks.attemptRead(ws, basename(host), card) : null
+  } catch {
+    return null
+  }
+})
 const MAX_BODY = 2 * 1024 * 1024
 
 function tokenMatches(header: string | undefined, token: string): boolean {
@@ -401,7 +413,7 @@ let apiToken = ''
 /** Who is calling: a script with the workspace token, the Assistant, or a project agent (by its own token). */
 /** An Assistant caller keeps the token it came with: one launch's, which its later work is checked against (#186). */
 /** A viewer (#620) reads and follows like the workspace token and changes nothing: every request but a GET is refused. */
-type Caller = { kind: 'api' } | { kind: 'viewer'; id: string; name: string } | { kind: 'assistant'; workspace: string; token: string } | ({ kind: 'agent'; runId: string } & AgentIdentity)
+type Caller = { kind: 'api' } | { kind: 'viewer'; id: string; name: string } | { kind: 'assistant'; workspace: string; token: string } | ({ kind: 'agent'; runId: string; fence?: RequestFence } & AgentIdentity)
 const callerStore = new AsyncLocalStorage<Caller>()
 
 function viewerCaller(): { id: string; name: string } | null {
@@ -410,7 +422,7 @@ function viewerCaller(): { id: string; name: string } | null {
 }
 
 /** The project agent making the call (known by its token), or null. */
-function agentCaller(): AgentIdentity | null {
+function agentCaller(): (AgentIdentity & { runId?: string; fence?: RequestFence }) | null {
   const c = callerStore.getStore()
   return c?.kind === 'agent' ? c : null
 }
@@ -1892,10 +1904,23 @@ route('POST', '/v1/inbox', async ({ body }) => {
   if (body?.ack !== undefined) {
     if (!Array.isArray(body.ack) || !body.ack.length || body.ack.length > 200 || !body.ack.every((x: unknown) => typeof x === 'string' && x.length <= 32)) throw new HttpError(400, apiSaid(API.inbox.ackArg))
     const ids = (body.ack as string[]).map((x) => x.trim())
-    return body.read === true ? named(await ackThenRead(host, agentId, ids)) : ackDeliveries(host, agentId, ids)
+    return body.read === true ? named(await ackThenRead(host, agentId, ids, receivedAttempts)) : ackDeliveries(host, agentId, ids)
   }
-  return named(await readInbox(host, agentId))
+  return named(await readInbox(host, agentId, receivedAttempts))
 })
+
+/**
+ * HI-3194: an inbox read's deliveries about cards, each stamped with the attempt it was made in: each such attempt is issued
+ * to the reading launch (attemptFence.ts: never past what it was made in).
+ */
+function receivedAttempts(issued: { card: number; attempt: string }[]): void {
+  const me = agentCaller()
+  if (!me?.runId) return
+  for (const x of issued) {
+    const [id, generation] = x.attempt.split('.').map(Number)
+    issueAttempt({ projectPath: me.projectPath, agentId: me.agentId, runId: me.runId }, x.card, { id, generation })
+  }
+}
 
 // An agent's deliveries with their states and times (#647): the newest `limit` (default 20, at most 200).
 route('GET', '/v1/projects/:name/agents/:agent/deliveries', async ({ params, query }) => {
@@ -2991,7 +3016,8 @@ async function taskActor(): Promise<tasks.TaskActor> {
       .projectConfig(agent.projectPath)
       .then((cfg) => projectAgents(cfg).find((x) => x.id === agent.agentId))
       .catch(() => undefined)
-    return { kind: 'agent', name: `${def?.name ?? agent.agentId} (${project})`, self: { project, agentId: agent.agentId }, scope: project }
+    // HI-3194: its request's fence over each of its writes on a card (captured as the request arrived).
+    return { kind: 'agent', name: `${def?.name ?? agent.agentId} (${project})`, self: { project, agentId: agent.agentId }, scope: project, ...(agent.fence ? { guard: new AttemptGuard(agent.fence) } : {}) }
   }
   // agent-protocol: the name a script's change is recorded under
   return { kind: 'agent', name: 'Agent API' }
@@ -3342,6 +3368,9 @@ route('GET', '/v1/tasks/:n', async ({ params, query }) => {
   const me = agentCaller()
   if (me) {
     noteCardRead(me, view.number)
+    // HI-3194: the card as it is now (its place, agent and description, in every form of this read; never the latest
+    // comment alone): the attempt this read shows is issued to the reading launch (attemptFence.ts).
+    if (me.runId && seen.attempt) issueAttempt({ projectPath: me.projectPath, agentId: me.agentId, runId: me.runId }, view.number, seen.attempt)
     // What it has received of the card's decisions, as a fact (#1216), in the background: the generation read with this
     // reply's decisions, never one written since.
     // HI-2854: the user's comments too, only from a read that gave every comment it keeps in full (not comments=n or
@@ -3459,7 +3488,14 @@ route('POST', '/v1/tasks', async ({ body }) => {
   }
   // Placed once it is made (the Assistant's: its own change, as cw_lane start is), never inside the card's own change.
   const placing = async <R extends { number: number }>(r: R) => (lane ? { ...r, ...(await placeOnLane(lane, r.number)) } : r)
-  if (actor.kind !== 'assistant') return placing(await reply(await create()))
+  if (actor.kind !== 'assistant') {
+    const made = await create()
+    // HI-3194: an agent's own new card is issued to its launch as it was made (its attempt as it came out of its making).
+    const me = agentCaller()
+    const made0 = me?.runId ? tasks.attemptRead(workspace, made.project, made.number) : null
+    if (me?.runId && made0) issueAttempt({ projectPath: me.projectPath, agentId: me.agentId, runId: me.runId }, made.number, made0)
+    return placing(await reply(made))
+  }
   const project = typeof input.project === 'string' && input.project ? input.project : null
   // Made in Doing with nobody on it (HI-2062): refused before the user is asked to approve it (checked again as it is made).
   if (project && input.column === 'doing' && !input.agent) throw new tasks.TaskConflictError(tasks.DOING_NOBODY_NEW)
@@ -3501,7 +3537,10 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
     changes.push(sayStored([API.card.saidTarget, { own: own ? 'yes' : 'no', target: own ?? '' }]))
     ownTargetNote = note
   }
-  const write = async (commit?: () => void): Promise<TaskCard> => {
+  // HI-3194: an agent's changes here that don't go through updateTask (its kind, review skip, target) fenced in their write.
+  const fenced = tasks.fenceCommit(actor, n)
+  const write = async (assistantGuard?: () => void): Promise<TaskCard> => {
+    const commit = assistantGuard ?? fenced
     if (confirmKind !== undefined) {
       await tasks.confirmKind(n, confirmKind, actor, { commit })
       changes.push(sayStored([confirmKind ? API.card.saidNoCode : API.card.saidCode]))
@@ -3516,7 +3555,8 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
     }
     if (target !== undefined && !moving) await setCardTarget(commit)
     // A change and its comment are saved together: a card watch woken by the change names this comment.
-    const c = Object.keys(patch).length ? await tasks.updateTask(n, patch, actor, { said: changes, comment: comment || undefined, commit }) : comment ? await tasks.commentTask(n, comment, actor, { commit }) : await tasks.readTask(n, actor)
+    // updateTask and commentTask fence an agent's change themselves (with its facts, for a move): only the Assistant's guard.
+    const c = Object.keys(patch).length ? await tasks.updateTask(n, patch, actor, { said: changes, comment: comment || undefined, commit: assistantGuard }) : comment ? await tasks.commentTask(n, comment, actor, { commit: assistantGuard }) : await tasks.readTask(n, actor)
     if (comment) changes.push(say(API.card.saidCommented))
     return c
   }
@@ -4844,7 +4884,8 @@ async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<voi
   const caller: Caller | null = ownWorkspace
     ? { kind: 'assistant', workspace: ownWorkspace, token: bearer }
     : agent
-      ? { kind: 'agent', ...agent }
+      ? // HI-3194: its launch's attempt bindings as the request arrives, before anything is awaited (attemptFence.ts).
+        { kind: 'agent', ...agent, fence: captureFence(agent) }
       : viewer
         ? { kind: 'viewer', id: viewer.id, name: viewer.name }
         : enabled && tokenMatches(req.headers.authorization, apiToken)

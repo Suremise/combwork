@@ -1016,7 +1016,7 @@ export const waitingCount = (host: string, agentId: string, kind: DeliveryKind):
  * One already waiting with the same source and ref is returned instead (made again from this one with `replace`).
  */
 export async function createDelivery(host: string, nd: NewDelivery, hooks?: DeliveryHooks): Promise<DeliveryRecord> {
-  const { meta, agentName } = checkedNew(host, nd)
+  const { meta, agentName, attempt } = checkedNew(host, nd)
   const store = await load(host)
   const r = await transact(store, (d) => {
     const why = senderRefusal(nd.from)
@@ -1032,11 +1032,11 @@ export async function createDelivery(host: string, nd: NewDelivery, hooks?: Deli
     }
     if (had) {
       if (!nd.replace) return had
-      const again: DeliveryRecord = { ...had, body: nd.body, ...(nd.card ? { card: nd.card } : {}), ...(meta ? { meta } : {}), ...(nd.forRun ? { forRun: nd.forRun } : {}), expires: new Date(Date.now() + (nd.expiresMs ?? DELIVERY_EXPIRY_HOURS * 60 * 60_000)).toISOString() }
+      const again: DeliveryRecord = { ...had, body: nd.body, ...(nd.card ? { card: nd.card, ...(attempt ? { attempt } : {}) } : {}), ...(meta ? { meta } : {}), ...(nd.forRun ? { forRun: nd.forRun } : {}), expires: new Date(Date.now() + (nd.expiresMs ?? DELIVERY_EXPIRY_HOURS * 60 * 60_000)).toISOString() }
       put(d, had, again)
       return again
     }
-    const rec = addNew(d, nd, meta, agentName)
+    const rec = addNew(d, nd, meta, agentName, attempt)
     d.after.push(() => log.info(`Delivery ${rec.id} (${rec.kind}) for ${userText(nd.agentName ?? nd.agentId)} queued`))
     return rec
   })
@@ -1055,7 +1055,7 @@ export async function createDelivery(host: string, nd: NewDelivery, hooks?: Deli
  */
 export async function createDeliveryOnce(host: string, nd: NewDelivery & { once: string }): Promise<{ record: DeliveryRecord | null; made: boolean }> {
   if (nd.once.length > 300) throw saidError(T.badKey, undefined, { kind: 'invalid' })
-  const { meta, agentName } = checkedNew(host, nd)
+  const { meta, agentName, attempt } = checkedNew(host, nd)
   const store = await load(host)
   try {
     const out = await transact(store, (d) => {
@@ -1063,7 +1063,7 @@ export async function createDeliveryOnce(host: string, nd: NewDelivery & { once:
       if (why) throw saidError(T.notSent, { why })
       const live = nd.source && nd.ref !== undefined ? d.records.find((x) => x.source === nd.source && x.ref === nd.ref && x.agentId === nd.agentId && isLive(x)) : undefined
       if (live) return { record: live, made: false }
-      const rec = addNew(d, nd, meta, agentName)
+      const rec = addNew(d, nd, meta, agentName, attempt)
       d.once = { key: nd.once, at: nowIso() }
       d.after.push(() => log.info(`Delivery ${rec.id} (${rec.kind}) for ${userText(nd.agentName ?? nd.agentId)} queued, once (${userText(nd.once)})`))
       return { record: rec as DeliveryRecord | null, made: true }
@@ -1096,7 +1096,7 @@ export async function deliveryReceiptForTests(host: string, key: string): Promis
 }
 
 /** A new delivery's checks before anything is read: refused (an Error) as createDelivery says; its meta and name as kept. */
-function checkedNew(host: string, nd: NewDelivery): { meta: DeliveryRecord['meta']; agentName: string | undefined } {
+function checkedNew(host: string, nd: NewDelivery): { meta: DeliveryRecord['meta']; agentName: string | undefined; attempt: string | undefined } {
   // Only what reads back is saved (readDelivery's limits): a longer text is refused here, never lost on a restart.
   if (nd.body.length > DELIVERY_BODY_MAX_CHARS) throw saidError(T.tooLong, { length: String(nd.body.length), max: String(DELIVERY_BODY_MAX_CHARS) }, { kind: 'invalid' })
   if ((nd.ref?.length ?? 0) > 300 || (nd.source?.length ?? 0) > 40) throw saidError(T.badKey, undefined, { kind: 'invalid' })
@@ -1107,11 +1107,19 @@ function checkedNew(host: string, nd: NewDelivery): { meta: DeliveryRecord['meta
   // Nor one Combwork keeps out of (HI-2670): an Independent agent, or a session without Combwork's tools or typing.
   const out = keptOut(host, nd.agentId, agentName ?? nd.agentId)
   if (out) throw new NoInbox(out)
-  return { meta, agentName }
+  // HI-3194: stamped with its card's attempt as it is made (what its receipt may issue, never more).
+  const a = nd.card ? attemptStamp?.(host, nd.card) : null
+  return { meta, agentName, attempt: a ? `${a.id}.${a.generation}` : undefined }
+}
+
+/** HI-3194: reads a card's attempt key for a host's new delivery (set by servers.ts, which can read the board). */
+let attemptStamp: ((host: string, card: number) => { id: number; generation: number } | null) | null = null
+export function setAttemptStamp(fn: typeof attemptStamp): void {
+  attemptStamp = fn
 }
 
 /** A new delivery added to a draft, within its limits (how many wait, how many are live, the file's budget), or refused. */
-function addNew(d: Draft, nd: NewDelivery, meta: DeliveryRecord['meta'], agentName: string | undefined): DeliveryRecord {
+function addNew(d: Draft, nd: NewDelivery, meta: DeliveryRecord['meta'], agentName: string | undefined, attempt?: string): DeliveryRecord {
   // agent-protocol: for the log; its caller says it in its own words (agentMessages.ts)
   if (nd.maxWaiting !== undefined && d.records.filter((x) => x.agentId === nd.agentId && x.kind === nd.kind && isWaiting(x)).length >= nd.maxWaiting) throw new TooManyWaiting(`${nd.maxWaiting} already wait`)
   if (d.records.filter(isLive).length >= MAX_LIVE_PER_HOST) throw new DeliveriesFull(say(T.projectFull, { max: String(MAX_LIVE_PER_HOST) }))
@@ -1124,7 +1132,7 @@ function addNew(d: Draft, nd: NewDelivery, meta: DeliveryRecord['meta'], agentNa
     conversation: nd.conversation || null,
     kind: nd.kind,
     from: nd.from,
-    ...(nd.card ? { card: nd.card, ...(nd.round ? { round: nd.round } : {}) } : {}),
+    ...(nd.card ? { card: nd.card, ...(nd.round ? { round: nd.round } : {}), ...(attempt ? { attempt } : {}) } : {}),
     body: nd.body,
     state: 'queued',
     created: nowIso(),
@@ -1304,7 +1312,7 @@ export async function cancelFromSource(host: string, source: string, ref: string
  * before and not acked (of the kinds it acks). What may no longer be given out is refused or expired instead, checked in
  * the same transaction.
  */
-export async function readInbox(host: string, agentId: string): Promise<{ items: InboxItem[]; unacked: string[] }> {
+export async function readInbox(host: string, agentId: string, receivedAbout?: (issued: { card: number; attempt: string }[]) => void): Promise<{ items: InboxItem[]; unacked: string[] }> {
   const store = await load(host)
   const given: DeliveryRecord[] = []
   let unacked: string[] | null = null
@@ -1356,6 +1364,8 @@ export async function readInbox(host: string, agentId: string): Promise<{ items:
     if (!r.missed) break
   }
   show(store, agentId)
+  // HI-3194: what this read received about a card, with the attempt each was made in (its caller issues those, never more).
+  receivedAbout?.(given.flatMap((x) => (x.card && x.attempt ? [{ card: x.card, attempt: x.attempt }] : [])))
   return { items: inDialectOf({ projectPath: host, agentId }, () => inboxItems(given)), unacked: unacked ?? [] }
 }
 
@@ -1424,9 +1434,9 @@ export function onCardTaskReceived(fn: typeof cardTaskReceived): void {
   cardTaskReceived = fn
 }
 
-export async function ackThenRead(host: string, agentId: string, ids: readonly string[]): Promise<{ acked: string[]; unknown: string[]; unread: string[]; items: InboxItem[]; unacked: string[] }> {
+export async function ackThenRead(host: string, agentId: string, ids: readonly string[], receivedAbout?: (issued: { card: number; attempt: string }[]) => void): Promise<{ acked: string[]; unknown: string[]; unread: string[]; items: InboxItem[]; unacked: string[] }> {
   const acked = await ackDeliveries(host, agentId, ids)
-  return { ...acked, ...(await readInbox(host, agentId)) }
+  return { ...acked, ...(await readInbox(host, agentId, receivedAbout)) }
 }
 
 /**
