@@ -837,14 +837,17 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
           {oldRules && (
             <Tooltip content={oldRules} focus>
               <span className="progress-lane-state old-rules" data-mark="old-rules" tabIndex={0} role="note" aria-label={oldRules}>
-                {tr(OLD_RULES)}
+                {/* A narrow panel shows its icon instead (HI-3209), the room for the project's link and the card. */}
+                <Icon name="history" className="progress-lane-tag-icon" />
+                <span className="progress-lane-tag-text">{tr(OLD_RULES)}</span>
               </span>
             </Tooltip>
           )}
           {l.target && (
             <Tooltip content={tr(LANE_TARGET_TIP, { branch: l.target })} focus>
               <span className="progress-lane-state lane-target" data-lane-target={l.target} tabIndex={0} role="note" aria-label={tr(LANE_TARGET_TIP, { branch: l.target })}>
-                {tr(LANE_TARGET, { branch: l.target })}
+                <Icon name="git-merge" className="progress-lane-tag-icon" />
+                <span className="progress-lane-tag-text">{tr(LANE_TARGET, { branch: l.target })}</span>
               </span>
             </Tooltip>
           )}

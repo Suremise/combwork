@@ -228,7 +228,8 @@ const beta = path.join(fx.ws, 'beta')
     check('…and the legend keeps Ready and Merging (an old-rules lane has them)', !!(await hover(bar, (t) => t.includes('Each colour is a category'))) && JSON.stringify(await legendRow('passed').locator('.lanes-legend-stage').allInnerTexts()) === '["Ready","Merging"]', await tipText())
     await shoot('3b-old-rules-solo', () => hover(seg(m.n), (t) => t.includes('Merging card')))
     // A crowded header (HI-3209): old rules, "into integration", the card and the count beside the pair and its slot. The
-    // project's link keeps a few letters, there to be seen and clicked (it was squeezed to nothing): the target gives way.
+    // project's link keeps a few letters, there to be seen and clicked (it was squeezed to nothing), and the header fits its
+    // row: in this narrow panel (its least width) the tags show as icons.
     await page.mouse.move(5, 5)
     for (const id of [l1, l2]) {
       const crowded = row(id)
@@ -244,7 +245,8 @@ const beta = path.join(fx.ws, 'beta')
           return b.width >= 20 && !!top && el.contains(top) && !!count && count.right <= header.right + 0.5 ? { width: b.width } : null
         })
       })
-      check(`a crowded lane header (into integration) keeps its project's link visible and clickable (${id === l1 ? 'l1' : 'l2'})`, !!shown, `${await crowded.locator('.progress-lane-top').innerText()} | ${JSON.stringify(await link.boundingBox())}`)
+      const parts = async () => JSON.stringify(await crowded.locator('.progress-lane-top').evaluate((top) => [Math.round(top.getBoundingClientRect().width), ...[...top.children].map((c) => `${c.className.replace(/\s+/g, '.')}=${Math.round(c.getBoundingClientRect().width)}`)]))
+      check(`a crowded lane header (into integration) keeps its project's link visible and clickable (${id === l1 ? 'l1' : 'l2'})`, !!shown, await parts())
     }
 
     // The lane ends: its mark goes. A new lane uses the new options.

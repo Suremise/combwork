@@ -14896,6 +14896,33 @@ button.progress-lane-why:focus-visible,
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Its tags' icons, shown instead of their words in a narrow panel (below). */
+.progress-lane-tag-icon {
+  display: none;
+}
+/* A narrow panel (its least width is 240px): a lane's pair, slot, project, old rules, "into <branch>", card and count
+   are more than its header holds (HI-3209). The two tags show as their icons, their tooltips and accessible names the
+   same, and the parts sit closer: the project's link and the card stay in view. */
+@container progress (max-width: 359px) {
+  .progress-lane-top {
+    gap: 4px;
+  }
+  .progress-lane-top .progress-lane-tag-icon {
+    display: inline-block;
+    font-size: 12px;
+    vertical-align: middle;
+  }
+  .progress-lane-top .progress-lane-tag-text {
+    display: none;
+  }
+  .progress-lane-top > .tip-wrap:has(> .progress-lane-state.lane-target) {
+    flex-shrink: 0;
+    min-width: 0;
+  }
+  .progress-lane-state.lane-target {
+    overflow: visible;
+  }
+}
 /* Retry an agent's new conversation (HI-2034): the reason's own place, kept whole (short: "⟳ Retry B1"); the project's name gives way. */
 button.progress-lane-retry {
   flex: none;
