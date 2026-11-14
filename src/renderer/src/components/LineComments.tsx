@@ -7,7 +7,7 @@
 // HI-3274: what is typed (a draft, an edit) is held by the layer, not the box, so a box made again (another spot's +, the
 // diff flipping to inline and back) keeps it; a "+" elsewhere opens another draft beside a draft with text in it.
 import { createPortal } from 'react-dom'
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type * as Monaco from 'monaco-editor'
 import { msg, tr } from '@shared/i18n'
 import { formatDateTime } from '@shared/dates'
@@ -48,22 +48,33 @@ type Zone = { key: string; side: LineSide; id: string; zone: Monaco.editor.IView
 
 const draftKey = (d: Draft): string => `${d.side}:${d.from}-${d.to}`
 
-/** What the layer's boxes hold for it (HI-3274), by key: a draft's text, an edit's text, a thread's open edit. */
-const Held = createContext<Map<string, unknown> | null>(null)
+/** State held by the layer for its boxes (HI-3274), by key, telling those that read it of each change. */
+type HeldStore = { values: Map<string, unknown>; subs: Set<() => void> }
+const heldStore = (): HeldStore => ({ values: new Map(), subs: new Set() })
+
+/** The layer's store: a draft's text, an edit's text, a box's save under way and its error, a thread's open edit. */
+const Held = createContext<HeldStore | null>(null)
 
 /**
- * State kept by the layer under `key` as well as in the component: one made again (a new portal, or listed above the diff
- * while inline) starts from it. Set back to `initial`, the layer forgets it.
+ * State held by the layer under `key` (`shared`), not by the component: one made again (a new portal, or listed above the
+ * diff while inline) has it, and a change made by the one it replaced (a save it started, ending) reaches it. Set back to
+ * `initial`, the layer forgets it. Not shared, or outside a layer, it is the component's own. The third value: it was held
+ * when the component was made.
  */
-function useHeld<T>(key: string | undefined, initial: T): [T, (v: T) => void, boolean] {
-  const held = useContext(Held)
-  const kept = useRef(key !== undefined && !!held?.has(key)).current
-  const [v, setV] = useState<T>(() => (kept ? (held!.get(key!) as T) : initial))
+function useHeld<T>(key: string, initial: T, shared = true): [T, (v: T) => void, boolean] {
+  const layer = useContext(Held)
+  const own = useRef<HeldStore | null>(null)
+  const store = shared && layer ? layer : (own.current ??= heldStore())
+  const kept = useRef(store.values.has(key)).current
+  const subscribe = useCallback((tell: () => void) => {
+    store.subs.add(tell)
+    return () => void store.subs.delete(tell)
+  }, [store])
+  const v = useSyncExternalStore(subscribe, () => (store.values.has(key) ? (store.values.get(key) as T) : initial))
   const set = (next: T): void => {
-    setV(next)
-    if (key === undefined || !held) return
-    if (next === initial) held.delete(key)
-    else held.set(key, next)
+    if (next === initial) store.values.delete(key)
+    else store.values.set(key, next)
+    for (const tell of [...store.subs]) tell()
   }
   return [v, set, kept]
 }
@@ -73,7 +84,8 @@ export function CommentLayer({ editor, card, submission, path, comments, agentNa
   const [drafts, setDrafts] = useState<Draft[]>([])
   const [zones, setZones] = useState<Zone[]>([])
   const [oldHidden, setOldHidden] = useState(false)
-  const held = useRef(new Map<string, unknown>()).current
+  const store = useRef(heldStore()).current
+  const held = store.values
   const sideEditor = (side: LineSide): Monaco.editor.ICodeEditor => (side === 'new' ? editor.getModifiedEditor() : editor.getOriginalEditor())
   const dropDraft = (d: Draft): void => setDrafts((ds) => ds.filter((x) => draftKey(x) !== draftKey(d)))
 
@@ -107,8 +119,9 @@ export function CommentLayer({ editor, card, submission, path, comments, agentNa
           const key = draftKey(d)
           setDrafts((ds) => {
             if (ds.some((x) => draftKey(x) === key)) return ds
-            const typed = (x: Draft): boolean => !!String(held.get(`draft:${draftKey(x)}`) ?? '').trim()
-            for (const x of ds) if (!typed(x)) held.delete(`draft:${draftKey(x)}`)
+            // Its text, as its Composer holds it (`text:` and its hold); a draft being saved stays.
+            const typed = (x: Draft): boolean => !!String(held.get(`text:draft:${draftKey(x)}`) ?? '').trim() || held.has(`busy:draft:${draftKey(x)}`)
+            for (const x of ds) if (!typed(x)) held.delete(`text:draft:${draftKey(x)}`)
             return [...ds.filter(typed), d]
           })
           requestAnimationFrame(() => editor.getContainerDomNode().querySelector<HTMLTextAreaElement>(`[data-draft="${key}"] textarea`)?.focus())
@@ -215,7 +228,7 @@ export function CommentLayer({ editor, card, submission, path, comments, agentNa
   const elsewhere = oldHidden ? comments.filter((c) => c.side === 'old') : []
   const elsewhereDrafts = oldHidden ? drafts.filter((d) => d.side === 'old') : []
   return (
-    <Held.Provider value={held}>
+    <Held.Provider value={store}>
       {elsewhere.length + elsewhereDrafts.length > 0 && (
         <div className="cw-comments-elsewhere" data-comments-elsewhere="">
           <div className="faint">{tr(M.elsewhere)}</div>
@@ -259,18 +272,23 @@ export const whereOf = (w: { side: LineSide; from: number; to: number }): string
 /**
  * A box to write a comment in (or edit one): Ctrl+Enter saves, Escape cancels; what went wrong said under it. Its text is
  * held by the layer under `hold` (HI-3274), so the box made again keeps it; a new box takes the focus, one made again doesn't.
+ * So are its save under way and its error (HR1's round 1): a box made again while its save runs stays read-only, with Save and
+ * Cancel off, until that save ends, so it can't save twice, and nothing typed meanwhile is lost when the save clears the box.
  */
 function Composer({ where, hold, initial = '', onSave, onCancel }: { where?: Draft; hold?: string; initial?: string; onSave: (body: string) => Promise<void>; onCancel: () => void }) {
-  const [text, setText, restored] = useHeld(hold, initial)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const shared = hold !== undefined
+  const [text, setText, restored] = useHeld(`text:${hold}`, initial, shared)
+  const [busy, setBusy] = useHeld(`busy:${hold}`, false, shared)
+  const [error, setError] = useHeld<string | null>(`error:${hold}`, null, shared)
   const ref = useRef<HTMLTextAreaElement>(null)
   useEffect(() => {
     if (!restored) ref.current?.focus()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const cancel = (): void => {
+    if (busy) return
     setText(initial)
+    setError(null)
     onCancel()
   }
   const save = async (): Promise<void> => {
@@ -281,7 +299,9 @@ function Composer({ where, hold, initial = '', onSave, onCancel }: { where?: Dra
       await onSave(text)
       setText(initial)
     } catch (e) {
+      // The text stays, to change and save again.
       setError(errorMessage(e))
+    } finally {
       setBusy(false)
     }
   }
@@ -291,6 +311,7 @@ function Composer({ where, hold, initial = '', onSave, onCancel }: { where?: Dra
       <textarea
         ref={ref}
         value={text}
+        readOnly={busy}
         maxLength={LINE_COMMENT_LIMITS.body}
         placeholder={tr(M.placeholder)}
         onChange={(e) => setText(e.target.value)}
@@ -307,7 +328,7 @@ function Composer({ where, hold, initial = '', onSave, onCancel }: { where?: Dra
       <div className="cw-comment-actions">
         <span className="faint">{tr(M.count, { n: text.length, max: LINE_COMMENT_LIMITS.body })}</span>
         <span className="grow" />
-        <button type="button" className="btn small subtle" onClick={cancel}>
+        <button type="button" className="btn small subtle" disabled={busy} onClick={cancel}>
           {tr(M.cancel)}
         </button>
         <button type="button" className="btn small primary" disabled={!text.trim() || busy} onClick={() => void save()}>
