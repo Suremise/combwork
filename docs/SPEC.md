@@ -4485,7 +4485,10 @@ A card's history text (`TaskHistoryEntry`) stays, for people; the facts are the 
 - **Line comments** [HI-3219, from HI-3191's design s12/s17/s20, Darren's decision of 14 Nov]: the user comments on
   lines of a revision's diff (Changes): a **+** in either side's glyph margin on the line under the mouse; pressed, a
   Markdown box under that line, or under the selected lines when the **+** is on one of them (a Monaco view zone),
-  Ctrl+Enter to save, Escape to cancel. Comments are **card facts** (`LineComment {id, submission, side, path, from, to,
+  Ctrl+Enter to save, Escape to cancel. Several drafts can be open (HI-3274): a **+** elsewhere opens another beside each
+  draft with text, an empty one giving way, and a **+** on an open draft's own lines goes back to its box; what is typed (a
+  draft, an edit) is held by the layer, so a box made again keeps it, and inline the original side's drafts are listed
+  above the diff with its comments. Comments are **card facts** (`LineComment {id, submission, side, path, from, to,
   lines, before, after, body}`, `LineCommentEdited {id, body, version}`, `LineCommentResolved`, `LineCommentReopened`,
   `LineCommentDeleted`), folded by `shared/workflow/lineComments.ts`; an id is `lc-<card key>-<the fact's seq>`. `new`
   is anchored in the submission's revision, `old` (deleted lines) in its base, derived from `submission`, never stored.
