@@ -10,7 +10,8 @@
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const { createHash } = require('crypto')
-const { execFileSync } = require('child_process')
+const { execFileSync, spawn } = require('child_process')
+const http = require('http')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
@@ -268,6 +269,49 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
       }
     }
     check('cw_update_task clears waitingFor and blocked with null, "null", "false", false, empty and \'""\', none kept as the reason (HI-3234)', kept.length === 0, JSON.stringify(kept))
+
+    // HI-3195: a keyed write is applied once. The same comment sent again with its request key (its reply lost): one
+    // comment, the retry answered "already applied"; the key reused for another body: refused, nothing written.
+    const keyed = async (k, text) => {
+      const res = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${ref}/comments`, { method: 'POST', headers: { Authorization: `Bearer ${tokens.builder}`, 'Content-Type': 'application/json', 'X-Combwork-Request': k }, body: JSON.stringify({ text }) })
+      return { status: res.status, body: await res.json().catch(() => null) }
+    }
+    const before = (await card(n)).comments.length
+    const k1 = `e2e-${Date.now()}-keyed-comment`
+    const first = await keyed(k1, 'Applied once.')
+    const retry = await keyed(k1, 'Applied once.')
+    check('a keyed comment sent twice is one comment; the retry is answered "already applied"', first.status === 200 && retry.status === 200 && retry.body?.replayed === true && retry.body?.applied === true && (await card(n)).comments.length === before + 1, JSON.stringify({ first, retry, comments: (await card(n)).comments.length - before }))
+    const reused = await keyed(k1, 'Another comment.')
+    check('…its key reused for another body is refused (409 request.keyReused), nothing written', reused.status === 409 && reused.body?.rule === 'request.keyReused' && (await card(n)).comments.length === before + 1, JSON.stringify(reused))
+    const malformed = await keyed('short', 'x')
+    check('…a malformed key is a wrong call (400)', malformed.status === 400, JSON.stringify(malformed))
+
+    // cw-mcp's side, against a server of the suite's own: the first reply to its write lost (the connection dropped), it
+    // sends the write again with the same key; told it was applied, its tool says so.
+    const seen = []
+    const fake = http.createServer((q, r) => {
+      if (q.method === 'GET') return r.end('{}')
+      seen.push(q.headers['x-combwork-request'])
+      if (seen.length === 1) return q.socket.destroy()
+      r.writeHead(200, { 'Content-Type': 'application/json' })
+      r.end(JSON.stringify({ replayed: true, applied: true, produced: { card: key } }))
+    })
+    await new Promise((res) => fake.listen(0, '127.0.0.1', res))
+    const viaFake = await new Promise((resolve) => {
+      const child = spawn(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { env: { ...lib.childEnv(builderCombwork.env), CW_API_URL: `http://127.0.0.1:${fake.address().port}` }, windowsHide: true })
+      let said = ''
+      child.stdout.on('data', (d) => {
+        said += d
+        if (said.includes('\n')) {
+          child.kill()
+          resolve(JSON.parse(said.split('\n')[0]).result)
+        }
+      })
+      child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_update_task', arguments: { number: key, comment: 'Lost reply.' } } }) + '\n')
+    })
+    fake.close()
+    check('cw-mcp sends a write whose reply was lost again, with the same request key', seen.length === 2 && !!seen[0] && seen[0] === seen[1], JSON.stringify(seen))
+    check('…and says it was applied earlier, naming the card', !viaFake.isError && /already applied/.test(viaFake.content[0].text) && viaFake.content[0].text.includes(key), JSON.stringify(viaFake))
 
     await inv('session:stop', alpha)
     await until(async () => (await inv('session:live')).length === 0, HUNG_MS)

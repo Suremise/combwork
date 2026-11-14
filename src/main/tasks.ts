@@ -1,3 +1,4 @@
+import { noteProduced } from './requestReceipts'
 import { createHash, randomBytes } from 'crypto'
 import { basename, join } from 'path'
 import { mkdir, writeFile } from 'original-fs/promises'
@@ -1573,6 +1574,8 @@ async function createTaskLocked(
   // merges into moves (a forward's resolution, which merges into the branch it resolves and nowhere else).
   const target = input.target === undefined ? null : await targetPick(project, input.target, actor, !!opts.pinTarget)
   const n = await nextNumber(ws)
+  // HI-3195: a keyed create's marker keeps the card it made, so a retry of it is told which card (requestReceipts.ts).
+  noteProduced({ created: n })
   const card: TaskCard = {
     number: n,
     title,

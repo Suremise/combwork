@@ -1,3 +1,4 @@
+import { fingerprintOf, KeyReused, KeysBusy, onceFor, REQUEST_KEY, type KeyedRequest } from './requestReceipts'
 import http, { type IncomingMessage, type ServerResponse } from 'http'
 import { AsyncLocalStorage } from 'async_hooks'
 import { randomBytes, timingSafeEqual } from 'crypto'
@@ -5052,7 +5053,10 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
       if (!res.writableEnded) gone.abort()
     })
     // Its replies name cards by key (#1219: "HI-12 (#40)"), its workspace's.
-    const run = (): Promise<unknown> => withCardNames(ws, () => r.handler({ params, query: url.searchParams, body, signal: gone.signal }), callerScope())
+    const plain = (): Promise<unknown> => withCardNames(ws, () => r.handler({ params, query: url.searchParams, body, signal: gone.signal }), callerScope())
+    // HI-3195: a project agent's write sent with a request key is applied once (requestReceipts.ts).
+    const keyed = ws ? keyedRequest(req, r.template, params, body) : null
+    const run = keyed && ws ? (): Promise<unknown> => onceFor(ws, keyed, plain) : plain
     // A project agent's replies say when a card it works on or reviews has a new decision (#357), whatever it called:
     // the Combwork tools add the line to their reply. (The bridge's own reports about its calls aren't the agent's.) Its
     // cards as they were when the call began count too, so the call that moves a card on (to Review, say) still hears
@@ -5072,6 +5076,32 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
     if (status >= 400 && status < 500) m.reason = reasonOf(e)
     send(res, status, body)
   }
+}
+
+/** HI-3195: the agent writes applied once with a request key: the card intents, its changes, a new card, a batch, comments. */
+const KEYED_ROUTES: ReadonlySet<string> = new Set([
+  'POST /v1/tasks',
+  'POST /v1/tasks/batch',
+  'PATCH /v1/tasks/:n',
+  'POST /v1/tasks/:n/comments',
+  'POST /v1/tasks/:n/ask-assistant',
+  'POST /v1/tasks/:n/start',
+  ...Object.keys(INTENT_ROUTES).map((path) => `POST /v1/tasks/:n/${path}`)
+])
+
+/**
+ * HI-3195: a project agent's write on a keyed route sent with `X-Combwork-Request`: its launch, key, fingerprint and route,
+ * or null (no key, not an agent's, not a keyed route). A malformed key is a wrong call (400).
+ */
+function keyedRequest(req: IncomingMessage, template: string, params: readonly string[], body: unknown): KeyedRequest | null {
+  const header = req.headers['x-combwork-request']
+  const key = Array.isArray(header) ? header[0] : header
+  if (key === undefined) return null
+  const me = agentCaller()
+  const routeKey = `${req.method} ${template}`
+  if (!me?.runId || !KEYED_ROUTES.has(routeKey)) return null
+  if (!REQUEST_KEY.test(key)) throw new HttpError(400, apiSaid(API.http.requestKey))
+  return { run: me.runId, key, fingerprint: fingerprintOf(req.method ?? '', template, params, body), route: routeKey, ...(params[0] ? { card: params[0] } : {}) }
 }
 
 /**
@@ -5129,6 +5159,9 @@ async function decisionsNotice(ws: WorkspaceService | null, before: Map<number, 
  * dialect (dialects, HI-2440: a CombworkError's text, also one answered with another status, said in the request's scope).
  */
 export function apiErrorReply(e: unknown): { status: number; body: Record<string, unknown> } {
+  // HI-3195: a request key reused for another request; too many keyed requests in flight (try again in a moment).
+  if (e instanceof KeyReused) return { status: 409, body: { error: say(API.http.requestKeyReused), rule: 'request.keyReused' } }
+  if (e instanceof KeysBusy) return { status: 503, body: { error: say(API.http.requestsBusy) } }
   // A refusal's `error` is its `message`, word for word (HI-3136: the same sentence, filled as the reader's).
   if (e instanceof tasks.WorkflowRefusedError) {
     const refused = refusalBody(e.refusal)

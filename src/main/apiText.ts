@@ -289,6 +289,9 @@ export const API = {
     userTyping: agentMsg({ id: 'api.handover.userTyping', text: 'The user has just typed in {agent}\'s terminal and may still be writing there. Ask the user before handing over.' })
   },
   http: {
+    requestKey: agentMsg({ id: 'api.http.requestKey', text: 'X-Combwork-Request must be 16 to 64 letters, digits, - or _.', note: 'HI-3195: a malformed request key header (cw-mcp makes it; X-Combwork-Request is a header name).' }),
+    requestKeyReused: agentMsg({ id: 'api.http.requestKeyReused', text: 'That request key was used for another request: nothing was done. Send a new request without reusing its key.', note: 'HI-3195: an Agent API write sent with a request key that an earlier, different request of the same launch used.' }),
+    requestsBusy: agentMsg({ id: 'api.http.requestsBusy', text: 'Too many writes are in flight right now: nothing was done. Try again in a moment.', note: 'HI-3195: the keyed writes in flight are at their limit; the request may be sent again.' }),
     apiOff: agentMsg({ id: 'api.http.apiOff', text: 'The Agent API is turned off in Settings → Agent API' }),
     badToken: agentMsg({ id: 'api.http.badToken', text: 'Missing or invalid bearer token' }),
     bodyJson: agentMsg({ id: 'api.http.bodyJson', text: 'Body must be JSON' }),

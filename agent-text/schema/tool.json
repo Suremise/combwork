@@ -150,6 +150,11 @@
       "preview": "plain"
     }
   },
+  "tool.call.appliedEarlier": {
+    "placeholders": {
+      "made": "select"
+    }
+  },
   "tool.call.error": {
     "placeholders": {
       "message": "plain"

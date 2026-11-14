@@ -11,6 +11,7 @@
 // The session's dialect (HI-2065), loaded before any text below is said: first, on purpose.
 import '../../shared/agentText/processDialect'
 import { AsyncLocalStorage } from 'async_hooks'
+import { createHash, randomUUID } from 'crypto'
 import { appendFileSync, readFileSync } from 'fs'
 import { createInterface } from 'readline'
 import { combworkInstructions, withLatestHandover, withPlatformRule } from '../../shared/combworkGuidance'
@@ -209,6 +210,7 @@ const T = {
   'updateSetting.arg.value': agentMsg({ id: 'tool.updateSetting.arg.value', text: 'What cw_read_setting says it takes.' }),
   'answerSimplify.description': agentMsg({ id: 'tool.answerSimplify.description', text: "Answer a card's simplify check, which Combwork told you of: carryOn (what still comes up is worth handling) or simplify (drop what isn't). Cutting scope, and the hard stop's question, are the user's: leave those. why: your reason, a comment on the card.", note: 'HI-3188: the Assistant-only tool for a simplify check (Workflow → Card loops).' }),
   'answerSimplify.done': agentMsg({ id: 'tool.answerSimplify.done', text: '{card}: answered {request}, {choice, select, carryOn {carry on} other {simplify}}; its agents are woken.', note: "HI-3188: cw_answer_simplify's reply." }),
+  'call.appliedEarlier': agentMsg({ id: 'tool.call.appliedEarlier', text: "Done earlier: Combwork had already applied this call ({made, select, other {{made}} none {its card}}), whose reply was lost. Read the card for its state now; don't send it again.", note: 'HI-3195: a retried write Combwork had already applied (its first reply lost). {made}: the card it made or was about (a key or #n), or none.' }),
   'undo.description': agentMsg({ id: 'tool.undo.description', text: 'Undo changes of your own (kept 7 days, grouped by the user\'s message): list, then change or group ("latest": your newest). What someone changed since stays. Only your own: never the user\'s or agents\'. (detail: use-cw-api, tools.md)' }),
   'undo.arg.change': agentMsg({ id: 'tool.undo.arg.change', text: "A change's id, from list with its group." }),
   'undo.arg.group': agentMsg({ id: 'tool.undo.arg.group', text: 'A message\'s id, from list, or "latest".' }),
@@ -374,19 +376,62 @@ function token(): string {
 const notices = new AsyncLocalStorage<Set<string>>()
 
 /**
+ * HI-3195: a tool call's request key (`X-Combwork-Request`), made once per call: each write it sends (POST, PATCH) is
+ * keyed `<base>-<n>`, n counted in the call, so its writes keep their own keys, and the same key is sent again when api()
+ * retries one whose reply was lost. Combwork applies a keyed write once (requestReceipts.ts). `lost`: a write of the call
+ * got no reply after its retries.
+ */
+const callKey = new AsyncLocalStorage<{ base: string; n: number; lost: boolean }>()
+/** A lost write's retries: how many more tries, each with the same key. */
+const LOST_RETRIES = 2
+/**
+ * HI-3195: tool calls whose write got no reply, by tool and arguments, for 10 minutes and at most 32: the same call again
+ * (the model retrying it) reuses that call's key, so Combwork answers "already applied" rather than writing twice. Cleared
+ * once that call's outcome is recovered (a later call with its key gets an answer). Equal arguments can't tell a new
+ * write from a retry while the first's outcome is unknown: this treats them as the retry.
+ */
+const unresolved = new Map<string, { base: string; at: number }>()
+const UNRESOLVED_MS = 10 * 60_000
+const UNRESOLVED_MAX = 32
+const callHash = (tool: string, args: unknown): string => createHash('sha256').update(JSON.stringify([tool, sortedKeys(args)])).digest('hex')
+const sortedKeys = (v: unknown): unknown => (Array.isArray(v) ? v.map(sortedKeys) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v as object).sort().map((k) => [k, sortedKeys((v as Record<string, unknown>)[k])])) : v)
+/** The key base for a call: an unresolved one's of the same tool and arguments (unexpired), else a new one. */
+function keyBaseFor(hash: string): string {
+  const now = Date.now()
+  for (const [h, u] of unresolved) if (now - u.at > UNRESOLVED_MS) unresolved.delete(h)
+  return unresolved.get(hash)?.base ?? randomUUID()
+}
+
+/** HI-3195: a write Combwork had applied already (a retry of one whose reply was lost): what it produced. */
+class AppliedEarlier extends Error {
+  constructor(readonly produced: Record<string, unknown>) {
+    super('applied earlier') // agent-protocol: an internal tag; the call says T['call.appliedEarlier']
+  }
+}
+
+/**
  * Calls the Agent API. `replyMs` is how long the reply may take: a wait passes its own (waitReplyMs), the rest take the
  * usual limit. Not fetch, whose 300 s limit on a reply's headers cut longer waits short (#371).
  */
 
 async function api(method: string, path: string, body?: unknown, replyMs?: number): Promise<unknown> {
+  // HI-3195: a write carries its call's request key (the same on each retry), so Combwork applies it once.
+  const call = method !== 'GET' ? callKey.getStore() : undefined
+  const requestKey = call ? `${call.base}-${++call.n}` : undefined
   // agent-protocol: an HTTP header
-  const headers = { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json', ...(WORKSPACE ? { 'X-Combwork-Workspace': encodeURIComponent(WORKSPACE) } : {}) }
-  let res: Awaited<ReturnType<typeof agentApiCall>>
-  try {
-    res = await agentApiCall(API + path, method, headers, body === undefined ? undefined : JSON.stringify(body), replyMs ?? REPLY_SECONDS * 1000)
-  } catch (e) {
-    // No reply (no connection, a timeout): a real error, whatever its message (HI-2553).
-    throw Object.assign(e instanceof Error ? e : new Error(String(e)), { noReply: true })
+  const headers = { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json', ...(WORKSPACE ? { 'X-Combwork-Workspace': encodeURIComponent(WORKSPACE) } : {}), ...(requestKey ? { 'X-Combwork-Request': requestKey } : {}) }
+  let res: Awaited<ReturnType<typeof agentApiCall>> | undefined
+  // A keyed write whose reply was lost is sent again, with the same key, a few times: applied at most once.
+  for (let tries = 0; ; tries++) {
+    try {
+      res = await agentApiCall(API + path, method, headers, body === undefined ? undefined : JSON.stringify(body), replyMs ?? REPLY_SECONDS * 1000)
+      break
+    } catch (e) {
+      if (requestKey && tries < LOST_RETRIES) continue
+      if (call) call.lost = true
+      // No reply (no connection, a timeout): a real error, whatever its message (HI-2553).
+      throw Object.assign(e instanceof Error ? e : new Error(String(e)), { noReply: true })
+    }
   }
   if (res.notice) {
     try {
@@ -402,6 +447,8 @@ async function api(method: string, path: string, body?: unknown, replyMs?: numbe
   } catch {
     // keep text
   }
+  // HI-3195: applied already (this call's key, a retry of a write whose reply was lost): said so, not as its reply.
+  if (res.status === 200 && data && typeof data === 'object' && (data as { replayed?: unknown }).replayed === true) throw new AppliedEarlier(((data as { produced?: Record<string, unknown> }).produced ?? {}) as Record<string, unknown>)
   if (res.status < 200 || res.status >= 300) throw Object.assign(new Error(typeof data === 'object' && data && 'refused' in data ? refusedText(data as Refused) : typeof data === 'object' && data && 'error' in data ? String((data as { error: unknown }).error) : say(T['call.error.http'], { status: res.status })), { status: res.status })
   return data
 }
@@ -1728,8 +1775,16 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
       let kind: CallReport['kind']
       let testId: string | undefined
       const said = new Set<string>()
+      // HI-3195: this call's request key: an unresolved earlier call's of the same tool and arguments, else a new one.
+      const hash = callHash(tool.name, args)
+      const call = { base: keyBaseFor(hash), n: 0, lost: false }
       try {
-        const result = await notices.run(said, () => tool.run(args))
+        const result = await callKey.run(call, () => notices.run(said, () => tool.run(args)).catch((e: unknown) => {
+          // Applied earlier: the call's outcome is recovered, said as such (what it made, to read).
+          if (e instanceof AppliedEarlier) return say(T['call.appliedEarlier'], { made: e.produced.created !== undefined ? `#${String(e.produced.created)}` : typeof e.produced.card === 'string' ? e.produced.card : 'none' })
+          throw e
+        }))
+        unresolved.delete(hash)
         // Compact: indenting JSON makes it about a third bigger for the model, and no easier for it to read.
         text = typeof result === 'string' ? result : JSON.stringify(result)
         // Combwork's flag (a new decision on a card the agent works on) goes after the reply, on its own line.
@@ -1744,6 +1799,12 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
         text = `${say(T['call.error'], { message: (e as Error).message })}${hint ? `\n${hint}` : ''}`
         testId = testLog(tool.name, params?.arguments, (e as Error).message, { mode: modeOf(args), chars: text.length, bytes: Buffer.byteLength(text, 'utf8') })
         reply(id, { content: [{ type: 'text', text }], isError: true })
+        // HI-3195: a write that got no reply is remembered, so the model's retry of the same call reuses its key.
+        if (call.lost) {
+          unresolved.delete(hash)
+          unresolved.set(hash, { base: call.base, at: Date.now() })
+          while (unresolved.size > UNRESOLVED_MAX) unresolved.delete(unresolved.keys().next().value!)
+        } else if (kind !== 'failed') unresolved.delete(hash)
       }
       // After the reply: the model's text exactly as sent (characters as UTF-16 code units, and UTF-8 bytes).
       calling--
