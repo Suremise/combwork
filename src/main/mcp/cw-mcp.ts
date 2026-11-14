@@ -1235,7 +1235,8 @@ const tools: Tool[] = [
         column: columnArg,
         position: { type: 'string', enum: ['top', 'bottom'], description: say(T['updateTask.arg.position']) },
         before: { type: ['number', 'string'], description: say(T['updateTask.arg.before']) },
-        blocked: { type: 'string' },
+        // HI-3234: null too, so a client passes a clear as null rather than the text "null" (the API clears on either).
+        blocked: { type: ['string', 'null'] },
         title: { type: 'string', description: say(T['updateTask.arg.title']) },
         description: { type: 'string' },
         ...(ASSISTANT ? { project: { type: 'string' } } : {}),
@@ -1248,7 +1249,7 @@ const tools: Tool[] = [
         context: contextArg,
         decision: { type: 'string', description: say(T['updateTask.arg.decision']) },
         // HI-2618: its own card in Doing waits on purpose, with why ('' clears it); no description: the tools' budget (replysize).
-        waitingFor: { type: 'string' },
+        waitingFor: { type: ['string', 'null'] },
         attachments: attachmentsArg('comment'),
         ...(ASSISTANT
           ? {
@@ -1280,7 +1281,7 @@ const tools: Tool[] = [
         numbers: cardsArg(say(T['updateTasks.arg.numbers'])),
         column: columnArg,
         position: { type: 'string', enum: ['top', 'bottom'], description: say(T['updateTasks.arg.position']) },
-        blocked: { type: 'string', description: say(T['updateTasks.arg.blocked']) },
+        blocked: { type: ['string', 'null'], description: say(T['updateTasks.arg.blocked']) },
         labels: { type: 'array', items: { type: 'string' }, description: say(T['updateTasks.arg.labels']) },
         addLabels: { type: 'array', items: { type: 'string' }, description: say(T['updateTasks.arg.addLabels']) },
         removeLabels: { type: 'array', items: { type: 'string' }, description: say(T['updateTasks.arg.removeLabels']) },
