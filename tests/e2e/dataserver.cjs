@@ -147,6 +147,13 @@ const description = {
     const goneText = await goneRow.innerText().catch(() => '')
     check('with its description gone, its server account is listed, saying so', /fake-srv's description is gone/.test(goneText), goneText)
     check('…with Remove alone: no menu, switch, Edit or Set Up', (await goneRow.locator('button').count()) === 1 && (await goneRow.locator('[data-remove]').count()) === 1 && (await goneRow.locator('[data-action="account-menu"], [data-edit-server], [data-set-up], [data-on-here]').count()) === 0)
+    // Its row as it looks, in both themes, for a visual review.
+    await page.mouse.move(5, 5)
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+      await page.screenshot({ path: path.join(lib.WORK, `dataserver-gone-${theme}.png`) })
+    }
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
     await goneRow.locator('[data-remove]').click()
     const askGone = page.locator('.dialog', { hasText: 'Remove Local stub?' })
     await lib.until(async () => ((await askGone.count()) === 1 ? true : null), HUNG_MS)
