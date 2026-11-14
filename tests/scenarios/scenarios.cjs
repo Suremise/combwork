@@ -3242,7 +3242,8 @@ module.exports.SCENARIOS = [
     fake: (c) => `skill card-loop then skill review-agent-work then ${fakeStartReview(c.cards.q)} then cw cw_ask_user {"card":"#${c.cards.q}","kind":"decide","text":"Round 3 would be a third new edge case in a row (a first name with spaces around it keeps them: \\"  Ann  Lee\\"). Worth handling, or simplify or cut scope?"}`,
     expect: (o, c) => {
       const asked = called(o, 'cw_ask_assistant').length > 0 || called(o, 'cw_ask_user').length > 0
-      const failedAgain = history(o.cards.q).filter((h) => h === 'Review failed').length > 2
+      // Its two earlier rounds are comments (reviewedWork's), not verdicts: any failed verdict here is the third round.
+      const failedAgain = history(o.cards.q).includes('Review failed')
       return [
         ['read the review-agent-work skill', read(o, 'review-agent-work'), o.skillsRead.join(',')],
         ['asked whether another edge case is worth handling (cw_ask_assistant or cw_ask_user), or passed it', asked || history(o.cards.q).includes('Review passed'), o.combworkCalls.map((x) => x.tool).join(',')],
