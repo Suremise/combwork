@@ -1,7 +1,9 @@
-import { advancedDef, advancedRoles } from '../../../shared/advanced'
-import { MUSE_CONFIG, MUSE_EVENTS, MUSE_FIELDS, MUSE_LOG_NAMES, MUSE_NAME_IDS, type MuseConfig, type MuseEvent, type MuseField, type MuseLog } from '../../../shared/providers/muse/names'
+import { MUSE_CONFIG, MUSE_EVENTS, MUSE_FIELDS, MUSE_NAME_IDS, type MuseConfig, type MuseEvent, type MuseField } from '../../../shared/providers/muse/names'
 import { advancedValues, type AdvancedReader } from '../../advancedValues'
 import { createLogger, userText } from '../../logger'
+import { nameMapping, onRefusedMapping } from './logNames'
+
+export { logNames } from './logNames'
 
 const log = createLogger('muse')
 
@@ -32,25 +34,14 @@ export function fallbackLine(id: string, value: unknown): string {
 /** Each refused value said once while it stays the same (the log is bounded). */
 const said = new Map<string, string>()
 
-function mapping<R extends string>(id: string, fallback: Readonly<Record<R, string>>, reader: AdvancedReader): Readonly<Record<R, string>> {
-  const def = advancedDef(id)
-  const value = reader.get<string[]>(id)
-  const map = def ? advancedRoles(def, value) : null
-  if (map) return map as Readonly<Record<R, string>>
+onRefusedMapping((id, value) => {
   const shown = String(JSON.stringify(value)).slice(0, 300)
-  if (said.get(id) !== shown) {
-    said.set(id, shown)
-    log.warn(fallbackLine(id, value))
-  }
-  return fallback
-}
+  if (said.get(id) === shown) return
+  said.set(id, shown)
+  log.warn(fallbackLine(id, value))
+})
 
 /** The hook and launch names now (a launch's own, taken at its start). */
 export function launchNames(reader: AdvancedReader = advancedValues): MuseNames {
-  return { events: mapping(MUSE_NAME_IDS.events, MUSE_EVENTS, reader), fields: mapping(MUSE_NAME_IDS.fields, MUSE_FIELDS, reader), config: mapping(MUSE_NAME_IDS.config, MUSE_CONFIG, reader) }
-}
-
-/** The session log's names now (one reader's, for the whole of its reading). */
-export function logNames(reader: AdvancedReader = advancedValues): Readonly<Record<MuseLog, string>> {
-  return mapping(MUSE_NAME_IDS.log, MUSE_LOG_NAMES, reader)
+  return { events: nameMapping(MUSE_NAME_IDS.events, MUSE_EVENTS, reader), fields: nameMapping(MUSE_NAME_IDS.fields, MUSE_FIELDS, reader), config: nameMapping(MUSE_NAME_IDS.config, MUSE_CONFIG, reader) }
 }

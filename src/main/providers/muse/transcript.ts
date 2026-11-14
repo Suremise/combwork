@@ -6,7 +6,7 @@ import { TimelineBuilder } from '../../../shared/usageTimeline'
 import type { NewItem } from '../conversation'
 import type { ConversationParserLike, ImageLocation } from '../types'
 import type { MuseLog } from '../../../shared/providers/muse/names'
-import { logNames } from './names'
+import { logNames } from './logNames'
 
 /**
  * Muse Code's session log (HI-3202, read from 1.4.20's: tests/fixtures/muse/session-1.4.20-echo.jsonl, an offline echo

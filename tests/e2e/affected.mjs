@@ -936,6 +936,8 @@ export const UNIT_SCANS = [
   { test: 'tests/providerRegistry.test.ts', adds: true },
   { test: 'tests/providerRegistry.test.ts', paths: ['src/'], lines: ['claude|codex|copilot|antigravity|agy|opencode', 'providers/'] },
   { test: 'tests/changelog.test.ts', paths: ['CHANGELOG.md'] }, // HI-2968: a version's section once, in order
+  // The usage worker's bundle holds every provider folder's worker.ts, found by a folder scan (HI-3259).
+  { test: 'tests/workerImports.test.ts', paths: ['src/main/providers/'], adds: true },
   // Every jj file that reads the files a jj write replaces calls Combwork's file gate, or says where (HI-2918).
   { test: 'tests/jjFileGateInventory.test.ts', paths: ['src/main/'], adds: true },
   { test: 'tests/jjFileGateInventory.test.ts', paths: ['src/main/'], lines: ['working_copy', 'packed-refs', "'refs'", '--git-dir', "'HEAD'", 'jjFileGate', 'storeGitGated', 'storeGatedHistory'] },
