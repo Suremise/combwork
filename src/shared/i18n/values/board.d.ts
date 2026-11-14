@@ -1029,7 +1029,44 @@ interface CombworkMessageValues {
   'board.work.branch': undefined
   'board.work.carriedOver': { from: string | number; to: string | number }
   'board.work.change': { commits: number; change: string | number }
+  'board.work.changes': undefined
+  'board.work.changes.between': { base: string | number; revision: string | number }
+  'board.work.changes.binary': undefined
+  'board.work.changes.failed': { error: string | number }
+  'board.work.changes.files': undefined
+  'board.work.changes.inline': undefined
+  'board.work.changes.noRepository': undefined
+  'board.work.changes.noRevision': undefined
+  'board.work.changes.noSubmission': undefined
+  'board.work.changes.notListed': { path: string | number }
+  'board.work.changes.openComments': { n: number }
+  'board.work.changes.reading': undefined
+  'board.work.changes.retry': undefined
+  'board.work.changes.sideBySide': undefined
   'board.work.check': { name: string | number; result: string; counted: string }
+  'board.work.comments.add': undefined
+  'board.work.comments.binary': undefined
+  'board.work.comments.cancel': undefined
+  'board.work.comments.changed': undefined
+  'board.work.comments.delete': undefined
+  'board.work.comments.edit': undefined
+  'board.work.comments.edited': undefined
+  'board.work.comments.elsewhere': undefined
+  'board.work.comments.empty': undefined
+  'board.work.comments.length': { n: number; max: number }
+  'board.work.comments.lines': { from: string | number; to: string | number; path: string | number }
+  'board.work.comments.noCard': undefined
+  'board.work.comments.noComment': undefined
+  'board.work.comments.placeholder': undefined
+  'board.work.comments.reopen': undefined
+  'board.work.comments.resolve': undefined
+  'board.work.comments.resolved': undefined
+  'board.work.comments.save': undefined
+  'board.work.comments.sent': undefined
+  'board.work.comments.tooLong': { max: number }
+  'board.work.comments.tooMany': { max: number }
+  'board.work.comments.where': { side: string; from: string | number; same: string; to: string | number }
+  'board.work.comments.you': undefined
   'board.work.doneUnproved': { when: string | number }
   'board.work.failed': { error: string | number }
   'board.work.files': { n: number }
@@ -1046,6 +1083,7 @@ interface CombworkMessageValues {
   'board.work.none': undefined
   'board.work.notRead': { note: string; why: string | number }
   'board.work.notReady': { slot: string | number; stale: string; why: string | number }
+  'board.work.openComments': { n: number }
   'board.work.openFile': { path: string | number }
   'board.work.outsideCombwork': undefined
   'board.work.outsideRules': { rules: string | number }
@@ -1057,6 +1095,22 @@ interface CombworkMessageValues {
   'board.work.revisionNotRead': { note: string; why: string | number }
   'board.work.revisions': undefined
   'board.work.round': { round: number }
+  'board.work.send.alreadySent': undefined
+  'board.work.send.button': { n: number; builder: string | number }
+  'board.work.send.changed': undefined
+  'board.work.send.editedSince': undefined
+  'board.work.send.integrated': undefined
+  'board.work.send.intro': { builder: string | number }
+  'board.work.send.itemsChanged': undefined
+  'board.work.send.noBuilder': undefined
+  'board.work.send.notHere': undefined
+  'board.work.send.nothing': undefined
+  'board.work.send.reading': undefined
+  'board.work.send.replace': { reviewer: string | number }
+  'board.work.send.reviewing': { reviewer: string | number }
+  'board.work.send.send': { n: number }
+  'board.work.send.sentBefore': undefined
+  'board.work.send.title': { builder: string | number }
   'board.work.staleChange': { approved: string | number; current: string | number }
   'board.work.staleDecision': undefined
   'board.work.staleNext': { approved: string | number }

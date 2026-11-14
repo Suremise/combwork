@@ -144,7 +144,7 @@ function seen(merged: PlanLimit, kept: PlanLimit, next: PlanLimit): PlanLimit {
 }
 
 /** The fields that say what a limit is, rather than how much of it is used (HI-2734). */
-const DESCRIPTION = ['label', 'windowMinutes', 'models'] as const
+const DESCRIPTION = ['label', 'windowMinutes', 'models', 'scope'] as const
 
 /**
  * A merged reading, saying what the limit is as the latest report to say it did (HI-2734): the new report's, unless the
@@ -157,6 +157,7 @@ function described(merged: PlanLimit, kept: PlanLimit, newAt = merged.describedA
   if (keptAt && newAt && Date.parse(keptAt) > Date.parse(newAt)) {
     for (const k of DESCRIPTION) (out as unknown as Record<string, unknown>)[k] = kept[k]
     if (kept.models === undefined) delete out.models
+    if (kept.scope === undefined) delete out.scope
     out.describedAt = keptAt
   } else if (newAt) out.describedAt = newAt
   return out
@@ -233,8 +234,8 @@ function saveSoon(): void {
 const USED = msg({ id: 'main.plan.used', defaultMessage: '{share, number, ::percent} of your {provider} {window, select, hours {{hours, plural, one {#-hour limit} other {#-hour limit}}} weekly {weekly limit} other {{label} limit}} used', description: "A notice: how much of a plan's usage limit is used ({share}: \"85%\"). {provider} is the coding agent. The limit is a rolling window of {hours} hours (the 5-hour one), the weekly one, or another the provider names itself ({label}, in English as the provider says it)." })
 
 /** A limit's window as main.plan.used selects on: a whole number of hours (the 5-hour window), the weekly one, else its label. */
-const usedWindow = (l: Pick<PlanLimit, 'windowMinutes' | 'models'>): { window: 'hours' | 'weekly' | 'other'; hours: number } =>
-  l.models ? { window: 'other', hours: 0 } : l.windowMinutes === 7 * 24 * 60 ? { window: 'weekly', hours: 0 } : l.windowMinutes && l.windowMinutes % 60 === 0 ? { window: 'hours', hours: l.windowMinutes / 60 } : { window: 'other', hours: 0 }
+const usedWindow = (l: Pick<PlanLimit, 'windowMinutes' | 'models' | 'scope'>): { window: 'hours' | 'weekly' | 'other'; hours: number } =>
+  l.models || l.scope ? { window: 'other', hours: 0 } : l.windowMinutes === 7 * 24 * 60 ? { window: 'weekly', hours: 0 } : l.windowMinutes && l.windowMinutes % 60 === 0 ? { window: 'hours', hours: l.windowMinutes / 60 } : { window: 'other', hours: 0 }
 
 const USED_ON = msg({ id: 'main.plan.usedOn', defaultMessage: '{share, number, ::percent} of the {window, select, hours {{hours, plural, one {#-hour limit} other {#-hour limit}}} weekly {weekly limit} other {{label} limit}} used on {connection}', description: "A notice (HI-1756): how much of a plan's usage limit is used ({share}: \"85%\") on one connection, a sign-in the user named ({connection}: \"Max 1\"). The limit is a rolling window of {hours} hours (the 5-hour one), the weekly one, or another the provider names itself ({label}, in English as the provider says it)." })
 
@@ -242,7 +243,7 @@ const USED_ON = msg({ id: 'main.plan.usedOn', defaultMessage: '{share, number, :
  * The notice that a limit is `level`% used: in the language shown, its title in English for the Agent API too. On a
  * connection (HI-1756), it names the connection, whose own limit it is. Exported for tests.
  */
-export function planNotice(provider: ProviderId, l: Pick<PlanLimit, 'usedPercent' | 'resetsAt' | 'label' | 'windowMinutes' | 'models'>, level: number, connection?: string): { title: string; body: string; apiTitle: string; apiTitleText: TextPart } {
+export function planNotice(provider: ProviderId, l: Pick<PlanLimit, 'usedPercent' | 'resetsAt' | 'label' | 'windowMinutes' | 'models' | 'scope'>, level: number, connection?: string): { title: string; body: string; apiTitle: string; apiTitleText: TextPart } {
   // The limit's name as text (HI-2734), so the title is in the window's language and the Agent API's in English, each whole.
   const values = { share: Math.round(l.usedPercent) / 100, provider: providerName(provider), ...usedWindow(l), label: limitNameText(l), connection: connection ?? '' }
   const m = connection ? USED_ON : USED
@@ -256,7 +257,7 @@ export function planNotice(provider: ProviderId, l: Pick<PlanLimit, 'usedPercent
  * status bar's warning colour goes by), the reset times and who reported them. Only the report times aren't a change.
  */
 const shownValues = (u: PlanUsage | null | undefined): string =>
-  JSON.stringify([u?.plan ?? null, (u?.limits ?? []).map((l) => [l.id, l.usedPercent, l.resetsAt, l.reportedBy ?? null, l.label, l.windowMinutes, l.models ?? null, !!l.unlimited, !!l.notIncluded, l.used ?? null, l.entitlement ?? null])])
+  JSON.stringify([u?.plan ?? null, (u?.limits ?? []).map((l) => [l.id, l.usedPercent, l.resetsAt, l.reportedBy ?? null, l.label, l.windowMinutes, l.models ?? null, l.scope ?? null, !!l.unlimited, !!l.notIncluded, l.used ?? null, l.entitlement ?? null])])
 
 /**
  * Providers report plan usage often (Claude Code with every status-line update, many times a minute while

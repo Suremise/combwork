@@ -16,7 +16,7 @@
   "connections.mark.anotherMark": "正在使用与所选连接不同的连接运行",
   "connections.mark.none": "无连接",
   "connections.mark.noneUsable": "此工作区中没有已启用的 {cli} 账号：启用一个之前它无法启动（“设置”→“账号与连接”）。",
-  "connections.mark.offHere": "{wanted} 所在的账号在此工作区中已停用：它正使用 {name}（其 CLI 的第一个可用连接）运行",
+  "connections.mark.offHere": "{wanted} 所在的账号在此工作区中已停用：它正使用 {name}（此处第一个已启用账号上匹配的连接）运行",
   "connections.mark.offNoDefault": "{wanted} 在此处已停用",
   "connections.mark.offNoDefaultUsable": "{wanted} 在此工作区中已停用，且没有其他已启用的 {cli} 账号：启用一个之前它无法启动（“设置”→“账号与连接”）。",
   "connections.mark.other": "在重启之前使用 {running} 运行。当前所选：{chosen}",

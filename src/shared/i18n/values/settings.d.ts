@@ -346,8 +346,14 @@ interface CombworkMessageValues {
   'settings.advanced.codex.queue.hint.title': undefined
   'settings.advanced.codex.rateLimitNudge.hide.desc': undefined
   'settings.advanced.codex.rateLimitNudge.hide.title': undefined
+  'settings.advanced.codex.rateLimits.defaultLimitId.desc': undefined
+  'settings.advanced.codex.rateLimits.defaultLimitId.title': undefined
   'settings.advanced.codex.rateLimits.field.desc': undefined
   'settings.advanced.codex.rateLimits.field.title': undefined
+  'settings.advanced.codex.rateLimits.limitId.desc': undefined
+  'settings.advanced.codex.rateLimits.limitId.title': undefined
+  'settings.advanced.codex.rateLimits.limitName.desc': undefined
+  'settings.advanced.codex.rateLimits.limitName.title': undefined
   'settings.advanced.codex.rateLimits.usedPercent.desc': undefined
   'settings.advanced.codex.rateLimits.usedPercent.title': undefined
   'settings.advanced.codex.rateLimits.windowMinutes.desc': undefined

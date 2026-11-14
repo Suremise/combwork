@@ -1964,6 +1964,8 @@ describe('sending a prompt to a CLI until it takes it (lib.sendPrompt, #190)', (
     let drawn = 0
     const inv = async (ch: string, _key: unknown, data?: unknown) => {
       if (ch === 'pty:buffer') return t.screen
+      // Its size, for the screen as drawn (HI-3210: sendPrompt reads what the CLI drew, not the raw output's text).
+      if (ch === 'pty:size') return { cols: 200, rows: 30 }
       const d = String(data)
       t.writes.push(d)
       if (d === '\x15') t.input = ''
@@ -2019,7 +2021,9 @@ describe('sending a prompt to a CLI until it takes it (lib.sendPrompt, #190)', (
     expect(await run()).toBe(2)
     expect(t.writes).toEqual([...attempt(text, true), ...attempt(text, true)])
     expect(t.taken).toEqual([text])
-    expect(String(log.mock.calls[0][0])).toMatch(/^INFO sendPrompt attempt 1 not taken: pasted, echoed yes, its text not on the last input line/)
+    // HI-3210: each paste's own line says when it was drawn; the attempt not taken says so after it.
+    const notTaken = log.mock.calls.map((c) => String(c[0])).find((l) => l.includes('not taken'))
+    expect(notTaken).toMatch(/^INFO sendPrompt attempt 1 not taken: pasted, drawn yes, its end not on the last input line/)
   })
 
   it('with bracketed paste on, a dropped prompt goes again as a paste after a Ctrl+U of its own (#1547)', async () => {

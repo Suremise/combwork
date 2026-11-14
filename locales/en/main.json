@@ -1087,6 +1087,10 @@
     "defaultMessage": "Not resumed",
     "description": "What the notice offering to resume the agents that were working before Combwork restarted says after Don't Resume (HI-2320), in place of its buttons."
   },
+  "main.outcome.nothingToResume": {
+    "defaultMessage": "Nothing left to resume",
+    "description": "What the notice offering to resume the agents that were working before Combwork restarted says, in place of its buttons, once none of the agents it named can be resumed any more (HI-3214: each was removed, is running already or has a newer conversation)."
+  },
   "main.outcome.offerReplaced": {
     "defaultMessage": "Replaced by a newer offer",
     "description": "What the notice offering to resume the agents that were working before Combwork restarted says once a newer such notice replaces it, listing every agent offered (another workspace got ready later; HI-2356), in place of its buttons."

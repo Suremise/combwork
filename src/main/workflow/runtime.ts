@@ -41,6 +41,9 @@ import { finishAccepts, recordFinish } from './finish'
 import { NOT_RUN_HERE, pauseWait, queueLine, queueStateOf, type QueueLive } from './queueState'
 import { checksView } from '../../shared/toolReplies'
 import { agentMsg, say, type AgentMsg, type AgentValues } from '../../shared/agentText'
+import { batchSent, feedbackExpectOf, foldLineComments, openReviewOf, sameExpect, type FeedbackExpect, type LineCommentView } from '../../shared/workflow/lineComments'
+import { FEEDBACK_REFUSED } from './feedbackText'
+import { combworkError } from '../combworkError'
 import { inDefaultDialect } from '../../shared/agentText/asyncScope'
 import { HISTORY, storedText } from '../../shared/taskHistory'
 
@@ -1112,7 +1115,7 @@ export class Workflow {
       await this.cfg.hooks?.beforeWrite?.('start')
       // How many times it may be gathered again while only its fingerprint moved (its platform's; HI-2916: jj's head moves
       // with Combwork's own jj operations beside it).
-      const gathers = this.platform(g.o).startGathers ?? 1
+      const gathers = this.platform(g.o).gathers ?? 1
       // Each pass gathered again is awaited here, never returned bare (HI-2916): this pass's `finally` gives back the slot
       // it lent only once the pass after has started with it, or hasn't. Returned bare, the `finally` ran at once, so the
       // pass after found its lease ended, lent another, and a third could find the slot still settling and wait.
@@ -1176,9 +1179,9 @@ export class Workflow {
       // fingerprint unreadable at that instant (HI-2972): gathered again from the top while its platform allows more
       // passes (none beyond #1206's one unless it says so), else refused.
       if (out && evidenceMoved) {
-        const again = gathers > 1 && this.gathering.depth(card.id) < gathers ? await this.startAgain(card, from, g.o, g.before) : null
+        const again = gathers > 1 && this.gathering.depth(card.id) < gathers ? await this.gatherAgain(card, from, g.o, g.before) : null
         if (again) {
-          this.startPassLog(card, 'write', again, gathers)
+          this.passLog(card, 'start', 'write', again, gathers)
           return await this.regather(card, () => this.start(ref, actor, opts))
         }
       }
@@ -1270,7 +1273,7 @@ export class Workflow {
     // covers, so a change to it before the write would go unseen (#1401 round 2).
     if (!this.platform(o).planCovered(before.primed, plan)) {
       if (lent) await this.slotUnused(card, lent)
-      this.startRefusedLog(card, 'plan', this.platform(o).startGathers ?? 1)
+      this.startRefusedLog(card, 'plan', this.platform(o).gathers ?? 1)
       return { rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal
     }
     const data: FactData['Started'] = { ...planned, builder, cardKind: card.kind }
@@ -1363,7 +1366,8 @@ export class Workflow {
 
   /**
    * How many passes deep each intent is in being gathered again (`regather`), its own call chain's (gatherDepth.ts): at
-   * most once, so a fingerprint moving again refuses, except a start on a platform allowing more (`startGathers`, HI-2916).
+   * most once, so a fingerprint moving again refuses, except a start or a verdict on a platform allowing more (`gathers`,
+   * HI-2916, HI-3216).
    */
   private readonly gathering = new GatherDepth()
 
@@ -1376,14 +1380,15 @@ export class Workflow {
    * fingerprint: the intent starts again, reading everything afresh, once (`regather`). A real change refuses at once,
    * as does a fingerprint moving again in the second pass. Git, the files and SQLite can't be one transaction:
    * reconciliation settles what comes after the transaction's read. `passes`: how many passes deep it may go (a start's
-   * platform may allow more than one, `startGathers`).
+   * platform may allow more than one, `gathers`).
    */
-  private async revalidate(card: CardRecord, s: CardState, o: WorkflowOptions, before: Evidence, passes = 1): Promise<boolean> {
+  private async revalidate(card: CardRecord, s: CardState, o: WorkflowOptions, before: Evidence, passes = 1, intent = 'start'): Promise<boolean> {
     if (this.gathering.depth(card.id) >= passes) return false
-    // A start allowed several passes (HI-2972): `startAgain`'s answer, a steady fingerprint going on to the write.
+    // An intent allowed several passes (HI-2972; a verdict's, HI-3216): `gatherAgain`'s answer, a steady fingerprint going
+    // on to the write.
     if (passes > 1) {
-      const again = await this.startAgain(card, s, o, before)
-      if (again === 'moved' || again === 'unreadable') this.startPassLog(card, 'before write', again, passes) // i18n-ignore: a log line's code, never shown
+      const again = await this.gatherAgain(card, s, o, before)
+      if (again === 'moved' || again === 'unreadable') this.passLog(card, intent, 'before write', again, passes) // i18n-ignore: a log line's code, never shown
       return again === 'moved' || again === 'unreadable'
     }
     const a = before.value === null ? null : this.evidenceNow(card, s, o, before.primed)
@@ -1391,7 +1396,7 @@ export class Workflow {
   }
 
   /**
-   * Whether a start on a platform allowing several passes (`startGathers`) is gathered again (HI-2972), asked with passes
+   * Whether a start or a verdict on a platform allowing several passes (`gathers`) is gathered again (HI-2972, HI-3216), asked with passes
    * left: `moved`, its fingerprint moved and its answer by content is the gathered one; `unreadable`, its fingerprint
    * couldn't be read when it was gathered or can't be now (jj's operation heads while any jj operation lands, Combwork's
    * own included: the new head is written before the old one goes); `steady`, the fingerprint is the gathered one;
@@ -1399,7 +1404,7 @@ export class Workflow {
    * still needs exactly the fingerprint it gathered, so nothing unreadable or changed is ever written on: unlike
    * `sameContent`, this asks no steadiness across its own read, since its answer only decides to read again.
    */
-  private async startAgain(card: CardRecord, s: CardState, o: WorkflowOptions, before: Evidence): Promise<'moved' | 'unreadable' | 'steady' | null> {
+  private async gatherAgain(card: CardRecord, s: CardState, o: WorkflowOptions, before: Evidence): Promise<'moved' | 'unreadable' | 'steady' | null> {
     if (before.value === null || before.content === null) return 'unreadable'
     const a = this.evidenceNow(card, s, o, before.primed)
     if (a === null) return 'unreadable'
@@ -1410,9 +1415,9 @@ export class Workflow {
     return content === before.content ? 'moved' : null
   }
 
-  /** A start gathered again (HI-2972): where, why, and the pass the next one is, in the log. */
-  private startPassLog(card: CardRecord, at: string, why: string, passes: number): void {
-    log.info(`#${card.id}'s start gathered again (${at}: fingerprint ${why}), pass ${this.gathering.depth(card.id) + 2} of ${passes}`)
+  /** An intent gathered again (HI-2972; a verdict's, HI-3216): which, where, why, and the pass the next one is, in the log. */
+  private passLog(card: CardRecord, intent: string, at: string, why: string, passes: number): void {
+    log.info(`#${card.id}'s ${intent} gathered again (${at}: fingerprint ${why}), pass ${this.gathering.depth(card.id) + 2} of ${passes}`)
   }
 
   /** A start refused as `evidence.changed` (HI-2972): which check, on which pass, in the log (` not started: `, as the platform's). */
@@ -2143,10 +2148,20 @@ export class Workflow {
     // HI-2660: what the pass accepts of others' focused-test runs, worked out in the write on the card's facts then.
     let acceptance: ReturnType<typeof acceptedRuns> = { accepted: [], warnings: [] }
     await this.cfg.hooks?.beforeWrite?.('verdict')
-    if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.verdict(ref, actor, args))
+    // As a start's (HI-3216): gathered again while only its fingerprint moved, or can't be read at that instant, as often
+    // as its platform allows. jj's head moves with Combwork's own jj operations beside a review (its review copy put at
+    // the revision reviewed as start review leases it), which change nothing the verdict decides on.
+    const gathers = this.platform(r.options).gathers ?? 1
+    if (await this.revalidate(card, s, r.options, before, gathers, 'verdict')) return this.regather(card, () => this.verdict(ref, actor, args))
+    let evidenceMoved = false
     const out = await this.writeWhole(card, r, actor, (w) => {
-      const changed = this.stillAt(w, s, 'verdict') ?? this.evidenceChanged(w, r.options, before)
-      if (changed) return changed
+      const stale = this.stillAt(w, s, 'verdict')
+      if (stale) return stale
+      const changed = this.evidenceChanged(w, r.options, before)
+      if (changed) {
+        evidenceMoved = true
+        return changed
+      }
       // `startReview`: its review started in the same write, under start review's guards (an agent's old verdict, #1268:
       // one write, so a refusal or an error later in it leaves nothing of either).
       if (args.startReview && sub) {
@@ -2191,8 +2206,70 @@ export class Workflow {
       this.finish(w, fin)
       return null
     })
+    // Its fingerprint moved again between the last gather and the write, its answer by content the same, or unreadable at
+    // that instant (a start's rule, HI-2972): gathered again from the top while its platform allows more passes.
+    if (out && evidenceMoved) {
+      const again = gathers > 1 && this.gathering.depth(card.id) < gathers ? await this.gatherAgain(card, s, r.options, before) : null
+      if (again) {
+        this.passLog(card, 'verdict', 'write', again, gathers)
+        return this.regather(card, () => this.verdict(ref, actor, args))
+      }
+      log.info(`#${card.id}'s verdict refused: evidence.changed at its write, pass ${this.gathering.depth(card.id) + 1} of ${gathers} (${this.noPassWhy(card, gathers)})`)
+    }
     if (out) return this.refuse(card, actor, 'verdict', out)
     return this.ok(card, 'review', this.state(card).stage, acceptance.accepted.length ? { accepted: acceptance.accepted } : undefined, acceptance.warnings)
+  }
+
+  /**
+   * HI-3220 (HI-3191's design, Darren's decision of 14 Nov): the user's open line comments sent to the card's builder as one
+   * fix round, from Review, Approved or queued. One write checks, refusing with nothing written: the stage; the card as the
+   * preview saw it (`expect`: its latest submission, decision generation and open review); a builder; the batch not sent
+   * before; every item open at the version shown; an agent's open review replaced only as confirmed (`replaces`, that very
+   * review); no merge under way (`queue.advancing`) and nothing integrated. Then a queued entry is taken out, and the
+   * user's failed verdict (its comment `message`'s), `FeedbackSent`, the move to Active and the builder's wake are written,
+   * the round counted and its limit asked as for any failed verdict. The window's refusals are thrown (FEEDBACK_REFUSED).
+   */
+  async feedback(ref: unknown, actor: Actor, args: { batch: string; items: readonly { id: string; version: number }[]; expect: FeedbackExpect; replaces?: { reviewer: string; submission: number } | null; message: (items: LineCommentView[], latest: { id: number; revision: string | null }) => string }): Promise<Reply> {
+    const card = this.resolve(ref, actor)
+    if (isRefusal(card)) return card
+    const s = this.state(card)
+    const r = s.started ? this.rulesetOf(card, s) : null
+    const out = await this.writeWhole(card, r, actor, (w) => {
+      const st = w.state()
+      if (st.stage !== 'review' && st.stage !== 'approved' && st.stage !== 'merging') throw combworkError(FEEDBACK_REFUSED.notHere)
+      if (st.integrated) throw combworkError(FEEDBACK_REFUSED.integrated)
+      if (!sameExpect(feedbackExpectOf(st), args.expect)) throw combworkError(FEEDBACK_REFUSED.changed)
+      const builder = st.started?.builder
+      if (!builder) throw combworkError(FEEDBACK_REFUSED.noBuilder)
+      const facts = w.tx.facts(card.id)
+      if (batchSent(facts, args.batch)) throw combworkError(FEEDBACK_REFUSED.alreadySent)
+      const views = foldLineComments(facts)
+      if (!args.items.length) throw combworkError(FEEDBACK_REFUSED.nothing)
+      const chosen = args.items.map((it) => {
+        const c = views.find((v) => v.id === it.id)
+        if (!c || c.state !== 'open' || c.version !== it.version) throw combworkError(FEEDBACK_REFUSED.itemsChanged)
+        return c
+      })
+      const review = openReviewOf(st)
+      if (review && (args.replaces?.reviewer !== review.reviewer || args.replaces?.submission !== review.submission)) throw combworkError(FEEDBACK_REFUSED.reviewing, { reviewer: review.reviewer })
+      const e = openEntry(st)
+      if (e?.state === 'started') return { rule: 'queue.advancing', values: { card: card.key, target: e.target } } as GuardRefusal
+      if (e) w.fact('IntegrationCancelled', { entry: e.id, reason: 'feedback' }) // i18n-ignore: a fact's kind and codes, not text
+      const latest = st.latest!
+      const round = st.rounds + 1
+      // agent-protocol: a fact's kind and codes; its comment is agent text, made in feedbackText.ts
+      const verdict = w.fact('Verdict', { reviewer: 'user', submission: latest.id, revision: latest.revision, pass: false, round, generation: st.generation, comment: args.message(chosen, { id: latest.id, revision: latest.revision }) }) // i18n-ignore: a fact's kind and codes; its comment is agent text (feedbackText.ts)
+      w.fact('FeedbackSent', { batch: args.batch, submission: latest.id, round, items: args.items.map(({ id, version }) => ({ id, version })) })
+      w.move('active', 'intent')
+      // Its wake names the user's verdict, not the move: a verdict of the user's reaches the builder whether or not the
+      // card has a reviewer (loopWakes.ts' targetOf), where a loop's handoffs need one.
+      w.action('wake', { agent: builder, why: stored(W.failedReview, { card: card.key }) }, verdict.seq)
+      w.woken.push(builder)
+      this.askAtLimit(w)
+      return null
+    })
+    if (out) return this.refuse(card, actor, 'feedback', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    return this.ok(card, s.stage, this.state(card).stage)
   }
 
   /**
@@ -2895,8 +2972,8 @@ export class Workflow {
       // agent-protocol: who can override, the refusal's override field (§16.8.3)
       if (releasedTarget && !opts.dry && opts.released !== releasedTarget) return by === 'user' ? needs(skipped) : this.refuse(card, 'assistant', 'start', (releasedRule as { refusal: GuardRefusal }).refusal, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
       await this.cfg.hooks?.beforeWrite?.('move')
-      // A start's passes, as `start`'s (its platform's `startGathers`, HI-2916).
-      const gathers = gs ? (this.platform(gs.o).startGathers ?? 1) : 1
+      // A start's passes, as `start`'s (its platform's `gathers`, HI-2916).
+      const gathers = gs ? (this.platform(gs.o).gathers ?? 1) : 1
       if (gs && (await this.revalidate(card, s, gs.o, gs.before, gathers))) return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
       if (!gs && gsub && (await this.revalidate(gsub.card, gsub.s, gsub.o, gsub.before))) return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
       const cause: FactData['Moved']['cause'] = skipped.length ? 'override' : 'user'
@@ -2952,9 +3029,9 @@ export class Workflow {
         if (releaseMoved && !this.gathering.depth(card.id)) return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
         // The start's fingerprint moved again before the write, its content the same: gathered again while its platform
         // allows more passes (`start`'s rule, HI-2916).
-        const again = startMoved && gs && gathers > 1 && this.gathering.depth(card.id) < gathers ? await this.startAgain(card, s, gs.o, gs.before) : null
+        const again = startMoved && gs && gathers > 1 && this.gathering.depth(card.id) < gathers ? await this.gatherAgain(card, s, gs.o, gs.before) : null
         if (again) {
-          this.startPassLog(card, 'write', again, gathers)
+          this.passLog(card, 'start', 'write', again, gathers)
           return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
         }
         if (startMoved) this.startRefusedLog(card, 'write', gathers, this.noPassWhy(card, gathers))

@@ -158,6 +158,8 @@ import { checkOffer, dismissOffer, releaseOffers } from './workflow/releaseOffer
 import { branchStartArg } from '../shared/nextVersion'
 import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pauseQueue, purgeQueueHistory, purgeTargetsOf, queueCardChange, queueHistory, queueViews, resolveForward, resumeQueue, settleQueueChanges } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
+import { revisionDiff } from './workflow/revisionDiff'
+import { addLineComment, changeLineComment, feedbackPreview, sendFeedback } from './workflow/lineComments'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
 import { withSkillDelivered } from '../shared/skillDelivery'
@@ -996,6 +998,11 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       if (typeof project === 'string' && project) reconcileCard(ws, n, project)
       return cardWork(ws, n)
     },
+    'tasks:revisionDiff': (n, submission, file) => revisionDiff(currentWorkspace(), Number(n), Number(submission), String(file ?? '')),
+    'tasks:lineCommentAdd': (n, comment) => addLineComment(currentWorkspace(), Number(n), comment),
+    'tasks:lineCommentChange': (n, id, change) => changeLineComment(currentWorkspace(), Number(n), String(id ?? ''), change),
+    'tasks:feedbackPreview': (n) => feedbackPreview(currentWorkspace(), Number(n)),
+    'tasks:feedbackSend': (n, send) => sendFeedback(currentWorkspace(), Number(n), send),
     'tasks:workBadges': async () => {
       const ws = currentWorkspace()
       if (!ws.path) return []

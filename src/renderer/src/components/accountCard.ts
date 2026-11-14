@@ -28,7 +28,7 @@ export function currentLimits(limits: readonly PlanLimit[] | undefined, now = Da
 
 /** A limit's window for its label: the 5-hour or the weekly one, else the provider's own name for it. */
 /** A limit's window as the usage messages select on (shared/planLimits.ts: a limit of part of a plan is named by limitName). */
-export const windowOf = (l: Pick<PlanLimit, 'windowMinutes' | 'models'>): 'fiveHour' | 'weekly' | 'other' => limitWindow(l)
+export const windowOf = (l: Pick<PlanLimit, 'windowMinutes' | 'models' | 'scope'>): 'fiveHour' | 'weekly' | 'other' => limitWindow(l)
 
 /**
  * When a limit resets, as plan-usage notices say it (main.plan.resetsAt/resetsOn): its time when that's today, its weekday

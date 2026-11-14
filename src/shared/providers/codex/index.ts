@@ -140,7 +140,9 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
     },
     session: {
       fixedSessionId: false,
-      defersMcpTools: false,
+      // Every MCP tool behind its tool search, marked or not (HI-3225: 0.167 and 0.169, every listed model; checked offline
+      // against a stand-in and once signed in): its model sees `mcp__combwork` only.
+      defersMcpTools: 'all',
       // Codex rejects permissionDecision "ask" (and then runs the tool), so Combwork asks the user itself.
       lockAsk: false,
       typedTurnsWithoutPrompt: false,

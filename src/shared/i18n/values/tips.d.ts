@@ -141,6 +141,8 @@ interface CombworkMessageValues {
   'tips.cardCostRounds.title': undefined
   'tips.cardDecisions.text': undefined
   'tips.cardDecisions.title': undefined
+  'tips.cardLineComments.text': undefined
+  'tips.cardLineComments.title': undefined
   'tips.cardLinks.text': undefined
   'tips.cardLinks.title': undefined
   'tips.cardLoop.text': undefined
@@ -149,6 +151,10 @@ interface CombworkMessageValues {
   'tips.cardMove.title': undefined
   'tips.cardReadFirst.text': undefined
   'tips.cardReadFirst.title': undefined
+  'tips.cardRevisionChanges.text': undefined
+  'tips.cardRevisionChanges.title': undefined
+  'tips.cardSendComments.text': undefined
+  'tips.cardSendComments.title': undefined
   'tips.cardSummaries.text': undefined
   'tips.cardSummaries.title': undefined
   'tips.cardWork.text': undefined

@@ -354,6 +354,11 @@
   "api.card.lanePosition": {
     "placeholders": {}
   },
+  "api.card.lineCommentsState": {
+    "placeholders": {
+      "state": "plain"
+    }
+  },
   "api.card.madeKind": {
     "placeholders": {
       "kind": "plain"
@@ -375,6 +380,12 @@
     "placeholders": {
       "position": "plain",
       "column": "plain"
+    }
+  },
+  "api.card.noFeedback": {
+    "placeholders": {
+      "card": "plain",
+      "batch": "plain"
     }
   },
   "api.card.notANumber": {

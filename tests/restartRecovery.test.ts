@@ -26,7 +26,7 @@ const h = vi.hoisted(() => ({
   advanced: { 'cw.restart.resumeAfterUpdate': true, 'cw.restart.resumeReadySeconds': 90 } as Record<string, unknown>,
   run: 0,
   /** The notices told (HI-2356): each one's offer, its message and its buttons' commands. */
-  toasts: [] as { offer?: string; message?: string; commands: string[] }[],
+  toasts: [] as { offer?: string; message?: string; commands: string[]; id?: string }[],
   /** The offers whose notices still have their buttons, and what each was resolved or had its buttons dropped with. */
   openOffers: new Set<string>(),
   resolved: [] as [string, string][],
@@ -133,9 +133,9 @@ async function startWith(entries: unknown[], o: { readyMs?: number; reason?: str
   m.loadRestartRecord(file)
   m.initRestartRecovery()
   events.setToastTeller((t) => {
-    h.toasts.push({ offer: t.offer, message: t.message, commands: (t.actions ?? []).map((a) => a.command) })
+    h.toasts.push({ offer: t.offer, message: t.message, commands: (t.actions ?? []).map((a) => a.command), id: t.id })
     if (t.offer) h.openOffers.add(t.offer)
-    return { id: `toast-${h.toasts.length}` }
+    return { id: t.id ?? `toast-${h.toasts.length}` }
   })
 }
 const saved = (): { reason: string; entries: { agentId: string; state: string; why?: string }[] } | null => {
@@ -444,6 +444,87 @@ describe('the restart queue (HI-1707)', () => {
       expect(m.restartRecord()?.entries.find((e) => e.agentId === 'b1')?.state).toBe('dismissed')
       expect(m.restartRecord()?.entries.find((e) => e.agentId === 'a1')?.state ?? 'gone').toMatch(/resumed|gone/)
       expect(h.resolved).toEqual([[first, expect.stringContaining('Resumed: a1 (alpha).')], [second.offer, 'Not resumed']])
+    })
+  })
+
+  // HI-3214: 1.5.0-rc.1's start after a quit showed the offer twice (the queue told it as the workspace's recovery settled,
+  // then the window's start notices told it again, replacing the first), and listed HB6, offered by an earlier run and
+  // started in a newer conversation since, which the resume then skipped as movedOn.
+  describe('one offer at a start, of the agents that can resume (HI-3214)', () => {
+    const offered = () => m.restartRecord()?.entries.map((e) => [e.agentId, e.state, e.why ?? null])
+
+    it('the queue decides first, then the start notices run: one notice, told once the window is up', async () => {
+      const ws = workspace(join(dir, 'ws'), ['a1', 'a2'])
+      h.workspaces = [ws]
+      await startWith([entry(ws.path, 'a1'), entry(ws.path, 'a2')], { reason: 'quit' })
+      // The workspace's merge slots recovered before the window's start notices: the queue decides, telling nothing yet
+      // (a notice told before the window can show it is lost).
+      await queueSettles(() => m.workspaceRecovering(ws.path, Promise.resolve()))
+      expect(m.restartRecord()?.entries.map((e) => e.state)).toEqual(['offered', 'offered'])
+      expect(h.toasts).toHaveLength(0)
+      await queueSettles(() => m.startRestartRecovery())
+      expect(h.toasts).toHaveLength(1)
+      // A reload's start notices, and the workspace read again: nothing more.
+      await queueSettles(async () => {
+        await m.startRestartRecovery()
+        events.emit({ type: 'workspace-changed', workspace: null })
+      })
+      expect(h.toasts).toHaveLength(1)
+      expect(h.resolved).toEqual([])
+      expect(h.toasts[0].message).toContain('a1 (alpha) and a2 (alpha)')
+      expect(h.starts).toEqual([])
+    })
+
+    it("an earlier run's offer for an agent in a newer conversation since: not offered, the rest in one notice", async () => {
+      const ws = workspace(join(dir, 'ws'), ['a1', 'hb6'])
+      h.workspaces = [ws]
+      // HB6's offer is an earlier run's, never answered, for a conversation it has left (its last is s-hb6 now).
+      await startWith([entry(ws.path, 'hb6', { state: 'offered', sessionId: 's-old' }), entry(ws.path, 'a1')], { reason: 'quit' })
+      await queueSettles(() => m.workspaceRecovering(ws.path, Promise.resolve()))
+      await queueSettles(() => m.startRestartRecovery())
+      expect(h.toasts).toHaveLength(1)
+      expect(h.toasts[0].message).toContain('a1 (alpha)')
+      expect(h.toasts[0].message).not.toContain('hb6')
+      expect(offered()).toEqual([['hb6', 'skipped', 'movedOn'], ['a1', 'offered', null]])
+      // Resume acts on what the notice named.
+      expect(await m.resumeOffered()).toBe(1)
+      await vi.waitFor(() => expect(h.starts).toEqual(['a1']), { timeout: HUNG_MS })
+    })
+
+    it("one told before its workspace was ready: once checked, its notice is replaced in place, or closes with nothing left", async () => {
+      const ws = workspace(join(dir, 'ws'), ['a1', 'hb6'], { read: false })
+      h.workspaces = [ws]
+      await startWith([entry(ws.path, 'hb6', { state: 'offered', sessionId: 's-old' }), entry(ws.path, 'a1', { state: 'offered' })], { reason: 'quit' })
+      m.workspaceRecovering(ws.path, Promise.resolve())
+      await m.startRestartRecovery()
+      // Not read yet, so not checkable: offered as the earlier run left them.
+      expect(h.toasts).toHaveLength(1)
+      expect(h.toasts[0].message).toContain('hb6 (alpha)')
+      ws.read = true
+      await queueSettles(() => events.emit({ type: 'workspace-changed', workspace: null }))
+      expect(h.toasts).toHaveLength(2)
+      expect(h.toasts[1].message).toContain('a1 (alpha)')
+      expect(h.toasts[1].message).not.toContain('hb6')
+      // The same entry, replaced in place; the first notice's buttons resolved, so they can't act on the new list.
+      expect(h.toasts[1].id).toBe(h.toasts[0].id)
+      expect(h.resolved).toEqual([[h.toasts[0].offer, 'Replaced by a newer offer']])
+      // An identical list again (a reload's start notices): nothing more.
+      await queueSettles(() => events.emit({ type: 'workspace-changed', workspace: null }))
+      expect(h.toasts).toHaveLength(2)
+    })
+
+    it('every agent an early notice named turns out unable to resume: it closes, saying nothing is left', async () => {
+      const ws = workspace(join(dir, 'ws'), ['hb6'], { read: false })
+      h.workspaces = [ws]
+      await startWith([entry(ws.path, 'hb6', { state: 'offered', sessionId: 's-old' })], { reason: 'quit' })
+      m.workspaceRecovering(ws.path, Promise.resolve())
+      await m.startRestartRecovery()
+      expect(h.toasts).toHaveLength(1)
+      ws.read = true
+      await queueSettles(() => events.emit({ type: 'workspace-changed', workspace: null }))
+      expect(h.toasts).toHaveLength(1)
+      expect(h.resolved).toEqual([[h.toasts[0].offer, 'Nothing left to resume']])
+      expect(offered()).toEqual([['hb6', 'skipped', 'movedOn']])
     })
   })
 

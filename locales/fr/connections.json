@@ -16,7 +16,7 @@
   "connections.mark.anotherMark": "Tourne sur une autre connexion que celle choisie",
   "connections.mark.none": "Aucune connexion",
   "connections.mark.noneUsable": "Aucun compte {cli} n’est activé dans cet espace de travail : l’agent ne peut pas démarrer tant qu’aucun ne l’est (Paramètres → Comptes et connexions).",
-  "connections.mark.offHere": "{wanted} est sur un compte désactivé dans cet espace de travail : l’agent fonctionne avec {name}, la première connexion utilisable de sa CLI",
+  "connections.mark.offHere": "{wanted} est sur un compte désactivé dans cet espace de travail : l’agent fonctionne avec {name}, la connexion correspondante sur le premier compte activé ici",
   "connections.mark.offNoDefault": "{wanted} est désactivée ici",
   "connections.mark.offNoDefaultUsable": "{wanted} est désactivée dans cet espace de travail, et aucun autre compte {cli} n’est activé : l’agent ne peut pas démarrer tant qu’aucun ne l’est (Paramètres → Comptes et connexions).",
   "connections.mark.other": "Tourne sur {running} jusqu’à son redémarrage. Choix actuel : {chosen}",

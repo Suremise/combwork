@@ -21,6 +21,7 @@
   "session.compact.userTyped": "Du hast im Terminal des Agenten getippt, während Combwork den Befehl zum Komprimieren gesendet hat, deshalb wurde er nicht gesendet: Was du getippt hast, bleibt.",
   "session.compact.waiting": "Der Agent wartet auf deine Antwort. Komprimiere, sobald er fertig ist.",
   "session.connection.fallback": "{why, select, missing {Die für ihn gewählte Verbindung wurde entfernt} other {Seine Verbindung {wanted} ist in diesem Arbeitsbereich ausgeschaltet}}, daher ist er mit {name} gestartet, der ersten hier nutzbaren Verbindung seiner CLI. Wähle in den Agent-Einstellungen eine andere.",
+  "session.connection.offMatched": "Seine Verbindung {wanted} gehört zu einem Konto, das in diesem Arbeitsbereich ausgeschaltet ist, daher ist er mit {name} ({account}) gestartet: {by, select, tag {der Verbindung dort mit demselben Tag, {tag}} name {der Verbindung dort mit demselben Namen} other {der ersten Verbindung dieses Kontos, da dort keine sein Tag oder seinen Namen hat}}. Wähle in den Agent-Einstellungen eine andere.",
   "session.connection.fallbackTitle": "{agent} läuft mit einer anderen Verbindung",
   "session.error.agentGone": "Diesen Agenten gibt es nicht mehr.",
   "session.error.inUseElsewhere": "Ein anderes Programm hat das Transkript geöffnet. Schließe es und versuche es dann erneut.",

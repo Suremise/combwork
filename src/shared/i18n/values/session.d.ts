@@ -24,6 +24,7 @@ interface CombworkMessageValues {
   'session.compact.waiting': undefined
   'session.connection.fallback': { why: string; wanted: string | number; name: string | number }
   'session.connection.fallbackTitle': { agent: string | number }
+  'session.connection.offMatched': { wanted: string | number; name: string | number; account: string | number; by: string; tag: string | number }
   'session.error.agentGone': undefined
   'session.error.inUseElsewhere': undefined
   'session.error.noAgents': undefined

@@ -486,6 +486,7 @@ interface CombworkMessageValues {
   'workspace.statusBar.running': { count: number; working: string | number; background: number; waiting: string | number }
   'workspace.statusBar.shortLimit': { window: string; label: string | number }
   'workspace.statusBar.shortModels': { models: string; window: string }
+  'workspace.statusBar.shortScoped': { name: string | number; window: string; hours: number }
   'workspace.statusBar.unlimitedLine': { label: string | number; hasReset: string; when: string | number }
   'workspace.statusBar.unlimitedShort': undefined
   'workspace.statusBar.workspace': { path: string | number }

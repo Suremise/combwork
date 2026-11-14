@@ -4,6 +4,9 @@ import { msg } from '../../i18n/msg'
 /** A recording of it taking Combwork's hooks (configured with the default timeouts) and sending them. */
 const HOOKS_TAKEN: AdvancedSample = { from: `${FIX}/turns-codex-0.162.1.json`, version: '0.162.1', text: '"hook_event_name": "PreToolUse"', shows: "Codex running Combwork's hooks (trusted, so their timeouts match the hashes Combwork gave it), PreToolUse too" } // i18n-ignore: a CLI's recorded text (#367)
 
+/** A Codex token_count's rate-limit snapshot, its fields as recorded (Codex 0.159.0, tests/fixtures/codex-0.159.jsonl). */
+const RATE_LIMIT_FIELDS = ['limit_id', 'limit_name', 'primary', 'secondary', 'credits', 'individual_limit', 'spend_control_reached', 'plan_type', 'rate_limit_reached_type']
+
 /** Codex's advanced values (#367), in the order Settings lists them: advanced.ts gathers them through the registry (HI-3201). */
 // agent-text: ADVANCED (Settings → Advanced's titles and descriptions, which agents read too: the settings tools, HI-2441)
 export const ADVANCED: readonly AdvancedSource[] = [
@@ -210,6 +213,37 @@ export const ADVANCED: readonly AdvancedSource[] = [
     default: 'window_minutes',
     applies: 'now',
     samples: [{ from: `${FIX}/codex-0.159.jsonl`, version: '0.159.0', fields: ['used_percent', 'window_minutes', 'resets_at'] }]
+  },
+  // HI-1125: which of Codex's limits a reading is (its rate-limit snapshot's id, codex-rs RateLimitSnapshot.limit_id).
+  {
+    id: 'codex.rateLimits.limitId',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.rateLimits.limitId.title', defaultMessage: "Session file: limit's id field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.codex.rateLimits.limitId.desc', defaultMessage: "The plan limits' field naming which of Codex's limits they are. Wrong, Combwork takes every reading for Codex's own limit, and a second limit's figures are mixed into it.", description: 'What the advanced setting "Session file: limit\'s id field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'field',
+    default: 'limit_id',
+    applies: 'now',
+    samples: [{ from: `${FIX}/codex-0.159.jsonl`, version: '0.159.0', fields: RATE_LIMIT_FIELDS }]
+  },
+  {
+    id: 'codex.rateLimits.limitName',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.rateLimits.limitName.title', defaultMessage: "Session file: limit's name field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.codex.rateLimits.limitName.desc', defaultMessage: "The plan limits' field with the name Codex gives a limit other than its own. Wrong, Combwork names such a limit by its id.", description: 'What the advanced setting "Session file: limit\'s name field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'field',
+    default: 'limit_name',
+    applies: 'now',
+    samples: [{ from: `${FIX}/codex-0.159.jsonl`, version: '0.159.0', fields: RATE_LIMIT_FIELDS }]
+  },
+  {
+    id: 'codex.rateLimits.defaultLimitId',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.rateLimits.defaultLimitId.title', defaultMessage: "Session file: Codex's own limit id", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.codex.rateLimits.defaultLimitId.desc', defaultMessage: "The id of Codex's own plan limits (its 5-hour and weekly ones). A reading with another id is a limit of its own, shown by its name. Wrong, Codex's own limits are shown as a separate limit, and their earlier readings and warnings start again.", description: 'What the advanced setting "Session file: Codex\'s own limit id" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'text',
+    default: 'codex', // i18n-ignore: a CLI's recorded value (#367)
+    applies: 'now',
+    samples: [{ from: `${FIX}/codex-0.159.jsonl`, version: '0.159.0', text: '"limit_id": "codex"' }] // i18n-ignore: a CLI's recorded text (#367)
   },
   // Connections (HI-1757): what Combwork asks Codex's app server in a connection's CODEX_HOME, never a token.
   {

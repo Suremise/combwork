@@ -91,6 +91,10 @@
     "defaultMessage": "{agent} runs on another connection",
     "description": "A notice's title (HI-2108): an agent started on another connection than its own (its own is off in this workspace, or was removed). {agent} is the agent."
   },
+  "session.connection.offMatched": {
+    "defaultMessage": "Its connection {wanted} is on an account that's off in this workspace, so it started on {name} ({account}): {by, select, tag {the connection there with the same tag, {tag}} name {the connection there with the same name} other {that account's first connection, as none there has its tag or name}}. Choose another in its Agent Settings.",
+    "description": "A notice (HI-3213) when an agent starts on another connection than its own because its own ({wanted}: its name) is on an account turned off in this workspace. {name} is the connection it started on, {account} that connection's account (\"Anthropic-2\"), the first account on here. {by}: how that connection was matched: tag (the same tag as its own, {tag}: the tag, such as Builders), name (the same name), other (neither matched, so that account's first connection). Agent Settings names a dialog."
+  },
   "session.error.agentGone": {
     "defaultMessage": "That agent no longer exists.",
     "description": "An action on an agent is refused: it was removed meanwhile."

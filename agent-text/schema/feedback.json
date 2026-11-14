@@ -1,0 +1,24 @@
+{
+  "feedback.header": {
+    "placeholders": {
+      "n": "plural"
+    }
+  },
+  "feedback.item": {
+    "placeholders": {
+      "id": "plain",
+      "path": "plain",
+      "lines": "plain",
+      "side": "select",
+      "commit": "plain"
+    }
+  },
+  "feedback.more": {
+    "placeholders": {
+      "m": "plain",
+      "card": "plain",
+      "batch": "plain",
+      "offset": "plain"
+    }
+  }
+}

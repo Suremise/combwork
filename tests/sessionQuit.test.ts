@@ -47,7 +47,7 @@ function live(adapter: unknown = claudeCode) {
   priv.live.set(`${P.toLowerCase()}#${agentId}`, l)
   priv.runs.set(state.runId, `${P.toLowerCase()}#${agentId}`)
   const key = `session:${P.toLowerCase()}#${agentId}`
-  return { l, agentId, run: state.runId, key, typed: () => writes.filter((w) => w.key === key).map((w) => w.data).join('') }
+  return { l, agentId, run: state.runId, key, input, typed: () => writes.filter((w) => w.key === key).map((w) => w.data).join('') }
 }
 
 beforeAll(async () => {
@@ -98,7 +98,9 @@ describe("a lane's builder ended by its CLI's own exit", () => {
 
   it('nothing typed or killed while the user types or has a draft in its prompt; forced (past the deadline), killed, never typed over', async () => {
     const a = live()
+    // The user's keys, as their terminal sends them: noted as theirs, and in its prompt (HI-3213: a draft is read there).
     priv.noteUserInput(a.key, 'half a sentence')
+    a.input.feed('half a sentence')
     expect(await sessions.quit(P, a.agentId, a.run, { fenced: () => true, why: 'its lane ended' })).toBe('held')
     expect(a.typed()).toBe('')
     expect(sessions.inputHeld(P, a.agentId)).toBe('the user is typing there')
@@ -108,6 +110,20 @@ describe("a lane's builder ended by its CLI's own exit", () => {
     expect(await sessions.quit(P, a.agentId, a.run, { fenced: () => true, why: 'past the deadline', force: true })).toBe('sent')
     expect(a.typed()).toBe('')
     expect(kills).toEqual([a.key])
+  })
+
+  // HI-3213: HG1, finished, stayed "switches once its turn is over" for good: the user's last key in its pane wasn't Enter
+  // (an Esc, a Shift+Tab), which counted as a draft whatever its prompt held. Only a draft its prompt shows holds it.
+  it("a last key that wasn't Enter, its prompt empty: no draft, so its exit is typed; text left there still holds it", async () => {
+    const a = live()
+    priv.userInput.set(a.key, { at: 0, enter: false })
+    expect(sessions.inputHeld(P, a.agentId)).toBeNull()
+    a.input.feed('x')
+    expect(sessions.inputHeld(P, a.agentId)).toBe("the user's draft is in its prompt")
+    // Deleted again (Backspace): its prompt empty once more.
+    a.input.feed('\x7f')
+    expect(await sessions.quit(P, a.agentId, a.run, { fenced: () => true, why: 'its lane ended' })).toBe('sent')
+    expect(a.typed()).toContain('/exit')
   })
 
   it('a fence lost (a new lease, a restart) before or while it types: nothing more written, nothing killed', async () => {

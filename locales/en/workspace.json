@@ -1939,6 +1939,10 @@
     "defaultMessage": "{models, select, gemini {Gemini} otherModels {Other} premium {Premium} chat {Chat} completions {Completions} other {{models}}}{window, select, weekly { wk} other {}}",
     "description": "The status bar's plan limits (HI-2734), before the percent of a limit that covers part of a plan: which models or requests (Antigravity's Gemini models or its other providers' models; Copilot's premium requests, chat messages or code completions; else the provider's own word, {models}), and \"wk\" for a weekly one. Keep it very short."
   },
+  "workspace.statusBar.shortScoped": {
+    "defaultMessage": "{name}{window, select, weekly { wk} fiveHour { 5h} hours { {hours, number}h} other {}}",
+    "description": "The status bar's plan limits (HI-1125), before the percent of a limit the provider names itself (one of Codex's limits other than its own, such as \"gpt-5.2-codex-sonic\"): its name as the provider gives it ({name}, never translated), and its window: \"wk\" for a weekly one, \"5h\" for a 5-hour one, else its hours ({hours}h). Keep it very short."
+  },
   "workspace.statusBar.unlimitedLine": {
     "defaultMessage": "{label} limit: unlimited{hasReset, select, yes {, its period resets {when}} other {}}",
     "description": "A line of the status bar's plan limits tooltip (HI-2734) for a limit the plan has no cap on: its name ({label}: \"Premium requests\"), and when its period resets ({when})."

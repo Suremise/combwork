@@ -128,8 +128,11 @@ export function CodeEditor({
   return <div className="monaco" ref={host} />
 }
 
-/** Side-by-side (or inline) read-only diff. */
-export function DiffView({ original, modified, language, inline }: { original: string; modified: string; language: string; inline?: boolean }) {
+/**
+ * Side-by-side (or inline) read-only diff. `onEditor` hears the diff editor once it is made, and null once it is gone: a
+ * layer of the caller's own over it (HI-3218, for a card's line comments).
+ */
+export function DiffView({ original, modified, language, inline, onEditor }: { original: string; modified: string; language: string; inline?: boolean; onEditor?: (editor: Monaco.editor.IStandaloneDiffEditor | null) => void }) {
   const host = useRef<HTMLDivElement>(null)
   const editor = useRef<Monaco.editor.IStandaloneDiffEditor | null>(null)
   const theme = useEditorTheme()
@@ -149,10 +152,12 @@ export function DiffView({ original, modified, language, inline }: { original: s
         // menu changes after the editor is disposed ("AbstractContextKeyService has been disposed").
         renderGutterMenu: false
       })
+      onEditor?.(editor.current)
     })
     return () => {
       disposed = true
       const e = editor.current
+      if (e) onEditor?.(null)
       if (e) {
         const m = e.getModel()
         e.dispose()

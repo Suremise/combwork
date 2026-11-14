@@ -16,7 +16,7 @@
   "connections.mark.anotherMark": "Running on another connection than the one chosen",
   "connections.mark.none": "No connection",
   "connections.mark.noneUsable": "No {cli} account is on in this workspace: it can't start until one is (Settings → Accounts & Connections).",
-  "connections.mark.offHere": "{wanted} is on an account that's off in this workspace: {name}, its CLI's first usable connection, runs it",
+  "connections.mark.offHere": "{wanted} is on an account that's off in this workspace: {name}, matched on the first account on here, runs it",
   "connections.mark.offNoDefault": "{wanted} is off here",
   "connections.mark.offNoDefaultUsable": "{wanted} is off in this workspace, and no other {cli} account is on: it can't start until one is (Settings → Accounts & Connections).",
   "connections.mark.other": "Runs on {running} until it restarts. Chosen now: {chosen}",

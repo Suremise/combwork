@@ -272,7 +272,7 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
       modelAliases: ['fable', 'opus', 'sonnet', 'haiku', 'default', 'best', 'opusplan'],
       fixedSessionId: true,
       // Behind its tool search, but for tools listed with anthropic/alwaysLoad (HI-2229).
-      defersMcpTools: true,
+      defersMcpTools: 'unmarked',
       lockAsk: true,
       typedTurnsWithoutPrompt: true,
       // SessionStart comes as it starts (once its folder is trusted), before any prompt.

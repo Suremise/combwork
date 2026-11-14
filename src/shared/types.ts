@@ -747,6 +747,11 @@ export interface PlanLimit {
    */
   models?: string
   /**
+   * A provider's own name for the part of the plan a limit covers, shown as it is (HI-1125: Codex's `limit_name`, else its
+   * `limit_id`, bounded): never read as one of `models`' kinds, so a limit named `chat` is "chat", not Copilot's chat messages.
+   */
+  scope?: string
+  /**
    * An unlimited entitlement the provider reported (HI-2734: Copilot): shown as such, no meter, never warned of. Its
    * usedPercent is 0, a placeholder, never a measured 0: every reader checks hasShare() (shared/planLimits.ts) first.
    */

@@ -1,3 +1,4 @@
+import type { FeedbackExpect, LineCommentView } from './workflow/lineComments'
 import type { CardAttachment, CardAttachmentGroup, CardDrafts } from './cardAttachments'
 import type { CardCleanupItem } from './cardCleanup'
 import type { SigningInfo } from './gitSigning'
@@ -620,6 +621,16 @@ export interface CombworkRequests {
   'tasks:start': (n: number, target: TaskStartTarget, opts?: { confirm?: boolean; reason?: string; released?: string }) => { agentId: string; agentName: string; added: boolean } | { ask: string[]; released?: string }
   /** A card's work (#1223): its facts folded into its line, revisions, verdicts, checks, marks and integration; null with no such card, or on a board not upgraded to 1.0. */
   'tasks:work': (n: number) => WorkView | null
+  /** HI-3218: one file of a card's submission (its fact's number, WorkRevision.submission), from its base to its revision. */
+  'tasks:revisionDiff': (n: number, submission: number, file: string) => GitDiff
+  /** HI-3219: the user's comment on lines of a card's submission's file (its side, 1-based lines); the comment's id. Read back in tasks:work's lineComments. */
+  'tasks:lineCommentAdd': (n: number, comment: { submission: number; path: string; side: 'new' | 'old'; from: number; to: number; body: string }) => string
+  /** HI-3219: a change to one of a card's line comments: its text (from the version shown), resolved, reopened or deleted. */
+  'tasks:lineCommentChange': (n: number, id: string, change: { edit: { body: string; version: number } } | 'resolve' | 'reopen' | 'delete') => void
+  /** HI-3220: a send's preview: its batch id, what it saw of the card, its builder, an open review, and the open comments (each edited since sent or not). */
+  'tasks:feedbackPreview': (n: number) => { batch: string; expect: FeedbackExpect | null; builder: string | null; review: { reviewer: string; submission: number } | null; items: (LineCommentView & { edited: boolean })[] }
+  /** HI-3220: sends the preview's comments to the card's builder as one fix round; refused as Workflow.feedback refuses. */
+  'tasks:feedbackSend': (n: number, send: { batch: string; items: { id: string; version: number }[]; expect: FeedbackExpect; replaces?: { reviewer: string; submission: number } | null }) => void
   /** Every live card's badges from its work (#1223), in number order; archived cards aren't read. */
   'tasks:workBadges': () => WorkBadge[]
 

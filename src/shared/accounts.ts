@@ -380,6 +380,25 @@ export const connectionsOn = <C extends Pick<Connection, 'account'>>(account: st
 /** An account's base connection (HI-2106): its first, made with it; none while it has none. */
 export const baseConnection = (account: string, connections: readonly Connection[]): Connection | undefined => connections.find((c) => c.account === account)
 
+/** Which rule matched an agent's connection on another account (HI-2530, HI-3213), said in the notice. */
+export type MatchedBy = 'tag' | 'name' | 'default'
+
+/**
+ * The connection on account `target` an agent's connection goes to (HI-2530: a usage move; HI-3213: its account off
+ * here): the first there with the same tag as the one it is on (any case and spacing; an untagged connection skips
+ * this), else the same name (any case), else the target's first connection, its default. Undefined only when the
+ * target has none.
+ */
+export function matchConnection(from: Pick<Connection, 'name' | 'tag'>, target: string, connections: readonly Connection[]): { connection: Connection; by: MatchedBy } | undefined {
+  const on = connectionsOn(target, connections)
+  const byTag = cleanTag(from.tag) ? on.find((c) => sameTag(c.tag, from.tag)) : undefined
+  if (byTag) return { connection: byTag, by: 'tag' }
+  const key = from.name.trim().toLowerCase()
+  const byName = on.find((c) => c.name.trim().toLowerCase() === key)
+  if (byName) return { connection: byName, by: 'name' }
+  return on[0] ? { connection: on[0], by: 'default' } : undefined
+}
+
 /** The connection on an account whose values are these (as launchValues keeps them), the earliest; none if no such one. */
 export function matchingConnection(account: Pick<Account, 'id' | 'provider' | 'kind'>, values: LaunchValues, connections: readonly Connection[]): Connection | undefined {
   const want = launchValues(values, account.provider, account.kind === 'server')
@@ -424,21 +443,29 @@ export function accountOnIn(cfg: Pick<WorkspaceConfig, 'connections'> | null | u
  * Which connection a launch uses (HI-2106, decision H), from the agent's (or the Assistant's) connection and the
  * workspace's accounts:
  * - its connection, on an account of its CLI that's on here: that one;
- * - its account off here, or the connection removed (or another CLI's), or none: its CLI's first usable connection here
- *   (the base connection of the first account in the order that's on here and has one), noted when it named one
- *   (`offFallback`, `missing`);
+ * - its account off here (`offFallback`): on the first account in the order that's on here and has a connection, the one
+ *   matching its own as a usage move matches (HI-3213, matchConnection: the same tag, else the same name, else that
+ *   account's first), `by` saying which;
+ * - the connection removed (or another CLI's), or none: its CLI's first usable connection here (the base connection of
+ *   the first account in the order that's on here and has one), noted when it named one (`missing`);
  * - none usable: refused (`none`: nothing named; `offNoDefault`: named, but none to fall back to).
  */
-export type AgentConnection = { ok: true; connection: Connection; account: Account; note?: 'offFallback' | 'missing' } | { ok: false; why: 'none' | 'offNoDefault'; wanted?: string }
+export type AgentConnection = { ok: true; connection: Connection; account: Account; note?: 'offFallback' | 'missing'; by?: MatchedBy } | { ok: false; why: 'none' | 'offNoDefault'; wanted?: string }
 
 export function resolveAgentConnection(cfg: Pick<WorkspaceConfig, 'connections'> | null | undefined, cli: ProviderId, wanted: string | null | undefined, accounts: readonly Account[], connections: readonly Connection[]): AgentConnection {
   const c = wanted ? connections.find((x) => x.id === wanted) : undefined
   const a = c ? accounts.find((x) => x.id === c.account) : undefined
   if (c && a && a.provider === cli && accountOnIn(cfg, a, accounts)) return { ok: true, connection: c, account: a }
+  const off = !!c && !!a && a.provider === cli
   for (const x of accounts) {
     if (x.provider !== cli || !accountOnIn(cfg, x, accounts)) continue
+    if (off) {
+      const m = matchConnection(c!, x.id, connections)
+      if (m) return { ok: true, connection: m.connection, account: x, note: 'offFallback', by: m.by }
+      continue
+    }
     const base = baseConnection(x.id, connections)
-    if (base) return { ok: true, connection: base, account: x, ...(wanted ? { note: c && a && a.provider === cli ? ('offFallback' as const) : ('missing' as const) } : {}) }
+    if (base) return { ok: true, connection: base, account: x, ...(wanted ? { note: 'missing' as const } : {}) }
   }
   return wanted ? { ok: false, why: 'offNoDefault', wanted } : { ok: false, why: 'none' } // i18n-ignore: a reason's code, not text
 }

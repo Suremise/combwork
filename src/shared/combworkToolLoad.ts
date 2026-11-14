@@ -5,7 +5,9 @@
  * Claude Code defers MCP tools: the model sees their names only and must load a tool's schema before calling it. Haiku
  * often called Combwork's most used tools without loading them, guessing their arguments (`key` for `number`), so Combwork marks
  * those few to be sent in full. The mark is the MCP tool's `_meta`, which a CLI that doesn't defer ignores; the other
- * tools stay deferred, so the prompt grows by these schemas only.
+ * tools stay deferred, so the prompt grows by these schemas only. Codex ignores it too, deferring every MCP tool (HI-3225,
+ * providers' `defersMcpTools: 'all'`): it reads no mark or setting that keeps one loaded, so there the refusal's
+ * argument hint (argumentHint) is what puts a guessed call right.
  */
 
 /** The `_meta` key Claude Code reads (2.1.316: a tool listed with it true is never deferred behind its tool search). */

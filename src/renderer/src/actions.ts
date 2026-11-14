@@ -595,6 +595,15 @@ export function agentsForSession(p: ProjectInfo, item: Pick<SessionListItem, 'cw
 
 type ResumeItem = Pick<SessionListItem, 'id' | 'recache' | 'title' | 'name' | 'agentId' | 'agentName' | 'cwd' | 'slot' | 'hold' | 'fresh'> & { provider?: ProviderId }
 
+/**
+ * What a restart resumes (stopped, then resumed at once): its running conversation, with its name, folder and slot as the
+ * Sessions list read them before the stop (HI-3213: without its slot, one that ran in a slot was read as a worktree no
+ * agent uses, and couldn't be resumed).
+ */
+export function restartItem(live: { sessionId: string; agentId: string }, item: Pick<SessionListItem, 'name' | 'cwd' | 'slot'> | undefined): ResumeItem {
+  return { id: live.sessionId, recache: null, title: null, name: item?.name, agentId: live.agentId, cwd: item?.cwd, ...(item?.slot ? { slot: item.slot } : {}) }
+}
+
 export async function resumeSession(path: string, item: ResumeItem, agentId?: string): Promise<void> {
   // Its buttons show it resuming from the click until it runs (#1177): under its agent, or, with none to run it yet,
   // under the session itself while one is added for it.

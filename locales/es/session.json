@@ -21,6 +21,7 @@
   "session.compact.userTyped": "Escribiste en la terminal del agente mientras Combwork enviaba Compactar, así que no se envió: lo que escribiste se queda.",
   "session.compact.waiting": "El agente espera tu respuesta. Compacta cuando haya terminado.",
   "session.connection.fallback": "{why, select, missing {La conexión elegida para él se quitó} other {Su conexión {wanted} está desactivada en este espacio de trabajo}}, así que se inició con {name}, la primera conexión utilizable de su CLI aquí. Elige otra en su Configuración del agente.",
+  "session.connection.offMatched": "Su conexión {wanted} está en una cuenta desactivada en este espacio de trabajo, así que se inició con {name} ({account}): {by, select, tag {la conexión de allí con la misma etiqueta, {tag}} name {la conexión de allí con el mismo nombre} other {la primera conexión de esa cuenta, ya que ninguna allí tiene su etiqueta ni su nombre}}. Elige otra en su Configuración del agente.",
   "session.connection.fallbackTitle": "{agent} se ejecuta con otra conexión",
   "session.error.agentGone": "Ese agente ya no existe.",
   "session.error.inUseElsewhere": "Otro programa tiene abierta su transcripción. Ciérralo y vuelve a intentarlo.",

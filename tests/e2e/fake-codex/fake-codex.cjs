@@ -519,11 +519,12 @@ async function scripted(step) {
     await hook('PostToolUse', c)
   }
   // "planusage F W": a token_count record with its plan's rate limits, as Codex writes one after each request (HI-1882):
-  // F% of the 5-hour window and W% of the weekly one, each resetting in a few hours.
-  const plan = /\bplanusage\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)/i.exec(step)
+  // F% of the 5-hour window and W% of the weekly one, each resetting in a few hours. "id=<id>" and "name=<name>" after
+  // them (HI-1125): the snapshot's limit_id and limit_name, one of Codex's limits other than its own.
+  const plan = /\bplanusage\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)(?:\s+id=(\S+))?(?:\s+name=(\S+))?/i.exec(step)
   if (plan) {
     const resets = Math.floor(Date.now() / 1000) + 3 * 3600
-    const rateLimits = { primary: { used_percent: Number(plan[1]), window_minutes: 300, resets_at: resets }, secondary: { used_percent: Number(plan[2]), window_minutes: 10080, resets_at: resets }, plan_type: 'plus' }
+    const rateLimits = { ...(plan[3] ? { limit_id: plan[3], limit_name: plan[4] ?? null } : {}), primary: { used_percent: Number(plan[1]), window_minutes: 300, resets_at: resets }, secondary: { used_percent: Number(plan[2]), window_minutes: 10080, resets_at: resets }, plan_type: 'plus' }
     fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'event_msg', payload: { type: 'token_count', info: null, rate_limits: rateLimits } }) + '\n')
   }
   // "patch FILE" (HI-2386): an apply_patch edit appending a line to FILE (in its folder), which Codex asks Combwork about first;

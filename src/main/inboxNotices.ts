@@ -7,6 +7,7 @@ import { advanced } from './advanced'
 import { allows } from './assistantControl'
 import { agentReadsInbox, countable, inboxSwitch } from './deliveries'
 import { orphanDraftFor } from './orphanProcesses'
+import { scopeOfHost, withCardNames } from './projectKeys'
 import { sessions, type NoticeDraft } from './sessions'
 import { workspaceFor } from './workspace'
 import { pausedFor } from './teamPause'
@@ -77,7 +78,9 @@ async function inboxNoticeFor(st: LiveSessionState, at: 'checkpoint' | 'drain'):
   const seen = told.get(st) ?? new Set<string>()
   told.set(st, seen)
   if (at === 'checkpoint' && unread.every((r) => seen.has(r.id))) return null
-  const text = [inboxNotice(at, unread.map(item)), lanes].filter(Boolean).join(' ')
+  // Its cards by their keys (HI-3226), as the doorbell typed as its prompt names them: a hook's work has no workspace of
+  // its own, so without its project's names they fell back to the workspace-wide number, which finds another card.
+  const text = withCardNames(workspaceFor(st.projectPath), () => [inboxNotice(at, unread.map(item)), lanes].filter(Boolean).join(' '), scopeOfHost(st.projectPath))
   return text ? { text, commit: () => unread.forEach((r) => seen.add(r.id)) } : null
 }
 

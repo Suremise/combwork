@@ -340,6 +340,80 @@ describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ
       }
     })
 
+    // HI-3216: jj card scenarios' verdict right after start review was refused evidence.changed now and then (3 of 8 runs):
+    // start review leases a review copy, and putting it at the revision reviewed is a jj operation on the shared
+    // repository, which moves the head the verdict's fingerprint keeps while the verdict decides. Nothing it decides on.
+    it("verdict: a jj operation beside it before each of its first three writes gathers it again each time; one before every write refuses once the passes are spent; a commit in the slot refuses (HI-3216)", async () => {
+      const w = await world(colocated)
+      const a = w.slots['slot-a']
+      const card = await started(w, 'verdict beside operations')
+      w.commitIn(a.folder, 'p.txt', a.identity.workspace)
+      moved(await w.wf.submit(card.key, B1, { summary: 's' }))
+      moved(await w.wf.startReview(card.key, R1))
+      // Another workspace's operation (as the review copy's checkout is): the verdict's own reads leave the slot as it was.
+      const elsewhere = (): void => void w.h.jj(w.repo, '--ignore-working-copy', 'new', 'main', '--no-edit', '-m', 'elsewhere')
+      const verdicts = (): number => w.store.facts(card.id).filter((f) => f.kind === 'Verdict').length
+      let writes = 0
+      // Before every write: refused once its passes are spent, nothing recorded.
+      w.wf.cfg.hooks = { beforeWrite: (intent) => void (intent === 'verdict' && (writes++, elsewhere())) }
+      refusedBy(await w.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }), 'evidence.changed')
+      expect(writes).toBe(4)
+      expect(verdicts()).toBe(0)
+      // A real change in the slot meanwhile (a commit): refused at once, never gathered again.
+      writes = 0
+      w.wf.cfg.hooks = { beforeWrite: (intent) => void (intent === 'verdict' && writes++ === 0 && w.commitIn(a.folder, 'late.txt', a.identity.workspace)) }
+      refusedBy(await w.wf.verdict(card.key, R1, { pass: false, comment: 'again', failKind: 'content' }), 'evidence.changed')
+      expect(writes).toBe(1)
+      expect(verdicts()).toBe(0)
+      // Before each of its first three writes (#1206's one pass refused the second): recorded on the fourth gather.
+      writes = 0
+      w.wf.cfg.hooks = { beforeWrite: (intent) => void (intent === 'verdict' && writes++ < 3 && elsewhere()) }
+      const out = await w.wf.verdict(card.key, R1, { pass: false, comment: 'again', failKind: 'content' })
+      w.wf.cfg.hooks = undefined
+      moved(out)
+      expect(writes).toBe(4)
+      expect(verdicts()).toBe(1)
+      expect(w.wf.state(card).stage).toBe('active')
+    })
+
+    it("verdict: the fingerprint unreadable at the write and the read after it (jj's operation heads while a review copy's operation lands): gathered again and recorded (HI-3216)", async () => {
+      const w = await world(colocated)
+      const a = w.slots['slot-a']
+      const card = await started(w, 'verdict, heads mid-update')
+      w.commitIn(a.folder, 'p.txt', a.identity.workspace)
+      moved(await w.wf.submit(card.key, B1, { summary: 's' }))
+      moved(await w.wf.startReview(card.key, R1))
+      // As the start's (HI-2972): the read after beforeWrite (revalidate's) as it is; the next two unreadable.
+      const real = JjPlatform.prototype.evidence
+      let skip = -1
+      let nulls = 0
+      const spy = vi.spyOn(JjPlatform.prototype, 'evidence').mockImplementation(function (this: JjPlatform, ...args: Parameters<JjPlatform['evidence']>) {
+        if (skip > 0) skip--
+        else if (skip === 0 && nulls > 0) {
+          nulls--
+          return null
+        }
+        return real.apply(this, args)
+      })
+      let once = true
+      w.wf.cfg.hooks = {
+        beforeWrite: (intent) => {
+          if (intent !== 'verdict' || !once) return
+          once = false
+          skip = 1
+          nulls = 2
+        }
+      }
+      try {
+        moved(await w.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
+        expect(nulls).toBe(0)
+        expect(w.wf.state(card).stage).toBe('approved')
+      } finally {
+        w.wf.cfg.hooks = undefined
+        spy.mockRestore()
+      }
+    })
+
     it("start: the target's ref read while a jj write of Combwork's holds the store (its slot detached beside it): unreadable, gathered again and started, never refused as a change by content (HI-3012)", async () => {
       const w = await world(colocated)
       const key = pathKeySync(w.ctx.store)

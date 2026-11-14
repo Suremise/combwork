@@ -26,6 +26,12 @@ const globalConfig = join(root, 'gitconfig')
 const ENV: Record<string, string> = { ...baseEnv(), GIT_CONFIG_GLOBAL: globalConfig, GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0' }
 /** The test's own permission for local (file) submodule URLs, given as a run's environment would carry it: Combwork's entries go before it. */
 const FILE_OK = { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'protocol.file.allow', GIT_CONFIG_VALUE_0: 'always' }
+/**
+ * The bound on a test that builds real repositories (HI-3207): each starts 166–232 git processes (counted with git's
+ * trace2; most are git-lfs's own, every `git lfs` call running about 15 git commands), 60–190 ms each on a busy PC: 13–20 s
+ * alone, and past vitest's 20 s under a full run's load. A bound for a hung run, sized to that work.
+ */
+const REAL_GIT_MS = 60_000
 
 const lfsInstalled = (() => {
   try {
@@ -37,7 +43,7 @@ const lfsInstalled = (() => {
 })()
 
 beforeAll(() => {
-  writeFileSync(globalConfig, '[user]\n\tname = Combwork Test\n\temail = test@example.invalid\n[core]\n\tautocrlf = false\n[init]\n\tdefaultBranch = main\n')
+  writeFileSync(globalConfig, '[user]\n\tname = Combwork Test\n\temail = test@example.invalid\n[core]\n\tautocrlf = false\n[init]\n\tdefaultBranch = main\n[maintenance]\n\tauto = false\n[gc]\n\tauto = 0\n')
 })
 afterEach(() => forgetGitLfsVersion())
 
@@ -185,7 +191,7 @@ describe('a project with neither', () => {
   })
 })
 
-describe('submodules in a linked worktree', () => {
+describe('submodules in a linked worktree', { timeout: REAL_GIT_MS }, () => {
   it('are checked out, nested ones too, with the shared config, .git/modules and the main checkout as they were', async () => {
     const nest = repo('nest-1', { 'n.txt': 'nested\n' })
     const sub = repo('sub-1', { 's.txt': 'sub\n' })
@@ -363,7 +369,7 @@ describe('submodules in a linked worktree', () => {
   })
 })
 
-describe("a copy's removed submodules", () => {
+describe("a copy's removed submodules", { timeout: REAL_GIT_MS }, () => {
   it('removes the folder of the last one, by its literal path, and keeps an unrelated nested repository a glob would match', async () => {
     const sub = repo('sub-9')
     const p = repo('proj-9')
@@ -447,7 +453,7 @@ describe("a copy's removed submodules", () => {
   })
 })
 
-describe("a submodule's clone in the worktree's git dir", () => {
+describe("a submodule's clone in the worktree's git dir", { timeout: REAL_GIT_MS }, () => {
   it('a junction at <git dir>/modules/<name> to a clone elsewhere is never taken for this worktree’s own: no update runs, the clone untouched', async () => {
     const sub = repo('sub-12', { 'v.txt': '1\n' })
     const p = repo('proj-12')
@@ -471,7 +477,7 @@ describe("a submodule's clone in the worktree's git dir", () => {
   })
 })
 
-describe.skipIf(!lfsInstalled)('Git LFS (git-lfs installed)', () => {
+describe.skipIf(!lfsInstalled)('Git LFS (git-lfs installed)', { timeout: REAL_GIT_MS }, () => {
   /** A project cloned from a bare origin holding one LFS file in a nested .gitattributes. */
   function lfsProject(name: string, o: { filter?: boolean } = {}): { project: string; content: string } {
     const work = join(root, `${name}-work`)
@@ -564,7 +570,7 @@ function host(project: string, folder: string, skip: boolean): CandidateHost {
   }
 }
 
-describe("the merge queue's candidate (HR2's round 2): LFS files from the card's merge left for the files step", () => {
+describe("the merge queue's candidate (HR2's round 2): LFS files from the card's merge left for the files step", { timeout: REAL_GIT_MS }, () => {
   /** A target E and a card R that adds a filter=lfs file, under a smudge filter that fails unless the smudge is skipped. */
   function strictFilterProject(name: string): { p: string; E: string; R: string } {
     const p = repo(name, { 'base.txt': 'base\n' })
@@ -630,7 +636,7 @@ describe("the merge queue's candidate (HR2's round 2): LFS files from the card's
   })
 })
 
-describe("HI-3027: the queue's folder, its submodule set up by the files step, and a revision that no longer has it", () => {
+describe("HI-3027: the queue's folder, its submodule set up by the files step, and a revision that no longer has it", { timeout: REAL_GIT_MS }, () => {
   /** A project with submodule libs/s, and the queue's folder after an earlier card's round: the files step has filled it. */
   async function queued(name: string): Promise<{ p: string; E: string; folder: string }> {
     const sub = repo(`${name}-sub`, { 'v.txt': '1\n' })

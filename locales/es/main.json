@@ -271,6 +271,7 @@
   "main.outcome.noLongerAsked": "Ya no lo pide",
   "main.outcome.noLongerHeld": "Ya no está ocupado",
   "main.outcome.notResumed": "No se reanudó",
+  "main.outcome.nothingToResume": "No queda nada que reanudar",
   "main.outcome.offerReplaced": "Reemplazado por una oferta más reciente",
   "main.outcome.openHereAgain": "La conversación vuelve a estar abierta aquí",
   "main.outcome.released": "Liberado",
