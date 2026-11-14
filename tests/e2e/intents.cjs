@@ -208,6 +208,9 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     const putBack = await call(assistantToken, `/v1/tasks/${n}/put-back`, { why: 'The user wants it later.' })
     check("at Control agents the Assistant puts it back, by its number: Todo", putBack.status === 200 && putBack.body?.to === 'todo' && (await card(n))?.column === 'todo' && (await card(n))?.comments.at(-1)?.text === 'The user wants it later.', JSON.stringify(putBack.body))
     check("…listed in what it did", (await inv('assistant:actions')).some((x) => x.ok && x.text.includes('put back')), JSON.stringify((await inv('assistant:actions')).map((x) => x.text)))
+    // HI-3194: the Assistant put the card back after the builder last acted on it (its attempt ended): the builder reads it
+    // again, as its put-back wake would have it do, before acting on it anew (asking the Assistant, starting it).
+    await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${ref}`, { headers: { Authorization: `Bearer ${tokens.builder}` } })
 
     // An agent asks the Assistant on a card (HI-1866): its comment and a history line, and the Assistant's inbox, whose
     // doorbell its idle session takes. Refused, with nothing written: a plain number, no text, the Assistant itself, and
@@ -237,9 +240,6 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     // An agent's Combwork tool: cw_start_card runs the start intent. Called through cw-mcp.js with the builder's own
     // combwork server settings (from its launch), not typed into its pane, where Combwork's own wakes may be typed meanwhile.
     const builderCombwork = await combworkOf(builder.id)
-    // HI-3194: the Assistant put the card back after the builder last acted on it (its attempt ended): the builder reads it
-    // again, as its put-back wake would have it do, before starting it anew.
-    await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${ref}`, { headers: { Authorization: `Bearer ${tokens.builder}` } })
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_start_card', arguments: { card: key } } }) + '\n',
       env: lib.childEnv(builderCombwork.env),
