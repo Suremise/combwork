@@ -789,6 +789,18 @@ const seamOn = (cli: ProviderId): boolean => {
 export function firstAccountHere(cli: ProviderId, cfg: WorkspaceConfig | null): Account | null {
   const here = accountHere(cli, cfg)
   if (here || !seamOn(cli)) return here
+  return ensureHomeAccount(cli)
+}
+
+/**
+ * A CLI's own home's account (its PC-wide sign-in's, or a test home's) and its base connection, made if missing: a test
+ * home the first time the seam needs it, and a user's own CLI as its description registers (HI-3196, main/clis.ts: it has
+ * no sign-in connections, so its agents run on its PC-wide account).
+ */
+export function ensureHomeAccount(cli: ProviderId): Account | null {
+  const id = pcWideSignIn(cli) ? pcAccountId(cli) : seamAccountId(cli)
+  const found = accountById(id)
+  if (found && baseConnection(found.id, allConnections())) return found
   let a: Account | undefined
   config.update((c) => {
     const store: AccountStore = { accounts: [...(c.accounts ?? [])], connections: [...(c.connections ?? [])], newId: newConnectionId }
@@ -1917,7 +1929,9 @@ export function agentLaunchView(a: AgentDef, cfg: Pick<ProjectConfig, 'migration
   if (!cfg.migrations?.accounts1 || !a.connection) return {}
   const c = getConnection(a.connection)
   // Its connection launches without Combwork's tools (HI-2670): Independent, as the window reads its role.
-  return { model: c?.model, effort: c?.effort, use200kContext: c?.use200kContext, permissionMode: c?.permissionMode, ...(launchesWithoutTools(c) ? { toolsOff: true as const } : {}) }
+  // Or its CLI takes none of Combwork's tools (HI-3196: a CLI that runs from a description): Independent too.
+  const noTools = launchesWithoutTools(c) || (!!a.provider && providerDescriptor(a.provider).capabilities.session?.combworkTools === false)
+  return { model: c?.model, effort: c?.effort, use200kContext: c?.use200kContext, permissionMode: c?.permissionMode, ...(noTools ? { toolsOff: true as const } : {}) }
 }
 
 // ---------------------------------------------------------------------------

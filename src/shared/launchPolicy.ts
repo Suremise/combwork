@@ -16,6 +16,7 @@
  */
 import { ADVANCED_DEFS, CW_GUIDANCE, overrideId } from './advanced'
 import { agentMsg, say } from './agentText'
+import { providerDescriptor } from './providers'
 import type { Connection, ConnectionLaunch, ProviderId } from './types'
 
 /** The switches a connection has besides its CLI's overrides. */
@@ -53,9 +54,12 @@ export interface LaunchPolicy {
 export function launchPolicy(conn: Pick<Connection, 'launch'> | null | undefined, cli: ProviderId, opts: { assistant?: boolean } = {}): LaunchPolicy {
   const l = conn?.launch
   const on = (s: LaunchSwitch): boolean => (opts.assistant && ASSISTANT_KEEPS.includes(s)) || l?.[s] !== false
+  // A CLI that takes no MCP server or skills from Combwork (HI-3196, data-only) gets neither its tools nor its guidance,
+  // whatever the connection says: guidance would tell it of tools and skills it doesn't have.
+  const noTools = providerDescriptor(cli).capabilities.session?.combworkTools === false
   return {
-    guidance: on('guidance'),
-    tools: on('tools'),
+    guidance: !noTools && on('guidance'),
+    tools: !noTools && on('tools'),
     typing: on('typing'),
     overrides: Object.fromEntries(overrideKeys(cli).map((k) => [overrideId(cli, k), l?.overrides?.[k] ?? overrideDefault(cli, k)]))
   }

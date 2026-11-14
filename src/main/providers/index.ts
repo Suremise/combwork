@@ -1,5 +1,6 @@
 import type { ProviderId } from '../../shared/types'
 import { PROVIDERS } from '../../shared/providers'
+import { BUILT_IN_PROVIDERS } from '../../shared/providers/registry'
 import type { ProviderAdapter } from './types'
 import { msg } from '../../shared/i18n/msg'
 import { combworkError } from '../combworkError'
@@ -25,8 +26,17 @@ export function orderedAdapters(found: readonly ProviderAdapter[], ids: readonly
 
 const ADAPTERS: ProviderAdapter[] = orderedAdapters(
   Object.values(import.meta.glob<ProviderAdapter>('./*/adapter.ts', { eager: true, import: 'default' })),
-  PROVIDERS.map((d) => d.id)
+  PROVIDERS.slice(0, BUILT_IN_PROVIDERS).map((d) => d.id)
 )
+
+/**
+ * The user's own CLIs' adapters (HI-3196: the generic adapter, one per description), after the built-in ones: a reload's
+ * snapshot replaces them whole, in the same step as the shared registry's tail (main/clis.ts). A launch takes its own copy
+ * at its start (forLaunch), so a reload never reaches it.
+ */
+export function registerCliAdapters(adapters: readonly ProviderAdapter[]): void {
+  ADAPTERS.splice(BUILT_IN_PROVIDERS, ADAPTERS.length - BUILT_IN_PROVIDERS, ...adapters)
+}
 
 export function allProviders(): ProviderAdapter[] {
   return ADAPTERS

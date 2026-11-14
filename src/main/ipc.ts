@@ -165,6 +165,7 @@ import { msg, tr } from '../shared/i18n'
 import { withSkillDelivered } from '../shared/skillDelivery'
 import { pauseApp, resumeApp } from './teamPause'
 import { endParkedProcess, installIfParked, teamPauseState } from './teamParked'
+import { cliSnapshotForWindow, openClisFolder, reloadClis } from './clis'
 
 /**
  * What the window is told when a call is refused (#845): thrown as CombworkErrors, so the window reads them in its language
@@ -1949,6 +1950,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
 
     'api:info': () => apiInfo(),
     'api:adminSnippet': (id: ProviderId) => adminSnippetFacts(id),
+    'clis:snapshot': () => cliSnapshotForWindow(),
+    'clis:reload': () => reloadClis(),
+    'clis:openFolder': () => openClisFolder(),
     'api:regenerateToken': async () => {
       await regenerateToken()
       return apiInfo()

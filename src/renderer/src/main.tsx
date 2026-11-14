@@ -8,6 +8,7 @@ import { App } from './App'
 import { ConsoleApp } from './ConsoleApp'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { initLanguage } from './i18n'
+import { initClis } from './clis'
 import './commitLoop'
 import { startWindowHealth } from './windowHealth'
 import { initTeamPause } from './teamPause'
@@ -19,6 +20,8 @@ const isConsole = location.hash === '#console'
 
 // The language first, so the first render is in it (#767).
 await initLanguage()
+// The user's own CLIs (HI-3196): main's snapshot registered before anything reads a provider.
+if (!isConsole) await initClis()
 initTeamPause()
 // An agent whose connection launches without Combwork's tools is Independent (HI-2670): main says so on its AgentInfo.
 readToolsOffWith((a) => (a as { toolsOff?: boolean }).toolsOff === true)

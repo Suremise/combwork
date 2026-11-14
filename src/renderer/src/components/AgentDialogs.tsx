@@ -29,6 +29,7 @@ import { MergeSlotNote, projectSlots, useMergeSlots } from './MergeSlots'
 import { confirmLineMerge, LineCardNote, QUEUE_MERGES, QueueCardNote } from './BranchMerge'
 import { pasteIntoTerminal } from './TerminalView'
 import { BusyButton, Icon, Modal, Tooltip, useBusy } from './ui'
+import { gapsLine } from './Clis'
 
 /** Markup in messages (tRich): <code> and <b>, keyed by their text. */
 const CODE = (chunks: ReactNode[]): ReactNode => <code key={String(chunks)}>{chunks}</code>
@@ -628,7 +629,7 @@ export function AgentSettingsDialog() {
         )
       }
       cliLocked={agent.live ? { cli: current, why: tr(msg({ id: 'agents.settings.otherCliStopped', defaultMessage: "Another CLI's connection can be chosen once {agent} is stopped: its conversations stay with {cli}.", description: "Under the connection in Agent Settings of a running agent ({agent}) (HI-2108): only its own CLI's ({cli}: \"Claude Code\") connections are offered while it runs." }), { agent: agent.name, cli: providerDescriptor(current).name }) } : undefined}
-      note={agent.live ? tr(msg({ id: 'agents.settings.appliesNext', defaultMessage: 'Changes apply the next time {agent} starts; the running session keeps its settings until then.', description: 'Under Agent Settings for a running agent ({agent}).' }), { agent: agent.name }) : undefined}
+      note={[agent.live ? tr(msg({ id: 'agents.settings.appliesNext', defaultMessage: 'Changes apply the next time {agent} starts; the running session keeps its settings until then.', description: 'Under Agent Settings for a running agent ({agent}).' }), { agent: agent.name }) : undefined, gapsLine(current)].filter(Boolean).join(' ') || undefined}
       nameProblem={nameProblem}
       confirmSave={async (f) => {
         // Made Independent while on a lane or holding cards (HI-2670): asked first, naming them.

@@ -24,13 +24,14 @@ import { WorkspaceStorageList } from '../components/Storage'
 import { AntivirusPanel } from '../components/Antivirus'
 import { AccountsSettings } from '../components/AccountsSettings'
 import { AdvancedSettings } from '../components/AdvancedSettings'
-import { LISTED_ADVANCED, groupName, shownText, type AdvancedState } from '@shared/advanced'
+import { listedAdvanced, groupName, shownText, type AdvancedState } from '@shared/advanced'
 import { choose, chooseTab, confirm, get, notify, set, showView, useLanguage, useRememberedTab, useStore, WORKFLOW_DEFAULTS_TAB, WORKFLOW_DEFAULTS_TABS } from '../store'
 import { TabPanel, Tabs } from '../components/Tabs'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { LANGUAGES, SOURCE_LANGUAGE, languageOf } from '@shared/i18n/languages'
 import { LANGUAGE_TEXT } from '@shared/i18n/languageText'
 import { cx, timeAgo } from '../util'
+import { ClisFolder } from '../components/Clis'
 
 /**
  * What is half typed in a box that only saves on its button (a model to add, a viewer token's name…), kept while Combwork
@@ -536,6 +537,8 @@ function ProviderStatus({ provider }: { provider: ProviderId }) {
 function ProvidersList() {
   const settings = useStore((s) => s.settings)
   const providers = useStore((s) => s.providers)
+  // The user's own CLIs (HI-3196): listed after the built-in providers, drawn again on each snapshot.
+  useStore((s) => s.clis?.generation)
   return (
     <div className="provider-list">
       {PROVIDERS.map((p) => {
@@ -558,6 +561,7 @@ function ProvidersList() {
           </div>
         )
       })}
+      <ClisFolder />
     </div>
   )
 }
@@ -946,7 +950,7 @@ function advancedMatches(q: string, modifiedOnly: boolean, advanced: AdvancedSta
   const words = q.split(/\s+/).filter(Boolean)
   const hits = (text: string): boolean => words.every((w) => text.toLowerCase().includes(w))
   // Its English matches as well as what it shows, as Settings' own rows do.
-  return LISTED_ADVANCED.some((d) => (!modifiedOnly || advanced?.values[d.id] !== undefined || advanced?.workspace?.[d.id] !== undefined) && hits(`${d.id} ${d.setting ?? ''} ${groupName(d.group)} ${d.title} ${d.desc} ${shownText(d.text.title)} ${shownText(d.text.desc)}`))
+  return listedAdvanced().some((d) => (!modifiedOnly || advanced?.values[d.id] !== undefined || advanced?.workspace?.[d.id] !== undefined) && hits(`${d.id} ${d.setting ?? ''} ${groupName(d.group)} ${d.title} ${d.desc} ${shownText(d.text.title)} ${shownText(d.text.desc)}`))
 }
 
 function DataFolder() {

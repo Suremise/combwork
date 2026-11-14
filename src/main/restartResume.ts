@@ -27,6 +27,7 @@ import { pausedFor } from './teamPause'
 import { projectAgents } from '../shared/defaults'
 import { agentWorkflowRole, reviewsWork } from '../shared/workflow/roles'
 import { dataFolder } from './combworkFolder'
+import { providerModule } from '../shared/providers'
 
 /**
  * Restarts announced and resumed (HI-1707, shared/restartResume.ts). As Combwork closes for an update, an install or a
@@ -606,7 +607,10 @@ async function until(fn: () => boolean, ms: number): Promise<boolean> {
  * running (or being started by another start: a card's placement resuming it, HI-1746, whose own start would be
  * refused), or started in a newer conversation since (movedOn). The resume asks it, and so does an offer (HI-3214).
  */
-function resumeBlocked(e: RestartEntry, ws: WorkspaceService): 'removed' | 'running' | 'movedOn' | null {
+function resumeBlocked(e: RestartEntry, ws: WorkspaceService): 'removed' | 'running' | 'movedOn' | 'noResume' | null {
+  // A CLI that runs from a description without a resume (HI-3196) has no conversation to resume.
+  const cli = providerModule(e.provider)?.cli
+  if (cli && !cli.session) return 'noResume'
   const agent = ws.info()?.projects.find((p) => samePlace(p.path, e.projectPath))?.agents.find((a) => a.id === e.agentId)
   if (!agent) return 'removed'
   if (sessions.liveFor(e.projectPath, e.agentId) || sessions.pendingStart(e.projectPath, e.agentId)) return 'running'
@@ -758,6 +762,8 @@ function whyText(e: RestartEntry): string {
       return tr(msg({ id: 'main.restart.why.removed', defaultMessage: 'it was removed', description: 'Why an agent was not resumed after Combwork restarted: the agent has been removed from its project.' }))
     case 'running':
       return tr(msg({ id: 'main.restart.why.running', defaultMessage: 'it is running already', description: 'Why an agent was not resumed after Combwork restarted: it is running already.' }))
+    case 'noResume':
+      return tr(msg({ id: 'main.restart.why.noResume', defaultMessage: "its CLI can't resume a conversation", description: 'Why an agent was not resumed after Combwork restarted (HI-3196): its CLI runs from a description that has no way to resume.' }))
     case 'movedOn':
       return tr(msg({ id: 'main.restart.why.movedOn', defaultMessage: 'it has a newer conversation', description: 'Why an agent was not resumed after Combwork restarted: it was started in another conversation since.' }))
     case 'notReady':

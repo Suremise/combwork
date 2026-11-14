@@ -1,0 +1,15 @@
+{
+  "clis.note.install": {
+    "text": "It runs from a description in your Combwork folder (clis): install it yourself, then Reload in Settings → Coding agents.",
+    "note": "A CLI that runs from a description (HI-3196): how it is installed, as the Agent API's provider listing says it."
+  },
+  "clis.note.signIn": {
+    "text": "Sign it in as its own documentation says, in a terminal: Combwork runs no sign-in for it.",
+    "note": "A CLI that runs from a description (HI-3196): how to sign it in again, as agents read it."
+  },
+  "clis.readiness.notFound": {
+    "text": "{provider} isn’t found: install it yourself (its description names where it is looked for), then choose Check again.",
+    "note": "Provider Setup, for a CLI that runs from a description (HI-3196): its executable wasn’t found. Combwork has no install task for it.",
+    "audience": "both"
+  }
+}

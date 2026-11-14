@@ -20,7 +20,7 @@ import { createIntl, createIntlCache } from '@formatjs/intl'
 import { currentChain, overrideOf, type AgentMsg } from './agentText'
 import { formatIcu } from './agentText/icu'
 import { APP_NAME } from './appName'
-import { FIXTURES as FIX, withValues, type AdvancedDef, type AdvancedGroup, type AdvancedSample, type AdvancedSource, type ListType, type Text, type TextPart } from './advancedDef'
+import { CLI_ADVANCED_DEFS, FIXTURES as FIX, withValues, type AdvancedDef, type AdvancedGroup, type AdvancedSample, type AdvancedSource, type ListType, type Text, type TextPart } from './advancedDef'
 import { fmt, language, msg, tr, type Msg } from './i18n'
 import { INBOX_SWITCH_ID } from './inboxSwitches'
 import { providerModule } from './providers'
@@ -1423,13 +1423,16 @@ export const ADVANCED_DEFS: readonly AdvancedDef[] = [...SOURCES, ...PROVIDER_MO
  */
 export const onConnection = (d: Pick<AdvancedDef, 'id' | 'override'>): boolean => !!d.override || d.id === CW_GUIDANCE
 
+/** Every advanced value: the built-in ones, then the user's own CLIs' (HI-3196, as the last snapshot registered them). */
+export const allAdvancedDefs = (): readonly AdvancedDef[] => (CLI_ADVANCED_DEFS.length ? [...ADVANCED_DEFS, ...CLI_ADVANCED_DEFS] : ADVANCED_DEFS)
+
 /** The advanced values Settings → Advanced and the settings catalogue list: all but a connection's switches. */
-export const LISTED_ADVANCED: readonly AdvancedDef[] = ADVANCED_DEFS.filter((d) => !onConnection(d))
+export const listedAdvanced = (): readonly AdvancedDef[] => allAdvancedDefs().filter((d) => !onConnection(d))
 
 const BY_ID = new Map(ADVANCED_DEFS.map((d) => [d.id, d]))
 
 export function advancedDef(id: string): AdvancedDef | undefined {
-  return BY_ID.get(id)
+  return BY_ID.get(id) ?? CLI_ADVANCED_DEFS.find((d) => d.id === id)
 }
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)

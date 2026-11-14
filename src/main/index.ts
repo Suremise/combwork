@@ -147,6 +147,7 @@ import { fmt, msg, tr } from '../shared/i18n'
 import { clearSavedPauses } from './teamPause'
 import { followMovedLink } from './combworkMove'
 import { allProviders } from './providers'
+import { startClis } from './clis'
 
 const log = createLogger('main')
 let quitting = false
@@ -1043,6 +1044,8 @@ app.whenReady().then(async () => {
   await startI18n(config.settings)
   // Advanced settings (#367): advanced.json's overrides, followed as it changes.
   advanced.load()
+  // The user's own CLIs (HI-3196): their descriptions read and registered before anything looks for a provider.
+  await startClis()
   // Connections' launch settings (HI-2670): the app-wide switches they replaced copied onto them once, and agents on a
   // connection without Combwork's tools read as Independent from here on.
   migrateLaunchPolicy()

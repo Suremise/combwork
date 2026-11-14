@@ -147,3 +147,16 @@ export const drawnWaitId = (provider: string): string => `${provider}.prompt.dra
 
 /** Where the recorded fixtures advanced values' samples come from are (a path from the repository's root). */
 export const FIXTURES = 'tests/fixtures'
+
+/**
+ * The advanced values of the user's own CLIs (HI-3196: each description's patterns, cliDescription.ts's cliAdvancedDefs),
+ * as the last snapshot registered them (registerCliModules). advanced.ts reads them beside its built-in ADVANCED_DEFS, which
+ * they never change. Overrides of them are kept by id in advanced.json, so a reload never loses one.
+ */
+export const CLI_ADVANCED_DEFS: readonly AdvancedDef[] = []
+
+/** Replaces the user's own CLIs' advanced values (registerCliModules alone calls it). */
+export function setCliAdvancedDefs(defs: readonly AdvancedDef[]): void {
+  const all = CLI_ADVANCED_DEFS as AdvancedDef[]
+  all.splice(0, all.length, ...defs)
+}

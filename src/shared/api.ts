@@ -1307,6 +1307,11 @@ export interface CombworkRequests {
   'api:info': () => AgentApiInfo
   /** What the Claude Code admin snippet is made from (HI-2777): ports and the hooks' timeouts. */
   'api:adminSnippet': (provider: ProviderId) => AdminSnippetFacts
+  /** The user's own CLIs as main read them (HI-3196): registered by a window before its first render. */
+  'clis:snapshot': () => import('./providers/cliSnapshot').CliSnapshotView
+  /** Reads the clis folder again and applies it (Settings → Coding agents → Reload). */
+  'clis:reload': () => import('./providers/cliSnapshot').CliSnapshotView
+  'clis:openFolder': () => void
   'api:regenerateToken': () => AgentApiInfo
   /** A new read-only viewer token with this name (#620). */
   'api:createViewer': (name: string) => AgentApiInfo

@@ -157,6 +157,7 @@ import { CONSOLE_KINDS, combworkName, mayRead, type ConsoleEvent, type ConsoleKi
 import { cardLabel, cardName, cardRef, namesOf } from '../shared/projectKeys'
 import { pauseTeam, resumeTeam } from './teamPause'
 import { scanWorkspace } from './teamParked'
+import { providerGaps, providerGapsForAgents } from '../shared/providers/gaps'
 
 const log = createLogger('servers')
 const MAX_BODY = 2 * 1024 * 1024
@@ -1150,6 +1151,8 @@ route('GET', '/v1/providers', async () => {
       // Whether agents can be given context200k (a 200K window instead of the model's 1M).
       context200k: p.capabilities.compaction?.contextLimit ?? false,
       modes: offeredModes(p.id, s).map((m) => ({ value: m.value, label: m.label, description: m.description })),
+      // What its CLI can't do in Combwork (HI-3196: one that runs from a description), only where it lacks something.
+      ...(providerGaps(p.id).length ? { gaps: providerGapsForAgents(p.id) } : {}),
       // Its connections usable in the caller's workspace (HI-2108), in the order: what cw_add_agent's connection names. Each
       // with its own account's default and, where they aren't the provider's, its models (HI-2856).
       ...(here ? { connections: listedConnections(p.id, connectionsHere(here).filter((c) => accountById(c.account)?.provider === p.id), accountById, at, s, models) } : {})

@@ -111,6 +111,12 @@ interface CombworkMessageValues {
   'providers.export.summary': undefined
   'providers.export.thinking': undefined
   'providers.export.you': undefined
+  'providers.gap.cost': undefined
+  'providers.gap.hooks': undefined
+  'providers.gap.liveMode': undefined
+  'providers.gap.resume': undefined
+  'providers.gap.tools': undefined
+  'providers.gap.transcript': undefined
   'providers.localLimits.context': { value: number; from: string | number; estimate: string }
   'providers.localLimits.inFile': { file: string | number }
   'providers.localLimits.notUsed': { why: string; model: string | number; file: string | number; connection: string | number }

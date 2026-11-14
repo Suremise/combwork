@@ -1363,6 +1363,10 @@
     "defaultMessage": "it has a newer conversation",
     "description": "Why an agent was not resumed after Combwork restarted: it was started in another conversation since."
   },
+  "main.restart.why.noResume": {
+    "defaultMessage": "its CLI can't resume a conversation",
+    "description": "Why an agent was not resumed after Combwork restarted (HI-3196): its CLI runs from a description that has no way to resume."
+  },
   "main.restart.why.notReady": {
     "defaultMessage": "it didn't get ready in time, so it was stopped",
     "description": "Why an agent was not resumed after Combwork restarted: its CLI did not become ready within the time allowed (Settings → Advanced), so Combwork stopped it."
