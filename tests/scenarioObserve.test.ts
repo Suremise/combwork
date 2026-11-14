@@ -2335,3 +2335,22 @@ describe("a launch's mode, as each CLI has its launch's guidance (launchedIn)", 
     expect(launchedIn({ ws: d, opencodeLog: log }, 'Coordinator')).toBe(false)
   })
 })
+
+describe("what an agent said about a card, every reply after the prompt (saidOnCard, jj-card-passed's integrate check, HI-3212)", () => {
+  const { saidOnCard } = (require('./scenarios/scenarios.cjs') as { helpers: { saidOnCard: (o: unknown, card: unknown, by: RegExp) => string } }).helpers
+  const told = '#1 passed review. Nothing for me to merge: it waits in Approved for you to integrate it, its work kept in its slot.'
+  const doorbell = 'Done: [CW] read the inbox: m1, m2.'
+  it("finds what an earlier reply said when OpenCode's doorbell turn (no Stop hook) replied last", () => {
+    const o = { replies: [told, doorbell], finalReply: doorbell }
+    expect(/integrat/i.test(o.finalReply)).toBe(false)
+    expect(/integrat/i.test(saidOnCard(o, { comments: [] }, /Coder/))).toBe(true)
+  })
+  it("and in the agent's own comments on the card, never another's", () => {
+    const card = { comments: [{ by: 'Coder (alpha)', text: 'It waits for you to integrate it.' }] }
+    expect(/integrat/i.test(saidOnCard({ replies: [doorbell], finalReply: doorbell }, card, /Coder/))).toBe(true)
+    expect(/integrat/i.test(saidOnCard({ replies: [doorbell], finalReply: doorbell }, { comments: [{ by: 'Reviewer (alpha)', text: 'Integrate it.' }] }, /Coder/))).toBe(false)
+  })
+  it('fails when no reply and no comment of its says it', () => {
+    expect(/integrat/i.test(saidOnCard({ replies: ['#1 passed review.', doorbell], finalReply: doorbell }, { comments: [] }, /Coder/))).toBe(false)
+  })
+})
