@@ -63,8 +63,8 @@ export class AttemptGuard {
   /**
    * The refusal for a write on card `card` (`key`: its key, as refusals name it) whose attempt before the write is `pre`
    * (null: a card with no workflow record, whose launch alone is checked), or null. A request with no binding for the card
-   * is its launch's first contact with it (the Assistant's call on HI-3194, 14 Nov: the card never asked that an agent
-   * must have read a card first): allowed, and bound to the attempt by its write.
+   * is its launch's first contact with it (Darren's decision on HI-3194, 14 Nov: no read-first rule, no saved
+   * bindings): allowed, and bound to the attempt by its write.
    */
   check(card: number, key: string, pre: AttemptKey | null): Refusal | null {
     if (currentAgentRun(this.fence.projectPath, this.fence.agentId) !== this.fence.runId) return refusal('attempt.staleLaunch', { card: key }, null)

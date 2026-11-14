@@ -5980,9 +5980,9 @@ moved on.
   card's attempt → **`attempt.moved`** (read it again), in every stage, Todo and Done included. **No binding is first
   contact** (a reviewer prompted to review, a question to the user on a card, a comment on a Todo card, a resumed agent
   after a restart): allowed, and the write binds the launch to the card's attempt then. The card asks that a stale call
-  can't act, not that an agent read a card first [the Assistant, 14 Nov, on Darren's simplify rule; he may overrule it].
-  What that leaves: a launch that saw a card only in a listing (which issues nothing), or a conversation resumed after a
-  Combwork restart (bindings are in memory), writing after a later attempt is taken as first contact. The
+  can't act, not that an agent read a card first (Darren, 14 Nov: no read-first rule, no binding from listings, no saved
+  bindings). The gap that leaves: after a Combwork restart, an old conversation of the same agent, resumed on a card
+  restarted on that agent, isn't fenced (bindings are in memory, so its first write is first contact). The
   builder's own moves (submit and its requeue, a merge report, a move to Review or Done, declaring paths, a design, going
   ahead, a follow-up) are refused **`attempt.notAssignee`** for an agent that isn't the attempt's builder (the card's agent
   now, or its cycle's builder when it has none). A put-back by another agent stays allowed (anyone moves a card), fenced by
