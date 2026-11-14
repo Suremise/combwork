@@ -596,6 +596,7 @@
   "workflow.summary.none.pair": "A reviewer agent checks each card, after the quick checks pass.",
   "workflow.summary.none.solo": "No review: a card is done when its builder submits it.",
   "workflow.summary.none.team": "A reviewer agent, then you, check each card, after the quick checks and the tests pass.",
+  "workflow.unreadable.blockerWork": "whether {card}'s work is in the target ({what})",
   "workflow.unreadable.branch": "the branch checked out in {folder}",
   "workflow.unreadable.branchedOff": "where {a} and {b} branched off",
   "workflow.unreadable.branchedOffTarget": "where the work branched off its target",

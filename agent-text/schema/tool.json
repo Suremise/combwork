@@ -636,10 +636,19 @@
   "tool.readTask.arg.comments": {
     "placeholders": {}
   },
+  "tool.readTask.arg.feedback": {
+    "placeholders": {}
+  },
   "tool.readTask.arg.history": {
     "placeholders": {}
   },
   "tool.readTask.arg.latestComment": {
+    "placeholders": {}
+  },
+  "tool.readTask.arg.lineComments": {
+    "placeholders": {}
+  },
+  "tool.readTask.arg.offset": {
     "placeholders": {}
   },
   "tool.readTask.arg.summary": {

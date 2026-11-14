@@ -24,6 +24,10 @@ const deliveries = await import('../src/main/deliveries')
 const { initInboxNotices } = await import('../src/main/inboxNotices')
 const tasks = await import('../src/main/tasks')
 const { projectAgents } = await import('../src/shared/defaults')
+const { keyProjects, scopeOfHost, withCardNames } = await import('../src/main/projectKeys')
+const { workspaceFor } = await import('../src/main/workspace')
+const { offerLine } = await import('../src/shared/deliveries')
+const { cardRef } = await import('../src/shared/projectKeys')
 
 describe("Combwork's notice wording (#650)", () => {
   it('names counts by kind, the cards and the ids, never what a delivery says or who sent it', () => {
@@ -132,6 +136,31 @@ describe('notices in the hook replies (#650)', () => {
     const e = await leave(st, { kind: 'card-event', card: 607 })
     expect(context(await hook(st, tool('p1', 'c4')))).toBe(`[CW] New in your inbox: 1 message and 1 card event (#607) (${m.id}, ${e.id}). Call cw_inbox now to read them; act on them and ack them, then carry on.`)
     expect(st.status).toBe('working')
+  })
+
+  it("HI-3226: names its cards by key, as the doorbell typed as the prompt does, though the hook server's work has no workspace", async () => {
+    const st = agent()
+    await run(() => keyProjects(w))
+    const made = await run(() => tasks.createTask({ title: 'Named by key', project: 'alpha' }, { kind: 'user' }))
+    // Its key as the window names it (in the workspace's work).
+    const card = { number: made.number, key: await run(() => cardRef(made.number)) }
+    expect(card.key).toMatch(/^[A-Z]+-\d+$/)
+    const e = await leave(st, { kind: 'card-event', card: card.number })
+    // As the hook server calls it: outside any workspace's work, so only the project's own names can name the card.
+    const outside = async (body: Record<string, unknown>) => {
+      const full = { session_id: st.sessionId, cwd: p, ...body }
+      const reply = sessions.hookReply(st.runId, full)
+      await sessions.handleHook(st.runId, full, reply)
+      return reply
+    }
+    await outside({ hook_event_name: 'UserPromptSubmit', prompt_id: 'p1', prompt: 'go' })
+    const told = context(await outside(tool('p1', 'c1')))
+    expect(told).toContain(`1 card event (${card.key}) (${e.id})`)
+    expect(told).not.toContain(`#${card.number}`)
+    // The doorbell typed as the prompt (deliveries.ts, offerLine in its host's names) names the same card the same way.
+    const rec = (await run(() => deliveries.deliveriesOf(p, st.agentId))).find((r) => r.id === e.id)!
+    const bell = withCardNames(workspaceFor(p), () => offerLine([rec], null), scopeOfHost(p))
+    expect(bell).toContain(`1 card event (${card.key}) (${e.id})`)
   })
 
   it("HI-2670: an agent made Independent while it runs gets no notice in its hooks, which still report its status; back in the workflow, its launch's own switches allowing, it is told again, without a restart", async () => {

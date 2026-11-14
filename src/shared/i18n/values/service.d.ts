@@ -235,6 +235,8 @@ interface CombworkMessageValues {
   'service.gitRepo.urlFailed': { remote: string | number; why: string | number }
   'service.intent.noWorkflow': { card: string | number }
   'service.intent.queueNotAgents': undefined
+  'service.jj.revisionNoRepo': undefined
+  'service.jj.revisionUnreadable': { path: string | number; commit: string | number; error: string | number }
   'service.keys.closed': undefined
   'service.keys.form': undefined
   'service.keys.notice': { keys: string | number }
@@ -308,6 +310,7 @@ interface CombworkMessageValues {
   'service.nextVersion.sameName': { from: string | number }
   'service.providers.keysStopped': { task: string | number; why: string | number }
   'service.providers.noSetup': { cli: string | number }
+  'service.providers.noTask': { cli: string | number; task: string }
   'service.providers.notInstalled': { cli: string | number }
   'service.providers.pickNotFound': { task: string | number; item: string | number }
   'service.providers.retryUnavailable': undefined

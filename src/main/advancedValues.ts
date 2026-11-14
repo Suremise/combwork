@@ -1,4 +1,4 @@
-import { ADVANCED_DEFS, advancedDef, advancedRegExp, literalRegExp, overrideId } from '../shared/advanced'
+import { ADVANCED_DEFS, advancedDef, allAdvancedDefs, advancedRegExp, literalRegExp, overrideId } from '../shared/advanced'
 import type { ProviderId } from '../shared/types'
 
 /**
@@ -73,5 +73,5 @@ export function readAdvancedFrom(r: AdvancedReader): void {
 
 /** Every setting's value as it applies now, for the worker. */
 export function resolvedValues(r: AdvancedReader): Record<string, unknown> {
-  return Object.fromEntries(ADVANCED_DEFS.map((d) => [d.id, r.get(d.id)]))
+  return Object.fromEntries(allAdvancedDefs().map((d) => [d.id, r.get(d.id)]))
 }

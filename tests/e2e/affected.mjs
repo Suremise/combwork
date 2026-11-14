@@ -87,7 +87,10 @@ export const EVERYTHING = [
   'src/shared/defaults.ts',
   'src/shared/dates.ts',
   'src/shared/units.ts',
-  'src/shared/providers.ts',
+  'src/shared/providers/index.ts',
+  'src/shared/providers/registry.ts',
+  'src/shared/providers/parts.ts',
+  'src/shared/providers/common.ts',
   // Coalesces reads for sessions.ts and the renderer's api.ts (#1629, #1646), both above.
   'src/shared/coalesce.ts',
   'src/main/providers/',
@@ -156,26 +159,27 @@ export const AREAS = [
   { paths: ['src/main/consoleRecorder.ts', 'src/shared/consoleFixtures.mts', 'src/shared/devConsole.ts', 'src/main/devConsole.ts', 'src/main/providers/copilot/adapter.ts', 'src/main/providers/copilot/events.ts', 'src/main/screenRecognition.ts', 'tests/fixtures/console/copilot.json', 'scripts/consoleFixture.mjs', 'tests/e2e/contract-copilot.cjs'], suites: ['contract-copilot', 'devconsole'] },
   { paths: ['src/main/consoleRecorder.ts', 'src/main/diagnostics.ts'], suites: ['consolewindow'] },
   // Developer console: show text (#699): the advanced setting, what main sends the window, the banner.
-  { paths: ['src/main/consoleWindow.ts', 'src/renderer/src/ConsoleApp.tsx', 'src/renderer/src/styles/console.css', 'src/shared/devConsole.ts', 'src/main/devConsole.ts', 'src/main/ipc.ts', 'src/shared/advanced.ts', 'src/main/advanced.ts', 'src/shared/redact.ts', 'tests/e2e/consoletext.cjs'], suites: ['consoletext'] },
+  { paths: ['src/main/consoleWindow.ts', 'src/renderer/src/ConsoleApp.tsx', 'src/renderer/src/styles/console.css', 'src/shared/devConsole.ts', 'src/main/devConsole.ts', 'src/main/ipc.ts', 'src/shared/advanced.ts', 'src/shared/advancedDef.ts', 'src/shared/providers/claude/advanced.ts', 'src/shared/providers/codex/advanced.ts', 'src/shared/providers/copilot/advanced.ts', 'src/shared/providers/antigravity/advanced.ts', 'src/shared/providers/opencode/advanced.ts', 'src/main/advanced.ts', 'src/shared/redact.ts', 'tests/e2e/consoletext.cjs'], suites: ['consoletext'] },
   // The developer console's flight recorder (#698): its triggers, captures and notices.
   { paths: ['src/main/flightRecorder.ts', 'src/shared/flightRecorder.ts', 'src/main/consoleRecorder.ts', 'tests/e2e/flightrecorder.cjs'], suites: ['flightrecorder'] },
   // Advanced settings (#367): the list, advanced.json, the workspace's own values, and what uses them (the combwork MCP server's waits).
-  { paths: ['src/main/advanced.ts', 'src/shared/advanced.ts', 'src/renderer/src/advanced.ts', 'src/renderer/src/components/AdvancedSettings.tsx', 'src/main/diagnostics.ts', 'src/shared/settingsCatalog.ts', 'tests/fixtures/advanced/', 'tests/e2e/advanced.cjs'], suites: ['advanced'] },
+  { paths: ['src/main/advanced.ts', 'src/shared/advanced.ts', 'src/shared/advancedDef.ts', 'src/shared/providers/claude/advanced.ts', 'src/shared/providers/codex/advanced.ts', 'src/shared/providers/copilot/advanced.ts', 'src/shared/providers/antigravity/advanced.ts', 'src/shared/providers/opencode/advanced.ts', 'src/renderer/src/advanced.ts', 'src/renderer/src/components/AdvancedSettings.tsx', 'src/main/diagnostics.ts', 'src/shared/settingsCatalog.ts', 'tests/fixtures/advanced/', 'tests/e2e/advanced.cjs'], suites: ['advanced'] },
   { paths: ['src/main/advanced.ts'], suites: ['replysize', 'assistantsettings'] },
   // The Combwork tools' description limits (HI-2012): replysize checks them.
   { paths: ['tests/e2e/toolLimits.cjs'], suites: ['replysize'] },
   { paths: ['tests/e2e/toolsides.cjs', 'src/shared/assistantTools.ts', 'src/main/mcp/cw-mcp.ts', 'src/main/sessions.ts', 'src/shared/workflow/roles.ts', 'src/main/launchSides.ts', 'src/main/workflowTools.ts', 'src/renderer/src/components/AgentDialogs.tsx'], suites: ['toolsides', 'replysize'] },
-  { paths: ['src/main/providers/opencode/', 'src/shared/opencode.ts', 'src/main/opencodeHistoryHost.ts', 'src/main/opencodeHistoryWorker.ts', 'tests/e2e/fake-opencode/'], suites: ['opencode', 'opencode-assistant', 'opencode-history', 'opencode-isolation', 'opencode-launch', 'opencode-providers', 'opencode-status', 'opencode-tools', 'opencodereal', 'opencodereal-dirs'] },
-  { paths: ['src/main/providers/antigravity/', 'src/main/statusLineState.ts', 'src/shared/antigravity.ts', 'tests/e2e/fake-agy/'], suites: ['antigravity', 'antigravity-windows', 'antigravityreal'] },
+  { paths: ['src/main/providers/opencode/', 'src/shared/providers/opencode/', 'tests/e2e/fake-opencode/'], suites: ['opencode', 'opencode-assistant', 'opencode-history', 'opencode-isolation', 'opencode-launch', 'opencode-providers', 'opencode-status', 'opencode-tools', 'opencodereal', 'opencodereal-dirs'] },
+  { paths: ['src/main/clis.ts', 'src/shared/providers/cliDescription.ts', 'src/shared/providers/cliSnapshot.ts', 'src/shared/providers/gaps.ts', 'src/renderer/src/clis.ts', 'src/renderer/src/components/Clis.tsx', 'src/main/independent.ts', 'src/main/launchScope.ts', 'src/main/serverLaunch.ts', 'tests/e2e/fake-datacli/', 'tests/e2e/fake-openai/', 'tests/e2e/datacli.cjs', 'tests/e2e/dataserver.cjs'], suites: ['datacli', 'dataserver'] },
+  { paths: ['src/main/providers/antigravity/', 'src/main/statusLineState.ts', 'src/shared/providers/antigravity/', 'tests/e2e/fake-agy/'], suites: ['antigravity', 'antigravity-windows', 'antigravityreal'] },
   { paths: ['src/main/assistantMemory.ts', 'src/shared/assistantMemory.ts', 'src/renderer/src/components/AssistantMemory.tsx', 'src/renderer/src/components/AssistantView.tsx'], suites: ['assistantmemory', 'assistantimages'] },
   { paths: ['src/main/journal.ts', 'src/main/journalService.ts', 'src/main/walCheckpoint.ts', 'src/main/walCheckpointWorker.ts','src/shared/journal.ts', 'src/renderer/src/components/JournalSettings.tsx', 'tests/e2e/journal.cjs'], suites: ['journal', 'replysize'] },
   { paths: ['src/main/startView.ts', 'src/shared/startView.ts'], suites: ['journal', 'assistantcompact', 'assistantresume'] },
   // Builds recorded as facts (#1534): the scripts' side, Combwork's route and markers, the Advanced switch.
-  { paths: ['scripts/buildFact.mjs', 'src/main/buildFacts.ts', 'src/shared/buildFacts.ts', 'src/renderer/src/components/journalBuilds.ts', 'src/main/journalService.ts', 'src/shared/advanced.ts', 'tests/e2e/buildfacts.cjs'], suites: ['buildfacts'] },
+  { paths: ['scripts/buildFact.mjs', 'src/main/buildFacts.ts', 'src/shared/buildFacts.ts', 'src/renderer/src/components/journalBuilds.ts', 'src/main/journalService.ts', 'src/shared/advanced.ts', 'src/shared/advancedDef.ts', 'src/shared/providers/claude/advanced.ts', 'src/shared/providers/codex/advanced.ts', 'src/shared/providers/copilot/advanced.ts', 'src/shared/providers/antigravity/advanced.ts', 'src/shared/providers/opencode/advanced.ts', 'tests/e2e/buildfacts.cjs'], suites: ['buildfacts'] },
   // The journal browser (#1033): the store's browse and forget, its IPC, the Assistant view's Journal.
   { paths: ['src/main/journal.ts', 'src/main/journalService.ts', 'src/shared/journal.ts', 'src/renderer/src/components/JournalView.tsx', 'src/renderer/src/components/journalBuilds.ts', 'src/renderer/src/components/AssistantView.tsx', 'tests/e2e/journalbrowse.cjs'], suites: ['journalbrowse'] },
   // Disable hardware acceleration (#676): the early read, the restart offer, the terminals' renderer, diagnostics.
-  { paths: ['src/main/gpu.ts', 'src/shared/advanced.ts', 'src/main/advanced.ts', 'src/renderer/src/components/AdvancedSettings.tsx', 'src/renderer/src/components/TerminalView.tsx', 'src/main/diagnostics.ts', 'tests/e2e/hwaccel.cjs'], suites: ['hwaccel'] },
+  { paths: ['src/main/gpu.ts', 'src/shared/advanced.ts', 'src/shared/advancedDef.ts', 'src/shared/providers/claude/advanced.ts', 'src/shared/providers/codex/advanced.ts', 'src/shared/providers/copilot/advanced.ts', 'src/shared/providers/antigravity/advanced.ts', 'src/shared/providers/opencode/advanced.ts', 'src/main/advanced.ts', 'src/renderer/src/components/AdvancedSettings.tsx', 'src/renderer/src/components/TerminalView.tsx', 'src/main/diagnostics.ts', 'tests/e2e/hwaccel.cjs'], suites: ['hwaccel'] },
   { paths: ['src/main/agentTokens.ts'], suites: ['boardscope', 'review', 'progress', 'progressreport', 'cardloop', 'replysize', 'combworktools'] },
   { paths: ['src/main/assistantControl.ts', 'src/main/assistantChanges.ts', 'src/main/assistantUndo.ts', 'src/shared/assistantActivity.ts', 'src/main/activityTargets.ts', 'src/main/taskBatch.ts', 'src/shared/assistant.ts', 'src/shared/assistantStatus.ts', 'src/shared/assistantTools.ts', 'src/main/modes.ts', 'src/renderer/src/components/Assistant.tsx', 'src/renderer/src/components/AssistantChanges.tsx', 'src/renderer/src/assistantUndo.ts', 'src/shared/assistantChangeList.ts', 'src/renderer/src/components/AssistantMark.tsx', 'src/renderer/src/components/AssistantView.tsx', 'src/renderer/src/components/Modes.tsx', 'src/shared/modeDescriptions.ts'], suites: ['assistantside', 'assistant', 'assistantcodex', 'assistant-control', 'assistantend', 'assistantimages', 'tipcorner', 'replysize', 'claude-real', 'assistantoverview', 'assistantbatch', 'assistantcompact', 'assistantsettings', 'assistantmode', 'cardchip', 'assistantpanel', 'assistantundo'] },
   { paths: ['src/main/installDir.ts'], suites: ['installdir'] },
@@ -252,7 +256,7 @@ export const AREAS = [
   { paths: ['src/main/connectionSeam.ts', 'src/main/connectionSwitch.ts', 'src/renderer/src/components/ConnectionChoice.tsx', 'tests/e2e/connections.cjs'], suites: ['connections', 'connectionrows', 'connections-codex', 'assistantcodex'] },
   // HI-2899: the Assistant's CLI as its launch picks it, its account banner and its home's migration (unpinned), on the fake Codex.
   { paths: ['tests/e2e/assistantcodex.cjs', 'src/shared/connectionLabel.ts', 'src/main/connectionMoves.ts', 'src/shared/connectionDefaults.ts'], suites: ['assistantcodex'] },
-  { paths: ['tests/e2e/connections-codex.cjs', 'tests/e2e/fake-codex/', 'src/main/providers/codex/', 'src/shared/codex.ts'], suites: ['connections-codex'] },
+  { paths: ['tests/e2e/connections-codex.cjs', 'tests/e2e/fake-codex/', 'src/main/providers/codex/', 'src/shared/providers/codex/'], suites: ['connections-codex'] },
   // Plan usage per connection, the status bar's and Overview's (HI-1756).
   { paths: ['src/main/planUsage.ts', 'src/shared/planLimits.ts', 'src/renderer/src/connectionUsage.ts', 'tests/e2e/connectionusage.cjs'], suites: ['connectionusage', 'planusage', 'antigravity'] },
   { paths: ['src/main/usageMoves.ts', 'src/shared/usageMoves.ts', 'src/main/connectionSwitch.ts', 'src/main/agentChoice.ts', 'src/renderer/src/components/UsageMoveRule.tsx', 'tests/e2e/usagemove.cjs'], suites: ['usagemove'] },
@@ -266,9 +270,9 @@ export const AREAS = [
   { paths: ['src/shared/activityMap.ts', 'src/renderer/src/views/ActivityMap.tsx', 'src/renderer/src/views/WorkspaceActivity.tsx'], suites: ['activitymap', 'activityworkspace'] },
   { paths: ['src/renderer/src/views/WorkspaceActivity.tsx', 'src/main/activityWorkspace.ts'], suites: ['activityworkspace'] },
   // What agents' commands leave running while they run (HI-2111).
-  { paths: ['src/main/orphanProcesses.ts', 'src/main/agentProcesses.ts', 'src/main/processSupervisor.ts', 'src/main/activityWorkspace.ts', 'src/main/teamParked.ts', 'src/main/inboxNotices.ts', 'src/renderer/src/views/ActivityTab.tsx', 'tests/e2e/fake-claude/linger.cjs'], suites: ['orphans'] },
+  { paths: ['src/main/orphanProcesses.ts', 'src/main/runProcesses.ts', 'src/main/agentProcesses.ts', 'src/main/processSupervisor.ts', 'src/main/activityWorkspace.ts', 'src/main/teamParked.ts', 'src/main/inboxNotices.ts', 'src/renderer/src/views/ActivityTab.tsx', 'tests/e2e/fake-claude/linger.cjs'], suites: ['orphans'] },
   { paths: ['src/main/compaction.ts'], suites: ['compact', 'overview', 'paneheader', 'idlestatus'] },
-  { paths: ['src/shared/safeguards.ts', 'src/main/providers/claude/safeguards.ts', 'src/main/providers/codex/safeguards.ts', 'src/main/cardSessions.ts'], suites: ['safeguards'] },
+  { paths: ['src/shared/safeguards.ts', 'src/shared/providers/claude/safeguards.ts', 'src/shared/providers/codex/safeguards.ts', 'src/main/providers/claude/safeguards.ts', 'src/main/providers/codex/safeguards.ts', 'src/main/cardSessions.ts'], suites: ['safeguards'] },
   { paths: ['src/main/diagnostics.ts', 'src/shared/redact.ts'], suites: ['about', 'testedclis'] },
   { paths: ['src/main/files.ts', 'src/main/platform/gitFiles.ts', 'src/shared/platform/metadataDirs.ts', 'src/renderer/src/views/FilesTab.tsx', 'src/renderer/src/components/FileView.tsx', 'src/renderer/src/components/DocEditor.tsx', 'src/renderer/src/components/Editors.tsx', 'src/renderer/src/editorDrafts.ts', 'src/renderer/src/monaco.ts', 'src/renderer/src/monacoLang.ts'], suites: ['files', 'editor', 'drafts', 'unsaved', 'icons', 'image', 'assistantimages', 'asarfiles'] },
   // The Files tab's Git menu (HI-2743): only the Files tab uses it.
@@ -284,7 +288,7 @@ export const AREAS = [
   // The turn ledger (#648): status by the CLIs' turn ids, reconciliation, the unknown state and Mark idle.
   { paths: ['src/main/turnLedger.ts', 'src/shared/runtime.ts'], suites: ['turnledger', 'idlestatus', 'background', 'attention', 'signin', 'lanewatch', 'replysize', 'hookshealth'] },
   // A CLI's retry wait (HI-1972): Codex's log read in its worker, shown as the agent's status.
-  { paths: ['src/main/codexLogWorker.ts', 'src/main/providers/codex/retryLog.ts', 'src/main/retryNotice.ts'], suites: ['turnledger'] },
+  { paths: ['src/main/providers/codex/retryLog.ts', 'src/main/retryNotice.ts'], suites: ['turnledger'] },
   // Hooks health (#1336): an agent whose hooks stop arriving shows as unknown, takes no lines, and pauses its lane.
   { paths: ['src/main/hooksHealth.ts', 'src/main/readiness.ts'], suites: ['hookshealth', 'hookstranscript', 'turnledger', 'idlestatus'] },
   { paths: ['src/main/turnsReader.ts', 'src/main/providers/turns.ts', 'src/main/providers/claude/turns.ts', 'src/main/providers/codex/turns.ts', 'src/main/providers/copilot/turns.ts', 'tests/e2e/hookstranscript.cjs', 'tests/e2e/hookscopilot.cjs'], suites: ['hookstranscript', 'hookscopilot', 'hookshealth'] },
@@ -301,7 +305,7 @@ export const AREAS = [
   // MCP catalogues (HI-545): reading, checking and installing their servers, the Catalogue tab and Settings → MCP Catalogues.
   { paths: ['src/main/mcpCatalog.ts', 'src/shared/mcpCatalog.ts', 'src/renderer/src/components/McpCatalog.tsx', 'tests/e2e/mcpcatalog.cjs'], suites: ['mcpcatalog', 'mcpfile'] },
   { paths: ['src/main/notes.ts'], suites: ['drafts', 'codex-handover'] },
-  { paths: ['src/main/planUsage.ts', 'src/renderer/src/components/ModelPicker.tsx', 'src/shared/claude.ts', 'src/shared/codex.ts', 'src/shared/prices.ts'], suites: ['plan', 'planusage', 'providers', 'codex-setup', 'context', 'unpricedcost', 'models'] },
+  { paths: ['src/main/planUsage.ts', 'src/renderer/src/components/ModelPicker.tsx', 'src/shared/providers/claude/', 'src/shared/providers/codex/', 'src/shared/prices.ts', 'src/shared/providers/claude/prices.ts', 'src/shared/providers/codex/prices.ts'], suites: ['plan', 'planusage', 'providers', 'codex-setup', 'context', 'unpricedcost', 'models'] },
   // Models and capabilities from the CLIs, and their fallbacks (#125).
   { paths: ['src/shared/models.ts', 'tests/fixtures/claude-initialize.json', 'tests/fixtures/codex-debug-models.json'], suites: ['models', 'assistant', 'footerfit', 'agents-ui', 'automode'] },
   { paths: ['src/main/power.ts', 'src/shared/keepAwake.ts'], suites: ['quitwait', 'quit'] },
@@ -395,7 +399,7 @@ export const AREAS = [
   { paths: ['tests/e2e/slotpool.cjs', 'src/main/slots.ts', 'src/main/slotsApp.ts', 'src/main/slotJobs.ts', 'src/main/workflow/queueJobs.ts', 'src/main/workflow/queueChecks.ts'], suites: ['slotpool', 'slotsessions'] },
   { paths: ['tests/e2e/slotwriterhold.cjs', 'src/main/agentFolders.ts', 'src/main/slots.ts', 'src/main/slotsApp.ts'], suites: ['slotwriterhold'] },
   // P7's switches and slot options set in the window and acting in the app (#1563).
-  { paths: ['tests/e2e/p7settings.cjs', 'src/shared/advanced.ts', 'src/renderer/src/components/AdvancedSettings.tsx', 'src/renderer/src/views/ProjectTabs.tsx'], suites: ['p7settings'] },
+  { paths: ['tests/e2e/p7settings.cjs', 'src/shared/advanced.ts', 'src/shared/advancedDef.ts', 'src/shared/providers/claude/advanced.ts', 'src/shared/providers/codex/advanced.ts', 'src/shared/providers/copilot/advanced.ts', 'src/shared/providers/antigravity/advanced.ts', 'src/shared/providers/opencode/advanced.ts', 'src/renderer/src/components/AdvancedSettings.tsx', 'src/renderer/src/views/ProjectTabs.tsx'], suites: ['p7settings'] },
   { paths: ['tests/e2e/slotscripts.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/slots.ts', 'src/main/slotsApp.ts', 'src/main/slotSettings.ts', 'src/main/worktrees.ts'], suites: ['slotscripts'] },
   { paths: ['tests/e2e/slotswitches.cjs', 'src/main/slotCards.ts', 'src/main/slots.ts', 'src/main/laneStart.ts'], suites: ['slotswitches'] },
   { paths: ['tests/e2e/copyquiet.cjs', 'src/main/copies.ts', 'src/main/copiesApp.ts', 'src/main/reviewCopies.ts'], suites: ['copyquiet'] },
@@ -421,7 +425,7 @@ export const AREAS = [
   // The workspace database's small stores (#1018): lanes, card watches and deliveries.
   { paths: ['src/main/storeRows.ts'], suites: ['progresslanes', 'cardloop', 'deliveries', 'agentmessage', 'inbox', 'lanewatch', 'agentwatch', 'loopwatch', 'watchrelease', 'unexpectedclose'] },
   { paths: ['src/main/projectKeys.ts', 'src/main/schema/keysStep.ts', 'src/main/schema/namesStep.ts', 'src/main/schema/valuesStep.ts', 'src/shared/projectKeys.ts', 'tests/e2e/projectkeys.cjs'], suites: ['projectkeys', 'keysui', 'replysize', 'combworktools', 'cardloop'] },
-  { paths: ['src/renderer/src/components/CardWork.tsx', 'src/renderer/src/cardWork.ts', 'src/shared/workflow/workView.ts', 'src/main/workflow/cardWork.ts', 'tests/e2e/cardwork.cjs'], suites: ['cardwork', 'board', 'carddialog', 'progressgates', 'progresslanes'] },
+  { paths: ['src/renderer/src/components/CardWork.tsx', 'src/renderer/src/cardWork.ts', 'src/shared/workflow/workView.ts', 'src/main/workflow/cardWork.ts', 'tests/e2e/cardwork.cjs', 'src/renderer/src/components/RevisionChanges.tsx', 'src/main/workflow/revisionDiff.ts', 'src/main/platform/revisionReads.ts', 'src/main/platform/revisionReadsPorts.ts', 'src/main/platform/gitRevisionReads.ts', 'src/main/platform/jjRevisionReads.ts', 'src/main/diffSides.ts', 'src/main/workflow/lineComments.ts', 'src/shared/workflow/lineComments.ts', 'src/renderer/src/components/LineComments.tsx', 'src/main/workflow/feedbackText.ts'], suites: ['cardwork', 'board', 'carddialog', 'progressgates', 'progresslanes'] },
   { paths: ['src/renderer/src/projectKeys.ts', 'src/shared/cardLinks.ts', 'src/renderer/src/cardLinks.ts', 'tests/e2e/keysui.cjs'], suites: ['keysui', 'cardlinks', 'board', 'boardarchive', 'cardchip', 'progresslanes', 'rail'] },
   { paths: ['src/main/storeTables.ts', 'src/main/storeBackup.ts', 'src/main/schema/storeCodec.ts'], suites: ['progresslanes', 'cardloop', 'lanewatch', 'agentwatch', 'loopwatch', 'watchrelease', 'performance'] },
   { paths: ['src/main/projectRemoval.ts', 'src/renderer/src/components/ProjectRemoval.tsx'], suites: ['board', 'storage'] },
@@ -553,8 +557,8 @@ export const AREAS = [
   { paths: ['src/renderer/src/components/StateMark.tsx', 'src/shared/agentState.ts'], suites: ['statemarks', 'contrast'] },
   { paths: ['src/renderer/src/components/AgentsTable.tsx', 'src/shared/agentTable.ts'], suites: ['agentrole', 'agentstable', 'cardchip'] },
   { paths: ['src/renderer/src/agentPlace.ts', 'tests/e2e/agentslots.cjs'], suites: ['agentslots', 'agents-ui', 'files', 'sessionorigin'] },
-  { paths: ['src/renderer/src/components/Tips.tsx', 'src/renderer/src/tips.ts', 'src/shared/tips.ts', 'src/shared/corner.ts', 'docs/USER_GUIDE.md', 'src/shared/userGuide.ts'], suites: ['tips', 'tipcorner'] },
-  { paths: ['src/renderer/src/tips.ts', 'src/shared/tips.ts'], suites: ['tipwindows'] },
+  { paths: ['src/renderer/src/components/Tips.tsx', 'src/renderer/src/tips.ts', 'src/shared/tips.ts', 'src/shared/providers/claude/tips.ts', 'src/shared/providers/codex/tips.ts', 'src/shared/providers/copilot/tips.ts', 'src/shared/providers/antigravity/tips.ts', 'src/shared/providers/opencode/tips.ts', 'src/shared/corner.ts', 'docs/USER_GUIDE.md', 'src/shared/userGuide.ts'], suites: ['tips', 'tipcorner'] },
+  { paths: ['src/renderer/src/tips.ts', 'src/shared/tips.ts', 'src/shared/providers/claude/tips.ts', 'src/shared/providers/codex/tips.ts', 'src/shared/providers/copilot/tips.ts', 'src/shared/providers/antigravity/tips.ts', 'src/shared/providers/opencode/tips.ts'], suites: ['tipwindows'] },
   { paths: ['src/renderer/src/startupReplay.ts'], suites: ['tips', 'tipwindows', 'skillprefs', 'sessiontree'] },
   { paths: ['src/renderer/src/components/TitleBar.tsx'], suites: ['windows', 'keys', 'carddialog', 'pin', 'closewindow', 'assistantside', 'startall', 'recent', 'removeall'] },
   { paths: ['src/main/pin.ts'], suites: ['pin', 'windows'] },
@@ -572,7 +576,7 @@ export const AREAS = [
   { paths: ['src/shared/workflow/stages.ts', 'src/shared/workflow/projectWorkflow.ts', 'src/shared/workflow/compile.ts', 'src/shared/workflow/options.ts', 'src/shared/tasks.ts', 'src/main/workflow/optionsForm.ts', 'src/main/workflow/rulesets.ts', 'src/shared/settingsCatalog.ts', 'src/main/settingsTools.ts', 'tests/e2e/stagenames.cjs'], suites: ['stagenames'] },
   { paths: ['src/renderer/src/views/ProjectTabs.tsx'], suites: ['overview', 'taskoverview', 'skillaudience', 'numbers', 'storage', 'unpricedcost', 'changes', 'changescompare', 'changespicker', 'unusedwt', 'mcpagents'] },
   { paths: ['src/shared/gitlink.ts', 'src/renderer/src/components/GitlinkDiff.tsx', 'src/main/gitCompare.ts', 'src/main/git.ts', 'src/main/platform/git.ts', 'src/renderer/src/components/CardWork.tsx', 'src/renderer/src/components/ChangesCompare.tsx', 'src/renderer/src/views/ProjectTabs.tsx', 'tests/e2e/submodulediff.cjs'], suites: ['submodulediff'] },
-  { paths: ['src/main/gitCompare.ts', 'src/renderer/src/components/ChangesCompare.tsx', 'src/main/platform/repoReads.ts', 'src/main/platform/gitRepoReads.ts', 'src/main/platform/repoReadsPorts.ts'], suites: ['changescompare', 'changespicker'] },
+  { paths: ['src/main/gitCompare.ts', 'src/main/diffSides.ts', 'src/renderer/src/components/ChangesCompare.tsx', 'src/main/platform/repoReads.ts', 'src/main/platform/gitRepoReads.ts', 'src/main/platform/repoReadsPorts.ts'], suites: ['changescompare', 'changespicker'] },
   { paths: ['src/renderer/src/components/ChangesLeftovers.tsx', 'src/shared/branchCleanup.ts'], suites: ['changesleftovers', 'gitcleanup'] },
   { paths: ['src/renderer/src/components/DataTable.tsx', 'src/shared/tableView.ts'], suites: ['overview', 'ctxpercent', 'performance', 'perftable', 'boardarchive'] },
   { paths: ['src/renderer/src/views/ProjectView.tsx', 'src/renderer/src/oneAgentMenu.ts', 'src/shared/oneAgent.ts'], suites: ['oneagent', 'agents-ui', 'agentstable', 'resumeall', 'paneheader', 'rail', 'tabstrip', 'startall', 'narrowmain', 'removeall', 'defaultprovider'] },
@@ -611,14 +615,14 @@ export const AREAS = [
   { paths: ['src/main/providers/claude/'], suites: ['agents', 'agentview', 'launchrace', 'restart', 'resume', 'mode', 'compact', 'image', 'plan', 'claude-real', 'claudehome', 'claudesettings', 'assistantmode', 'assistantresume'] },
   { paths: ['src/main/providers/codex/'], suites: ['codex', 'codex-background', 'codex-extra', 'codex-handover', 'codex-mcpapproval', 'codex-setup', 'codex-storepwsh', 'attention', 'skilldelivery', 'sessiontree', 'codexfolder'] },
   // Copilot's offline suite (the real CLI against the stand-in model), the provider pages and the skill copies it shares with Codex.
-  { paths: ['src/main/providers/copilot/', 'src/shared/copilot.ts', 'src/main/exitKeys.ts'], suites: ['copilot', 'copilotsize', 'copilotcopy', 'providers', 'skilldelivery', 'models'] },
+  { paths: ['src/main/providers/copilot/', 'src/shared/providers/copilot/', 'src/main/exitKeys.ts'], suites: ['copilot', 'copilotsize', 'copilotcopy', 'providers', 'skilldelivery', 'models'] },
   { paths: ['tests/e2e/fake-copilot-api.cjs'], suites: ['copilot', 'copilotsize', 'copilotcopy', 'workspacenotes', 'slotguidance'] },
   // A folder being changed under its agents (#646): the Git view takes it; deliveries and starts wait for it.
   { paths: ['src/main/folderFence.ts'], suites: ['gitview', 'deliveries', 'inbox', 'agentmessage', 'background'] },
   // How Combwork's lines reach a busy real Codex or Copilot (#600): their runner, and what they check.
   { paths: ['tests/e2e/wakepaste-cli/', 'src/main/terminalScreen.ts', 'src/main/lineWriter.ts', 'src/main/deliveries.ts'], suites: ['wakepaste-codex', 'wakepaste-copilot'] },
-  { paths: ['src/shared/copilot.ts', 'tests/e2e/fake-copilot-api.cjs'], suites: ['wakepaste-copilot'] },
-  { paths: ['src/main/providers/codex/', 'src/shared/codex.ts'], suites: ['wakepaste-codex'] },
+  { paths: ['src/shared/providers/copilot/', 'tests/e2e/fake-copilot-api.cjs'], suites: ['wakepaste-copilot'] },
+  { paths: ['src/main/providers/codex/', 'src/shared/providers/codex/'], suites: ['wakepaste-codex'] },
   // What a Codex launch through its app server would rely on (#653): checked against the installed Codex.
   { paths: ['src/main/providers/codex/'], suites: ['codex-appserver'] },
   // Codex's Advanced switches (#1167): right-click passed to Codex, and its terminal title left to the user's config.
@@ -630,13 +634,13 @@ export const AREAS = [
   { paths: ['src/main/mcp/cw-mcp.ts', 'src/main/index.ts', 'tests/e2e/agentguidance.cjs'], suites: ['agentguidance'] },
   { paths: ['src/main/providers/codex/adapter.ts', 'tests/e2e/codexownhooks.cjs'], suites: ['codexownhooks'] },
   // Codex's app server asked one thing, owned until it ends (HI-1757): a connection's sign-in check, a launch's hook check.
-  { paths: ['src/main/codexChecks.ts'], suites: ['connections-codex', 'codexownhooks'] },
+  { paths: ['src/main/providers/codex/checks.ts'], suites: ['connections-codex', 'codexownhooks'] },
   // The CLI's own setting and the Assistant's other MCP servers (#1284).
   { paths: ['src/shared/cliOwnMode.ts', 'src/renderer/src/components/PermissionMode.tsx', 'src/main/providers/claude/', 'tests/e2e/cliownmode.cjs'], suites: ['cliownmode'] },
   // A typed prompt's line breaks for Codex (HI-1327): the fake Codex's (codexnewline) and the real one's (codex-newline).
   { paths: ['tests/e2e/codexnewline.cjs', 'tests/e2e/codex-newline.cjs', 'src/shared/terminalInput.ts', 'src/main/providers/codex/'], suites: ['codexnewline', 'codex-newline'] },
   // An agent's Hooks dialog and Activity's lock blocks (HI-982), on the fake Claude Code and the fake Codex.
-  { paths: ['tests/e2e/claudemanaged.cjs', 'tests/e2e/fake-claude/', 'src/shared/claudeHookHandlers.ts', 'src/main/hookTwins.ts', 'src/main/hookTokens.ts', 'src/main/providers/claude/hookPolicy.ts', 'src/main/providers/claude/adapter.ts', 'src/main/providers/claude/updateChannel.ts', 'src/main/servers.ts', 'src/renderer/src/components/AdminSnippetDialog.tsx', 'src/renderer/src/views/ProjectView.tsx'], suites: ['claudemanaged'] },
+  { paths: ['tests/e2e/claudemanaged.cjs', 'tests/e2e/fake-claude/', 'src/shared/providers/claude/hookHandlers.ts', 'src/main/hookTwins.ts', 'src/main/hookTokens.ts', 'src/main/providers/claude/hookPolicy.ts', 'src/main/providers/claude/adapter.ts', 'src/main/providers/claude/updateChannel.ts', 'src/main/servers.ts', 'src/renderer/src/components/AdminSnippetDialog.tsx', 'src/renderer/src/views/ProjectView.tsx'], suites: ['claudemanaged'] },
   { paths: ['tests/e2e/claudemanagedreal.cjs'], suites: ['claudemanagedreal'] },
   { paths: ['tests/e2e/hooksview.cjs', 'src/main/hookListing.ts', 'src/shared/hooks.ts', 'src/renderer/src/components/HooksDialog.tsx', 'src/main/servers.ts', 'src/main/providers/codex/', 'src/main/providers/claude/', 'src/main/providers/copilot/'], suites: ['hooksview'] },
   // The fake Codex CLI: every suite that runs it.
@@ -668,7 +672,7 @@ export const AREAS = [
   // The installer's copies (npm run dist first).
   { paths: ['electron-builder.yml', 'scripts/dist.mjs', 'scripts/distCopy.mjs'], suites: ['packaged', 'packaged-mcp', 'packaged-progress', 'packaged-sign', 'packaged-transcript', 'packaged-workers'] },
   // Combwork's worker threads in the installed copy, their scripts inside app.asar (HI-1880).
-  { paths: ['src/main/workerThreads.ts', 'src/main/places.ts', 'src/main/usageWorker.ts', 'src/main/gitWorker.ts', 'src/main/repoLockWorker.ts', 'src/main/walCheckpointWorker.ts', 'src/main/codexLogWorker.ts', 'src/main/noneBaselineWorker.ts', 'src/main/stallWatchdog.ts', 'tests/e2e/packaged-workers.cjs'], suites: ['packaged-workers'] },
+  { paths: ['src/main/workerThreads.ts', 'src/main/places.ts', 'src/main/usageWorker.ts', 'src/main/gitWorker.ts', 'src/main/repoLockWorker.ts', 'src/main/walCheckpointWorker.ts', 'src/main/noneBaselineWorker.ts', 'src/main/stallWatchdog.ts', 'tests/e2e/packaged-workers.cjs'], suites: ['packaged-workers'] },
   // Session records in the workspace's database (#1061): the suites that read or write them, Remove from Combwork and Repair.
   { paths: ['src/main/sessionStore.ts', 'tests/e2e/storeDocs.cjs', 'src/main/schema/sessionDeliveryTables.ts', 'src/main/schema/sessionDeliveryCodec.ts', 'tests/e2e/sessionDeliveryCodec.cjs'], suites: ['agents', 'assistantimages', 'assistantmode', 'cardchip', 'overview', 'providerdetect', 'quit', 'restart', 'resume', 'review', 'safeguards', 'sessionname', 'sessioncleanup', 'sessionorigin', 'sessionsize', 'sessiontree', 'wtrecreate', 'storage', 'transcript', 'wsmove', 'changespicker', 'dialogs', 'files', 'i18nlive', 'performance', 'projectrename', 'wsoverview', 'removeall', 'codex', 'codex-handover'] },
 ]
@@ -727,7 +731,10 @@ export const REAL_TIER = [
   'src/main/transcripts.ts',
   'src/main/transcriptDisplay.ts',
   'src/main/transcriptFiles.ts',
-  'src/shared/providers.ts',
+  'src/shared/providers/index.ts',
+  'src/shared/providers/registry.ts',
+  'src/shared/providers/parts.ts',
+  'src/shared/providers/common.ts',
   'tests/e2e/lib.cjs',
   // The environment the real CLIs are started in.
   'tests/e2e/runContext.cjs',
@@ -917,6 +924,9 @@ export const UNIT_SCANS = [
   // Every source file: no control character (#1040), no mixed line endings (#149).
   { test: 'tests/controlCharacters.test.ts', lines: ['[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f]'] },
   { test: 'tests/lineEndings.test.ts' },
+  // HI-3201: no code outside a provider's folders names a provider or imports its folder; the folders match the registry.
+  { test: 'tests/providerRegistry.test.ts', adds: true },
+  { test: 'tests/providerRegistry.test.ts', paths: ['src/'], lines: ['claude|codex|copilot|antigravity|agy|opencode', 'providers/'] },
   { test: 'tests/changelog.test.ts', paths: ['CHANGELOG.md'] }, // HI-2968: a version's section once, in order
   // Every jj file that reads the files a jj write replaces calls Combwork's file gate, or says where (HI-2918).
   { test: 'tests/jjFileGateInventory.test.ts', paths: ['src/main/'], adds: true },
@@ -1049,8 +1059,8 @@ export const UNIT_SCANS = [
   // THIRD_PARTY_NOTICES.md is generated from what ships (package.json's dependencies, the renderer's libraries).
   { test: 'tests/licenses.test.ts', paths: ['package.json', 'package-lock.json', 'THIRD_PARTY_NOTICES.md', 'LICENSE', 'scripts/thirdPartyNotices.mjs', 'scripts/licenseText.mjs', 'scripts/licenses.mjs', 'scripts/notices/'] },
   // Advanced settings (#367): the list, and the recorded fixtures each CLI-facing default is checked against.
-  { test: 'tests/advanced.test.ts', paths: ['src/shared/advanced.ts', 'tests/fixtures/'] },
-  { test: 'tests/settingsWorkspace.test.ts', paths: ['src/shared/advanced.ts'] },
+  { test: 'tests/advanced.test.ts', paths: ['src/shared/advanced.ts', 'src/shared/advancedDef.ts', 'src/shared/providers/claude/advanced.ts', 'src/shared/providers/codex/advanced.ts', 'src/shared/providers/copilot/advanced.ts', 'src/shared/providers/antigravity/advanced.ts', 'src/shared/providers/opencode/advanced.ts', 'tests/fixtures/'] },
+  { test: 'tests/settingsWorkspace.test.ts', paths: ['src/shared/advanced.ts', 'src/shared/advancedDef.ts', 'src/shared/providers/claude/advanced.ts', 'src/shared/providers/codex/advanced.ts', 'src/shared/providers/copilot/advanced.ts', 'src/shared/providers/antigravity/advanced.ts', 'src/shared/providers/opencode/advanced.ts'] },
   // npm run check:repo's test files and the tests it picks by name exist (HI-2244): its script, a test file renamed or
   // deleted, or a describe or test renamed in a file it runs by name.
   { test: 'tests/checkRepo.test.ts', paths: ['package.json'] },

@@ -6,7 +6,8 @@
 //    reported before the next one starts; a request left from the earlier process is removed, never acted on.
 // 2. Combwork ended from outside while an agent is starting: the next start resumes it once, and nothing else twice.
 // 3. An ordinary quit: the next start offers to resume, and nothing resumes until Resume is chosen.
-// 4. An offer left unanswered, then another quit with another agent working: one offer of both; Don't Resume resumes none.
+// 4. An offer left unanswered, then another quit with another agent working: one offer of both, told once, leaving out
+//    an agent offered before and started in a new conversation since (HI-3214); Don't Resume resumes none.
 // 5. Settings → Advanced → Resume agents after an update off: an install offers instead of resuming.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -311,19 +312,37 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     check('Resume resumes it, its note saying Combwork was quit', !!(await lib.until(async () => ((await notes(c, agents.Worker.id)).at(-1) ?? '').startsWith('[CW] Combwork was quit and started again'), HUNG_MS)))
 
     // --- 4. An offer left unanswered, then another quit with Builder working too: one offer of both; Don't Resume.
-    await lib.sendPrompt(c.inv, lib.ptyKey(alpha, agents.Worker.id), 'holduntil go-worker-4', { submitted: async () => (await c.live(agents.Worker.id))?.status === 'working' })
+    // HI-3214: Watcher, offered too, is started in a new conversation meanwhile (as HB6 was): not offered again.
+    await c.inv('session:start', alpha, { agentId: agents.Watcher.id }).catch(() => undefined)
+    await lib.until(async () => (await c.live(agents.Watcher.id))?.status === 'ready', HUNG_MS, 300)
+    for (const n of ['Worker', 'Watcher']) await lib.sendPrompt(c.inv, lib.ptyKey(alpha, agents[n].id), `holduntil go-${n.toLowerCase()}-4`, { submitted: async () => (await c.live(agents[n].id))?.status === 'working' })
     check('Combwork quits again', await quit(c))
     c = null
     c = await start()
-    await lib.until(async () => (await anyToast(c, /Resume the agent that was working\?/))?.text, HUNG_MS)
+    await lib.until(async () => (await anyToast(c, /Resume the 2 agents that were working\?/))?.text, HUNG_MS)
+    const watcherWas = record()?.entries?.find((e) => e.agentName === 'Watcher')?.sessionId
+    await c.inv('session:start', alpha, { agentId: agents.Watcher.id }).catch(() => undefined)
+    const watcherNew = await lib.until(async () => {
+      const s = await c.live(agents.Watcher.id)
+      return s?.status === 'ready' && s.sessionId && s.sessionId !== watcherWas ? s.sessionId : null
+    }, HUNG_MS, 300)
+    check('Watcher, offered, starts in a new conversation instead', !!watcherWas && !!watcherNew, JSON.stringify({ watcherWas, watcherNew }))
+    await c.inv('session:stop', alpha, agents.Watcher.id)
+    await lib.until(async () => !(await c.live(agents.Watcher.id)), HUNG_MS, 300)
     await c.inv('session:start', alpha, { agentId: agents.Builder.id }).catch(() => undefined)
     await lib.until(async () => (await c.live(agents.Builder.id))?.status === 'ready', HUNG_MS, 300)
     await lib.sendPrompt(c.inv, lib.ptyKey(alpha, agents.Builder.id), 'holduntil go-builder', { submitted: async () => (await c.live(agents.Builder.id))?.status === 'working' })
     check('Combwork quits with the offer unanswered', await quit(c))
     c = null
+    const startedAt = logLines().length
     c = await start()
     const both = await lib.until(async () => (await anyToast(c, /Resume the 2 agents that were working\?/))?.text, HUNG_MS)
     check('the next start offers both: the earlier offer kept, Builder added', !!both && both.includes('Worker (alpha)') && both.includes('Builder (alpha)'), both)
+    // HI-3214: told once, though the queue and the window's start notices both run; Watcher, in a newer conversation, left out.
+    check('…once the start notices have run', !!(await lib.until(() => logLines().slice(startedAt).some((l) => l.includes('profile: start notices done')), HUNG_MS)))
+    const offers = async () => (await Promise.all(c.app.windows().map((p) => p.evaluate(() => [...document.querySelectorAll('.toast')].filter((t) => /Resume the .*that were working\?|Resume the agent that was working\?/.test(t.innerText)).length).catch(() => 0)))).reduce((x, y) => x + y, 0)
+    check('…in one notice, not two', (await offers()) === 1, String(await offers()))
+    check("…not naming Watcher, whose earlier offer is for a conversation it has left", !both.includes('Watcher') && record()?.entries?.find((e) => e.agentName === 'Watcher')?.state === 'skipped', JSON.stringify(record()?.entries?.map((e) => [e.agentName, e.state, e.why])))
     await clickToast(c, 'Resume the 2 agents that were working?', "Don't Resume")
     check("Don't Resume resumes neither, and the record is gone", !!(await lib.until(() => !fs.existsSync(recordFile), HUNG_MS)) && !(await c.live(agents.Worker.id)) && !(await c.live(agents.Builder.id)))
 

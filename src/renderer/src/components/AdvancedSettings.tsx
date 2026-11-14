@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react'
-import { LISTED_ADVANCED, advancedRow, type AdvancedGroup, advancedShown, advancedTakesText, advancedUnit, checkAdvanced, cliFacing, folderList, foldersText, groupName, shownText, type AdvancedDef, type AdvancedRow } from '@shared/advanced'
+import { listedAdvanced, advancedRow, type AdvancedGroup, advancedShown, advancedTakesText, advancedUnit, checkAdvanced, cliFacing, folderList, foldersText, groupName, shownText, type AdvancedDef, type AdvancedRow } from '@shared/advanced'
 import { msg, tr, tRich } from '@shared/i18n'
 import { INBOX_SWITCH_ID } from '@shared/inboxSwitches'
 import type { ProviderId } from '@shared/types'
@@ -34,13 +34,14 @@ const TABS_KEY = 'settings.advanced'
 
 /**
  * Its tabs (HI-1839): Combwork, then each CLI with advanced values, in Combwork's order (HI-2139), as the descriptors name them;
- * a group of a CLI Combwork no longer offers keeps a tab after them.
+ * a group of a CLI Combwork no longer offers keeps a tab after them. Made again as the providers change (HI-3196: a user's
+ * own CLI's values have its tab).
  */
-const GROUPS: AdvancedGroup[] = (() => {
-  const used = new Set(LISTED_ADVANCED.map((d) => d.group))
+function advancedGroups(listed: readonly { group: AdvancedGroup }[]): AdvancedGroup[] {
+  const used = new Set(listed.map((d) => d.group))
   const ordered: AdvancedGroup[] = ['cw', ...PROVIDERS.map((p) => p.id).filter((id) => used.has(id))]
   return [...ordered, ...[...used].filter((g) => !ordered.includes(g))].filter((g) => used.has(g))
-})()
+}
 
 /** Whether a group is a CLI's (its tab has the CLI's icon, and is dimmed while it is off). */
 const isCli = (g: AdvancedGroup): g is ProviderId => PROVIDERS.some((p) => p.id === g)
@@ -52,12 +53,15 @@ export function AdvancedSettings({ query, modifiedOnly: outerModified }: { query
   const [ownModified, setModifiedOnly] = useState(false)
   const modifiedOnly = outerModified || ownModified
   const words = `${query} ${filter}`.toLowerCase().split(/\s+/).filter(Boolean)
-  const rows = useMemo(() => LISTED_ADVANCED.map((d) => advancedRow(d, state)), [state])
+  // A user's own CLI registered, changed or removed (HI-3196): its tab and its values' rows, at once (a new list then).
+  useStore((s) => s.clis?.generation)
+  const listed = listedAdvanced()
+  const rows = useMemo(() => listed.map((d) => advancedRow(d, state)), [listed, state])
   const matches = (text: string): boolean => words.every((w) => text.toLowerCase().includes(w))
   // Its English matches as well as what it shows, as Settings' own rows do.
   const shown = rows.filter((r) => (!modifiedOnly || r.override !== undefined || r.workspaceValue !== undefined) && matches(`${r.def.id} ${r.def.setting ?? ''} ${groupName(r.def.group)} ${r.def.title} ${r.def.desc} ${shownText(r.def.text.title)} ${shownText(r.def.text.desc)}`))
   const settings = useStore((s) => s.settings)
-  const groups = GROUPS
+  const groups = useMemo(() => advancedGroups(listed), [listed])
   const idBase = useId()
   // Filtering (Settings' search, this list's filter, either Modified only): each tab counts its matches; the tab shown is
   // the remembered one while it has some, else the first that has; a tab clicked meanwhile narrows to it, unremembered,
@@ -69,10 +73,10 @@ export function AdvancedSettings({ query, modifiedOnly: outerModified }: { query
   useEffect(() => {
     setClicked((c) => (c && c.key !== filterKey ? null : c))
   }, [filterKey])
-  const remembered = useRememberedTab<AdvancedGroup>(TABS_KEY, GROUPS, 'cw')
+  const remembered = useRememberedTab<AdvancedGroup>(TABS_KEY, groups, 'cw')
   const count = (g: AdvancedGroup): number => shown.filter((r) => r.def.group === g).length
   // A value's own id searched for opens its group's tab, whatever is remembered.
-  const exact = LISTED_ADVANCED.find((d) => words.length === 1 && d.id.toLowerCase() === words[0])?.group
+  const exact = listedAdvanced().find((d) => words.length === 1 && d.id.toLowerCase() === words[0])?.group
   const tab: AdvancedGroup = !filtering ? remembered : (filterTab ?? exact ?? (count(remembered) ? remembered : (groups.find((g) => count(g) > 0) ?? remembered)))
   const choose = (g: AdvancedGroup): void => (filtering ? setClicked({ key: filterKey, tab: g }) : chooseTab(TABS_KEY, g))
   if (!state) return null

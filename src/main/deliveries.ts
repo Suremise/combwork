@@ -47,6 +47,7 @@ import { readyFor } from './readiness'
 import { sessions } from './sessions'
 import { folderChanging, folderSteady, inFolder, onFolderSteady } from './folderFence'
 import { cardsNow } from './tasks'
+import { noToolsIn } from './independent'
 import { workspaceFor, WorkspaceService } from './workspace'
 import { pausedFor } from './teamPause'
 import { pauseHolds } from '../shared/teamPause'
@@ -167,6 +168,7 @@ const T = {
   assistantEnded: agentMsg({ id: 'inbox.refused.assistantEnded', text: "the Assistant's session that left it ended", note: 'Why a delivery the Assistant left was refused, as its sender reads it.' }),
   noInbox: agentMsg({ id: 'inbox.refused.noInbox', text: '{name} has no inbox: turn on the Agent API', note: "Why an agent that can't read an inbox is given no delivery (#650's decision), as its sender sees it. name: the agent's name." }),
   independent: agentMsg({ id: 'inbox.refused.independent', text: '{name} is Independent: Combwork gives it nothing, and the user works with it in its pane', note: "Why an Independent agent (HI-2670) is given no delivery, as its sender sees it: it takes no part in the workflow. name: the agent's name." }),
+  noTools: agentMsg({ id: 'inbox.refused.noTools', text: "{name}'s CLI takes none of Combwork's tools (it runs from a description), so it has no inbox: start it on a task, or the user types to it in its pane", note: "Why an agent on a CLI that runs from a description (HI-3196) is given no delivery, as its sender sees it: its CLI takes no MCP server or skills from Combwork. A task can still be its launch's prompt. name: the agent's name." }),
   plain: agentMsg({ id: 'inbox.refused.plain', text: "{name} runs as if started from a terminal, without Combwork's tools or typing, so it has no inbox until it restarts", note: "Why an agent is given no delivery (HI-2670), as its sender sees it: its running session launched without Combwork's tools or without Combwork typing into it (its connection's launch settings). name: the agent's name." }),
   late: agentMsg({ id: 'inbox.expired.late', text: 'not received in time', note: 'Why a delivery expired, as its sender reads it: not read before its expiry.' }),
   runEnded: agentMsg({ id: 'inbox.expired.sessionEnded', text: 'the session it was for has ended', note: 'Why a delivery for one launch of its agent expired, as its sender reads it.' }),
@@ -874,7 +876,7 @@ const noInbox = (name: string): string => say(T.noInbox, { name })
 /** Why Combwork gives an agent nothing (HI-2670: sessions.keepsOut), as its sender sees it; null when it may. */
 function keptOut(host: string, agentId: string, name: string): string | null {
   const why = sessions.keepsOut(host, agentId)
-  return why ? say(why === 'independent' ? T.independent : T.plain, { name }) : null
+  return why ? say(why === 'independent' ? T.independent : why === 'noTools' ? T.noTools : T.plain, { name }) : null
 }
 /** A delivery refused because its agent can't read an inbox: the message says so, and what to do. */
 export class NoInbox extends Error {}
@@ -2016,6 +2018,10 @@ export async function launchWith<T extends { runId: string }>(host: string, nd: 
   // The user's own task for an agent that can't read an inbox (#650's decision): its launch's prompt, as their input,
   // no delivery. Anyone else's is refused (createDelivery, below) before anything is launched.
   if (!readsInbox(host, nd.agentId) && nd.from.kind === 'user') return { record: null, launched: await start(nd.body) }
+  // An agent whose CLI takes none of Combwork's tools (HI-3196) has no inbox either: whoever sends it, its task is its
+  // launch's prompt, typed as it is (never a line telling it to call cw_inbox), with no delivery.
+  const ws = workspaceFor(host)
+  if (ws && noToolsIn(ws, host, nd.agentId)) return { record: null, launched: await start(nd.body) }
   // Saved as offered before anything is launched (persist before the effect, #647): not saved, nothing starts. From
   // here a crash leaves it offered, so it is uncertain after the restart, never queued and typed again as if new. The
   // scheduler never offers it (it isn't waiting), and the checks leave it alone while the launch starts.

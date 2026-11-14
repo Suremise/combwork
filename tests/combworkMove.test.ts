@@ -15,6 +15,7 @@ import { build } from 'esbuild'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { esbuildEagerGlob } from './esbuildGlob'
 // old-name: begin combworkMove-inputs
 /** 1.0's folder, board file and exclude line header: the move's input. */
 const OLD_DIR = '.hive'
@@ -405,7 +406,7 @@ if (stopAt) m.moveTestHooks.after = async (step) => { if (step === stopAt) { app
 m.moveFolders(ws).then((r) => appendFileSync(out, 'moved ' + r.moved + '\\n'), (e) => appendFileSync(out, 'refused ' + e.message + '\\n'))
 `
     )
-    await build({ entryPoints: [entry], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs', electron: join(__dirname, 'electron-stub.ts') }, external: ['node:sqlite'], logLevel: 'silent' })
+    await build({ entryPoints: [entry], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs', electron: join(__dirname, 'electron-stub.ts') }, external: ['node:sqlite'], plugins: [esbuildEagerGlob()], logLevel: 'silent' })
   }, 60_000)
   afterAll(() => {
     for (const c of children) if (c.exitCode === null) c.kill()

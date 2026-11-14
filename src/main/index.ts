@@ -11,7 +11,7 @@ import { initSkillCopies } from './skillCopies'
 import { initLaunchFolders } from './launchFolders'
 import { offNames } from '../shared/skillDelivery'
 import { initInboxNotices } from './inboxNotices'
-import { startOrphanWatch, stopOrphanWatch } from './orphanProcesses'
+import { setOrphanRuns, startOrphanWatch, stopOrphanWatch } from './orphanProcesses'
 import { initDecisionWakes } from './decisionWakes'
 // The user's answers given to the Assistant too (HI-1734): its delivery source, registered at start.
 import './answerRelay'
@@ -77,7 +77,6 @@ import { startReconciling, stopReconciling } from './workflow/reconciler'
 import { startReleaseOffers, stopReleaseOffers } from './workflow/releaseOffer'
 import { queueFolderNeeded, releaseQueueRunners } from './workflow/queueRunner'
 import { endAllOwnedWork, endOwnedWork, endOwnedWorkNow } from './platform/ownedWork'
-import { stopCodexChecks } from './codexChecks'
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
 import { poolFor, startSlots, stopSlots } from './slotsApp'
 import { setQueueNeed, setSlotPools } from './unusedWorktrees'
@@ -131,7 +130,6 @@ import { abandonWindowStorage } from './storage'
 import { agentTokenFile } from './agentTokens'
 import { progress, setTaskbarTestHook, startProgress } from './progressService'
 import { startMergeSlots } from './mergeSlotHost'
-import { startOpencodeHistory, stopOpencodeHistory } from './opencodeHistoryHost'
 import { startLanes } from './lanes'
 import { startLaneStarts } from './laneStarts'
 import { startHandOverCheck } from './handOverCheck'
@@ -148,6 +146,8 @@ import { chooseStartLanguage, languageInfo, startI18n, switchLanguage } from './
 import { fmt, msg, tr } from '../shared/i18n'
 import { clearSavedPauses } from './teamPause'
 import { followMovedLink } from './combworkMove'
+import { allProviders } from './providers'
+import { startClis } from './clis'
 
 const log = createLogger('main')
 let quitting = false
@@ -807,9 +807,9 @@ async function quitNow(tellUser: boolean): Promise<void> {
   // HI-1185: platforms' owned work (the Git view's signing checks): no new one admitted from here, and those running
   // ended and waited for, their signers and temp folders gone, before the app exits (HR1's round 2).
   await endAllOwnedWork().catch((e) => log.warn("ending the platforms' owned work as Combwork closes", e))
-  // Codex's checks (HI-1757): those under way settled, each held one's end tried once more (bounded); what is left ends
-  // with its job (kill on close) as Combwork exits.
-  await stopCodexChecks().catch((e) => log.warn("ending Codex's checks as Combwork closes", e))
+  // The providers' own work as Combwork closes (HI-3201: Codex's checks, HI-1757: those under way settled, each held one's
+  // end tried once more, bounded; what is left ends with its job, kill on close, as Combwork exits).
+  await Promise.all(allProviders().map((p) => p.lifecycle?.closing?.().catch((e) => log.warn(`ending ${p.descriptor.name}'s own work as Combwork closes`, e))))
   await slotsQuiet
   await usageHistory.stop()
   await progress.saveNow().catch(() => undefined)
@@ -1044,6 +1044,8 @@ app.whenReady().then(async () => {
   await startI18n(config.settings)
   // Advanced settings (#367): advanced.json's overrides, followed as it changes.
   advanced.load()
+  // The user's own CLIs (HI-3196): their descriptions read and registered before anything looks for a provider.
+  await startClis()
   // Connections' launch settings (HI-2670): the app-wide switches they replaced copied onto them once, and agents on a
   // connection without Combwork's tools read as Independent from here on.
   migrateLaunchPolicy()
@@ -1375,6 +1377,16 @@ app.whenReady().then(async () => {
 
   // A review waiting on its builder's Progress run for the card isn't stalled (HI-1993).
   setStallRuns((wsPath) => progress.list(wsPath))
+  // HI-3206: a left-running process in a live cw-progress run's tree isn't told while the run is live.
+  setOrphanRuns((projectPath) => {
+    try {
+      const ws = workspaceOf(projectPath).path
+      return ws ? progress.list(ws) : []
+    } catch {
+      // No workspace for it (closed meanwhile): no runs, so nothing is held back.
+      return []
+    }
+  })
 
   // The usage history (#1106): its tick for running sessions; each workspace's import starts as it opens.
   usageHistory.start()
@@ -1408,8 +1420,8 @@ app.whenReady().then(async () => {
   // Long runs agents report (the Progress panel): stale runs, and the setting.
   startProgress()
   startMergeSlots()
-  // OpenCode agents' history, usage and plan limits, read from their servers (HI-2762).
-  startOpencodeHistory()
+  // The providers' own work (HI-3201): OpenCode agents' history, usage and plan limits, read from their servers (HI-2762).
+  for (const p of allProviders()) p.lifecycle?.start?.()
   startLanes()
   // A lane's next card, started on its builder once the card before it is Done (HI-1990).
   startLaneStarts()
@@ -1493,7 +1505,7 @@ app.on('will-quit', () => {
   killAll()
   // The fallback when the quit couldn't wait (an updater's install, a crash's quit): synchronous, best effort.
   endOwnedWorkNow()
-  stopOpencodeHistory()
+  for (const p of allProviders()) p.lifecycle?.quitting?.()
   stopOrphanWatch()
   closeProcessTracking()
   unwatchAll()

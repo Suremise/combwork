@@ -604,6 +604,7 @@ interface CombworkMessageValues {
   'workflow.summary.none.pair': undefined
   'workflow.summary.none.solo': undefined
   'workflow.summary.none.team': undefined
+  'workflow.unreadable.blockerWork': { card: string | number; what: string | number }
   'workflow.unreadable.branch': { folder: string | number }
   'workflow.unreadable.branchedOff': { a: string | number; b: string | number }
   'workflow.unreadable.branchedOffTarget': undefined

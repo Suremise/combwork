@@ -91,6 +91,10 @@
     "defaultMessage": "{agent} runs on another connection",
     "description": "A notice's title (HI-2108): an agent started on another connection than its own (its own is off in this workspace, or was removed). {agent} is the agent."
   },
+  "session.connection.offMatched": {
+    "defaultMessage": "Its connection {wanted} is on an account that's off in this workspace, so it started on {name} ({account}): {by, select, tag {the connection there with the same tag, {tag}} name {the connection there with the same name} other {that account's first connection, as none there has its tag or name}}. Choose another in its Agent Settings.",
+    "description": "A notice (HI-3213) when an agent starts on another connection than its own because its own ({wanted}: its name) is on an account turned off in this workspace. {name} is the connection it started on, {account} that connection's account (\"Anthropic-2\"), the first account on here. {by}: how that connection was matched: tag (the same tag as its own, {tag}: the tag, such as Builders), name (the same name), other (neither matched, so that account's first connection). Agent Settings names a dialog."
+  },
   "session.error.agentGone": {
     "defaultMessage": "That agent no longer exists.",
     "description": "An action on an agent is refused: it was removed meanwhile."
@@ -519,6 +523,14 @@
     "defaultMessage": "Process {pid}: the shell that started it has exited. Activity lists it, with End It; the agent is told too.",
     "description": "The notice that an agent left a process running (HI-2111). {pid} is its process id. Activity is a tab of Combwork's; End It is a button there."
   },
+  "session.orphan.bodyRunEnded": {
+    "defaultMessage": "Process {pid} is still running after its cw-progress run “{run}” ended, the shell that started it gone. Activity lists it, with End It; the agent is told too.",
+    "description": "The notice that a process is left running (HI-3206): it belonged to a cw-progress run ({run}, its title) that has finished, and it is still running. {pid} is its process id. Activity is a tab of Combwork's; End It is a button there. Keep cw-progress as it is (a command)."
+  },
+  "session.orphan.bodyRunUnconfirmed": {
+    "defaultMessage": "Process {pid}: its cw-progress run “{run}” is no longer seen running, and the shell that started it has exited. Activity lists it, with End It; the agent is told too.",
+    "description": "The notice that a process is left running (HI-3206): it belonged to a cw-progress run ({run}, its title) that Combwork no longer sees running (it went quiet, or its process is gone), without saying it ended. {pid} is its process id. Keep cw-progress as it is (a command)."
+  },
   "session.orphan.title": {
     "defaultMessage": "{agent} left {command} running for {time}",
     "description": "A notice's title (HI-2111): a process an agent's command started is still running with the shell that started it gone. {agent} is the agent's name; {command} what the process runs, cut short; {time} how long it has run (\"12 min\")."
@@ -654,6 +666,10 @@
   "session.start.beingOpened": {
     "defaultMessage": "This conversation is already being opened in another agent.",
     "description": "Resuming a conversation is refused: another agent is starting on it now."
+  },
+  "session.start.cantResume": {
+    "defaultMessage": "{provider} can't resume a conversation: start a new one instead.",
+    "description": "Starting an agent on a conversation failed (HI-3196): its CLI runs from a description that has no way to resume. {provider} is its name."
   },
   "session.start.cleaning": {
     "defaultMessage": "Combwork is archiving, deleting or cleaning up this session's files. Try again in a moment.",

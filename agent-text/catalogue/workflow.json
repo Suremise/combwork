@@ -1729,6 +1729,11 @@
     "note": "Why workflow options cannot be saved: a stage’s name is too long. {stage} is the stage’s default name (glossary 2.2), {max} the most characters it takes.",
     "audience": "both"
   },
+  "workflow.unreadable.blockerWork": {
+    "text": "whether {card}'s work is in the target ({what})",
+    "note": "What Combwork couldn't read, the object of \"Combwork couldn't read …\" (HI-3233): whether the work of a card this card waits for was merged into its target branch. {card} is that card's key (AM-12); {what} is what exactly couldn't be read, such as \"whether a1b2c3d is in e4f5a6b\".",
+    "audience": "both"
+  },
   "workflow.unreadable.branch": {
     "text": "the branch checked out in {folder}",
     "note": "What Combwork couldn't read, the object of \"Combwork couldn't read …\". {folder} is a folder path.",

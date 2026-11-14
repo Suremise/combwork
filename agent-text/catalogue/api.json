@@ -267,6 +267,9 @@
   "api.card.lanePosition": {
     "text": "lane's position is last (the default) or next (before its first card still in Todo)"
   },
+  "api.card.lineCommentsState": {
+    "text": "Unknown state \"{state}\": open or all."
+  },
   "api.card.madeKind": {
     "text": "made it {kind}"
   },
@@ -279,6 +282,9 @@
   },
   "api.card.movedToEnd": {
     "text": "moved it to the {position} of {column}"
+  },
+  "api.card.noFeedback": {
+    "text": "{card} has no sent batch \"{batch}\"."
   },
   "api.card.notANumber": {
     "text": "\"{value}\" is not a card number or key (12, #12 or HI-12)"

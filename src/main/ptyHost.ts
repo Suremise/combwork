@@ -146,7 +146,7 @@ export function childEnv(extra: Record<string, string> = {}): Record<string, str
   for (const k of CHILD_ENV_STRIP) delete env[k]
   // If Combwork itself was started from inside an agent's session, don't leak that session's identity
   // (each provider lists its variables), nor Combwork's own CW_ variables. User configuration is kept.
-  const sessionVars = new Set(allProviders().flatMap((p) => p.envToStrip))
+  const sessionVars = new Set(allProviders().flatMap((p) => p.install.envToStrip))
   for (const k of Object.keys(env)) if (sessionVars.has(k) || (k.startsWith('CW_') && !SESSION_SETTINGS.has(k))) delete env[k]
   env.TERM_PROGRAM = 'Combwork' // i18n-ignore: an environment variable's value, which programs in the terminal read
   env.COLORTERM = 'truecolor'
@@ -300,7 +300,7 @@ export function ptySize(key: string): { cols: number; rows: number } {
 /**
  * Makes a terminal's process redraw its screen at the size it has, as resizing the window by hand does: one row
  * shorter for a moment, then its size again. For a CLI whose full-screen interface a resize while it started can leave
- * drawn at the wrong width (capabilities.startupSizeRefresh, #486). A resize meanwhile is the size it ends at.
+ * drawn at the wrong width (capabilities.terminal.startupSizeRefresh, #486). A resize meanwhile is the size it ends at.
  */
 export function refreshPty(key: string): void {
   const e = entries.get(key)

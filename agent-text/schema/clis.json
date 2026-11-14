@@ -1,0 +1,13 @@
+{
+  "clis.note.install": {
+    "placeholders": {}
+  },
+  "clis.note.signIn": {
+    "placeholders": {}
+  },
+  "clis.readiness.notFound": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  }
+}

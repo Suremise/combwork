@@ -91,7 +91,7 @@ import { agentNowOf, cardStall, laneOrderView, reviewDueOf, stepWaitOf, type Sta
 import { forwardWaitOf } from './queueReturn'
 import { cancelMessages, leaveMessage, MESSAGE_MAX_CHARS } from './agentMessages'
 import { giveUnseen } from './cardFreshness'
-import { ackCardTask, ackDeliveries, ackThenRead, onCardTaskReceived, deliveriesOf, deliverNow, deliveryView, inboxSwitch, launchWith, NotGiven, readInbox, setAttemptStamp } from './deliveries'
+import { ackCardTask, ackDeliveries, ackThenRead, onCardTaskReceived, deliveriesOf, deliverNow, deliveryView, inboxSwitch, launchWith, NoInbox, NotGiven, readInbox, setAttemptStamp } from './deliveries'
 import { INBOX_SWITCHES, type InboxSwitch } from '../shared/inboxSwitches'
 import { isDoorbell } from '../shared/doorbell'
 import type { DeliverySender, InboxItem } from '../shared/deliveries'
@@ -121,6 +121,8 @@ import { workspaceNotesFile } from './workspaceNotes'
 import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
 import { cardStages } from './boardStore'
 import { cardFacts, cardKind, cardReviewSkip, cardTarget, factRow, forYouOfCards } from './workflow/cardWork'
+import { feedbackRead, lineCommentsOf } from './workflow/lineComments'
+import { lineCommentCounts, pageOf } from '../shared/workflow/lineComments'
 import type { ForYouItem } from '../shared/workflow/workView'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket, type Recorded } from './workflow/runChecks'
 import { workflowSummary } from './workflow/optionsForm'
@@ -143,8 +145,8 @@ import { clearDiscovery, writeDiscovery } from './apiDiscovery'
 import { createViewerToken, loadViewerTokens, revokeViewerToken, viewerForToken, viewerTokens } from './viewerTokens'
 import { hookTokenMatches, refusedHookNote, runForHookToken } from './hookTokens'
 import { answering, carrying, claimTwin, hasContext, type TwinEntry } from './hookTwins'
-import { fixedHookUrl, type ClaudeSnippetFacts } from '../shared/claudeHookHandlers'
-import { launchHookTimeouts } from './providers/claude/adapter'
+import { fixedHookUrl, type AdminSnippetFacts } from '../shared/hooks'
+import { provider as providerAdapter } from './providers'
 import { unusedWorktreeCounts } from './unusedWorktrees'
 import { devConsole, combworkSourceId, sessionSourceId } from './devConsole'
 import { consoleSources } from './devConsoleSources'
@@ -156,6 +158,7 @@ import { CONSOLE_KINDS, combworkName, mayRead, type ConsoleEvent, type ConsoleKi
 import { cardLabel, cardName, cardRef, namesOf } from '../shared/projectKeys'
 import { pauseTeam, resumeTeam } from './teamPause'
 import { scanWorkspace } from './teamParked'
+import { providerGaps, providerGapsForAgents } from '../shared/providers/gaps'
 
 const log = createLogger('servers')
 
@@ -502,14 +505,14 @@ function apiPort(): number {
 }
 
 /**
- * What the Claude Code admin snippet is made from (HI-2777): this Combwork's Agent API port, the other build's default
- * one (an installed app's 47821, a development build's 47822) and the hooks' timeouts as Settings → Advanced has them,
- * so a snippet made now matches the handlers Combwork's launches pass.
+ * What a provider's admin snippet is made from (HI-2777): this Combwork's Agent API port, the other build's default one
+ * (an installed app's 47821, a development build's 47822) and the provider's own values (Claude Code's hooks' timeouts as
+ * Settings → Advanced has them), so a snippet made now matches the handlers Combwork's launches pass.
  */
-export function claudeSnippetFacts(): ClaudeSnippetFacts {
+export function adminSnippetFacts(id: ProviderId): AdminSnippetFacts {
   const port = apiPort()
   const other = app.isPackaged ? DEFAULT_API_PORT + 1 : DEFAULT_API_PORT
-  return { port, otherPort: other === port ? null : other, packaged: app.isPackaged, listening: !!apiServer?.listening, timeouts: launchHookTimeouts() }
+  return { port, otherPort: other === port ? null : other, packaged: app.isPackaged, listening: !!apiServer?.listening, settings: providerAdapter(id).adminSnippet?.settings() ?? {} }
 }
 
 export function apiInfo(): AgentApiInfo {
@@ -1158,8 +1161,10 @@ route('GET', '/v1/providers', async () => {
       models,
       efforts: fallbackEfforts(p.id, s),
       // Whether agents can be given context200k (a 200K window instead of the model's 1M).
-      context200k: p.capabilities.contextLimit,
+      context200k: p.capabilities.compaction?.contextLimit ?? false,
       modes: offeredModes(p.id, s).map((m) => ({ value: m.value, label: m.label, description: m.description })),
+      // What its CLI can't do in Combwork (HI-3196: one that runs from a description), only where it lacks something.
+      ...(providerGaps(p.id).length ? { gaps: providerGapsForAgents(p.id) } : {}),
       // Its connections usable in the caller's workspace (HI-2108), in the order: what cw_add_agent's connection names. Each
       // with its own account's default and, where they aren't the provider's, its models (HI-2856).
       ...(here ? { connections: listedConnections(p.id, connectionsHere(here).filter((c) => accountById(c.account)?.provider === p.id), accountById, at, s, models) } : {})
@@ -1744,6 +1749,8 @@ route('POST', '/v1/projects/:name/agents/:agent/prompt', async ({ params, body }
     // A task delivery (#649), given now or not at all: never queued behind the agent's work.
     const r = await deliverNow(p, { agentId, agentName: a.name, conversation: st.sessionId || null, kind: 'task', from: callerSender(), body: text, need: 'free' }).catch((e: Error) => {
       if (e instanceof NotGiven) throw new HttpError(409, apiSaid(API.agent.promptFailed, { agent: a.name, error: e.message }))
+      // It has no inbox (an Independent agent, a launch as if from a terminal, a CLI without Combwork's tools): said as such.
+      if (e instanceof NoInbox) throw new HttpError(409, apiSaid(API.agent.promptFailed, { agent: a.name, error: e.message }))
       throw e
     })
     return { done: [API.done.prompted, { agent: a.name, project: basename(p), given: r ? 'yes' : 'no', id: r?.id ?? '' }], said: `: ${clip(text.replace(/\s+/g, ' '), 80)}`, result: { ok: true, ...(r ? { id: r.id } : {}) } }
@@ -3390,9 +3397,40 @@ route('GET', '/v1/tasks/:n', async ({ params, query }) => {
     ...told,
     ...(archive.archived ? { commentsArchived: archive.archived } : {}),
     ...(archive.mayHaveBeenLost ? { commentsMayHaveBeenLost: true, commentsNote: say(API.card.commentsMayHaveBeenLost) } : {}),
-    ...(all > SPLIT_HINT_COMMENTS ? { hint: say(API.card.splitHint, { n: String(all) }) } : {})
+    ...(all > SPLIT_HINT_COMMENTS ? { hint: say(API.card.splitHint, { n: String(all) }) } : {}),
+    // HI-3219: its line comments as counts only (read in rows from /line-comments), when it has any.
+    ...lineCommentCountsOf(seen.card.number)
   }
   return query.get('history') === 'false' ? withoutHistory(withArchive) : withArchive
+})
+
+/** A card's line comments as counts (HI-3219), or nothing when it has none: a key read only with one card, never a listing. */
+function lineCommentCountsOf(n: number): { lineComments?: { open: number; sent: number; resolved: number } } {
+  const views = lineCommentsOf(workspace, n)
+  return views.length ? { lineComments: lineCommentCounts(views) } : {}
+}
+
+// HI-3219: a card's line comments, a page of rows (state=open, the default, or all), from `offset`, `next` while more remain.
+route('GET', '/v1/tasks/:n/line-comments', async ({ params, query }) => {
+  requireWorkspace()
+  const c = await tasks.readTask(taskNumber(params[0]), await taskActor())
+  const state = query.get('state') ?? 'open'
+  if (state !== 'open' && state !== 'all') throw new HttpError(400, apiSaid(API.card.lineCommentsState, { state }))
+  const rows = lineCommentsOf(workspace, c.number)
+    .filter((x) => state === 'all' || x.state === 'open')
+    .map(({ id, path, side, from, to, state: st, version, lines, before, after, body }) => ({ id, path, side, from, to, state: st, version, lines, before, after, body }))
+  const page = pageOf(rows, Number(query.get('offset') ?? 0))
+  return { number: c.number, lineComments: page.rows, ...(page.next !== undefined ? { next: page.next } : {}) }
+})
+
+// HI-3220: a batch of line comments the user sent to the card's builder, each as it was sent, a page from `offset`, `next` while more remain.
+route('GET', '/v1/tasks/:n/feedback/:batch', async ({ params, query }) => {
+  requireWorkspace()
+  const c = await tasks.readTask(taskNumber(params[0]), await taskActor())
+  const batch = decodeURIComponent(params[1])
+  const read = feedbackRead(workspace, c.number, batch, Number(query.get('offset') ?? 0))
+  if (!read) throw new HttpError(404, apiSaid(API.card.noFeedback, { card: cardRef(c.number), batch }))
+  return { number: c.number, ...read }
 })
 
 /** Past this many comments on a card (its archived ones counted), a read of it suggests splitting it (HI-2641). */

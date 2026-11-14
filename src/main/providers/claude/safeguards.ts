@@ -1,4 +1,5 @@
-import { SAFEGUARD_DEFAULTS, SAFEGUARD_TOOLS, newStop, type SafeguardEvent } from '../../../shared/safeguards'
+import { SAFEGUARD_TOOLS, newStop, type SafeguardEvent } from '../../../shared/safeguards'
+import { CLAUDE_SAFEGUARDS } from '../../../shared/providers/claude/safeguards'
 import { advancedValues as advanced } from '../../advancedValues'
 import { isUserPrompt } from './prompts'
 
@@ -29,7 +30,7 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v 
  *   advanced setting claude-code.safeguard.note, so a reworded one can be caught by an override) and, as the very next
  *   entry, a notice for the model (a user entry, isMeta, with `refusedMessageId`: the stopped response). The pair is one
  *   stop, by that adjacency or the notice's `parentUuid`; a notice alone is a stop by its own `refusedMessageId`.
- * - A flagged request answered by another model, or by none, is a system record (SAFEGUARD_DEFAULTS.claudeRecords:
+ * - A flagged request answered by another model, or by none, is a system record (CLAUDE_SAFEGUARDS.records:
  *   `model_refusal_fallback` with `originalModel`, `fallbackModel` and `scope`; `model_refusal_no_fallback`), a stop by
  *   its `requestId`, and for the session a switch the safeguard made (flagged). Claude Code may first have asked the user
  *   about it (its prompt, which Combwork sees on screen): `asked`.
@@ -43,7 +44,7 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v 
 export function claudeSafeguards(appended: string, memo: Record<string, unknown>): SafeguardEvent[] {
   const m = memo as Memo
   const note = advanced.pattern('claude-code.safeguard.note')
-  const records: readonly string[] = SAFEGUARD_DEFAULTS.claudeRecords
+  const records: readonly string[] = CLAUDE_SAFEGUARDS.records
   const out: SafeguardEvent[] = []
   const stop = (at: number, id: string | undefined, model = m.model, asked = false): boolean => {
     if (!newStop(m, id)) return false

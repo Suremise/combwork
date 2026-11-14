@@ -2,7 +2,7 @@ import { join, resolve } from 'path'
 import { app } from 'electron'
 import { realpathSync } from 'original-fs'
 import type { ProviderId } from '../shared/types'
-import { PROVIDERS, providerDescriptor } from '../shared/providers'
+import { PROVIDERS, providerDescriptor, signInConnections } from '../shared/providers'
 
 /**
  * Whether a provider's sign-in is Combwork's connections' (HI-1755), and the test seam that keeps a test copy on its CLI
@@ -33,15 +33,17 @@ export function testHomeSeam(homeEnv: string, env: NodeJS.ProcessEnv = process.e
 
 /** The folder in the user's own folder of the CLI with this home variable (`.claude` for CLAUDE_CONFIG_DIR). */
 function userHomeOf(homeEnv: string): string {
-  return PROVIDERS.find((p) => p.capabilities.connections?.homeEnv === homeEnv)?.capabilities.connections?.userHome ?? '.claude'
+  const p = PROVIDERS.find((x) => signInConnections(x)?.homeEnv === homeEnv)
+  return (p && signInConnections(p)?.userHome) ?? '.claude'
 }
 
 /**
  * Whether the provider's sign-in belongs to its connections (it has them, and the test seam isn't on; since S8, HI-1774,
  * for everyone): its CLI's own home is then never checked or signed in by Combwork, and its settings aren't read for its
- * agents. Copilot has none: its own machine-wide login, as before (HI-1758).
+ * agents. Copilot has none: its own machine-wide login, as before (HI-1758); nor has a server-only CLI (HI-3197), whose
+ * own home is its PC-wide account's.
  */
 export function connectionsManaged(id: ProviderId, env: NodeJS.ProcessEnv = process.env): boolean {
-  const caps = providerDescriptor(id).capabilities.connections
+  const caps = signInConnections(providerDescriptor(id))
   return !!caps && !testHomeSeam(caps.homeEnv, env)
 }

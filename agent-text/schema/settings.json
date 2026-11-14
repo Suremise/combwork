@@ -709,10 +709,28 @@
   "settings.advanced.codex.rateLimitNudge.hide.title": {
     "placeholders": {}
   },
+  "settings.advanced.codex.rateLimits.defaultLimitId.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.rateLimits.defaultLimitId.title": {
+    "placeholders": {}
+  },
   "settings.advanced.codex.rateLimits.field.desc": {
     "placeholders": {}
   },
   "settings.advanced.codex.rateLimits.field.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.rateLimits.limitId.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.rateLimits.limitId.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.rateLimits.limitName.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.rateLimits.limitName.title": {
     "placeholders": {}
   },
   "settings.advanced.codex.rateLimits.usedPercent.desc": {
@@ -1329,6 +1347,18 @@
     "placeholders": {}
   },
   "settings.advanced.cw.outage.waitMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.processes.knownHosts.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.processes.knownHosts.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.processes.orphanMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.processes.orphanMinutes.title": {
     "placeholders": {}
   },
   "settings.advanced.cw.processes.orphanNotice.desc": {

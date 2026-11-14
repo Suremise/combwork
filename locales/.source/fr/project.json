@@ -247,6 +247,7 @@
   "project.limit.notReported": "{provider} hasn’t reported your plan’s limits in its sessions so far. Its sessions report them as they run; accounts that use an API key have none.",
   "project.limit.planOnly": "Your plan: {plan}. {provider} hasn’t reported this plan’s limits yet.",
   "project.limit.resets": "used · resets {when}",
+  "project.limit.scoped": "{name}{window, select, weekly {, weekly} fiveHour {, 5-hour} hours {, {hours, plural, one {#-hour} other {#-hour}}} other {}}",
   "project.limit.tip": "How much of your plan’s {window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} allowance is used, across all your {provider} sessions (not just Combwork).",
   "project.limit.tipConnection": "How much of the plan’s {window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} allowance is used on {name}, across all its sessions (not just Combwork's).",
   "project.limit.title": "{window, select, fiveHour {5-hour limit} weekly {Weekly limit} other {{label} limit}}",

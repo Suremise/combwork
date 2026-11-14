@@ -41,5 +41,80 @@
   },
   "board.error.upgradeFirstStart": {
     "placeholders": {}
+  },
+  "board.work.changes.noRepository": {
+    "placeholders": {}
+  },
+  "board.work.changes.noRevision": {
+    "placeholders": {}
+  },
+  "board.work.changes.noSubmission": {
+    "placeholders": {}
+  },
+  "board.work.changes.notListed": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "board.work.comments.binary": {
+    "placeholders": {}
+  },
+  "board.work.comments.changed": {
+    "placeholders": {}
+  },
+  "board.work.comments.empty": {
+    "placeholders": {}
+  },
+  "board.work.comments.lines": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain",
+      "path": "plain"
+    }
+  },
+  "board.work.comments.noCard": {
+    "placeholders": {}
+  },
+  "board.work.comments.noComment": {
+    "placeholders": {}
+  },
+  "board.work.comments.sent": {
+    "placeholders": {}
+  },
+  "board.work.comments.tooLong": {
+    "placeholders": {
+      "max": "number"
+    }
+  },
+  "board.work.comments.tooMany": {
+    "placeholders": {
+      "max": "number"
+    }
+  },
+  "board.work.send.alreadySent": {
+    "placeholders": {}
+  },
+  "board.work.send.changed": {
+    "placeholders": {}
+  },
+  "board.work.send.integrated": {
+    "placeholders": {}
+  },
+  "board.work.send.itemsChanged": {
+    "placeholders": {}
+  },
+  "board.work.send.noBuilder": {
+    "placeholders": {}
+  },
+  "board.work.send.notHere": {
+    "placeholders": {}
+  },
+  "board.work.send.nothing": {
+    "placeholders": {}
+  },
+  "board.work.send.reviewing": {
+    "placeholders": {
+      "reviewer": "plain"
+    }
   }
 }

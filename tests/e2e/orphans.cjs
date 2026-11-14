@@ -153,6 +153,39 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
     check('…and HB2 still runs', !!(await liveOf()))
     check('…and Pause the team no longer names it', !!(await until(async () => !(await items()).some((i) => i.process?.pid === pid))), JSON.stringify(await items()))
     await inv('team:resume')
+
+    // --- HI-3206: a cw-progress run whose shell is gone while it runs ("progress-orphan 14": its wrapper left with no
+    // living parent): nothing is told while the run is live, past the bound; once it ends, what it left behind is told,
+    // naming the run.
+    const runFile = path.join(claudeHome, 'fake-progress-orphan.jsonl')
+    const leftByRun = () => (fs.existsSync(runFile) ? fs.readFileSync(runFile, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l).pid) : [])
+    const mark = (await toasts()).length
+    // Its left-running notices only (an agent's turn ending says so in a notice of its own).
+    const leftNotices = async () => (await toasts()).slice(mark).filter((t) => (t.title ?? '').startsWith('HB2 left '))
+    await lib.sendPrompt(inv, lib.ptyKey(alpha, hb2.id), 'progress-orphan 14', { submitted: async () => leftByRun().length > 0 })
+    await until(async () => (await liveOf())?.status === 'finished')
+    const lpid = leftByRun()[0]
+    for (const id of lib.identify([lpid])) ids.set(id.pid, id)
+    const sandboxRun = async () => (await inv('progress:list')).find((r) => r.title === 'Sandbox cycle' && r.agentId === hb2.id)
+    const hb2Processes = async () => (await inv('activity:now', alpha)).launches.filter((l) => l.agentId === hb2.id).flatMap((l) => l.processes)
+    // Held: Activity marks a process of the live run (its wrapper, its parent gone) as the run's, once it is past the bound.
+    const heldPast = await until(async () => {
+      const r = await sandboxRun()
+      if (r?.state !== 'running') return null
+      const held = (await hb2Processes()).find((p) => p.orphan?.run === 'Sandbox cycle')
+      const ms = held?.created ? Number((BigInt(held.created) - 116444736000000000n) / 10000n) : NaN
+      return held && Date.now() - ms > 4000 + 2000 ? held : null
+    }, HUNG_MS)
+    check('a live cw-progress run whose shell is gone: Activity marks its process as the run’s, past the bound', !!heldPast, JSON.stringify(await hb2Processes()))
+    check('…and nothing is told while the run is live', (await leftNotices()).length === 0, JSON.stringify(await leftNotices()))
+    // The run ends (its command exits): the linger it started is told, naming the run.
+    check('the run ends', !!(await until(async () => (await sandboxRun())?.finishedAt, HUNG_MS)), JSON.stringify(await sandboxRun()))
+    const told = await until(async () => (await leftNotices()).find((t) => t.message?.includes(String(lpid))) ?? null, HUNG_MS)
+    check('what it left behind is told once the run has ended, naming the run', !!told && /cw-progress run “Sandbox cycle” ended/.test(told.message), JSON.stringify(await leftNotices()))
+    check('…and only that: the run’s own wrapper, gone with it, is never told', (await leftNotices()).every((t) => t.message?.includes(String(lpid))), JSON.stringify(await leftNotices()))
+    const left = (await hb2Processes()).find((p) => p.pid === lpid)
+    if (left?.created) await inv('activity:endProcess', alpha, hb2.id, lpid, left.created)
+    check('…and End It ends it', !!(await until(async () => !alive(lpid))), String(lpid))
   } catch (err) {
     check('no unexpected error', false, err.stack)
   } finally {

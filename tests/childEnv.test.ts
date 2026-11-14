@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@lydell/node-pty', () => ({ spawn: () => undefined }))
 vi.mock('../src/main/events', () => ({ sendPty: () => undefined }))
-vi.mock('../src/main/providers', () => ({ allProviders: () => [{ envToStrip: ['CLAUDECODE'] }] }))
+vi.mock('../src/main/providers', () => ({ allProviders: () => [{ install: { envToStrip: ['CLAUDECODE'] } }] }))
 
 const { childEnv, SESSION_SETTINGS } = await import('../src/main/ptyHost')
 

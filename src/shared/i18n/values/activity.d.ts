@@ -70,6 +70,8 @@ interface CombworkMessageValues {
   'activity.openSession': undefined
   'activity.orphanFact': undefined
   'activity.orphanFor': { pid: string | number; time: string | number; cpu: string | number }
+  'activity.orphanHeld': { run: string | number }
+  'activity.orphanHost': undefined
   'activity.orphanLabel': undefined
   'activity.parentLabel': undefined
   'activity.pause': undefined

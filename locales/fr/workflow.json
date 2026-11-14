@@ -561,6 +561,7 @@
   "workflow.summary.none.pair": "Un agent relecteur vérifie chaque carte, une fois les vérifications rapides passées.",
   "workflow.summary.none.solo": "Pas de relecture : une carte est terminée quand son auteur la soumet.",
   "workflow.summary.none.team": "Chaque carte est vérifiée par un agent relecteur, puis par toi, une fois les vérifications rapides et les tests passés.",
+  "workflow.unreadable.blockerWork": "la présence du travail de {card} dans la branche cible ({what})",
   "workflow.unreadable.branch": "la branche extraite dans le dossier {folder}",
   "workflow.unreadable.branchedOff": "le commit commun à {a} et à {b}",
   "workflow.unreadable.branchedOffTarget": "le commit commun au travail et à sa branche cible",

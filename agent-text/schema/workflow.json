@@ -1498,6 +1498,12 @@
       "max": "number"
     }
   },
+  "workflow.unreadable.blockerWork": {
+    "placeholders": {
+      "card": "plain",
+      "what": "plain"
+    }
+  },
   "workflow.unreadable.branch": {
     "placeholders": {
       "folder": "plain"

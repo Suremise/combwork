@@ -247,6 +247,7 @@ interface CombworkMessageValues {
   'project.limit.notReported': { provider: string | number }
   'project.limit.planOnly': { plan: string | number; provider: string | number }
   'project.limit.resets': { when: string | number }
+  'project.limit.scoped': { name: string | number; window: string; hours: number }
   'project.limit.tip': { window: string; label: string | number; provider: string | number }
   'project.limit.tipConnection': { window: string; label: string | number; name: string | number }
   'project.limit.title': { window: string; label: string | number }

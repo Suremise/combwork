@@ -16,6 +16,7 @@ interface CombworkMessageValues {
   'main.accounts.nothingToKeep': { name: string | number }
   'main.accounts.removeFailed': { name: string | number; error: string | number }
   'main.accounts.running': { name: string | number }
+  'main.accounts.serverOnly': { cli: string | number }
   'main.accounts.setUpCancelled': { name: string | number }
   'main.accounts.usageMove.bad': undefined
   'main.antivirus.allExcluded': undefined
@@ -273,6 +274,7 @@ interface CombworkMessageValues {
   'main.outcome.noLongerAsked': undefined
   'main.outcome.noLongerHeld': undefined
   'main.outcome.notResumed': undefined
+  'main.outcome.nothingToResume': undefined
   'main.outcome.offerReplaced': undefined
   'main.outcome.openHereAgain': undefined
   'main.outcome.released': undefined
@@ -341,11 +343,13 @@ interface CombworkMessageValues {
   'main.restart.why.held': undefined
   'main.restart.why.idle': undefined
   'main.restart.why.movedOn': undefined
+  'main.restart.why.noResume': undefined
   'main.restart.why.notReady': undefined
   'main.restart.why.notStopped': undefined
   'main.restart.why.removed': undefined
   'main.restart.why.running': undefined
   'main.restart.why.stopped': undefined
+  'main.server.check.otherApi': { name: string | number }
   'main.server.context.invalid': { max: number }
   'main.server.context.noModel': { model: string | number }
   'main.server.key.chars': undefined

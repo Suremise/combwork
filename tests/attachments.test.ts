@@ -20,7 +20,7 @@ describe('attachment kinds and labels', () => {
   it("labels a kind by whether the agent's CLI reads it itself (the matrix in the descriptors)", () => {
     const label = (provider: 'claude-code' | 'codex' | 'copilot', kind: Parameters<typeof attachmentLabel>[0]) => {
       const d = providerDescriptor(provider)
-      return attachmentLabel(kind, d.capabilities.attachments, d.name)
+      return attachmentLabel(kind, d.capabilities.terminal!.attachments!, d.name)
     }
     // Checked against Claude Code 2.1.296, Codex 0.162.1 and Copilot 1.0.95 (tests/fixtures/attachments).
     expect(label('claude-code', 'pdf')).toMatchObject({ label: 'PDF', native: true })
@@ -36,7 +36,7 @@ describe('attachment kinds and labels', () => {
 
   it('the descriptors say what the recorded checks of the CLIs found', () => {
     const matrix = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'attachments', 'matrix.json'), 'utf8')) as Record<string, { native?: string[] }>
-    for (const p of ['claude-code', 'codex', 'copilot'] as const) expect([...providerDescriptor(p).capabilities.attachments].sort()).toEqual([...(matrix[p].native ?? [])].sort())
+    for (const p of ['claude-code', 'codex', 'copilot'] as const) expect([...providerDescriptor(p).capabilities.terminal!.attachments!].sort()).toEqual([...(matrix[p].native ?? [])].sort())
   })
 
   it('leads a path into an old .combwork/images folder to .combwork/attachments', () => {

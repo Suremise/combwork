@@ -16,7 +16,7 @@ const log = createLogger('opencodeHistory')
 const SHUTDOWN_MS = 25_000
 
 // The OpenCode history's main side (HI-2762, design s7/s10/s13). Main never reads a session itself: it tells the worker
-// (historyCore, in opencodeHistoryWorker.ts) what runs, which server each has, when to read, and when a run ended, and
+// (historyCore, in threads/historyWorker.ts) what runs, which server each has, when to read, and when a run ended, and
 // passes on what the worker says (a published mirror, a limits reading). Per run: the server's password (kept from the
 // launch's preparation, never written) and address (the launcher's opencode-server.json, written once its server is
 // ready); a poll every opencode.history.pollSeconds while it runs; at its end, an export of its session. Across runs: a
@@ -24,7 +24,7 @@ const SHUTDOWN_MS = 25_000
 
 type Body = CoreRequest extends infer R ? (R extends { id: number } ? Omit<R, 'id'> : never) : never
 
-/** Where Combwork's other parts take what the history finds for a run (set at startup: opencodeHistoryHost). */
+/** Where Combwork's other parts take what the history finds for a run (set at startup: historyHost.ts). */
 export interface HistorySink {
   /** A run's plan limits as its server reported them (null: its account has none: clear its connection's). */
   limits(runId: string, usage: PlanUsage | null): void
@@ -475,7 +475,7 @@ export class OpencodeHistory {
 
 export let opencodeHistory = new OpencodeHistory()
 
-/** Tests: the worker from this script (a build of opencodeHistoryWorker.ts), 'in-process', or null for the default; a new history. */
+/** Tests: the worker from this script (a build of threads/historyWorker.ts), 'in-process', or null for the default; a new history. */
 export async function historyWorkerForTests(script: string | null, deps?: CoreDeps): Promise<OpencodeHistory> {
   await opencodeHistory.stop()
   scriptForTests = script

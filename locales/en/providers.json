@@ -439,6 +439,30 @@
     "defaultMessage": "You",
     "description": "The Markdown export of a conversation (Sessions tab → Export): the heading over the user's messages."
   },
+  "providers.gap.cost": {
+    "defaultMessage": "No cost: Combwork has no prices for it",
+    "description": "What a CLI that runs from a description lacks (HI-3196), in a list under it in Provider Setup and Agent Settings."
+  },
+  "providers.gap.hooks": {
+    "defaultMessage": "No hooks: no file locks or notices in its turns; its status is read from its screen",
+    "description": "What a CLI that runs from a description lacks (HI-3196), in a list under it in Provider Setup and Agent Settings."
+  },
+  "providers.gap.liveMode": {
+    "defaultMessage": "No live mode switch: a restart changes its permission mode",
+    "description": "What a CLI that runs from a description lacks (HI-3196), in a list under it in Provider Setup and Agent Settings."
+  },
+  "providers.gap.resume": {
+    "defaultMessage": "No resume: a stopped session starts a new conversation",
+    "description": "What a CLI that runs from a description lacks (HI-3196), when its description has no way to resume, in a list under it."
+  },
+  "providers.gap.tools": {
+    "defaultMessage": "No Combwork tools, skills or guidance: no board, no inbox",
+    "description": "What a CLI that runs from a description lacks (HI-3196), in a list under it in Provider Setup and Agent Settings."
+  },
+  "providers.gap.transcript": {
+    "defaultMessage": "No transcript: no conversation view, usage or context gauge",
+    "description": "What a CLI that runs from a description lacks (HI-3196), in a list under it in Provider Setup and Agent Settings."
+  },
   "providers.localLimits.context": {
     "defaultMessage": "Context size {value, number} tokens ({from}){estimate, select, yes {: an estimate until Claude Code reports its window} other {}}",
     "description": "A line of the context tooltip of an agent on a local model (HI-2682): the context its launch gave Claude Code. {value} is a number of tokens; {from} where it was set (\"Context size on Local\", \"env in …settings.json\"). estimate yes: Claude Code hasn't reported its window yet. Keep the select keys."

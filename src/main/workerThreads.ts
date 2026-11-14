@@ -19,9 +19,11 @@ export function bundledScriptExists(file: string): boolean {
   }
 }
 
-/** Combwork's worker threads, by the names Copy Diagnostics gives them. */
-export type WorkerName = 'folder move' | 'usage history' | 'git' | 'repository lock' | 'WAL checkpoints' | 'stall watchdog' | 'log writer' | "Codex's log" | 'None baseline' | 'OpenCode history' | 'jj' | 'jj publish'
-const NAMES: WorkerName[] = ['usage history', 'git', 'repository lock', 'WAL checkpoints', 'stall watchdog', 'log writer', "Codex's log", 'None baseline'] // i18n-ignore: a worker's name, for Copy Diagnostics' report (English)
+/** Combwork's own worker threads, by the names Copy Diagnostics gives them; a provider's own are named by it (its worker.ts' `threads`). */
+type CombworkWorkerName = 'folder move' | 'usage history' | 'git' | 'repository lock' | 'WAL checkpoints' | 'stall watchdog' | 'log writer' | 'None baseline' | 'jj' | 'jj publish'
+export type WorkerName = CombworkWorkerName | (string & {})
+/** Copy Diagnostics' list: Combwork's, with the providers' own threads before None baseline's. */
+const namesWith = (providers: readonly string[]): string[] => ['usage history', 'git', 'repository lock', 'WAL checkpoints', 'stall watchdog', 'log writer', ...providers, 'None baseline'] // i18n-ignore: a worker's name, for Copy Diagnostics' report (English)
 
 type WorkerState = { how: 'started'; running: () => boolean } | { how: 'here' | 'ended'; why: string }
 const states = new Map<WorkerName, WorkerState>()
@@ -48,9 +50,9 @@ export function workerHere(name: WorkerName, why: string): void {
   states.set(name, { how: 'here', why })
 }
 
-/** For Copy Diagnostics: how each worker runs (a packaged e2e suite checks each is its own thread). */
-export function workerThreadLines(): string[] {
-  return NAMES.map((n) => {
+/** For Copy Diagnostics: how each worker runs (a packaged e2e suite checks each is its own thread); `providers`: the providers' own threads. */
+export function workerThreadLines(providers: readonly string[] = []): string[] {
+  return namesWith(providers).map((n) => {
     const s = states.get(n)
     if (!s) return `- ${n}: not started yet` // i18n-ignore: Copy Diagnostics' report, in English
     if (s.how === 'started') return `- ${n}: ${s.running() ? 'its own thread' : 'started, not running yet'}` // i18n-ignore: Copy Diagnostics' report, in English

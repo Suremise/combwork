@@ -16,7 +16,7 @@
   "connections.mark.anotherMark": "選んだ接続とは別の接続で実行中",
   "connections.mark.none": "接続なし",
   "connections.mark.noneUsable": "このワークスペースで有効な{cli}のアカウントがありません。アカウントを有効にするまで起動できません（「設定」→「アカウントと接続」）。",
-  "connections.mark.offHere": "{wanted}のアカウントはこのワークスペースでは無効です。CLIで最初に使える接続{name}で動いています",
+  "connections.mark.offHere": "{wanted}のアカウントはこのワークスペースでは無効です。ここで有効な最初のアカウントで一致した接続{name}で動いています",
   "connections.mark.offNoDefault": "{wanted}はここでは無効",
   "connections.mark.offNoDefaultUsable": "{wanted}はこのワークスペースでは無効で、ほかに有効な{cli}のアカウントもありません。アカウントを有効にするまで起動できません（「設定」→「アカウントと接続」）。",
   "connections.mark.other": "再起動するまで{running}で実行します。現在の選択：{chosen}",

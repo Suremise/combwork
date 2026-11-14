@@ -1164,6 +1164,16 @@
     "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork (HI-2609): Codex's offer to switch to a cheaper model when the account nears its usage limit.",
     "audience": "both"
   },
+  "settings.advanced.codex.rateLimits.defaultLimitId.desc": {
+    "text": "The id of Codex's own plan limits (its 5-hour and weekly ones). A reading with another id is a limit of its own, shown by its name. Wrong, Codex's own limits are shown as a separate limit, and their earlier readings and warnings start again.",
+    "note": "What the advanced setting \"Session file: Codex's own limit id\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.codex.rateLimits.defaultLimitId.title": {
+    "text": "Session file: Codex's own limit id",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
   "settings.advanced.codex.rateLimits.field.desc": {
     "text": "The field of Codex's token counts with a subscription's limits. Wrong, Combwork shows no plan limits for Codex.",
     "note": "What the advanced setting \"Session file: plan limits field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
@@ -1171,6 +1181,26 @@
   },
   "settings.advanced.codex.rateLimits.field.title": {
     "text": "Session file: plan limits field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.codex.rateLimits.limitId.desc": {
+    "text": "The plan limits' field naming which of Codex's limits they are. Wrong, Combwork takes every reading for Codex's own limit, and a second limit's figures are mixed into it.",
+    "note": "What the advanced setting \"Session file: limit's id field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.codex.rateLimits.limitId.title": {
+    "text": "Session file: limit's id field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.codex.rateLimits.limitName.desc": {
+    "text": "The plan limits' field with the name Codex gives a limit other than its own. Wrong, Combwork names such a limit by its id.",
+    "note": "What the advanced setting \"Session file: limit's name field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.codex.rateLimits.limitName.title": {
+    "text": "Session file: limit's name field",
     "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
@@ -2179,8 +2209,28 @@
     "note": "An advanced setting's title (Settings → Advanced), followed by its value in minutes (\"120 min\").",
     "audience": "both"
   },
+  "settings.advanced.cw.processes.knownHosts.desc": {
+    "text": "Programs expected to keep running after the shell that started them is gone, such as Windows Sandbox's guest: a regular expression matched against the program's file name. Combwork never tells these as left running; Activity still lists them, with End It. Add a program here to stop its notices.",
+    "note": "What the advanced setting \"Processes left running: known hosts\" does (Settings → Advanced). Activity is a tab of Combwork's; End It its button. Keep \"Windows Sandbox\" as it is (a product).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.processes.knownHosts.title": {
+    "text": "Processes left running: known hosts",
+    "note": "An advanced setting's title (Settings → Advanced): the programs expected to keep running after the shell that started them is gone (the Windows Sandbox guest's), which Combwork never tells as left running.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.processes.orphanMinutes.desc": {
+    "text": "How long a process an agent's command started may run with the shell that started it gone before Combwork tells you and the agent. A longer wait means fewer notices for processes you expect to keep running a while.",
+    "note": "What the advanced setting \"Processes left running: minutes before telling\" does (Settings → Advanced, under Combwork).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.processes.orphanMinutes.title": {
+    "text": "Processes left running: minutes before telling",
+    "note": "An advanced setting's title (Settings → Advanced), followed by its value in minutes (\"10 min\"): how long a process an agent's command left running, its shell gone, runs before Combwork tells it.",
+    "audience": "both"
+  },
   "settings.advanced.cw.processes.orphanNotice.desc": {
-    "text": "When a process an agent's command started is still running ten minutes on with the shell that started it gone, Combwork says so once in a notice, and tells the agent once at its next tool call or turn's end, so it can end it. Turned off, neither is told; Activity still lists the process as left running, with End It.",
+    "text": "When a process an agent's command started is still running with the shell that started it gone (for as long as “Processes left running: minutes before telling” says), Combwork says so once in a notice, and tells the agent once at its next tool call or turn's end, so it can end it. A process of a cw-progress run that is still running, or of a known host, isn't told. Turned off, nothing is told; Activity still lists the process as left running, with End It.",
     "note": "What the advanced setting \"Processes left running: tell me and the agent\" does (Settings → Advanced, under Combwork). Activity is a tab of Combwork's; End It is its button.",
     "audience": "both"
   },

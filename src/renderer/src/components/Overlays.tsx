@@ -11,7 +11,7 @@ import { TerminalView } from './TerminalView'
 import { UpdateStatusRow } from './Updates'
 import { discardDrafts, saveAllDrafts, unsavedFiles } from './FileView'
 import type { CustomCommand, ProviderId, ProviderTask, QuitChoice, QuitSession, SessionStatus, TestedCli, HostCheck } from '@shared/types'
-import { PROVIDERS, enabledProviders, installSourceText, isProviderEnabled, providerDescriptor, shownText } from '@shared/providers'
+import { PROVIDERS, enabledProviders, installSourceText, isProviderEnabled, providerDescriptor, shownText, providerModule } from '@shared/providers'
 import { distinguishingParents } from '@shared/folderLabels'
 import { GIT_DOWNLOAD, GIT_MIN, gitFixText, gitOldText, gitProblemText } from '@shared/gitTool'
 import { testedNote, testedSummary } from '@shared/testedClis'
@@ -25,6 +25,7 @@ import { ProviderIcon } from './ProviderIcon'
 import { ConnectionSetupLine, ServerSetupLines, useProviderWarnings } from './ConnectionChoice'
 import { AgentsDetail, CARD_COLUMN, PROJECT_COLUMN, STATE_COLUMN, type AgentColumn, type AgentTableGroup, type AgentTableRow } from './AgentsTable'
 import { BusyButton, CodeText, CopyableCode, Icon, IconButton, LoadFailed, Modal, SearchInput, STATUS_TEXT, useBackdrop, useBusy } from './ui'
+import { ProviderGapsNote } from './Clis'
 
 // A message's tags (tRich), drawn the same everywhere: <b> bold, <muted> and <faint> greyed, a link.
 const bold = (chunks: React.ReactNode[]): React.ReactNode => <strong key="b">{chunks}</strong>
@@ -1060,9 +1061,11 @@ export function AgentSetupDialog() {
               <strong>{tr(msg({ id: 'shell.setup.notInstalled', defaultMessage: '{provider} is not installed', description: "Provider Setup when a CLI isn't installed. {provider} is its name." }), { provider: p.name })}</strong>
               <div className="muted">{tr(msg({ id: 'shell.setup.notInstalledDetail', defaultMessage: "Combwork runs the standalone {provider} command-line tool in each project. It isn't bundled with Combwork — install it with {company}'s official installer.", description: 'Provider Setup, under "<provider> is not installed". {provider} is the coding agent\'s name, {company} its maker\'s.' }), { provider: p.name, company: p.company })}</div>
             </div>
+            {!providerModule(tab)?.cli && (
             <button className="btn primary" disabled={running} onClick={() => void start('install')}>
               <Icon name="cloud-download" /> {tr(msg({ id: 'shell.setup.install', defaultMessage: 'Install {provider}', description: "Provider Setup's button: installs the CLI. {provider} is its name." }), { provider: p.name })}
             </button>
+            )}
           </div>
           {info.editorExtensionOnly && p.extensionNote && (
             <div className="banner info" style={{ borderRadius: 6, marginBottom: 10 }}>
@@ -1082,6 +1085,7 @@ export function AgentSetupDialog() {
           <Icon name="info" /> {tRich(msg({ id: 'shell.setup.rejected', defaultMessage: '{n, plural, one {Ignored a copy} other {Ignored copies}} bundled with an editor extension ({path}). Combwork only uses the standalone CLI.', description: "Provider Setup when it found a CLI only inside an editor's extension. {n} is how many; {path} is where (one of them)." }), { n: info.rejected.length, path: <CopyableCode key="path" code={info.rejected[0]} /> })}
         </p>
       )}
+      <ProviderGapsNote provider={tab} />
       <GitSetupRow />
       {finished && (
         <div className={cx('banner', finished.ok ? 'success' : 'warn')} data-finished={finished.ok ? 'ok' : 'not-found'} style={{ borderRadius: 6, marginTop: 10 }}>
@@ -1412,8 +1416,8 @@ export function CompactDialog() {
   const live = agent.live
   // A watching agent can be compacted: its watch is kept, and a wake waits for the compaction to end.
   const idle = !!live && (live.status === 'ready' || live.status === 'finished' || live.status === 'watching')
-  const cache = usage && provider.capabilities.promptCacheTtl ? cacheState(usage, ttl) : null
-  const focusOk = provider.capabilities.compactFocus
+  const cache = usage && provider.capabilities.usage?.promptCacheTtl ? cacheState(usage, ttl) : null
+  const focusOk = provider.capabilities.compaction?.compactFocus
   const run = async (): Promise<void> => {
     const r = await action.run('compact', () => call('session:compact', project.path, (focusOk && focus.trim()) || undefined, agent.id))
     if (r) close()

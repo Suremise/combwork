@@ -879,6 +879,8 @@ async function runPrompt(text, enter = null) {
   if (linger) leaveRunning(Number(linger[1]))
   if (/\bhidden-linger\b/i.test(text)) leaveUnnamedRunning()
   if (/\bprogress-linger\b/i.test(text)) await leaveProgressRunning(!/\bnowait\b/i.test(text))
+  const progressOrphan = /\bprogress-orphan\s+(\d+)/i.exec(text)
+  if (progressOrphan) leaveProgressOrphan(Number(progressOrphan[1]))
   if (/\bdevapp\b/i.test(text)) leaveAppRunning()
   const secs = Number(/\bwork\s+(\d+)/i.exec(text)?.[1] ?? 1)
   await sleep(secs * 1000)
@@ -1586,6 +1588,16 @@ function leaveAppRunning() {
  * each minute, missed them). fake-progress-delay-ms.txt (N) starts the command N ms late, as a machine under load does.
  * wait false ("progress-linger nowait"): the turn ends at once, the command still to start, as a real agent's may be (#1134).
  */
+/**
+ * "progress-orphan N" (HI-3206): a cw-progress run whose shell is gone while it runs: a short-lived starter starts
+ * cmd → cw-progress --title "Sandbox cycle" → a child that keeps a detached "linger" for N seconds, then exits; so the
+ * run's wrapper has no living parent while the run is live, and once the run ends the linger is what it left behind (its
+ * pid in fake-progress-orphan.jsonl in its home). Not waited for.
+ */
+function leaveProgressOrphan(seconds) {
+  spawn(process.execPath, [path.join(__dirname, 'linger.cjs'), 'progress-starter', path.join(home, 'fake-progress-orphan.jsonl'), process.env.CW_AGENT || 'agent', String(seconds)], { cwd, env: process.env, detached: true, stdio: 'ignore', windowsHide: true }).unref()
+}
+
 async function leaveProgressRunning(wait = true) {
   const q = (x) => `"${x}"`
   const pids = path.join(home, 'fake-progress-linger.jsonl')

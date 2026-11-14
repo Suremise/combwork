@@ -342,6 +342,8 @@
   "agents.resume.hold.holds": "{agent} garde déjà {slot}. Libère cet emplacement pour reprendre cette conversation dans le sien.",
   "agents.resume.hold.reused": "L’emplacement de cette conversation ({slot}) contient maintenant {kind, select, card {le travail de {work}} other {le travail d’un couloir}}. Lis sa transcription, ou repars de zéro avec une passation.",
   "agents.resume.hold.reviewer": "L’agent {agent} fait maintenant de la relecture, et les relecteurs ne travaillent jamais dans un emplacement ({slot}). Lis sa transcription, ou repars de zéro avec une passation.",
+  "agents.resume.noPrompt": "Elle n’a jamais eu de prompt, {cli} n’a donc rien à reprendre.",
+  "agents.resume.noResume": "{cli} ne peut pas reprendre une session : sa description ne prévoit aucune reprise.",
   "agents.resume.noRoom": "Aucun agent ne travaille dans le dossier du projet, et le projet n’a plus de place pour un autre agent.",
   "agents.resume.noTranscript": "Ni {cli} ni Combwork n’ont plus sa transcription, il n’y a donc rien à reprendre.",
   "agents.resume.notInstalled": "{cli} n’est pas installé. Installe-le dans Configuration des fournisseurs pour la reprendre.",

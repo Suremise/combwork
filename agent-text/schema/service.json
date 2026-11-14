@@ -896,6 +896,16 @@
   "service.intent.queueNotAgents": {
     "placeholders": {}
   },
+  "service.jj.revisionNoRepo": {
+    "placeholders": {}
+  },
+  "service.jj.revisionUnreadable": {
+    "placeholders": {
+      "path": "plain",
+      "commit": "plain",
+      "error": "plain"
+    }
+  },
   "service.keys.closed": {
     "placeholders": {}
   },
@@ -1180,6 +1190,12 @@
   "service.providers.noSetup": {
     "placeholders": {
       "cli": "plain"
+    }
+  },
+  "service.providers.noTask": {
+    "placeholders": {
+      "cli": "plain",
+      "task": "select"
     }
   },
   "service.providers.notInstalled": {

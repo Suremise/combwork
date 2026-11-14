@@ -74,6 +74,11 @@
       "name": "plain"
     }
   },
+  "main.accounts.serverOnly": {
+    "placeholders": {
+      "cli": "plain"
+    }
+  },
   "main.accounts.setUpCancelled": {
     "placeholders": {
       "name": "plain"
@@ -464,6 +469,11 @@
   },
   "main.quit.closed": {
     "placeholders": {}
+  },
+  "main.server.check.otherApi": {
+    "placeholders": {
+      "name": "plain"
+    }
   },
   "main.server.context.invalid": {
     "placeholders": {

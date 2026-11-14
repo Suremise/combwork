@@ -553,11 +553,20 @@
   "tool.readTask.arg.comments": {
     "text": "Only the newest n."
   },
+  "tool.readTask.arg.feedback": {
+    "text": "A sent batch, by its id."
+  },
   "tool.readTask.arg.history": {
     "text": "Long; rarely needed."
   },
   "tool.readTask.arg.latestComment": {
     "text": "Only the newest comment."
+  },
+  "tool.readTask.arg.lineComments": {
+    "text": "Its line comments as rows."
+  },
+  "tool.readTask.arg.offset": {
+    "text": "With either: the reply's next."
   },
   "tool.readTask.arg.summary": {
     "text": "Each comment's first line."

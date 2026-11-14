@@ -24,6 +24,7 @@ interface CombworkMessageValues {
   'session.compact.waiting': undefined
   'session.connection.fallback': { why: string; wanted: string | number; name: string | number }
   'session.connection.fallbackTitle': { agent: string | number }
+  'session.connection.offMatched': { wanted: string | number; name: string | number; account: string | number; by: string; tag: string | number }
   'session.error.agentGone': undefined
   'session.error.inUseElsewhere': undefined
   'session.error.noAgents': undefined
@@ -131,6 +132,8 @@ interface CombworkMessageValues {
   'session.notice.untakenTitle': { agent: string | number }
   'session.notice.waitingForInput': undefined
   'session.orphan.body': { pid: string | number }
+  'session.orphan.bodyRunEnded': { pid: string | number; run: string | number }
+  'session.orphan.bodyRunUnconfirmed': { pid: string | number; run: string | number }
   'session.orphan.title': { agent: string | number; command: string | number; time: string | number }
   'session.plan.asking': undefined
   'session.plan.noToggle': { provider: string | number }
@@ -165,6 +168,7 @@ interface CombworkMessageValues {
   'session.start.archived': undefined
   'session.start.args': { problem: string | number; connection: string | number }
   'session.start.beingOpened': undefined
+  'session.start.cantResume': { provider: string | number }
   'session.start.cleaning': undefined
   'session.start.cliRequired': { provider: string | number }
   'session.start.closing': undefined

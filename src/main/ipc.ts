@@ -87,7 +87,7 @@ import { missingWorktree, recreateWorktree, unlinkMissingWorktree } from './agen
 import { CW_DIR, projectAgents as agentsOf } from '../shared/defaults'
 import type { MoveOptions, TaskCard } from '../shared/types'
 import { killPty, ptyBuffer, ptySize, resizePty, writePty } from './ptyHost'
-import { apiInfo, claudeSnippetFacts, createViewer, regenerateToken, revokeViewer } from './servers'
+import { adminSnippetFacts, apiInfo, createViewer, regenerateToken, revokeViewer } from './servers'
 import * as projectAgents from './projectAgents'
 import * as templates from './templates'
 import * as branchWatch from './branchWatch'
@@ -158,11 +158,14 @@ import { checkOffer, dismissOffer, releaseOffers } from './workflow/releaseOffer
 import { branchStartArg } from '../shared/nextVersion'
 import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pauseQueue, purgeQueueHistory, purgeTargetsOf, queueCardChange, queueHistory, queueViews, resolveForward, resumeQueue, settleQueueChanges } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
+import { revisionDiff } from './workflow/revisionDiff'
+import { addLineComment, changeLineComment, feedbackPreview, sendFeedback } from './workflow/lineComments'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
 import { withSkillDelivered } from '../shared/skillDelivery'
 import { pauseApp, resumeApp } from './teamPause'
 import { endParkedProcess, installIfParked, teamPauseState } from './teamParked'
+import { cliSnapshotForWindow, openClisFolder, reloadClis } from './clis'
 
 /**
  * What the window is told when a call is refused (#845): thrown as CombworkErrors, so the window reads them in its language
@@ -302,7 +305,7 @@ function assertExtraArgs(args: unknown): void {
 function guardFile(path: string, write = false): string {
   if (insideArchive(path)) throw combworkError(M.insideArchive, undefined, { kind: 'forbidden' })
   // A CLI's own files: its connections' homes on in this workspace (HI-1755), else the CLI's own home.
-  if (workspace.isAllowedPath(path) || allProviders().some((p) => p.fileAllowed(path, write, connectionHomes(p.id, workspace.path ? workspace.config : null)?.map((h) => h.home)))) return path
+  if (workspace.isAllowedPath(path) || allProviders().some((p) => p.projectFiles?.fileAllowed(path, write, connectionHomes(p.id, workspace.path ? workspace.config : null)?.map((h) => h.home)))) return path
   // The skills that ship with Combwork, to view one the workspace doesn't have.
   if (!write && insideReal(path, [skills.bundledSkillsDir()])) return path
   throw combworkError(M.outsideWorkspace, undefined, { kind: 'forbidden' })
@@ -996,6 +999,11 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       if (typeof project === 'string' && project) reconcileCard(ws, n, project)
       return cardWork(ws, n)
     },
+    'tasks:revisionDiff': (n, submission, file) => revisionDiff(currentWorkspace(), Number(n), Number(submission), String(file ?? '')),
+    'tasks:lineCommentAdd': (n, comment) => addLineComment(currentWorkspace(), Number(n), comment),
+    'tasks:lineCommentChange': (n, id, change) => changeLineComment(currentWorkspace(), Number(n), String(id ?? ''), change),
+    'tasks:feedbackPreview': (n) => feedbackPreview(currentWorkspace(), Number(n)),
+    'tasks:feedbackSend': (n, send) => sendFeedback(currentWorkspace(), Number(n), send),
     'tasks:workBadges': async () => {
       const ws = currentWorkspace()
       if (!ws.path) return []
@@ -1784,7 +1792,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
     'memory:list': async (p) => {
       const project = workspace.assertProject(p)
-      return (await Promise.all(allProviders().map((a) => a.memorySources(project, connectionHomes(a.id, workspace.config))))).flat()
+      return (await Promise.all(allProviders().map((a) => a.projectFiles?.memorySources(project, connectionHomes(a.id, workspace.config)) ?? []))).flat()
     },
     'memory:instructionsShared': async (p, ids) => {
       const project = workspace.assertProject(p)
@@ -1941,7 +1949,10 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'session:restartForTools': (p, agentId, when) => sessions.restartForTools(p, agentId, { when: when === 'atSafePoint' ? 'atSafePoint' : 'ifIdle' }),
 
     'api:info': () => apiInfo(),
-    'api:claudeSnippet': () => claudeSnippetFacts(),
+    'api:adminSnippet': (id: ProviderId) => adminSnippetFacts(id),
+    'clis:snapshot': () => cliSnapshotForWindow(),
+    'clis:reload': () => reloadClis(),
+    'clis:openFolder': () => openClisFolder(),
     'api:regenerateToken': async () => {
       await regenerateToken()
       return apiInfo()

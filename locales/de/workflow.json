@@ -561,6 +561,7 @@
   "workflow.summary.none.pair": "Ein Reviewer-Agent prüft jede Karte, nachdem die schnellen Checks bestanden haben.",
   "workflow.summary.none.solo": "Kein Review: Eine Karte ist erledigt, wenn ihr Bearbeiter sie einreicht.",
   "workflow.summary.none.team": "Jede Karte prüft erst ein Reviewer-Agent, dann du, nachdem die schnellen Checks und die Tests bestanden haben.",
+  "workflow.unreadable.blockerWork": "ob die Arbeit von {card} im Zielbranch ist ({what})",
   "workflow.unreadable.branch": "den in {folder} ausgecheckten Branch",
   "workflow.unreadable.branchedOff": "den Abzweigpunkt von {a} und {b}",
   "workflow.unreadable.branchedOffTarget": "den Abzweigpunkt der Arbeit von ihrem Zielbranch",

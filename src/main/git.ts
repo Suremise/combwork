@@ -8,7 +8,7 @@ import type { GitDiff, GitStatus } from '../shared/types'
 import { gitlinkOf, parseRawRows, parseSubprojectPatch, subprojectLine, type GitlinkChange, type GitlinkSide } from '../shared/gitlink'
 import { gitProblemData } from '../shared/gitTool'
 import { withValues } from '../shared/advanced'
-import { msg, tr } from '../shared/i18n'
+import { msg } from '../shared/i18n'
 import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { runGit, type GitOutcome, type GitReply, type GitRequest, type RefsRequest } from './gitWorker'
@@ -18,7 +18,8 @@ import type { RunResult } from './platform/repoContext'
 
 const log = createLogger('git')
 
-export const MAX_DIFF_BYTES = 2 * 1024 * 1024
+import { MAX_DIFF_BYTES, isBinary, tooLargeDiff } from './diffSides'
+export { MAX_DIFF_BYTES, isBinary, tooLargeDiff } from './diffSides'
 
 /** What a git command answered: the repository context port's RunResult (SPEC §16.3.6), as git() gives it. */
 export type GitResult = RunResult
@@ -349,12 +350,8 @@ const M = {
   failed: msg({ id: 'service.git.failed', defaultMessage: '{command} failed: {why}', description: "An error in the Changes tab: a git command ({command}, as it is: \"git status\") failed; {why} is git's own first line, or why git can't run." }),
   exitCode: msg({ id: 'service.git.exitCode', defaultMessage: 'exit code {code}', description: 'Why a git command failed when git said nothing: the number it exited with.' }),
   outside: msg({ id: 'service.git.outside', defaultMessage: 'Path is outside the project', description: "An error showing a file's changes: its path leads out of the project." }),
-  gitlinkUnread: msg({ id: 'service.git.gitlinkUnread', defaultMessage: "Couldn't read which commit submodule {path} is at.", description: "An error in the Changes tab (HI-2864): git's output about a submodule's commit ({path}, its folder) couldn't be read, so its change isn't shown. Glossary: submodule." }),
-  tooLarge: msg({ id: 'service.git.tooLarge', defaultMessage: 'File is too large to diff ({kb, number} KB).', description: "Shown in place of a file's changes in the Changes tab: the file is too large ({kb} KB) to compare." })
+  gitlinkUnread: msg({ id: 'service.git.gitlinkUnread', defaultMessage: "Couldn't read which commit submodule {path} is at.", description: "An error in the Changes tab (HI-2864): git's output about a submodule's commit ({path}, its folder) couldn't be read, so its change isn't shown. Glossary: submodule." })
 }
-
-/** Shown in place of a file's diff when it is over MAX_DIFF_BYTES. */
-export const tooLargeDiff = (path: string, bytes: number): GitDiff => ({ path, original: '', modified: tr(M.tooLarge, { kb: Math.round(bytes / 1024) }), binary: true })
 
 /** Why a git command failed, for an error the window shows: git missing, else git's own first line. `command` is the git command, as it is. */
 export function failure(command: string, r: GitResult): Error {
@@ -445,12 +442,6 @@ async function workingStatus(projectPath: string): Promise<{ status: GitStatus; 
     status.files.push({ path: file, status: code, staged: x !== ' ' && x !== '?' })
   }
   return { status, inWorktree }
-}
-
-export function isBinary(buf: Buffer): boolean {
-  const n = Math.min(buf.length, 8000)
-  for (let i = 0; i < n; i++) if (buf[i] === 0) return true
-  return false
 }
 
 /**

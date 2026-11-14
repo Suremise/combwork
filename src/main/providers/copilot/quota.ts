@@ -1,5 +1,5 @@
 import type { PlanLimit, PlanUsage } from '../../../shared/types'
-import { COPILOT } from '../../../shared/copilot'
+import { COPILOT } from '../../../shared/providers/copilot'
 import { isoTime } from '../../../shared/planLimits'
 import { advancedValues as advanced } from '../../advancedValues'
 

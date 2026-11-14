@@ -346,8 +346,14 @@ interface CombworkMessageValues {
   'settings.advanced.codex.queue.hint.title': undefined
   'settings.advanced.codex.rateLimitNudge.hide.desc': undefined
   'settings.advanced.codex.rateLimitNudge.hide.title': undefined
+  'settings.advanced.codex.rateLimits.defaultLimitId.desc': undefined
+  'settings.advanced.codex.rateLimits.defaultLimitId.title': undefined
   'settings.advanced.codex.rateLimits.field.desc': undefined
   'settings.advanced.codex.rateLimits.field.title': undefined
+  'settings.advanced.codex.rateLimits.limitId.desc': undefined
+  'settings.advanced.codex.rateLimits.limitId.title': undefined
+  'settings.advanced.codex.rateLimits.limitName.desc': undefined
+  'settings.advanced.codex.rateLimits.limitName.title': undefined
   'settings.advanced.codex.rateLimits.usedPercent.desc': undefined
   'settings.advanced.codex.rateLimits.usedPercent.title': undefined
   'settings.advanced.codex.rateLimits.windowMinutes.desc': undefined
@@ -549,6 +555,10 @@ interface CombworkMessageValues {
   'settings.advanced.cw.outage.resumesPerHour.title': undefined
   'settings.advanced.cw.outage.waitMinutes.desc': undefined
   'settings.advanced.cw.outage.waitMinutes.title': undefined
+  'settings.advanced.cw.processes.knownHosts.desc': undefined
+  'settings.advanced.cw.processes.knownHosts.title': undefined
+  'settings.advanced.cw.processes.orphanMinutes.desc': undefined
+  'settings.advanced.cw.processes.orphanMinutes.title': undefined
   'settings.advanced.cw.processes.orphanNotice.desc': undefined
   'settings.advanced.cw.processes.orphanNotice.title': undefined
   'settings.advanced.cw.progress.lanesShown.desc': undefined
@@ -1058,6 +1068,7 @@ interface CombworkMessageValues {
   'settings.connections.server.keyTitle': { name: string | number }
   'settings.connections.server.label': undefined
   'settings.connections.server.limitsHint': undefined
+  'settings.connections.server.limitsHintGeneric': undefined
   'settings.connections.server.local': { name: string | number }
   'settings.connections.server.modelId': undefined
   'settings.connections.server.models': undefined
@@ -1066,6 +1077,7 @@ interface CombworkMessageValues {
   'settings.connections.server.needUrl': undefined
   'settings.connections.server.needsKey': undefined
   'settings.connections.server.notBelow': undefined
+  'settings.connections.server.notPassed': undefined
   'settings.connections.server.output': undefined
   'settings.connections.server.outputDefault': { n: number }
   'settings.connections.server.pickerHint': undefined

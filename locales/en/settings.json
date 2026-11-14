@@ -1379,12 +1379,36 @@
     "defaultMessage": "Don't offer a cheaper model near the limit",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork (HI-2609): Codex's offer to switch to a cheaper model when the account nears its usage limit."
   },
+  "settings.advanced.codex.rateLimits.defaultLimitId.desc": {
+    "defaultMessage": "The id of Codex's own plan limits (its 5-hour and weekly ones). A reading with another id is a limit of its own, shown by its name. Wrong, Codex's own limits are shown as a separate limit, and their earlier readings and warnings start again.",
+    "description": "What the advanced setting \"Session file: Codex's own limit id\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.codex.rateLimits.defaultLimitId.title": {
+    "defaultMessage": "Session file: Codex's own limit id",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
   "settings.advanced.codex.rateLimits.field.desc": {
     "defaultMessage": "The field of Codex's token counts with a subscription's limits. Wrong, Combwork shows no plan limits for Codex.",
     "description": "What the advanced setting \"Session file: plan limits field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
   },
   "settings.advanced.codex.rateLimits.field.title": {
     "defaultMessage": "Session file: plan limits field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.codex.rateLimits.limitId.desc": {
+    "defaultMessage": "The plan limits' field naming which of Codex's limits they are. Wrong, Combwork takes every reading for Codex's own limit, and a second limit's figures are mixed into it.",
+    "description": "What the advanced setting \"Session file: limit's id field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.codex.rateLimits.limitId.title": {
+    "defaultMessage": "Session file: limit's id field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.codex.rateLimits.limitName.desc": {
+    "defaultMessage": "The plan limits' field with the name Codex gives a limit other than its own. Wrong, Combwork names such a limit by its id.",
+    "description": "What the advanced setting \"Session file: limit's name field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.codex.rateLimits.limitName.title": {
+    "defaultMessage": "Session file: limit's name field",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.rateLimits.usedPercent.desc": {
@@ -2191,8 +2215,24 @@
     "defaultMessage": "Resuming after a connection drops: wait at most",
     "description": "An advanced setting's title (Settings → Advanced), followed by its value in minutes (\"120 min\")."
   },
+  "settings.advanced.cw.processes.knownHosts.desc": {
+    "defaultMessage": "Programs expected to keep running after the shell that started them is gone, such as Windows Sandbox's guest: a regular expression matched against the program's file name. Combwork never tells these as left running; Activity still lists them, with End It. Add a program here to stop its notices.",
+    "description": "What the advanced setting \"Processes left running: known hosts\" does (Settings → Advanced). Activity is a tab of Combwork's; End It its button. Keep \"Windows Sandbox\" as it is (a product)."
+  },
+  "settings.advanced.cw.processes.knownHosts.title": {
+    "defaultMessage": "Processes left running: known hosts",
+    "description": "An advanced setting's title (Settings → Advanced): the programs expected to keep running after the shell that started them is gone (the Windows Sandbox guest's), which Combwork never tells as left running."
+  },
+  "settings.advanced.cw.processes.orphanMinutes.desc": {
+    "defaultMessage": "How long a process an agent's command started may run with the shell that started it gone before Combwork tells you and the agent. A longer wait means fewer notices for processes you expect to keep running a while.",
+    "description": "What the advanced setting \"Processes left running: minutes before telling\" does (Settings → Advanced, under Combwork)."
+  },
+  "settings.advanced.cw.processes.orphanMinutes.title": {
+    "defaultMessage": "Processes left running: minutes before telling",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in minutes (\"10 min\"): how long a process an agent's command left running, its shell gone, runs before Combwork tells it."
+  },
   "settings.advanced.cw.processes.orphanNotice.desc": {
-    "defaultMessage": "When a process an agent's command started is still running ten minutes on with the shell that started it gone, Combwork says so once in a notice, and tells the agent once at its next tool call or turn's end, so it can end it. Turned off, neither is told; Activity still lists the process as left running, with End It.",
+    "defaultMessage": "When a process an agent's command started is still running with the shell that started it gone (for as long as “Processes left running: minutes before telling” says), Combwork says so once in a notice, and tells the agent once at its next tool call or turn's end, so it can end it. A process of a cw-progress run that is still running, or of a known host, isn't told. Turned off, nothing is told; Activity still lists the process as left running, with End It.",
     "description": "What the advanced setting \"Processes left running: tell me and the agent\" does (Settings → Advanced, under Combwork). Activity is a tab of Combwork's; End It is its button."
   },
   "settings.advanced.cw.processes.orphanNotice.title": {
@@ -4227,6 +4267,10 @@
     "defaultMessage": "Context size and Output budget are used when an agent starts on that model (not for IDs Claude Code reads as its own, nor where the session’s settings map the ID to a Claude model). A change applies when its agents next start.",
     "description": "Under a server connection's model list (HI-2682): when the models' Context size and Output budget fields are used. Context size and Output budget are the fields' names."
   },
+  "settings.connections.server.limitsHintGeneric": {
+    "defaultMessage": "Context size and Output budget go to the CLI when an agent starts on that model, where its description passes them ('{context}' and '{output}').",
+    "description": "Under a server connection's model list (HI-3197), for a CLI that runs from a description: when a model's context size and output budget are used. Keep '{context}' and '{output}' as they are (quoted in ICU): they are the description's placeholders, not values."
+  },
   "settings.connections.server.local": {
     "defaultMessage": "{name} (on this PC)",
     "description": "A preset of a server connection that runs on the user's own computer ({name}: \"Ollama\")."
@@ -4258,6 +4302,10 @@
   "settings.connections.server.notBelow": {
     "defaultMessage": "The output budget must be smaller than the context size.",
     "description": "Under a server connection's model's fields (HI-2682): its output budget isn't smaller than its context size, so it can't be saved."
+  },
+  "settings.connections.server.notPassed": {
+    "defaultMessage": "Not set: not passed (the CLI’s own)",
+    "description": "The placeholder of an empty Context size or Output budget field of a server connection's model (HI-3197), for a CLI that runs from a description: a value left empty isn't given to the CLI, which then uses its own. Keep it short."
   },
   "settings.connections.server.output": {
     "defaultMessage": "Output budget",

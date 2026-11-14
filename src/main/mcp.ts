@@ -657,7 +657,7 @@ export async function writeServerNow(name: string, def: McpServerDef, files: Map
 async function projectDefs(projectPath: string): Promise<Record<string, McpServerDef>> {
   const defs: Record<string, McpServerDef> = {}
   for (const p of allProviders()) {
-    for (const [n, d] of Object.entries(await p.projectMcpServers(projectPath).catch(() => ({})))) defs[n] ??= d
+    for (const [n, d] of Object.entries((await p.projectFiles?.projectMcpServers(projectPath).catch((): Record<string, McpServerDef> => ({}))) ?? {})) defs[n] ??= d
   }
   return defs
 }

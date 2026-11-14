@@ -214,7 +214,9 @@ async function machineSkills(cfg: WorkspaceConfig | null): Promise<SkillInfo[]> 
   }
   const all: SkillInfo[] = []
   for (const [p, home] of homes) {
-    const roots = p.skillRoots(home)
+    const roots = p.projectFiles?.skillRoots(home)
+    // A CLI that reads no project files (no projectFiles part) has no skills of its own.
+    if (!roots) continue
     const skills: SkillInfo[] = []
     for (const dir of roots.machine) skills.push(...(await findSkills(dir, 'machine', 4)))
     const pluginSkills = roots.plugins ? await findSkills(roots.plugins, 'plugin', 7) : []
@@ -331,7 +333,7 @@ export async function listedSkillFiles(dir: string, projectPath?: string): Promi
 
 /** The folder a provider's project skills are created in (e.g. <project>/.claude/skills): the first it loads them from. */
 function localDir(projectPath: string, id: ProviderId): string {
-  const rel = provider(id).skillRoots().local[0]
+  const rel = provider(id).projectFiles?.skillRoots().local[0]
   if (!rel) throw combworkError(msg({ id: 'content.skill.noLocalFolder', defaultMessage: '{cli} has no project skills folder.', description: "An error adding a project's own skill for a coding agent CLI ({cli}: \"Codex\") that reads no skills from a project's folder." }), { cli: provider(id).descriptor.name }, { kind: 'invalid' })
   return join(projectPath, rel)
 }
@@ -344,7 +346,7 @@ export async function localSkills(projectPath: string): Promise<SkillInfo[]> {
   const out: SkillInfo[] = []
   const seen = new Set<string>()
   for (const p of allProviders()) {
-    for (const rel of p.skillRoots().local) {
+    for (const rel of p.projectFiles?.skillRoots().local ?? []) {
       const dir = join(projectPath, rel)
       if (seen.has(dir.toLowerCase())) continue
       seen.add(dir.toLowerCase())
@@ -502,7 +504,7 @@ async function deletableSkill(dir: string): Promise<boolean> {
   if (parent === resolve(workspace.skillsDir).toLowerCase()) return true
   for (const project of await workspace.listProjectPaths()) {
     for (const p of allProviders()) {
-      if (p.skillRoots().local.some((rel) => parent === resolve(project, rel).toLowerCase())) return true
+      if (p.projectFiles?.skillRoots().local.some((rel) => parent === resolve(project, rel).toLowerCase())) return true
     }
   }
   return false

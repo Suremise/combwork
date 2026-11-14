@@ -559,6 +559,14 @@
     "defaultMessage": "Put what you decide on the card",
     "description": "A tip's title."
   },
+  "tips.cardLineComments.text": {
+    "defaultMessage": "In a revision’s Changes, hover a line and press + to comment on it, or select lines first. Comments stay on the card, where you can edit, resolve or reopen them.",
+    "description": "A tip (HI-3219). Names of Combwork's views and commands (Changes): keep them as Combwork shows them. Glossary: revision."
+  },
+  "tips.cardLineComments.title": {
+    "defaultMessage": "Comment on the lines of a card’s work",
+    "description": "A tip's title (HI-3219). Glossary: work."
+  },
   "tips.cardLinks.text": {
     "defaultMessage": "Card numbers an agent or the Assistant prints, like #12, are links: hover one for its title and column, and Ctrl+click it to open the card.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
@@ -590,6 +598,22 @@
   "tips.cardReadFirst.title": {
     "defaultMessage": "Point a card at the docs it needs",
     "description": "A tip's title."
+  },
+  "tips.cardRevisionChanges.text": {
+    "defaultMessage": "In a card’s Work section, Changes on a revision shows each of its files from where the work started to that revision, as it was submitted, even after the folder has moved on.",
+    "description": "A tip (HI-3218). Names of Combwork's menus, views, settings and commands (Work, Changes): keep them as Combwork shows them. Glossary: work, revision."
+  },
+  "tips.cardRevisionChanges.title": {
+    "defaultMessage": "See exactly what a revision changed",
+    "description": "A tip's title (HI-3218). Glossary: revision."
+  },
+  "tips.cardSendComments.text": {
+    "defaultMessage": "Once you’ve commented on a card’s lines, Send in its Work section gives every open comment to its builder as one fix round, from Review or Approved. A comment left open goes again with the next send.",
+    "description": "A tip (HI-3220). Names of Combwork's views and commands (Work, Send, Review, Approved): keep them as Combwork shows them. Glossary: builder, round."
+  },
+  "tips.cardSendComments.title": {
+    "defaultMessage": "Send your comments to the builder in one go",
+    "description": "A tip's title (HI-3220). Glossary: builder."
   },
   "tips.cardSummaries.text": {
     "defaultMessage": "Agents start a card's report or review verdict with one line saying what is ready or what was found, the details below; they and the Assistant read just those lines when that's enough.",
@@ -1260,7 +1284,7 @@
     "description": "A tip's title (HI-2670): a connection whose sessions start with none of Combwork's additions."
   },
   "tips.leftRunning.text": {
-    "defaultMessage": "A process an agent's command started that keeps running after its shell has gone shows in Activity as Left running, with its CPU time and End It. Past ten minutes, a notice says so once, and the agent is told too.",
+    "defaultMessage": "A process an agent's command started that keeps running after its shell is gone shows in Activity as Left running, with End It. Past the minutes set in Settings → Advanced, you and the agent are told once, unless it belongs to a live cw-progress run.",
     "description": "A tip (HI-2111). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Left running is a row's label; End It a button)."
   },
   "tips.leftRunning.title": {
@@ -2454,5 +2478,21 @@
   "tips.workspaceNotes.title": {
     "defaultMessage": "Notes about this machine for every agent",
     "description": "A tip's title."
+  },
+  "tips.yourOwnCliServer.text": {
+    "defaultMessage": "A CLI that runs from a description can run on Ollama, LM Studio, llama.cpp or vLLM on this PC: its description says how to give it the server, and you add the server in Settings → Accounts & Connections, then give an agent a connection on it.",
+    "description": "A tip (HI-3197). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them; Ollama, LM Studio, llama.cpp and vLLM are products' names."
+  },
+  "tips.yourOwnCliServer.title": {
+    "defaultMessage": "Your own CLI on a model server of yours",
+    "description": "A tip's title (HI-3197)."
+  },
+  "tips.yourOwnClis.text": {
+    "defaultMessage": "A JSON file describing a CLI, in the clis folder of your Combwork profile, lets your agents run it: how to start it, how its first prompt goes in, and how to read its screen. Settings → Providers → Your own CLIs opens the folder and reloads it.",
+    "description": "A tip (HI-3196). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. clis is a folder's name: keep it."
+  },
+  "tips.yourOwnClis.title": {
+    "defaultMessage": "Run a CLI Combwork has no provider for",
+    "description": "A tip's title (HI-3196)."
   }
 }

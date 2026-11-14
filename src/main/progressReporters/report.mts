@@ -163,6 +163,9 @@ export class ProgressRun {
       // Its process (#549): once it is gone without a finish, Combwork says the run ended without a report.
       pid: process.pid
     }
+    // HI-3206: when it sent this, taken by itself just before sending: it held its pid from its start to now, so Combwork
+    // takes a process by that pid created strictly before this as it (a pid reused since was created later).
+    if (target) (body as Record<string, unknown>).sentAt = Date.now()
     this.id = target
       ? this.send('POST', '/v1/progress', body, this.startTimeoutMs).then((r) => (r && typeof (r as { id?: unknown }).id === 'string' ? (r as { id: string }).id : null))
       : Promise.resolve(null)

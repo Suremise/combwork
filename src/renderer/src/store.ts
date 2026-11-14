@@ -216,6 +216,8 @@ interface State {
   advanced: AdvancedState | null
   /** Moves on each time main says Combwork's accounts changed (HI-980): Settings → Accounts reads them again. */
   connectionsChanged: number
+  /** The user's own CLIs as main read them last (HI-3196): its generation moves views that list providers on. */
+  clis: import('@shared/providers/cliSnapshot').CliSnapshotView | null
   workspace: WorkspaceInfo | null
   /** The recent workspaces as this window sees them (#144). */
   recent: RecentWorkspace[]
@@ -571,6 +573,7 @@ export const useStore = create<State>(() => ({
   settings: null,
   advanced: null,
   connectionsChanged: 0,
+  clis: null,
   workspace: null,
   recent: [],
   openProgress: null,

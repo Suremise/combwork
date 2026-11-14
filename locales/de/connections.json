@@ -16,7 +16,7 @@
   "connections.mark.anotherMark": "Läuft mit einer anderen als der gewählten Verbindung",
   "connections.mark.none": "Keine Verbindung",
   "connections.mark.noneUsable": "In diesem Arbeitsbereich ist kein Konto für {cli} eingeschaltet: Der Agent kann erst starten, wenn eines eingeschaltet ist (Einstellungen → Konten & Verbindungen).",
-  "connections.mark.offHere": "{wanted} gehört zu einem Konto, das in diesem Arbeitsbereich ausgeschaltet ist: Der Agent läuft mit {name}, der ersten nutzbaren Verbindung seiner CLI",
+  "connections.mark.offHere": "{wanted} gehört zu einem Konto, das in diesem Arbeitsbereich ausgeschaltet ist: Der Agent läuft mit {name}, der passenden Verbindung auf dem ersten hier eingeschalteten Konto",
   "connections.mark.offNoDefault": "{wanted} ist hier ausgeschaltet",
   "connections.mark.offNoDefaultUsable": "{wanted} ist in diesem Arbeitsbereich ausgeschaltet, und kein anderes Konto für {cli} ist eingeschaltet: Der Agent kann erst starten, wenn eines eingeschaltet ist (Einstellungen → Konten & Verbindungen).",
   "connections.mark.other": "Läuft bis zum Neustart mit {running}. Jetzt gewählt: {chosen}",

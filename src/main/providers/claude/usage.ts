@@ -1,7 +1,7 @@
 import type { CompactionEvent, DayUsage, SessionUsage, SubSession, UsageTokens } from '../../../shared/types'
 import { addTokens, emptyDay, localDay } from '../../../shared/usageDays'
 import { TimelineBuilder } from '../../../shared/usageTimeline'
-import { CLAUDE_CODE } from '../../../shared/claude'
+import { CLAUDE_CODE } from '../../../shared/providers/claude'
 import { isSessionId } from '../../../shared/defaults'
 import { countSafeguards } from '../../../shared/safeguards'
 import { claudeSafeguards } from './safeguards'

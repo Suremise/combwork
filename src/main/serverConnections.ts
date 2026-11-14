@@ -1,6 +1,6 @@
 import type { Account, ProviderId, ServerConnection, ServerModel } from '../shared/types'
 import type { ServerCaps, ServerListing } from '../shared/providers'
-import { providerDescriptor } from '../shared/providers'
+import { providerDescriptor, signInConnections } from '../shared/providers'
 import { msg, type Msg } from '../shared/i18n'
 import { cleanModels, keepListedRemote, keyProblem, listedIds, listedRemote, listingUrl, mergeListed, parseBaseUrl, type BaseUrlProblem, type ServerModelsRead } from '../shared/serverConnection'
 import { CONTEXT_MAX, tokensOf } from '../shared/serverDiagnostics'
@@ -12,7 +12,7 @@ import { combworkError } from './combworkError'
 import { keyInfo, removeKey, saveKey, withKey } from './keyStore'
 import { createLogger, userText } from './logger'
 import { plainHttpGet, type PlainReply } from './plainHttpsJson'
-import { providerService } from './providerService'
+import { providerService, noTask } from './providerService'
 
 /**
  * Server connections (HI-1772, SPEC §11.2): a connection that gets its model from a server of the user's (DeepSeek's,
@@ -364,7 +364,9 @@ export async function setUpServerConnection(id: string, folder?: string): Promis
     const b = checkedUrl(server.baseUrl)
     const got = await withKey(id, b.origin)
     if (!got && !b.local) throw combworkError(msg({ id: 'main.server.setUp.noKey', defaultMessage: '{name} has no key yet. Add its key first, then set it up.', description: "An error opening Set Up for a server connection ({name}, its name in Settings → Accounts & Connections): its server needs an API key and none is saved." }), { name: a.name }, { kind: 'conflict' })
-    const homeEnv = providerDescriptor(a.provider).capabilities.connections!.homeEnv
+    // Set Up is a sign-in CLI's server connection's (Claude Code's first-run screens): a server-only CLI has no login task.
+    const homeEnv = signInConnections(providerDescriptor(a.provider))?.homeEnv
+    if (!homeEnv) return noTask(providerDescriptor(a.provider).name, 'login')
     // Once it ends, its set-up state is read again (HI-1870).
     return providerService.runAccountLogin(a.provider, id, { [homeEnv]: accountFolder(id) }, () => (void readSetUp(id), rereadTrust(id)), { env: serverEnv(caps, server, got?.key ?? null), cwd: folder ?? accountFolder(id) })
   })

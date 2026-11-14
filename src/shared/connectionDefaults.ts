@@ -29,7 +29,7 @@ export function cliDefaults(settings: Pick<AppSettings, 'providers'>, provider: 
   return {
     ...(g.defaultModel ? { model: g.defaultModel } : {}),
     ...(g.defaultEffort ? { effort: g.defaultEffort } : {}),
-    ...(providerDescriptor(provider).capabilities.contextLimit && g.use200kContext ? { use200kContext: true } : {})
+    ...(providerDescriptor(provider).capabilities.compaction?.contextLimit && g.use200kContext ? { use200kContext: true } : {})
   }
 }
 
@@ -59,7 +59,7 @@ export function projectOverrides(cfg: Pick<ProjectConfig, 'providers'>, provider
   return {
     ...(pc.model && pc.model !== 'inherit' ? { model: pc.model } : {}),
     ...(pc.effort && pc.effort !== 'inherit' ? { effort: pc.effort } : {}),
-    ...(providerDescriptor(provider).capabilities.contextLimit && (pc.use200kContext === 'on' || pc.use200kContext === 'off') ? { use200kContext: pc.use200kContext === 'on' } : {})
+    ...(providerDescriptor(provider).capabilities.compaction?.contextLimit && (pc.use200kContext === 'on' || pc.use200kContext === 'off') ? { use200kContext: pc.use200kContext === 'on' } : {})
   }
 }
 
@@ -142,7 +142,7 @@ export function legacyLaunchSettings(agent: Pick<AgentDef, 'provider' | 'model' 
   let permissionMode = agent?.permissionMode ?? projectMode
   if (!modeAllowed(provider, permissionMode, settings)) permissionMode = modeAllowed(provider, projectMode, settings) ? projectMode : fallbackMode
   const extraArgs = [g.extraArgs, pc.extraArgs].filter((a) => a && a.trim())
-  const contextLimit = providerDescriptor(provider).capabilities.contextLimit
+  const contextLimit = providerDescriptor(provider).capabilities.compaction?.contextLimit ?? false
   if (layer.kind === 'connection') {
     const d = layer.conn?.defaults
     if (layer.conn?.kind === 'server') return { provider, model: agent?.model || d?.model || null, effort: null, permissionMode, extraArgs, use200kContext: false }
@@ -210,17 +210,20 @@ export function legacyEffective(agent: AgentDef, pc: ProjectConfig, assistant: b
 // The migration: accounts, connections made by the rule, deduplicated.
 // ---------------------------------------------------------------------------
 
-/** Copilot's one PC-wide sign-in as an account (decision C): made by Combwork, never removed, on the CLI's own home. */
-export const COPILOT_ACCOUNT = 'copilot'
-
 /**
  * A CLI's one PC-wide sign-in as an account (decision C, HI-2544): for each CLI without connections (Copilot, the
- * Antigravity CLI), its own, named by the CLI's id: Copilot's is COPILOT_ACCOUNT. Never another CLI's.
+ * Antigravity CLI), its own, named by the CLI's id (Copilot's: COPILOT_ACCOUNT). Never another CLI's.
  */
 export const pcAccountId = (cli: ProviderId): string => cli
 
-/** Whether a CLI signs in once for the PC (no connections of its own): its account is pcAccountId's. */
-export const pcWideSignIn = (cli: ProviderId): boolean => !providerDescriptor(cli).capabilities.connections
+/**
+ * Whether a CLI signs in once for the PC (no sign-in connections of its own): its account is pcAccountId's. A server-only
+ * CLI (HI-3197) too: its own home is its PC-wide account, beside its server accounts.
+ */
+export const pcWideSignIn = (cli: ProviderId): boolean => {
+  const c = providerDescriptor(cli).capabilities.connections
+  return !c || c.signIn === false
+}
 
 /** A test copy's CLI test home as an account (the seam, connectionSeam.ts): its id. */
 export const seamAccountId = (cli: ProviderId): string => `cli-${cli}`

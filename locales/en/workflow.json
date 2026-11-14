@@ -2411,6 +2411,10 @@
     "defaultMessage": "A reviewer agent, then you, check each card, after the quick checks and the tests pass.",
     "description": "What the Team preset sets up, for a project without version control."
   },
+  "workflow.unreadable.blockerWork": {
+    "defaultMessage": "whether {card}'s work is in the target ({what})",
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\" (HI-3233): whether the work of a card this card waits for was merged into its target branch. {card} is that card's key (AM-12); {what} is what exactly couldn't be read, such as \"whether a1b2c3d is in e4f5a6b\"."
+  },
   "workflow.unreadable.branch": {
     "defaultMessage": "the branch checked out in {folder}",
     "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\". {folder} is a folder path."

@@ -218,6 +218,7 @@ export const EDGES = [
   { file: 'src/main/platform/repoReads', module: 'src/shared/gitRepo', class: 'gitUi', why: "RepoReads' view types keep their Git names (§16.3.6 port 5)" },
   { file: 'src/main/platform/repoReadsPorts', module: 'src/main/platform/gitRepoReads', class: 'registry', names: ['gitRepoReads'], why: "the repository reads port's map (R2)" },
   { file: 'src/main/platform/releaseReadsPorts', module: 'src/main/platform/gitReleaseReads', class: 'registry', names: ['gitReleaseReads'], why: "the release reads port's map (HI-3148)" },
+  { file: 'src/main/platform/revisionReadsPorts', module: 'src/main/platform/gitRevisionReads', class: 'registry', names: ['gitRevisionReads'], why: "the revision reads port's map (HI-3218)" },
   { file: 'src/main/platform/workspacePorts', module: 'src/main/platform/gitWorkspacePort', class: 'registry', names: ['gitWorkspacePort'], why: "the workspace port's map (R4)" },
   { file: 'src/main/projectAgents', module: 'src/main/branchWatch', class: 'gitUi', why: "an agent's branch card checked again" },
   { file: 'src/main/projectAgents', module: 'src/main/gitTool', class: 'gitUi', why: "Add Agent's 0.9 worktree choice says why git can't run" },
@@ -560,6 +561,53 @@ export const JJ_EDGES = [
   { file: 'src/main/workflow/service', module: 'src/main/platform/jjPlatform', class: 'registry', names: ['JjCardDeps'], why: "the type of jj's card work's dependencies, which the app gives each project's workflow (setJjCards, HI-2868)" },
   { file: 'src/main/workflow/storeSwitch', module: 'src/main/platform/jjStoreSide', class: 'impl', names: ['fallbackOf', 'retryMoved'], why: "re-exported for storeSwitch's callers and tests (HI-3140 moved jj's side of the store switch)" }
 ]
+
+/** The descriptor fields that declare a platform's integration modes (HI-2840): its finishes and its default one. */
+export const MODE_FIELDS = ['finishes', 'defaultFinish']
+
+/** The module whose `Finisher` union names every integration mode. */
+const FINISHERS = 'src/shared/workflow/options'
+
+/** The modes, read from `Finisher`'s union by TypeScript's parser (a new one is looked for without editing this file). */
+function finisherValues(root, over) {
+  // Found by its folder's listing, as platformIds finds the descriptors (a source path in this text reads as a script).
+  const file = `${dirname(FINISHERS)}/${readdirSync(join(root, dirname(FINISHERS))).find((e) => e.startsWith(`${basename(FINISHERS)}.`))}`
+  const sf = ts.createSourceFile(file, over[file] ?? readFileSync(join(root, file), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  const decl = sf.statements.find((st) => ts.isTypeAliasDeclaration(st) && st.name.text === 'Finisher')
+  const members = !decl ? [] : ts.isUnionTypeNode(decl.type) ? decl.type.types : [decl.type]
+  const out = members.map((t) => (ts.isLiteralTypeNode(t) && ts.isStringLiteral(t.literal) ? t.literal.text : null))
+  if (!out.length || out.includes(null)) throw new Error(`${file}: its Finisher isn't a union of string literals the audit can read`)
+  return out
+}
+
+/**
+ * HI-2840 (Darren's decision of 14 Nov: the integration modes are a generic capability the platform declares): each place
+ * outside the descriptors that declares a platform's modes, as `<file>:<line> <field>`: a property of that name (an
+ * object's field, a class's) given a mode or a list holding one. That would be a second list the form, the
+ * contradictions or the workflow could follow instead of the descriptor's; reading `PLATFORMS[p].finishes` is how they
+ * ask. Other things named so (a count of finishes told, a batcher) hold no mode, so never count.
+ */
+export function modeDeclarations(root, over = {}) {
+  const modes = finisherValues(root, over)
+  const isMode = (n) => !!n && (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) && modes.includes(n.text)
+  const holdsMode = (n) => {
+    while (n && (ts.isParenthesizedExpression(n) || ts.isAsExpression(n) || ts.isSatisfiesExpression(n))) n = n.expression
+    return !!n && (isMode(n) || (ts.isArrayLiteralExpression(n) && n.elements.some(isMode)))
+  }
+  const out = []
+  for (const { file, text } of filesOf(root, over)) {
+    if (file.replace(/\.tsx?$/, '') === DESCRIPTORS || !MODE_FIELDS.some((f) => text.includes(f))) continue
+    const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+    const visit = (n) => {
+      const value = ts.isPropertyAssignment(n) || ts.isPropertyDeclaration(n) ? n.initializer : null
+      const name = value && (ts.isIdentifier(n.name) || ts.isStringLiteral(n.name)) ? n.name.text : null
+      if (name && MODE_FIELDS.includes(name) && holdsMode(value)) out.push(`${file}:${sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1} ${name}`)
+      ts.forEachChild(n, visit)
+    }
+    visit(sf)
+  }
+  return out
+}
 
 /** The audit against the source: what isn't listed, what is listed but gone, and names beyond an edge's list. */
 export function audit(root, over = {}) {

@@ -561,6 +561,7 @@
   "workflow.summary.none.pair": "Un agente revisor revisa cada tarjeta, después de que pasen las comprobaciones rápidas.",
   "workflow.summary.none.solo": "Sin revisión: una tarjeta pasa a Hecho cuando su autor la envía.",
   "workflow.summary.none.team": "Cada tarjeta la revisa un agente revisor y después tú, cuando pasan las comprobaciones rápidas y las pruebas.",
+  "workflow.unreadable.blockerWork": "si el trabajo de {card} está en la rama de destino ({what})",
   "workflow.unreadable.branch": "la rama extraída en {folder}",
   "workflow.unreadable.branchedOff": "dónde se separaron {a} y {b}",
   "workflow.unreadable.branchedOffTarget": "dónde se separó el trabajo de su rama de destino",

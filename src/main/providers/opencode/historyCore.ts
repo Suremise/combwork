@@ -7,7 +7,7 @@ import { buildMirror, mirrorState, newestMessage, ownMessages, parseExport, plac
 
 // The OpenCode history's worker core (HI-2762, design s7/s10/s13): every read of a session from its agent's private server,
 // every `opencode session export`, and every write of a session's mirror (mirror.ts) happens here, in a thread of its own
-// (opencodeHistoryWorker.ts; in unit tests, in-process). Main sends requests and gets small answers.
+// (threads/historyWorker.ts; in unit tests, in-process). Main sends requests and gets small answers.
 //
 // Ownership and publication are one serialized step per session: the core owns each session's epoch, bumped by `begin`
 // (a run starts on it), `end` (that run ended) and `removeRoot` (its account goes), applied in the order they come; a

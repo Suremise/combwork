@@ -393,7 +393,7 @@ export function WorkspaceOverviewView() {
               </h2>
               <div className="cards">
                 <Card title={tr(M.tokens)} value={formatTokens(totalTokens(t))} sub={tr(M.outputSub, { tokens: formatTokens(t.output) })} />
-                <Card title={tr(M.apiCost)} value={costText(t)} sub={t.unpriced ? tr(M.withoutPriceShort, { count: t.unpriced }) : tr(!t.estimated ? M.asReported : p.capabilities.reportsCost && !usesOwnPrices(p.id, settings) ? M.partlyEstimated : M.estimated)} tip={tr(M.costTip)} />
+                <Card title={tr(M.apiCost)} value={costText(t)} sub={t.unpriced ? tr(M.withoutPriceShort, { count: t.unpriced }) : tr(!t.estimated ? M.asReported : p.capabilities.usage?.reportsCost && !usesOwnPrices(p.id, settings) ? M.partlyEstimated : M.estimated)} tip={tr(M.costTip)} />
                 <Card title={tr(M.sessions)} value={formatNumber(t.sessions)} sub={tr(M.promptsSub, { count: t.prompts })} />
               </div>
               <PlanLimits provider={p.id} />

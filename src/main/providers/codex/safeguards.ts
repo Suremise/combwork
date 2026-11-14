@@ -1,4 +1,5 @@
-import { SAFEGUARD_DEFAULTS, SAFEGUARD_TOOLS, newStop, type SafeguardEvent } from '../../../shared/safeguards'
+import { SAFEGUARD_TOOLS, newStop, type SafeguardEvent } from '../../../shared/safeguards'
+import { CODEX_SAFEGUARDS } from '../../../shared/providers/codex/safeguards'
 
 /** What the reading keeps between reads (the launch's memo): the model the agent runs on, its last tool calls, the turn, the stops seen. */
 interface Memo {
@@ -23,16 +24,16 @@ export function errorKind(info: unknown): string | null {
 /**
  * Codex's safeguards in rollout lines (#606), as Codex 0.160 names them (in its protocol; not seen in a real rollout
  * yet): a request it flags is rerouted to another model (event_msg `model_reroute`, with from_model, to_model and a
- * reason, SAFEGUARD_DEFAULTS.codexReroute), and a turn its usage policy stops ends with an error whose
- * `codex_error_info` names the policy (SAFEGUARD_DEFAULTS.codexStop), in an `error` event, the turn's end, or both.
+ * reason, CODEX_SAFEGUARDS.reroute), and a turn its usage policy stops ends with an error whose
+ * `codex_error_info` names the policy (CODEX_SAFEGUARDS.stop), in an `error` event, the turn's end, or both.
  * A reroute is a stop on the model it left and a switch the safeguard made (flagged). Each stop counts once by its
  * turn (a policy's error and the turn's end report the same one; a reroute is one per turn and models), however close
  * two turns' stops are.
  */
 export function codexSafeguards(appended: string, memo: Record<string, unknown>): SafeguardEvent[] {
   const m = memo as Memo
-  const reroute: readonly string[] = SAFEGUARD_DEFAULTS.codexReroute
-  const stops: readonly string[] = SAFEGUARD_DEFAULTS.codexStop
+  const reroute: readonly string[] = CODEX_SAFEGUARDS.reroute
+  const stops: readonly string[] = CODEX_SAFEGUARDS.stop
   const out: SafeguardEvent[] = []
   const stop = (at: number, id: string, model = m.model): void => {
     if (!newStop(m, id)) return

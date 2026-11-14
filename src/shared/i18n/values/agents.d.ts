@@ -355,6 +355,8 @@ interface CombworkMessageValues {
   'agents.resume.hold.holds': { agent: string | number; slot: string | number }
   'agents.resume.hold.reused': { slot: string | number; kind: string; work: string | number }
   'agents.resume.hold.reviewer': { agent: string | number; slot: string | number }
+  'agents.resume.noPrompt': { cli: string | number }
+  'agents.resume.noResume': { cli: string | number }
   'agents.resume.noRoom': undefined
   'agents.resume.noTranscript': { cli: string | number }
   'agents.resume.notInstalled': { cli: string | number }

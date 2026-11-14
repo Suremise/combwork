@@ -36,7 +36,7 @@ function feed(a: Agent, ev: HookEvent, i: HookIds, continued = false): Agent {
 /** Hook bodies through a provider's own normaliser. */
 function send(adapter: ProviderAdapter, a: Agent, bodies: Record<string, unknown>[], continued: (body: Record<string, unknown>, i: number) => boolean = () => false): Agent {
   bodies.forEach((body, i) => {
-    const h = adapter.normalizeHook(body)
+    const h = adapter.hooks!.normalizeHook(body)
     feed(a, h.event, h.ids, h.event.kind === 'stop' && continued(body, i))
   })
   return a

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { codexMcpServer, hookHash, toToml } from '../src/main/providers/codex/adapter'
 import { scriptCall } from '../src/main/providers/codex/scriptCalls'
 import { CodexConversationParser, parseRollout, patchPaths, presetFromSettings, rolloutDetails, rolloutPlanUsage } from '../src/main/providers/codex/rollout'
-import { codexModelLabel } from '../src/shared/codex'
+import { gptModelLabel } from '../src/shared/providers/common'
 import { tempDir } from './tempDir'
 
 const line = (o: unknown): string => JSON.stringify(o)
@@ -487,10 +487,10 @@ describe('Codex compactions', () => {
 
 describe('Codex models', () => {
   it('names models', () => {
-    expect(codexModelLabel('gpt-6-luna')).toBe('GPT-6 Luna')
-    expect(codexModelLabel('gpt-5.6-terra')).toBe('GPT-5.6 Terra')
-    expect(codexModelLabel('gpt-5.5')).toBe('GPT-5.5')
-    expect(codexModelLabel('o4-mini')).toBe('o4-mini')
+    expect(gptModelLabel('gpt-6-luna')).toBe('GPT-6 Luna')
+    expect(gptModelLabel('gpt-5.6-terra')).toBe('GPT-5.6 Terra')
+    expect(gptModelLabel('gpt-5.5')).toBe('GPT-5.5')
+    expect(gptModelLabel('o4-mini')).toBe('o4-mini')
   })
 })
 

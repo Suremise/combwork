@@ -156,3 +156,14 @@ export function transcriptMarkdown(items: TranscriptItem[], title: string, subti
   }
   return out.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd() + '\n'
 }
+
+/** Tool input as readable text: the command itself for shells, otherwise one "key: value" per field. */
+export function formatToolInput(name: string, input: Record<string, unknown>): string {
+  if ((name === 'Bash' || name === 'PowerShell') && typeof input.command === 'string') return input.command
+  return Object.entries(input)
+    .map(([k, v]) => {
+      if (typeof v === 'string') return v.includes('\n') ? `${k}:\n${v}` : `${k}: ${v}`
+      return `${k}: ${JSON.stringify(v, null, 2)}`
+    })
+    .join('\n')
+}

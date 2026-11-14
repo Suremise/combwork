@@ -568,7 +568,7 @@ export function OverviewTab({ project }: { project: ProjectInfo }) {
               </h2>
               <div className="cards">
                 <Card title={tr(M.tokens)} value={formatTokens(tokens(t))} sub={tr(M.outputSub, { tokens: formatTokens(t.output) })} />
-                <Card title={tr(M.cost)} value={costText(t)} sub={t.unpriced ? tr(M.withoutPriceShort, { count: t.unpriced }) : tr(!t.estimated ? M.asReported : p.capabilities.reportsCost && !usesOwnPrices(p.id, settings) ? M.partlyEstimated : M.estimated)} tip={costTip} />
+                <Card title={tr(M.cost)} value={costText(t)} sub={t.unpriced ? tr(M.withoutPriceShort, { count: t.unpriced }) : tr(!t.estimated ? M.asReported : p.capabilities.usage?.reportsCost && !usesOwnPrices(p.id, settings) ? M.partlyEstimated : M.estimated)} tip={costTip} />
                 <Card title={tr(M.sessions)} value={formatNumber(t.sessions)} sub={tr(M.promptsSub, { count: t.prompts })} />
               </div>
               <PlanLimits provider={p.id} />
@@ -769,7 +769,7 @@ function SessionDetails({ project, items }: { project: ProjectInfo; items: Sessi
   const u: SessionUsage | null = current?.usage ?? null
 
   const provider = providerDescriptor(u?.provider ?? current?.provider)
-  const cacheTtl = provider.capabilities.promptCacheTtl
+  const cacheTtl = provider.capabilities.usage?.promptCacheTtl
   const ttl = u ? (settings?.sessions.cacheTtl === '5m' ? 300 : settings?.sessions.cacheTtl === '1h' ? 3600 : u.cacheTtlSeconds) : 300
   const elapsed = u?.lastActivity ? (now - Date.parse(u.lastActivity)) / 1000 : Infinity
   const warm = elapsed < ttl
@@ -942,7 +942,8 @@ function LimitCards({ kept, now, tip, none, provider }: { kept: PlanUsage | unde
   const usage = kept && { ...kept, limits: kept.limits.filter((l) => !l.resetsAt || Date.parse(l.resetsAt) > now) }
   const title = (l: PlanLimit): string => {
     const name = limitName(l)
-    return tr(M.limitTitle, { window: limitWindow(l), label: `${name.charAt(0).toUpperCase()}${name.slice(1)}` })
+    // A name the provider gives (HI-1125) is shown as it is, never capitalised ("gpt-5.2-codex-sonic").
+    return tr(M.limitTitle, { window: limitWindow(l), label: l.scope ? name : `${name.charAt(0).toUpperCase()}${name.slice(1)}` })
   }
   // Its counts, where the provider says them (HI-2734: Copilot's requests), in its (i).
   const tipOf = (l: PlanLimit): string => (l.used !== undefined && l.entitlement !== undefined ? `${tip(l)}\n${tr(M.limitCounts, { used: l.used, entitlement: l.entitlement })}` : tip(l))

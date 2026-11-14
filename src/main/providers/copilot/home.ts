@@ -1,6 +1,6 @@
 import { homedir } from 'os'
 import { join } from 'path'
-import { COPILOT } from '../../../shared/copilot'
+import { COPILOT } from '../../../shared/providers/copilot'
 import { overrides } from '../../advancedValues'
 
 /** Copilot's own folder (its config, sessions and logs): COPILOT_HOME, else ~/.copilot. */
