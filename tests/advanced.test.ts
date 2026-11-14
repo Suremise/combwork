@@ -128,6 +128,57 @@ describe('an override', () => {
     expect(advancedShown(policy, 'ask')).toBe('Ask each time')
   })
 
+  // A list with roles (HI-3202): each role once as role=name, whole or not at all, by one parser for saving and reading.
+  it('takes a mapping only whole: every role once, well-formed names, no other role, no name twice where it must be distinct', async () => {
+    const { advancedRoles, advancedTakesText, parseRoles } = await import('../src/shared/advanced')
+    const map: AdvancedDef = { ...def('cw.showDeveloperFeatures'), id: 'cw.test.map', kind: 'list', roles: ['start', 'stop'], default: ['start=Begin', 'stop=End'] }
+    const distinct: AdvancedDef = { ...map, distinct: true }
+    expect(checkAdvanced(map, ['start=Begin', 'stop=End'])).toEqual({ value: ['start=Begin', 'stop=End'] })
+    // Comma-separated, as Settings' box gives it; spaces trimmed; any order; a dotted name is one name.
+    expect(checkAdvanced(map, ' stop=runtime.session , start=Begin ')).toEqual({ value: ['stop=runtime.session', 'start=Begin'] })
+    expect(advancedRoles(map, ['stop=runtime.session', 'start=Begin'])).toEqual({ start: 'Begin', stop: 'runtime.session' })
+    const refused = (v: unknown): void => expect(checkAdvanced(map, v), JSON.stringify(v)).toMatchObject({ error: expect.stringContaining('takes each of start, stop once, as role=name') })
+    refused(['start=Begin']) // a role missing
+    refused(['start=Begin', 'start=Again']) // a role twice
+    refused(['start=Begin', 'stop=End', 'other=X']) // a role not its own
+    refused(['start=Begin', 'end=End']) // an unknown role in place of one
+    refused(['start=Begin', 'stop=']) // no name
+    refused(['start=Begin', 'stop=a b']) // not a name
+    refused(['start=Begin', 'stop=1abc']) // starting with a digit
+    refused(['start=Begin', `stop=${'x'.repeat(101)}`]) // over 100 characters
+    refused(['start=Begin', '__proto__=X']) // never a key outside its roles
+    refused('')
+    refused(42)
+    // One name for two roles: refused where the roles must be told apart, taken where they needn't be.
+    expect(checkAdvanced(distinct, ['start=Same', 'stop=Same'])).toMatchObject({ error: expect.stringContaining('gives Same to more than one role') })
+    expect(checkAdvanced(map, ['start=Same', 'stop=Same'])).toEqual({ value: ['start=Same', 'stop=Same'] })
+    // Read the same way: anything checkAdvanced refuses is no map at all, never part of one.
+    expect(advancedRoles(map, ['start=Begin'])).toBeNull()
+    expect(advancedRoles(distinct, ['start=Same', 'stop=Same'])).toBeNull()
+    expect(parseRoles(map, ['start=Begin', 'stop=End'])).toMatchObject({ map: { start: 'Begin', stop: 'End' } })
+    const m = advancedRoles(map, ['start=Begin', 'stop=End'])!
+    expect(Object.getPrototypeOf(m)).toBeNull()
+    expect(Object.isFrozen(m)).toBe(true)
+    expect(shownText(advancedTakesText(map))).toContain('start, stop')
+    // A plain list and a folder list are as they were.
+    const names = def('codex.hooks.knownEvents')
+    expect(checkAdvanced(names, 'SessionStart, Stop')).toEqual({ value: ['SessionStart', 'Stop'] })
+    expect(checkAdvanced(names, ['start=Begin'])).toMatchObject({ error: expect.any(String) })
+  })
+
+  it("declares a mapping's rule soundly: roles only on a plain list, never with paths, distinct only with roles, its default whole", () => {
+    for (const d of ADVANCED_DEFS) {
+      if (d.distinct) expect(d.roles, d.id).toBeTruthy()
+      if (!d.roles) continue
+      expect(d.kind, d.id).toBe('list')
+      expect(d.paths, d.id).toBeFalsy()
+      expect(new Set(d.roles).size, d.id).toBe(d.roles.length)
+      expect(checkAdvanced(d, d.default), d.id).toEqual({ value: d.default })
+      // Each sample of a mapping names its role, one of its own.
+      for (const s of d.samples ?? []) expect(d.roles.includes(s.role!), `${d.id} ${s.text}`).toBe(true)
+    }
+  })
+
   it('takes a pattern that compiles and finds something, text, a field name, names, a whole number in range', () => {
     const trust = def('claude-code.trust.prompt')
     expect(checkAdvanced(trust, 'trust (this|the) folder')).toEqual({ value: 'trust (this|the) folder' })

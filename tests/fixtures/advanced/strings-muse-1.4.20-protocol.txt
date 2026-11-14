@@ -1,0 +1,26 @@
+# Muse Code 1.4.20 (muse.exe, SHA-256 2d223f7f992f02c313225ed47adf3dda24e7361b6b8389f2c19f7c12f026618a): printable strings
+# read from the binary's bytes (never run), one per line, around the protocol names Combwork maps (HI-3202, muse.names.*).
+1 peer approvalSessionStartUserPromptSubmitPreToolUsePermissionRequestPostToolUsePreLLMCallPostLLMCallPreCompactPostCompactSubagentStartSubagen
+PreCompactPostCompactSubagentStartSubagentStopStopSessionEndNotificationPostToolUseFailureStopFailurePostToolBatchInterruptSessionForkToolUseStartblockedcommand deniedfailedsee hook logstimed outkept original resu
+PostToolBatchCalltool_nametool_inputtool_use_idtool_response
+hook_event_name
+stop_hook_activepending_async_questions
+# `last_assistant_message` tail and reports `blocked` instead of `idle`
+triggermanual
+hooksdecisionblock
+runtime_tool_call_idobserved_statedecisionreason
+mcpServers
+t was not provided: disable_remindersthe following required argument was not provided: no_foreign_personal_contextthe following required argument was not provided: api_key_stdinthe following requi
+retained_frame
+childrenrecord_json
+RawLogRecordEnvelopeschema_versionidstreamsequencerecorded_atrecord_typedurabilitycausation_idpayload_typepayload_schema_versionpayload
+if record.get("payload_type") == "runtime.session.metadata":
+elif kind == "assistant_message_committed":
+inbox delivery anomalymodel_completedmodel completedcontext compaction candidatecontext compaction installedcontext compaction
+Usageinput_tokensoutput_tokenscached_tokenscache_write_tokens
+cache_read_tokensreasoning_tokensprompt_tokens
+writewrite_fileeditapply_patchpatch
+R hooks must declare `async: true`; synchronous cancellation hooks are not admitted
+nttelemetry.proxytelemetry.destinationtelemetry.authtelemetry.artillerytelemetry.ca_bundlecontext.foreign_personal_rulescontext.foreign_personal_skillsfeature_config.enabledtools.web_search.modeprovidermodeltools.web_fetch.enabled
+McpServerModeV1requiredoptional
+"mode": "optional"

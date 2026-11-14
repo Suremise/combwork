@@ -661,6 +661,8 @@ interface CombworkMessageValues {
   'settings.advanced.error.number': { title: string | number; min: string | number; max: string | number }
   'settings.advanced.error.oneLine': { title: string | number; most: string | number }
   'settings.advanced.error.pattern': { title: string | number }
+  'settings.advanced.error.roles': { title: string | number; roles: string | number }
+  'settings.advanced.error.rolesTwice': { title: string | number; name: string | number }
   'settings.advanced.error.text': { title: string | number }
   'settings.advanced.logs.desc': undefined
   'settings.advanced.logs.tip': undefined
@@ -676,6 +678,14 @@ interface CombworkMessageValues {
   'settings.advanced.muse.hooks.pathField.title': undefined
   'settings.advanced.muse.hooks.timeoutSeconds.desc': undefined
   'settings.advanced.muse.hooks.timeoutSeconds.title': undefined
+  'settings.advanced.muse.names.configKeys.desc': undefined
+  'settings.advanced.muse.names.configKeys.title': undefined
+  'settings.advanced.muse.names.hookEvents.desc': undefined
+  'settings.advanced.muse.names.hookEvents.title': undefined
+  'settings.advanced.muse.names.hookFields.desc': undefined
+  'settings.advanced.muse.names.hookFields.title': undefined
+  'settings.advanced.muse.names.sessionLog.desc': undefined
+  'settings.advanced.muse.names.sessionLog.title': undefined
   'settings.advanced.muse.override.keepPersonalOut.desc': undefined
   'settings.advanced.muse.override.keepPersonalOut.title': undefined
   'settings.advanced.muse.override.keepProjectConfigOut.desc': undefined
@@ -736,6 +746,7 @@ interface CombworkMessageValues {
   'settings.advanced.takes.number': { unit: string; min: string | number; max: string | number }
   'settings.advanced.takes.pattern': undefined
   'settings.advanced.takes.patternFlags': { flags: string | number }
+  'settings.advanced.takes.roles': { roles: string | number }
   'settings.advanced.takes.text': undefined
   'settings.advanced.unit.agents': { n: number }
   'settings.advanced.unit.captures': { n: number }

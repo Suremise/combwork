@@ -1,11 +1,19 @@
-import { FIXTURES as FIX, overrideId, type AdvancedSource } from '../../advancedDef'
+import { FIXTURES as FIX, overrideId, type AdvancedSample, type AdvancedSource } from '../../advancedDef'
 import { msg } from '../../i18n/msg'
+import { CONFIG_ROLES, EVENT_ROLES, FIELD_ROLES, LOG_ROLES, MUSE_CONFIG, MUSE_EVENTS, MUSE_FIELDS, MUSE_LOG_NAMES, MUSE_NAME_IDS, entriesOf } from './names'
 
 // Muse Code 1.4.20's recordings (HI-3202): its --help, its sandbox check, its screens (an offline Windows Sandbox), its
 // hooks and session log (the offline echo provider), and strings verbatim from the signed binary for what no offline run
 // shows (strings-muse-1.4.20.txt says how they were taken).
 const HELP = `${FIX}/advanced/help-muse-1.4.20.txt`
 const STRINGS = `${FIX}/advanced/strings-muse-1.4.20.txt`
+/** The protocol names' strings, read from the binary's bytes (its header says how). */
+const PROTOCOL = `${FIX}/advanced/strings-muse-1.4.20-protocol.txt`
+/** The hooks 1.4.20 sent the Sandbox check's stub (HI-3202, 14 Nov: a new session, then a long guidance's). */
+const HOOKS = `${FIX}/muse/hooks-1.4.20-sandbox.jsonl`
+const LOG = `${FIX}/muse/session-1.4.20-echo.jsonl`
+/** A mapping's sample: `text` as 1.4.20 recorded it, holding `role`'s name. */
+const named = (role: string, from: string, text: string): AdvancedSample => ({ from, version: '1.4.20', role, text })
 
 /** Muse Code's advanced values (#367), in the order Settings lists them: advanced.ts gathers them through the registry (HI-3201). */
 // agent-text: ADVANCED (Settings → Advanced's titles and descriptions, which agents read too: the settings tools, HI-2441)
@@ -140,6 +148,89 @@ export const ADVANCED: readonly AdvancedSource[] = [
     samples: [
       { from: `${FIX}/advanced/screen-muse-1.4.20-ready.txt`, version: '1.4.20', text: 'Voice input (Alt+V to start)', shows: 'A new session, ready' }, // i18n-ignore: a CLI's recorded text (#367)
       { from: `${FIX}/advanced/screen-muse-1.4.20-resume.txt`, version: '1.4.20', text: 'Voice input (Alt+V to start)', shows: 'A resumed session, ready (no hook yet)' } // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
+  // Its protocol's names (HI-3202): each a mapping of Combwork's roles to Muse's names, taken whole or not at all. A launch
+  // keeps the hook and config names it started with, so a change reaches sessions started afterwards.
+  {
+    id: MUSE_NAME_IDS.events,
+    group: 'muse',
+    title: msg({ id: 'settings.advanced.muse.names.hookEvents.title', defaultMessage: 'Hook events', description: "An advanced setting's title (Settings → Advanced, under Muse Code): the names of the CLI's hook events, mapped from Combwork's roles." }),
+    desc: msg({ id: 'settings.advanced.muse.names.hookEvents.desc', defaultMessage: "Muse's name for each hook event Combwork gives it and reads back (a session's start, a prompt, a tool's use, a question, a turn's end…). Wrong, Muse refuses the launch or the agent's status stops following it.", description: 'What the advanced setting "Hook events" is for, and what goes wrong when it is wrong (Settings → Advanced, under Muse Code).' }),
+    kind: 'list',
+    roles: EVENT_ROLES,
+    distinct: true,
+    default: entriesOf(EVENT_ROLES, MUSE_EVENTS),
+    applies: 'sessions',
+    samples: [
+      named('start', HOOKS, '"hook_event_name":"SessionStart"'),
+      named('prompt', HOOKS, '"hook_event_name":"UserPromptSubmit"'),
+      named('stop', HOOKS, '"hook_event_name":"Stop"'),
+      named('end', HOOKS, '"hook_event_name":"SessionEnd"'),
+      ...(['preTool', 'postTool', 'permission', 'preCompact', 'postCompact'] as const).map((r) => named(r, PROTOCOL, MUSE_EVENTS[r])),
+      ...(['postToolFailure', 'notification', 'stopFailure', 'interrupt'] as const).map((r) => named(r, PROTOCOL, `SessionEndNotificationPostToolUseFailureStopFailurePostToolBatchInterrupt`)) // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
+  {
+    id: MUSE_NAME_IDS.fields,
+    group: 'muse',
+    title: msg({ id: 'settings.advanced.muse.names.hookFields.title', defaultMessage: 'Hook fields', description: "An advanced setting's title (Settings → Advanced, under Muse Code): the names of the fields in the CLI's hooks, mapped from Combwork's roles." }),
+    desc: msg({ id: 'settings.advanced.muse.names.hookFields.desc', defaultMessage: "Muse's name for each field Combwork reads in its hooks (the event, the session, the turn, the tool and its input…), and for the reply that stops a tool a file lock holds. Wrong, the agent's status, turns or locks stop following Muse.", description: 'What the advanced setting "Hook fields" is for, and what goes wrong when it is wrong (Settings → Advanced, under Muse Code).' }),
+    kind: 'list',
+    roles: FIELD_ROLES,
+    default: entriesOf(FIELD_ROLES, MUSE_FIELDS),
+    applies: 'sessions',
+    samples: [
+      ...(['event', 'session', 'cwd', 'turn', 'prompt', 'source', 'lastMessage'] as const).map((r) => named(r, HOOKS, `"${MUSE_FIELDS[r]}":`)),
+      ...(['tool', 'input', 'call'] as const).map((r) => named(r, PROTOCOL, 'tool_nametool_inputtool_use_id')), // i18n-ignore: a CLI's recorded text (#367)
+      named('trigger', PROTOCOL, 'triggermanual'), // i18n-ignore: a CLI's recorded text (#367)
+      named('stopActive', HOOKS, '"stop_hook_active":'),
+      named('patch', PROTOCOL, 'apply_patchpatch'), // i18n-ignore: a CLI's recorded text (#367)
+      named('decision', PROTOCOL, 'hooksdecisionblock'), // i18n-ignore: a CLI's recorded text (#367)
+      named('block', PROTOCOL, 'hooksdecisionblock'), // i18n-ignore: a CLI's recorded text (#367)
+      named('reason', PROTOCOL, 'decisionreason') // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
+  {
+    id: MUSE_NAME_IDS.config,
+    group: 'muse',
+    title: msg({ id: 'settings.advanced.muse.names.configKeys.title', defaultMessage: 'Launch setting keys', description: "An advanced setting's title (Settings → Advanced, under Muse Code): the names of the CLI's settings that Combwork gives each launch with -c, mapped from Combwork's roles." }),
+    desc: msg({ id: 'settings.advanced.muse.names.configKeys.desc', defaultMessage: "The keys of the settings Combwork gives each Muse launch for that run only (its hooks, its MCP servers and an MCP server's mode, other CLIs' personal skills and rules off). Nothing is written to Muse's own settings. Wrong, Muse refuses the launch or runs without Combwork's tools.", description: 'What the advanced setting "Launch setting keys" is for, and what goes wrong when it is wrong (Settings → Advanced, under Muse Code). MCP is a protocol name: keep it.' }),
+    kind: 'list',
+    roles: CONFIG_ROLES,
+    distinct: true,
+    default: entriesOf(CONFIG_ROLES, MUSE_CONFIG),
+    applies: 'sessions',
+    samples: [
+      named('hooks', PROTOCOL, 'hooksdecisionblock'), // i18n-ignore: a CLI's recorded text (#367)
+      named('mcpServers', PROTOCOL, 'mcpServers'), // i18n-ignore: a CLI's recorded text (#367)
+      named('mode', PROTOCOL, '"mode": "optional"'), // i18n-ignore: a CLI's recorded text (#367)
+      named('modeRequired', PROTOCOL, 'McpServerModeV1requiredoptional'), // i18n-ignore: a CLI's recorded text (#367)
+      named('foreignSkills', PROTOCOL, 'context.foreign_personal_rulescontext.foreign_personal_skills'), // i18n-ignore: a CLI's recorded text (#367)
+      named('foreignRules', PROTOCOL, 'context.foreign_personal_rulescontext.foreign_personal_skills') // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
+  {
+    id: MUSE_NAME_IDS.log,
+    group: 'muse',
+    title: msg({ id: 'settings.advanced.muse.names.sessionLog.title', defaultMessage: 'Session log names', description: "An advanced setting's title (Settings → Advanced, under Muse Code): the field names and record kinds of the CLI's session log, mapped from Combwork's roles." }),
+    desc: msg({ id: 'settings.advanced.muse.names.sessionLog.desc', defaultMessage: "The field names and record kinds Combwork reads in Muse's session log (session.jsonl): its prompts, replies, model requests and their tokens. Wrong, an agent's conversation or usage stays empty.", description: 'What the advanced setting "Session log names" is for, and what goes wrong when it is wrong (Settings → Advanced, under Muse Code). session.jsonl is a file name: keep it.' }),
+    kind: 'list',
+    roles: LOG_ROLES,
+    default: entriesOf(LOG_ROLES, MUSE_LOG_NAMES),
+    applies: 'now',
+    samples: [
+      named('wrapper', LOG, '"retained_frame"'),
+      ...(['children', 'recordJson', 'recordedAt', 'id', 'payload', 'record', 'build', 'semver', 'event', 'prompt', 'text', 'usage', 'inputTokens', 'cachedTokens', 'outputTokens', 'reasoningTokens', 'model'] as const).map((r) => named(r, LOG, `"${MUSE_LOG_NAMES[r]}":`)),
+      named('payloadType', LOG, '"payload_type":"runtime.session"'),
+      named('metadata', LOG, '"payload_type":"runtime.session.metadata"'),
+      named('session', LOG, '"payload_type":"runtime.session"'),
+      named('payloadKind', LOG, '"kind":"run"'),
+      named('run', LOG, '"kind":"run"'),
+      named('eventKind', LOG, '"kind":"started"'),
+      named('started', LOG, '"kind":"started"'),
+      named('reply', LOG, '"kind":"assistant_message_committed"'),
+      named('request', LOG, '"kind":"model_completed"')
     ]
   }
 ]

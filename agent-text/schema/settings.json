@@ -1695,6 +1695,18 @@
       "title": "plain"
     }
   },
+  "settings.advanced.error.roles": {
+    "placeholders": {
+      "title": "plain",
+      "roles": "plain"
+    }
+  },
+  "settings.advanced.error.rolesTwice": {
+    "placeholders": {
+      "title": "plain",
+      "name": "plain"
+    }
+  },
   "settings.advanced.error.text": {
     "placeholders": {
       "title": "plain"
@@ -1754,6 +1766,30 @@
     "placeholders": {}
   },
   "settings.advanced.muse.hooks.timeoutSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.configKeys.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.configKeys.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.hookEvents.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.hookEvents.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.hookFields.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.hookFields.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.sessionLog.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.sessionLog.title": {
     "placeholders": {}
   },
   "settings.advanced.muse.override.keepPersonalOut.desc": {
@@ -1933,6 +1969,11 @@
   "settings.advanced.takes.patternFlags": {
     "placeholders": {
       "flags": "plain"
+    }
+  },
+  "settings.advanced.takes.roles": {
+    "placeholders": {
+      "roles": "plain"
     }
   },
   "settings.advanced.takes.text": {

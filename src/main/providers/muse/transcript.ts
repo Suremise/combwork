@@ -5,6 +5,8 @@ import { emptyDay, localDay } from '../../../shared/usageDays'
 import { TimelineBuilder } from '../../../shared/usageTimeline'
 import type { NewItem } from '../conversation'
 import type { ConversationParserLike, ImageLocation } from '../types'
+import type { MuseLog } from '../../../shared/providers/muse/names'
+import { logNames } from './names'
 
 /**
  * Muse Code's session log (HI-3202, read from 1.4.20's: tests/fixtures/muse/session-1.4.20-echo.jsonl, an offline echo
@@ -28,24 +30,12 @@ import type { ConversationParserLike, ImageLocation } from '../types'
 
 const MUSE: ProviderId = 'muse'
 
-/** The field and kind names read (1.4.20's), in one place: what a later Muse renames is changed here. */
-export const MUSE_LOG = {
-  wrapper: 'retained_frame',
-  wrapperChildren: 'children',
-  wrapperRecord: 'record_json',
-  recordedAt: 'recorded_at',
-  metadata: 'runtime.session.metadata',
-  session: 'runtime.session',
-  run: 'run',
-  started: 'started',
-  prompt: 'prompt',
-  reply: 'assistant_message_committed',
-  replyText: 'text',
-  request: 'model_completed',
-  usage: 'usage',
-  terminal: 'terminal',
-  compaction: /compact/i
-} as const
+/** The log's names, as one reader reads them throughout (muse.names.sessionLog, logNames). */
+export type LogNames = Readonly<Record<MuseLog, string>>
+
+/** A compaction's event kinds: a guess, as no 1.4.20 record has one (the echo provider never compacts). */
+const COMPACTION = /compact/i
+const COMPACTION_DONE = /complet|finish|done|end/i
 
 /** A Muse session id: a UUID (its hex groups, any version), never a path. */
 const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -98,9 +88,19 @@ export async function museSessionFile(dataHomes: readonly string[], sessionId: s
 type Rec = Record<string, any>
 
 const isObj = (v: unknown): v is Rec => !!v && typeof v === 'object' && !Array.isArray(v)
+/** A record's own field (never one through its prototype): a name is data, a dotted one a single name. */
+const own = (r: unknown, k: string): unknown => (isObj(r) && Object.hasOwn(r, k) ? r[k] : undefined)
+const ownObj = (r: unknown, k: string): Rec | null => {
+  const v = own(r, k)
+  return isObj(v) ? v : null
+}
+const ownText = (r: unknown, k: string): string | null => {
+  const v = own(r, k)
+  return typeof v === 'string' ? v : null
+}
 
 /** A line's records: itself, or a wrapper's children; none for a line that isn't one. */
-export function museRecords(line: string): Rec[] {
+export function museRecords(line: string, n: LogNames): Rec[] {
   if (!line.trim()) return []
   let r: unknown
   try {
@@ -109,12 +109,13 @@ export function museRecords(line: string): Rec[] {
     return []
   }
   if (!isObj(r)) return []
-  if (MUSE_LOG.wrapper in r) {
-    const children = Array.isArray(r[MUSE_LOG.wrapperChildren]) ? r[MUSE_LOG.wrapperChildren] : []
-    return children.flatMap((c: unknown) => {
-      if (!isObj(c) || typeof c[MUSE_LOG.wrapperRecord] !== 'string') return []
+  if (Object.hasOwn(r, n.wrapper)) {
+    const children = own(r, n.children)
+    return (Array.isArray(children) ? children : []).flatMap((c: unknown) => {
+      const json = ownText(c, n.recordJson)
+      if (json === null) return []
       try {
-        const inner = JSON.parse(c[MUSE_LOG.wrapperRecord])
+        const inner = JSON.parse(json)
         return isObj(inner) ? [inner] : []
       } catch {
         return []
@@ -125,29 +126,39 @@ export function museRecords(line: string): Rec[] {
 }
 
 /** A record's time as ISO 8601 (its `recorded_at`, microseconds since the epoch), or undefined. */
-export function recordTime(r: Rec): string | undefined {
-  const us = r[MUSE_LOG.recordedAt]
+export function recordTime(r: Rec, n: LogNames): string | undefined {
+  const us = own(r, n.recordedAt)
   if (typeof us !== 'number' || !Number.isFinite(us) || us <= 0) return undefined
   const d = new Date(Math.floor(us / 1000))
   return Number.isNaN(d.getTime()) ? undefined : d.toISOString()
 }
 
 /** A run event of a record (`runtime.session`, `payload.kind: run`), or null. */
-export function runEvent(r: Rec): Rec | null {
-  if (r.payload_type !== MUSE_LOG.session || !isObj(r.payload) || r.payload.kind !== MUSE_LOG.run) return null
-  return isObj(r.payload.event) ? r.payload.event : null
+export function runEvent(r: Rec, n: LogNames): Rec | null {
+  const payload = ownObj(r, n.payload)
+  if (own(r, n.payloadType) !== n.session || !payload || own(payload, n.payloadKind) !== n.run) return null
+  return ownObj(payload, n.event)
+}
+
+/** The build a session's metadata record names (`payload.record.build.semver`), or null. */
+function buildOf(r: Rec, n: LogNames): string | null {
+  if (own(r, n.payloadType) !== n.metadata) return null
+  return ownText(ownObj(ownObj(ownObj(r, n.payload), n.record), n.build), n.semver)
 }
 
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0)
 
 /** A model id a run event names (`model`, else `model_id`), when it is a plain one. */
-const modelOf = (e: Rec): string | null => {
-  const v = typeof e.model === 'string' ? e.model : typeof e.model_id === 'string' ? e.model_id : null
+const modelOf = (e: Rec, n: LogNames): string | null => {
+  const v = ownText(e, n.model) ?? ownText(e, n.modelId)
   return v && v.trim() && v !== 'unknown' ? v.trim() : null
 }
 
 /** Records already read, by their id: a line for one again is left out. */
-const recordId = (r: Rec): string | null => (typeof r.id === 'string' && r.id ? r.id : null)
+const recordId = (r: Rec, n: LogNames): string | null => ownText(r, n.id) || null
+
+/** A run event's kind. */
+const kindOf = (e: Rec, n: LogNames): string | null => ownText(e, n.eventKind)
 
 /**
  * Muse's session log in the conversation view: each turn's prompt, its reply, and its compactions. Tool calls aren't
@@ -159,13 +170,16 @@ export class MuseConversationParser implements ConversationParserLike {
   offset = 0
   private seen = new Set<string>()
 
-  /** The project whose session it is (kept for paths in tool calls, once they are read). */
-  constructor(readonly projectPath: string | null = null) {}
+  /** `projectPath`: the project whose session it is (kept for paths in tool calls, once they are read). */
+  constructor(
+    readonly projectPath: string | null = null,
+    private readonly n: LogNames = logNames()
+  ) {}
 
   feed(buf: Buffer): number {
     let start = 0
     for (let nl = buf.indexOf(10); nl !== -1; nl = buf.indexOf(10, start)) {
-      for (const r of museRecords(buf.toString('utf8', start, nl))) this.record(r)
+      for (const r of museRecords(buf.toString('utf8', start, nl), this.n)) this.record(r)
       start = nl + 1
     }
     this.offset += start
@@ -177,24 +191,29 @@ export class MuseConversationParser implements ConversationParserLike {
   }
 
   private record(r: Rec): void {
-    const id = recordId(r)
+    const n = this.n
+    const id = recordId(r, n)
     if (id) {
       if (this.seen.has(id)) return
       this.seen.add(id)
     }
-    const e = runEvent(r)
+    const e = runEvent(r, n)
     if (!e) return
-    const ts = recordTime(r) ?? null
-    if (e.kind === MUSE_LOG.started && typeof e[MUSE_LOG.prompt] === 'string' && e[MUSE_LOG.prompt].trim()) {
-      this.push({ kind: 'user', timestamp: ts, text: e[MUSE_LOG.prompt], images: [] })
+    const ts = recordTime(r, n) ?? null
+    const kind = kindOf(e, n)
+    const prompt = ownText(e, n.prompt)
+    if (kind === n.started && prompt?.trim()) {
+      this.push({ kind: 'user', timestamp: ts, text: prompt, images: [] })
       return
     }
-    if (e.kind === MUSE_LOG.reply && typeof e[MUSE_LOG.replyText] === 'string' && e[MUSE_LOG.replyText].trim()) {
-      this.push({ kind: 'assistant', timestamp: ts, text: e[MUSE_LOG.replyText] })
+    const reply = ownText(e, n.text)
+    if (kind === n.reply && reply?.trim()) {
+      this.push({ kind: 'assistant', timestamp: ts, text: reply })
       return
     }
-    if (typeof e.kind === 'string' && MUSE_LOG.compaction.test(e.kind) && /complet|finish|done|end/i.test(e.kind)) {
-      this.push({ kind: 'compaction', timestamp: ts, trigger: 'auto', preTokens: 0, postTokens: 0, nextRequestTokens: null, summary: typeof e.summary === 'string' && e.summary.trim() ? e.summary : null })
+    if (kind && COMPACTION.test(kind) && COMPACTION_DONE.test(kind)) {
+      const summary = ownText(e, 'summary')
+      this.push({ kind: 'compaction', timestamp: ts, trigger: 'auto', preTokens: 0, postTokens: 0, nextRequestTokens: null, summary: summary?.trim() ? summary : null })
     }
   }
 }
@@ -212,7 +231,10 @@ export class MuseUsageParser {
   private seen = new Set<string>()
   private compactAsked = false
 
-  constructor(sessionId: string) {
+  constructor(
+    sessionId: string,
+    private readonly n: LogNames = logNames()
+  ) {
     this.usage = {
       provider: MUSE,
       sessionId,
@@ -244,28 +266,32 @@ export class MuseUsageParser {
   }
 
   feed(text: string): void {
-    for (const line of text.split('\n')) for (const r of museRecords(line)) this.record(r)
+    for (const line of text.split('\n')) for (const r of museRecords(line, this.n)) this.record(r)
   }
 
   private record(r: Rec): void {
     const usage = this.usage
-    const id = recordId(r)
+    const n = this.n
+    const id = recordId(r, n)
     if (id) {
       if (this.seen.has(id)) return
       this.seen.add(id)
     }
-    const ts = recordTime(r)
-    if (r.payload_type === MUSE_LOG.metadata && isObj(r.payload?.record?.build) && typeof r.payload.record.build.semver === 'string') usage.cliVersion = r.payload.record.build.semver
-    const e = runEvent(r)
+    const ts = recordTime(r, n)
+    const build = buildOf(r, n)
+    if (build) usage.cliVersion = build
+    const e = runEvent(r, n)
     if (!e) return
     if (ts) {
       if (!usage.firstActivity || ts < usage.firstActivity) usage.firstActivity = ts
       if (!usage.lastActivity || ts > usage.lastActivity) usage.lastActivity = ts
     }
-    const model = modelOf(e)
+    const model = modelOf(e, n)
     if (model) usage.model = model
-    if (e.kind === MUSE_LOG.started && typeof e[MUSE_LOG.prompt] === 'string') {
-      const said = e[MUSE_LOG.prompt].trim()
+    const kind = kindOf(e, n)
+    const prompt = ownText(e, n.prompt)
+    if (kind === n.started && prompt !== null) {
+      const said = prompt.trim()
       if (said === '/compact') {
         this.compactAsked = true
         return
@@ -276,12 +302,12 @@ export class MuseUsageParser {
       if (said) usage.lastPrompt = said
       return
     }
-    if (e.kind === MUSE_LOG.request) {
-      const u = isObj(e[MUSE_LOG.usage]) ? e[MUSE_LOG.usage] : {}
-      const fresh = num(u.input_tokens)
-      const cache = num(u.cached_tokens)
-      const output = num(u.output_tokens)
-      const reasoning = num(u.reasoning_tokens)
+    if (kind === n.request) {
+      const u = ownObj(e, n.usage) ?? {}
+      const fresh = num(own(u, n.inputTokens))
+      const cache = num(own(u, n.cachedTokens))
+      const output = num(own(u, n.outputTokens))
+      const reasoning = num(own(u, n.reasoningTokens))
       usage.requests++
       usage.inputTokens += fresh
       usage.cacheReadTokens += cache
@@ -301,7 +327,7 @@ export class MuseUsageParser {
       this.timeline.add(ts || usage.lastActivity, step, 1, -1, 0, usage.model)
       return
     }
-    if (typeof e.kind === 'string' && MUSE_LOG.compaction.test(e.kind) && /complet|finish|done|end/i.test(e.kind)) {
+    if (kind && COMPACTION.test(kind) && COMPACTION_DONE.test(kind)) {
       const c: CompactionEvent = { timestamp: ts ?? '', trigger: this.compactAsked ? 'manual' : 'auto', preTokens: usage.contextTokens, postTokens: 0 }
       usage.compactions.push(c)
       this.compactAsked = false
@@ -319,8 +345,8 @@ export class MuseUsageParser {
 }
 
 /** Usage for a whole session log. */
-export function parseMuseTranscript(text: string, sessionId: string, title: string | null = null): SessionUsage {
-  const p = new MuseUsageParser(sessionId)
+export function parseMuseTranscript(text: string, sessionId: string, title: string | null = null, n: LogNames = logNames()): SessionUsage {
+  const p = new MuseUsageParser(sessionId, n)
   p.feed(text)
   return p.result(title)
 }

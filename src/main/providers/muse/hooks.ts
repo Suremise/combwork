@@ -3,6 +3,8 @@ import { agentMsg, say } from '../../../shared/agentText'
 import { hookIds } from '../common'
 import type { LockDecision, NormalizedHook } from '../types'
 import { isMuseSessionId } from './transcript'
+import { DEFAULT_NAMES, type MuseNames } from './names'
+import type { MuseEvent } from '../../../shared/providers/muse/names'
 
 // Muse Code's hooks as Combwork reads them (HI-3202). Observed with 1.4.20 offline (tests/fixtures/muse/hooks-1.4.20-echo.jsonl):
 // SessionStart (source), UserPromptSubmit (prompt, turn_id), Stop (last_assistant_message, stop_hook_active, turn_id),
@@ -26,11 +28,14 @@ export function musePatchPaths(patch: string): string[] {
 }
 
 /** The files an editing tool's call changes, absolute (relative to the hook's cwd): none for any other tool. */
-export function museEditedPaths(tool: string, input: unknown, cwd: string | null, edit: EditTools): string[] {
+export function museEditedPaths(tool: string, input: unknown, cwd: string | null, edit: EditTools, patchField: string = DEFAULT_NAMES.fields.patch): string[] {
   if (!edit.names.test(tool) || !input || typeof input !== 'object') return []
   const i = input as Record<string, unknown>
-  const named = typeof i[edit.pathField] === 'string' && i[edit.pathField] ? [String(i[edit.pathField])] : []
-  const patched = typeof i.patch === 'string' ? musePatchPaths(i.patch) : []
+  const own = (k: string): unknown => (Object.hasOwn(i, k) ? i[k] : undefined)
+  const path = own(edit.pathField)
+  const named = typeof path === 'string' && path ? [path] : []
+  const patch = own(patchField)
+  const patched = typeof patch === 'string' ? musePatchPaths(patch) : []
   const all = [...new Set([...named, ...patched])]
   return cwd ? all.map((p) => (isAbsolute(p) ? p : resolve(cwd, p))) : all
 }
@@ -45,9 +50,9 @@ const ASKS = {
 }
 
 /** A short line of what a tool call asks for, in the CLI's place (agents read it: GET /v1/projects). */
-function asking(tool: string, input: Record<string, unknown>, edit: EditTools): string {
+function asking(tool: string, input: Record<string, unknown>, edit: EditTools, patchField: string): string {
   if (edit.names.test(tool)) {
-    const files = museEditedPaths(tool, input, null, edit)
+    const files = museEditedPaths(tool, input, null, edit, patchField)
     return files.length ? say(ASKS.editFiles, { files: files.join(', ') }) : say(ASKS.editFile)
   }
   const line = typeof input.command === 'string' ? input.command.split('\n')[0] : ''
@@ -55,61 +60,79 @@ function asking(tool: string, input: Record<string, unknown>, edit: EditTools): 
   return tool ? say(ASKS.use, { tool }) : say(ASKS.continue)
 }
 
-/** A hook's JSON as Combwork tracks it. */
-export function normalizeMuseHook(body: Record<string, any>, edit: EditTools): NormalizedHook {
-  const event = String(body.hook_event_name ?? '')
-  const tool = typeof body.tool_name === 'string' ? body.tool_name : ''
-  const input = body.tool_input && typeof body.tool_input === 'object' ? (body.tool_input as Record<string, unknown>) : {}
-  const cwd = typeof body.cwd === 'string' && body.cwd ? body.cwd : null
-  const call = typeof body.tool_use_id === 'string' && /^[\w.:-]{1,128}$/.test(body.tool_use_id) ? body.tool_use_id : undefined
+/** The role a hook's event name stands for in a launch's names (each name one role's: muse.names.hookEvents is distinct). */
+function roleOf(event: string, events: MuseNames['events']): MuseEvent | null {
+  for (const [role, name] of Object.entries(events)) if (name === event) return role as MuseEvent
+  return null
+}
+
+/**
+ * A hook's JSON as Combwork tracks it, read by the launch's names (`names`: the event and field names it gave and gets
+ * back; 1.4.20's when absent). A field is read only as the body's own, never through its prototype.
+ */
+export function normalizeMuseHook(body: Record<string, any>, edit: EditTools, names: MuseNames = DEFAULT_NAMES): NormalizedHook {
+  const f = names.fields
+  const field = (k: string): unknown => (Object.hasOwn(body, k) ? body[k] : undefined)
+  const text = (k: string): string | null => {
+    const v = field(k)
+    return typeof v === 'string' ? v : null
+  }
+  const event = String(field(f.event) ?? '')
+  const tool = text(f.tool) ?? ''
+  const rawInput = field(f.input)
+  const input = rawInput && typeof rawInput === 'object' ? (rawInput as Record<string, unknown>) : {}
+  const cwd = text(f.cwd) || null
+  const callId = text(f.call)
+  const call = callId && /^[\w.:-]{1,128}$/.test(callId) ? callId : undefined
+  const session = field(f.session)
   const out: NormalizedHook = {
     event: { kind: 'ignore' },
-    sessionId: isMuseSessionId(body.session_id) ? body.session_id : null,
+    sessionId: isMuseSessionId(session) ? session : null,
     // 1.4.20 sends null: its session log is found by the session id (transcript.ts).
     transcriptPath: null,
     // Its permission_mode is "default" whatever --approval-mode chose (observed): not the live mode.
     mode: null,
     editedPaths: [],
-    ids: hookIds(body, { turn: 'turn_id', call: 'tool_use_id' })
+    ids: { ...hookIds(body, { turn: f.turn, call: f.call }), continued: field(f.stopActive) === true }
   }
-  switch (event) {
-    case 'SessionStart':
-      out.event = { kind: 'start', source: typeof body.source === 'string' ? body.source : null }
+  switch (roleOf(event, names.events)) {
+    case 'start':
+      out.event = { kind: 'start', source: text(f.source) }
       break
-    case 'UserPromptSubmit':
-      out.event = { kind: 'prompt', text: typeof body.prompt === 'string' ? body.prompt : null }
+    case 'prompt':
+      out.event = { kind: 'prompt', text: text(f.prompt) }
       break
-    case 'PreToolUse':
+    case 'preTool':
       out.event = { kind: 'toolStart' }
-      out.editedPaths = museEditedPaths(tool, input, cwd, edit)
+      out.editedPaths = museEditedPaths(tool, input, cwd, edit, f.patch)
       break
-    case 'PostToolUse':
-    case 'PostToolUseFailure':
+    case 'postTool':
+    case 'postToolFailure':
       out.event = call ? { kind: 'toolEnd', call } : { kind: 'toolEnd' }
       break
-    case 'PermissionRequest':
-      out.event = { kind: 'ask', ask: { kind: 'permission', blocking: true, message: asking(tool, input, edit), ...(call ? { call } : {}) } }
+    case 'permission':
+      out.event = { kind: 'ask', ask: { kind: 'permission', blocking: true, message: asking(tool, input, edit, f.patch), ...(call ? { call } : {}) } }
       break
-    case 'Notification':
+    case 'notification':
       // Muse waits on the user (its SDK: "notification").
-      out.event = { kind: 'ask', ask: { kind: 'question', blocking: true, message: typeof body.message === 'string' ? body.message : '' } }
+      out.event = { kind: 'ask', ask: { kind: 'question', blocking: true, message: text(f.message) ?? '' } }
       break
-    case 'Stop':
-      out.event = { kind: 'stop', lastMessage: typeof body.last_assistant_message === 'string' ? body.last_assistant_message : null }
+    case 'stop':
+      out.event = { kind: 'stop', lastMessage: text(f.lastMessage) }
       break
-    case 'StopFailure':
-      out.event = { kind: 'stop', lastMessage: typeof body.error === 'string' ? body.error : null, failed: true }
+    case 'stopFailure':
+      out.event = { kind: 'stop', lastMessage: text(f.error), failed: true }
       break
-    case 'Interrupt':
+    case 'interrupt':
       out.event = { kind: 'interrupt' }
       break
-    case 'PreCompact':
-      out.event = { kind: 'compactStart', trigger: typeof body.trigger === 'string' ? body.trigger : 'auto' }
+    case 'preCompact':
+      out.event = { kind: 'compactStart', trigger: text(f.trigger) ?? 'auto' }
       break
-    case 'PostCompact':
+    case 'postCompact':
       out.event = { kind: 'compactEnd' }
       break
-    case 'SessionEnd':
+    case 'end':
       out.event = { kind: 'end' }
       break
   }
@@ -121,7 +144,7 @@ export function normalizeMuseHook(body: Record<string, any>, edit: EditTools): N
  * put before the model). Muse has no answer that asks the user on a hook's behalf, so an `ask` blocks too, saying why;
  * a warning blocks nothing.
  */
-export function museLockReply(d: LockDecision): Record<string, unknown> {
-  if (d.kind === 'deny' || d.kind === 'ask') return { decision: 'block', reason: d.reason }
+export function museLockReply(d: LockDecision, fields: MuseNames['fields'] = DEFAULT_NAMES.fields): Record<string, unknown> {
+  if (d.kind === 'deny' || d.kind === 'ask') return { [fields.decision]: fields.block, [fields.reason]: d.reason }
   return {}
 }

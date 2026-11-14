@@ -19,6 +19,7 @@ const { normalizeMuseHook, museLockReply, museEditedPaths, musePatchPaths } = aw
 const { museEnv, museRoots } = await import('../src/main/providers/muse/home')
 const { parseMuseVersion, classifySandbox } = await import('../src/main/providers/muse/install')
 const { TOOLS_SERVER } = await import('../src/shared/assistantTools')
+const { MUSE_EVENTS } = await import('../src/shared/providers/muse/names')
 
 const MAX = 16384
 const fixture = (p: string): string => readFileSync(join(__dirname, 'fixtures', p), 'utf8')
@@ -70,11 +71,11 @@ describe("Muse's hook commands", () => {
 
   it('give every event, SessionStart printing the guidance first, only PreToolUse reading the reply, Interrupt async', () => {
     const h = museHooks('http://h/?r=1', 'C:\\a.txt', 'C:\\g.md', 10) as Record<string, { hooks: { command: string; async?: boolean }[] }[]>
-    expect(Object.keys(h)).toEqual([...HOOK_EVENTS])
+    expect(Object.keys(h)).toEqual(HOOK_EVENTS.map((r) => MUSE_EVENTS[r]))
     expect(h.SessionStart[0].hooks.map((x) => x.command.split(' ')[0])).toEqual(['type', 'curl.exe'])
     expect(h.SessionStart[0].hooks[0].command).toBe('type C:\\g.md')
     expect(h.PreToolUse[0].hooks[0].command).not.toMatch(/-o NUL$/)
-    for (const e of HOOK_EVENTS.filter((x) => x !== 'PreToolUse')) expect(h[e][0].hooks.at(-1)!.command).toMatch(/-o NUL$/)
+    for (const e of HOOK_EVENTS.filter((x) => x !== 'preTool')) expect(h[MUSE_EVENTS[e]][0].hooks.at(-1)!.command).toMatch(/-o NUL$/)
     expect(h.Interrupt[0].hooks[0].async).toBe(true)
     expect(JSON.stringify(h)).not.toContain('\\"')
   })
@@ -214,5 +215,99 @@ describe("Muse's environment, install and sandbox", () => {
     for (const f of ['ready', 'resume']) expect(startupScreen(starting, fixture(`advanced/screen-muse-1.4.20-${f}.txt`), a), f).toBe('ready')
     expect(startupScreen(starting, fixture('advanced/screen-muse-1.4.20-sandbox-setup.txt'), a)).toEqual({ asked: 'Set up the Windows sandbox' })
     expect(startupScreen(starting, 'Muse Code 1.4.20\nloading…', a)).toBeNull()
+  })
+})
+
+describe("Muse's names, as its advanced mappings say (HI-3202)", () => {
+  const SESSION = '01a1d9f2-e1a5-7300-bebb-9ee68a049822'
+  const set = async (values: Record<string, unknown>): Promise<void> => {
+    const { readAdvancedFrom, valuesReader } = await import('../src/main/advancedValues')
+    readAdvancedFrom(valuesReader(values))
+  }
+  const renamed = async (): Promise<Record<string, string[]>> => {
+    const n = await import('../src/shared/providers/muse/names')
+    return {
+      [n.MUSE_NAME_IDS.events]: n.entriesOf(n.EVENT_ROLES, { ...n.MUSE_EVENTS, start: 'Begin', preTool: 'BeforeTool' }),
+      [n.MUSE_NAME_IDS.fields]: n.entriesOf(n.FIELD_ROLES, { ...n.MUSE_FIELDS, turn: 'turn_ref', patch: 'diff', decision: 'verdict', block: 'deny' }),
+      [n.MUSE_NAME_IDS.config]: n.entriesOf(n.CONFIG_ROLES, { ...n.MUSE_CONFIG, hooks: 'hook_set', mcpServers: 'mcp_servers', mode: 'startup' }),
+      [n.MUSE_NAME_IDS.log]: n.entriesOf(n.LOG_ROLES, { ...n.MUSE_LOG_NAMES, session: 'rt.session', inputTokens: 'in_tokens' })
+    }
+  }
+  const reset = (): Promise<void> => set({})
+
+  it("gives a launch's arguments and hooks by the names set, and reads its hooks, edits and lock replies back by them", async () => {
+    const { MuseAdapter } = await import('../src/main/providers/muse/adapter')
+    const { launchNames } = await import('../src/main/providers/muse/names')
+    try {
+      await set(await renamed())
+      const names = launchNames()
+      const hooks = museHooks('http://h/?r=1', 'C:\\a.txt', 'C:\\g.md', 10, names.events) as Record<string, { hooks: { command: string }[] }[]>
+      expect(Object.keys(hooks)).toContain('Begin')
+      expect(Object.keys(hooks)).not.toContain('SessionStart')
+      expect(hooks.Begin[0].hooks[0].command).toBe('type C:\\g.md')
+      expect(hooks.BeforeTool[0].hooks[0].command).not.toMatch(/-o NUL$/)
+      const servers = launchServers({ [TOOLS_SERVER]: { command: 'node', args: ['x.js'] } }, new Set(), {}, names.config)
+      expect(servers.pass[TOOLS_SERVER]).toMatchObject({ startup: 'required' })
+      const args = museArgs({ ctx: { executable: 'muse.exe', resume: false, sessionId: '', model: '', effort: '', permissionMode: '', extraArgs: [], initialPrompt: 'go' } as never, hooks, servers: servers.pass, keepPersonalOut: true, config: names.config })
+      expect(args.some((a) => a.startsWith('hook_set={"Begin":'))).toBe(true)
+      expect(args.some((a) => a.startsWith(`mcp_servers.${TOOLS_SERVER}=`))).toBe(true)
+      expect(args.some((a) => a.startsWith('hooks=') || a.startsWith('mcpServers.'))).toBe(false)
+
+      // The launch's own copy reads its hooks by the names it gave them, whatever the setting says afterwards.
+      const launched = new MuseAdapter().forLaunch()
+      await reset()
+      const later = new MuseAdapter().forLaunch()
+      const start = { hook_event_name: 'Begin', session_id: SESSION, source: 'startup', turn_ref: 't1', cwd: 'C:\\proj' }
+      expect(launched.hooks!.normalizeHook(start)).toMatchObject({ event: { kind: 'start', source: 'startup' }, sessionId: SESSION, ids: { turn: 't1' } })
+      expect(later.hooks!.normalizeHook(start).event).toEqual({ kind: 'ignore' })
+      expect(later.hooks!.normalizeHook({ ...start, hook_event_name: 'SessionStart' }).event).toMatchObject({ kind: 'start' })
+      const edit = { hook_event_name: 'BeforeTool', session_id: SESSION, cwd: 'C:\\proj', tool_name: 'apply_patch', tool_input: { diff: '*** Update File: src/a.ts\n' } }
+      expect(launched.hooks!.normalizeHook(edit)).toMatchObject({ event: { kind: 'toolStart' }, editedPaths: ['C:\\proj\\src\\a.ts'] })
+      expect(launched.hooks!.lockReply({ kind: 'deny', reason: 'held' })).toEqual({ verdict: 'deny', reason: 'held' })
+      expect(later.hooks!.lockReply({ kind: 'deny', reason: 'held' })).toEqual({ decision: 'block', reason: 'held' })
+      // A field is the body's own: a name that is a prototype's (constructor, toString) reads nothing.
+      expect(normalizeMuseHook({ hook_event_name: 'constructor' }, { names: /x/, pathField: 'path' }).event).toEqual({ kind: 'ignore' })
+    } finally {
+      await reset()
+    }
+  })
+
+  it("reads the session log's conversation and usage by the names set, one reader's names throughout", async () => {
+    const { MuseConversationParser, MuseUsageParser, parseMuseTranscript } = await import('../src/main/providers/muse/transcript')
+    const log = fixture('muse/session-1.4.20-echo.jsonl')
+    // The same log as a Muse that renamed runtime.session and input_tokens would write it (in wrapped records too).
+    const moved = log.split('"payload_type":"runtime.session"').join('"payload_type":"rt.session"').split('\\"payload_type\\":\\"runtime.session\\"').join('\\"payload_type\\":\\"rt.session\\"').split('"input_tokens"').join('"in_tokens"').split('\\"input_tokens\\"').join('\\"in_tokens\\"')
+    expect(moved).not.toBe(log)
+    const before = parseMuseTranscript(log, SESSION)
+    try {
+      await set(await renamed())
+      const after = parseMuseTranscript(moved, SESSION)
+      expect([after.requests, after.inputTokens, after.outputTokens, after.userMessages, after.cliVersion]).toEqual([before.requests, before.inputTokens, before.outputTokens, before.userMessages, before.cliVersion])
+      expect(after.requests).toBeGreaterThan(0)
+      // The old log, read by the new names, has no run events.
+      expect(parseMuseTranscript(log, SESSION).requests).toBe(0)
+      const conv = new MuseConversationParser()
+      conv.feed(Buffer.from(moved))
+      expect(conv.items.some((i) => i.kind === 'assistant')).toBe(true)
+      // A reader made before a change keeps its names to its end.
+      const usage = new MuseUsageParser(SESSION)
+      await reset()
+      usage.feed(moved)
+      expect(usage.result().requests).toBe(before.requests)
+    } finally {
+      await reset()
+    }
+  })
+
+  it("falls back to 1.4.20's names whole when a stored mapping isn't one: never part of a map", async () => {
+    const { launchNames, logNames } = await import('../src/main/providers/muse/names')
+    const n = await import('../src/shared/providers/muse/names')
+    try {
+      await set({ [n.MUSE_NAME_IDS.events]: ['start=Begin'], [n.MUSE_NAME_IDS.fields]: [...n.entriesOf(n.FIELD_ROLES, n.MUSE_FIELDS), 'extra=x'], [n.MUSE_NAME_IDS.config]: n.entriesOf(n.CONFIG_ROLES, { ...n.MUSE_CONFIG, hooks: 'same', mcpServers: 'same' }), [n.MUSE_NAME_IDS.log]: 'not a list' })
+      expect(launchNames()).toEqual({ events: n.MUSE_EVENTS, fields: n.MUSE_FIELDS, config: n.MUSE_CONFIG })
+      expect(logNames()).toEqual(n.MUSE_LOG_NAMES)
+    } finally {
+      await reset()
+    }
   })
 })

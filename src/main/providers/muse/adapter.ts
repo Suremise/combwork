@@ -17,6 +17,7 @@ import { checkHome, checkSandbox, locateMuse, museLoginCommand, museReadiness, m
 import { guidancePaths, hookPath, launchGuidance, launchServers, museArgs, museHooks, startContext, windowsShortName } from './launch'
 import { museLockReply, normalizeMuseHook, type EditTools } from './hooks'
 import { judgeProject, projectConfig, UnreadableConfig, type ProjectConfig } from './projectConfig'
+import { launchNames, type MuseNames } from './names'
 import { MuseConversationParser, MuseUsageParser, isMuseSessionId, museSessionFile, parseMuseTranscript } from './transcript'
 
 // Meta's Muse Code as a Combwork provider (HI-3202, against 1.4.20; the spike HI-2895). Each launch runs on its account's
@@ -60,6 +61,18 @@ interface Prepared {
 export class MuseAdapter implements ProviderAdapter {
   readonly id = MUSE
   readonly descriptor = MUSE_DESCRIPTOR
+  /**
+   * `pinned`: a launch's own names (forLaunch), which its hooks were given and are read back by to its end; absent (the
+   * registry's instance), the names as they are now.
+   */
+  constructor(private readonly pinned: MuseNames | null = null) {}
+  /** Its copy for a launch (HI-3202): Muse's names (muse.names.*) taken now and kept until it ends. */
+  forLaunch(): ProviderAdapter {
+    return new MuseAdapter(launchNames())
+  }
+  private get names(): MuseNames {
+    return this.pinned ?? launchNames()
+  }
   // Its capability parts (ProviderAdapter), each implemented by this class's own members.
   get install(): this {
     return this
@@ -220,7 +233,7 @@ export class MuseAdapter implements ProviderAdapter {
       throw combworkError(REFUSED.projectServers, { provider: NAME, servers: fmt.list([...verdict.refused.keys()]), count: files.length, files: fmt.list(files) })
     }
     if (keepOut && verdict.hookFiles.length) throw combworkError(REFUSED.projectHooks, { provider: NAME, count: verdict.hookFiles.length, files: fmt.list(verdict.hookFiles) })
-    const { pass, vars, skipped } = launchServers(ctx.mcpServers, verdict.fromProject, ctx.env)
+    const { pass, vars, skipped } = launchServers(ctx.mcpServers, verdict.fromProject, ctx.env, this.names.config)
     // The guidance, whole where it fits Muse's start limit, else a pointer to the file holding it (startContext).
     const paths = guidancePaths(ctx.privateDir)
     const max = advanced.number('muse.guidance.maxBytes')
@@ -254,8 +267,9 @@ export class MuseAdapter implements ProviderAdapter {
     const p = this.prepared.get(ctx.runId)
     if (!p) throw new Error('a Muse launch was built before it was prepared') // i18n-ignore: an internal check, never shown
     keepBounded(this.prepared, ctx.runId, p)
-    const hooks = museHooks(ctx.hookUrl, p.authFile, p.guidanceFile, advanced.number('muse.hooks.timeoutSeconds'))
-    const args = museArgs({ ctx: { ...ctx, executable }, hooks, servers: p.servers, keepPersonalOut: launchOverrides(ctx.overrides, MUSE, 'keepPersonalOut') })
+    const names = this.names
+    const hooks = museHooks(ctx.hookUrl, p.authFile, p.guidanceFile, advanced.number('muse.hooks.timeoutSeconds'), names.events)
+    const args = museArgs({ ctx: { ...ctx, executable }, hooks, servers: p.servers, keepPersonalOut: launchOverrides(ctx.overrides, MUSE, 'keepPersonalOut'), config: names.config })
     const env = { ...museEnv(ctx.env, p.home, launchOverrides(ctx.overrides, MUSE, 'stripAccountVars')), ...p.vars }
     return { ...toSpawnable(executable, args), env }
   }
@@ -280,11 +294,11 @@ export class MuseAdapter implements ProviderAdapter {
 
   // ---- Hooks.
   normalizeHook(body: Record<string, any>): NormalizedHook {
-    return normalizeMuseHook(body, this.editTools())
+    return normalizeMuseHook(body, this.editTools(), this.names)
   }
 
   lockReply(d: LockDecision): Record<string, unknown> {
-    return museLockReply(d)
+    return museLockReply(d, this.names.fields)
   }
 
   /** None: Muse's reply forms for a notice aren't recorded (only PreToolUse's reply reaches it: launch.ts). */

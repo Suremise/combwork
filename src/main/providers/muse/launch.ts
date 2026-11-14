@@ -9,6 +9,8 @@ import { findSecretWarnings } from '../../mcpSecrets'
 import { taskArgs } from '../common'
 import type { LaunchContext } from '../types'
 import { isMuseSessionId } from './transcript'
+import { DEFAULT_NAMES, type MuseNames } from './names'
+import { EVENT_ROLES } from '../../../shared/providers/muse/names'
 
 // A Muse launch's command line (HI-3202, checked against 1.4.20 offline): `muse [resume <id>] <options>
 // --trust-workspace -c hooks=<json> -c mcpServers.<name>=<json>… -c context.foreign_personal_*=false [-- PROMPT]`. Every
@@ -59,9 +61,10 @@ const isRef = (v: unknown): boolean => typeof v === 'string' && /^\$\{[A-Za-z_][
  * literal goes into Muse's environment under a name of Combwork's (`vars`, prefix `${prefix}_<n>`), and the value names
  * it. A literal secret would then be in the environment of everything Muse runs, so such a server isn't passed (Codex's
  * rule); the user's own `${VAR}` reference is passed as it is, and only when that variable is set in `env` (else Muse
- * refuses the whole run). Combwork's own is `mode: "required"`, so a session never runs without its tools.
+ * refuses the whole run). Combwork's own is `mode: "required"`, so a session never runs without its tools (`config`: the launch's
+ * names for them, muse.names.configKeys).
  */
-export function museServer(name: string, def: McpServerDef, prefix: string, env: Readonly<Record<string, string>>): { value: Record<string, unknown>; vars: Record<string, string> } | { skipped: 'secret' | 'mixed' | 'unset' | 'empty' } {
+export function museServer(name: string, def: McpServerDef, prefix: string, env: Readonly<Record<string, string>>, config: MuseNames['config'] = DEFAULT_NAMES.config): { value: Record<string, unknown>; vars: Record<string, string> } | { skipped: 'secret' | 'mixed' | 'unset' | 'empty' } {
   if (findSecretWarnings(def).length) return { skipped: 'secret' }
   const vars: Record<string, string> = {}
   let problem: 'mixed' | 'unset' | null = null
@@ -83,7 +86,7 @@ export function museServer(name: string, def: McpServerDef, prefix: string, env:
     }
     return out
   }
-  const required = name === TOOLS_SERVER ? { mode: 'required' } : {}
+  const required = name === TOOLS_SERVER ? { [config.mode]: config.modeRequired } : {}
   if (typeof def.url === 'string' && def.url) {
     const headers = leaves(def.headers)
     if (problem) return { skipped: problem }
@@ -105,7 +108,7 @@ export const SERVER_VARS = 'CW_MUSE_MCP'
  * The servers a launch passes, by name (museServer's values), the variables their values are in (for Muse's environment),
  * and those it can't pass, with why. `env`: the launch's environment, where a `${VAR}` of the user's must be set.
  */
-export function launchServers(given: Record<string, McpServerDef>, fromProject: ReadonlySet<string>, env: Readonly<Record<string, string>>): { pass: Record<string, Record<string, unknown>>; vars: Record<string, string>; skipped: Map<string, string> } {
+export function launchServers(given: Record<string, McpServerDef>, fromProject: ReadonlySet<string>, env: Readonly<Record<string, string>>, config: MuseNames['config'] = DEFAULT_NAMES.config): { pass: Record<string, Record<string, unknown>>; vars: Record<string, string>; skipped: Map<string, string> } {
   const pass: Record<string, Record<string, unknown>> = Object.create(null)
   const vars: Record<string, string> = {}
   const skipped = new Map<string, string>()
@@ -117,7 +120,7 @@ export function launchServers(given: Record<string, McpServerDef>, fromProject: 
       skipped.set(name, 'name')
       continue
     }
-    const s = museServer(name, def, `${SERVER_VARS}_${n++}`, env)
+    const s = museServer(name, def, `${SERVER_VARS}_${n++}`, env, config)
     if ('value' in s) {
       pass[name] = s.value
       Object.assign(vars, s.vars)
@@ -126,8 +129,8 @@ export function launchServers(given: Record<string, McpServerDef>, fromProject: 
   return { pass, vars, skipped }
 }
 
-/** The hook events Combwork asks Muse for (1.4.20's names), in the order they're given. */
-export const HOOK_EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'PermissionRequest', 'Notification', 'Stop', 'StopFailure', 'Interrupt', 'PreCompact', 'PostCompact', 'SessionEnd'] as const // i18n-ignore: a CLI's hook event names
+/** The hook events Combwork asks Muse for, by their roles, in the order they're given (their names: muse.names.hookEvents). */
+export const HOOK_EVENTS = EVENT_ROLES
 
 /**
  * A path a hook command can name without quotes: Muse 1.4.20 runs a hook as `%COMSPEC% /C <command>` with each `"` in it
@@ -160,21 +163,22 @@ export function museForwardCommand(hookUrl: string, authPath: string, seconds: n
  * The hooks a launch gives Muse (`-c hooks=<json>`): each event forwards its JSON to Combwork's hook server (curl, the
  * launch's auth file: no token in the command or the environment); SessionStart first prints the launch's guidance
  * file. Muse runs a hook through %COMSPEC% /C, with its JSON on stdin and a cleared environment (1.4.20, observed). Paths
- * are hookPath's.
+ * are hookPath's. Each event is keyed by the launch's name for it (`events`, muse.names.hookEvents), the name its hooks
+ * then come back with.
  */
-export function museHooks(hookUrl: string, authPath: string, guidancePath: string | null, seconds: number): Record<string, unknown> {
+export function museHooks(hookUrl: string, authPath: string, guidancePath: string | null, seconds: number, events: MuseNames['events'] = DEFAULT_NAMES.events): Record<string, unknown> {
   const command = museForwardCommand(hookUrl, authPath, seconds)
   // Only PreToolUse's reply is Muse's to read (a lock's block). Any other's is discarded: Muse takes a hook's plain output
   // as context (SessionStart's, observed), and Combwork's reply to it is never meant for the model.
   const quiet = `${command} -o NUL`
-  const out: Record<string, unknown> = {}
-  for (const event of HOOK_EVENTS) {
+  const out: Record<string, unknown> = Object.create(null)
+  for (const role of HOOK_EVENTS) {
     const hooks: Record<string, unknown>[] = []
     // Its plain output is the session's start context (cmd's `type` prints the file's bytes as they are: UTF-8 kept).
-    if (event === 'SessionStart' && guidancePath) hooks.push({ type: 'command', command: `type ${guidancePath}`, timeout: seconds }) // i18n-ignore: a hook command the CLI runs
+    if (role === 'start' && guidancePath) hooks.push({ type: 'command', command: `type ${guidancePath}`, timeout: seconds }) // i18n-ignore: a hook command the CLI runs
     // 1.4.20 admits an Interrupt hook only as async ("synchronous cancellation hooks are not admitted", observed).
-    hooks.push({ type: 'command', command: event === 'PreToolUse' ? command : quiet, timeout: seconds, ...(event === 'Interrupt' ? { async: true } : {}) })
-    out[event] = [{ hooks }]
+    hooks.push({ type: 'command', command: role === 'preTool' ? command : quiet, timeout: seconds, ...(role === 'interrupt' ? { async: true } : {}) })
+    out[events[role]] = [{ hooks }]
   }
   return out
 }
@@ -184,6 +188,8 @@ export interface MuseArgsInput {
   hooks: Record<string, unknown>
   servers: Record<string, Record<string, unknown>>
   keepPersonalOut: boolean
+  /** The launch's names for the settings it gives (muse.names.configKeys); 1.4.20's when absent. */
+  config?: MuseNames['config']
 }
 
 /** A launch's arguments (1.4.20's --help; `muse resume <id>` takes the root options after it). */
@@ -199,9 +205,10 @@ export function museArgs(i: MuseArgsInput): string[] {
   args.push(...museModeFlags(ctx.permissionMode || MUSE_DESCRIPTOR.defaultPermissionMode))
   // Combwork's tools start only in a trusted workspace (1.4.20 withholds every MCP server otherwise); for this run only.
   args.push('--trust-workspace')
-  args.push('-c', `hooks=${JSON.stringify(i.hooks)}`)
-  for (const [name, value] of Object.entries(i.servers)) args.push('-c', `mcpServers.${name}=${JSON.stringify(value)}`)
-  if (i.keepPersonalOut) args.push('-c', 'context.foreign_personal_skills=false', '-c', 'context.foreign_personal_rules=false')
+  const config = i.config ?? DEFAULT_NAMES.config
+  args.push('-c', `${config.hooks}=${JSON.stringify(i.hooks)}`)
+  for (const [name, value] of Object.entries(i.servers)) args.push('-c', `${config.mcpServers}.${name}=${JSON.stringify(value)}`)
+  if (i.keepPersonalOut) args.push('-c', `${config.foreignSkills}=false`, '-c', `${config.foreignRules}=false`)
   args.push(...ctx.extraArgs)
   // A new session's first task on its command line (after --, observed); a resume takes none (resumePromptTyped).
   if (ctx.initialPrompt && !ctx.resume) args.push(...taskArgs(ctx.executable, ctx.initialPrompt))
