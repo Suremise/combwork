@@ -2668,7 +2668,7 @@
     "description": "Under an advanced setting whose value no longer finds what the CLI was recorded showing (Settings → Advanced). {cli} is the CLI's name, {version} its version; {shown} is the CLI's own text, in English."
   },
   "settings.advanced.muse.guidance.maxBytes.desc": {
-    "defaultMessage": "The most of a start hook's output Muse keeps as the session's context (1.4.20 cuts the rest off). Combwork's guidance, the agent's instructions and the Workspace notes go in whole when they fit; when they don't, Combwork gives a short pointer to the file that holds them instead. Too large, Muse cuts them off unseen.",
+    "defaultMessage": "The most of a start hook's output Muse keeps as the session's context (1.4.20 keeps none of a longer one). Combwork's guidance, the agent's instructions and the Workspace notes go in whole when they fit; when they don't, Combwork gives a short pointer to the file that holds them instead. Too large, Muse drops them, and the agent starts without them.",
     "description": "What the advanced setting \"Guidance: most Muse takes at start\" is for, and what goes wrong when it is wrong (Settings → Advanced). Workspace notes is a place in Combwork."
   },
   "settings.advanced.muse.guidance.maxBytes.title": {

@@ -97,14 +97,14 @@ export const ADVANCED: readonly AdvancedSource[] = [
     id: 'muse.guidance.maxBytes',
     group: 'muse',
     title: msg({ id: 'settings.advanced.muse.guidance.maxBytes.title', defaultMessage: 'Guidance: most Muse takes at start', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
-    desc: msg({ id: 'settings.advanced.muse.guidance.maxBytes.desc', defaultMessage: "The most of a start hook's output Muse keeps as the session's context (1.4.20 cuts the rest off). Combwork's guidance, the agent's instructions and the Workspace notes go in whole when they fit; when they don't, Combwork gives a short pointer to the file that holds them instead. Too large, Muse cuts them off unseen.", description: 'What the advanced setting "Guidance: most Muse takes at start" is for, and what goes wrong when it is wrong (Settings → Advanced). Workspace notes is a place in Combwork.' }),
+    desc: msg({ id: 'settings.advanced.muse.guidance.maxBytes.desc', defaultMessage: "The most of a start hook's output Muse keeps as the session's context (1.4.20 keeps none of a longer one). Combwork's guidance, the agent's instructions and the Workspace notes go in whole when they fit; when they don't, Combwork gives a short pointer to the file that holds them instead. Too large, Muse drops them, and the agent starts without them.", description: 'What the advanced setting "Guidance: most Muse takes at start" is for, and what goes wrong when it is wrong (Settings → Advanced). Workspace notes is a place in Combwork.' }),
     kind: 'number',
     default: 16384,
     min: 1024,
     max: 1048576,
     unit: 'bytes',
     applies: 'sessions',
-    samples: [{ from: `${FIX}/muse/session-1.4.20-echo.jsonl`, version: '1.4.20', text: 'PROBE-SESSIONSTART-MARKER-7f3a: the session contract would be here.', shows: 'A start hook’s plain output kept as the session’s context (a 20 KB one was cut at 16,384 bytes)' }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/muse/session-1.4.20-echo.jsonl`, version: '1.4.20', text: 'PROBE-SESSIONSTART-MARKER-7f3a: the session contract would be here.', shows: 'A start hook’s plain output kept as the session’s context (1.4.20 keeps 16,384 bytes whole and none of one byte more: tests/fixtures/muse/guidance-limit-1.4.20.json)' }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'muse.sandbox.setupRequired',

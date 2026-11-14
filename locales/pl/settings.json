@@ -651,7 +651,7 @@
   "settings.advanced.miss.field": "{cli} {version}: brak tu pola „{field}” (wysłane pola: {fields}). Nie szkodzi, jeśli od tamtej pory {cli} ma nową wersję.",
   "settings.advanced.miss.list": "{cli} {version}: pola spoza tej listy: {missing} (wszystkie wysłane pola: {fields}). Nie szkodzi, jeśli od tamtej pory {cli} ma nową wersję.",
   "settings.advanced.miss.text": "Ta wartość nie pasuje do tekstu pokazanego przez {cli} {version} („{shown}”). Nie szkodzi, jeśli od tamtej pory {cli} ma nową wersję.",
-  "settings.advanced.muse.guidance.maxBytes.desc": "Najwięcej wyjścia hooka startowego, ile Muse zachowuje jako kontekst sesji (1.4.20 obcina resztę). Wskazówki Combwork, instrukcje agenta i notatki obszaru roboczego trafiają w całości, gdy się mieszczą; gdy nie, Combwork daje zamiast nich krótki odnośnik do pliku, który je zawiera. Za duża wartość: Muse obcina je niezauważenie.",
+  "settings.advanced.muse.guidance.maxBytes.desc": "Najwięcej wyjścia hooka startowego, ile Muse zachowuje jako kontekst sesji (1.4.20 z dłuższego nie zachowuje nic). Wskazówki Combwork, instrukcje agenta i notatki obszaru roboczego trafiają w całości, gdy się mieszczą; gdy nie, Combwork daje zamiast nich krótki odnośnik do pliku, który je zawiera. Za duża wartość: Muse je odrzuca, a agent startuje bez nich.",
   "settings.advanced.muse.guidance.maxBytes.title": "Wskazówki: najwięcej, ile Muse przyjmuje na starcie",
   "settings.advanced.muse.hooks.editTools.desc": "Nazwy narzędzi Muse, które zmieniają pliki; Combwork sprawdza je przed uruchomieniem z blokadami plików innych agentów. Jeśli są złe, edycja zablokowanego pliku nie zostaje odrzucona.",
   "settings.advanced.muse.hooks.editTools.title": "Hooki: narzędzia edytujące pliki",

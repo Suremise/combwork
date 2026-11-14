@@ -666,7 +666,7 @@
   "settings.advanced.miss.field": "{cli} {version} sent no field \"{field}\" here (it sent {fields}). Fine if {cli} has changed since.",
   "settings.advanced.miss.list": "{cli} {version} sent {missing}, which this list doesn't have (it sent {fields}). Fine if {cli} has changed since.",
   "settings.advanced.miss.text": "It doesn't find what {cli} {version} showed (\"{shown}\"). Fine if {cli} has changed since.",
-  "settings.advanced.muse.guidance.maxBytes.desc": "The most of a start hook's output Muse keeps as the session's context (1.4.20 cuts the rest off). Combwork's guidance, the agent's instructions and the Workspace notes go in whole when they fit; when they don't, Combwork gives a short pointer to the file that holds them instead. Too large, Muse cuts them off unseen.",
+  "settings.advanced.muse.guidance.maxBytes.desc": "The most of a start hook's output Muse keeps as the session's context (1.4.20 keeps none of a longer one). Combwork's guidance, the agent's instructions and the Workspace notes go in whole when they fit; when they don't, Combwork gives a short pointer to the file that holds them instead. Too large, Muse drops them, and the agent starts without them.",
   "settings.advanced.muse.guidance.maxBytes.title": "Guidance: most Muse takes at start",
   "settings.advanced.muse.hooks.editTools.desc": "The names of Muse's tools that change files, which Combwork checks against other agents' file locks before they run. Wrong, an edit of a locked file isn't refused.",
   "settings.advanced.muse.hooks.editTools.title": "Hooks: tools that edit files",

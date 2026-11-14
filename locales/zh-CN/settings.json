@@ -651,7 +651,7 @@
   "settings.advanced.miss.field": "{cli} {version} 在这里没有发送字段“{field}”（它发送的是 {fields}）。如果 {cli} 之后有过变化，这没有问题。",
   "settings.advanced.miss.list": "{cli} {version} 发送了此列表中没有的 {missing}（它发送的是 {fields}）。如果 {cli} 之后有过变化，这没有问题。",
   "settings.advanced.miss.text": "它找不到 {cli} {version} 显示的内容（“{shown}”）。如果 {cli} 之后有过变化，这没有问题。",
-  "settings.advanced.muse.guidance.maxBytes.desc": "启动钩子的输出中 Muse 作为会话上下文保留的上限（1.4.20 会截断其余部分）。Combwork 的指南、智能体的说明和工作区笔记放得下时会完整传入；放不下时，Combwork 改为提供指向存放它们的文件的简短引用。设置得太大，Muse 会在无人察觉的情况下截断它们。",
+  "settings.advanced.muse.guidance.maxBytes.desc": "启动钩子的输出中 Muse 作为会话上下文保留的上限（超过此长度的输出，1.4.20 会全部丢弃）。Combwork 的指南、智能体的说明和工作区笔记放得下时会完整传入；放不下时，Combwork 改为提供指向存放它们的文件的简短引用。设置得太大，Muse 会丢弃它们，智能体启动时就没有这些内容。",
   "settings.advanced.muse.guidance.maxBytes.title": "指南：Muse 启动时接收的上限",
   "settings.advanced.muse.hooks.editTools.desc": "Muse 中更改文件的工具名称，Combwork 会在它们运行前对照其他智能体的文件锁进行检查。若设置有误，对已锁定文件的编辑不会被拒绝。",
   "settings.advanced.muse.hooks.editTools.title": "钩子：编辑文件的工具",
