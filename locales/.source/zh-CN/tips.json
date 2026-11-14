@@ -145,6 +145,8 @@
   "tips.cardLinks.title": "Ctrl+click a card number in the terminal",
   "tips.cardLoop.text": "Tell one agent to work through some cards as the builder and another to review them: each waits for the other at no cost, and Combwork wakes it when the card changes.",
   "tips.cardLoop.title": "Let two agents build and review in turn",
+  "tips.cardLoopChurn.text": "With a reviewer agent, Combwork counts each card’s back-and-forth and asks you whether to simplify at 12, and how to go on at 30. Set both under Card loops in Version Control → Workflow.",
+  "tips.cardLoopChurn.title": "A card that goes round in circles stops",
   "tips.cardMove.text": "Drag any dialog by its header (a card, Add Agent, Agent Settings…) to see what's behind it; Escape while dragging puts it back.",
   "tips.cardMove.title": "Move a dialog out of the way",
   "tips.cardReadFirst.text": "In a card's Read first, list the doc sections it needs, like docs/PLAN.md#setup: the agent's start prompt lists them, so it reads those sections instead of a whole plan. Click one to read it in Combwork.",

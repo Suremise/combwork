@@ -143,6 +143,8 @@
   "tips.cardLinks.title": "Ctrl+clic sur un numéro de carte dans le terminal",
   "tips.cardLoop.text": "Demande à un agent de traiter des cartes en tant qu’auteur et à un autre de les relire : chacun attend l’autre sans frais, et Combwork le réveille quand la carte change.",
   "tips.cardLoop.title": "Deux agents qui font et relisent à tour de rôle",
+  "tips.cardLoopChurn.text": "Avec un agent relecteur, Combwork compte les allers-retours de chaque carte et vous demande s’il faut simplifier à 12, et comment continuer à 30. Réglez les deux sous Boucles de cartes, dans Gestion de versions → Flux de travail.",
+  "tips.cardLoopChurn.title": "Une carte qui tourne en rond s’arrête",
   "tips.cardMove.text": "Fais glisser n’importe quelle boîte de dialogue par son en-tête (une carte, Ajouter un agent, Paramètres de l’agent…) pour voir ce qu’il y a derrière ; Échap pendant le glissement la remet en place.",
   "tips.cardMove.title": "Écarter une boîte de dialogue",
   "tips.cardReadFirst.text": "Dans « À lire d’abord » d’une carte, liste les sections de documents dont elle a besoin, comme docs/PLAN.md#setup : le prompt de démarrage de l’agent les cite, donc il lit ces sections plutôt qu’un plan entier. Clique sur l’une d’elles pour la lire dans Combwork.",

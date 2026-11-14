@@ -5,7 +5,6 @@
 // open question. Screenshots of For you and the badge, light and dark. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
-const { _electron } = require('playwright-core')
 const { execFileSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
@@ -39,14 +38,9 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
-  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' }, viewport: { width: 1300, height: 860 } })
   try {
-    const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    await lib.fitWindow(app, page, { width: 1300, height: 860 })
-    await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await page.getByText('alpha', { exact: true }).first().click()
     // Pair: a reviewer agent; the simplify check at 2 and the hard stop at 4, so a few requests reach each.

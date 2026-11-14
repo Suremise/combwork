@@ -143,6 +143,8 @@
   "tips.cardLinks.title": "Strg+Klick auf eine Kartennummer im Terminal",
   "tips.cardLoop.text": "Sag einem Agenten, er soll einige Karten als Bearbeiter abarbeiten, und einem anderen, er soll sie reviewen: Jeder wartet kostenlos auf den anderen, und Combwork weckt ihn, wenn sich die Karte ändert.",
   "tips.cardLoop.title": "Zwei Agenten abwechselnd bauen und reviewen lassen",
+  "tips.cardLoopChurn.text": "Mit einem Reviewer-Agenten zählt Combwork die Abstimmungsrunden jeder Karte und fragt dich bei 12, ob vereinfacht werden soll, und bei 30, wie es weitergeht. Beides stellst du unter Kartenschleifen in Versionsverwaltung → Workflow ein.",
+  "tips.cardLoopChurn.title": "Eine Karte, die sich im Kreis dreht, hält an",
   "tips.cardMove.text": "Zieh jeden Dialog an seinem Kopf (eine Karte, „Agent hinzufügen“, „Agent-Einstellungen“…), um zu sehen, was dahinter liegt; Escape während des Ziehens setzt ihn zurück.",
   "tips.cardMove.title": "Einen Dialog beiseiteschieben",
   "tips.cardReadFirst.text": "Liste unter „Zuerst lesen“ einer Karte die Dokumentabschnitte auf, die sie braucht, etwa docs/PLAN.md#setup: Der Startprompt des Agenten nennt sie, sodass er diese Abschnitte statt eines ganzen Plans liest. Klicke auf einen, um ihn in Combwork zu lesen.",
