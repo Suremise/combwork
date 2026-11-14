@@ -484,7 +484,7 @@
   "performance.trend.errors": "Errores reales",
   "performance.trend.errorsLine": "{errors, plural, one {# error real} many {# errores reales} other {# errores reales}}",
   "performance.toolList.upfront": "Si se aplaza",
-  "performance.toolList.upfrontTip": "Una estimación de Combwork, no una medida: lo que una CLI que aplaza las herramientas MCP recibe al inicio si lo hace: las herramientas que Combwork marca para enviarse completas y los nombres de las demás. Claude Code las aplaza salvo que su búsqueda de herramientas esté desactivada (un ajuste, un modelo o una pasarela pueden desactivarla); no se puede observar si un inicio lo hizo ni cómo redacta la CLI la lista. Un guion: una CLI que no aplaza (Codex y Copilot reciben la lista entera: Bytes), o no se sabe.",
+  "performance.toolList.upfrontTip": "Una estimación de Combwork, no una medida: lo que una CLI que aplaza las herramientas MCP recibe al inicio si lo hace: las herramientas que Combwork marca para enviarse completas y los nombres de las demás. Claude Code las aplaza salvo que su búsqueda de herramientas esté desactivada (un ajuste, un modelo o una pasarela pueden desactivarla). Codex aplaza todas, también las marcadas, así que no recibe nada de la lista al inicio (0), solo el nombre del servidor. No se puede observar si un inicio lo hizo ni cómo redacta la CLI la lista. Un guion: una CLI que no aplaza (Copilot recibe la lista entera: Bytes), o no se sabe.",
   "performance.toolList.unknownProvider": "Desconocido",
   "performance.reasons.unknown": "Un motivo que esta versión de Combwork no conoce"
 }

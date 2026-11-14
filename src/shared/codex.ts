@@ -142,7 +142,9 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
     planModeToggle: true,
     promptCacheTtl: false,
     reportsCost: false,
-    defersMcpTools: false,
+    // Every MCP tool behind its tool search, marked or not (HI-3225: 0.167 and 0.169, every listed model; checked offline
+    // against a stand-in and once signed in): its model sees `mcp__combwork` only.
+    defersMcpTools: 'all',
     compactFocus: false,
     contextLimit: false,
     autoCompactReserve: null,

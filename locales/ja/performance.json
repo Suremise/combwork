@@ -484,7 +484,7 @@
   "performance.trend.errors": "実際のエラー",
   "performance.trend.errorsLine": "{errors, plural, other {実際のエラー # 件}}",
   "performance.toolList.upfront": "遅延時",
-  "performance.toolList.upfrontTip": "計測ではなく Combwork の推定です。MCP ツールを遅延読み込みする CLI が、そうした場合に開始時に受け取るもの: Combwork が全体を送るよう指定したツールと、ほかのツールの名前。Claude Code はツール検索がオフでない限り遅延読み込みします（設定、モデル、ゲートウェイによってオフになることがあります）。起動ごとに実際にそうしたか、CLI が一覧をどう表現するかは観測できません。ダッシュ: 遅延読み込みしない CLI（Codex と Copilot は一覧全体を受け取ります: バイト）、または不明。",
+  "performance.toolList.upfrontTip": "計測ではなく Combwork の推定です。MCP ツールを遅延読み込みする CLI が、そうした場合に開始時に受け取るもの: Combwork が全体を送るよう指定したツールと、ほかのツールの名前。Claude Code はツール検索がオフでない限り遅延読み込みします（設定、モデル、ゲートウェイによってオフになることがあります）。Codex は指定したものも含めすべてを遅延読み込みするため、開始時には一覧を何も受け取らず（0）、サーバー名だけを受け取ります。起動ごとに実際にそうしたか、CLI が一覧をどう表現するかは観測できません。ダッシュ: 遅延読み込みしない CLI（Copilot は一覧全体を受け取ります: バイト）、または不明。",
   "performance.toolList.unknownProvider": "不明",
   "performance.reasons.unknown": "このバージョンの Combwork が知らない理由"
 }

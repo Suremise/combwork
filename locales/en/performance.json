@@ -1728,8 +1728,8 @@
     "description": "Column header of the Combwork tool list table (HI-2553): Combwork's estimate of the bytes a CLI that defers MCP tools (Claude Code) puts in its prompt at the start, if it does, a start, on average. Shown with ≈."
   },
   "performance.toolList.upfrontTip": {
-    "defaultMessage": "Combwork’s estimate, not a measurement: what a CLI that defers MCP tools gets at the start if it does, the tools Combwork marks to be sent in full and the others’ names. Claude Code defers them unless its tool search is off (a setting, a model or a gateway can turn it off); whether a launch did, and how the CLI words the list, aren’t observable. A dash: a CLI that doesn’t defer (Codex and Copilot get the whole list: Bytes), or not known.",
-    "description": "Info tip of the If deferred column of the Combwork tool list table (HI-2553). Keep Combwork, Claude Code, Codex and Copilot (names); Bytes is a column: name it as there."
+    "defaultMessage": "Combwork’s estimate, not a measurement: what a CLI that defers MCP tools gets at the start if it does, the tools Combwork marks to be sent in full and the others’ names. Claude Code defers them unless its tool search is off (a setting, a model or a gateway can turn it off). Codex defers every one, the marked ones too, so it gets none of the list up front (0), only the server’s name. Whether a launch did, and how the CLI words the list, aren’t observable. A dash: a CLI that doesn’t defer (Copilot gets the whole list: Bytes), or not known.",
+    "description": "Info tip of the If deferred column of the Combwork tool list table (HI-2553, HI-3225). Keep Combwork, Claude Code, Codex and Copilot (names); Bytes is a column: name it as there."
   },
   "performance.tools.calls": {
     "defaultMessage": "Calls",

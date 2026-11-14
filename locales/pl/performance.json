@@ -484,7 +484,7 @@
   "performance.trend.errors": "Prawdziwe błędy",
   "performance.trend.errorsLine": "{errors, plural, one {# prawdziwy błąd} few {# prawdziwe błędy} many {# prawdziwych błędów} other {# prawdziwego błędu}}",
   "performance.toolList.upfront": "Przy odroczeniu",
-  "performance.toolList.upfrontTip": "Szacunek Combwork, nie pomiar: co CLI odraczające narzędzia MCP dostaje na starcie, jeśli je odracza: narzędzia oznaczone przez Combwork do wysłania w całości i nazwy pozostałych. Claude Code je odracza, chyba że jego wyszukiwanie narzędzi jest wyłączone (może je wyłączyć ustawienie, model lub brama); nie widać, czy dany start tak zrobił ani jak CLI formułuje listę. Kreska: CLI, które nie odracza (Codex i Copilot dostają całą listę: Bajty), lub nie wiadomo.",
+  "performance.toolList.upfrontTip": "Szacunek Combwork, nie pomiar: co CLI odraczające narzędzia MCP dostaje na starcie, jeśli je odracza: narzędzia oznaczone przez Combwork do wysłania w całości i nazwy pozostałych. Claude Code je odracza, chyba że jego wyszukiwanie narzędzi jest wyłączone (może je wyłączyć ustawienie, model lub brama). Codex odracza wszystkie, także oznaczone, więc na starcie nie dostaje nic z listy (0), tylko nazwę serwera. Nie widać, czy dany start tak zrobił ani jak CLI formułuje listę. Kreska: CLI, które nie odracza (Copilot dostaje całą listę: Bajty), lub nie wiadomo.",
   "performance.toolList.unknownProvider": "Nieznany",
   "performance.reasons.unknown": "Przyczyna, której ta wersja Combwork nie zna"
 }

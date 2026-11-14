@@ -484,7 +484,7 @@
   "performance.trend.errors": "Erros reais",
   "performance.trend.errorsLine": "{errors, plural, one {# erro real} many {# erros reais} other {# erros reais}}",
   "performance.toolList.upfront": "Se adiada",
-  "performance.toolList.upfrontTip": "Uma estimativa do Combwork, não uma medição: o que uma CLI que adia as ferramentas MCP recebe no início, se adiar: as ferramentas que o Combwork marca para envio completo e os nomes das demais. O Claude Code as adia, a menos que a busca de ferramentas dele esteja desligada (um ajuste, um modelo ou um gateway pode desligá-la); não dá para observar se um início adiou nem como a CLI redige a lista. Um traço: uma CLI que não adia (o Codex e o Copilot recebem a lista inteira: Bytes), ou não se sabe.",
+  "performance.toolList.upfrontTip": "Uma estimativa do Combwork, não uma medição: o que uma CLI que adia as ferramentas MCP recebe no início, se adiar: as ferramentas que o Combwork marca para envio completo e os nomes das demais. O Claude Code as adia, a menos que a busca de ferramentas dele esteja desligada (um ajuste, um modelo ou um gateway pode desligá-la). O Codex adia todas, inclusive as marcadas, então não recebe nada da lista no início (0), só o nome do servidor. Não dá para observar se um início adiou nem como a CLI redige a lista. Um traço: uma CLI que não adia (o Copilot recebe a lista inteira: Bytes), ou não se sabe.",
   "performance.toolList.unknownProvider": "Desconhecido",
   "performance.reasons.unknown": "Um motivo que esta versão do Combwork não conhece"
 }

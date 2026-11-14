@@ -484,7 +484,7 @@
   "performance.trend.errors": "真正的错误",
   "performance.trend.errorsLine": "{errors, plural, other {# 个真正的错误}}",
   "performance.toolList.upfront": "延迟加载时",
-  "performance.toolList.upfrontTip": "Combwork 的估算，不是测量值：延迟加载 MCP 工具的 CLI 在这样做时开始时收到的内容：Combwork 标记为完整发送的工具和其他工具的名称。除非工具搜索被关闭（设置、模型或网关都可能关闭它），Claude Code 会延迟加载这些工具；某次启动是否这样做、CLI 如何表述列表，都无法观测。短横线：不延迟加载的 CLI（Codex 和 Copilot 收到整个列表：字节），或未知。",
+  "performance.toolList.upfrontTip": "Combwork 的估算，不是测量值：延迟加载 MCP 工具的 CLI 在这样做时开始时收到的内容：Combwork 标记为完整发送的工具和其他工具的名称。除非工具搜索被关闭（设置、模型或网关都可能关闭它），Claude Code 会延迟加载这些工具。Codex 会延迟加载全部工具，包括标记的工具，因此开始时收不到列表中的任何内容（0），只有服务器的名称。某次启动是否这样做、CLI 如何表述列表，都无法观测。短横线：不延迟加载的 CLI（Copilot 收到整个列表：字节），或未知。",
   "performance.toolList.unknownProvider": "未知",
   "performance.reasons.unknown": "此版本的 Combwork 不认识的原因"
 }

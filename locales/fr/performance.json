@@ -484,7 +484,7 @@
   "performance.trend.errors": "Vraies erreurs",
   "performance.trend.errorsLine": "{errors, plural, one {# vraie erreur} many {# vraies erreurs} other {# vraies erreurs}}",
   "performance.toolList.upfront": "Si différée",
-  "performance.toolList.upfrontTip": "Une estimation de Combwork, pas une mesure : ce qu’une CLI qui diffère les outils MCP reçoit au démarrage si elle le fait : les outils que Combwork marque pour être envoyés en entier et les noms des autres. Claude Code les diffère sauf si sa recherche d’outils est désactivée (un réglage, un modèle ou une passerelle peut la désactiver) ; on ne peut observer ni si un démarrage l’a fait, ni comment la CLI formule la liste. Un tiret : une CLI qui ne diffère pas (Codex et Copilot reçoivent toute la liste : Octets), ou inconnu.",
+  "performance.toolList.upfrontTip": "Une estimation de Combwork, pas une mesure : ce qu’une CLI qui diffère les outils MCP reçoit au démarrage si elle le fait : les outils que Combwork marque pour être envoyés en entier et les noms des autres. Claude Code les diffère sauf si sa recherche d’outils est désactivée (un réglage, un modèle ou une passerelle peut la désactiver). Codex les diffère tous, même ceux marqués, et ne reçoit donc rien de la liste au démarrage (0), seulement le nom du serveur. On ne peut observer ni si un démarrage l’a fait, ni comment la CLI formule la liste. Un tiret : une CLI qui ne diffère pas (Copilot reçoit toute la liste : Octets), ou inconnu.",
   "performance.toolList.unknownProvider": "Inconnu",
   "performance.reasons.unknown": "Un motif que cette version de Combwork ne connaît pas"
 }

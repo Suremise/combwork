@@ -484,7 +484,7 @@
   "performance.trend.errors": "Echte Fehler",
   "performance.trend.errorsLine": "{errors, plural, one {# echter Fehler} other {# echte Fehler}}",
   "performance.toolList.upfront": "Wenn zurückgestellt",
-  "performance.toolList.upfrontTip": "Eine Schätzung von Combwork, keine Messung: was eine CLI, die MCP-Tools zurückstellt, beim Start bekommt, wenn sie es tut: die Tools, die Combwork zum vollständigen Senden markiert, und die Namen der anderen. Claude Code stellt sie zurück, außer seine Tool-Suche ist aus (eine Einstellung, ein Modell oder ein Gateway kann sie ausschalten); ob ein Start es getan hat und wie die CLI die Liste formuliert, ist nicht sichtbar. Ein Strich: eine CLI, die nicht zurückstellt (Codex und Copilot bekommen die ganze Liste: Bytes), oder nicht bekannt.",
+  "performance.toolList.upfrontTip": "Eine Schätzung von Combwork, keine Messung: was eine CLI, die MCP-Tools zurückstellt, beim Start bekommt, wenn sie es tut: die Tools, die Combwork zum vollständigen Senden markiert, und die Namen der anderen. Claude Code stellt sie zurück, außer seine Tool-Suche ist aus (eine Einstellung, ein Modell oder ein Gateway kann sie ausschalten). Codex stellt jedes zurück, auch die markierten, und bekommt so nichts von der Liste vorab (0), nur den Namen des Servers. Ob ein Start es getan hat und wie die CLI die Liste formuliert, ist nicht sichtbar. Ein Strich: eine CLI, die nicht zurückstellt (Copilot bekommt die ganze Liste: Bytes), oder nicht bekannt.",
   "performance.toolList.unknownProvider": "Unbekannt",
   "performance.reasons.unknown": "Ein Grund, den diese Version von Combwork nicht kennt"
 }
