@@ -74,5 +74,50 @@
     "text": "{path} isn't one of this submission's files.",
     "note": "A card's revision diff couldn't be shown: the file isn't among the files the submission changed.",
     "audience": "both"
+  },
+  "board.work.comments.binary": {
+    "text": "Lines of a binary file, or of one too large to compare, can’t be commented on.",
+    "note": "A line comment couldn't be added: the file is binary, or too large for its diff to be shown.",
+    "audience": "both"
+  },
+  "board.work.comments.changed": {
+    "text": "That comment was changed meanwhile: look at it again.",
+    "note": "A line comment's edit couldn't be saved: someone changed the comment since it was opened for editing.",
+    "audience": "both"
+  },
+  "board.work.comments.empty": {
+    "text": "A comment needs some text.",
+    "note": "A line comment on a card's revision diff couldn't be saved: its text is empty.",
+    "audience": "both"
+  },
+  "board.work.comments.lines": {
+    "text": "Lines {from} to {to} aren’t in that side of {path}.",
+    "note": "A line comment couldn't be added: the lines it names ({from} to {to}: line numbers, never formatted as amounts) aren't in that side (the original or the changed version) of the file {path}.",
+    "audience": "both"
+  },
+  "board.work.comments.noCard": {
+    "text": "This card’s work can’t be read, so it can’t take comments.",
+    "note": "A line comment couldn't be saved: the card's work record (its facts) can't be read: a card from before 1.0, or its project has none.",
+    "audience": "both"
+  },
+  "board.work.comments.noComment": {
+    "text": "That comment is no longer on this card.",
+    "note": "A line comment couldn't be changed: it was deleted meanwhile.",
+    "audience": "both"
+  },
+  "board.work.comments.sent": {
+    "text": "A comment sent to the builder can’t be deleted: resolve it instead.",
+    "note": "A line comment couldn't be deleted: it was already sent to the card's builder, so it can only be resolved. Glossary: builder.",
+    "audience": "both"
+  },
+  "board.work.comments.tooLong": {
+    "text": "A comment can be at most {max, number} characters.",
+    "note": "A line comment on a card's revision diff couldn't be saved: its text is longer than {max} characters.",
+    "audience": "both"
+  },
+  "board.work.comments.tooMany": {
+    "text": "This card has {max, number} open comments already: resolve some first.",
+    "note": "A line comment couldn't be added or reopened: the card already has the most open comments it can have ({max}).",
+    "audience": "both"
   }
 }

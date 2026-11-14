@@ -1128,6 +1128,29 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
   measure('cw_project_status (connections)', tool('cw_project_status', { project: 'beta' }, 'assistant'), 3500)
   await inv('connections:setOn', max.id, false)
 
+  // --- HI-3219: a card's line comments: counts in its read, rows a page at a time within their budget. Coder starts and
+  // submits a card with a 60-line file, and the user leaves 30 comments on it, each with a body at the limit.
+  const lcCard = await inv('tasks:create', { title: 'Line comments', project: 'alpha', agent: coder.id, column: 'todo' })
+  const lcKey = lcCard.key || `#${lcCard.number}`
+  // Started as the user does from the board (an agent can't start a card on itself through the Agent API).
+  const lcStart = await inv('tasks:start', lcCard.number, { kind: 'agent', agentId: coder.id }).then(() => null, (e) => String(e?.message ?? e))
+  check('line comments: the card is started on Coder', lcStart === null, String(lcStart))
+  fs.writeFileSync(path.join(alpha, 'lines.txt'), Array.from({ length: 60 }, (_, i) => `line ${i + 1}: ${'w'.repeat(150)}`).join('\n') + '\n')
+  lib.git(alpha, ['add', 'lines.txt'])
+  // Its card's trailer: other cards' agents work in this folder too.
+  lib.git(alpha, ['commit', '-qm', 'Lines to comment on', '-m', `Combwork-Card: ${lcKey}`])
+  const lcSubmit = tool('cw_submit', { card: lcKey, summary: 'Lines to comment on.' })
+  check('line comments: Coder submits it', !lcSubmit.isError, lcSubmit.text)
+  const lcSub = (await inv('tasks:work', lcCard.number))?.revisions.at(-1)?.submission
+  for (let i = 0; i < 30; i++) await inv('tasks:lineCommentAdd', lcCard.number, { submission: lcSub, path: 'lines.txt', side: 'new', from: i + 1, to: i + 3, body: `Comment ${i + 1}. ${prose(400 + i, 3900)}`.slice(0, 4000) })
+  const lcRead = JSON.parse(measure('cw_read_task (line comment counts)', JSON.stringify(JSON.parse(tool('cw_read_task', { number: lcKey }).text).lineComments ?? null), 60))
+  check('line comments: a card’s read counts them', lcRead?.open === 30 && lcRead.resolved === 0 && lcRead.sent === 0, JSON.stringify(lcRead))
+  const lcPage = JSON.parse(measure('cw_read_task (lineComments, a page)', tool('cw_read_task', { number: lcKey, lineComments: 'open' }), 24500))
+  check('line comments: a page of rows, and where the next starts', lcPage.lineComments.length > 0 && lcPage.lineComments.length < 30 && lcPage.next === lcPage.lineComments.length && lcPage.lineComments[0].lines.startsWith('line 1: '), JSON.stringify({ rows: lcPage.lineComments?.length, next: lcPage.next }))
+  const lcNext = JSON.parse(tool('cw_read_task', { number: lcKey, lineComments: 'all', offset: lcPage.next }).text)
+  check('line comments: the next page goes on from there', lcNext.lineComments[0]?.id !== lcPage.lineComments[0].id && lcNext.lineComments[0]?.body.startsWith(`Comment ${lcPage.next + 1}.`), JSON.stringify(lcNext.lineComments?.[0]?.body?.slice(0, 40)))
+  await inv('tasks:delete', lcCard.number).catch(() => undefined)
+
   // A request that began in this workspace and ends after the window opened another: counted nowhere (not the next).
   const nextWs = path.join(lib.WORK, 'replysize-next-ws')
   fs.rmSync(nextWs, { recursive: true, force: true })

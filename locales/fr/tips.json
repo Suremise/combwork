@@ -137,6 +137,8 @@
   "tips.cardCostRounds.title": "Ce qu’a coûté chaque tour de relecture",
   "tips.cardDecisions.text": "Les Décisions d’une carte, au-dessus de ses commentaires, contiennent ce que tu as décidé : les agents vérifient leur travail par rapport à elles avant de passer en Relecture, et les relecteurs rejettent un travail qui en ignore une. Dis une décision à l’Assistant et il l’y enregistre ; un agent qui attend ta réponse en est informé.",
   "tips.cardDecisions.title": "Noter ce que tu décides sur la carte",
+  "tips.cardLineComments.text": "Dans les Modifications d’une révision, survole une ligne et appuie sur + pour la commenter, ou sélectionne d’abord des lignes. Les commentaires restent sur la carte, où tu peux les modifier, les résoudre ou les rouvrir.",
+  "tips.cardLineComments.title": "Commenter les lignes du travail d’une carte",
   "tips.cardLinks.text": "Les numéros de carte qu’affiche un agent ou l’Assistant, comme #12, sont des liens : survole-en un pour voir son titre et sa colonne, et fais Ctrl+clic dessus pour ouvrir la carte.",
   "tips.cardLinks.title": "Ctrl+clic sur un numéro de carte dans le terminal",
   "tips.cardLoop.text": "Demande à un agent de traiter des cartes en tant qu’auteur et à un autre de les relire : chacun attend l’autre sans frais, et Combwork le réveille quand la carte change.",

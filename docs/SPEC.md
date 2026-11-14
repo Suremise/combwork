@@ -4371,6 +4371,29 @@ A card's history text (`TaskHistoryEntry`) stays, for people; the facts are the 
   diff limit is said as too large, never read; a binary one is said as binary; a failed read is an error with Retry,
   never an empty side. A renamed file shows as added (its old path isn't recorded). None has no revision reads: no
   Changes. `DiffView`'s `onEditor` gives the editor to a layer over it (HI-3219's line comments).
+- **Line comments** [HI-3219, from HI-3191's design s12/s17/s20, Darren's decision of 14 Nov]: the user comments on
+  lines of a revision's diff (Changes): a **+** in either side's glyph margin on the line under the mouse; pressed, a
+  Markdown box under that line, or under the selected lines when the **+** is on one of them (a Monaco view zone),
+  Ctrl+Enter to save, Escape to cancel. Comments are **card facts** (`LineComment {id, submission, side, path, from, to,
+  lines, before, after, body}`, `LineCommentEdited {id, body, version}`, `LineCommentResolved`, `LineCommentReopened`,
+  `LineCommentDeleted`), folded by `shared/workflow/lineComments.ts`; an id is `lc-<card key>-<the fact's seq>`. `new`
+  is anchored in the submission's revision, `old` (deleted lines) in its base, derived from `submission`, never stored.
+  Main writes them (`workflow/lineComments.ts`, IPC `tasks:lineCommentAdd`, `tasks:lineCommentChange`) in the card's
+  write, checking the facts as they are then: the quote and two lines of context each side are read from the commits
+  (`revisionDiff`), never taken from the window, each line cut to 200 characters with "…", the quote to 2,000 (a long
+  range keeps its first and last lines, "…N lines…" between), so a fact is at most 2,800 characters of code whatever the
+  file, `from`/`to` the real line numbers; a body at most 4,000 characters; at most 200 open on a card; an edit names the
+  version it was made from and is refused if the comment changed since; a comment never sent can be deleted, a sent one
+  (HI-3220) only resolved. The window reads them with the card's work (`WorkView.lineComments`), so each change shows
+  once written. Threads show under their last line (Edit, Resolve or Reopen, Delete while unsent); a side the diff
+  doesn't show (the original, inline) lists its comments above the diff. The Work section counts the open ones (on the
+  card and each revision), and a revision's files list marks files that have some. On a newer revision a comment stays
+  on the revision it was made on: following lines across revisions is HI-3221 (On Hold). **Agents**: a card's read
+  (`GET /v1/tasks/:n`, `cw_read_task`) gives counts only (`lineComments: {open, sent, resolved}`, when it has any; never
+  in a listing); `GET /v1/tasks/:n/line-comments?state=open|all&offset=` (`cw_read_task` with `lineComments` and
+  `offset`) gives rows `{id, path, side, from, to, state, version, lines, before, after, body}`, at most 24,000
+  characters of rows a page (always one), `next` while more remain. Only the user writes them in this version: reviewer
+  agents' comments are HI-3222 (On Hold).
 - **Restart** resumes from the log. The merge queue rebuilds from `IntegrationRequested` entries with no
   `IntegrationCancelled`, `IntegrationFailed` or `Integrated` for the same entry id; an entry with `IntegrationStarted`
   and no outcome is reconciled first (§16.4.5) [note §4; P1, answering HR2's round 1 finding 8].

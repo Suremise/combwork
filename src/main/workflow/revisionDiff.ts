@@ -20,6 +20,12 @@ const M = {
   noRepository: msg({ id: 'board.work.changes.noRepository', defaultMessage: "This project has no repository to read the revision from.", description: "A card's revision diff couldn't be shown: the card's project has no version control (None)." })
 }
 
+/** Card `n`'s project's folder (the workspace's for a card about the workspace). */
+export function projectPathOf(ws: WorkspaceService, n: number): string {
+  const project = cardHeads(ws, [n])[0]?.project
+  return typeof project === 'string' && project ? join(ws.path!, project) : ws.path!
+}
+
 /** One file of submission `submission` (its fact's number) of card `n`, from the submission's base to its revision. */
 export async function revisionDiff(ws: WorkspaceService, n: number, submission: number, file: string): Promise<GitDiff> {
   const f = cardFacts(ws, n).find((x): x is Fact<'Submitted'> => x.kind === 'Submitted' && x.seq === submission)
@@ -28,8 +34,7 @@ export async function revisionDiff(ws: WorkspaceService, n: number, submission: 
   if (!base || !revision) throw combworkError(M.noRevision)
   const path = String(file ?? '')
   if (!files.some((c) => c.path === path)) throw combworkError(M.notListed, { path })
-  const project = cardHeads(ws, [n])[0]?.project
-  const projectPath = typeof project === 'string' && project ? join(ws.path!, project) : ws.path!
+  const projectPath = projectPathOf(ws, n)
   const cfg = await ws.projectConfig(projectPath).catch(() => null)
   const reads = revisionReadsOf(platformIdOf(projectPath, cfg?.platform))
   if (!reads) throw combworkError(M.noRepository)
