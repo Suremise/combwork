@@ -202,6 +202,14 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     lib.git(b10.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', '-A'])
     lib.git(b10.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', 'Dialog'])
     const head10 = git(fx.alpha, 'rev-parse', line10)
+    // HI-3247: picked only once the card has settled (B10 placed in its slot, its commit observed). A move refuses as
+    // "changed" when any fact lands on the card between its check and its write (stillAsChecked's seq), as these two do
+    // late under load; the window then says "Try again" in a toast, and the card stays on 1.2.0.
+    const settled10 = await waitHung(async () => {
+      const f = await inv('tasks:facts', n10)
+      return f.some((x) => x.kind === 'BuilderPlaced') && f.some((x) => x.kind === 'HeadMoved' && x.data?.to === head10) ? true : null
+    }).catch(() => null)
+    check('…the card settled before it is moved: its builder placed, its commit observed', !!settled10, JSON.stringify(await h.kinds(n10)))
     q.mergeOn(fx, 'integration', '1.2.0', '1.2.0 released into integration')
     // The card dialog: its Merges into shows 1.2.0 (the project's) and is open for a card in flight; integration picked.
     await q.showBoard(page)
@@ -214,7 +222,9 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     await page.locator('.dialog').first().screenshot({ path: path.join(fx.shots, 'retarget-dialog-in-flight.png') }).catch(() => undefined)
     await field.selectOption('integration')
     const moved10 = await waitHung(async () => ((await h.kinds(n10)).includes('Retargeted') ? true : null)).catch(() => null)
-    check('…picked integration there: it moves, its line where it was', !!moved10 && git(fx.alpha, 'rev-parse', line10) === head10, JSON.stringify(await h.kinds(n10)))
+    // HI-3247: a refusal shows only as an error toast; its text and the card's last history lines say why it didn't move.
+    const why10 = async () => ({ kinds: await h.kinds(n10), toasts: await page.locator('.toast').allInnerTexts().catch(() => []), history: ((await card(n10))?.history ?? []).slice(-4).map((x) => x.what) })
+    check('…picked integration there: it moves, its line where it was', !!moved10 && git(fx.alpha, 'rev-parse', line10) === head10, JSON.stringify(await why10()))
     await waitHung(async () => (await field.getAttribute('data-card-target-field')) === 'integration')
     check('…the field shows integration now', (await field.getAttribute('data-card-target-field')) === 'integration', String(await field.getAttribute('data-card-target-field')))
     await page.keyboard.press('Escape')
