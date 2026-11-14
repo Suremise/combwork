@@ -48,10 +48,11 @@ vi.mock('../src/main/providers', async (orig) => {
     ...actual,
     allProviders: () =>
       actual.allProviders().map((p) => {
-        if (!p.copyPathData) return p
-        const real = p.copyPathData.bind(p)
+        if (!p.transcript?.copyPathData) return p
+        const real = p.transcript.copyPathData.bind(p)
         const q = Object.create(p) as typeof p
-        q.copyPathData = async (from: string, to: string, apply: boolean) => (state.copyFails && apply ? [{ provider: p.id, from, to, copy: 0, kept: [], failed: ['EPERM: the conversation is held open (test)'] }] : real(from, to, apply))
+        // q's parts are q itself (an adapter's part getters return it), so this replaces q's alone.
+        q.transcript!.copyPathData = async (from: string, to: string, apply: boolean) => (state.copyFails && apply ? [{ provider: p.id, from, to, copy: 0, kept: [], failed: ['EPERM: the conversation is held open (test)'] }] : real(from, to, apply))
         return q
       })
   }

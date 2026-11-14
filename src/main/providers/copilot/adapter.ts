@@ -131,6 +131,41 @@ function mcpServersIn(file: string): Record<string, McpServerDef> {
 export class CopilotAdapter implements ProviderAdapter {
   readonly id = COPILOT
   readonly descriptor = COPILOT_DESCRIPTOR
+  // Its capability parts (ProviderAdapter), each implemented by this class's own members: a getter, so an object made from
+  // this one (Object.create) is its own parts too.
+  get install(): this {
+    return this
+  }
+  get launch(): this {
+    return this
+  }
+  get hooks(): this {
+    return this
+  }
+  get terminal(): this {
+    return this
+  }
+  get modes(): this {
+    return this
+  }
+  get transcript(): this {
+    return this
+  }
+  get usage(): this {
+    return this
+  }
+  get githubHost(): this {
+    return this
+  }
+  get models(): this {
+    return this
+  }
+  get compaction(): this {
+    return this
+  }
+  get projectFiles(): this {
+    return this
+  }
   /**
    * The question an ask_user call asks, per Copilot session, from its PreToolUse until the call ends (HI-1945): from
    * 1.0.104 its elicitation_dialog Notification says only "Information requested", so the question comes from here.

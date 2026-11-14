@@ -46,7 +46,7 @@ beforeAll(async () => {
   writeFileSync(join(wsPath, 'alpha', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }] }))
   config.settings.providers['claude-code'].enabled = true
   providerService.info = ((id: string) => ({ provider: id, found: true, path: 'claude.exe' })) as never
-  vi.spyOn(provider('claude-code'), 'accountStatus').mockImplementation(async () => ({ ok: true, loggedIn: false }))
+  vi.spyOn(provider('claude-code').accounts!, 'accountStatus').mockImplementation(async () => ({ ok: true, loggedIn: false }))
   w = createWorkspaceService()
   await w.open(wsPath)
 })

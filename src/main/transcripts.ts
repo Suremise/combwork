@@ -109,7 +109,7 @@ async function parseNow(projectPath: string, sessionId: string, key: string): Pr
   const rewritten = replaced || (!!e && !isGz(path) && e.path === path && !!e.parser.rewritten && (size !== e.size || st.mtimeMs !== e.mtime) && e.parser.offset > 0 && size >= e.parser.offset && (await prefixHash(path, e.parser.offset)) !== e.read?.copy().digest('hex'))
   if (!e || rewritten || e.path !== path || (isGz(path) ? stamp !== e.stamp : size < e.parser.offset)) {
     const id = await sessions.sessionProvider(projectPath, sessionId)
-    e = { path, provider: id, parser: provider(id).conversationParser(projectPath), size: 0, stamp: '', used: 0 }
+    e = { path, provider: id, parser: provider(id).transcript?.conversationParser(projectPath) ?? noConversation(), size: 0, stamp: '', used: 0 }
     cache.set(key, e)
   }
   e.used = Date.now()
@@ -146,6 +146,12 @@ async function parseNow(projectPath: string, sessionId: string, key: string): Pr
   }
   return e
 }
+
+/** A CLI without a transcript part (HI-3201): its file is read past, and nothing of it is shown. */
+const noConversation = (): ConversationParserLike => ({ items: [], images: [], offset: 0, feed(buf: Buffer): number {
+  this.offset += buf.length
+  return buf.length
+} })
 
 function forDisplay(item: TranscriptItem): TranscriptItem {
   // Combwork's own notices in the language the window shows (#797); the cache keeps them as data.
@@ -203,7 +209,7 @@ export const transcripts = {
     const loc = e.parser.images[imageId]
     if (!loc) throw combworkError(msg({ id: 'service.transcripts.noImage', defaultMessage: 'No such image', description: "An error in the Sessions tab: the image asked for isn't in the conversation (any more)." }), undefined, { kind: 'notFound' })
     const entry = JSON.parse((await readBytes(e.path, loc.offset, loc.offset + loc.length)).toString('utf8'))
-    const url = await provider(e.provider).imageData(entry, loc, e.path)
+    const url = await provider(e.provider).transcript?.imageData(entry, loc, e.path)
     if (!url) throw combworkError(msg({ id: 'service.transcripts.imageNotKept', defaultMessage: 'The image is not stored in the transcript', description: "An error in the Sessions tab: the conversation's file mentions the image but doesn't hold it." }), undefined, { kind: 'notFound' })
     return url
   },
@@ -248,7 +254,7 @@ export const transcripts = {
     const e = await parsed(projectPath, sessionId)
     const project = workspace.assertSessionHost(projectPath)
     const p = provider(e.provider)
-    const subtitle = tr(msg({ id: 'service.transcripts.exported', defaultMessage: '{session} · exported from Combwork {date}', description: 'The line under the title of a conversation exported as Markdown (Sessions tab → Export): {session} says which session it was, {date} when it was exported.' }), { session: p.exportSubtitle(sessionId, project), date: formatDateTime(new Date()) })
+    const subtitle = tr(msg({ id: 'service.transcripts.exported', defaultMessage: '{session} · exported from Combwork {date}', description: 'The line under the title of a conversation exported as Markdown (Sessions tab → Export): {session} says which session it was, {date} when it was exported.' }), { session: p.transcript?.exportSubtitle(sessionId, project) ?? sessionId, date: formatDateTime(new Date()) })
     return transcriptMarkdown(e.parser.items, title, subtitle, p.descriptor.assistant)
   }
 }

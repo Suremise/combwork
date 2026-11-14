@@ -263,6 +263,47 @@ export function launchModel(ctx: Pick<LaunchContext, 'model' | 'use200kContext' 
 export class ClaudeCodeAdapter implements ProviderAdapter {
   readonly id = CLAUDE_CODE
   readonly descriptor = CLAUDE_DESCRIPTOR
+  // Its capability parts (ProviderAdapter), each implemented by this class's own members: a getter, so an object made from
+  // this one (Object.create) is its own parts too.
+  get install(): this {
+    return this
+  }
+  get launch(): this {
+    return this
+  }
+  get hooks(): this {
+    return this
+  }
+  get status(): this {
+    return this
+  }
+  get terminal(): this {
+    return this
+  }
+  get modes(): this {
+    return this
+  }
+  get transcript(): this {
+    return this
+  }
+  get usage(): this {
+    return this
+  }
+  get accounts(): this {
+    return this
+  }
+  get models(): this {
+    return this
+  }
+  get compaction(): this {
+    return this
+  }
+  get projectFiles(): this {
+    return this
+  }
+  get background(): this {
+    return this
+  }
   /** Its admin snippet's values (HI-2777): the hooks' timeouts as Settings → Advanced has them, so it matches its launches. */
   readonly adminSnippet = { settings: (): Record<string, number> => ({ ...launchHookTimeouts() }) }
   /** If Combwork itself was started from inside a Claude Code session, don't leak that session's identity. User configuration such as CLAUDE_CODE_GIT_BASH_PATH is kept. */

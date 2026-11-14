@@ -65,8 +65,8 @@ beforeAll(() => {
   advanced.load(join(base, 'profile'))
   mkdirSync(home, { recursive: true })
   config.settings.providers[CLI].enabled = true
-  vi.spyOn(provider(CLI), 'accountStatus').mockResolvedValue({ ok: true, loggedIn: false })
-  vi.spyOn(provider(CLI), 'listModels').mockImplementation(async (_exe, env) => {
+  vi.spyOn(provider(CLI).accounts!, 'accountStatus').mockResolvedValue({ ok: true, loggedIn: false })
+  vi.spyOn(provider(CLI).models!, 'listModels').mockImplementation(async (_exe, env) => {
     const dir = (env.CLAUDE_CONFIG_DIR ?? '').toLowerCase()
     listed.push(dir)
     const f = listing.get(dir)

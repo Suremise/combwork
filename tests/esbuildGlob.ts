@@ -5,7 +5,7 @@ import type { Plugin } from 'esbuild'
 /**
  * Vite's eager import.meta.glob for a test's esbuild bundle of main's code (HI-3201: the usage worker finds each provider's
  * parser by it): `import.meta.glob<T>('./*\/name.ts', { eager: true, import: 'X' })` becomes an object of the matching
- * files' exports, by their paths, as Vite builds it. Only the form main uses: one pattern, a single `*` folder, eager.
+ * files' exports, by their paths, as Vite builds it. Only the providers' form: one pattern, a single `*` folder, eager.
  */
 export function esbuildEagerGlob(): Plugin {
   return {
@@ -17,9 +17,10 @@ export function esbuildEagerGlob(): Plugin {
         const dir = dirname(args.path)
         let n = 0
         const imports: string[] = []
-        const out = code.replace(/import\.meta\.glob(?:<[^>]*>)?\(\s*'([^']+)'\s*,\s*\{\s*eager:\s*true(?:\s*,\s*import:\s*'([^']+)')?\s*\}\s*\)/g, (_all, pattern: string, name?: string) => {
+        const out = code.replace(/import\.meta\.glob(?:<[^>]*>)?\(\s*'([^']+)'\s*,\s*\{\s*eager:\s*true(?:\s*,\s*import:\s*'([^']+)')?\s*\}\s*\)/g, (_all: string, pattern: string, name?: string) => {
           const m = /^(.*)\/\*\/([^/*]+)$/.exec(pattern)
-          if (!m) throw new Error(`esbuildEagerGlob: an unsupported pattern ${pattern} in ${args.path}`)
+          // Another form (a folder of JSON files: the dialects' schema) is left as it is, as esbuild leaves it.
+          if (!m) return _all
           const base = join(dir, m[1])
           const entries = readdirSync(base, { withFileTypes: true })
             .filter((d) => d.isDirectory())

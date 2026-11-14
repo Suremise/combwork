@@ -123,7 +123,7 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
       ...(set?.executablePath ? ['  - its path is set in Settings'] : []), // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
       ...(set?.extraArgs ? ['  - extra arguments are set'] : []), // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
       ...(info.editorExtensionOnly ? ["  - only an editor extension's copy was found"] : []), // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
-      ...(provider(id).diagnostics?.() ?? []).map((l) => `  - ${l}`),
+      ...(provider(id).install.diagnostics?.() ?? []).map((l) => `  - ${l}`),
       ...(info.readiness ?? []).map((r) => `  - ${r.level}: ${r.message}`)
     ]
     return [head, ...extra]

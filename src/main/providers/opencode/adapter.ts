@@ -97,6 +97,38 @@ const homeOf = (env: NodeJS.ProcessEnv): string | undefined => env[DATA_ENV] || 
 export class OpencodeAdapter implements ProviderAdapter {
   readonly id = OPENCODE
   readonly descriptor = OPENCODE_DESCRIPTOR
+  // Its capability parts (ProviderAdapter), each implemented by this class's own members: a getter, so an object made from
+  // this one (Object.create) is its own parts too.
+  get install(): this {
+    return this
+  }
+  get launch(): this {
+    return this
+  }
+  get hooks(): this {
+    return this
+  }
+  get modes(): this {
+    return this
+  }
+  get transcript(): this {
+    return this
+  }
+  get usage(): this {
+    return this
+  }
+  get accounts(): this {
+    return this
+  }
+  get models(): this {
+    return this
+  }
+  get compaction(): this {
+    return this
+  }
+  get projectFiles(): this {
+    return this
+  }
   /**
    * Its history (HI-2762), read from its servers: joined to the rest of Combwork once it has started (historyHost.ts, loaded
    * then: it reaches the sessions, which reach the providers), its worker ended as Combwork quits.

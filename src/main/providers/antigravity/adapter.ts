@@ -259,6 +259,38 @@ export function statusLineConversation(body: Record<string, any>): string | null
 export class AntigravityAdapter implements ProviderAdapter {
   readonly id = ANTIGRAVITY
   readonly descriptor = ANTIGRAVITY_DESCRIPTOR
+  // Its capability parts (ProviderAdapter), each implemented by this class's own members: a getter, so an object made from
+  // this one (Object.create) is its own parts too.
+  get install(): this {
+    return this
+  }
+  get launch(): this {
+    return this
+  }
+  get hooks(): this {
+    return this
+  }
+  get status(): this {
+    return this
+  }
+  get modes(): this {
+    return this
+  }
+  get transcript(): this {
+    return this
+  }
+  get usage(): this {
+    return this
+  }
+  get models(): this {
+    return this
+  }
+  get compaction(): this {
+    return this
+  }
+  get projectFiles(): this {
+    return this
+  }
   /** agy's account and updater variables are handled in its own environment (antigravityEnv): nothing for every child. */
   readonly envToStrip: string[] = []
   /** agy is checked in its sessions' environment (antigravityEnv), which these switches change. */

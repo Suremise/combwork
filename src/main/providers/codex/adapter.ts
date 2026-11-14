@@ -602,6 +602,41 @@ const idFromFile = (f: string): string | null => /-([0-9a-f]{8}-[0-9a-f]{4}-[0-9
 export class CodexAdapter implements ProviderAdapter {
   readonly id = CODEX
   readonly descriptor = CODEX_DESCRIPTOR
+  // Its capability parts (ProviderAdapter), each implemented by this class's own members: a getter, so an object made from
+  // this one (Object.create) is its own parts too.
+  get install(): this {
+    return this
+  }
+  get launch(): this {
+    return this
+  }
+  get hooks(): this {
+    return this
+  }
+  get terminal(): this {
+    return this
+  }
+  get modes(): this {
+    return this
+  }
+  get transcript(): this {
+    return this
+  }
+  get usage(): this {
+    return this
+  }
+  get accounts(): this {
+    return this
+  }
+  get models(): this {
+    return this
+  }
+  get compaction(): this {
+    return this
+  }
+  get projectFiles(): this {
+    return this
+  }
   /** Its connections' checks (HI-1757): those under way settled as Combwork closes (codex/checks.ts). */
   readonly lifecycle = { closing: (): Promise<void> => stopCodexChecks() }
   /** A parent Codex session's identity, when Combwork runs inside one. User configuration (CODEX_HOME…) is kept. */

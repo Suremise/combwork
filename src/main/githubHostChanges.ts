@@ -28,8 +28,8 @@ export async function movedAgents(ws: WorkspaceService, live: readonly LiveSessi
   const out: { state: LiveSessionState; host: string | null }[] = []
   for (const s of live) {
     const adapter = provider(s.provider)
-    if (!s.signInHost || !adapter.descriptor.capabilities.githubHost || !adapter.signInHostFor || !inScope(s.projectPath)) continue
-    const now = await adapter.signInHostFor(await githubHostsFor(ws, s.projectPath, env), env)
+    if (!s.signInHost || !adapter.descriptor.capabilities.githubHost || !adapter.githubHost?.signInHostFor || !inScope(s.projectPath)) continue
+    const now = await adapter.githubHost?.signInHostFor(await githubHostsFor(ws, s.projectPath, env), env)
     const was = s.signInHost
     if (!now || now.host !== was.host || now.repoHost !== was.repoHost || (now.source ?? null) !== (was.source ?? null) || (now.account ?? null) !== (was.account ?? null)) out.push({ state: s, host: now?.host ?? null })
   }
@@ -40,7 +40,7 @@ export async function movedAgents(ws: WorkspaceService, live: readonly LiveSessi
 export function watchGithubHostChanges(liveStates: () => LiveSessionState[], env: () => Record<string, string> = () => childEnv()): void {
   // A workspace closing (HI-2779): checks still running for its hosts are dropped, and the hosts in use checked again.
   WorkspaceService.closingListeners.add(() => {
-    for (const p of allProviders()) p.githubHostsChanged?.()
+    for (const p of allProviders()) p.githubHost?.githubHostsChanged?.()
     // Superseded at once, and checked again (forgetCatalog: a refresh running for the old routes publishes nothing).
     for (const p of allProviders()) {
       if (!p.descriptor.capabilities.githubHost) continue
@@ -49,7 +49,7 @@ export function watchGithubHostChanges(liveStates: () => LiveSessionState[], env
     }
   })
   onGithubHostsChanged((ws, projectPath) => {
-    for (const p of allProviders()) p.githubHostsChanged?.()
+    for (const p of allProviders()) p.githubHost?.githubHostsChanged?.()
     // A refresh running for the old hosts is superseded now, in this turn, and nothing of their catalogues shows while they
     // are checked again (the replacement starts once the workspace has read the projects again, below).
     for (const p of allProviders()) if (p.descriptor.capabilities.githubHost) providerService.forgetCatalog(p.id)

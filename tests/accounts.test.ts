@@ -84,8 +84,8 @@ beforeAll(async () => {
   // A kill ends the terminal, its exit run, as node-pty's does.
   terminals.onKill = (key) => logins.get(key.split(':').at(-1)!)?.(1)
   // No CLI starts here: an account's models read (HI-2852, at its sign-in) answers nothing.
-  vi.spyOn(provider('claude-code'), 'listModels').mockResolvedValue(null)
-  vi.spyOn(provider('claude-code'), 'accountStatus').mockImplementation(async (_exe, env) => {
+  vi.spyOn(provider('claude-code').models!, 'listModels').mockResolvedValue(null)
+  vi.spyOn(provider('claude-code').accounts!, 'accountStatus').mockImplementation(async (_exe, env) => {
     const dir = env.CLAUDE_CONFIG_DIR!
     asked.push(dir)
     const s = [...status].find(([k]) => k.toLowerCase() === dir.toLowerCase())?.[1]
@@ -507,7 +507,7 @@ describe("a sign-in connection's Set Up (HI-1826)", () => {
 describe("whether a connection's first-run setup is done (HI-1870: Needs set up)", () => {
   const ONBOARDING = join(__dirname, 'fixtures', 'advanced', 'onboarding-claude-2.1.311.jsonl')
   const [onboarded, fresh] = readFileSync(ONBOARDING, 'utf8').trim().split(/\r?\n/)
-  const setUpOf = (dir: string) => provider('claude-code').connectionSetUp!(dir)
+  const setUpOf = (dir: string) => provider('claude-code').accounts?.connectionSetUp!(dir)
   const folder = (name: string, claudeJson?: string): string => {
     const dir = join(base, 'setup', name)
     mkdirSync(dir, { recursive: true })
@@ -551,7 +551,7 @@ describe("whether a connection's first-run setup is done (HI-1870: Needs set up)
 
 describe("whether a connection trusts a workspace's folders (HI-1870)", () => {
   const TRUST = join(__dirname, 'fixtures', 'advanced', 'trust-entry-claude-2.1.311.json')
-  const trustsOf = (dir: string, targets: { root: string | null; git: boolean; short: boolean }[]) => provider('claude-code').connectionTrusts!(dir, targets)
+  const trustsOf = (dir: string, targets: { root: string | null; git: boolean; short: boolean }[]) => provider('claude-code').accounts?.connectionTrusts!(dir, targets)
   const trustHome = (name: string, claudeJson?: string): string => {
     const dir = join(base, 'trust', name)
     mkdirSync(dir, { recursive: true })
@@ -997,7 +997,7 @@ describe("a workspace's accounts", () => {
       const alphaConnection = (info: Awaited<ReturnType<typeof w.refresh>>) => info.projects.find((p) => p.name === 'alpha')?.agents[0]?.connection
       beforeEach(async () => {
         held = []
-        spy = vi.spyOn(provider('claude-code'), 'connectionTrusts').mockImplementation((dir, targets) => new Promise((answer) => held.push({ home: dir, projects: targets.length, answer })))
+        spy = vi.spyOn(provider('claude-code').accounts!, 'connectionTrusts').mockImplementation((dir, targets) => new Promise((answer) => held.push({ home: dir, projects: targets.length, answer })))
         a = await accounts.addAccount('claude-code', 'Trusting')
         writeFileSync(join(folderOf(a), '.claude.json'), JSON.stringify({ hasCompletedOnboarding: true }))
         await projectsNow(1)

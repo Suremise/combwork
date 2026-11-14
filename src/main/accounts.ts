@@ -24,7 +24,7 @@ import { connectionLoginChanged, forgetConnectionUsage, usageLogin } from './pla
 import { childEnv, hasPty, killPty, ptyGone } from './ptyHost'
 import { connectionsManaged, testHomeSeam } from './connectionSeam'
 import { provider } from './providers'
-import type { TrustReading, TrustTarget } from './providers/types'
+import type { ProviderAccountsPart, TrustReading, TrustTarget } from './providers/types'
 import { trustRoot } from './platform/repoPorts'
 import { withoutAccountEnv } from './providers/common'
 import { providerService } from './providerService'
@@ -144,7 +144,7 @@ function mustGet(id: string): Account {
  * server, held by providers/codex/checks.ts until it is gone, across a restart too).
  */
 function assertNotHeld(a: Account): void {
-  if (!provider(a.provider).accountHeld?.(accountFolder(a.id))) return
+  if (!provider(a.provider).accounts?.accountHeld?.(accountFolder(a.id))) return
   throw combworkError(msg({ id: 'main.accounts.checkHeld', defaultMessage: "{name} is being checked: Combwork is still making sure {cli}'s check of it has ended. Try again in a moment.", description: "An error signing in or removing a connection ({name}, its name in Settings → Accounts & Connections): the coding agent CLI's ({cli}: \"Codex\") check of who it is signed in as hasn't been confirmed ended yet, so the connection is held." }), { name: a.name, cli: providerDescriptor(a.provider).name }, { kind: 'conflict' })
 }
 
@@ -152,11 +152,13 @@ function assertNotHeld(a: Account): void {
 const namesOrgs = (id: ProviderId): boolean => providerDescriptor(id).capabilities.connections?.orgs !== false
 
 /** The provider's account support, or a refusal: one without it can't have accounts in Combwork. */
-function support(id: ProviderId): { homeEnv: string; shared: readonly string[]; adapter: ReturnType<typeof provider> } {
+function support(id: ProviderId): { homeEnv: string; shared: readonly string[]; adapter: ReturnType<typeof provider>; accounts: ProviderAccountsPart; configHome: () => string } {
   const caps = providerDescriptor(id).capabilities.connections
   const adapter = provider(id)
-  if (!caps || !adapter.accountStatus || !adapter.accountSharedTarget || !adapter.configHome) throw combworkError(msg({ id: 'main.accounts.noProvider', defaultMessage: "{cli} can't have sign-in connections in Combwork yet.", description: 'An error: connections were asked for a coding agent CLI ({cli}: "Codex") that Combwork keeps no connections for.' }), { cli: providerDescriptor(id).name }, { kind: 'invalid' })
-  return { homeEnv: caps.homeEnv, shared: caps.shared, adapter }
+  const accounts = adapter.accounts
+  const configHome = adapter.install.configHome?.bind(adapter.install)
+  if (!caps || !accounts || !configHome) throw combworkError(msg({ id: 'main.accounts.noProvider', defaultMessage: "{cli} can't have sign-in connections in Combwork yet.", description: 'An error: connections were asked for a coding agent CLI ({cli}: "Codex") that Combwork keeps no connections for.' }), { cli: providerDescriptor(id).name }, { kind: 'invalid' })
+  return { homeEnv: caps.homeEnv, shared: caps.shared, adapter, accounts, configHome }
 }
 
 // ---------------------------------------------------------------------------
@@ -248,9 +250,9 @@ async function assertRealFolder(dir: string): Promise<void> {
 
 /** A shared folder's target, checked: absolute, in the CLI's own home, neither the accounts folder nor in it. */
 function sharedTarget(id: ProviderId, name: string): string {
-  const { adapter } = support(id)
-  const target = resolve(adapter.accountSharedTarget!(name))
-  const home = resolve(adapter.configHome!())
+  const { accounts, configHome } = support(id)
+  const target = resolve(accounts.accountSharedTarget(name))
+  const home = resolve(configHome())
   const root = resolve(accountsRoot()).toLowerCase()
   const t = target.toLowerCase()
   if (!samePath(resolve(target, '..'), home) || t === root || t.startsWith(root + '\\') || root.startsWith(t + '\\'))
@@ -480,7 +482,7 @@ export async function addAccount(id: ProviderId, name: string, server?: ServerCo
 export function effortUsable(cli: ProviderId, model: string | null, conn: Pick<Account, 'id' | 'home' | 'kind'> | null, effort: string): boolean {
   // The account's own models and default (HI-2852), never the CLI's own home's.
   const info = accountInfo(providerService.info(cli), conn) ?? providerService.info(cli)
-  const runs = model || (conn && !conn.home ? provider(cli).configuredDefaultModel(accountFolder(conn.id)) : null) || info.defaultModel || null
+  const runs = model || (conn && !conn.home ? provider(cli).models?.configuredDefaultModel(accountFolder(conn.id)) : null) || info.defaultModel || null
   const caps = modelCaps(cli, runs, info, config.settings)
   return !caps.perModel || caps.efforts.some((e) => e.value === effort)
 }
@@ -1158,7 +1160,7 @@ async function trustTestHold(): Promise<void> {
 async function readTrustOnce(id: string, projects: Projects): Promise<TrustAnswer | null> {
   await trustTestHold()
   const a = getAccount(id)
-  const read = a && provider(a.provider).connectionTrusts
+  const read = a && provider(a.provider).accounts?.connectionTrusts
   if (!a || !read) return null
   // No folder it would be used in here (HI-1871): nothing to read, nothing pending.
   if (!projects.length) return { pending: [], unknown: false }
@@ -1282,7 +1284,7 @@ const projectsFor = (a: Account): { name: string; path: string }[] => {
 export async function readSetUp(id: string): Promise<void> {
   const a = getAccount(id)
   if (!a) return
-  const read = provider(a.provider).connectionSetUp
+  const read = provider(a.provider).accounts?.connectionSetUp
   if (!read) return
   const gen = generation(id)
   let now: boolean | null
@@ -1308,11 +1310,11 @@ async function checkOnce(id: string): Promise<ConnectionObserved | null> {
   let observed: ConnectionObserved
   try {
     await assertRealFolder(dir)
-    const { homeEnv, adapter } = support(a.provider)
+    const { homeEnv, adapter, accounts } = support(a.provider)
     const exe = providerService.info(a.provider).path
     if (!exe) observed = { ...a.observed, at, loggedIn: null, error: `${adapter.descriptor.name} isn't installed` } // i18n-ignore: for the log
     else {
-      const s = await slot(() => adapter.accountStatus!(exe, withoutAccountEnv(adapter, childEnv({ [homeEnv]: dir }))))
+      const s = await slot(() => accounts.accountStatus(exe, withoutAccountEnv(accounts, childEnv({ [homeEnv]: dir }))))
       observed = s.ok ? { at, loggedIn: s.loggedIn, ...(s.loggedIn ? { email: s.email, orgId: s.orgId, plan: s.plan ?? null, ...(s.loginExpiresAt ? { loginExpiresAt: s.loginExpiresAt } : {}) } : {}) } : { ...keptIdentity(a.observed), at, loggedIn: null, error: s.error }
     }
   } catch (e) {
@@ -1368,13 +1370,13 @@ export const accountModelHooks: { queued?: (id: string) => Promise<void>; starte
 /** Whether an account's models are read in its own folder: a Combwork sign-in folder of a CLI that lists its models. */
 function readsOwnModels(a: Account | undefined): a is Account {
   if (!a || isServer(a) || a.home || removing.has(a.id)) return false
-  return !!providerDescriptor(a.provider).capabilities.connections?.homeEnv && !!provider(a.provider).listModels
+  return !!providerDescriptor(a.provider).capabilities.connections?.homeEnv && !!provider(a.provider).models?.listModels
 }
 
 /** An account's models as kept (a catalogue of `version`, undefined: any) with its folder's own default. */
 function keptModels(a: Account, version: string | null | undefined): AccountModels {
   const catalog = cachedCatalogFor(config.get().accountModelCatalogs?.[a.id], version ?? undefined, undefined)
-  return { catalog, defaultModel: provider(a.provider).configuredDefaultModel(accountFolder(a.id)) ?? catalog?.defaultModel ?? null }
+  return { catalog, defaultModel: provider(a.provider).models?.configuredDefaultModel(accountFolder(a.id)) ?? catalog?.defaultModel ?? null }
 }
 
 /**
@@ -1414,6 +1416,9 @@ async function readModelsOnce(id: string, st: { seq: number }, seq: number): Pro
   if (!readsOwnModels(a)) return
   const cli = a.provider
   const adapter = provider(cli)
+  // A CLI that can't list its models (no models part, or none of its own) has none to read.
+  const listModels = adapter.models?.listModels?.bind(adapter.models)
+  if (!listModels) return
   const homeEnv = providerDescriptor(cli).capabilities.connections!.homeEnv
   const { path: exe, version } = providerService.info(cli)
   if (!exe) return
@@ -1436,7 +1441,7 @@ async function readModelsOnce(id: string, st: { seq: number }, seq: number): Pro
     await accountModelHooks.started?.(id)
     // Checked again after the waits: the folder's check and the hook.
     if (!current()) return undefined
-    return adapter.listModels!(exe, withoutAccountEnv(adapter, childEnv({ [homeEnv]: dir }))).catch(() => null)
+    return listModels(exe, withoutAccountEnv(adapter.accounts ?? null, childEnv({ [homeEnv]: dir }))).catch(() => null)
   })
   if (read === undefined || !current()) return
   let catalog: ModelCatalog | null
@@ -1449,12 +1454,12 @@ async function readModelsOnce(id: string, st: { seq: number }, seq: number): Pro
     catalog = cachedCatalogFor(config.get().accountModelCatalogs?.[id], version, undefined)
     log.warn(`account ${id}: ${adapter.descriptor.name} ${version ?? ''} didn't say which models it has: ${catalog ? 'using its last answer' : 'using the fallback list'}`)
   }
-  providerService.setAccountModels(cli, id, { catalog, defaultModel: adapter.configuredDefaultModel(dir) ?? catalog?.defaultModel ?? null })
+  providerService.setAccountModels(cli, id, { catalog, defaultModel: adapter.models?.configuredDefaultModel(dir) ?? catalog?.defaultModel ?? null })
 }
 
 providerService.setAccountModelSource({
   cached: (cli, version) => {
-    if (!providerDescriptor(cli).capabilities.connections?.homeEnv || !provider(cli).listModels) return undefined
+    if (!providerDescriptor(cli).capabilities.connections?.homeEnv || !provider(cli).models?.listModels) return undefined
     return Object.fromEntries(list().filter((a) => a.provider === cli && readsOwnModels(a)).map((a) => [a.id, keptModels(a, version)]))
   },
   refresh: refreshAccountModels
@@ -1610,7 +1615,7 @@ function changed(id: string): void {
  */
 async function loginStamp(id: string): Promise<string | null> {
   const a = getAccount(id)
-  const isLogin = a && provider(a.provider).accountLoginFile?.bind(provider(a.provider))
+  const isLogin = a && provider(a.provider).accounts?.accountLoginFile?.bind(provider(a.provider))
   if (!isLogin) return null
   const dir = accountFolder(id)
   try {
@@ -1662,7 +1667,7 @@ export const accountWatched = (id: string): boolean => !!watched.get(id)?.w
 export function accountFolderEvent(id: string, name: string | Buffer | null): void {
   const a = getAccount(id)
   if (!a) return
-  const isLogin = provider(a.provider).accountLoginFile
+  const isLogin = provider(a.provider).accounts?.accountLoginFile
   // No name (some changes on Windows, a busy folder's above all): compared like a login file's.
   if (typeof name !== 'string' || !isLogin || isLogin.call(provider(a.provider), name)) noticed(id)
 }
@@ -1790,7 +1795,7 @@ export function accountsView(check = false): ConnectionsView {
   if (workspace.path) for (const [id, here] of hereOf) if (check || trustState.get(trustKey(id, workspace.path))?.sig !== JSON.stringify(here)) requestTrust(id, workspace.path, here)
   const trustOf = (a: Account): { trust?: ConnectionTrust } => {
     const here = hereOf.get(a.id)
-    if (!workspace.path || !here || !provider(a.provider).connectionTrusts) return {}
+    if (!workspace.path || !here || !provider(a.provider).accounts?.connectionTrusts) return {}
     const t = trustShown(a.id, workspace.path, here)
     const setUpIn = setUpTarget(a, t.pending)
     return { trust: { ...t, ...(setUpIn ? { setUpIn } : {}) } }

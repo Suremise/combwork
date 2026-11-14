@@ -506,17 +506,8 @@ export interface ProviderLifecycle {
   quitting?(): void
 }
 
-export interface ProviderAdapter {
-  readonly id: ProviderId
-  readonly descriptor: ProviderDescriptor
-
-  /** Its own work at Combwork's start and end (ProviderLifecycle); absent: none. */
-  readonly lifecycle?: ProviderLifecycle
-
-  /** Its admin snippet's own values (HI-2777: the shared half's adminSnippet builds the block from them); absent: none. */
-  readonly adminSnippet?: { settings(): Record<string, number> }
-
-  // Installation
+/** Finding, installing, updating and checking the CLI. Every provider has it. */
+export interface ProviderInstallPart {
   locate(): Promise<AgentInstallInfo>
   /**
    * The newest version the installer of `executable` (the one found) can deliver, which updateCommand installs: its own
@@ -540,67 +531,6 @@ export interface ProviderAdapter {
    * when it has none now. Absent: a CLI whose catalogue doesn't depend on one. A cached catalogue is used only in its own.
    */
   catalogContext?(): string | null
-  /**
-   * What a launch on these GitHub hosts would sign in as (HI-2779, capabilities.githubHost), worked out as prepareLaunch
-   * records it: `env` is Combwork's environment, before the hosts are written into it. A change compares it with running
-   * agents' records.
-   */
-  signInHostFor?(hosts: ResolvedGithubHosts, env: Record<string, string>): Promise<LaunchedSignInHost | null>
-  /** A GitHub host setting changed or a workspace closed (HI-2779): checks under way for the old hosts are dropped. */
-  githubHostsChanged?(): void
-  /** The CLI's sign-in; `host`: the GitHub host it signs in on (HI-2779, capabilities.githubHost), else its default. */
-  loginCommand(executable: string, host?: string): CommandSpec
-  /**
-   * Who a home folder is signed in as (HI-980: an account's folder, given in `env` under the descriptor's
-   * `capabilities.connections.homeEnv`), from the CLI's own status: never a token. `ok: false` when it couldn't be told
-   * (a timeout, output it couldn't read), which isn't signed out.
-   */
-  accountStatus?(executable: string, env: NodeJS.ProcessEnv): Promise<ConnectionStatus>
-  /**
-   * Whether a connection's folder (`home`) has had the CLI's one-time first-run setup that Set Up answers (HI-1870), as
-   * the CLI's own files there say, read only; null when it can't be told. Absent: the CLI has none to tell.
-   */
-  connectionSetUp?(home: string): Promise<boolean | null>
-  /** The arguments the CLI takes in a connection's Set Up on its folder (`home`), as its launches there do (HI-1893). Absent: none. */
-  connectionSetUpArgs?(home: string): string[]
-  /**
-   * Whether the CLI on a connection's folder (`home`) trusts each of a workspace's folders (HI-1870), as its own files
-   * there say, read only: true, false (not trusted, or no record), or null when it can't be told (a file it can't
-   * read, a folder Combwork couldn't resolve). Absent: the CLI keeps no trust to tell.
-   */
-  connectionTrusts?(home: string, targets: readonly TrustTarget[]): Promise<TrustReading[]>
-  /** Where a shared folder of an account (capabilities.connections.shared) links to: that folder of the CLI's own home. */
-  accountSharedTarget?(name: string): string
-  /** Whether a file in an account's folder is one that changes when the CLI signs in or out there: watched, never read. */
-  accountLoginFile?(name: string): boolean
-  /**
-   * The key Combwork presses for a line break in a prompt it types (HI-1327), for the CLI at `version`: one of the
-   * descriptor's `typedNewlines`, as Settings → Advanced chooses it; null: a space (as before). Absent: always a space.
-   */
-  typedNewline?(version: string | null): TypedNewline | null
-  /**
-   * A connection's sign-in, when it differs from loginCommand (HI-1757: Codex keeps the login in the connection's folder).
-   * `home`: the connection's folder; the spec's `env`, when it has one, is put over the sign-in's environment (HI-2759:
-   * OpenCode's roots and its sign-in config are derived from the folder).
-   */
-  accountLoginCommand?(executable: string, home?: string): CommandSpec
-  /**
-   * A connection's Set Up, when the CLI's own run on the folder (with connectionSetUpArgs) isn't safe for it (HI-2759:
-   * OpenCode's needs its private config and roots, so its Set Up is its sign-in); its `env` is put over the run's.
-   */
-  accountSetUpCommand?(executable: string, home: string): CommandSpec
-  /**
-   * Environment variables the CLI reads as a login (HI-1757: Codex's CODEX_ACCESS_TOKEN), left out wherever it runs on a
-   * connection (its sign-in, its checks, its sessions: withoutAccountEnv), so they can't stand in for the connection's own.
-   */
-  accountEnvDrop?(): readonly string[]
-  /** The same by a pattern on the variable's name (HI-1772: Claude Code reads whole families: ANTHROPIC_*, CLAUDE_CODE_USE_*). */
-  accountEnvDropPattern?(): RegExp
-  /**
-   * Whether a connection's folder (its home) is held by the CLI's own check of it, not yet confirmed ended (HI-1757:
-   * Codex's app server): its sign-in and removal are refused meanwhile, as while a launch holds it.
-   */
-  accountHeld?(home: string): boolean
   /** A one-time setup task (Codex's Windows sandbox), when the provider has one. */
   setupCommand?(executable: string): CommandSpec
   /** The CLI's own home (its sign-in and config) as Combwork's sessions get it: what a test copy notes beside the CLI (#368). */
@@ -614,15 +544,18 @@ export interface ProviderAdapter {
   readonly locateSettings?: readonly string[]
   /** Extra lines for Help → Copy Diagnostics (Codex: its Windows sandbox), with no paths or names in them. */
   diagnostics?(): string[]
-  /** The CLI's own default model from its settings, if set. */
-  /** The CLI's own default model from its settings; `home`: a connection's home (HI-1755) rather than the CLI's own. */
-  configuredDefaultModel(home?: string): string | null
-  /** Whether a model seen in a transcript is this provider's (to learn the CLI's default). */
-  ownsModel(model: string): boolean
   /** Environment variables to remove from sessions: a parent session's identity when Combwork runs inside one. */
   readonly envToStrip: string[]
-
-  // Launch
+}
+/** Starting and resuming a session in a terminal, and typing into it. Every provider has it. */
+export interface ProviderLaunchPart {
+  /** The CLI's sign-in; `host`: the GitHub host it signs in on (HI-2779, capabilities.githubHost), else its default. */
+  loginCommand(executable: string, host?: string): CommandSpec
+  /**
+   * The key Combwork presses for a line break in a prompt it types (HI-1327), for the CLI at `version`: one of the
+   * descriptor's `typedNewlines`, as Settings → Advanced chooses it; null: a space (as before). Absent: always a space.
+   */
+  typedNewline?(version: string | null): TypedNewline | null
   /** Prepares the launch (skills, MCP, hooks) and says what it delivered of each skill in ctx.skills, by name. */
   prepareLaunch(ctx: LaunchContext): Promise<Record<string, SkillDelivery>>
   /** Where this launch's CLI reads a delivered Combwork skill (its copy), for measuring what the session got. */
@@ -634,21 +567,36 @@ export interface ProviderAdapter {
   launchNotice?(ctx: LaunchContext): { title: string; message: string } | null
   /** Something in a folder agents work in (any provider's) that stops this CLI working there (#509: a stray .codex), or null. */
   folderWarning?(folder: string): { title: string; message: string } | null
-
-  // Hooks and live details
+  /**
+   * Terminal output meaning the CLI is waiting for a prompt, for CLIs whose first hook only comes with the
+   * first prompt (Codex creates its thread lazily): until then Combwork shows the agent as ready from this.
+   */
+  readonly readyOutput?: RegExp
+  /** Output that means the CLI is asking the user something before it starts (e.g. whether to trust the folder). */
+  readonly startupQuestion?: RegExp
+  /**
+   * How Combwork ends the CLI as a person would, for CLIs that write what Combwork reads only as they exit (Copilot's token
+   * totals, #465): the keys it types, one every gapMs, before killing the CLI if it is still running after graceMs.
+   * Without it, Stop kills the process. `armed` (HI-2272): what its screen shows once a first key at its prompt has
+   * armed the next to exit. With it, Stop types the first key on conditions rather than at a fixed beat (exitKeys.ts):
+   * a turn under way is cancelled first and its end waited for, and the key that exits is typed once this shows.
+   */
+  readonly exitKeys?: { keys: string[]; gapMs: number; graceMs: number; armed?: RegExp }
+  /**
+   * The command a person types to end the CLI (Claude Code's /exit, Codex's /quit), which Combwork types, then Enter, at a
+   * lane's end once its builder's turn is over (HI-1706, sessions.quit), killing it if it is still running after graceMs.
+   * Only that end uses it: Stop and restarts don't. A CLI without one is ended there by its exitKeys, or killed.
+   */
+  readonly quitLine?: { line: string; graceMs: number }
+  /**
+   * What to do about the CLI exiting before its session started, from the lines it printed last (escapes removed):
+   * e.g. an argument it refused, a model it doesn't know, no sign-in. Null when it doesn't recognise the error.
+   */
+  startHint?(text: string): StartHint | null
+}
+/** The CLI calls Combwork's hooks: what each tells, and what Combwork answers. */
+export interface ProviderHooksPart {
   normalizeHook(body: Record<string, any>): NormalizedHook
-  /**
-   * For CLIs whose terminal title says when a person must act (Codex's "Action Required"): a test of a title, for
-   * this version of the CLI, and the launch (its override switches: a title Combwork didn't set isn't read). Null (or
-   * absent) when its title doesn't say: its hooks then tell Combwork (see hookStatus).
-   */
-  titleAttention?(version: string | null, ctx?: Pick<LaunchContext, 'overrides'>): ((title: string) => boolean) | null
-  /**
-   * For CLIs that write their turn's state to the terminal in an OSC sequence (Copilot's OSC 7501, HI-2802): a test of an
-   * OSC payload whose first group is the state ("working", "done", else idle). Read only while the launch's hooks are
-   * missing, as a status of last resort: it says working and finished, never that a person must act.
-   */
-  terminalTurn?(): RegExp | null
   lockReply(decision: LockDecision): Record<string, unknown>
   /**
    * The reply that puts Combwork's fixed notice text before the model at this hook (#650: the CLI's own event name, as the
@@ -685,34 +633,6 @@ export interface ProviderAdapter {
   /** Whether Combwork's reply to a Stop hook makes the CLI carry the turn on (a block, or context it acts on, #648). */
   stopContinues(reply: Record<string, any>): boolean
   /**
-   * For CLIs whose screen shows for sure whether a turn runs (#648, the turn ledger's last check before "state unknown"):
-   * a reading of the rendered screen, for this version of the CLI: 'idle' at its prompt, 'working' on a turn, or null when
-   * it doesn't show for sure. Null (or absent) for versions it wasn't checked with.
-   */
-  turnScreen?(version: string | null): ((screen: string) => 'idle' | 'working' | null) | null
-  /**
-   * Whether the CLI is waiting to retry its model request (HI-1972: rate-limited, its connection lost), from its own
-   * records: its newest such wait in conversation `sessionId` recorded since `since` (ms), or null (none, or Combwork can't
-   * tell). `env` is the launch's environment (where its CLI keeps its records), `transcriptPath` its transcript where
-   * known. Read off main's thread and bounded in time; never changes anything of the CLI's. Absent: Combwork can't tell.
-   */
-  retryWait?(q: { sessionId: string; env: NodeJS.ProcessEnv; transcriptPath?: string; since: number }): Promise<RetryWait | null>
-  /** How long a running turn goes without a hook before retryWait is asked (ms); absent: 20 s. */
-  retryLookAfterMs?(): number
-  /** Claude Code's status-line JSON. */
-  statusLine?(body: Record<string, any>): LiveDetails
-  /**
-   * The conversation a status line names, for a CLI that can't be given one up front (HI-2544: the Antigravity CLI):
-   * a valid id, or null. Combwork takes it for the launch while it has none, and never in place of a known one.
-   */
-  statusLineSession?(body: Record<string, any>): string | null
-  /**
-   * A permission prompt the CLI's status line says it shows, for a CLI that sends no hook for one (HI-2545: the Antigravity
-   * CLI's `tool_confirmation_pending`): the blocking ask, or null when none is pending. Combwork applies it as a hook's ask,
-   * in order with the launch's hooks, once when it begins (Combwork never answers it: the person does, in the CLI).
-   */
-  statusLineAsk?(body: Record<string, any>): Ask | null
-  /**
    * Reads, before the hook is normalized, what it needs from the CLI's own records (HI-2545: the Antigravity CLI's user
    * prompt, from its transcript, as its hooks carry none), adding it to `body`. Called in the launch's hook order, off
    * main's thread for its reads and bounded in time; `launch` says whose hook it is (only that agent's own records are
@@ -732,17 +652,6 @@ export interface ProviderAdapter {
   noticeDeadlineMs?(event: string): number | null
   /** The reply to a PreToolUse Combwork doesn't refuse, for a CLI that takes no answer as a denial (HI-2545: agy's `allow`). */
   preToolUseDefault?(): Record<string, unknown>
-  /**
-   * Whether the status line says the CLI is idle, for a CLI that sends no hook when its turn ends some ways (HI-2545: a
-   * cancelled permission prompt in the Antigravity CLI): a running turn with no end heard within idleGraceMs is interrupted.
-   */
-  statusLineIdle?(body: Record<string, any>): boolean
-  idleGraceMs?(): number
-  /**
-   * How a launch's CLI will compact by itself, read from its command, environment and the CLI's settings files (never
-   * changed), for the model it runs as (`models`: the id it resolves to, then the choice). Absent: Combwork doesn't know.
-   */
-  autoCompact?(ctx: LaunchContext, cmd: CommandSpec, models: string[]): AutoCompactSetting
   /**
    * Where the CLI's settings files turn its hooks off for a launch (#1336: why its hooks don't reach Combwork), read now and
    * never changed: the settings' name in the window's language, or null when none does (or Combwork can't tell).
@@ -765,6 +674,101 @@ export interface ProviderAdapter {
    * dialog lists none.
    */
   launchHooks?(ctx: LaunchContext, cmd: CommandSpec): LaunchHooks
+}
+/** The CLI's status line feeds a session's live details (model, cost, limits, context). */
+export interface ProviderStatusPart {
+  /** Claude Code's status-line JSON. */
+  statusLine(body: Record<string, any>): LiveDetails
+  /**
+   * The conversation a status line names, for a CLI that can't be given one up front (HI-2544: the Antigravity CLI):
+   * a valid id, or null. Combwork takes it for the launch while it has none, and never in place of a known one.
+   */
+  statusLineSession?(body: Record<string, any>): string | null
+  /**
+   * A permission prompt the CLI's status line says it shows, for a CLI that sends no hook for one (HI-2545: the Antigravity
+   * CLI's `tool_confirmation_pending`): the blocking ask, or null when none is pending. Combwork applies it as a hook's ask,
+   * in order with the launch's hooks, once when it begins (Combwork never answers it: the person does, in the CLI).
+   */
+  statusLineAsk?(body: Record<string, any>): Ask | null
+  /**
+   * Whether the status line says the CLI is idle, for a CLI that sends no hook when its turn ends some ways (HI-2545: a
+   * cancelled permission prompt in the Antigravity CLI): a running turn with no end heard within idleGraceMs is interrupted.
+   */
+  statusLineIdle?(body: Record<string, any>): boolean
+  idleGraceMs?(): number
+}
+/** Reading the CLI's screen: its title, its turn, a question or a prompt drawn in it. */
+export interface ProviderTerminalPart {
+  /**
+   * For CLIs whose terminal title says when a person must act (Codex's "Action Required"): a test of a title, for
+   * this version of the CLI, and the launch (its override switches: a title Combwork didn't set isn't read). Null (or
+   * absent) when its title doesn't say: its hooks then tell Combwork (see hookStatus).
+   */
+  titleAttention?(version: string | null, ctx?: Pick<LaunchContext, 'overrides'>): ((title: string) => boolean) | null
+  /**
+   * For CLIs that write their turn's state to the terminal in an OSC sequence (Copilot's OSC 7501, HI-2802): a test of an
+   * OSC payload whose first group is the state ("working", "done", else idle). Read only while the launch's hooks are
+   * missing, as a status of last resort: it says working and finished, never that a person must act.
+   */
+  terminalTurn?(): RegExp | null
+  /**
+   * For CLIs whose screen shows for sure whether a turn runs (#648, the turn ledger's last check before "state unknown"):
+   * a reading of the rendered screen, for this version of the CLI: 'idle' at its prompt, 'working' on a turn, or null when
+   * it doesn't show for sure. Null (or absent) for versions it wasn't checked with.
+   */
+  turnScreen?(version: string | null): ((screen: string) => 'idle' | 'working' | null) | null
+  /**
+   * Whether an ask is the CLI's prompt about a safeguard stop (Claude Code asks whether to switch models), from the ask
+   * and the terminal's screen as it shows it.
+   */
+  safeguardAsk?(ask: Ask, screen: string): boolean
+  /**
+   * The question a CLI puts on its screen by itself while idle, sending no hook (HI-1959: Claude Code's offer to teach
+   * auto mode about the environment), from the screen as shown; null when none shows. The agent waits for the user
+   * while it does, and nothing is typed into it: the question takes the keys, and Enter answers it.
+   */
+  idleQuestion?(screen: string): string | null
+  /**
+   * What the CLI's ordinary input holds, from the screen with dim cells blanked (TerminalScreen.textWithoutDim: a hint in
+   * an empty input is dim): '' when empty, null when no ordinary input is drawn (a dialog, a redraw, a blank screen).
+   */
+  promptText?(screen: string): string | null
+  /**
+   * What promptText reads, as drawn: its rows and their spacing kept (HI-1979: a Ctrl+U that deletes an empty row, a
+   * line break's, changes this and not promptText's words). Null where promptText is.
+   */
+  promptBox?(screen: string): string | null
+  /** Whether the CLI's screen shows it busy holding what was typed (as CommandSpec.busyScreen): a menu switch waits while it does. */
+  busyScreen?(screen: string): boolean
+}
+/** Switching a running session's permission mode (Combwork's own rule is canSwitchModeLive). */
+export interface ProviderModesPart {
+  /** For liveModeSwitch 'menu': the keys that pick a mode in the CLI's menu. */
+  modeMenuKeys?(target: PermissionMode): KeySteps
+  /** The mode the CLI says it switched to, from its terminal output after a menu switch (null: not said yet). */
+  modeFromOutput?(tail: string): PermissionMode | null
+  /**
+   * Whether the CLI's screen shows its own question about the mode just picked (Codex's warning before Full Access,
+   * #1014): the user answers it in the terminal, and a menu switch waits for that answer.
+   */
+  modeConfirmScreen?(screen: string): boolean
+  /**
+   * With modeConfirmScreen, how long the CLI has after the pick to show its question (when no transcript can confirm the
+   * switch) and how long the switch waits for the user's answer, in milliseconds: advanced settings, as a CLI changes.
+   */
+  modeConfirmWait?(): { appearMs: number; answerMs: number }
+  /** For providers with a Plan toggle: the key that turns it on or off. */
+  readonly planToggleKey?: string
+  /**
+   * The permission mode shown in the terminal footer, from the terminal's rendered screen (its lines as text), and the
+   * mode the session was launched in (for modes whose footers look the same).
+   */
+  footerMode?(screen: string, launched?: PermissionMode | null): PermissionMode | null
+  /** Whether a running session can switch to a mode without restarting. */
+  canSwitchLive(target: PermissionMode, current: PermissionMode | undefined, launched: PermissionMode | null | undefined): boolean
+}
+/** Finding, reading and exporting the CLI's sessions from its transcripts. */
+export interface ProviderTranscriptPart {
   /**
    * Details from lines appended to the session's transcript (Codex: model, preset, Plan mode, plan limits). `memo` is
    * the launch's own, kept between reads (and emptied when the reading starts again), for what a later line completes.
@@ -791,68 +795,6 @@ export interface ProviderAdapter {
   transcriptTurns?(appended: string, memo: Record<string, unknown>): TranscriptTurn[]
   /** How transcriptTurns' ids meet its hooks: the same id ('id'), or only by when its hooks came ('time'). */
   turnsJoin?: 'id' | 'time'
-  /**
-   * Whether an ask is the CLI's prompt about a safeguard stop (Claude Code asks whether to switch models), from the ask
-   * and the terminal's screen as it shows it.
-   */
-  safeguardAsk?(ask: Ask, screen: string): boolean
-  /**
-   * The question a CLI puts on its screen by itself while idle, sending no hook (HI-1959: Claude Code's offer to teach
-   * auto mode about the environment), from the screen as shown; null when none shows. The agent waits for the user
-   * while it does, and nothing is typed into it: the question takes the keys, and Enter answers it.
-   */
-  idleQuestion?(screen: string): string | null
-  /**
-   * What the CLI's ordinary input holds, from the screen with dim cells blanked (TerminalScreen.textWithoutDim: a hint in
-   * an empty input is dim): '' when empty, null when no ordinary input is drawn (a dialog, a redraw, a blank screen).
-   */
-  promptText?(screen: string): string | null
-  /**
-   * What promptText reads, as drawn: its rows and their spacing kept (HI-1979: a Ctrl+U that deletes an empty row, a
-   * line break's, changes this and not promptText's words). Null where promptText is.
-   */
-  promptBox?(screen: string): string | null
-  /**
-   * The installed CLI's models and what each can do (#125), when it can say (null: couldn't, or an unexpected reply).
-   * Asking may start the CLI briefly, but never a session, a prompt or a sign-in. env: the sessions' environment.
-   */
-  listModels?(executable: string, env: Record<string, string>): Promise<CatalogRead | null>
-  /** The effort the CLI's own settings choose for every model, if any (Codex's model_reasoning_effort). */
-  configuredDefaultEffort?(): string | null
-  /** For liveModeSwitch 'menu': the keys that pick a mode in the CLI's menu. */
-  modeMenuKeys?(target: PermissionMode): KeySteps
-  /** The mode the CLI says it switched to, from its terminal output after a menu switch (null: not said yet). */
-  modeFromOutput?(tail: string): PermissionMode | null
-  /**
-   * Whether the CLI's screen shows its own question about the mode just picked (Codex's warning before Full Access,
-   * #1014): the user answers it in the terminal, and a menu switch waits for that answer.
-   */
-  modeConfirmScreen?(screen: string): boolean
-  /**
-   * With modeConfirmScreen, how long the CLI has after the pick to show its question (when no transcript can confirm the
-   * switch) and how long the switch waits for the user's answer, in milliseconds: advanced settings, as a CLI changes.
-   */
-  modeConfirmWait?(): { appearMs: number; answerMs: number }
-  /** Whether the CLI's screen shows it busy holding what was typed (as CommandSpec.busyScreen): a menu switch waits while it does. */
-  busyScreen?(screen: string): boolean
-  /** For providers with a Plan toggle: the key that turns it on or off. */
-  readonly planToggleKey?: string
-  /**
-   * The permission mode shown in the terminal footer, from the terminal's rendered screen (its lines as text), and the
-   * mode the session was launched in (for modes whose footers look the same).
-   */
-  footerMode?(screen: string, launched?: PermissionMode | null): PermissionMode | null
-  /** Whether a running session can switch to a mode without restarting. */
-  canSwitchLive(target: PermissionMode, current: PermissionMode | undefined, launched: PermissionMode | null | undefined): boolean
-  /** Terminal output meaning a compaction Combwork started was refused or failed (no hook comes). */
-  readonly compactFailure: RegExp | null
-  /**
-   * Terminal output meaning the CLI is waiting for a prompt, for CLIs whose first hook only comes with the
-   * first prompt (Codex creates its thread lazily): until then Combwork shows the agent as ready from this.
-   */
-  readonly readyOutput?: RegExp
-
-  // Transcripts
   transcriptPath(folder: string, sessionId: string, recorded?: string): Promise<string | null>
   /** Where to put a transcript restored from Combwork's backup so the CLI can resume it; null if it can't be restored. */
   restorePath(folder: string, sessionId: string, recorded?: string): string | null
@@ -883,22 +825,24 @@ export interface ProviderAdapter {
    * have none.
    */
   copyPathData?(from: string, to: string, apply: boolean): Promise<PathDataCopy[]>
-  /** Output that means the CLI is asking the user something before it starts (e.g. whether to trust the folder). */
-  readonly startupQuestion?: RegExp
+  conversationParser(projectPath: string): ConversationParserLike
+  /** An image's data URL from the transcript line holding it. */
+  /** `transcriptPath`: the transcript the line is from, for an image kept beside it (agy's media files, HI-2546). */
+  imageData(line: Record<string, any>, loc: ImageLocation, transcriptPath: string): string | null | Promise<string | null>
+  /** Heading for a Markdown export. */
+  exportSubtitle(sessionId: string, project: string): string
+}
+/** A session's tokens, cost and limits, and a rate-limited request's wait. */
+export interface ProviderUsagePart {
   /**
-   * How Combwork ends the CLI as a person would, for CLIs that write what Combwork reads only as they exit (Copilot's token
-   * totals, #465): the keys it types, one every gapMs, before killing the CLI if it is still running after graceMs.
-   * Without it, Stop kills the process. `armed` (HI-2272): what its screen shows once a first key at its prompt has
-   * armed the next to exit. With it, Stop types the first key on conditions rather than at a fixed beat (exitKeys.ts):
-   * a turn under way is cancelled first and its end waited for, and the key that exits is typed once this shows.
+   * Whether the CLI is waiting to retry its model request (HI-1972: rate-limited, its connection lost), from its own
+   * records: its newest such wait in conversation `sessionId` recorded since `since` (ms), or null (none, or Combwork can't
+   * tell). `env` is the launch's environment (where its CLI keeps its records), `transcriptPath` its transcript where
+   * known. Read off main's thread and bounded in time; never changes anything of the CLI's. Absent: Combwork can't tell.
    */
-  readonly exitKeys?: { keys: string[]; gapMs: number; graceMs: number; armed?: RegExp }
-  /**
-   * The command a person types to end the CLI (Claude Code's /exit, Codex's /quit), which Combwork types, then Enter, at a
-   * lane's end once its builder's turn is over (HI-1706, sessions.quit), killing it if it is still running after graceMs.
-   * Only that end uses it: Stop and restarts don't. A CLI without one is ended there by its exitKeys, or killed.
-   */
-  readonly quitLine?: { line: string; graceMs: number }
+  retryWait?(q: { sessionId: string; env: NodeJS.ProcessEnv; transcriptPath?: string; since: number }): Promise<RetryWait | null>
+  /** How long a running turn goes without a hook before retryWait is asked (ms); absent: 20 s. */
+  retryLookAfterMs?(): number
   parseUsage(text: string, sessionId: string): SessionUsage
   /** Reads a transcript's usage a piece at a time (whole lines), for transcripts that keep growing. */
   usageParser(sessionId: string): UsageParser
@@ -907,14 +851,94 @@ export interface ProviderAdapter {
    * without it (the usage history, #1106); absent for a CLI whose transcript has it.
    */
   usageTitle?(sessionId: string): string | null
-  conversationParser(projectPath: string): ConversationParserLike
-  /** An image's data URL from the transcript line holding it. */
-  /** `transcriptPath`: the transcript the line is from, for an image kept beside it (agy's media files, HI-2546). */
-  imageData(line: Record<string, any>, loc: ImageLocation, transcriptPath: string): string | null | Promise<string | null>
-  /** Heading for a Markdown export. */
-  exportSubtitle(sessionId: string, project: string): string
-
-  // Project files
+}
+/** Sign-in connections: an account per folder of Combwork's, which the CLI's home variable points at. */
+export interface ProviderAccountsPart {
+  /**
+   * Who a home folder is signed in as (HI-980: an account's folder, given in `env` under the descriptor's
+   * `capabilities.connections.homeEnv`), from the CLI's own status: never a token. `ok: false` when it couldn't be told
+   * (a timeout, output it couldn't read), which isn't signed out.
+   */
+  accountStatus(executable: string, env: NodeJS.ProcessEnv): Promise<ConnectionStatus>
+  /**
+   * Whether a connection's folder (`home`) has had the CLI's one-time first-run setup that Set Up answers (HI-1870), as
+   * the CLI's own files there say, read only; null when it can't be told. Absent: the CLI has none to tell.
+   */
+  connectionSetUp?(home: string): Promise<boolean | null>
+  /** The arguments the CLI takes in a connection's Set Up on its folder (`home`), as its launches there do (HI-1893). Absent: none. */
+  connectionSetUpArgs?(home: string): string[]
+  /**
+   * Whether the CLI on a connection's folder (`home`) trusts each of a workspace's folders (HI-1870), as its own files
+   * there say, read only: true, false (not trusted, or no record), or null when it can't be told (a file it can't
+   * read, a folder Combwork couldn't resolve). Absent: the CLI keeps no trust to tell.
+   */
+  connectionTrusts?(home: string, targets: readonly TrustTarget[]): Promise<TrustReading[]>
+  /** Where a shared folder of an account (capabilities.connections.shared) links to: that folder of the CLI's own home. */
+  accountSharedTarget(name: string): string
+  /** Whether a file in an account's folder is one that changes when the CLI signs in or out there: watched, never read. */
+  accountLoginFile(name: string): boolean
+  /**
+   * A connection's sign-in, when it differs from loginCommand (HI-1757: Codex keeps the login in the connection's folder).
+   * `home`: the connection's folder; the spec's `env`, when it has one, is put over the sign-in's environment (HI-2759:
+   * OpenCode's roots and its sign-in config are derived from the folder).
+   */
+  accountLoginCommand?(executable: string, home?: string): CommandSpec
+  /**
+   * A connection's Set Up, when the CLI's own run on the folder (with connectionSetUpArgs) isn't safe for it (HI-2759:
+   * OpenCode's needs its private config and roots, so its Set Up is its sign-in); its `env` is put over the run's.
+   */
+  accountSetUpCommand?(executable: string, home: string): CommandSpec
+  /**
+   * Environment variables the CLI reads as a login (HI-1757: Codex's CODEX_ACCESS_TOKEN), left out wherever it runs on a
+   * connection (its sign-in, its checks, its sessions: withoutAccountEnv), so they can't stand in for the connection's own.
+   */
+  accountEnvDrop?(): readonly string[]
+  /** The same by a pattern on the variable's name (HI-1772: Claude Code reads whole families: ANTHROPIC_*, CLAUDE_CODE_USE_*). */
+  accountEnvDropPattern?(): RegExp
+  /**
+   * Whether a connection's folder (its home) is held by the CLI's own check of it, not yet confirmed ended (HI-1757:
+   * Codex's app server): its sign-in and removal are refused meanwhile, as while a launch holds it.
+   */
+  accountHeld?(home: string): boolean
+}
+/** Signing in on a GitHub host (Copilot): the workspace's and project's GitHub host settings. */
+export interface ProviderGithubHostPart {
+  /**
+   * What a launch on these GitHub hosts would sign in as (HI-2779, capabilities.githubHost), worked out as prepareLaunch
+   * records it: `env` is Combwork's environment, before the hosts are written into it. A change compares it with running
+   * agents' records.
+   */
+  signInHostFor(hosts: ResolvedGithubHosts, env: Record<string, string>): Promise<LaunchedSignInHost | null>
+  /** A GitHub host setting changed or a workspace closed (HI-2779): checks under way for the old hosts are dropped. */
+  githubHostsChanged(): void
+}
+/** The CLI's models: its own catalogue, its default, and which model ids are its. */
+export interface ProviderModelsPart {
+  /** The CLI's own default model from its settings, if set. */
+  /** The CLI's own default model from its settings; `home`: a connection's home (HI-1755) rather than the CLI's own. */
+  configuredDefaultModel(home?: string): string | null
+  /** Whether a model seen in a transcript is this provider's (to learn the CLI's default). */
+  ownsModel(model: string): boolean
+  /**
+   * The installed CLI's models and what each can do (#125), when it can say (null: couldn't, or an unexpected reply).
+   * Asking may start the CLI briefly, but never a session, a prompt or a sign-in. env: the sessions' environment.
+   */
+  listModels?(executable: string, env: Record<string, string>): Promise<CatalogRead | null>
+  /** The effort the CLI's own settings choose for every model, if any (Codex's model_reasoning_effort). */
+  configuredDefaultEffort?(): string | null
+}
+/** Compacting a session's context: where the CLI does it by itself, and a failed compaction's words. */
+export interface ProviderCompactionPart {
+  /**
+   * How a launch's CLI will compact by itself, read from its command, environment and the CLI's settings files (never
+   * changed), for the model it runs as (`models`: the id it resolves to, then the choice). Absent: Combwork doesn't know.
+   */
+  autoCompact?(ctx: LaunchContext, cmd: CommandSpec, models: string[]): AutoCompactSetting
+  /** Terminal output meaning a compaction Combwork started was refused or failed (no hook comes). */
+  readonly compactFailure: RegExp | null
+}
+/** A project's instructions, memory, skills and MCP servers as the CLI reads them. */
+export interface ProviderProjectFilesPart {
   /** `homes`: the connections' homes on in the project's workspace (HI-1755), whose user memory replaces the CLI's own home's. */
   memorySources(projectPath: string, homes?: readonly { id: string; name: string; home: string }[]): Promise<MemorySource[]>
   /**
@@ -930,18 +954,56 @@ export interface ProviderAdapter {
   skillRoots(home?: string): SkillRoots
   /** MCP servers a project defines in the CLI's own config, which Combwork leaves off until copied to the workspace. */
   projectMcpServers(projectPath: string): Promise<Record<string, McpServerDef>>
-
-  /**
-   * What to do about the CLI exiting before its session started, from the lines it printed last (escapes removed):
-   * e.g. an argument it refused, a model it doesn't know, no sign-in. Null when it doesn't recognise the error.
-   */
-  startHint?(text: string): StartHint | null
-
-  // Background sessions (capabilities.backgroundSessions)
+}
+/** Background sessions (Claude Code's agent view), which Combwork stops or keeps (capabilities.backgroundSessions). */
+export interface ProviderBackgroundPart {
   /** The CLI's background job named in what it printed when it refused to resume a session held there; null if none. */
-  backgroundJobIn?(output: string): string | null
+  backgroundJobIn(output: string): string | null
   /** Stops one of the CLI's background jobs (its conversation is kept). */
-  stopBackgroundJob?(executable: string, jobId: string): Promise<void>
+  stopBackgroundJob(executable: string, jobId: string): Promise<void>
+}
+
+/**
+ * A provider's adapter (HI-3201): its id and descriptor, and its capability parts. `install` and `launch` every provider has;
+ * each other part only a provider that supports it (an absent part is legal: its callers do without it, as they say). A
+ * class adapter implements a part's members itself and names it present with `readonly <part> = this`; a provider given
+ * as data can give each part as an object of its own.
+ */
+export interface ProviderAdapter {
+  readonly id: ProviderId
+  readonly descriptor: ProviderDescriptor
+  /** Its own work at Combwork's start and end (ProviderLifecycle); absent: none. */
+  readonly lifecycle?: ProviderLifecycle
+  /** Its admin snippet's own values (HI-2777: the shared half's adminSnippet builds the block from them); absent: none. */
+  readonly adminSnippet?: { settings(): Record<string, number> }
+  /** Finding, installing, updating and checking the CLI. Every provider has it (every provider). */
+  readonly install: ProviderInstallPart
+  /** Starting and resuming a session in a terminal, and typing into it. Every provider has it (every provider). */
+  readonly launch: ProviderLaunchPart
+  /** The CLI calls Combwork's hooks; absent: none of it. */
+  readonly hooks?: ProviderHooksPart
+  /** The CLI's status line feeds a session's live details (model, cost, limits, context); absent: none of it. */
+  readonly status?: ProviderStatusPart
+  /** Reading the CLI's screen; absent: none of it. */
+  readonly terminal?: ProviderTerminalPart
+  /** Switching a running session's permission mode (Combwork's own rule is canSwitchModeLive); absent: none of it. */
+  readonly modes?: ProviderModesPart
+  /** Finding, reading and exporting the CLI's sessions from its transcripts; absent: none of it. */
+  readonly transcript?: ProviderTranscriptPart
+  /** A session's tokens, cost and limits, and a rate-limited request's wait; absent: none of it. */
+  readonly usage?: ProviderUsagePart
+  /** Sign-in connections; absent: none of it. */
+  readonly accounts?: ProviderAccountsPart
+  /** Signing in on a GitHub host (Copilot); absent: none of it. */
+  readonly githubHost?: ProviderGithubHostPart
+  /** The CLI's models; absent: none of it. */
+  readonly models?: ProviderModelsPart
+  /** Compacting a session's context; absent: none of it. */
+  readonly compaction?: ProviderCompactionPart
+  /** A project's instructions, memory, skills and MCP servers as the CLI reads them; absent: none of it. */
+  readonly projectFiles?: ProviderProjectFilesPart
+  /** Background sessions (Claude Code's agent view), which Combwork stops or keeps (capabilities.backgroundSessions); absent: none of it. */
+  readonly background?: ProviderBackgroundPart
 }
 
 /** A CLI's model catalog as read (models.ts files of each adapter): its models, and the one it runs by default. */

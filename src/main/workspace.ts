@@ -1777,7 +1777,7 @@ export class WorkspaceService {
   async unmanagedMcp(projectPath: string): Promise<string[]> {
     const names = new Set<string>()
     // Every provider's at once (HI-1705).
-    for (const servers of await whenAll(allProviders().map((p) => p.projectMcpServers(projectPath).catch(() => ({}))))) for (const n of Object.keys(servers)) names.add(n)
+    for (const servers of await whenAll(allProviders().map((p) => p.projectFiles?.projectMcpServers(projectPath).catch(() => ({})) ?? {}))) for (const n of Object.keys(servers)) names.add(n)
     if (!names.size || !this.path) return []
     const deployed = new Set(
       (await readdir(this.mcpDir).catch(() => [] as string[])).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5))

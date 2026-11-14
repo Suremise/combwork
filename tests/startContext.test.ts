@@ -32,7 +32,7 @@ const copilotHooks = recording(join('copilot', 'sessionstart-1.0.98.json'))
 describe("each CLI's start context reply (#1065)", () => {
   it('Codex: hookSpecificOutput at each SessionStart, which it sends at the first prompt, on resuming and after a compaction', () => {
     expect(codex.startContextReply('V')).toEqual({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: 'V' } })
-    expect((codex as ProviderAdapter).startContextAfterCompaction).toBeUndefined()
+    expect((codex as ProviderAdapter).hooks?.startContextAfterCompaction).toBeUndefined()
     const starts = codexHooks.hooks.map((b) => codex.normalizeHook(b).event).filter((e) => e.kind === 'start')
     expect(starts).toEqual([{ kind: 'start', source: 'startup' }, { kind: 'start', source: 'resume' }, { kind: 'start', source: 'compact' }])
   })
@@ -47,7 +47,7 @@ describe("each CLI's start context reply (#1065)", () => {
   })
 
   it('Claude Code: its SessionStart after a compaction carries it', () => {
-    expect((claude as ProviderAdapter).startContextAfterCompaction).toBeUndefined()
+    expect((claude as ProviderAdapter).hooks?.startContextAfterCompaction).toBeUndefined()
   })
 })
 
@@ -193,6 +193,10 @@ describe('the start context in the hook replies (#1065)', () => {
       const waiters: { n: number; done: () => void }[] = []
       const adapter = {
         ...copilot,
+        // Its own hooks part (HI-3201: a provider's parts are getters, which a spread leaves out).
+        get hooks(): object {
+          return this
+        },
         prepareHook: async (body: Record<string, any>) => {
           if (Array.isArray(body.compactions)) body.combworkExpanded = body.compactions.map((turn: string) => ({ hook_event_name: 'Expanded', kind: 'compactEnd', turn }))
         },
