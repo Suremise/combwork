@@ -57,6 +57,9 @@ const held = { ...noSession, id: 'fake-held', name: 'Fake Held CLI', launch: { p
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, 'fake-claude', 'fake-claude.cmd')
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
+  // The user's typing pause outlasts an Enter here (enterEndsPause off), one second long: a first prompt it holds is tried
+  // again when it ends, though nothing more is drawn.
+  cfg.settings.assistant = { ...cfg.settings.assistant, enterEndsPause: false, typingPause: 1 }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
   let app, page, inv, api
@@ -226,6 +229,21 @@ const held = { ...noSession, id: 'fake-held', name: 'Fake Held CLI', launch: { p
     check('a first prompt waits for its question, the user’s draft and the draft’s question: then typed once', draftStart.status === 200 && JSON.stringify(linesOf()) === JSON.stringify(['y', 'ask', 'n', 'builder task']) && !lines().some((e) => e.kind === 'typedWhileBusy' && e.id === draftId), JSON.stringify({ lines: linesOf(), status: (await live())?.status, screen: lib.plainText((await inv('pty:buffer', lib.ptyKey(proj, a.id)).catch(() => '')) ?? '').slice(-400) }))
     await lib.until(async () => (['ready', 'finished'].includes((await live())?.status) ? true : null), HUNG_MS, 150)
 
+    // --- A first prompt held only by the user's typing pause is typed when the pause ends, with nothing more on its screen.
+    await inv('session:stop', proj, a.id)
+    await stopped()
+    fs.writeFileSync(trust, '')
+    await api('POST', `/v1/projects/demo/agents/${a.id}/start`, { prompt: 'quiet task' })
+    const quietLaunch = await lib.until(async () => launches()[7], HUNG_MS)
+    const quietId = arg(quietLaunch, '--session-id')
+    await statusIs('waiting')
+    fs.rmSync(trust, { force: true })
+    await inv('pty:write', lib.ptyKey(proj, a.id), 'y\r')
+    const quietLines = () => lines().filter((e) => e.kind === 'line' && e.id === quietId).map((e) => e.text)
+    check('a first prompt held by the typing pause alone is typed when it ends', !!(await lib.until(async () => (quietLines().includes('quiet task') ? true : null), HUNG_MS)) && JSON.stringify(quietLines()) === JSON.stringify(['y', 'quiet task']), JSON.stringify(quietLines()))
+    await lib.until(async () => (['ready', 'finished'].includes((await live())?.status) ? true : null), HUNG_MS, 150)
+    const draftIdKept = draftId
+
     // --- Combwork quits while it runs, and starts again: the session it had is kept, and resumes by its id.
     await inv('pty:write', lib.ptyKey(proj, a.id), 'before quitting')
     await inv('pty:write', lib.ptyKey(proj, a.id), '\r')
@@ -234,10 +252,10 @@ const held = { ...noSession, id: 'fake-held', name: 'Fake Held CLI', launch: { p
     await app.close()
     await boot()
     await lib.waitForProvider(inv, 'fake-data')
-    check('after a restart, its Resume still names the session', (await resumeId()) === draftId, String(await resumeId()))
+    check('after a restart, its Resume still names the session', (await resumeId()) === quietId && quietId !== draftIdKept, String(await resumeId()))
     const afterRestart = await api('POST', `/v1/projects/demo/agents/${a.id}/start`, { resume: true })
-    const seventh = await lib.until(async () => launches()[7], HUNG_MS)
-    check('…and resumes it by its id', afterRestart.status === 200 && arg(seventh, '--resume') === draftId && !lines().some((e) => e.kind === 'resumeRefused'), JSON.stringify({ afterRestart, args: seventh?.args }))
+    const seventh = await lib.until(async () => launches()[8], HUNG_MS)
+    check('…and resumes it by its id', afterRestart.status === 200 && arg(seventh, '--resume') === quietId && !lines().some((e) => e.kind === 'resumeRefused'), JSON.stringify({ afterRestart, args: seventh?.args }))
     await statusIs('ready')
     await inv('session:stop', proj, a.id)
     await stopped()
@@ -246,7 +264,7 @@ const held = { ...noSession, id: 'fake-held', name: 'Fake Held CLI', launch: { p
     const b = await lib.addAgent(inv, proj, { name: 'NoSession', provider: 'fake-nosession' })
     const liveB = async () => (await inv('session:live')).find((s) => s.agentId === b.id && s.status !== 'stopped') ?? null
     await inv('session:start', proj, { agentId: b.id })
-    const eighth = await lib.until(async () => launches()[8], HUNG_MS)
+    const eighth = await lib.until(async () => launches()[9], HUNG_MS)
     check('a CLI without a session starts with no session id', !!eighth && !eighth.args.includes('--session-id'), JSON.stringify(eighth?.args))
     check('…and is ready at its prompt', !!(await lib.until(async () => ((await liveB())?.status === 'ready' ? true : null), HUNG_MS, 150)), JSON.stringify({ status: (await liveB())?.status, screen: lib.plainText((await inv('pty:buffer', lib.ptyKey(proj, b.id)).catch(() => '')) ?? '').slice(-300) }))
     await inv('pty:write', lib.ptyKey(proj, b.id), 'no session here')
@@ -256,7 +274,7 @@ const held = { ...noSession, id: 'fake-held', name: 'Fake Held CLI', launch: { p
     await inv('session:stop', proj, b.id)
     await lib.until(async () => !(await liveB()), HUNG_MS, 150)
     const noResume = await api('POST', `/v1/projects/demo/agents/${b.id}/start`, { resume: true })
-    check('…and a resume of it is refused, saying there is none', noResume.status === 409 && launches().length === 9, JSON.stringify(noResume))
+    check('…and a resume of it is refused, saying there is none', noResume.status === 409 && launches().length === 10, JSON.stringify(noResume))
 
     // --- A launch held while it prepares, its CLI's description removed and reloaded meanwhile: it launches from the
     // copy it took (its arguments), not refused as turned off; the next start is refused (its CLI is gone).

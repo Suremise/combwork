@@ -589,28 +589,19 @@ export const adminSnippetProvider = (): ProviderModule | null => PROVIDER_MODULE
 /** A provider's shared half (registry.ts), or undefined for an id this version doesn't know. */
 export const providerModule = (id: ProviderId | null | undefined): ProviderModule | undefined => PROVIDER_MODULES.find((m) => m.descriptor.id === id)
 
-/** Descriptors a launch still preparing holds (holdDescriptor), the newest last. */
-const HELD: { id: ProviderId; descriptor: ProviderDescriptor }[] = []
+/** A launch's own copy of a descriptor, in that launch's own steps alone (main's launchScope.ts); none elsewhere. */
+let scoped: (id: ProviderId) => ProviderDescriptor | undefined = () => undefined
+
+/** Main sets how a launch's own steps find its pinned descriptor (HI-3196: launchScope.ts); the window has none. */
+export function setDescriptorScope(find: (id: ProviderId) => ProviderDescriptor | undefined): void {
+  scoped = find
+}
 
 export function providerDescriptor(id: ProviderId | null | undefined): ProviderDescriptor {
   const want = id || DEFAULT_PROVIDER
-  for (let i = HELD.length - 1; i >= 0; i--) if (HELD[i].id === want) return HELD[i].descriptor
+  const own = scoped(want)
+  if (own) return own
   return PROVIDERS.find((p) => p.id === want) ?? { ...UNKNOWN, id: id ?? 'unknown', name: id ?? 'Unknown provider' } // i18n-ignore: a stand-in name for a provider id Combwork doesn't know
-}
-
-/**
- * Holds the descriptor a launch pinned (HI-3196: a CLI from a description, its copy taken at the launch's start) while it
- * runs: what main reads by id meanwhile (its launch policy, modes, models, its status) is that copy, whatever a reload
- * registers or removes; a new launch still needs its CLI registered (main's provider(id)). The newest hold of an id wins.
- * Released (the function returned) when it exits or fails to start.
- */
-export function holdDescriptor(descriptor: ProviderDescriptor): () => void {
-  const held = { id: descriptor.id, descriptor }
-  HELD.push(held)
-  return () => {
-    const i = HELD.indexOf(held)
-    if (i >= 0) HELD.splice(i, 1)
-  }
 }
 
 /**

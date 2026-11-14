@@ -34,7 +34,7 @@ import { agentPlace, bindSession, claimPlace, ClaimRefused, folderAgent, folderF
 import { slotEnv } from './slots'
 import { copiesDirOf, grantsCopies } from './copies'
 import { agentWorkflowRole, inWorkflow, launchWorkflow, reviewsWork, type LaunchWorkflow } from '../shared/workflow/roles'
-import { agentLaunchSettings, agentProvider, autoProviderPending, canSwitchModeLive, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake, holdDescriptor, providerSwitchOn } from '../shared/providers'
+import { agentLaunchSettings, agentProvider, autoProviderPending, canSwitchModeLive, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake, providerSwitchOn } from '../shared/providers'
 import { isCliOwnMode, modeInEffect } from '../shared/cliOwnMode'
 import { accountInfo, dialectModelId, modelIdName, modelSwitched, resolvedModel } from '../shared/models'
 import type {
@@ -129,6 +129,7 @@ import { combworkSkills, parseSkillFrontmatter, skillFor } from './skills'
 import { copyBook, sessionEnded } from './skillCopies'
 import { workspaceNotesFor } from './workspaceNotes'
 import { independentIn } from './independent'
+import { inLaunchScope, pinInLaunchScope } from './launchScope'
 import { skillOff } from '../shared/skillDelivery'
 import { samePath } from '../shared/movePaths'
 import { chainGuidanceRevision, GUIDANCE_REVISION, launchParts, launchRecord } from './guidance'
@@ -612,6 +613,8 @@ interface LiveSession {
   stopsAnswered?: number[]
   /** Its typed first prompt is being typed now (HI-3196: typeFirstPrompt), so no second try starts meanwhile. */
   firstPromptTyping?: boolean
+  /** Its first prompt's try when the user's typing pause ends (firstPromptWhenQuiet): cancelled when it is sent or the run ends. */
+  firstPromptWait?: { at: number; timer: ReturnType<typeof setTimeout> }
   /** Its first prompt is on its record (HI-3196: a CLI that resumes by Combwork's id; notePrompted). */
   prompted?: boolean
   /** Its first prompt, to type once its screen first says it is ready (HI-3196: a CLI whose prompt is typed). */
@@ -2062,7 +2065,8 @@ class SessionManager {
     const times = new StepTimes()
     // A new conversation (HI-2197): the agent's watch from before ended first, its wake cancelled, before anything launches.
     const before = freshFrom ? (this.deliveries?.carry(projectPath, agentId, freshFrom) ?? Promise.resolve(0)).then(() => undefined) : opts.resumeId || opts.keepWatch ? Promise.resolve() : this.conversationEnds(projectPath, agentId)
-    const run = before.then(() => this.startReserved(projectPath, agentId, id, opts, times))
+    // Its own steps in a scope of their own (HI-3196: launchScope.ts), where the copy of its CLI it takes is what they read.
+    const run = before.then(() => inLaunchScope(() => this.startReserved(projectPath, agentId, id, opts, times)))
     pending.done = run.catch(() => undefined)
     pending.outcome = run
     try {
@@ -2077,8 +2081,6 @@ class SessionManager {
       throw e
     } finally {
       this.starting.delete(id)
-      // Its descriptor held (HI-3196): released here only if it didn't start; a launch that runs keeps it until it exits.
-      if (!this.live.get(id)) this.unhold(id)
       endAdmission(id)
       const slow = times.slowLine()
       if (slow) log.info(`${opts.resumeId ? 'Resume' : 'Start'} of ${userText(agentId)} in ${userText(basename(projectPath))} ${slow}`)
@@ -2393,11 +2395,8 @@ class SessionManager {
     // its status readers and its command.
     const registered = providerAdapter(providerId)
     const adapter = registered.launch.forLaunch?.() ?? registered
-    // What it reads by id is that copy too (its policy, modes, models, what its status reads), until it exits.
-    if (registered.launch.forLaunch) {
-      this.unhold(id)
-      this.held.set(id, holdDescriptor(adapter.descriptor))
-    }
+    // What its own steps read by id is that copy too (its policy, modes, models): in its launch's scope alone (start's).
+    if (registered.launch.forLaunch) pinInLaunchScope(adapter.descriptor)
     const name = adapter.descriptor.name
     if (opts.resumeId && !adapter.transcript && !adapter.launch.resumesById) throw combworkError(M.cantResume, { provider: name }, { kind: 'conflict' })
     const resuming = opts.resumeId ? 'yes' : 'no'
@@ -2521,16 +2520,7 @@ class SessionManager {
     return state
   }
 
-  /** Descriptors held by launches still preparing (HI-3196: holdDescriptor), by live id. */
-  private held = new Map<string, () => void>()
-
-  private unhold(id: string): void {
-    this.held.get(id)?.()
-    this.held.delete(id)
-  }
-
   private forget(id: string): void {
-    this.unhold(id)
     const l = this.live.get(id)
     if (l) {
       this.runs.delete(l.state.runId)
@@ -2581,7 +2571,7 @@ class SessionManager {
     l.state.settingUp = false
     setStatus(l.state, null)
     try {
-      await this.launch(projectPath, ({ ...agent, needsSetup: false } as StoredAgent), launch)
+      await inLaunchScope(() => this.launch(projectPath, ({ ...agent, needsSetup: false } as StoredAgent), launch), l?.adapter.descriptor)
     } catch (e) {
       void this.afterLaunch(l.state.runId, this.label(l.state))
       this.forget(id)
@@ -3923,8 +3913,10 @@ class SessionManager {
     if (!text || l.firstPromptTyping || !this.owns(l)) return
     const { projectPath, agentId, runId } = l.state
     // Only at a safe point: at its prompt, nothing on its screen asking or taking its keys, nobody typing there, no draft
-    // of the user's in it and no line of Combwork's waiting (inputHeld). Not yet: kept, and tried again as its screen draws.
-    if (!this.firstPromptSafe(l)) return
+    // of the user's in it and no line of Combwork's waiting (inputHeld). Not yet: kept, and tried again as its screen
+    // draws, as its status changes, and when the user's typing pause ends (which neither of those says).
+    if (!this.firstPromptSafe(l)) return this.firstPromptWhenQuiet(l)
+    this.cancelFirstPromptWait(l)
     l.firstPromptTyping = true
     const since = Date.now()
     void this.sendPrompt(projectPath, agentId, text, () => {
@@ -3938,6 +3930,7 @@ class SessionManager {
     })
       .then(() => {
         if (l.typedFirstPrompt === text) l.typedFirstPrompt = undefined
+        this.cancelFirstPromptWait(l)
       })
       .catch((e: Error) => {
         // Its Enter was pressed (the line recorded as typed): never typed again. Else kept, for the next safe point.
@@ -3947,6 +3940,29 @@ class SessionManager {
       .finally(() => {
         l.firstPromptTyping = false
       })
+  }
+
+  /**
+   * A first prompt held by the user's typing pause (userMayBeTyping) is tried again when that pause ends (userQuietAt),
+   * once; anything else that holds it (a draft, a question, work) ends with a draw or a status change, which try it again.
+   */
+  private firstPromptWhenQuiet(l: LiveSession): void {
+    const { projectPath, agentId } = l.state
+    const at = this.userQuietAt(projectPath, agentId)
+    if (at === null || l.firstPromptWait?.at === at) return
+    this.cancelFirstPromptWait(l)
+    const timer = setTimeout(() => {
+      if (l.firstPromptWait?.timer !== timer) return
+      l.firstPromptWait = undefined
+      if (this.owns(l)) this.typeFirstPrompt(l)
+    }, Math.max(0, at - Date.now()) + 1)
+    timer.unref?.()
+    l.firstPromptWait = { at, timer }
+  }
+
+  private cancelFirstPromptWait(l: LiveSession): void {
+    if (l.firstPromptWait) clearTimeout(l.firstPromptWait.timer)
+    l.firstPromptWait = undefined
   }
 
   /** Whether a launch's first prompt can be typed now (typeFirstPrompt): the same guards any line of Combwork's has. */
@@ -5341,7 +5357,8 @@ class SessionManager {
       // Its CLI has exited: its transcript is finished (archiving it at once is fine, inUse).
       this.noteExit(l.state.sessionId)
       this.live.delete(id)
-      this.unhold(id)
+      // A first prompt still waiting for the user's typing pause to end (HI-3196) goes with its run.
+      this.cancelFirstPromptWait(l)
       this.recheckTools(id)
       // The last of Combwork's sessions in its folder: Combwork's skill copies there go, as Settings → Advanced says (#1431). Not
       // as Combwork quits: the next start's sweep does it, unless sessions resume there first.

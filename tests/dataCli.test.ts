@@ -14,7 +14,8 @@ process.env.CW_USER_DATA = join(base, 'profile')
 
 const { checkCliDescription, cliDescriptor, cliPatternId, CLI_BOUNDS } = await import('../src/shared/providers/cliDescription')
 const { englishText, advancedDef, listedAdvanced } = await import('../src/shared/advanced')
-const { PROVIDERS, providerDescriptor, DEFAULT_PROVIDER, holdDescriptor, providerSwitchOn } = await import('../src/shared/providers')
+const { PROVIDERS, providerDescriptor, DEFAULT_PROVIDER, providerSwitchOn } = await import('../src/shared/providers')
+const { inLaunchScope, pinInLaunchScope } = await import('../src/main/launchScope')
 const { SETTINGS_SECTIONS, settingEntry } = await import('../src/shared/settingsCatalog')
 const { BUILT_IN_PROVIDERS } = await import('../src/shared/providers/registry')
 const { registerCliSnapshot } = await import('../src/shared/providers/cliSnapshot')
@@ -320,17 +321,37 @@ describe('what is made from the providers follows a snapshot (Settings, the Assi
   })
 })
 
-describe('a launch preparing keeps its CLI’s descriptor (holdDescriptor)', () => {
+describe('each launch keeps its own view of its CLI (launchScope), everything else the registry as it is now', () => {
   afterEach(() => registerCliSnapshot({ generation: 0, clis: [] }))
-  it('reads its copy by id while held, whatever a reload removes; its switch alone says whether it is off', () => {
-    const cli = ok(desc())
-    registerCliSnapshot({ generation: 31, clis: [cli] })
-    const release = holdDescriptor(providerDescriptor('fake-cli'))
-    registerCliSnapshot({ generation: 32, clis: [] })
-    expect(providerDescriptor('fake-cli').name).toBe('Fake CLI')
-    expect(launchPolicy(null, 'fake-cli').tools).toBe(false)
-    expect(providerSwitchOn({ providers: { 'fake-cli': { enabled: true } } } as never, 'fake-cli')).toBe(true)
-    release()
-    expect(providerDescriptor('fake-cli').name).toBe('fake-cli')
+  it('keeps an old launch on its copy and a new one on the new, while listings and settings read the new', async () => {
+    const mode = (value: string) => ({ value, label: value, args: [`--${value}`] })
+    const oldCli = ok(desc({ name: 'Old CLI', launch: { prompt: 'typed', modes: [mode('old-mode')] } }))
+    const newCli = ok(desc({ name: 'New CLI', launch: { prompt: 'typed', modes: [mode('new-mode')] } }))
+    const modes = (): string[] => providerDescriptor('fake-cli').permissionModes.map((m) => m.value)
+    registerCliSnapshot({ generation: 41, clis: [oldCli] })
+    let releaseOld: () => void = () => undefined
+    const oldHeld = new Promise<void>((r) => (releaseOld = r))
+    const seen: Record<string, unknown> = {}
+    // A launch of the old description pins it, then waits (its preparation) while a reload registers the new one.
+    const oldLaunch = inLaunchScope(async () => {
+      pinInLaunchScope(providerDescriptor('fake-cli'))
+      await oldHeld
+      seen.old = { name: providerDescriptor('fake-cli').name, modes: modes(), tools: launchPolicy(null, 'fake-cli').tools }
+    })
+    registerCliSnapshot({ generation: 42, clis: [newCli] })
+    // A second launch, of the new one, at the same time.
+    await inLaunchScope(async () => {
+      pinInLaunchScope(providerDescriptor('fake-cli'))
+      await Promise.resolve()
+      seen.new = { name: providerDescriptor('fake-cli').name, modes: modes() }
+    })
+    seen.outside = { name: providerDescriptor('fake-cli').name, modes: modes() }
+    releaseOld()
+    await oldLaunch
+    expect(seen.old).toEqual({ name: 'Old CLI', modes: ['old-mode', 'cli-own'], tools: false })
+    expect(seen.new).toEqual({ name: 'New CLI', modes: ['new-mode', 'cli-own'] })
+    expect(seen.outside).toEqual({ name: 'New CLI', modes: ['new-mode', 'cli-own'] })
+    // Its switch alone says whether it is off, registered or not.
+    expect(providerSwitchOn({ providers: { gone: { enabled: true } } } as never, 'gone')).toBe(true)
   })
 })
