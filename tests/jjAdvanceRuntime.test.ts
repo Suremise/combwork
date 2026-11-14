@@ -358,6 +358,58 @@ describe.skipIf(!jjExe)(`Combwork's jj advance through the adapter (jj ${TESTED_
       expect(facts(w, card, 'Integrated')).toHaveLength(1)
     })
 
+    it("recovery of a verified attempt after the target moved on past R (HR1's round 2): one Integrated for the attempt, its obligation at the head proved, no question; again: nothing more", async () => {
+      const w = await world(colocated, { candidates: true, oneSlot: true, advance: true })
+      const card = await approved(w)
+      await candidate(w, card)
+      const crashing: AdvanceHost = { ...advanceHostOf(w.wf), advanced: async () => false }
+      await advanceWith(w, card, crashing)
+      const [j] = await journalOf(w, card)
+      expect([j.phase, j.settled ?? null]).toEqual(['verified', null])
+      const R = j.plan.result
+      expect(w.main()).toBe(R)
+      // Another card's (or the user's) work lands on the target after R, before Combwork records it.
+      w.h.jj(w.repo, 'new', 'main', '-m', 'later work')
+      writeFileSync(join(w.repo, 'later.txt'), 'later\n')
+      w.h.jj(w.repo, 'commit', '-m', 'later work')
+      w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', '@-')
+      w.h.jj(w.repo, 'git', 'export')
+      const later = w.main()
+      expect(later).not.toBe(R)
+      await jjp(w, card).recoverAdvances!(advanceHostOf(w.wf))
+      const integrated = facts(w, card, 'Integrated')
+      expect(integrated).toHaveLength(1)
+      expect(integrated[0]).toMatchObject({ by: 'combwork', result: R })
+      expect(facts(w, card, 'AdvanceStopped')).toEqual([])
+      expect(advanceRequest(w, card)).toBeUndefined()
+      expect(rows(w, 'jj_obligations')).toMatchObject([{ state: 'owed', result: later }])
+      expect(w.wf.state(card).stage).toBe('done')
+      await jjp(w, card).recoverAdvances!(advanceHostOf(w.wf))
+      expect(facts(w, card, 'Integrated')).toHaveLength(1)
+      expect(rows(w, 'jj_obligations')).toHaveLength(1)
+    })
+
+    it("recovery of a verified attempt while J5 can't be read records nothing yet and asks nothing; once readable, one Integrated with its obligation", async () => {
+      const w = await world(colocated, { candidates: true, oneSlot: true, advance: true })
+      const card = await approved(w)
+      await candidate(w, card)
+      const crashing: AdvanceHost = { ...advanceHostOf(w.wf), advanced: async () => false }
+      await advanceWith(w, card, crashing)
+      const real = w.deps.integration
+      w.deps.integration = async () => null
+      try {
+        await jjp(w, card).recoverAdvances!(advanceHostOf(w.wf))
+      } finally {
+        w.deps.integration = real
+      }
+      expect(facts(w, card, 'Integrated')).toHaveLength(0)
+      expect(facts(w, card, 'AdvanceStopped')).toEqual([])
+      expect(advanceRequest(w, card)).toBeUndefined()
+      await jjp(w, card).recoverAdvances!(advanceHostOf(w.wf))
+      expect(facts(w, card, 'Integrated')).toHaveLength(1)
+      expect(rows(w, 'jj_obligations')).toHaveLength(1)
+    })
+
     it('recovery waits for an active writer (its card lock held from journal to outcome): never classified half way, one attempt', async () => {
       let release: () => void = () => undefined
       const paused = new Promise<void>((r) => (release = r))

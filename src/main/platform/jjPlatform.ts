@@ -869,14 +869,18 @@ export class JjPlatform implements PlatformAdapter {
       // integration's publish obligation written with Integrated, so the card is tracked for publishing either way. A proof
       // that can't be read yet leaves the attempt as journaled (`verified`): recovery records it once the proof comes; one
       // that says the target doesn't contain the work disagrees with the lineage just proved, so only the user settles it.
+      // HR1's round 2: the proof answers at the target's head now, which may have moved on past R since the attempt was
+      // verified (another card, the user): that is forward progress, not a disagreement. What must hold is that R itself,
+      // the attempt's verified result, is in the target now (read pinned); the obligation follows the proof's head.
       const rec = this.deps?.records
       const approved = s.approved?.revision && s.approved.base ? { base: s.approved.base, revision: s.approved.revision, key: s.latest?.key ?? null } : null
       const p = approved ? await this.proof(card, s, approved) : ({ unknown: 'noApproval' } as JjProved)
-      if ('unknown' in p) {
-        checksLog.warn(`advance of #${userText(card.key)} verified; its proof isn't readable yet (${p.unknown}): recorded once it is`) // i18n-ignore: a log line, English
+      const rIn = !('unknown' in p) && p.contained ? await resultContained(h, deps, j.plan) : null
+      if ('unknown' in p || rIn === 'unknown') {
+        checksLog.warn(`advance of #${userText(card.key)} verified; its proof isn't readable yet (${'unknown' in p ? p.unknown : 'result'}): recorded once it is`) // i18n-ignore: a log line, English
         return false
       }
-      if (!p.contained || p.result !== j.plan.result || !rec) {
+      if (!p.contained || rIn !== true || !rec) {
         if (await host.stopped(card, ref, j.planId, { code: 'proofDisagrees', detail: p.contained ? p.result : 'notContained', undo: false, uncertain: true }, this.advanceWords(j, s, 'other', 'proofDisagrees'))) await journalSettled(h, deps, j, 'uncertain', { detail: 'proofDisagrees' }) // i18n-ignore: codes
         return false
       }
