@@ -239,7 +239,8 @@ function Composer({ where, initial = '', onSave, onCancel }: { where?: Draft; in
 
 /** One saved comment: who and when, where, its Markdown, and what can be done with it. */
 export function Thread({ card, c, agentName }: { card: number; c: LineCommentView; agentName: (id: string | null) => string }) {
-  const [editing, setEditing] = useState(false)
+  // The version Edit was opened on (HR1's round 1): saved against it, so an edit made meanwhile is refused, never overwritten.
+  const [editing, setEditing] = useState<{ version: number; body: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const change = async (what: Change): Promise<void> => {
     setError(null)
@@ -263,7 +264,7 @@ export function Thread({ card, c, agentName }: { card: number; c: LineCommentVie
         {!editing && (
           <>
             {c.state === 'open' && (
-              <button type="button" className="btn small subtle" onClick={() => setEditing(true)}>
+              <button type="button" className="btn small subtle" onClick={() => setEditing({ version: c.version, body: c.body })}>
                 {tr(M.edit)}
               </button>
             )}
@@ -279,9 +280,9 @@ export function Thread({ card, c, agentName }: { card: number; c: LineCommentVie
         )}
       </div>
       {editing ? (
-        <Composer initial={c.body} onCancel={() => setEditing(false)} onSave={async (body) => {
-          await call('tasks:lineCommentChange', card, c.id, { edit: { body, version: c.version } })
-          setEditing(false)
+        <Composer initial={editing.body} onCancel={() => setEditing(null)} onSave={async (body) => {
+          await call('tasks:lineCommentChange', card, c.id, { edit: { body, version: editing.version } })
+          setEditing(null)
         }} />
       ) : (
         <Markdown className="cw-comment-body" source={c.body} />

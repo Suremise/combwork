@@ -170,6 +170,15 @@ const commit = (dir, file, text, message) => {
   check('Edit changes its text and raises its version', !!(await lib.until(async () => { const c = (await comments())[0]; return c?.body === 'Say Hello.' && c.version === 2 }, HUNG_MS)), JSON.stringify(await comments()))
   const stale = await inv('tasks:lineCommentChange', g, one.id, { edit: { body: 'Old view', version: 1 } }).then(() => null, (e) => String(e?.message ?? e))
   check('an edit from an older version is refused', /changed meanwhile/.test(stale ?? ''), String(stale))
+  // HR1's round 1: an editor left open while the comment changes elsewhere saves against the version it opened on, so its
+  // stale draft is refused, never written over the newer text.
+  await thread.getByRole('button', { name: 'Edit' }).click()
+  await thread.locator('textarea').fill('A stale draft.')
+  await inv('tasks:lineCommentChange', g, one.id, { edit: { body: 'Newer, from elsewhere.', version: 2 } })
+  check('the comment changes elsewhere while its editor is open, and the window reads it', !!(await lib.until(async () => { const c = (await comments())[0]; return c?.version === 3 && c.body === 'Newer, from elsewhere.' && (await thread.locator('textarea').count()) === 1 && (await thread.locator('textarea').inputValue().catch(() => '')) === 'A stale draft.' }, HUNG_MS)), JSON.stringify(await comments()))
+  await thread.locator('textarea').press('Control+Enter')
+  check('saving the stale draft is refused, saying so, and the newer text stays', !!(await lib.until(async () => /changed meanwhile/.test(await thread.innerText().catch(() => '')), HUNG_MS)) && (await comments())[0]?.body === 'Newer, from elsewhere.' && (await comments())[0]?.version === 3, `${await thread.innerText().catch(() => '')} | ${JSON.stringify(await comments())}`)
+  await thread.getByRole('button', { name: 'Cancel' }).click()
   await thread.getByRole('button', { name: 'Resolve' }).click()
   check('Resolve marks it resolved, and it no longer counts as open', !!(await lib.until(async () => (await comments())[0]?.state === 'resolved' && (await section.locator('[data-revision-open-comments]').count()) === 0 && (await thread.getAttribute('data-state').catch(() => '')) === 'resolved', HUNG_MS)))
   await thread.getByRole('button', { name: 'Reopen' }).click()
