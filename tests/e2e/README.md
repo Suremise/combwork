@@ -356,7 +356,7 @@ same code while every required check still runs:
   narrow a round's tests are, and what never runs on a card unless it asks, is AGENTS.md's **Tests per card**.
 - **A merge** (#1010; into main or an integration branch such as `feature/090-session`) runs **focused checks** on the
   merged code: typecheck, lint, `npm run check:repo` (the repo-wide checks: the i18n guard and the unit tests that
-  scan every file, under a minute, HI-2244), and the cards' own focused suites (those their reviews ran, plus any
+  scan every file, and the catalogue coverage tests, HI-2244, HI-3257), and the cards' own focused suites (those their reviews ran, plus any
   suite the merge's conflicts touched), `npm run e2e -- <suites> --build --record`. **Not** the full set and **not**
   `--affected`: merges take turns at one slot, and an hour or more of e2e for each kept every other lane waiting (a
   phase of five merges took hours) and was the load Combwork crashed under (#988). Every card has already passed review

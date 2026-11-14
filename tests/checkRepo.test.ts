@@ -7,7 +7,13 @@
 // the first three took 50 s of a minute. The full unit run is for a release's final checks, and on
 // request. Vitest takes files and the name pattern as filters, so a file or test renamed would silently drop out: each
 // must still be there.
-import { existsSync, readFileSync } from 'fs'
+// HI-3257: and the catalogue coverage tests the merge queue would otherwise never run, since it runs no focused unit test:
+// the agent-text canary dialect over each area (agentText*.test.ts whole, agentText.test.ts's by name: its catalogue
+// freshness is agentTextExtract.mjs --check above), each window area's catalogue rules (tests/i18n/) and the settings
+// catalogue's. Three messages unseen by a canary and two area rules broken reached 1.6.0 on 14 Nov. Measured on their
+// own, about 14 s. They run last, on their own: in the first run's pool they slowed focusedPick's command-line test
+// past its limit.
+import { existsSync, readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error: plain .mjs modules without types
@@ -15,15 +21,16 @@ import { UNIT_SCANS } from './e2e/affected.mjs'
 
 const root = join(__dirname, '..')
 const script: string = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts['check:repo']
-const FILES = '((?:tests\\/[\\w/]+\\.test\\.ts ?)+)'
+const FILES = '((?:tests\\/[\\w/.]+\\.test\\.ts ?)+)'
 // The agent-text guard and its catalogue's freshness (HI-2065) beside the i18n guard's, then the names check of the
 // change (HI-2617: the lines it adds since the merge queue's target, CW_CHECK_BASE), and the WorkspaceService rule when the
 // change touches one of its inputs (HI-2678, tests/e2e/workspaceRuleCheck.mjs).
-const SHAPE = new RegExp(`^node scripts\\/i18nGuard\\.mjs && node scripts\\/agentTextGuard\\.mjs && node scripts\\/agentTextExtract\\.mjs --check && node tests\\/oldNames\\.mjs --diff && node tests\\/e2e\\/workspaceRuleCheck\\.mjs --diff && vitest run ${FILES} && vitest run ${FILES} -t "([^"]+)"$`)
+const SHAPE = new RegExp(`^node scripts\\/i18nGuard\\.mjs && node scripts\\/agentTextGuard\\.mjs && node scripts\\/agentTextExtract\\.mjs --check && node tests\\/oldNames\\.mjs --diff && node tests\\/e2e\\/workspaceRuleCheck\\.mjs --diff && vitest run ${FILES} && vitest run ${FILES} -t "([^"]+)" && vitest run ${FILES}$`)
 const shape = SHAPE.exec(script)
 const list = (s: string | undefined): string[] => s?.trim().split(' ') ?? []
 const whole = list(shape?.[1])
 const byName = list(shape?.[2])
+const coverage = list(shape?.[4])
 
 /** A pattern's top-level alternatives (split at each | outside parentheses). */
 function alternatives(pattern: string): string[] {
@@ -42,17 +49,25 @@ function alternatives(pattern: string): string[] {
 }
 
 describe('npm run check:repo', () => {
-  it("runs the i18n guard, the agent-text guard and its catalogue's check, the change's names check, the repo-wide test files, then the tree-reading tests of more files by name", () => {
+  it("runs the i18n guard, the agent-text guard and its catalogue's check, the change's names check, the repo-wide test files, the tree-reading tests of more files by name, then the catalogue coverage tests", () => {
     expect(shape, script).not.toBeNull()
   })
 
   it('names test files that exist, once each, sorted', () => {
-    for (const files of [whole, byName]) {
+    for (const files of [whole, byName, coverage]) {
       expect(files.length).toBeGreaterThan(0)
       expect(files.filter((f) => !existsSync(join(root, f)))).toEqual([])
       expect(files).toEqual([...new Set(files)].sort())
     }
-    expect(whole.filter((f) => byName.includes(f))).toEqual([])
+    const all = [...whole, ...byName, ...coverage]
+    expect(all.filter((f, i) => all.indexOf(f) !== i)).toEqual([])
+  })
+
+  // HI-3257: a new agent-text canary file or window area's test runs here as soon as it is added.
+  it("includes every agent-text and window area's catalogue test (agentText.test.ts by name, agentTextGuard's rules are the guard's)", () => {
+    const tests = [...readdirSync(join(root, 'tests')).filter((f) => /^agentText.*\.test\.ts$/.test(f)).map((f) => `tests/${f}`), ...readdirSync(join(root, 'tests/i18n')).filter((f) => f.endsWith('.test.ts')).map((f) => `tests/i18n/${f}`)]
+    expect(tests.filter((t) => !coverage.includes(t) && t !== 'tests/agentText.test.ts' && t !== 'tests/agentTextGuard.test.ts')).toEqual([])
+    expect(byName).toContain('tests/agentText.test.ts')
   })
 
   // Vitest matches the pattern against each level's name on its own (a describe's, a test's), never the two joined, so
