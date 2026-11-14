@@ -151,7 +151,8 @@ export interface JjCardDeps {
   /**
    * HI-3236, an unpackaged test launch only (CW_TEST_ADVANCE_STOP=undo, jjCards.ts): a verified move is recorded as a stop
    * with its undo offered (the move itself real, the undo the real protocol under its real conditions), so e2e can reach
-   * the Undo button: s30 §2's conditions exclude every naturally detected stop.
+   * the Undo button: s30 §2's conditions exclude every stop the lineage detects (HI-3281: only `proofDisagrees`, where J5's
+   * proof disagrees with the lineage just proved, offers it naturally, and e2e can't make J5 disagree).
    */
   advanceTestStop?: boolean
   /**
@@ -911,7 +912,11 @@ export class JjPlatform implements PlatformAdapter {
         return false
       }
       if (!p.contained || rIn !== true || !rec) {
-        if (await host.stopped(card, ref, j.planId, { code: 'proofDisagrees', detail: p.contained ? p.result : 'notContained', undo: false, uncertain: true }, this.advanceWords(j, s, 'other', 'proofDisagrees'))) await journalSettled(h, deps, j, 'uncertain', { detail: 'proofDisagrees' }) // i18n-ignore: codes
+        // HI-3281: the one stop whose undo can be offered naturally. The lineage was just proved exactly Combwork's move,
+        // so s30 §2's conditions, read again now, hold unless something changed since: then Undo is offered (Approve
+        // undoes, Decline leaves it to the user); else it is the user's to settle, as an uncertain outcome is.
+        const undo = await undoOfferedNow(h, deps, j)
+        if (await host.stopped(card, ref, j.planId, { code: 'proofDisagrees', detail: p.contained ? p.result : 'notContained', undo, uncertain: !undo }, undo ? this.advanceWords(j, s, 'proofDisagrees', p.contained ? p.result : 'notContained') : this.advanceWords(j, s, 'other', 'proofDisagrees'))) await journalSettled(h, deps, j, undo ? 'stopped' : 'uncertain', { detail: 'proofDisagrees' }) // i18n-ignore: codes
         return false
       }
       const method = j.plan.style === 'squash' ? 'squash' : j.plan.style === 'rebase' ? 'fastForward' : 'merge'

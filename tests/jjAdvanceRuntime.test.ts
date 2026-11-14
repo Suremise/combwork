@@ -6,6 +6,8 @@
 //   start again (only once the target doesn't contain the result), the undo (a crash after its revert, the old answer
 //   replayed: nothing run twice, asked afresh; a fresh Approve: one undo), an agent's answer refused, a repeated
 //   delivery doing nothing;
+// - HI-3281: the undo offered naturally where J5's proof disagrees with a lineage proved Combwork's alone, and not
+//   where another operation came since;
 // - recovery at each one-sided state, under the card's lock: a journal with no fact, a fact with no journal, the fact's
 //   write unconfirmed, a crash after prepare, a crash after the integrate, a crash between `verified` and Integrated,
 //   an active writer.
@@ -568,5 +570,62 @@ describe.skipIf(!jjExe)(`Combwork's jj advance through the adapter (jj ${TESTED_
       expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(1)
       expect(w.main()).toBe(head0)
     })
+
+    it("HI-3281: J5's proof disagreeing with a lineage proved exactly Combwork's offers the undo (no test seam): Approve undoes the real move, never Integrated, the plan not advanced again", async () => {
+      const w = await world(colocated, { candidates: true, oneSlot: true, advance: true })
+      const card = await approved(w)
+      await candidate(w, card)
+      const head0 = w.main()
+      await disagreeing(w, card, () => undefined, () => advanceWith(w, card, advanceHostOf(w.wf)))
+      expect(w.main()).not.toBe(head0)
+      expect(facts(w, card, 'AdvanceStopped')).toEqual([expect.objectContaining({ code: 'proofDisagrees', detail: 'notContained', undo: true, uncertain: false })])
+      const req = advanceRequest(w, card)!
+      expect(req.gate).toBe(ADVANCE_STOPPED_GATE)
+      expect(req.text).toContain('couldn’t prove that main contains')
+      expect((await journalOf(w, card)).map((j) => j.settled)).toEqual(['stopped'])
+      await answer(w, card, req.request, 'approved')
+      expect(facts(w, card, 'AdvanceResolved')).toEqual([expect.objectContaining({ how: 'undone' })])
+      expect(w.main()).toBe(head0)
+      expect(facts(w, card, 'Integrated')).toHaveLength(0)
+      await pass(w, card)
+      expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(1)
+      expect(w.main()).toBe(head0)
+    })
+
+    it('HI-3281: the proof disagreeing after another jj operation since the move: no undo offered, the uncertain question, the target left as moved', async () => {
+      const w = await world(colocated, { candidates: true, oneSlot: true, advance: true })
+      const card = await approved(w)
+      await candidate(w, card)
+      const head0 = w.main()
+      // The user's own operation between the verified move and its record: the op log since P0 isn't Combwork's alone.
+      await disagreeing(w, card, () => void w.h.jj(w.repo, 'bookmark', 'create', 'elsewhere', '-r', head0), () => advanceWith(w, card, advanceHostOf(w.wf)))
+      const moved0 = w.main()
+      expect(moved0).not.toBe(head0)
+      expect(facts(w, card, 'AdvanceStopped')).toEqual([expect.objectContaining({ code: 'proofDisagrees', undo: false, uncertain: true })])
+      expect(advanceRequest(w, card)!.gate).toBe(ADVANCE_UNCERTAIN_GATE)
+      expect((await journalOf(w, card)).map((j) => j.settled)).toEqual(['uncertain'])
+      await pass(w, card)
+      expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(1)
+      expect(w.main()).toBe(moved0)
+    })
   })
 })
+
+/**
+ * HI-3281: J5's proof made to say the target doesn't contain the approved change, for `run` only (no real repository
+ * makes J5 disagree with a lineage jj just proved; the move, the conditions and the undo stay real). `meanwhile` runs
+ * first, inside the proof, so after the verified move and before the undo's conditions are read.
+ */
+async function disagreeing<T>(w: World, card: { id: number }, meanwhile: () => void, run: () => Promise<T>): Promise<T> {
+  const p = jjp(w, card) as unknown as { proof: (...a: unknown[]) => Promise<unknown> }
+  const real = p.proof
+  p.proof = async () => {
+    meanwhile()
+    return { contained: false }
+  }
+  try {
+    return await run()
+  } finally {
+    p.proof = real
+  }
+}
