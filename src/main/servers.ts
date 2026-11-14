@@ -1,3 +1,4 @@
+import { keyedWrite } from '../shared/requestKeys'
 import { fingerprintOf, KeyReused, KeysBusy, onceFor, REQUEST_KEY, type KeyedRequest } from './requestReceipts'
 import http, { type IncomingMessage, type ServerResponse } from 'http'
 import { AsyncLocalStorage } from 'async_hooks'
@@ -5055,7 +5056,7 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
     // Its replies name cards by key (#1219: "HI-12 (#40)"), its workspace's.
     const plain = (): Promise<unknown> => withCardNames(ws, () => r.handler({ params, query: url.searchParams, body, signal: gone.signal }), callerScope())
     // HI-3195: a project agent's write sent with a request key is applied once (requestReceipts.ts).
-    const keyed = ws ? keyedRequest(req, r.template, params, body) : null
+    const keyed = ws ? keyedRequest(req, url.pathname, r.template, params, body) : null
     const run = keyed && ws ? (): Promise<unknown> => onceFor(ws, keyed, plain) : plain
     // A project agent's replies say when a card it works on or reviews has a new decision (#357), whatever it called:
     // the Combwork tools add the line to their reply. (The bridge's own reports about its calls aren't the agent's.) Its
@@ -5079,29 +5080,22 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
 }
 
 /** HI-3195: the agent writes applied once with a request key: the card intents, its changes, a new card, a batch, comments. */
-const KEYED_ROUTES: ReadonlySet<string> = new Set([
-  'POST /v1/tasks',
-  'POST /v1/tasks/batch',
-  'PATCH /v1/tasks/:n',
-  'POST /v1/tasks/:n/comments',
-  'POST /v1/tasks/:n/ask-assistant',
-  'POST /v1/tasks/:n/start',
-  ...Object.keys(INTENT_ROUTES).map((path) => `POST /v1/tasks/:n/${path}`)
-])
 
 /**
  * HI-3195: a project agent's write on a keyed route sent with `X-Combwork-Request`: its launch, key, fingerprint and route,
  * or null (no key, not an agent's, not a keyed route). A malformed key is a wrong call (400).
  */
-function keyedRequest(req: IncomingMessage, template: string, params: readonly string[], body: unknown): KeyedRequest | null {
+function keyedRequest(req: IncomingMessage, path: string, template: string, params: readonly string[], body: unknown): KeyedRequest | null {
   const header = req.headers['x-combwork-request']
   const key = Array.isArray(header) ? header[0] : header
   if (key === undefined) return null
   const me = agentCaller()
-  const routeKey = `${req.method} ${template}`
-  if (!me?.runId || !KEYED_ROUTES.has(routeKey)) return null
+  // The writes cw-mcp keys (shared/requestKeys.ts), a project agent's only: the same list both sides read.
+  if (!me?.runId || !keyedWrite(req.method ?? '', path)) return null
   if (!REQUEST_KEY.test(key)) throw new HttpError(400, apiSaid(API.http.requestKey))
-  return { run: me.runId, key, fingerprint: fingerprintOf(req.method ?? '', template, params, body), route: routeKey, ...(params[0] ? { card: params[0] } : {}) }
+  // HR3's round 1: the marker is the agent's, not its launch's, so a retry after a restart (its next launch, the same
+  // key from cw-mcp's kept keys) finds it. A replaced launch's token is refused before this (401), and its writes fenced.
+  return { run: `${me.projectPath.toLowerCase()}#${me.agentId}`, key, fingerprint: fingerprintOf(req.method ?? '', template, params, body), route: `${req.method} ${template}`, ...(params[0] ? { card: params[0] } : {}) }
 }
 
 /**

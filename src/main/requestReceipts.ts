@@ -27,7 +27,10 @@ export const IN_FLIGHT_MAX = 256
 /** The longest a retry waits for the request in flight it joined before asking the table (a hung first try). */
 export const JOIN_WAIT_MS = 120_000
 
-/** A keyed request: its launch, key, fingerprint and route template, and the card its route names (if any). */
+/**
+ * A keyed request: whose it is (`run`: the agent, `<project path>#<agent id>`, so a retry from its next launch after a
+ * restart finds the marker), its key, fingerprint and route, and the card its route names (if any).
+ */
 export interface KeyedRequest {
   run: string
   key: string
@@ -66,6 +69,17 @@ class KeyTaken extends Error {}
 interface Scope extends KeyedRequest {
   produced: Record<string, unknown>
   written: boolean
+  /**
+   * The request was refused (runtime.refuse recorded it) before anything it asked was applied: nothing it commits from
+   * then on (the refusal's record, the history line after it) takes a marker, so its retry is refused (or done) again.
+   */
+  auditOnly: boolean
+  /**
+   * HR3's round 1: the board change running now applies something the request asked (appliesRequest: the card's own
+   * save, the runtime's facts of the requesting agent): only such a change takes the marker, never Combwork's own
+   * bookkeeping in the same request (an observation made while gathering).
+   */
+  applies: boolean
 }
 const scope = new AsyncLocalStorage<Scope>()
 
@@ -73,6 +87,21 @@ const scope = new AsyncLocalStorage<Scope>()
 export function noteProduced(o: Record<string, unknown>): void {
   const s = scope.getStore()
   if (s && !s.written) Object.assign(s.produced, o)
+}
+
+/**
+ * HR3's round 1: the board change running now only records a refusal (the runtime's `Refused` fact): it applies nothing
+ * the request asked, so its commit writes no marker, and a retry of the request is refused (or done) again.
+ */
+export function auditOnly(): void {
+  const s = scope.getStore()
+  if (s && !s.written) s.auditOnly = true
+}
+
+/** HR3's round 1: the board change running now applies what the keyed request asked: its commit takes the marker. */
+export function appliesRequest(): void {
+  const s = scope.getStore()
+  if (s && !s.written && !s.auditOnly) s.applies = true
 }
 
 /** The fingerprint of a request: its method, route template, resolved route values and its body as canonical JSON. */
@@ -88,9 +117,14 @@ function canonical(v: unknown): unknown {
 }
 
 // The marker, written in the board change that commits first while the request runs (its first durable write).
-setBoardCommitHook((db: DatabaseSync, afterCommit) => {
+setBoardCommitHook((db: DatabaseSync, afterCommit, changed) => {
   const s = scope.getStore()
   if (!s || s.written) return
+  // Only a change that applies what the request asked takes the marker: not a refused request's record, nor Combwork's own
+  // bookkeeping in the request (each change is judged on its own), nor one that changed nothing.
+  const applies = s.applies
+  s.applies = false
+  if (s.auditOnly || !changed || !applies) return
   const at = new Date().toISOString()
   // Expired markers go first (a key past its 24 hours is free again).
   db.prepare('DELETE FROM request_receipts WHERE at < ?').run(new Date(Date.now() - RECEIPT_HOURS * 3_600_000).toISOString()) // i18n-ignore: SQL
@@ -144,7 +178,7 @@ export async function onceFor<T>(ws: WorkspaceService, req: KeyedRequest, handle
   const saved = receipt(ws, req.run, req.key)
   if (saved) return fromReceipt(saved, req)
   if (inFlight.size >= IN_FLIGHT_MAX && !inFlight.has(id)) throw new KeysBusy()
-  const outcome = scope.run({ ...req, produced: {}, written: false }, handler).catch((e: unknown) => {
+  const outcome = scope.run({ ...req, produced: {}, written: false, auditOnly: false, applies: false }, handler).catch((e: unknown) => {
     // Taken by another request's commit meanwhile (this one's change undone): answered as that one's applied write.
     if (e instanceof KeyTaken) {
       const r = receipt(ws, req.run, req.key)

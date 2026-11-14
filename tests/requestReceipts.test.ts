@@ -20,6 +20,10 @@ const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const receipts = await import('../src/main/requestReceipts')
 const { advanced } = await import('../src/main/advanced')
+const { runCardIntent } = await import('../src/main/cardIntents')
+const { allOff } = await import('../src/shared/workflow/options')
+const { INTENT_PATHS, keyedWrite } = await import('../src/shared/requestKeys')
+const { INTENT_ROUTES } = await import('../src/main/servers')
 
 advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
@@ -34,13 +38,16 @@ const user = { kind: 'user' } as const
 const agent = { kind: 'agent' as const, name: 'Builder (p)', self: { project: 'p', agentId: 'a1' }, scope: 'p' }
 let n = 0
 
-async function workspace(path = join(base, `ws-${++n}`)): Promise<{ w: WS; path: string }> {
+async function workspace(path = join(base, `ws-${++n}`), options?: Record<string, unknown>): Promise<{ w: WS; path: string }> {
   const repo = join(path, 'p')
   mkdirSync(join(repo, '.combwork'), { recursive: true })
   writeFileSync(join(repo, 'a.txt'), 'one\n')
   try {
     execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo })
-    writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }] }))
+    for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) execFileSync('git', ['config', k, v], { cwd: repo })
+    execFileSync('git', ['add', '-A'], { cwd: repo })
+    execFileSync('git', ['commit', '-qm', 'initial'], { cwd: repo })
+    writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }], ...(options ? { workflow: { platform: 'git', preset: null, options } } : {}) }))
   } catch {
     // Opened again: already made.
   }
@@ -144,6 +151,32 @@ describe('a keyed write is applied once (HI-3195)', () => {
     }
     expect(await inWorkspace(w, () => receipts.onceFor(w, r, plantedFirst))).toMatchObject({ applied: true })
     expect(await comments(w, card)).toBe(0)
+  })
+
+  it("HR3's round 1: a refused write (its Refused fact recorded) takes no marker: its retry is refused again, not \"applied\"", async () => {
+    const { w } = await workspace(undefined, { ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project' })
+    const card = await inWorkspace(w, async () => (await tasks.createTask({ title: 'Work', project: 'p' }, user)).number)
+    await inWorkspace(w, () => runCardIntent({ n: card, plain: false }, agent, { kind: 'start' }))
+    const r = { run: 'p#a1', key: KEY(10), fingerprint: receipts.fingerprintOf('POST', '/v1/tasks/:n/submit', ['#1'], { summary: 'Done' }), route: 'POST /v1/tasks/:n/submit' }
+    const submit = () => inWorkspace(w, () => runCardIntent({ n: card, plain: false }, agent, { kind: 'submit', summary: 'Done' }))
+    const refusedRule = async (): Promise<string | null> => {
+      try {
+        await inWorkspace(w, () => receipts.onceFor(w, r, submit))
+        return null
+      } catch (e) {
+        return (e as { refusal?: { rule: string } }).refusal?.rule ?? String(e)
+      }
+    }
+    // Nothing committed to submit: refused (its Refused fact written), and refused again on retry, never "applied".
+    expect(await refusedRule()).toBe('submit.empty')
+    expect(await refusedRule()).toBe('submit.empty')
+  })
+
+  it("the keyed writes are one list, both sides: every card intent, never a write the server doesn't deduplicate", () => {
+    expect([...INTENT_PATHS].sort()).toEqual(Object.keys(INTENT_ROUTES).sort())
+    for (const path of INTENT_PATHS) expect(keyedWrite('POST', `/v1/tasks/HI-12/${path}`), path).toBe(true)
+    for (const [m, p] of [['POST', '/v1/tasks'], ['POST', '/v1/tasks/batch'], ['PATCH', '/v1/tasks/%2312'], ['POST', '/v1/tasks/HI-12/comments'], ['POST', '/v1/tasks/HI-12/ask-assistant'], ['POST', '/v1/tasks/HI-12/start']]) expect(keyedWrite(m, p), `${m} ${p}`).toBe(true)
+    for (const [m, p] of [['POST', '/v1/projects/alpha/agents/B1/message'], ['POST', '/v1/notify'], ['POST', '/v1/inbox'], ['GET', '/v1/tasks/HI-12'], ['POST', '/v1/tasks/wait'], ['PUT', '/v1/shared/file']]) expect(keyedWrite(m, p), `${m} ${p}`).toBe(false)
   })
 
   it('a marker past 24 hours is gone: the key runs again; past the in-flight limit a new key waits (503), its retries still join', async () => {

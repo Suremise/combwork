@@ -313,6 +313,48 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     check('cw-mcp sends a write whose reply was lost again, with the same request key', seen.length === 2 && !!seen[0] && seen[0] === seen[1], JSON.stringify(seen))
     check('…and says it was applied earlier, naming the card', !viaFake.isError && /already applied/.test(viaFake.content[0].text) && viaFake.content[0].text.includes(key), JSON.stringify(viaFake))
 
+    // HR3's round 1: a write the server doesn't deduplicate (cw_notify) is sent once, never again after a lost reply; and a
+    // write that got no reply at all is kept, by key, in the agent's own file, so its next launch's same call reuses it.
+    const runMcp = (port, name, args, extraEnv = {}) =>
+      new Promise((resolve) => {
+        const child = spawn(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { env: { ...lib.childEnv(builderCombwork.env), CW_API_URL: `http://127.0.0.1:${port}`, ...extraEnv }, windowsHide: true })
+        let got = ''
+        child.stdout.on('data', (d) => {
+          got += d
+          if (got.includes('\n')) {
+            child.kill()
+            resolve(JSON.parse(got.split('\n')[0]).result)
+          }
+        })
+        child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n')
+      })
+    const dropping = (drops) => {
+      const calls = []
+      const server = http.createServer((q, r) => {
+        if (q.method === 'GET') return r.end('{}')
+        calls.push({ path: q.url, key: q.headers['x-combwork-request'] })
+        if (calls.length <= drops) return q.socket.destroy()
+        r.writeHead(200, { 'Content-Type': 'application/json' })
+        r.end(JSON.stringify({ replayed: true, applied: true, produced: { card: key } }))
+      })
+      return new Promise((res) => server.listen(0, '127.0.0.1', () => res({ server, calls, port: server.address().port })))
+    }
+    const unkeyed = await dropping(1)
+    const notified = await runMcp(unkeyed.port, 'cw_notify', { title: 'Sent once' })
+    unkeyed.server.close()
+    check("a write Combwork doesn't apply once by key (cw_notify) isn't sent again after a lost reply, nor keyed", unkeyed.calls.length === 1 && !unkeyed.calls[0].key && notified.isError, JSON.stringify({ calls: unkeyed.calls, notified }))
+    const keysFile = path.join(lib.probeDir('request-keys'), 'agent-keys.json')
+    const lost = await dropping(99)
+    const first3 = await runMcp(lost.port, 'cw_update_task', { number: key, comment: 'Kept key.' }, { CW_REQUEST_KEYS_FILE: keysFile })
+    lost.server.close()
+    const keptKeys = fs.existsSync(keysFile) ? JSON.parse(fs.readFileSync(keysFile, 'utf8')) : null
+    check('a write with no reply after its retries is kept by its key in the agent\'s file', first3.isError && lost.calls.length === 3 && keptKeys?.entries?.length === 1, JSON.stringify({ calls: lost.calls, keptKeys }))
+    const later = await dropping(0)
+    const relaunched = await runMcp(later.port, 'cw_update_task', { number: key, comment: 'Kept key.' }, { CW_REQUEST_KEYS_FILE: keysFile })
+    later.server.close()
+    const base = (k) => (k ?? '').replace(/-\d+$/, '')
+    check("…and the agent's next launch (another cw-mcp) sends the same call with that key, told it was applied earlier", later.calls.length === 1 && base(later.calls[0].key) === base(lost.calls[0].key) && /already applied/.test(relaunched.content?.[0]?.text ?? ''), JSON.stringify({ first: lost.calls[0], later: later.calls, relaunched }))
+
     await inv('session:stop', alpha)
     await until(async () => (await inv('session:live')).length === 0, HUNG_MS)
   } finally {

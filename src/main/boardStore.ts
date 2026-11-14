@@ -1043,7 +1043,7 @@ function boardWriteLocked<T>(ws: WorkspaceService, path: string, key: string, fn
       for (const check of state.checks.values()) check()
       // HI-3195: a keyed Agent API request's applied marker, in this same transaction (requestReceipts.ts): its key already
       // taken undoes the change.
-      commitHook?.(db, (then) => state.after.push(then))
+      commitHook?.(db, (then) => state.after.push(then), state.changed)
       if (!boards.has(key)) throw combworkError(M.noWorkspace, undefined, { kind: 'conflict' })
       // Undone part way, whatever the change made of the error meanwhile (a batch skips a card that fails): it fails whole.
       if (state.lost) throw state.lost
@@ -1115,7 +1115,7 @@ export function afterBoardWrite(ws: WorkspaceService, fn: () => void): void {
 }
 
 /** HI-3195: what runs in every board change just before its COMMIT, on its connection (requestReceipts.ts's marker). */
-let commitHook: ((db: DatabaseSync, afterCommit: (fn: () => void) => void) => void) | null = null
+let commitHook: ((db: DatabaseSync, afterCommit: (fn: () => void) => void, changed: boolean) => void) | null = null
 export function setBoardCommitHook(fn: typeof commitHook): void {
   commitHook = fn
 }

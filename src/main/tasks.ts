@@ -1,4 +1,4 @@
-import { noteProduced } from './requestReceipts'
+import { appliesRequest, noteProduced } from './requestReceipts'
 import { createHash, randomBytes } from 'crypto'
 import { basename, join } from 'path'
 import { mkdir, writeFile } from 'original-fs/promises'
@@ -739,6 +739,8 @@ const keptCards = new WeakMap<WorkspaceService, { path: string; generation: numb
  * guard) checks it here, after the last await and just before the write (HI-2415), so a revoked change saves nothing.
  */
 async function saveCard(ws: WorkspaceService, n: number, card: TaskCard, before?: TaskCard | null, withRow?: () => void, commit?: () => void): Promise<void> {
+  // HI-3195: a keyed agent request's card saved: its change applies what it asked (requestReceipts.ts' marker).
+  appliesRequest()
   // Who holds it now, for its cost (#602): a hold that ended gets its end, a new one starts.
   trackHolds(card, new Date().toISOString())
   const ids = await ws.projectIds()

@@ -8,6 +8,7 @@
 // writes changes of the board and its actions run by the actions worker; reconciliation uses it. P4 routes `tasks.ts`'s
 // moves and the intents' routes through it (#1265 on). `tests/workflow` runs it on a store of its own, with `runActions`.
 
+import { appliesRequest, auditOnly } from '../requestReceipts'
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
 import { ADVANCE_GATES, ADVANCE_STOPPED_GATE, agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, overridableEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type StageId, CHURN_GATES, CHURN_LIMIT_GATE, PAUSE_GATES, SIMPLIFY_GATE, churnDue, churnTotal, countsChurn, type PauseChoice } from '../../shared/workflow/facts'
@@ -803,6 +804,8 @@ export class Workflow {
         w = new Write(tx, tx.card(card.id), ruleset, actor, tx.card(card.id).stage)
         also?.before?.(w)
         const written = fn(w, prepared)
+        // HI-3195: facts the requesting agent recorded (not its refusal): the write applies what a keyed request asked.
+        if (agentOf(w!.actor) && w!.written.some((f) => f.actor === w!.actor && f.source === 'recorded' && f.kind !== 'Refused')) appliesRequest()
         this.closeSettled(w)
         // HI-3188: the churn's questions, in the write that counted (or that left one no longer holding).
         this.churnAfter(w)
@@ -992,6 +995,8 @@ export class Workflow {
         this.store.tx((tx) => {
           // HI-3194: a stale agent request is refused for that first (its fence, as in every write), not for what it found.
           also?.before?.(new Write(tx, tx.card(card.id), null, actor, tx.card(card.id).stage))
+          // HI-3195: a refusal's record applies nothing a keyed request asked: its commit takes no applied marker.
+          auditOnly()
           tx.append(card.id, { kind: 'Refused', actor, source: 'recorded', data: { move, rule: g.rule, message: out.message, next: out.next, values: g.values } }) // i18n-ignore: a fact's kind and codes, not text
         })
       )

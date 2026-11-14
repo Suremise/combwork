@@ -158,7 +158,7 @@ import { agentTempSetting, prepareAgentTemp, protectedFolders, withAgentTemp } f
 import { ServerMarks } from './serverMarks'
 import { usageHistory, type StoredUsage } from './usageHistory'
 import { journalSettingsOf } from './journalService'
-import { endAgentToken, launchTokenFile, newAgentToken } from './agentTokens'
+import { agentRequestKeysFile, endAgentToken, launchTokenFile, newAgentToken } from './agentTokens'
 import { endHookToken, hooksRefused, newHookToken } from './hookTokens'
 import { lookAtTurns, type TurnsReading } from './turnsReader'
 import { hookSeen, hookTurn, hooksMissing, newHooksWatch, noteHooksMissing, promptSent, SeenOnce, transcriptReset, transcriptTurns, turnHeard, typedPending, type HooksWatch } from './hooksHealth'
@@ -3037,7 +3037,7 @@ class SessionManager {
     if (ownToken) await newAgentToken({ workspace: workspaceOf(projectPath).path!, projectPath, agentId: agent.id }, state.runId)
     // HI-3195: its combwork server names this launch's own token file (its run's folder), set here once the token is made:
     // its settings may have been read while an earlier launch's token was the agent's.
-    const tokenEnv: Record<string, string> = ownToken ? { CW_API_TOKEN_FILE: launchTokenFile(state.runId) } : {}
+    const tokenEnv: Record<string, string> = ownToken ? { CW_API_TOKEN_FILE: launchTokenFile(state.runId), CW_REQUEST_KEYS_FILE: agentRequestKeysFile(projectPath, agent.id) } : {}
     const assistantText = workspace.isAssistantHome(projectPath) ? await this.assistantInstructions(projectPath, agent).catch(() => null) : null
     // A new conversation starts in its mode; a resumed one is told it if it was last given another (below).
     l.mode = !resume ? assistantText?.modeId || undefined : undefined

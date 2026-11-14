@@ -12,7 +12,9 @@
 import '../../shared/agentText/processDialect'
 import { AsyncLocalStorage } from 'async_hooks'
 import { createHash, randomUUID } from 'crypto'
-import { appendFileSync, readFileSync } from 'fs'
+import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
+import { dirname } from 'path'
+import { keyedWrite } from '../../shared/requestKeys'
 import { createInterface } from 'readline'
 import { combworkInstructions, withLatestHandover, withPlatformRule } from '../../shared/combworkGuidance'
 import { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, assistantTools, controlAllows, hiddenForSide, TOOLS_SERVER, WORKER_ONLY_TOOLS, workflowHiddenOf } from '../../shared/assistantTools'
@@ -393,6 +395,33 @@ const LOST_RETRIES = 2
 const unresolved = new Map<string, { base: string; at: number }>()
 const UNRESOLVED_MS = 10 * 60_000
 const UNRESOLVED_MAX = 32
+/**
+ * HR3's round 1: kept in the agent's own file (CW_REQUEST_KEYS_FILE, the launch's env: one per agent, not per launch), so
+ * the agent's next launch after a restart (its conversation resumed, the same call made again) reuses the key and Combwork
+ * answers "already applied" (its markers are the agent's). Read at start; written whole on each change.
+ */
+const KEYS_FILE = process.env.CW_REQUEST_KEYS_FILE || ''
+function loadUnresolved(): void {
+  if (!KEYS_FILE) return
+  try {
+    const kept = JSON.parse(readFileSync(KEYS_FILE, 'utf8')) as { entries?: { hash?: unknown; base?: unknown; at?: unknown }[] }
+    for (const e of kept.entries ?? []) if (typeof e.hash === 'string' && typeof e.base === 'string' && typeof e.at === 'number' && Date.now() - e.at <= UNRESOLVED_MS) unresolved.set(e.hash, { base: e.base, at: e.at })
+  } catch {
+    // None kept, or unreadable: nothing to reuse.
+  }
+}
+function saveUnresolved(): void {
+  if (!KEYS_FILE) return
+  try {
+    mkdirSync(dirname(KEYS_FILE), { recursive: true })
+    const tmp = `${KEYS_FILE}.${process.pid}.tmp`
+    writeFileSync(tmp, JSON.stringify({ entries: [...unresolved].map(([hash, u]) => ({ hash, ...u })) }))
+    renameSync(tmp, KEYS_FILE)
+  } catch {
+    // Not kept: a retry after a restart may write again, as before.
+  }
+}
+loadUnresolved()
 const callHash = (tool: string, args: unknown): string => createHash('sha256').update(JSON.stringify([tool, sortedKeys(args)])).digest('hex')
 const sortedKeys = (v: unknown): unknown => (Array.isArray(v) ? v.map(sortedKeys) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v as object).sort().map((k) => [k, sortedKeys((v as Record<string, unknown>)[k])])) : v)
 /** The key base for a call: an unresolved one's of the same tool and arguments (unexpired), else a new one. */
@@ -416,7 +445,8 @@ class AppliedEarlier extends Error {
 
 async function api(method: string, path: string, body?: unknown, replyMs?: number): Promise<unknown> {
   // HI-3195: a write carries its call's request key (the same on each retry), so Combwork applies it once.
-  const call = method !== 'GET' ? callKey.getStore() : undefined
+  // Only a project agent's writes Combwork applies once by their key (shared/requestKeys.ts): any other is sent once.
+  const call = !ASSISTANT && keyedWrite(method, path) ? callKey.getStore() : undefined
   const requestKey = call ? `${call.base}-${++call.n}` : undefined
   // agent-protocol: an HTTP header
   const headers = { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json', ...(WORKSPACE ? { 'X-Combwork-Workspace': encodeURIComponent(WORKSPACE) } : {}), ...(requestKey ? { 'X-Combwork-Request': requestKey } : {}) }
@@ -1784,7 +1814,7 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
           if (e instanceof AppliedEarlier) return say(T['call.appliedEarlier'], { made: typeof e.produced.created === 'string' ? e.produced.created : typeof e.produced.card === 'string' ? e.produced.card : 'none' })
           throw e
         }))
-        unresolved.delete(hash)
+        if (unresolved.delete(hash)) saveUnresolved()
         // Compact: indenting JSON makes it about a third bigger for the model, and no easier for it to read.
         text = typeof result === 'string' ? result : JSON.stringify(result)
         // Combwork's flag (a new decision on a card the agent works on) goes after the reply, on its own line.
@@ -1804,7 +1834,8 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
           unresolved.delete(hash)
           unresolved.set(hash, { base: call.base, at: Date.now() })
           while (unresolved.size > UNRESOLVED_MAX) unresolved.delete(unresolved.keys().next().value!)
-        } else if (kind !== 'failed') unresolved.delete(hash)
+          saveUnresolved()
+        } else if (kind !== 'failed' && unresolved.delete(hash)) saveUnresolved()
       }
       // After the reply: the model's text exactly as sent (characters as UTF-16 code units, and UTF-8 bytes).
       calling--

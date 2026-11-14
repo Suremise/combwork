@@ -2,7 +2,7 @@ import { randomBytes, timingSafeEqual } from 'crypto'
 import { app } from 'electron'
 import { mkdir, rm } from 'original-fs/promises'
 import { dirname, join } from 'path'
-import { writeJsonAtomic } from './fsutil'
+import { hashText, writeJsonAtomic } from './fsutil'
 import { agentMsg, inDefaultDialect, say } from '../shared/agentText'
 import { createLogger } from './logger'
 import { recordTestToken } from './testQuiet'
@@ -34,6 +34,14 @@ const key = (projectPath: string, agentId: string): string => `${projectPath.toL
 export function agentTokenFile(projectPath: string, agentId: string): string {
   const run = tokens.get(key(projectPath, agentId))?.runId
   return run ? launchTokenFile(run) : ''
+}
+
+/**
+ * HI-3195 (HR3's round 1): where an agent's Combwork tools keep their writes whose reply was lost (cw-mcp's request keys),
+ * one file per agent, so its next launch after a restart reuses a key and Combwork answers "already applied".
+ */
+export function agentRequestKeysFile(projectPath: string, agentId: string): string {
+  return join(app.getPath('userData'), 'agent-requests', `${hashText(key(projectPath, agentId))}.json`)
 }
 
 /** HI-3195: the token file of the launch `runId`. */
