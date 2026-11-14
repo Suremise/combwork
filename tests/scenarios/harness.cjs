@@ -681,6 +681,13 @@ async function runScenario(sc, providerKey, opts = {}) {
     const implementer = await lib.addAgent(inv, alpha, { name: 'Implementer', workflowRole: 'reviewer', ...launch })
     // The run's dialect in their model slot (HI-2443: their Dialect setting), applied at their launch.
     if (opts.dialect) for (const a of [coder, implementer]) await inv('agents:update', alpha, a.id, { dialect: opts.dialect.path })
+    /** HI-3195: another of alpha's running agents' Agent API token, from its launch's own file (by its live run id). */
+    const agentToken = async (key) => {
+      const s = (await inv('session:live')).find((x) => x.projectPath.toLowerCase() === alpha.toLowerCase() && x.agentId === ctx.agents[key].id)
+      const token = s ? lib.launchToken(userData, s.runId) : null
+      if (!token) throw new Error(`${key} has no running launch with a token`)
+      return token
+    }
     const ctx = {
       api,
       inv,
@@ -728,8 +735,7 @@ async function runScenario(sc, providerKey, opts = {}) {
        * own Agent API token (each agent's in the profile's agent-api folder, as its Combwork tools read it).
        */
       slot: async (key, action, body = {}) => {
-        const file = path.join(userData, 'agent-api', `${require('crypto').createHash('sha256').update(`${alpha.toLowerCase()}#${ctx.agents[key].id}`).digest('hex').slice(0, 16)}.json`)
-        const token = JSON.parse(fs.readFileSync(file, 'utf8')).token
+        const token = await agentToken(key)
         const res = await fetch(`http://127.0.0.1:${port}/v1/projects/alpha/merge-slot/${action}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
         const reply = await res.json().catch(() => null)
         if (res.status !== 200) throw new Error(`${key}'s merge slot ${action}: ${res.status} ${JSON.stringify(reply)}`)
@@ -740,8 +746,7 @@ async function runScenario(sc, providerKey, opts = {}) {
        * token (#1382: a builder's design posted for the subject to check): { status, body }.
        */
       as: async (key, method, route, body) => {
-        const file = path.join(userData, 'agent-api', `${require('crypto').createHash('sha256').update(`${alpha.toLowerCase()}#${ctx.agents[key].id}`).digest('hex').slice(0, 16)}.json`)
-        const token = JSON.parse(fs.readFileSync(file, 'utf8')).token
+        const token = await agentToken(key)
         const res = await fetch(`http://127.0.0.1:${port}${route}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
         return { status: res.status, body: await res.json().catch(() => null) }
       },

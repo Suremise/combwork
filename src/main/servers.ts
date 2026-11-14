@@ -138,7 +138,7 @@ import { apiOutcome, appMetrics, clock as metricsClock, knownRoute, metricsHandl
 import { metricsReport } from './metricsUsage'
 import { apiLabel, beginWork, hookLabel } from './mainStalls'
 import type { GuidanceSeries, MetricOutcome, MetricsPart, MetricsQuery, MetricsReport } from '../shared/metrics'
-import { agentForToken, agentToken, agentTokenFile, onAgentTokenEnded, type AgentIdentity, type EndedLaunch } from './agentTokens'
+import { agentForToken, agentToken, agentTokenFile, currentAgentRun, onAgentTokenEnded, type AgentIdentity, type EndedLaunch } from './agentTokens'
 import { AttemptGuard, captureFence, issueAttempt, type RequestFence } from './attemptFence'
 import { API_EVENTS, apiEventFor, publicRun } from './apiEvents'
 import { clearDiscovery, writeDiscovery } from './apiDiscovery'
@@ -1911,10 +1911,24 @@ route('POST', '/v1/inbox', async ({ body }) => {
   if (body?.ack !== undefined) {
     if (!Array.isArray(body.ack) || !body.ack.length || body.ack.length > 200 || !body.ack.every((x: unknown) => typeof x === 'string' && x.length <= 32)) throw new HttpError(400, apiSaid(API.inbox.ackArg))
     const ids = (body.ack as string[]).map((x) => x.trim())
-    return body.read === true ? named(await ackThenRead(host, agentId, ids, receivedAttempts)) : ackDeliveries(host, agentId, ids)
+    return body.read === true ? named(await ackThenRead(host, agentId, ids, receivedAttempts, inboxFence())) : ackDeliveries(host, agentId, ids, inboxFence())
   }
-  return named(await readInbox(host, agentId, receivedAttempts))
+  return named(await readInbox(host, agentId, receivedAttempts, { fence: inboxFence() }))
 })
+
+/**
+ * HI-3195: a project agent's inbox read or ack fenced to the launch its request came from (captured as it arrived): one
+ * replaced since, before the read's or ack's save commits, is refused (409), nothing received or acked through it. The
+ * Assistant's inbox has no launch fence (its token is the workspace's Assistant's).
+ */
+function inboxFence(): (() => void) | undefined {
+  const me = agentCaller()
+  if (!me?.runId) return undefined
+  const { projectPath, agentId, runId } = me
+  return () => {
+    if (currentAgentRun(projectPath, agentId) !== runId) throw new HttpError(409, apiSaid(API.inbox.staleLaunch))
+  }
+}
 
 /**
  * HI-3194: an inbox read's deliveries about cards, each stamped with the attempt it was made in: each such attempt is issued

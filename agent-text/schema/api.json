@@ -1353,6 +1353,9 @@
   "api.inbox.readArg": {
     "placeholders": {}
   },
+  "api.inbox.staleLaunch": {
+    "placeholders": {}
+  },
   "api.intent.acceptArg": {
     "placeholders": {
       "max": "plain"

@@ -129,7 +129,7 @@ import { journalSettingsOf } from './journalService'
 import { assistantStartView } from './startView'
 import { combworkWindows, lastFocused, TITLE_BAR_OVERLAY, registerWindow, unregisterWindow, windowForPath, type CombworkWindow } from './windows'
 import { abandonWindowStorage } from './storage'
-import { agentTokenFile } from './agentTokens'
+import { agentTokenFile, clearOldTokenFiles } from './agentTokens'
 import { progress, setTaskbarTestHook, startProgress } from './progressService'
 import { startMergeSlots } from './mergeSlotHost'
 import { startLanes } from './lanes'
@@ -1306,6 +1306,8 @@ app.whenReady().then(async () => {
 
   // Hook auth files of an earlier run of Combwork: their tokens died with it (#345).
   await clearHookAuth()
+  // HI-3195: tokens are per launch now: the per-agent files an earlier version wrote go.
+  await clearOldTokenFiles()
   // A launch's side of the workflow for its metrics (HI-2049): before the Agent API or a window can start an agent.
   startLaunchSides()
   // The tools a project's workflow leaves out of its agents' launches, and the restarts when it changes (HI-2694).

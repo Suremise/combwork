@@ -21,7 +21,6 @@
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const { execFileSync, spawnSync } = require('child_process')
-const { createHash } = require('crypto')
 const fs = require('fs')
 const path = require('path')
 const { CLAUDE_TEST_HOME, CODEX_HOME } = require('./runContext.cjs')
@@ -69,11 +68,11 @@ const parts = {
 if (parts.copilot) lib.skip(`${parts.copilot}: it builds the cards`)
 if (parts.claude && parts.codex) lib.skip(`${parts.claude}; ${parts.codex}`)
 
-/** An agent's Agent API token, from the file Combwork keeps for it (agentTokens.ts). */
+/** An agent's Agent API token: its live launch's own file (HI-3195, agentTokens.ts), by the run id the window shows. */
+const runs = new Map()
 const tokenOf = (projectPath, agentId) => {
-  const h = createHash('sha256').update(`${projectPath.toLowerCase()}#${agentId}`).digest('hex').slice(0, 16)
-  const f = path.join(userData, 'agent-api', `${h}.json`)
-  return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')).token : null
+  const run = runs.get(`${projectPath.toLowerCase()}#${agentId}`)
+  return run ? lib.launchToken(userData, run) : null
 }
 
 /** The command lines of the processes that name the copies folder (read only). */
@@ -132,7 +131,12 @@ const namingCopies = () => {
       { key: 'copilot', def: await lib.addAgent(inv, alpha, { name: 'RP', provider: 'copilot', permissionMode: 'accept-edits', workflowRole: 'reviewer' }) }
     ]
     for (const [k, why] of Object.entries(parts)) if (why && k !== 'copilot') console.log(`SKIP the ${k} reviewer: ${why}`)
-    const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
+    const live = async (id) => {
+      const s = (await inv('session:live')).find((x) => x.projectPath.toLowerCase() === alpha.toLowerCase() && x.agentId === id)
+      // Its launch's run id, for its token file (tokenOf).
+      if (s) runs.set(`${alpha.toLowerCase()}#${id}`, s.runId)
+      return s
+    }
     const started = async (a) => {
       await inv('session:start', alpha, { agentId: a.def?.id ?? a.id })
       const id = a.def?.id ?? a.id

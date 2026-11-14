@@ -684,6 +684,50 @@ describe('the delivery service (#647)', async () => {
     expect((await deliveries.deliveriesOf(alpha, 'b1')).map((r) => `${r.id} ${r.state} ${r.receivedVia}`)).toEqual(['m1 acked inbox', 'm2 acked inbox', 'm3 received inbox'])
     expect(ackText([], ['m9'], ['m4'])).toBe('Nothing acked. Not read yet: m4: read it with cw_inbox first. Not in your inbox: m9.')
   })
+  it("HI-3195: a read, an ack and ack-then-read from a launch replaced before their save commits keep nothing; the current launch's go through", async () => {
+    st.status = 'working'
+    await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'task', from: combwork, body: 'First.' })
+    await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'task', from: combwork, body: 'Second.' })
+    // The agent's current launch, as the fence reads it (servers.ts: currentAgentRun), and a fence for launch `run`.
+    let current = 'r1'
+    const fenceOf = (run: string) => () => {
+      if (current !== run) throw new Error(`launch ${run} was replaced`)
+    }
+    // Replaced after the plan, before its save commits.
+    const renewAtSave = () => deliveries.setBeforeSaveForTests(() => void (current = 'r2'))
+    renewAtSave()
+    try {
+      await expect(deliveries.readInbox(alpha, 'b1', undefined, { fence: fenceOf('r1') })).rejects.toThrow(/r1 was replaced/)
+    } finally {
+      deliveries.setBeforeSaveForTests(null)
+    }
+    expect(await states()).toEqual(['m1 queued', 'm2 queued'])
+    // Already replaced when it asks: refused at once, nothing read.
+    await expect(deliveries.readInbox(alpha, 'b1', undefined, { fence: fenceOf('r1') })).rejects.toThrow(/r1 was replaced/)
+    // The current launch reads: received.
+    expect((await deliveries.readInbox(alpha, 'b1', undefined, { fence: fenceOf('r2') })).items.flatMap((i) => i.ids)).toEqual(['m1', 'm2'])
+    // Its ack, the launch replaced before the ack's save: not acked.
+    deliveries.setBeforeSaveForTests(() => void (current = 'r3'))
+    try {
+      await expect(deliveries.ackDeliveries(alpha, 'b1', ['m1'], fenceOf('r2'))).rejects.toThrow(/r2 was replaced/)
+    } finally {
+      deliveries.setBeforeSaveForTests(null)
+    }
+    expect(await states()).toEqual(['m1 received', 'm2 received'])
+    // Ack-then-read, one save: the launch replaced before it commits keeps neither the ack nor a receipt.
+    await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'task', from: combwork, body: 'Third.' })
+    deliveries.setBeforeSaveForTests(() => void (current = 'r4'))
+    try {
+      await expect(deliveries.ackThenRead(alpha, 'b1', ['m1'], undefined, fenceOf('r3'))).rejects.toThrow(/r3 was replaced/)
+    } finally {
+      deliveries.setBeforeSaveForTests(null)
+    }
+    expect(await states()).toEqual(['m1 received', 'm2 received', 'm3 queued'])
+    // The current launch's ack-then-read: both, in one call.
+    const both = await deliveries.ackThenRead(alpha, 'b1', ['m1'], undefined, fenceOf('r4'))
+    expect([both.acked, both.items.flatMap((i) => i.ids)]).toEqual([['m1'], ['m3']])
+    expect(await states()).toEqual(['m1 acked', 'm2 received', 'm3 received'])
+  })
   it("a launch's task is saved as offered before anything is launched (#649 round 2): not saved, nothing starts; while it starts, never offered by the scheduler; its run's save failing after the launch, it is still followed, and a restart finds it uncertain", async () => {
     const task = (body: string) => ({ agentId: 'b1', agentName: 'B1', kind: 'task' as const, from: combwork, body })
     // Not saved: nothing is launched.

@@ -1314,10 +1314,20 @@ export async function cancelFromSource(host: string, source: string, ref: string
  * before and not acked (of the kinds it acks). What may no longer be given out is refused or expired instead, checked in
  * the same transaction.
  */
-export async function readInbox(host: string, agentId: string, receivedAbout?: (issued: { card: number; attempt: string }[]) => void): Promise<{ items: InboxItem[]; unacked: string[] }> {
+/**
+ * HI-3195: a read's or ack's launch fence, the caller's (servers.ts: the request's launch, captured as it arrived): it throws
+ * once that launch is no longer the agent's current one. Asked before anything, and again as the store's commit guard
+ * (save's `d.commit`, after every await), so a launch replaced meanwhile commits no received or acked transition.
+ */
+export type LaunchFence = () => void
+
+export async function readInbox(host: string, agentId: string, receivedAbout?: (issued: { card: number; attempt: string }[]) => void, opts: { fence?: LaunchFence; ack?: readonly string[] } = {}): Promise<{ items: InboxItem[]; unacked: string[]; acks?: AckResult }> {
+  opts.fence?.()
   const store = await load(host)
   const given: DeliveryRecord[] = []
   let unacked: string[] | null = null
+  // HI-3195: ack-then-read's acks, in the read's own save (made in its first attempt): both kept, or neither.
+  let acks: AckResult | undefined
   // The conversation reading (what a carried delivery is shown again to once: replayedTo), or its launch while its CLI
   // hasn't named the conversation yet.
   const live = sessions.liveFor(host, agentId)
@@ -1337,8 +1347,10 @@ export async function readInbox(host: string, agentId: string, receivedAbout?: (
         store,
         () => relevanceNow(store, agentId),
         (d, rel) => {
+          if (opts.fence) d.commit = opts.fence
           const held = applyRelevance(store, d, rel, agentId)
           recheck(store, d, agentId)
+          if (opts.ack && !acks) acks = ackIn(store, d, agentId, opts.ack)
           const may = gate(d)
           const mine = d.records.filter((x) => x.agentId === agentId)
           const give = mine.filter((x) => may(x) && !held.has(x.id))
@@ -1358,6 +1370,8 @@ export async function readInbox(host: string, agentId: string, receivedAbout?: (
       // Nothing received yet: the read fails, and gave nothing. A retry failing keeps what the attempts before it
       // received (saved as received): this read returns them, and what it missed waits for the next.
       if (!attempt) throw e
+      // HI-3195: a launch replaced meanwhile is refused, never given what an earlier attempt received.
+      opts.fence?.()
       log.warn(`${userText(agentId)}'s inbox read gave what it had: trying again failed`, e)
       break
     }
@@ -1368,7 +1382,32 @@ export async function readInbox(host: string, agentId: string, receivedAbout?: (
   show(store, agentId)
   // HI-3194: what this read received about a card, with the attempt each was made in (its caller issues those, never more).
   receivedAbout?.(given.flatMap((x) => (x.card && x.attempt ? [{ card: x.card, attempt: x.attempt }] : [])))
-  return { items: inDialectOf({ projectPath: host, agentId }, () => inboxItems(given)), unacked: unacked ?? [] }
+  return { items: inDialectOf({ projectPath: host, agentId }, () => inboxItems(given)), unacked: unacked ?? [], ...(acks ? { acks } : {}) }
+}
+
+/** What an ack did: acked (now or before), unknown (not the agent's, or ended unreceived), unread (not read yet). */
+export interface AckResult {
+  acked: string[]
+  unknown: string[]
+  unread: string[]
+}
+
+/** The acks of `ids` by `agentId`, in a draft (ackDeliveries' rules). */
+function ackIn(store: Store, d: Draft, agentId: string, ids: readonly string[]): AckResult {
+  const acked: string[] = []
+  const unknown: string[] = []
+  const unread: string[] = []
+  for (const id of [...new Set(ids)]) {
+    const x = byId(d.records, id)
+    if (!x || x.agentId !== agentId) unknown.push(id)
+    else if (x.state === 'acked') acked.push(id)
+    // Not read yet: read it first (never acked, nor its source told it was received, from its id alone).
+    else if (isUnread(x)) unread.push(id)
+    else if (x.state === 'received' && set(store, d, x, 'acked')) acked.push(id)
+    // Ended without being received (cancelled, refused, expired): not for it to act on.
+    else unknown.push(id)
+  }
+  return { acked, unknown, unread }
 }
 
 /**
@@ -1376,24 +1415,14 @@ export async function readInbox(host: string, agentId: string, receivedAbout?: (
  * alone is no sign of reading; one not read yet is `unread`, nothing changes, and the agent reads it first). Ids that
  * aren't its own, or don't exist, are unknown (nothing said of them). Acked again: still acked.
  */
-export async function ackDeliveries(host: string, agentId: string, ids: readonly string[]): Promise<{ acked: string[]; unknown: string[]; unread: string[] }> {
+export async function ackDeliveries(host: string, agentId: string, ids: readonly string[], fence?: LaunchFence): Promise<AckResult> {
+  fence?.()
   const store = await load(host)
   const r = await transact(store, (d) => {
+    // HI-3195: the acking launch still the agent's current one as the ack commits.
+    if (fence) d.commit = fence
     recheck(store, d, agentId)
-    const acked: string[] = []
-    const unknown: string[] = []
-    const unread: string[] = []
-    for (const id of [...new Set(ids)]) {
-      const x = byId(d.records, id)
-      if (!x || x.agentId !== agentId) unknown.push(id)
-      else if (x.state === 'acked') acked.push(id)
-      // Not read yet: read it first (never acked, nor its source told it was received, from its id alone).
-      else if (isUnread(x)) unread.push(id)
-      else if (x.state === 'received' && set(store, d, x, 'acked')) acked.push(id)
-      // Ended without being received (cancelled, refused, expired): not for it to act on.
-      else unknown.push(id)
-    }
-    return { acked, unknown, unread }
+    return ackIn(store, d, agentId, ids)
   })
   show(store, agentId)
   return { acked: r.acked, unknown: r.unknown, unread: r.unread }
@@ -1436,9 +1465,10 @@ export function onCardTaskReceived(fn: typeof cardTaskReceived): void {
   cardTaskReceived = fn
 }
 
-export async function ackThenRead(host: string, agentId: string, ids: readonly string[], receivedAbout?: (issued: { card: number; attempt: string }[]) => void): Promise<{ acked: string[]; unknown: string[]; unread: string[]; items: InboxItem[]; unacked: string[] }> {
-  const acked = await ackDeliveries(host, agentId, ids)
-  return { ...acked, ...(await readInbox(host, agentId, receivedAbout)) }
+export async function ackThenRead(host: string, agentId: string, ids: readonly string[], receivedAbout?: (issued: { card: number; attempt: string }[]) => void, fence?: LaunchFence): Promise<{ acked: string[]; unknown: string[]; unread: string[]; items: InboxItem[]; unacked: string[] }> {
+  // HI-3195: one save for both (the acks made in the read's plan, before what it gives): a fence refusing it keeps neither.
+  const { acks, ...read } = await readInbox(host, agentId, receivedAbout, { fence, ack: ids })
+  return { ...(acks ?? (await ackDeliveries(host, agentId, ids, fence))), ...read }
 }
 
 /**

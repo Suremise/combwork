@@ -1,11 +1,12 @@
 import { randomBytes, timingSafeEqual } from 'crypto'
 import { app } from 'electron'
-import { mkdir } from 'original-fs/promises'
+import { mkdir, rm } from 'original-fs/promises'
 import { dirname, join } from 'path'
-import { hashText, writeJsonAtomic } from './fsutil'
+import { writeJsonAtomic } from './fsutil'
 import { agentMsg, inDefaultDialect, say } from '../shared/agentText'
 import { createLogger } from './logger'
 import { recordTestToken } from './testQuiet'
+import { launchPrivateDir } from './hookTokens'
 
 /**
  * Each agent launch's own Agent API token. The API knows from it which agent, project and workspace a call comes
@@ -24,9 +25,26 @@ const log = createLogger('agent-tokens')
 const tokens = new Map<string, AgentIdentity & { token: string; runId: string }>()
 const key = (projectPath: string, agentId: string): string => `${projectPath.toLowerCase()}#${agentId}`
 
-/** Where an agent's Combwork tools find its token: one file per agent, so its launch settings stay the same. */
+/**
+ * Where an agent's current launch finds its token (HI-3195): a file in that launch's own private folder, beside its hook
+ * token, gone with the launch (endHookToken). A launch's settings name its own file, so a leftover process of a replaced
+ * launch (HI-2232's renewal race) reads only its own revoked token, never its successor's, as it did when every launch
+ * of an agent shared one file. '' while the agent has no launch.
+ */
 export function agentTokenFile(projectPath: string, agentId: string): string {
-  return join(app.getPath('userData'), 'agent-api', `${hashText(key(projectPath, agentId))}.json`)
+  const run = tokens.get(key(projectPath, agentId))?.runId
+  return run ? launchTokenFile(run) : ''
+}
+
+/** HI-3195: the token file of the launch `runId`. */
+export const launchTokenFile = (runId: string): string => join(launchPrivateDir(runId), 'agent-token.json')
+
+/** Before HI-3195, every launch of an agent shared this file: an earlier version's are removed at start (clearOldTokenFiles). */
+const oldTokenFolder = (): string => join(app.getPath('userData'), 'agent-api')
+
+/** HI-3195: at start, the per-agent token files an earlier version left (their tokens died with it): never read again. */
+export async function clearOldTokenFiles(): Promise<void> {
+  await rm(oldTokenFolder(), { recursive: true, force: true }).catch((e) => log.warn('removing the old per-agent token files', e))
 }
 
 /** A launch whose token stopped working: ended with the agent, or replaced by its next launch. */
@@ -65,7 +83,7 @@ export async function newAgentToken(id: AgentIdentity, runId: string): Promise<s
   const was = tokens.get(k)
   tokens.set(k, { ...id, token, runId })
   if (was) ended(was)
-  const file = agentTokenFile(id.projectPath, id.agentId)
+  const file = launchTokenFile(runId)
   await mkdir(dirname(file), { recursive: true })
   await writeJsonAtomic(file, { token, note: inDefaultDialect(() => say(FILE_NOTE)) })
   return token

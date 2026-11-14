@@ -890,6 +890,10 @@
   "api.inbox.readArg": {
     "text": "read is true or false"
   },
+  "api.inbox.staleLaunch": {
+    "text": "This launch of yours was replaced (a restart or a new conversation): nothing was read or acked through it. Your current launch reads its inbox.",
+    "note": "HI-3195: an inbox read or ack from an agent launch that has since been replaced."
+  },
   "api.intent.acceptArg": {
     "text": "accept must be a list of at most {max} test ids.",
     "note": "HI-2660: a verdict's accept that isn't a list of focused test ids, or is too long. {max}: the limit."

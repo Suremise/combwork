@@ -85,8 +85,7 @@ const check = (name, ok, extra = '') => {
     check('the builder starts', !!(await until(() => idle(builder.id), HUNG_MS)))
     sessionId = (await live(builder.id)).sessionId
     // Its first launch's token, which stops working when that launch ends.
-    const tokenDir = path.join(userData, 'agent-api')
-    const firstToken = JSON.parse(fs.readFileSync(path.join(tokenDir, fs.readdirSync(tokenDir)[0]), 'utf8')).token
+    const firstToken = lib.launchToken(userData, (await live(builder.id)).runId)
     // Started fresh, its tools connect as it starts: a message is told to it at once.
     const m0 = await asAssistant('POST', `/v1/projects/alpha/agents/Builder/message`, { text: 'Hello from the suite (fresh start).' })
     check('a message for a fresh launch is given', m0.status === 200 && !!(await until(() => delivery(m0.body?.id)?.state === 'acked' || delivery(m0.body?.id)?.state === 'received', HUNG_MS)), JSON.stringify(m0))

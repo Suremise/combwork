@@ -1,7 +1,7 @@
 // An agent launch's token ending (HI-2416): when its agent's launch ends, or a new launch replaces it, the token stops
 // working and Combwork's listeners are told which launch it was, once, so what it opened (the Agent API's event streams,
 // servers.ts endLaunchStreams) ends with it. An end for an older launch, after a restart, changes and tells nothing.
-import { mkdirSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
@@ -12,7 +12,7 @@ const profile = join(base, 'profile')
 mkdirSync(profile, { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => profile
 
-const { agentForToken, endAgentToken, newAgentToken, onAgentTokenEnded } = await import('../src/main/agentTokens')
+const { agentForToken, agentTokenFile, clearOldTokenFiles, endAgentToken, newAgentToken, onAgentTokenEnded } = await import('../src/main/agentTokens')
 type Ended = Parameters<Parameters<typeof onAgentTokenEnded>[0]>[0]
 
 const listeners: (() => void)[] = []
@@ -69,5 +69,30 @@ describe("an agent launch's token ending (HI-2416)", () => {
     await newAgentToken(id('a4'), 'run-y')
     endAgentToken(id('a4').projectPath, 'a4', 'run-y')
     expect(got).toEqual([])
+  })
+})
+
+describe("each launch's own token file (HI-3195)", () => {
+  it("a launch's token is in its own folder; a replaced launch's file keeps its own revoked token, never its successor's", async () => {
+    const first = await newAgentToken(id('f1'), 'run-f1')
+    const firstFile = agentTokenFile(id('f1').projectPath, 'f1')
+    expect(firstFile).toBe(join(profile, 'launches', 'run-f1', 'agent-token.json'))
+    expect(JSON.parse(readFileSync(firstFile, 'utf8')).token).toBe(first)
+    // Renewed: the new launch's settings name its own file; the old launch's file still holds only the old token, revoked.
+    const second = await newAgentToken(id('f1'), 'run-f2')
+    expect(agentTokenFile(id('f1').projectPath, 'f1')).toBe(join(profile, 'launches', 'run-f2', 'agent-token.json'))
+    expect(JSON.parse(readFileSync(firstFile, 'utf8')).token).toBe(first)
+    expect(agentForToken(first)).toBeNull()
+    expect(agentForToken(second)?.runId).toBe('run-f2')
+    // No launch: no file named.
+    endAgentToken(id('f1').projectPath, 'f1', 'run-f2')
+    expect(agentTokenFile(id('f1').projectPath, 'f1')).toBe('')
+  })
+
+  it('the per-agent files an earlier version wrote are removed at start', async () => {
+    mkdirSync(join(profile, 'agent-api'), { recursive: true })
+    writeFileSync(join(profile, 'agent-api', 'old.json'), JSON.stringify({ token: 'old' }))
+    await clearOldTokenFiles()
+    expect(existsSync(join(profile, 'agent-api'))).toBe(false)
   })
 })

@@ -301,6 +301,7 @@ export const API = {
     viewerReadOnly: agentMsg({ id: 'api.http.viewerReadOnly', text: 'A viewer token is read-only: it can read Combwork (GET) and follow its events (GET /v1/events), not change anything' })
   },
   inbox: {
+    staleLaunch: agentMsg({ id: 'api.inbox.staleLaunch', text: 'This launch of yours was replaced (a restart or a new conversation): nothing was read or acked through it. Your current launch reads its inbox.', note: 'HI-3195: an inbox read or ack from an agent launch that has since been replaced.' }),
     ackArg: agentMsg({ id: 'api.inbox.ackArg', text: 'ack is a list of delivery ids ("m12"), at most 200' }),
     noInbox: agentMsg({ id: 'api.inbox.noInbox', text: 'Only an agent or the Assistant has an inbox.' }),
     readArg: agentMsg({ id: 'api.inbox.readArg', text: 'read is true or false' })
