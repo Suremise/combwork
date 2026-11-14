@@ -4,6 +4,9 @@ import { msg } from '../../i18n/msg'
 import { agentMsg, say } from '../../agentText'
 import type { ModeOption, ModelGroup, ProviderDescriptor } from '..'
 import { defineProvider } from '../parts'
+import { TIPS } from './tips'
+import { CODEX_SAFEGUARDS } from './safeguards'
+import { CODEX_PRICES } from './prices'
 
 /**
  * Codex's side of the shared provider data: its permission presets (the /permissions menu), reasoning
@@ -110,6 +113,7 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
   company: 'OpenAI', // i18n-ignore: a company name
   cliName: 'codex',
   icon: 'codex',
+  badge: { shape: 'square', glyph: 'braces', color: '#14a89a' },
   setupUrl: 'https://developers.openai.com/codex/cli',
   pricingUrl: 'https://openai.com/api/pricing/',
   permissionModes: withCliOwn(CODEX_PERMISSION_MODES),
@@ -182,4 +186,4 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
 
 /** Codex's shared half, as the registry lists it (HI-3201). */
 // agent-text: CODEX_DESCRIPTOR.text.safeguardHelp (a CLI's sentence stored by id in a card comment, said when read: providerMessage)
-export default defineProvider({ descriptor: CODEX_DESCRIPTOR })
+export default defineProvider({ descriptor: CODEX_DESCRIPTOR, prices: CODEX_PRICES, tips: TIPS, safeguards: CODEX_SAFEGUARDS })

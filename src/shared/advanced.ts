@@ -24,7 +24,7 @@ import { CLAUDE_FOOTER_MODES } from './providers/claude'
 import { COPILOT_FOOTER_MODES } from './providers/copilot'
 import { fmt, language, msg, tr, type Msg } from './i18n'
 import { INBOX_SWITCH_ID } from './inboxSwitches'
-import { SAFEGUARD_DEFAULTS } from './safeguards'
+import { CLAUDE_SAFEGUARDS } from './providers/claude/safeguards'
 import type { ProviderId } from './types'
 import { WORKSPACE_NOTES_MAX } from './workspaceNotes'
 
@@ -2030,7 +2030,7 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.claude-code.safeguard.note.title', defaultMessage: 'Safeguard stop: transcript note', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.safeguard.note.desc', defaultMessage: "Claude Code's note in its transcript when its safety classifier stops a response, and the notice it adds for the model (#606). Wrong, Combwork misses such stops: no shield on the agent's pane, and Performance doesn't count them.", description: 'What the advanced setting "Safeguard stop: transcript note" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
-    default: SAFEGUARD_DEFAULTS.claudeNote,
+    default: CLAUDE_SAFEGUARDS.note,
     flags: 'i',
     applies: 'now',
     samples: [
@@ -2044,7 +2044,7 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.claude-code.safeguard.prompt.title', defaultMessage: 'Safeguard stop: question', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.safeguard.prompt.desc', defaultMessage: 'Claude Code\'s question after a safeguard stop, whether to switch models, told by its open dialog\'s choices in the lines it wrote last. Combwork shows the agent waiting for you, and why, while it is open; wrong, the agent shows only "Claude needs your permission".', description: 'What the advanced setting "Safeguard stop: question" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
-    default: SAFEGUARD_DEFAULTS.claudePrompt,
+    default: CLAUDE_SAFEGUARDS.prompt,
     flags: 'i',
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/safeguard-prompt-claude-2.1.296.txt`, version: '2.1.296', text: ' ❯ 1. Switch automatically\n      Continue on Opus 4.8 now, and switch without asking from now on\n   2. Stay on Opus 5.5' }] // i18n-ignore: a CLI's recorded text (#367)

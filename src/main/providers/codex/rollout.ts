@@ -7,7 +7,8 @@ import { isSessionId } from '../../../shared/defaults'
 import { NOTICE_TEXT, firstLine, noticeOf, shortPath, toolLabel, type NewItem } from '../conversation'
 import type { ConversationParserLike, ImageLocation, LiveDetails } from '../types'
 import { advancedValues as advanced } from '../../advancedValues'
-import { countSafeguards, SAFEGUARD_DEFAULTS } from '../../../shared/safeguards'
+import { countSafeguards } from '../../../shared/safeguards'
+import { CODEX_SAFEGUARDS } from '../../../shared/providers/codex/safeguards'
 import { codexSafeguards, errorKind } from './safeguards'
 import { cwdOf, scriptCall } from './scriptCalls'
 
@@ -139,7 +140,7 @@ export function rolloutDetails(text: string): LiveDetails {
       }
       // A turn that ended on another error (#1632: a lost connection, a server error): it needs the user until the next.
       // A usage policy's stop is a safeguard's (#606, codexSafeguards), told as one.
-      const policy = p.type === 'task_complete' && (SAFEGUARD_DEFAULTS.codexStop as readonly string[]).includes(errorKind(p.error?.codex_error_info) ?? '')
+      const policy = p.type === 'task_complete' && (CODEX_SAFEGUARDS.stop as readonly string[]).includes(errorKind(p.error?.codex_error_info) ?? '')
       const failed = p.type === 'task_complete' && !refused && !policy && p.error && typeof p.error === 'object' ? p.error : null
       if (failed) {
         out.turnFailed = typeof failed.message === 'string' ? failed.message.trim() : ''

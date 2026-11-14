@@ -7,6 +7,10 @@ import type { Tr } from '../../tasks'
 import type { PermissionMode } from '../../types'
 import type { ModeCaveatFacts, ModeOption, ModelGroup, ModelOption, ProviderDescriptor } from '..'
 import { defineProvider } from '../parts'
+import { TIPS } from './tips'
+import { CLAUDE_SAFEGUARDS } from './safeguards'
+import { baseModel } from './modelIds'
+import { CLAUDE_PRICES } from './prices'
 
 /**
  * Claude Code's side of the shared provider data: its permission modes, effort levels and models,
@@ -172,11 +176,7 @@ export const CLAUDE_MODEL_GROUPS: ModelGroup[] = [
   }
 ]
 
-/**
- * The model without its 1M-context suffix. Current models have the 1M window without it; only Opus 4.6 and
- * Sonnet 4.6 need "[1m]" (typed as a custom model ID), and Claude Code rejects it when 1M is turned off.
- */
-export const baseModel = (model: string): string => model.replace(/\[1m\]$/i, '')
+export { baseModel } from './modelIds'
 
 export const isOlderModel = (model: string): boolean => CLAUDE_MODEL_GROUPS.some((g) => g.older && g.models.some((m) => m.value === baseModel(model)))
 
@@ -258,6 +258,7 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
   company: 'Anthropic', // i18n-ignore: a company name
   cliName: 'claude',
   icon: 'claude',
+  badge: { shape: 'circle', glyph: 'tilde', color: '#e8705f' },
   setupUrl: 'https://code.claude.com/docs/en/setup',
   pricingUrl: 'https://platform.claude.com/docs/en/about-claude/pricing',
   permissionModes: withCliOwn(CLAUDE_PERMISSION_MODES),
@@ -395,4 +396,4 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
 
 /** Claude Code's shared half, as the registry lists it (HI-3201). */
 // agent-text: CLAUDE_DESCRIPTOR.text.safeguardHelp (a CLI's sentence stored by id in a card comment, said when read: providerMessage)
-export default defineProvider({ descriptor: CLAUDE_DESCRIPTOR })
+export default defineProvider({ descriptor: CLAUDE_DESCRIPTOR, prices: CLAUDE_PRICES, tips: TIPS, safeguards: CLAUDE_SAFEGUARDS })

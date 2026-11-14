@@ -6,6 +6,7 @@ import { withCliOwn } from '../../cliOwnMode'
 import { msg } from '../../i18n/msg'
 import { agentMsg, say } from '../../agentText'
 import { defineProvider } from '../parts'
+import { TIPS } from './tips'
 
 /**
  * GitHub Copilot's side of the shared provider data (the Copilot CLI, `copilot`): its modes, reasoning levels and models.
@@ -236,6 +237,7 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
   company: 'GitHub', // i18n-ignore: a company name
   cliName: 'copilot',
   icon: 'copilot',
+  badge: { shape: 'diamond', glyph: 'chevrons', color: '#8b6cf0' },
   setupUrl: 'https://docs.github.com/copilot/how-tos/copilot-cli',
   pricingUrl: 'https://docs.github.com/copilot/reference/ai-models/supported-models',
   permissionModes: withCliOwn(COPILOT_PERMISSION_MODES),
@@ -301,4 +303,10 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
 }
 
 /** GitHub Copilot's shared half, as the registry lists it (HI-3201). */
-export default defineProvider({ descriptor: COPILOT_DESCRIPTOR })
+export default defineProvider({
+  descriptor: COPILOT_DESCRIPTOR,
+  // GitHub Copilot reports each session's cost itself, in AI credits ($0.01 each, charged at each model's API rate):
+  // no table ships. Prices a user adds are used for sessions without a reported cost.
+  prices: { checked: '2026-09-30', shipped: {} },
+  tips: TIPS
+})

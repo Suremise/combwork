@@ -3,6 +3,7 @@ import { withCliOwn } from '../../cliOwnMode'
 import { msg } from '../../i18n/msg'
 import { agentMsg, say } from '../../agentText'
 import { defineProvider } from '../parts'
+import { TIPS } from './tips'
 
 /**
  * OpenCode (Anomaly's anomalyco/opencode **V2**, the `@opencode/cli` package, executable `opencode`), Combwork's fifth
@@ -113,6 +114,7 @@ export const OPENCODE_DESCRIPTOR: ProviderDescriptor = {
   company: 'Anomaly', // i18n-ignore: a company name
   cliName: 'opencode',
   icon: 'opencode',
+  badge: { shape: 'octagon', glyph: 'brackets', color: '#d4892a' },
   setupUrl: 'https://opencode.ai/docs',
   pricingUrl: 'https://opencode.ai/docs/providers',
   permissionModes: withCliOwn(OPENCODE_PERMISSION_MODES),
@@ -180,4 +182,10 @@ export const OPENCODE_DESCRIPTOR: ProviderDescriptor = {
 }
 
 /** OpenCode's shared half, as the registry lists it (HI-3201). */
-export default defineProvider({ descriptor: OPENCODE_DESCRIPTOR })
+export default defineProvider({
+  descriptor: OPENCODE_DESCRIPTOR,
+  // OpenCode reaches many vendors' models through the account's own sign-ins and keys, each priced by its vendor (checked
+  // 9 Nov 2026, HI-2759): no table ships, and its sessions show as unpriced. Prices a user adds are used.
+  prices: { checked: '2026-11-09', shipped: {} },
+  tips: TIPS
+})

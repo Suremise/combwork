@@ -5,6 +5,7 @@ import type { TypedNewline } from '../terminalInput'
 import { msg, type Msg } from '../i18n/msg'
 import type { Tr } from '../tasks'
 import { PROVIDER_MODULES } from './registry'
+import type { ProviderModule } from './parts'
 
 /**
  * Providers: the coding-agent CLIs Combwork can run. Everything the UI and the shared settings logic need to know about one
@@ -313,6 +314,13 @@ export interface ModeCaveatFacts {
   label?: string
 }
 
+/** A provider's badge (ProviderIcon draws each shape and glyph): its own, so badges tell apart in one colour too. */
+export interface ProviderBadge {
+  shape: 'circle' | 'square' | 'diamond' | 'hexagon' | 'octagon'
+  glyph: 'tilde' | 'braces' | 'chevrons' | 'rise' | 'brackets'
+  color: string
+}
+
 export interface ProviderDescriptor {
   id: ProviderId
   /** Product name: "Claude Code". */
@@ -323,6 +331,11 @@ export interface ProviderDescriptor {
   cliName: string
   /** Icon key for the renderer (see ProviderIcon). */
   icon: string
+  /**
+   * Combwork's own badge for it (ProviderIcon), never the provider's logo (#470): an outline, a glyph and a colour, always
+   * shown with its name or as its tooltip. Absent: a neutral terminal icon.
+   */
+  badge?: ProviderBadge
   setupUrl: string
   /** The provider's published API prices, which its price table is checked against (#436). */
   pricingUrl: string
@@ -389,6 +402,7 @@ const UNKNOWN: ProviderDescriptor = {
   company: '',
   cliName: '',
   icon: 'question',
+  badge: undefined,
   permissionModes: [],
   modelGroups: [],
   modelLabel: (m) => m,
@@ -487,6 +501,9 @@ export function contextLines(u: { provider: ProviderId; contextTokens: number; c
 /** A message of a provider's own text (`text`) by its id, or null: a comment Combwork wrote on a card names one (#866). */
 // Each provider's sentences a card comment stores by id are marked agent-text in its own module (HI-3201).
 export const providerMessage = (id: string): Msg | null => PROVIDERS.flatMap((p) => Object.values(p.text ?? {})).find((m): m is Msg => !!m && m.id === id) ?? null
+
+/** A provider's shared half (registry.ts), or undefined for an id this version doesn't know. */
+export const providerModule = (id: ProviderId | null | undefined): ProviderModule | undefined => PROVIDER_MODULES.find((m) => m.descriptor.id === id)
 
 export function providerDescriptor(id: ProviderId | null | undefined): ProviderDescriptor {
   return PROVIDERS.find((p) => p.id === (id || DEFAULT_PROVIDER)) ?? { ...UNKNOWN, id: id ?? 'unknown', name: id ?? 'Unknown provider' } // i18n-ignore: a stand-in name for a provider id Combwork doesn't know
