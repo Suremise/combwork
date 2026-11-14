@@ -35,7 +35,7 @@ export interface CliDescription {
   binary: {
     /** Its executable's names on PATH ("mycli"; ".exe", ".cmd" and ".bat" found too). */
     names: string[]
-    /** Folders or files where it may be, a %VARIABLE% at the start allowed. */
+    /** Folders (each looked in for its names) or files where it may be, a %VARIABLE% at the start allowed. */
     paths?: string[]
     /** The arguments that print its version, and the pattern whose first group is the version. */
     versionArgs?: string[]

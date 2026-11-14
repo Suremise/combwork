@@ -330,6 +330,19 @@ describe('finding its executable (locate)', () => {
     expect(info.path).toBe(join(fake, 'datacli.cmd'))
     expect(info.version).toBe('1.2.3')
   })
+  it('looks in a folder for its names, and never takes the folder itself (HI-3269)', async () => {
+    const fake = join(__dirname, 'e2e', 'fake-datacli')
+    const empty = join(base, 'locate-empty')
+    mkdirSync(empty, { recursive: true })
+    const at = async (paths: string[]) => {
+      const cli = ok(desc({ id: 'locate-cli', binary: { names: ['datacli'], paths, versionArgs: ['--version'], versionPattern: 'datacli (\\d+\\.\\d+\\.\\d+)' } }))
+      return await new CliAdapter({ ...cliModule(cli), cli }).locate()
+    }
+    // A folder without it is passed over, and the next place is reached.
+    const info = await at([empty, fake])
+    expect(info.path).toBe(join(fake, 'datacli.cmd'))
+    expect(info.version).toBe('1.2.3')
+  })
 })
 
 describe('what is made from the providers follows a snapshot (Settings, the Assistant’s catalogue)', () => {
