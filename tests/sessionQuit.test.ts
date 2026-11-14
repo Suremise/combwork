@@ -127,22 +127,58 @@ describe("a lane's builder ended by its CLI's own exit", () => {
   })
 
   // HI-3261: a CLI whose prompt can't be read counts any key not sent as a draft. The one key that answered its question
-  // before its start (y, 1, Esc) went to that question, so it leaves none; text typed after an Enter there still does.
-  it("its question before its start took a key with no Enter: no draft; text after an Enter, or any key once started, is one", () => {
+  // before its start (y, 1, Esc) went to that question, so it leaves none. Anything more may be a draft left in the prompt
+  // the answer opened (HR2's round 1): text after the key in the same write, a key after it before its screen says the
+  // question is gone, text after an Enter, or any key once started.
+  const asking = (): { a: ReturnType<typeof live>; l: ReturnType<typeof live>['l'] & { askedAtStart?: boolean }; type: (data: string) => void } => {
     const a = live(codex)
     const l = a.l as typeof a.l & { askedAtStart?: boolean }
-    const past = (): void => void ((priv.userInput.get(a.key) as { at: number }).at = 0)
     l.askedAtStart = true
-    priv.noteUserInput(a.key, 'y')
-    past()
-    expect(sessions.inputHeld(P, a.agentId)).toBeNull()
-    priv.noteUserInput(a.key, 'y\rask')
-    past()
-    expect(sessions.inputHeld(P, a.agentId)).toBe("the user's draft is in its prompt")
+    // Typed, and past the typing pause.
+    const type = (data: string): void => {
+      priv.noteUserInput(a.key, data)
+      ;(priv.userInput.get(a.key) as { at: number }).at = 0
+    }
+    return { a, l, type }
+  }
+  const DRAFT = "the user's draft is in its prompt"
+
+  it('its question before its start took one key alone: no draft, so its prompt and its exit go ahead', async () => {
+    const { a, l, type } = asking()
+    type('y')
     l.askedAtStart = false
-    priv.noteUserInput(a.key, '\x1b')
-    past()
-    expect(sessions.inputHeld(P, a.agentId)).toBe("the user's draft is in its prompt")
+    expect(sessions.inputHeld(P, a.agentId)).toBeNull()
+    expect(await sessions.quit(P, a.agentId, a.run, { fenced: () => true, why: 'its lane ended' })).toBe('sent')
+  })
+
+  it('a key with text after it in the same write (ydraft), its question since gone: a draft, so its prompt and its exit wait', async () => {
+    const { a, l, type } = asking()
+    type('ydraft')
+    l.askedAtStart = false
+    expect(sessions.inputHeld(P, a.agentId)).toBe(DRAFT)
+    expect(await sessions.quit(P, a.agentId, a.run, { fenced: () => true, why: 'its lane ended' })).toBe('held')
+    expect(a.typed()).toBe('')
+    // Sent (Enter): nothing held.
+    type('\r')
+    expect(sessions.inputHeld(P, a.agentId)).toBeNull()
+  })
+
+  it('a second key before its screen says the question is gone: a draft, however its first one went', () => {
+    const { a, l, type } = asking()
+    type('y')
+    type('d')
+    l.askedAtStart = false
+    expect(sessions.inputHeld(P, a.agentId)).toBe(DRAFT)
+  })
+
+  it('text after an Enter at its question, or a key once started: a draft', () => {
+    const one = asking()
+    one.type('y\rask')
+    expect(sessions.inputHeld(P, one.a.agentId)).toBe(DRAFT)
+    const two = asking()
+    two.l.askedAtStart = false
+    two.type('\x1b')
+    expect(sessions.inputHeld(P, two.a.agentId)).toBe(DRAFT)
   })
 
   it('a fence lost (a new lease, a restart) before or while it types: nothing more written, nothing killed', async () => {

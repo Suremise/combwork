@@ -1417,8 +1417,8 @@ class SessionManager {
   onAssistantExit: (projectPath: string) => void = () => undefined
   /**
    * When the user last typed in each terminal (by pty key), so nothing else types over them: its run's own (HI-3261: a run's
-   * start forgets an earlier run's). `answer`: typed while its CLI's question before its start showed, with no Enter (a
-   * one-key answer, Esc, an arrow): the question took it, so it leaves no draft.
+   * start forgets an earlier run's). `answer`: one key alone typed while its CLI's question before its start showed (y, 1,
+   * Esc), the first since the run began or since an Enter: the question took it, so it leaves no draft.
    */
   private userInput = new Map<string, { at: number; enter: boolean; answer?: boolean }>()
   /** The Combwork Assistant's instructions for a launch (who it is, and its mode's), and the mode's name and id. */
@@ -4277,8 +4277,12 @@ class SessionManager {
     // xterm's own replies (focus in/out, cursor reports, colour queries) aren't typing.
     const typed = typedText(data)
     const l = typed ? [...this.live.values()].find((x) => this.key(x.state.projectPath, x.state.agentId) === key) : undefined
-    // Keys with no Enter while its question before its start shows went to that question (HI-3261): no draft of the user's.
-    if (typed) this.userInput.set(key, { at: Date.now(), enter: typed.endsWith('\r'), ...(l?.askedAtStart && !typed.includes('\r') ? { answer: true } : {}) })
+    // One key alone (y, 1, Esc) while its question before its start shows went to that question (HI-3261): no draft of the
+    // user's. Only the first key since the run began or since an Enter: more text in the same write (a paste, keys sent
+    // together: `ydraft`), or a later key before its screen says the question is gone, may be a draft left in its prompt.
+    const prev = this.userInput.get(key)
+    const answer = !!typed && !!l?.askedAtStart && [...typed].length === 1 && (!prev || prev.enter)
+    if (typed) this.userInput.set(key, { at: Date.now(), enter: typed.endsWith('\r'), ...(answer ? { answer: true } : {}) })
     if (typed?.includes('\r')) {
       this.userEnter.set(key, Date.now())
       // A prompt of the user's, perhaps (#1336): a hook should follow it if it starts a turn.
