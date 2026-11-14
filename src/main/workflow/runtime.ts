@@ -2235,10 +2235,13 @@ export class Workflow {
       if (e) w.fact('IntegrationCancelled', { entry: e.id, reason: 'feedback' }) // i18n-ignore: a fact's kind and codes, not text
       const latest = st.latest!
       const round = st.rounds + 1
-      w.fact('Verdict', { reviewer: 'user', submission: latest.id, revision: latest.revision, pass: false, round, generation: st.generation, comment: args.message(chosen, { id: latest.id, revision: latest.revision }) })
+      const verdict = w.fact('Verdict', { reviewer: 'user', submission: latest.id, revision: latest.revision, pass: false, round, generation: st.generation, comment: args.message(chosen, { id: latest.id, revision: latest.revision }) })
       w.fact('FeedbackSent', { batch: args.batch, submission: latest.id, round, items: args.items.map(({ id, version }) => ({ id, version })) })
       w.move('active', 'intent')
-      this.wake(w, builder, stored(W.failedReview, { card: card.key }))
+      // Its wake names the user's verdict, not the move: a verdict of the user's reaches the builder whether or not the
+      // card has a reviewer (loopWakes.ts' targetOf), where a loop's handoffs need one.
+      w.action('wake', { agent: builder, why: stored(W.failedReview, { card: card.key }) }, verdict.seq)
+      w.woken.push(builder)
       this.askAtLimit(w)
       return null
     })

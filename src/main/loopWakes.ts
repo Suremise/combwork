@@ -120,7 +120,7 @@ export async function cardReviewer(ws: WorkspaceService, _projectPath: string, c
  * arrival in Review (not a builder reviewing its own card), else its builder (the card's agent, or `agent` when the
  * action named one: the runtime's builder); an agent of the project. Null: no one's.
  */
-async function targetOf(ws: WorkspaceService, projectPath: string, card: TaskCard, kind: LoopWakeKind, agent?: string): Promise<{ id: string; name: string } | null> {
+async function targetOf(ws: WorkspaceService, projectPath: string, card: TaskCard, kind: LoopWakeKind, agent?: string, byUser = false): Promise<{ id: string; name: string } | null> {
   const agents = projectAgents(await ws.projectConfig(projectPath)).map((a) => ({ id: a.id, name: a.name }))
   // The user's answer reaches the agent waiting on it in or out of a loop (#1269); a loop's handoffs need a reviewer.
   // A pool lane's design closed by its answer or its builder going ahead (HI-2325) leaves the card with no reviewer
@@ -128,7 +128,7 @@ async function targetOf(ws: WorkspaceService, projectPath: string, card: TaskCar
   // notice to the reviewer the pool gave that design (`agent`, the runtime's, kept by its wake).
   const poolStep = (kind === 'stepAnswer' || (kind === 'stepNotice' && !!agent)) && poolCard(ws, card)
   const reviewer = kind === 'answer' || poolStep ? null : await reviewerOf(ws, card)
-  if (!reviewer && kind !== 'answer' && !poolStep) return null
+  if (!reviewer && kind !== 'answer' && !poolStep && !(byUser && kind === 'verdict')) return null
   const target = kind === 'review' || toReviewer(kind) ? (agent ?? reviewer) : (agent ?? card.agent)
   if (!target || ((kind === 'review' || toReviewer(kind)) && target === card.agent)) return null
   const found = agents.find((a) => a.id === target)
@@ -258,7 +258,8 @@ function aboutOf(ws: WorkspaceService, a: ActionRow): { kind: LoopWakeKind; text
   if (f?.kind === 'ReviewerRequest') return { kind: 'request', text: String(data.text ?? '') }
   // A design or a follow-up asks its reviewer for a check; going ahead only tells it; an answer is its builder's.
   if (f?.kind === 'LoopStep') return { kind: data.step === 'ok' || data.step === 'gaps' ? 'stepAnswer' : data.step === 'proceed' ? 'stepNotice' : 'step', text: loopStepWords(String(data.step ?? ''), String(data.text ?? ''), typeof data.design === 'string' ? data.design : undefined, typeof data.of === 'string' ? data.of : undefined) }
-  if (f?.kind === 'Verdict') return { kind: 'verdict' }
+  // HI-3220: the user's own verdict (line comments sent to the builder) reaches the builder with no reviewer too.
+  if (f?.kind === 'Verdict') return { kind: 'verdict', ...(data.reviewer === 'user' ? { byUser: true } : {}) }
   if (f?.kind === 'Submitted' || (f?.kind === 'Moved' && data.to === 'review')) return { kind: 'review' }
   if (f?.kind === 'Moved' && (data.to === 'approved' || data.to === 'done')) return { kind: data.to }
   return { kind: 'note', ...(typeof p.why === 'string' && p.why ? { text: p.why } : {}) }
@@ -288,7 +289,7 @@ async function wakeFromAction(a: ActionRow, from: WorkspaceService): Promise<voi
   const named = kind !== 'review' && typeof p.agent === 'string' && p.agent !== 'builder' && p.agent !== 'reviewers' ? p.agent : undefined
   // A lane reviewed by the pool (#1443): the pool gives each submission to a reviewer and tells it (reviewerPool.ts).
   if (kind === 'review' && poolCard(ws, card)) return
-  const to = await targetOf(ws, projectPath, card, kind, named)
+  const to = await targetOf(ws, projectPath, card, kind, named, 'byUser' in about && about.byUser === true)
   if (!to || p.by === `agent:${to.id}`) return
   const since = p.since && typeof p.since === 'object' ? (p.since as TaskHistoryEntry) : (card.history.at(-1) ?? null)
   try {

@@ -264,7 +264,8 @@ const commit = (dir, file, text, message) => {
   const fromPassed = await inv('tasks:feedbackSend', fb, { batch: again.batch, items: again.items.map((c) => ({ id: c.id, version: c.version })), expect: again.expect, replaces: null }).then(() => null, (e) => String(e?.message ?? e))
   check('from Passed: sent, round 2 counted, the card back in Doing', fromPassed === null && !!(await lib.until(async () => (await sentFacts(2)) && (await fbFacts()).filter((x) => x.kind === 'Verdict' && x.data.reviewer === 'user').at(-1)?.data.round === 2 && (await card(fb))?.column === 'doing', HUNG_MS)), String(fromPassed))
   const twice = await inv('tasks:feedbackSend', fb, { batch: again.batch, items: again.items.map((c) => ({ id: c.id, version: c.version })), expect: again.expect, replaces: null }).then(() => null, (e) => String(e?.message ?? e))
-  check('the same send again is refused', /sent already|changed since/.test(twice ?? ''), String(twice))
+  // The card is back in Doing: refused by its stage first (Workflow.feedback's checks; a batch sent twice in Review is the unit test's).
+  check('the same send again is refused', /Review or Approved only/.test(twice ?? ''), String(twice))
 
   // --- A submission whose repository couldn't be read (#1224 round 1, finding 2): its revision and files say they
   // weren't read, and why, never "no files changed". HEAD is unreadable while it is submitted, then put back.
