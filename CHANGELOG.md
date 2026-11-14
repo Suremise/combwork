@@ -91,6 +91,8 @@
 
 ### Fixed
 
+- **A lane's Add Card… results are easier to read** (HI-3217). Each card found is two rows: its key and title across the width, and under them, smaller, the lane that has it, with a line between cards. Before, that lane's name sat in a narrow column, wrapped over three lines, and cut the title short.
+
 - **A crowded lane header keeps its project's link** (HI-3209). In Progress → Lanes, a running lane showing *into <branch>* beside old rules, its card and count could squeeze the project's name to nothing in a narrow panel, so it couldn't be seen or clicked. The name now keeps a few letters, *into <branch>* is cut short before it, and in a narrow panel **old rules** and *into <branch>* show as icons (hover over one for what it says), so the name, the card and the count stay in view.
 
 - **A card waiting for Done cards of another project starts** (HI-3233). With *Cards start only when the cards they wait for are merged* on, Combwork looked for the other project's merge in this card's repository, couldn't read it, and refused the start. A card from another project now counts once it's Done. When Combwork can't read whether a card's work is in the target, the refusal names that card.

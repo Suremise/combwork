@@ -1241,9 +1241,13 @@ function CardPicker({ lane: l, all, taken, onPick, onClose }: { lane: Lane; all:
                     li?.querySelector<HTMLElement>('button')?.focus()
                   }}
                 >
-                  <span className="progress-lane-queue-key">{cardLabelOf({ tasks }, t.number)}</span>
-                  <span className="progress-lane-queue-title">{t.title}</span>
-                  {other && <span className="faint">{tr(EDIT.onOther, { builder: other.builder.name })}</span>}
+                  {/* Two rows (HI-3217): the key and the title, the title given the row's width; under it, smaller, the
+                      lane that has it. */}
+                  <span className="progress-lane-picker-head" title={t.title}>
+                    <span className="progress-lane-queue-key">{cardLabelOf({ tasks }, t.number)}</span>
+                    <span className="progress-lane-queue-title">{t.title}</span>
+                  </span>
+                  {other && <span className="faint progress-lane-picker-status">{tr(EDIT.onOther, { builder: other.builder.name })}</span>}
                 </button>
               </li>
             )
