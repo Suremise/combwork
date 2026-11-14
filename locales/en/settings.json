@@ -4287,6 +4287,10 @@
     "defaultMessage": "The output budget must be smaller than the context size.",
     "description": "Under a server connection's model's fields (HI-2682): its output budget isn't smaller than its context size, so it can't be saved."
   },
+  "settings.connections.server.notPassed": {
+    "defaultMessage": "Not set: not passed (the CLI’s own)",
+    "description": "The placeholder of an empty Context size or Output budget field of a server connection's model (HI-3197), for a CLI that runs from a description: a value left empty isn't given to the CLI, which then uses its own. Keep it short."
+  },
   "settings.connections.server.output": {
     "defaultMessage": "Output budget",
     "description": "A field on a server connection's model (HI-2682): the most tokens the model may write in one reply."

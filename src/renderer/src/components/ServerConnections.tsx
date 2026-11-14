@@ -44,6 +44,7 @@ const M = {
   context: msg({ id: 'settings.connections.server.context', defaultMessage: 'Context size', description: "A field on a server connection's model (HI-2682): the context the model has on this server, in tokens. The same value as Server diagnostics' context size." }),
   output: msg({ id: 'settings.connections.server.output', defaultMessage: 'Output budget', description: "A field on a server connection's model (HI-2682): the most tokens the model may write in one reply." }),
   tokens: msg({ id: 'settings.connections.server.tokens', defaultMessage: 'tokens', description: "Beside a server connection's model's Context size and Output budget fields (HI-2682): the unit." }),
+  notPassed: msg({ id: 'settings.connections.server.notPassed', defaultMessage: 'Not set: not passed (the CLI’s own)', description: "The placeholder of an empty Context size or Output budget field of a server connection's model (HI-3197), for a CLI that runs from a description: a value left empty isn't given to the CLI, which then uses its own. Keep it short." }),
   contextNone: msg({ id: 'settings.connections.server.contextNone', defaultMessage: 'Not set: 200,000 assumed', description: "The placeholder of a server connection's model's empty Context size field (HI-2682): with none set, Claude Code assumes a 200K context." }),
   outputDefault: msg({ id: 'settings.connections.server.outputDefault', defaultMessage: 'Default: {n, number}', description: "The placeholder of a server connection's model's empty Output budget field (HI-2682): the budget used when none is set. {n} is a number of tokens." }),
   notBelow: msg({ id: 'settings.connections.server.notBelow', defaultMessage: 'The output budget must be smaller than the context size.', description: "Under a server connection's model's fields (HI-2682): its output budget isn't smaller than its context size, so it can't be saved." }),
@@ -201,7 +202,8 @@ const tokensTyped = (v: string): number | undefined => {
  */
 function ModelLimits({ m, ownLimits, disabled, onChange }: { m: ServerModel; ownLimits: boolean; disabled?: boolean; onChange: (m: ServerModel) => void }) {
   const off = disabled || !!m.unsupported
-  const out = defaultOutput(m.context)
+  // Claude Code's own defaults (HI-2682) where it applies limits itself; elsewhere an empty value is simply not passed (HI-3197).
+  const out = ownLimits ? defaultOutput(m.context) : null
   const field = (key: 'context' | 'output', label: Msg, placeholder: string) => (
     <label className="flex server-model-limit" data-limit={key}>
       {tr(label)}
@@ -242,8 +244,8 @@ function ModelLimits({ m, ownLimits, disabled, onChange }: { m: ServerModel; own
           />
         </label>
         )}
-        {field('context', M.context, tr(M.contextNone))}
-        {field('output', M.output, out ? tr(M.outputDefault, { n: out }) : '')}
+        {field('context', M.context, tr(ownLimits ? M.contextNone : M.notPassed))}
+        {field('output', M.output, !ownLimits ? tr(M.notPassed) : out ? tr(M.outputDefault, { n: out }) : '')}
       </div>
       {m.unsupported && <div className="hint" data-limits-unsupported={m.unsupported}>{tr(M.unsupported, { why: m.unsupported })}</div>}
       {!m.unsupported && !outputFits(m) && <div className="error" data-limits-error>{tr(M.notBelow)}</div>}

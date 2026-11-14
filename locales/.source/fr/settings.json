@@ -1071,6 +1071,7 @@
   "settings.connections.server.needUrl": "Give the base URL in full, starting with https:// (or http:// for this PC).",
   "settings.connections.server.needsKey": "Its server needs a key: agents on it are refused until one is added.",
   "settings.connections.server.notBelow": "The output budget must be smaller than the context size.",
+  "settings.connections.server.notPassed": "Not set: not passed (the CLI’s own)",
   "settings.connections.server.output": "Output budget",
   "settings.connections.server.outputDefault": "Default: {n, number}",
   "settings.connections.server.pickerHint": "Claude Code’s /model lists these models by their exact IDs, under their labels. With no Claude model among them, its own Opus, Sonnet and Haiku rows are hidden. A lineup in your own settings is used instead.",

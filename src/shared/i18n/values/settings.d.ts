@@ -1073,6 +1073,7 @@ interface CombworkMessageValues {
   'settings.connections.server.needUrl': undefined
   'settings.connections.server.needsKey': undefined
   'settings.connections.server.notBelow': undefined
+  'settings.connections.server.notPassed': undefined
   'settings.connections.server.output': undefined
   'settings.connections.server.outputDefault': { n: number }
   'settings.connections.server.pickerHint': undefined

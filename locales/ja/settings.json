@@ -1607,6 +1607,7 @@
   "settings.connections.server.label": "ラベル",
   "settings.connections.server.pickerHint": "Claude Codeの/modelには、これらのモデルが正確なIDでラベル付きで表示されます。Claudeのモデルが1つもなければ、Claude Code自身のOpus、Sonnet、Haikuの行は表示されません。自分の設定にモデル一覧がある場合はそちらが使われます。",
   "settings.connections.server.notBelow": "出力上限はコンテキストサイズより小さくする必要があります。",
+  "settings.connections.server.notPassed": "未設定：渡しません（CLI自身の値）",
   "settings.connections.server.output": "出力上限",
   "settings.connections.server.outputDefault": "既定値：{n, number}",
   "settings.connections.server.tight": "余裕が少なめ：Combworkのツールを含むClaude Codeの最初のリクエストは14,000～28,000トークンになることがあり、セッションが開始しないか、すぐに圧縮されることがあります。",

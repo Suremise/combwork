@@ -1607,6 +1607,7 @@
   "settings.connections.server.label": "Bezeichnung",
   "settings.connections.server.pickerHint": "Claude Codes /model listet diese Modelle mit ihren genauen IDs unter ihren Bezeichnungen. Ist kein Claude-Modell darunter, werden seine eigenen Zeilen Opus, Sonnet und Haiku ausgeblendet. Eine Modellauswahl in deinen eigenen Einstellungen wird stattdessen verwendet.",
   "settings.connections.server.notBelow": "Das Ausgabebudget muss kleiner als die Kontextgröße sein.",
+  "settings.connections.server.notPassed": "Nicht festgelegt: nicht übergeben (Wert der CLI)",
   "settings.connections.server.output": "Ausgabebudget",
   "settings.connections.server.outputDefault": "Standard: {n, number}",
   "settings.connections.server.tight": "Wenig Platz: Die erste Anfrage von Claude Code mit den Werkzeugen von Combwork kann 14.000–28.000 Tokens groß sein, daher startet eine Sitzung womöglich nicht oder komprimiert sofort.",

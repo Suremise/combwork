@@ -1607,6 +1607,7 @@
   "settings.connections.server.label": "标签",
   "settings.connections.server.pickerHint": "Claude Code 的 /model 会按准确的 ID 列出这些模型，并显示它们的标签。如果其中没有 Claude 模型，它自带的 Opus、Sonnet 和 Haiku 行会被隐藏。若你自己的设置中有模型列表，则使用那个列表。",
   "settings.connections.server.notBelow": "输出预算必须小于上下文大小。",
+  "settings.connections.server.notPassed": "未设置：不传递（使用 CLI 自身的值）",
   "settings.connections.server.output": "输出预算",
   "settings.connections.server.outputDefault": "默认：{n, number}",
   "settings.connections.server.tight": "空间不足：Claude Code 带 Combwork 工具的首个请求可能有 14,000–28,000 个 Token，因此会话可能无法启动，或会立即压缩。",
