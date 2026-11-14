@@ -668,6 +668,24 @@ interface CombworkMessageValues {
   'settings.advanced.miss.field': { cli: string | number; version: string | number; field: string | number; fields: string | number }
   'settings.advanced.miss.list': { cli: string | number; version: string | number; missing: string | number; fields: string | number }
   'settings.advanced.miss.text': { cli: string | number; version: string | number; shown: string | number }
+  'settings.advanced.muse.guidance.maxBytes.desc': undefined
+  'settings.advanced.muse.guidance.maxBytes.title': undefined
+  'settings.advanced.muse.hooks.editTools.desc': undefined
+  'settings.advanced.muse.hooks.editTools.title': undefined
+  'settings.advanced.muse.hooks.pathField.desc': undefined
+  'settings.advanced.muse.hooks.pathField.title': undefined
+  'settings.advanced.muse.hooks.timeoutSeconds.desc': undefined
+  'settings.advanced.muse.hooks.timeoutSeconds.title': undefined
+  'settings.advanced.muse.override.keepPersonalOut.desc': undefined
+  'settings.advanced.muse.override.keepPersonalOut.title': undefined
+  'settings.advanced.muse.override.keepProjectConfigOut.desc': undefined
+  'settings.advanced.muse.override.keepProjectConfigOut.title': undefined
+  'settings.advanced.muse.override.stripAccountVars.desc': undefined
+  'settings.advanced.muse.override.stripAccountVars.title': undefined
+  'settings.advanced.muse.sandbox.setupRequired.desc': undefined
+  'settings.advanced.muse.sandbox.setupRequired.title': undefined
+  'settings.advanced.muse.sandbox.setupScreen.desc': undefined
+  'settings.advanced.muse.sandbox.setupScreen.title': undefined
   'settings.advanced.off': undefined
   'settings.advanced.on': undefined
   'settings.advanced.openLogs': undefined

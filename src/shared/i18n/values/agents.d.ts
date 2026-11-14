@@ -277,6 +277,16 @@ interface CombworkMessageValues {
   'agents.models.serverCloud': { model: string | number }
   'agents.models.serverCloudAs': { model: string | number; names: string | number }
   'agents.models.unavailableGroup': undefined
+  'agents.muse.extensionNote': undefined
+  'agents.muse.installNote': undefined
+  'agents.muse.modelPlaceholder': undefined
+  'agents.muse.never': undefined
+  'agents.muse.neverDescription': undefined
+  'agents.muse.onRequest': undefined
+  'agents.muse.onRequestDescription': undefined
+  'agents.muse.signInHelp': undefined
+  'agents.muse.untrusted': undefined
+  'agents.muse.untrustedDescription': undefined
   'agents.name.empty': undefined
   'agents.name.taken': { agent: string | number; project: string | number; suggestion: string | number }
   'agents.name.tooLong': { max: string | number }

@@ -1,0 +1,22 @@
+Set up the Windows sandbox
+
+Muse runs the agent's commands in a sandbox. To set it up, Muse needs
+administrator permission to create or update two local Windows accounts
+and a MuseSandboxUsers group for them:
+
+  muse-sbx-r1  runs commands that have no network access, or that can reach
+               the network only through Muse's proxy.
+  muse-sbx-u1  runs commands that are allowed to use the network.
+
+Both are standard accounts, not administrators, and separate from your own
+account, so commands that run as them can change your files only where Muse
+allows, such as your workspace. Muse creates and protects their passwords;
+you never sign in to them. Windows may list them on the sign-in screen and
+under C:\Users.
+
+If you continue, Windows may ask you to approve this change.
+
+> 1  Yes, set up the sandbox
+  2  No, exit
+
+Use Up/Down or 1/2, then Enter. Esc exits.

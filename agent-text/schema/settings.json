@@ -1732,6 +1732,60 @@
       "shown": "plain"
     }
   },
+  "settings.advanced.muse.guidance.maxBytes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.guidance.maxBytes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.hooks.editTools.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.hooks.editTools.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.hooks.pathField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.hooks.pathField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.hooks.timeoutSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.hooks.timeoutSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.override.keepPersonalOut.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.override.keepPersonalOut.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.override.keepProjectConfigOut.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.override.keepProjectConfigOut.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.override.stripAccountVars.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.override.stripAccountVars.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.sandbox.setupRequired.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.sandbox.setupRequired.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.sandbox.setupScreen.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.sandbox.setupScreen.title": {
+    "placeholders": {}
+  },
   "settings.advanced.opencode.ambient.integrations.desc": {
     "placeholders": {}
   },

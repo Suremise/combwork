@@ -392,7 +392,9 @@ const cliInstalled = {
   // Google's installer's place (Combwork looks there too).
   agy: () => cliPath('agy', [join(process.env.LOCALAPPDATA || '', 'agy', 'bin', 'agy.exe')]),
   // The pinned build only (HI-2763: a real-tier run of OpenCode is of the tested version), never one on the PATH.
-  opencode: () => [join(process.env.LOCALAPPDATA || '', 'combwork-test', 'opencode-2.2.6', 'opencode.exe')].find((p) => existsSync(p)) || null
+  opencode: () => [join(process.env.LOCALAPPDATA || '', 'combwork-test', 'opencode-2.2.6', 'opencode.exe')].find((p) => existsSync(p)) || null,
+  // The pinned, offline-tested build only (HI-3202: Muse Code 1.4.20, its echo provider), never one on the PATH.
+  muse: () => [join(process.env.LOCALAPPDATA || '', 'combwork-test', 'muse-1.4.20', 'muse.exe')].find((p) => existsSync(p)) || null
 }
 /**
  * False only when Claude Code itself says it isn't signed in to its test home (`claude auth status --json`, with

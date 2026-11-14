@@ -3342,7 +3342,8 @@ class SessionManager {
     // turn of its own runs yet.
     // A CLI whose first prompt is typed (HI-3196, data-only): kept until its screen first says it is ready, then typed as
     // any line Combwork types is (sendPrompt, its guards): never on its command line.
-    if (l.initialPrompt && adapter.launch.promptTyped) l.typedFirstPrompt = l.initialPrompt
+    // A resume whose CLI takes no prompt with it (HI-3202) types it the same way.
+    if (l.initialPrompt && (adapter.launch.promptTyped || (l.resumed && adapter.launch.resumePromptTyped))) l.typedFirstPrompt = l.initialPrompt
     else if (l.initialPrompt) this.notePrompt(l, true)
     l.initialPrompt = undefined
     l.startAllowed = undefined
@@ -7569,6 +7570,8 @@ class SessionManager {
       if (ev.kind !== 'stop') this.settleFailure(id, l)
       this.carryOut(id, l, step, String(body.hook_event_name ?? ''), ev, arrived)
       actions = step.actions
+      // A first prompt still waiting to be typed (resumePromptTyped): its start hook, or a turn's end, may make it safe now.
+      if (l.typedFirstPrompt) queueMicrotask(() => this.typeFirstPrompt(l))
       if (ev.kind !== 'ignore') (l.recentHooks ??= []).push({ kind: ev.kind, at: Date.now(), status: st.status })
       if ((l.recentHooks?.length ?? 0) > RECENT_HOOKS) l.recentHooks!.shift()
     } else if (guard && hook.event.kind === 'ask') {

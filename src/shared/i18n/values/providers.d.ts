@@ -125,6 +125,21 @@ interface CombworkMessageValues {
   'providers.localLimits.switched': { model: string | number }
   'providers.memory.connection': { file: string | number; name: string | number }
   'providers.memory.user': { file: string | number }
+  'providers.muse.connections.setUp': undefined
+  'providers.muse.guidanceTooLong': { provider: string | number; max: number }
+  'providers.muse.hookPath': { provider: string | number; folder: string | number }
+  'providers.muse.notice.projectOff': { count: number; files: string | number }
+  'providers.muse.notice.sandbox': undefined
+  'providers.muse.notice.servers': { count: number; servers: string | number }
+  'providers.muse.notice.title': undefined
+  'providers.muse.otherAccount': { provider: string | number; session: string | number }
+  'providers.muse.projectHooks': { provider: string | number; count: number; files: string | number }
+  'providers.muse.projectServers': { provider: string | number; count: number; files: string | number; servers: string | number }
+  'providers.muse.sandbox.action': undefined
+  'providers.muse.sandbox.meanwhile': undefined
+  'providers.muse.sandbox.needed': undefined
+  'providers.muse.sandbox.runs': undefined
+  'providers.muse.unreadableConfig': { provider: string | number; file: string | number; why: string | number }
   'providers.opencode.adoptRefused': { why: string }
   'providers.opencode.claudeAgentModel': { provider: string | number; model: string | number }
   'providers.opencode.connections.setUp': undefined

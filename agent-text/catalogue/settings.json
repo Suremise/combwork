@@ -2774,6 +2774,96 @@
     "note": "Under an advanced setting whose value no longer finds what the CLI was recorded showing (Settings → Advanced). {cli} is the CLI's name, {version} its version; {shown} is the CLI's own text, in English.",
     "audience": "both"
   },
+  "settings.advanced.muse.guidance.maxBytes.desc": {
+    "text": "The most of a start hook's output Muse keeps as the session's context (1.4.20 cuts the rest off). Combwork's guidance, the agent's instructions and the Workspace notes go in whole when they fit; when they don't, Combwork gives a short pointer to the file that holds them instead. Too large, Muse cuts them off unseen.",
+    "note": "What the advanced setting \"Guidance: most Muse takes at start\" is for, and what goes wrong when it is wrong (Settings → Advanced). Workspace notes is a place in Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.muse.guidance.maxBytes.title": {
+    "text": "Guidance: most Muse takes at start",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.muse.hooks.editTools.desc": {
+    "text": "The names of Muse's tools that change files, which Combwork checks against other agents' file locks before they run. Wrong, an edit of a locked file isn't refused.",
+    "note": "What the advanced setting \"Hooks: tools that edit files\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.muse.hooks.editTools.title": {
+    "text": "Hooks: tools that edit files",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.muse.hooks.pathField.desc": {
+    "text": "The field of an editing tool's input that names the file it changes (a patch names its own files). Wrong, Combwork can't tell which file an edit changes, so a file lock doesn't stop it.",
+    "note": "What the advanced setting \"Hooks: an edit's file\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.muse.hooks.pathField.title": {
+    "text": "Hooks: an edit's file",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.muse.hooks.timeoutSeconds.desc": {
+    "text": "How long Muse waits for Combwork to take one of its hooks (an edit waits for a file lock). Too short, Combwork misses what Muse reports, an agent may look stuck, and an edit of a locked file can go ahead before Combwork refuses it.",
+    "note": "What the advanced setting \"Hooks: timeout\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.muse.hooks.timeoutSeconds.title": {
+    "text": "Hooks: timeout",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.muse.override.keepPersonalOut.desc": {
+    "text": "Muse also reads the personal skills and rules you keep for other CLIs (such as Claude Code's and Codex's, in your user folder). Combwork turns that off for its agents' launches (context.foreign_personal_skills and context.foreign_personal_rules, for that run only), so an agent has the skills and instructions Combwork gave it. Turned off, Muse reads them as it would outside Combwork.",
+    "note": "What the advanced setting \"Keep other CLIs' personal skills and rules out\" does (Settings → Advanced, under Muse Code). context.foreign_personal_skills and context.foreign_personal_rules are setting names: keep them.",
+    "audience": "both"
+  },
+  "settings.advanced.muse.override.keepPersonalOut.title": {
+    "text": "Keep other CLIs' personal skills and rules out",
+    "note": "An advanced setting's title (Settings → Advanced, under Muse Code): one of Combwork's overrides of the CLI, on by default.",
+    "audience": "both"
+  },
+  "settings.advanced.muse.override.keepProjectConfigOut.desc": {
+    "text": "Muse starts Combwork's tools only in a workspace it trusts, and trusting one also loads that project's own .mcp.json servers and .muse\\hooks.json hooks, which Muse can't be told to leave out. So Combwork doesn't start a Muse agent where those files define a server or hook the agent wasn't given, or can't be read, and says which. Turned off, such an agent starts and Muse runs them too: the project's own config then runs inside Combwork's agents, outside what you gave them.",
+    "note": "What the advanced setting \"Keep the project's own Muse MCP servers and hooks out\" does (Settings → Advanced, under Muse Code). .mcp.json and .muse\\hooks.json are file names: keep them.",
+    "audience": "both"
+  },
+  "settings.advanced.muse.override.keepProjectConfigOut.title": {
+    "text": "Keep the project's own Muse MCP servers and hooks out",
+    "note": "An advanced setting's title (Settings → Advanced, under Muse Code): one of Combwork's overrides of the CLI, on by default.",
+    "audience": "both"
+  },
+  "settings.advanced.muse.override.stripAccountVars.desc": {
+    "text": "Muse uses META_API_KEY over an account's own sign-in, and sends the headers in MUSE_CUSTOM_HEADERS with its requests. Combwork leaves both out wherever Muse runs on an account (its sessions, sign-in and checks), so each agent runs as the account it was given. Turned off, a key or header set in Combwork's environment applies to every Muse agent.",
+    "note": "What the advanced setting \"Keep Meta API keys in the environment away from Muse\" does (Settings → Advanced, under Muse Code). META_API_KEY and MUSE_CUSTOM_HEADERS are environment variables: keep them.",
+    "audience": "both"
+  },
+  "settings.advanced.muse.override.stripAccountVars.title": {
+    "text": "Keep Meta API keys in the environment away from Muse",
+    "note": "An advanced setting's title (Settings → Advanced, under Muse Code): one of Combwork's overrides of the CLI, on by default.",
+    "audience": "both"
+  },
+  "settings.advanced.muse.sandbox.setupRequired.desc": {
+    "text": "What muse sandbox windows check prints when Muse's Windows sandbox isn't set up. Combwork then says so in Provider Setup, and that each new agent will show Muse's setup screen. Wrong, Combwork doesn't tell you, and agents wait at that screen.",
+    "note": "What the advanced setting \"Sandbox not set up\" is for (Settings → Advanced, under Muse Code). muse sandbox windows check is a command: keep it. Provider Setup is a dialog's name.",
+    "audience": "both"
+  },
+  "settings.advanced.muse.sandbox.setupRequired.title": {
+    "text": "Sandbox not set up (muse sandbox windows check)",
+    "note": "An advanced setting's title (Settings → Advanced, under Muse Code): the pattern of the CLI's check saying its Windows sandbox needs setting up. muse sandbox windows check is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.muse.sandbox.setupScreen.desc": {
+    "text": "The screen Muse shows before a session when its Windows sandbox isn't set up, asking for administrator rights. Combwork never answers it: it shows the agent as waiting for you. Wrong, the agent looks as if it is still starting.",
+    "note": "What the advanced setting \"Sandbox setup screen\" is for, and what goes wrong when it is wrong (Settings → Advanced, under Muse Code).",
+    "audience": "both"
+  },
+  "settings.advanced.muse.sandbox.setupScreen.title": {
+    "text": "Sandbox setup screen",
+    "note": "An advanced setting's title (Settings → Advanced, under Muse Code): the pattern of the CLI's first-run screen asking to set up its Windows sandbox.",
+    "audience": "both"
+  },
   "settings.advanced.opencode.ambient.integrations.desc": {
     "text": "OpenCode's providers that can use a sign-in this PC already has (an AWS profile, a gcloud login, the Azure CLI's), by their ids: Combwork denies each unless the account saved a credential for it. Wrong, an agent could use one of those sign-ins unasked.",
     "note": "What the advanced setting \"Providers using this PC's sign-ins\" is (Settings → Advanced, under OpenCode). AWS, gcloud and Azure CLI are names.",

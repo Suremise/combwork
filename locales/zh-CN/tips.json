@@ -382,6 +382,8 @@
   "tips.moreAgents.title": "超过 {usual, plural, other {# 个智能体}}",
   "tips.moveAnyway.text": "把卡片拖过其项目的某条规则时（例如在评审前拖到“已完成”），Combwork 会先询问并列出将跳过的规则。“仍然移动”会在卡片上记录一次例外放行并附上你的理由：卡片上打开的锁图标会显示是谁、跳过了哪些规则以及原因。",
   "tips.moveAnyway.title": "附上理由，绕过规则移动卡片",
+  "tips.muse.text": "智能体可以使用 Meta 的 Muse Code。用 Meta 的安装程序安装它，在“设置”→“账号与连接”中添加一个 Muse Code 账号并在那里登录。每个账号都有自己的登录、设置和会话，与你自己的 Muse 分开。",
+  "tips.muse.title": "在 Muse Code 上运行智能体",
   "tips.myPrices.text": "Claude Code 的费用是它自己根据其价格表算出的。你的费率不同（有折扣或其他套餐）？把“会话费用”设为“我的价格”，Combwork 就会改用你的价格表为每个会话计价。",
   "tips.myPrices.title": "为 Claude Code 设置自己的价格",
   "tips.newCard.text": "按 {key} 即可为当前项目新建卡片，无需离开正在做的事。",

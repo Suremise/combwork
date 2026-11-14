@@ -249,6 +249,8 @@ export const SUITES = [
   { name: 'mergeslot' },
   { name: 'mode', needs: ['claude'], claudeHome: 'own' },
   { name: 'models' },
+  { name: 'muse' },
+  { name: 'musereal', needs: ['muse'] },
   { name: 'narrowmain' },
   { name: 'nocode' },
   { name: 'notifyonce' },

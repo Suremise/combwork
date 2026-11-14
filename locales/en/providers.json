@@ -495,6 +495,66 @@
     "defaultMessage": "User {file} (all projects)",
     "description": "In the Memory view: the user's own instructions file, which every project's agents read. {file} is its name (CLAUDE.md)."
   },
+  "providers.muse.connections.setUp": {
+    "defaultMessage": "Set Up runs `muse login` on this account, so you can sign it in to Meta in your browser. Answer in the terminal; Combwork types nothing into it.",
+    "description": "Settings → Accounts & Connections, above a Muse Code account's Set Up terminal: what Set Up is for. muse login is a command: keep it. Set Up names a button."
+  },
+  "providers.muse.guidanceTooLong": {
+    "defaultMessage": "{provider} didn't start: Combwork's guidance is over {provider}'s start limit of {max, number} bytes, and even the pointer to the file that holds it doesn't fit. Raise \"Guidance: most Muse takes at start\" in Settings → Advanced.",
+    "description": "Why a Muse Code agent didn't start (its pane): its guidance, and the short pointer that replaces it, are both over Muse's start limit. {provider} is the CLI's name, {max} a size in bytes. The quoted text is an advanced setting's title: use that setting's translated title. Settings → Advanced is a place in Combwork."
+  },
+  "providers.muse.hookPath": {
+    "defaultMessage": "{provider} didn't start: its hook commands can't name Combwork's files in {folder}, because that path has a space or a character Windows' command prompt reads, and Windows has no short name for it. Muse runs its hooks in a way that can't quote a path. Turn on 8.3 short names for that drive, or move Combwork's data to a path without spaces.",
+    "description": "Why a Muse Code agent didn't start (its pane): Muse runs hook commands through cmd without being able to quote a path, and the folder of Combwork's launch files has a space or a special character and no 8.3 short name. {provider} is the CLI's name, {folder} a path. 8.3 short names is a Windows feature's name."
+  },
+  "providers.muse.notice.projectOff": {
+    "defaultMessage": "{count, plural, one {{files} is} other {{files} are}} the project's own Muse config, which this agent loads along with Combwork's tools, because \"Keep the project's own Muse MCP servers and hooks out\" is off in Settings → Advanced.",
+    "description": "Part of a notice as a Muse Code agent starts with the project's own Muse config loaded, because the user turned off Combwork's switch. {files}: paths joined as a list; {count}: how many. The quoted text is an advanced setting's title: use that setting's translated title."
+  },
+  "providers.muse.notice.sandbox": {
+    "defaultMessage": "Muse's Windows sandbox isn't set up, so this agent shows Muse's setup screen in its pane and waits there: answer it there yourself, or once for every agent with Set up in Provider Setup. Combwork never answers it.",
+    "description": "Part of a notice as a Muse Code agent starts before Muse's Windows sandbox was set up. Set up and Provider Setup are Combwork's names: keep them."
+  },
+  "providers.muse.notice.servers": {
+    "defaultMessage": "{count, plural, one {The MCP server {servers} isn’t} other {The MCP servers {servers} aren’t}} passed to Muse: a literal secret in one (use an environment variable reference such as $'{TOKEN}'), a reference to a variable that isn’t set, text mixed with a variable, or a name with characters other than letters, digits, - and _ keeps it out.",
+    "description": "Part of a notice as a Muse Code agent starts: MCP servers it was given are left out, and why they can be. {servers}: their names joined as a list; {count}: how many. $'{TOKEN}' is ICU-quoted and shows as ${TOKEN}, an example of a reference: keep it exactly, quotes included."
+  },
+  "providers.muse.notice.title": {
+    "defaultMessage": "Muse can’t use everything this agent was given",
+    "description": "A notice as a Muse Code agent starts: something it was given can't apply (an MCP server it can't be passed, its sandbox)."
+  },
+  "providers.muse.otherAccount": {
+    "defaultMessage": "{provider} didn't resume {session}: it is in another Muse Code account's sessions, not the account this agent runs on now. Start a new session, or move the agent back to that account.",
+    "description": "Why a Muse Code agent didn't resume a session (its pane): each Muse Code account keeps its own sessions, and this one isn't in the account the agent runs on. {provider} is the CLI's name, {session} the session's id."
+  },
+  "providers.muse.projectHooks": {
+    "defaultMessage": "{provider} didn't start: {count, plural, one {{files} defines} other {{files} define}} hooks of the project's own, which {provider} runs along with Combwork's tools. Combwork can't keep them out, so it doesn't start {provider} here. Remove them from that file, then start the agent again.",
+    "description": "Why a Muse Code agent didn't start (its pane): the project's own Muse hooks file defines hooks, which Muse can't be kept from running. {provider} is the CLI's name, {files} the files' paths joined as a list, {count} how many files."
+  },
+  "providers.muse.projectServers": {
+    "defaultMessage": "{provider} didn't start: {count, plural, one {{files} defines} other {{files} define}} MCP servers this agent wasn't given ({servers}), and {provider} starts a project's servers along with Combwork's tools. Combwork can't keep them out, so it doesn't start {provider} here. Remove them from that file, or give them to the agent in Combwork's MCP servers.",
+    "description": "Why a Muse Code agent didn't start (its pane): the project's own .mcp.json (or Muse settings) defines MCP servers the agent wasn't given, which Muse can't be kept from starting. {provider} is the CLI's name, {files} the config files' paths joined as a list, {count} how many files, {servers} the servers' names joined as a list. MCP servers is a place in Combwork."
+  },
+  "providers.muse.sandbox.action": {
+    "defaultMessage": "Set up",
+    "description": "Provider Setup's button: opens Muse Code's sandbox setup in a terminal."
+  },
+  "providers.muse.sandbox.meanwhile": {
+    "defaultMessage": "Combwork never answers that screen for an agent. Run Set up here once instead, or answer it in an agent’s pane yourself.",
+    "description": "Provider Setup, under Muse Code's sandbox Set up: Combwork doesn't answer Muse's sandbox screen by itself."
+  },
+  "providers.muse.sandbox.needed": {
+    "defaultMessage": "Muse's Windows sandbox isn't set up. Until it is, each new Muse agent shows Muse's setup screen in its pane, and waits there for you.",
+    "description": "Provider Setup and Settings → Providers: Muse Code's own Windows sandbox (where it runs an agent's commands) isn't set up on this PC."
+  },
+  "providers.muse.sandbox.runs": {
+    "defaultMessage": "**Set up** runs `muse sandbox windows setup` in a terminal. Muse asks for administrator permission there to create two local Windows accounts and a group for its sandbox: Windows asks you, and the choice is yours. Combwork types nothing into it.",
+    "description": "Provider Setup, under Muse Code's sandbox Set up: what it does. **…** marks bold text and `…` a command: keep the marks and the command."
+  },
+  "providers.muse.unreadableConfig": {
+    "defaultMessage": "{provider} didn't start: Combwork couldn't read {file} ({why}), which {provider} would load. Fix or remove the file, then start the agent again.",
+    "description": "Why a Muse Code agent didn't start (its pane): a config file in the project (an MCP server or hook list) couldn't be read, so Combwork couldn't keep what it holds out of the agent. {provider} is the CLI's name, {file} a path, {why} the error's own words."
+  },
   "providers.opencode.adoptRefused": {
     "defaultMessage": "Combwork can't take this OpenCode session over: {why, select, notRead {it hasn't been read from OpenCode yet} otherFolder {it ran in a folder that isn't this project's} otherMark {Combwork already has another session under its id} other {it isn't one of its account's sessions any more}}.",
     "description": "An error when adopting (taking over) a session from the Sessions tab: an OpenCode session made outside Combwork (in OpenCode's own window) couldn't be adopted. {why} picks the reason. OpenCode is a product's name."

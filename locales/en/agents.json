@@ -1103,6 +1103,46 @@
     "defaultMessage": "Not available to this account",
     "description": "A group of the model picker: models the CLI lists that the user's account can't use (shown, not offered)."
   },
+  "agents.muse.extensionNote": {
+    "defaultMessage": "You have Muse inside an editor. Combwork doesn't use the editor's copy. Install the standalone Muse Code CLI; your editor keeps working as before.",
+    "description": "Provider Setup → Muse Code, when only an editor copy was found: why Combwork needs the standalone CLI."
+  },
+  "agents.muse.installNote": {
+    "defaultMessage": "Install Muse Code with Meta’s installer, in PowerShell: `irm https://dev.meta.ai/install.ps1 | iex`. It installs `muse` in %LOCALAPPDATA%\\Programs\\muse. Then sign in on an account in Settings → Accounts & Connections. If Muse is installed somewhere else, set its path in Settings → Muse Code.",
+    "description": "Provider Setup → Muse Code: how to install it. Keep the command in backticks, muse and %LOCALAPPDATA%\\Programs\\muse exactly as they are; Settings → Accounts & Connections and Settings → Muse Code are places in Combwork."
+  },
+  "agents.muse.modelPlaceholder": {
+    "defaultMessage": "Model ID, e.g. muse-spark-1.2",
+    "description": "Placeholder of the custom model ID box (Muse Code). Keep the model ID exactly as it is."
+  },
+  "agents.muse.never": {
+    "defaultMessage": "Never ask",
+    "description": "Muse Code's approval mode never: it runs tools without asking. Keep it short."
+  },
+  "agents.muse.neverDescription": {
+    "defaultMessage": "Runs tools and commands without asking, inside Muse’s own sandbox. Use only where unattended changes are acceptable.",
+    "description": "What Muse Code's Never ask mode does (the mode picker)."
+  },
+  "agents.muse.onRequest": {
+    "defaultMessage": "Ask when needed",
+    "description": "Muse Code's default approval mode (on-request): it asks before what its rules don't allow. Keep it short."
+  },
+  "agents.muse.onRequestDescription": {
+    "defaultMessage": "Asks before a tool or command its own rules don’t allow.",
+    "description": "What Muse Code's Ask when needed mode does (the mode picker)."
+  },
+  "agents.muse.signInHelp": {
+    "defaultMessage": "Sign in again: Settings → Accounts & Connections → the Muse Code account → Sign in (it runs muse login).",
+    "description": "How to sign in to Muse Code again. muse login is a command: keep it; Settings → Accounts & Connections is a place in Combwork."
+  },
+  "agents.muse.untrusted": {
+    "defaultMessage": "Ask before anything",
+    "description": "Muse Code's approval mode untrusted: it asks before every tool that isn't read-only. Keep it short."
+  },
+  "agents.muse.untrustedDescription": {
+    "defaultMessage": "Asks before every tool and command that isn’t read-only.",
+    "description": "What Muse Code's Ask before anything mode does (the mode picker)."
+  },
   "agents.name.empty": {
     "defaultMessage": "Enter a name.",
     "description": "Why an agent name can't be used: it is empty."

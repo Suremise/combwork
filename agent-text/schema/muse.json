@@ -1,0 +1,30 @@
+{
+  "muse.asks.continue": {
+    "placeholders": {}
+  },
+  "muse.asks.editFile": {
+    "placeholders": {}
+  },
+  "muse.asks.editFiles": {
+    "placeholders": {
+      "files": "plain"
+    }
+  },
+  "muse.asks.run": {
+    "placeholders": {
+      "command": "plain"
+    }
+  },
+  "muse.asks.use": {
+    "placeholders": {
+      "tool": "plain"
+    }
+  },
+  "muse.guidance.pointer": {
+    "placeholders": {
+      "size": "plain",
+      "max": "plain",
+      "file": "plain"
+    }
+  }
+}

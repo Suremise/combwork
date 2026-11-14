@@ -587,6 +587,11 @@ export interface ProviderLaunchPart {
   /** Its first prompt is typed once its screen is ready (sessions.ts), not passed on its command line (HI-3196). */
   readonly promptTyped?: boolean
   /**
+   * A resumed session's first prompt is typed once it is ready (as promptTyped's), its new sessions' passed on its command
+   * line (HI-3202: Muse 1.4.20's `resume <id>` takes no prompt). Ready is its start hook's, or its screen's.
+   */
+  readonly resumePromptTyped?: boolean
+  /**
    * Its start (readyOutput, startupQuestion) is read from its rendered screen, a line each, as each draw lands, not from
    * its output's tail run together (HI-3196: a description's patterns anchor ^ and $ at each line).
    */

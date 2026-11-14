@@ -382,6 +382,8 @@
   "tips.moreAgents.title": "Mehr als {usual, plural, one {# Agent} other {# Agenten}}",
   "tips.moveAnyway.text": "Ziehst du eine Karte an einer Regel ihres Projekts vorbei (etwa nach Erledigt vor ihrem Review), fragt Combwork zuerst und nennt die übergangenen Regeln. „Trotzdem verschieben“ vermerkt eine Ausnahme auf der Karte, mit deiner Begründung: Ein offenes Schloss auf der Karte zeigt, wer, welche Regeln und warum.",
   "tips.moveAnyway.title": "Eine Karte an ihren Regeln vorbei verschieben, mit Begründung",
+  "tips.muse.text": "Agenten können Muse Code von Meta verwenden. Installiere es mit dem Installationsprogramm von Meta, füge unter Einstellungen → Konten & Verbindungen ein Muse-Code-Konto hinzu und melde es dort an. Jedes Konto hat seine eigene Anmeldung, Einstellungen und Sitzungen, getrennt von deinem eigenen Muse.",
+  "tips.muse.title": "Agenten mit Muse Code ausführen",
   "tips.myPrices.text": "Die Kosten von Claude Code sind seine eigene Angabe, aus seiner Preistabelle. Hast du andere Tarife (einen Rabatt, eine andere Stufe)? Stell „Sitzungskosten“ auf „Eigene Preise“, dann berechnet Combwork jede Sitzung nach deiner Tabelle.",
   "tips.myPrices.title": "Eigene Preise für Claude Code",
   "tips.newCard.text": "Drück {key} für eine neue Karte im Projekt, in dem du gerade bist, ohne zu unterbrechen, was du tust.",

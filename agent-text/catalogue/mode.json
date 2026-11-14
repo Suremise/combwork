@@ -179,6 +179,30 @@
     "text": "Plan",
     "note": "GitHub Copilot's permission mode plan: its name, as agents and the Agent API read it (the window has its own message)."
   },
+  "mode.muse.never.desc": {
+    "text": "Runs tools and commands without asking, inside Muse’s own sandbox. Use only where unattended changes are acceptable.",
+    "note": "What Muse Code's approval mode never does, as agents and the Agent API read it."
+  },
+  "mode.muse.never.label": {
+    "text": "Never ask",
+    "note": "Muse Code's approval mode never: its name, as agents and the Agent API read it."
+  },
+  "mode.muse.onRequest.desc": {
+    "text": "Asks before a tool or command its own rules don’t allow.",
+    "note": "What Muse Code's default approval mode (on-request) does, as agents and the Agent API read it."
+  },
+  "mode.muse.onRequest.label": {
+    "text": "Ask when needed",
+    "note": "Muse Code's default approval mode (on-request): its name, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.muse.untrusted.desc": {
+    "text": "Asks before every tool and command that isn’t read-only.",
+    "note": "What Muse Code's approval mode untrusted does, as agents and the Agent API read it."
+  },
+  "mode.muse.untrusted.label": {
+    "text": "Ask before anything",
+    "note": "Muse Code's approval mode untrusted: its name, as agents and the Agent API read it."
+  },
   "mode.opencode.auto.desc": {
     "text": "Approves every permission OpenCode’s rules don’t explicitly deny, without asking. Use only where unattended changes are acceptable.",
     "note": "What OpenCode's no-guardrails mode does, as agents and the Agent API read it."
