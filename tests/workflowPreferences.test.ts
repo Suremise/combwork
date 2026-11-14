@@ -11,6 +11,7 @@ import { asksPreset } from '../src/shared/workflow/presetStep'
 import { legacyPreferences, migrateGlobalFileLocks, migrateProjectPreferences, migrateWorkspacePreferences, PREFERENCE_DEFAULTS, preferencesOf, projectInfoPreferences, projectOwnPreferences } from '../src/shared/workflow/preferences'
 import { resolveOptions } from '../src/main/workflow/rulesets'
 import type { ProjectConfig } from '../src/shared/types'
+import { LANE_DEFAULT_EVENTS, LANE_EVENTS, takesAssistantWakes, wakeEventsOf, type AssistantWakes } from '../src/shared/laneEvents'
 
 const PREFS: Partial<WorkflowOptions> = { loopWakes: false, loopRounds: 3, loopWaitHours: 2, loopStepWaitMinutes: 45, fileLocks: 'warn' }
 
@@ -19,7 +20,26 @@ describe('the preferences resolve on their own (HI-1766)', () => {
     expect(preferencesOf('git', {}).values).toEqual(PREFERENCE_DEFAULTS)
     const r = preferencesOf('git', { global: { git: { fileLocks: 'off', loopRounds: 4 } }, workspace: { git: { loopRounds: 5 }, none: { loopWaitHours: 9 } }, project: { loopWakes: false } })
     expect(r.values).toEqual({ ...PREFERENCE_DEFAULTS, fileLocks: 'off', loopRounds: 5, loopWakes: false })
-    expect(r.origins).toEqual({ fileLocks: 'global', loopRounds: 'workspace', loopWakes: 'project', loopWaitHours: 'platform', loopStepWaitMinutes: 'platform', maxAgents: 'platform', simplifyAt: 'platform', churnStopAt: 'platform' })
+    expect(r.origins).toEqual({ fileLocks: 'global', loopRounds: 'workspace', loopWakes: 'project', loopWaitHours: 'platform', loopStepWaitMinutes: 'platform', assistantWakes: 'platform', maxAgents: 'platform', simplifyAt: 'platform', churnStopAt: 'platform' })
+  })
+
+  it('Wake the Assistant for (HI-3211): Standard (as before) unless a level sets it, each level over the one before; one it doesn’t take is passed over', () => {
+    expect(PREFERENCE_DEFAULTS.assistantWakes).toEqual({ level: 'standard', events: [] })
+    expect(wakeEventsOf(PREFERENCE_DEFAULTS.assistantWakes)).toEqual(LANE_DEFAULT_EVENTS)
+    const important: AssistantWakes = { level: 'important', events: [] }
+    const quiet: AssistantWakes = { level: 'quiet', events: ['failed'] }
+    expect(preferencesOf('git', { workspace: { git: { assistantWakes: important } } }).values.assistantWakes).toEqual(important)
+    const r = preferencesOf('git', { workspace: { git: { assistantWakes: important } }, project: { assistantWakes: quiet } })
+    expect(r.values.assistantWakes).toEqual(quiet)
+    expect(r.origins.assistantWakes).toBe('project')
+    // Quiet keeps Custom's events, unused: only a lane's end and an agent waiting (with the question always told).
+    expect(wakeEventsOf(quiet)).toEqual(['ended', 'abandoned', 'waiting', 'paused-user'])
+    expect(wakeEventsOf({ level: 'custom', events: ['passed'] })).toEqual(['passed'])
+    expect(wakeEventsOf({ level: 'everything', events: [] })).toEqual([...LANE_EVENTS])
+    for (const bad of [{ level: 'loud', events: [] }, { level: 'custom', events: ['merged'] }, { level: 'custom', events: ['failed', 'failed'] }, { level: 'custom' }, 'quiet', { level: 'quiet', events: [], extra: 1 }]) {
+      expect(takesAssistantWakes(bad), JSON.stringify(bad)).toBe(false)
+      expect(preferencesOf('git', { workspace: { git: { assistantWakes: important } }, project: { assistantWakes: bad as never } }).values.assistantWakes).toEqual(important)
+    }
   })
 
   it('a value an option doesn’t take is passed over, not the level: other levels and options still count', () => {

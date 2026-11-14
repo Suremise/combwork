@@ -2068,6 +2068,9 @@
   "settings.agent.helps.assistant.panelSide": {
     "placeholders": {}
   },
+  "settings.agent.helps.assistantWakes": {
+    "placeholders": {}
+  },
   "settings.agent.helps.board.archiveDoneDays": {
     "placeholders": {}
   },
@@ -2222,6 +2225,12 @@
   },
   "settings.agent.takes.aValue": {
     "placeholders": {}
+  },
+  "settings.agent.takes.assistantWakes": {
+    "placeholders": {
+      "shape": "plain",
+      "events": "plain"
+    }
   },
   "settings.agent.takes.branch": {
     "placeholders": {}

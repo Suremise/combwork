@@ -85,6 +85,8 @@
   "tips.assistantUndo.title": "Undo the Assistant's changes",
   "tips.assistantWaits.text": "Ask the Assistant to let you know when an agent finishes a build or a test run: it waits without checking in, and Combwork wakes it when the agent finishes, needs you or stops.",
   "tips.assistantWaits.title": "Have the Assistant tell you when an agent is done",
+  "tips.assistantWakes.text": "Wake the Assistant for, under Card loops in Version Control → Workflow, sets which events in a project’s lanes wake the Assistant: Everything, Standard, Important only, Quiet or your own list. Each wake costs it tokens.",
+  "tips.assistantWakes.title": "Choose what wakes the Assistant",
   "tips.attachFiles.text": "Drop a PDF, a log or any file onto an agent's terminal: Combwork keeps a copy with the session and pastes its path. A chip shows what's attached, and says when the agent's CLI doesn't read that kind of file itself, so the agent opens it by its path.",
   "tips.attachFiles.title": "Attach any file to a prompt",
   "tips.attachmentsTabs.text": "The Attachments tab has Pane attachments and Card attachments. Show in Attachments, beside a card's attachments, opens Card attachments at that card; Show Session's Attachments, in an agent's ⋯ menu, opens Pane attachments at its session.",

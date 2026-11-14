@@ -678,11 +678,15 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     // It names the design, which the answer names.
     expect(st.typed[0].text).toContain(`The builder: "design ${id} posted for your check (answer with its id): Design: a step the reviewer is woken for."`)
     expect(st.typed[0].text).toContain("check it and answer with cw_loop_step (ok, or gaps saying what's missing, and its id)")
+    // HI-3211 (Darren's decision (b)): R1's own watch, for Review alone, didn't fire, and is still on: the line says so.
+    expect(st.typed[0].text).toContain("This is your card loop's handoff (Wake reviewers and builders), not your card watch, which is still on.")
     st.status.set('b1', 'ready')
     await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, r1, { kind: 'loopStep', step: 'ok', text: 'Holds: build it.', design: id }))
     await typedUntil(st, 2)
     expect(st.typed[1]).toMatchObject({ agent: 'b1' })
     expect(st.typed[1].text).toContain(`The reviewer: "design ${id} is OK: Holds: build it."`)
+    // B1 has no card watch: nothing said of one.
+    expect(st.typed[1].text).not.toContain('still on')
     await vi.waitFor(async () => expect(await history(w, c)).toEqual(expect.arrayContaining(['Combwork: Woke R1 (alpha) with a card loop step (a loop wake)', 'Combwork: Woke B1 (alpha) with a card loop step (a loop wake)'])), HANG)
     await disposeWorkspaceService(w)
   })

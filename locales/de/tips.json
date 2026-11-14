@@ -83,6 +83,8 @@
   "tips.assistantUndo.title": "Änderungen des Assistenten rückgängig machen",
   "tips.assistantWaits.text": "Bitte den Assistenten, dir Bescheid zu geben, wenn ein Agent einen Build oder Testlauf abschließt: Er wartet, ohne nachzufragen, und Combwork weckt ihn, wenn der Agent fertig ist, dich braucht oder stoppt.",
   "tips.assistantWaits.title": "Den Assistenten melden lassen, wenn ein Agent fertig ist",
+  "tips.assistantWakes.text": "„Assistenten wecken bei“ unter „Kartenschleifen“ in Versionsverwaltung → Workflow legt fest, welche Ereignisse in den Lanes eines Projekts den Assistenten wecken: Alles, Standard, Nur Wichtiges, Ruhig oder deine eigene Liste. Jedes Wecken kostet ihn Tokens.",
+  "tips.assistantWakes.title": "Festlegen, was den Assistenten weckt",
   "tips.attachFiles.text": "Zieh ein PDF, ein Log oder eine beliebige Datei auf das Terminal eines Agenten: Combwork legt eine Kopie bei der Sitzung ab und fügt ihren Pfad ein. Ein Chip zeigt, was angehängt ist, und sagt, wenn die CLI des Agenten diese Art Datei nicht selbst liest; der Agent öffnet sie dann über ihren Pfad.",
   "tips.attachFiles.title": "Jede Datei an einen Prompt anhängen",
   "tips.attachmentsTabs.text": "Der Tab „Anhänge“ hat „Anhänge in Bereichen“ und „Anhänge an Karten“. „In „Anhänge“ zeigen“ neben den Anhängen einer Karte öffnet „Anhänge an Karten“ bei dieser Karte; „Anhänge der Sitzung zeigen“ im ⋯-Menü eines Agenten öffnet „Anhänge in Bereichen“ bei seiner Sitzung.",

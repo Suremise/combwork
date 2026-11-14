@@ -269,6 +269,16 @@
     "note": "A move on a card, named in a refused move: a reviewer passing or failing it (glossary 2.3: verdict).",
     "audience": "both"
   },
+  "workflow.option.assistantWakes.desc": {
+    "text": "Which events in this project’s lanes wake the Assistant while it watches them; each wake costs it tokens. A question for you on a lane’s card always wakes it, unless the Assistant asked it itself. No level stops messages and decisions sent to it, or watches it starts on particular cards or agents.",
+    "note": "What the workflow option “Wake the Assistant for” does (HI-3211). A lane: a builder and a reviewer taking cards in turn (glossary: lane). Tokens: what the Assistant’s coding agent uses up.",
+    "audience": "both"
+  },
+  "workflow.option.assistantWakes.title": {
+    "text": "Wake the Assistant for",
+    "note": "A workflow option, under Card loops (HI-3211): which events in this project’s lanes wake the Combwork Assistant while it watches them (glossary: lane, the Assistant).",
+    "audience": "both"
+  },
   "workflow.option.churnStopAt.desc": {
     "text": "With a reviewer agent, once a card has had this much back-and-forth in all (with any card it was split from), Combwork stops its loop to ask you to carry on, split it, accept it with follow-ups or take it over (0 turns it off).",
     "note": "What the workflow option “Hard stop after” does (Card loops, HI-3188).",

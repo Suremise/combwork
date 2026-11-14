@@ -5,6 +5,7 @@
 ### Added
 
 - **A card that goes round in circles stops** (HI-3188). With a reviewer agent, Combwork counts each card's back-and-forth: failed reviews, designs and follow-ups, reviewer requests and questions to you. It shows the count on the board. At **Simplify check after** (12) it pauses the card's loop to ask whether what still comes up is worth handling, or to simplify or cut scope. At **Hard stop after** (30) it asks how to go on, as at the round limit. Both are under Card loops in Version Control → Workflow (0 turns either off; Solo turns both off). A follow-up made from a split keeps the count. The Assistant hears of a simplify check first and may answer carry on or simplify.
+- **Choose what wakes the Assistant** (HI-3211). **Wake the Assistant for**, under Card loops in a project's Version Control → Workflow (or the Combwork and workspace defaults), sets which events in that project's lanes wake the Assistant: Everything, Standard (the default, as before), Important only, Quiet, or the events you tick. Each project can have its own, and a change applies to the watch the Assistant already has. A question the Assistant asked you no longer wakes it as an echo, and a card loop's wake says when the agent's own wait is still on.
 
 - **A CLI from a description can run on a model server of yours** (HI-3197). A description's `server` section says the protocol (OpenAI's or Anthropic's) and how a launch gets the server: variables and arguments naming its address, key, model and the model's context and output. Add the server in **Settings → Accounts & Connections** (presets for Ollama, LM Studio, llama.cpp and vLLM), then give an agent a connection on it. The values go into that launch alone, never the CLI's own config; the key stays encrypted and hidden in logs.
 
@@ -92,6 +93,12 @@
 - **Agents end processes only by their own handle** (HI-2865). An agent in one project ended every lane's runs with `ps -ef | grep cw-progress | xargs kill` (Git Bash's `ps` lists every process of yours), so other cards' tests stopped with exit 143. Combwork now tells every agent to end only what it started, by its handle or the pid and start time it took, never by name or a `ps`/`grep` pattern.
 
 ### Fixed
+
+- **Agents can clear a card's waiting mark and block again** (HI-3234). `cw_update_task` with `waitingFor` or `blocked` set to `null`, `false` or empty clears it, as the Agent API says. Before, Claude Code passed `null` as the text "null", and the card showed it as the reason. The texts "null" and "false" now clear too, and are never kept as a reason.
+
+- **Compare no longer shows an unreadable file as added or deleted** (HI-3227). When a commit lists a file whose contents Git can't read (a damaged or incomplete repository), the Changes tab's comparison says the diff failed, with Try again, as a revision's Changes already does. Before, the file showed as added or deleted.
+
+- **A lane's Add Card… results are easier to read** (HI-3217). Each card found is two rows: its key and title across the width, and under them, smaller, the lane that has it, with a line between cards. Before, that lane's name sat in a narrow column, wrapped over three lines, and cut the title short.
 
 - **A crowded lane header keeps its project's link** (HI-3209). In Progress → Lanes, a running lane showing *into <branch>* beside old rules, its card and count could squeeze the project's name to nothing in a narrow panel, so it couldn't be seen or clicked. The name now keeps a few letters, *into <branch>* is cut short before it, and in a narrow panel **old rules** and *into <branch>* show as icons (hover over one for what it says), so the name, the card and the count stay in view.
 

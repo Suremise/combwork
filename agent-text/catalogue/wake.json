@@ -443,6 +443,10 @@
     "text": ". {who} (cw_read_task with latestComment for the comment in full).",
     "note": "#405: the end of a loop wake: who is what it tells the agent (wake.loop.review…, or its lane's next card)."
   },
+  "wake.loop.watchOn": {
+    "text": "This is your card loop's handoff (Wake reviewers and builders), not your card watch, which is still on.",
+    "note": "HI-3211: after a loop wake's line, when the agent's own card watch on the card is still on and hasn't fired: the wake came from the loop, so the watch's filter (changes) wasn't broken. Wake reviewers and builders is a workflow option's title: keep it as written."
+  },
   "wake.many.count": {
     "text": "{n} watched cards changed{short}",
     "note": "#226: a wake line counting its cards, when not even their keys fit; short is its end."

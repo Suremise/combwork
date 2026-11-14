@@ -211,6 +211,10 @@
     "defaultMessage": "Copy as JSON",
     "description": "The button copying the project’s workflow options as JSON, to paste into another project."
   },
+  "workflow.form.customWakesValue": {
+    "defaultMessage": "Custom: {events}",
+    "description": "An inherited value of the workflow option “Wake the Assistant for” (HI-3211) set to Custom: the events ticked, joined as a list (e.g. “A card fails review and A lane ends”)."
+  },
   "workflow.form.defaultBranch": {
     "defaultMessage": "The repository’s default branch",
     "description": "The placeholder of the target branch field in Project Settings → Workflow: left empty, the default branch."
@@ -790,6 +794,14 @@
   "workflow.nextVersion.upstream": {
     "defaultMessage": "{name} is made here only and tracks no remote branch, which “The target branch follows its remote” needs before its first card starts. {how, select, ready {Publish it to {remote}: {publish}. Or, if {remote} has it already, set what it tracks: {track1}, then {track2}.} choose {This repository has no remote, or several, that Combwork can name: in these commands {remote} stands for the one {name} should follow. Publish it there: {publish}. Or, if it has it already, set what it tracks: {track1}, then {track2}.} shallow {This repository is a shallow clone, which follow mode can’t use: fetch its whole history (git fetch --unshallow) first, then publish {name}.} other {The remote it would follow ({remote}) has several push addresses, or none, and follow mode publishes to exactly one: leave it one, then publish {name}.}}",
     "description": "HI-3128: under the steps in the Start the next version dialog, with the workflow option “The target branch follows its remote” on (its name: use its words): the new branch {name} isn’t on any remote and tracks none, so its first card can’t start until the user publishes it (Combwork doesn’t). how (select, keep the keys): ready, a remote Combwork can name ({remote}); choose, none it can name ({remote} is a placeholder such as <remote> for the user to replace); shallow, a shallow clone; other, the named remote ({remote}) has several push addresses or none. {publish}, {track1}, {track2} are git commands: keep them exactly as they are."
+  },
+  "workflow.option.assistantWakes.desc": {
+    "defaultMessage": "Which events in this project’s lanes wake the Assistant while it watches them; each wake costs it tokens. A question for you on a lane’s card always wakes it, unless the Assistant asked it itself. No level stops messages and decisions sent to it, or watches it starts on particular cards or agents.",
+    "description": "What the workflow option “Wake the Assistant for” does (HI-3211). A lane: a builder and a reviewer taking cards in turn (glossary: lane). Tokens: what the Assistant’s coding agent uses up."
+  },
+  "workflow.option.assistantWakes.title": {
+    "defaultMessage": "Wake the Assistant for",
+    "description": "A workflow option, under Card loops (HI-3211): which events in this project’s lanes wake the Combwork Assistant while it watches them (glossary: lane, the Assistant)."
   },
   "workflow.option.churnStopAt.desc": {
     "defaultMessage": "With a reviewer agent, once a card has had this much back-and-forth in all (with any card it was split from), Combwork stops its loop to ask you to carry on, split it, accept it with follow-ups or take it over (0 turns it off).",
@@ -2607,6 +2619,26 @@
     "defaultMessage": "the files written in {folder}",
     "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": which files changed in a folder. {folder} is a folder path."
   },
+  "workflow.value.assistantWakes.custom": {
+    "defaultMessage": "Custom",
+    "description": "A value of the workflow option “Wake the Assistant for” (HI-3211): the events you tick."
+  },
+  "workflow.value.assistantWakes.everything": {
+    "defaultMessage": "Everything",
+    "description": "A value of the workflow option “Wake the Assistant for” (HI-3211): every event in a lane."
+  },
+  "workflow.value.assistantWakes.important": {
+    "defaultMessage": "Important only",
+    "description": "A value of the workflow option “Wake the Assistant for” (HI-3211): failures, blocks, merges due, lanes ending and agents waiting for you."
+  },
+  "workflow.value.assistantWakes.quiet": {
+    "defaultMessage": "Quiet",
+    "description": "A value of the workflow option “Wake the Assistant for” (HI-3211): only agents waiting for you and lanes ending."
+  },
+  "workflow.value.assistantWakes.standard": {
+    "defaultMessage": "Standard",
+    "description": "A value of the workflow option “Wake the Assistant for” (HI-3211), the default: what woke it before this option existed."
+  },
   "workflow.value.commitMessage.branch": {
     "defaultMessage": "The branch’s own, with no card key or trailers",
     "description": "A value of the workflow option “Commit message” (glossary 2.6, G19): the commit takes the message the branch’s commits have (with several, the first one’s subject and each one’s message), never the card’s key or Combwork’s trailers. Trailers: git’s “Key: value” lines at a message’s end."
@@ -2714,6 +2746,78 @@
   "workflow.value.style.squash": {
     "defaultMessage": "Squash",
     "description": "A value of the workflow option “Merge style” (glossary 2.6, G6)."
+  },
+  "workflow.wakeEvent.abandoned": {
+    "defaultMessage": "A lane is abandoned",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane."
+  },
+  "workflow.wakeEvent.blocked": {
+    "defaultMessage": "A card is blocked",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane."
+  },
+  "workflow.wakeEvent.ended": {
+    "defaultMessage": "A lane ends",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane."
+  },
+  "workflow.wakeEvent.failed": {
+    "defaultMessage": "A card fails review",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane."
+  },
+  "workflow.wakeEvent.mergeDue": {
+    "defaultMessage": "A lane’s merge is due",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): every card of a lane passed review."
+  },
+  "workflow.wakeEvent.moved": {
+    "defaultMessage": "A card moves",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): a card goes to another board column."
+  },
+  "workflow.wakeEvent.passed": {
+    "defaultMessage": "A card passes review",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane."
+  },
+  "workflow.wakeEvent.pausedMerge": {
+    "defaultMessage": "A lane waits for a merge",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): a lane taking one card at a time waits for its last card to be merged."
+  },
+  "workflow.wakeEvent.pausedUser": {
+    "defaultMessage": "A question for you on a lane’s card (always)",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211), always on and not changeable: an agent or Combwork asks the user something on a lane’s card."
+  },
+  "workflow.wakeEvent.reblocked": {
+    "defaultMessage": "A blocked card has news",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): a blocked card’s reason changed, or its agent commented."
+  },
+  "workflow.wakeEvent.stalled": {
+    "defaultMessage": "A card or a merge stalls",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): nothing has happened on a card for a long time, or a lane’s merge isn’t being done."
+  },
+  "workflow.wakeEvent.unblocked": {
+    "defaultMessage": "A card is unblocked",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane."
+  },
+  "workflow.wakeEvent.waiting": {
+    "defaultMessage": "An agent waits for you",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an agent of the project stops to wait for the user (a permission prompt, a question)."
+  },
+  "workflow.wakeLevel.custom": {
+    "defaultMessage": "The events you tick.",
+    "description": "Under the workflow option “Wake the Assistant for” while Custom is chosen (HI-3211); the events follow as ticks."
+  },
+  "workflow.wakeLevel.everything": {
+    "defaultMessage": "Every event in a lane: also each card passing review, each card moving, and a lane waiting for a merge. For a few big cards you want to follow closely.",
+    "description": "Under the workflow option “Wake the Assistant for” while Everything is chosen (HI-3211): what wakes the Assistant."
+  },
+  "workflow.wakeLevel.important": {
+    "defaultMessage": "A failed review, a card blocked, a lane whose merge is due, a lane ending, and an agent waiting for you. No stalls or unblocks: for busy projects of many small cards.",
+    "description": "Under the workflow option “Wake the Assistant for” while Important only is chosen (HI-3211): what wakes the Assistant."
+  },
+  "workflow.wakeLevel.quiet": {
+    "defaultMessage": "Only an agent waiting for you and a lane ending. The Assistant hears of failures and blocks when it next looks, or when you ask.",
+    "description": "Under the workflow option “Wake the Assistant for” while Quiet is chosen (HI-3211): what wakes the Assistant."
+  },
+  "workflow.wakeLevel.standard": {
+    "defaultMessage": "A failed review, a card blocked, unblocked or stalled, a lane whose merge is due or stalled, a lane ending, and an agent waiting for you. What Combwork has always woken it for.",
+    "description": "Under the workflow option “Wake the Assistant for” while Standard (the default) is chosen (HI-3211): what wakes the Assistant."
   },
   "workflow.why.commitMessage": {
     "defaultMessage": "Card titles can name people and details a public history shouldn’t keep; choose Combwork’s for the card’s key, linking each merge to its card.",

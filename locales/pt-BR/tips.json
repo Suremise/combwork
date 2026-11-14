@@ -83,6 +83,8 @@
   "tips.assistantUndo.title": "Desfazer as alterações do Assistente",
   "tips.assistantWaits.text": "Peça ao Assistente para avisar quando um agente terminar um build ou uma execução de testes: ele espera sem ficar verificando, e o Combwork o acorda quando o agente termina, precisa de você ou para.",
   "tips.assistantWaits.title": "Peça ao Assistente para avisar quando um agente terminar",
+  "tips.assistantWakes.text": "Acordar o Assistente para, em Ciclos de cartões de Controle de versão → Fluxo de trabalho, define quais eventos das raias de um projeto acordam o Assistente: Tudo, Padrão, Só o importante, Silencioso ou a sua própria lista. Cada vez que ele acorda gasta tokens.",
+  "tips.assistantWakes.title": "Escolha o que acorda o Assistente",
   "tips.attachFiles.text": "Solte um PDF, um log ou qualquer arquivo no terminal de um agente: o Combwork guarda uma cópia com a sessão e cola o caminho dele. Um chip mostra o que está anexado e avisa quando a CLI do agente não lê esse tipo de arquivo sozinha, para que o agente o abra pelo caminho.",
   "tips.attachFiles.title": "Anexe qualquer arquivo a um prompt",
   "tips.attachmentsTabs.text": "A aba Anexos tem Anexos dos painéis e Anexos dos cartões. Mostrar em Anexos, ao lado dos anexos de um cartão, abre Anexos dos cartões nesse cartão; Mostrar anexos da sessão, no menu ⋯ de um agente, abre Anexos dos painéis na sessão dele.",

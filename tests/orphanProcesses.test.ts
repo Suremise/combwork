@@ -329,6 +329,39 @@ describe('the polling layer’s runs (HR1’s round 1 of HI-3206)', () => {
     })
   }
 
+  // HI-3245: the lineage read before the run registered (its reporter not in that snapshot yet); a later look has it.
+  for (const reused of [false, true]) {
+    it(reused ? 'a later process given the reporter’s pid (started after it sent) never binds: the wrapper is told (HI-3245)' : 'a reporter missing from the first look is bound at a later one: its wrapper held, never told (HI-3245)', async () => {
+      const { lookForTests, markOrphans, setOrphanRuns, setOrphansForTests, stopOrphanWatch } = await import('../src/main/orphanProcesses')
+      stopOrphanWatch()
+      host.ids = ['r1']
+      host.lineage = { r1: [wrapper] }
+      host.processes = async () => [proc(30, wrapper.created, 'cmd /c cw-progress --title "Sandbox cycle"')]
+      setOrphanRuns(() => [run()])
+      toasts.list = []
+      try {
+        await lookForTests()
+        const later = reused ? { ...reporter, created: ft(T + 1000) } : reporter
+        host.lineage = { r1: [wrapper, later] }
+        await lookForTests()
+        await lookForTests()
+        if (reused) {
+          expect(toasts.list).toHaveLength(1)
+          expect(markOrphans('r1', [proc(30, wrapper.created)])[0].orphan?.run).toBeUndefined()
+        } else {
+          expect(toasts.list).toEqual([])
+          expect(markOrphans('r1', [proc(30, wrapper.created)])[0].orphan).toEqual({ cpuMs: 1, run: 'Sandbox cycle' })
+        }
+      } finally {
+        setOrphanRuns(null)
+        setOrphansForTests('r1', null)
+        host.lineage = null
+        host.processes = async () => null
+        stopOrphanWatch()
+      }
+    })
+  }
+
   it('keeps a run’s binding and title only while needed: pruned as runs end and launches go; cleared when the watch stops', async () => {
     const { lookForTests, runStateForTests, setOrphanRuns, setOrphansForTests, stopOrphanWatch } = await import('../src/main/orphanProcesses')
     stopOrphanWatch()

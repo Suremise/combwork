@@ -588,10 +588,18 @@ describe.skipIf(!jjExe)(`merge checks on a jj card's candidate (jj ${TESTED_JJ.v
       await vi.waitFor(() => expect(jjp.checksBusy()).toBe(false), { timeout: REAL_JJ_MS, interval: 100 })
       expect(x.leases[0].given).toBe('invalid')
       const checksKey = checksJournalKey('p-jj', card.key, cycle, rec.offer!.attempt)
-      // The lease not freed yet: the candidate dropped, its checks journal kept (its lease ref the evidence).
-      await jjp.afterRun()
-      expect(w.store.boardMeta(checksKey)).not.toBeNull()
-      expect(w.refAt(`refs/cw/jj/${card.key}/${rec.offer!.attempt}/candidate`)).toBeNull()
+      // The lease not freed yet: the candidate dropped, its checks journal kept (its lease ref the evidence). The drop waits
+      // for the pool to have the copy back (parkFree: free, not returning while its ended job's processes exit, slower on a
+      // busy machine, HI-3228), so the sweep runs until it is dropped; the journal is kept on every run.
+      await vi.waitFor(
+        async () => {
+          await x.pool.refresh()
+          await jjp.afterRun()
+          expect(w.store.boardMeta(checksKey)).not.toBeNull()
+          expect(w.refAt(`refs/cw/jj/${card.key}/${rec.offer!.attempt}/candidate`)).toBeNull()
+        },
+        { timeout: REAL_JJ_MS, interval: 200 }
+      )
       // Freed: the next sweep removes the journal and the window's row.
       freed = true
       await jjp.afterRun()

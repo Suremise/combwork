@@ -83,6 +83,8 @@
   "tips.assistantUndo.title": "Cofanie zmian Asystenta",
   "tips.assistantWaits.text": "Poproś Asystenta, żeby dał Ci znać, gdy agent skończy kompilację lub testy: czeka, nie sprawdzając co chwilę, a Combwork wybudza go, gdy agent skończy, będzie Cię potrzebował lub się zatrzyma.",
   "tips.assistantWaits.title": "Niech Asystent powie, gdy agent skończy",
+  "tips.assistantWakes.text": "Wybudzaj Asystenta przy, w Pętlach kart w Kontrola wersji → Przepływ pracy, ustala, które zdarzenia na torach projektu wybudzają Asystenta: Wszystko, Standard, Tylko ważne, Cicho albo własna lista. Każde wybudzenie kosztuje go tokeny.",
+  "tips.assistantWakes.title": "Wybierz, co wybudza Asystenta",
   "tips.attachFiles.text": "Upuść PDF, log lub dowolny plik na terminal agenta: Combwork zachowuje kopię z sesją i wkleja jego ścieżkę. Etykieta pokazuje, co załączono, i mówi, kiedy CLI agenta nie czyta samo tego rodzaju plików, więc agent otwiera plik po ścieżce.",
   "tips.attachFiles.title": "Załącz dowolny plik do promptu",
   "tips.attachmentsTabs.text": "Zakładka Załączniki ma Załączniki z paneli i Załączniki kart. Pokaż w Załącznikach, obok załączników karty, otwiera Załączniki kart przy tej karcie; Pokaż załączniki sesji, w menu ⋯ agenta, otwiera Załączniki z paneli przy jego sesji.",

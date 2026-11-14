@@ -86,6 +86,7 @@
   ],
   "compare diff: pinned": [
     "<base>/ws/p :: --literal-pathspecs diff --raw -z --no-abbrev --no-renames --no-ext-diff <id> <id> -- f.txt",
+    "<base>/ws/p :: --literal-pathspecs ls-tree --full-tree -z <id> -- f.txt",
     "<base>/ws/p :: cat-file -s <id>:f.txt",
     "<base>/ws/p :: cat-file -s <id>:f.txt",
     "<base>/ws/p :: cat-file blob <id>:f.txt",
@@ -112,6 +113,8 @@
   ],
   "compare diff: no such file": [
     "<base>/ws/p :: --literal-pathspecs diff --raw -z --no-abbrev --no-renames --no-ext-diff <id> <id> -- nope.txt",
+    "<base>/ws/p :: --literal-pathspecs ls-tree --full-tree -z <id> -- nope.txt",
+    "<base>/ws/p :: --literal-pathspecs ls-tree --full-tree -z <id> -- nope.txt",
     "<base>/ws/p :: cat-file -s <id>:nope.txt",
     "<base>/ws/p :: cat-file -s <id>:nope.txt",
     "<base>/ws/p :: merge-base <id> <id>",

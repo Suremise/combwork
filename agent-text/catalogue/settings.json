@@ -3168,6 +3168,10 @@
     "text": "Windows notifications or other apps cover the right of the screen.",
     "note": "When the setting assistant.panelSide is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
+  "settings.agent.helps.assistantWakes": {
+    "text": "Many of your lane watch's wakes are ones you only acknowledge (a busy project of small cards: Important only), or the user wants you told more of a few big cards (Everything); quieter during a long unattended run.",
+    "note": "When the workflow option assistantWakes (Wake the Assistant for) is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill). Important only and Everything are its levels as Settings names them."
+  },
   "settings.agent.helps.board.archiveDoneDays": {
     "text": "The Done column has grown long with finished cards.",
     "note": "When the setting board.archiveDoneDays is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
@@ -3339,6 +3343,10 @@
   "settings.agent.takes.aValue": {
     "text": "a value",
     "note": "What a workflow option takes when there's nothing more to say."
+  },
+  "settings.agent.takes.assistantWakes": {
+    "text": "an object {shape} (events: Custom's, any of {events}; kept, unused, at the other levels)",
+    "note": "What the workflow option assistantWakes takes (HI-3211). {shape} is the object's JSON form and {events} the lane events' ids: code."
   },
   "settings.agent.takes.branch": {
     "text": "a branch name (\"\" for the repository's default branch)",

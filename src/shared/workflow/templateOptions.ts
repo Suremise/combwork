@@ -40,6 +40,7 @@ export const TEMPLATE_CARRIED = [
   'loopRounds',
   'loopWaitHours',
   'loopStepWaitMinutes',
+  'assistantWakes',
   'stageNames',
   'maxAgents'
 ] as const satisfies readonly OptionKey[]

@@ -27,6 +27,7 @@ Suggest a setting when what you see matches its "when it helps" line. Some signa
 - Long test runs the user can't follow: `general.progressPanel` and `general.progressCommands`.
 - The chime or banners interrupting the user, or agents waiting unnoticed: `notifications.*`.
 - A Done column that has grown long: `board.archiveDoneDays`.
+- Lane watch wakes you only acknowledge, or too few for a project of big cards: Wake the Assistant for (`assistantWakes`, a workspace's or a project's).
 
 Suggest in one line: what it does, why now, and where it is ("Settings → Sessions → Warn when a transcript is over is 100 MB; Coder's is at 80 MB and slowing down. 50 would flag it sooner."). One suggestion at a time, and not again once the user has declined it.
 

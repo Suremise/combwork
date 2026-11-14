@@ -967,6 +967,10 @@
     "text": "Your watch ({watch}) has ended.",
     "note": "HI-2195: a usage watch already met ends the watch before it."
   },
+  "reply.wait.follows": {
+    "text": "what Wake the Assistant for says, each lane by its project's level",
+    "note": "HI-3211: a lane watch's events when the Assistant named none: the user's setting (Wake the Assistant for: keep its name as written, a workflow option's title), read for each lane from its project."
+  },
   "reply.wait.gone": {
     "text": "{card} {archived, select, yes {was archived} other {was archived or deleted}}",
     "note": "A watched card that is gone."
