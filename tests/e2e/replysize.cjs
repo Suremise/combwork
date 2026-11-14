@@ -250,8 +250,9 @@ const prose = (seed, n) => {
   check('projects: a line each, with their agents and their roles in the workflow (#1430)', /^alpha \(on, \w+\): Coder \[claude-code, either\] idle; Tester \[claude-code, either\] stopped$/m.test(projects), projects)
   // About 3,030 characters: each Claude Code agent's connection fields (HI-1771), there for everyone since HI-1774.
   // Each agent row names its connection (HI-2108: every agent has one, its id and name).
-  // HI-3188: two more preferences in its workflow options (simplifyAt, churnStopAt), about 35 characters.
-  measure('cw_project_status', tool('cw_project_status', {}), 3350)
+  // HI-3188: two more preferences in its workflow options (simplifyAt, churnStopAt), about 35 characters; HI-3211's
+  // assistantWakes, about 45 more.
+  measure('cw_project_status', tool('cw_project_status', {}), 3400)
   const usage = measure('cw_session_usage', tool('cw_session_usage', {}), 1500)
   check('usage leaves out its days unless asked', !usage.includes('"days"') && tool('cw_session_usage', { days: true }).text.includes('"days"'))
   const notes = measure('cw_list_shared_notes', tool('cw_list_shared_notes', {}), 1500)
@@ -702,7 +703,8 @@ const prose = (seed, n) => {
   check('cancel with no watch says so', measure('cw_wait_for_agents (cancel)', tool('cw_wait_for_agents', { cancel: true }, 'assistant'), 100) === 'You had no watch.', texts['cw_wait_for_agents (cancel)'])
   // A lane watch (#531): begun, saying what it counts; cancelled.
   const laneWatch = measure('cw_wait_for_tasks (lanes, wake)', tool('cw_wait_for_tasks', { lanes: ['all'], wake: true }, 'assistant'), 300)
-  check('a lane watch begun (default events, not repeated): to end the turn', laneWatch.startsWith('Waiting on all running lanes. End your turn now: Combwork types a line into this session on a lane event'), laneWatch)
+  // HI-3211: what it counts is each lane's project's Wake the Assistant for, said in brackets after "lanes".
+  check('a lane watch begun (default events, not repeated): to end the turn', laneWatch.startsWith('Waiting on all running lanes') && laneWatch.includes('End your turn now: Combwork types a line into this session on a lane event'), laneWatch)
   check('…cancelled', measure('cw_wait_for_tasks (lanes, cancel)', tool('cw_wait_for_tasks', { cancel: true }, 'assistant'), 100) === 'Cancelled your lane watch.', texts['cw_wait_for_tasks (lanes, cancel)'])
   check('activating a project confirms it', measure('cw_activate_project', tool('cw_activate_project', { project: 'gamma' }, 'assistant'), 300) === 'gamma is on.')
   measure('cw_create_project', tool('cw_create_project', { name: 'epsilon' }, 'assistant'), 300)
