@@ -1735,8 +1735,7 @@ async function lanesIn(ws: WorkspaceService, rec: Pick<WatchRecord, 'scope' | 'l
       const stall = card && !card.archived ? await cardStallWith(ws, card, agents, order) : null
       const stalled = stall?.why ?? null
       // An ended lane's cards are another lane's or nobody's: no requests of theirs are told for it.
-      // HI-3211: never one the watcher asked itself (its echo), by who asked (an agent's id, or the Assistant as the
-      // request's actor), never a name.
+      // HI-3211: for the Assistant, never one it asked itself (its echo), by the request's actor, never a name.
       const asked = running(l) && asks ? newestAsk(asks.get(lc.number), rec.agentId) : undefined
       marks[lc.number] = laneCardMark(card, stalled, asked)
       changed.push({ mark: marks[lc.number], updatedAt: card?.updatedAt })
@@ -1768,12 +1767,13 @@ interface LaneBoard {
 }
 
 /**
- * A card's newest open request for the user (HI-1991), as a lane watch tells it; null for none. Not one `self` asked
- * (HI-3211): a request the watcher made itself is left out before the newest is taken, so another agent's on the same
- * card is still told, and the left-out one never moves the card's mark.
+ * A card's newest open request for the user (HI-1991), as a lane watch tells it; null for none. For the Assistant's watch
+ * (`self` the Assistant), never one the Assistant asked (HI-3211, Darren's decision (c): its echo, an exception of the
+ * Assistant's alone): left out before the newest is taken, so another agent's on the same card is still told, and the
+ * left-out one never moves the card's mark.
  */
 function newestAsk(items: readonly ForYouItem[] | undefined, self?: string): LaneAsked | null {
-  const own = (x: ForYouItem): boolean => !!self && (x.asker === self || (self === ASSISTANT_AGENT_ID && !!x.byAssistant))
+  const own = (x: ForYouItem): boolean => self === ASSISTANT_AGENT_ID && !!x.byAssistant
   const i = items?.filter((x) => !own(x)).reduce<ForYouItem | null>((a, b) => (!a || b.since > a.since ? b : a), null)
   return i ? { since: i.since, by: i.asker, text: i.text, ...(i.shown ? { shown: i.shown } : {}) } : null
 }

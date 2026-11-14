@@ -5434,11 +5434,11 @@ Project Settings loses its **Card loops** and **Workflow** sections (the second 
   end); an agent waiting for the user counts by its project's level. A change applies from the next check, in either
   direction, and replays nothing: a lane's marks move on at every check whatever is counted. Another agent's lane watch
   with no `events` keeps the default, and a watch naming `events` counts those. Card watches, agent watches, messages and
-  decisions sent to the Assistant and loop wakes aren't filtered (the user's choice of scope, r18). The watch's reply says
-  it follows the setting. **A request the watcher asked itself never counts as `paused-user` for it** (its echo): left out
-  per request before the card's newest is taken (`newestAsk`), by the request's asker (an agent's id) or, for the
-  Assistant, the request's fact's actor (`byAssistant`), never a name, so another agent's request on the same card still
-  wakes it, and the left-out one moves no mark. The Assistant suggests a level (tune-settings) and changes it with
+  decisions sent to the Assistant and loop wakes aren't filtered (Darren's decision (c), 14 Nov). The watch's reply says
+  it follows the setting. **A request the Assistant asked itself never counts as `paused-user` for its watch** (its echo;
+  the Assistant's alone, Darren's decision (c)): left out per request before the card's newest is taken (`newestAsk`),
+  by the request's fact's actor (`byAssistant`), never a name, so another agent's request on the same card still wakes
+  it, and the left-out one moves no mark. Another agent's own requests are told to its watch as before. The Assistant suggests a level (tune-settings) and changes it with
   `cw_update_setting` only when the user agrees.
 - **A loop wake says it isn't the agent's card watch** (HI-3211, Darren's decision (b), 14 Nov): when the agent's own card
   watch on the card is still on and hasn't fired as its line is made just before it is given (`watchStillOn`), the line

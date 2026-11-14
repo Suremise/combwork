@@ -1413,7 +1413,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
       await disposeWorkspaceService(w)
     })
 
-    it("a question the watcher asked itself isn't told to it (its echo), at any level or with its events named; another agent's on the same card still is, and the echo is never told later", async () => {
+    it("a question the Assistant asked itself isn't told to it (its echo), at any level or with its events named; another agent's on the same card still is, and the echo is never told later", async () => {
       const { w, alpha, home } = await open()
       const st = fake(alpha, home)
       const { workflowFor } = await import('../src/main/workflow/service')
