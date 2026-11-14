@@ -781,3 +781,35 @@ describe("a local model's output budget and context on the connection (HI-2682)"
     expect(saved(a.id).some((m) => 'unsupported' in m)).toBe(false)
   })
 })
+
+describe("a CLI's description removed while its server connection is kept (HI-3238)", () => {
+  it('Accounts still shows the rest, its connection can be removed, and it is back with its description', async () => {
+    const { applyClis } = await import('../src/main/clis')
+    const { checkCliDescription } = await import('../src/shared/providers/cliDescription')
+    const r = checkCliDescription({ id: 'gone-cli', name: 'Gone CLI', binary: { names: ['gonecli'] }, launch: { prompt: 'typed' }, status: { ready: '^> ' }, server: { api: 'openai', env: { OPENAI_BASE_URL: '{baseUrl}', OPENAI_API_KEY: '{key}' } } })
+    if (!r.ok) throw new Error('the description was refused')
+    const described = (clis: (typeof r.cli)[]) => applyClis({ generation: 0, folder: join(base, 'clis'), clis, problems: [] })
+    config.settings.providers['gone-cli'] = { enabled: true } as never
+    described([r.cli])
+    try {
+      const kept = await serverOn({ cli: 'gone-cli' as never, name: 'Local', preset: 'ollama', baseUrl: 'http://localhost:11434', models: [{ id: 'qwen3:8b', as: ['opus'] }] })
+      const other = await serverOn()
+      described([])
+      // Its description gone: the view lists every connection still, its own included, and nothing throws.
+      expect(view().connections.map((c) => c.id)).toEqual(expect.arrayContaining([kept.id, other.id]))
+      expect(here(() => accounts.accountsView(true)).connections.map((c) => c.id)).toContain(kept.id)
+      await accounts.readSetUp(kept.id)
+      // Restored: the same connection, as it was.
+      described([r.cli])
+      expect(view().connections.find((c) => c.id === kept.id)).toMatchObject({ name: 'Local', provider: 'gone-cli' })
+      // Gone again, it can be removed.
+      described([])
+      await accounts.removeAccount(kept.id)
+      expect(view().connections.map((c) => c.id)).not.toContain(kept.id)
+      expect(view().connections.map((c) => c.id)).toContain(other.id)
+    } finally {
+      described([])
+      delete config.settings.providers['gone-cli']
+    }
+  })
+})
