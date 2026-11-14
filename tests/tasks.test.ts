@@ -411,6 +411,19 @@ describe('task board', () => {
     expect(stalledReason({ ...card, agent: null }, null)).toMatch(/no agent/)
     expect(stalledReason({ ...card, column: 'review' }, null)).toBeNull()
     expect(stalledReason({ ...card, archived: true }, null)).toBeNull()
+    // HI-2959: a returned forward merge (no agent by design) says what it waits for, agents' words and the window's.
+    const { tr } = await import('../src/shared/i18n')
+    const forward = { from: 'main', to: '1.5.0', removeOnly: false }
+    const nobody = { ...card, agent: null }
+    expect(stalledReason(nobody, null, undefined, forward)).toBe('A forward merge the merge queue returned (main into 1.5.0): no agent works on it, so it waits for the user or the Assistant: Retry merge, Resolve on a builder (a card for a builder to resolve it) or Remove from queue.')
+    expect(stalledReason(nobody, null, tr, forward)).toBe('A forward merge the merge queue returned (main into 1.5.0): no agent works on it, so it waits for you. Open it for Retry merge, Resolve on a Builder… or Remove from queue.')
+    // Returned for its direction: Remove from queue alone, never Retry or Resolve.
+    const removeOnly = stalledReason(nobody, null, tr, { ...forward, removeOnly: true })!
+    expect(removeOnly).toMatch(/Remove from queue ends it\.$/)
+    expect(removeOnly).not.toMatch(/Retry|Resolve/)
+    expect(stalledReason(nobody, null, undefined, { ...forward, removeOnly: true })).not.toMatch(/Retry|Resolve/)
+    // A forward with an agent on it never is one: its agent's own stall.
+    expect(stalledReason(card, null, tr, forward)).toMatch(/removed/)
   })
 
   it("takes a removed agent's open cards back, and leaves its done ones", async () => {

@@ -6,15 +6,16 @@
 
 import { AsyncLocalStorage } from 'async_hooks'
 import { closeSync, copyFileSync, existsSync, openSync, readFileSync, renameSync, statSync, unlinkSync } from 'original-fs'
-import { access } from 'original-fs/promises'
+import { access, lstat, readFile } from 'original-fs/promises'
 import { isAbsolute, join, resolve as resolvePath } from 'path'
 import { branchOfRef, git, gitRouted } from '../git'
 import { gitExe } from '../gitTool'
 import { plainRepo, refSync } from './repoRefs'
 import type { FileChange } from '../../shared/workflow/facts'
+import { gitlinkOf, parseRawRows, sideOf, type GitlinkSide } from '../../shared/gitlink'
 import { UNREADABLE as U } from '../../shared/workflow/texts'
 import { isUnknown, unknown, withDetail, type Change, type Containment, type Maybe } from './types'
-import type { CommitInfo, WorktreeNow } from './history'
+import type { CommitInfo, SubmoduleChange, SubmoduleState, WorktreeNow } from './history'
 
 // A commit as attribution reads it, and a worktree as worktreeNow reads it: port 3's types (history.ts, HI-2787).
 export type { CommitInfo, WorktreeNow } from './history'
@@ -318,13 +319,20 @@ export function treeOf(repo: string, rev: string): Promise<Maybe<string>> {
   })
 }
 
-/** The repository's default branch: `main` or `master` when one exists, else the branch the folder is on. */
-export async function defaultBranch(repo: string): Promise<Maybe<string>> {
+/** The repository's own main branch, `main` or `master`, whichever exists first; null when it has neither (HI-3049). */
+export async function mainBranch(repo: string): Promise<Maybe<string | null>> {
   for (const b of ['main', 'master']) {
     const h = await lineHead(repo, b)
     if (isUnknown(h)) return h
     if (h) return b
   }
+  return null
+}
+
+/** The repository's default branch: `main` or `master` when one exists, else the branch the folder is on. */
+export async function defaultBranch(repo: string): Promise<Maybe<string>> {
+  const m = await mainBranch(repo)
+  if (m !== null) return m
   const b = await branch(repo)
   if (isUnknown(b)) return b
   return b ?? unknown(U.defaultBranch, { folder: repo })
@@ -375,6 +383,27 @@ export async function dirty(folder: string, paths?: string[]): Promise<Maybe<str
   return now.dirty.filter((f) => f.startsWith('(') || mine(f))
 }
 
+/**
+ * HI-3023: a porcelain v2 `1 ` row of a submodule whose only change is inside it: nothing staged (`X` is `.`), its
+ * checked-out commit the recorded one (`S.`), only edited or untracked files in it (`S.M.`, `S..U`, `S.MU`). The
+ * folder has nothing of it to commit or set aside: the work is the submodule's own.
+ */
+export const insideOnly = (xy: string | undefined, sub: string | undefined): boolean => !!xy && !!sub && xy[0] === '.' && sub.length === 4 && sub[0] === 'S' && sub[1] === '.' && (sub[2] === 'M' || sub[3] === 'U')
+
+/** HI-3124: how a submodule's porcelain v2 row says it changed (its `XY` and `S<c><m><u>`): see SubmoduleState. */
+export function submoduleState(xy: string | undefined, sub: string | undefined): SubmoduleState {
+  const [x, y] = [xy?.[0], xy?.[1]]
+  if (x === 'A') return 'added'
+  if (x === 'D') return 'removed'
+  if (x === 'M') return 'staged'
+  if (x === '.' && y === 'D') return 'deleted'
+  if (x === '.' && sub?.[1] === 'C') return 'moved'
+  return 'other'
+}
+
+/** A submodule row's HEAD object (`hH`): null when HEAD has none (an added one: all zeros). */
+const recordedOf = (h: string | undefined): string | null => (h && /^[0-9a-f]{40,64}$/.test(h) && !/^0+$/.test(h) ? h : null)
+
 /** A merge, rebase or cherry-pick under way: these in the git dir (dirty lists them as `(MERGE_HEAD)`…). */
 const MARKERS = ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply']
 
@@ -401,15 +430,27 @@ export async function worktreeNow(folder: string, o: { target?: string; gitPaths
   let line: string | null = null
   let oid: string | null = null
   const files: string[] = []
+  const inside: string[] = []
+  const subs: SubmoduleChange[] = []
   const parts = r.out.split('\0')
   for (let i = 0; i < parts.length; i++) {
     const p = parts[i]
     if (!p) continue
     if (p.startsWith('# branch.oid ')) oid = /^[0-9a-f]{40,64}$/.test(p.slice(13)) ? p.slice(13) : null
     else if (p.startsWith('# branch.head ')) line = p.slice(14) === '(detached)' ? null : p.slice(14)
-    else if (p.startsWith('1 ')) files.push(p.split(' ').slice(8).join(' '))
-    else if (p.startsWith('2 ')) {
-      files.push(p.split(' ').slice(9).join(' '))
+    else if (p.startsWith('1 ')) {
+      const f = p.split(' ')
+      const path = f.slice(8).join(' ')
+      files.push(path)
+      if (insideOnly(f[1], f[2])) inside.push(path)
+      // `1 XY sub mH mI mW hH hI path`
+      if (f[2]?.[0] === 'S') subs.push({ path, state: submoduleState(f[1], f[2]), recorded: recordedOf(f[6]) })
+    } else if (p.startsWith('2 ')) {
+      const f = p.split(' ')
+      const path = f.slice(9).join(' ')
+      files.push(path)
+      // A rename (`2 XY sub mH mI mW hH hI Xscore path`): said as other.
+      if (f[2]?.[0] === 'S') subs.push({ path, state: 'other', recorded: recordedOf(f[6]) })
       i++ // the original path
     } else if (p.startsWith('u ')) files.push(p.split(' ').slice(10).join(' '))
     else if (p.startsWith('? ')) files.push(p.slice(2))
@@ -421,20 +462,37 @@ export async function worktreeNow(folder: string, o: { target?: string; gitPaths
   if (out.length !== asked.length + (o.target && target === undefined ? 1 : 0)) return unknown(U.state, { folder })
   // Looked at off main's thread (HI-1814), all at once: a handful of paths.
   const there = await Promise.all(MARKERS.map((_, i) => access(isAbsolute(out[i]) ? out[i] : join(folder, out[i])).then(() => true, () => false)))
-  MARKERS.forEach((marker, i) => {
-    if (there[i]) files.push(`(${marker})`)
-  })
-  return { line, head: oid, dirty: files, ...(o.target ? { target: target === undefined ? out[asked.length] : target } : {}), gitPaths: out.slice(MARKERS.length, asked.length) }
+  const operations = MARKERS.filter((_, i) => there[i]).map((marker) => `(${marker})`)
+  // HI-3081: a path git lists twice (`D ` and `?`: Stop Tracking keeps the file) is one change, counted once.
+  return { line, head: oid, dirty: [...new Set(files), ...operations], operations, ...(inside.length ? { insideOnly: inside } : {}), ...(subs.length ? { submodules: subs } : {}), ...(o.target ? { target: target === undefined ? out[asked.length] : target } : {}), gitPaths: out.slice(MARKERS.length, asked.length) }
 }
 
-/** Files changed from base to head, as git lists them. */
+/**
+ * Files changed from base to head, as git lists them. HI-2864: read as raw rows (the same paths and letters as
+ * `--name-status`, with both modes and full ids), so a row with a gitlink on either side keeps what each side is (a
+ * submodule's commit, a file, a link, nothing) for the Work section. Output that isn't raw rows is unknown, never a
+ * partial list.
+ */
 export async function filesChanged(repo: string, base: string, headRev: string): Promise<Maybe<FileChange[]>> {
-  const r = await git(repo, ['diff', '--name-status', '--no-renames', '-z', base, headRev])
-  if (!r.ok) return unknown(U.filesChanged, { from: base.slice(0, 7), to: headRev.slice(0, 7) })
-  const parts = r.out.split('\0').filter(Boolean)
-  const out: FileChange[] = []
-  for (let i = 0; i + 1 < parts.length; i += 2) out.push({ status: parts[i][0], path: parts[i + 1] })
-  return out
+  const r = await git(repo, ['diff', '--raw', '-z', '--no-abbrev', '--no-renames', '--no-ext-diff', base, headRev])
+  const rows = r.ok ? parseRawRows(r.out) : null
+  if (!rows) return unknown(U.filesChanged, { from: base.slice(0, 7), to: headRev.slice(0, 7) })
+  return rows.map((row) => {
+    const link = gitlinkOf(row)
+    return { status: row.status, path: row.path, ...(link ? { gitlink: { from: link.from, to: link.to } } : {}) }
+  })
+}
+
+/**
+ * HI-2864: what a path is at a commit (a gitlink with its commit, a file, a link, or nothing there), from its tree entry's
+ * mode: `ls-tree -z` of that one literal path. Unknown when git can't say or its output isn't one entry or none.
+ */
+export async function treeSide(repo: string, rev: string, path: string): Promise<Maybe<GitlinkSide>> {
+  const r = await git(repo, ['--literal-pathspecs', 'ls-tree', '-z', '--full-tree', rev, '--', path])
+  const entries = r.ok ? r.out.split('\0').filter(Boolean) : null
+  const m = entries?.length === 1 ? /^(\d{6}) \w+ ([0-9a-f]{40}|[0-9a-f]{64})\t(.*)$/s.exec(entries[0]) : null
+  if (!entries || entries.length > 1 || (entries.length === 1 && (!m || m[3] !== path))) return unknown(U.filesChanged, { from: rev.slice(0, 7), to: rev.slice(0, 7) })
+  return m ? sideOf(m[1], m[2]) : { kind: 'none' }
 }
 
 /**
@@ -640,8 +698,9 @@ export async function commitIds(repo: string, range: string, max: number): Promi
  * The commits of a range, oldest first, with their author emails and `Combwork-Card` trailers. `firstParent`: only the line's
  * own commits, its merges included but not the commits a merge brought in (HI-2382).
  */
-export async function commits(repo: string, range: string, opts: { firstParent?: boolean } = {}): Promise<Maybe<CommitInfo[]>> {
-  const r = await git(repo, ['log', '--reverse', ...(opts.firstParent ? ['--first-parent'] : []), '--format=%H%x1f%ae%x1f%(trailers:key=Combwork-Card,valueonly,separator=%x2C)%x1f%s%x1e', range])
+export async function commits(repo: string, range: string, opts: { firstParent?: boolean; except?: readonly string[] } = {}): Promise<Maybe<CommitInfo[]>> {
+  // `except`: revisions whose history is left out (HI-3145: a forward resolution's source), as git log's ^rev.
+  const r = await git(repo, ['log', '--reverse', ...(opts.firstParent ? ['--first-parent'] : []), '--format=%H%x1f%ae%x1f%(trailers:key=Combwork-Card,valueonly,separator=%x2C)%x1f%s%x1e', range, ...(opts.except ?? []).map((x) => `^${x}`)])
   if (!r.ok) return unknown(U.commitsOf, { range })
   return r.out
     .split('\x1e')
@@ -668,13 +727,57 @@ export async function checkouts(repo: string): Promise<Maybe<Record<string, stri
   const r = await git(repo, ['worktree', 'list', '--porcelain'])
   if (!r.ok) return withDetail(unknown(U.worktrees, { folder: repo }), r.err)
   const out: Record<string, string> = {}
+  const detached: string[] = []
   let folder = ''
   for (const l of lines(r.out)) {
     if (l.startsWith('worktree ')) folder = l.slice(9)
     else if (l.startsWith('branch refs/heads/')) out[l.slice(18)] = folder
+    else if (l === 'detached') detached.push(folder)
+  }
+  // HI-3081: a worktree a rebase has detached still has that branch checked out: git writes the branch back when the
+  // rebase ends (refusing if it moved meanwhile), so moving it from outside (the merge queue's `update-ref` "checked
+  // out nowhere") broke the user's rebase, and Commit and Set Aside said the branch wasn't checked out at all.
+  for (const f of detached) {
+    const rebasing = await rebasingBranch(f)
+    if (isUnknown(rebasing)) return rebasing
+    if (rebasing && !(rebasing in out)) out[rebasing] = f
   }
   return out
 }
+
+/** HI-3081: the branch a rebase under way in a worktree will write back (null: none under way). */
+async function rebasingBranch(folder: string): Promise<Maybe<string | null>> {
+  // Its git dir from `.git`, with no git process where it can say (most worktrees); else git's own answer.
+  const own = gitDirSync(folder)
+  let paths = own ? [join(own, 'rebase-merge', 'head-name'), join(own, 'rebase-apply', 'head-name')] : null
+  if (!paths) {
+    // A worktree whose folder is gone (prunable: a test merge's copy just removed) has nothing under way in it. HR1's
+    // round 1: only a folder the system says isn't there; one it can't look at is unknown, never "no rebase".
+    const there = await lstat(folder).then(
+      () => true,
+      (e: NodeJS.ErrnoException) => (absent(e) ? false : e)
+    )
+    if (there === false) return null
+    if (there !== true) return withDetail(unknown(U.worktrees, { folder }), there.message)
+    const r = await git(folder, ['rev-parse', '--path-format=absolute', '--git-path', 'rebase-merge/head-name', '--git-path', 'rebase-apply/head-name'])
+    if (!r.ok) return withDetail(unknown(U.worktrees, { folder }), r.err)
+    paths = lines(r.out).map((l) => l.trim())
+  }
+  for (const p of paths) {
+    // HR1's round 1: no marker only when the system says it isn't there; a marker it can't read (denied, I/O) is
+    // unknown, so the branch is never taken for one checked out nowhere and moved under a rebase.
+    const name = await readFile(p, 'utf8').then(
+      (t) => t.trim(),
+      (e: NodeJS.ErrnoException) => (absent(e) ? '' : e)
+    )
+    if (typeof name !== 'string') return withDetail(unknown(U.worktrees, { folder }), name.message)
+    if (name.startsWith('refs/heads/')) return name.slice(11)
+  }
+  return null
+}
+
+/** A file-system error that says the path isn't there (rather than that it couldn't be looked at). */
+const absent = (e: NodeJS.ErrnoException | undefined): boolean => e?.code === 'ENOENT' || e?.code === 'ENOTDIR'
 
 /** Makes a card's folder: a worktree on a new line from `base` (§16.10, the spike's stand-in for slots). */
 export async function isolate(repo: string, folder: string, line: string, base: string): Promise<Maybe<string>> {

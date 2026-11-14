@@ -25,6 +25,7 @@ import { useConnections, useProviderWarnings } from './ConnectionChoice'
 import { connectionsApply, planUsageItems } from '@shared/accounts'
 import { useConnectionsInUse } from '../connectionUsage'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
+import { useReleaseOffers } from '../releaseOffers'
 
 const M = {
   projects: msg({ id: 'workspace.activity.projects', defaultMessage: 'Projects', description: 'The activity bar (left edge): the Projects view.' }),
@@ -99,7 +100,8 @@ export function ActivityBar() {
   const attention = useInbox().needYou.length
   // Cards waiting for the user (#1276, For you: an approval, a decision, a question); Review's count stays in the board
   // sidebar's Waiting for review.
-  const forYou = new Set(useForYou().summary.items.map((i) => i.card)).size
+  // HI-3155: the projects' release offers too, For you items of their own.
+  const forYou = new Set(useForYou().summary.items.map((i) => i.card)).size + useReleaseOffers().length
 
   const button = (id: Activity, icon: string, labelMsg: Msg, command: string, badge?: number, badgeLabel?: string) => {
     const kb = commandKeybinding(command)

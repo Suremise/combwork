@@ -18,11 +18,14 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const lanes = await import('../src/main/lanes')
+const { laneTarget } = await import('../src/main/laneTarget')
 const form = await import('../src/main/workflow/optionsForm')
 const retarget = await import('../src/main/workflow/retarget')
 const gitRepoMod = await import('../src/main/gitRepo')
 const nv = await import('../src/main/workflow/nextVersion')
 const { workflowFor } = await import('../src/main/workflow/service')
+const { rulesNow } = await import('../src/main/workflow/rulesets')
+const cardWork = await import('../src/main/workflow/cardWork')
 const { agentActor } = await import('../src/shared/workflow/facts')
 const { preset } = await import('../src/shared/workflow/options')
 const { settingEntry } = await import('../src/shared/settingsCatalog')
@@ -203,6 +206,15 @@ describe('Start the next version (HI-2807)', () => {
     expect((await options(w, repo)).target).toBe('1.3.0')
   })
 
+  it('HI-3114: asked twice as the Agent API asks (the release named, no commit), starts it once and refuses the second', async () => {
+    const { w, repo } = await project()
+    const ask = () => inWorkspace(w, () => nv.startNextVersion(w, repo, { from: { ref: '1.3.0', commit: '' }, preview: true }))
+    expect(await ask()).toMatchObject({ name: '1.4.0', from: '1.3.0' })
+    await expect(ask()).rejects.toThrow(/is 1\.4\.0 now, not 1\.3\.0/)
+    expect(hasBranch(repo, '1.5.0')).toBe(false)
+    expect((await options(w, repo)).target).toBe('1.4.0')
+  })
+
   it('keeps the branch and says so when it moved before the save’s refusal could take it back', async () => {
     const { w, repo } = await project()
     const plan = await inWorkspace(w, () => nv.nextVersionPlan(w, repo))
@@ -253,6 +265,86 @@ describe('Start the next version (HI-2807)', () => {
     const moved = await inWorkspace(w, () => retarget.retargetApply(w, repo, confirmed, user))
     expect(moved.moved.cards.map((c) => c.number)).toEqual([free.number])
     expect((await workflowFor(w, repo))!.state((await workflowFor(w, repo))!.store.card(started.number)).started?.target).toBe('1.3.0')
+  })
+})
+
+describe('a lane left on the release by Start the next version (HI-3113)', () => {
+  const card = async (w: WS, title: string) => (await inWorkspace(w, () => tasks.createTask({ title, project: 'p' }, user))).number
+  const pin = async (w: WS, repo: string, num: number, target: string) => {
+    const wf = (await workflowFor(w, repo))!
+    await store.boardWrite(w, async () => wf.store.updateCard(num, { target }))
+  }
+
+  it('reads as merging into 1.3.0, as its ruleset recorded it: shown, counted as using it, and its cards checked against it', async () => {
+    const { w, repo } = await project()
+    const [la, lb] = [await card(w, 'Lane A'), await card(w, 'Lane B')]
+    const started = await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [la, lb], by: 'You' })
+    await inWorkspace(w, () => nv.startNextVersion(w, repo, { from: { ref: '1.3.0', commit: '' }, preview: true }))
+    expect((await options(w, repo)).target).toBe('1.4.0')
+    // Its ruleset id marks no other target: it was started on the project's own.
+    const wf = (await workflowFor(w, repo))!
+    expect(wf.lane(started.lane.id)?.ruleset).not.toContain('~target:')
+    expect(laneTarget(w, { project: 'p', ruleset: wf.lane(started.lane.id)!.ruleset! })).toBe('1.3.0')
+    // The window's and cw_lane's reading: its Merges into named, now that it isn't the project's own.
+    expect((await lanes.listLanes(w, { project: 'p' })).find((l) => l.id === started.lane.id)?.target).toBe('1.3.0')
+    // Counted as using 1.3.0: the release can't be taken out from under it.
+    expect(await inWorkspace(w, () => retarget.referencesTo(w, repo, '1.3.0', () => []))).toContain('B1')
+    const f = await inWorkspace(w, () => form.workflowForm(w, repo))
+    await expect(inWorkspace(w, () => form.setWorkflowOptions(w, repo, { preset: f.preset, options: { ...f.own, otherTargets: ['main'] } }))).rejects.toThrow(/while these use it: B1/)
+    // A lane card's Merges into: the release is the lane's, the next version isn't.
+    expect((await inWorkspace(w, () => tasks.setTarget(lb, '1.3.0', user))).number).toBe(lb)
+    await expect(inWorkspace(w, () => tasks.setTarget(lb, '1.4.0', user))).rejects.toThrow(/lane, which merges into 1\.3\.0/)
+    // A release fix pinned to 1.3.0 joins it; a next-version card doesn't.
+    const fix = await card(w, 'Release fix')
+    await pin(w, repo, fix, '1.3.0')
+    await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [la, lb, fix], by: 'You' })
+    expect((await lanes.listLanes(w, { project: 'p' })).find((l) => l.id === started.lane.id)?.cards.map((c) => c.number)).toEqual([la, lb, fix])
+    const next = await card(w, 'Next version')
+    await pin(w, repo, next, '1.4.0')
+    await expect(lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [la, lb, fix, next], by: 'You' })).rejects.toThrow(/merges into 1\.4\.0, and this lane into 1\.3\.0/)
+  })
+
+  it('is not old rules for its Merges into alone (HI-3142); a real rule change since still is', async () => {
+    const { w, repo } = await project()
+    const la = await card(w, 'Lane A')
+    const started = await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [la], by: 'You' })
+    await inWorkspace(w, () => nv.startNextVersion(w, repo, { from: { ref: '1.3.0', commit: '' }, preview: true }))
+    const view = async () => (await lanes.listLanes(w, { project: 'p' })).find((l) => l.id === started.lane.id)!
+    // Its ruleset differs from the project's now (G7 1.3.0 against 1.4.0) by its target alone: only "into 1.3.0".
+    expect([(await view()).target, (await view()).oldRules]).toEqual(['1.3.0', false])
+    // A rule changed since (the merge style): old rules, its Merges into still named.
+    const f = await inWorkspace(w, () => form.workflowForm(w, repo))
+    await inWorkspace(w, () => form.setWorkflowOptions(w, repo, { preset: f.preset, options: { ...f.own, style: f.options.style === 'squash' ? 'merge' : 'squash' } }))
+    expect([(await view()).target, (await view()).oldRules]).toEqual(['1.3.0', true])
+  })
+
+  it("its cards aren't old rules for its Merges into alone (HI-3161); a real rule change since still marks them", async () => {
+    const { w, repo } = await project()
+    const la = await card(w, 'Lane A')
+    await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [la], by: 'You' })
+    const wf = (await workflowFor(w, repo))!
+    expect(await store.boardWrite(w, async () => wf.start(`#${la}`, agentActor('b1')))).toMatchObject({ ok: true })
+    await inWorkspace(w, () => nv.startNextVersion(w, repo, { from: { ref: '1.3.0', commit: '' }, preview: true }))
+    // As the window reads them (ipc's tasks:workBadges).
+    const badge = async () => {
+      const now = await rulesNow(w)
+      return cardWork.workBadges(w, now.ids, now.at).find((b) => b.card === la)!
+    }
+    // In flight under the lane's ruleset, which recorded G7 1.3.0 unmarked; the project's is on 1.4.0 now.
+    expect([(await badge()).stage, (await badge()).oldRules]).toEqual(['active', false])
+    const f = await inWorkspace(w, () => form.workflowForm(w, repo))
+    await inWorkspace(w, () => form.setWorkflowOptions(w, repo, { preset: f.preset, options: { ...f.own, style: f.options.style === 'squash' ? 'merge' : 'squash' } }))
+    expect((await badge()).oldRules).toBe(true)
+  })
+
+  it("counts a lane started on the next version's branch as using it, so the start's undo check finds it", async () => {
+    const { w, repo } = await project()
+    await inWorkspace(w, () => nv.startNextVersion(w, repo, { from: { ref: '1.3.0', commit: '' }, preview: true }))
+    const lc = await card(w, 'On 1.4.0')
+    const started = await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [lc], by: 'You' })
+    // On the project's own, 1.4.0: nothing named in the window, but 1.4.0 is in use.
+    expect((await lanes.listLanes(w, { project: 'p' })).find((l) => l.id === started.lane.id)?.target).toBeUndefined()
+    expect(await inWorkspace(w, () => retarget.referencesTo(w, repo, '1.4.0', () => []))).toContain('B1')
   })
 })
 

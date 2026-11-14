@@ -138,6 +138,15 @@ const renamable = (dir) => {
       await panel.locator('.progress-tab[data-tab="lanes"]').click()
     }
     const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
+    /**
+     * A lane ended, its card n put back in Todo as the user would (HI-3166). A lane ended with its card in flight leaves
+     * that card its lease on slot-a (HI-3118), so B1 would keep the slot: put back, the card's lease ends, B1 is stopped
+     * once idle and slot-a is free, as each step here starts from.
+     */
+    const endLane = async (id, n) => {
+      await inv('lanes:end', id, true)
+      if ((await card(n))?.column === 'doing') await inv('tasks:move', n, 'todo', { confirm: true, reason: 'laneslotretry frees slot-a' })
+    }
     /** The lane's status as it changes, each new one with when (ms from `t0`), until `stop` (what HR1 asked to see). */
     const watchStatus = (n, t0) => {
       const seen = []
@@ -161,7 +170,7 @@ const renamable = (dir) => {
     const first = await inv('lanes:start', alpha, { builder: b1.id, reviewer: r1.id, cards: [c1] })
     check('the first lane is lent slot-a', first.slot === 'slot-a' && first.started.every((s) => s.how !== 'failed'), JSON.stringify(first))
     check('B1 runs in slot-a', !!(await until(async () => same((await live(b1.id))?.cwd, slotA) && ['ready', 'finished'].includes((await live(b1.id))?.status), HUNG_MS)), JSON.stringify(await live(b1.id)))
-    await inv('lanes:end', first.lane.id, true)
+    await endLane(first.lane.id, c1)
     check('the first lane is ended, B1 stopped, slot-a free', !!(await until(async () => !!(await lane(first.lane.id))?.endedAt && !(await live(b1.id)) && (await slotNow())?.state === 'ready' && !(await slotNow())?.lease, HUNG_MS)), JSON.stringify(await slotNow()))
     // What B1's run left in slot-a (its processes exiting) gone first, so only the holder holds it from here.
     check('…nothing left holding slot-a', !!(await until(() => renamable(slotA), HUNG_MS)))
@@ -202,7 +211,7 @@ const renamable = (dir) => {
     const key = lib.ptyKey(alpha, b1.id)
     await lib.typeLine(inv, key, home, 'B1', `shell: node "${turn}"`, { taken: async () => beating(beat4) && (await live(b1.id))?.status === 'working', ready: async () => ['ready', 'finished'].includes((await live(b1.id))?.status), hungMs: HUNG_MS })
     check('B1 is in a turn in slot-a, a process it started holding slot-a', !!(await until(async () => beating(beat4) && (await live(b1.id))?.status === 'working' && !renamable(slotA), HUNG_MS)), JSON.stringify(await live(b1.id)))
-    await inv('lanes:end', second.lane.id, true)
+    await endLane(second.lane.id, c2)
     const t4 = Date.now()
     const stop4 = watchStatus(c3, t4)
     const third = await apiLane([c3])
@@ -232,7 +241,7 @@ const renamable = (dir) => {
 
     // --- 5. Through the API, B1 stopped, a process holding slot-a: the lane waits, says why, and is lent it once free.
     const third4 = await laneOf(c3)
-    await inv('lanes:end', third4.id, true)
+    await endLane(third4.id, c3)
     check('the lane is ended, B1 stopped, slot-a free and held by nothing', !!(await until(settled, HUNG_MS)), JSON.stringify(await slotNow()))
     const go5 = path.join(tools, 'hold5-go.txt')
     const beat5 = path.join(tools, 'hold5-beat.txt')
@@ -262,7 +271,7 @@ const renamable = (dir) => {
     // --- 6. HI-2467: Windows Sandbox's broker working in slot-a (a stand-in: a process whose current folder is slot-a,
     // its id in CW_TEST_SYSTEM_BROKER, so its path, read by the helper, is taken as the broker's). Named only while it
     // is seen working there, idle or not as the Sandbox's own processes run, looked at again on each retry.
-    await inv('lanes:end', (await laneOf(c4)).id, true)
+    await endLane((await laneOf(c4)).id, c4)
     check('the lane is ended, B1 stopped, slot-a free and held by nothing', !!(await until(settled, HUNG_MS)), JSON.stringify(await slotNow()))
     const standGo = path.join(tools, 'stand-go.txt')
     let standInstance = 0

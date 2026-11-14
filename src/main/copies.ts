@@ -26,19 +26,26 @@
 
 import { randomBytes } from 'crypto'
 import type { DatabaseSync } from 'node:sqlite'
+import { admitOrThrow } from './platform/fenceAdmit'
 import { existsSync } from 'original-fs'
 import { mkdir } from 'original-fs/promises'
 import { basename, join, resolve } from 'path'
 import { placeMatcher, samePlace } from './fsutil'
 import { agentMsg, inDefaultDialect, say, sayWithId, type AgentMsg, type AgentValues, type Said } from '../shared/agentText'
 import { createLogger, userText } from './logger'
-import { deletingIn, folderThere, IDLE_MS, lockHash, OpLost, quiet, releaseDeleteIn, type Holder, type OpHolder, type SlotConn, type SlotOptionsNow, type SlotRunner, type SlotRunEnd } from './slots'
-import { slotWorkspaces } from './platform/workspacePorts'
+import { deletingIn, folderThere, IDLE_MS, lockHash, OpLost, quiet, releaseDeleteIn, type Holder, type OpHolder, type SlotConn, type SlotOptionsNow, type SlotRun, type SlotRunner, type SlotRunEnd } from './slots'
+import { slotWorkspaces, workspacePortOf } from './platform/workspacePorts'
+import { isUnknown } from './platform/types'
+import type { WorkspaceFence, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort } from './platform/workspacePort'
+import { isPlatformId } from '../shared/platform/descriptors'
 
 const log = createLogger('copies')
 
-/** The workspace lifecycle port copies are made, reset and removed with (SPEC §16.3.6 Port 2, HI-2789's R5). */
-const port = slotWorkspaces
+/**
+ * The workspace lifecycle port copies are made, reset and removed with (SPEC §16.3.6 Port 2, HI-2789's R5), unless the
+ * pool is given another (HI-2795: jj's, by injection only).
+ */
+const defaultPort = slotWorkspaces
 
 /** The folder a project's copies are in, under its worktrees folder: fixed, so a reviewer's grant never changes. */
 export const COPIES_DIR = 'copies'
@@ -56,6 +63,9 @@ export const COPY_TEXT = {
   off: agentMsg({ id: 'copy.refusal.off', text: 'review copies are off (Settings → Advanced, Reviewers review in review copies)', note: 'Why a reviewer gets no review copy: the advanced setting is off. Names the setting as the window shows it.' }),
   setupFailed: agentMsg({ id: 'copy.refusal.setupFailed', text: "{copy}'s setup failed: {error}", note: "Why a copy was not lent: its setup failed. {error} is why (copy.error.*, git's or the command's)." }),
   closed: agentMsg({ id: 'copy.error.closed', text: 'the workspace closed', note: "Why a copy wasn't set up, or an isolated check's copy wasn't leased: its workspace closed." }),
+  identityUnread: agentMsg({ id: 'copy.error.identityUnread', text: "its workspace's identity couldn't be read", note: "A copy's setup error (HI-2795): a jj workspace was made but its store, name or folder ids couldn't be read, so Combwork won't use it." }),
+  notExact: agentMsg({ id: 'copy.error.notExact', text: "it isn't exactly the revision asked for", note: "A copy's setup error (HI-2795): the jj copy, checked right before it is handed over, isn't exactly the revision (other files, another parent, stale or divergent)." }),
+  removalCutShort: agentMsg({ id: 'copy.error.removalCutShort', text: 'its removal was cut short and is finished by the next clean-up', note: "A copy's error, kept on the copy (HI-2795): a jj copy's removal stopped part way (its workspace forgotten, its folder not yet in the Recycle Bin), so it isn't lent until the next clean-up finishes it." }),
   notListed: agentMsg({ id: 'copy.error.notListed', text: 'its folder is there but git does not list it as a worktree', note: "A copy's error: its folder exists but isn't a worktree git knows, so Combwork leaves it alone." }),
   worktreeAdd: agentMsg({ id: 'copy.error.worktreeAdd', text: 'git worktree add: {error}', note: "A copy's setup error: `git worktree add` failed. {error} is git's first line, else failed." }),
   checkout: agentMsg({ id: 'copy.error.checkout', text: 'git checkout: {error}', note: "A copy's reset error: `git checkout` of the revision failed. {error} is git's first line, else failed." }),
@@ -92,6 +102,9 @@ export interface Copy {
   usedAt: string
   op: { token: string; kind: OpKind; pid: number; started: number } | null
   job: string | null
+  /** The platform whose workspace it is (HI-2795; absent: Git), and its identity where that platform records one (jj). */
+  platform?: WorkspacePlatform
+  identity?: WorkspaceIdentity | null
 }
 
 export interface CopyLease {
@@ -115,6 +128,11 @@ export interface CopyLease {
   returned: string | null
   why: string | null
   freed: string | null
+  /**
+   * A jj copy's verification after its quiescence barrier (HI-2795): true, it was exactly its revision once every consumer
+   * had ended; false, it wasn't; null, not verified (every Git lease, and a jj lease not freed yet). jj's credit needs true.
+   */
+  intact?: boolean | null
 }
 
 export type CopyRefusal =
@@ -179,7 +197,9 @@ const copyOfRow = (r: Row): Copy => ({
   createdAt: r.created_at as string,
   usedAt: r.used_at as string,
   op: r.op ? { token: r.op as string, kind: r.op_kind as OpKind, pid: (r.op_pid as number) ?? 0, started: (r.op_started as number) ?? 0 } : null,
-  job: (r.job as string | null) ?? null
+  job: (r.job as string | null) ?? null,
+  platform: (r.platform as WorkspacePlatform | undefined) ?? 'git',
+  identity: r.store && r.workspace && r.generation ? { store: r.store as string, workspace: r.workspace as string, generation: r.generation as string } : null
 })
 const leaseOfRow = (r: Row): CopyLease => ({
   id: r.id as string,
@@ -197,7 +217,8 @@ const leaseOfRow = (r: Row): CopyLease => ({
   from: r.from_at as string,
   returned: (r.returned_at as string | null) ?? null,
   why: (r.why as string | null) ?? null,
-  freed: (r.freed_at as string | null) ?? null
+  freed: (r.freed_at as string | null) ?? null,
+  intact: r.intact === undefined || r.intact === null ? null : r.intact === 1
 })
 
 /** No operation, no job, no lease that isn't freed. */
@@ -271,24 +292,29 @@ export class CopyStore {
    * recently used), else a new `copy-N` (the lowest number free) while the project has fewer than `size`. The lease's
    * row is in the same write; the index refuses a second lease not freed on the copy.
    */
-  async take(req: CopyRequest, o: { size: number; dir: string; token: string; holder: Holder; profile: string; skip?: ReadonlySet<string> }): Promise<{ ok: true; lease: CopyLease; copy: Copy; fresh: boolean } | { ok: false; size: number }> {
+  async take(req: CopyRequest, o: { size: number; dir: string; token: string; holder: Holder; profile: string; skip?: ReadonlySet<string>; platform?: WorkspacePlatform }): Promise<{ ok: true; lease: CopyLease; copy: Copy; fresh: boolean } | { ok: false; size: number }> {
     try {
       return await this.conn.write((db) => {
         const at = this.iso()
         // The project being deleted (#1447): no copy leased or made until its reservation ends.
         if (deletingIn(db, this.project)) return { ok: false as const, size: 0 }
+        // The platform fence (HI-2799): a copy's lease is an admission on the project's repository, refused while it switches.
+        admitOrThrow(db, this.project, o.platform ?? 'git')
         const all = (db.prepare('SELECT * FROM copies WHERE project = ? ORDER BY name').all(this.project) as Row[]).map(copyOfRow)
         const leased = (c: Copy): boolean => !!db.prepare('SELECT 1 FROM copy_leases WHERE project = ? AND copy = ? AND freed_at IS NULL').get(this.project, c.name)
-        const free = all.filter((c) => (c.state === 'free' || c.state === 'dirty' || c.state === 'gone') && !c.warmError && !c.op && !c.job && !leased(c) && !o.skip?.has(c.name))
+        // Only a copy of this pool's platform (HI-2795, R2.6): a Git copy is never reused by a jj pool.
+        const free = all.filter((c) => (c.platform ?? 'git') === (o.platform ?? 'git') && (c.state === 'free' || c.state === 'dirty' || c.state === 'gone') && !c.warmError && !c.op && !c.job && !leased(c) && !o.skip?.has(c.name))
         let copy = free.sort((a, b) => b.usedAt.localeCompare(a.usedAt))[0]
         let fresh = false
         if (!copy) {
-          if (all.length >= o.size) return { ok: false as const, size: o.size }
+          // HI-2936: the size counts this platform's copies alone: another's left by a switch is never reused, so never fills it.
+          if (all.filter((c) => (c.platform ?? 'git') === (o.platform ?? 'git')).length >= o.size) return { ok: false as const, size: o.size }
           const names = new Set(all.map((c) => c.name.toLowerCase()))
           let n = 1
           while (names.has(copyName(n)) || existsSync(join(o.dir, copyName(n)))) n++
           const name = copyName(n)
           db.prepare("INSERT INTO copies (project, name, folder, state, created_at, used_at, op, op_kind, op_pid, op_started) VALUES (?, ?, ?, 'creating', ?, ?, ?, 'lease', ?, ?)").run(this.project, name, join(o.dir, name), at, at, o.token, o.holder.pid, o.holder.started)
+          if ((o.platform ?? 'git') !== 'git') db.prepare('UPDATE copies SET platform = ? WHERE project = ? AND name = ?').run(o.platform!, this.project, name)
           copy = this.copyIn(db, name)!
           fresh = true
         } else {
@@ -371,6 +397,49 @@ export class CopyStore {
     })
   }
 
+  /**
+   * Frees a returned lease after its verification (HI-2795: a jj copy, its `recover` operation `token`): the result
+   * stored on the lease and the copy freed in the same write, so nothing can lend, reset or reuse it before it is.
+   */
+  async freeVerified(lease: string, copy: string, token: string, intact: boolean): Promise<boolean> {
+    return this.conn.write((db) => {
+      const ok = db.prepare("SELECT 1 FROM copies c JOIN copy_leases l ON l.project = c.project AND l.copy = c.name WHERE c.project = ? AND c.name = ? AND c.state = 'returning' AND c.op = ? AND l.id = ? AND l.returned_at IS NOT NULL AND l.freed_at IS NULL").get(this.project, copy, token, lease)
+      if (!ok) return false
+      const at = this.iso()
+      db.prepare('UPDATE copy_leases SET freed_at = ?, job = NULL, intact = ? WHERE id = ?').run(at, intact ? 1 : 0, lease)
+      db.prepare("UPDATE copies SET state = 'free', used_at = ?, op = NULL, op_kind = NULL, op_pid = NULL, op_started = NULL WHERE project = ? AND name = ?").run(at, this.project, copy)
+      return true
+    })
+  }
+
+  /** A returning copy's verification operation started (HI-2795): only while it is returning with nothing else on it. */
+  async startVerify(copy: string, token: string, holder: Holder): Promise<boolean> {
+    return this.conn.write((db) => Number(db.prepare("UPDATE copies SET op = ?, op_kind = 'recover', op_pid = ?, op_started = ? WHERE project = ? AND name = ? AND state = 'returning' AND op IS NULL AND job IS NULL").run(token, holder.pid, holder.started, this.project, copy).changes) === 1)
+  }
+
+  /** A copy's workspace identity recorded (HI-2795), in its operation's write. */
+  async setIdentity(name: string, token: string, id: WorkspaceIdentity): Promise<void> {
+    await this.fenced(name, token, (db) => db.prepare('UPDATE copies SET store = ?, workspace = ?, generation = ? WHERE project = ? AND name = ?').run(id.store, id.workspace, id.generation, this.project, name))
+  }
+
+  /** A multi-step change's journal (HI-2795: a jj copy's removal), a board_meta row by key. */
+  journal(key: string): WorkspaceJournal {
+    return {
+      read: () =>
+        this.conn.read((db) => {
+          const r = db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined
+          if (!r) return null
+          try {
+            return JSON.parse(r.value) as unknown
+          } catch {
+            return { unreadable: true }
+          }
+        }),
+      write: (v) => this.conn.write((db) => void db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify(v))),
+      clear: () => this.conn.write((db) => void db.prepare('DELETE FROM board_meta WHERE key = ?').run(key))
+    }
+  }
+
   /** A lease's job (its isolated run's processes), set before anything is put in it. */
   async setLeaseJob(lease: string, job: string): Promise<boolean> {
     return this.conn.write((db) => Number(db.prepare('UPDATE copy_leases SET job = ? WHERE id = ? AND project = ? AND returned_at IS NULL').run(job, lease, this.project).changes) === 1)
@@ -424,6 +493,12 @@ export interface CopyPoolDeps {
   reviewOn: () => boolean
   /** How long a returning copy is held back before it shows as still in use (Settings → Advanced). */
   quietWaitMs: () => number
+  /** How its copies are made, reset, verified and removed (HI-2795); unset: Git's worktrees. */
+  workspaces?: WorkspacePort
+  /** The port its new copies are made with, by its project's platform now (HI-2866: the app's), when `workspaces` isn't set. */
+  workspacesFor?: () => WorkspacePort
+  /** Reads the project's platform again before a lending (HI-2866). */
+  refreshPorts?: () => Promise<void>
   now?: () => number
 }
 
@@ -441,6 +516,46 @@ export class CopyPool {
 
   private now(): number {
     return this.deps.now?.() ?? Date.now()
+  }
+
+  /** The pool's port: the deps', else Git's (HI-2795). */
+  private get port(): WorkspacePort {
+    return this.deps.workspaces ?? this.deps.workspacesFor?.() ?? defaultPort()
+  }
+
+  /** A copy's own port: the pool's for its platform, else its platform's (a Git copy in a jj pool is removed by Git). */
+  private portOf(c: Pick<Copy, 'platform'>): WorkspacePort {
+    const p = c.platform ?? 'git'
+    if (p === this.port.platform) return this.port
+    const own = isPlatformId(p) ? workspacePortOf(p) : null
+    // agent-protocol: a programming error, never an agent's or the user's
+    if (!own) throw new Error(`No workspace port for copy platform ${p}`) // i18n-ignore: an internal error, for the log
+    return own
+  }
+
+  /** Whether a copy has its port here (HI-2936: a leftover of a platform switched from, its port not registered). */
+  private hasPort(c: Pick<Copy, 'platform'>): boolean {
+    const p = c.platform ?? 'git'
+    return p === this.port.platform || (isPlatformId(p) && !!workspacePortOf(p))
+  }
+
+  private fenceOf(name: string, token: string): WorkspaceFence {
+    return { still: () => this.store.fenced(name, token, () => true).catch(() => false) }
+  }
+
+  private removalJournal(name: string): WorkspaceJournal {
+    return this.store.journal(`copy_wsremove:${this.store.project}:${name}`)
+  }
+
+  /**
+   * A jj copy disposed of (HI-2795/s21 §3: stale, divergent, or not exactly its revision): forgotten and its folder to
+   * the Recycle Bin, journalled, with no snapshot and nothing abandoned. True once gone; false keeps the copy out of
+   * the pool (its journal kept).
+   */
+  private async dispose(c: Copy, token: string): Promise<boolean> {
+    const r = await this.portOf(c).remove(this.deps.project, c.folder, { force: true, identity: c.identity ?? null, journal: this.removalJournal(c.name), fence: this.fenceOf(c.name, token) })
+    if (!r.ok) log.warn(`Copy ${userText(c.name)} couldn't be disposed of: ${userText(r.err)}`)
+    return r.ok
   }
 
   get closed(): boolean {
@@ -510,6 +625,7 @@ export class CopyPool {
   async leaseCopy(req: CopyRequest): Promise<CopyLeaseResult> {
     if (req.kind === 'review' && !this.deps.reviewOn()) return { ok: false, refusal: { why: 'off' } }
     if (this.closed) return { ok: false, refusal: { why: 'noCopy', size: 0 } }
+    await this.deps.refreshPorts?.()
     await this.refresh()
     const holder = await this.deps.holder.self()
     const size = await this.deps.size()
@@ -517,7 +633,7 @@ export class CopyPool {
     for (;;) {
       const token = newToken()
       const out = await this.op(token, async (): Promise<CopyLeaseResult | 'skip'> => {
-        const taken = await this.store.take(req, { size, dir: this.deps.dir, token, holder, profile: this.deps.profile, skip })
+        const taken = await this.store.take(req, { size, dir: this.deps.dir, token, holder, profile: this.deps.profile, skip, ...(this.port.platform !== 'git' ? { platform: this.port.platform } : {}) })
         if (!taken.ok) return { ok: false, refusal: this.heldTooLong() ?? { why: 'noCopy', size: taken.size } }
         const done = await this.reset(taken.copy, taken.lease, token, taken.fresh)
         if (done === 'ready') return { ok: true, lease: this.store.lease(taken.lease.id)!, copy: this.store.copy(taken.copy.name)! }
@@ -575,6 +691,8 @@ export class CopyPool {
         return { why: 'noCopy', size: 0 }
       }
       const opts = await this.deps.options()
+      // HI-1182: with the setting on, Combwork's checkouts here leave LFS files for the step below.
+      const filesOn = opts.gitFiles !== false && !!this.port.files
       let made = fresh || copy.state === 'gone' || !(await folderThere(copy.folder))
       const listed = made ? true : await this.listed(copy.folder)
       // Git can't list the worktrees (HI-2810): passed over as it was, its lease dropped, looked at again next time.
@@ -603,16 +721,45 @@ export class CopyPool {
       }
       // Still this operation's, right before anything on disk changes.
       await this.store.fenced(name, token, () => undefined)
+      const port = this.port
+      if (!made && port.identity) {
+        // A jj copy (HI-2795/s21 §3): reset only when healthy; stale, divergent or not this copy any more, disposed of and
+        // made again, never reset or updated.
+        // Owned (HR1, round 1): reset only as the copy recorded (its identity) by this operation (its fence); a replacement
+        // or a lost operation is refused untouched, and dispose refuses a replacement too (its generation).
+        const at = await port.resetTo(copy.folder, lease.revision, { identity: copy.identity ?? null, fence: this.fenceOf(name, token), skipSmudge: filesOn })
+        if (!at.ok) {
+          if (!(await this.dispose(copy, token))) return await fail(sayStored(T.checkout, { error: port.errorLine(at.err) || 'failed' }))
+          made = true
+        }
+      }
       if (made) {
         await mkdir(this.deps.dir, { recursive: true })
-        await port().prune(this.deps.project)
-        const r = await port().create(this.deps.project, copy.folder, lease.revision)
-        if (!r.ok) return await fail(sayStored(T.worktreeAdd, { error: port().errorLine(r.err) || 'failed' }))
-        if (opts.copy.trim()) await port().copyIgnored(this.deps.project, copy.folder, opts.copy).catch((e) => log.warn(`Could not copy files into ${userText(name)}`, e))
-      } else {
+        await port.prune(this.deps.project)
+        const r = await port.create(this.deps.project, copy.folder, lease.revision, { skipSmudge: filesOn })
+        if (!r.ok) return await fail(sayStored(T.worktreeAdd, { error: port.errorLine(r.err) || 'failed' }))
+        if (port.identity) {
+          const id = await port.identity(copy.folder)
+          if (!id) return await fail(sayStored(T.identityUnread))
+          await this.store.setIdentity(name, token, id)
+        }
+        if (opts.copy.trim()) await port.copyIgnored(this.deps.project, copy.folder, opts.copy).catch((e) => log.warn(`Could not copy files into ${userText(name)}`, e))
+      } else if (!port.identity) {
         // The exact revision, and nothing else: tracked changes dropped, what isn't ignored removed (dependencies stay).
-        const at = await port().resetTo(copy.folder, lease.revision)
-        if (!at.ok) return await fail(sayStored(at.failed === 'checkout' ? T.checkout : T.clean, { error: port().errorLine(at.err) || 'failed' }))
+        const at = await port.resetTo(copy.folder, lease.revision, { skipSmudge: filesOn })
+        if (!at.ok) return await fail(sayStored(at.failed === 'checkout' ? T.checkout : T.clean, { error: port.errorLine(at.err) || 'failed' }))
+      }
+      // HI-1182: its submodules and LFS files at exactly this revision, after every make or reset and before its setup (a
+      // removed submodule's folder this copy cloned goes too); a folder that uses neither runs nothing.
+      if (filesOn) {
+        const files = port.files!
+        const need = await files.needed(copy.folder, true)
+        if (typeof need === 'object') return await fail(need.error)
+        if (need) {
+          const end = await this.run(name, token, { slot: name, of: 'copy', holder: lease.agent, what: 'gitFiles', command: files.title, folder: copy.folder, env: {}, files: { step: { folder: copy.folder, project: this.deps.project, disposable: true }, tool: files } })
+          if (!end.settled) return await fail(sayStored(T.setupNotEnded), end.logPath)
+          if (!end.ok) return await fail(end.error ?? (end.timedOut ? sayStored(T.setupTimedOut) : sayStored(T.setupExit, { code: String(end.exitCode) })), end.logPath)
+        }
       }
       const hash = await lockHash(copy.folder)
       const needed = made || (hash !== null && hash !== copy.installHash)
@@ -627,6 +774,12 @@ export class CopyPool {
         }
         fields = { ...fields, installHash: hash }
       }
+      // Before the run (HI-2795/s21 §3): a jj copy handed over only exactly at its revision, recorded and read at one operation.
+      if (port.copyIntact) {
+        const now = this.store.copy(name) ?? copy
+        const ok = await port.copyIntact(copy.folder, lease.revision, this.fenceOf(name, token), now.identity ?? null)
+        if (ok !== true) return await fail(isUnknown(ok) ? sayStored(T.checkout, { error: ok.detail ?? ok.what }) : sayStored(T.notExact))
+      }
       // The lease as it is now, in the write that ends the operation: returned meanwhile, the copy is returning, not lent.
       return await this.store.fenced(name, token, (db) => {
         const open = !!db.prepare('SELECT 1 FROM copy_leases WHERE id = ? AND returned_at IS NULL AND freed_at IS NULL').get(lease.id)
@@ -639,14 +792,14 @@ export class CopyPool {
     }
   }
 
-  /** Whether git lists a worktree at `folder`; null when its listing fails (HI-2810, #734: unknown, never an empty one). */
+  /** Whether the platform lists a workspace at `folder`; null when its listing fails (HI-2810, #734: unknown, never an empty one). */
   private async listed(folder: string): Promise<boolean | null> {
-    const l = await port().list(this.deps.project).catch(() => null)
+    const l = await this.port.list(this.deps.project).catch(() => null)
     return l ? l.some((w) => samePlace(w.path, folder)) : null
   }
 
   /** A command of an operation's, in a job recorded on the copy first and cleared once settled (as slots' runs). */
-  private async run(name: string, token: string, r: { slot: string; of: 'copy'; holder: string | null; what: 'setup' | 'install'; command: string; folder: string; env: Record<string, string> }): Promise<SlotRunEnd> {
+  private async run(name: string, token: string, r: { slot: string; of: 'copy'; holder: string | null; what: 'setup' | 'install' | 'gitFiles'; command: string; folder: string; env: Record<string, string>; files?: SlotRun['files'] }): Promise<SlotRunEnd> {
     const job = newJob()
     await this.store.fenced(name, token, (db) => db.prepare('UPDATE copies SET job = ? WHERE project = ? AND name = ?').run(job, this.store.project, name))
     const end = await this.deps.runner({ ...r, job, signal: this.life.signal })
@@ -669,6 +822,45 @@ export class CopyPool {
    * Returns a lease (a verdict, a review given up, the run's end, its holder's session ended): the copy `returning`,
    * then freed only through the barrier (tried at once, and again on every refresh). Whether it was open.
    */
+  /**
+   * HI-2950: the pool's free jj copies still at `at` (a candidate's commit, where its checks left them) moved onto `to` (the
+   * target's head it was built on), so nothing of theirs stays on the candidate and it can be dropped. Each the copy's own
+   * reset (the port's `resetTo`: tracked changes dropped, what isn't ignored removed), as the copy recorded it, under an
+   * operation of a lease's kind on a free copy (a crash is recovered as a lease's reset: the copy made again), never while a
+   * run or a process is in it. A copy leased or returning isn't touched (its barrier frees it first: try again later).
+   * Whether no copy is left at `at`.
+   */
+  async parkFree(at: string, to: string): Promise<boolean> {
+    let clear = true
+    for (const c of this.store.copies()) {
+      if (c.revision !== at) continue
+      const port = this.portOf(c)
+      if (c.state !== 'free' || c.op || !port.identity) {
+        clear = false
+        continue
+      }
+      const token = newToken()
+      let ok = false
+      await this.op(token, async () => {
+        if (!(await this.store.startOp(c.name, 'lease', 'free', token, await this.deps.holder.self()))) return
+        try {
+          if (this.deps.runIn(c.folder) || !(await quiet(c.folder))) {
+            await this.store.fenced(c.name, token, (db) => this.store.setIn(db, c.name, 'free', {}, { op: null }))
+            return
+          }
+          await this.store.fenced(c.name, token, () => undefined)
+          const r = await port.resetTo(c.folder, to, { identity: c.identity ?? null, fence: this.fenceOf(c.name, token) })
+          ok = r.ok
+          await this.store.fenced(c.name, token, (db) => this.store.setIn(db, c.name, 'free', ok ? { revision: to } : {}, { op: null }))
+        } catch (e) {
+          if (!(e instanceof OpLost)) throw e
+        }
+      })
+      if (!ok) clear = false
+    }
+    return clear
+  }
+
   async returnCopy(lease: string, why: string): Promise<boolean> {
     const l = await this.store.returnLease(lease, why)
     if (!l) return false
@@ -726,6 +918,22 @@ export class CopyPool {
       if (busy) return hold({ why: 'holder', by: busy })
     }
     if ((await folderThere(c.folder)) && !(await quiet(c.folder))) return hold({ why: 'process', by: sayStored(T.heldProcess) })
+    const port = this.portOf(c)
+    if (port.copyIntact) {
+      // HI-2795/s21 §3: every consumer ended, its result taken against the files now, under a verification operation; the
+      // result and the copy's freeing in one write, so no credit or reuse can race it.
+      const token = newToken()
+      await this.op(token, async () => {
+        if (!(await this.store.startVerify(name, token, await this.deps.holder.self()))) return
+        try {
+          const ok = await port.copyIntact!(c.folder, l.revision, this.fenceOf(name, token), c.identity ?? null)
+          if (await this.store.freeVerified(l.id, name, token, ok === true)) this.held.delete(l.id)
+        } catch (e) {
+          if (!(e instanceof OpLost)) throw e
+        }
+      })
+      return null
+    }
     if (await this.store.free(l.id, name)) this.held.delete(l.id)
     return null
   }
@@ -753,7 +961,8 @@ export class CopyPool {
       if (over === true) await this.store.returnLease(l.id, mine ? 'over' : 'combworkGone')
     }
     for (const c of this.store.copies()) {
-      if (c.state === 'returning') await this.tryFree(c.name)
+      // HI-2936: one whose platform has no port here is kept as it is until it has one.
+      if (c.state === 'returning' && this.hasPort(c)) await this.tryFree(c.name)
       else if (c.state === 'free' && !(await folderThere(c.folder))) await this.store.markGone(c.name)
     }
   }
@@ -783,6 +992,11 @@ export class CopyPool {
       try {
         const settled = !c.job || (await this.deps.settle(c.job))
         const job = settled ? { job: null } : {}
+        // A verification cut short (HI-2795): back to returning, not freed, its lease's result still null; verified again.
+        if (was.kind === 'recover') {
+          await this.store.fenced(c.name, token, (db) => this.store.setIn(db, c.name, 'returning', {}, { op: null, ...job }))
+          return
+        }
         if (was.kind === 'lease') {
           await this.store.fenced(c.name, token, (db) => {
             const l = db.prepare('SELECT id FROM copy_leases WHERE project = ? AND copy = ? AND freed_at IS NULL').get(this.store.project, c.name) as { id: string } | undefined
@@ -820,10 +1034,21 @@ export class CopyPool {
         if (await folderThere(c.folder)) {
           if (!(await quiet(c.folder))) return await keep({ why: 'process' as const, by: sayStored(T.heldProcess) })
           await this.store.fenced(name, token, () => undefined)
-          // A copy holds nobody's work (detached at a revision): its build outputs go with it.
-          const r = await port().remove(this.deps.project, c.folder, { force: true })
+          // A copy holds nobody's work (detached at a revision): its build outputs go with it. A jj copy (HI-2795): forgotten
+          // and trashed, journalled; a removal part done keeps the copy out of the pool, never lent, until it's finished.
+          const port = this.portOf(c)
+          const r = port.identity ? await port.remove(this.deps.project, c.folder, { force: true, identity: c.identity ?? null, journal: this.removalJournal(name), fence: this.fenceOf(name, token) }) : await port.remove(this.deps.project, c.folder, { force: true })
+          if (!r.ok && port.identity && this.removalJournal(name).read()) {
+            await this.store.fenced(name, token, (db) => this.store.setIn(db, name, 'creating', { warmError: sayStored(T.removalCutShort) }, { op: null })).catch((e) => {
+              if (!(e instanceof OpLost)) throw e
+            })
+            return { why: 'busy' as const }
+          }
           if (!r.ok) return await keep({ why: 'busy' as const })
-        } else await port().prune(this.deps.project)
+        } else if (this.portOf(c).identity && this.removalJournal(name).read()) {
+          // Forgotten and trashed before a stop (HI-2795): only its journal left.
+          await this.removalJournal(name).clear()
+        } else await this.portOf(c).prune(this.deps.project)
         await this.store.fenced(name, token, (db) => db.prepare('DELETE FROM copies WHERE project = ? AND name = ?').run(this.store.project, name))
         log.info(`Removed copy ${userText(name)} (${userText(c.folder)})`)
         return null
@@ -844,8 +1069,13 @@ export class CopyPool {
     const removed: string[] = []
     const free = (c: Copy): boolean => !c.op && !c.job && !this.store.leaseOn(c.name)
     for (const c of all.filter((x) => x.state === 'creating' && x.warmError && free(x))) if (!(await this.remove(c.name))) removed.push(c.name)
-    let over = all.length - removed.length - size
-    for (const c of all.filter((x) => (x.state === 'free' || x.state === 'gone') && free(x) && at - Date.parse(x.usedAt) >= IDLE_MS).sort((a, b) => a.usedAt.localeCompare(b.usedAt))) {
+    // HI-2936: another platform's copies, left by a switch of the project's, are never reused: each removed once idle (by
+    // its own port), and none counted against this platform's size.
+    const mine = (c: Copy): boolean => (c.platform ?? 'git') === this.port.platform
+    for (const c of all.filter((x) => !mine(x) && !removed.includes(x.name) && (x.state === 'free' || x.state === 'gone') && free(x) && at - Date.parse(x.usedAt) >= IDLE_MS && this.hasPort(x))) if (!(await this.remove(c.name))) removed.push(c.name)
+    const own = all.filter(mine)
+    let over = own.filter((c) => !removed.includes(c.name)).length - size
+    for (const c of own.filter((x) => (x.state === 'free' || x.state === 'gone') && free(x) && at - Date.parse(x.usedAt) >= IDLE_MS).sort((a, b) => a.usedAt.localeCompare(b.usedAt))) {
       if (over <= 0) break
       if (!(await this.remove(c.name))) {
         removed.push(c.name)

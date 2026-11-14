@@ -80,6 +80,9 @@ const LONG = 'Coordinator out of the box: fold the coordinator playbook into the
   }
   const c1 = await make(LONG, a.B1.id)
   const c3 = await make('Lane C docs', a.B3.id)
+  // B2's lane works a card of B2's own: a lane ends as soon as every card is Done, gone or given to another agent
+  // (HI-3117, HI-3118), so with B3's card it ended at once and B2 never got its brief.
+  const c2 = await make('Lane B tools', a.B2.id)
   const cs = await make('Solo card', one.id, 'solo')
   // Lanes: B1 with R1, B2 with R2 (started with the workspace's token, naming the builder). Idle builders outside slots,
   // B1 and B2 get their lanes in new conversations (HI-2232), each taking the lane's brief as its first turn: quiet first
@@ -91,7 +94,7 @@ const LONG = 'Coordinator out of the box: fold the coordinator playbook into the
   check('B1 and B2 are quiet before their lanes', !!(await until(async () => (await Promise.all(builders.map(quiet))).every(Boolean), 45000)), JSON.stringify(await Promise.all(builders.map((n) => live(a[n].id)))))
   const before = Object.fromEntries(await Promise.all(builders.map(async (n) => [n, (await live(a[n].id))?.sessionId])))
   const l1 = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'B1', reviewer: 'R1', cards: [c1] })
-  const l2 = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'B2', reviewer: 'R2', cards: [c3] })
+  const l2 = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'B2', reviewer: 'R2', cards: [c2] })
   check('the lanes start', l1.status === 200 && l2.status === 200, JSON.stringify([l1, l2]))
   const renewed = async (n) => lib.laneBriefDone(PORT, 'alpha', await live(a[n].id), before[n], apiToken)
   check('…B1 and B2 in new conversations, done with their briefs', !!(await until(async () => (await Promise.all(builders.map(renewed))).every(Boolean), 45000)), JSON.stringify(await Promise.all(builders.map((n) => live(a[n].id)))))

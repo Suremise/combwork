@@ -78,9 +78,28 @@ describe('tools by workflow (HI-2694): which are hidden', () => {
   it('a tool is kept while any set of rules still in force uses it (work in flight under Pair while the project is Solo)', () => {
     expect(hidden(presetOf('solo'), presetOf('pair'))).toEqual(hidden(presetOf('pair')))
     // A card sitting in Review or Approved (left there with the rules off, moved there past them) keeps what takes it.
-    expect(hiddenForWorkflow([presetOf('solo')], ['review'])).not.toContain('cw_verdict')
-    expect(hiddenForWorkflow([presetOf('solo')], ['approved'])).not.toContain('cw_report_merge')
-    expect(hiddenForWorkflow([presetOf('solo')], ['active'])).toEqual(hidden(presetOf('solo')))
+    const at = (stage: string, ...sets: WorkflowOptions[]) => ({ stage, sets })
+    expect(hiddenForWorkflow([presetOf('solo')], [at('review', presetOf('solo'))])).not.toContain('cw_verdict')
+    // The merge report only where its handler takes one from Approved (not checked with no review, say), never under
+    // Committed is done or You integrate, whose cards it refuses in any stage (HI-3008: a jj card's Approved restarted
+    // its builder for it).
+    const notChecked = { ...presetOf('solo'), finish: 'notChecked' as const, folder: 'slots' as const }
+    expect(hidden(notChecked)).toContain('cw_report_merge')
+    expect(hiddenForWorkflow([notChecked], [at('approved', notChecked)])).not.toContain('cw_report_merge')
+    expect(hiddenForWorkflow([notChecked], [at('merging', notChecked)])).not.toContain('cw_report_merge')
+    expect(hiddenForWorkflow([presetOf('solo')], [at('approved', presetOf('solo'))])).toContain('cw_report_merge')
+    const youIntegrate = { ...presetOf('pair'), finish: 'userIntegrates' as const }
+    expect(hiddenForWorkflow([youIntegrate], [at('approved', youIntegrate)])).toEqual(hidden(youIntegrate))
+    expect(hidden(youIntegrate)).toContain('cw_report_merge')
+    expect(hiddenForWorkflow([presetOf('solo')], [at('active', presetOf('solo'))])).toEqual(hidden(presetOf('solo')))
+    // HI-3014: a stage keeps a tool under its own cards' rules only. The project now not checked (no review, no OK), a
+    // Solo card (Committed is done) moved into Approved can't borrow the merge report from it; a not-checked card can.
+    const both = [notChecked, presetOf('solo')]
+    expect(hiddenForWorkflow(both, [at('approved', presetOf('solo'))])).toContain('cw_report_merge')
+    expect(hiddenForWorkflow(both, [at('approved', notChecked)])).not.toContain('cw_report_merge')
+    expect(hiddenForWorkflow(both, [at('active', notChecked), at('approved', presetOf('solo'))])).toContain('cw_report_merge')
+    // Review keeps the review tools whatever its cards' rules.
+    expect(hiddenForWorkflow(both, [at('review', presetOf('solo'))]).filter((t) => REVIEW.includes(t))).toEqual([])
     // Nothing known: nothing hidden.
     expect(hiddenForWorkflow([])).toEqual([])
   })
@@ -120,11 +139,11 @@ afterAll(async () => {
   store.closeAllBoards()
 })
 
-/** A workspace with project p, on None (no Git needed), its options `options`. */
-async function workspace(options: Partial<WorkflowOptions>): Promise<WS> {
+/** A workspace with project p, on None (no Git needed) unless `platform` says, its options `options`. */
+async function workspace(options: Partial<WorkflowOptions>, platform: 'none' | 'git' = 'none'): Promise<WS> {
   const ws = join(base, `ws-${++n}`)
   mkdirSync(join(ws, 'p', '.combwork'), { recursive: true })
-  writeFileSync(join(ws, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'a1', name: 'Agent 1' }], workflow: { platform: 'none', options } }))
+  writeFileSync(join(ws, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, platform, agents: [{ id: 'a1', name: 'Agent 1' }], workflow: { platform, options } }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
@@ -133,7 +152,7 @@ async function workspace(options: Partial<WorkflowOptions>): Promise<WS> {
 const projectPath = (w: WS): string => join(w.path!, 'p')
 
 /** A card of p started under `rules`, in `stage`, in one board change. */
-async function cardUnder(w: WS, rules: WorkflowOptions, stage: 'active' | 'review' | 'done'): Promise<number> {
+async function cardUnder(w: WS, rules: WorkflowOptions, stage: 'active' | 'review' | 'approved' | 'done'): Promise<number> {
   const card = (await inWorkspace(w, () => tasks.createTask({ title: `Under ${rules.review}`, project: 'p' }, user))).number
   const r = mustCompile(rules)
   const facts = FactStore.forBoard(w, { project: 'p', key: 'P' })
@@ -157,7 +176,7 @@ describe("a project's list from its options and its work in flight (HR1's s11 po
     expect(w.info()?.projects[0].platform?.id).toBe('none')
     expect(workflowHiddenNow(w, projectPath(w))).toEqual(hidden(soloNone))
     const card = await cardUnder(w, pairNone, 'active')
-    expect(workRetained(w, 'p')).toMatchObject({ stages: ['active'] })
+    expect(workRetained(w, 'p')).toMatchObject({ stages: [{ stage: 'active', sets: [{ review: pairNone.review, finish: pairNone.finish }] }] })
     expect(workflowHiddenNow(w, projectPath(w))).toEqual(hidden(soloNone, pairNone))
     // Done: its rules no longer count, read again at the next commit (the board's token moved).
     await store.boardWrite(w, async () => FactStore.forBoard(w, { project: 'p', key: 'P' }).tx((tx) => tx.setStage(card, 'done')))
@@ -201,6 +220,26 @@ describe("a project's list from its options and its work in flight (HR1's s11 po
     }
     expect(workflowHiddenNow(w, projectPath(w))).not.toEqual([])
     expect(compile({ ...soloNone, folder: 'slots' }).ok).toBe(false)
+  })
+
+  it("HI-3014: a Solo card moved into Approved can't borrow the merge report from the project's not-checked rules; a not-checked card keeps it", async () => {
+    // Git: the project now not checked with no review and no OK before merging (no merge report: only Approved takes one).
+    const notChecked = { ...presetOf('solo'), finish: 'notChecked' as const, folder: 'slots' as const }
+    const w = await workspace(notChecked, 'git')
+    const p = projectPath(w)
+    expect(w.info()?.projects[0].platform?.id).toBe('git')
+    expect(workflowHiddenNow(w, p)).toEqual(hidden(notChecked))
+    expect(hidden(notChecked)).toContain('cw_report_merge')
+    // A card started under Solo (Committed is done: its merge report is refused in every stage), then moved into Approved
+    // by hand: nothing gained, so no agent is restarted for it.
+    const solo = await cardUnder(w, presetOf('solo'), 'active')
+    expect(workflowHiddenNow(w, p)).toContain('cw_report_merge')
+    await store.boardWrite(w, async () => FactStore.forBoard(w, { project: 'p', key: 'P' }).tx((tx) => tx.setStage(solo, 'approved')))
+    expect(workflowHiddenNow(w, p)).toContain('cw_report_merge')
+    expect(workRetained(w, 'p')?.stages).toEqual([{ stage: 'approved', sets: [expect.objectContaining({ finish: 'committed' })] }])
+    // A card under the not-checked rules moved into Approved takes one: the report is kept for it.
+    await cardUnder(w, notChecked, 'approved')
+    expect(workflowHiddenNow(w, p)).not.toContain('cw_report_merge')
   })
 
   it('a database closed and opened again is read afresh (its token moves)', async () => {

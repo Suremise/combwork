@@ -23,6 +23,13 @@ const WINDOW: RefusalFormat = { one: (m, values) => tr(m, values), list: (items)
 /** A value for every placeholder the refusals have. */
 const SAMPLE: RefusalValues = {
   card: 'AM-12',
+  // platform.offLine (HI-3116): whether the card's line exists, its commands' arguments, the card's start.
+  made: 'no',
+  lineArg: 'cw/b1',
+  onArg: 'main',
+  start: 'a3f2c1d4e5f60718293a4b5c6d7e8f9012345678',
+  // platform.changed (HI-2799): the version control the project uses now.
+  platform: 'jj',
   revision: 'a3f2c1d',
   reason: 'waits for the design',
   waitsFor: 'AM-3',
@@ -61,6 +68,50 @@ const SAMPLE: RefusalValues = {
   key: 'AM-12',
   earlier: 'AM-11',
   line: 'cw/b1',
+  // forward.resolutionTarget (HI-2985): the branches a Resolve card merges by hand.
+  from: 'cw/HI/HI-12-fix',
+  to: '1.5.0',
+  // forward.resolutionSource (HI-2999): the commit it resolves, in full.
+  source: '0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c',
+  // platform.offLine (HI-3010): where the card's folder is instead (a detached head is rendered on its own below).
+  where: 'other',
+  on: 'main',
+  // platform.detachedFolder (HI-3104): the branch to check out, found ('no', none it could name, is rendered on its own below).
+  has: 'yes',
+  branch: 'main',
+  // platform.keptAcross, platform.keptElsewhere (HI-3069): the kept slot, the version control now, its folder there.
+  slot: 'slot-b',
+  now: 'Git',
+  gone: 'no',
+  // platform.slotLeft: whether Combwork could tell the slot is still the card's.
+  unknown: 'no',
+  // platform.jjRefused: what jj's check found (its forms are its own test's).
+  count: 2,
+  setting: 'none()',
+  base: 'a3f2c1d',
+  other: 'AM-7',
+  max: '1MiB',
+  // move.doingNobody, move.notFromHere's reviewer, submit.empty, submit.trailer: their remaining values.
+  also: 'no',
+  back: 'no',
+  changes: 'no',
+  at: 'head',
+  // platform.keptLine (HI-3112): the branch a card's kept line was made from, which its lane's target isn't.
+  kept: '1.4.0',
+  // platform.noUpstream (HI-3128): a remote it can name and the commands that give the target an upstream (its other
+  // forms are rendered on their own below).
+  how: 'ready',
+  remote: 'origin',
+  publish: 'git push -u origin 1.5.0',
+  track1: 'git fetch origin 1.5.0',
+  track2: 'git branch -u origin/1.5.0 1.5.0',
+  // start.released (HI-3148): the release's tag, its date (as lanes.ts passes it, in ms) and the branch it was merged
+  // into; a branch to start on instead.
+  tag: 'v1.4.0',
+  dated: 'yes',
+  date: Date.UTC(2026, 10, 2),
+  into: 'main',
+  suggest: '1.5.0',
   alias: '#1061',
   what: workflowText(UNREADABLE.head, { where: 'D:\\work\\am' }),
   rule: 'submit.checksPassed',
@@ -85,6 +136,11 @@ describe('the workflow text in every locale', () => {
 
   it('renders every refusal in each locale with sample values: no placeholder left, no English where a translation exists', async () => {
     const english = Object.fromEntries((Object.keys(REFUSALS) as RuleId[]).map((rule) => [rule, refusalLines(rule, SAMPLE, WINDOW)]))
+    // English first (HI-3147): a value the samples lack leaves a message unformatted in every language, English too.
+    for (const rule of Object.keys(REFUSALS) as RuleId[]) {
+      const e = english[rule]
+      messages(rule).forEach((m, i) => expect([e.message, e.next, ...(e.change !== null ? [e.change] : [])][i], `en ${m.id}`).not.toMatch(/[{}]/))
+    }
     for (const code of LOCALES) {
       const cat = await loadCatalogue(code)
       setLanguage(code, cat, code)
@@ -134,6 +190,65 @@ describe('the workflow text in every locale', () => {
       expect(b.message, code).toContain('b4c5d6e')
       expect(b.message, code).toContain('team@example.com')
       expect(b.next, code).toContain('git commit --amend --no-edit --reset-author')
+    }
+  })
+
+  it("renders both branches of platform.offLine's {where} select in every locale: a detached head at its commit, another branch by its name (HI-3010, HI-3006)", async () => {
+    const start = 'a3f2c1d4e5f60718293a4b5c6d7e8f9012345678'
+    const detached = { card: 'AM-12', line: 'cw/b1', lineArg: 'cw/b1', where: 'detached', head: 'bd6ff9d', on: '', onArg: "''", made: 'yes', start }
+    const other = { card: 'AM-12', line: 'cw/b1', lineArg: 'cw/b1', where: 'other', head: '', on: 'main', onArg: 'main', made: 'yes', start }
+    // HI-3116: on another branch with the card's line not made yet: make it from the card's start, never "switch back".
+    const missing = { ...other, made: 'no' }
+    for (const code of LOCALES) {
+      setLanguage(code, await loadCatalogue(code), code)
+      const [a, b, c] = [refusalLines('platform.offLine', detached, WINDOW), refusalLines('platform.offLine', other, WINDOW), refusalLines('platform.offLine', missing, WINDOW)]
+      for (const line of [a.message, a.next, b.message, b.next, c.next]) expect(line, code).not.toMatch(/[{}]/)
+      expect(a.message, code).toContain('bd6ff9d')
+      expect(b.message, code).toContain('main')
+      expect(a.next, code).toContain('git switch -c cw/b1')
+      expect(a.next, code).not.toBe(b.next)
+      expect(b.next, code).toContain('git switch cw/b1')
+      expect(c.next, code).toContain(`git switch -c cw/b1 ${start}`)
+      expect(c.next, code).not.toBe(b.next)
+    }
+  })
+
+  it("renders platform.jjRefused's unbound by its {state} in every locale: pending says to end the turn, held repeats the hold's own sentence, other is today's (HI-3115)", async () => {
+    const told = 'AM-12 waits for slot-a: jj new 0123abcd keeps them where they are.'
+    const of = (state: string) => refusalLines('platform.jjRefused', { card: 'AM-12', why: 'unbound', state, told }, WINDOW)
+    for (const code of LOCALES) {
+      setLanguage(code, await loadCatalogue(code), code)
+      const [pending, held, other] = [of('pending'), of('held'), of('other')]
+      for (const line of [pending.message, pending.next, held.message, held.next, other.message, other.next]) expect(line, code).not.toMatch(/[{}]/)
+      expect(held.next, code).toBe(told)
+      expect(pending.next, code).not.toBe(other.next)
+    }
+  })
+
+  it("renders both branches of platform.detachedFolder's {has} select in English and every locale: its branch by name, or how to check one out (HI-3104, HI-3147)", async () => {
+    const found = { card: 'AM-12', head: 'bd6ff9d', has: 'yes', branch: 'main' }
+    const none = { card: 'AM-12', head: 'bd6ff9d', has: 'no', branch: '' }
+    for (const code of ['en', ...LOCALES]) {
+      setLanguage(code, code === 'en' ? {} : await loadCatalogue(code), code)
+      const [a, b] = [refusalLines('platform.detachedFolder', found, WINDOW), refusalLines('platform.detachedFolder', none, WINDOW)]
+      for (const line of [a.message, a.next, b.message, b.next]) expect(line, code).not.toMatch(/[{}]/)
+      expect(a.message, code).toContain('bd6ff9d')
+      expect(a.next, code).toContain('git switch main')
+      expect(b.next, code).toContain('git switch -c')
+      expect(b.next, code).not.toContain('main')
+    }
+  })
+
+  it("renders each form of platform.noUpstream's {how} select in English and every locale, its commands as they are (HI-3128, HI-3147)", async () => {
+    const ready = { card: 'AM-12', target: '1.5.0', how: 'ready', remote: 'origin', publish: 'git push -u origin 1.5.0', track1: 'git fetch origin 1.5.0', track2: 'git branch -u origin/1.5.0 1.5.0' }
+    const forms = [ready, { ...ready, how: 'choose', remote: '<remote>' }, { ...ready, how: 'shallow', publish: '', track1: '', track2: '' }, { ...ready, how: 'other', publish: '', track1: '', track2: '' }]
+    for (const code of ['en', ...LOCALES]) {
+      setLanguage(code, code === 'en' ? {} : await loadCatalogue(code), code)
+      const shown = forms.map((v) => refusalLines('platform.noUpstream', v, WINDOW))
+      for (const l of shown) for (const line of [l.message, l.next]) expect(line, code).not.toMatch(/[{}]/)
+      for (const l of shown.slice(0, 2)) for (const cmd of [ready.publish, ready.track1, ready.track2]) expect(l.next, code).toContain(cmd)
+      expect(shown[2].next, code).toContain('git fetch --unshallow')
+      expect(new Set(shown.map((l) => l.next)).size, code).toBe(4)
     }
   })
 

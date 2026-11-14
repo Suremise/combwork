@@ -7,13 +7,14 @@ import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { FILE_TIME_SLACK_MS, Observer, observer, type ObserveEvent } from '../src/main/platform/observe'
+import { FILE_TIME_SLACK_MS, kindReads, Observer, observer, type ObserveEvent } from '../src/main/platform/observe'
 import { isUnknown } from '../src/main/platform/types'
 import { tempDir } from './tempDir'
 
 // A file's metadata as the write log reads it (HI-1767), changed for one path at a time: `fail` makes lstat and stat of
 // it reject with that code; `link` makes it a link: lstat reports the link's own times, stat its target's.
-const meta = vi.hoisted(() => ({ fail: new Map<string, string>(), link: new Map<string, { own: number; target: number }>() }))
+// `hold`: lstat of anything under that folder waits until its gate opens (HI-3173: kind reads held, as on a slow disk).
+const meta = vi.hoisted(() => ({ fail: new Map<string, string>(), link: new Map<string, { own: number; target: number }>(), hold: null as { under: string; gate: Promise<void> } | null }))
 vi.mock('fs/promises', async (original) => {
   const real = await original<typeof import('fs/promises')>()
   const key = (p: unknown): string => String(p).toLowerCase()
@@ -23,6 +24,8 @@ vi.mock('fs/promises', async (original) => {
   }
   const read = (which: 'stat' | 'lstat') =>
     (async (p: string, ...rest: unknown[]) => {
+      const hold = meta.hold
+      if (which === 'lstat' && hold && key(p).startsWith(hold.under)) await hold.gate
       failing(p)
       const s = await (real[which] as (...a: unknown[]) => Promise<import('fs').Stats>)(p, ...rest)
       const l = meta.link.get(key(p))
@@ -210,6 +213,74 @@ describe('the watcher on a Git repository', () => {
     const t2 = Date.now()
     writeFileSync(join(p, 'a.txt'), 'b\n')
     expect((await between(t2)).paths).toEqual(['a.txt'])
+  })
+
+  it('an ignored folder deleted, or deleted and made again, does not count (HI-3173)', async () => {
+    mkdirSync(join(p, 'out', 'chunks'), { recursive: true })
+    writeFileSync(join(p, 'out', 'bundle.js'), 'x')
+    writeFileSync(join(p, 'out', 'chunks', 'a.js'), 'x')
+    await armed(o, p)
+    const t0 = Date.now()
+    // `rm -rf out` with no rebuild: the folder's own path, gone, is in the record.
+    rmSync(join(p, 'out'), { recursive: true })
+    await seen({ kind: 'written', folder: p, paths: ['out'] })
+    expect(await between(t0)).toEqual({ changed: false, paths: [] })
+    // A clean build: deleted and made again.
+    await armed(o, p)
+    const t1 = Date.now()
+    mkdirSync(join(p, 'out'))
+    writeFileSync(join(p, 'out', 'bundle.js'), 'y')
+    rmSync(join(p, 'out'), { recursive: true })
+    mkdirSync(join(p, 'out'))
+    writeFileSync(join(p, 'out', 'bundle.js'), 'z')
+    expect(await between(t1)).toEqual({ changed: false, paths: [] })
+  })
+
+  it('a file named as an ignored folder, replaced by that folder, still counts (HI-3173)', async () => {
+    const t0 = Date.now()
+    writeFileSync(join(p, 'out'), 'an input, not ignored\n')
+    // Its event is read while it is a file (it lasts longer than a moment: Darren's decision on HI-3158).
+    await o.settled(p)
+    rmSync(join(p, 'out'))
+    mkdirSync(join(p, 'out'))
+    writeFileSync(join(p, 'out', 'bundle.js'), 'x')
+    expect((await between(t0)).paths).toEqual(['out'])
+  })
+
+  it("kind reads held (a slow disk): one path written over and over keeps at most the bound waiting, and what wasn't read counts (HI-3173, HR2's round 1)", async () => {
+    const was = { ...kindReads }
+    let open = (): void => undefined
+    try {
+      Object.assign(kindReads, { atOnce: 2, queued: 16 })
+      meta.hold = { under: p.toLowerCase(), gate: new Promise<void>((r) => (open = r)) }
+      const t0 = Date.now()
+      // A file `out` (not ignored: `.gitignore` says `out/`) written over and over while no read can finish, each write's
+      // event in before the next (Windows may fold writes made back to back into one event).
+      const outEvents = (): number => events.filter((e) => e.kind === 'written' && e.paths.includes('out')).length
+      const write = async (i: number): Promise<void> => {
+        const before = outEvents()
+        writeFileSync(join(p, 'out'), `${i}\n`)
+        await vi.waitFor(() => expect(outEvents()).toBeGreaterThan(before), { timeout: HUNG_MS })
+      }
+      let i = 0
+      while (o.kindsWaiting < 16 && i < 200) await write(i++)
+      expect(o.kindsWaiting).toBe(16)
+      for (const end = i + 20; i < end; ) await write(i++)
+      expect(o.kindsWaiting).toBe(16)
+      // Replaced by an `out/` folder before any read is in: those read find a folder, but those left unread make `out`
+      // ask as a file too, so it still counts.
+      rmSync(join(p, 'out'))
+      mkdirSync(join(p, 'out'))
+      writeFileSync(join(p, 'out', 'bundle.js'), 'x')
+      meta.hold = null
+      open()
+      expect((await between(t0)).paths).toEqual(['out'])
+      expect(o.kindsWaiting).toBe(0)
+    } finally {
+      Object.assign(kindReads, was)
+      meta.hold = null
+      open()
+    }
   })
 
   it('a tracked file in node_modules counts, its edit undone too', async () => {

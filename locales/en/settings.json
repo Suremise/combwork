@@ -1835,6 +1835,26 @@
     "defaultMessage": "Move agents at a usage threshold",
     "description": "An advanced setting's title (Settings → Advanced), listed under Combwork. An account in Settings → Accounts & Connections can move its agents to another account when it has used a share of its plan's limit."
   },
+  "settings.advanced.cw.activity.mapMotion.desc": {
+    "defaultMessage": "The Activity map sends a dot along a spoke to its station for each tool call an agent makes, and back when it ends. As Windows says follows Windows' Show animations setting; On always moves them; Off only lights the station.",
+    "description": "What the advanced setting \"The Activity map's moving pulses\" does (Settings → Advanced, under Combwork). As Windows says, On and Off are the setting's choices: use the words its list shows. Show animations is the name of a Windows setting: use the name Windows gives it in your language."
+  },
+  "settings.advanced.cw.activity.mapMotion.off": {
+    "defaultMessage": "Off",
+    "description": "A choice of the advanced setting \"The Activity map's moving pulses\": never move them; the station lights instead."
+  },
+  "settings.advanced.cw.activity.mapMotion.on": {
+    "defaultMessage": "On",
+    "description": "A choice of the advanced setting \"The Activity map's moving pulses\": always move them."
+  },
+  "settings.advanced.cw.activity.mapMotion.system": {
+    "defaultMessage": "As Windows says",
+    "description": "A choice of the advanced setting \"The Activity map's moving pulses\": follow Windows' animation setting."
+  },
+  "settings.advanced.cw.activity.mapMotion.title": {
+    "defaultMessage": "The Activity map's moving pulses",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork: whether the Activity tab's map shows a dot travelling to a station for each tool call."
+  },
   "settings.advanced.cw.agents.tempFolder.desc": {
     "defaultMessage": "A folder for agents' own temporary files (Claude Code's scratchpad, and what Codex, Copilot and their shells write to the temp folder), instead of Windows' Temp folder: each agent and the Assistant get a folder of their own in it, made at launch, and kept. A full path (%LOCALAPPDATA% and other variables at the start are filled in), never inside a project or a slot. Empty: the system's Temp folder, as before. Sessions started afterwards take it.",
     "description": "What the advanced setting \"Agents' temp folder\" does (Settings → Advanced, under Combwork). Scratchpad is Claude Code's word for its working folder. %LOCALAPPDATA% is a Windows variable: keep it."
@@ -2219,6 +2239,14 @@
     "defaultMessage": "A card's start in its own words",
     "description": "An advanced setting's title (Settings → Advanced), listed under Combwork: what Combwork types into an agent when a card is started on it."
   },
+  "settings.advanced.cw.prompt.wholeCardMax.desc": {
+    "defaultMessage": "When a card is started on an agent, Combwork gives it the whole card, its decisions and every comment included, if all of it fits in this many characters, so the agent needn't read the card again before it starts. A longer card gets its title, description and latest feedback, and the agent reads the rest. 0 never gives the whole card.",
+    "description": "What the advanced setting \"A card in full at its start, up to\" does (Settings → Advanced, under Combwork)."
+  },
+  "settings.advanced.cw.prompt.wholeCardMax.title": {
+    "defaultMessage": "A card in full at its start, up to",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in characters (\"6000 characters\")."
+  },
   "settings.advanced.cw.queue.checkMinutes.desc": {
     "defaultMessage": "How long the merge queue lets one merge check or install run before it ends it. A check ended this way is a failure of the environment, not of the work: the card comes back marked so, and its builder can send the same revision back into the queue. Raise it when a project’s checks really take longer; too long, and a hung check holds the queue up that long.",
     "description": "What the advanced setting \"Merge queue: longest a merge check runs\" does, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -2354,6 +2382,22 @@
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.title": {
     "defaultMessage": "Retry wait: tell the Assistant after",
     "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"300 s\"). A retry wait: an agent's coding agent waiting to try its model request again."
+  },
+  "settings.advanced.cw.sessions.signFailFast.desc": {
+    "defaultMessage": "When a repository signs commits, an agent's commit with Git for Windows' gpg or ssh-keygen, GnuPG's gpg or Windows' ssh-keygen signs with nobody there, or fails at once and tells the agent why, instead of waiting for a passphrase nobody can type. Signing stays on, and your git and gpg settings are never changed: sessions get a signer of Combwork's in their environment only. Other signers run as before. Turned off, sessions use git's own signer, as before.",
+    "description": "What the advanced setting \"Agents' signed commits never wait for a passphrase\" does (Settings → Advanced). gpg, ssh-keygen, Git for Windows and GnuPG are names: keep them."
+  },
+  "settings.advanced.cw.sessions.signFailFast.title": {
+    "defaultMessage": "Agents' signed commits never wait for a passphrase",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork: agents' commits signed with gpg or ssh fail at once rather than waiting for someone to type a passphrase."
+  },
+  "settings.advanced.cw.sessions.signTimeoutSeconds.desc": {
+    "defaultMessage": "How long an agent's signed commit lets gpg or ssh-keygen run before Combwork ends it and the commit fails. Long enough for a hardware key you touch; a signer still running then is waiting for someone.",
+    "description": "What the advanced setting \"Agents' signer: give up after\" does (Settings → Advanced). gpg and ssh-keygen are names: keep them."
+  },
+  "settings.advanced.cw.sessions.signTimeoutSeconds.title": {
+    "defaultMessage": "Agents' signer: give up after",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"120 s\"): how long an agent's commit may wait for its signer."
   },
   "settings.advanced.cw.sessions.terminalType.desc": {
     "defaultMessage": "Combwork starts each session with TERM=xterm-256color, as its terminal is, and without Windows Terminal's WT_SESSION, so the CLIs draw the same whether Combwork was opened from the Start menu or a terminal (Claude Code draws ❯ rather than >). A TERM in your own environment or the session's is kept. Turned off, sessions get the environment Combwork was opened with.",

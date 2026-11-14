@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { app } from 'electron'
-import { atStart, checkRequest, mergeSnapshot, parseRecord, recordOpen, resumeNote, REQUEST_FILE, type RestartEntry, type RestartRecord, type RequestTarget } from '../src/shared/restartResume'
+import { atStart, checkRequest, closeReason, mergeSnapshot, parseRecord, recordOpen, resumeNote, REQUEST_FILE, type RestartEntry, type RestartRecord, type RequestTarget } from '../src/shared/restartResume'
 import { dropLoggerListenersAfterEach, loggerListenerCounts } from './loggerListeners'
 import { tempDir } from './tempDir'
 
@@ -99,6 +99,14 @@ describe('the line a resumed agent is given (resumeNote)', () => {
 
   it('after a quit, with no card or lane: why, and to carry on', () => {
     expect(resumeNote(entry({ from: '1.0.0', at: '2026-10-26T09:30:00.000Z' }), '1.0.0', 'quit')).toBe('[CW] Combwork was quit and started again at 09:30 UTC; your session was stopped and is resumed now. Carry on where you were.')
+  })
+
+  it("a plain quit that installed the update with Install now is a quit, never Combwork restarting for an update (HI-3167)", () => {
+    expect(closeReason('quit', false)).toBe('quit')
+    expect(closeReason(null, false)).toBe('quit')
+    expect(closeReason('restart', false)).toBe('update')
+    expect(closeReason(null, true)).toBe('restart')
+    expect(resumeNote(entry({ from: '1.4.0', at: '2026-11-13T09:19:00.000Z' }), '1.5.0', closeReason('quit', false))).toBe('[CW] Combwork was quit and started again (1.4.0 → 1.5.0) at 09:19 UTC; your session was stopped and is resumed now. Carry on where you were.')
   })
 })
 

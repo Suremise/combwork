@@ -10,7 +10,9 @@ import * as actions from '../actions'
 import { confirm, isAssistantPath, notify, openInSessionsTab, revealAgent, set, setAssistantOpen, useStore } from '../store'
 import { Icon, IconButton, statusText, useContextMenu, type MenuEntry } from '../components/ui'
 import { StateMark } from '../components/StateMark'
-import { loadActivityView, saveActivityView, type ActivityView } from '../activityView'
+import { loadActivityView, loadMapShow, saveActivityView, saveMapShow, type ActivityView, type MapShow } from '../activityView'
+import { ActivityMap, MapToggles, mapSessions, mapStrip, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
+import { mapContextEntries, mapMode, mapReadOrder, shownAlone, type MapContext } from '@shared/activityMap'
 import { cx } from '../util'
 import { boundedQueue, latestOnly } from '@shared/coalesce'
 import { fmt, msg, tr } from '@shared/i18n'
@@ -27,6 +29,7 @@ export const FADE_MS = 1500
 /** Each project's session list as last read here: the tab opens on it at once and draws the fresh one when it comes. */
 const lastLists = new Map<string, SessionListItem[]>()
 export const NO_NOW: ActivityNow = { launches: [], tasks: [] }
+const NO_ENTRIES: MapEntry[] = []
 
 /**
  * Render times of the tab (ms, from its render to its layout effect), the latest last: the Activity tab's measurement
@@ -42,6 +45,8 @@ interface Reads {
   list: SessionListItem[] | null
   turns: ReadonlyMap<string, ActivityTurns>
   now: ActivityNow
+  /** The map's agents' context (HI-2903), by agent: held with the rest, so a frozen ring doesn't move. */
+  contexts: ReadonlyMap<string, MapContext | null>
 }
 
 /** An activity state as an agent state mark: failed is stalled, done idle. */
@@ -98,13 +103,26 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   // round 3): hidden or gone, what waits is dropped and what still runs applies nothing.
   const turnReads = useRef(boundedQueue(TURNS_AT_ONCE))
   const listReads = useRef(latestOnly())
+  // A session's turns are read and taken in only while the list or the map shows it (HR2's HI-2903 round 1): checked when
+  // its read starts and when it answers, so a read the map no longer wants (a filter changed, the map off) neither runs
+  // nor fills the cache again after its session was dropped.
+  const wantedTurns = (id: string): boolean => shownSessionsRef.current.some((x) => x.id === id)
+  const mapOnlyRef = useRef(new Set<string>())
   const readTurns = useCallback(
     (ids: string[]): void => {
       for (const id of ids)
         turnReads.current.add(
           id,
-          () => call('activity:turns', project.path, id, turnsRef.current.get(id)?.version).catch(() => null),
-          (t) => t && setTurns((m) => new Map(m).set(id, t))
+          () => {
+            if (!wantedTurns(id)) return Promise.resolve(null)
+            if (mapOnlyRef.current.has(id)) noteMapTurns('read')
+            return call('activity:turns', project.path, id, turnsRef.current.get(id)?.version).catch(() => null)
+          },
+          (t) => {
+            if (!t || !wantedTurns(id)) return
+            if (mapOnlyRef.current.has(id)) noteMapTurns('applied')
+            setTurns((m) => new Map(m).set(id, t))
+          }
         )
     },
     [project.path]
@@ -179,10 +197,18 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
     () =>
       tasks
         .filter((c) => !c.archived && c.project.toLowerCase() === project.name.toLowerCase())
-        .map((c) => ({ number: c.number, label: cardLabel(c), title: c.title, column: c.column, builder: c.agent, reviewer: c.review?.agent ?? null })),
+        .map((c) => ({ number: c.number, label: cardLabel(c), title: c.title, column: c.column, builder: c.agent, reviewer: c.review?.agent ?? null, ...(c.column === 'doing' && c.waitingFor ? { waiting: { reason: c.waitingFor.reason, assistant: !!c.waitingFor.ask } } : {}) })),
     [tasks, project.name]
   )
-  const reads = useMemo<Reads>(() => ({ agents, cards, list, turns, now }), [agents, cards, list, turns, now])
+  // The map (HI-2903): its toggles (one for every view), and its agents' context, read only while it shows them.
+  const [mapShow, setMapShowState] = useState<MapShow>(loadMapShow)
+  const setMapShow = useCallback((m: MapShow): void => {
+    saveMapShow(m)
+    setMapShowState(m)
+  }, [])
+  const [mapEntries, setMapEntries] = useState<MapEntry[]>(NO_ENTRIES)
+  const contexts = useMapContexts(active && mapShow.map && mapShow.context, mapEntries)
+  const reads = useMemo<Reads>(() => ({ agents, cards, list, turns, now, contexts }), [agents, cards, list, turns, now, contexts])
 
   // --- Frozen or live (HI-1743): a snapshot taken when the tab opens; Refresh takes another; Play goes live.
   const [held, setHeld] = useState<Reads | null>(null)
@@ -235,13 +261,15 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
     lastReads.current = reads
     if (!held || was === reads) return
     // A session's turns read for the first time aren't an update to hold: they complete the snapshot.
-    const onlyFirstTurns = was.agents === reads.agents && was.cards === reads.cards && was.list === reads.list && was.now === reads.now && [...reads.turns].every(([id, t]) => was.turns.get(id) === t || !held.turns.has(id))
+    const onlyFirstTurns = was.agents === reads.agents && was.cards === reads.cards && was.list === reads.list && was.now === reads.now && [...reads.turns].every(([id, t]) => was.turns.get(id) === t || !held.turns.has(id)) && [...reads.contexts].every(([k, c]) => was.contexts.get(k) === c || !held.contexts.has(k))
     if (!onlyFirstTurns) setPending((n) => n + 1)
   }, [reads, held])
   const drawn = useMemo<Reads>(() => {
     if (!held) return reads
     const extra = [...reads.turns].filter(([id]) => !held.turns.has(id))
-    return extra.length ? { ...held, turns: new Map([...held.turns, ...extra]) } : held
+    // A context read for the first time completes the snapshot too (an agent's ring, once its usage is in).
+    const extraCtx = [...reads.contexts].filter(([k]) => !held.contexts.has(k))
+    return extra.length || extraCtx.length ? { ...held, turns: new Map([...held.turns, ...extra]), contexts: new Map([...held.contexts, ...extraCtx]) } : held
   }, [held, reads])
 
   const input = useMemo<ActivityInput>(() => ({ agents: drawn.agents, cards: drawn.cards, sessions: drawn.list ?? [], turns: drawn.turns, now: drawn.now, at: Date.now() }), [drawn])
@@ -285,10 +313,71 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
     return () => clearTimeout(t)
   }, [fading, parts])
 
+  // --- The map (HI-2903): exactly one agent in the filter, its map; else the shared map of the agents the tabs show.
+  const mode = mapMode(view.agents)
+  // Its agents: the list's own tabs, by the same filters (Agents, Cards, Hide finished, the tab kept), so a filter changed
+  // on a frozen snapshot changes the map as it changes the list (HR2's round 2).
+  const entries = useMemo<MapEntry[]>(
+    () => mapTabs(input, view, mode, view.tab).map((t) => ({ key: t.agentId, path: project.path, agentId: t.agentId, name: t.name, tab: t, input, live: project.agents.find((a) => a.id === t.agentId)?.live ?? null })),
+    // The live state is the project's now (its provider and session): taken in with the drawn reads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mode, view.agents, view.cards, view.hideFinished, view.tab, input]
+  )
+  // One agent of the selection shown alone (HI-3180, Darren's decision): the strip's click. The selection, its tabs and
+  // the strip stay; a click on another switches, on that one (or Escape) shows them all again. The agent shown alone is
+  // always the current tab's (HI-3186): one shown agent, so the tab and the strip mark the same one.
+  const [showAlone, setShowAlone] = useState(false)
+  // The selection chosen again (Agents ▾, even the same): all of it shown again.
+  useEffect(() => setShowAlone(false), [view.agents])
+  const alone = shownAlone(showAlone, mode, entries, tab?.agentId ?? null)
+  const drawnMode = alone ? 'single' : mode
+  const drawnEntries = useMemo(() => (alone ? entries.filter((e) => e.key === alone) : entries), [entries, alone])
+  // What the map reads turns and contexts for: the one shown alone first (HR1's round 1: the ninth of ten is read, as a
+  // filter to it was), then the rest of the selection.
+  const readEntries = useMemo(() => mapReadOrder(entries, alone), [entries, alone])
+  // The context reads take each agent's live state as the project has it now (HI-2929: a setup ending, local limits set
+  // after the launch, under the same session id).
+  const forContexts = mapContextEntries(readEntries, (e) => project.agents.find((a) => a.id === e.agentId)?.live ?? null)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => setMapEntries(forContexts.entries), [forContexts.key])
+  const mapOn = mapShow.map
+  // Animated once live and the snapshot released (HI-2939): its first pulses' baseline is then the live reads, never the
+  // held ones (from those, what came while frozen was sent as a burst).
+  const map = useActivityMap({ active, animate: active && live && !held && mapOn, scope: `${fresh}|${drawnMode}|${filterKey}|${alone ?? ''}`, entries: mapOn ? drawnEntries : NO_ENTRIES, contexts: drawn.contexts, mode: drawnMode, at: input.at })
+  const strip = useMemo(() => (alone ? mapStrip(entries, drawn.contexts, readEntries) : undefined), [alone, entries, drawn.contexts, readEntries])
+  // The sessions the map reads beyond the list's (the shared map's agents' running sessions): none with the map off.
+  const mapRead = useMemo(() => (mapOn ? mapSessions(readEntries, mode) : []), [mapOn, readEntries, mode])
+  // The strip's click (HI-3186): another agent becomes the tab, shown alone; the one shown alone shows them all again.
+  const pickMapAgent = useCallback(
+    (key: string) => {
+      if (alone === key) return setShowAlone(false)
+      setSelected(null)
+      setView({ tab: key })
+      setShowAlone(true)
+    },
+    [alone, setView]
+  )
+
   // The turns of each session shown: read once there (the tick reads live ones again: HR6's round 1, a running
-  // subagent's too).
-  const shownSessions = useMemo(() => parts.flatMap((p) => [...(p.session ? [{ id: p.session.session.id, live: true }] : []), ...p.subagents.flatMap((n) => (n.kind === 'session' && !n.gone ? [{ id: n.session.id, live: n.live }] : []))]), [parts])
+  // subagent's too), and the map's.
+  const shownSessions = useMemo(() => {
+    const listed = parts.flatMap((p) => [...(p.session ? [{ id: p.session.session.id, live: true }] : []), ...p.subagents.flatMap((n) => (n.kind === 'session' && !n.gone ? [{ id: n.session.id, live: n.live }] : []))])
+    const have = new Set(listed.map((x) => x.id))
+    return [...listed, ...mapRead.filter((x) => !have.has(x.id)).map((x) => ({ id: x.id, live: x.live }))]
+  }, [parts, mapRead])
   shownSessionsRef.current = shownSessions
+  // Turns read only for the map, dropped once neither it nor the list shows their session (a filter changed, the map off).
+  // Which those are is known as it renders, so a read starting or answering after this render is checked against it.
+  const listedIds = new Set(parts.flatMap((p) => [...(p.session ? [p.session.session.id] : []), ...p.subagents.flatMap((n) => (n.kind === 'session' ? [n.session.id] : []))]))
+  const mapOnlyNow = new Set(mapRead.map((x) => x.id).filter((id) => !listedIds.has(id)))
+  const droppable = useRef(new Set<string>())
+  mapOnlyRef.current = mapOnlyNow
+  const mapOnlyKey = [...mapOnlyNow].join(',')
+  useEffect(() => {
+    const drop = [...droppable.current].filter((id) => !mapOnlyRef.current.has(id) && !shownSessionsRef.current.some((x) => x.id === id))
+    droppable.current = new Set(mapOnlyRef.current)
+    if (drop.length) setTurns((m) => new Map([...m].filter(([id]) => !drop.includes(id))))
+  }, [mapOnlyKey])
   const unread = shownSessions.filter((x) => !turns.has(x.id)).map((x) => x.id).join(',')
   useEffect(() => {
     if (active && unread) readTurns(unread.split(','))
@@ -343,6 +432,7 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
           {reading && <span className="faint">{tr(M.reading)}</span>}
           {!list && listError && <span className="error-text">{tr(M.loadFailed, { error: listError })}</span>}
           <div className="actions">
+            <MapToggles show={mapShow} onChange={setMapShow} />
             {!live && pending > 0 && (
               <button className="chip activity-pill" onClick={refresh} title={tr(M.pillTip)}>
                 <Icon name="refresh" /> {tr(M.pill, { n: pending })}
@@ -376,6 +466,8 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
             ))}
           </div>
         )}
+        <div className={cx('activity-body', mapOn && entries.length > 0 && 'with-map')}>
+          {mapOn && entries.length > 0 && <ActivityMap mode={drawnMode} title={project.name} model={map.model} pulses={map.pulses} endPulse={map.endPulse} show={mapShow} onPick={pickMapAgent} strip={strip} picked={alone} />}
         {!parts.length ? (
           <div className="pane-empty">{reading ? null : tr(filtered ? M.emptyFiltered : M.empty)}</div>
         ) : (
@@ -391,7 +483,14 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
                 </span>
                 <span className="faint activity-card-column">· {tr(M.column, { column: card.column })}</span>
               </div>
-            ) : solo ? (
+            ) : null}
+            {/* Waiting on purpose (HI-2915, HI-2618): what for, under its card's line, cut short with the whole in its title. */}
+            {card?.waiting && (
+              <div className="activity-card-waiting faint" data-mark="waiting" title={tr(M.waiting, { assistant: card.waiting.assistant ? 'yes' : 'no', reason: card.waiting.reason })}>
+                {tr(M.waiting, { assistant: card.waiting.assistant ? 'yes' : 'no', reason: card.waiting.reason })}
+              </div>
+            )}
+            {card ? null : solo ? (
               <div className="activity-card-head">
                 <span className="activity-card-title" title={solo.title || solo.name || solo.id.slice(0, 8)}>
                   {solo.title || solo.name || solo.id.slice(0, 8)}
@@ -403,6 +502,7 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
             ))}
           </div>
         )}
+        </div>
       </div>
       {chosen && <Details project={project} node={chosen} onClose={() => setSelected(null)} />}
       {menu.element}
@@ -728,6 +828,7 @@ const M = {
   pillTip: msg({ id: 'activity.pillTip', defaultMessage: 'Take a new snapshot with what came since. It stays frozen.', description: "Tooltip of the Activity tab's updates pill." }),
   refresh: msg({ id: 'activity.refresh', defaultMessage: 'Refresh', description: "Tooltip of the Activity tab's refresh button: takes a new snapshot of what runs now." }),
   endedNode: msg({ id: 'activity.endedNode', defaultMessage: 'Ended', description: "A node's second line in the Activity tab, live, once its process or session ended: it fades out, then leaves." }),
+  waiting: msg({ id: 'activity.waiting', defaultMessage: '{assistant, select, yes {Waiting for the Assistant’s answer: {reason}} other {Waiting: {reason}}}', description: "A line under the card an agent works on in the Activity tab (HI-2915): the card, in Active, is marked as waiting on purpose, so Combwork doesn't report it as stalled. assistant is yes when its agent asked the Combwork Assistant for something and waits for its answer; {reason} is why, in the agent's or the user's own words (for the Assistant, the request). Keep the select keys." }),
   column: msg({ id: 'activity.column', defaultMessage: '{column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}', description: "A card node's second line in the Activity tree: its board column. Use the board's column names." }),
   state: msg({ id: 'activity.state', defaultMessage: '{state, select, working {Working} waiting {Waiting for you} failed {Failed or stalled} done {Done} other {Idle}}', description: 'A node\'s state in the Activity tree: working, waiting for you, failed (or stalled), done, idle.' }),
   noPrompt: msg({ id: 'activity.noPrompt', defaultMessage: '(no prompt text)', description: 'A turn node in the Activity tree whose prompt has no text (only images, say).' }),

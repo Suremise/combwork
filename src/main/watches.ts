@@ -299,6 +299,8 @@ export const testHooks: {
   beforeWakeCancel?: () => Promise<void>
   /** HI-2521: a pause in a lane watch's setup, after its lanes were read and before it is saved. */
   afterLanesRead?: () => Promise<void>
+  /** HI-2889: a pause in endOwnLaneWatch, under the store's lock, before the caller's lane reading (a lane changing meanwhile). */
+  inOwnLaneEnd?: () => Promise<void>
 } = {}
 /** The same seams by their first name (round-one probes use it). */
 export const testPauses = testHooks
@@ -1132,6 +1134,53 @@ export async function endWatchOf(projectPath: string, agentId: string, why: stri
     }
   }
   return infoOf(rec).label
+}
+
+/**
+ * HI-2889: a lane's builder whose watch follows nothing but that lane (its id alone, maybe cards of the lane beside it; no
+ * agents, no usage) and hasn't fired: ended, so Combwork can start the lane's next card on it. Such a watch waits for the
+ * lane to go on, which the card's start is (its prompt wakes the builder), and nothing fires it when its card goes Done
+ * (`moved` isn't a default lane event). HB2 watched its own lane after each Done and sat `watching`, which a start never
+ * types into, until the lane-next stall fired 15 min later. Checked and ended under the store's lock; the label of the
+ * watch ended, or null (no watch, or one that waits on more, or one firing now: its wake goes first). `current`: the
+ * caller's synchronous reading of the lane as it is then (HR1 on HI-2889), run under the lock just before the record is
+ * removed: its cards now when the start is still due on a builder still watching, else null and nothing is ended (a lane
+ * paused, ended, reassigned or changed while this waited for the lock).
+ */
+export async function endOwnLaneWatch(projectPath: string, agentId: string, laneId: string, current: () => readonly number[] | null): Promise<string | null> {
+  const ws = workspaceFor(projectPath)
+  if (!ws?.path) return null
+  const store = await load(ws)
+  const rec = await locked(store, async () => {
+    const r = recordOf(store, projectPath, agentId)
+    if (!r || r.fired || store.delivering.has(r.id)) return null
+    await testHooks.inOwnLaneEnd?.()
+    // Read again after any await: the record as it is now, and the lane.
+    if (recordOf(store, projectPath, agentId) !== r || r.fired || store.delivering.has(r.id)) return null
+    const cards = current()
+    if (!cards || !ownLaneOnly(r, { id: laneId, cards })) return null
+    const before = store.list
+    store.list = store.list.filter((x) => x !== r)
+    try {
+      await save(store)
+    } catch (e) {
+      store.list = before
+      log.warn(`ending ${userText(agentId)}'s watch on its lane ${laneId}`, e)
+      return null
+    }
+    return r
+  })
+  if (!rec) return null
+  log.info(`${userText(agentId)}'s watch ended: its lane ${laneId}'s next card starts`)
+  sessions.watchChanged(projectPath, agentId)
+  return infoOf(rec).label
+}
+
+/** HI-2889: a watch on lane `lane` alone (no other lane, nor "all"), no agents or usage beside it, and only cards of that lane. */
+function ownLaneOnly(r: WatchRecord, lane: { id: string; cards: readonly number[] }): boolean {
+  if (!r.lanes || r.lanes.ids === 'all' || !r.lanes.ids.length || r.lanes.ids.some((id) => id !== lane.id)) return false
+  if (r.agents || r.usage) return false
+  return r.cond.cards.every((n) => lane.cards.includes(n))
 }
 
 /**

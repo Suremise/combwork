@@ -1819,6 +1819,94 @@
     "defaultMessage": "{pass, select, yes {Last verdict: passed} other {Last verdict: failed}}{revision, select, none {} other { on {revision}}}{current, select, no {, which no longer counts} other {}}",
     "description": "A line in a lane segment's hover (Progress panel): the card's last review verdict, passed or failed, on which revision (a short commit id; none for a card without one: keep that branch empty), and whether it no longer counts (a newer change or decision since). Keep the select keys as they are."
   },
+  "board.laneEdit.add": {
+    "defaultMessage": "Add Card…",
+    "description": "HI-2898: a button at the end of a lane's cards (Progress → Lanes): opens a search to add a card of the project to the lane. The … says more follows: keep it."
+  },
+  "board.laneEdit.cancelChange": {
+    "defaultMessage": "Cancel Change",
+    "description": "HI-2898: a button after a lane's queued change (Progress → Lanes: a change of its cards that waits for its card in progress to be Done): drops that change, keeping the cards as they are."
+  },
+  "board.laneEdit.cards": {
+    "defaultMessage": "Cards to add",
+    "description": "HI-2898: accessible name of the list of matching cards under the search box that adds a card to a lane (Progress → Lanes)."
+  },
+  "board.laneEdit.dismiss": {
+    "defaultMessage": "Dismiss",
+    "description": "HI-2898: tooltip of the × that closes a refused change's message under a lane (Progress → Lanes)."
+  },
+  "board.laneEdit.done": {
+    "defaultMessage": "{op, select, move {Moved {card} in {lane}} add {Added {card} to {lane}} remove {Took {card} off {lane}} transfer {Moved {card} to {lane}} cancel {Cancelled the queued change of {lane}} other {Undone}}",
+    "description": "HI-2898: a notification's title after the user changed a lane's cards in Progress → Lanes (a lane: a builder and a reviewer agent working through cards in turn): moved a card ({card}, its key) within it, added one, took one off (it goes back to the board), moved one here from another lane (transfer), cancelled its queued change, or undid the last change (other). {lane} is the lane's builder / reviewer (B1 / R1). Keep the select keys. It has an Undo button."
+  },
+  "board.laneEdit.handle": {
+    "defaultMessage": "Drag to move {card}, or press Alt+Up and Alt+Down; Delete takes it off",
+    "description": "HI-2898: tooltip and accessible description of a card waiting its turn in a lane's cards (Progress → Lanes): it can be dragged to another place, moved with Alt+Up and Alt+Down, or taken off with Delete. {card} is its key."
+  },
+  "board.laneEdit.lastCard": {
+    "defaultMessage": "{card} is the lane’s last card to do, and a lane keeps at least one: to stop the lane, end it (End Lane or Abandon Lane… in its menu)",
+    "description": "HI-3066: tooltip of the × on a lane's last card not Done (a click shows the same refusal) (Progress → Lanes): it can't be taken off, as a lane always keeps one. {card} is its key. End Lane and Abandon Lane… are the lane's menu items: as they're translated there."
+  },
+  "board.laneEdit.leftOut": {
+    "defaultMessage": "{n, plural, one {{cards} stays where it is: it can’t come back to the lane now.} other {{cards} stay where they are: they can’t come back to the lane now.}}",
+    "description": "HI-3062: under the title of the notification after Cancel Change on a lane (Progress → Lanes: it drops a change of the lane's cards that was waiting for its card in progress to be Done): the cards that change had taken off and that can't be put back now (another lane or agent has them, they were started, or they keep work), which stay where they are. {cards}: their keys, listed (AL-4, AL-7); {n}: how many."
+  },
+  "board.laneEdit.locked": {
+    "defaultMessage": "{card} is under way: it keeps its place",
+    "description": "HI-2898: tooltip of the lock on a lane's card in progress (Progress → Lanes): it can't be moved. {card} is its key."
+  },
+  "board.laneEdit.moveHere": {
+    "defaultMessage": "Move Here",
+    "description": "HI-2898: a button beside the refusal to add a card that another lane has (Progress → Lanes): takes it off that lane and adds it to this one, in one change."
+  },
+  "board.laneEdit.noMatch": {
+    "defaultMessage": "No card in To do matches.",
+    "description": "HI-2898: under the search box that adds a card to a lane (Progress → Lanes), when no card of the project in To do (not started) matches what was typed. To do is the board's column, as the board names it."
+  },
+  "board.laneEdit.notLast": {
+    "defaultMessage": "Only the last change of the lanes made here can be undone.",
+    "description": "HI-2898: why an Undo on an older notification of a change of a lane's cards (Progress → Lanes) does nothing: only the latest change can be undone."
+  },
+  "board.laneEdit.nothingToUndo": {
+    "defaultMessage": "Nothing to undo in the lanes",
+    "description": "HI-2898: said (a notification) when the user presses Ctrl+Z in Progress → Lanes with no change of a lane's cards made in this window to undo."
+  },
+  "board.laneEdit.onOther": {
+    "defaultMessage": "on the lane of {builder}",
+    "description": "HI-2898: after a card in the search that adds a card to a lane (Progress → Lanes): another running lane (of the builder agent {builder}) has it."
+  },
+  "board.laneEdit.otherWorkspace": {
+    "defaultMessage": "That change was made in another workspace: open it there to undo it.",
+    "description": "HI-2898: an error, the Undo of a change of a lane's cards was pressed after this window switched to another workspace."
+  },
+  "board.laneEdit.queued": {
+    "defaultMessage": "It applies once {card} is Done.",
+    "description": "HI-2898: under the title of the notification after changing a lane's cards in Progress → Lanes, when the change waits for the lane's card in progress ({card}, its key) to be Done first."
+  },
+  "board.laneEdit.remove": {
+    "defaultMessage": "Take {card} off the lane (it goes back to the board)",
+    "description": "HI-2898: tooltip of the × on a card waiting its turn in a lane's cards (Progress → Lanes): takes it off the lane; the card stays on the board, in To do. {card} is its key."
+  },
+  "board.laneEdit.said": {
+    "defaultMessage": "{card}: {at} of {n, plural, one {# card} other {# cards}}",
+    "description": "HI-2898: said to screen readers after a card is moved in a lane's cards with Alt+Up or Alt+Down (Progress → Lanes): the card ({card}, its key) and its place now ({at}) among the lane's cards ({n})."
+  },
+  "board.laneEdit.search": {
+    "defaultMessage": "Find a card by key or title",
+    "description": "HI-2898: placeholder and accessible name of the search box that adds a card to a lane (Progress → Lanes, Add Card…)."
+  },
+  "board.laneEdit.stuck": {
+    "defaultMessage": "{card} can’t move further that way",
+    "description": "HI-2898: said to screen readers when a card in a lane's cards (Progress → Lanes) is moved with Alt+Up or Alt+Down but is already first among the cards that can move, or last."
+  },
+  "board.laneEdit.undo": {
+    "defaultMessage": "Undo",
+    "description": "HI-2898: the button on the notification after changing a lane's cards (Progress → Lanes): undoes that change."
+  },
+  "board.laneEdit.undoFailed": {
+    "defaultMessage": "Couldn’t undo the change of the lane",
+    "description": "HI-2898: a notification's title: undoing a change of a lane's cards (Progress → Lanes) was refused; the reason follows (the lane changed since, say)."
+  },
   "board.laneStart.addCard": {
     "defaultMessage": "Add a card from Todo…",
     "description": "The first entry of the Start Lane dialog's card picker: choosing a card adds it at the end of the lane's list. Todo is a board column."
@@ -1919,6 +2007,10 @@
     "defaultMessage": "Project",
     "description": "A field label in the Start Lane dialog: the project whose cards the lane works through."
   },
+  "board.laneStart.releasedReason": {
+    "defaultMessage": "Why start it there anyway (a hotfix, say)",
+    "description": "HI-3148: a field label in the Start Lane dialog, shown when the branch the lane would merge into is already released (or Combwork couldn’t check): the user’s reason for starting on it anyway, recorded with the lane."
+  },
   "board.laneStart.remove": {
     "defaultMessage": "Take {card} out of the lane",
     "description": "Tooltip of a button in the Start Lane dialog: removes the card ({card}, its key) from the lane's list (the card stays on the board)."
@@ -1934,6 +2026,10 @@
   "board.laneStart.start": {
     "defaultMessage": "Start Lane",
     "description": "Button of the Start Lane dialog: records the lane and starts both agents."
+  },
+  "board.laneStart.startAnyway": {
+    "defaultMessage": "Start Anyway",
+    "description": "HI-3148: the Start Lane dialog’s button when the lane’s branch is already released (or couldn’t be checked): starts the lane there anyway, with the reason given. Enabled once a reason is written."
   },
   "board.laneStart.started": {
     "defaultMessage": "Lane started: {pair}",
@@ -2022,6 +2118,22 @@
   "board.lanes.endFailed": {
     "defaultMessage": "Couldn't end {lane}",
     "description": "A toast's title: ending a lane from the Progress panel failed ({lane}: its builder / reviewer and name). The reason follows."
+  },
+  "board.lanes.endedCards": {
+    "defaultMessage": "{n, plural, one {# card} other {# cards}}",
+    "description": "HI-2898: how many cards a lane that ended today had, in Ended today (Progress → Lanes)."
+  },
+  "board.lanes.endedRan": {
+    "defaultMessage": "ran {time}",
+    "description": "HI-3178: how long a lane that ended today ran, from its start to its end (waits and pauses included), in Ended today (Progress → Lanes). Keep it short. {time}: 4 min, 1 h 5 min."
+  },
+  "board.lanes.endedRanTip": {
+    "defaultMessage": "Started {start}, ended {end}: {time} from its start to its end, waits and pauses included. A lane given new cards keeps its start.",
+    "description": "HI-3178: tooltip of how long a lane that ended today ran, in Ended today (Progress → Lanes). {start}, {end}: a date and time; {time}: 4 min, 1 h 5 min."
+  },
+  "board.lanes.endedToday": {
+    "defaultMessage": "Ended today ({n, number})",
+    "description": "HI-2898: a collapsed row at the top of Progress → Lanes: the lanes (a builder and a reviewer working through cards in turn) that ended today, local time ({n}: how many); it opens to them."
   },
   "board.lanes.expand": {
     "defaultMessage": "{open, select, yes {Hide the cards of {lane}} other {Show the cards of {lane}}}",
@@ -2219,9 +2331,17 @@
     "defaultMessage": "It was already waiting when Combwork first saw it: it has waited at least this long.",
     "description": "Tooltip of a lane's wait time with a + in its header (Progress panel): Combwork didn't see the wait begin."
   },
+  "board.lanes.waiting": {
+    "defaultMessage": "waiting",
+    "description": "HI-2915: a lane's mark in its header (Progress panel), lower case: one of its cards in Active is marked as waiting on purpose (for the Assistant's answer, a quiet window), so Combwork doesn't report it as stalled; its tooltip says what for."
+  },
   "board.lanes.waitingForYou": {
     "defaultMessage": "{n, plural, one {# waiting for you} other {# waiting for you}}",
     "description": "In the Progress panel's Lanes bar, after how many lanes there are: how many of them wait for the user's answer (an approval, a decision, a round limit). Glossary: lane."
+  },
+  "board.lanes.waitingTip": {
+    "defaultMessage": "{assistant, select, yes {{card} waits for the Assistant’s answer to its request: {reason}} other {{card} waits: {reason}}}",
+    "description": "HI-2915: tooltip and accessible name of a lane header's waiting mark (Progress panel). {card} is the card's key (HI-12); assistant is yes when its agent asked the Combwork Assistant and waits for its answer; {reason} is why, in the agent's or the user's own words (for the Assistant, the request). Keep the select keys."
   },
   "board.lanes.waits": {
     "defaultMessage": "{reason, select, blocked {{card} is blocked} hold {{card} is On Hold} you {waiting for you ({ask, select, approve {approval} decide {a decision} test {a test} signIn {a sign-in} other {an answer}}): {card}} roundLimit {waiting for you: {card} reached its round limit} notMerged {waiting: {card} not merged} merging {waiting: {card} merging} stale {stale: {card} must be submitted again} reviewer {waiting for a reviewer on {card}} lineUpdate {waiting: bringing the builder’s branch up to date before {card}} hooks {paused: {agent}'s hooks aren't arriving} checkCopy {waiting for a check copy for {card}} slot {waiting for a slot} other {list changes after {card}}}",
@@ -2242,6 +2362,10 @@
   "board.lanes.waitsPreparing": {
     "defaultMessage": "waiting: preparing {slot}",
     "description": "Why a lane waits, in its header in the Progress panel, lower case: Combwork is preparing its slot (a working folder it lends to the lane: its setup command or a dependency install before the next card). {slot} is the slot's name, such as slot-b: keep it as it is. The lane isn't paused."
+  },
+  "board.lanes.waitsSlotCard": {
+    "defaultMessage": "waiting for a slot: {agent} still builds in {slot} for {heldFor}, which keeps it until that card is Done or put back",
+    "description": "Why a lane waits, in its header in the Progress panel, lower case (HI-3168): no slot can be lent to it because its builder {agent} (an agent's name) already holds the slot {slot} (a working folder Combwork lends, such as slot-a: keep it as it is) for another card, {heldFor} (its key, such as HI-12), and an agent works in one slot at a time. Usually that card was still being worked when an earlier lane ended. Done is a board column; put back means moved back to Todo. Combwork lends the lane a slot once that happens."
   },
   "board.lanes.waitsSlotHeld": {
     "defaultMessage": "waiting for {slot}: {held, select, session {{agent}’s session is still in it} broker {a process still has a file or folder in it open: Windows Sandbox’s broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}",
@@ -2346,6 +2470,10 @@
   "board.move.askMessage": {
     "defaultMessage": "{n, plural, one {This skips a rule of its project:} other {This skips # rules of its project:}}",
     "description": "The question before a move that skips workflow rules (glossary: rule): how many it skips ({n}), listed below by name. Moving anyway records an exception on the card (glossary: override), with the reason the user gives."
+  },
+  "board.move.askReleased": {
+    "defaultMessage": "{branch} is released: start new work on it only for a hotfix. Moving it anyway starts it on {branch}.",
+    "description": "HI-3148: under the question before a start that skips the rule “New work starts only on a branch that isn’t released”: {branch} (as 1.4.0) already shipped (tagged and merged into the default branch)."
   },
   "board.move.askTitle": {
     "defaultMessage": "Move {card} to {column} anyway?",
@@ -2715,6 +2843,14 @@
     "defaultMessage": "Couldn’t bring the branch up to date",
     "description": "HI-2679: an error’s title: the forward merge couldn’t be queued. Its text says why."
   },
+  "board.queue.forwardLocalAhead": {
+    "defaultMessage": "{n, plural, one {# commit of your local {from} isn’t on its remote, so it wasn’t brought into {to}: publish it first if it should be.} other {# commits of your local {from} aren’t on its remote, so they weren’t brought into {to}: publish them first if they should be.}}",
+    "description": "HI-3126: a notification after Bring Up to Date under “The target branch follows its remote”: Combwork brings in branch {from} as its remote has it, and the local branch {from} has {n} commits (counted along its history) its remote lacks, which were left out. {to} is the branch being brought up to date. Branch names."
+  },
+  "board.queue.forwardResolving": {
+    "defaultMessage": "{card} is resolving it: Bring Up to Date waits for it",
+    "description": "HI-3000: on a merge queue’s card, after the line saying how far its branch is behind another: a card ({card}: its key, such as HI-12) made by Resolve on a builder is merging that branch in by hand, so Bring Up to Date (the button’s name: as translated there) isn’t offered for that branch until the card is Done."
+  },
   "board.queue.forwardUpToDate": {
     "defaultMessage": "{to} already has everything of {from}",
     "description": "HI-2679: a notification: nothing to bring in, so nothing was queued."
@@ -2755,9 +2891,29 @@
     "defaultMessage": "Paused by you. The queue merges nothing until you resume it.",
     "description": "Why a merge queue is paused, on its card in the Progress panel: the user paused it (Pause queue)."
   },
+  "board.queue.pause.catchUpChanges": {
+    "defaultMessage": "{card} is merged and on {target}’s remote already, but {files, select, none {files it changes have changes} other {{count, plural, one {{files} has changes} other {{files} have changes}}}} in the folder {target} is checked out in, so the local {target} isn’t up to date with it yet. Set them aside, and it catches up.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel (HI-2988, “The target branch follows its remote”): the card ({card}: its key) was merged and pushed to the remote, and bringing the local branch ({target}) up to date with it waits for files with uncommitted or staged changes in the folder where it is checked out ({files}: a list of names, five at most, or none; {count}: how many in all). Set Aside is a button beside it (as translated there). Keep the select keys and the word none."
+  },
   "board.queue.pause.checkedOut": {
     "defaultMessage": "{target} is checked out in a folder. Combwork merges into it there now: resume to carry on.",
     "description": "Why a merge queue is paused, on its card in the Progress panel: an older pause, from before Combwork could merge into a checked-out branch ({target})."
+  },
+  "board.queue.pause.commit": {
+    "defaultMessage": "Commit",
+    "description": "HI-2944: a button on a merge paused on uncommitted changes (the Merges tab, Version Control → Merge queue, a card's Work section): commits exactly the files named, in the folder the branch is checked out in, then the merge goes on."
+  },
+  "board.queue.pause.commitTip": {
+    "defaultMessage": "Commit {files} as they are now, on {target}, and let the merge go on.",
+    "description": "HI-2944: tooltip of Commit on a paused merge. {files} lists every file it commits (all of them, though the pause text names five at most); {target} is the branch."
+  },
+  "board.queue.pause.fetchFailed": {
+    "defaultMessage": "Fetching {target}’s remote failed (git’s message follows): a sign-in, the network or the address. Fix it, then resume.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel (HI-1183, “The target branch follows its remote”): before a test merge, fetching the remote branch the target ({target}: a branch) follows failed; git's own message follows."
+  },
+  "board.queue.pause.fetchFailedCatchUp": {
+    "defaultMessage": "Fetching {target}’s remote failed (git’s message follows), and {card}’s published merge still has to be brought into the local {target}. Fix the remote, then resume; or, if it is gone for good, turn off “The target branch follows its remote” and resume: {card}’s merge is then brought in from this repository.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel (HI-3055, HI-3128, “The target branch follows its remote”: the option's name, use its words): a card ({card}: its key) was merged and published to the remote, and bringing that merge into the local target ({target}: a branch) waits on a fetch of the remote, which failed; git's own message follows. With the option off, Combwork brings the merge in from the repository, without the remote."
   },
   "board.queue.pause.folderBusy": {
     "defaultMessage": "The folder {target} is checked out in was busy (an operation such as a merge or rebase was going on there).",
@@ -2779,9 +2935,25 @@
     "defaultMessage": "Needs you: Combwork stopped part way and changes nothing more on its own. Open the card for its state and the commands that finish or undo it.",
     "description": "Why a merge queue is paused, on its card in the Progress panel: something Combwork couldn't settle by itself (a merge stopped part way, or what an earlier run left). Open the card: a button beside it."
   },
+  "board.queue.pause.noUpstream": {
+    "defaultMessage": "{target} follows its remote, but it tracks no remote branch. {files, select, ready {If its remote hasn’t got {target} yet, publish it there (the first command below); if it has, set what {target} tracks (the two after it). Then resume; or turn off “The target branch follows its remote”.} choose {This repository has no remote, or several, that Combwork can name: in the commands below, the placeholder in angle brackets stands for the one {target} should follow. If it hasn’t got {target} yet, publish it there (the first command); if it has, set what {target} tracks (the two after it). Then resume; or turn off “The target branch follows its remote”.} shallow {This repository is a shallow clone, which follow mode can’t use: fetch its whole history (git fetch --unshallow), then publish {target} or set what it tracks, and resume; or turn off “The target branch follows its remote”.} ambiguous {The remote it would follow (named below) has several push addresses, or none, and follow mode publishes to exactly one: leave it one, then publish {target} or set what it tracks, and resume; or turn off “The target branch follows its remote”.} other {Publish it to its remote, or set the remote branch it tracks, then resume; or turn off “The target branch follows its remote”.}}",
+    "description": "Why a merge queue is paused, on its card in the Progress panel (HI-1183, HI-3128): the option “The target branch follows its remote” is on (its name: use its words), but the target ({target}: a branch) has no upstream branch, as a new version's branch made by Start the next version has. {files} (select, keep the keys) says what follows on the lines below, which are git commands (or a remote's name) shown as they are: ready, a remote Combwork can name, the commands that publish {target} there or set what it tracks; choose, none it can name, the commands with a placeholder in angle brackets for the user to replace; shallow, a shallow clone; ambiguous, the named remote has several push addresses or none; other, an older pause with no commands. Combwork runs none of them."
+  },
   "board.queue.pause.other": {
     "defaultMessage": "Paused ({reason}).",
     "description": "Why a merge queue is paused, on its card in the Progress panel, for a reason this window has no words for ({reason}: Combwork's code for it)."
+  },
+  "board.queue.pause.publishFailed": {
+    "defaultMessage": "{card} wasn’t published: the push to {target}’s remote couldn’t reach it (git’s message follows: the network, a sign-in or the address), so nothing was sent and {card} waits to be tested again. Fix it, then resume.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel (HI-3091, “The target branch follows its remote”): pushing the tested merge of a card ({card}: its key) to the remote branch the target ({target}: a branch) follows never reached the remote (offline, a refused sign-in, a moved repository); git's message follows. Nothing was sent; Resume tests and pushes it again."
+  },
+  "board.queue.pause.publishRefused": {
+    "defaultMessage": "{card} wasn’t published: the project’s pre-push hook or the remote refused the push to {target}’s remote (its message follows), so nothing changed there and {card} waits to be tested again. Settle it, then resume.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel (HI-1183, “The target branch follows its remote”): pushing the tested merge of a card ({card}: its key) to the remote branch the target ({target}: a branch) follows was refused by the project's pre-push hook or by the remote (a protected branch, say); their message follows. Nothing was published."
+  },
+  "board.queue.pause.publishUnknown": {
+    "defaultMessage": "Combwork pushed {card} to {target}’s remote but never heard whether it arrived, and the remote doesn’t show it now. Answer in For you whether it was published; resume to look at the remote again.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel (HI-1183, “The target branch follows its remote”): the answer to pushing a card's merge ({card}: its key) was lost (the network, a crash) and the remote branch doesn't contain it now, so Combwork asks the user (For you, glossary 2.3) rather than guess."
   },
   "board.queue.pause.pushFailed": {
     "defaultMessage": "{card} is merged, but pushing {target} failed (git’s message follows). Fix it, then resume; or turn off “Push the target branch after merging” and resume to keep merging locally.",
@@ -2791,6 +2963,10 @@
     "defaultMessage": "{card} is merged, but {target} has no remote to push to: it tracks none, and the repository has no origin or only remote. Add one or set what {target} tracks, then resume; or turn off “Push the target branch after merging” and resume.",
     "description": "Why a merge queue is paused, on its card in the Progress panel (G18): after merging a card ({card}: its key), the target ({target}: a branch) had nowhere to be pushed. Origin is git's usual name for a remote: keep it. “Push the target branch after merging” is a workflow option's name: use its words."
   },
+  "board.queue.pause.pushRefused": {
+    "defaultMessage": "{card} is merged, but the remote refused the push of {target} (its message follows: a protected branch, say, takes changes through pull requests). Settle it there, then resume; or turn off “Push the target branch after merging” and resume to keep merging locally.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel (G18, HI-1183): after merging a card ({card}: its key), the remote refused the push of the target ({target}: a branch) itself, for a rule of its own (a hook, a protected branch); its message follows. “Push the target branch after merging” is a workflow option's name: use its words."
+  },
   "board.queue.pause.pushRejected": {
     "defaultMessage": "{card} is merged, but its remote refused the push of {target}: it has commits {target} hasn’t (Combwork never forces a push). Pull them into {target}, then resume; or turn off “Push the target branch after merging” and resume to keep merging locally.",
     "description": "Why a merge queue is paused, on its card in the Progress panel (G18): after merging a card ({card}: its key), pushing the target ({target}: a branch) was refused because the remote has newer commits. “Push the target branch after merging” is a workflow option's name: use its words."
@@ -2799,9 +2975,29 @@
     "defaultMessage": "{card} is merged, and {target} still has to be pushed, but Combwork couldn’t read {target} to do it. Resume to try again; or turn off “Push the target branch after merging” and resume to keep merging locally.",
     "description": "Why a merge queue is paused, on its card in the Progress panel (G18): after merging a card ({card}: its key), Combwork couldn't read the target ({target}: a branch) to push it (git didn't answer), so the push still waits. “Push the target branch after merging” is a workflow option's name: use its words."
   },
+  "board.queue.pause.remoteAmbiguous": {
+    "defaultMessage": "{target}’s remote has {files, select, none {no push address} other {more than one push address ({files})}}, and Combwork publishes to exactly one. Leave it one, then resume.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel (HI-1183, “The target branch follows its remote”): the remote the target ({target}: a branch) tracks has several push URLs ({files}: them, without credentials) or none, and Combwork pushes to a single one. Keep the select keys and the word none."
+  },
+  "board.queue.pause.remoteDiverged": {
+    "defaultMessage": "The local {target} has commits its remote doesn’t, and Combwork never forces a push or merges them by itself. Push or pull them, then resume.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel (HI-1183, “The target branch follows its remote”): the local target branch ({target}) has commits the remote branch it follows lacks, so its merges can't be published there safely."
+  },
+  "board.queue.pause.remoteUnsupported": {
+    "defaultMessage": "Combwork can’t follow {target}’s remote here: the repository is a shallow clone, or this system can’t keep the remote’s sign-in settings safely. Fetch its whole history (git fetch --unshallow), then resume; or turn off “The target branch follows its remote”.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel (HI-1183): following the target's ({target}: a branch) remote needs the whole history (a shallow clone has only part) and a safe place for the sign-in settings Combwork captures (Windows' protection for stored secrets). Keep the git command as it is. The option's name: use its words."
+  },
   "board.queue.pause.rulesOff": {
     "defaultMessage": "The workflow's rules are off (Settings → Advanced), so the queue doesn't merge.",
     "description": "Why a merge queue is paused, on its card in the Progress panel: the workflow rules are turned off in Settings → Advanced."
+  },
+  "board.queue.pause.setAside": {
+    "defaultMessage": "Set Aside",
+    "description": "HI-2944: a button on a merge paused on uncommitted changes: sets the files named aside (a git stash Combwork names), then the merge goes on."
+  },
+  "board.queue.pause.setAsideTip": {
+    "defaultMessage": "Keep the changes to {files} in a git stash (git stash pop brings them back) and let the merge go on.",
+    "description": "HI-2944: tooltip of Set Aside on a paused merge. {files} lists every file it sets aside. Keep git stash pop as it is: a command."
   },
   "board.queue.pause.signing": {
     "defaultMessage": "Signing the merge commit failed.",
@@ -2812,8 +3008,8 @@
     "description": "Why a merge queue is paused, on its card in the Progress panel: git's commit signing asked for a passphrase or PIN, which Combwork can't type."
   },
   "board.queue.pause.staged": {
-    "defaultMessage": "Changes are staged in the folder {target} is checked out in. Commit or unstage them, then resume.",
-    "description": "Why a merge queue is paused, on its card in the Progress panel: the folder where the target ({target}: a branch) is checked out has staged changes."
+    "defaultMessage": "{files, select, none {Changes are staged in the folder {target} is checked out in. Commit them or set them aside, and the merge goes on.} other {{count, plural, one {{files} is staged in the folder {target} is checked out in. Commit it or set it aside, and the merge goes on.} other {{files} are staged in the folder {target} is checked out in. Commit them or set them aside, and the merge goes on.}}}}",
+    "description": "Why a merge queue is paused, on its card in the Progress panel: the folder where the target ({target}: a branch) is checked out has staged changes ({files}: a list of the staged files' names, five at most, or none; {count}: how many files are staged in all). HI-2944: Commit and Set Aside are buttons beside it, acting on those files. Keep the select keys and the word none."
   },
   "board.queue.pause.subfolderTarget": {
     "defaultMessage": "This project is inside a larger repository, so the queue merges only into a branch the card’s options name. Name it in Version Control → Workflow, apply it to {card} when you save, then resume; or remove {card} from the queue.",
@@ -2828,8 +3024,8 @@
     "description": "Why a merge queue is paused, on its card in the Progress panel: its checks passed but didn't count (the folder changed during them, say). Glossary 2.3: merge checks; 2.4: work."
   },
   "board.queue.pause.unstagedChanges": {
-    "defaultMessage": "{files, select, none {Files the merge changes} other {{files}}} have changes in the folder {target} is checked out in. Commit or undo them, then resume.",
-    "description": "Why a merge queue is paused, on its card in the Progress panel: files the merge would change ({files}: a list of names) have changes in the folder where the target ({target}: a branch) is checked out. Keep the select keys and the word none."
+    "defaultMessage": "{files, select, none {Files the merge changes have uncommitted changes in the folder {target} is checked out in. Commit them or set them aside, and the merge goes on.} other {{count, plural, one {{files} has uncommitted changes in the folder {target} is checked out in. Commit it or set it aside, and the merge goes on.} other {{files} have uncommitted changes in the folder {target} is checked out in. Commit them or set them aside, and the merge goes on.}}}}",
+    "description": "Why a merge queue is paused, on its card in the Progress panel: files the merge would change ({files}: a list of names, five at most, or none; {count}: how many in all) have changes in the folder where the target ({target}: a branch) is checked out. HI-2944: Commit and Set Aside are buttons beside it; HI-2951: one file agrees as one. Keep the select keys and the word none."
   },
   "board.queue.pause.wrongBranch": {
     "defaultMessage": "The folder {target} was checked out in is on another branch now.",
@@ -2876,8 +3072,8 @@
     "description": "Under Recent merges in the Progress panel's Merges tab, when the merge queue has merged, returned or paused nothing yet (or nothing of the agent the panel is filtered to)."
   },
   "board.queue.recent.paused": {
-    "defaultMessage": "Paused: {reason, select, user {by you} assistant {by the Assistant} pushRejected {the remote refused the push} pushFailed {the push failed} pushNoRemote {no remote to push to} pushUnreadable {couldn’t read the branch to push it} targetMovesFast {the branch kept moving} folderBusy {its folder was busy} wrongBranch {its folder changed branch} staged {changes staged in its folder} unstagedChanges {changes in its folder} identity {no commit identity} needsYou {needs you} uncounted {the checks didn’t count} checkedOut {the branch was checked out} rulesOff {the rules were off} signingWaits {signing waited for you} signing {signing failed} hookTimedOut {a hook ran too long} subfolderTarget {no target branch named} mergeChoice {waiting for how to merge} approval {waiting for your OK} focusedSkip {waiting for your OK to skip focused tests} other {{code}}}",
-    "description": "A pause in the Progress panel's Recent merges (Merges tab): the merge queue paused, and why in a few words (by the user or the Assistant; the push of the target branch refused, failed, with no remote or unreadable (G18); the branch moving, its checked-out folder busy, on another branch, with staged or other changes; no git identity; needs the user; checks that didn't count; rules off; commit signing; a git hook; no target branch for a project in a subfolder; the merge style choice after the upgrade; the user's approval; skipping focused tests). Else {code}, Combwork's code for it. Lower case after the colon. Keep the select keys."
+    "defaultMessage": "Paused: {reason, select, user {by you} assistant {by the Assistant} pushRejected {the remote refused the push} pushFailed {the push failed} pushNoRemote {no remote to push to} pushUnreadable {couldn’t read the branch to push it} pushRefused {the remote refused the push} publishRefused {the push to the remote was refused} publishFailed {the push couldn’t reach the remote} noUpstream {no remote branch tracked} remoteAmbiguous {not one push address} remoteUnsupported {can’t follow the remote here} fetchFailed {the fetch failed} remoteDiverged {local commits the remote lacks} publishUnknown {waiting for your answer about a push} targetMovesFast {the branch kept moving} folderBusy {its folder was busy} wrongBranch {its folder changed branch} staged {changes staged in its folder} unstagedChanges {changes in its folder} identity {no commit identity} needsYou {needs you} uncounted {the checks didn’t count} checkedOut {the branch was checked out} rulesOff {the rules were off} signingWaits {signing waited for you} signing {signing failed} hookTimedOut {a hook ran too long} subfolderTarget {no target branch named} mergeChoice {waiting for how to merge} approval {waiting for your OK} focusedSkip {waiting for your OK to skip focused tests} other {{code}}}",
+    "description": "A pause in the Progress panel's Recent merges (Merges tab): the merge queue paused, and why in a few words (by the user or the Assistant; the push of the target branch refused, failed, with no remote or unreadable (G18); following the remote (HI-1183): the push refused, no remote branch tracked, not one push address, a shallow clone, the fetch failed, local commits the remote lacks, a push whose outcome the user is asked about; the branch moving, its checked-out folder busy, on another branch, with staged or other changes; no git identity; needs the user; checks that didn't count; rules off; commit signing; a git hook; no target branch for a project in a subfolder; the merge style choice after the upgrade; the user's approval; skipping focused tests). Else {code}, Combwork's code for it. Lower case after the colon. Keep the select keys."
   },
   "board.queue.recent.push": {
     "defaultMessage": "{state, select, pushed {Pushed} pending {Not pushed yet} off {Not pushed: pushing was turned off} reset {Not pushed: the branch no longer had it} other {Push not recorded}}",
@@ -2907,6 +3103,10 @@
     "defaultMessage": "Couldn't remove the card from the queue",
     "description": "An error's title: Remove from queue failed (Progress panel); its message says why (its merge has begun, say)."
   },
+  "board.queue.removeForwardMessage": {
+    "defaultMessage": "It ends in Done and nothing is merged: {to} isn't brought up to date with {from}. To try again later, use Bring Up to Date… on {to}'s queue.",
+    "description": "HI-3084: the confirmation before Remove from queue on a forward merge card (Combwork's own card bringing branch {to} up to date with branch {from}): it has no builder, so it ends in Done (a stage, glossary 2.2) with nothing merged. Bring Up to Date… is a button on the merge queue's card: as translated there."
+  },
   "board.queue.removeMessage": {
     "defaultMessage": "It goes back to Approved and isn't merged. Its builder is told. To merge it later, requeue it from the card.",
     "description": "The confirmation before Remove from queue (Progress panel). Approved is a stage (glossary 2.2)."
@@ -2928,8 +3128,8 @@
     "description": "An error's title: Resume queue failed (Progress panel)."
   },
   "board.queue.returnWhy": {
-    "defaultMessage": "{reason, select, conflict {{files, select, none {conflict} other {conflict in {files}}}} checks {{check, select, none {checks failed} other {checks failed: {check}}}} hook {a hook failed} folderBusy {the folder {target} is checked out in was busy} notUpToDate {not up to date with {target}} focused {its focused tests couldn’t be chosen or proved} other {{why}}}",
-    "description": "Why the merge queue returned a card to its builder, in a few words after a colon: a conflict (in {files}: file names), its merge checks failed ({check}: the check, such as unit), a git hook failed, the folder the target ({target}: a branch) is checked out in was busy, or it wasn't up to date with the target, or its focused tests (G20: the tests its change needs) couldn't be chosen or proved by its review; else {why} as Combwork recorded it. Lower case. Keep the select keys and the word none."
+    "defaultMessage": "{reason, select, conflict {{files, select, none {conflict} other {conflict in {files}}}} checks {{check, select, none {checks failed} other {checks failed: {check}}}} hook {a hook failed} folderBusy {the folder {target} is checked out in was busy} notUpToDate {not up to date with {target}} focused {its focused tests couldn’t be chosen or proved} direction {against the release path’s direction, no override} resolution {the commit it resolves was copied, not merged} targetMoved {{target} moved while it was being merged} pushRefused {publishing it to {target}’s remote was refused} notPublished {its publication to {target}’s remote didn’t happen} other {{why}}}",
+    "description": "Why the merge queue returned a card to its builder, in a few words after a colon: a conflict (in {files}: file names), its merge checks failed ({check}: the check, such as unit), a git hook failed, the folder the target ({target}: a branch) is checked out in was busy, or it wasn't up to date with the target, or its focused tests (G20: the tests its change needs) couldn't be chosen or proved by its review, or (direction, HI-2892) it was a forward merge against the release path's direction (into an older version or main) made without the user's override, or (resolution, HI-2999) a card resolving a forward merge's conflict lacks the commit it resolves, its changes cherry-picked or copied rather than merged, or the target moved during the merge, or publishing the merge to the target's remote was refused (a pre-push hook or the remote), or the user said its publication didn't happen; else {why} as Combwork recorded it. Lower case. Keep the select keys and the word none."
   },
   "board.queue.returned": {
     "defaultMessage": "{card} returned: {why}",
@@ -3006,6 +3206,42 @@
   "board.readOnly.newer": {
     "defaultMessage": "This board was saved by a newer version of Combwork: it is read-only here.",
     "description": "Tooltip on what changes cards (the board's add-card buttons, the card dialog's Save, comments and decisions), disabled while the board was saved by a newer Combwork (whose format this one can't change); also a banner in the card dialog."
+  },
+  "board.releaseOffer.drop": {
+    "defaultMessage": "{n, plural, one {{branches} is released and nothing uses it: take it off Other branches work can merge into?} other {{branches} are released and nothing uses them: take them off Other branches work can merge into?}}",
+    "description": "HI-3155: the cleanup part of a release offer: branches listed under Other branches work can merge into that are released and unused ({branches}: their names, joined; {n} how many). Other branches work can merge into is an option’s name: as translated there."
+  },
+  "board.releaseOffer.failed": {
+    "defaultMessage": "The release offer couldn’t be put off",
+    "description": "HI-3155: a notification’s title: Not now on a release offer failed; the reason follows."
+  },
+  "board.releaseOffer.kept": {
+    "defaultMessage": "{n, plural, one {{branches} is released but still in use, so it stays.} other {{branches} are released but still in use, so they stay.}}",
+    "description": "HI-3155: released branches under Other branches work can merge into that cards, lanes or slots still use ({branches}: each name with what uses it, joined; {n} how many)."
+  },
+  "board.releaseOffer.move": {
+    "defaultMessage": "{project}: {target} is released ({dated, select, yes {{tag}, tagged {date, date, medium}} other {{tag}}}, merged into {into}). {how, select, move {Move Work merges into to {next}?} start {Start {next}, the next version?} other {}}",
+    "description": "HI-3155: a release offer (For you, a project’s own item): the project’s Work merges into ({target}) is released: a tag named after it ({tag}, as v1.4.0) and merged into the default branch ({into}). dated yes: the tag’s own date. how move: offers to move Work merges into to the next version ({next}, which exists); start: offers to start it ({next} doesn’t exist yet); other: no next version. Work merges into is an option’s name: as translated there."
+  },
+  "board.releaseOffer.moveButton": {
+    "defaultMessage": "Move…",
+    "description": "HI-3155: a release offer’s button: fills the change into Version Control → Workflow and opens its Save… (with what can follow). The ellipsis: a dialog follows."
+  },
+  "board.releaseOffer.notNow": {
+    "defaultMessage": "Not now",
+    "description": "HI-3155: a release offer’s button: hides it until it changes (a new release, the next version made)."
+  },
+  "board.releaseOffer.removeButton": {
+    "defaultMessage": "Remove…",
+    "description": "HI-3155: a release offer’s button when it only takes released branches off Other branches work can merge into: opens Workflow’s Save… with that change."
+  },
+  "board.releaseOffer.stale": {
+    "defaultMessage": "The release offer changed since it was shown: here it is as it is now.",
+    "description": "HI-3155: a notification: a release offer’s button found the offer changed (or gone); the offers are read again."
+  },
+  "board.releaseOffer.startButton": {
+    "defaultMessage": "Start {next}…",
+    "description": "HI-3155: a release offer’s button: opens Start the next version for {next} (a branch name, as 1.5.0)."
   },
   "board.restore09.done": {
     "defaultMessage": "The 0.9 board is back",
@@ -3455,6 +3691,10 @@
     "defaultMessage": "Its builder waits for its reviewer to check the follow-up it posted. Show the reviewer and ask it to answer it.",
     "description": "Tooltip on a card stalled in Review or Passed (#1467): in a card loop, the builder posted a follow-up for its reviewer to check (a change asked of reviewed work, such as a screenshot's), and nobody answered."
   },
+  "board.stall.hintForward": {
+    "defaultMessage": "Combwork’s own card, which no agent works on: open it and choose in its Work section.",
+    "description": "HI-2959: tooltip on a forward merge card (Combwork's own card bringing one branch up to date with another) back from the merge queue in the Active column: no agent works on it, so the user chooses what to do in the card dialog's Work section."
+  },
   "board.stall.hintLaneOrder": {
     "defaultMessage": "Its builder and its lane's reviewer are each waiting for the other. Ask the builder to send the card its reviewer waits for, or ask the reviewer to review this one.",
     "description": "Tooltip on a card stalled in Review by its card loop's deadlock: the builder sent this card to Review and waits for its verdict, while the loop's reviewer waits for another card of the loop to arrive."
@@ -3490,6 +3730,10 @@
   "board.stalled.followUpWait": {
     "defaultMessage": "{builder} posted a follow-up on {card} for its reviewer to check and has waited {waited}: nobody has answered it.",
     "description": "Why a card in Review or Passed is stalled (#1467): in a card loop, its builder ({builder}, an agent's name) posted a follow-up for its reviewer to check (a change asked of reviewed work, such as a screenshot's), and is only waiting; no reviewer answered. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none; {waited} how long (\"40 min\", \"2 h 5 min\")."
+  },
+  "board.stalled.forwardWaits": {
+    "defaultMessage": "A forward merge the merge queue returned ({from} into {to}): no agent works on it, so it waits for you. {removeOnly, select, yes {It went against the release path's direction: Remove from queue ends it.} other {Open it for Retry merge, Resolve on a Builder… or Remove from queue.}}",
+    "description": "HI-2959: why a forward merge card (Combwork's own card bringing branch {to} up to date with {from}) in the Active column has no agent, on the card: it came back from the merge queue and waits for the user. removeOnly yes: refused for the release path's direction (only Remove from queue). Keep the select keys; the commands as translated in the card's Work section."
   },
   "board.stalled.laneOrderWait": {
     "defaultMessage": "{reviewer} is waiting for {other}, before {card} in the lane, while {builder} waits on the review of {card}: each has waited on the other for {waited}.",
@@ -3646,6 +3890,14 @@
   "board.target.field": {
     "defaultMessage": "Merges into",
     "description": "HI-2556: a field label in the card dialog: the branch the card’s work is made from and merges into (Darren’s name for it)."
+  },
+  "board.target.kept": {
+    "defaultMessage": "Its work is kept on {branch}: it starts there again, whatever this says.",
+    "description": "HI-3129: a note under the card dialog’s Merges into, for a card put back whose work is kept (in its slot) on another branch or bookmark ({branch}) than the one the field shows: its next start carries on there. Changing the field doesn’t move that work."
+  },
+  "board.target.keptUnknown": {
+    "defaultMessage": "Its work is kept in a slot whose branch Combwork can’t read now: it won’t start until it can.",
+    "description": "HI-3129: a note under the card dialog’s Merges into, for a card put back whose kept work’s branch or bookmark can’t be read now: its start is refused until it can be, never started on the one the field shows."
   },
   "board.target.mark": {
     "defaultMessage": "Into {branch}",
@@ -3855,9 +4107,17 @@
     "defaultMessage": "The pass for {from} carries over to {to}: the same change.",
     "description": "A mark in the card dialog's Work section: a pass for an earlier revision ({from}) still counts for a later one ({to}) with exactly the same changes. Glossary: carries over, same change."
   },
+  "board.work.change": {
+    "defaultMessage": "{commits, plural, one {change {change}} other {change {change}, # commits}}",
+    "description": "Beside a jj card's revision in the card dialog's Work section (HI-2869): its jj change id (short), and how many commits its submitted work holds when more than one. “change” is jj's term."
+  },
   "board.work.check": {
     "defaultMessage": "{name}: {result, select, passed {passed} failed {failed} other {stopped}}{counted, select, no { (not counted)} other {}}",
     "description": "A check under a revision in the card dialog's Work section: its name (typecheck, as the project names it), then a colon and how it ended; (not counted) when it doesn't count for the revision (its hover says why). Keep the select keys. Glossary: check."
+  },
+  "board.work.doneUnproved": {
+    "defaultMessage": "Done by you, integration not proved ({when}).",
+    "description": "The card dialog's Work section (HI-2924): the user moved this jj card to Done themselves, and Combwork couldn't prove its change is in its target (a conflict resolved by hand changes the change). Their Done counts as their word that it's integrated. {when}: a date and time."
   },
   "board.work.failed": {
     "defaultMessage": "Couldn’t read the card’s work: {error}",
@@ -3914,6 +4174,10 @@
   "board.work.notRead": {
     "defaultMessage": "{note, select, beforeChange {Not read when its work started} noTarget {Not read: there was no target branch to start from} other {Combwork couldn't read {why}}}",
     "description": "In the card dialog's Work section, in place of a branch, base or target Combwork couldn't read when the card's work started. {note} picks why: Combwork read nothing as the work started (beforeChange), it had no target branch to find the base from (noTarget), or another reason, {why}: what Combwork couldn't read (such as \"the latest commit in …\", already translated). Keep the select keys. Glossary: target branch."
+  },
+  "board.work.notReady": {
+    "defaultMessage": "Not started in {slot} yet: {stale, select, yes {another jj workspace rewrote its working copy, so it is stale. Recover it under Version Control → Slots and copies, and the card is prepared there again.} other {Combwork couldn’t get it ready ({why}).}}",
+    "description": "The card dialog's Work section (HI-2913): the card's slot ({slot}, slot-a) couldn't be prepared for its start, so its work hasn't started there. {stale} yes: the slot is a stale jj workspace (another workspace rewrote the commit it works on), which the user mends with Recover… in the Slots and copies list; other: {why} is the reason, in English as its builder was told. Keep the select keys."
   },
   "board.work.openFile": {
     "defaultMessage": "Open {path} in Files",
@@ -3982,6 +4246,14 @@
   "board.work.verdict": {
     "defaultMessage": "{reviewer}: {pass, select, yes {passed} other {failed}}{current, select, no { (no longer counts)} other {}}",
     "description": "A verdict under a revision in the card dialog's Work section: who reviewed it ({reviewer}, an agent's name, then a colon) and whether it passed or failed; (no longer counts) when a newer revision or decision came since. Keep the select keys. Glossary: verdict, pass/fail."
+  },
+  "board.work.via": {
+    "defaultMessage": "{via, select, ancestry {(found in its history)} replay {(its change found applied again)} sameTree {(the target already had it)} candidate {(from a prepared candidate)} other {}}",
+    "description": "After how a jj card went into its target, in the card dialog's Work section (HI-2869): how jj proved it was there. Keep the select keys; other stays empty."
+  },
+  "board.work.workspace": {
+    "defaultMessage": "Workspace",
+    "description": "A label in the card dialog's Work section (HI-2869): the jj workspace (a slot) a jj card's work is in follows. “workspace” is jj's term."
   },
   "board.workQueue.advance": {
     "defaultMessage": "Tested and ready: update {target} in its folder now?",
@@ -4059,6 +4331,14 @@
     "defaultMessage": "{n, plural, one {# file, and where it is} other {# files, and where each is}}",
     "description": "A sub-heading in the card dialog's Work section, over the files a stopped merge left: how many ({n}), and for each whether it is as before the merge, as merged, or neither."
   },
+  "board.workQueue.forwardNext": {
+    "defaultMessage": "No agent works on a forward merge: it waits for you. Retry merge tries again with {from} as it is then; Resolve on a builder ends it and makes a card for a builder to merge {from} into {to} by hand; Remove from queue ends it, nothing merged.",
+    "description": "HI-2959: the card dialog's Work section, on a forward merge card (Combwork's own card bringing branch {to} up to date with branch {from}) the merge queue returned with a conflict or a red check: no agent may act on it, so the user (or the Assistant) chooses. Retry merge, Resolve on a builder and Remove from queue are commands: as translated there."
+  },
+  "board.workQueue.forwardRemoveOnly": {
+    "defaultMessage": "No agent works on a forward merge: it waits for you. It went against the release path’s direction ({from} into {to}), so it can’t be merged or handed to a builder: Remove from queue ends it, nothing merged.",
+    "description": "HI-3084: the card dialog's Work section, on a forward merge card (Combwork's own card bringing branch {to} up to date with branch {from}) the merge queue returned because it would merge against the release path's direction (an older version from a newer one, say): only Remove from queue ends it. Remove from queue is a command: as translated there."
+  },
   "board.workQueue.heading": {
     "defaultMessage": "Merge queue",
     "description": "A sub-heading in the card dialog's Work section: where the card stands in the merge queue follows. Glossary 2.5: merge queue."
@@ -4090,6 +4370,34 @@
   "board.workQueue.queuedNoPlace": {
     "defaultMessage": "Queued for {target}",
     "description": "The card dialog's Work section: the card waits in the merge queue for the branch {target} (its place isn't known here: another Combwork runs the queue)."
+  },
+  "board.workQueue.remove": {
+    "defaultMessage": "Remove from Queue…",
+    "description": "HI-3084: a button in the card dialog's Work section on a forward merge card the merge queue returned (or whose merge was declined): ends it in Done, nothing merged (asks first). Title case, as the window's buttons."
+  },
+  "board.workQueue.resolve": {
+    "defaultMessage": "Resolve on a Builder…",
+    "description": "HI-2959: a button in the card dialog's Work section on a forward merge card the merge queue returned: ends it and makes an ordinary card for an agent (a builder) to do the merge by hand and resolve its conflict (asks first). Title case, as the window's buttons."
+  },
+  "board.workQueue.resolveConfirm": {
+    "defaultMessage": "Resolve on a Builder",
+    "description": "HI-2959: the button confirming Resolve on a builder. Keep it short."
+  },
+  "board.workQueue.resolveFailed": {
+    "defaultMessage": "Couldn't hand the forward merge to a builder",
+    "description": "HI-2959: an error's title: Resolve on a builder failed (the card dialog); its message says why."
+  },
+  "board.workQueue.resolveMessage": {
+    "defaultMessage": "{card} ends, nothing merged, and a new card is made on {to} for a builder: it merges {from} at {revision} into its branch, resolves the conflict and goes through review and the merge queue like any card, as a merge commit. Give the new card to a builder or a lane.",
+    "description": "HI-2959: the confirmation before Resolve on a builder. {card}: the forward merge card's key; {from}, {to}: branch names; {revision}: a short commit id (the attempt that came back)."
+  },
+  "board.workQueue.resolveTitle": {
+    "defaultMessage": "Resolve {card} on a builder?",
+    "description": "HI-2959: title of the confirmation before Resolve on a builder ({card}: the forward merge card's key)."
+  },
+  "board.workQueue.resolved": {
+    "defaultMessage": "Made {card} for a builder to resolve it.",
+    "description": "HI-2959: a notification after Resolve on a builder: the new card ({card}: its key) was made; give it to a builder."
   },
   "board.workQueue.result": {
     "defaultMessage": "The merge",

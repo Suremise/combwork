@@ -23,7 +23,7 @@ const endHelper = (pid: number | null): number => (pid ? endExactly(identify([pi
 // Every child gets the run context's allowlisted environment, never the shell's (a NODE_OPTIONS preload, a GIT_DIR).
 const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 
-vi.mock('../src/main/events', () => ({ emit: () => undefined, toast: () => undefined }))
+vi.mock('../src/main/events', () => ({ emit: () => undefined, toast: () => undefined, onCombworkEvent: () => () => undefined }))
 // Combwork's profile, where leftovers.json is kept: this file's own.
 const profile = vi.hoisted(() => ({ dir: '' }))
 vi.mock('electron', async (importOriginal) => {

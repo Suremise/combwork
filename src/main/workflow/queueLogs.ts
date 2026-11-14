@@ -12,6 +12,11 @@ export const pauseLogKey = (target: string): string => `queue.pauseLog:${target}
 export const pushPendingKey = (target: string): string => `queue.pushPending:${target}`
 /** The settled pushes, newest first, at most QUEUE_LOG_MAX: the panel's only. */
 export const pushLogKey = (target: string): string => `queue.pushLog:${target}`
+/**
+ * HI-3177: when a past branch's queue history was purged (an ISO time): its outcomes and requests at or before it are no
+ * longer the queue's (its cards keep their own facts), so the target isn't listed until a request after it.
+ */
+export const purgedKey = (target: string): string => `queue.purged:${target}`
 
 /** A merge owed its push: its entry and the target's commit it made. */
 export interface PushPending {

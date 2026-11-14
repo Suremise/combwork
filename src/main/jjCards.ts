@@ -1,0 +1,174 @@
+// jj's card work's dependencies, composed by the app (HI-2868, J9b1; design HI-2868/s7 §1, s13): what JjPlatform needs
+// beside jj, from the app's own services, so platform code imports no app module. Given to each project's workflow
+// through service.ts' `setJjCards` (slotCards.ts sets it while slots run). Real cards use it since J9e (HI-2874).
+//
+// - the jj workspace port: J9a's registered one (slotsApp.ts' jjPort), with its bindings in the workspace database;
+// - the store's lock: the app's re-entrant store lock (the repository lock, one per store);
+// - git on the store, as `git --git-dir <store>`;
+// - J5's reads (jjTargetHead): pinned reads in the project's folder (`--at-op`: no snapshot), git on the store, §16.3.2's
+//   containment on the store, the bundles' journal in board_meta (J9b2's);
+// - the card's lease and slot rows, read synchronously in the write under way (the final Submitted transaction's);
+// - the pins' ownership records in board_meta.
+
+import { knownStamp, setupStampOf } from './jjSetupStamp'
+import { basename } from 'path'
+import { git } from './git'
+import { jjRunner, storeGatedHistory, storeGitGated } from './platform/jjRunner'
+import { historyFor } from './platform/historyPorts'
+import { jjContextOf } from './platform/jjDetect'
+import { boundaryOf, canonicalStore } from './platform/repoBoundary'
+import { JjStoreChanged } from './platform/jjWorkspacePort'
+import type { JjCardDeps, JjPinRecord } from './platform/jjPlatform'
+import type { JjBundle, JjIntegrationDeps } from './platform/jjIntegration'
+import { boardConn, jjPort, storeLock } from './slotsApp'
+import { boardFile } from './boardStore'
+import { commitPublishOff } from './jjPublish'
+import { mergeBundles, type SqlDb } from './platform/jjObligations'
+import { SlotStore } from './slots'
+import { attemptsKey, readAttempts, saveAttemptIn } from './platform/jjCandidateStep'
+import type { WorkspaceService } from './workspace'
+import { candidateCheckLease, candidateLeaseBack, candidateRun, copyAt, copyLeaseFreed, parkCandidateCopies, takeStopped } from './copiesApp'
+import { appQueueChecks } from './workflow/queueChecksApp'
+import { jobSpawn } from './workflow/jobSpawn'
+import type { Spawn } from './workflow/queueChecks'
+
+/** A project's jj card dependencies in a workspace. `projectId`: the slot tables' id of the project (as poolFor keys it). */
+export function jjCardsFor(ws: WorkspaceService, projectPath: string, projectId: () => string): JjCardDeps {
+  const slots = (): SlotStore => new SlotStore(boardConn(ws), projectId() || basename(projectPath))
+  const journal = (key: string) => slots().journal(key)
+  // Under Combwork's file gate for the store (HI-2918): a jj write of Combwork's exporting there never meets its reads.
+  const gitOn = (store: string, args: readonly string[]) => {
+    const full = ['--git-dir', store, ...args]
+    return storeGitGated(store, full, () => git(store, full))
+  }
+  return {
+    runner: jjRunner,
+    port: () => jjPort(),
+    lock: (store) => (fn) => storeLock(store, fn),
+    git: gitOn,
+    // Git's history of the jj store, under Combwork's file gate for it (HI-2918).
+    history: storeGatedHistory(historyFor('git')),
+    integration: async (): Promise<JjIntegrationDeps | null> => {
+      const d = await jjContextOf(projectPath, jjRunner).catch(() => null)
+      if (!d || !('jj' in d)) return null
+      const ctx = d.jj
+      return {
+        runner: jjRunner,
+        view: { jjRepo: ctx.jjRepo, store: ctx.store, colocated: ctx.colocated },
+        folder: projectPath,
+        git: (args) => gitOn(ctx.store, args),
+        gitContains: (store, target, c, at) => storeGatedHistory(historyFor('git')).contains(store, target, c, at),
+        // The store checked again inside its lock (HI-2896, s13 §3): a colocation change since this context was read
+        // refuses before any pin or journal write.
+        lock: (fn) =>
+          storeLock(ctx.store, async () => {
+            const b = await boundaryOf(ctx.root)
+            const now = 'jj' in b && !ctx.colocated ? b.jj.store : 'colocated' in b && ctx.colocated ? b.colocated.store : null
+            if (!now || (await canonicalStore(now)) !== (await canonicalStore(ctx.store))) throw new JjStoreChanged(ctx.root)
+            return fn()
+          }),
+        // Merged in one write with what is journalled (HR1's round 1): an observer's older snapshot never erases a bundle
+        // another observer's proof journalled.
+        journal: (card: string, cycle: number, bundles: JjBundle[]) =>
+          boardConn(ws).write((db) => {
+            const key = `jj_bundles:${card.toLowerCase()}:${cycle}`
+            const r = db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined // i18n-ignore: SQL
+            let stored: JjBundle[] = []
+            try {
+              const v = r ? (JSON.parse(r.value) as unknown) : []
+              stored = Array.isArray(v) ? (v as JjBundle[]) : []
+            } catch {
+              stored = []
+            }
+            db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify(mergeBundles(stored, bundles))) // i18n-ignore: SQL
+          })
+      }
+    },
+    slotHold: (lease, expect) => {
+      const store = slots()
+      const l = store.lease(lease)
+      if (!l) return null
+      const s = store.slot(l.slot)
+      if (!s) return null
+      const held = !l.to && l.slot === expect.slot && l.agent === expect.agent && (l.card === null || l.card === expect.card) && !s.op && !s.job && (!s.writer || (s.writer.lease === lease && s.writer.agent === expect.agent))
+      return { held, print: `lease:${l.to ? 'ended' : 'open'}:${l.slot}:${l.agent}:${l.card ?? '-'}:${s.op ? s.op.token : '-'}:${s.job ?? '-'}:${s.writer ? s.writer.run : '-'}` }
+    },
+    // J9b2's (HI-2882): the project's rows on the workspace database, its bundles' journal, and the publish worker.
+    records: {
+      projectId: () => projectId() || basename(projectPath),
+      dbFile: () => boardFile(ws.path!),
+      read: (fn) => boardConn(ws).read((db) => fn(db as unknown as SqlDb)),
+      write: async (fn) => void (await boardConn(ws).write((db) => fn(db as unknown as SqlDb))),
+      bundles: (card, cycle) => {
+        const v = journal(`jj_bundles:${card.toLowerCase()}:${cycle}`).read()
+        return Array.isArray(v) ? (v as JjBundle[]) : []
+      },
+      publish: (req) => commitPublishOff(req),
+      // HI-2871: a card and cycle's candidate attempts (J4's records with their fingerprints), one board_meta row merged
+      // by attempt in one write: a later phase of one attempt never erases another's entry.
+      attempts: (card, cycle) => {
+        const key = attemptsKey(projectId() || basename(projectPath), card, cycle)
+        return boardConn(ws).read((db) => readAttempts(db as unknown as SqlDb, key))
+      },
+      saveAttempt: async (card, cycle, e) => {
+        const key = attemptsKey(projectId() || basename(projectPath), card, cycle)
+        await boardConn(ws).write((db) => saveAttemptIn(db as unknown as SqlDb, key, e))
+      }
+    },
+    pins: {
+      read: (ref) => {
+        const v = journal(`jj_pin:${ref}`).read() as JjPinRecord | { unreadable: true } | null
+        return v && 'seq' in v ? v : null
+      },
+      write: (ref, rec) => journal(`jj_pin:${ref}`).write(rec)
+    },
+    // HI-2938: the merge checks on a candidate: a check copy of the project's pool at the candidate's commit, its job
+    // holding every process (jobSpawn), the merge queue's runner placed in the copy (Stop ends the lease's job).
+    candidateChecks: {
+      // The setup command with its stamp read just before it (a change between them changes the stamp read after: the
+      // result's publication then refuses, HR1's round 1 finding 3; HI-3122: the command's own, not the file's).
+      setup: async () => {
+        const stamp = setupStamp()
+        const setup = (await ws.projectConfig(projectPath).catch(() => null))?.worktreeSetup ?? ''
+        return { setup, stamp }
+      },
+      setupStamp: () => setupStamp(),
+      knownStamp: (stamp) => knownStamp(stamp),
+      lease: async (card, revision) => {
+        const r = await candidateCheckLease(ws, projectPath, card, revision)
+        if (!('lease' in r)) return r
+        const id = r.lease.id
+        return { id, folder: r.folder, spawn: jobSpawn(r.job), copy: r.copy, give: (why: string, end?: boolean) => candidateLeaseBack(ws, projectPath, id, why, !!end) }
+      },
+      parkCopies: (at, to) => parkCandidateCopies(ws, projectPath, at, to),
+      leaseFreed: (id) => copyLeaseFreed(ws, projectPath, id),
+      runCheck: (name, command, folder, ctx, spawn) => checksIn(folder, spawn).runCheck(name, command, folder, ctx),
+      install: (folder, ctx, spawn) => checksIn(folder, spawn).install(folder, true, ctx),
+      stopped: (run) => takeStopped(run),
+      // The workspace's life: its close ends a running check's job and gives the lease back (HI-2938/s11 §3).
+      signal: ws.lifetime
+    }
+  }
+
+  /**
+   * HI-3122: the stamp of the project's setup command now, synchronously (jjSetupStamp.ts): what else project.json gains
+   * (an agent's new conversation, any other setting) leaves it as it was, so it no longer ends a running check.
+   */
+  function setupStamp(): string {
+    return setupStampOf(projectPath)
+  }
+
+  /** The queue's runner for a check copy: its runs in the copy (stoppable), each run its lease's ref as it starts. */
+  function checksIn(folder: string, spawn: Spawn): ReturnType<typeof appQueueChecks> {
+    const at = (async () => copyAt(ws, projectPath, folder))()
+    return appQueueChecks(
+      ws,
+      projectPath,
+      spawn,
+      (run) => {
+        if (run) void at.then((c) => (c?.lease ? candidateRun(ws, projectPath, c.lease.id, run) : undefined)).catch(() => undefined)
+      },
+      { copy: basename(folder), stoppable: true }
+    )
+  }
+}

@@ -103,6 +103,10 @@
     "text": "Combwork does not check merges: report each one with cw_report_merge.",
     "note": "Finish: merges aren't checked."
   },
+  "brief.rule.finish.userIntegrates": {
+    "text": "The user integrates each approved card into its target with jj; Combwork does not merge it.",
+    "note": "Finish (jj, HI-2799): the user integrates."
+  },
   "brief.rule.off": {
     "text": "Workflow rules are off in this project: the cards move as you put them (cw_update_task).",
     "note": "The only rule while workflow rules are off."

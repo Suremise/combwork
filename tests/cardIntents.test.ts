@@ -20,6 +20,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { FactStore } = await import('../src/main/workflow/factStore')
+const { reconcilersIdle } = await import('../src/main/workflow/reconciler')
 const { advanced } = await import('../src/main/advanced')
 const service = await import('../src/main/workflow/service')
 const { ENFORCE } = service
@@ -147,9 +148,19 @@ describe('a card by intent (#1267)', () => {
     // A comment never moves an Approved card (S2).
     await inWorkspace(w, () => tasks.commentTask(card, 'A thought after the pass', builder))
     expect(foldCard(facts(w, card)).stage).toBe('approved')
-    // The builder merges it and reports the merge: Done, its merge checked.
-    git(repo, 'merge', '-q', '--no-ff', '-m', 'merge card', 'card')
-    const merged = await act(w, card, builder, { kind: 'reportMerge' })
+    // The builder merges it and reports the merge: Done, its merge checked. Combwork's reconciler follows the project from
+    // the approval and, finding the merge first (its watcher's run, 400 ms after it, ahead of a slow report under load),
+    // moves the card to Done itself: the report is then refused from there (HI-3154), as it should be. Held as Repair holds
+    // it (no new run reads a line meanwhile), any run under way finished first, the report is the one this test checks.
+    w.repairingMove = true
+    let merged: Awaited<ReturnType<typeof act>>
+    try {
+      await reconcilersIdle(w)
+      git(repo, 'merge', '-q', '--no-ff', '-m', 'merge card', 'card')
+      merged = await act(w, card, builder, { kind: 'reportMerge' })
+    } finally {
+      w.repairingMove = false
+    }
     expect(merged.done).toMatchObject({ from: 'approved', to: 'done' })
     expect(merged.card.column).toBe('done')
     expect(merged.done.next).toEqual({ step: 'done' })
@@ -726,9 +737,13 @@ describe('a card by intent (#1267)', () => {
     const reviewerNow = () => inWorkspace(w, async () => loopReviewerOf(w, await tasks.getTask(card, w)))
     await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a3', cards: [card], by: 'Builder (p)' })
     expect(await reviewerNow()).toEqual({ id: 'a3', name: 'Other (p)' })
-    await w.mutateProjectConfig(p, (cfg) => ({ agents: cfg.agents.filter((a) => a.id !== 'a3') }))
-    expect(await reviewerNow()).toBeNull()
-    expect(await refused(act(w, card, builder, design('Plan v2')))).toBe('loop.noReviewer')
+    // Under the lanes' lock (HI-3101): the lanes' next look (300 ms after the start's write) abandons a lane whose agent
+    // is gone, and the card's last reviewer is its reviewer again (the next test); held, that look waits for this.
+    await lanes.withLanesLock(w, async () => {
+      await w.mutateProjectConfig(p, (cfg) => ({ agents: cfg.agents.filter((a) => a.id !== 'a3') }))
+      expect(await reviewerNow()).toBeNull()
+      expect(await refused(act(w, card, builder, design('Plan v2')))).toBe('loop.noReviewer')
+    })
   })
 
   it("Combwork's removal of a lane's reviewer abandons its lane: the card's last reviewer is its reviewer again (#1382)", async () => {
@@ -767,6 +782,49 @@ describe('a card by intent (#1267)', () => {
     // With the workflow rules off, nothing guards it.
     await advanced.set(ENFORCE, false)
     expect(await refused(act(w, card, reviewer, design('Plan v3')))).toBeNull()
+  })
+
+  it("a pool lane's design (HI-3011): the reviewer the pool gave it answers it, gaps then ok, and nobody else; once the card is put back, it hears nothing waits", async () => {
+    const { w, repo } = await workspace()
+    const card = await create(w)
+    await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: null, pool: true, cards: [card], by: 'Builder (p)' })
+    await act(w, card, builder, { kind: 'start' })
+    const wf = (await service.workflowFor(w, repo))!
+    // What the pool's pass writes as it gives a design out (reviewerPool.ts): here to Other (a3), so the lane has no reviewer of its own to fall back on.
+    const give = async (id: string) => {
+      const submission = Number(id.split('/s')[1])
+      await wf.write(wf.store.card(card), null, 'combwork', (x) => x.fact('ReviewerAssigned', { reviewer: 'a3', submission, design: true }))
+    }
+    const wakes = () => wakesOf(w, card)
+    const first = String((await act(w, card, builder, design('Plan'))).done.data?.design)
+    // Not given out yet: nobody's to answer.
+    expect(await refused(act(w, card, other, answer('gaps', first)))).toBe('loop.stepNotYours')
+    await give(first)
+    // The production rule (loopReviewerOf's pool branch) names the one it was given.
+    expect((await loopReviewerOf(w, await tasks.getTask(card, w)))?.id).toBe('a3')
+    // Anyone else, the builder included, is still refused; the reviewer it was given answers, and the builder is woken.
+    expect(await refused(act(w, card, reviewer, answer('gaps', first)))).toBe('loop.stepNotYours')
+    expect(await refused(act(w, card, builder, answer('ok', first)))).toBe('loop.stepNotYours')
+    const before = wakes().length
+    expect(await refused(act(w, card, other, answer('gaps', first, 'What bounds it?')))).toBeNull()
+    expect(facts(w, card).at(-1)).toMatchObject({ kind: 'LoopStep', actor: 'agent:a3', data: { step: 'gaps', of: 'design', design: first } })
+    expect(wakes().slice(before)).toEqual(['a1'])
+    // Revised and given again: its ok reaches the builder too; a late answer to the first hears it is stale.
+    const second = String((await act(w, card, builder, design('Plan v2'))).done.data?.design)
+    await give(second)
+    expect(await refused(act(w, card, other, answer('gaps', first)))).toBe('loop.staleStep')
+    expect(await refused(act(w, card, other, answer('ok', second, 'Fine')))).toBeNull()
+    expect(facts(w, card).at(-1)).toMatchObject({ kind: 'LoopStep', data: { step: 'ok', of: 'design', design: second } })
+    expect(wakes().slice(before)).toEqual(['a1', 'a1'])
+    // HI-2980's sequence: a design given out, then the card put back to To do before its answer. The design closed with
+    // the move, so its reviewer hears nothing waits (not that it isn't its), and the refused answer writes nothing.
+    const third = String((await act(w, card, builder, design('Plan v3'))).done.data?.design)
+    await give(third)
+    await act(w, card, builder, { kind: 'putBack', why: 'Waiting for the user' })
+    const after = { facts: facts(w, card).filter((f) => f.kind === 'LoopStep').length, wakes: wakes().length }
+    expect(await refused(act(w, card, other, answer('gaps', third, 'Late')))).toBe('loop.noStep')
+    expect(await refused(act(w, card, reviewer, answer('ok', third)))).toBe('loop.noStep')
+    expect({ facts: facts(w, card).filter((f) => f.kind === 'LoopStep').length, wakes: wakes().length }).toEqual(after)
   })
 
   it("a follow-up of a passed card (#1467): named, it wakes the reviewer; only the reviewer's answer settles it, never going ahead", async () => {

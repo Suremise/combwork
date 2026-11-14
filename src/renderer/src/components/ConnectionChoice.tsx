@@ -6,7 +6,7 @@ import { enabledProviders, providerDescriptor, providerName, providersInUse, pro
 import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
 import { notify, set, setActivity, useStore } from '../store'
-import { cliReadyOf, connectionCli, connectionOf, firstReadyConnection, firstUsableConnection, offeredConnections, offHereChoice, orderedAccounts, type ConnectionShown } from '@shared/connectionLabel'
+import { cliReadyOf, connectionCli, connectionOf, firstReadyConnection, firstUsableConnection, offeredConnections, offHereChoice, orderedAccounts, type AssistantNeed, type ConnectionShown } from '@shared/connectionLabel'
 
 export { cliReadyOf, connectionCli, firstReadyConnection, firstUsableConnection, offeredConnections }
 import { Icon, Tooltip } from './ui'
@@ -228,7 +228,6 @@ export const needsConnection = (view: ConnectionsView | null, cli: ProviderId): 
 
 const SETUP = {
   text: msg({ id: 'project.banner.connectionSetup', defaultMessage: "No {cli} account is on in this workspace, so its agents can't start. Add one and sign it in.", description: 'Banner in a project whose agents\' CLI ({cli}: "Claude Code") has no account (a sign-in or server) on in the workspace (HI-1755; HI-2108).' }),
-  assistant: msg({ id: 'assistant.banner.connectionSetup', defaultMessage: "No {cli} account is on in this workspace, so the Assistant can't start. Add one and sign it in.", description: 'Banner in the Assistant panel when its coding agent CLI ({cli}: "Claude Code") has no account (a sign-in or server) on in the workspace (HI-1774; HI-2108): it can\'t start until one is.' }),
   add: msg({ id: 'project.banner.connectionSetupAdd', defaultMessage: 'Add an Account', description: 'Button on the banner asking for an account (HI-2108): opens Settings → Accounts & Connections.' }),
   setupLine: msg({ id: 'shell.setup.connections', defaultMessage: '{n, plural, =0 {{cli} signs in per account, and none is on in this workspace yet: add one and sign it in.} one {{cli} signs in per account: # is on in this workspace.} other {{cli} signs in per account: # are on in this workspace.}}', description: 'Provider Setup, for a coding agent CLI ({cli}: "Claude Code") that signs in per account (Settings → Accounts & Connections) rather than here (HI-1774; HI-2108). {n} is how many of its accounts are on in the open workspace.' }),
   setupLineOff: msg({ id: 'shell.setup.connectionsOff', defaultMessage: '{cli} signs in per account, and none is on in this workspace: {n, plural, one {{names} is off here.} other {{names} are off here.}} Turn one on with On here.', description: 'Provider Setup (HI-2650), for a coding agent CLI ({cli}: "Claude Code") that signs in per account, when it has accounts but none is on in the open workspace. {names}: their names, joined ("Work and Personal"); {n}: how many. On here is the switch on each account\'s row in Settings → Accounts & Connections, which the button beside it opens.' }),
@@ -260,9 +259,11 @@ export function NoConnectionBanner({ cli, where = 'project' }: { cli?: ProviderI
       ? tr(OFF.one, { where, name: choice.name, cli: providerDescriptor(choice.cli).name })
       : choice.kind === 'several'
         ? tr(OFF.several, { where, names: fmt.list(choice.names) })
-        : cli
-          ? tr(where === 'assistant' ? SETUP.assistant : SETUP.text, { cli: providerDescriptor(cli).name })
-          : tr(OFF.empty)
+        : where === 'assistant'
+          ? tr(ASSISTANT.noneAny)
+          : cli
+            ? tr(SETUP.text, { cli: providerDescriptor(cli).name })
+            : tr(OFF.empty)
   const turnOn = async (id: string, name: string): Promise<void> => {
     setBusy(true)
     try {
@@ -288,6 +289,41 @@ export function NoConnectionBanner({ cli, where = 'project' }: { cli?: ProviderI
         ) : (
           <button className="btn small primary" data-open-connections onClick={openConnections}>
             {tr(choice.kind === 'several' ? OFF.choose : SETUP.add)}
+          </button>
+        )}
+      </span>
+    </div>
+  )
+}
+
+const ASSISTANT = {
+  noneAny: msg({ id: 'assistant.banner.noAccountAny', defaultMessage: "No account is on in this workspace, so the Assistant can't start. Add one for any coding agent Combwork supports and sign it in: the Assistant runs on the first one in your order of accounts.", description: 'Banner in the Assistant panel (HI-2899) when the Assistant names no coding agent CLI of its own (a new workspace) and no account (a sign-in or server, of any CLI: Claude Code, Codex, Copilot…) is on in the workspace. Its button opens Settings → Accounts & Connections.' }),
+  noneFor: msg({ id: 'assistant.banner.noAccountFor', defaultMessage: "{others, select, yes {The Assistant runs on {cli}, and no {cli} account is on in this workspace, so it can't start. Add one, or choose another coding agent's account in the Assistant's settings.} other {The Assistant runs on {cli}, and no {cli} account is on in this workspace, so it can't start. Add one and sign it in.}}", description: 'Banner in the Assistant panel (HI-2899) when the Assistant runs on a coding agent CLI chosen in its settings ({cli}: "Codex") and none of that CLI\'s accounts is on in the workspace. {others}: yes when another CLI\'s account is on, to choose in the Assistant\'s settings (a second button opens them); keep the select keys.' }),
+  signedOut: msg({ id: 'assistant.banner.signedOut', defaultMessage: "{name}, the Assistant's {cli} account, is signed out, so the Assistant can't start. Sign it in again in Settings → Accounts & Connections.", description: 'Banner in the Assistant panel (HI-2899) when the account the Assistant runs on ({name}: the user\'s name for its connection; {cli}: "Claude Code") is signed out. Settings → Accounts & Connections is where accounts are signed in: its button opens it.' })
+}
+
+/**
+ * The Assistant panel's banner while it can't start for want of an account (HI-2899, assistantNeed): accounts off here
+ * (NoConnectionBanner's choice, any CLI's for an Assistant that names none), its account signed out, or none added, in
+ * words that name only the CLI it really runs on (never Claude Code by default), with what to do. `settingsLabel`: the
+ * Assistant's own Assistant Settings… (its panel's menu item), for the button that opens them.
+ */
+export function AssistantAccountBanner({ need, settingsLabel }: { need: Exclude<AssistantNeed, { kind: 'ok' }>; settingsLabel: string }) {
+  if (need.kind === 'off') return <NoConnectionBanner {...(need.choice.cli ? { cli: need.choice.cli } : {})} where="assistant" />
+  const text = need.kind === 'signedOut' ? tr(ASSISTANT.signedOut, { name: need.name, cli: providerDescriptor(need.cli).name }) : need.kind === 'noneFor' ? tr(ASSISTANT.noneFor, { cli: providerDescriptor(need.cli).name, others: need.others ? 'yes' : 'no' }) : tr(ASSISTANT.noneAny) // i18n-ignore: select keys
+  return (
+    <div className="banner warn wrap-banner" data-connection-setup="assistant" data-assistant-need={need.kind}>
+      <span className="wrap-banner-text">
+        <Icon name="plug" />
+        <span className="grow">{text}</span>
+      </span>
+      <span className="wrap-banner-actions">
+        <button className="btn small primary" data-open-connections onClick={openConnections}>
+          {tr(need.kind === 'signedOut' ? SETUP.open : SETUP.add)}
+        </button>
+        {need.kind === 'noneFor' && need.others && (
+          <button className="btn small" data-open-assistant-settings onClick={() => set({ assistantSettingsOpen: true })}>
+            {settingsLabel}
           </button>
         )}
       </span>

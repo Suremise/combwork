@@ -154,16 +154,18 @@ export function Dialogs() {
     return (
       <Modal
         title={dialog.title}
-        icon={dialog.danger ? 'warning' : 'question'}
+        icon={dialog.danger ? 'warning' : dialog.okOnly ? 'info' : 'question'}
         wide={dialog.wide}
         onClose={() => close(false)}
         busy={!!action.busy}
         error={action.error}
         footer={
           <>
-            <button className="btn subtle" onClick={() => close(false)}>
-              {dialog.cancelLabel ?? tr(msg({ id: 'shell.dialog.cancel', defaultMessage: 'Cancel', description: "A dialog's button that closes it without doing anything." }))}
-            </button>
+            {!dialog.okOnly && (
+              <button className="btn subtle" onClick={() => close(false)}>
+                {dialog.cancelLabel ?? tr(msg({ id: 'shell.dialog.cancel', defaultMessage: 'Cancel', description: "A dialog's button that closes it without doing anything." }))}
+              </button>
+            )}
             <BusyButton
               className={dialog.action ? cx(actClass(dialog.action), 'solid') : dialog.danger ? 'danger' : 'primary'}
               autoFocus
@@ -1123,6 +1125,8 @@ export function QuitDialog() {
   const sessions = useStore((s) => s.quitRequest)
   const unsaved = useStore((s) => s.quitUnsaved)
   const scope = useStore((s) => s.quitScope)
+  // HI-3167: the update this quit offers to install now (Install now, or Next time).
+  const update = useStore((s) => s.quitUpdate)
   const windows = useStore((s) => s.windowCount)
   const workspaceName = useStore((s) => s.workspace?.name)
   // Closing a window, closing its workspace or switching it: only this workspace's sessions stop.
@@ -1135,9 +1139,11 @@ export function QuitDialog() {
   const [dontAsk, setDontAsk] = useState(false)
   const [keep, setKeep] = useState<'save' | 'discard'>('save')
   const [saving, setSaving] = useState(false)
+  const [install, setInstall] = useState<'now' | 'later'>('now')
   useEffect(() => {
     setDontAsk(false)
     setKeep('save')
+    setInstall('now')
   }, [sessions])
   if (!sessions) return null
   const decide = async (choice: QuitChoice): Promise<void> => {
@@ -1162,8 +1168,9 @@ export function QuitDialog() {
         }
       }
     }
-    set({ quitRequest: null, quitUnsaved: [] })
-    void call('app:quitDecision', choice, dontAsk)
+    set({ quitRequest: null, quitUnsaved: [], quitUpdate: null })
+    // The version shown, for main to check it is still the one ready (HI-3167).
+    void call('app:quitDecision', choice, dontAsk, update && install === 'now' && (choice === 'now' || choice === 'wait') ? update.version : null)
   }
   // What "when agents finish" waits for: working, background tasks, and a watcher whose card another agent is working on.
   const working = sessions.filter((s) => s.status === 'working' || s.status === 'background' || s.keepsQuitWaiting).length
@@ -1269,6 +1276,27 @@ export function QuitDialog() {
           <button className="btn small subtle" onClick={() => void decide('window')} disabled={saving}>
             <Icon name="close" /> {tr(msg({ id: 'shell.quit.windowOnlyButton', defaultMessage: 'Close this window only', description: "The quit dialog's button that closes just this window." }))}
           </button>
+        </div>
+      )}
+      {update && !closing && (
+        // HI-3167: installing as Combwork quits is the user's say each time, and the installer's finish page says when it's done.
+        <div className="quit-update">
+          <p style={{ marginTop: unsaved.length || sessions.length ? undefined : 0 }}>
+            <strong>{tr(msg({ id: 'shell.quit.updateReady', defaultMessage: '{app} {version} is ready to install.', description: "The quit dialog, when an update has been downloaded: install it as Combwork quits, or next time. {app} is Combwork's name, {version} the new version." }), { app: APP_NAME, version: update.version })}</strong>
+          </p>
+          <div className="segmented quit-update-choice">
+            <button className={cx(install === 'now' && 'active')} onClick={() => setInstall('now')}>
+              <Icon name="cloud-download" /> {tr(msg({ id: 'shell.quit.installNow', defaultMessage: 'Install now', description: "The quit dialog's choice: install the downloaded update as Combwork quits." }))}
+            </button>
+            <button className={cx(install === 'later' && 'active')} onClick={() => setInstall('later')}>
+              <Icon name="history" /> {tr(msg({ id: 'shell.quit.installLater', defaultMessage: 'Next time', description: "The quit dialog's choice: don't install the downloaded update now; Combwork asks again the next time it quits." }))}
+            </button>
+          </div>
+          <div className={cx('detail', install === 'now' && 'quit-update-warn')}>
+            {install === 'now'
+              ? tr(msg({ id: 'shell.quit.installNowDetail', defaultMessage: "Its installer opens as {app} quits and takes about {seconds, plural, one {# second} other {# seconds}}. Don't shut down or restart the PC until the installer says it has finished: its Finish button opens {app} again.", description: "Under the quit dialog's Install now. {seconds} is about how long installing takes; {app} is Combwork's name. Finish is the installer's own button (Windows installer's wording)." }), { seconds: update.seconds, app: APP_NAME })
+              : tr(msg({ id: 'shell.quit.installLaterDetail', defaultMessage: "It stays downloaded, and {app} asks again the next time you quit.", description: "Under the quit dialog's Next time. {app} is Combwork's name." }), { app: APP_NAME })}
+          </div>
         </div>
       )}
       {sessions.length > 0 && <div className="detail">{tr(msg({ id: 'shell.quit.kept', defaultMessage: 'Conversations are kept. Resume them from the project or its Sessions tab next time.', description: 'At the bottom of the quit dialog.' }))}</div>}

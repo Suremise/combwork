@@ -20,7 +20,7 @@ describe('worktreeNow', () => {
     sh(repo, 'worktree', 'add', '-q', '-b', 'feature/card', wt, 'main')
     const mainHead = commit(repo, { 'b.txt': 'b\n' }, 'main moves')
     const now = await G.worktreeNow(wt, { target: 'main', gitPaths: ['index'] })
-    expect(now).toEqual({ line: 'feature/card', head: await G.head(wt), dirty: [], target: mainHead, gitPaths: [sh(wt, 'rev-parse', '--path-format=absolute', '--git-path', 'index')] })
+    expect(now).toEqual({ line: 'feature/card', head: await G.head(wt), dirty: [], operations: [], target: mainHead, gitPaths: [sh(wt, 'rev-parse', '--path-format=absolute', '--git-path', 'index')] })
     expect(isUnknown(now) || existsSync(now.gitPaths[0])).toBe(true)
     // Uncommitted files and a rebase under way (its marker in the worktree's own git folder).
     writeFileSync(join(wt, 'new.txt'), 'new\n')
@@ -32,6 +32,9 @@ describe('worktreeNow', () => {
     const rebasing = await G.worktreeNow(wt, { target: 'main' })
     expect(rebasing).toMatchObject({ line: null, target: sh(repo, 'rev-parse', 'main') })
     expect(isUnknown(rebasing) ? [] : rebasing.dirty).toEqual(expect.arrayContaining(['new.txt', '(rebase-merge)']))
+    // HI-2983: the operations under way apart from the files, listed last in dirty.
+    expect(isUnknown(rebasing) ? [] : rebasing.operations).toEqual(['(rebase-merge)'])
+    expect(isUnknown(rebasing) ? [] : rebasing.dirty.slice(-1)).toEqual(['(rebase-merge)'])
     expect(await G.dirty(wt)).toEqual(isUnknown(rebasing) ? null : rebasing.dirty)
     sh(wt, 'rebase', '--abort')
     // Detached; and a line that doesn't exist is null, the rest still read.
@@ -127,7 +130,7 @@ describe('worktreeNow', () => {
       if (args[0] === 'status') asked.push([...args])
     }
     try {
-      expect(await G.worktreeNow(clone, { target: 'main' })).toEqual({ line: 'main', head: mine, dirty: ['new.txt'], target: mine, gitPaths: [] })
+      expect(await G.worktreeNow(clone, { target: 'main' })).toEqual({ line: 'main', head: mine, dirty: ['new.txt'], operations: [], target: mine, gitPaths: [] })
     } finally {
       gitTestHooks.started = undefined
     }
@@ -140,7 +143,7 @@ describe('worktreeNow', () => {
     const dir = join(tempDir('git-'), 'empty')
     execFileSync('git', ['init', '-q', '-b', 'main', dir])
     writeFileSync(join(dir, 'a.txt'), 'a\n')
-    expect(await G.worktreeNow(dir)).toEqual({ line: 'main', head: null, dirty: ['a.txt'], gitPaths: [] })
+    expect(await G.worktreeNow(dir)).toEqual({ line: 'main', head: null, dirty: ['a.txt'], operations: [], gitPaths: [] })
     expect(await G.dirty(dir)).toEqual(['a.txt'])
   })
 

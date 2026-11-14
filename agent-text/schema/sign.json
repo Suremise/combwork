@@ -1,0 +1,33 @@
+{
+  "sign.loop": {
+    "placeholders": {}
+  },
+  "sign.needsSomeone": {
+    "placeholders": {}
+  },
+  "sign.noArgs": {
+    "placeholders": {}
+  },
+  "sign.notFound": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "sign.notStarted": {
+    "placeholders": {
+      "program": "plain",
+      "detail": "plain"
+    }
+  },
+  "sign.timedOut": {
+    "placeholders": {
+      "program": "plain",
+      "seconds": "number"
+    }
+  },
+  "sign.unreadable": {
+    "placeholders": {
+      "detail": "plain"
+    }
+  }
+}

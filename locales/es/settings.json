@@ -558,7 +558,9 @@
   "settings.advanced.cw.prompt.clearDraft.desc": "Antes de que Combwork escriba un prompt o Compactar en la CLI de un agente, pulsa Ctrl+U, que borra lo que haya en la entrada de la CLI, y lo vuelve a pulsar para retirar un prompt que dejó a medias. Si lo desactivas, Combwork nunca lo pulsa: el texto que quede en la entrada de la CLI se queda delante de lo que Combwork escribe y se envía con ello, un prompt dejado a medias se queda en la entrada y Compactar puede fallar por culpa de un borrador. Cambiar el modo de Codex sigue borrando primero su entrada, como necesita su menú.",
   "settings.advanced.cw.prompt.clearDraft.title": "Borrar el borrador de la CLI antes de que Combwork escriba",
   "settings.advanced.cw.prompt.rawCardStart.desc": "Cuando se inicia una tarjeta en un agente, Combwork se la da envuelta en sus propias palabras: qué tarjeta es en el tablero, de qué depende y qué documentos leer primero, y qué habilidad seguir. Activado, el agente recibe solo el título y la descripción de la tarjeta, y lo que escribiste al iniciarla. Los demás prompts de Combwork (sus avisos y mensajes) siguen igual: son cómo hablan Combwork y sus agentes.",
+  "settings.advanced.cw.prompt.wholeCardMax.desc": "Al iniciar una tarjeta en un agente, Combwork le da la tarjeta entera, con sus decisiones y todos los comentarios, si todo cabe en este número de caracteres, para que el agente no tenga que volver a leerla antes de empezar. Una tarjeta más larga recibe su título, su descripción y la última respuesta, y el agente lee el resto. 0 nunca da la tarjeta entera.",
   "settings.advanced.cw.prompt.rawCardStart.title": "El inicio de una tarjeta con sus propias palabras",
+  "settings.advanced.cw.prompt.wholeCardMax.title": "Una tarjeta completa al iniciarla, hasta",
   "settings.advanced.cw.queue.checkMinutes.desc": "Cuánto tiempo deja la cola de fusión que se ejecute una comprobación de fusión o una instalación antes de terminarla. Una comprobación terminada así es un fallo del entorno, no del trabajo: la tarjeta vuelve marcada así y su autor puede enviar la misma versión de nuevo a la cola. Auméntalo cuando las comprobaciones de un proyecto realmente tarden más; si es demasiado largo, una comprobación colgada retiene la cola ese tiempo.",
   "settings.advanced.cw.queue.checkMinutes.title": "Cola de fusión: tiempo máximo de una comprobación de fusión",
   "settings.advanced.cw.queue.checkedOutTarget.ask": "Preguntar cada vez",
@@ -593,6 +595,10 @@
   "settings.advanced.cw.restart.resumeReadySeconds.title": "Reanudar tras un reinicio: listo en",
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.desc": "Cuánto puede seguir esperando el agente de programación de un agente para reintentar su solicitud al modelo (límite de solicitudes, o su servicio inalcanzable) en un turno antes de que Combwork avise al Asistente, una vez por turno. 0: nunca.",
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.title": "Espera de reintento: avisar al Asistente tras",
+  "settings.advanced.cw.sessions.signFailFast.desc": "Cuando un repositorio firma sus commits, el commit de un agente con gpg o ssh-keygen de Git for Windows, gpg de GnuPG o ssh-keygen de Windows se firma sin nadie delante, o falla al instante y le dice al agente por qué, en lugar de esperar una frase de contraseña que nadie puede escribir. La firma sigue activada y tu configuración de git y gpg nunca se cambia: las sesiones reciben un firmante de Combwork solo en su entorno. Los demás firmantes funcionan como antes. Desactivado, las sesiones usan el firmante propio de git, como antes.",
+  "settings.advanced.cw.sessions.signFailFast.title": "Los commits firmados de los agentes nunca esperan una frase de contraseña",
+  "settings.advanced.cw.sessions.signTimeoutSeconds.desc": "Cuánto tiempo deja el commit firmado de un agente que gpg o ssh-keygen se ejecute antes de que Combwork lo termine y el commit falle. Lo bastante para una llave física que tocas; un firmante que siga en marcha entonces está esperando a alguien.",
+  "settings.advanced.cw.sessions.signTimeoutSeconds.title": "Firmante de los agentes: rendirse después de",
   "settings.advanced.cw.sessions.terminalType.desc": "Combwork inicia cada sesión con TERM=xterm-256color, como es su terminal, y sin el WT_SESSION de Windows Terminal, para que las CLI dibujen igual tanto si Combwork se abrió desde el menú Inicio como desde una terminal (Claude Code dibuja ❯ en vez de >). Se conserva un TERM de tu propio entorno o del de la sesión. Desactivado, las sesiones reciben el entorno con el que se abrió Combwork.",
   "settings.advanced.cw.sessions.terminalType.title": "Las sesiones dicen que su terminal es xterm-256color",
   "settings.advanced.cw.showDeveloperFeatures.desc": "Muestra Ayuda → Consola de desarrollador (Ctrl+Alt+J): lo que cada CLI envía a Combwork, junto a lo que Combwork entendió.",
@@ -1630,5 +1636,10 @@
   "settings.advanced.opencode.server.readySeconds.desc": "Cuánto tiempo tiene el servidor privado de un agente de OpenCode para responder antes de que el inicio se rinda y lo termine. Si es demasiado corto, un agente en un PC lento no se inicia.",
   "settings.advanced.opencode.server.readySeconds.title": "Servidor: tiempo para iniciarse",
   "settings.advanced.opencode.version.desc": "Lo que imprime opencode --version: la versión es su primer grupo. Combwork usa solo OpenCode 2 o posterior. Si es incorrecto, OpenCode no se encuentra.",
-  "settings.advanced.opencode.version.title": "La versión en opencode --version"
+  "settings.advanced.opencode.version.title": "La versión en opencode --version",
+  "settings.advanced.cw.activity.mapMotion.desc": "El mapa de actividad envía un punto por un radio hasta su estación por cada llamada a herramienta de un agente, y de vuelta cuando termina. Como diga Windows sigue el ajuste de Windows Mostrar animaciones; Activado siempre los mueve; Desactivado solo ilumina la estación.",
+  "settings.advanced.cw.activity.mapMotion.off": "Desactivado",
+  "settings.advanced.cw.activity.mapMotion.on": "Activado",
+  "settings.advanced.cw.activity.mapMotion.system": "Como diga Windows",
+  "settings.advanced.cw.activity.mapMotion.title": "Pulsos en movimiento del mapa de actividad"
 }

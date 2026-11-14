@@ -43,6 +43,8 @@ export interface QueueQueued {
   at: string
   /** HI-2709: the cards it waits for (keys), blocked by them while they aren't Done: the queue goes on without it. */
   waitingOn?: string[]
+  /** HI-3084: a forward merge's branches (HI-2679): removed, it ends in Done, nothing merged, and its confirmation says so. */
+  forward?: { from: string; to: string }
 }
 
 /** An entry's outcome, kept for the panel: merged (with the result), returned to its builder (why, the log, the files), cancelled. */
@@ -128,6 +130,23 @@ export function shellLine(args: string[]): string {
   return args.map((a) => (/^[A-Za-z0-9._/:=+-]+$/.test(a) ? a : `'${a.replace(/'/g, "''")}'`)).join(' ')
 }
 
+/** HI-3128: what stands for a remote Combwork can't name in an upstream remedy's commands: marked, never a guess. */
+export const REMOTE_PLACEHOLDER = '<remote>'
+
+/**
+ * HI-3128: the commands giving `branch` the upstream follow mode needs, for `remote` (null: the placeholder, unquoted so
+ * it reads as one to replace). `publish` creates it there by an explicit refspec (a tag of the same name makes a bare
+ * name ambiguous) and sets what it tracks; `track` sets the two settings follow mode reads, whatever the remote's fetch
+ * mapping. The branch is named in each, so the checked-out branch is never touched.
+ */
+export function upstreamCommands(remote: string | null, branch: string): { publish: string; track: [string, string] } {
+  const SENTINEL = 'CWREMOTEPLACEHOLDER'
+  const r = remote ?? SENTINEL
+  const line = (args: string[]): string => shellLine(args).split(SENTINEL).join(REMOTE_PLACEHOLDER)
+  const ref = `refs/heads/${branch}`
+  return { publish: line(['git', 'push', '-u', r, `${ref}:${ref}`]), track: [line(['git', 'config', `branch.${branch}.remote`, r]), line(['git', 'config', `branch.${branch}.merge`, ref])] }
+}
+
 /**
  * The state an advance into a checked-out target was left in (§16.9.2's terminal state, #1351): the folder, the branch
  * its HEAD named (null: none, a detached HEAD) and the target's ref (null: unreadable) as Combwork found them, the advance's
@@ -158,6 +177,11 @@ export interface QueuePauseInfo {
   message?: string
   /** An advance into a checked-out target left part way (needsYou, #1351): the state it is in and how to settle it. */
   stuck?: QueueStuck
+  /**
+   * HI-2988: the owed catch-up's pause (follow mode: `card` merged and published already, the local target behind it):
+   * its changes are set aside, never committed there.
+   */
+  catchUp?: true
 }
 
 /** A project's queue for one target. */
@@ -169,7 +193,10 @@ export interface QueuePauseInfo {
  */
 export interface QueueForward {
   others: string[]
-  behind: { from: string; commits: number | null }[]
+  /** HI-3000: `resolving`, the card resolving that pair (Resolve on a builder) while it is open: nothing more is offered for it. */
+  behind: { from: string; commits: number | null; resolving?: { card: number; key: string } }[]
+  /** HI-3126: the targets follow their remotes: every source is offered, whatever its local count (a request reads the remotes). */
+  follows?: true
 }
 
 export interface QueueView {
@@ -205,6 +232,13 @@ export interface QueueView {
    * (#1356; the window's model only): an old ruleset's queue stays shown while they are.
    */
   inFlight: number[]
+  /**
+   * HI-2893: a past branch's queue: its target is none of the project's targets now (Work merges into, Other branches work
+   * can merge into) and it holds nothing: no entry testing or queued, and (HI-2927) no card in flight into it, no pause
+   * and no Combwork running it; unreadable targets make none past. The Merges tab leaves it out, Version Control lists
+   * its history under Past branches, and the Agent API lists it only when asked (`past=true`).
+   */
+  past?: true
 }
 
 /**

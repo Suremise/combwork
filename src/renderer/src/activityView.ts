@@ -81,3 +81,30 @@ export function saveActivityView(project: string, view: ActivityView): void {
     // Storage full or blocked: the view lasts while the window does.
   }
 }
+
+/** What the Activity map shows (HI-2903): the map, its feed and its context rings, each on unless turned off. One for every view. */
+export interface MapShow {
+  map: boolean
+  feed: boolean
+  context: boolean
+}
+const MAP_KEY = `${PREFIX}map` // i18n-ignore: a storage key
+
+/** The map's toggles as this user left them (storage that can't be read: all on). */
+export function loadMapShow(): MapShow {
+  try {
+    const v = JSON.parse(localStorage.getItem(MAP_KEY) ?? 'null') as Record<string, unknown> | null
+    return { map: v?.map !== false, feed: v?.feed !== false, context: v?.context !== false }
+  } catch {
+    return { map: true, feed: true, context: true }
+  }
+}
+
+/** Keeps the map's toggles (storage that can't be written: they last while the window does). */
+export function saveMapShow(show: MapShow): void {
+  try {
+    localStorage.setItem(MAP_KEY, JSON.stringify(show))
+  } catch {
+    // Storage full or blocked.
+  }
+}

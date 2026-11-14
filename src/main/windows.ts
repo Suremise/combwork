@@ -1,5 +1,6 @@
 import type { BrowserWindow, WebContents } from 'electron'
 import type { CombworkEvent, QuitChoice, QuitScope, QuitSession } from '../shared/types'
+import type { InstallOffer } from './updateConsent'
 import { setEventRouter } from './events'
 import { samePlace } from './fsutil'
 import { forgetWindowViews } from './transcriptReads'
@@ -22,7 +23,8 @@ export interface CombworkWindow {
   unsaved: string[]
   focusedAt: number
   /** A quit or close question shown in this window, waiting for the answer. */
-  question: { request: QuitSession[]; unsaved: string[]; scope: QuitScope; answer: (c: QuitChoice) => void } | null
+  /** `update`: the update it offers to install now (HI-3167); `answer`'s `install`, the version Install now was chosen for. */
+  question: { request: QuitSession[]; unsaved: string[]; scope: QuitScope; update: InstallOffer | null; answer: (c: QuitChoice, install: string | null) => void } | null
   /** Closing was decided: let the window close. */
   closing: boolean
   /** The project its page shows (reported by the page): for banners shown for "This project" (#157). */

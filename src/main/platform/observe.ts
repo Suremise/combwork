@@ -18,12 +18,14 @@
 import { watch, readFileSync, existsSync, statSync, type FSWatcher } from 'original-fs'
 import { lstat, stat } from 'original-fs/promises'
 import { dirname, isAbsolute, join, resolve, sep } from 'path'
-import { git, readRefsOffMain } from '../git'
+import { readRefsOffMain } from '../git'
 import { createLogger, userText } from '../logger'
 import { declaresPaths, deliversCommits, type PlatformId } from '../../shared/platform/descriptors'
 import { isMainGitDir, plainRepo, readRepoRefs, type Heads, type RepoRefs } from './repoRefs'
 import { UNREADABLE } from '../../shared/workflow/texts'
+import { inMetadataDir } from '../../shared/platform/metadataDirs'
 import { unknown, type Maybe } from './types'
+import { gitIgnoredByKind, type EntryKind, type RecordedKinds } from './gitIgnoredByKind'
 import type { Disposable, FolderChanges, ObserveEvent, ObservePort } from './history'
 
 const log = createLogger('observe')
@@ -51,6 +53,13 @@ export const FILE_TIME_SLACK_MS = 100
 const ARM_MS = 250
 /** At most this many working folders per repository are watched (its worktrees): beyond, the rest are unknown. */
 const MAX_FOLDERS = 64
+/**
+ * HI-3173, a Git folder's record reads each event's entry kind as it comes (gitIgnoredByKind.ts): `atOnce` at a time,
+ * and at most `queued` events waiting, however many of them name the same path (the service-changes resource rule;
+ * HR2's round 1). Past it, an event's entry is left unread, and its path is asked as a file too (it counts unless that
+ * is ignored). A setting for the tests, as worktreeRetry is.
+ */
+export const kindReads = { atOnce: 8, queued: 4096 }
 
 // What the watcher tells its subscribers, and how a subscription ends: port 3's types (history.ts, HI-2787).
 export type { Disposable, FolderChanges, ObserveEvent } from './history'
@@ -147,6 +156,8 @@ interface WriteEntry {
   at: number
   /** The folder-relative path written (with `/`), or ':reflog' for a HEAD reflog entry, ':edit' for an agent's edit hook. */
   path: string
+  /** A Git folder's: what its entry was when read after the event (null: nothing there), unset while not read. */
+  kind?: EntryKind | null
 }
 
 /**
@@ -164,12 +175,20 @@ class FolderLog {
   lastEvent = 0
   private entries: WriteEntry[] = []
   private watch: DirWatch
+  /** HI-3173: the paths whose kind is still to be read, each with the entries it is for; and the reads under way. */
+  private toRead = new Map<string, WriteEntry[]>()
+  private reads = 0
+  /** The entries in toRead, all paths' together: at most kindReads.queued. */
+  private waiting = 0
+  private closed = false
 
   constructor(
     readonly folder: string,
     private written: (paths: string[]) => void,
     /** The main folder's `.git` events (relative to `.git`), or null when events were lost; else they're dropped. */
-    private gitEvent: ((rel: string | null) => void) | null = null
+    private gitEvent: ((rel: string | null) => void) | null = null,
+    /** A Git folder's: each event's entry kind is read (gitIgnoredByKind.ts). */
+    private readKinds = false
   ) {
     this.since = Date.now() + ARM_MS
     this.watch = new DirWatch(folder, true, (name) => this.event(name))
@@ -189,11 +208,59 @@ class FolderLog {
       this.gitEvent?.(rel.slice(5))
       return
     }
+    // jj's store (HI-2800): every jj command writes there, and none of it is the project's work.
+    if (inMetadataDir(rel)) return
     // Every path is kept, `node_modules` too (a project can track vendored files there): what git ignores is dropped
     // when a check asks. An install's thousands of writes are bounded by WRITE_LOG_MAX: past it, the oldest go and a
     // question about their time is unknown.
-    this.push({ at: now, path: rel })
+    const e: WriteEntry = { at: now, path: rel }
+    this.push(e)
+    if (this.readKinds) this.readKind(e)
     this.written([rel])
+  }
+
+  /**
+   * Reads what an event's entry is (HI-3173), soon after it came: a path already waiting is read once for all its
+   * entries; past kindReads.queued entries waiting, it stays unread.
+   */
+  private readKind(e: WriteEntry): void {
+    if (this.closed || this.waiting >= kindReads.queued) return
+    const waiting = this.toRead.get(e.path)
+    if (waiting) waiting.push(e)
+    else this.toRead.set(e.path, [e])
+    this.waiting++
+    this.pump()
+  }
+
+  private pump(): void {
+    while (!this.closed && this.reads < kindReads.atOnce && this.toRead.size) {
+      const [path, entries] = this.toRead.entries().next().value!
+      this.toRead.delete(path)
+      this.waiting -= entries.length
+      this.reads++
+      void lstat(join(this.folder, path))
+        .then(
+          (s): EntryKind => (s.isDirectory() ? 'd' : 'f'),
+          (err: unknown): EntryKind | null => (['ENOENT', 'ENOTDIR'].includes((err as NodeJS.ErrnoException).code ?? '') ? null : '?')
+        )
+        .then((kind) => {
+          for (const x of entries) x.kind = kind
+        })
+        .finally(() => {
+          this.reads--
+          this.pump()
+        })
+    }
+  }
+
+  /** Whether every kind read asked for so far is in. */
+  get kindsRead(): boolean {
+    return !this.reads && !this.toRead.size
+  }
+
+  /** The events whose kind read waits to start (the tests' look at the bound). */
+  get kindsWaiting(): number {
+    return this.waiting
   }
 
   push(e: WriteEntry): void {
@@ -222,6 +289,10 @@ class FolderLog {
 
   close(): void {
     this.watch.close()
+    // Its queued kind reads are dropped; those under way end by themselves.
+    this.closed = true
+    this.toRead.clear()
+    this.waiting = 0
   }
 }
 
@@ -426,7 +497,7 @@ class RepoWatch {
       const k = f.folder.toLowerCase()
       if (this.logs.has(k) || this.held(f.folder)) continue
       const main = f.gitDir.toLowerCase() === this.common.toLowerCase()
-      this.logs.set(k, new FolderLog(f.folder, (paths) => this.tell({ kind: 'written', folder: f.folder, paths }), main ? (rel) => this.event(rel) : null))
+      this.logs.set(k, new FolderLog(f.folder, (paths) => this.tell({ kind: 'written', folder: f.folder, paths }), main ? (rel) => this.event(rel) : null, true))
     }
   }
 
@@ -540,6 +611,13 @@ export class Observer implements ObservePort {
     let folders = this.folders.size
     for (const r of this.repos.values()) folders += r.logs.size
     return { repos: this.repos.size, folders }
+  }
+
+  /** HI-3173: the events whose kind read waits to start, in every Git folder (the tests' look at kindReads' bound). */
+  get kindsWaiting(): number {
+    let n = 0
+    for (const r of this.repos.values()) for (const l of r.logs.values()) n += l.kindsWaiting
+    return n
   }
 
   /** A repository's event, to the projects it holds. */
@@ -679,10 +757,18 @@ export class Observer implements ObservePort {
     let files = [...new Set(seen.filter((e) => !e.path.startsWith(':')).map((e) => e.path))]
     if (counts) files = counts(files)
     else if (files.length && this.isGitFolder(l.folder)) {
-      const r = await git(l.folder, ['check-ignore', '-z', '--stdin'], undefined, files.join('\0'))
-      // Exit 1: none of them is ignored. Anything else is git failing: unknown, never "nothing changed".
-      if (!r.ok && r.code !== 1) return unknown(UNREADABLE.ignored, { folder })
-      const ignored = new Set(r.out.split('\0').filter(Boolean))
+      // HI-3173: each path asked as every kind its entry had during the run (gitIgnoredByKind.ts).
+      const recorded = new Map<string, RecordedKinds>()
+      for (const e of seen) {
+        if (e.path.startsWith(':')) continue
+        let r = recorded.get(e.path)
+        if (!r) recorded.set(e.path, (r = { kinds: new Set(), unread: false }))
+        if (e.kind === undefined) r.unread = true
+        else if (e.kind) r.kinds.add(e.kind)
+      }
+      const ignored = await gitIgnoredByKind(l.folder, files, (p) => recorded.get(p) ?? { kinds: new Set(), unread: true })
+      // Git failing: unknown, never "nothing changed".
+      if (!ignored) return unknown(UNREADABLE.ignored, { folder })
       files = files.filter((f) => !ignored.has(f))
     }
     // An event is timed when it arrives, so one for a write just before t0 can come after it (HI-1767: a check copy's
@@ -773,7 +859,8 @@ async function settle(l: FolderLog): Promise<number> {
   const start = Date.now()
   for (;;) {
     const quiet = Date.now() - Math.max(l.lastEvent, start)
-    if (quiet >= WRITES_QUIET_MS || Date.now() - start >= WRITES_SETTLE_MAX_MS) return Date.now()
+    // A Git folder's kind reads too (HI-3173): one not in by the cap stays unread, and its path is asked as a file too.
+    if ((quiet >= WRITES_QUIET_MS && l.kindsRead) || Date.now() - start >= WRITES_SETTLE_MAX_MS) return Date.now()
     await new Promise((r) => setTimeout(r, WRITES_QUIET_MS - quiet + 5))
   }
 }

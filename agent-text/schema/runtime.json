@@ -23,6 +23,14 @@
   "runtime.choice.takeOver": {
     "placeholders": {}
   },
+  "runtime.forward.resolving": {
+    "placeholders": {
+      "card": "plain",
+      "from": "plain",
+      "source": "plain",
+      "to": "plain"
+    }
+  },
   "runtime.move.doneByOverride": {
     "placeholders": {
       "cards": "plain",
@@ -57,15 +65,37 @@
       "why": "plain"
     }
   },
+  "runtime.start.earlierUnread": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "runtime.start.earlierWork": {
+    "placeholders": {
+      "card": "plain",
+      "line": "plain",
+      "from": "select",
+      "now": "plain",
+      "state": "select",
+      "target": "plain"
+    }
+  },
   "runtime.start.laneStarted": {
     "placeholders": {
       "card": "plain"
+    }
+  },
+  "runtime.start.moreFiles": {
+    "placeholders": {
+      "files": "plain",
+      "more": "plain"
     }
   },
   "runtime.start.slotMove": {
     "placeholders": {
       "slot": "plain",
       "line": "plain",
+      "carried": "select",
       "target": "plain",
       "card": "plain"
     }
@@ -74,6 +104,13 @@
     "placeholders": {
       "card": "plain",
       "why": "plain"
+    }
+  },
+  "runtime.start.targetChanges": {
+    "placeholders": {
+      "target": "plain",
+      "folder": "plain",
+      "files": "plain"
     }
   },
   "runtime.submit.movedAhead": {
@@ -222,6 +259,13 @@
       "card": "plain",
       "by": "select",
       "reason": "plain"
+    }
+  },
+  "runtime.wake.resolutionOverride": {
+    "placeholders": {
+      "card": "plain",
+      "to": "plain",
+      "from": "plain"
     }
   },
   "runtime.wake.reviewerAsks": {

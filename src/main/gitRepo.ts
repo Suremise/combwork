@@ -1479,6 +1479,11 @@ const UPDATE = {
 /** The sessions' statuses that keep a folder busy, as folderBusyData's. */
 const FOLDER_BUSY = new Set(['starting', 'working', 'waiting', 'background', 'watching', 'signin'])
 
+/** The first of the project's agents working in `folder` now (HI-2944: Commit or Set aside there is refused), or null. */
+export async function busyAgentIn(projectPath: string, folder: string): Promise<string | null> {
+  return (await folderAgents(projectPath, folder)).find((a) => a.status && FOLDER_BUSY.has(a.status))?.name ?? null
+}
+
 /** Where a branch is checked out: the project folder, another worktree (a slot's, or not), or nowhere (null). */
 async function branchFolder(projectPath: string, branch: string): Promise<Pick<BranchUpdatePlan, 'where' | 'folder' | 'slot'>> {
   const s = await repoSummary(projectPath)

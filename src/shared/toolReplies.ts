@@ -47,6 +47,7 @@ const R = {
   and: agentMsg({ id: 'reply.list.and', text: '{a} and {b}', note: 'Two items, or a list of them joined one by one ("a and b and c").' }),
   askedNone: agentMsg({ id: 'reply.ask.assistantNone', text: "{card}: your request is on the card, but the Assistant couldn't be given it; the user is told. Ask the user instead (cw_ask_user).", note: "cw_ask_assistant (HI-1866) when the request couldn't be delivered to the Assistant. {card} is the card's key." }),
   asked: agentMsg({ id: 'reply.ask.assistant', text: '{card}: asked the Assistant ({delivery} in its inbox). Its answer comes to your inbox.', note: "cw_ask_assistant (HI-1866): the request's id in the Assistant's inbox ({delivery}, m41)." }),
+  askedWaiting: agentMsg({ id: 'reply.ask.assistantWaiting', text: '{card}: asked the Assistant ({delivery} in its inbox). Its answer comes to your inbox or as a comment on {card}, which shows as waiting for it until the Assistant has dealt with it.', note: "cw_ask_assistant (HI-1866, HI-2915) on the asker's own card in Doing: the card is marked waiting for the answer. {delivery}: the request's id in the Assistant's inbox (m41)." }),
   notifiedOpens: agentMsg({ id: 'reply.notify.opens', text: 'Notification shown; a click opens {opens}.', note: 'cw_notify (HI-1961): what a click on the notification opens (an agent or a card).' }),
   notified: agentMsg({ id: 'reply.notify.shown', text: 'Notification shown.', note: 'cw_notify: the notification was shown.' }),
   changesNoneFor: agentMsg({ id: 'reply.undo.noneForGroup', text: 'No changes of yours are kept for message {group}.', note: "cw_undo's list for one message (#1282) when none is kept. {group} is the message's group id." }),
@@ -209,7 +210,7 @@ const R = {
   queueRunBy: agentMsg({ id: 'reply.queue.runBy', text: 'run by {by}', note: "A merge queue's state: another Combwork runs it." }),
   queueRunning: agentMsg({ id: 'reply.queue.running', text: 'running', note: "A merge queue's state: running." }),
   queueEmpty: agentMsg({ id: 'reply.queue.empty', text: 'empty', note: "A merge queue's state: nothing in it." }),
-  queueHead: agentMsg({ id: 'reply.queue.head', text: 'Merge queue for {target} in {project}: {state}.', note: "cw_queue list's line for a target's queue." }),
+  queueHead: agentMsg({ id: 'reply.queue.head', text: 'Merge queue for {target} in {project}{past, select, yes { (a past branch: not a target now)} other {}}: {state}.', note: "cw_queue list's line for a target's queue. HI-2893: past yes for a past branch's queue." }),
   queueHow: agentMsg({ id: 'reply.queue.how', text: "to {purpose}, in the {place, select, project {project folder} other {target's folder}}: {command}", note: "A merge queue stopped part way (#1351): a command that settles it, what for and where to run it. Joined by \"; \", its first letter made a capital." }),
   queueFilesMore: agentMsg({ id: 'reply.queue.filesMore', text: '{files}, {n} more', note: 'A list cut short (files, processes): those shown, and how many more.' }),
   queueStuck: agentMsg({ id: 'reply.queue.stuck', text: 'Stopped part way ({phase}): {hasBranch, select, yes {the folder is on {branch}} other {the folder has no branch}}, {target} at {ref} (expected {expected}, result {result}){hasFiles, select, yes {; files {files}} other {}}.', note: 'An advance into the checked-out target left part way (#1351): where it stands; how to settle it follows.' }),
@@ -574,10 +575,12 @@ export interface Refused {
   override: string | null
   /** HI-2339: what else to know (a None submit's files left out of its paths), each a line, as a moved reply's. */
   warnings?: string[]
+  /** HI-2854: a refused submit's unseen decisions and comments of the user's, each in full. */
+  unread?: string[]
 }
 
 /** A refusal's three sentences, each on a line, and its rule: what was refused, what to do next, where the rule is changed; then its warnings. */
-export const refusedText = (r: Refused): string => [`${r.message} (${r.rule})`, r.next, ...(r.change ? [r.change] : []), ...(r.warnings ?? []).map((warning) => say(R.warning, { warning }))].join('\n')
+export const refusedText = (r: Refused): string => [`${r.message} (${r.rule})`, r.next, ...(r.change ? [r.change] : []), ...(r.warnings ?? []).map((warning) => say(R.warning, { warning })), ...(r.unread ?? [])].join('\n')
 
 // agent-protocol: intent names and the Combwork tools that take them
 export const INTENT_TOOL: Record<string, string> = { start: 'cw_start_card', submit: 'cw_submit', verdict: 'cw_verdict', 'report merge': 'cw_report_merge', 'put back': 'cw_put_back', 'start review': 'cw_start_review' }
@@ -607,12 +610,14 @@ export interface AskedAssistant {
   ok: true
   card: string
   delivery: string
+  /** HI-2915: the card is marked waiting for the Assistant's answer (its own card in Doing). */
+  waiting?: boolean
 }
 
 /** "HI-12: asked the Combwork Assistant (m41 in its inbox). Its answer comes to your inbox." */
 export function askedAssistantText(a: AskedAssistant): string {
   if (!a.delivery) return say(R.askedNone, { card: a.card })
-  return say(R.asked, { card: a.card, delivery: a.delivery })
+  return say(a.waiting ? R.askedWaiting : R.asked, { card: a.card, delivery: a.delivery })
 }
 
 /** "Notification shown; a click opens HB4." (HI-1961: `opens`, the agent or card its target names.) */
@@ -1297,7 +1302,7 @@ export function queueText(q: QueuePublic): string {
     : q.runBy && !q.runHere
       ? say(R.queueRunBy, { by: q.runBy })
       : say(q.testing || q.queued.length ? R.queueRunning : R.queueEmpty)
-  const lines = [say(R.queueHead, { target: q.target, project: q.project, state })]
+  const lines = [say(R.queueHead, { target: q.target, project: q.project, state, past: q.past ? 'yes' : 'no' })]
   const st = q.paused?.stuck
   if (st) {
     // An advance into the checked-out target left part way (#1351): where it stands, and how to settle it.

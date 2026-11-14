@@ -105,8 +105,9 @@ const check = (name, ok, extra = '') => {
     let from = readsOfInput().length
     let started = await startCard('Card one', written)
     check('a card started on the agent is typed into its CLI', started === true, String(started))
-    check('by default it goes in as one line, as a paste: spacing collapsed, line breaks gone', !!(await lib.until(async () => inputSince(from).includes('Card one Plan one: step A step B\x1b[201~'), HUNG_MS, 100)), JSON.stringify(inputSince(from)))
-    check('…and the CLI gets it on one line', !!(await lib.until(async () => transcriptHas(inTranscript('Card one Plan one: step A step B')), HUNG_MS, 200)))
+    // A card Combwork started says so after its title (HI-2854).
+    check('by default it goes in as one line, as a paste: spacing collapsed, line breaks gone', !!(await lib.until(async () => inputSince(from).includes('Card one It is in Doing and yours. Plan one: step A step B\x1b[201~'), HUNG_MS, 100)), JSON.stringify(inputSince(from)))
+    check('…and the CLI gets it on one line', !!(await lib.until(async () => transcriptHas(inTranscript('Card one It is in Doing and yours. Plan one: step A step B')), HUNG_MS, 200)))
     // What part 4 looks for to say Combwork's wrapper is left out: shown here to be typed, so that check can fail (HI-2514).
     check("by default it goes in inside Combwork's wrapper", inputSince(from).includes(WRAPPER), JSON.stringify(inputSince(from)))
 
@@ -114,15 +115,15 @@ const check = (name, ok, extra = '') => {
     from = readsOfInput().length
     started = await startCard('Card two', written)
     check('as typed, a card started on the agent is typed into its CLI', started === true, String(started))
-    check('as typed, the paste keeps its spacing and line breaks (each the Enter a terminal pastes)', !!(await lib.until(async () => inputSince(from).includes('Card two\r\rPlan one:\r  step A\r\rstep B\x1b[201~'), HUNG_MS, 100)), JSON.stringify(inputSince(from)))
-    check('…and the CLI gets the prompt as written', !!(await lib.until(async () => transcriptHas(inTranscript('Card two\n\nPlan one:\n  step A\n\nstep B')), HUNG_MS, 200)))
+    check('as typed, the paste keeps its spacing and line breaks (each the Enter a terminal pastes)', !!(await lib.until(async () => inputSince(from).includes('Card two\r\rIt is in Doing and yours.\r\rPlan one:\r  step A\r\rstep B\x1b[201~'), HUNG_MS, 100)), JSON.stringify(inputSince(from)))
+    check('…and the CLI gets the prompt as written', !!(await lib.until(async () => transcriptHas(inTranscript('Card two\n\nIt is in Doing and yours.\n\nPlan one:\n  step A\n\nstep B')), HUNG_MS, 200)))
     await inv('advanced:set', AS_TYPED, false)
 
     // Invisible characters (#1547): Claude Code 2.1.309 leaves a prompt with one unsent until Enter again, so Combwork leaves
     // them out; those an emoji is made of stay.
     from = readsOfInput().length
     started = await startCard('Card three', 'Zero​width﻿ and a family \u{1f468}‍\u{1f469}')
-    check('a card with invisible characters is typed without them, an emoji kept whole', !!(await lib.until(async () => inputSince(from).includes('Card three Zerowidth and a family \u{1f468}‍\u{1f469}\x1b[201~'), HUNG_MS, 100)), JSON.stringify(inputSince(from)))
+    check('a card with invisible characters is typed without them, an emoji kept whole', !!(await lib.until(async () => inputSince(from).includes('Card three It is in Doing and yours. Zerowidth and a family \u{1f468}‍\u{1f469}\x1b[201~'), HUNG_MS, 100)), JSON.stringify(inputSince(from)))
 
     // ---- 2. Ctrl+C and Ctrl+V. Text to select: typed into the CLI's input, never sent.
     const TEXT = 'SELECTME alpha beta delta'

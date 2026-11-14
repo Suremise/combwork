@@ -97,6 +97,7 @@ describe('reconciliation in the app, record-only (#1217)', () => {
     expect(factsOf(w, card).find((f) => f.kind === 'Started')!.data).toMatchObject({ folder: wt, line: 'card', target: 'main' })
     const before = git(repo, 'rev-parse', 'main')
     git(repo, 'merge', '-q', '--no-ff', '-m', 'merge card', 'card')
+    const merged = git(repo, 'rev-parse', 'main')
     await reconcileNow(w, repo)
     const integrated = factsOf(w, card).find((f) => f.kind === 'Integrated')!
     expect(integrated).toMatchObject({ actor: 'outside', source: 'observed', data: { revision: head, target: 'main', by: 'outside', method: 'merge' } })
@@ -112,6 +113,33 @@ describe('reconciliation in the app, record-only (#1217)', () => {
     await reconcileNow(w, repo, ['main'])
     expect(factsOf(w, card).at(-1)).toMatchObject({ kind: 'LeftTarget', source: 'observed', data: { revision: head, target: 'main' } })
     expect((await inWorkspace(w, () => tasks.getTask(card, w))).column).toBe('done')
+    // HI-2988: main back at the merge: the mark cleared (BackInTarget), once; the card still Done.
+    git(repo, 'reset', '-q', '--hard', merged)
+    await reconcileNow(w, repo, ['main'])
+    expect(factsOf(w, card).at(-1)).toMatchObject({ kind: 'BackInTarget', source: 'observed', data: { revision: head, target: 'main' } })
+    const wf = (await workflowFor(w, repo))!
+    expect(wf.state(wf.store.card(card)).marks.leftTarget).toBeUndefined()
+    await reconcileNow(w, repo, ['main'])
+    expect(kinds(w, card).filter((k) => k === 'BackInTarget')).toHaveLength(1)
+    // Left and back again, by the same heads and new ones (HR1's round 1): each transition its own fact, a read with no
+    // change none. B1 (before), back at the merge, B2 (another bad head), the merge again, G2 (a good head past it), B1.
+    const marked = (): boolean => !!wf.state(wf.store.card(card)).marks.leftTarget
+    const at = async (ref: string): Promise<boolean> => {
+      git(repo, 'reset', '-q', '--hard', ref)
+      await reconcileNow(w, repo, ['main'])
+      await reconcileNow(w, repo, ['main'])
+      return marked()
+    }
+    git(repo, 'reset', '-q', '--hard', before)
+    git(repo, 'commit', '-q', '--allow-empty', '-m', 'another head without the merge')
+    const b2 = git(repo, 'rev-parse', 'HEAD')
+    git(repo, 'reset', '-q', '--hard', merged)
+    git(repo, 'commit', '-q', '--allow-empty', '-m', 'a head past the merge')
+    const g2 = git(repo, 'rev-parse', 'HEAD')
+    const seen = [await at(before), await at(merged), await at(b2), await at(merged), await at(g2), await at(before)]
+    expect(seen).toEqual([true, false, true, false, false, true])
+    expect(kinds(w, card).filter((k) => k === 'LeftTarget')).toHaveLength(4)
+    expect(kinds(w, card).filter((k) => k === 'BackInTarget')).toHaveLength(3)
   })
 
   it('a rebase after the pass carries it over; an amend with new content makes it stale; neither moves the card', async () => {

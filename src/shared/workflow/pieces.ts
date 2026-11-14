@@ -9,6 +9,8 @@ export const GUARDS = {
   'start.notBlocked': { needs: null },
   'start.dependenciesIntegrated': { needs: 'containment' },
   'start.slotAvailable': { needs: 'isolation' },
+  // HI-2799: jj's card work isn't enabled yet (its line under jj, J2's refused prepare): every jj start refuses.
+  'start.platformReady': { needs: null },
   'submit.notDuplicate': { needs: 'revisions' },
   'requeue.allowed': { needs: 'integration' },
   'submit.ready': { needs: 'revisions' },

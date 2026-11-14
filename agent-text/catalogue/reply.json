@@ -51,6 +51,10 @@
     "text": "{card}: your request is on the card, but the Assistant couldn't be given it; the user is told. Ask the user instead (cw_ask_user).",
     "note": "cw_ask_assistant (HI-1866) when the request couldn't be delivered to the Assistant. {card} is the card's key."
   },
+  "reply.ask.assistantWaiting": {
+    "text": "{card}: asked the Assistant ({delivery} in its inbox). Its answer comes to your inbox or as a comment on {card}, which shows as waiting for it until the Assistant has dealt with it.",
+    "note": "cw_ask_assistant (HI-1866, HI-2915) on the asker's own card in Doing: the card is marked waiting for the answer. {delivery}: the request's id in the Assistant's inbox (m41)."
+  },
   "reply.attachment.bytes": {
     "text": "{n, number} bytes",
     "note": "An attachment's size (HI-1751)."
@@ -444,8 +448,8 @@
     "note": "A list cut short (files, processes): those shown, and how many more."
   },
   "reply.queue.head": {
-    "text": "Merge queue for {target} in {project}: {state}.",
-    "note": "cw_queue list's line for a target's queue."
+    "text": "Merge queue for {target} in {project}{past, select, yes { (a past branch: not a target now)} other {}}: {state}.",
+    "note": "cw_queue list's line for a target's queue. HI-2893: past yes for a past branch's queue."
   },
   "reply.queue.how": {
     "text": "to {purpose}, in the {place, select, project {project folder} other {target's folder}}: {command}",

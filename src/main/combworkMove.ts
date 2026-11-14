@@ -536,7 +536,9 @@ export async function repairWorktrees(host: string, moves: FolderMove[]): Promis
   const fixed: string[] = []
   for (const p of paths) {
     const to = movedPathOf(p, moves)
-    if (to && present(to)) fixed.push(to)
+    // A jj workspace colocated with Git (HI-2800, gate relocation) is left as it is: git's repair would make only git's half
+    // right, its `.jj` still naming the old store, and no move of a jj workspace is supported.
+    if (to && present(to) && !present(join(to, '.jj'))) fixed.push(to)
   }
   if (!fixed.length) return 0
   const rep = await relocate.repair(host, fixed)

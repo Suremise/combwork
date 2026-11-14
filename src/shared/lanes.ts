@@ -98,6 +98,12 @@ export interface LaneRecord {
    */
   slotWait?: { since: string; note: string; stoppedOnly?: true }
   /**
+   * HI-3148: started on a released line by the user's or the Assistant's override (a hotfix lane): the line it was given
+   * for (the lane's fixed Merges into), who gave it, why and when. Its cards' starts onto that line go through while it
+   * runs; ended or replaced, it goes with the lane. Kept in its row's `extra`.
+   */
+  releasedOverride?: { target: string; by: 'user' | 'assistant'; reason: string; at: string }
+  /**
    * The lane's agents still owed their new conversation (HI-2034): its start found one in a turn or with a prompt it
    * hadn't taken yet, so it is launched once free (laneStarts.ts' pass), within `cw.lanes.freshStartWaitMinutes`.
    * Kept with the lane (its row's `extra`), changed only under the lanes' lock. While its builder's is here, Combwork gives
@@ -116,6 +122,13 @@ export interface LaneRecord {
    * given to the next free pooled reviewer. Kept with the lane (its row's `extra`).
    */
   pool?: true
+  /**
+   * Its list's revision (HI-2898): goes up by one at each save that changes `cards` or `pending` (lanes.ts' write, and the
+   * runtime's writeLane), never reset or reused, so the same list coming back still has a new one. The window's lane
+   * edits name the revision they were made on, and are refused once it moved. Kept with the lane (its row's `extra`);
+   * missing: 0.
+   */
+  listRev?: number
   /**
    * Its due card's wait for the cards it depends on (HI-2618): an episode begins once Combwork sees that card due with one
    * of them not Done (`waiting`, a new `id` each time), is claimed once none is open (`pending`: with the rules off, its
@@ -182,7 +195,8 @@ export const laneBuilds = (lanes: readonly Pick<LaneRecord, 'state' | 'project' 
 export function laneCard(n: number, card: TaskCard | null, of?: { lane: string; builder: string; owner?: string | null }): LaneCard {
   if (!card) return { number: n, title: '', column: 'gone', blocked: null, round: 1, reviewing: false }
   const elsewhere = !of || card.column === 'done' ? null : card.agent ? (card.agent !== of.builder ? card.agent : null) : of.owner && of.owner !== of.lane ? of.owner : null
-  return { number: n, title: card.title, column: card.column, blocked: card.blocked || null, round: card.history.filter((h) => VERDICT_FAILED.test(h.what)).length + 1, reviewing: !!card.review, ...(elsewhere ? { elsewhere } : {}) }
+  const givenAway = !!elsewhere && !!card.agent && elsewhere === card.agent
+  return { number: n, title: card.title, column: card.column, blocked: card.blocked || null, round: card.history.filter((h) => VERDICT_FAILED.test(h.what)).length + 1, reviewing: !!card.review, ...(elsewhere ? { elsewhere } : {}), ...(givenAway ? { givenAway: true as const } : {}) }
 }
 
 /** Whether a lane's card is finished for the loop: passed review, merged, or gone. */
@@ -237,8 +251,10 @@ export interface LaneSlotHeld {
    * HI-2468, a refused start's: `left`, programs the last run of `agent` left running there (`program`, the first by
    * name, and `more` beyond it); `lastRun`, that run of `agent`'s not known to have ended.
    */
-  held: 'session' | 'process' | 'broker' | 'left' | 'lastRun'
+  held: 'session' | 'process' | 'broker' | 'left' | 'lastRun' | 'card'
   agent?: string
+  /** `card` (HI-3168): the slot is lent to this card, which `agent` builds there (one agent, one slot), so none is lent. */
+  card?: number
   broker?: string
   idle?: boolean
   program?: string
@@ -268,8 +284,9 @@ const unrecordedCard = (n: number, card: TaskCard | null): LaneCard => ({ number
  * (currentCard); an ended lane without its record has none. A card held elsewhere (HI-1821: another agent's, or, given
  * to none, another lane's: `owners`, main's owner lane by card) is never its current card nor why it waits.
  */
-export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null, rulesetStages?: StageId[] | null, slot?: { slot: string | null; waiting: boolean; info?: LaneSlotInfo | null; held?: LaneSlotHeld | null } | null, owners?: ReadonlyMap<number, string | null>, startWait?: LaneStartWait | null, teamPaused = false, dueDeps?: DueDeps | null, outOfWorkflow?: ReadonlySet<string>, offSide?: ReadonlyMap<string, 'builder' | 'reviewer'>): LaneInfo {
+export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null, rulesetStages?: StageId[] | null, slot?: { slot: string | null; waiting: boolean; info?: LaneSlotInfo | null; held?: LaneSlotHeld | null } | null, owners?: ReadonlyMap<number, string | null>, startWait?: LaneStartWait | null, teamPaused = false, dueDeps?: DueDeps | null, outOfWorkflow?: ReadonlySet<string>, offSide?: ReadonlyMap<string, 'builder' | 'reviewer'>, target?: string | null): LaneInfo {
   const unrecorded = !running(rec) && !rec.frozen
+  const ownTarget = target === undefined ? (rec.ruleset ? targetOfRulesetId(rec.ruleset) : null) : target
   // A card at its round limit waits for the user's answer (§16.11.4, `atLimit`: the main side's facts): it pauses the lane.
   const live = (n: number): LaneCard => ({ ...laneCard(n, cards.get(n) ?? null, { lane: rec.id, builder: rec.builder.id, owner: owners?.get(n) }), ...(atLimit?.has(n) ? { roundLimit: true } : {}) })
   const list = isFrozen(rec) ? rec.frozen! : rec.cards.map((n) => (unrecorded ? unrecordedCard(n, cards.get(n) ?? null) : live(n)))
@@ -294,7 +311,7 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
   // Waiting for a slot (#1438, `slot`: the main side's): lent none yet, so nothing of it can start; only what already
   // waits for the user, or its hooks, says more. A free slot held (HI-2466): which, and what holds it.
   const held = slot?.held ?? null
-  const noSlot = running(rec) && !unrecorded && slot?.waiting && !(found && USERS.has(found.reason)) ? { reason: 'slot' as const, card: current, ...(held ? { slot: held.slot, held: held.held, ...(held.agent ? { agent: held.agent } : {}), ...(held.broker ? { broker: held.broker } : {}), ...(held.idle !== undefined ? { idle: held.idle } : {}) } : {}) } : null
+  const noSlot = running(rec) && !unrecorded && slot?.waiting && !(found && USERS.has(found.reason)) ? { reason: 'slot' as const, card: current, ...(held ? { slot: held.slot, held: held.held, ...(held.agent ? { agent: held.agent } : {}), ...(held.card !== undefined ? { heldFor: held.card } : {}), ...(held.broker ? { broker: held.broker } : {}), ...(held.idle !== undefined ? { idle: held.idle } : {}) } : {}) } : null
   // Its slot being prepared (#1446: G15's warming, its setup or an install): said when nothing else is, never pausing.
   const preparing = running(rec) && !unrecorded && slot?.info?.state === 'preparing' ? { reason: 'preparing' as const, card: current, slot: slot.info.name } : null
   // Its card due to start and not started yet (HI-2029, laneStarts.ts: `startWait`), only while that card is the current
@@ -338,9 +355,11 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
     mergeCommit: rec.mergeCommit,
     status,
     queued: running(rec) && rec.pending ? [...rec.pending] : null,
+    listRev: rec.listRev ?? 0,
     oldRules: laneOldRules(rec, rulesetNow),
-    // Its Merges into (HI-2556): the other target its recorded ruleset marks; absent for the project's own.
-    ...(rec.ruleset && targetOfRulesetId(rec.ruleset) ? { target: targetOfRulesetId(rec.ruleset)! } : {}),
+    // Its Merges into (HI-2556): absent for the project's own. `target` as the caller read it (HI-3113: marked, or as its
+    // ruleset recorded it, against the project's own); not given, the other target its ruleset id marks.
+    ...(ownTarget ? { target: ownTarget } : {}),
     stages: running(rec) && rec.ruleset && rulesetStages ? [...rulesetStages] : null,
     slot: running(rec) ? (slot?.slot ?? null) : null,
     slotInfo: running(rec) ? (slot?.info ?? null) : null,
@@ -467,6 +486,7 @@ const L = {
   checkCopy: agentMsg({ id: 'lane.status.checkCopy', text: 'waiting for a check copy for {card}', note: "A lane waits for a check copy (a copy at the card's revision for its checks)." }),
   slot: agentMsg({ id: 'lane.status.slot', text: 'waiting for a slot', note: 'A lane started with no slot free waits for one to be lent to it (#1438).' }),
   slotHeld: agentMsg({ id: 'lane.status.slotHeld', text: "waiting for {slot}: {held, select, session {{agent}'s session is still in it} broker {a process still has a file or folder in it open: Windows Sandbox's broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}", note: "HI-2466: a lane waiting for a slot, the only free one ({slot}) held: a session of the agent {agent} still runs in it, or (other) a process holds it. broker (HI-2467): a process holds it, and Windows Sandbox's broker ({broker}: its process name, such as WindowsSandboxServer) has the slot as its current folder; idle: yes, no Sandbox runs; no, one does; other, not known. Combwork tries again until it is free." }),
+  slotCard: agentMsg({ id: 'lane.status.slotCard', text: 'waiting for a slot: {agent} still builds in {slot} for {card}, which keeps it until that card is Done or put back', note: "HI-3168: a lane waiting for a slot, refused one because its builder {agent} already holds {slot} for another card, {card} (one agent, one slot): typically a card still in flight when an earlier lane of {agent}'s ended (HI-3118). Combwork lends the lane a slot once that card is Done or put back." }),
   teamPause: agentMsg({ id: 'lane.status.teamPause', text: 'paused: the team is pausing', note: "The workspace's team is paused (before an update, HI-2081): nothing of a lane moves until it resumes." }),
   preparing: agentMsg({ id: 'lane.status.preparing', text: 'waiting: preparing {slot}', note: "A lane's slot is being prepared (warming, its setup or an install, #1446); {slot} is its name." }),
   freshTimeout: agentMsg({ id: 'lane.status.fresh.timeout', text: "{agent}'s new conversation didn't start (it wasn't free in time): retry it from the lane's row, or end the lane", note: "An agent owed a new conversation for its lane (HI-2034) wasn't free within the wait: no more automatic tries until the user retries it." }),
@@ -524,6 +544,8 @@ const L = {
   carryOn: agentMsg({ id: 'lane.next.carryOn', text: 'Carry on with {card}{also}.', note: 'cw_lane next: the card in flight (Doing or Review) to carry on; {card} is its key and title; {also} is " (why the lane waits)" or nothing.' }),
   carryOnIn: agentMsg({ id: 'lane.next.carryOnIn', text: 'Carry on with {card} in {slot}{also}.', note: 'cw_lane next: the card in flight to carry on, in the slot its lane builds in (#1438); {also} as in lane.next.carryOn.' }),
   afterQueue: agentMsg({ id: 'lane.next.afterQueue', text: 'Next: {card}, once {n, plural, one {it is} other {they are}} Done.', note: "cw_lane next, after its passed cards' places in the merge queue (#1354): the next card waits for them to be Done (one card at a time); {n} is how many." }),
+  reviewNext: agentMsg({ id: 'lane.next.reviewNext', text: '{card} waits for your review (lane {lane}): review it.', note: "cw_lane next (HI-3118), for an agent that reviews a running lane and builds none: the first card of its lanes in Review. {card} is its key and title." }),
+  reviewNone: agentMsg({ id: 'lane.next.reviewNone', text: 'No card of your lanes waits for your review now: end your turn; Combwork wakes you when one is submitted.', note: 'cw_lane next (HI-3118), for an agent that reviews a running lane and builds none, with no card of its lanes in Review.' }),
   start: agentMsg({ id: 'lane.next.start', text: 'Next: {card}. Start it.', note: 'cw_lane next: the card to start next; {card} is its key and title.' }),
   startIn: agentMsg({ id: 'lane.next.startIn', text: 'Next: {card}. Start it: it is built in {slot}, on a new branch Combwork makes there.', note: "cw_lane next: the card to start next, built in the lane's slot (#1438), where Combwork makes its line as it starts." }),
   cardsNone: agentMsg({ id: 'lane.args.cardsNone', text: 'cards must be the card numbers, in order (at least one)', note: "cw_lane start's refusal of its cards argument: none given, or not a list." }),
@@ -566,6 +588,7 @@ export function laneStatusText(s: LaneStatus): string {
     case 'checkCopy':
       return say(L.checkCopy, { card })
     case 'slot':
+      if (s.slot && s.held === 'card' && s.heldFor !== undefined) return say(L.slotCard, { agent: s.agent ?? say(L.anAgent), slot: s.slot, card: cardRef(s.heldFor) })
       return s.slot && s.held ? say(L.slotHeld, { slot: s.slot, held: s.held, agent: s.agent ?? say(L.anAgent), broker: s.broker ?? '', idle: idleKey(s.idle) }) : say(L.slot)
     case 'teamPause':
       return say(L.teamPause)
@@ -589,8 +612,13 @@ export function laneStatusText(s: LaneStatus): string {
   }
 }
 
-/** Whether every card of a lane is merged (Done), so the lane has ended. Gone cards don't count against it. */
-export const allDone = (cards: readonly LaneCard[]): boolean => cards.some((c) => c.column === 'done') && cards.every((c) => c.column === 'done' || c.column === 'gone')
+/**
+ * Whether a lane has no card of its own left to do, so it ends: each card merged (Done), gone (archived, deleted, moved
+ * to another project) or given to another agent (HI-3117). A card given to none that a newer lane lists (held elsewhere
+ * by HI-1821) still keeps it running (HI-3118: a lane is never ended because another lists its cards). A lane whose
+ * cards are all gone ends too, rather than holding its builder and slot with nothing to do.
+ */
+export const allDone = (cards: readonly LaneCard[]): boolean => cards.every((c) => c.column === 'done' || c.column === 'gone' || !!c.givenAway)
 
 /**
  * The lanes listed (the window's panel, the Agent API without `all`): running ones, and ended ones until their builder
@@ -633,7 +661,8 @@ export function readLane(v: unknown): LaneRecord | null {
   if (!['active', 'ended', 'abandoned'].includes(v.state as string)) return null
   if (!text(v.startedBy, 200) || !time(v.startedAt) || !time(v.updatedAt) || !(v.endedAt === null || time(v.endedAt))) return null
   if (v.state !== 'active' && v.endedAt === null) return null
-  if (!(v.name === null || text(v.name, LANE_NAME_MAX)) || !(v.mergeCommit === null || text(v.mergeCommit, 64))) return null
+  // Its name is cut, never a reason to drop the lane (HI-3119: one saved longer than the reader allowed vanished).
+  if (!(v.mergeCommit === null || text(v.mergeCommit, 64))) return null
   // Its snapshot, kept only when every card of it reads back (else it reads from the board, as before #512).
   const frozen = Array.isArray(v.frozen) && v.frozen.length === cards.length ? v.frozen.map(cardOf) : null
   const snapshot = frozen?.every((c, i) => c && c.number === cards[i]) ? (frozen as LaneCard[]) : null
@@ -643,7 +672,7 @@ export function readLane(v: unknown): LaneRecord | null {
   return {
     id: v.id,
     project: v.project,
-    name: v.name as string | null,
+    name: laneName(v.name),
     builder,
     reviewer,
     cards: cards as number[],
@@ -657,11 +686,13 @@ export function readLane(v: unknown): LaneRecord | null {
     mergeCommit: v.mergeCommit as string | null,
     ...(snapshot ? { frozen: snapshot } : {}),
     ...(text(v.ruleset, 128) ? { ruleset: v.ruleset } : {}),
+    ...(isObj(v.releasedOverride) && text(v.releasedOverride.target, 250) && (v.releasedOverride.by === 'user' || v.releasedOverride.by === 'assistant') && typeof v.releasedOverride.reason === 'string' && time(v.releasedOverride.at) ? { releasedOverride: { target: v.releasedOverride.target as string, by: v.releasedOverride.by, reason: (v.releasedOverride.reason as string).slice(0, 4000), at: v.releasedOverride.at as string } } : {}),
     ...(pending ? { pending } : {}),
     ...(whole(v.inFlight, 1e9) ? { inFlight: v.inFlight as number } : {}),
     ...(isObj(v.slotWait) && time(v.slotWait.since) && typeof v.slotWait.note === 'string' ? { slotWait: { since: v.slotWait.since as string, note: (v.slotWait.note as string).slice(0, 4000), ...(v.slotWait.stoppedOnly === true ? { stoppedOnly: true as const } : {}) } } : {}),
     ...(isObj(v.brief) && whole(v.brief.rev, 1e9) && (v.brief.text === null || typeof v.brief.text === 'string') && (v.brief.out === null || whole(v.brief.out, 1e9)) ? { brief: { text: v.brief.text === null ? null : (v.brief.text as string).slice(0, LANE_BRIEF_MAX), rev: v.brief.rev as number, out: v.brief.out as number | null, ...(text(v.brief.notIn, 128) ? { notIn: v.brief.notIn as string } : {}) } } : {}),
     ...(v.pool === true && !reviewer ? { pool: true as const } : {}),
+    ...(whole(v.listRev, Number.MAX_SAFE_INTEGER) ? { listRev: v.listRev as number } : {}),
     ...(fresh ? { freshStart: fresh } : {}),
     ...(v.state === 'active' && isObj(v.depEpisode) && whole(v.depEpisode.card, 1e9) && text(v.depEpisode.id, 64) && ['waiting', 'pending', 'sent'].includes(v.depEpisode.state as string) && time(v.depEpisode.at) ? { depEpisode: { card: v.depEpisode.card as number, id: v.depEpisode.id as string, state: v.depEpisode.state as DepEpisode['state'], at: v.depEpisode.at as string } } : {})
   }
@@ -695,12 +726,21 @@ export function laneNumber(v: unknown, what: 'rounds' | 'waitMinutes', fallback:
   return Math.round(v)
 }
 
-/** A lane's name from untrusted arguments: one line, trimmed, cut to LANE_NAME_MAX (null: none). */
+/**
+ * A lane's name from untrusted arguments: one line, trimmed, cut to LANE_NAME_MAX (null: none). Measured in UTF-16 units,
+ * as the dialog's maxLength and readLane measure it (HI-3119), and cut between characters, never inside one.
+ */
 export function laneName(v: unknown): string | null {
   if (typeof v !== 'string') return null
-  const t = [...v.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim()]
-  if (!t.length) return null
-  return t.length > LANE_NAME_MAX ? `${t.slice(0, LANE_NAME_MAX - 1).join('')}…` : t.join('')
+  const t = v.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim()
+  if (!t) return null
+  if (t.length <= LANE_NAME_MAX) return t
+  let cut = ''
+  for (const ch of t) {
+    if (cut.length + ch.length > LANE_NAME_MAX - 1) break
+    cut += ch
+  }
+  return `${cut.trimEnd()}…`
 }
 
 /** A wait in a few words: "6 h", "90 min". */
@@ -761,7 +801,9 @@ export function laneEndText(l: LaneInfo & { note?: string }): string {
  * `queue`: the lane's passed cards Combwork merges, each with where it is in the merge queue (#1354): the lane takes one card
  * at a time, so the next waits for them to be Done.
  */
-export function laneNextText(r: { lane: LaneInfo; next: { card: number; title: string; carryOn: boolean } | null; waits: LaneStatus | null; queue?: { card: number; line: string }[]; unsubmitted?: UnsubmittedCard[] }): string {
+export function laneNextText(r: { lane: LaneInfo; next: { card: number; title: string; carryOn: boolean } | null; waits: LaneStatus | null; queue?: { card: number; line: string }[]; unsubmitted?: UnsubmittedCard[]; review?: { card: number; title: string } | null }): string {
+  // An agent that only reviews (HI-3118): a reviewer's answer, never a card to start.
+  if (r.review !== undefined) return r.review ? say(L.reviewNext, { card: `${cardRef(r.review.card)} ${r.review.title}`, lane: r.lane.id }) : say(L.reviewNone)
   if (r.lane.state === 'paused' && r.waits) return say(L.nextWaits, { why: laneStatusText(r.waits) })
   // Each passed card's place in the merge queue (#1354): its key, then the queue's own line.
   const queued = r.queue?.length ? r.queue.map((q) => `${cardRef(q.card)}: ${q.line}`).join(' ') : ''

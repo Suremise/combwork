@@ -97,7 +97,7 @@ const base = tempDir('slotwriters-')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const { boardFile, onBoardCommitted } = await import('../src/main/boardStore')
 const { SlotPool, SlotStore, fileSlotConn } = await import('../src/main/slots')
-const { goneWriterCleared, goneWriterSettles, goneWriterStill, heldSlots, heldWriter, releaseHeldWriter, setWriterHost, writerOver } = await import('../src/main/agentFolders')
+const { bindSession, goneWriterCleared, goneWriterSettles, goneWriterStill, heldSlots, heldWriter, releaseHeldWriter, setWriterHost, writerOver } = await import('../src/main/agentFolders')
 const { releasableSlots, releaseSlot, SlotReleaseRefused } = await import('../src/main/slotRelease')
 const { settleRunForTests } = await import('../src/main/agentProcesses')
 const { onCombworkEvent } = await import('../src/main/events')
@@ -1077,5 +1077,87 @@ describe('Release Slot through the Agent API and the Assistant (#1561)', () => {
     expect(await list()).toEqual({ carried: [], held: [] })
     expect(await refusal(release('slot-a', {}))).toBe(409)
     expect(await refusal(release('slot-a', { kind: 'carried' }))).toBe(409)
+  })
+})
+
+describe("a switch's resume in flight across its lease's end and its cancel (HI-2920)", () => {
+  const key = `${project.toLowerCase()}#b1`
+  const conv = 's-switch'
+  /**
+   * b1 running in slot-a under a lease of its own, in conversation `conv` bound to it; its switch's quit ends that run (its
+   * writer's release then waits for the tracker, as a CLI's exit leaves it), and the resume's wait for that release is
+   * where each test changes the board (`during`, after the release has been written).
+   */
+  async function switching(during: (lease: string) => Promise<void>): Promise<{ old: string; lease: string; end: Promise<string>; claims: () => number }> {
+    hostOn(false)
+    if (!carriedLease()) expect(await store.carry('b1', { name: 'slot-a', folder, target: null })).not.toBeNull()
+    const lease = carriedLease()!.id
+    await inWorkspace(ws, () => ws.upsertSession(project, { id: conv, agent: 'claude-code', agentId: 'b1', cwd: folder, names: 2, name: conv, lastActiveAt: new Date().toISOString() }))
+    await inWorkspace(ws, () => bindSession(project, conv, lease))
+    const state = await start()
+    const old = state.runId
+    ;(manager.live.get(key)!.state as { sessionId?: string }).sessionId = conv
+    const settle = manager.settleWriterOf as (run: string) => void
+    saved.set('quit', manager.quit)
+    manager.quit = async () => {
+      settle.call(manager, old)
+      manager.live.delete(key)
+      manager.runs.clear()
+      return 'sent'
+    }
+    const real = (manager.earlierWritersSettled as (...a: unknown[]) => Promise<void>).bind(manager)
+    waitSpy = vi.spyOn(manager as unknown as { earlierWritersSettled: (...a: unknown[]) => Promise<void> }, 'earlierWritersSettled').mockImplementation(async (...a: unknown[]) => {
+      settleRunForTests(old, 'ended')
+      await real(...a)
+      await during(lease)
+    })
+    // Counted until the test ends: a cancel ends the switch before its start's claim would come.
+    let claimed = 0
+    offClaims = onBoardCommitted(() => {
+      const w = writer()
+      if (w?.run && w.run !== old) claimed++
+    })
+    expect(inWorkspace(ws, () => sessions.switchAtSafePoint(project, 'b1'))).toBe('queued')
+    const op = (manager.switches as Map<string, { done: Promise<string> }>).get(key)!
+    return { old, lease, end: op.done, claims: () => claimed }
+  }
+
+  let waitSpy: { mockRestore: () => void } | null = null
+  let offClaims: (() => void) | null = null
+  afterEach(() => {
+    manager.quit = saved.get('quit')
+    waitSpy?.mockRestore()
+    waitSpy = null
+    offClaims?.()
+    offClaims = null
+  })
+
+  it('its lease ended and the slot freed as it left it while it waited: refused, never taking the slot by hand (no carried lease left), nothing launched', async () => {
+    const s = await switching(async (lease) => {
+      // The card's Done: its lease ends, and the slot is free and ready at the head it was left at.
+      await store.end(lease, 'done')
+      expect(await store.finalizeEndRev(lease, sh(folder, 'rev-parse', 'HEAD').trim())).toBe(true)
+      await store.conn.write((db) => store.setIn(db, 'slot-a', 'ready'))
+    })
+    expect(await s.end).toBe('failed')
+    expect(sessions.startingFor(project, 'b1')).toBe(false)
+    expect(carriedLease()).toBeNull()
+    expect(store.slot('slot-a')).toMatchObject({ state: 'ready', writer: null })
+    expect(s.claims()).toBe(0)
+    expect(launched).toBe(1)
+  })
+
+  it('stopped while it waited (its switch cancelled), its lease still open: the start claims nothing and nothing launches', async () => {
+    const s = await switching(async () => {
+      sessions.stop(project, 'b1')
+    })
+    expect(await s.end).toBe('cancelled')
+    // The resume's start, already begun, gives up before its claim.
+    await vi.waitFor(() => expect(sessions.startingFor(project, 'b1')).toBe(false), { timeout: 15000 })
+    expect(manager.writers.size).toBe(0)
+    expect(s.claims()).toBe(0)
+    expect(writer()).toBeNull()
+    expect(carriedLease()?.id).toBe(s.lease)
+    expect(launched).toBe(1)
   })
 })

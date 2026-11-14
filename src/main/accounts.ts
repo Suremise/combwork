@@ -768,6 +768,15 @@ export function firstUsableAccount(cfg: WorkspaceConfig | null): Account | null 
   return null
 }
 
+/**
+ * The CLI an agent launches (HI-2899): its own; the Assistant naming neither a CLI nor a connection (a new workspace's),
+ * the first usable account's (decision A), Automatic's pick only where none is. One rule for its start, its launch
+ * settings and the accounts it uses, so they never disagree.
+ */
+export function launchCli(agent: Pick<AgentDef, 'provider' | 'connection'> | null | undefined, cfg: WorkspaceConfig | null, assistant: boolean): ProviderId {
+  return assistant && !agent?.provider && !agent?.connection ? (firstUsableAccount(cfg)?.provider ?? agentProvider(agent, config.settings)) : agentProvider(agent, config.settings)
+}
+
 /** Whether a test copy runs a CLI on its CLI test home (connectionSeam.ts). */
 const seamOn = (cli: ProviderId): boolean => {
   const caps = providerDescriptor(cli).capabilities.connections
@@ -1265,7 +1274,7 @@ const projectsFor = (a: Account): { name: string; path: string }[] => {
   const projects = (info?.projects ?? []).filter((p) => usedBy(p, (ag) => agentProvider(ag, config.settings))).map((p) => ({ name: p.name, path: p.path }))
   const home = info?.assistant
   // An Assistant that names no CLI yet: the first usable account's, as its launch (decision A).
-  const assistantCli = (ag: AgentInfo): ProviderId => (!ag.provider && !ag.connection ? (firstUsableAccount(cfg)?.provider ?? agentProvider(ag, config.settings)) : agentProvider(ag, config.settings))
+  const assistantCli = (ag: AgentInfo): ProviderId => launchCli(ag, cfg, true)
   return home && usedBy(home, assistantCli) ? [...projects, { name: home.name, path: home.path }] : projects
 }
 

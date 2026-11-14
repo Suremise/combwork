@@ -107,8 +107,10 @@ function foldersOf(common: string): { folder: string; gitDir: string }[] {
   for (const n of names) {
     const gitDir = join(common, 'worktrees', n)
     try {
+      // A relative gitdir (Git's worktree.useRelativePaths, a colocated jj workspace's) is the entry's own, as Git reads
+      // it: never the process's working folder (HI-3160).
       const target = readFileSync(join(gitDir, 'gitdir'), 'utf8').trim()
-      out.push({ folder: dirname(resolve(target)), gitDir })
+      out.push({ folder: dirname(resolve(gitDir, target)), gitDir })
     } catch {
       // Being made or removed.
     }

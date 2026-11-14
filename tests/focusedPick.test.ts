@@ -13,7 +13,9 @@ import { SUITES } from './e2e/suites.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { isRealCli } from './e2e/runner.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { UNIT_SCANS, diffLinesOf, isUnitTestFile, needsLines, pickLines, pickTests, scanSelects, unitPicks, under } from './e2e/affected.mjs'
+import { UNIT_SCANS, diffLinesOf, isUnitTestFile, needsLines, pickLines, pickTests, scanSelects, unchangedSince, unitPicks, under } from './e2e/affected.mjs'
+// @ts-expect-error: a plain .mjs module without types
+import { narrowRelatedInTree } from './e2e/relatedTests.mjs'
 import { tempDir } from './tempDir'
 
 const runContext = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
@@ -174,6 +176,31 @@ describe('the tests a change needs (pickTests)', () => {
     expect(units({ paths: [file], diffLines })).toContain('tests/e2esuites.test.ts')
     // The same file changed without a seam doesn't.
     expect(units({ paths: [file], diffLines: { [file]: ['export const DAY_MS = 86_400_001'] } })).not.toContain('tests/e2esuites.test.ts')
+  })
+
+  it('HI-3002: a checkout with no change since the base has nothing for Vitest to relate, and nothing related is narrowed for free', () => {
+    const repo = tempDir('cw-focused-unchanged-')
+    const git = (...args: string[]): string => execFileSync('git', ['-c', 'core.autocrlf=false', '-c', 'user.name=Combwork Test', '-c', 'user.email=test@example.invalid', ...args], { cwd: repo, env: runContext.baseEnv(), encoding: 'utf8' })
+    git('init', '-q', '-b', 'main')
+    writeFileSync(join(repo, 'a.ts'), 'export const a = 1\n')
+    git('add', '.')
+    git('commit', '-q', '-m', 'base')
+    const base = git('rev-parse', 'HEAD').trim()
+    expect(unchangedSince(repo, base)).toBe(true)
+    // Untracked, unstaged, staged, then committed since the base: each one changed.
+    writeFileSync(join(repo, 'b.ts'), 'export const b = 2\n')
+    expect(unchangedSince(repo, base)).toBe(false)
+    git('add', 'b.ts')
+    expect(unchangedSince(repo, base)).toBe(false)
+    git('commit', '-q', '-m', 'b')
+    expect(unchangedSince(repo, base)).toBe(false)
+    expect(unchangedSince(repo, 'HEAD')).toBe(true)
+    writeFileSync(join(repo, 'a.ts'), 'export const a = 3\n')
+    expect(unchangedSince(repo, 'HEAD')).toBe(false)
+    // A base that is no commit: never taken for unchanged.
+    expect(unchangedSince(repo, 'no-such-commit-HI-3002')).toBe(false)
+    // None related: none kept, and the tree (here with no vitest.config.ts to read) isn't read for it.
+    expect(narrowRelatedInTree({ cwd: repo, base, paths: ['a.ts'], related: [] })).toEqual({ keep: [], dropped: [], why: [] })
   })
 
   it("reads a diff's added and removed lines per file, a deleted and a new file included, not its headers", () => {

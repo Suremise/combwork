@@ -375,6 +375,10 @@
     "defaultMessage": "All *.{ext} files",
     "description": "A choice in the Exclude from Git menu: ignore every file with this extension ({ext}, such as log), anywhere in the project. Keep *.{ext}."
   },
+  "files.git.commitIt": {
+    "defaultMessage": "Commit It",
+    "description": "HI-2944: the button of the notification after Exclude from Git into .gitignore: commits .gitignore alone, as it is now, on the project folder's branch."
+  },
   "files.git.exclude": {
     "defaultMessage": "Exclude from Git",
     "description": "Files tab's right-click menu (HI-2743): opens a menu of ways to make git ignore the file or folder (a line in .gitignore)."
@@ -388,8 +392,8 @@
     "description": "Notification after Exclude from Git. {added} is how many lines were added to {file} (.gitignore or .git/info/exclude); {line} the one line; {branch} the branch of the project folder changed, or none."
   },
   "files.git.excludedDetail": {
-    "defaultMessage": "{file, select, gitignore {The change to .gitignore shows in the Version Control tab, to commit.} other {Only this PC: nothing to commit.}}",
-    "description": "Under the notification after Exclude from Git. {file} is gitignore for .gitignore, else .git/info/exclude."
+    "defaultMessage": "{file, select, gitignore {Not committed yet. Commit It commits .gitignore as it is now, with any earlier edits to it; or commit it later in the Version Control tab.} other {Only this PC: nothing to commit.}}",
+    "description": "Under the notification after Exclude from Git. {file} is gitignore for .gitignore, else .git/info/exclude. Commit It is the notification's button (HI-2944)."
   },
   "files.git.ignoredBy": {
     "defaultMessage": "Ignored by {file}:{line} `{pattern}`",
@@ -400,8 +404,8 @@
     "description": "A folder's git status in the Files tab's details: {status} is the first change inside it, such as Modified."
   },
   "files.git.inGitignore": {
-    "defaultMessage": "Shared with everyone",
-    "description": "A heading in the Exclude from Git menu (shown in capitals): the choices under it write the project's .gitignore, which is committed, so collaborators and agents get it. Each choice's second line names the file."
+    "defaultMessage": "Shared with the repository (a commit)",
+    "description": "A heading in the Exclude from Git menu (shown in capitals): the choices under it write the project's .gitignore, which is then committed (HI-2944: the notification offers Commit It), so collaborators and agents get it. Each choice's second line names the file."
   },
   "files.git.include": {
     "defaultMessage": "Include Again",
@@ -420,7 +424,7 @@
     "description": "Files tab's right-click menu in a project that isn't a git repository (HI-2743): opens the Initialise repository dialog in the Version Control tab."
   },
   "files.git.onThisPc": {
-    "defaultMessage": "Only on this PC",
+    "defaultMessage": "Only on this PC (nothing to commit)",
     "description": "A heading in the Exclude from Git menu (shown in capitals): the choices under it write .git/info/exclude, which git never commits. Each choice's second line names the file."
   },
   "files.git.ruleAt": {

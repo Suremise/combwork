@@ -1,0 +1,11 @@
+{
+  "folderChanges.commitFailed": "无法提交",
+  "folderChanges.committed": "已在 {branch} 上提交 {count, plural, other {# 个文件}}。",
+  "folderChanges.committedWarning": "已在 {branch} 上提交 {count, plural, other {# 个文件}}，但有警告",
+  "folderChanges.resumed": "合并继续进行。",
+  "folderChanges.setAside": "已在 {branch} 上搁置 {count, plural, other {# 个文件}}。",
+  "folderChanges.setAsideDetail": "Git 将它们保存在名为“{name}”的储藏（stash）中：git stash pop 可将其恢复。",
+  "folderChanges.setAsideFailed": "无法搁置更改",
+  "folderChanges.setAsideWarning": "已在 {branch} 上搁置 {count, plural, other {# 个文件}}，但有警告",
+  "folderChanges.stillPaused": "合并仍处于暂停状态：原因显示在该合并上。"
+}

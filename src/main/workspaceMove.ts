@@ -492,6 +492,7 @@ export function worktreeRenamer(ws: WorkspaceService, projectPath: string, hooks
   }
   return {
     identity: worktreeIdentity,
+    unmovable: async (folder) => (await relocation().unmovable?.(folder)) ?? null,
     where,
     // Each CLI's per-folder data (its conversations and memory) copied for the new path, checked first: every provider's
     // copy applied with no failure, or no rename. The old data is never touched.

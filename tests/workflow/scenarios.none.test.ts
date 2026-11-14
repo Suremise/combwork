@@ -7,7 +7,7 @@ import { join } from 'path'
 import { B1, B2, commit, moved, put, R1, refusedBy, setup, type Env } from './harness'
 import { refusalBody } from '../../src/shared/workflow/refusals'
 import { refusedText, type Refused } from '../../src/shared/toolReplies'
-import { preset } from '../../src/shared/workflow/options'
+import { allOff, preset } from '../../src/shared/workflow/options'
 import { reconcile } from '../../src/main/workflow/reconcile'
 import { runCheck } from '../../src/main/workflow/checks'
 import { detect, offer } from '../../src/main/platform/registry'
@@ -513,6 +513,27 @@ describe("None: the user's drag asks what a card's paths leave out (HI-2352)", (
     moved(await e.wf.move(card.key, 'done', 'user', { askPaths: true }))
     expect(e.wf.state(card).stage).toBe('done')
     expect(e.wf.state(card).latest).toBeNull()
+  })
+
+  it("HI-2854: Solo and All off: the builder's own submit is refused while it hasn't seen a decision, and goes on once it has; the user's drag still asks nothing", async () => {
+    for (const o of [preset('none', 'solo'), allOff('none')]) {
+      const e = (env = setup(o, { files }))
+      const card = e.wf.createCard({ title: 'Docs A', paths: ['docs/a.md'] })
+      moved(await e.wf.start(card.key, B1))
+      put(e.project, 'docs/a.md', 'a, written\n')
+      moved(await e.wf.recordDecision(card.key, 'Keep it small'))
+      refusedBy(await e.wf.submit(card.key, B1, { summary: 'a' }), 'submit.decisionsReceived')
+      await e.wf.received(card.key, 'B1')
+      moved(await e.wf.submit(card.key, B1, { summary: 'a' }))
+      expect(e.wf.state(card).stage).toBe('done')
+      // The user's drag of another card, with a decision its builder hasn't read: a move, asking nothing.
+      const other = e.wf.createCard({ title: 'Docs B', paths: ['docs/b.md'] })
+      moved(await e.wf.start(other.key, B1))
+      moved(await e.wf.recordDecision(other.key, 'Mind the links'))
+      moved(await e.wf.move(other.key, 'done', 'user', { askPaths: true }))
+      env.close()
+      env = null
+    }
   })
 
   it('asks nothing when nothing is left out, for a no-code card, from Todo (start and submit in one drag), or without askPaths', async () => {

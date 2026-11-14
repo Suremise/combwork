@@ -12,6 +12,7 @@ import type { FileChange, Manifest } from '../../shared/workflow/facts'
 import { UNREADABLE } from '../../shared/workflow/texts'
 import { isUnknown, unknown, type Maybe } from './types'
 import { CW_DIR } from '../../shared/defaults'
+import { METADATA_DIRS } from '../../shared/platform/metadataDirs'
 
 /** At most this many files or bytes per card; beyond, the revision is unknown and the option row says to narrow it. */
 export const NONE_MAX_FILES = 20_000
@@ -80,7 +81,8 @@ export class NoneAdapter {
   private skip(name: string): boolean {
     const fold = (s: string): string => (this.anyCase ? s.toLowerCase() : s)
     const n = fold(name)
-    return n === CW_DIR || n === '.git' || this.excluded.some((x) => fold(x) === n)
+    // A platform's own folder is never a deliverable: `.git`, and jj's `.jj` (HI-2800: a non-colocated jj repository is a None project).
+    return n === CW_DIR || METADATA_DIRS.includes(n) || this.excluded.some((x) => fold(x) === n)
   }
 
   /**

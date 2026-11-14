@@ -147,6 +147,14 @@
     "text": "Nothing else to start: the lane ends by itself once all are Done.",
     "note": "cw_lane next, after its passed cards' places in the merge queue (#1354): no card is left to start."
   },
+  "lane.next.reviewNext": {
+    "text": "{card} waits for your review (lane {lane}): review it.",
+    "note": "cw_lane next (HI-3118), for an agent that reviews a running lane and builds none: the first card of its lanes in Review. {card} is its key and title."
+  },
+  "lane.next.reviewNone": {
+    "text": "No card of your lanes waits for your review now: end your turn; Combwork wakes you when one is submitted.",
+    "note": "cw_lane next (HI-3118), for an agent that reviews a running lane and builds none, with no card of its lanes in Review."
+  },
   "lane.next.start": {
     "text": "Next: {card}. Start it.",
     "note": "cw_lane next: the card to start next; {card} is its key and title."
@@ -230,6 +238,14 @@
   "lane.refused.next.ended": {
     "text": "Your lane {lane} has ended: all its cards are Done. Nothing more on it: don't start it again; end your turn unless you have other work.",
     "note": "cw_lane next, for an agent whose lane just ended (HI-2273): never \"start one\", which invited a builder to start it again."
+  },
+  "lane.refused.next.endedOpen": {
+    "text": "Your lane {lane} was ended with {cards} not Done: nothing more on it. Don't start it again; ask the user before starting another lane with {n, plural, one {that card} other {those cards}}.",
+    "note": "cw_lane next (HI-3118), for an agent whose lane was just ended (by the user, say) while cards of it were still open: never \"all its cards are Done\". {cards} is their keys, joined with \", \"; {n} how many."
+  },
+  "lane.refused.next.endedUnknown": {
+    "text": "Your lane {lane} has ended. Nothing more on it: don't start it again; end your turn unless you have other work.",
+    "note": "cw_lane next (HI-3118), for an agent whose lane just ended when how its cards stood then wasn't kept: says nothing of them."
   },
   "lane.refused.next.none": {
     "text": "No running lane of yours: start one with cw_lane start, or ask the user",
@@ -438,6 +454,10 @@
   "lane.status.slot": {
     "text": "waiting for a slot",
     "note": "A lane started with no slot free waits for one to be lent to it (#1438)."
+  },
+  "lane.status.slotCard": {
+    "text": "waiting for a slot: {agent} still builds in {slot} for {card}, which keeps it until that card is Done or put back",
+    "note": "HI-3168: a lane waiting for a slot, refused one because its builder {agent} already holds {slot} for another card, {card} (one agent, one slot): typically a card still in flight when an earlier lane of {agent}'s ended (HI-3118). Combwork lends the lane a slot once that card is Done or put back."
   },
   "lane.status.slotHeld": {
     "text": "waiting for {slot}: {held, select, session {{agent}'s session is still in it} broker {a process still has a file or folder in it open: Windows Sandbox's broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}",

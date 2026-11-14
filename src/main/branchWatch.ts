@@ -1,6 +1,6 @@
 import { basename } from 'path'
 import type { AgentBranchStatus, CombworkEvent, ProjectInfo } from '../shared/types'
-import { leasedLine, legacyWorktree, slotsMigrated } from './agentFolders'
+import { leasedLine, legacyWorktree, slotsMigrated, type LeasedLine } from './agentFolders'
 import { boardRead } from './boardStore'
 import { emit, onCombworkEvent } from './events'
 import { createLogger, userText } from './logger'
@@ -10,6 +10,8 @@ import { gitProblem } from './gitTool'
 import { workTargetOf } from './gitRepo'
 import * as G from './platform/git'
 import { isUnknown } from './platform/types'
+import { workspacePortOf } from './platform/workspacePorts'
+import type { PlatformId } from '../shared/platform/descriptors'
 
 const log = createLogger('branches')
 
@@ -48,6 +50,8 @@ export interface Watched {
   worktree: wt.WorktreeRef
   slot?: true
   target?: string
+  /** Its slot's platform, as its row records it: whose port says whether its line is a preparation key (HI-3170). */
+  platform?: PlatformId
 }
 
 /**
@@ -61,7 +65,7 @@ function findAgent(projectPath: string, agentId: string): Watched | null {
   const agent = project?.agents.find((a) => a.id === agentId)
   if (!ws || !project || !agent) return null
   const legacy = legacyWorktree(agent)
-  let leased: { folder: string; target: string | null; line: string | null; carried: boolean } | null = null
+  let leased: LeasedLine | null = null
   try {
     const slotProject = project.config?.id ?? basename(project.path)
     leased = boardRead(ws, (db) => leasedLine(db, slotProject, agentId))
@@ -70,7 +74,7 @@ function findAgent(projectPath: string, agentId: string): Watched | null {
   }
   if (leased) {
     const branch = leased.line ?? (leased.carried ? (legacy?.branch ?? null) : null)
-    return branch ? { project, agentId, worktree: { path: leased.folder, branch, base: leased.target ?? legacy?.base ?? '' }, slot: true, ...(leased.target ? { target: leased.target } : {}) } : null
+    return branch ? { project, agentId, worktree: { path: leased.folder, branch, base: leased.target ?? legacy?.base ?? '' }, slot: true, ...(leased.target ? { target: leased.target } : {}), ...(leased.platform ? { platform: leased.platform } : {}) } : null
   }
   return legacy ? { project, agentId, worktree: legacy } : null
 }
@@ -83,6 +87,13 @@ function findAgent(projectPath: string, agentId: string): Watched | null {
  */
 export async function lineStatus(found: Watched): Promise<AgentBranchStatus | null> {
   const { project, worktree } = found
+  // A line its slot's platform's port calls a preparation key (a jj card's: a slot's locator, HI-2866) is never a Git
+  // branch: nothing for git to check (HI-2896: in a non-colocated jj project git there finds no repository at all, every
+  // check a warning). HI-3170: the port says so; a slot whose platform's port isn't registered can't be read here either.
+  if (found.platform) {
+    const port = workspacePortOf(found.platform)
+    if (!port || port.lineIsKey?.(worktree.branch)) return null
+  }
   // A branch that isn't there has nothing to merge, and isn't an error to log (HI-1698: an agent's 0.9 branch gone with
   // its worktree, a card's line deleted after its merge, each checked on every refresh): null, quietly.
   if ((await G.lineHead(project.path, worktree.branch)) === null) return null

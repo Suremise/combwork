@@ -388,6 +388,13 @@
   "api.card.overrideArg": {
     "placeholders": {}
   },
+  "api.card.ownTarget": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain",
+      "default": "plain"
+    }
+  },
   "api.card.recordedDecision": {
     "placeholders": {}
   },
@@ -436,6 +443,16 @@
   "api.card.stayInProject": {
     "placeholders": {
       "project": "plain"
+    }
+  },
+  "api.card.targetReleased": {
+    "placeholders": {
+      "target": "plain",
+      "tag": "plain",
+      "into": "plain",
+      "card": "plain",
+      "has": "select",
+      "suggest": "plain"
     }
   },
   "api.card.titleRequired": {
@@ -524,6 +541,11 @@
       "project": "plain"
     }
   },
+  "api.change.dismissOffer": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
   "api.change.endALane": {
     "placeholders": {}
   },
@@ -536,7 +558,8 @@
     "placeholders": {
       "to": "plain",
       "from": "plain",
-      "project": "plain"
+      "project": "plain",
+      "override": "select"
     }
   },
   "api.change.forwardAny": {
@@ -633,6 +656,14 @@
       "column": "plain"
     }
   },
+  "api.change.resolveForward": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "api.change.resolveForwardAny": {
+    "placeholders": {}
+  },
   "api.change.resumeAQueue": {
     "placeholders": {}
   },
@@ -728,6 +759,9 @@
     "placeholders": {}
   },
   "api.check.leaseArgs": {
+    "placeholders": {}
+  },
+  "api.check.noCopies": {
     "placeholders": {}
   },
   "api.check.noVcs": {
@@ -999,13 +1033,27 @@
       "queued": "select",
       "card": "plain",
       "to": "plain",
-      "from": "plain"
+      "from": "plain",
+      "override": "select",
+      "ahead": "plural",
+      "aheadTotal": "plain"
+    }
+  },
+  "api.done.forwardResolved": {
+    "placeholders": {
+      "card": "plain",
+      "from": "plain",
+      "source": "plain",
+      "to": "plain",
+      "forward": "plain"
     }
   },
   "api.done.forwardUpToDate": {
     "placeholders": {
       "to": "plain",
-      "from": "plain"
+      "from": "plain",
+      "ahead": "plural",
+      "aheadTotal": "plain"
     }
   },
   "api.done.freshRetried": {
@@ -1090,6 +1138,11 @@
   "api.done.notRunning": {
     "placeholders": {
       "agent": "plain",
+      "project": "plain"
+    }
+  },
+  "api.done.offerDismissed": {
+    "placeholders": {
       "project": "plain"
     }
   },
@@ -1424,6 +1477,12 @@
   "api.lane.projectRequired": {
     "placeholders": {}
   },
+  "api.lane.releasedArg": {
+    "placeholders": {}
+  },
+  "api.lane.releasedNotYours": {
+    "placeholders": {}
+  },
   "api.lane.targetText": {
     "placeholders": {}
   },
@@ -1558,6 +1617,12 @@
       "subfolder": "select"
     }
   },
+  "api.project.vcsJj": {
+    "placeholders": {
+      "root": "plain",
+      "colocated": "select"
+    }
+  },
   "api.project.vcsUnsupported": {
     "placeholders": {
       "name": "plain"
@@ -1572,10 +1637,16 @@
   "api.queue.forwardArgs": {
     "placeholders": {}
   },
+  "api.queue.nextVersionArgs": {
+    "placeholders": {}
+  },
   "api.queue.notAgents": {
     "placeholders": {
       "what": "plain"
     }
+  },
+  "api.queue.overrideArg": {
+    "placeholders": {}
   },
   "api.queue.projectRequired": {
     "placeholders": {}

@@ -142,7 +142,16 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   // --- Lanes, started through the Agent API (#483) as the Assistant or a script would, while the panel is open: the
   // panel follows lanes-changed. B1's, B3's (long), R1's (paused: its current card blocked), an ended one and an
   // abandoned one, and two more running (of agents that never ran): seven, one more than shows before scrolling (#512).
-  for (const name of ['B5', 'B6', 'B7', 'B8']) await lib.addAgent(inv, alpha, { name })
+  const more = []
+  for (const name of ['B5', 'B6', 'B7', 'B8']) more.push(await lib.addAgent(inv, alpha, { name }))
+  const [b5, b6, b7, b8] = more
+  // Each of these lanes works cards of its own builder: a lane ends as soon as every card is Done, gone or given to
+  // another agent (HI-3117, HI-3118), so B1's cards would end them the moment they start. B5's two (the lane ended as
+  // merged, below): one Done by then, one passed; B6's two (the one abandoned) in Todo, as B1's #5 and #8 were.
+  const merged = [await make('Merged one', 'review', b5.id), await make('Merged two', 'review', b5.id)]
+  for (const n of merged) await verdict(n, 'passed')
+  const [m1, m2] = merged
+  const [p5, p8] = [await make('Given up one', 'todo', b6.id), await make('Given up two', 'todo', b6.id)]
   await inv('tasks:update', short[0], { blocked: 'Waiting for your answer' })
   const workspaceToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
   const startLane = async (builder, reviewer, name, cards) => {
@@ -179,16 +188,18 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   t1 = tokenOf(b1)
   t3 = tokenOf(b3)
   const l3 = await startLane('R1', null, null, short)
-  const l4 = await startLane('B5', 'R1', 'merged earlier', [n1, n2])
-  const l5 = await startLane('B6', null, 'given up', [n5, n8])
-  // Cards merged while their lanes run (HI-2176): a lane started leaves out a card already Done (HI-2097), so #1 and
-  // the long lane's first 18 go to Done only now.
+  const l4 = await startLane('B5', 'R1', 'merged earlier', [m1, m2])
+  const l5 = await startLane('B6', null, 'given up', [p5, p8])
+  // Cards merged while their lanes run (HI-2176): a lane started leaves out a card already Done (HI-2097), so #1, B5's
+  // first and the long lane's first 18 go to Done only now.
   await inv('tasks:update', n1, { column: 'done' })
+  await inv('tasks:update', m1, { column: 'done' })
   for (const n of long.slice(0, 18)) await inv('tasks:update', n, { column: 'done' })
   const ended = await api(workspaceToken, 'POST', `/v1/lanes/${l4}/end`, { mergeCommit: 'abc1234' })
   const dropped = await api(workspaceToken, 'POST', `/v1/lanes/${l5}/end`, { abandoned: true })
-  const l6 = await startLane('B7', 'R1', 'six of six', [await make('Seventh lane, one', 'doing')])
-  const l7 = await startLane('B8', 'R1', 'one more', [await make('Eighth lane, one', 'todo')])
+  // Their builders' own cards (HI-3117, HI-3118: a lane of cards given to another agent ends at once).
+  const l6 = await startLane('B7', 'R1', 'six of six', [await make('Seventh lane, one', 'doing', b7.id)])
+  const l7 = await startLane('B8', 'R1', 'one more', [await make('Eighth lane, one', 'todo', b8.id)])
   check('seven lanes started, one ended and one abandoned', [l1, l2, l3, l4, l5, l6, l7].every(Boolean) && ended.body?.state === 'ended' && dropped.body?.state === 'abandoned', JSON.stringify([ended, dropped]))
   const order = () => section.locator('.progress-lane').evaluateAll((els) => els.map((e) => e.getAttribute('data-lane')))
   // Running lanes first, newest first, then the paused ones (#512) newest first: R1's (its current card blocked) and
@@ -431,7 +442,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const work = [
     [row1, n3, 'review', (l) => l.includes(`Under review: ${head7}`) && l.some((x) => x.startsWith(`Last verdict: failed on ${head7}`))],
     [row1, n2, 'passed', (l) => l.some((x) => x.startsWith(`Last verdict: passed on ${head7}`))],
-    [section.locator(`.progress-lane[data-lane="${l4}"]`), n1, 'merged', (l) => l.includes('Merged as abc1234')]
+    [section.locator(`.progress-lane[data-lane="${l4}"]`), m1, 'merged',(l) => l.includes('Merged as abc1234')]
   ]
   for (const [row, n, what, ok] of work) {
     const seg = row.locator(`.lane-seg[data-card="${n}"]`)
@@ -539,13 +550,16 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   check('free: the merge card and divider go', !!(await until(async () => (await panel.locator('.progress-merge, .progress-divider').count()) === 0, HUNG_MS)))
 
   // --- A card moving on the board moves its segment.
+  await inv('tasks:update', p5, { column: 'doing' })
   await inv('tasks:update', n5, { column: 'doing' })
   check("a card moved on the board changes its lane's segment", !!(await until(async () => /\bdoing\b/.test((await row1.locator(`.lane-seg[data-card="${n5}"]`).getAttribute('class')) ?? ''), HUNG_MS)))
-  // …but not the abandoned lane's (#512): B6's lane had #5 in Todo when it was given up, and B1's lane works it now.
+  // …but not the abandoned lane's (#512): B6's lane had its first card in Todo when it was given up, and it is in Doing
+  // now. (Its own card, not B1's #5 as before HI-3117/HI-3118: a lane of another agent's cards ends at once.) Moved
+  // before B1's #5, so the panel has had the move by the time #5's shows.
   const row5 = section.locator(`.progress-lane[data-lane="${l5}"]`)
-  const seg5 = (await row5.locator(`.lane-seg[data-card="${n5}"]`).getAttribute('class')) ?? ''
-  check('the abandoned lane keeps the card as it left it, unanimated, while another lane works it', /\btodo\b/.test(seg5) && !/\bdoing\b/.test(seg5) && (await row5.locator(`.lane-seg[data-card="${n5}"]`).evaluate((e) => getComputedStyle(e, '::before').animationName)) === 'none', seg5)
-  await row5.locator(`.lane-seg[data-card="${n5}"]`).hover()
+  const seg5 = (await row5.locator(`.lane-seg[data-card="${p5}"]`).getAttribute('class')) ?? ''
+  check('the abandoned lane keeps the card as it left it, unanimated, while the board has it in Doing', /\btodo\b/.test(seg5) && !/\bdoing\b/.test(seg5) && (await row5.locator(`.lane-seg[data-card="${p5}"]`).evaluate((e) => getComputedStyle(e, '::before').animationName)) === 'none', seg5)
+  await row5.locator(`.lane-seg[data-card="${p5}"]`).hover()
   check("…and its hover says it's as the lane left it", !!(await until(async () => /when the lane ended/.test((await page.locator('.tip').allInnerTexts()).join(' ')), HUNG_MS)))
   // R1's lane was paused on its blocked card; its builder moves on to the next one: working, not paused, on that card.
   const row3 = section.locator(`.progress-lane[data-lane="${l3}"]`)
@@ -555,20 +569,21 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   // Running again, it sorts with the running lanes, newest first (it was started after B1's and B3's).
   check('…and moves up among the running lanes', !!(await until(async () => (await order()).join() === [l7, l6, l3, l2, l1, l4, l5].join(), HUNG_MS)), JSON.stringify(await order()))
   // A lane ended without a record of its cards (ended before #512 kept one, or the record damaged): B5's merged lane,
-  // its record taken out of what is saved (#1018, #1212: the workspace's database). Its card #2 moving on in B1's lane shows there
-  // only; B5's says not recorded.
+  // its record taken out of what is saved (#1018, #1212: the workspace's database). Its second card moving on shows on
+  // the board only; B5's lane says not recorded. (B5's own cards since HI-3117/HI-3118, so no longer B1's #2.)
   const { storeDocs, forgetLaneCards } = require('./storeDocs.cjs')
   const old = storeDocs(ws, 'lanes').find((x) => x.id === l4)
   check("an ended lane's cards are kept with it", Array.isArray(old?.frozen) && old.frozen.map((c) => c.column).join() === 'done,passed', JSON.stringify(old?.frozen))
   forgetLaneCards(ws, l4)
+  // A move of B1's #2 too, after B5's: B1's row showing it says the lanes-changed of both has reached the panel (#1270 round 3).
+  await inv('tasks:update', m2, { column: 'review' })
   await inv('tasks:update', n2, { column: 'review' })
   const row4 = section.locator(`.progress-lane[data-lane="${l4}"]`)
-  const seg4 = async () => (await row4.locator(`.lane-seg[data-card="${n2}"]`).getAttribute('class')) ?? ''
-  // Both rows waited for: B1's shows the move once lanes-changed reaches it, which may come after B5's (#1270 round 3).
+  const seg4 = async () => (await row4.locator(`.lane-seg[data-card="${m2}"]`).getAttribute('class')) ?? ''
   const seg1 = async () => (await row1.locator(`.lane-seg[data-card="${n2}"]`).getAttribute('class')) ?? ''
   check("without that record, the merged lane says its cards weren't recorded, not where the board has them now", !!(await until(async () => /\bunrecorded\b/.test(await seg4()) && /\breview\b/.test(await seg1()), HUNG_MS)) && !/\breview\b/.test(await seg4()), JSON.stringify([await seg4(), await seg1()]))
   check('…its count unknown, and no current card', /–\/2/.test(await row4.locator('.progress-lane-top').innerText()) && (await row4.locator('.progress-lane-current').count()) === 0, await row4.locator('.progress-lane-top').innerText())
-  await row4.locator(`.lane-seg[data-card="${n2}"]`).hover()
+  await row4.locator(`.lane-seg[data-card="${m2}"]`).hover()
   check('…and its hover says so', !!(await until(async () => /not recorded: the lane ended before Combwork kept where its cards were/.test((await page.locator('.tip').allInnerTexts()).join(' ')), HUNG_MS)))
   await page.mouse.move(5, 5)
   await until(async () => (await page.locator('.tip').count()) === 0, HUNG_MS)
@@ -708,9 +723,10 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   mine = [l2, l1, l3, l6, l7]
   check('…Move Up moves it', await ordered([...mine, l4, l5]), JSON.stringify(await order()))
   // A new lane arrives on top; the moved ones keep their order below it.
-  // B9's: an agent of its own (a builder's new lane hides its ended one).
-  await lib.addAgent(inv, alpha, { name: 'B9' })
-  const l8 = await startLane('B9', null, 'arrives on top', [await make('Ninth lane, one', 'doing', b1.id)])
+  // B9's: an agent of its own (a builder's new lane hides its ended one), and a card of its own (HI-3117, HI-3118: a
+  // lane of another agent's cards ends at once).
+  const b9 = await lib.addAgent(inv, alpha, { name: 'B9' })
+  const l8 = await startLane('B9', null, 'arrives on top', [await make('Ninth lane, one', 'doing', b9.id)])
   check('a lane started since arrives on top, the order below it kept', await ordered([l8, ...mine, l4, l5]), JSON.stringify(await order()))
   // A lane that finishes drops to the very bottom, after those that finished before it.
   const endL6 = await api(workspaceToken, 'POST', `/v1/lanes/${l6}/end`, { abandoned: true })
@@ -787,7 +803,10 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   await panel2.locator('.progress-tab[data-tab="lanes"]').click()
   const queuedLine = panel2.locator(`.progress-tab-lanes .progress-lane[data-lane="${l9}"] .progress-lane-queued`)
   const wantLine = `Next, once ${K(q1)} is Done: ${K(q4)} added, new order: ${K(q1)}, ${K(q4)}, ${K(q3)}, ${K(q2)}`
-  check('the Lanes tab shows the queued change under the lane', !!(await until(async () => ((await queuedLine.count()) === 1 ? (await queuedLine.innerText()).trim() : '') === wantLine, HUNG_MS)), JSON.stringify({ got: await queuedLine.innerText().catch(() => null), want: wantLine }))
+  // Its text (HI-2898 puts Cancel Change after it).
+  const queuedText = queuedLine.locator('.progress-lane-queued-text')
+  check('the Lanes tab shows the queued change under the lane', !!(await until(async () => ((await queuedLine.count()) === 1 ? (await queuedText.innerText()).trim() : '') === wantLine, HUNG_MS)), JSON.stringify({ got: await queuedText.innerText().catch(() => null), want: wantLine }))
+  check('…with Cancel Change after it', (await queuedLine.locator('[data-action="lane-cancel-change"]').count()) === 1)
   check('…its whole text in its title', (await queuedLine.getAttribute('title')) === wantLine)
   check('…and no other lane shows one', (await panel2.locator('.progress-lane-queued').count()) === 1)
   await queuedLine.scrollIntoViewIfNeeded()

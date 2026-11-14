@@ -29,6 +29,7 @@ interface CombworkMessageValues {
   'worktrees.merge.cantCheck': { folder: string | number }
   'worktrees.merge.caseAlias': { branch: string | number; other: string | number }
   'worktrees.merge.detached': undefined
+  'worktrees.merge.hooksElsewhere': { branch: string | number }
   'worktrees.merge.intoItself': { branch: string | number }
   'worktrees.merge.noTarget': { branch: string | number }
   'worktrees.merge.notRemoved': undefined
@@ -37,6 +38,7 @@ interface CombworkMessageValues {
   'worktrees.merge.staged': undefined
   'worktrees.merge.targetElsewhere': { branch: string | number; folder: string | number }
   'worktrees.merge.targetMoved': { branch: string | number }
+  'worktrees.merge.temporaryLeft': { folder: string | number }
   'worktrees.merge.uncommitted': { files: number }
   'worktrees.merge.unknownFiles': undefined
   'worktrees.missing.noAgent': undefined

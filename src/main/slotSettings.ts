@@ -14,13 +14,14 @@ import type { WorkspaceService } from './workspace'
 
 export type SlotSettingKey = keyof SlotOptions | 'copiesSize'
 
-const KEYS: readonly SlotSettingKey[] = ['setup', 'archive', 'copy', 'copiesSize']
+const KEYS: readonly SlotSettingKey[] = ['setup', 'archive', 'copy', 'copiesSize', 'gitFiles']
 /** The longest a script or a list of patterns may be. */
 const MAX_TEXT = 4000
 
 const M = {
   bad: msg({ id: 'slots.setting.bad', defaultMessage: 'That isn’t a slot setting Combwork has.', description: 'An error: a request to change a setting of “Slots and copies” named one that doesn’t exist.' }),
   badSize: msg({ id: 'slots.setting.badSize', defaultMessage: 'The number of review and check copies is a whole number from {min, number} to {max, number}.', description: 'An error: the number of review and check copies given isn’t a whole number from 1 to 32. {min} and {max} are the limits (1 and 32).' }),
+  badSwitch: msg({ id: 'slots.setting.badSwitch', defaultMessage: 'Set up submodules and LFS is on or off.', description: 'An error (HI-1182): a request to change the setting “Set up submodules and LFS” gave something other than on or off. Keep the setting’s name as Combwork shows it.' }),
   badText: msg({ id: 'slots.setting.badText', defaultMessage: 'A slot script or list of files is text of at most {max, number} characters.', description: 'An error: a slot script or list of copied files given isn’t text, or is too long. {max} is the limit (4,000).' })
 }
 
@@ -31,9 +32,12 @@ export interface SlotSettingsNow {
 }
 
 /** Sets (or, with null, removes) one slot setting of a project, under its lock; refused when the key or value isn't one. */
-export async function setSlotSetting(ws: WorkspaceService, projectPath: string, key: SlotSettingKey, value: string | number | null): Promise<SlotSettingsNow> {
+export async function setSlotSetting(ws: WorkspaceService, projectPath: string, key: SlotSettingKey, value: string | number | boolean | null): Promise<SlotSettingsNow> {
   if (!KEYS.includes(key)) throw combworkError(M.bad, undefined, { kind: 'invalid' })
-  if (key === 'copiesSize') {
+  if (key === 'gitFiles') {
+    // HI-1182: off is stored (false); on is the default, so it is removed.
+    if (value !== null && typeof value !== 'boolean') throw combworkError(M.badSwitch, undefined, { kind: 'invalid' })
+  } else if (key === 'copiesSize') {
     if (value !== null && (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 32)) throw combworkError(M.badSize, { min: 1, max: 32 }, { kind: 'invalid' })
   } else if (value !== null && (typeof value !== 'string' || value.length > MAX_TEXT)) throw combworkError(M.badText, { max: MAX_TEXT }, { kind: 'invalid' })
   const cfg = await ws.mutateProjectConfig(projectPath, (c) => {
@@ -44,6 +48,11 @@ export async function setSlotSetting(ws: WorkspaceService, projectPath: string, 
       return { copies }
     }
     const slots = { ...c.slots }
+    if (key === 'gitFiles') {
+      if (value === false) slots.gitFiles = false
+      else delete slots.gitFiles
+      return { slots }
+    }
     if (value === null) delete slots[key]
     else slots[key] = key === 'copy' ? (value as string) : (value as string).trim()
     // The copy's Inherit takes the project's own value from before 1.0 too (HI-1765: its `worktreeCopy` is its own, read

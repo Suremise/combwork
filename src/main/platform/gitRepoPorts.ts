@@ -9,7 +9,7 @@ import { readFile, realpath, stat } from 'original-fs/promises'
 import { changingFolder } from '../folderFence'
 import { git, gitRouted, withoutGitRoute } from '../git'
 import { checkGit, gitProblem, gitTool } from '../gitTool'
-import { commonGitDir, inStoreOrder, withLocksInOrder, withRepoLock } from '../repoLock'
+import { commonGitDir, withRepoLock, withStoreLocks } from '../repoLock'
 import { currentLine, ensureCombworkExcluded, trackedCombworkFiles, untrackCombwork } from './gitKeepOut'
 import { fileList, ignoredSet } from './gitFiles'
 import { holdRefs } from './refHold'
@@ -116,7 +116,7 @@ export const gitRepoPorts: RepoPorts = {
   },
   locks: {
     withRepoLock: (ctx, fn, o) => withRepoLock(ctx.folder, fn, o),
-    withRepoLocks: (ctxs, fn, o) => withLocksInOrder(inStoreOrder(ctxs), fn, o),
+    withRepoLocks: (ctxs, fn, o) => withStoreLocks(ctxs, fn, o),
     changingFolder: (ctx, what, fn) => changingFolder(ctx.folder, what, fn),
     holdRefs: (ctx, refs, o) => holdRefs(ctx.folder, refs, o)
   },

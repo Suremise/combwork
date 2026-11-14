@@ -406,4 +406,4 @@ function otherProfile(fx, suffix) {
   return { ...fx, userData }
 }
 
-module.exports = { HUNG_MS, devSeam, queueProject, prepare, steer, queueOptions, startCombwork, agent, renewed, rejoin,releaseHeld, intent, act, startCard, approve, approveBy, commitOn, mergeOn, head, launches, folderHelpers, showBoard, openByTitle, checkWith, restoreCheck, mergesTab, otherProfile }
+module.exports = { HUNG_MS, devSeam, queueProject, prepare, steer, queueOptions, startCombwork, agent, renewed, rejoin,releaseHeld, intent, act, startCard, approve, approveBy, approveCard, commitOn, mergeOn, head, launches, folderHelpers, showBoard, openByTitle, checkWith, restoreCheck, mergesTab, otherProfile }

@@ -1,0 +1,44 @@
+Operation {
+    view_id: ViewId(
+        "450b5393171d0d77729374600063e8dd43dd96584500ee333cff84c53fe3b47e3dc162256d01852c6d4ae557e5b81fcef7fe1a1ea691fd66d2a1100bd0fc36e0",
+    ),
+    parents: [
+        OperationId(
+            "d2f43587a7e613b5c7925131cd0ce259e46c9184a25b3457af827138a9383e5d7886a941106c04b6b6ce32808b03da30adf013ac46c51788a76373070359060b",
+        ),
+        OperationId(
+            "48e9aa1b8e3844108c31c8be59dd0d76f972bfea656cc923235d05593abd942efc65a42dd1cb25c553c82164fbe8a2c6cf3c960ddd370f6ad2930f2bc0f7b49f",
+        ),
+    ],
+    metadata: OperationMetadata {
+        time: TimestampRange {
+            start: Timestamp {
+                timestamp: MillisSinceEpoch(
+                    1794292383555,
+                ),
+                tz_offset: 0,
+            },
+            end: Timestamp {
+                timestamp: MillisSinceEpoch(
+                    1794292383560,
+                ),
+                tz_offset: 0,
+            },
+        },
+        description: "reconcile divergent operations",
+        hostname: "test-host",
+        username: "test-user",
+        is_snapshot: false,
+        workspace_name: Some(
+            WorkspaceNameBuf(
+                "default",
+            ),
+        ),
+        attributes: {
+            "args": "jj --no-pager '--color=never' --config 'user.name=t' --config 'user.email=t@e' --ignore-working-copy bookmark list",
+        },
+    },
+    commit_predecessors: Some(
+        {},
+    ),
+}

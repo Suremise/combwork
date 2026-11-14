@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { shortRevision } from '@shared/progress'
 import { historyOutcome, historyRows, justMerged, mergedText, pauseText, pauseWhyShort, pulseLine, pushStateText, queueEstimate, queueNews, queuedText, returnCheck, returnedText, returnRun, returnWhy, shownReturns, testingText, type HistoryRow } from '@shared/progressQueue'
 import type { MergeSlotInfo, ProgressRun } from '@shared/types'
@@ -11,6 +11,8 @@ import { cardLabelOf, choose, confirm, findProject, notify, openVersionControl, 
 import { cx, timeAgo } from '../util'
 import { minutesText } from './MergeSlots'
 import { MergeCard, useMergeFold } from './ProgressMerge'
+import { FolderChangeButtons } from './FolderChangeButtons'
+import { removeFromQueue } from '../queueRemove'
 import { Icon, Tooltip } from './ui'
 
 /**
@@ -56,10 +58,13 @@ const FORWARD_T = {
   cancel: msg({ id: 'board.queue.forwardCancel', defaultMessage: 'Cancel', description: 'HI-2679: the choice that cancels the forward merge.' }),
   failed: msg({ id: 'board.queue.forwardFailed', defaultMessage: 'Couldn’t bring the branch up to date', description: 'HI-2679: an error’s title: the forward merge couldn’t be queued. Its text says why.' }),
   upToDate: msg({ id: 'board.queue.forwardUpToDate', defaultMessage: '{to} already has everything of {from}', description: 'HI-2679: a notification: nothing to bring in, so nothing was queued.' }),
+  resolving: msg({ id: 'board.queue.forwardResolving', defaultMessage: '{card} is resolving it: Bring Up to Date waits for it', description: 'HI-3000: on a merge queue’s card, after the line saying how far its branch is behind another: a card ({card}: its key, such as HI-12) made by Resolve on a builder is merging that branch in by hand, so Bring Up to Date (the button’s name: as translated there) isn’t offered for that branch until the card is Done.' }),
+  localAhead: msg({ id: 'board.queue.forwardLocalAhead', defaultMessage: '{n, plural, one {# commit of your local {from} isn’t on its remote, so it wasn’t brought into {to}: publish it first if it should be.} other {# commits of your local {from} aren’t on its remote, so they weren’t brought into {to}: publish them first if they should be.}}', description: 'HI-3126: a notification after Bring Up to Date under “The target branch follows its remote”: Combwork brings in branch {from} as its remote has it, and the local branch {from} has {n} commits (counted along its history) its remote lacks, which were left out. {to} is the branch being brought up to date. Branch names.' }),
   already: msg({ id: 'board.queue.forwardAlready', defaultMessage: '{to} is being brought up to date with {from} already', description: 'HI-2679: a notification: a forward merge for this pair is queued or waiting already; nothing new was queued.' })
 }
 
-export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView; runs: readonly ProgressRun[]; now: number; showProject: boolean }) {
+/** `inVersionControl`: shown in Version Control's Merge queue section, so without its link there (HI-2893). */
+export function QueueCard({ view: v, runs, now, showProject, inVersionControl = false }: { view: QueueView; runs: readonly ProgressRun[]; now: number; showProject: boolean; inVersionControl?: boolean }) {
   useLanguage()
   const [busy, setBusy] = useState(false)
   const testingRun = v.testing?.run ? (runs.find((r) => r.id === v.testing!.run) ?? null) : null
@@ -88,8 +93,10 @@ export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView
   const nothing = !v.testing && !v.queued.length && !v.paused && !merged.length && !returns.length
   // HI-2679: what this target lacks of the project's other targets, and the button that brings it up to date.
   const behind = (v.forward?.behind ?? []).filter((b) => b.commits !== 0)
+  // HI-3126: under follow mode, a branch whose local count is 0 is offered too: its remote may have more (the request reads it).
+  const offerable = (v.forward?.behind ?? []).filter((b) => b.commits !== null && !b.resolving && (b.commits !== 0 || v.forward?.follows))
   const forward = async (): Promise<void> => {
-    const offered = behind.filter((b) => b.commits !== null).map((b) => b.from)
+    const offered = offerable.map((b) => b.from)
     if (!offered.length) return
     const from =
       offered.length === 1
@@ -101,6 +108,7 @@ export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView
       const r = await attempt(tr(FORWARD_T.failed), () => call('queue:forward', v.projectPath, from, v.target))
       if (r?.upToDate) notify('info', tr(FORWARD_T.upToDate, { to: v.target, from }))
       else if (r && !r.queued) notify('info', tr(FORWARD_T.already, { to: v.target, from }))
+      if (r?.localAhead) notify('warning', tr(FORWARD_T.localAhead, { n: r.localAhead, from, to: v.target }))
     } finally {
       setBusy(false)
     }
@@ -132,6 +140,7 @@ export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView
           <Icon name="debug-pause" />
           <span className="progress-queue-text">{pauseText(v.paused, v.target, tr, list)}</span>
           {v.paused.reason === 'needsYou' && v.paused.card && <CardButton keyOf={v.paused.card} />}
+          <FolderChangeButtons projectPath={v.projectPath} target={v.target} paused={v.paused} />
         </div>
       )}
       {v.testing && (
@@ -162,7 +171,7 @@ export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView
                   </span>
                 ) : null}
                 <RevisionButton revision={q.revision} />
-                <button type="button" className="btn small subtle progress-queue-remove" aria-label={tr(msg({ id: 'board.queue.removeNamed', defaultMessage: 'Remove {card} from the queue', description: "Accessible name of Remove from queue on a queued card ({card}: its key) on a merge queue's card in the Progress panel." }), { card: q.key })} onClick={() => void removeFromQueue(q.card, q.key)}>
+                <button type="button" className="btn small subtle progress-queue-remove" aria-label={tr(msg({ id: 'board.queue.removeNamed', defaultMessage: 'Remove {card} from the queue', description: "Accessible name of Remove from queue on a queued card ({card}: its key) on a merge queue's card in the Progress panel." }), { card: q.key })} onClick={() => void removeFromQueue(q.card, q.key, q.forward)}>
                   {tr(msg({ id: 'board.queue.remove', defaultMessage: 'Remove', description: "A button beside a queued card on a merge queue's card in the Progress panel: Remove from queue (asks first). Keep it short." }))}
                 </button>
               </li>
@@ -184,23 +193,34 @@ export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView
         </div>
       )}
       {behind.map((b) => (
-        <div key={`behind:${b.from}`} className="progress-queue-line progress-queue-behind" data-behind={b.from}>
-          <Tooltip content={tr(FORWARD_T.behindTip, { from: b.from })}>
-            <span>
-              <Icon name="git-compare" /> {b.commits === null ? tr(FORWARD_T.unknown, { from: b.from, to: v.target }) : tr(FORWARD_T.behind, { n: b.commits, from: b.from, to: v.target })}
-            </span>
-          </Tooltip>
-        </div>
+        <Fragment key={`behind:${b.from}`}>
+          <div className="progress-queue-line progress-queue-behind" data-behind={b.from}>
+            <Tooltip content={tr(FORWARD_T.behindTip, { from: b.from })}>
+              <span>
+                <Icon name="git-compare" /> {b.commits === null ? tr(FORWARD_T.unknown, { from: b.from, to: v.target }) : tr(FORWARD_T.behind, { n: b.commits, from: b.from, to: v.target })}
+              </span>
+            </Tooltip>
+          </div>
+          {/* HI-3000: the card resolving this pair, on its own line under it: no Bring Up to Date for the pair meanwhile. */}
+          {b.resolving && (
+            <div className="progress-queue-line progress-queue-resolving" data-resolving={b.resolving.key} data-resolving-from={b.from}>
+              <span className="progress-queue-text faint">{tr(FORWARD_T.resolving, { card: b.resolving.key })}</span>
+              <CardButton keyOf={b.resolving.key} />
+            </div>
+          )}
+        </Fragment>
       ))}
-      {behind.some((b) => b.commits !== null) && (
+      {offerable.length > 0 && (
         <button type="button" className="btn small" disabled={busy} data-action="forward" onClick={() => void forward()}>
           <Icon name="git-merge" /> {tr(FORWARD_T.button)}
         </button>
       )}
       {nothing && <div className="progress-queue-line faint">{tr(msg({ id: 'board.queue.empty', defaultMessage: 'Nothing queued.', description: "A merge queue's card in the Progress panel when no card is waiting or being merged." }))}</div>}
-      <button type="button" className="progress-queue-link" onClick={() => openVersionControl(v.projectPath, 'queue')}>
-        {tr(msg({ id: 'board.queue.inVersionControl', defaultMessage: 'Queue in Version Control', description: "A link on a merge queue's card in the Progress panel: shows the project's Version Control tab at its Merge queue section, with its history." }))} <Icon name="arrow-right" />
-      </button>
+      {!inVersionControl && (
+        <button type="button" className="progress-queue-link" onClick={() => openVersionControl(v.projectPath, 'queue')}>
+          {tr(msg({ id: 'board.queue.inVersionControl', defaultMessage: 'Queue in Version Control', description: "A link on a merge queue's card in the Progress panel: shows the project's Version Control tab at its Merge queue section, with its history." }))} <Icon name="arrow-right" />
+        </button>
+      )}
     </div>
   )
 }
@@ -276,17 +296,6 @@ export function RevisionButton({ revision, short = shortRevision }: { revision: 
       <code>{s}</code>
     </button>
   )
-}
-
-/** Remove from queue, after asking: the card goes back to Approved and its builder is told; it isn't merged. */
-async function removeFromQueue(n: number, key: string): Promise<void> {
-  const ok = await confirm({
-    title: tr(msg({ id: 'board.queue.removeTitle', defaultMessage: 'Remove {card} from the merge queue?', description: "Title of the confirmation before Remove from queue ({card}: the card's key). Glossary 2.5: merge queue." }), { card: key }),
-    message: tr(msg({ id: 'board.queue.removeMessage', defaultMessage: "It goes back to Approved and isn't merged. Its builder is told. To merge it later, requeue it from the card.", description: "The confirmation before Remove from queue (Progress panel). Approved is a stage (glossary 2.2)." })),
-    confirmLabel: tr(msg({ id: 'board.queue.removeConfirm', defaultMessage: 'Remove from queue', description: 'The button confirming Remove from queue. Keep it short.' }))
-  })
-  if (!ok) return
-  await attempt(tr(msg({ id: 'board.queue.removeFailed', defaultMessage: "Couldn't remove the card from the queue", description: "An error's title: Remove from queue failed (Progress panel); its message says why (its merge has begun, say)." })), () => call('queue:remove', n, ''))
 }
 
 /**

@@ -25,6 +25,7 @@ const { apiErrorReply } = await import('../src/main/servers')
 const { allOff } = await import('../src/shared/workflow/options')
 const { foldCard } = await import('../src/shared/workflow/facts')
 const { workBadges } = await import('../src/main/workflow/cardWork')
+const { reconcileNow } = await import('../src/main/workflow/reconciler')
 const { GIT_HEAVY_MS } = await import('./workflow/harness')
 
 advanced.load(join(base, 'profile'))
@@ -464,10 +465,14 @@ describe('drags run the intents they stand for (#1290)', () => {
   })
 
   it('reopening a Done card: back to Todo with no Override; dragged on to Doing, a new cycle starts in the same change', async () => {
-    const { w } = await workspace(PAIR)
+    const { w, repo } = await workspace(PAIR)
     const card = await create(w)
     await update(w, card, { column: 'doing', agent: 'a1' })
     await move(w, card, 'done', { confirm: true })
+    // The move to Done scheduled a reconciliation of the card (service.ts, 400 ms on): its look at the target records a
+    // TargetMoved for this cycle. Run it now, so it lands before the change below is counted, not inside it when a loaded
+    // run is slower than its timer (HI-3123).
+    await reconcileNow(w, repo)
     const first = foldCard(facts(w, card)).cycle
     // Done → Doing: reopened (to Todo) and started again, one change; the reopening skips nothing.
     const before = facts(w, card).length
@@ -626,12 +631,12 @@ describe('the window asks before a move that skips rules (#1275)', () => {
     const card = await create(w)
     await update(w, card, { blocked: 'Needs a design decision' })
     const before = kinds(w, card)
-    expect(await inWorkspace(w, () => tasks.startAsks(card, 'a1'))).toEqual(['start.notBlocked'])
+    expect(await inWorkspace(w, () => tasks.startAsks(card, 'a1'))).toEqual({ rules: ['start.notBlocked'] })
     expect(kinds(w, card)).toEqual(before)
     expect((await inWorkspace(w, () => tasks.getTask(card, w))).column).toBe('todo')
     // A card nothing blocks asks nothing.
     const free = await create(w, 'Free')
-    expect(await inWorkspace(w, () => tasks.startAsks(free, 'a1'))).toEqual([])
+    expect(await inWorkspace(w, () => tasks.startAsks(free, 'a1'))).toEqual({ rules: [] })
     // Started with the user's reason (the question answered), as Start makes its move (taskStart's giveCard; the launch
     // itself is boardgates'): one Override carrying it, then its start.
     await update(w, card, { agent: 'a1', column: 'doing', override: { reason: 'Decided in the call' } })

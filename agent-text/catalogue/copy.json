@@ -31,13 +31,25 @@
     "text": "the workspace closed",
     "note": "Why a copy wasn't set up, or an isolated check's copy wasn't leased: its workspace closed."
   },
+  "copy.error.identityUnread": {
+    "text": "its workspace's identity couldn't be read",
+    "note": "A copy's setup error (HI-2795): a jj workspace was made but its store, name or folder ids couldn't be read, so Combwork won't use it."
+  },
   "copy.error.interrupted": {
     "text": "its reset was interrupted",
     "note": "A check or review copy's error, kept on the copy, when its reset was taken over from a Combwork that is gone (#1435)."
   },
+  "copy.error.notExact": {
+    "text": "it isn't exactly the revision asked for",
+    "note": "A copy's setup error (HI-2795): the jj copy, checked right before it is handed over, isn't exactly the revision (other files, another parent, stale or divergent)."
+  },
   "copy.error.notListed": {
     "text": "its folder is there but git does not list it as a worktree",
     "note": "A copy's error: its folder exists but isn't a worktree git knows, so Combwork leaves it alone."
+  },
+  "copy.error.removalCutShort": {
+    "text": "its removal was cut short and is finished by the next clean-up",
+    "note": "A copy's error, kept on the copy (HI-2795): a jj copy's removal stopped part way (its workspace forgotten, its folder not yet in the Recycle Bin), so it isn't lent until the next clean-up finishes it."
   },
   "copy.error.setupExit": {
     "text": "its setup exited with code {code}",

@@ -121,8 +121,11 @@ describe("Copilot's plan limits (a model call's quota snapshots)", () => {
 })
 
 describe('plan limits of part of a plan, kept and shown (HI-2734)', () => {
+  // Gemini's reset is the recorded one (2026-11-14T02:04:21Z) as an offset from `at`, so a test reading the clock
+  // (reportPlanUsage) passes Date.now() and still has both resets ahead (HI-3204: a fixed date failed once it passed).
+  const GEMINI_RESET = Date.parse('2026-11-14T02:04:21Z') - AT
   const agy = (gemini: number, other = 1, at = AT, extra: Record<string, unknown> = {}): PlanUsage =>
-    agyPlanUsage({ quota: { 'gemini-weekly': { remaining_fraction: gemini, reset_time: '2026-11-14T02:04:21Z' }, '3p-weekly': { remaining_fraction: other, reset_time: new Date(at + WEEK * 60e3).toISOString() } }, ...extra }, new Date(at))!
+    agyPlanUsage({ quota: { 'gemini-weekly': { remaining_fraction: gemini, reset_time: new Date(at + GEMINI_RESET).toISOString() }, '3p-weekly': { remaining_fraction: other, reset_time: new Date(at + WEEK * 60e3).toISOString() } }, ...extra }, new Date(at))!
   const pct = (u: PlanUsage, id: string) => u.limits.find((l) => l.id === id)?.usedPercent
 
   it('merges each limit by its id: a lower reading later keeps the higher; one left out stays until its reset', () => {
@@ -254,9 +257,11 @@ describe('plan limits of part of a plan, kept and shown (HI-2734)', () => {
         if (e.type === 'plan-usage') told.push(JSON.stringify(e.usage.limits.map((l) => l.models)))
       })
       try {
-        reportPlanUsage('antigravity', agy(0.9))
-        reportPlanUsage('antigravity', agy(0.9))
-        const renamed = { ...agy(0.9), limits: agy(0.9).limits.map((l) => (l.id === 'gemini-weekly' ? { ...l, models: 'gemini-pro' } : l)) }
+        // reportPlanUsage drops a limit whose reset has passed by the clock: read at now, so both resets are ahead.
+        const now = Date.now()
+        reportPlanUsage('antigravity', agy(0.9, 1, now))
+        reportPlanUsage('antigravity', agy(0.9, 1, now))
+        const renamed = { ...agy(0.9, 1, now), limits: agy(0.9, 1, now).limits.map((l) => (l.id === 'gemini-weekly' ? { ...l, models: 'gemini-pro' } : l)) }
         reportPlanUsage('antigravity', renamed)
         expect(told).toHaveLength(2)
         expect(told[1]).toContain('gemini-pro')

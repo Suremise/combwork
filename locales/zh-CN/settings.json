@@ -558,7 +558,9 @@
   "settings.advanced.cw.prompt.clearDraft.desc": "Combwork 在向智能体的 CLI 输入提示词或“压缩”之前，会按 Ctrl+U 清除 CLI 输入框中的内容；要撤回中途停止的提示词时，它也会再按一次。关闭后，Combwork 从不按这个键：CLI 输入框中残留的文本会留在 Combwork 输入的内容之前并一起发送，中途停止的提示词会留在输入框中，有草稿时“压缩”可能会失败。更改 Codex 的模式时仍会先清除其输入框，因为它的菜单需要这样。",
   "settings.advanced.cw.prompt.clearDraft.title": "Combwork 输入前清除 CLI 中的草稿",
   "settings.advanced.cw.prompt.rawCardStart.desc": "在智能体上开始一张卡片时，Combwork 会用自己的话包装后交给它：它是看板上的哪张卡片、依赖什么、先读哪些文档，以及要遵循哪个技能。开启后，智能体只获得卡片的标题和描述，以及你开始时写下的内容。Combwork 的其他提示（唤醒和消息）保持不变：那是 Combwork 与其智能体交流的方式。",
+  "settings.advanced.cw.prompt.wholeCardMax.desc": "在代理上开始卡片时，如果整张卡片（包括其决定和所有评论）不超过这个字符数，Combwork 会把整张卡片发给代理，这样代理开始前无需再读一遍。更长的卡片只发送标题、描述和最新反馈，其余由代理自己读取。设为 0 则从不发送整张卡片。",
   "settings.advanced.cw.prompt.rawCardStart.title": "开始卡片时只发送卡片原文",
+  "settings.advanced.cw.prompt.wholeCardMax.title": "开始卡片时发送完整卡片的上限",
   "settings.advanced.cw.queue.checkMinutes.desc": "合并队列在结束合并前检查或安装之前允许其运行的时长。这样结束的检查是环境的失败，而不是工作的失败：卡片会带着这一标记退回，其构建者可以把同一修订版本再次送回队列。项目的检查确实需要更长时间时调高它；太长的话，一个卡住的检查会让队列停那么久。",
   "settings.advanced.cw.queue.checkMinutes.title": "合并队列：合并前检查的最长运行时间",
   "settings.advanced.cw.queue.checkedOutTarget.ask": "每次询问",
@@ -593,6 +595,10 @@
   "settings.advanced.cw.restart.resumeReadySeconds.title": "重启后恢复：就绪时限",
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.desc": "智能体的编程智能体在一个回合中可以持续等待重试其模型请求（被限流，或无法连接到服务）多久，之后 Combwork 会通知助手，每个回合一次。0：从不。",
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.title": "等待重试：在此之后通知助手",
+  "settings.advanced.cw.sessions.signFailFast.desc": "当仓库对提交签名时，智能体使用 Git for Windows 的 gpg 或 ssh-keygen、GnuPG 的 gpg 或 Windows 的 ssh-keygen 提交，会在无人值守的情况下签名，或立即失败并告诉智能体原因，而不是等待一个没人能输入的密码短语。签名保持开启，你的 git 和 gpg 设置也从不更改：会话只在自己的环境中使用 Combwork 的签名程序。其他签名程序照旧运行。关闭后，会话照旧使用 git 自己的签名程序。",
+  "settings.advanced.cw.sessions.signFailFast.title": "智能体的签名提交从不等待密码短语",
+  "settings.advanced.cw.sessions.signTimeoutSeconds.desc": "智能体的签名提交允许 gpg 或 ssh-keygen 运行多久，超时后 Combwork 会结束它，提交失败。这足够你触碰硬件密钥；到那时仍在运行的签名程序是在等人。",
+  "settings.advanced.cw.sessions.signTimeoutSeconds.title": "智能体的签名程序：超时放弃",
   "settings.advanced.cw.sessions.terminalType.desc": "Combwork 以 TERM=xterm-256color（与其终端一致）启动每个会话，且不带 Windows Terminal 的 WT_SESSION，因此无论 Combwork 是从“开始”菜单还是从终端打开，各 CLI 的显示都相同（Claude Code 显示 ❯ 而不是 >）。你自己的环境或会话环境中的 TERM 会保留。关闭后，会话获得打开 Combwork 时的环境。",
   "settings.advanced.cw.sessions.terminalType.title": "会话声明其终端为 xterm-256color",
   "settings.advanced.cw.showDeveloperFeatures.desc": "显示“帮助”→“开发者控制台”（Ctrl+Alt+J）：每个 CLI 发给 Combwork 的内容，以及 Combwork 对它的解读。",
@@ -1630,5 +1636,10 @@
   "settings.advanced.opencode.server.readySeconds.desc": "OpenCode 智能体的私有服务器有多长时间作出响应，超时后启动会放弃并结束它。太短时，慢速电脑上的智能体无法启动。",
   "settings.advanced.opencode.server.readySeconds.title": "服务器：启动时间",
   "settings.advanced.opencode.version.desc": "opencode --version 的输出：版本是其第一个分组。Combwork 只使用 OpenCode 2 或更高版本。设置错误时，将找不到 OpenCode。",
-  "settings.advanced.opencode.version.title": "opencode --version 中的版本"
+  "settings.advanced.opencode.version.title": "opencode --version 中的版本",
+  "settings.advanced.cw.activity.mapMotion.desc": "智能体每次调用工具时，活动地图会沿辐条向对应站点发出一个点，调用结束时再返回。“跟随 Windows”遵循 Windows 的“显示动画”设置；“开”总是移动；“关”只点亮站点。",
+  "settings.advanced.cw.activity.mapMotion.off": "关",
+  "settings.advanced.cw.activity.mapMotion.on": "开",
+  "settings.advanced.cw.activity.mapMotion.system": "跟随 Windows",
+  "settings.advanced.cw.activity.mapMotion.title": "活动地图的移动脉冲"
 }

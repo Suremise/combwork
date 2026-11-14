@@ -19,6 +19,8 @@ import { insideReal, placeKey } from './fsutil'
 import { folderFacts, legacyWorktree } from './agentFolders'
 import { unusedWorktreeFolders } from './unusedWorktrees'
 import { trash } from './trash'
+import { removeLaunchFolder, staleLaunchFolders } from './launchFolders'
+import { launchFolderAgent, launchFolderOf } from './launchFolderNames'
 import { attachmentsDir } from './attachmentsFolder'
 import { CARD_ATTACHMENTS_DIR, isSessionFolder } from '../shared/attachments'
 import { gzSize, isGz } from './transcriptFiles'
@@ -315,7 +317,9 @@ async function cleanupFacts(projectPath: string): Promise<CleanupFacts> {
     const path = join(dir, e.name)
     attachmentFolders.push({ name: e.name, path, bytes: await folderSize(path, 'use') })
   }
-  return { sessions: list, attachmentFolders, liveNames, now: Date.now() }
+  // Launch folders of removed agents (HI-3144): a project's only, never the Assistant's (its agent isn't in its agents).
+  const launchFolders = workspace.isAssistantHome(projectPath) ? [] : await Promise.all((await staleLaunchFolders(projectPath)).map(async (f) => ({ ...f, bytes: await folderSize(f.path, 'use') })))
+  return { sessions: list, attachmentFolders, liveNames, now: Date.now(), launchFolders }
 }
 
 /** What Clean Up… would remove with these options (nothing is changed). */
@@ -364,6 +368,18 @@ export async function cleanup(projectPath: string, opts: CleanupOptions, listed:
     try {
       await trashAttachments(projectPath, i)
       done(i)
+    } catch (e) {
+      skipped.push(`${i.path}: ${(e as Error).message}`)
+    }
+  }
+  // Launch folders of removed agents (HI-3144): each checked again as it goes (not the project's agent, nor starting or
+  // running), to the Recycle Bin.
+  for (const i of items.filter((x) => x.kind === 'launch-folder')) {
+    const agent = launchFolderAgent(basename(i.path))
+    if (!agent || resolve(launchFolderOf(projectPath, agent)).toLowerCase() !== resolve(i.path).toLowerCase()) continue
+    try {
+      if (await removeLaunchFolder(projectPath, agent, 'trash')) done(i)
+      else skipped.push(`${i.path}: ${tr(msg({ id: 'main.storage.launchInUse', defaultMessage: 'its agent is the project’s again, or is starting', description: 'Why Clean Up (Settings → Storage) skipped a launch folder (HI-3144): since the preview, its agent was added back to the project (an undo) or is starting, or the folder is gone.' }))}`)
     } catch (e) {
       skipped.push(`${i.path}: ${(e as Error).message}`)
     }

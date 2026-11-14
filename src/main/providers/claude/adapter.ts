@@ -5,7 +5,7 @@ import { join, basename } from 'path'
 import { mkdir, open, readdir, readFile, stat, writeFile } from 'original-fs/promises'
 import { existsSync, readFileSync, realpathSync } from 'original-fs'
 import type { AgentInstallInfo, AutoCompactSetting, HookCause, McpServerDef, MemorySource, PathDataCopy, PlanLimit, PlanUsage, ReadinessIssue, RetryWait, SubSession } from '../../../shared/types'
-import { CW_DIR, assertSessionId, isSessionId } from '../../../shared/defaults'
+import { assertSessionId, isSessionId } from '../../../shared/defaults'
 import { isCliOwnMode } from '../../../shared/cliOwnMode'
 import { CLAUDE_CODE, CLAUDE_DESCRIPTOR, CLAUDE_FOOTER_MODES, baseModel, canSwitchLive, footerMode, hookMode } from '../../../shared/claude'
 import { providerSettings } from '../../../shared/providers'
@@ -42,6 +42,7 @@ import { atMost } from '../../../shared/atMost'
 import { joined } from '../../../shared/coalesce'
 import { advanced } from '../../advanced'
 import { launchOverrides } from '../../advancedValues'
+import { launchFolderFree, launchFolderOf } from '../../launchFolderNames'
 
 const log = createLogger('claude-code')
 /** Transcripts whose sub-agent check is remembered (by path and mtime). */
@@ -483,7 +484,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
    * replaces the folder while the project's other agents may still be reading theirs.
    */
   launchDir(projectPath: string, agentId: string): string {
-    return join(projectPath, CW_DIR, `launch-${agentId}`)
+    return launchFolderOf(projectPath, agentId)
   }
 
   /** Rebuilds the agent's launch folder with exactly the session's Combwork skills, MCP servers and Combwork's hooks. */
@@ -506,6 +507,8 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
       Object.assign(ctx.env, got.env)
       ctx.localLimits = got.record
     }
+    // A removal of this agent's folder under way (HI-3144: one that qualified before this agent was added back) ends first.
+    await launchFolderFree(ctx.projectPath, ctx.agentId)
     const dir = this.launchDir(ctx.projectPath, ctx.agentId)
     const pluginDir = join(dir, 'plugin')
     const skillsDir = join(pluginDir, 'skills')

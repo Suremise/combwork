@@ -81,6 +81,7 @@ function sharedTexts(): { name: string; text: string }[] {
     status({ reason: 'slot', slot: 'slot-b', held: 'session', agent: 'B1' }),
     status({ reason: 'slot', slot: 'slot-b', held: 'session' }),
     status({ reason: 'slot', slot: 'slot-b', held: 'process' }),
+    status({ reason: 'slot', slot: 'slot-b', held: 'card', agent: 'B1', heldFor: 7 }),
     status({ reason: 'slot', slot: 'slot-b', held: 'broker', broker: 'WindowsSandboxServer', idle: true }),
     status({ reason: 'slot', slot: 'slot-b', held: 'broker', broker: 'WindowsSandboxServer' }),
     // HI-2468: a refused start, its slot held.
@@ -129,6 +130,8 @@ function sharedTexts(): { name: string; text: string }[] {
   out.push({ name: 'next paused', text: laneNextText({ lane: { ...view, state: 'paused' }, next: null, waits: { reason: 'hold', card: 3 } }) })
   out.push({ name: 'next none', text: laneNextText({ lane: view, next: null, waits: null }) })
   out.push({ name: 'next none, queued', text: laneNextText({ lane: view, next: null, waits: null, queue }) })
+  // An agent that only reviews (HI-3118): a card waiting for its review, or none.
+  out.push({ name: 'next review', text: laneNextText({ lane: view, next: null, waits: null, review: { card: 2, title: 'Card 2' } }) }, { name: 'next review none', text: laneNextText({ lane: view, next: null, waits: null, review: null }) })
   for (const slot of [null, 'slot-b'])
     for (const waits of [null, { reason: 'reviewer', card: 2 } as LaneStatus]) {
       const lane = { ...view, slot }
@@ -223,6 +226,9 @@ describe('the canary dialect over the lanes service (main/lanes.ts)', () => {
       }
       const lane = await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c1.number, c3.number], by: 'B1 (alpha)' })
       outputs.leftOut = lane.note ?? ''
+      // While c1 is plainly its own, before B2's lane below lists it too.
+      outputs.endNotDone = await said(lanes.endLane(w, lane.lane.id, { project: 'alpha', agent: 'b1' }))
+      outputs.abandonNotOurs = await said(lanes.endLane(w, lane.lane.id, { project: 'alpha', agent: 'b1', abandoned: true }))
       outputs.stays = await start({ cards: [c2.number], ownBuilder: true })
       outputs.shared = await start({ builder: 'b2', reviewer: 'r1', cards: [c1.number] })
       outputs.fresh = (await lanes.freshCardsNote(w, [c2.number], 'B9', 0, null)) ?? ''
@@ -231,8 +237,6 @@ describe('the canary dialect over the lanes service (main/lanes.ts)', () => {
       outputs.joinNoLane = await said(lanes.joinLane(w, { project: 'alpha', builder: 'b3', reviewer: 'r1', by: 'R1 (alpha)' }))
       outputs.joinedFirst = await said(lanes.joinLane(w, { project: 'alpha', builder: 'b3', reviewer: 'r1', cards: [c2.number], by: 'R1 (alpha)' }))
       outputs.endNotOurs = await said(lanes.endLane(w, lane.lane.id, { project: 'alpha', agent: 'b3' }))
-      outputs.abandonNotOurs = await said(lanes.endLane(w, lane.lane.id, { project: 'alpha', agent: 'b1', abandoned: true }))
-      outputs.endNotDone = await said(lanes.endLane(w, lane.lane.id, { project: 'alpha', agent: 'b1' }))
       outputs.nextNone = await said(lanes.laneNext(w, 'alpha', 'g1'))
       await lanes.endLane(w, lane.lane.id, { abandoned: true })
       outputs.nextAbandoned = await said(lanes.laneNext(w, 'alpha', 'b1'))

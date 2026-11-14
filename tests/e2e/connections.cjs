@@ -78,6 +78,9 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     check('the one-time notice says agents run on accounts (HI-2108), naming Claude Code', !!(await lib.until(async () => /Agents now run on accounts: add one for Claude Code/.test(await page.locator('[data-connections-intro]').innerText().catch(() => '')), HUNG_MS)))
     if ((await page.locator('.assistant-panel').count()) === 0) await page.keyboard.press('Control+Alt+I')
     check("the Assistant asks for a connection too: it can't start without one", !!(await lib.until(async () => /so the Assistant can't start/.test(await page.locator('[data-connection-setup="assistant"]').innerText().catch(() => '')), HUNG_MS)))
+    // HI-2899: in words for any coding agent, never "No Claude Code account" (it names no CLI yet: any account will do).
+    const assistantBanner = page.locator('[data-connection-setup="assistant"]')
+    check("…provider-neutral (HI-2899): no account, any coding agent's, with Add an Account", (await assistantBanner.getAttribute('data-assistant-need')) === 'noneAny' && /any coding agent Combwork supports/.test(await assistantBanner.innerText()) && !/Claude Code/.test(await assistantBanner.innerText()) && (await assistantBanner.locator('[data-open-connections]').count()) === 1, await assistantBanner.innerText().catch(() => ''))
     await shots('setup')
     // In narrow panes (HI-2535: 900 px with the sidebar and the Assistant open), each banner's button goes under its
     // message rather than squeezing it into a narrow column beside the button.
@@ -130,6 +133,10 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     const alphaBanner = page.locator('[data-connection-setup="project"]')
     await page.getByText('alpha', { exact: true }).first().click({ timeout: HUNG_MS })
     check("…the project's banner says so and offers Turn On Here", !!(await lib.until(async () => (await alphaBanner.getAttribute('data-off-here').catch(() => null)) === 'one' && /Max 1, your Claude Code account, is off in this workspace/.test(await alphaBanner.innerText()) && (await alphaBanner.locator(`[data-turn-on-here="${max1.id}"]`).count()) === 1, HUNG_MS)), await alphaBanner.innerText().catch(() => ''))
+    // HI-2899: the Assistant's banner offers it too (any CLI's account, Max 1 the only one).
+    if ((await page.locator('.assistant-panel').count()) === 0) await page.keyboard.press('Control+Alt+I')
+    check("…and the Assistant's banner offers Turn On Here on Max 1 (HI-2899)", !!(await lib.until(async () => (await page.locator('[data-connection-setup="assistant"]').getAttribute('data-off-here').catch(() => null)) === 'one' && (await page.locator(`[data-connection-setup="assistant"] [data-turn-on-here="${max1.id}"]`).count()) === 1, HUNG_MS)), await page.locator('[data-connection-setup="assistant"]').innerText().catch(() => ''))
+    await page.keyboard.press('Control+Alt+I')
     // Another workspace, open in its own window, with its own choice: none on (turned on and off there).
     const p3Next = app.waitForEvent('window')
     await inv('window:new')

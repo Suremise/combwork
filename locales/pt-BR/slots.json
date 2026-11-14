@@ -8,5 +8,6 @@
   "slots.release.otherCombwork": "{slot} está retido por outro Combwork que ainda está em execução (processo {pid}): libere-o lá ou feche esse Combwork antes.",
   "slots.setting.bad": "O Combwork não tem essa configuração de slot.",
   "slots.setting.badSize": "O número de cópias de revisão e verificação é um número inteiro de {min, number} a {max, number}.",
+  "slots.setting.badSwitch": "Preparar submódulos e LFS está ligado ou desligado.",
   "slots.setting.badText": "Um script de slot ou uma lista de arquivos é um texto de no máximo {max, number} caracteres."
 }

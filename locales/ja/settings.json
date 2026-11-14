@@ -558,7 +558,9 @@
   "settings.advanced.cw.prompt.clearDraft.desc": "Combworkはエージェントのプロンプトや「コンパクト化」をCLIに入力する前にCtrl+Uを押してCLIの入力欄を消去し、途中で止めたプロンプトを取り消すときにももう一度押します。オフにすると、Combworkは一切押しません。CLIの入力欄に残ったテキストはCombworkが入力する内容の前に残って一緒に送信され、途中で止めたプロンプトは入力欄に残り、下書きがあると「コンパクト化」が失敗することがあります。Codexのモードを変更するときは、そのメニューに必要なため、引き続き先に入力欄を消去します。",
   "settings.advanced.cw.prompt.clearDraft.title": "Combworkが入力する前にCLIの下書きを消去する",
   "settings.advanced.cw.prompt.rawCardStart.desc": "エージェントでカードを開始すると、Combworkはそれを自分の言葉で包んで渡します（ボード上のどのカードか、何に依存し、最初にどのドキュメントを読むか、どのスキルに従うか）。オンにすると、エージェントはカードのタイトルと説明、開始時に書いた内容だけを受け取ります。Combworkのほかのプロンプト（ウェイクやメッセージ）はそのままです。それがCombworkとエージェントのやり取りの仕方だからです。",
+  "settings.advanced.cw.prompt.wholeCardMax.desc": "カードをエージェントで開始するとき、決定事項とすべてのコメントを含むカード全体がこの文字数に収まれば、Combwork はカード全体を渡します。エージェントは開始前にカードを読み直す必要がありません。それより長いカードではタイトル、説明、最新のフィードバックを渡し、残りはエージェントが読みます。0 にするとカード全体は渡しません。",
   "settings.advanced.cw.prompt.rawCardStart.title": "カードの開始をそのままの言葉で",
+  "settings.advanced.cw.prompt.wholeCardMax.title": "開始時にカード全体を渡す上限",
   "settings.advanced.cw.queue.checkMinutes.desc": "マージキューがマージ前のチェックやインストールを終了させるまでに実行を許す時間です。こうして終了したチェックは作業ではなく環境の失敗として扱われ、カードはそのように示されて戻り、ビルダーは同じリビジョンをキューに戻せます。プロジェクトのチェックが実際にもっと時間がかかる場合は値を上げてください。長すぎると、止まったチェックがその間キューを止めます。",
   "settings.advanced.cw.queue.checkMinutes.title": "マージキュー：マージ前のチェックの最長実行時間",
   "settings.advanced.cw.queue.checkedOutTarget.ask": "毎回確認",
@@ -593,6 +595,10 @@
   "settings.advanced.cw.restart.resumeReadySeconds.title": "再起動後の再開：準備完了までの時間",
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.desc": "エージェントのコーディングエージェントが1回のターンでモデルへのリクエストの再試行を待ち続けられる時間（レート制限、またはサービスに接続できない場合）。これを過ぎるとCombworkがアシスタントに知らせます（1ターンに1回）。0：知らせない。",
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.title": "再試行待ち：アシスタントに知らせるまでの時間",
+  "settings.advanced.cw.sessions.signFailFast.desc": "リポジトリがコミットに署名する場合、Git for Windowsのgpgやssh-keygen、GnuPGのgpg、Windowsのssh-keygenを使うエージェントのコミットは、誰もいなくても署名されるか、すぐに失敗してエージェントに理由を伝えます。誰も入力できないパスフレーズを待つことはありません。署名はオンのままで、gitとgpgの設定は変更されません。セッションはその環境の中だけでCombworkの署名プログラムを使います。ほかの署名プログラムはこれまでどおり動きます。オフにすると、セッションはこれまでどおりgit自身の署名プログラムを使います。",
+  "settings.advanced.cw.sessions.signFailFast.title": "エージェントの署名付きコミットはパスフレーズを待たない",
+  "settings.advanced.cw.sessions.signTimeoutSeconds.desc": "エージェントの署名付きコミットがgpgやssh-keygenを実行させておく時間です。これを過ぎるとCombworkが終了させ、コミットは失敗します。タッチするハードウェアキーに十分な長さです。その時点でまだ動いている署名プログラムは誰かを待っています。",
+  "settings.advanced.cw.sessions.signTimeoutSeconds.title": "エージェントの署名プログラム：打ち切りまで",
   "settings.advanced.cw.sessions.terminalType.desc": "Combworkは各セッションを、その端末どおりTERM=xterm-256colorで、Windows TerminalのWT_SESSIONなしで起動します。そのため、Combworkをスタートメニューから開いても端末から開いても、CLIの表示は同じになります（Claude Codeは > ではなく ❯ を表示します）。自分の環境やセッションの環境にあるTERMはそのまま使われます。オフにすると、セッションはCombworkを開いたときの環境を受け取ります。",
   "settings.advanced.cw.sessions.terminalType.title": "セッションの端末をxterm-256colorとして伝える",
   "settings.advanced.cw.showDeveloperFeatures.desc": "「ヘルプ」→「開発者コンソール」（Ctrl+Alt+J）を表示します。各CLIがCombworkに送った内容と、Combworkがそれをどう解釈したかを並べて表示します。",
@@ -1630,5 +1636,10 @@
   "settings.advanced.opencode.server.readySeconds.desc": "OpenCodeエージェントのプライベートサーバーが応答するまでに与えられる時間。過ぎると起動をあきらめてサーバーを終了します。短すぎると、遅いPCではエージェントが起動しません。",
   "settings.advanced.opencode.server.readySeconds.title": "サーバー：起動までの時間",
   "settings.advanced.opencode.version.desc": "opencode --versionが出力するもの：バージョンは最初のグループです。CombworkはOpenCode 2以降のみを使います。間違っていると、OpenCodeが見つかりません。",
-  "settings.advanced.opencode.version.title": "opencode --versionのバージョン"
+  "settings.advanced.opencode.version.title": "opencode --versionのバージョン",
+  "settings.advanced.cw.activity.mapMotion.desc": "アクティビティマップは、エージェントのツール呼び出しごとに点をスポークに沿ってステーションへ送り、終わると戻します。「Windowsに従う」はWindowsの「アニメーションを表示する」設定に従います。「オン」は常に動かし、「オフ」はステーションを光らせるだけです。",
+  "settings.advanced.cw.activity.mapMotion.off": "オフ",
+  "settings.advanced.cw.activity.mapMotion.on": "オン",
+  "settings.advanced.cw.activity.mapMotion.system": "Windowsに従う",
+  "settings.advanced.cw.activity.mapMotion.title": "アクティビティマップの動くパルス"
 }

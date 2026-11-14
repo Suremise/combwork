@@ -78,6 +78,7 @@ const PASS_ENV = {
   CW_TEST_QUIET: '0 shows the test copies of Combwork (taking focus, notifying), to watch a run',
   CW_TEST_PROGRESS_TIMINGS: "where the Progress panel's suite timings are kept (tests/progressReport.mts)",
   CW_PROGRESS_CHECK_DEV: "1: packaged-progress checks the dev build's cw-progress",
+  CW_SIGN_CHECK_DEV: "1: packaged-sign checks the dev build's cw-sign (HI-2867)",
   CW_EXE: 'plan and lib.launch run this packaged Combwork executable instead of the dev build (the queue suites on a packaged build, #1578)',
   REPLYSIZE_OUT: "replysize's report file, in the work folder"
 }
@@ -134,6 +135,23 @@ function withoutCombworkShims(env, parent) {
 /** The allowlisted environment, and nothing else: for a child that isn't Combwork (git, a test server). */
 function baseEnv(parent = process.env) {
   return withoutCombworkShims(pick(parent, ALLOW), parent)
+}
+
+/**
+ * A variable of a plain environment object whatever its name's case: a copy of Windows' environment keeps the parent's
+ * spelling (PowerShell gives `Path`, Git Bash `PATH`), so `env.PATH` reads nothing from one of them (HI-2945).
+ */
+function envValue(env, name) {
+  const k = Object.keys(env).find((x) => x.toUpperCase() === name.toUpperCase())
+  return k === undefined ? undefined : env[k]
+}
+
+/**
+ * `env` with `dirs` first on its PATH, before `rest` (the allowlisted PATH unless given), read whatever its spelling; a
+ * copy holding PATH under one spelling only, so no later merge can keep the shorter one (HI-2945).
+ */
+function withPathFirst(env, dirs, rest = envValue(baseEnv(), 'PATH')) {
+  return apply({ ...env }, { PATH: [...[].concat(dirs), rest ?? ''].join(';') })
 }
 
 /**
@@ -275,4 +293,4 @@ function suiteEnv({ name, port = null, work = null, runDir, cliLog = null, slots
   return env
 }
 
-module.exports = { TEST_ROOT, MACHINE_LANES_DIR, LANES_DIR, OWN_LANES, HEAVY_DIR, WORK, CODEX_HOME, CLAUDE_TEST_HOME, ALLOW, PASS_ENV, CARRIED, baseEnv, childEnv, combworkEnv, isCombworkEnv, suiteEnv, trashDir, cliHomes, isUserCliHome, TEST_GIT_IDENTITY, gitConfig, writeGitConfig, gitEnv, isUserGitConfig }
+module.exports = { TEST_ROOT, MACHINE_LANES_DIR, LANES_DIR, OWN_LANES, HEAVY_DIR, WORK, CODEX_HOME, CLAUDE_TEST_HOME, ALLOW, PASS_ENV, CARRIED, baseEnv, envValue, withPathFirst, childEnv, combworkEnv, isCombworkEnv, suiteEnv, trashDir, cliHomes, isUserCliHome, TEST_GIT_IDENTITY, gitConfig, writeGitConfig, gitEnv, isUserGitConfig }

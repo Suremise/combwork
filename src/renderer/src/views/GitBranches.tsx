@@ -38,6 +38,7 @@ import { INIT_TEXT, InitRepoButton } from '../components/InitRepo'
 import { at, GIT_TEXT, GitForm, gitAction, Loading, rich, useFolderBusy, useGitRead, type FormSpec, type OpenForm } from './GitTab'
 import { awayFromProject } from '../agentPlace'
 import { NewBranchForm, type NewBranchDraft } from '../components/NewBranchForm'
+import { GitSigning } from '../components/GitSigning'
 
 /**
  * Version Control → Branches & remotes (#607, #1385; its own file since #1416): the project folder's branch or detached
@@ -802,6 +803,8 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
               </tbody>
             </table>
             </div>
+            {/* HI-1185: how commits are signed, and whether they can be signed with nobody there. */}
+            <GitSigning project={project} />
             {form && <GitForm make={form.make} onClose={() => setForm(null)} />}
           </div>
         )

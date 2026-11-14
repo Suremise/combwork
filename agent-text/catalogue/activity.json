@@ -71,6 +71,10 @@
     "text": "The paths it declared stay with the card.",
     "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
   },
+  "activity.undo.forwardResolved": {
+    "text": "A forward merge it handed to a builder stays ended, and the card made for the builder stays: put that card on hold or remove it if it isn't wanted.",
+    "note": "Why undo leaves this (HI-2959: Resolve on a builder). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
   "activity.undo.freshRetried": {
     "text": "A lane agent's new conversation tried again isn't stopped by undo: end the lane if it isn't wanted.",
     "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."

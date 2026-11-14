@@ -3,7 +3,7 @@
 // rollback; HEAD seen naming the target after the swap; every row of the recovery table after a crash at each point of
 // the journal, never merging twice; the terminal state's record (branch, ref, each file's side, the commands, For you);
 // Ask each time (OP-40): the Approve bound to the entry and its test merge.
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished } from 'vitest'
 import { execFileSync } from 'child_process'
 import { tempDir } from '../tempDir'
 import { shellLine } from '../../src/shared/workflow/queue'
@@ -11,7 +11,7 @@ import { createRequire } from 'module'
 
 const { baseEnv } = createRequire(import.meta.url)('../e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
 import { readFileSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { dirname, join, resolve } from 'path'
 import { B1, commit, GIT_HEAVY_MS, moved, R1, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { MergeQueue, type QueueConfig, type QueueHook } from '../../src/main/workflow/mergeQueue'
@@ -119,6 +119,94 @@ describe('the conditions before anything is touched (§16.9.2)', () => {
     expect(e.wf.state(card).stage).toBe('done')
     expect(readFileSync(join(e.project, 'new.txt'), 'utf8')).toBe('A\n')
     expect(readFileSync(join(e.project, 'README.md'), 'utf8')).toBe('the user is editing this\n')
+  })
+
+  it("HI-2944's repro: Files' shared exclude left uncommitted, and a card that also changes .gitignore, pauses naming .gitignore", async () => {
+    const e = pair()
+    writeFileSync(join(e.project, '.gitignore'), 'node_modules/\n')
+    sh(e.project, 'add', '.gitignore')
+    sh(e.project, 'commit', '-q', '-m', 'ignore')
+    const card = await queued(e, 'A', '.gitignore', 'node_modules/\nout/\n')
+    // Files' own Exclude from git, in a workspace holding the project.
+    const { createWorkspaceService, disposeWorkspaceService } = await import('../../src/main/workspace')
+    const { gitExclude } = await import('../../src/main/filesGit')
+    const w = createWorkspaceService()
+    w.path = dirname(e.project)
+    onTestFinished(() => disposeWorkspaceService(w))
+    expect(await gitExclude(e.project, [{ rel: 'reference', isDir: true }], 'shared', false)).toMatchObject({ file: '.gitignore', lines: ['/reference/'] })
+    const before = head(e)
+    const [o] = await e.queue().drain('main')
+    expect(o).toMatchObject({ outcome: 'paused', reason: 'unstagedChanges', files: ['.gitignore'] })
+    // The pause names the folder the changes are in: Commit and Set aside act there only.
+    expect(resolve(e.store.queuePause('main')?.folder ?? '').toLowerCase()).toBe(resolve(e.project).toLowerCase())
+    expect(head(e)).toBe(before)
+    expect(readFileSync(join(e.project, '.gitignore'), 'utf8')).toBe('node_modules/\n/reference/\n')
+    expect(e.kinds(card.id)).not.toContain('IntegrationStarted')
+  })
+
+  it("HI-2944: a start whose target's folder has uncommitted changes says so and tells the window, before it is written; never refused", async () => {
+    const e = pair()
+    const told: unknown[] = []
+    const cfg = e.wf.cfg as { targetChanges?: (c: unknown, card: string) => void }
+    cfg.targetChanges = (c, card) => told.push({ ...(c as object), card })
+    // Clean: nothing said.
+    const clean = e.wf.createCard({ title: 'clean' })
+    const s0 = await e.wf.start(clean.key, B1)
+    moved(s0)
+    expect(s0.warnings ?? []).toEqual([])
+    expect(told).toEqual([])
+    // The user's .gitignore line, uncommitted where main is checked out: said, the start written all the same.
+    writeFileSync(join(e.project, '.gitignore'), '/reference/\n')
+    const card = e.wf.createCard({ title: 'A' })
+    cfg.targetChanges = (c, key) => told.push({ ...(c as object), card: key, written: e.kinds(card.id).includes('Started') })
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    expect((s.warnings ?? []).join('\n')).toMatch(/^main's folder .+ has uncommitted changes \(\.gitignore\): a merge into main that changes them pauses/m)
+    expect(told).toMatchObject([{ target: 'main', files: ['.gitignore'], card: card.key, written: false }])
+    expect(e.kinds(card.id)).toContain('Started')
+  })
+
+  it('HI-2960: the start warning names three files at most, then how many more; the window is told them all', async () => {
+    const e = pair()
+    const told: { files?: string[] }[] = []
+    const cfg = e.wf.cfg as { targetChanges?: (c: unknown, card: string) => void }
+    cfg.targetChanges = (c) => told.push(c as { files?: string[] })
+    for (const n of [1, 2, 3, 4, 5, 6]) writeFileSync(join(e.project, `log-${n}.txt`), `${n}\n`)
+    writeFileSync(join(e.project, '.gitignore'), '/reference/\n')
+    const card = e.wf.createCard({ title: 'many' })
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    const warning = (s.warnings ?? []).find((w) => w.includes('has uncommitted changes')) ?? ''
+    const named = /has uncommitted changes \((.+?)\): /.exec(warning)?.[1] ?? ''
+    expect(named).toMatch(/^[^,]+, [^,]+, [^,]+ and 4 more$/)
+    expect(told[0]?.files).toHaveLength(7)
+  })
+
+  // HI-2984: Solo merges nothing, and its target's folder is the folder the agent works in (maybe its own half-done work):
+  // the warning was false there, at every start.
+  it('HI-2984: a Solo start in a dirty project folder says nothing of a merge and tells the window nothing', async () => {
+    const e = (env = setup({ ...preset('git', 'solo'), preChecks: [], mergeChecks: [] }))
+    expect([e.options.finish, e.options.folder]).toEqual(['committed', 'project'])
+    const told: unknown[] = []
+    ;(e.wf.cfg as { targetChanges?: (c: unknown, card: string) => void }).targetChanges = (c) => told.push(c)
+    writeFileSync(join(e.project, 'wip.txt'), 'half done\n')
+    const card = e.wf.createCard({ title: 'A' })
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    expect((s.warnings ?? []).join('\n')).not.toMatch(/uncommitted changes/)
+    expect(told).toEqual([])
+    // A lane started there: the same.
+    expect(await e.wf.targetChangesWarning('main')).toBeNull()
+    expect(told).toEqual([])
+  })
+
+  it("HI-2984: a pair lane's start, its target checked out dirty in the project folder while cards build in slots, still says it", async () => {
+    const e = pair()
+    const told: unknown[] = []
+    ;(e.wf.cfg as { targetChanges?: (c: unknown, card: string) => void }).targetChanges = (c) => told.push(c)
+    writeFileSync(join(e.project, '.gitignore'), '/reference/\n')
+    expect(await e.wf.targetChangesWarning('main')).toMatch(/^main's folder .+ has uncommitted changes \(\.gitignore\): a merge into main that changes them pauses/)
+    expect(told).toMatchObject([{ target: 'main', files: ['.gitignore'] }])
   })
 
   it('the conditions are checked inside the lock and the fence, and the fence names the folder', async () => {

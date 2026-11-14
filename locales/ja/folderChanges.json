@@ -1,0 +1,11 @@
+{
+  "folderChanges.commitFailed": "コミットできませんでした",
+  "folderChanges.committed": "{branch}で{count, plural, other {#件のファイル}}をコミットしました。",
+  "folderChanges.committedWarning": "{branch}で{count, plural, other {#件のファイル}}をコミットしました（警告あり）",
+  "folderChanges.resumed": "マージを続けます。",
+  "folderChanges.setAside": "{branch}で{count, plural, other {#件のファイル}}を退避しました。",
+  "folderChanges.setAsideDetail": "Gitは「{name}」という名前のスタッシュに保存しています。git stash popで元に戻せます。",
+  "folderChanges.setAsideFailed": "変更を退避できませんでした",
+  "folderChanges.setAsideWarning": "{branch}で{count, plural, other {#件のファイル}}を退避しました（警告あり）",
+  "folderChanges.stillPaused": "マージはまだ一時停止中です。理由はそのマージに表示されています。"
+}

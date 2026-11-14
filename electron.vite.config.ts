@@ -1,3 +1,4 @@
+import { execFileSync } from 'child_process'
 import { resolve } from 'path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import type { Plugin } from 'vite'
@@ -30,11 +31,25 @@ export function monacoDompurify(): Plugin {
   }
 }
 
+/**
+ * cw-sign.exe (HI-2867), the signer launcher agents' sessions get, compiled from resources/cw-sign/cw-sign.cs into
+ * out/bin after each main build (scripts/buildSignLauncher.mjs). Without a compiler it warns and the build goes on:
+ * sessions then get no signer entries and sign as before.
+ */
+export function signLauncher(): Plugin {
+  return {
+    name: 'cw-sign-launcher',
+    closeBundle() {
+      execFileSync(process.execPath, [resolve(__dirname, 'scripts/buildSignLauncher.mjs')], { stdio: 'inherit', windowsHide: true })
+    }
+  }
+}
+
 export default defineConfig({
   main: {
     // Agent text's formatter (HI-2433, shared/agentText/icu.ts) is bundled into the chunks, not loaded from node_modules:
     // cw-mcp.js and cw-progress.js run outside the asar, where they find only Node's built-ins and Combwork's chunks.
-    plugins: [externalizeDepsPlugin({ exclude: ['intl-messageformat', '@formatjs/icu-messageformat-parser'] })],
+    plugins: [externalizeDepsPlugin({ exclude: ['intl-messageformat', '@formatjs/icu-messageformat-parser'] }), signLauncher()],
     build: {
       rollupOptions: {
         // Electron's fs without its .asar handling, which main uses (#246): electron-vite externalises Node's built-ins
@@ -45,6 +60,8 @@ export default defineConfig({
           // The scripts agents' sessions run, named for what agents see (HI-2463: cw-*), as their sources are.
           'cw-mcp': resolve(__dirname, 'src/main/mcp/cw-mcp.ts'),
           'cw-progress': resolve(__dirname, 'src/main/progressReporters/cw-progress.ts'),
+          // The signer agents' sessions run through cw-sign.exe (HI-2867), as Node outside the asar.
+          'cw-sign': resolve(__dirname, 'src/main/platform/cw-sign.ts'),
           // The close commands' runner (HI-1368), run as Node outside the asar.
           'cw-close-runner': resolve(__dirname, 'src/main/closeCommand/cw-close-runner.ts'),
           // The usage history's worker thread (#1106).
@@ -55,6 +72,10 @@ export default defineConfig({
           'none-baseline-worker': resolve(__dirname, 'src/main/noneBaselineWorker.ts'),
           // Git's worker thread, which starts its processes (HI-1783).
           'git-worker': resolve(__dirname, 'src/main/gitWorker.ts'),
+          // jj's worker thread, which starts its processes (HI-2793), never Git's.
+          'jj-worker': resolve(__dirname, 'src/main/platform/jjWorker.ts'),
+          // jj's publish worker thread (HI-2882): a publish observation's database transaction, off main's thread.
+          'jj-publish-worker': resolve(__dirname, 'src/main/jjPublishWorker.ts'),
           // The stall watchdog's thread (HI-1692).
           'stall-watchdog': resolve(__dirname, 'src/main/stallWatchdog.ts'),
           // The log's writer thread (HI-1730).

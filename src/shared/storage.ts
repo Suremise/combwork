@@ -6,12 +6,13 @@ import { isSessionFolder } from './attachments'
 
 const M = {
   neverStarted: msg({ id: 'workspace.storage.neverStarted', defaultMessage: 'A launch that never got a session', description: "Storage, a folder of attachments to clean up: pasted into a launch that never became a session." }),
+  removedAgent: msg({ id: 'workspace.storage.removedAgent', defaultMessage: 'Removed agent {id}', description: 'Storage, a launch folder to clean up (HI-3144): its agent was removed. {id} is the agent’s id (a-1234abcd).' }),
   deletedSession: msg({ id: 'workspace.storage.deletedSession', defaultMessage: 'Deleted session {id}', description: 'Storage, a folder of attachments to clean up: its session was deleted. {id} is the start of its id (8 characters).' })
 }
 
 const DAY = 24 * 60 * 60 * 1000
 
-export const DEFAULT_CLEANUP: CleanupOptions = { archivedAttachmentsDays: 90, orphanAttachments: false, archivedBackupsDays: null, goneBackups: false }
+export const DEFAULT_CLEANUP: CleanupOptions = { archivedAttachmentsDays: 90, orphanAttachments: false, archivedBackupsDays: null, goneBackups: false, launchFolders: true }
 
 /** One of a project's sessions, as Clean Up sees it. */
 export interface CleanupSession {
@@ -34,6 +35,8 @@ export interface CleanupFacts {
   /** Session ids and run-<launch> names of what is running now. */
   liveNames: Set<string>
   now: number
+  /** Launch folders of agents no longer the project's, none starting or running (HI-3144, launchFolders.ts). */
+  launchFolders?: { agentId: string; path: string; bytes: number }[]
 }
 
 /**
@@ -61,6 +64,7 @@ export function planCleanup(facts: CleanupFacts, opts: CleanupOptions): CleanupI
       if (opts.archivedBackupsDays !== null && old(s, opts.archivedBackupsDays)) for (const b of s.backups) items.push({ kind: 'archived-backup', path: b.path, bytes: b.bytes, sessionId: s.id, label: label(s) })
     } else if (opts.goneBackups) for (const b of s.backups) items.push({ kind: 'gone-backup', path: b.path, bytes: b.bytes, sessionId: s.id, label: label(s) })
   }
+  if (opts.launchFolders) for (const f of facts.launchFolders ?? []) items.push({ kind: 'launch-folder', path: f.path, bytes: f.bytes, label: tr(M.removedAgent, { id: f.agentId }) })
   return items
 }
 

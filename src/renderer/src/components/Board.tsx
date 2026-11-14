@@ -23,7 +23,7 @@ import { TargetField, TargetMark, useProjectTargets } from './CardTarget'
 import { askedByNow, useForYou } from '../forYou'
 import { useTeamPause, workspacePaused } from '../teamPause'
 import type { ForYouItem } from '@shared/workflow/workView'
-import { useWorkBadges } from '../cardWork'
+import { badgeSource, useWorkBadges } from '../cardWork'
 import type { WorkBadge } from '@shared/workflow/workView'
 import { RULE_NAMES, workflowMessage } from '@shared/workflow/texts'
 import { refusalLines, type Refusal, type RefusalFormat } from '@shared/workflow/refusals'
@@ -46,6 +46,7 @@ import { ProviderIcon } from './ProviderIcon'
 import { cliReadyOf, ConnectionChoice, firstReadyConnection, offeredConnections, useConnections } from './ConnectionChoice'
 import { CardCostLine } from './CardCost'
 import { useLaneOf, useLanes } from '../laneSource'
+import { CARD_DRAG } from '../laneEdits'
 import { DocRefViewer, problemLines } from './DocRefViewer'
 import { boardLayout, cardColumn, cardStage, ownStageName, type BoardProject, type BoardStageColumn } from '../boardStages'
 import { BoardWorkflowLink, useBoardProjects } from './BoardWorkflow'
@@ -53,6 +54,7 @@ import { useAdvancedValue } from '../advanced'
 import type { StageId } from '@shared/workflow/facts'
 import { parseDocRef, splitDocRefs } from '@shared/docRefs'
 import { gist } from '@shared/gist'
+import { ReleaseOfferRow, useReleaseOffers } from '../releaseOffers'
 
 const NO_TASKS: TaskCard[] = []
 const NO_FOLD: BoardFold = {}
@@ -109,7 +111,7 @@ export function cardStalled(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrd
 }
 
 /** What a stalled card's hover says to do, by why it is stalled. */
-type StallKind = 'nobody' | 'not-watching' | 'wake-untaken' | 'review-silent' | 'review-wait' | 'review-verdict' | 'lane-order' | 'loop-step' | 'follow-up'
+type StallKind = 'nobody' | 'forward' | 'not-watching' | 'wake-untaken' | 'review-silent' | 'review-wait' | 'review-verdict' | 'lane-order' | 'loop-step' | 'follow-up'
 
 /** The agents as every card's stall reads them: those that may loop on a card, and those watching cards. */
 function stallAgentsOf(projects: ProjectInfo[]) {
@@ -145,8 +147,11 @@ function cardStall(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrderView | 
   const { agent } = cardAgent(projects, c)
   // Main's start state (HI-1977): an agent starting isn't stalled, one whose start failed says why.
   const now = agent ? stallAgentOf(agent) : null
-  const nobody = startFailedReason(c, now, tr) ?? startWaitingReason(c, now, tr) ?? stalledReason(c, now, tr)
-  if (nobody) return { text: nobody, kind: 'nobody' }
+  // HI-2959: a returned forward merge (no agent by design) says what it waits for, from its work badge.
+  const badges = badgeSource.get()
+  const forward = badges.ws === get().workspace?.path ? (badges.badges.get(c.number)?.forwardWait ?? null) : null
+  const nobody = startFailedReason(c, now, tr) ?? startWaitingReason(c, now, tr) ?? stalledReason(c, now, tr, forward)
+  if (nobody) return { text: nobody, kind: forward && !c.agent ? 'forward' : 'nobody' }
   const { loopers, watchers } = stallAgentsNow(projects)
   const looping = notWatchingReason(c, loopers, tr)
   if (looping) return { text: looping, kind: notWatchingAgent(c, loopers)?.untaken ? 'wake-untaken' : 'not-watching' }
@@ -207,6 +212,7 @@ function stallHint(kind: StallKind): string {
   if (kind === 'lane-order') return tr(msg({ id: 'board.stall.hintLaneOrder', defaultMessage: "Its builder and its lane's reviewer are each waiting for the other. Ask the builder to send the card its reviewer waits for, or ask the reviewer to review this one.", description: "Tooltip on a card stalled in Review by its card loop's deadlock: the builder sent this card to Review and waits for its verdict, while the loop's reviewer waits for another card of the loop to arrive." }))
   if (kind === 'loop-step') return tr(msg({ id: 'board.stall.hintLoopStep', defaultMessage: 'Its builder waits for its reviewer to check the design it posted. Ask the reviewer to answer it, or tell the builder to go ahead as posted.', description: 'Tooltip on a card stalled in Doing (#1382): in a card loop, the builder posted a design for its reviewer to check before building, and nobody answered.' }))
   if (kind === 'follow-up') return tr(msg({ id: 'board.stall.hintFollowUp', defaultMessage: 'Its builder waits for its reviewer to check the follow-up it posted. Show the reviewer and ask it to answer it.', description: 'Tooltip on a card stalled in Review or Passed (#1467): in a card loop, the builder posted a follow-up for its reviewer to check (a change asked of reviewed work, such as a screenshot\'s), and nobody answered.' }))
+  if (kind === 'forward') return tr(msg({ id: 'board.stall.hintForward', defaultMessage: 'Combwork’s own card, which no agent works on: open it and choose in its Work section.', description: "HI-2959: tooltip on a forward merge card (Combwork's own card bringing one branch up to date with another) back from the merge queue in the Active column: no agent works on it, so the user chooses what to do in the card dialog's Work section." }))
   if (kind === 'review-wait') return tr(msg({ id: 'board.stall.hintReviewWait', defaultMessage: "Its reviewer's watch didn't wake it. Show the reviewer and ask it to review the card.", description: 'Tooltip on a card stalled in Review: its reviewer watches it but has not started.' }))
   return tr(msg({ id: 'board.stall.hintNobody', defaultMessage: 'Nobody is working on it. Start it again (on this agent or another), or move it back to Todo.', description: 'Tooltip on a card stalled in Doing: no agent is working on it. Todo is a board column.' }))
 }
@@ -273,6 +279,7 @@ const MOVE = {
   askTitle: msg({ id: 'board.move.askTitle', defaultMessage: 'Move {card} to {column} anyway?', description: "Title of the question before a move that skips some of the card's workflow rules (glossary: rule). {card} is the card's name (its key, such as AM-12, or #12), {column} the board column it is moved to." }),
   askMessage: msg({ id: 'board.move.askMessage', defaultMessage: '{n, plural, one {This skips a rule of its project:} other {This skips # rules of its project:}}', description: "The question before a move that skips workflow rules (glossary: rule): how many it skips ({n}), listed below by name. Moving anyway records an exception on the card (glossary: override), with the reason the user gives." }),
   detail: msg({ id: 'board.move.askDetail', defaultMessage: 'Moving it anyway records an override on the card, with your reason.', description: "Under the rules a move would skip, in the question before it: making the move records it on the card as an exception to the rules (glossary: override), with the reason the user gives below." }),
+  released: msg({ id: 'board.move.askReleased', defaultMessage: '{branch} is released: start new work on it only for a hotfix. Moving it anyway starts it on {branch}.', description: 'HI-3148: under the question before a start that skips the rule “New work starts only on a branch that isn’t released”: {branch} (as 1.4.0) already shipped (tagged and merged into the default branch).' }),
   reason: msg({ id: 'board.move.reason', defaultMessage: 'Reason (optional)', description: "The label of the field in the question before a move that skips rules: why the user makes the exception, kept with it on the card. Optional." }),
   anyway: msg({ id: 'board.move.anyway', defaultMessage: 'Move Anyway', description: 'The button of the question before a move that skips rules: makes the move, recording it as an override (glossary: override).' }),
   refused: msg({ id: 'board.move.refused', defaultMessage: "{card} can't move to {column}", description: "A toast's title: a card's move was refused for something no exception to the rules can make true (nothing to submit, something Combwork couldn't read). {card} is the card's name, {column} a board column. The toast's text says why and what to do." }),
@@ -318,13 +325,14 @@ const refusalText = (r: Refusal, name: string): string => {
  * The question before a move (or a Start) that skips rules (#1275): the rules by name, a reason, Move Anyway. The reason
  * given (maybe empty), or null when the user cancels.
  */
-function askToSkip(name: string, column: TaskColumn, rules: readonly string[]): Promise<string | null> {
+function askToSkip(name: string, column: TaskColumn, rules: readonly string[], released?: string): Promise<string | null> {
   return prompt({
     title: tr(MOVE.askTitle, { card: name, column: tr(COLUMN_TEXT[column].label) }),
     message: tr(MOVE.askMessage, { n: rules.length }),
     list: rules.map((id) => (RULE_NAMES[id] ? tr(RULE_NAMES[id]) : id)),
     listOnly: true,
-    detail: tr(MOVE.detail),
+    // HI-3148: the released line it would start on, named, as the override confirmed is for it alone.
+    detail: released ? `${tr(MOVE.released, { branch: released })} ${tr(MOVE.detail)}` : tr(MOVE.detail),
     fieldLabel: tr(MOVE.reason),
     confirmLabel: tr(MOVE.anyway)
   })
@@ -351,9 +359,9 @@ export async function moveCard(c: Pick<TaskCard, 'number' | 'project'>, column: 
       r = await call('tasks:move', c.number, column, move)
     }
     if ('ask' in r) {
-      const reason = await askToSkip(name, column, r.ask)
+      const reason = await askToSkip(name, column, r.ask, r.released)
       if (reason === null) return false
-      r = await call('tasks:move', c.number, column, { ...move, confirm: true, ...(reason.trim() ? { reason: reason.trim() } : {}) })
+      r = await call('tasks:move', c.number, column, { ...move, confirm: true, ...(reason.trim() ? { reason: reason.trim() } : {}), ...(r.released ? { released: r.released } : {}) })
     }
     if ('refused' in r) {
       notify('error', tr(MOVE.refused, { card: name, column: where }), refusalText(r.refused, name))
@@ -878,6 +886,8 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
   const startDrag = useCallback((e: React.DragEvent, c: TaskCard, column: BoardColumnId): void => {
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', cardLabel(c))
+    // Its number too, for a lane in Progress → Lanes to take it (HI-2898).
+    e.dataTransfer.setData(CARD_DRAG, String(c.number))
     dragNow.current = { n: c.number, column, before: c.number }
     showDrag(dragNow.current)
     dropsNow.current = { n: c.number, columns: null }
@@ -1378,7 +1388,9 @@ export function BoardToolbar({
   }, [tasks, asideOpen])
   const menu = useContextMenu()
   const waiting = useForYou().summary.items
-  const forYouCount = new Set(waiting.filter((i) => project === null || i.project.toLowerCase() === project.toLowerCase()).map((i) => i.card)).size
+  // HI-3155: a project's release offer is a For you item of its own (not a card's), counted here too.
+  const offers = useReleaseOffers().filter((o) => project === null || o.project.toLowerCase() === project.toLowerCase())
+  const forYouCount = new Set(waiting.filter((i) => project === null || i.project.toLowerCase() === project.toLowerCase()).map((i) => i.card)).size + offers.length
   return (
     <div className="board-toolbar">
       <div className="board-search">
@@ -1726,7 +1738,21 @@ export function BoardView() {
         <span className="faint">{tr(msg({ id: 'board.view.intro', defaultMessage: 'Plan work as cards, start them on agents, and see where each one is on its way to Done.', description: 'Under the Task Board\'s title, whatever the workflow (HI-2341: some have no Review or Approved). Done is the board\'s last column, in every workflow.' }))}</span>
       </div>
       <BoardToolbar project={project} query={query} setQuery={(q) => set({ boardQuery: q })} archived={archived} setArchived={(v) => set({ boardArchived: v })} forYouOnly={forYouOnly} setForYouOnly={(v) => set({ boardForYou: v })} />
+      {forYouOnly && <BoardReleaseOffers project={project} />}
       <Board project={project} query={query} archived={archived} forYouOnly={forYouOnly} />
+    </div>
+  )
+}
+
+/** HI-3155: the projects' release offers above the cards while For you is on (their own For you items, not a card's). */
+function BoardReleaseOffers({ project }: { project: string | null }) {
+  const offers = useReleaseOffers().filter((o) => project === null || o.project.toLowerCase() === project.toLowerCase())
+  if (!offers.length) return null
+  return (
+    <div className="board-release-offers">
+      {offers.map((o) => (
+        <ReleaseOfferRow key={o.id} offer={o} />
+      ))}
     </div>
   )
 }
@@ -2590,9 +2616,9 @@ function StartChoices({ project, pick }: { project: ProjectInfo; pick: StartPick
 async function startCard(card: TaskCard, project: ProjectInfo, target: TaskStartTarget): Promise<boolean> {
   let r = await call('tasks:start', card.number, target)
   if ('ask' in r) {
-    const reason = await askToSkip(cardLabel(card), 'doing', r.ask)
+    const reason = await askToSkip(cardLabel(card), 'doing', r.ask, r.released)
     if (reason === null) return false
-    r = await call('tasks:start', card.number, target, { confirm: true, ...(reason.trim() ? { reason: reason.trim() } : {}) })
+    r = await call('tasks:start', card.number, target, { confirm: true, ...(reason.trim() ? { reason: reason.trim() } : {}), ...(r.released ? { released: r.released } : {}) })
     if ('ask' in r) return false
   }
   notify('success', tr(msg({ id: 'board.start.started', defaultMessage: '{card} started on agent {agent}', description: "A toast's title after a card started: its name: its key, such as AM-12, or #12 for a card with none and the agent ({agent}, its name). The card's title follows. A noun before the name (glossary §1 rule 4)." }), { card: cardLabel(card), agent: r.agentName }), card.title, [{ label: tr(msg({ id: 'board.start.show', defaultMessage: 'Show', description: "A button on the toast after a card started: shows the agent it started on." })), command: 'agent.show', args: [project.path, r.agentId] }])

@@ -35,6 +35,30 @@
     "text": "Work on task {card} from the Combwork task board: {title}",
     "note": "The first line of a card's start prompt. card: its key (AM-12), or #12 for a card with none."
   },
+  "prompt.card.whole.comment": {
+    "text": "{by}, {date}:\n{text}",
+    "note": "HI-2854: one comment in a start that carries the whole card. by: its author; date: YYYY-MM-DD; text: in full."
+  },
+  "prompt.card.whole.comments": {
+    "text": "Its comments, oldest first, each in its author's words:",
+    "note": "HI-2854: in a start that carries the whole card, before every comment it has (prompt.card.whole.comment)."
+  },
+  "prompt.card.whole.decision": {
+    "text": "- {text} ({date}, recorded by {by})",
+    "note": "HI-2854: one decision in a start that carries the whole card. text: in full; date: YYYY-MM-DD; by: who recorded it."
+  },
+  "prompt.card.whole.decisions": {
+    "text": "The user's decisions on it, oldest first:",
+    "note": "HI-2854: in a start that carries the whole card, before its decisions (prompt.card.whole.decision), one a line."
+  },
+  "prompt.card.whole.inFull": {
+    "text": "This is the card in full: every decision and comment it has now.",
+    "note": "HI-2854: the last line of a start that carries the whole card, after the skill line: the agent needn't read it again."
+  },
+  "prompt.card.yours": {
+    "text": "It is in Doing and yours.",
+    "note": "HI-2854: said when Combwork started the card on the agent (taskStart, a slot's placement), so it needn't start it again."
+  },
   "prompt.context.broken": {
     "text": "{n, plural, one {This reference no longer resolves} other {These references no longer resolve}}: {problems}. Ask the user which section is meant, or read the closest.",
     "note": "#819: never silently nothing: the references that no longer resolve (prompt.context.problem), joined with \"; \"."

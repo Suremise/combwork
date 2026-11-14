@@ -16,7 +16,8 @@ import { tempDir } from './tempDir'
 type Identity = { pid: number; started: number }
 const { stopProcessesIn, identify, endExactly } = createRequire(import.meta.url)('./e2e/folderProcesses.cjs') as { stopProcessesIn: (folder: string, since?: number) => number; identify: (pids: number[]) => Identity[]; endExactly: (targets: Identity[]) => number }
 
-vi.mock('../src/main/events', () => ({ emit: () => undefined, sendPty: () => undefined }))
+// Every export agentProcesses and ptyHost use (HI-2861): a job host lost mid-run toasts.
+vi.mock('../src/main/events', () => ({ emit: () => undefined, sendPty: () => undefined, toast: () => undefined, onCombworkEvent: () => () => undefined }))
 vi.mock('../src/main/providers', () => ({ allProviders: () => [] }))
 
 describe("the gate's command line", () => {

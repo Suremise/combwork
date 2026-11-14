@@ -154,8 +154,14 @@ const AGENTS = [
     // An agent starting in alpha changes the agents' live state meanwhile (store updates that would draw it).
     await inv('session:start', alpha, { agentId: 'hr1' })
     await until(async () => ['ready', 'finished'].includes((await liveOf(alpha, 'hr1'))?.status), HUNG_MS)
+    // …and a project's usage changing, as a session's tokens do (HI-3182: the map's context took it in while hidden,
+    // drawing it once more whenever one landed). Sent after the start's events on the same channel, so once it has landed
+    // in the window, they have too.
+    const bumps = await page.evaluate(() => window.__cwUsageBumps())
+    await app.evaluate(({ BrowserWindow }, ev) => { for (const w of BrowserWindow.getAllWindows()) w.webContents.send('cw:event', ev) }, { type: 'usage-changed', projectPath: alpha, sessionId: (await liveOf(alpha, 'hr1')).sessionId })
+    check('hidden: a usage change landed', !!(await until(async () => (await page.evaluate(() => window.__cwUsageBumps())) > bumps, HUNG_MS)))
     const hidden1 = await counts()
-    check('hidden: nothing read, nothing drawn, though agents changed', hidden1.now === hidden0.now && hidden1.lists === hidden0.lists && hidden1.turns === hidden0.turns && hidden1.renders === hidden0.renders, JSON.stringify([hidden0, hidden1]))
+    check('hidden: nothing read, nothing drawn, though agents and usage changed',hidden1.now === hidden0.now && hidden1.lists === hidden0.lists && hidden1.turns === hidden0.turns && hidden1.renders === hidden0.renders, JSON.stringify([hidden0, hidden1]))
     await visibility('visible')
     check('shown again, it reads again', !!(await until(async () => (await counts()).now > hidden1.now, HUNG_MS)))
 

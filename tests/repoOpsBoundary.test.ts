@@ -95,6 +95,13 @@ describe('an operation the platform doesn’t list is refused at main’s entry 
     await expect(inWorkspace(w, async () => repoOpHandlers['files:gitExclude'](repo, [{ rel: 'notes.txt', isDir: false }], 'local', false))).rejects.toThrow(REFUSED)
     expect(ran).toEqual([])
     expect(existsSync(exclude) ? readFileSync(exclude, 'utf8') : null).toBe(before)
+    // HI-2944: Files' Commit it, with .gitignore changed: refused, nothing committed.
+    const head = sh(repo, 'rev-parse', 'HEAD')
+    writeFileSync(join(repo, '.gitignore'), 'node_modules/\n/reference/\n')
+    ran = without('folderChanges')
+    await expect(inWorkspace(w, async () => repoOpHandlers['files:gitCommitIgnore'](repo))).rejects.toThrow(REFUSED)
+    expect(ran).toEqual([])
+    expect(sh(repo, 'rev-parse', 'HEAD')).toBe(head)
   })
 
   it('the Merge dialog’s worktree merge: refused inside its lock, nothing merged', async () => {
@@ -155,8 +162,10 @@ describe('the platform each entry point selects is the window’s as before (HI-
 describe('the one map (HI-2788)', () => {
   it('every mutation channel is a handler of repoOpsIpc.ts, or ipc.ts’ merge through opsAt; ipc.ts calls no mutation itself', () => {
     const channels = Object.keys(REPO_OP_CHANNELS).sort()
-    expect([...Object.keys(repoOpHandlers), 'worktrees:mergeBranch', 'agents:merge', 'worktrees:mergeUnused'].sort()).toEqual(channels)
+    expect([...Object.keys(repoOpHandlers), 'worktrees:mergeBranch', 'agents:merge', 'worktrees:mergeUnused', 'queue:settleChanges'].sort()).toEqual(channels)
     const ipc = readFileSync(join(__dirname, '..', 'src', 'main', 'ipc.ts'), 'utf8')
+    // HI-2944: Commit or Set aside on a paused merge, with the queue's pause and resume, through opsAt.
+    expect(ipc).toContain("opsAt('queue:settleChanges')")
     expect(ipc).toContain('...repoOpHandlers,')
     expect(ipc).toContain("opsAt('worktrees:mergeBranch').mergeLine(")
     // The older merges refuse at their handler's start (their port call is further in, in their lock).

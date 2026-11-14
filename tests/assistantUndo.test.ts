@@ -191,6 +191,42 @@ describe("the Assistant's changes, recorded and undone (#1282)", () => {
     expect((await card(c.number)).waitingFor?.reason).toBe('Mine again')
   })
 
+  it("a request's waiting mark put back keeps its request's ref (HI-2931): it goes when that request is acked, or at once when it was meanwhile", async () => {
+    const { askAssistant } = await import('../src/main/assistantAsk')
+    const deliveries = await import('../src/main/deliveries')
+    const acked = async (id: string) => {
+      await deliveries.readInbox(w.assistantHome, 'assistant')
+      await deliveries.ackDeliveries(w.assistantHome, 'assistant', [id])
+    }
+    const c = await make('Asked the Assistant')
+    await run(() => tasks.updateTask(c.number, { column: 'doing', agent: 'a1' }, user))
+    const asked = await run(() => askAssistant(w, c.number, agentA1, 'May I have the Sandbox?'))
+    const request = (await card(c.number)).waitingFor!
+    expect(request.ask).toBeTruthy()
+    // The Assistant's own mark over it (as the request's line says), undone by the user: the request's mark is back, ref and all.
+    let group = newMessage()
+    await asAssistant(`hold #${c.number}`, () => tasks.updateTask(c.number, { waitingFor: 'After the e2e run' }, assistant))
+    let [change] = groupOf(group)!.changes
+    let [r] = await userUndo(w, { change: change.id })
+    expect(r.undone).toEqual(['waitingFor'])
+    expect((await card(c.number)).waitingFor).toEqual(request)
+    // So the request's ack takes it off.
+    await acked(asked.id)
+    await vi.waitFor(async () => expect((await card(c.number)).waitingFor).toBeUndefined(), { timeout: 10_000 })
+    // Asked again, the Assistant's mark over it, and that request acked meanwhile (its take-off leaves the Assistant's
+    // mark): the undo puts back an ended request's mark, which goes at once.
+    const again = await run(() => askAssistant(w, c.number, agentA1, 'May I have it after CB1?'))
+    group = newMessage()
+    await asAssistant(`hold #${c.number} again`, () => tasks.updateTask(c.number, { waitingFor: 'After CB1' }, assistant))
+    ;[change] = groupOf(group)!.changes
+    await acked(again.id)
+    await vi.waitFor(() => expect(deliveries.deliveryNow(w.assistantHome, again.id)?.state).toBe('acked'), { timeout: 10_000 })
+    expect((await card(c.number)).waitingFor?.reason).toBe('After CB1')
+    ;[r] = await userUndo(w, { change: change.id })
+    expect(r.undone).toEqual(['waitingFor'])
+    expect((await card(c.number)).waitingFor).toBeUndefined()
+  })
+
   it('a card it made is archived; one someone else has changed since is left, and said', async () => {
     const group = newMessage()
     const made = await asAssistant('add the task "Its own" to the board', () => tasks.createTask({ title: 'Its own', project: 'alpha' }, assistant), 'create-task')

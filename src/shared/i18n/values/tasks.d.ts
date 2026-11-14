@@ -90,6 +90,7 @@ interface CombworkMessageValues {
   'tasks.error.targetMoved': { card: string | number }
   'tasks.error.targetNotAgents': undefined
   'tasks.error.targetNotListed': { hasTargets: string; target: string | number; default: string | number; hasOthers: string; others: string | number }
+  'tasks.error.targetResolution': { card: string | number; from: string | number; to: string | number }
   'tasks.error.tooLong': { what: string; max: number }
   'tasks.error.tooManyContext': { max: string | number }
   'tasks.error.tooManyDecisions': { max: string | number }
@@ -129,9 +130,11 @@ interface CombworkMessageValues {
   'tasks.history.dependsOn': { cards: string | number }
   'tasks.history.description': undefined
   'tasks.history.followUpSubmitted': { revision: string | number }
+  'tasks.history.forwardResolving': { card: string | number; from: string | number; source: string | number; to: string | number }
   'tasks.history.fromOlder': { was: string | number }
   'tasks.history.given': { agent: string | number }
   'tasks.history.imported': { project: string | number; was: string | number }
+  'tasks.history.jjCandidateReturned': { target: string | number; reason: string; check: string | number; files: string }
   'tasks.history.kind': { how: string; kind: string }
   'tasks.history.labels': { labels: string | number }
   'tasks.history.labelsAdded': { labels: string | number }

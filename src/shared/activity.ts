@@ -35,7 +35,16 @@ export interface ActivityTool {
   failed: boolean
   /** Its result is in the transcript. */
   done: boolean
+  /**
+   * A script's calls, by name only (HI-2240's `calls`; the Activity map's stations, HI-2903), its latest SCRIPT_CALLS:
+   * absent for any other call. `callsMore`: how many earlier ones were left out.
+   */
+  calls?: string[]
+  callsMore?: number
 }
+
+/** A script's calls kept by name for the Activity map (its latest): a script can make any number (HR2's HI-2903 round 1). */
+export const SCRIPT_CALLS = 400
 
 /** A turn: a prompt and what followed it, up to the next prompt. */
 export interface ActivityTurn {
@@ -147,7 +156,7 @@ export function activityTurns(items: readonly TranscriptItem[], max = ACTIVITY_T
     }
     if (!turn) continue
     if (item.kind === 'tool') {
-      turn.tools.push({ itemId: item.id, name: item.tool.name, summary: cut(maskText(item.tool.summary), LINE), at: item.timestamp, until: nextAt[i - from], failed: item.tool.isError, done: item.tool.result !== null })
+      turn.tools.push({ itemId: item.id, name: item.tool.name, summary: cut(maskText(item.tool.summary), LINE), at: item.timestamp, until: nextAt[i - from], failed: item.tool.isError, done: item.tool.result !== null, ...scriptCalls(item.tool.calls) })
       turn.lastKind = 'tool'
     } else if (item.kind === 'assistant' && item.text.trim()) {
       turn.reply = cut(maskText(item.text), LINE)
@@ -155,6 +164,15 @@ export function activityTurns(items: readonly TranscriptItem[], max = ACTIVITY_T
     }
   }
   return { total, turns }
+}
+
+/** A script's calls as a tool call keeps them: the names of its latest SCRIPT_CALLS, and how many earlier ones there were. */
+function scriptCalls(calls: readonly TranscriptTool[] | undefined): Pick<ActivityTool, 'calls' | 'callsMore'> {
+  if (!calls?.length) return {}
+  const from = Math.max(0, calls.length - SCRIPT_CALLS)
+  const names: string[] = []
+  for (let i = from; i < calls.length; i++) names.push(calls[i].name)
+  return from ? { calls: names, callsMore: from } : { calls: names }
 }
 
 /** A Windows FILETIME (100 ns since 1601, as text) as Unix ms; null when it isn't one. */
@@ -200,6 +218,8 @@ export interface ActivityCard {
   column: string
   builder: string | null
   reviewer: string | null
+  /** HI-2915: in Doing and marked waiting on purpose (HI-2618): why, and whether it waits for the Assistant's answer. */
+  waiting?: { reason: string; assistant: boolean }
 }
 
 export interface ActivityInput {

@@ -126,9 +126,10 @@ describe('the session contract', () => {
     // folder about 35. #1529 (P8) held the agent's at its 1.0.0 size (2,656 characters, 2,787 with a handover): the
     // board rules became the intents and Combwork's refusals, and #903's act-then-ack line came in within it; the
     // Assistant's grew by that line, about 140. HI-686's route to the generalist skill (Darren's design: the contract
-    // points to it) added 15 ("; for other work, use generalist", the shortest that reads).
-    expect(agent.length).toBeLessThanOrEqual(2671)
-    expect(withLatestHandover(agent, 'handovers/2026-10-03-web-auth-refactor.md').length).toBeLessThanOrEqual(2802)
+    // points to it) added 15 ("; for other work, use generalist", the shortest that reads). HI-2865's never-by-name rule in the stop-what-you-start line added 121 (an agent of another
+    // project ended every lane's cw-progress runs by a `ps | grep` pattern).
+    expect(agent.length).toBeLessThanOrEqual(2792)
+    expect(withLatestHandover(agent, 'handovers/2026-10-03-web-auth-refactor.md').length).toBeLessThanOrEqual(2923)
     expect(assistant.length).toBeLessThan(820)
     for (const level of ['look', 'agents', 'projects'] as const) expect(controlRules(level).length).toBeLessThan(1200)
     const card = { number: 7, title: 'T', description: 'D', blockedBy: [], comments: [] } as unknown as TaskCard
@@ -378,8 +379,8 @@ describe('the bundled skills', () => {
     const text = catalog.get('card-loop')!.text
     const line = (starts: string): string => text.split(/\r?\n/).find((l) => l.startsWith(starts)) ?? ''
     // In Git only (HR1's #1524 round 1 finding 1): a no-code card submits a summary, a project without version control its files' state.
-    expect(line('1. Do its work')).toMatch(/for a code card in Git, commit each round's work and name the commit in its summary; a no-code card has nothing to commit/)
-    expect(line('2. Review it')).toMatch(/`cw_start_review` names what to review \(a revision, or a no-code card's summary\)\. For a code card in Git, work that revision doesn't hold \(uncommitted, or no commit named\) isn't a failed round on that alone/)
+    expect(line('1. Do its work')).toMatch(/for a code card in Git or jj, commit each round's work and name the commit in its summary; a no-code card has nothing to commit/)
+    expect(line('2. Review it')).toMatch(/`cw_start_review` names what to review \(a revision, or a no-code card's summary\)\. For a code card in Git or jj, work that revision doesn't hold \(uncommitted, or no commit named\) isn't a failed round on that alone/)
     expect(line('Your watch, your card in Review: the card')).toMatch(/changes: \["verdict", "column", "comment"\]/)
     // #1639: after a submission or a failed verdict in a lane, Combwork arms the watch and the reply says so.
     expect(text).toMatch(/After a submission or a failed verdict in your lane, Combwork watches the card for you/)
@@ -394,7 +395,7 @@ describe('the bundled skills', () => {
     // commit gets a question, never a review of that commit.
     expect(catalog.get('review-agent-work')!.text).toMatch(/What start review names is what you review, and what your verdict is recorded against: if the builder's summary names another commit, ask the builder \(`cw_request_builder`\) rather than review that one\./)
     // Since HI-2011 in its reference file for edge cases (other-targets.md).
-    expect(catalog.get('review-agent-work')!.text).toMatch(/For a code card in Git, work that revision doesn't hold \(sent uncommitted\) gets a request for a commit \(`cw_request_builder`\), not a verdict \(card-loop, Reviewer\)\./)
+    expect(catalog.get('review-agent-work')!.text).toMatch(/For a code card in Git or jj, work that revision doesn't hold \(sent uncommitted\) gets a request for a commit \(`cw_request_builder`\), not a verdict \(card-loop, Reviewer\)\./)
   })
 })
 
@@ -448,8 +449,10 @@ describe('the skills follow the gates (#1524)', () => {
     // What a submission is depends on two separate dimensions, the platform and the card's kind (HR1's #1524 findings:
     // round 1's 1 and 3, round 2's 1): only a code card in Git has a commit, its default the card's own revision (in a
     // shared folder not the folder's head); a no-code card submits its summary on either platform.
-    const SUBMITS: [platform: 'Git' | 'None', kind: 'code' | 'no-code', says: RegExp][] = [
-      ['Git', 'code', /for a code card in Git, a revision, by default the card's own \(its line's head, or its newest commit in a folder shared with other agents; the reply names it\), so commit what it should hold first/],
+    // HI-2870: a jj card's is its commit too, the same clause.
+    const SUBMITS: [platform: 'Git' | 'jj' | 'None', kind: 'code' | 'no-code', says: RegExp][] = [
+      ['jj', 'code', /for a code card in Git or jj, a revision, by default the card's own/],
+      ['Git', 'code', /for a code card in Git or jj, a revision, by default the card's own \(its line's head, or its newest commit in a folder shared with other agents; the reply names it\), so commit what it should hold first/],
       ['Git', 'no-code', /for a no-code card, such as a decision or a write-up, its summary alone/],
       ['None', 'code', /without version control, the state of the card's files \(`paths`\)/],
       ['None', 'no-code', /for a no-code card, such as a decision or a write-up, its summary alone/]
@@ -518,8 +521,10 @@ describe('the skills follow the gates (#1524)', () => {
   // HI-2011's split added only each reference file's heading and SKILL.md's list of them: the rules were moved, not added.
   it('stay smaller than before P8 (work-on-card 8,991 and card-loop 15,776 characters), reference files and all (LF)', () => {
     // Round 2: each list also says where its files are (beside SKILL.md), as a model looked in its working folder.
-    expect(catalog.get('work-on-card')!.text.replace(/\r/g, '').length).toBeLessThan(9850)
-    expect(catalog.get('card-loop')!.text.replace(/\r/g, '').length).toBeLessThan(11850)
+    // HI-2870 (J9d): jj's clauses (a jj card's commit; a passed one waits for the user to integrate it): 9850 before.
+    expect(catalog.get('work-on-card')!.text.replace(/\r/g, '').length).toBeLessThan(9950)
+    // HI-2870 (J9d): its commit clauses scoped to a code card "in Git or jj": 11850 before.
+    expect(catalog.get('card-loop')!.text.replace(/\r/g, '').length).toBeLessThan(11900)
   })
 })
 
@@ -608,7 +613,8 @@ describe('the review and merge skills follow the gates (#1525)', () => {
 
   it('stay smaller than before P8 (review-agent-work 7,475 and merge-ready 5,291 characters, LF)', () => {
     // HI-2011's split added each reference file's heading and SKILL.md's list of them (7,475 and 5,291 before it).
-    expect(review().replace(/\r/g, '').length).toBeLessThan(8150)
+    // HI-2870 (J9d): a jj copy's change read from its base, a jj card's missing commit asked for: 8150 before.
+    expect(review().replace(/\r/g, '').length).toBeLessThan(8200)
     // Round 2: merging back in SKILL.md, what is rarer in who-merges.md under headings of its own.
     expect(merge().replace(/\r/g, '').length).toBeLessThan(5800)
   })

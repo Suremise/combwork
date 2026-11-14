@@ -55,7 +55,7 @@ describe("the merge queue's candidate through the integration port", () => {
 
   it("the port's contract imports no platform's code, only types", () => {
     const text = read('src/main/platform/integration.ts')
-    expect(importsOf('src/main/platform/integration.ts').sort()).toEqual(['src/main/platform/types', 'src/shared/workflow/conflicts', 'src/shared/workflow/queue'])
+    expect(importsOf('src/main/platform/integration.ts').sort()).toEqual(['src/main/platform/types', 'src/shared/gitSigning', 'src/shared/workflow/conflicts', 'src/shared/workflow/queue'])
     expect([...text.matchAll(/^import .*$/gm)].every((m) => m[0].startsWith('import type '))).toBe(true)
   })
 
@@ -70,5 +70,20 @@ describe("the merge queue's candidate through the integration port", () => {
     }
     walk('src')
     expect(files.filter((f) => importsOf(f).includes('src/main/platform/gitIntegration'))).toEqual(['src/main/platform/integrationPorts.ts'])
+  })
+
+  it("HI-2794: jj's advance probe is evidence only: nothing in src imports it, and it imports no port or fact writer", () => {
+    const files: string[] = []
+    const walk = (dir: string): void => {
+      for (const e of readdirSync(join(root, dir))) {
+        const p = `${dir}/${e}`
+        if (statSync(join(root, p)).isDirectory()) walk(p)
+        else if (/\.tsx?$/.test(e)) files.push(p)
+      }
+    }
+    walk('src')
+    // gate:advance stays closed (SPEC §16.3.6, "Open: jj's target advance"): no product code may advance a jj target with it.
+    expect(files.filter((f) => importsOf(f).includes('src/main/platform/jjAdvanceProbe'))).toEqual([])
+    expect(importsOf('src/main/platform/jjAdvanceProbe.ts').sort()).toEqual(['src/main/platform/jjRunner', 'src/main/platform/repoContext'])
   })
 })

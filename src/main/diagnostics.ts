@@ -13,6 +13,8 @@ import { LOG_FILE, logsDir } from './logger'
 import { provider } from './providers'
 import { providerService } from './providerService'
 import { repoTools } from './platform/repoPorts'
+import { jjRunner } from './platform/jjRunner'
+import { TESTED_JJ } from '../shared/jjTool'
 import { combworkWindows } from './windows'
 import { GUIDANCE_REVISION } from './guidance'
 import { combworkSkills } from './skills'
@@ -130,6 +132,11 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
     const g = runner.readinessNow()
     providerLines.push(`- **${tool}**: ${g.state === 'missing' ? "not found on Combwork's PATH" : g.version ? `${g.version}${g.path ? ` at \`${g.path}\`` : ''}${g.state === 'old' ? ' (older than Combwork needs)' : ''}` : `unknown${g.error ? ` (${g.error})` : ''}`}`) // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
   }
+
+  // Jujutsu (HI-2793's J0; a platform since HI-2799): it has no repository context port, so it isn't among repoTools();
+  // checked here (no process when it isn't on PATH).
+  const jj = await jjRunner.readiness().catch(() => null)
+  providerLines.push(`- **Jujutsu**: ${!jj ? 'unknown' : jj.state === 'missing' ? "not found on Combwork's PATH" : jj.version ? `${jj.version}${jj.path ? ` at \`${jj.path}\`` : ''}; tested with ${TESTED_JJ.version}${jj.state === 'old' ? ' (older: not run)' : jj.state === 'untested' ? ' (newer: untested, not trusted)' : ''}` : `unknown${jj.error ? ` (${jj.error})` : ''}`}`) // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
 
   // Bundled skills: Combwork's own names, so they are shown; the user's own skills only as a count.
   const skillLines: string[] = []

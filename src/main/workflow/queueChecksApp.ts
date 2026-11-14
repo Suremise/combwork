@@ -12,6 +12,7 @@ import { childEnv } from '../ptyHost'
 import type { WorkspaceService } from '../workspace'
 import { QUEUE_CHECK_MINUTES, QUEUE_NETWORK_CODES } from '../../shared/advanced'
 import { progressRuns, queueChecks, type Spawn } from './queueChecks'
+import { slotWorkspaces } from '../platform/workspacePorts'
 
 const log = createLogger('queue')
 
@@ -22,8 +23,8 @@ export const queueLogDir = (): string => join(app.getPath('userData'), 'logs', '
  * The runner for a project's queue (`QueueConfig.runCheck` and `install`). `onRun`: told each run's id as it starts (null
  * when runs aren't kept), for the queue's model (#1353).
  */
-export function appQueueChecks(ws: WorkspaceService, projectPath: string, spawn?: Spawn, onRun?: (id: string | null) => void): ReturnType<typeof queueChecks> {
-  const runs = ws.path ? progressRuns(progress, () => progressGate.on(), ws.path, projectPath, (e) => log.warn('merge queue run not shown', e)) : undefined
+export function appQueueChecks(ws: WorkspaceService, projectPath: string, spawn?: Spawn, onRun?: (id: string | null) => void, extra: { copy?: string; stoppable?: boolean } = {}): ReturnType<typeof queueChecks> {
+  const runs = ws.path ? progressRuns(progress, () => progressGate.on(), ws.path, projectPath, (e) => log.warn('merge queue run not shown', e), extra) : undefined
   return queueChecks({
     ...(spawn ? { spawn } : {}),
     env: () => childEnv(),
@@ -31,6 +32,11 @@ export function appQueueChecks(ws: WorkspaceService, projectPath: string, spawn?
     logDir: queueLogDir(),
     timeoutMs: () => Math.max(1, Number(advanced.get(QUEUE_CHECK_MINUTES)) || 90) * 60_000,
     networkCodes: () => advanced.pattern(QUEUE_NETWORK_CODES),
-    setupCommand: async () => (await ws.projectConfig(projectPath).catch(() => null))?.worktreeSetup ?? ''
+    setupCommand: async () => (await ws.projectConfig(projectPath).catch(() => null))?.worktreeSetup ?? '',
+    // HI-1182: Version Control → Slots and copies' Set up submodules and LFS, as it is now (unreadable: as its default, on).
+    gitFilesOn: async () => (await ws.projectConfig(projectPath).catch(() => null))?.slots?.gitFiles !== false,
+    project: projectPath,
+    // The queue's folder is a worktree made as slots are: their platform's step.
+    files: slotWorkspaces().files
   })
 }

@@ -7,6 +7,7 @@ import type { AvOffer } from './antivirus'
 import type { ActivityKind, ActivityTarget, UndoFinalWhy } from './assistantActivity'
 import type { AttachmentKind } from './attachments'
 import type { IgnoreRule, IgnoreTarget } from './gitIgnoreRules'
+import type { GitlinkChange } from './gitlink'
 import type { AgentProcess } from './agentProcesses'
 import type { StartFailure } from './startFailure'
 import type { FreshReason } from './sessionFresh'
@@ -24,7 +25,7 @@ import type { SafeguardNote, ScreenStop } from './safeguards'
 import type { AgentLeftovers, LeftoverProcessMode } from './agentProcesses'
 import type { UsageTimeline } from './usageTimeline'
 import type { PlatformId, ProjectPlatform } from './platform/descriptors'
-import type { SwitchRefusal } from './platform/switching'
+import type { StoreSwitch, SwitchRefusal } from './platform/switching'
 import type { Contradiction, PresetId, WorkflowOptions } from './workflow/options'
 import type { Refusal } from './workflow/refusals'
 import type { ReviewerMode, WorkflowRole } from './workflow/roles'
@@ -129,6 +130,11 @@ export type TileOrder = 'panes' | 'urgency'
 export type QuitChoice = 'now' | 'wait' | 'cancel' | 'window'
 /** What the quit dialog is for: quitting, closing a window, closing its workspace, or switching the window to another workspace. */
 export type QuitScope = 'app' | 'window' | 'workspace' | 'switch'
+/** HI-3167: the downloaded update a quit offers to install now: its version, and about how long installing takes. */
+export interface QuitUpdate {
+  version: string
+  seconds: number
+}
 
 /** A running session listed in the quit dialog. */
 export interface QuitSession {
@@ -725,6 +731,16 @@ export interface PlanLimit {
   /** When the reading kept was reported, and by which session's agent (#383: sessions relay readings of different ages). */
   reportedAt?: string
   reportedBy?: string
+  /**
+   * How old the reading kept is (HI-3181), from its session's reports, which carry no time of their own: taken at or before
+   * `firstSeenAt` (the session's first report of this figure), and after `changedAfter` (its report before, of another
+   * figure; absent for a session's first). Two readings so ordered: the newer one is what it is now, even lower.
+   * `takenAfter` (HI-3187): its run's launch, where the provider's readings all come from the run's own API calls
+   * (capabilities.planUsageSinceLaunch), so a run's first report is dated too.
+   */
+  firstSeenAt?: string
+  changedAfter?: string
+  takenAfter?: string
   /**
    * Which part of the plan it covers, where a provider has several limits of one window (HI-2734: agy's weekly quotas):
    * `gemini`, `otherModels` (agy's third-party models), `premium` (Copilot's premium requests), else the provider's own word.
@@ -1445,6 +1461,12 @@ export interface TaskWaiting {
   /** Who marked it (the user, the Assistant, an agent's name). */
   by: string
   at: string
+  /**
+   * HI-2915: set only by Combwork when the card's agent asked the Assistant (`cw_ask_assistant`) on it: that request's ref
+   * (its delivery's), so the mark goes when that request ends and only then (a later mark has none). Never from the
+   * Agent API.
+   */
+  ask?: string
 }
 
 /** An agent reviewing a card (TaskCard.review). */
@@ -1500,9 +1522,10 @@ export interface TaskPatch {
   decisionId?: string
   /**
    * A column move across workflow rules (#1265, SPEC §16.8.4), with why: the Assistant's, required when its move skips
-   * a rule (else refused, naming them); the user's reason, optional. Never an agent's.
+   * a rule (else refused, naming them); the user's reason, optional. Never an agent's. `released` (HI-3148): the released
+   * line a start the move makes may go onto, as the ask or the refusal named it: for that line only.
    */
-  override?: { reason: string }
+  override?: { reason: string; released?: string }
 }
 
 /**
@@ -1511,7 +1534,7 @@ export interface TaskPatch {
  * question first (the rules the move would skip: nothing written; move again with `confirm`), or refused. `leftOut`
  * (HI-2352): a None code card's submission, asked first what its paths leave out: move again with `paths`.
  */
-export type TaskMoveResult = { moved: TaskCard; stopped?: Refusal } | { ask: string[] } | { leftOut: { paths: string[]; files: string[] } } | { refused: Refusal }
+export type TaskMoveResult = { moved: TaskCard; stopped?: Refusal } | { ask: string[]; released?: string } | { leftOut: { paths: string[]; files: string[] } } | { refused: Refusal }
 
 /** Which agent Start gives a card to; a new one runs on `connection` (its id: HI-2121), else the first usable here. */
 /** `worktree` (0.9's own worktree for a new agent) is refused since 1.0 (#1451); the window stops sending it (#1442). */
@@ -1701,6 +1724,12 @@ export interface NextVersionPlan {
   listed: boolean
   /** What can follow the proposed branch, both going on (started cards and running lanes stay); null: nothing on the release. */
   retarget: RetargetPreview | null
+  /**
+   * HI-3128: under follow mode, the new branch is made here only and tracks no remote branch: the remote Combwork can name
+   * for it (`from`'s, else the only one; null: none), and whether follow mode can use it (`unusable`: several push
+   * addresses, or a shallow clone). The window renders the commands for the name typed (upstreamCommands).
+   */
+  upstream?: { kind: 'ready' | 'choose' | 'unusable'; remote: string | null; why?: 'ambiguous' | 'shallow' }
 }
 
 /** HI-2807: what Start the next version did. */
@@ -1729,7 +1758,7 @@ export interface RetargetPreview {
    * as checked, and its own target then, which the apply expects); one that can't stays with why.
    */
   cards: { move: { number: number; key: string; title: string; started?: { head: string; own: string | null } }[]; keep: { number: number; key: string; title: string; why: RetargetCardKeep }[] }
-  slots: { move: { name: string; folder: string; target: string | null; head: string }[]; keep: { name: string; why: 'lent' | 'dirty' | 'busy' | 'unmerged' | 'cantCheck' }[] }
+  slots: { move: { name: string; folder: string; target: string | null; head: string }[]; keep: { name: string; why: 'lent' | 'dirty' | 'busy' | 'unmerged' | 'cantCheck' | 'kept' }[] }
   /** Running lanes on `from` that stay, with why (none given: more than one card of it in flight). */
   lanes: { id: string; name: string | null; builder: string; why?: RetargetCardKeep }[]
   /** HI-2753: running lanes on `from` that move to `to`, each with its card in flight (moved with it in one write), if any. */
@@ -1737,7 +1766,7 @@ export interface RetargetPreview {
 }
 
 /** Why a card stays on the old target in a retarget (HI-2680, HI-2753): its own work, or why its move in flight can't be made. */
-export type RetargetCardKeep = 'work' | 'started' | 'cantCheck' | 'queued' | 'notInTarget' | 'reviewed' | 'noLine'
+export type RetargetCardKeep = 'work' | 'started' | 'cantCheck' | 'queued' | 'notInTarget' | 'reviewed' | 'noLine' | 'refused' | 'line' | 'kept' | 'lane'
 
 /** What a retarget did (HI-2680): each item moved, or skipped with why (never all or nothing). */
 export interface RetargetResult {
@@ -1745,7 +1774,7 @@ export interface RetargetResult {
   to: string
   moved: { cards: { number: number; key: string }[]; slots: string[]; lanes?: string[] }
   /** A card's (`card`, `key`) or a slot's (`slot`), with why it didn't move. */
-  skipped: { card?: number; key?: string; slot?: string; lane?: string; why: 'targetChanged' | 'refused' | 'changed' | 'busy' | 'dirty' | 'moved' | 'unmerged' | 'cantCheck' | 'gone' | 'setAside' | 'failed'; detail?: string }[]
+  skipped: { card?: number; key?: string; slot?: string; lane?: string; why: 'targetChanged' | 'refused' | 'changed' | 'busy' | 'dirty' | 'moved' | 'unmerged' | 'cantCheck' | 'gone' | 'setAside' | 'failed' | 'fixed'; detail?: string }[]
 }
 
 export interface KeptTargets {
@@ -1769,6 +1798,8 @@ export interface PlatformSwitchCheck {
   gitFolder: boolean
   /** A card in flight goes through Combwork's merge queue (its ruleset's): the queue carries on, and stays shown. */
   queue: boolean
+  /** A switch between Git and jj (HI-2799): the repository's projects switch together, after a drain. */
+  store?: StoreSwitch
 }
 
 /** A project's Session tab as this user left it (AppConfig.ui.projectViews, HI-1749): ProjectConfig's view fields. */
@@ -1910,6 +1941,30 @@ export interface ProjectConfig {
   loopStepWaitMinutes?: number | null
 }
 
+/**
+ * HI-3134: a stale jj slot's recovery refused `divergent`: the commit its folder holds (`folder`) is still in jj beside
+ * the commit jj's latest operation gives the slot (`head`); `same`: one change, divergent. Full commit ids.
+ */
+export interface SlotRecoverDivergent {
+  folder: string
+  head: string
+  same: boolean
+}
+
+/**
+ * What a stale jj slot's recovery did (HI-2996, the window's Recover…): how many files it put back as they were, each copy
+ * it wrote beside a file that changed meanwhile (relative to the slot, with `/`), the files deleted there that it kept
+ * (changed or back meanwhile), and the commit jj made of the folder that it kept (divergent), if any.
+ */
+export interface SlotRecovery {
+  restored: number
+  copies: { path: string; copy: string }[]
+  /** Files it moved aside and left there, the version before the recovery: their path was created again meanwhile. */
+  asides: { path: string; copy: string }[]
+  keptDeleted: string[]
+  divergent: string | null
+}
+
 /** One of a project's slots as the window reads it (#1429, slots.ts): its state and its open lease, if any. */
 export interface SlotView {
   name: string
@@ -1925,6 +1980,26 @@ export interface SlotView {
    * frees it.
    */
   writer: { agent: string; lease: string; held: boolean } | null
+  /**
+   * HI-2869: the platform that made it, when its workspaces are its own commands' records (jj's; HI-3140: `ownedWorkspaces`),
+   * and, for such a slot, stale (another workspace rewrote it).
+   */
+  platform?: PlatformId
+  stale?: true
+  /** HI-3135: a stale jj slot whose checkout's operation the user's `jj op abandon` discarded (absent: another workspace rewrote it). */
+  staleWhy?: 'abandoned'
+  /** HI-2995: a jj slot kept for a card put back with committed work not in its target yet: that card's number. */
+  keptFor?: number
+  /** HI-3143: kept for that card's uncommitted edit (or files jj doesn't track), not commits. */
+  keptEdit?: true
+  /**
+   * HI-3032: a kept slot whose folder is gone (state `gone`): the generation it was kept at (Remove… sends it back, so only
+   * that slot is removed) and its work's last commit, as recorded when its card's lease ended (null: none recorded).
+   * HI-3097 `forgotten`: its folder is there, jj no longer listing its workspace (forgotten outside Combwork).
+   */
+  keptGone?: { generation: string; commit: string | null; forgotten?: true }
+  /** HI-3103: kept for no card, its workspace forgotten outside Combwork, its folder there: its generation, for Remove…. */
+  forgotten?: { generation: string }
 }
 
 /** A slot's writer as Release Slot… shows it (#1506, agentFolders.ts heldWriter). */
@@ -1958,11 +2033,22 @@ export interface CopyView {
 /** What a test copy asks of a project's slot pool (`slots:test`, unpackaged builds only: #1429's e2e). */
 export type SlotTestOp = { op: 'lend'; agent: string; card?: number; lane?: string; slot?: string } | { op: 'release'; lease: string; why?: string } | { op: 'tidy'; at?: number } | { op: 'remove'; slot: string } | { op: 'carry'; agent: string; slot: string; folder: string } | { op: 'homes'; folders: string[] } | { op: 'writer'; slot: string; agent: string; run: string; pid: number; started: number } | { op: 'quit'; agent: string }
 
+/** HI-1182: what a project folder uses of submodules and Git LFS (Version Control → Slots and copies), and git-lfs's version line (null: not installed, or LFS unused). */
+export interface GitFilesStatus {
+  submodules: number
+  lfs: boolean
+  lfsVersion: string | null
+  /** Whether an LFS filter is configured (git lfs install); without one, LFS files stay pointers. */
+  lfsFilter: boolean
+}
+
 /** A project's slot options as project.json keeps them (ProjectConfig.slots): each left out falls back (slots.ts). */
 export interface SlotOptions {
   setup?: string
   archive?: string
   copy?: string
+  /** HI-1182: false turns off setting up submodules and Git LFS in slots and copies (left out: on, where either is used). */
+  gitFiles?: boolean
 }
 
 export interface ProjectProviderConfig {
@@ -2361,6 +2447,8 @@ export interface MergeResult {
   /** After a squash merge, the agent's branch was moved to the merged branch; or why it wasn't. */
   branchMoved?: boolean
   moveError?: string
+  /** Merged, with something to say after (HI-3030: its temporary folder couldn't be removed), in the user's language. */
+  note?: string
 }
 
 /**
@@ -3529,10 +3617,12 @@ export interface CleanupOptions {
   archivedBackupsDays: number | null
   /** Backups of archived sessions the CLI no longer has: the session is deleted (its usage still counts). */
   goneBackups: boolean
+  /** Launch folders of removed agents (HI-3144: `.combwork/launch-<id>`). */
+  launchFolders?: boolean
 }
 
 export interface CleanupItem {
-  kind: 'archived-attachments' | 'orphan-attachments' | 'archived-backup' | 'gone-backup'
+  kind: 'archived-attachments' | 'orphan-attachments' | 'archived-backup' | 'gone-backup' | 'launch-folder'
   path: string
   bytes: number
   sessionId?: string
@@ -3764,6 +3854,8 @@ export interface GitDiff {
   original: string
   modified: string
   binary: boolean
+  /** HI-2864: either side is a submodule (mode 160000). Its sides are git's own `Subproject commit` lines; a file's or link's side is its content. */
+  gitlink?: GitlinkChange
 }
 
 /** A recent workspace as a window sees it (File → Open Recent, the welcome page; #144). */
@@ -3938,6 +4030,50 @@ export interface FileGitDone {
   lines: string[]
   count: number
   branch: string | null
+}
+
+/** HI-2944: what is done with a folder's uncommitted changes: committed there, or set aside (a named git stash). */
+export type FolderChangeAction = 'commit' | 'setAside'
+
+/** HI-2944: a folder's changes committed or set aside. */
+export interface FolderChangesDone {
+  action: FolderChangeAction
+  /** The folder, as git lists it. */
+  folder: string
+  /** Its branch then. */
+  branch: string
+  /** The paths acted on (a rename's both). */
+  files: string[]
+  /** The commit's or the stash's message (the stash is found by it in `git stash list`). */
+  message: string
+  /** The commit made, or the stash's object (`git stash list` shows it). */
+  made: string
+  /**
+   * HI-3059: made, but its paths' entries weren't all taken into the real index afterwards (that step failed, or another
+   * git staged one of them meanwhile and its staging was kept): what the user should check. The commit or stash stands.
+   */
+  warning?: Text
+}
+
+/** HI-2944: a target's folder with uncommitted changes, as a start finds it (warned of, never refused). */
+export interface TargetChanges {
+  target: string
+  folder: string
+  /** Every path git reports changed there, untracked ones too. */
+  files: string[]
+}
+
+/** HI-2944: the queue's pause a Commit or Set aside acts on, as the window showed it. */
+export interface QueuePauseRef {
+  card: string
+  reason: string
+  at: string
+}
+
+/** HI-2944: Commit or Set aside from a paused merge: done, and whether the queue goes on (the pause then, if not). */
+export interface QueueChangesSettled {
+  done: FolderChangesDone
+  resumed: boolean
 }
 
 /** A file opened in the Files tab editor. */
@@ -4212,7 +4348,7 @@ export type CombworkEvent =
   /** The workspace's task board changed (its path names the window). */
   | { type: 'tasks-changed'; workspacePath: string }
   /** Quitting needs the user's decision: the renderer shows the quit dialog and answers with app:quitDecision. */
-  | { type: 'quit-request'; sessions: QuitSession[]; unsaved: string[]; /** Anything but 'app' stops only this window's workspace's sessions. */ scope?: QuitScope }
+  | { type: 'quit-request'; sessions: QuitSession[]; unsaved: string[]; /** Anything but 'app' stops only this window's workspace's sessions. */ scope?: QuitScope; /** HI-3167: the update it offers to install now. */ update?: QuitUpdate }
   /** Combwork is waiting for working agents to finish before quitting (or stopped waiting). */
   | { type: 'quit-pending'; pending: boolean; working: number }
   /** This window's close command (HI-1368): the panel shows it while it runs or failed; null: none (the panel goes). */
@@ -4265,6 +4401,8 @@ export type CombworkEvent =
   | { type: 'queue-changed'; workspacePath: string; projectPath: string; target: string }
   /** A project's workflow (project.json's `workflow`: its options, preset, stage names) was written (#1417): views read its stages again. */
   | { type: 'workflow-changed'; workspacePath: string; projectPath: string }
+  /** HI-3155: a project's release offer appeared, changed, went or was put off: read them again (workflow:releaseOffers). */
+  | { type: 'release-offers'; workspacePath: string; projectPath: string }
   /** Busy agents whose tools a workflow change changes (HI-2694): the window asks whether to restart them when their turn is over. */
   | { type: 'tools-restart-asked'; workspacePath: string; projectPath: string; agents: { id: string; name: string }[] }
   /** A lane ended with every card Done (#1270): once, with what each card brought in (its Integrated result; null: none). */
@@ -4307,6 +4445,11 @@ export interface LaneCard {
    * builder has it, else the newest). Its lane shows it but never takes it, waits on it or keys a queued list change to it.
    */
   elsewhere?: string
+  /**
+   * HI-3118: held elsewhere because it is given to another agent than the lane's builder (not merely listed by a newer
+   * lane): the lane has given it up, so it doesn't keep the lane from ending (allDone).
+   */
+  givenAway?: true
 }
 
 export interface LaneInfo {
@@ -4342,6 +4485,8 @@ export interface LaneInfo {
   status: LaneStatus | null
   /** A list change made while a card was in flight, applied at the next card boundary (#1270); null: none. */
   queued: number[] | null
+  /** Its list's revision (HI-2898, LaneRecord.listRev): what a window edit of its list names, refused once it moved. */
+  listRev: number
   /**
    * Old rules (#1421, §16.5.4): a running lane whose recorded ruleset isn't its project's current one, so it keeps the
    * options from before a change until it ends. Never on an ended lane, nor one with none recorded (from before 1.0).
@@ -4404,6 +4549,63 @@ export interface LaneSlotInfo {
   since: string
 }
 
+/** A running lane as a window edit of its list saw it (HI-2898): its id and its list's revision (LaneInfo.listRev). */
+export interface LaneSeen {
+  lane: string
+  rev: number
+}
+
+/**
+ * A window edit of a running lane's list (HI-2898, Progress → Lanes): each names the revision it was made on, and is
+ * refused once that moved. `to` and `at` are places in the lane's working list (its queued list when it has one): `to`
+ * where the card ends up, `at` before which card it goes (none: last).
+ */
+export type LaneEdit =
+  | ({ op: 'move'; card: number; to: number } & LaneSeen)
+  | ({ op: 'add'; card: number; at?: number } & LaneSeen)
+  | ({ op: 'remove'; card: number } & LaneSeen)
+  | ({ op: 'cancel' } & LaneSeen)
+  | { op: 'transfer'; card: number; from: LaneSeen; to: LaneSeen; at?: number }
+  | { op: 'undo'; undo: LaneEditUndo }
+
+/** A lane's list as an edit left it or found it: its cards, its queued list (null: none) and their revision. */
+export interface LaneListState {
+  lane: string
+  cards: number[]
+  pending: number[] | null
+  rev: number
+}
+
+/**
+ * What undoing a window edit of lanes needs (HI-2898): each lane's list before it and the revision the edit left it at,
+ * the card's agent before and after when the edit changed it, with the card's history entry the edit left (its token:
+ * any change of the card since moves it on), and the cards it would bring back. Undone whole or not at all.
+ */
+export interface LaneEditUndo {
+  lanes: { before: Omit<LaneListState, 'rev'>; rev: number }[]
+  card: { number: number; before: string | null; after: string | null; head: string | null } | null
+  /**
+   * Each card the undo would bring back onto a lane (one the edit took off, or Move here's), as the edit left it: its last
+   * history entry, and whether it kept work from an earlier start then. The undo is refused once one of them changed
+   * since (started, given to an agent, moved), or gained such work (HR1's round 1).
+   */
+  back: { number: number; head: string | null; work: boolean }[]
+}
+
+/** What a window edit of lanes did (HI-2898): for its notification, and its Undo (null: nothing to undo). */
+export interface LaneEditResult {
+  op: LaneEdit['op']
+  card: number | null
+  /**
+   * Each lane it changed, with the card in flight its change was queued after (null: applied now), and the revision its
+   * list is at after this edit (HI-2932: the window names it in its next quick edit).
+   */
+  lanes: { lane: string; queuedAfter: number | null; rev: number }[]
+  undo: LaneEditUndo | null
+  /** Cancel Change (HI-3062): the cards its queued change took off that couldn't come back now, left where they are. */
+  leftOut?: number[]
+}
+
 /** Start lane… from the window (#1280): who builds and reviews, the cards in order, the user's note and a name. */
 export interface LaneStartRequest {
   builder: string
@@ -4417,6 +4619,30 @@ export interface LaneStartRequest {
   applyNow?: boolean
   /** Its Merges into (HI-2556): one of LaneStartInfo.targets' others; null or absent, the project's own. */
   target?: string | null
+  /** HI-3148: the user's Start Anyway for a lane on a released line (a hotfix lane): the line as the window named it, and why. */
+  released?: { target: string; reason: string }
+}
+
+/**
+ * HI-3155: a project's release offer (its For you item, not a card's). Either part may be absent, never both. `basis` is
+ * Work merges into and Other branches work can merge into as the offer read them: every action on it is checked against
+ * them, and refused once they moved.
+ */
+export interface ReleaseOffer {
+  id: string
+  project: string
+  projectPath: string
+  basis: { target: string; otherTargets: string[] }
+  move: ReleaseOfferPart['move']
+  cleanup: ReleaseOfferPart['cleanup']
+  since: string
+}
+
+export interface ReleaseOfferPart {
+  /** Work merges into is released: the tag, where it went, the tag's own date (annotated only), and where to go next. */
+  move: { target: string; tag: string; into: string; date: string | null; moveTo: string | null; startNext: string | null } | null
+  /** Other branches work can merge into that are released: those nothing uses (`drop`), and those still used (`kept`). */
+  cleanup: { drop: { branch: string; tag: string }[]; kept: { branch: string; tag: string; uses: string[] }[] } | null
 }
 
 /**
@@ -4426,8 +4652,15 @@ export interface LaneStartRequest {
 export interface LaneStartInfo {
   pool: { id: string; name: string }[] | null
   /** The branches its Merges into offers (HI-2556): the project's Work merges into and the others it lists; null: none to pick. */
-  targets: { default: string; others: string[] } | null
+  /** HI-3129: `fixedInFlight`, a card in flight keeps its target (its platform can't move started work). */
+  targets: { default: string; others: string[]; othersUnread?: true; fixedInFlight?: true } | null
 }
+
+/**
+ * HI-3129: where a card waiting to start would start when that isn't the Merges into its dialog shows (main's
+ * `tasks.keptTarget`): its kept work's branch or bookmark, or `unknown` when that can't be read; null: where it shows.
+ */
+export type KeptTargetShown = { target: string } | { unknown: true } | null
 
 /** What Start lane… did: the lane recorded, and how each agent started (failed: the lane stays, why said). */
 export interface LaneStartResult {
@@ -4463,7 +4696,9 @@ export interface LaneStatus {
   /** preparing (#1446): the slot being prepared; slot (HI-2466), and startWait `refused` (HI-2468): the free slot it was refused as held. */
   slot?: string
   /** slot (HI-2466), and startWait `refused` (HI-2468): what holds that free slot, a session or a process (a file or folder in it open); Combwork tries again until it is free. */
-  held?: 'session' | 'process' | 'broker' | 'left' | 'lastRun'
+  held?: 'session' | 'process' | 'broker' | 'left' | 'lastRun' | 'card'
+  /** slot, held `card` (HI-3168): the card whose lease holds the slot (`agent` builds it there; Done or put back frees it). */
+  heldFor?: number
   /** startWait `refused`, held `left` (HI-2468): the first program by name that `heldBy`'s last run left running in the slot. */
   program?: string
   /** held `left` (HI-2468): how many more it left running beyond `program`. */
@@ -4615,6 +4850,8 @@ export interface ProgressRun {
    * it, and it can be stopped from the panel: its processes are in the copy's job).
    */
   copy?: string
+  /** HI-2938: Combwork's own run in a check copy whose processes are its lease's job (a jj candidate's check): Stop ends them. */
+  stoppable?: boolean
 }
 
 /**

@@ -8,6 +8,7 @@ import { parseDocRef } from '../shared/docRefs'
 import { docOutline, findHeading, sectionText } from '../shared/docSections'
 import type { ContextProblem } from '../shared/types'
 import { CW_DIR } from '../shared/defaults'
+import { METADATA_DIRS } from '../shared/platform/metadataDirs'
 
 /** A shared note's reference starts with this: `shared:plans/i18n.md`. */
 export const SHARED_PREFIX = 'shared:'
@@ -20,12 +21,12 @@ export type DocRead = { ok: true; text: string } | { ok: false; code: 'outside' 
 
 const MARKDOWN = /\.(md|markdown|mdx)$/i
 
-/** Whether a path inside the folder goes into Combwork's own `.combwork` or git's `.git`. */
-const hidden = (inside: string): boolean => inside.split(/[\\/]/).some((part) => part.toLowerCase() === CW_DIR || part.toLowerCase() === '.git')
+/** Whether a path inside the folder goes into Combwork's own `.combwork` or a platform's own folder (`.git`, jj's `.jj`: HI-2800). */
+const hidden = (inside: string): boolean => inside.split(/[\\/]/).some((part) => part.toLowerCase() === CW_DIR || METADATA_DIRS.includes(part.toLowerCase()))
 
 /**
  * Reads a document: `path` relative to `root` (a project's folder, or the shared notes' folder for `shared:` paths).
- * A path outside it, into `.combwork` or `.git`, or not Markdown is refused before anything is read.
+ * A path outside it, into `.combwork`, `.git` or `.jj`, or not Markdown is refused before anything is read.
  */
 export async function readDoc(root: string, path: string): Promise<DocRead> {
   const rel = path.replace(/\\/g, '/').replace(/^\.\//, '')

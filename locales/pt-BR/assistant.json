@@ -1,5 +1,7 @@
 {
-  "assistant.banner.connectionSetup": "Nenhuma conta do {cli} está ativada neste espaço de trabalho, então o Assistente não pode ser iniciado. Adicione uma e faça login nela.",
+  "assistant.banner.noAccountAny": "Nenhuma conta está ativada neste espaço de trabalho, então o Assistente não pode ser iniciado. Adicione uma para qualquer agente de programação compatível com o Combwork e faça login nela: o Assistente usa a primeira na sua ordem de contas.",
+  "assistant.banner.noAccountFor": "{others, select, yes {O Assistente usa o {cli}, e nenhuma conta do {cli} está ativada neste espaço de trabalho, então ele não pode ser iniciado. Adicione uma ou escolha a conta de outro agente de programação nas configurações do Assistente.} other {O Assistente usa o {cli}, e nenhuma conta do {cli} está ativada neste espaço de trabalho, então ele não pode ser iniciado. Adicione uma e faça login nela.}}",
+  "assistant.banner.signedOut": "{name}, a conta do {cli} do Assistente, está desconectada, então o Assistente não pode ser iniciado. Faça login nela de novo em Configurações → Contas e conexões.",
   "assistant.chooseConnections.agent": "Agente",
   "assistant.chooseConnections.next": "Depois",
   "assistant.chooseConnections.now": "Agora",
@@ -724,6 +726,7 @@
   "assistant.undo.why.context": "As seções de documentos para ler primeiro ficam como foram definidas.",
   "assistant.undo.why.decision": "Uma decisão que ele registrou fica: só você altera ou remove decisões.",
   "assistant.undo.why.declarePaths": "Os caminhos que ele declarou ficam com o cartão.",
+  "assistant.undo.why.forwardResolved": "Um merge de atualização que ele entregou a um executor continua encerrado, e o cartão criado para o executor continua: ponha esse cartão em espera ou remova-o se ele não for desejado.",
   "assistant.undo.why.freshRetried": "Desfazer não interrompe a conversa nova de um agente da raia que foi tentada de novo: encerre a raia se ela não for desejada.",
   "assistant.undo.why.handOver": "Uma passagem de trabalho não pode ser desfeita: o trabalho foi para o outro agente.",
   "assistant.undo.why.laneEnded": "Uma raia encerrada continua encerrada: inicie-a de novo se ela deve continuar.",

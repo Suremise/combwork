@@ -15,7 +15,7 @@ import type { BranchAt, BranchUpdateHow, PushScope } from '../../shared/gitRepo'
 import type { GitInitCheck, GitInitOptions } from '../../shared/gitInit'
 import type { IgnoreTarget } from '../../shared/gitIgnoreRules'
 import type { BranchStart, ResolvedStart } from '../../shared/nextVersion'
-import type { FileGitDone, MergeResult } from '../../shared/types'
+import type { FileGitDone, FolderChangeAction, FolderChangesDone, MergeResult } from '../../shared/types'
 import type { Operation } from '../../shared/platform/descriptors'
 
 /**
@@ -43,6 +43,7 @@ export interface OpMembers {
   setIdentity: 'setIdentity'
   init: 'initCheck' | 'init'
   ignoreRules: 'exclude' | 'untrack' | 'include'
+  folderChanges: 'settleChanges' | 'commitIgnore'
 }
 
 /** The port as handed out for one operation: its own members only. */
@@ -92,4 +93,14 @@ export interface RepoOps {
   exclude(projectPath: string, items: unknown, target: IgnoreTarget, ext: boolean): Promise<FileGitDone>
   untrack(projectPath: string, items: unknown): Promise<FileGitDone>
   include(projectPath: string, items: unknown): Promise<FileGitDone>
+  // A folder's uncommitted changes (HI-2944).
+  /**
+   * Commits or sets aside exactly `shown`, the changes in the folder `target` is checked out in (found here, never given),
+   * under the repository lock and that folder's fence, only while that is still `seen` (the folder the user was shown the
+   * changes in: a pause's, or a start's warning's); `guard` runs there before anything is touched and refuses by throwing
+   * (the caller's own condition: the queue's pause still the one acted on).
+   */
+  settleChanges(projectPath: string, target: string, seen: string, action: FolderChangeAction, shown: string[], label: string, guard?: () => void): Promise<FolderChangesDone>
+  /** Files' Commit it: the project folder's top .gitignore, as it is now, committed alone. */
+  commitIgnore(projectPath: string): Promise<FolderChangesDone>
 }

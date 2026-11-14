@@ -12,6 +12,8 @@ import { placeholderMirror } from './mirror'
 import { serverInfoPath } from './launcher'
 
 const log = createLogger('opencodeHistory')
+/** The longest a shutdown's reply is waited for before its worker is ended: its exports' trees ended (endTreeAsync's two bounded runs). */
+const SHUTDOWN_MS = 25_000
 
 // The OpenCode history's main side (HI-2762, design s7/s10/s13). Main never reads a session itself: it tells the worker
 // (historyCore, in opencodeHistoryWorker.ts) what runs, which server each has, when to read, and when a run ended, and
@@ -123,7 +125,8 @@ class HistoryThread {
   async stop(): Promise<void> {
     const w = this.worker
     if (w) {
-      await this.ask({ type: 'shutdown' }, 2000).catch(() => undefined)
+      // Bounded by its exports' teardowns (HI-3009: PowerShell lists and ends each tree, each run bounded at 10 s).
+      await this.ask({ type: 'shutdown' }, SHUTDOWN_MS).catch(() => undefined)
       this.worker = null
       await w.terminate().catch(() => undefined)
     } else if (this.inProcess) await this.ask({ type: 'shutdown' }).catch(() => undefined)

@@ -8,6 +8,7 @@ import { B1, B2, commit, moved, R1, R2, refusedBy, setup, sh, type Env } from '.
 import { tempDir } from './tempDir'
 import { boardFile } from '../src/main/boardStore'
 import { attributeFolder } from '../src/main/workflow/reconcile'
+import { lineName } from '../src/main/workflow/runtime'
 import { compile, loadRuleset } from '../src/shared/workflow/compile'
 import { agentActor } from '../src/shared/workflow/facts'
 import { allOff, contradictions, preset, reviewerModeOf, takesOption, type WorkflowOptions } from '../src/shared/workflow/options'
@@ -193,11 +194,14 @@ function withBoundary(e: Env, before: () => void | Promise<void>): unknown {
   return wf
 }
 
-/** A card built by `by` and submitted: in a slot of its own (G11 = slots), or with a trailer in the project folder. */
+/**
+ * A card built by `by` and submitted: in a slot of its own (G11 = slots), on the card's own line (a submission off it is
+ * refused, HI-3010), or with a trailer in the project folder.
+ */
 async function submitted(e: Env, card: { id: number; key: string; title: string }, by = B1): Promise<void> {
   if (e.options.folder === 'slots') {
     const slot = join(tempDir('slot-'), 'slot')
-    sh(e.project, 'worktree', 'add', '-q', '-b', `cw/am/am-${card.id}`, slot, 'main')
+    sh(e.project, 'worktree', 'add', '-q', '-b', lineName('AM', card), slot, 'main')
     e.wf.cfg.slotFor = async () => ({ slot: 'slot', folder: slot, lease: `l-${card.id}`, fresh: true })
     moved(await e.wf.start(card.key, by))
     commit(slot, { [`${card.id}.txt`]: `${card.title}\n` }, card.title)

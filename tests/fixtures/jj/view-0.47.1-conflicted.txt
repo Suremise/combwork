@@ -1,0 +1,112 @@
+View {
+    head_ids: {
+        CommitId(
+            "aabc9f31134515612b4ce53163a32f54fe8b2221",
+        ),
+        CommitId(
+            "55f699fa8e3319dc9c2427dbf0f2d264e5e7ed3d",
+        ),
+    },
+    local_bookmarks: {
+        RefNameBuf(
+            "main",
+        ): Conflicted(
+            [
+                Some(
+                    CommitId(
+                        "0f80b7ab5caedd630c011bfa1fa49a53c02dad4a",
+                    ),
+                ),
+                Some(
+                    CommitId(
+                        "55f699fa8e3319dc9c2427dbf0f2d264e5e7ed3d",
+                    ),
+                ),
+                Some(
+                    CommitId(
+                        "8cb16c754bd75c206c9f7d87de5e19df256bd9d9",
+                    ),
+                ),
+            ],
+        ),
+    },
+    local_tags: {},
+    remote_views: {
+        RemoteNameBuf(
+            "git",
+        ): RemoteView {
+            bookmarks: {
+                RefNameBuf(
+                    "main",
+                ): RemoteRef {
+                    target: Resolved(
+                        Some(
+                            CommitId(
+                                "0f80b7ab5caedd630c011bfa1fa49a53c02dad4a",
+                            ),
+                        ),
+                    ),
+                    state: Tracked,
+                },
+            },
+            tags: {},
+        },
+        RemoteNameBuf(
+            "origin",
+        ): RemoteView {
+            bookmarks: {
+                RefNameBuf(
+                    "main",
+                ): RemoteRef {
+                    target: Resolved(
+                        Some(
+                            CommitId(
+                                "8cb16c754bd75c206c9f7d87de5e19df256bd9d9",
+                            ),
+                        ),
+                    ),
+                    state: Tracked,
+                },
+            },
+            tags: {},
+        },
+    },
+    git_refs: {
+        GitRefNameBuf(
+            "refs/heads/main",
+        ): Resolved(
+            Some(
+                CommitId(
+                    "0f80b7ab5caedd630c011bfa1fa49a53c02dad4a",
+                ),
+            ),
+        ),
+        GitRefNameBuf(
+            "refs/remotes/origin/main",
+        ): Resolved(
+            Some(
+                CommitId(
+                    "8cb16c754bd75c206c9f7d87de5e19df256bd9d9",
+                ),
+            ),
+        ),
+    },
+    git_heads: {
+        WorkspaceNameBuf(
+            "default",
+        ): Resolved(
+            Some(
+                CommitId(
+                    "0f80b7ab5caedd630c011bfa1fa49a53c02dad4a",
+                ),
+            ),
+        ),
+    },
+    wc_commit_ids: {
+        WorkspaceNameBuf(
+            "default",
+        ): CommitId(
+            "aabc9f31134515612b4ce53163a32f54fe8b2221",
+        ),
+    },
+}

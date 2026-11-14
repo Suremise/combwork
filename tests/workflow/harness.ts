@@ -2,6 +2,7 @@
 // store in a file of its own, and a Workflow over them, with wakes and notifications captured. Scenarios (SPEC §16.18)
 // drive it as agents and the user would, and read the facts.
 import { execFileSync } from 'child_process'
+import { createRequire } from 'module'
 import { cpSync, mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tempDir } from '../tempDir'
@@ -12,6 +13,7 @@ import { isRefusal, Workflow, type Reply, type WorkflowConfig } from '../../src/
 import { MergeQueue, type CheckResult, type QueueConfig } from '../../src/main/workflow/mergeQueue'
 import type { QueueLive } from '../../src/main/workflow/queueState'
 import { allOff, type WorkflowOptions } from '../../src/shared/workflow/options'
+import type { PlatformId } from '../../src/shared/platform/descriptors'
 import { agentActor, agentOf, type Actor, type FactKind } from '../../src/shared/workflow/facts'
 import type { Refusal } from '../../src/shared/workflow/refusals'
 import type { StoredText } from '../../src/shared/types'
@@ -23,6 +25,7 @@ export const R1 = agentActor('R1')
 export const R2 = agentActor('R2')
 
 const ID = ['-c', 'user.name=Combwork Test', '-c', 'user.email=test@example.invalid']
+const runContext = createRequire(import.meta.url)('../e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 
 /**
  * HI-2025 (Darren's decision): the bound of a merge-queue test whose work is 65 to 110 git processes (Combwork's own git per
@@ -46,12 +49,16 @@ export function put(dir: string, file: string, content: string): void {
   writeFileSync(p, content)
 }
 
-/** Writes files and commits them; the new commit's id. */
-export function commit(cwd: string, files: Record<string, string>, message: string, opts: { trailer?: string; email?: string } = {}): string {
+/**
+ * Writes files and commits them; the new commit's id. `at` (ms): the commit's and its reflog entry's time
+ * (GIT_COMMITTER_DATE), for a move that must fall in a later second than a lease's start (HI-3031).
+ */
+export function commit(cwd: string, files: Record<string, string>, message: string, opts: { trailer?: string; email?: string; at?: number } = {}): string {
   for (const [f, c] of Object.entries(files)) put(cwd, f, c)
   sh(cwd, 'add', '-A')
   const who = opts.email ? ['-c', `user.email=${opts.email}`] : []
-  execFileSync('git', [...ID, ...who, 'commit', '-q', '-m', message, ...(opts.trailer ? ['--trailer', `Combwork-Card: ${opts.trailer}`] : [])], { cwd, stdio: 'pipe' })
+  const env = opts.at === undefined ? {} : { env: { ...runContext.baseEnv(), GIT_COMMITTER_DATE: `@${Math.floor(opts.at / 1000)} +0000` } }
+  execFileSync('git', [...ID, ...who, 'commit', '-q', '-m', message, ...(opts.trailer ? ['--trailer', `Combwork-Card: ${opts.trailer}`] : [])], { cwd, stdio: 'pipe', ...env })
   return sh(cwd, 'rev-parse', 'HEAD')
 }
 
@@ -102,7 +109,7 @@ export interface Env {
 }
 
 /** A scenario's world: Git (a repository) or None (a folder), with these options. */
-export function setup(options: Partial<WorkflowOptions> & { platform: 'git' | 'none' }, extra: { runsOf?: (a: string) => string[]; autoRun?: boolean; files?: Record<string, string>; enforced?: () => boolean; queueLive?: (target: string) => QueueLive; checksSettled?: () => Promise<void>; focused?: WorkflowConfig['focused']; hooks?: WorkflowConfig['hooks']; reviewersPresent?: WorkflowConfig['reviewersPresent'] } = {}): Env {
+export function setup(options: Partial<WorkflowOptions> & { platform: PlatformId }, extra: { releaseGrant?: (lane: string) => string | null; runsOf?: (a: string) => string[]; autoRun?: boolean; files?: Record<string, string>; enforced?: () => boolean; queueLive?: (target: string) => QueueLive; checksSettled?: () => Promise<void>; focused?: WorkflowConfig['focused']; hooks?: WorkflowConfig['hooks']; reviewersPresent?: WorkflowConfig['reviewersPresent'] } = {}): Env {
   const home = tempDir('wf-')
   const project = join(home, 'project')
   if (options.platform === 'git') gitRepo(project)
@@ -134,6 +141,7 @@ export function setup(options: Partial<WorkflowOptions> & { platform: 'git' | 'n
       focused: extra.focused,
       hooks: extra.hooks,
       reviewersPresent: extra.reviewersPresent,
+      releaseGrant: extra.releaseGrant,
       // The P2 scenarios run the P4 runtime: reconciliation acts on what it observes (#1217: the app's P3 records only).
       reconcileActs: true,
       effects: { wake: (agent, card, why) => wakes.push({ agent, card: card.key, why }), notify: (card, text, shown) => notes.push({ card: card.key, text, ...(shown ? { shown } : {}) }) }

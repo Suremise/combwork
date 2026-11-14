@@ -85,6 +85,7 @@
     "=> {\"base\":\"release\",\"head\":\"feature\",\"basecommit\":\"<id>\",\"headcommit\":\"<id>\",\"mergebase\":\"<id>\",\"ahead\":1,\"behind\":3,\"aheadcommits\":[{\"hash\":\"<id>\",\"short\":\"<short>\",\"author\":\"combwork test\",\"email\":\"test@example.invalid\",\"date\":\"<time>\",\"refs\":[\"feature\"],\"subject\":\"feature work\"}],\"behindcommits\":[{\"hash\":\"<id>\",\"short\":\"<short>\",\"author\":\"combwork test\",\"email\":\"test@example.invalid\",\"date\":\"<time>\",\"refs\":[\"release\"],\"subject\":\"release work 3\"},{\"hash\":\"<id>\",\"short\":\"<short>\",\"author\":\"combwork test\",\"email\":\"test@example.invalid\",\"date\":\"<time>\",\"refs\":[],\"subject\":\"release work 2\"},{\"hash\":\"<id>\",\"short\":\"<short>\",\"author\":\"combwork test\",\"email\":\"test@example.invalid\",\"date\":\"<time>\",\"refs\":[],\"subject\":\"release work 1\"}],\"page\":1,\"pages\":1,\"files\":[{\"path\":\"f.txt\",\"status\":\"a\"}],\"filestotal\":1}"
   ],
   "compare diff: pinned": [
+    "<base>/ws/p :: --literal-pathspecs diff --raw -z --no-abbrev --no-renames --no-ext-diff <id> <id> -- f.txt",
     "<base>/ws/p :: cat-file -s <id>:f.txt",
     "<base>/ws/p :: cat-file -s <id>:f.txt",
     "<base>/ws/p :: cat-file blob <id>:f.txt",
@@ -110,6 +111,7 @@
     "!! there's no branch nope here any more."
   ],
   "compare diff: no such file": [
+    "<base>/ws/p :: --literal-pathspecs diff --raw -z --no-abbrev --no-renames --no-ext-diff <id> <id> -- nope.txt",
     "<base>/ws/p :: cat-file -s <id>:nope.txt",
     "<base>/ws/p :: cat-file -s <id>:nope.txt",
     "<base>/ws/p :: merge-base <id> <id>",

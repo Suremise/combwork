@@ -93,6 +93,8 @@ describe("the Agent API's and sessions' agent text (card 3b)", () => {
       expect(say(API.done.cancelledMessages, { agent: 'a', project: 'p', n, total: String(n) })).toBe(`Cancelled ${n === 1 ? 'the message' : `${n} messages`} waiting for a in p`)
       expect(say(API.done.freshRetried, { lane: 'L1', retried: n, total: String(n) })).toBe(`Lane L1: ${n} new conversation${n > 1 ? 's' : ''} tried again`)
       expect(say(API.done.connectionsChosen, { project: 'p', changed: '2', skipped: n, skippedTotal: String(n) })).toBe(`Chose connections in p: 2 agents changed, ${n} skipped`)
+      // HI-3151: HI-3126's commits of the local branch its remote lacks.
+      expect(say(API.done.forwardUpToDate, { from: 'dev', to: 'main', ahead: n, aheadTotal: String(n) })).toBe(`main has everything of dev already: nothing queued. ${n} commit${s} of the local dev ${n === 1 ? "isn't" : "aren't"} on its remote, so ${n === 1 ? 'it' : 'they'} ${n === 1 ? "wasn't" : "weren't"} brought in: publish ${n === 1 ? 'it' : 'them'} first if ${n === 1 ? 'it' : 'they'} should be`)
       expect(say(API.agent.promptBackground, { agent: 'a', tasks: n, total: String(n) })).toMatch(new RegExp(`^a is waiting on ${n} background task${s} it started`))
     }
   })

@@ -394,7 +394,7 @@ export function assistantHasSetup(cli: ProviderId, inp: LegacyInputs): boolean {
  * it resolved to ("<account> · Assistant" where it differs from the base); the active one's is its agent's. Null when
  * it was migrated already.
  */
-export function migrateAssistant(raw: ProjectConfig, inp: LegacyInputs, store: AccountStore, at: string): ProjectConfig | null {
+export function migrateAssistant(raw: ProjectConfig, inp: LegacyInputs, store: AccountStore, at: string, opts: { ran?: boolean } = {}): ProjectConfig | null {
   if (raw.migrations?.accounts1) return null
   const pc = assistantProjectConfig(raw, inp.settings as AppSettings)
   const agent = projectAgents(pc)[0] ?? { id: ASSISTANT_AGENT_ID, name: '' }
@@ -410,10 +410,43 @@ export function migrateAssistant(raw: ProjectConfig, inp: LegacyInputs, store: A
     placed = r.agent
     if (!r.connection) unplaced[agent.id] = r.values
   }
+  // HI-2899: it never ran (`ran` false: no session of its), nothing named its CLI and no account to place it on (a new
+  // workspace's): it names none, so it runs the first usable account's (decision A), never Automatic's pick (Claude Code
+  // on a fresh install) pinned for good. One that ran keeps the CLI it ran on (HI-2139), as before.
+  if (opts.ran === false && !made[active] && !assistantNamedCli(projectAgents(raw)[0], inp)) {
+    placed = withoutOwn({ ...agent, provider: undefined })
+    delete unplaced[agent.id]
+  }
   const record: ProjectAccountsMigration = { at, assistant: made, ...(Object.keys(unplaced).length ? { unplaced } : {}) }
   const { providers: _p, defaultProvider: _d, ...rest } = raw
   // Its agent keeps what it had besides (its mode, its id).
   return { ...(rest as ProjectConfig), agents: [{ ...placed, id: ASSISTANT_AGENT_ID }], migrations: { ...raw.migrations, accounts1: record } }
+}
+
+/**
+ * Whether anything named the Assistant's CLI before connections (HI-2899): its own agent (`raw`: as kept), Settings →
+ * Assistant's provider or the default provider (neither Automatic), or a setup of its for any CLI (assistantHasSetup).
+ */
+export function assistantNamedCli(raw: Pick<AgentDef, 'provider'> | undefined, inp: LegacyInputs): boolean {
+  const real = (p: string | undefined): boolean => !!p && p !== 'inherit' && p !== AUTO_PROVIDER
+  return !!raw?.provider || real(inp.settings.assistant?.provider) || real(inp.settings.defaultProvider) || PROVIDERS.some((p) => assistantHasSetup(p.id, inp))
+}
+
+/**
+ * HI-2899's repair of a home migrated before it: an Assistant the migration pinned to Automatic's pick though it never ran
+ * (`ran` false) and nothing named its CLI (no connection, its values still waiting to be placed, assistantNamedCli false
+ * for its settings) names none
+ * again, so its launch takes the first usable account's (decision A). The patch, or null when there's nothing to repair.
+ * The agent's own provider can't tell a pin from a choice, so only the settings are asked; a choice made since in its
+ * settings gives it a connection, which this never touches.
+ */
+export function unpinAssistant(cfg: ProjectConfig, inp: LegacyInputs, ran: boolean): Pick<ProjectConfig, 'agents' | 'migrations'> | null {
+  const record = cfg.migrations?.accounts1
+  const agent = projectAgents(cfg)[0]
+  if (ran || !record || !agent?.provider || agent.connection || !record.unplaced?.[agent.id] || assistantNamedCli(undefined, inp)) return null
+  const { [agent.id]: _gone, ...left } = record.unplaced
+  const { unplaced: _u, ...rest } = record
+  return { agents: [{ ...withoutOwn(agent), provider: undefined }], migrations: { ...cfg.migrations, accounts1: { ...rest, ...(Object.keys(left).length ? { unplaced: left } : {}) } } }
 }
 
 /** A workspace.json without its own launch sources (HI-2106): the Assistant's old choices, and each provider's stored default. */

@@ -6,6 +6,8 @@ import type { ForYouItem } from '@shared/workflow/workView'
 import { call } from './api'
 import { useForYou } from './forYou'
 import { NO_PROJECTS, agentsOnScreen, findProject, get, projectKey, revealAgent, set, setAssistantOpen, showVersionControl, showView, useStore } from './store'
+import type { ReleaseOffer } from '@shared/types'
+import { useReleaseOffers } from './releaseOffers'
 
 /** The window's attention inbox (shared/inbox.ts): agents that need you, and worktree agents with work to review. */
 export function useInbox(): Inbox {
@@ -21,15 +23,17 @@ export function useInbox(): Inbox {
  * stopped in their panes (a prompt, a sign-in, a question, an error, a failed start); finished agents are apart. Counted
  * as things (HI-1931, `needYou`): each card with requests once, each agent once, one on a counted card under it.
  */
-export function useNeedsYou(): Inbox & { requests: ForYouItem[]; grouped: NeedYou; count: number } {
+export function useNeedsYou(): Inbox & { requests: ForYouItem[]; grouped: NeedYou; count: number; offers: ReleaseOffer[] } {
   const box = useInbox()
   const requests = useForYou().summary.items
   const tasks = useStore((s) => s.tasks)
+  // HI-3155: the projects' release offers, For you items of their own (not a card's), counted with the rest.
+  const offers = useReleaseOffers()
   return useMemo(() => {
     const cardsOf = (a: InboxItem): number[] => [...agentDoingCards(tasks, a.projectName, a.agentId), ...agentReviewCards(tasks, a.projectName, a.agentId)].map((c) => c.number)
     const grouped = needYou(requests, box.needYou, cardsOf)
-    return { ...box, requests, grouped, count: grouped.count }
-  }, [box, requests, tasks])
+    return { ...box, requests, grouped, offers, count: grouped.count + offers.length }
+  }, [box, requests, tasks, offers])
 }
 
 /** Opens a card's request (For you) in its dialog. */

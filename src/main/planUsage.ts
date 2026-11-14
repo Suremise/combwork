@@ -29,10 +29,10 @@ const resetPassed = (l: Pick<PlanLimit, 'resetsAt'>, now: number): boolean => !!
 
 /**
  * One limit's reading, given the one kept and a new report (#383, from what the CLIs were seen to send: a session reports
- * its own latest API call's reading, so another's can be older). Usage never goes down within a reset period, so:
- * the new reading when none is kept or the kept one's period is over; nothing from a period already over (a resumed
- * rollout's); the later period's when they differ; within one period the higher, as reported, with the later reset time
- * (they wobble by seconds). With no reset time to tell periods apart, the latest report, as before.
+ * its own latest API call's reading, so another's can be older). Usage goes down within a reset period only when the plan's
+ * usage is reset (HI-3181), so: the new reading when none is kept or the kept one's period is over; nothing from a period
+ * already over (a resumed rollout's); the later period's when they differ; within one period the newer where the reports
+ * tell, else the higher, as reported, with the later reset time (they wobble by seconds). With no reset time to tell periods apart, the latest report, as before.
  * What the plan allows changing (HI-2734: unlimited now or no longer, another entitlement) makes the two readings
  * incomparable: the one reported later is what it is now, whatever its figure, and never a mix of the two.
  */
@@ -45,19 +45,82 @@ function mergeLimit(kept: PlanLimit | undefined, next: PlanLimit, now: number): 
   return seen(mergeSame(kept, next), kept, next)
 }
 
-/** Two readings of the same allowance (#383): the later period's, else the higher share, said as the latest report said it. */
+/**
+ * Which of two readings of one period was taken later, where their sessions' reports tell (HI-3181): one taken after the
+ * other's session had already reported it, or after its own run launched (HI-3187: a run launched since the other was
+ * taken, its first report included). Null when they can't be ordered. A reading kept from before HI-3181 was taken at or
+ * before its report.
+ */
+function newer(kept: PlanLimit, next: PlanLimit): 'kept' | 'next' | null {
+  const takenBy = (l: PlanLimit): string | undefined => l.firstSeenAt ?? l.reportedAt
+  // A reading taken after a report that came at or after the other was taken (HR3's round 2: equal is a session changing
+  // its figure on the report right after the one that gave the kept one).
+  const after = (a: string | undefined, b: string | undefined): boolean => !!a && !!b && Date.parse(a) >= Date.parse(b)
+  if (after(takenAfter(next), takenBy(kept))) return 'next'
+  if (after(takenAfter(kept), takenBy(next))) return 'kept'
+  return null
+}
+
+/** The latest a reading is known to have been taken after (HI-3181, HI-3187): its session's report before, or its run's launch. */
+const takenAfter = (l: PlanLimit): string | undefined => later(l.changedAfter, l.takenAfter)
+
+/**
+ * Two readings of the same allowance (#383): the later period's; within one, the newer where their reports tell
+ * (HI-3181: a usage reset lowers the share mid-period), else the higher; said as the latest report said it. A reading
+ * that can't be dated (a session's first report, or one forgotten) never replaces one that can (HR1's round 1): it may be
+ * from before a drop the dated one shows. Its run's launch orders a reading only when the launch came after the kept one
+ * was taken (HI-3187); otherwise it is still undated (HR1's round 1: two runs' launches and calls interleave, so a run
+ * launched later can still relay a reading from before the drop).
+ */
 function mergeSame(kept: PlanLimit, next: PlanLimit): PlanLimit {
   if (!kept.resetsAt || !next.resetsAt) return described(next, kept)
   if (!samePeriod(kept.resetsAt, next.resetsAt)) return Date.parse(next.resetsAt) > Date.parse(kept.resetsAt) ? next : kept
   const resetsAt = Date.parse(next.resetsAt) > Date.parse(kept.resetsAt) ? next.resetsAt : kept.resetsAt
-  if (next.usedPercent >= kept.usedPercent) return described({ ...next, resetsAt }, kept)
-  // The higher reading kept, its figures and who reported them.
-  const out: PlanLimit = { ...next, usedPercent: kept.usedPercent, resetsAt, reportedAt: kept.reportedAt, reportedBy: kept.reportedBy }
-  if (kept.used === undefined) delete out.used
-  else out.used = kept.used
-  if (out.reportedAt === undefined) delete out.reportedAt
-  if (out.reportedBy === undefined) delete out.reportedBy
+  const order = newer(kept, next)
+  const undatedOverDated = !next.changedAfter && !!takenAfter(kept)
+  if (order === 'next' || (order === null && !undatedOverDated && next.usedPercent >= kept.usedPercent)) return described({ ...next, resetsAt }, kept)
+  // The reading kept, its figures, who reported them and how old it is.
+  const out: PlanLimit = { ...next, usedPercent: kept.usedPercent, resetsAt }
+  for (const k of ['used', 'reportedAt', 'reportedBy', 'firstSeenAt', 'changedAfter', 'takenAfter'] as const) {
+    if (kept[k] === undefined) delete out[k]
+    else (out as unknown as Record<string, unknown>)[k] = kept[k]
+  }
   return described(out, kept, next.describedAt ?? next.reportedAt)
+}
+
+/** One session's latest reading of a limit (HI-3181): its figure and period, and when it was first and last reported. */
+interface SessionReading {
+  usedPercent: number
+  resetsAt: string | null
+  firstSeenAt: string
+  changedAfter?: string
+  lastAt: string
+}
+
+/** Sessions' latest readings, by session and limit (HI-3181); in memory, a session's first report after a restart is of unknown age. */
+const sessionReadings = new Map<string, SessionReading>()
+const SESSION_READINGS_KEPT = 500
+
+/**
+ * How old each limit's reading in a session's report is (HI-3181), from that session's earlier reports. Claude Code's
+ * status line carries no reading time, and a session repeats its latest API call's reading until it calls again
+ * (tests/fixtures/planusage-2026-10-19.json): a figure the session hadn't reported before was taken since its report
+ * before; one it repeats is as old as its first report of it. `launchedAt` (HI-3187): its run's launch, where every
+ * reading of a run was taken since (capabilities.planUsageSinceLaunch). Exported for tests (`memo` there).
+ */
+export function readingAges(session: string, report: PlanUsage, memo = sessionReadings, launchedAt?: string): Record<string, { firstSeenAt: string; changedAfter?: string; takenAfter?: string }> {
+  const ages: Record<string, { firstSeenAt: string; changedAfter?: string; takenAfter?: string }> = {}
+  for (const l of report.limits) {
+    const key = `${session}\n${l.id}`
+    const prev = memo.get(key)
+    const same = prev && prev.usedPercent === l.usedPercent && samePeriod(prev.resetsAt, l.resetsAt)
+    const age = same ? { firstSeenAt: prev.firstSeenAt, ...(prev.changedAfter ? { changedAfter: prev.changedAfter } : {}) } : { firstSeenAt: report.updatedAt, ...(prev ? { changedAfter: prev.lastAt } : {}) }
+    ages[l.id] = launchedAt ? { ...age, takenAfter: launchedAt } : age
+    memo.delete(key)
+    memo.set(key, { usedPercent: l.usedPercent, resetsAt: l.resetsAt, ...age, lastAt: report.updatedAt })
+  }
+  while (memo.size > SESSION_READINGS_KEPT) memo.delete(memo.keys().next().value!)
+  return ages
 }
 
 /** Whether a reading says what the plan allows (HI-2734: Copilot's entitlement, unlimited or not included). */
@@ -104,11 +167,17 @@ const allowanceChanged = (a: PlanLimit, b: PlanLimit): boolean => !!a.unlimited 
 
 /**
  * What to keep of a provider's plan usage after a report: each limit merged by its id (mergeLimit), limits the report
- * doesn't name kept until their reset passes. `reportedBy` names the session (its agent) on the limits it set.
- * Exported for tests.
+ * doesn't name kept until their reset passes. `reportedBy` names the session (its agent) on the limits it set; `ages`,
+ * how old its readings are (readingAges, HI-3181). Exported for tests.
  */
-export function mergePlanUsage(kept: PlanUsage | undefined, report: PlanUsage, now = Date.now(), reportedBy?: string): PlanUsage {
-  const stamped = report.limits.map((l) => ({ ...l, reportedAt: report.updatedAt, ...(reportedBy ? { reportedBy } : {}) }))
+export function mergePlanUsage(kept: PlanUsage | undefined, report: PlanUsage, now = Date.now(), reportedBy?: string, ages?: ReturnType<typeof readingAges>): PlanUsage {
+  const stamped = report.limits.map((l) => {
+    const out: PlanLimit = { ...l, reportedAt: report.updatedAt, ...(reportedBy ? { reportedBy } : {}) }
+    delete out.firstSeenAt
+    delete out.changedAfter
+    delete out.takenAfter
+    return { ...out, ...ages?.[l.id] }
+  })
   const ids = new Set(stamped.map((l) => l.id))
   const limits = [
     ...stamped.map((l) => mergeLimit(kept?.limits.find((k) => k.id === l.id), l, now)),
@@ -128,6 +197,16 @@ export function nextWarning(l: Pick<PlanLimit, 'usedPercent' | 'resetsAt'>, warn
   const level = warned && samePeriod(warned.resetsAt, l.resetsAt) ? warned.level : 0
   const crossed = WARN_LEVELS.find((w) => l.usedPercent >= w)
   return crossed !== undefined && crossed > level ? crossed : null
+}
+
+/**
+ * The level a period's warnings stand at once its figure went down (HI-3181: a usage reset mid-period): the highest still
+ * crossed, so a climb back past the others warns again. Null when nothing changes. Exported for tests.
+ */
+export function warnedAfterDrop(l: Pick<PlanLimit, 'usedPercent' | 'resetsAt'>, warned: { resetsAt: string | null; level: number } | undefined): number | null {
+  if (!warned || !samePeriod(warned.resetsAt, l.resetsAt)) return null
+  const crossed = WARN_LEVELS.find((w) => l.usedPercent >= w) ?? 0
+  return crossed < warned.level ? crossed : null
 }
 
 function resetText(iso: string | null): string {
@@ -183,7 +262,8 @@ const shownValues = (u: PlanUsage | null | undefined): string =>
  * Providers report plan usage often (Claude Code with every status-line update, many times a minute while
  * agents work). What mergePlanUsage keeps is in memory (saved with the config on quit and with any other
  * change); it is only written to disk when a shown value changes, and then at most once a minute. `reportedBy` is the
- * reporting session's agent, for the status bar's tooltip.
+ * reporting session's agent, for the status bar's tooltip; `session`, its run, and `launchedAt`, when that run launched
+ * if the provider's readings are all its own run's (readingAges).
  *
  * A session launched on a connection (HI-1756) reports that connection's own limits: kept by its id
  * (`connectionPlanUsage`), never mixed into its CLI's, and warned of per connection (`connection:<id>:<limit>`), the
@@ -192,7 +272,7 @@ const shownValues = (u: PlanUsage | null | undefined): string =>
  * session launched as the login the connection is signed in as now. One still running as another (a login kept since,
  * or changed in a pane) or whose login its launch couldn't tell is left out: it never fills another login's figures.
  */
-export function reportPlanUsage(provider: ProviderId, report: PlanUsage, reportedBy?: string, connection?: { id: string; name: string; login?: string }): void {
+export function reportPlanUsage(provider: ProviderId, report: PlanUsage, reportedBy?: string, connection?: { id: string; name: string; login?: string }, session?: string, launchedAt?: string): void {
   if (connection && (!connection.login || connection.login !== connectionLoginNow(connection.id))) return
   const c = config.get()
   const kept = connection ? c.connectionPlanUsage?.[connection.id] : c.planUsage[provider]
@@ -200,7 +280,9 @@ export function reportPlanUsage(provider: ProviderId, report: PlanUsage, reporte
   const stale = !!connection && !!kept && (kept as ConnectionPlanUsage).login !== connection.login
   if (stale) forgetConnectionUsage(connection.id)
   const prev = stale ? undefined : kept
-  const usage = mergePlanUsage(prev, report, Date.now(), reportedBy)
+  // How old its readings are (HI-3181), from this session's reports of this login's or this CLI's figures, and its launch.
+  const ages = session ? readingAges(`${session}\n${connection ? `${connection.id}\n${connection.login}` : provider}`, report, sessionReadings, launchedAt) : undefined
+  const usage = mergePlanUsage(prev, report, Date.now(), reportedBy, ages)
   const changed = shownValues(prev) !== shownValues(usage)
   if (connection) c.connectionPlanUsage = { ...c.connectionPlanUsage, [connection.id]: { ...usage, login: connection.login } }
   else c.planUsage = { ...c.planUsage, [provider]: usage }
@@ -213,6 +295,9 @@ export function reportPlanUsage(provider: ProviderId, report: PlanUsage, reporte
     // Unlimited, or not in the plan (HI-2734): nothing to warn of.
     if (!hasShare(l)) continue
     const key = warningKey(provider, l.id, connection?.id)
+    // Gone down within its period (HI-3181): warned of again as it climbs back.
+    const lowered = warnedAfterDrop(l, config.get().planWarnings[key])
+    if (lowered !== null) config.update((cfg) => (cfg.planWarnings[key] = { resetsAt: l.resetsAt, level: lowered }))
     const level = nextWarning(l, config.get().planWarnings[key])
     if (level === null) continue
     config.update((cfg) => (cfg.planWarnings[key] = { resetsAt: l.resetsAt, level }))

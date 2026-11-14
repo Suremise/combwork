@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import { basename, dirname, join, resolve } from 'path'
 import { copyFile, mkdir } from 'original-fs/promises'
 import { existsSync } from 'original-fs'
@@ -13,6 +14,7 @@ import type { TextPart } from '../shared/advanced'
 import { fmt, msg, tr } from '../shared/i18n'
 import { gitProblemData, gitProblemText } from '../shared/gitTool'
 import { copyDir, isDir, placeKey, samePlace } from './fsutil'
+import { targetSigning } from './branchConfig'
 import { branchOfRef, git, gitReading } from './git'
 import { gitTool } from './gitTool'
 import { errorText, combworkError, shownError } from './combworkError'
@@ -32,6 +34,8 @@ const M = {
   noTarget: msg({ id: 'worktrees.merge.noTarget', defaultMessage: 'There is no branch {branch} to merge into.', description: 'Why nothing was merged: the branch to merge into ({branch}) does not exist.' }),
   caseAlias: msg({ id: 'worktrees.merge.caseAlias', defaultMessage: "The branches {branch} and {other} differ only in case, which Windows can't tell apart, so nothing was merged. Rename one of them, then merge.", description: 'Why nothing was merged: two branches ({branch}, {other}) have names that differ only in upper and lower case, and Windows treats them as one.' }),
   nothingMerged: msg({ id: 'worktrees.merge.nothing', defaultMessage: 'Nothing was merged: {why}.', description: "Why nothing was merged: git couldn't read the project folder's branch, or failed while merging. {why} says why (git's message)." }),
+  temporaryLeft: msg({ id: 'worktrees.merge.temporaryLeft', defaultMessage: "Combwork couldn't remove its temporary folder {folder}: remove it in Unused worktrees.", description: 'HI-3030: a second line after a merge into a branch checked out nowhere: the temporary folder Combwork made to merge there ({folder}: its path) could not be removed.' }),
+  hooksElsewhere: msg({ id: 'worktrees.merge.hooksElsewhere', defaultMessage: "If one of the repository's hooks refused it: they ran in a temporary checkout of {branch}, which has none of the project folder's untracked files (node_modules, say). Check out {branch} in the project folder and merge there to run them with everything in place.", description: "HI-3109 (Darren's decision A): a line after a refused merge into a branch checked out nowhere ({branch}). Combwork makes that merge in a temporary checkout, where the repository's git hooks (commit-msg, pre-commit…) run without the project folder's untracked files; a hook needing them (node_modules) fails there. Keep node_modules as it is." }),
   gitFailed: msg({ id: 'worktrees.gitFailed', defaultMessage: '{command} failed', description: "Why git couldn't do something, when git said nothing itself. {command} is the git command (\"git rev-parse\"): keep it as it is." }),
   gitProblem: msg({ id: 'worktrees.gitProblem', defaultMessage: '{problem}.', description: 'An error: git cannot run. {problem} says why (git is missing, or too old), without its full stop.' }),
   readBranch: msg({ id: 'worktrees.readBranch', defaultMessage: "git couldn't read the branch checked out in {folder} ({why})", description: "An error: git couldn't say which branch the folder {folder} has checked out; {why} is git's reason." }),
@@ -493,7 +497,8 @@ export async function mergeWorktree(projectPath: string, wt: WorktreeRef, opts: 
   // Any other failure means this git can't do the check (older than 2.38); the merge itself still refuses to lose work.
 
   if (opts.squash) {
-    const m = await git(projectPath, ['merge', '--squash', source])
+    // HI-3108: --ff, so the repository's merge.ff never refuses a squash (it makes no merge commit).
+    const m = await git(projectPath, ['merge', '--squash', '--ff', source])
     if (!m.ok) {
       await git(projectPath, ['reset', '--merge'])
       return { ok: false, error: m.err || m.out || tr(M.gitFailed, { command: 'git merge --squash' }) } // i18n-ignore: a git command, as it is
@@ -580,13 +585,87 @@ async function mergeElsewhere(projectPath: string, wt: WorktreeRef, into: string
   const oldTree = await git(projectPath, ['rev-parse', `${from}^{tree}`])
   // A squash that changes nothing (its work is in the target already) makes no commit, as git merge --squash doesn't.
   if (squash && oldTree.ok && oldTree.out.trim() === tree) return afterMerge(projectPath, wt, into, from, !!moveBranch)
-  const commit = await git(projectPath, ['commit-tree', tree, '-p', from, ...(squash ? [] : ['-p', tip.out.trim()]), '-m', message])
-  if (!commit.ok) return fail(commit.err || 'git commit-tree') // i18n-ignore: a git command, as it is
-  const made = commit.out.trim()
-  const moved = await git(projectPath, ['update-ref', '-m', `combwork: merge ${wt.branch}`, `refs/heads/${into}`, made, from]) // i18n-ignore: a reflog line, git's
-  if (!moved.ok) return { ok: false, error: tr(msg({ id: 'worktrees.merge.targetMoved', defaultMessage: '{branch} changed while Combwork was merging into it. Nothing was merged: merge again.', description: 'Why nothing was merged: the branch merged into ({branch}) moved on meanwhile (another merge or commit).' }), { branch: into }) }
+  // HI-3030 (Darren's decision): made by git merge itself, as every other merge Combwork makes, so the repository's commit
+  // hooks run and it is signed as the repository says, or refused saying why, never made unsigned (git commit-tree
+  // signed nothing). In a temporary detached worktree at the target's tip, beside the merge queue's, removed after.
+  const tmp = join(await temporaryRoot(projectPath), `merge-${randomUUID().slice(0, 8)}`)
+  const add = await git(projectPath, ['worktree', 'add', '--detach', tmp, from])
+  const removed = async (): Promise<string | null> => ((await git(projectPath, ['worktree', 'remove', '--force', tmp])).ok ? null : tr(M.temporaryLeft, { folder: tmp }))
+  if (!add.ok) {
+    // HI-3109: git made it and then a post-checkout hook failed (its status is git's): the checkout is there, at the
+    // target's tip, so the merge goes on in it. Anything else is refused, and whatever git made of it goes first.
+    const at = existsSync(tmp) ? await git(tmp, ['rev-parse', '--verify', 'HEAD']) : null
+    if (!at?.ok || at.out.trim() !== from) {
+      const left = existsSync(tmp) ? await removed() : null
+      const why = tr(M.nothingMerged, { why: add.err || 'git worktree add' }) // i18n-ignore: a git command, as it is
+      return { ok: false, error: left ? `${why}\n${left}` : why }
+    }
+    log.info(`The temporary merge folder for ${userText(into)} was made, but its post-checkout hook failed: merging there all the same (${userText(add.err.trim())})`)
+  }
+  /**
+   * Refused: git's own words (a hook, the signer), what it started undone in the temporary folder, which then goes.
+   * HI-3109 (Darren's decision A): said with where the hooks ran, and how to run them with the project folder's files.
+   */
+  const refused = async (r: { err: string; out: string }, command: string, undo: string[]): Promise<MergeResult> => {
+    await git(tmp, undo)
+    const left = await removed()
+    const why = (r.err || r.out).trim() || tr(M.gitFailed, { command })
+    return { ok: false, error: [tr(M.nothingMerged, { why }), tr(M.hooksElsewhere, { branch: into }), left].filter(Boolean).join('\n') }
+  }
+  // HI-3111: the target's signing settings (an `includeIf onbranch:` one too), read in this temporary worktree with its
+  // HEAD on the target for the read alone and detached at the target's tip again; unreadable, nothing is merged.
+  const onIt = await targetSigning((cwd, args) => git(cwd, args), tmp, into, from)
+  if ('failed' in onIt) {
+    const left = await removed()
+    const why = tr(M.nothingMerged, { why: onIt.failed })
+    return { ok: false, error: left ? `${why}\n${left}` : why }
+  }
+  const signing = onIt.args
+  if (squash) {
+    // HI-3108: --ff, as above: the repository's merge.ff has nothing to say about a squash.
+    const m = await git(tmp, [...signing, 'merge', '--squash', '--ff', tip.out.trim()])
+    if (!m.ok) return refused(m, 'git merge --squash', ['reset', '--merge']) // i18n-ignore: a git command, as it is
+    const c = await git(tmp, [...signing, 'commit', '-m', message])
+    if (!c.ok) return refused(c, 'git commit', ['reset', '--merge']) // i18n-ignore: a git command, as it is
+  } else {
+    const m = await git(tmp, [...signing, 'merge', '--no-ff', '-m', message, tip.out.trim()])
+    if (!m.ok) return refused(m, 'git merge', ['merge', '--abort']) // i18n-ignore: a git command, as it is
+  }
+  const head = await git(tmp, ['rev-parse', 'HEAD'])
+  const made = head.ok ? head.out.trim() : ''
+  // Nothing to merge (its work in the target already: git merge says it is up to date, HR1's round 1): done, the target
+  // where it was, as a merge into the checked-out branch answers it.
+  if (made === from) {
+    const left = await removed()
+    log.info(`${userText(wt.branch)} is in ${userText(into)} already (not checked out): nothing to merge`)
+    const done = await afterMerge(projectPath, wt, into, from, squash && !!moveBranch)
+    return left ? { ...done, note: left } : done
+  }
+  // Moved only from the tip it was merged on (update-ref's compare and swap): a target that moved meanwhile is left as it is.
+  const moved = made ? await git(projectPath, ['update-ref', '-m', `combwork: merge ${wt.branch}`, `refs/heads/${into}`, made, from]) : null // i18n-ignore: a reflog line, git's
+  const left = await removed()
+  if (!moved?.ok) {
+    const why = !made ? tr(M.nothingMerged, { why: head.err || 'git rev-parse' }) : tr(msg({ id: 'worktrees.merge.targetMoved', defaultMessage: '{branch} changed while Combwork was merging into it. Nothing was merged: merge again.', description: 'Why nothing was merged: the branch merged into ({branch}) moved on meanwhile (another merge or commit).' }), { branch: into }) // i18n-ignore: a git command, as it is
+    return { ok: false, error: left ? `${why}\n${left}` : why }
+  }
   log.info(`Merged ${userText(wt.branch)} into ${userText(into)} (not checked out)${squash ? ' (squash)' : ''}`)
-  return afterMerge(projectPath, wt, into, made, squash && !!moveBranch)
+  const done = await afterMerge(projectPath, wt, into, made, squash && !!moveBranch)
+  return left ? { ...done, note: left } : done
+}
+
+/**
+ * Where a project's temporary merge folders go (HI-3030): beside its slots and the merge queue's folder, in its
+ * workspace's worktrees folder; a project with no workspace open here, beside its own folder's.
+ */
+async function temporaryRoot(projectPath: string): Promise<string> {
+  try {
+    const { workspaceFor } = await import('./workspace')
+    const ws = workspaceFor(projectPath)
+    if (ws) return join(ws.worktreesRoot, basename(projectPath))
+  } catch {
+    // Not loadable here (a test of this module alone): beside the project's folder, as below.
+  }
+  return join(worktreesRoot(dirname(projectPath)), basename(projectPath))
 }
 
 /**

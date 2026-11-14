@@ -284,6 +284,210 @@
       "file": "plain"
     }
   },
+  "service.folderChanges.agentBusy": {
+    "placeholders": {
+      "agent": "plain",
+      "folder": "plain"
+    }
+  },
+  "service.folderChanges.busy": {
+    "placeholders": {
+      "folder": "plain",
+      "what": "plain"
+    }
+  },
+  "service.folderChanges.caseRename": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain"
+    }
+  },
+  "service.folderChanges.changed": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "service.folderChanges.commitFailed": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "service.folderChanges.commitTimedOut": {
+    "placeholders": {
+      "seconds": "number"
+    }
+  },
+  "service.folderChanges.commitTimedOutMoved": {
+    "placeholders": {
+      "seconds": "number",
+      "head": "select"
+    }
+  },
+  "service.folderChanges.deletedKept": {
+    "placeholders": {
+      "file": "plain"
+    }
+  },
+  "service.folderChanges.detached": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "service.folderChanges.indexBusy": {
+    "placeholders": {}
+  },
+  "service.folderChanges.midOperation": {
+    "placeholders": {
+      "state": "select",
+      "folder": "plain"
+    }
+  },
+  "service.folderChanges.moved": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
+  "service.folderChanges.nestedRepo": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "service.folderChanges.noTarget": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
+  "service.folderChanges.nothing": {
+    "placeholders": {
+      "file": "plain"
+    }
+  },
+  "service.folderChanges.readFailed": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "service.folderChanges.removedForFolder": {
+    "placeholders": {
+      "file": "plain"
+    }
+  },
+  "service.folderChanges.stashFailed": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "service.folderChanges.stashPartial": {
+    "placeholders": {
+      "stash": "plain",
+      "why": "plain"
+    }
+  },
+  "service.folderChanges.stashTimedOut": {
+    "placeholders": {
+      "seconds": "number",
+      "made": "select",
+      "stash": "plain"
+    }
+  },
+  "service.folderChanges.stashUnproved": {
+    "placeholders": {}
+  },
+  "service.folderChanges.submoduleAdded": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "service.folderChanges.submoduleDeleted": {
+    "placeholders": {
+      "folder": "plain",
+      "path": "plain"
+    }
+  },
+  "service.folderChanges.submoduleInside": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "service.folderChanges.submoduleMoved": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "service.folderChanges.submoduleOther": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "service.folderChanges.submoduleRemoved": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "service.folderChanges.submoduleStaged": {
+    "placeholders": {
+      "folder": "plain",
+      "path": "plain"
+    }
+  },
+  "service.folderChanges.submoduleStagedBack": {
+    "placeholders": {
+      "folder": "plain",
+      "path": "plain"
+    }
+  },
+  "service.folderChanges.tooManyToSetAside": {
+    "placeholders": {
+      "count": "number",
+      "folder": "plain"
+    }
+  },
+  "service.folderChanges.unmerged": {
+    "placeholders": {
+      "file": "plain"
+    }
+  },
+  "service.folderChanges.unplaced": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "service.folderChanges.wrongBranch": {
+    "placeholders": {
+      "folder": "plain",
+      "target": "plain"
+    }
+  },
+  "service.forward.defaultUnread": {
+    "placeholders": {
+      "card": "plain",
+      "from": "plain",
+      "to": "plain"
+    }
+  },
+  "service.forward.direction": {
+    "placeholders": {
+      "to": "plain",
+      "from": "plain",
+      "why": "select",
+      "dir": "select"
+    }
+  },
+  "service.forward.directionRetry": {
+    "placeholders": {
+      "card": "plain",
+      "why": "select",
+      "to": "plain",
+      "from": "plain"
+    }
+  },
+  "service.forward.folderSwitched": {
+    "placeholders": {
+      "card": "plain",
+      "now": "plain",
+      "was": "plain"
+    }
+  },
   "service.forward.missing": {
     "placeholders": {
       "unknown": "select",
@@ -296,6 +500,11 @@
   "service.forward.notAgents": {
     "placeholders": {}
   },
+  "service.forward.notReturned": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
   "service.forward.notTargets": {
     "placeholders": {
       "from": "plain",
@@ -304,8 +513,28 @@
       "sources": "plain"
     }
   },
+  "service.forward.openNoOverride": {
+    "placeholders": {
+      "card": "plain",
+      "to": "plain",
+      "from": "plain"
+    }
+  },
   "service.forward.raced": {
     "placeholders": {}
+  },
+  "service.forward.resolveRaced": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "service.forward.unreadable": {
+    "placeholders": {
+      "to": "plain",
+      "from": "plain",
+      "what": "plain",
+      "detail": "select"
+    }
   },
   "service.fsutil.keptBusy": {
     "placeholders": {
@@ -331,6 +560,11 @@
     "placeholders": {
       "command": "plain",
       "why": "plain"
+    }
+  },
+  "service.git.gitlinkUnread": {
+    "placeholders": {
+      "path": "plain"
     }
   },
   "service.git.outside": {
@@ -682,6 +916,97 @@
   "service.keys.unknownProject": {
     "placeholders": {}
   },
+  "service.laneEdit.already": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "service.laneEdit.cardChanged": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "service.laneEdit.changed": {
+    "placeholders": {
+      "lane": "plain"
+    }
+  },
+  "service.laneEdit.dependency": {
+    "placeholders": {
+      "card": "plain",
+      "dep": "plain"
+    }
+  },
+  "service.laneEdit.done": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "service.laneEdit.ended": {
+    "placeholders": {
+      "lane": "plain"
+    }
+  },
+  "service.laneEdit.fixedPlace": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "service.laneEdit.full": {
+    "placeholders": {
+      "max": "number",
+      "lane": "plain"
+    }
+  },
+  "service.laneEdit.invalid": {
+    "placeholders": {}
+  },
+  "service.laneEdit.keptWork": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "service.laneEdit.lastCard": {
+    "placeholders": {
+      "card": "plain",
+      "lane": "plain"
+    }
+  },
+  "service.laneEdit.noQueued": {
+    "placeholders": {
+      "lane": "plain"
+    }
+  },
+  "service.laneEdit.notOnLane": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "service.laneEdit.notQueued": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "service.laneEdit.notTodo": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "service.laneEdit.onLane": {
+    "placeholders": {
+      "card": "plain",
+      "builder": "plain"
+    }
+  },
+  "service.laneEdit.otherProject": {
+    "placeholders": {
+      "card": "plain",
+      "project": "plain"
+    }
+  },
+  "service.laneEdit.since": {
+    "placeholders": {}
+  },
   "service.laneStart.busy": {
     "placeholders": {
       "status": "select",
@@ -733,6 +1058,23 @@
   },
   "service.lanes.noWorkspace": {
     "placeholders": {}
+  },
+  "service.lanes.releaseUnknown": {
+    "placeholders": {
+      "target": "plain",
+      "what": "plain"
+    }
+  },
+  "service.lanes.released": {
+    "placeholders": {
+      "target": "plain",
+      "dated": "select",
+      "tag": "plain",
+      "date": "date",
+      "into": "plain",
+      "has": "select",
+      "suggest": "plain"
+    }
   },
   "service.lanes.targetBuilder": {
     "placeholders": {}
@@ -871,9 +1213,85 @@
       "cli": "plain"
     }
   },
+  "service.queue.catchUpNoCommit": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain"
+    }
+  },
+  "service.queue.pauseChanged": {
+    "placeholders": {}
+  },
+  "service.queue.pauseNoFolder": {
+    "placeholders": {}
+  },
+  "service.queue.purgeRefused": {
+    "placeholders": {
+      "target": "plain",
+      "why": "select"
+    }
+  },
+  "service.queue.purgeUnknown": {
+    "placeholders": {}
+  },
+  "service.releaseOffer.drop": {
+    "placeholders": {
+      "branches": "plain",
+      "id": "plain"
+    }
+  },
+  "service.releaseOffer.head": {
+    "placeholders": {
+      "id": "plain",
+      "project": "plain"
+    }
+  },
+  "service.releaseOffer.kept": {
+    "placeholders": {
+      "kept": "plain"
+    }
+  },
+  "service.releaseOffer.move": {
+    "placeholders": {
+      "target": "plain",
+      "tag": "plain",
+      "into": "plain",
+      "how": "select",
+      "next": "plain",
+      "id": "plain"
+    }
+  },
+  "service.releaseOffer.stale": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "service.releaseOffer.tail": {
+    "placeholders": {
+      "id": "plain"
+    }
+  },
   "service.repoOps.notOffered": {
     "placeholders": {
       "platform": "plain"
+    }
+  },
+  "service.slots.held": {
+    "placeholders": {
+      "card": "plain",
+      "slot": "plain",
+      "kind": "select",
+      "target": "plain",
+      "why": "plain",
+      "hasCommits": "select",
+      "ids": "plain",
+      "more": "plural",
+      "selectArg": "plain",
+      "hasEdits": "select",
+      "at": "plain",
+      "base": "plain",
+      "stopped": "select",
+      "builder": "plain"
     }
   },
   "service.slots.notPrepared": {

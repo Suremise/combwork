@@ -15,6 +15,14 @@
     "defaultMessage": "Each card’s focused tests need the command that runs them.",
     "description": "Why workflow options cannot be saved (G20): “Each card’s focused tests” is on but the project has no command to run them (its runner, focused.run)."
   },
+  "workflow.contradiction.jjNeedsSlots": {
+    "defaultMessage": "With jj, each card needs its own folder: agents sharing the project folder aren’t supported yet.",
+    "description": "Why workflow options cannot be saved (HI-2799): a project using jj (Jujutsu) was set to have everyone work in the project folder. Keep jj (the tool’s name)."
+  },
+  "workflow.contradiction.jjYouIntegrate": {
+    "defaultMessage": "With jj, you integrate the reviewed work yourself: Combwork doesn’t merge it.",
+    "description": "Why workflow options cannot be saved (HI-2799): a project using jj (Jujutsu) had another finish chosen than “You integrate it”. Keep jj (the tool’s name)."
+  },
   "workflow.contradiction.mergeNeedsSlots": {
     "defaultMessage": "When Combwork or the agent merges, each card needs its own folder.",
     "description": "Why workflow options cannot be saved: a merging option was chosen while everyone works in the project folder."
@@ -46,6 +54,14 @@
   "workflow.contradiction.upToDateNeedsSlots": {
     "defaultMessage": "Slots are brought up to date only when each card has its own folder.",
     "description": "Why workflow options cannot be saved: “Slots are brought up to date before each card” (G15) was set while everyone works in the project folder (glossary 2.5: slot)."
+  },
+  "workflow.earlierWork.message": {
+    "defaultMessage": "{read, select, yes {{n, plural, one {Its earlier line, {lines}, may hold work its target lacked:} other {Its earlier lines, {lines}, may hold work their target lacked:}} Combwork leaves that work there and doesn’t carry it in.} other {Combwork couldn’t read the card’s earlier starts, so it can’t tell whether work from before was left on a line of its own.}} Check what the card’s folder has (its target may hold that work by now), then bring in what you need, or leave it. Its builder is told on the card.",
+    "description": "HI-3107: the notice’s text. yes: {lines} lists branch or bookmark names, {n} how many; other: the card’s starts couldn’t be read. Keep the select keys. Never says the folder lacks the work: its target may hold it. The builder gets the same as a comment on the card."
+  },
+  "workflow.earlierWork.title": {
+    "defaultMessage": "{read, select, yes {{card}: its earlier work is on {line}} other {{card}: its earlier work couldn’t be read}}",
+    "description": "HI-3107: a notice when a card starts: it ran before under another version control (Git, before the repository switched to jj), and its line from then may still have work (yes); or its earlier starts couldn’t be read, so that can’t be told (other). Keep the select keys. {card} is a card key; {line} a branch or bookmark name."
   },
   "workflow.forYou.decidedAfterMerge": {
     "defaultMessage": "{card} was decided after it merged: does it need a follow-up?",
@@ -90,6 +106,14 @@
   "workflow.forYou.queueAdvance": {
     "defaultMessage": "{card} is tested and ready to merge: update {target} in {folder} now?",
     "description": "A For you request (Approve, §16.9.2): the merge queue has merged and checked the card's work, and waits for the user's OK before it updates the branch {target}, which is checked out in the folder {folder} (its files change there). Settings → Advanced → Merge into a checked-out branch: Ask each time. {card} is a card key like AM-12."
+  },
+  "workflow.forYou.queueCatchUp": {
+    "defaultMessage": "{card} is merged and on {target}’s remote already: update {target} in {folder} to it now? Decline, and {target} there stays as it is until you pull.",
+    "description": "A For you request (Approve, HI-3092, “The target branch follows its remote”): a card ({card}: a key like AM-12) was found already merged on the remote branch the target ({target}: a branch) follows, so it is Done; the local {target}, checked out in the folder {folder} (its files change there), is behind it. Settings → Advanced → Merge into a checked-out branch: Ask each time, so the queue waits for the user's OK before it updates that folder. Declined: nothing changes there; the user pulls when they want."
+  },
+  "workflow.forYou.queuePublish": {
+    "defaultMessage": "Combwork pushed {card} ({result}) to {endpoint} for {target}, but never heard whether the push arrived, and {target} there doesn’t show it now. Approve if {result} was published (someone may have removed it since); decline if it wasn’t, and the queue tests {card} again. Until you answer, the queue for {target} waits.",
+    "description": "A For you request (Approve, HI-1183, §16.9.4, “The target branch follows its remote”): the merge queue pushed a merge to the remote, the push’s answer was lost (the network, a crash), and the remote’s branch doesn’t contain it now, so Combwork can’t tell whether it was published and asks. {card} a card key like AM-12; {result} a short commit id; {endpoint} the remote’s address without credentials; {target} the branch."
   },
   "workflow.forYou.queueStuck": {
     "defaultMessage": "{card}'s merge into {target} stopped part way in {folder}, with {files, plural, one {# file} other {# files}} left between the two, and Combwork changes nothing more there. The card's Work section lists each file and its side, and the commands to copy. {how, select, both {To finish it, run {finish} (PowerShell) in {project}; to undo it, run {undo} (PowerShell) in {folder}.} finish {To finish it, run {finish} (PowerShell) in {folder}.} undo {To undo it, run {undo} (PowerShell) in {folder}.} other {Its files are neither as they were nor as merged: put them right by hand.}} Then answer here, and the queue looks again.",
@@ -327,6 +351,10 @@
     "defaultMessage": "The defaults of Git projects.",
     "description": "Beside the None · Git choice above workflow defaults, while Git is chosen."
   },
+  "workflow.form.levelForJj": {
+    "defaultMessage": "The defaults of jj projects.",
+    "description": "Beside the None · Git · jj choice above workflow defaults, while jj (Jujutsu, HI-2799) is chosen. Keep jj."
+  },
   "workflow.form.levelForNone": {
     "defaultMessage": "The defaults of projects without version control.",
     "description": "Beside the None · Git choice above workflow defaults, while None is chosen."
@@ -334,6 +362,10 @@
   "workflow.form.levelGit": {
     "defaultMessage": "Git",
     "description": "The choice of the defaults for Git projects (glossary 2.1: keep)."
+  },
+  "workflow.form.levelJj": {
+    "defaultMessage": "jj",
+    "description": "The choice of the defaults for projects using jj (Jujutsu, HI-2799). Keep jj: the tool’s name, lower case."
   },
   "workflow.form.levelNone": {
     "defaultMessage": "None",
@@ -406,6 +438,14 @@
   "workflow.form.off": {
     "defaultMessage": "Off",
     "description": "A workflow option’s value: off."
+  },
+  "workflow.form.offerStale": {
+    "defaultMessage": "Work merges into or Other branches work can merge into changed since the release offer was made, so it wasn’t filled in. The offer is read again.",
+    "description": "HI-3155: a notification: a release offer’s Move… or Remove… found the saved options no longer the ones it was made on. Work merges into and Other branches work can merge into are option names: as translated there."
+  },
+  "workflow.form.offerUnsaved": {
+    "defaultMessage": "Workflow has changes you haven’t saved, so the release offer wasn’t filled in. Save or discard them, then choose Move… again.",
+    "description": "HI-3155: a notification: Move… or Remove… on a release offer (For you) found unsaved edits in the Workflow section, which it doesn’t overwrite. Move… and Remove… are the offer’s buttons: as translated there."
   },
   "workflow.form.on": {
     "defaultMessage": "On",
@@ -496,16 +536,16 @@
     "description": "HI-2680: an error’s title: the workflow options were saved, but the retarget that should follow failed. Its text says why."
   },
   "workflow.form.retargetKeep": {
-    "defaultMessage": "{what}: {why, select, work {it has work on its branch} started {already started} lane {a running lane keeps its branch until it ends} queued {it is in the merge queue} notInTarget {it has commits {to} doesn’t have} reviewed {its reviewed work would bring other commits} noLine {it works in the project folder} lent {lent} dirty {it has changes not committed} busy {in use} unmerged {it holds commits {from} lacks} targetChanged {the target changed meanwhile} refused {not allowed now} changed {it changed meanwhile} moved {it moved meanwhile} gone {its folder is gone} setAside {set aside: look at its folder} other {Combwork can’t tell}}",
-    "description": "HI-2680, HI-2753: a card, slot or lane the retarget leaves where it is, and why (a select: keep the keys). {what} is its name; {from} the old branch, {to} the new one. queued: in the merge queue; notInTarget: a started card with commits the new branch lacks; reviewed: a reviewed card whose change would differ on the new branch; noLine: it has no branch of its own."
+    "defaultMessage": "{what}: {why, select, work {it has work on its branch} started {already started} lane {a running lane keeps its branch until it ends} queued {it is in the merge queue} notInTarget {it has commits {to} doesn’t have} reviewed {its reviewed work would bring other commits} noLine {it works in the project folder} line {its branch was made from {from}, so it keeps merging there} kept {its work is kept on {from}} lent {lent} dirty {it has changes not committed} busy {in use} unmerged {it holds commits {from} lacks} targetChanged {the target changed meanwhile} refused {not allowed now} changed {it changed meanwhile} moved {it moved meanwhile} gone {its folder is gone} setAside {set aside: look at its folder} other {Combwork can’t tell}}",
+    "description": "HI-2680, HI-2753: a card, slot or lane the retarget leaves where it is, and why (a select: keep the keys). {what} is its name; {from} the old branch, {to} the new one. queued: in the merge queue; notInTarget: a started card with commits the new branch lacks; reviewed: a reviewed card whose change would differ on the new branch; noLine: it has no branch of its own; line (HI-3112): a card put back whose branch, made from the old branch {from}, still holds history the new one lacks, so it keeps merging into {from}; kept (HI-3152, jj): a card put back, or the slot keeping its work, whose work is kept on the old bookmark {from}, where it starts again."
   },
   "workflow.form.retargetLane": {
     "defaultMessage": "{hasCard, select, yes {{lane}, with its card {card} {title}: to the new branch} other {{lane}: its next cards start from the new branch}}",
     "description": "HI-2753: a running lane (a card loop) that the retarget moves to the new Work merges into, in the dialog before saving: with its card in flight ({card}, its key, and {title}), both in one step, or with none in flight. {lane} names the lane (its name and builder). Keep the select keys."
   },
   "workflow.form.retargetSkipped": {
-    "defaultMessage": "{what}: {why, select, targetChanged {the target changed meanwhile} refused {not allowed now} changed {it changed meanwhile} busy {in use} dirty {it has changes not committed} moved {it moved meanwhile} unmerged {it holds commits the old branch lacks} gone {its folder is gone} setAside {set aside until you remove it: look at its folder first} failed {it couldn’t be moved; Combwork looks at it again} other {Combwork can’t tell}}",
-    "description": "HI-2680: a line of the notification after the retarget: a card or slot left where it was ({what}: its key or name), and why (a select: keep the keys)."
+    "defaultMessage": "{what}: {why, select, targetChanged {the target changed meanwhile} refused {not allowed now} changed {it changed meanwhile} busy {in use} dirty {it has changes not committed} moved {it moved meanwhile} unmerged {it holds commits the old branch lacks} gone {its folder is gone} setAside {set aside until you remove it: look at its folder first} failed {it couldn’t be moved; Combwork looks at it again} fixed {its version control can’t move it} other {Combwork can’t tell}}",
+    "description": "HI-2680: a line of the notification after the retarget: a card or slot left where it was ({what}: its key or name), and why (a select: keep the keys). fixed (HI-3152): the project’s version control (jj) can’t move a lane, a started card or a slot to another target."
   },
   "workflow.form.retargetSlot": {
     "defaultMessage": "{slot}: free, to the new branch",
@@ -647,6 +687,10 @@
     "defaultMessage": "Report the merge",
     "description": "A move on a card, named in a refused move: the agent saying it merged the work."
   },
+  "workflow.move.resolveOnBuilder": {
+    "defaultMessage": "Resolve on a builder",
+    "description": "A move on a card, named in a refused move (HI-2959): the user's Resolve on a builder on a forward merge the merge queue returned (Combwork's card bringing one branch up to date with another): it ends, and a new card is made for a builder to resolve its conflict."
+  },
   "workflow.move.retryMerge": {
     "defaultMessage": "Retry merge",
     "description": "A move on a card, named in a refused move: the user's Retry merge on the merge queue's card."
@@ -735,6 +779,10 @@
     "defaultMessage": "Start the next version",
     "description": "HI-2807: the title of the Start the next version dialog."
   },
+  "workflow.nextVersion.upstream": {
+    "defaultMessage": "{name} is made here only and tracks no remote branch, which “The target branch follows its remote” needs before its first card starts. {how, select, ready {Publish it to {remote}: {publish}. Or, if {remote} has it already, set what it tracks: {track1}, then {track2}.} choose {This repository has no remote, or several, that Combwork can name: in these commands {remote} stands for the one {name} should follow. Publish it there: {publish}. Or, if it has it already, set what it tracks: {track1}, then {track2}.} shallow {This repository is a shallow clone, which follow mode can’t use: fetch its whole history (git fetch --unshallow) first, then publish {name}.} other {The remote it would follow ({remote}) has several push addresses, or none, and follow mode publishes to exactly one: leave it one, then publish {name}.}}",
+    "description": "HI-3128: under the steps in the Start the next version dialog, with the workflow option “The target branch follows its remote” on (its name: use its words): the new branch {name} isn’t on any remote and tracks none, so its first card can’t start until the user publishes it (Combwork doesn’t). how (select, keep the keys): ready, a remote Combwork can name ({remote}); choose, none it can name ({remote} is a placeholder such as <remote> for the user to replace); shallow, a shallow clone; other, the named remote ({remote}) has several push addresses or none. {publish}, {track1}, {track2} are git commands: keep them exactly as they are."
+  },
   "workflow.option.commands.desc": {
     "defaultMessage": "The command each named check runs. A run counts as the check only when it runs that command.",
     "description": "What the workflow setting “Check commands” does."
@@ -803,6 +851,14 @@
     "defaultMessage": "Where cards are built",
     "description": "A workflow option (glossary 2.6, G11)."
   },
+  "workflow.option.followRemote.desc": {
+    "defaultMessage": "Before each test merge, the merge queue fetches the remote branch the target tracks and tests on its latest commit, pushes each merge there only if nobody pushed meanwhile (testing again if they did), and then brings the local target up to date.",
+    "description": "What the workflow option “The target branch follows its remote” does (glossary 2.1: merge queue; 2.5: test merge). “Push the target branch after merging” is another option’s name."
+  },
+  "workflow.option.followRemote.title": {
+    "defaultMessage": "The target branch follows its remote",
+    "description": "A workflow option (glossary 2.6, G21): the target branch is the one it tracks on its remote; Combwork’s merge queue fetches it before each test merge and publishes each merge there first."
+  },
   "workflow.option.identity.desc": {
     "defaultMessage": "Commits are made with the name and email from the project’s git config (else your global one).",
     "description": "What the workflow option “Commits use the project’s identity” does."
@@ -855,6 +911,14 @@
     "defaultMessage": "Combwork’s merge queue runs these named commands on the card’s work merged with the target branch, and moves the target only once each one has passed.",
     "description": "What the workflow option “Checks pass on the merged result” does (glossary 2.1: merge queue)."
   },
+  "workflow.option.mergeChecks.jjDesc": {
+    "defaultMessage": "Combwork runs these named commands on the candidate, in a check copy of its own, and offers the candidate for you to integrate only once each one has passed. One that fails sends the card back to its builder.",
+    "description": "What the workflow option “Checks pass on the candidate” does, for a project using jj (HI-2938). A check copy is a working folder Combwork keeps for checks (glossary)."
+  },
+  "workflow.option.mergeChecks.jjTitle": {
+    "defaultMessage": "Checks pass on the candidate",
+    "description": "The workflow option “Checks pass on the merged result” (G9) for a project using jj (HI-2938): named commands Combwork runs on the candidate it builds for the user to integrate. Candidate: the commit Combwork builds."
+  },
   "workflow.option.mergeChecks.title": {
     "defaultMessage": "Checks pass on the merged result",
     "description": "A workflow option (glossary 2.6, G9): named commands Combwork’s merge queue runs on a card’s work merged with the target branch."
@@ -862,6 +926,14 @@
   "workflow.option.mergeInstall.desc": {
     "defaultMessage": "Before the checks on the merged result, the merge queue installs the dependencies afresh, and always does when the lock file or manifests changed.",
     "description": "What the workflow option “Install dependencies from scratch” does. Lock file: as in the glossary (G15 value)."
+  },
+  "workflow.option.mergeInstall.jjDesc": {
+    "defaultMessage": "Before the checks on a candidate, its check copy installs the dependencies afresh: always, or when the lock file or manifests changed.",
+    "description": "What the workflow option “Install dependencies from scratch” does, for a project using jj (HI-2938). A check copy is a working folder Combwork keeps for checks. Lock file: as in the glossary."
+  },
+  "workflow.option.mergeInstall.jjTitle": {
+    "defaultMessage": "Install dependencies from scratch",
+    "description": "The workflow option “Install dependencies from scratch” for a project using jj (HI-2938): before the checks on the candidate."
   },
   "workflow.option.mergeInstall.title": {
     "defaultMessage": "Install dependencies from scratch",
@@ -983,6 +1055,14 @@
     "defaultMessage": "When the target branch has moved on since the review, the merge queue brings the work up to date in its own folder first, and returns the card if that conflicts or makes a different change.",
     "description": "What the workflow option “Work is up to date with its target branch before it merges” does (glossary 2.1: merge queue; Squash is the merge style’s value)."
   },
+  "workflow.option.strict.jjDesc": {
+    "defaultMessage": "When the target bookmark has moved on since the review, Combwork first brings the work up to date with it (merged in, or rebased with Squash), then builds the candidate on that, and returns the card if that conflicts or makes a different change. Rebase builds its candidate on the bookmark anyway.",
+    "description": "What the workflow option “The candidate brings work up to date first” does, for a project using jj (HI-2871). A bookmark is jj’s name for a branch; Squash and Rebase are the candidate style’s values."
+  },
+  "workflow.option.strict.jjTitle": {
+    "defaultMessage": "The candidate brings work up to date first",
+    "description": "The workflow option “Work is up to date with its target branch before it merges” (G8, strict) for a project using jj (HI-2871): before building the candidate the user integrates, Combwork brings the card’s work up to date with the target bookmark."
+  },
   "workflow.option.strict.title": {
     "defaultMessage": "Work is up to date with its target branch before it merges",
     "description": "A workflow option (glossary 2.6, G8, strict): a card’s work must contain the target branch’s latest commit before it is merged; Combwork’s merge queue brings it up to date itself."
@@ -990,6 +1070,14 @@
   "workflow.option.style.desc": {
     "defaultMessage": "How a card’s work is merged into the target branch.",
     "description": "What the workflow option “Merge style” does."
+  },
+  "workflow.option.style.jjDesc": {
+    "defaultMessage": "Once a card passes, Combwork builds a candidate from it on the target bookmark: a merge commit, one squashed commit, or its commits copied on top. You move the bookmark to the candidate yourself; Combwork never does.",
+    "description": "What the workflow option “Candidate style” does, for a project using jj (HI-2871). A bookmark is jj’s name for a branch: keep it as jj’s term."
+  },
+  "workflow.option.style.jjTitle": {
+    "defaultMessage": "Candidate style",
+    "description": "The workflow option “Merge style” (G6) for a project using jj (HI-2871): how the candidate commit Combwork builds for the user to integrate is made (merge commit, squash or rebase). Candidate: the commit Combwork builds."
   },
   "workflow.option.style.title": {
     "defaultMessage": "Merge style",
@@ -1095,6 +1183,22 @@
     "defaultMessage": "Leave it to the user or the Assistant.",
     "description": "HI-2679: the next step after an agent was refused acting on a forward-merge card."
   },
+  "workflow.refused.forward.resolutionSource.message": {
+    "defaultMessage": "{card} resolves the merge of {from} into {to}, but {revision} doesn’t contain {source}, the commit that came back: a cherry-pick or a copy of its changes leaves it out of {to}’s history, so the next Bring Up to Date would conflict again.",
+    "description": "HI-2999: a refused submission of a card made by Resolve on a builder (it merges branch {from} into branch {to} by hand): the revision submitted ({revision}, a short commit id) doesn’t have the commit it resolves ({source}, a full commit id) in its history. Bring Up to Date is a command’s name in the window: as translated there. {card} is a card key like AM-12."
+  },
+  "workflow.refused.forward.resolutionSource.next": {
+    "defaultMessage": "In its branch, run git merge {source}, resolve the conflict, commit, and submit again.",
+    "description": "HI-2999: the next step after that refusal: merge the commit ({source}, a full commit id; \"git merge\" is a command, never translated) into the card’s branch."
+  },
+  "workflow.refused.forward.resolutionTarget.message": {
+    "defaultMessage": "{card} resolves the merge of {from} into {to}, but it would start from {target} and merge there.",
+    "description": "HI-2985: a refused start of a card made by Resolve on a builder (it merges branch {from} into branch {to} by hand): its Merges into is another branch now ({target}), as when the project’s Work merges into moved on after it was made. {card} is a card key like AM-12."
+  },
+  "workflow.refused.forward.resolutionTarget.next": {
+    "defaultMessage": "The user or the Assistant can set its Merges into to {to}, then start it again.",
+    "description": "HI-2985: the next step after a refused start of a Resolve on a builder card: set its Merges into (a name in the window: as translated there) to branch {to}."
+  },
   "workflow.refused.integrate.approved.message": {
     "defaultMessage": "{card} at {revision} isn't approved: {why}",
     "description": "A refused merge: the revision lacks the passes or approvals its rules need. {why} is a whole sentence saying what's missing."
@@ -1180,8 +1284,8 @@
     "description": "A refused card loop step (#1382, #1467): an answer (OK, gaps) or going ahead when no design or follow-up posted by its builder waits for its reviewer's check. A follow-up: a change asked of reviewed work, such as a screenshot's. {card} is a card key."
   },
   "workflow.refused.loop.noStep.next": {
-    "defaultMessage": "Read the card: it may have been answered, or the card moved on.",
-    "description": "The next step after a card loop step with nothing to answer (#1382): what was posted for the check may have been answered."
+    "defaultMessage": "Read the card: it may have been answered, or the card moved on. Feedback still worth giving goes on the card as a comment.",
+    "description": "The next step after a card loop step with nothing to answer (#1382): what was posted for the check may have been answered, or the card left the column it was posted in (HI-3011: a design closes when its card is put back). A reviewer with feedback for it comments on the card instead."
   },
   "workflow.refused.loop.roundLimit.message": {
     "defaultMessage": "{card} reached its round limit: it goes on once its round-limit question is answered.",
@@ -1363,6 +1467,102 @@
     "defaultMessage": "Declare only the files of the work, outside {folder}: a card's paths narrow the project's work, never widen it.",
     "description": "The next step after a refused declaration of a card's paths: name files outside the excluded folder {folder} (#1511)."
   },
+  "workflow.refused.platform.changed.message": {
+    "defaultMessage": "{card} can't start under these rules: its project uses {platform} now.",
+    "description": "HI-2799: a refused start: the start was prepared under the project’s previous version control, and the project was switched meanwhile. {card} is a card key; {platform} is None, Git or jj."
+  },
+  "workflow.refused.platform.changed.next": {
+    "defaultMessage": "Start it again: it is then checked under {platform}’s rules.",
+    "description": "HI-2799: the next step after a start refused because the project switched version control meanwhile. {platform} is None, Git or jj."
+  },
+  "workflow.refused.platform.detachedFolder.message": {
+    "defaultMessage": "{card} can’t start: the project folder is on no branch (its head is detached at {head}), so what its builder commits would be on none.",
+    "description": "HI-3104: a refused start in a Git project whose cards are built in the project folder: the folder has no branch checked out (a detached head, as a jj repository colocated with Git leaves it after switching back to Git), so commits made there would belong to no branch. {card} is a card key like AM-12; {head} a short commit id."
+  },
+  "workflow.refused.platform.detachedFolder.next": {
+    "defaultMessage": "{has, select, yes {Check out its branch in the project folder (git switch {branch}), then start it again.} other {Check out a branch in the project folder (an existing one with git switch, or a new one with git switch -c), then start it again.}}",
+    "description": "HI-3104: the next step after a start refused because the project folder is on no branch. has (select): yes when Combwork found the branch to check out ({branch}, its name), other when it found none it could name. git switch and git switch -c are commands: keep them as they are. Translate both whole sentences."
+  },
+  "workflow.refused.platform.jjRefused.message": {
+    "defaultMessage": "{why, select, tooLarge {{card}: jj left {count, plural, one {a new file} other {# new files}} out of its snapshot for being over its size limit for new files (snapshot.max-new-file-size), so the work isn't all recorded: {files}.} autoTrack {{card}: jj's setting snapshot.auto-track is {setting} here, not all(), so jj doesn't record new files by itself and the work may not all be recorded.} mergeWorkingCopy {{card}: the slot's working copy has more than one parent, so its work isn't one line of commits.} notFromBase {{card}: the work in its slot doesn't start from the card's base {base}.} otherCard {{card}: commit {commit} is {other}'s work.} divergent {{card}: commit {commit} is divergent in jj (its change has more than one visible commit).} conflicted {{card}: commit {commit} has unresolved conflicts.} tooLong {{card}: its work has more than {max, number} commits.} unbound {{state, select, pending {{card}: its slot isn't prepared for it yet.} held {{card}: its slot isn't prepared for it yet.} other {{card}: its slot isn't prepared for this card any more.}}} isolated {{card}: jj projects have no check copies yet.} recovered {{card}: commits of its work hold copies that Recover… wrote beside the original files: {files}.} other {{card}: jj refused it.}}",
+    "description": "HI-2868: a refused move on a card of a project using jj (Jujutsu): why its work can't be taken as it is. In unbound, {state} (HI-3115) is pending (the card's slot isn't prepared for it yet) held (its preparation waits on what the slot holds; {told} is Combwork's own notice about it, in English: keep it as it is), or other (prepared for another card since): keep its select keys. {card} is a card key like AM-12; {commit} and {base} are short commit ids; {other} is another card's key; {max} is a number; {files} is a list of file paths and {count} their number (HI-2973). 'working copy', 'divergent' and 'snapshot' are jj's terms; snapshot.max-new-file-size is jj's setting: keep it as it is. Translate each sentence. autoTrack (HI-3096): the user's jj setting snapshot.auto-track ({setting}, its value) isn't all(), so jj leaves new files untracked; snapshot.auto-track and all() are jj's: keep them. recovered (HI-2996): Recover… (a button of a stale slot, as the window names it) wrote a copy of the user's version beside a file that had changed meanwhile, and commits of the card's work hold that copy; {files} is a list of file paths, as they are."
+  },
+  "workflow.refused.platform.jjRefused.next": {
+    "defaultMessage": "{why, select, tooLarge {Leave a file out deliberately with .gitignore, or raise jj's limit (jj config set --repo snapshot.max-new-file-size and a size in bytes) and commit it with jj commit, then submit again.} autoTrack {Set it back to all() for this repository (jj config set --repo snapshot.auto-track 'all()'), then submit again: jj then records the new files.} mergeWorkingCopy {Commit the work with jj commit, so the working copy is empty on one parent, then submit again.} notFromBase {Rebase the work onto the card's base, or start the card again.} otherCard {Leave that card's commits out of this card's work (rebase without them), then submit again.} divergent {Resolve the divergence in jj (abandon or rewrite one side), then try again.} conflicted {Resolve the conflicts in jj, then try again.} tooLong {Squash some of the commits, then submit again.} unbound {{state, select, pending {Combwork prepares the card's slot once you're idle: end your turn. If anything there stops it, Combwork tells you what and how to clear it.} held {{told}} other {Put the card back and start it again.}}} isolated {Run the check again without --isolated, in the card's slot.} recovered {Compare each copy with its original and keep what you want under the original name, then take the copies out of every commit of the work (jj squash or jj diffedit: deleting them in a later commit leaves them in its history) and submit again.} other {Look at the slot with jj, then try again.}}",
+    "description": "HI-2868: the next step after a refused move on a jj project's card, by the reason (why, select). jj commit, --isolated, .gitignore, jj config set --repo snapshot.max-new-file-size and jj config set --repo snapshot.auto-track 'all()' are commands and names: keep them as they are. 'working copy' and 'divergent' are jj's terms. Translate each sentence. recovered (HI-2996): copies Recover… wrote beside the originals are in commits of the card's work: the user's version of each is compared with the original, kept under the original name if wanted, and the copies taken out of every commit (jj squash and jj diffedit are commands: keep them)."
+  },
+  "workflow.refused.platform.keptAcross.message": {
+    "defaultMessage": "{card} can't start: its committed work from before it was put back is kept in slot {slot}, a {platform} slot from before the repository switched to {now}.",
+    "description": "HI-3069: a refused start: the card was put back with commits under one version control, kept for it in its slot, and the repository has since switched to the other, so that slot can’t be lent back and the card would start without its work. {card} is a card key like AM-12; {slot} a slot’s name; {platform} and {now} are Git or jj (keep them)."
+  },
+  "workflow.refused.platform.keptAcross.next": {
+    "defaultMessage": "{gone, select, yes {Its folder is gone, so nothing of it is left to go on with: remove the slot (Version Control → Slots and copies, Remove…), and {card} starts afresh from its target.} other {Switch the repository back to {platform} to go on with {card} in that slot.}}",
+    "description": "HI-3069: the next step after a start refused because the card’s kept slot is of the other version control. gone (select): yes when the slot’s folder was deleted, so removing the slot lets the card start afresh; other: switching back is the way on. Version Control, Slots and copies and Remove… are names in the window: as translated there. {platform} is Git or jj; {card} a card key."
+  },
+  "workflow.refused.platform.keptElsewhere.message": {
+    "defaultMessage": "{card} can't start there: its committed work from before it was put back is kept in slot {slot}, and it starts only in that slot.",
+    "description": "HI-3132: a refused start: the card was put back with commits, kept for it in slot {slot} (a name), and this start would have put it somewhere else (the project folder, or across a wait for that slot), without that work. {card} is a card key like AM-12."
+  },
+  "workflow.refused.platform.keptElsewhere.next": {
+    "defaultMessage": "Wait until {slot} is free, then start {card} again: it gets that slot back, with its work.",
+    "description": "HI-3132: the next step after that refusal: once the slot {slot} is free (nothing works in it), starting the card {card} again lends it that slot with the work kept in it."
+  },
+  "workflow.refused.platform.keptLine.message": {
+    "defaultMessage": "{card} can’t start: its branch was made from {kept} and still holds history {target} lacks, but its lane merges into {target}.",
+    "description": "HI-3112: a refused start: the card was started before, put back, and its branch (made from {kept}, the branch it merged into then) is kept, so it keeps merging into {kept}; but the card is in a lane whose cards merge into {target}. {card} is a card key like AM-12; {kept} and {target} are branch names."
+  },
+  "workflow.refused.platform.keptLine.next": {
+    "defaultMessage": "Take it out of the lane and start it on its own, to merge into {kept}; or make a new card for {target}.",
+    "description": "HI-3112: the next step after a start refused because the card’s kept branch ({kept}) isn’t its lane’s ({target}). {kept} and {target} are branch names."
+  },
+  "workflow.refused.platform.keptOnTarget.message": {
+    "defaultMessage": "{why, select, unread {{card}'s work is kept in slot {slot}, but Combwork can't read which bookmark that work is on.} other {{card}'s earlier work is in slot {slot}, on {target}: it can't start on {now}.}}",
+    "description": "HI-3129: a refused start of a jj card put back with work kept in slot {slot} (a name). why (keep the select keys): unread, Combwork could not prove the bookmark that work is on; mismatch (other), the work is on the bookmark {target} but the card’s own Merges into names {now}. {card} is a card key like AM-12; {target} and {now} are bookmark names."
+  },
+  "workflow.refused.platform.keptOnTarget.next": {
+    "defaultMessage": "{why, select, unread {Look at the slot (Version Control → Slots and copies, or jj itself), then start it again.} other {Set its Merges into back to {target} to go on with it there, or integrate that work first.}}",
+    "description": "HI-3129: the next step after that refusal, by why (keep the select keys). Merges into is the card’s field naming the bookmark its work goes to; {target} a bookmark name."
+  },
+  "workflow.refused.platform.noTarget.message": {
+    "defaultMessage": "{card} can’t start: its project has no target bookmark chosen, the one its work merges into.",
+    "description": "HI-3106: a refused start in a project using jj (Jujutsu): no target bookmark (Work merges into) is chosen, and jj has no default to fall back on, as Git has its default branch. {card} is a card key like AM-12. A bookmark is jj’s name for a branch."
+  },
+  "workflow.refused.platform.noTarget.next": {
+    "defaultMessage": "Choose one in Version Control → Workflow (Work merges into), then start it again.",
+    "description": "HI-3106: the next step after a start refused for no target bookmark: the user chooses it in the window. Version Control, Workflow and Work merges into are names in the window: as translated there."
+  },
+  "workflow.refused.platform.noUpstream.message": {
+    "defaultMessage": "{card} can’t start: {target} tracks no remote branch, and with “The target branch follows its remote” on each card starts from its remote.",
+    "description": "HI-3128: a refused start under the workflow option “The target branch follows its remote” (its name: use its words): the branch work merges into ({target}) has no upstream, as a new version’s branch made by Start the next version has, so there is no remote head to start from. {card} is a card key like AM-12."
+  },
+  "workflow.refused.platform.noUpstream.next": {
+    "defaultMessage": "{how, select, ready {If {remote} hasn’t got {target} yet, publish it there: {publish}. If it has, set what {target} tracks: {track1}, then {track2}. Then start it again; or turn off “The target branch follows its remote”.} choose {This repository has no remote, or several, that Combwork can name: in these commands {remote} stands for the one {target} should follow. If it hasn’t got {target} yet, publish it there: {publish}. If it has, set what {target} tracks: {track1}, then {track2}. Then start it again; or turn off “The target branch follows its remote”.} shallow {This repository is a shallow clone, which follow mode can’t use: fetch its whole history (git fetch --unshallow), then publish {target} or set what it tracks, and start it again; or turn off “The target branch follows its remote”.} other {The remote {target} would follow ({remote}) has several push addresses, or none, and follow mode publishes to exactly one: leave it one, then publish {target} or set what it tracks, and start it again; or turn off “The target branch follows its remote”.}}",
+    "description": "HI-3128: the next step after a start refused for a target with no upstream under “The target branch follows its remote” (its name: use its words). how (select, keep the keys): ready, a remote Combwork can name ({remote}); choose, none it can name ({remote} is then a placeholder such as <remote>, which the user replaces); shallow, the repository is a shallow clone; other, the named remote ({remote}) has several push addresses or none. {publish}, {track1}, {track2} are git commands: keep them exactly as they are. Combwork runs none of them: the user does."
+  },
+  "workflow.refused.platform.offLine.message": {
+    "defaultMessage": "{card}'s folder isn't on its branch {line}: {where, select, detached {its head is detached at {head}} other {it is on {on}}}, so the work there isn't what the card would merge.",
+    "description": "HI-3010: a refused submit: the card's slot (its folder) has another branch or no branch checked out (a detached head), so its commits there aren't on the card's own branch, which is what review and the merge read. {card} is a card key like AM-12; {line} and {on} are branch names; {head} is a short commit id. Translate each branch of the select."
+  },
+  "workflow.refused.platform.offLine.next": {
+    "defaultMessage": "{where, select, detached {Put the commits on the card's branch: git switch -c {lineArg} if it doesn't exist yet, else git switch {lineArg} and git cherry-pick the commits made off it. Then submit again.} other {{made, select, no {The card's branch doesn't exist yet: make it from where the card started with git switch -c {lineArg} {start}, then git cherry-pick there the card's own commits made on {onArg}. Then submit again.} other {Switch back with git switch {lineArg}, and git cherry-pick there any commits of the card's made on {onArg}. Then submit again.}}}}",
+    "description": "HI-3010, HI-3116: the next step after a submit refused because the card’s folder isn’t on its branch, by where it is (where, select: a detached head, or another branch) and, on another branch, whether the card’s branch exists yet (made, select: no, or yes). git switch -c, git switch and git cherry-pick are commands: keep them and their arguments exactly as they are. {lineArg} and {onArg} are branch names as typed in a shell (possibly in quotes); {start} is a commit id."
+  },
+  "workflow.refused.platform.slotLeft.message": {
+    "defaultMessage": "{unknown, select, yes {Combwork couldn't tell whether {card}'s slot {slot} ({folder}) is still the card's, so it wasn't submitted.} other {{card}'s slot {slot} ({folder}) isn't the card's any more: Combwork ended its lease there, so the work in that folder may be another card's now.}}",
+    "description": "HI-3118: a refused submit: the card was started in a slot (a working folder Combwork lends to one card or lane at a time), and Combwork no longer holds that slot for it (its lane ended, say), so the folder may have been lent to another card since. unknown yes: whether it still holds it couldn't be read. {card} is a card key like AM-12; {slot} a slot's name like slot-a; {folder} its path. Translate each branch of the select."
+  },
+  "workflow.refused.platform.slotLeft.next": {
+    "defaultMessage": "{unknown, select, yes {Try again in a moment.} other {Put the card back and start it again: it gets a slot of its own, with its committed work if the slot was kept for it.}}",
+    "description": "HI-3118: the next step after a submit refused because the card’s slot is no longer held for it (unknown yes: that couldn’t be read). Put back and start are actions on the card."
+  },
+  "workflow.refused.platform.switching.message": {
+    "defaultMessage": "{card} can't start now: its repository's version control is being switched.",
+    "description": "HI-2799: a refused start: the project’s repository is switching between Git and jj, and nothing starts on it meanwhile. {card} is a card key like AM-12."
+  },
+  "workflow.refused.platform.switching.next": {
+    "defaultMessage": "Try again in a moment, once the switch has finished.",
+    "description": "HI-2799: the next step after a start refused while the repository’s version control is switched."
+  },
   "workflow.refused.platform.targetGone.message": {
     "defaultMessage": "{card} was started on {target}, which no longer exists in this repository.",
     "description": "HI-2753: a refused move (a submit): the branch the card was started on and merges into (its target, {target}) was deleted, as an integration branch is once it has been merged. {card} is a card key like AM-12."
@@ -1475,6 +1675,30 @@
     "defaultMessage": "Wait for it to be unblocked, or work on another card.",
     "description": "The next step after a refused start of a blocked card."
   },
+  "workflow.refused.start.platformReady.message": {
+    "defaultMessage": "{card} can't start: cards don't run in a jj project yet.",
+    "description": "A refused start of a card in a project using jj (Jujutsu, HI-2799): Combwork shows its repository but doesn’t start card work there yet. {card} is a card key. Keep jj (the tool’s name)."
+  },
+  "workflow.refused.start.platformReady.next": {
+    "defaultMessage": "Work on it outside Combwork’s cards, or switch the project to Git in Version Control.",
+    "description": "The next step after a refused start in a jj project (HI-2799). Version Control is the tab’s name (glossary 2.1). Keep Git and jj."
+  },
+  "workflow.refused.start.releaseUnknown.message": {
+    "defaultMessage": "Combwork couldn’t check whether {target} is released ({what}), so {card} wasn’t started.",
+    "description": "HI-3148: a refused start: whether the branch the card would start on ({target}) has already shipped couldn’t be read ({what}: what couldn’t be read). {card} is a card key like AM-12."
+  },
+  "workflow.refused.start.releaseUnknown.next": {
+    "defaultMessage": "Try again once the repository can be read; for work that has to go on now, ask the user: the user or the Assistant can start it anyway.",
+    "description": "HI-3148: the next step after a start refused because whether its branch is released couldn’t be read."
+  },
+  "workflow.refused.start.released.message": {
+    "defaultMessage": "{card} can’t start on {target}: {target} is released ({dated, select, yes {{tag}, tagged {date, date, medium}} other {{tag}}}, merged into {into}).",
+    "description": "HI-3148: a refused start: the branch the card would start on and merge into ({target}) already shipped: a tag named after it ({tag}, as v1.4.0) is in its history and it is merged into the default branch ({into}, as main). With dated yes, the tag’s own date ({date}: an annotated tag’s date, never claimed as the publication date). {card} is a card key like AM-12."
+  },
+  "workflow.refused.start.released.next": {
+    "defaultMessage": "{has, select, yes {Did you mean {suggest}? Set its Merges into to {suggest}; or, for hotfix work on {target}, ask the user: the user or the Assistant can start it there anyway.} other {Start it on a branch that isn’t released; or, for hotfix work on {target}, ask the user: the user or the Assistant can start it there anyway.}}",
+    "description": "HI-3148: the next step after a start refused on a released branch ({target}). With has yes, {suggest} is a branch that exists and isn’t released (the project’s Work merges into, or the next version’s). Merges into is the card’s option of that name: as translated there."
+  },
   "workflow.refused.start.slotAvailable.change": {
     "defaultMessage": "This is set in Version Control → Where cards are built.",
     "description": "Where the rule that refused starting for want of a slot is changed."
@@ -1512,12 +1736,12 @@
     "description": "The next step after a refused submit for review with uncommitted changes (HI-1618, HI-2227, HI-2257): an agent doing the card commits its work; one asked only to submit it asks the user before committing; changes that aren't the card's are removed only once asked about."
   },
   "workflow.refused.submit.decisionsReceived.message": {
-    "defaultMessage": "{card} has a decision you haven't read.",
-    "description": "A refused submit: the card has a newer decision than the builder has received."
+    "defaultMessage": "{card} has a decision or a comment from the user that you haven't seen.",
+    "description": "A refused submit (HI-2854): the card has a decision, or a comment the user wrote, newer than the builder has received."
   },
   "workflow.refused.submit.decisionsReceived.next": {
-    "defaultMessage": "Read it, check your work against it, then submit.",
-    "description": "The next step after a refused submit for an unread decision."
+    "defaultMessage": "Check your work against each (listed below, or read the card), then submit again.",
+    "description": "The next step after a refused submit for an unseen decision or comment of the user's: the agent's reply lists them below when it can."
   },
   "workflow.refused.submit.empty.message": {
     "defaultMessage": "{card}: nothing committed to review.",
@@ -1675,6 +1899,10 @@
     "defaultMessage": "Combwork checks the merge",
     "description": "A rule of the workflow, named where a move skips or can't check it: a card is done only when its work is in its target (glossary 2.6: G5)."
   },
+  "workflow.rule.forward.resolutionSource": {
+    "defaultMessage": "A resolution merges the commit it resolves",
+    "description": "A rule of the workflow, named where a move can’t check it (HI-2999): a card made by Resolve on a builder (it merges one branch into another by hand) must contain, merged, the commit that came back from the merge queue, not a copy of its changes."
+  },
   "workflow.rule.integrate.approved": {
     "defaultMessage": "Work is reviewed before it's merged",
     "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: G1)."
@@ -1715,6 +1943,14 @@
     "defaultMessage": "Blocked cards don't start",
     "description": "A rule of the workflow, named where a move skips or can't check it."
   },
+  "workflow.rule.start.platformReady": {
+    "defaultMessage": "Cards run only where Combwork supports the version control",
+    "description": "A rule of the workflow, named where a move skips or can’t check it (HI-2799): cards don’t start in a project using jj (Jujutsu) yet."
+  },
+  "workflow.rule.start.released": {
+    "defaultMessage": "New work starts only on a branch that isn’t released",
+    "description": "HI-3148: a rule of the workflow, named where a start skips it (the user’s Start anyway on a released branch, for a hotfix): a card doesn’t start on a branch already released (tagged and merged into the default branch)."
+  },
   "workflow.rule.start.slotAvailable": {
     "defaultMessage": "Each card in its own folder",
     "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: G11 values): a card starts only when a folder is free."
@@ -1728,8 +1964,8 @@
     "description": "A rule of the workflow, named where a move skips or can't check it."
   },
   "workflow.rule.submit.decisionsReceived": {
-    "defaultMessage": "The builder has read every decision",
-    "description": "A rule of the workflow, named where a move skips or can't check it: the agent who built the card has read every decision on it (glossary 2.5: builder)."
+    "defaultMessage": "The builder has seen every decision and every comment of the user's",
+    "description": "A rule of the workflow, named where a move skips or can't check it: the agent who built the card has seen every decision on it, and every comment the user wrote (HI-2854; glossary 2.5: builder)."
   },
   "workflow.rule.submit.focusedChosen": {
     "defaultMessage": "Each card’s focused tests are chosen before review",
@@ -1807,9 +2043,45 @@
     "defaultMessage": "These are saved as you change them, apart from the options above.",
     "description": "Under the heading “Slots and copies”: its settings save at once, unlike the workflow options, which are saved with Save…."
   },
+  "workflow.slots.divergent": {
+    "defaultMessage": "{same, select, yes {The slot’s change is divergent in jj: its folder holds commit {folder}, and jj’s latest operation gives the slot commit {head}, another version of the same change.} other {The slot’s folder holds commit {folder}, which is still in jj, but jj’s latest operation gives the slot commit {head}.}} Recovering would take what only {folder} holds out of the folder, so nothing was changed.",
+    "description": "HI-3134: the text of the window after Recover… was refused (divergentTitle). {folder} and {head} are short jj commit ids: the one the slot’s folder holds, and the one jj now gives the slot. same: yes when both are versions of one change (jj calls that divergent). Keep the select keys."
+  },
+  "workflow.slots.divergentNext": {
+    "defaultMessage": "Look at both versions in jj (jj log -r \"{folder} | {head}\", and jj diff --from {head} --to {folder}), choose the one the slot should have, keeping anything in its folder you want, then choose Recover… again.",
+    "description": "HI-3134: the second paragraph of the window after Recover… was refused (divergentTitle): what to do next. {folder} and {head} are short jj commit ids; the jj commands are commands: keep them as they are."
+  },
+  "workflow.slots.divergentTitle": {
+    "defaultMessage": "{slot} wasn’t recovered",
+    "description": "HI-3134: the title of a window after Recover… of a stale jj slot was refused because the commit its folder holds is still in jj beside the one jj now gives the slot. {slot} is its name (slot-a)."
+  },
   "workflow.slots.fromSetup": {
     "defaultMessage": "From the project’s setup command before 1.0",
     "description": "Where the setting “Setup script” comes from while it isn’t set: the setup command the project had for agents’ worktrees before 1.0."
+  },
+  "workflow.slots.gitFiles": {
+    "defaultMessage": "Set up submodules and LFS",
+    "description": "A switch under “Slots and copies” (HI-1182): whether Combwork checks out the repository’s submodules and fetches its Git LFS files in each slot and copy it makes. Keep LFS (Git LFS, a product’s name)."
+  },
+  "workflow.slots.gitFilesDesc": {
+    "defaultMessage": "Before the setup script, checks out submodules and fetches Git LFS files in each new slot, in each review and check copy, and in the merge queue’s folder. Without it, they have empty submodule folders and LFS pointer files.",
+    "description": "What the switch “Set up submodules and LFS” does (HI-1182; glossary 2.5: slot, review copy). Keep Git LFS (a product’s name); pointer files are the small text files Git LFS keeps in place of the real ones."
+  },
+  "workflow.slots.gitFilesLfs": {
+    "defaultMessage": "It uses Git LFS ({version}).",
+    "description": "Under the switch “Set up submodules and LFS” (HI-1182): the project uses Git LFS, and git-lfs is installed. {version} is git-lfs’s own version line, such as git-lfs/3.8.1 (GitHub; windows amd64; go 1.27.3). Keep Git LFS."
+  },
+  "workflow.slots.gitFilesNoFilter": {
+    "defaultMessage": "It uses Git LFS, but it isn’t set up for this repository: slots and copies can’t be prepared until you run git lfs install.",
+    "description": "Under the switch “Set up submodules and LFS” (HI-1182): git-lfs is installed but its filter isn’t configured, so LFS files would stay pointer files. Keep Git LFS and the command git lfs install as they are."
+  },
+  "workflow.slots.gitFilesNoLfs": {
+    "defaultMessage": "It uses Git LFS, but git-lfs isn’t installed: slots and copies can’t be prepared until it is. Turning this off skips the step, but where your git config requires the LFS filter, git itself still can’t check files out.",
+    "description": "Under the switch “Set up submodules and LFS” (HI-1182): the project uses Git LFS and the git-lfs program can’t be found. Keep Git LFS and git-lfs (a product and its program)."
+  },
+  "workflow.slots.gitFilesSubmodules": {
+    "defaultMessage": "{n, plural, one {This project has # submodule.} other {This project has # submodules.}}",
+    "description": "Under the switch “Set up submodules and LFS” (HI-1182): how many submodules the project folder’s repository has."
   },
   "workflow.slots.heading": {
     "defaultMessage": "Slots and copies",
@@ -1826,6 +2098,22 @@
   "workflow.slots.inherit": {
     "defaultMessage": "Inherit",
     "description": "A button beside a slot setting set for this project: stop setting it here, and use the inherited value again (the workspace’s, Combwork’s or the default)."
+  },
+  "workflow.slots.keptEditFor": {
+    "defaultMessage": "Kept for {card}: its changes aren’t committed yet",
+    "description": "HI-3143: beside a jj slot in the list under “Slots and copies”, in place of workflow.slots.keptFor: the card {card} (its key, HI-12) was put back with changes in the slot that aren’t committed yet, so the slot is kept for that card and given back to it when it starts again; no other card is lent it."
+  },
+  "workflow.slots.keptFor": {
+    "defaultMessage": "Kept for {card}: its committed work isn’t in the target yet",
+    "description": "HI-2995: beside a jj slot in the list under “Slots and copies”: the card {card} (its key, HI-12) was put back with commits that aren’t in its target yet, and the slot holds them, so it is kept for that card and given back to it when it starts again; no other card is lent it."
+  },
+  "workflow.slots.keptForgottenFor": {
+    "defaultMessage": "Kept for {card}, but jj no longer lists its workspace",
+    "description": "HI-3097: beside a jj slot in the list under “Slots and copies”, in place of workflow.slots.keptFor: the slot was kept for the card {card} (its key, HI-12), but its jj workspace was forgotten outside Combwork (jj workspace forget), its folder left in place, so the card can’t get it back. Remove… beside it ends it."
+  },
+  "workflow.slots.keptGoneFor": {
+    "defaultMessage": "Kept for {card}, but its folder is missing",
+    "description": "HI-3032: beside a jj slot in the list under “Slots and copies”, in place of workflow.slots.keptFor: the slot was kept for the card {card} (its key, HI-12), which was put back with commits not in its target yet, but its folder has been deleted, so the card can’t get it back. Remove… beside it ends it."
   },
   "workflow.slots.lentCard": {
     "defaultMessage": "{agent}, for {card}",
@@ -1851,6 +2139,14 @@
     "defaultMessage": "None",
     "description": "A slot script that isn’t set: nothing runs."
   },
+  "workflow.slots.notRecovered": {
+    "defaultMessage": "{slot} wasn’t recovered: {why, select, busy {something works in it (an agent working there: stop it first)} preparing {its card is still being prepared there} notStale {it isn’t stale any more} identity {its folder isn’t the workspace Combwork made} other {jj couldn’t do it}}.",
+    "description": "A notice after recovering a stale jj slot was refused (HI-2869, HI-2913). {why} picks the reason: busy (something works in the slot, such as the agent of the lane holding it, which the user stops first), preparing (the card the slot is lent to is still being prepared there), and the others. Keep the select keys."
+  },
+  "workflow.slots.notRemovedKept": {
+    "defaultMessage": "{slot} wasn’t removed: {why, select, changed {it changed after the list was shown (its folder is back, or it was made again)} busy {something works in it now} other {Combwork kept it}}.",
+    "description": "HI-3032: a notice after removing a jj slot kept for a card was refused. {why} picks the reason; keep the select keys."
+  },
   "workflow.slots.off": {
     "defaultMessage": "Off",
     "description": "A setting’s value: off."
@@ -1863,9 +2159,73 @@
     "defaultMessage": "Open Advanced",
     "description": "A button beside “Reviewers review in review copies”: opens Settings → Advanced."
   },
+  "workflow.slots.recover": {
+    "defaultMessage": "Recover…",
+    "description": "A button beside a stale jj slot (HI-2869): brings it up to date, keeping any edits jj hadn’t recorded (asks first)."
+  },
+  "workflow.slots.recoverMessage": {
+    "defaultMessage": "Combwork copies any edits jj hadn’t recorded in it aside first, into the folder below, then brings the slot up to date with jj. It runs only while nothing works in the slot.",
+    "description": "The confirmation before recovering a stale jj slot (HI-2869); the folder edits are copied into is listed under it."
+  },
+  "workflow.slots.recoverTitle": {
+    "defaultMessage": "Recover {slot}?",
+    "description": "The title of the confirmation before recovering a stale jj slot (HI-2869). {slot} is the slot’s name."
+  },
+  "workflow.slots.recovered": {
+    "defaultMessage": "{slot} is recovered.",
+    "description": "A notice after a stale jj slot was recovered (HI-2869)."
+  },
+  "workflow.slots.recoveredAsides": {
+    "defaultMessage": "{n, plural, one {# file was created again during the recovery, so the version it had before was left beside it: {files}.} other {# files were created again during the recovery, so the version each had before was left beside it: {files}.}} Keep what you want of it, then delete it.",
+    "description": "HI-2996: after a stale jj slot was recovered: while it put files back, something created some of them again, so Combwork left the version the file had just before (moved aside) under another name beside it. {files} lists their full paths, joined as a list. The user keeps what they want and deletes that copy."
+  },
+  "workflow.slots.recoveredCopies": {
+    "defaultMessage": "{n, plural, one {# file had changed meanwhile, so your version of it was written beside it, under the name below.} other {# files had changed meanwhile, so your version of each was written beside it, under the names below.}} Compare them, keep what you want under the original name, then delete the copies: a card’s work that holds one can’t be submitted.",
+    "description": "HI-2996: after a stale jj slot was recovered: files the user had edited (not yet recorded by jj) had also changed in the update, so Combwork kept the update in the file and wrote the user’s version beside it as a copy (listed under this, as paths). The user compares and deletes the copies; a card can’t be submitted for review while they are in its work."
+  },
+  "workflow.slots.recoveredDivergent": {
+    "defaultMessage": "jj also kept commit {commit}, which holds what it recorded of the slot during the recovery. It shows as divergent in jj: once you’ve looked at it, abandon it with jj abandon {commit}.",
+    "description": "HI-2996: after a stale jj slot was recovered, jj made a commit of the slot’s files that Combwork couldn’t prove was only what it kept, so it left it (a divergent change in jj). {commit} is its short id. jj abandon is a command: keep it as it is."
+  },
+  "workflow.slots.recoveredKeptDeleted": {
+    "defaultMessage": "{n, plural, one {You had deleted {files}, but it changed or came back meanwhile, so it was kept.} other {You had deleted {files}, but they changed or came back meanwhile, so they were kept.}}",
+    "description": "HI-2996: after a stale jj slot was recovered: files the user had deleted there (not yet recorded by jj) changed in the update or were created again, so Combwork kept them rather than deleting them. {files} lists their paths, joined as a list."
+  },
+  "workflow.slots.recoveredPutBack": {
+    "defaultMessage": "{n, plural, =0 {No other file needed putting back.} one {# other file was put back as it was.} other {# other files were put back as they were.}}",
+    "description": "HI-2996: after a stale jj slot was recovered, the number of the user’s edited files put back unchanged (nothing to look at for these)."
+  },
+  "workflow.slots.recoveredTitle": {
+    "defaultMessage": "{slot} is recovered: look at these",
+    "description": "HI-2996: the title of the window shown after a stale jj slot ({slot}, its name) was recovered, when the recovery left something for the user to look at: copies it wrote, deleted files it kept, or a commit it kept."
+  },
   "workflow.slots.release": {
     "defaultMessage": "Release…",
     "description": "A button beside a held slot in the list of slots: asks, then frees it for other work (#1506)."
+  },
+  "workflow.slots.removeForgottenFree": {
+    "defaultMessage": "jj no longer lists {slot}’s workspace. Its folder goes to the Recycle Bin as it is, with any changes in it.",
+    "description": "HI-3103: the confirmation before removing a jj slot kept for no card whose workspace was forgotten outside Combwork (jj workspace forget), its folder still there: the whole folder, uncommitted changes included, goes to the Recycle Bin. {slot} is the slot’s name."
+  },
+  "workflow.slots.removeForgottenMessage": {
+    "defaultMessage": "Its folder goes to the Recycle Bin as it is, with any changes in it. {card} then starts again from its target, in another slot. The work it committed here stays in jj’s store{commit, select, none {.} other {: its last commit is {commit}.}}",
+    "description": "HI-3097: in place of workflow.slots.removeKeptMessage, the confirmation before removing a jj slot kept for the card {card} (its key, HI-12) whose workspace jj no longer lists, its folder still there: the whole folder, uncommitted edits included, is moved to the Recycle Bin. {commit} is the short id of the last commit of the card’s work (jj keeps it), or none when Combwork has none recorded: keep the select key none."
+  },
+  "workflow.slots.removeKept": {
+    "defaultMessage": "Remove…",
+    "description": "HI-3032: a button beside a jj slot kept for a card whose folder is missing (workflow.slots.keptGoneFor): asks, then removes the slot so the card can start again."
+  },
+  "workflow.slots.removeKeptMessage": {
+    "defaultMessage": "{card} then starts again from its target, in another slot. The work it committed here stays in jj’s store{commit, select, none {.} other {: its last commit is {commit}.}}",
+    "description": "HI-3032: the confirmation before removing a jj slot kept for the card {card} (its key, HI-12) whose folder is missing. {commit} is the short id of the last commit of the card’s work (jj keeps it), or none when Combwork has none recorded: keep the select key none."
+  },
+  "workflow.slots.removeKeptTitle": {
+    "defaultMessage": "Remove {slot}?",
+    "description": "HI-3032: the title of the confirmation before removing a jj slot kept for a card whose folder is missing. {slot} is the slot’s name."
+  },
+  "workflow.slots.removedKept": {
+    "defaultMessage": "{slot} is removed.",
+    "description": "HI-3032: a notice after a jj slot kept for a card whose folder was missing was removed. {slot} is its name."
   },
   "workflow.slots.reviewCopies": {
     "defaultMessage": "Reviewers review in review copies",
@@ -1895,6 +2255,14 @@
     "defaultMessage": "Runs in a new slot, and again in a slot whose lock files changed since its last install, e.g. npm ci. Review and check copies run it too.",
     "description": "What the setting “Setup script” does (glossary 2.5: slot, review copy; lock file)."
   },
+  "workflow.slots.stale": {
+    "defaultMessage": "Stale: another jj workspace changed it",
+    "description": "Beside a jj slot in the list under “Slots and copies” (HI-2869): its files are behind its working-copy commit because another jj workspace rewrote it; it isn’t lent until recovered. “workspace” is jj’s term."
+  },
+  "workflow.slots.staleAbandoned": {
+    "defaultMessage": "Stale: its jj operation was abandoned (jj op abandon)",
+    "description": "HI-3135: beside a jj slot in the list under “Slots and copies”, in place of workflow.slots.stale: the operation its folder was last brought to was discarded by the user’s jj op abandon, so jj can’t read it until it is recovered; it isn’t lent until then. jj op abandon is a command: keep it as it is."
+  },
   "workflow.slots.state.creating": {
     "defaultMessage": "Being set up",
     "description": "A slot’s state in the list under “Slots and copies”."
@@ -1903,9 +2271,21 @@
     "defaultMessage": "Has changes left in it",
     "description": "A slot’s state in the list under “Slots and copies”: it has uncommitted or untracked files, so it isn’t lent until clean."
   },
+  "workflow.slots.state.forgotten": {
+    "defaultMessage": "Not listed by jj",
+    "description": "HI-3097: a jj slot’s state in the list under “Slots and copies”, in place of “Folder missing” (workflow.slots.state.gone): its folder is there, but its jj workspace was forgotten outside Combwork, so jj no longer lists it (workflow.slots.keptForgottenFor beside it)."
+  },
   "workflow.slots.state.gone": {
     "defaultMessage": "Folder missing",
     "description": "A slot’s state in the list under “Slots and copies”: its folder is gone (Combwork recreates it)."
+  },
+  "workflow.slots.state.kept": {
+    "defaultMessage": "Holds a card’s commits",
+    "description": "HI-2995: a jj slot’s state in the list under “Slots and copies”, in place of “Has changes left in it”: it holds the commits of a card that was put back (named beside it, workflow.slots.keptFor), not uncommitted files."
+  },
+  "workflow.slots.state.keptEdit": {
+    "defaultMessage": "Holds a card’s uncommitted changes",
+    "description": "HI-3143: a jj slot’s state in the list under “Slots and copies”, in place of workflow.slots.state.kept: it holds a put-back card’s changes that aren’t committed yet (edits, or new files jj doesn’t track), kept for that card (named beside it, workflow.slots.keptEditFor)."
   },
   "workflow.slots.state.lent": {
     "defaultMessage": "In use",
@@ -1982,6 +2362,18 @@
   "workflow.summary.git.team": {
     "defaultMessage": "Pair with stricter checks: the unit tests too, a clean install before every merge, and your OK for cards labelled ui or release.",
     "description": "What the Team preset sets up, for a Git project (glossary 2.1: Team, Pair)."
+  },
+  "workflow.summary.jj.pair": {
+    "defaultMessage": "A reviewer agent passes each card after the quick checks, then you integrate it yourself.",
+    "description": "What the Pair preset sets up, for a project using jj (Jujutsu, HI-2799): Combwork never merges under jj."
+  },
+  "workflow.summary.jj.solo": {
+    "defaultMessage": "Each card in its own jj workspace, no review: you integrate the work yourself.",
+    "description": "What the Solo preset sets up, for a project using jj (Jujutsu, HI-2799). Keep jj; a jj workspace is a working folder jj makes."
+  },
+  "workflow.summary.jj.team": {
+    "defaultMessage": "A reviewer agent, then you, check each card after the quick checks and the tests, then you integrate it yourself.",
+    "description": "What the Team preset sets up, for a project using jj (Jujutsu, HI-2799): Combwork never merges under jj."
   },
   "workflow.summary.none.pair": {
     "defaultMessage": "A reviewer agent checks each card, after the quick checks pass.",
@@ -2087,6 +2479,18 @@
     "defaultMessage": "the path {path}, which is outside the project",
     "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": a card's path that isn't in its project. {path} is the path."
   },
+  "workflow.unreadable.remoteBehind": {
+    "defaultMessage": "where to start from: {target} has commits that {endpoint} doesn’t (push or pull them first)",
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\" (HI-1183): the local branch {target} has commits the remote branch it follows (at {endpoint}, an address) lacks, so Combwork won't start a card's work from either."
+  },
+  "workflow.unreadable.remoteHead": {
+    "defaultMessage": "the branch {branch} on {endpoint}, which {target} follows",
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\" (HI-1183): fetching the remote branch {branch} from {endpoint} (a remote's address) failed; {target} is the local branch that follows it. Git's own words follow."
+  },
+  "workflow.unreadable.remoteSetup": {
+    "defaultMessage": "the remote branch {target} follows (it must track one, on a remote with a single push address)",
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\" (HI-1183, “The target branch follows its remote”): the branch on a remote that the target branch {target} tracks; it tracks none, or its remote has several push addresses or none."
+  },
   "workflow.unreadable.replay": {
     "defaultMessage": "{revision} applied onto {onto}",
     "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": the result of applying a revision's change onto another commit. {revision} and {onto} are short commit ids."
@@ -2114,6 +2518,10 @@
   "workflow.unreadable.target": {
     "defaultMessage": "the target branch {target}",
     "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": the branch the work merges into. {target} is its name."
+  },
+  "workflow.unreadable.tracking": {
+    "defaultMessage": "which remote branch {branch} tracks (its upstream must be a branch on a remote, or it must track none)",
+    "description": "What Combwork couldn’t read, the object of \"Combwork couldn’t read …\" (HI-3126, “The target branch follows its remote”): how the branch {branch} tracks a remote branch. Its Git settings name only half of one, another local branch, or a remote that isn’t there, or they couldn’t be read."
   },
   "workflow.unreadable.uncommitted": {
     "defaultMessage": "the uncommitted changes in {folder}",
@@ -2151,6 +2559,10 @@
     "defaultMessage": "Not checked",
     "description": "A value of the workflow option “Who merges” (glossary 2.6, G5)."
   },
+  "workflow.value.finish.userIntegrates": {
+    "defaultMessage": "You integrate it yourself",
+    "description": "A value of the workflow option “Who merges” (glossary 2.6, G5) for a project using jj (Jujutsu, HI-2799): Combwork never merges under jj; you bring the reviewed work into its target with jj."
+  },
   "workflow.value.folder.project": {
     "defaultMessage": "Everyone in the project folder",
     "description": "A value of the workflow option “Where cards are built” (glossary 2.6, G11)."
@@ -2162,6 +2574,10 @@
   "workflow.value.mergeInstall.always": {
     "defaultMessage": "Before every merge",
     "description": "A value of the workflow option “Install dependencies from scratch”: before each card’s merge checks."
+  },
+  "workflow.value.mergeInstall.alwaysCandidate": {
+    "defaultMessage": "Before every candidate’s checks",
+    "description": "The value “always” of the workflow option “Install dependencies from scratch” in a project using jj (HI-2938): before the merge checks on each candidate (the commit Combwork builds for the user to integrate)."
   },
   "workflow.value.mergeInstall.onManifestChange": {
     "defaultMessage": "When the lock file or manifests change",
@@ -2250,6 +2666,10 @@
   "workflow.why.folder": {
     "defaultMessage": "Pairs and teams build in parallel, each card apart from the others.",
     "description": "Why the presets set “Where cards are built” as they do (Solo: the project folder)."
+  },
+  "workflow.why.followRemote": {
+    "defaultMessage": "Following a remote reaches it and its sign-in before every merge, so it stays yours unless you turn it on.",
+    "description": "Why the presets leave “The target branch follows its remote” off."
   },
   "workflow.why.identity": {
     "defaultMessage": "Commits name the project’s identity, whoever’s computer made them.",

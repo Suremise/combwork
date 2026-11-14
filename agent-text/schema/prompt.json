@@ -47,6 +47,32 @@
       "title": "plain"
     }
   },
+  "prompt.card.whole.comment": {
+    "placeholders": {
+      "by": "plain",
+      "date": "plain",
+      "text": "plain"
+    }
+  },
+  "prompt.card.whole.comments": {
+    "placeholders": {}
+  },
+  "prompt.card.whole.decision": {
+    "placeholders": {
+      "text": "plain",
+      "date": "plain",
+      "by": "plain"
+    }
+  },
+  "prompt.card.whole.decisions": {
+    "placeholders": {}
+  },
+  "prompt.card.whole.inFull": {
+    "placeholders": {}
+  },
+  "prompt.card.yours": {
+    "placeholders": {}
+  },
   "prompt.context.broken": {
     "placeholders": {
       "n": "plural",

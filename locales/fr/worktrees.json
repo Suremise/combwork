@@ -27,6 +27,7 @@
   "worktrees.merge.cantCheck": "Git n’a pas pu chercher les modifications non commitées du worktree (échec de git status dans {folder}). Corrige le problème, puis relance la fusion.",
   "worktrees.merge.caseAlias": "Les branches {branch} et {other} ne diffèrent que par la casse, que Windows ne distingue pas : rien n’a donc été fusionné. Renomme l’une d’elles, puis fusionne.",
   "worktrees.merge.detached": "Le dossier du projet n’est sur aucune branche (HEAD détachée). Fais d’abord un checkout de la branche dans laquelle fusionner.",
+  "worktrees.merge.hooksElsewhere": "Si l’un des hooks du dépôt l’a refusé : ils se sont exécutés dans une extraction temporaire de {branch}, qui n’a aucun des fichiers non suivis du dossier du projet (node_modules, par exemple). Extrais {branch} dans le dossier du projet et fusionne là-bas pour les exécuter avec tout en place.",
   "worktrees.merge.intoItself": "La branche {branch} ne peut pas être fusionnée dans elle-même.",
   "worktrees.merge.noTarget": "Il n’y a pas de branche {branch} dans laquelle fusionner.",
   "worktrees.merge.notRemoved": "Fusion faite, mais le worktree n’a pas été retiré",
@@ -68,5 +69,6 @@
   "worktrees.why.notChecked": "non vérifié",
   "worktrees.why.notListed": "git ne le liste pas comme worktree sur la branche {branch}",
   "worktrees.why.notMerged": "{n, plural, one {# commit non fusionné} many {# commits non fusionnés} other {# commits non fusionnés}} dans la branche {into}",
-  "worktrees.why.uncommitted": "{n, plural, one {# fichier non commité} many {# fichiers non commités} other {# fichiers non commités}}"
+  "worktrees.why.uncommitted": "{n, plural, one {# fichier non commité} many {# fichiers non commités} other {# fichiers non commités}}",
+  "worktrees.merge.temporaryLeft": "Combwork n’a pas pu supprimer son dossier temporaire {folder} : supprime-le dans Worktrees inutilisés."
 }

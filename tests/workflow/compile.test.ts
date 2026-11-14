@@ -2,7 +2,7 @@
 // piece refuses to load, a newer ruleset is read-only, and every refusal is three whole sentences.
 import { describe, expect, it } from 'vitest'
 import { allOff, preset } from '../../src/shared/workflow/options'
-import { canonical, compile, loadRuleset, mustCompile, RULESET_VERSION } from '../../src/shared/workflow/compile'
+import { canonical, compile, loadRuleset, mustCompile, RETIRED_GUARD, RULESET_VERSION } from '../../src/shared/workflow/compile'
 import { REFUSALS, refusal } from '../../src/shared/workflow/refusals'
 import { GUARDS } from '../../src/shared/workflow/pieces'
 import { foldCard, type Fact } from '../../src/shared/workflow/facts'
@@ -101,5 +101,45 @@ describe('the fold, card references and lane lists', () => {
     done.add(2)
     const n = nextCard(l, (c) => done.has(c))
     expect(n).toMatchObject({ card: 3, lane: { cards: [1, 2, 3, 4], pending: null } })
+  })
+})
+
+// Git's and None's compiled rulesets before J9e (HI-2874), read from the code before it: the guard was only ever jj's.
+const GIT_PAIR_ID = 'ebb83cd9b111ed37'
+const NONE_SOLO_ID = 'e4422a9e4fd0679e'
+
+describe('jj card starts on (HI-2874, J9e): the retired guard', () => {
+  it('a jj ruleset compiles without start.platformReady; Git and None rulesets, ids included, are as before', () => {
+    for (const id of ['solo', 'pair', 'team'] as const) expect(mustCompile(preset('jj', id)).guards.start).not.toContain(RETIRED_GUARD)
+    // The guard was only ever added for jj: Git's and None's compiled rules are the same as before J9e (their ids pinned).
+    expect(mustCompile(preset('git', 'pair')).id).toBe(GIT_PAIR_ID)
+    expect(mustCompile(preset('none', 'solo')).id).toBe(NONE_SOLO_ID)
+  })
+
+  it("a stored jj ruleset with the guard (a lane's, an Override's) loads without it: a copy, its id, version and the rest kept", () => {
+    const r = mustCompile(preset('jj', 'pair'))
+    const stored = JSON.parse(JSON.stringify({ ...r, id: 'legacy-jj', guards: { ...r.guards, start: [...r.guards.start.slice(0, 1), RETIRED_GUARD, ...r.guards.start.slice(1)] } }))
+    const before = JSON.stringify(stored)
+    const l = loadRuleset(stored)
+    if (!l.ok) throw new Error('not loaded')
+    expect(l.ruleset.id).toBe('legacy-jj')
+    expect(l.ruleset.version).toBe(stored.version)
+    expect(l.ruleset.guards.start).toEqual(r.guards.start)
+    expect({ ...l.ruleset.guards, start: [] }).toEqual({ ...stored.guards, start: [] })
+    expect(l.ruleset.options).toEqual(stored.options)
+    expect(l.ruleset.stages).toEqual(stored.stages)
+    // The row read isn't changed (a copy).
+    expect(JSON.stringify(stored)).toBe(before)
+  })
+
+  it("a newer version's read-only row, and a non-jj row, are left as they are", () => {
+    const r = mustCompile(preset('jj', 'pair'))
+    const future = { ...r, version: RULESET_VERSION + 1, guards: { ...r.guards, start: [RETIRED_GUARD, ...r.guards.start] } }
+    const lf = loadRuleset(future)
+    expect(lf.ok && lf.readOnly && lf.ruleset.guards.start.includes(RETIRED_GUARD)).toBe(true)
+    const g = mustCompile(preset('git', 'pair'))
+    const git = { ...g, guards: { ...g.guards, start: [RETIRED_GUARD, ...g.guards.start] } }
+    const lg = loadRuleset(git)
+    expect(lg.ok && lg.ruleset).toBe(git)
   })
 })

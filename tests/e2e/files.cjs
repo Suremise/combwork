@@ -233,7 +233,7 @@ const check = (name, ok, extra = '') => {
   check('git menu: an untracked file offers Exclude from Git, not Stop Tracking', (await menuItem('Exclude from Git').count()) === 1 && (await menuItem('Stop Tracking').count()) === 0)
   await page.screenshot({ path: path.join(shots, '7-git-menu-dark.png') })
   await menuItem('Exclude from Git').click()
-  check('git menu: Exclude offers .gitignore (shared) and Only on this PC', (await shown(page.locator('.menu .menu-header', { hasText: 'Shared with everyone' }))) && (await page.locator('.menu .menu-header', { hasText: 'Only on this PC' }).count()) === 1)
+  check('git menu: Exclude offers .gitignore (shared) and Only on this PC', (await shown(page.locator('.menu .menu-header', { hasText: 'Shared with the repository (a commit)' }))) && (await page.locator('.menu .menu-header', { hasText: 'Only on this PC' }).count()) === 1)
   check('git menu: …and All *.txt files', (await menuItem('All *.txt files').count()) === 2)
   await page.screenshot({ path: path.join(shots, '7-git-exclude-dark.png') })
   await menuItem('This file').first().click()
@@ -350,7 +350,7 @@ const check = (name, ok, extra = '') => {
   check('git menu (light): opens', await gitMenu('made-outside.txt'))
   await page.screenshot({ path: path.join(shots, '7-git-menu-light.png') })
   await menuItem('Exclude from Git').click()
-  await shown(page.locator('.menu .menu-header', { hasText: 'Shared with everyone' }))
+  await shown(page.locator('.menu .menu-header', { hasText: 'Shared with the repository (a commit)' }))
   await page.screenshot({ path: path.join(shots, '7-git-exclude-light.png') })
   await page.keyboard.press('Escape')
 

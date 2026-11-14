@@ -9,7 +9,9 @@ import { call, errorMessage } from '../api'
 import { NO_PROJECTS, activityAgentKey, cardActivityAgents, openActivity, set, useStore, workspaceActivityKey } from '../store'
 import { Icon, IconButton, InfoTip, statusText, Tooltip, useContextMenu, type MenuEntry } from '../components/ui'
 import { StateMark } from '../components/StateMark'
-import { loadActivityView, saveActivityView, type ActivityView } from '../activityView'
+import { loadActivityView, loadMapShow, saveActivityView, saveMapShow, type ActivityView, type MapShow } from '../activityView'
+import { ActivityMap, MapToggles, mapSessions, mapStrip, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
+import { liveIn, mapContextEntries, mapMode, mapReadOrder, shownAlone, type MapContext } from '@shared/activityMap'
 import { cx } from '../util'
 import { ACTIVITY_M, Details, FADE_MS, LIST_EVERY, markOf, NO_NOW, PartView, TICK_MS, TURNS_AT_ONCE, usePageVisible } from './ActivityTab'
 
@@ -46,7 +48,11 @@ interface Reads {
   lists: ReadonlyMap<string, SessionListItem[]>
   turns: ReadonlyMap<string, ActivityTurns>
   now: ReadonlyMap<string, ActivityNow>
+  /** The map's agents' context (HI-2903), by agent key (host-qualified): held with the rest. */
+  contexts: ReadonlyMap<string, MapContext | null>
 }
+
+const NO_ENTRIES: MapEntry[] = []
 
 /** A host's agents as the Activity tab takes them (shared/activity.ts). */
 const activityAgents = (h: ProjectInfo): ActivityAgent[] =>
@@ -79,6 +85,7 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
   const projects = useWhileActive(active, (s) => s.workspace?.projects ?? NO_PROJECTS)
   const assistant = useWhileActive(active, (s) => s.workspace?.assistant ?? null)
   const hosts = useMemo(() => [...projects, ...(assistant ? [assistant] : [])], [projects, assistant])
+  const workspaceName = useStore((s) => s.workspace?.name ?? '')
   // The view (filters, tab, own processes, its card): the workspace's own, never a project's (HR5's design check).
   const vk = workspaceActivityKey(workspacePath)
   const stored = useStore((s) => s.activityFilters[vk])
@@ -130,13 +137,26 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
   const nowReads = useRef(boundedQueue(1))
   const listReads = useRef(boundedQueue(LISTS_AT_ONCE))
   const turnReads = useRef(boundedQueue(TURNS_AT_ONCE))
+  // A session's turns are read and taken in only while the list or the map shows it (HR2's HI-2903 round 1): checked when
+  // its read starts and when it answers.
+  const mapOnlyRef = useRef(new Set<string>())
   const readTurns = useCallback((wanted: { path: string; id: string }[]): void => {
+    const isShown = (key: string): boolean => shownSessionsRef.current.some((x) => sk(x.path, x.id) === key)
     for (const { path, id } of wanted) {
       const key = sk(path, id)
       turnReads.current.add(
         key,
-        () => (counts.turns++, call('activity:turns', path, id, turnsRef.current.get(key)?.version).catch(() => null)),
-        (t) => t && setTurns((m) => new Map(m).set(key, t))
+        () => {
+          if (!isShown(key)) return Promise.resolve(null)
+          if (mapOnlyRef.current.has(key)) noteMapTurns('read')
+          counts.turns++
+          return call('activity:turns', path, id, turnsRef.current.get(key)?.version).catch(() => null)
+        },
+        (t) => {
+          if (!t || !isShown(key)) return
+          if (mapOnlyRef.current.has(key)) noteMapTurns('applied')
+          setTurns((m) => new Map(m).set(key, t))
+        }
       )
     }
   }, [])
@@ -242,7 +262,15 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
     const own = tasks.filter((c) => !c.archived && !c.project).map(activityCard)
     return new Map(hosts.map((h) => [hk(h.path), [...tasks.filter((c) => !c.archived && c.project && c.project.toLowerCase() === h.name.toLowerCase()).map(activityCard), ...own]]))
   }, [tasks, hosts])
-  const reads = useMemo<Reads>(() => ({ agents, cards, lists, turns, now }), [agents, cards, lists, turns, now])
+  // The map (HI-2903): its toggles (one for every view), and its agents' context, read only while it shows them.
+  const [mapShow, setMapShowState] = useState<MapShow>(loadMapShow)
+  const setMapShow = useCallback((m: MapShow): void => {
+    saveMapShow(m)
+    setMapShowState(m)
+  }, [])
+  const [mapEntries, setMapEntries] = useState<MapEntry[]>(NO_ENTRIES)
+  const contexts = useMapContexts(active && mapShow.map && mapShow.context, mapEntries)
+  const reads = useMemo<Reads>(() => ({ agents, cards, lists, turns, now, contexts }), [agents, cards, lists, turns, now, contexts])
 
   // --- Frozen or live, as the project's tab (HI-1743).
   const [held, setHeld] = useState<Reads | null>(null)
@@ -289,7 +317,7 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
     const was = lastReads.current
     lastReads.current = reads
     if (!held || was === reads) return
-    const onlyFirst = was.agents === reads.agents && was.cards === reads.cards && was.now === reads.now && [...reads.lists].every(([k, l]) => was.lists.get(k) === l || !held.lists.has(k)) && [...reads.turns].every(([k, t]) => was.turns.get(k) === t || !held.turns.has(k))
+    const onlyFirst = was.agents === reads.agents && was.cards === reads.cards && was.now === reads.now && [...reads.lists].every(([k, l]) => was.lists.get(k) === l || !held.lists.has(k)) && [...reads.turns].every(([k, t]) => was.turns.get(k) === t || !held.turns.has(k)) && [...reads.contexts].every(([k, c]) => was.contexts.get(k) === c || !held.contexts.has(k))
     if (!onlyFirst) setPending((n) => n + 1)
   }, [reads, held])
   const drawn = useMemo<Reads>(() => {
@@ -297,7 +325,8 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
     // What the snapshot hadn't read yet completes it (a host's first list, a session's first turns).
     const newLists = [...reads.lists].filter(([k]) => !held.lists.has(k))
     const newTurns = [...reads.turns].filter(([k]) => !held.turns.has(k))
-    return newLists.length || newTurns.length ? { ...held, lists: new Map([...held.lists, ...newLists]), turns: new Map([...held.turns, ...newTurns]) } : held
+    const newCtx = [...reads.contexts].filter(([k]) => !held.contexts.has(k))
+    return newLists.length || newTurns.length || newCtx.length ? { ...held, lists: new Map([...held.lists, ...newLists]), turns: new Map([...held.turns, ...newTurns]), contexts: new Map([...held.contexts, ...newCtx]) } : held
   }, [held, reads])
 
   // --- The tabs, by host, and the one shown.
@@ -370,13 +399,70 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
     return () => clearTimeout(t)
   }, [fading, parts])
 
-  // Turns only for the tab shown (its agent's session and running subagents).
+  // --- The map (HI-2903): exactly one agent in the filter, its map; else the shared map of the agents the tabs show,
+  // every key host-qualified (an agent's activityAgentKey, a session's sk).
+  const mode = mapMode(view.agents)
+  // Its agents: the list's own tabs, by the same filters (Agents, Cards, Hide finished, the tab kept).
+  const entries = useMemo<MapEntry[]>(() => {
+    const out = shownHosts.flatMap((h) => {
+      const input = inputs.get(hk(h.path))!
+      const keep = h.agents.find((a) => activityAgentKey(h.path, a.id) === view.tab)?.id
+      return mapTabs(input, { agents: inFilter(h), cards: view.cards, hideFinished: view.hideFinished }, 'shared', keep).map((t): MapEntry => ({ key: activityAgentKey(h.path, t.agentId), path: h.path, agentId: t.agentId, name: t.name, tab: t, input, live: h.agents.find((a) => a.id === t.agentId)?.live ?? null }))
+    })
+    return mode === 'single' ? out.slice(0, 1) : out
+  }, [mode, shownHosts, inputs, inFilter, view.cards, view.hideFinished, view.tab])
+  // One agent of the selection shown alone (HI-3180, Darren's decision), always the current tab's (HI-3186): see the
+  // project's tab.
+  const [showAlone, setShowAlone] = useState(false)
+  // The selection chosen again (Agents ▾, even the same): all of it shown again.
+  useEffect(() => setShowAlone(false), [view.agents])
+  const alone = shownAlone(showAlone, mode, entries, current?.key ?? null)
+  const drawnMode = alone ? 'single' : mode
+  const drawnEntries = useMemo(() => (alone ? entries.filter((e) => e.key === alone) : entries), [entries, alone])
+  // What the map reads turns and contexts for: the one shown alone first (HR1's round 1), then the rest.
+  const readEntries = useMemo(() => mapReadOrder(entries, alone), [entries, alone])
+  // Each agent's live state as the hosts have it now, keyed by what its ring depends on (HI-2929: a setup ending, local
+  // limits or a model set later). Not the entries' own: shownHosts is taken in only when a status or session changes.
+  const forContexts = mapContextEntries(readEntries, (e) => liveIn(hosts, e.path, e.agentId))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => setMapEntries(forContexts.entries), [forContexts.key])
+  const mapOn = mapShow.map
+  // Animated once live and the snapshot released (HI-2939): see the project's tab.
+  const map = useActivityMap({ active, animate: active && live && !held && mapOn, scope: `${fresh}|${drawnMode}|${filterKey}|${alone ?? ''}`, entries: mapOn ? drawnEntries : NO_ENTRIES, contexts: drawn.contexts, mode: drawnMode, at })
+  const strip = useMemo(() => (alone ? mapStrip(entries, drawn.contexts, readEntries) : undefined), [alone, entries, drawn.contexts, readEntries])
+  const mapRead = useMemo(() => (mapOn ? mapSessions(readEntries, mode) : []), [mapOn, readEntries, mode])
+  // The strip's click (HI-3186): another agent becomes the tab, shown alone; the one shown alone shows them all again.
+  const pickMapAgent = useCallback(
+    (key: string) => {
+      if (alone === key) return setShowAlone(false)
+      setSelected(null)
+      setView({ tab: key })
+      setShowAlone(true)
+    },
+    [alone, setView]
+  )
+
+  // Turns for the tab shown (its agent's session and running subagents), and the map's agents' sessions.
   const shownSessions = useMemo(() => {
     const path = current?.host.path
-    if (!path) return []
-    return parts.flatMap((p) => [...(p.session ? [{ path, id: p.session.session.id, live: true }] : []), ...p.subagents.flatMap((n) => (n.kind === 'session' && !n.gone ? [{ path, id: n.session.id, live: n.live }] : []))])
-  }, [parts, current?.host.path])
+    const listed = path ? parts.flatMap((p) => [...(p.session ? [{ path, id: p.session.session.id, live: true }] : []), ...p.subagents.flatMap((n) => (n.kind === 'session' && !n.gone ? [{ path, id: n.session.id, live: n.live }] : []))]) : []
+    const have = new Set(listed.map((x) => sk(x.path, x.id)))
+    return [...listed, ...mapRead.filter((x) => !have.has(sk(x.path, x.id)))]
+  }, [parts, current?.host.path, mapRead])
   shownSessionsRef.current = shownSessions
+  // Turns read only for the map, dropped once neither it nor the list shows their session (a filter changed, the map off).
+  // Which those are is known as it renders, so a read starting or answering after this render is checked against it.
+  const listPath = current?.host.path
+  const listedKeys = new Set(listPath ? parts.flatMap((p) => [...(p.session ? [sk(listPath, p.session.session.id)] : []), ...p.subagents.flatMap((n) => (n.kind === 'session' ? [sk(listPath, n.session.id)] : []))]) : [])
+  const mapOnlyNow = new Set(mapRead.map((x) => sk(x.path, x.id)).filter((k) => !listedKeys.has(k)))
+  mapOnlyRef.current = mapOnlyNow
+  const mapOnlyKey = [...mapOnlyNow].join(',')
+  const droppable = useRef(new Set<string>())
+  useEffect(() => {
+    const drop = [...droppable.current].filter((k) => !mapOnlyRef.current.has(k) && !shownSessionsRef.current.some((x) => sk(x.path, x.id) === k))
+    droppable.current = new Set(mapOnlyRef.current)
+    if (drop.length) setTurns((m) => new Map([...m].filter(([k]) => !drop.includes(k))))
+  }, [mapOnlyKey])
   const unread = shownSessions.filter((x) => !turns.has(sk(x.path, x.id)))
   const unreadKey = unread.map((x) => sk(x.path, x.id)).join(',')
   useEffect(() => {
@@ -444,6 +530,7 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
           {reading && <span className="faint">{tr(ACTIVITY_M.reading)}</span>}
           {listError && <span className="error-text">{tr(ACTIVITY_M.loadFailed, { error: listError })}</span>}
           <div className="actions">
+            <MapToggles show={mapShow} onChange={setMapShow} />
             {!live && pending > 0 && (
               <button className="chip activity-pill" onClick={refresh} title={tr(ACTIVITY_M.pillTip)}>
                 <Icon name="refresh" /> {tr(ACTIVITY_M.pill, { n: pending })}
@@ -487,6 +574,8 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
             ))}
           </div>
         )}
+        <div className={cx('activity-body', mapOn && entries.length > 0 && 'with-map')}>
+          {mapOn && entries.length > 0 && <ActivityMap mode={drawnMode} title={workspaceName} model={map.model} pulses={map.pulses} endPulse={map.endPulse} show={mapShow} onPick={pickMapAgent} strip={strip} picked={alone} />}
         {!parts.length || !current ? (
           <div className="pane-empty">{reading ? null : forCardLabel ? tr(M.cardNobody, { card: forCardLabel }) : tr(filtered ? ACTIVITY_M.emptyFiltered : M.empty)}</div>
         ) : (
@@ -513,6 +602,7 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
             ))}
           </div>
         )}
+        </div>
       </div>
       {chosen && current && <Details project={current.host} node={chosen} onClose={() => setSelected(null)} />}
       {menu.element}

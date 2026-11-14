@@ -1,0 +1,20 @@
+{
+  "jj.candidate.checks": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain",
+      "check": "plain",
+      "log": "select",
+      "path": "select"
+    }
+  },
+  "jj.candidate.returned": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain",
+      "why": "select",
+      "files": "select",
+      "log": "select"
+    }
+  }
+}

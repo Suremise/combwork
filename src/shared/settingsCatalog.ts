@@ -28,7 +28,7 @@ import { LISTED_ADVANCED, advancedDef, advancedTakesText, advancedText, agentTex
 import { agentMsg, say, type AgentMsg } from './agentText'
 import { language, msg } from './i18n'
 import { FORM_GROUPS, takesOption, type OptionKey } from './workflow/options'
-import { OPTION_TEXT, optionTitle, VALUE_TEXT } from './workflow/optionTexts'
+import { OPTION_TEXT, optionDesc, optionTitle, VALUE_TEXT } from './workflow/optionTexts'
 import { writeWorkflow } from './workflow/projectWorkflow'
 import { LANGUAGE_TEXT } from './i18n/languageText'
 import { LANGUAGES, SOURCE_LANGUAGE } from './i18n/languages'
@@ -694,7 +694,7 @@ export const PLATFORM_SETTING_KEY = 'workflow.platform'
 
 /** Each workflow option as a hidden row the Assistant's settings tool sets it by, placed by `at` (its section and key). */
 function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Partial<Pick<Row, 'workflowLevel'>>, platform?: PlatformId): Row[] {
-  const option = (key: OptionKey, type: SettingControl, options?: [string, TextPart][]): Row => ({ ...at(key), workflow: key, title: (platform ? optionTitle(key, platform) : null) ?? OPTION_TEXT[key]!.title, desc: OPTION_TEXT[key]!.desc, type, ...(options ? { options: [INHERIT, ...options.map(([value, label]) => ({ value, label }))] } : {}), hidden: true })
+  const option = (key: OptionKey, type: SettingControl, options?: [string, TextPart][]): Row => ({ ...at(key), workflow: key, title: (platform ? optionTitle(key, platform) : null) ?? OPTION_TEXT[key]!.title, desc: (platform ? optionDesc(key, platform) : null) ?? OPTION_TEXT[key]!.desc, type, ...(options ? { options: [INHERIT, ...options.map(([value, label]) => ({ value, label }))] } : {}), hidden: true })
   const V = VALUE_TEXT
   const rows: Row[] = [
     option('review', 'select', [['none', V.review.none], ['agent', V.review.agent], ['agentThenYou', V.review.agentThenYou], ['you', V.review.you]]),
@@ -712,6 +712,7 @@ function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Parti
     option('mergeInstall', 'select', [['onManifestChange', V.mergeInstall.onManifestChange], ['always', V.mergeInstall.always]]),
     option('strict', 'boolean'),
     option('pushTarget', 'boolean'),
+    option('followRemote', 'boolean'),
     option('commitMessage', 'select', [['combwork', V.commitMessage.combwork], ['branch', V.commitMessage.branch]]),
     option('okBefore', 'custom'),
     option('folder', 'select', [['slots', V.folder.slots], ['project', V.folder.project]]),

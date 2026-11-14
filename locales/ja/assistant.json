@@ -1,5 +1,7 @@
 {
-  "assistant.banner.connectionSetup": "このワークスペースで有効な{cli}のアカウントがないため、アシスタントを起動できません。アカウントを追加してサインインしてください。",
+  "assistant.banner.noAccountAny": "このワークスペースで有効なアカウントがないため、アシスタントを起動できません。Combworkが対応するいずれかのコーディングエージェントのアカウントを追加してサインインしてください。アシスタントはアカウントの順序で最初のものを使います。",
+  "assistant.banner.noAccountFor": "{others, select, yes {アシスタントは{cli}で動きますが、このワークスペースで有効な{cli}のアカウントがないため、起動できません。アカウントを追加するか、アシスタントの設定で別のコーディングエージェントのアカウントを選んでください。} other {アシスタントは{cli}で動きますが、このワークスペースで有効な{cli}のアカウントがないため、起動できません。アカウントを追加してサインインしてください。}}",
+  "assistant.banner.signedOut": "アシスタントの{cli}のアカウント「{name}」はサインアウトしているため、アシスタントを起動できません。「設定」→「アカウントと接続」でもう一度サインインしてください。",
   "assistant.chooseConnections.agent": "エージェント",
   "assistant.chooseConnections.next": "変更後",
   "assistant.chooseConnections.now": "現在",
@@ -724,6 +726,7 @@
   "assistant.undo.why.context": "最初に読むドキュメントのセクションは設定されたままです。",
   "assistant.undo.why.decision": "記録した決定事項は残ります。決定事項を変更・削除できるのは、エージェントやアシスタントではなく自分だけです。",
   "assistant.undo.why.declarePaths": "宣言したパスはカードに残ります。",
+  "assistant.undo.why.forwardResolved": "ビルダーに渡した最新化のマージは終了したままで、ビルダー用に作ったカードも残ります。不要なら、そのカードを保留にするか削除してください。",
   "assistant.undo.why.freshRetried": "再試行したレーンのエージェントの新しい会話は、元に戻しても停止しません。不要ならレーンを終了してください。",
   "assistant.undo.why.handOver": "引き継ぎは元に戻せません。作業は別のエージェントに移りました。",
   "assistant.undo.why.laneEnded": "終了したレーンは終了したままです。続ける場合は再開してください。",

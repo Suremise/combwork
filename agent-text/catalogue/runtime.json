@@ -31,6 +31,10 @@
     "text": "the user takes it over",
     "note": "The user's choice at a lane's round limit, as its answer's wake says it."
   },
+  "runtime.forward.resolving": {
+    "text": "Ended here, nothing merged: Resolve on a builder made {card} for a builder to merge {from} ({source}) into {to} and resolve the conflict there. Follow {card}.",
+    "note": "HI-2959: the comment on a forward merge card (Combwork merging branch {from} into {to}) ended by Resolve on a builder. {card}: the new card’s key; {source}: a short commit id."
+  },
   "runtime.move.doneByOverride": {
     "text": "{cards} can start without {card}'s work in the target: it is Done by an override, not merged.",
     "note": "A move's warning: cards waiting on this one can start, but its work isn't in their target. {cards}: their keys."
@@ -59,17 +63,33 @@
     "text": "{card} is blocked: {why}",
     "note": "A start's warning: the card is blocked. {why}: the block's reason, in its author's words."
   },
+  "runtime.start.earlierUnread": {
+    "text": "Combwork couldn't read {card}'s earlier starts, so it can't tell whether work from before (on a line of another version control) was left behind: if the card ran before, check its earlier line before bringing in what you need.",
+    "note": "HI-3107: a start’s warning (never a refusal): the card’s recorded starts couldn’t be read, so its earlier work can’t be looked for; said rather than taken for none (HR2)."
+  },
+  "runtime.start.earlierWork": {
+    "text": "{card} has earlier work on {line}, {from, select, known {from before its project switched to {now}} other {from a start whose version control Combwork couldn't read}}: {state, select, ahead {commits its target {target} doesn't hold} other {Combwork couldn't tell whether its target holds it}}. Combwork leaves it on that line and doesn't carry it in, though this start's target may hold it by now: check whether your folder has it before bringing in what you need, or leave it.",
+    "note": "HI-3107: a start’s warning (never a refusal): the card ran before under another version control (Git, say, before the repository switched to jj; from other: its start’s ruleset couldn’t be read), and its line from then has (ahead) or may have (other: it couldn’t be read) work the target recorded then lacked. Never claims the new folder lacks it (its new target, or a kept folder, may hold it). {line} and {target} are branch or bookmark names; {now} is the version control in force (Git, jj)."
+  },
   "runtime.start.laneStarted": {
     "text": "Combwork started {card} for you, as your lane's next card: carry on with it.",
     "note": "HI-2092: a lane's builder starting the card Combwork had already started for it: its start's warning."
   },
+  "runtime.start.moreFiles": {
+    "text": "{files} and {more} more",
+    "note": "HI-2944: a list of paths cut at three, and how many more there are."
+  },
   "runtime.start.slotMove": {
-    "text": "You'll continue in {slot}, on {line}: Combwork makes the line there from {target}, then gives you {card} there (a new conversation unless you already work there; your old one is kept). End your turn now.",
-    "note": "A start given a slot (#1438): the card's line is made there and the card given to the agent there, so it ends its turn now."
+    "text": "You'll continue in {slot}, on {line}: Combwork {carried, select, yes {carries the line on there, as it was (it merges into {target})} other {makes the line there from {target}}}, then gives you {card} there (a new conversation unless you already work there; your old one is kept). End your turn now.",
+    "note": "A start given a slot (#1438): the card's line is made there and the card given to the agent there, so it ends its turn now. HI-3112: carried, a line from an earlier start that carries on (never said to be made from the target)."
   },
   "runtime.start.slotWait": {
     "text": "{card} waits for a slot: {why}",
     "note": "A start's warning beside its refusal (#1438): why no slot is free."
+  },
+  "runtime.start.targetChanges": {
+    "text": "{target}'s folder {folder} has uncommitted changes ({files}): a merge into {target} that changes them pauses until they are committed or set aside. Combwork tells the user in its window; leave them as they are.",
+    "note": "HI-2944: a start's warning (never a refusal): the folder the target is checked out in has uncommitted changes; the user's window shows a notification with Commit and Set Aside. {files}: up to three paths, then how many more."
   },
   "runtime.submit.movedAhead": {
     "text": "moved ahead of {cards} (not started); its reviewer is told",
@@ -174,6 +194,10 @@
   "runtime.wake.removed": {
     "text": "{card} was taken out of the merge queue by {by, select, user {the user} other {the Assistant}}{reason}. It isn't merged; it is queued again only if the user retries it or it is approved again.",
     "note": "The builder's wake for a card taken out of the queue. {by}: user or assistant. {reason}: \": \" and the reason, or nothing."
+  },
+  "runtime.wake.resolutionOverride": {
+    "text": "{card}: the user’s override of the release path’s direction is recorded on it, so its merge may bring {to} up to date with {from}. Submit the same revision again (cw_submit): it goes back into the merge queue once, as approved.",
+    "note": "HI-3040: the builder’s wake when the user (or the Assistant on their explicit request) recorded an override on a forward merge’s resolution the queue returned for its direction. {from} and {to}: branch names."
   },
   "runtime.wake.reviewerAsks": {
     "text": "{card}: the reviewer asks: {text}",

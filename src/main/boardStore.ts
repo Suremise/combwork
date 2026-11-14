@@ -15,6 +15,8 @@ import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
 import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_ATTACHMENTS_STEP, CARD_REVS_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_RUNNERS_STEP, COPIES_STEP, QUEUE_SEEN_STEP, SESSION_LEASES_STEP, SKILL_COPIES_STEP, SLOTS_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
 import { NAMES_STEP } from './schema/namesStep'
 import { VALUES_STEP } from './schema/valuesStep'
+import { WORKSPACE_IDENTITY_STEP } from './schema/workspaceIdentityStep'
+import { JJ_PUBLISH_STEP } from './schema/jjPublishStep'
 import { addCommentArchive, allArchivedComments, archivedCommentCount, archivedCommentRows, archiveCommentRows, COMMENT_ARCHIVE_STEP, mayHaveLostCards, type Evicted } from './schema/commentArchive'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, isIoError, openDb, OPENABLE_WAIT_MS, schemaVersion, soleCopy, untilOpenable, type Db, type Migration, type PendingGroup } from './db'
 import { checkpointsReleased, checkpointWhenIdle, timedCommit } from './walCheckpoint'
@@ -349,6 +351,22 @@ export const BOARD_MIGRATIONS: Migration[] = [
     name: COMMENT_ARCHIVE_STEP.name,
     group: UPGRADE_GROUP_ID,
     up: (db) => addCommentArchive(db)
+  },
+  {
+    // HI-2795 (jj's J2): slots' and copies' platform identity, and a copy lease's verification (schema/workspaceIdentityStep.ts).
+    // In the 1.0 group, as 25–27 are: every step outside it is 0.9's.
+    version: 28,
+    name: WORKSPACE_IDENTITY_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => WORKSPACE_IDENTITY_STEP.up(db)
+  },
+  {
+    // HI-2882 (jj's J9b2): jj integrations' publish obligations, their per-target sequence and sweep, and the retained
+    // proof bundles (schema/jjPublishStep.ts). In the 1.0 group, as 25–28 are.
+    version: 29,
+    name: JJ_PUBLISH_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => JJ_PUBLISH_STEP.up(db)
   }
 ]
 
@@ -1310,6 +1328,14 @@ export function cardDoc(ws: WorkspaceService, n: number): Record<string, unknown
     }
     const [r] = readCardRows(db, { numbers: [n] })
     return r ? composeCard(r) : null
+  })
+}
+
+/** HI-2915: the cards whose waiting mark is an Assistant request's (`waitingFor.ask`, kept in a card's extra): each number and ref. */
+export function askWaitMarks(ws: WorkspaceService): { n: number; ref: string }[] {
+  return readSnapshot(ws, (b, db) => {
+    const ask = `json_extract(${b.legacy ? 'doc' : 'extra'}, '$.waitingFor.ask')` // i18n-ignore: SQL
+    return db.prepare(`SELECT number AS n, ${ask} AS ref FROM cards WHERE ${ask} IS NOT NULL`).all() as { n: number; ref: string }[] // i18n-ignore: SQL
   })
 }
 

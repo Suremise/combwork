@@ -3,7 +3,7 @@ import type { Account, AgentDef, AppSettings, Connection, LegacyConnection, Proj
 import { DEFAULT_APP_CONFIG, DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS, mergeDefaults, migrateConfig, migrateProjectConfig, withLegacyProjectFields } from '../src/shared/defaults'
 import { agentLaunchSettings, autoProvider, setInstalledCheck, splitArgs } from '../src/shared/providers'
 import { connectionName, joinArgs, launchValues, matchingConnection, resolveAgentConnection, sameValues } from '../src/shared/accounts'
-import { type AccountStore, type LegacyInputs, COPILOT_ACCOUNT, assistantHasSetup, baseValues, connectionFor, legacyEffective, legacyLaunchSettings, migrateAccounts, migrateAssistant, migrateProject, migrateWorkspaceFile, placeUnplaced, seamAccountId } from '../src/shared/connectionDefaults'
+import { type AccountStore, type LegacyInputs, COPILOT_ACCOUNT, assistantHasSetup, baseValues, connectionFor, legacyEffective, legacyLaunchSettings, migrateAccounts, migrateAssistant, migrateProject, migrateWorkspaceFile, placeUnplaced, seamAccountId, unpinAssistant } from '../src/shared/connectionDefaults'
 import { ASSISTANT_AGENT_ID, assistantProjectConfig } from '../src/shared/assistant'
 
 /**
@@ -358,5 +358,52 @@ describe("0.9's providers' order, read by the migration only (HI-2139)", () => {
 
   it("isn't today's: Automatic's fallback picks in Combwork's order", () => {
     expect(autoProvider(loaded.settings)).toBe('claude-code')
+  })
+})
+
+describe("HI-2899: a new workspace's Assistant names no CLI", () => {
+  // A fresh install: Claude Code and Codex on, Automatic, nothing set for the Assistant, no account.
+  const fresh = settingsOf({ providers: { 'claude-code': { enabled: true }, codex: { enabled: true } } })
+  const inp = (settings: AppSettings = fresh): LegacyInputs => ({ settings, ws: {}, legacy: [], seam: () => false })
+  const home = (): ProjectConfig => projectOf({ version: 2, agents: [{ id: ASSISTANT_AGENT_ID, name: 'Assistant' }] })
+
+  it('never ran, nothing named its CLI, no account: no CLI pinned and nothing left to place, so its launch takes the first usable account', () => {
+    const store: AccountStore = { accounts: [], connections: [], newId }
+    const m = migrateAssistant(home(), inp(), store, AT, { ran: false })!
+    expect(m.agents[0].provider).toBeUndefined()
+    expect(m.agents[0].connection).toBeUndefined()
+    expect(m.migrations?.accounts1?.unplaced).toBeUndefined()
+    expect(m.migrations?.accounts1?.at).toBe(AT)
+  })
+
+  it('one that ran keeps the CLI it ran on (HI-2139), as does one whose ran is unknown', () => {
+    for (const opts of [{ ran: true }, {}]) expect(migrateAssistant(home(), inp(), { accounts: [], connections: [], newId }, AT, opts)!.agents[0].provider).toBe('claude-code')
+  })
+
+  it('a CLI named anywhere (its own agent, Settings → Assistant, the default provider, a setup of its) is kept', () => {
+    const store = (): AccountStore => ({ accounts: [], connections: [], newId })
+    expect(migrateAssistant(projectOf({ version: 2, agents: [{ id: ASSISTANT_AGENT_ID, name: 'Assistant', provider: 'codex' }] }), inp(), store(), AT, { ran: false })!.agents[0].provider).toBe('codex')
+    expect(migrateAssistant(home(), inp(settingsOf({ ...fresh, assistant: { provider: 'codex' } })), store(), AT, { ran: false })!.agents[0].provider).toBe('codex')
+    expect(migrateAssistant(home(), inp(settingsOf({ ...fresh, defaultProvider: 'codex' })), store(), AT, { ran: false })!.agents[0].provider).toBe('codex')
+    expect(migrateAssistant(home(), inp(settingsOf({ ...fresh, assistant: { providers: { 'claude-code': { model: 'opus' } } } })), store(), AT, { ran: false })!.agents[0].provider).toBe('claude-code')
+  })
+
+  it('an account to place it on: placed there, as before', () => {
+    const store: AccountStore = { accounts: [account('a-1', 'claude-code')], connections: [], newId }
+    const m = migrateAssistant(home(), { ...inp(), ws: { connections: { 'claude-code': { on: ['a-1'], default: 'a-1' } } } }, store, AT, { ran: false })!
+    expect(m.agents[0]).toMatchObject({ provider: 'claude-code', connection: expect.any(String) })
+  })
+
+  it('a home migrated before it, pinned so: unpinned once (never one that ran, has a connection or was named)', () => {
+    const pinned = migrateAssistant(home(), inp(), { accounts: [], connections: [], newId }, AT, { ran: true })!
+    expect(pinned.agents[0].provider).toBe('claude-code')
+    expect(pinned.migrations?.accounts1?.unplaced?.[ASSISTANT_AGENT_ID]).toBeDefined()
+    const patch = unpinAssistant(pinned, inp(), false)!
+    expect(patch.agents[0].provider).toBeUndefined()
+    expect(patch.migrations?.accounts1?.unplaced).toBeUndefined()
+    expect(unpinAssistant({ ...pinned, ...patch }, inp(), false)).toBeNull()
+    expect(unpinAssistant(pinned, inp(), true)).toBeNull()
+    expect(unpinAssistant(pinned, inp(settingsOf({ ...fresh, assistant: { provider: 'claude-code' } })), false)).toBeNull()
+    expect(unpinAssistant({ ...pinned, agents: [{ ...pinned.agents[0], connection: 'c-1' }] }, inp(), false)).toBeNull()
   })
 })

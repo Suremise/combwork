@@ -139,6 +139,7 @@ describe("Git's history reads, through the port", () => {
     await same(() => G.lineHead(a, 'work'), () => gitHistory.lineHead(a, 'work'))
     await same(() => G.lineHead(a, 'nope'), () => gitHistory.lineHead(a, 'nope'))
     await same(() => G.defaultBranch(a), () => gitHistory.defaultTarget(a))
+    await same(() => G.mainBranch(a), () => gitHistory.mainLine(a))
     await same(() => G.commonDir(tree), () => gitHistory.store(tree))
     await same(() => G.commonDirFast(tree), () => gitHistory.storeFast(tree))
     await same(() => G.isAncestor(a, main, work), () => gitHistory.isAncestor(a, main, work))

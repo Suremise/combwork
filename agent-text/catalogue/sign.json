@@ -1,0 +1,30 @@
+{
+  "sign.loop": {
+    "text": "Combwork's signer wrapper couldn't tell which signer git would use without it, so it signed nothing and the commit wasn't made. Tell the user; turning off the Advanced setting \"Agents' signed commits never wait for a passphrase\" and restarting the session gives it git's own signer.",
+    "note": "cw-sign (HI-2867): Combwork's environment entries weren't as Combwork set them, so git's own signer couldn't be found."
+  },
+  "sign.needsSomeone": {
+    "text": "Combwork: signing this commit needs someone to enter a passphrase or unlock a key, and nobody can in an agent's session, so it failed at once instead of waiting, and the commit wasn't made. Signing stays on: don't commit unsigned or change git's signing settings unless the user says so. Tell the user: their key can sign with nobody there (loaded in ssh-agent, or its passphrase cached by gpg-agent), as Version Control → Branches & remotes → Signing shows.",
+    "note": "cw-sign's line after the signer's own error (HI-2867), which the agent reads under git's \"failed to sign the data\". Keep Version Control → Branches & remotes → Signing as the window shows it."
+  },
+  "sign.noArgs": {
+    "text": "Combwork's signer wrapper got no usable arguments from git, so it signed nothing and the commit wasn't made. Tell the user; turning off the Advanced setting \"Agents' signed commits never wait for a passphrase\" and restarting the session gives it git's own signer.",
+    "note": "cw-sign (HI-2867): cw-sign.exe's argument transport was missing or malformed."
+  },
+  "sign.notFound": {
+    "text": "{name} wasn't found, so the commit wasn't signed or made.",
+    "note": "cw-sign (HI-2867): the signer (as configured, or git's default) isn't on the session's PATH."
+  },
+  "sign.notStarted": {
+    "text": "{program} couldn't be started ({detail}), so the commit wasn't signed or made.",
+    "note": "cw-sign (HI-2867): starting the signer failed. detail: the system's words."
+  },
+  "sign.timedOut": {
+    "text": "Combwork: the signer ({program}) didn't finish within {seconds, number} s, so Combwork ended it and the commit wasn't made. Signing stays on: don't commit unsigned or change git's signing settings unless the user says so. Tell the user (the bound is the Advanced setting \"Agents' signer: give up after\").",
+    "note": "cw-sign (HI-2867): the signer was ended at its bound. program: its path. Keep the Advanced setting's title as Settings shows it."
+  },
+  "sign.unreadable": {
+    "text": "Combwork's signer wrapper couldn't read git's signing settings ({detail}), so it signed nothing and the commit wasn't made.",
+    "note": "cw-sign (HI-2867): git config failed. detail: git's words."
+  }
+}

@@ -8,5 +8,6 @@
   "slots.release.otherCombwork": "{slot} est retenu par un autre Combwork qui tourne encore (processus {pid}) : libère-le là-bas, ou quitte d’abord cet autre Combwork.",
   "slots.setting.bad": "Ce paramètre des emplacements n’existe pas dans Combwork.",
   "slots.setting.badSize": "Le nombre de copies de relecture et de vérification est un nombre entier de {min, number} à {max, number}.",
+  "slots.setting.badSwitch": "Préparer les sous-modules et LFS est activé ou désactivé.",
   "slots.setting.badText": "Un script d’emplacement ou une liste de fichiers est un texte d’au plus {max, number} caractères."
 }

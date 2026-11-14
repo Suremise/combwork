@@ -1381,7 +1381,9 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     expect(watches.watchFor(home, 'assistant')).toBeNull()
     // Through the Agent API's reply: "Already: …".
     expect(taskWaitText({ lanesAlready: (r as { already: string[] }).already, replaced: (r as { replaced: string }).replaced })).toBe(`Already: Lane B1 / R1 (screenshots): ended: merged at 47a3d54c0ffe; Lane B2 / R2: was abandoned. Your watch (waiting for #${c}) has ended.`)
-    // A running lane watched for failures only: its end still wakes the watch, which has nothing left to watch.
+    // A running lane watched for failures only: its end still wakes the watch, which has nothing left to watch. Its card
+    // is its builder's (HI-3117: a lane whose cards are all another agent's has nothing left, and ends by itself).
+    await inWorkspace(w, () => tasks.updateTask(c, { agent: 'b3' }, { kind: 'user' }))
     const running = (await lanes.startLane(w, { project: 'alpha', builder: 'b3', reviewer: 'r1', cards: [c], by: 'B3 (alpha)' })).lane
     st.status = 'watching'
     const on = await watches.registerLaneWatch(w, home, 'assistant', { ids: [running.id], events: ['failed'] })

@@ -7,7 +7,8 @@
 // that. Narrowed a few pixels at a time, a Claude Code agent's footer (priced, so it has a cost, with every warning: its
 // context past the Compact threshold, a transcript past its warn size and a background task running) and a Codex agent's
 // ("Approve for me", its longest label, no warnings), at 100% and 125% zoom, and the Assistant's (its plain transcript
-// size): nothing overlaps, every step comes in that order and widening brings the text back. Screenshots of each step and of each place in both
+// size): nothing overlaps, every step comes in that order and widening brings the text back. The mode chip sits on the
+// footer's line, its label on the text's baseline, at both zooms (HI-3183). Screenshots of each step and of each place in both
 // themes. The agents and the Assistant are the fake Claude Code and the fake Codex. Dev build, throwaway profile,
 // workspace, CLAUDE_CONFIG_DIR and CODEX_HOME.
 const lib = require('./lib.cjs')
@@ -123,6 +124,47 @@ function sweep([agent, from, to, step, keep]) {
   })()
 }
 
+/**
+ * In the page (HI-3183): how the agent's mode chip sits on its footer's line. The text boxes of the chip's label and of
+ * the model beside it (a range's box: the font's ascent to its descent, so with the same font the same top is the same
+ * baseline), and the centre of the chip's border box against the model text's, in CSS px.
+ */
+function chipLine(agent) {
+  const el = [...document.querySelectorAll('.agent-pane')].filter((p) => p.querySelector('.pane-header-bar')?.textContent.includes(agent)).map((p) => p.querySelector('.pane-footer-bar')).find((f) => f && f.getBoundingClientRect().width > 0)
+  const chip = el?.querySelector('.mode-chip')
+  const label = chip?.querySelector('.mode-label')
+  const model = el?.querySelector('.foot-model')
+  if (!chip || !label || !model) return { missing: true }
+  const textBox = (x) => {
+    const walker = document.createTreeWalker(x, NodeFilter.SHOW_TEXT)
+    const node = walker.nextNode()
+    const range = document.createRange()
+    range.selectNodeContents(node)
+    return range.getBoundingClientRect()
+  }
+  const [l, m, c] = [textBox(label), textBox(model), chip.getBoundingClientRect()]
+  const fb = el.getBoundingClientRect()
+  const line = fb.top + parseFloat(getComputedStyle(el).borderTopWidth) + (fb.bottom - fb.top - parseFloat(getComputedStyle(el).borderTopWidth)) / 2
+  const icon = chip.querySelector('.codicon:not(.mode-caret)')?.getBoundingClientRect()
+  const caret = chip.querySelector('.mode-caret')?.getBoundingClientRect()
+  return {
+    label: label.textContent,
+    labelFont: getComputedStyle(label).fontSize,
+    modelFont: getComputedStyle(model).fontSize,
+    // The label's text against the model's: top and bottom of the text box.
+    topDiff: +(l.top - m.top).toFixed(2),
+    bottomDiff: +(l.bottom - m.bottom).toFixed(2),
+    // The chip's border box centred on the model's text, and on the footer's line (below its top border).
+    chipOffText: +((c.top + c.bottom) / 2 - (m.top + m.bottom) / 2).toFixed(2),
+    chipOffLine: +((c.top + c.bottom) / 2 - line).toFixed(2),
+    textOffLine: +((m.top + m.bottom) / 2 - line).toFixed(2),
+    iconOffChip: icon ? +((icon.top + icon.bottom) / 2 - (c.top + c.bottom) / 2).toFixed(2) : null,
+    caretOffChip: caret ? +((caret.top + caret.bottom) / 2 - (c.top + c.bottom) / 2).toFixed(2) : null,
+    chipHeight: +(c.bottom - c.top).toFixed(2),
+    footerHeight: +(fb.bottom - fb.top).toFixed(2)
+  }
+}
+
 /** Everything wrong with a narrowing sweep (widest first): a text cut, a step out of order, an overlap. */
 function problems(states, { hasTasks, hasSize, hasPlain }) {
   const most = hasSize ? 3 : hasTasks ? 2 : hasPlain ? 1 : 0
@@ -226,12 +268,29 @@ function problems(states, { hasTasks, hasSize, hasPlain }) {
   const atFull = await ratio()
   const zoomed = (zoom) => until(async () => Math.abs((await ratio()) - atFull * zoom) < 0.01, HUNG_MS)
 
+  /** The mode chip on the footer's line (HI-3183): the label in the text's font on its baseline, the border box centred on the line, the footer's height kept. */
+  const onLine = async (z, name, s) => {
+    // The footer, taken by the window: Playwright's screenshots don't follow the window's zoom (at 125% they show another
+    // part of the page), the window's own capture takes its box in the window's pixels (CSS px times the zoom).
+    const rect = await footerOf(name).evaluate((el) => {
+      const b = el.getBoundingClientRect()
+      return { x: b.left, y: b.top - 4, width: b.width, height: b.height + 8 }
+    })
+    const file = path.join(lib.WORK, `footerfit-line-${name.toLowerCase()}-${z.replace('%', '')}.png`)
+    const png = await app.evaluate(async ({ BrowserWindow }, [r, zf]) => {
+      const scaled = { x: Math.floor(r.x * zf), y: Math.floor(r.y * zf), width: Math.ceil(r.width * zf), height: Math.ceil(r.height * zf) }
+      return (await BrowserWindow.getAllWindows()[0].webContents.capturePage(scaled)).toPNG().toString('base64')
+    }, [rect, parseFloat(z) / 100])
+    fs.writeFileSync(file, Buffer.from(png, 'base64'))
+    check(`${z}: ${name}'s mode chip ("${s.label}") sits on the footer's line`, !s.missing && s.labelFont === s.modelFont && Math.abs(s.topDiff) <= 0.1 && Math.abs(s.bottomDiff) <= 0.1 && Math.abs(s.chipOffLine) <= 0.5 && Math.abs(s.iconOffChip) <= 0.5 && Math.abs(s.caretOffChip) <= 0.5 && s.footerHeight === 24, JSON.stringify(s))
+  }
   for (const zoom of [1, 1.25]) {
     await app.evaluate(({ BrowserWindow }, z) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(z), zoom)
     await zoomed(zoom)
     const z = `${zoom * 100}%`
     // Claude Code: every step.
     await show('Writer', 'claude')
+    await onLine(z, 'Writer', await page.evaluate(chipLine, 'Writer'))
     const states = await page.evaluate(sweep, ['Writer', null, 120, -3])
     const bad = problems(states, { hasTasks: true, hasSize: true, hasPlain: false })
     check(`${z}: Claude Code footer: every step in order, nothing cut early, nothing overlapping`, !bad.length, bad.slice(0, 6).join('; '))
@@ -249,6 +308,7 @@ function problems(states, { hasTasks, hasSize, hasPlain }) {
     check(`${z}: widening brings each back`, back.at(-1).fit === 0 && back.at(-1).tasks === 'full' && back.at(-1).size === 'full' && back.at(-1).ctx === 'full' && Math.abs(back.at(-1).rightGap) <= 1 && back.every((s, i) => i === 0 || s.fit <= back[i - 1].fit), JSON.stringify(back.at(-1)))
     // Codex: its longest label shortens before anything is cut off.
     await show('Checker', 'codex')
+    await onLine(z, 'Checker', await page.evaluate(chipLine, 'Checker'))
     const cx = await page.evaluate(sweep, ['Checker', null, 100, -3])
     const cxBad = problems(cx, { hasTasks: cx.some((s) => s.tasks), hasSize: cx.some((s) => s.size), hasPlain: cx.some((s) => s.plain) })
     check(`${z}: Codex footer: in order, nothing overlapping, its icon and caret always shown`, !cxBad.length, cxBad.slice(0, 6).join('; '))

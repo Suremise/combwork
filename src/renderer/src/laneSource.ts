@@ -47,6 +47,8 @@ export interface Lane {
   stages: LaneInfo['stages']
   /** A list change queued behind its card in flight (#1270), as main has it: shown in the Lanes tab (HI-2151); null: none. */
   queued: number[] | null
+  /** Its list's revision (HI-2898): what an edit of its list in the Lanes tab names, refused once it moved. */
+  listRev: number
 }
 
 const NO_LANES: Lane[] = []
@@ -97,17 +99,22 @@ export function useLanes(load = true): Lane[] {
   const projects = useStore((s) => s.workspace?.projects)
   const order = useLaneOrder()
   return useMemo(() => {
-    if (!raw.length || !projects) return NO_LANES
-    // A lane names its project by folder name; one whose project isn't in the workspace is left out.
-    const pathOf = new Map(projects.map((p) => [folderName(p.path), p.path]))
-    const who = (a: { id: string; name: string }): Lane['builder'] => ({ agentId: a.id, name: a.name })
-    const lanes = raw.flatMap((d): Lane[] => {
-      const project = pathOf.get(d.project.toLowerCase())
-      const frozen = d.state === 'ended' || d.state === 'abandoned' ? d.cards : null
-      return project ? [{ id: d.id, project, builder: who(d.builder), reviewer: d.reviewer ? who(d.reviewer) : null, pool: !!d.pool, poolReview: d.poolReview ?? null, slot: d.slotInfo ?? null, name: d.name, cards: d.cards.map((c) => c.number), info: d.cards, state: d.state, frozen, startedAt: d.startedAt, endedAt: d.endedAt, mergeCommit: d.mergeCommit, status: d.status ?? null, oldRules: !!d.oldRules, ...(d.target ? { target: d.target } : {}), stages: d.stages ?? null, queued: d.queued ?? null }] : []
-    })
+    const lanes = projects ? lanesOf(raw, projects) : NO_LANES
     return lanes.length ? panelOrder(lanes, order) : NO_LANES
   }, [raw, projects, order])
+}
+
+/** Lanes as main read them, as the panel shows them: in the workspace's projects (one whose project isn't is left out). */
+export function lanesOf(raw: readonly LaneInfo[], projects: readonly { path: string }[]): Lane[] {
+  if (!raw.length) return NO_LANES
+  // A lane names its project by folder name.
+  const pathOf = new Map(projects.map((p) => [folderName(p.path), p.path]))
+  const who = (a: { id: string; name: string }): Lane['builder'] => ({ agentId: a.id, name: a.name })
+  return raw.flatMap((d): Lane[] => {
+    const project = pathOf.get(d.project.toLowerCase())
+    const frozen = d.state === 'ended' || d.state === 'abandoned' ? d.cards : null
+    return project ? [{ id: d.id, project, builder: who(d.builder), reviewer: d.reviewer ? who(d.reviewer) : null, pool: !!d.pool, poolReview: d.poolReview ?? null, slot: d.slotInfo ?? null, name: d.name, cards: d.cards.map((c) => c.number), info: d.cards, state: d.state, frozen, startedAt: d.startedAt, endedAt: d.endedAt, mergeCommit: d.mergeCommit, status: d.status ?? null, oldRules: !!d.oldRules, ...(d.target ? { target: d.target } : {}), stages: d.stages ?? null, queued: d.queued ?? null, listRev: d.listRev ?? 0 }] : []
+  })
 }
 
 /**

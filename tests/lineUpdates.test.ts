@@ -150,13 +150,18 @@ async function approved(w: WS, wt: string, card: number, file: string, reviewed 
   return rev
 }
 
-/** The builder merges its approved card into main as `how` (a squash, or a merge commit) and reports it: Done. */
+/**
+ * The builder merges its approved card into main as `how` (a squash, or a merge commit) and reports it: Done. Combwork's
+ * reconciler follows the project from the card's approval (service.ts) and may find the merge first (its watcher's run,
+ * 400 ms after the commit, ahead of a slow report under load, HI-3101): then the card is Done already and the report is
+ * refused from there.
+ */
 async function merged(w: WS, repo: string, card: number, how: 'squash' | 'merge', rev = 'card'): Promise<void> {
   if (how === 'squash') {
     git(repo, 'merge', '-q', '--squash', rev)
     git(repo, 'commit', '-qm', `squash #${card}`)
   } else git(repo, 'merge', '-q', '--no-ff', '-m', `merge #${card}`, rev)
-  await act(w, card, builder, { kind: 'reportMerge' })
+  expect([null, 'move.notFromHere']).toContain(await refused(act(w, card, builder, { kind: 'reportMerge' })))
   expect(foldCard(facts(w, card)).stage).toBe('done')
 }
 
@@ -508,7 +513,18 @@ describe('the move checked again at its boundary (#1271 round 2)', () => {
     it('a moving pass reads its git paths and the target from the .git files, with no git process', async () => {
       const { repo, wt, cards, w } = await squashed()
       const ran: (readonly string[])[] = []
-      gitTestHooks.started = (_cwd, args) => void ran.push(args)
+      // The pass's own: the reconciler, following the project since the card's approval, runs on its watcher's events
+      // (the squash, the move) and may read git while the pass runs, under load (HI-3101).
+      const stack = (): string => {
+        const limit = Error.stackTraceLimit
+        Error.stackTraceLimit = 100
+        try {
+          return new Error().stack ?? ''
+        } finally {
+          Error.stackTraceLimit = limit
+        }
+      }
+      gitTestHooks.started = (_cwd, args) => void (!/[\\/]reconciler?\.ts:/.test(stack()) && ran.push(args))
       await update(w)
       gitTestHooks.started = undefined
       expect(git(wt, 'rev-parse', 'HEAD')).toBe(git(repo, 'rev-parse', 'main'))

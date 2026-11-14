@@ -41,8 +41,11 @@ afterAll(async () => {
   store.closeAllBoards()
 })
 
+/** The bound for a hung run, never how long a step should take. */
+const HUNG_MS = 15_000
+
 /** Waits for `ok` (a bound for a hung run, never how long it should take). */
-async function until(ok: () => boolean, ms = 15_000): Promise<void> {
+async function until(ok: () => boolean, ms = HUNG_MS): Promise<void> {
   const by = Date.now() + ms
   while (!ok()) {
     if (Date.now() > by) throw new Error('git commands still running after the call ended') // i18n-ignore: a test's own failure
@@ -61,19 +64,27 @@ async function traced(base: string, fn: () => Promise<unknown>): Promise<string[
   const at = resolve(base).toLowerCase().replace(/\\/g, '/')
   const stable = (s: string): string =>
     s.replace(/\\\\/g, '/').replace(/\\/g, '/').toLowerCase().split(at).join('<base>').replace(/\b[0-9a-f]{40}\b/g, '<id>').replace(/\b[0-9a-f]{7,12}\b/g, '<short>')
-  let running = 0
+  // HI-2954: only the commands this step saw start are waited for. A plain count went below zero when one started before
+  // the step (a refresh of the workspace's) ended inside it, and the wait below never ended (repoReadTraces on CI, 11 Nov).
+  const running = new Map<string, number>()
+  const key = (cwd: string, args: readonly string[]): string => `${resolve(cwd)}\0${args.join('\0')}`
   gitTestHooks.started = (cwd, args) => {
-    running++
+    running.set(key(cwd, args), (running.get(key(cwd, args)) ?? 0) + 1)
     ran.push(stable(`${resolve(cwd)} :: ${args.join(' ')}`))
   }
-  gitTestHooks.ended = () => void running--
+  gitTestHooks.ended = (cwd, args) => {
+    const n = running.get(key(cwd, args))
+    if (n === undefined) return
+    if (n > 1) running.set(key(cwd, args), n - 1)
+    else running.delete(key(cwd, args))
+  }
   let end = ''
   try {
     end = stable(`=> ${JSON.stringify((await fn()) ?? null)}`)
   } catch (e) {
     end = stable(`!! ${(e as Error).message}`)
   } finally {
-    await until(() => running === 0)
+    await until(() => running.size === 0, HUNG_MS)
     gitTestHooks.started = undefined
     gitTestHooks.ended = undefined
   }
@@ -117,7 +128,12 @@ describe("the window's repository mutations (HI-2788)", { timeout: 180_000 }, ()
     const w = createWorkspaceService()
     await w.open(ws)
     opened.push(w)
-    const run = (fn: () => Promise<unknown>): Promise<string[]> => traced(base, () => inWorkspace(w, fn))
+    // HI-2954: the workspace's own refreshes settled first. Opening leaves one scheduled (its writes of project.json schedule
+    // it, 250 ms on), as can a step's writes: its git would otherwise straddle or land in a step's trace.
+    const run = async (fn: () => Promise<unknown>): Promise<string[]> => {
+      await w.refreshesSettled()
+      return traced(base, () => inWorkspace(w, fn))
+    }
     const at = (line: string): string => sh(repo, 'rev-parse', line)
 
     // Branches.

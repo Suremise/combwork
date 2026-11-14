@@ -30,7 +30,9 @@ export const REPO_OP_CHANNELS = {
   'git:init': 'init',
   'files:gitExclude': 'ignoreRules',
   'files:gitUntrack': 'ignoreRules',
-  'files:gitInclude': 'ignoreRules'
+  'files:gitInclude': 'ignoreRules',
+  'files:gitCommitIgnore': 'folderChanges',
+  'queue:settleChanges': 'folderChanges'
 } as const satisfies Partial<Record<CombworkChannel, Operation>>
 
 export type RepoOpChannel = keyof typeof REPO_OP_CHANNELS

@@ -128,3 +128,40 @@ export const connectionCli = (view: ConnectionsView | null, id: string | null | 
   const c = id && view ? view.connectionRows?.find((x) => x.id === id) : undefined
   return c && view ? cliOfConnections(view)(c.account) : undefined
 }
+
+/**
+ * The Assistant's CLI as its launch picks it (sessions.ts, decision A, HI-2108): its own (`provider`) when it names one or
+ * a connection; one that names neither (a new workspace's) runs the CLI of the first usable connection here, Automatic's
+ * pick (`fallback`) only where none is. Running, the CLI it runs.
+ */
+export function assistantCli(a: { provider?: string; connection?: string; live?: { provider: ProviderId } | null }, view: ConnectionsView | null, settings: Parameters<typeof isProviderEnabled>[0], ready: CliReady, fallback: ProviderId): ProviderId {
+  if (a.live?.provider) return a.live.provider
+  if (a.provider || a.connection) return fallback
+  return connectionCli(view, firstUsableConnection(view, settings, ready)) ?? fallback
+}
+
+/**
+ * What the Assistant panel says while the Assistant can't start for want of an account (HI-2899): nothing (`ok`: it can,
+ * or connections don't apply to its CLI here); its connection's account signed out (`signedOut`, named); accounts off in
+ * this workspace that would do (`off`, as offHereChoice: one to turn on, or several); none added that would do: for an
+ * Assistant that names no CLI, any CLI's (`noneAny`), else its own CLI's (`noneFor`, `others` when another CLI's
+ * connection is usable here, to choose in its settings). `cli`: assistantCli's.
+ */
+export type AssistantNeed = { kind: 'ok' } | { kind: 'signedOut'; name: string; cli: ProviderId } | { kind: 'off'; choice: Exclude<OffHereChoice, { kind: 'none' }> } | { kind: 'noneAny' } | { kind: 'noneFor'; cli: ProviderId; others: boolean }
+
+export function assistantNeed(a: { provider?: string; connection?: string }, cli: ProviderId, view: ConnectionsView | null, settings: Parameters<typeof isProviderEnabled>[0], ready: CliReady, signedOut: (account: Account) => boolean): AssistantNeed {
+  const shown = connectionOf(a.connection, cli, undefined, view)
+  if (!view || !shown || view.testHome.includes(cli)) return { kind: 'ok' }
+  if (shown.desired.ok) {
+    const id = shown.desired.account
+    const account = view.connections.find((x) => x.id === id)
+    return account && account.kind !== 'server' && signedOut(account) ? { kind: 'signedOut', name: shown.desired.name, cli } : { kind: 'ok' }
+  }
+  const automatic = !a.provider && !a.connection
+  // One that names no CLI, while Combwork still looks for the CLIs, or with an account on here whose CLI isn't installed:
+  // no account is missing (a missing CLI is the CLI warnings' to say), so nothing here.
+  if (automatic && (firstReadyConnection(view, settings, ready).checking || offeredConnections(view, settings).length)) return { kind: 'ok' }
+  const choice = offHereChoice(view, ready, automatic ? undefined : cli)
+  if (choice.kind !== 'none') return { kind: 'off', choice }
+  return automatic ? { kind: 'noneAny' } : { kind: 'noneFor', cli, others: offeredConnections(view, settings).some((c) => cliOfConnections(view)(c.account) !== cli) }
+}

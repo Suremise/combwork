@@ -11,7 +11,8 @@ import type { AgentInfo, AgentStart, DueDeps, LaneStatus, ProgressRun, TaskCard 
 import { LOOP_STEP_WAIT_MINUTES, laneStatusText } from '../shared/lanes'
 import { forYouOfCards } from './workflow/cardWork'
 import { projectPreferences } from './workflow/preferences'
-import { queueReturnOf, staleApprovalOf } from './queueReturn'
+import { forwardWaitOf, queueReturnOf, staleApprovalOf } from './queueReturn'
+import type { ForwardWait } from '../shared/workflow/workView'
 import { isResuming } from './restartResume'
 import { startNow, startSeq } from './agentStarts'
 import { sessions } from './sessions'
@@ -223,8 +224,8 @@ function ownQuestionOpen(wsPath: string, c: TaskCard, agentId: string): boolean 
  * check (stepWaitMs: its project's workflow option Design check wait, HI-1766), and who owes its review (`due`,
  * reviewDueOf, HI-2636).
  */
-export function cardStall(c: TaskCard, agentNow: StallAgent | null, wsPath: string | null, lane?: LaneOrderView | null, stepWaitMs = LOOP_STEP_WAIT_MINUTES * 60_000, returned?: { at: string } | null, stale?: { since: string; approved: string | null; current: string | null } | null, due?: ReviewDue): string | null {
-  const cause = cardStallCause(c, agentNow, wsPath, lane, stepWaitMs, returned, stale, due)
+export function cardStall(c: TaskCard, agentNow: StallAgent | null, wsPath: string | null, lane?: LaneOrderView | null, stepWaitMs = LOOP_STEP_WAIT_MINUTES * 60_000, returned?: { at: string } | null, stale?: { since: string; approved: string | null; current: string | null } | null, due?: ReviewDue, forward?: ForwardWait | null): string | null {
+  const cause = cardStallCause(c, agentNow, wsPath, lane, stepWaitMs, returned, stale, due, forward)
   if (!cause) return null
   // HI-2754: the agent the stall is about, idle after its latest turn was stopped by its provider's safety filter: said
   // beside the reason, never in its place.
@@ -239,7 +240,7 @@ export function cardStall(c: TaskCard, agentNow: StallAgent | null, wsPath: stri
  * waits, an agent not running, a deadlocked lane, a review copy). That agent as it is live in the card's project (its
  * name, provider, status and safeguard note), when it is.
  */
-export function cardStallCause(c: TaskCard, agentNow: StallAgent | null, wsPath: string | null, lane?: LaneOrderView | null, stepWaitMs = LOOP_STEP_WAIT_MINUTES * 60_000, returned?: { at: string } | null, stale?: { since: string; approved: string | null; current: string | null } | null, due?: ReviewDue): StallCause | null {
+export function cardStallCause(c: TaskCard, agentNow: StallAgent | null, wsPath: string | null, lane?: LaneOrderView | null, stepWaitMs = LOOP_STEP_WAIT_MINUTES * 60_000, returned?: { at: string } | null, stale?: { since: string; approved: string | null; current: string | null } | null, due?: ReviewDue, forward?: ForwardWait | null): StallCause | null {
   // Waiting on purpose (HI-2618: HB3 held HI-2590 for a quiet window and was reported stalled four times): what it
   // waits for is said on the card, never a stall, until it is cleared or the card leaves Doing.
   if (c.waitingFor && c.column === 'doing') return null
@@ -281,7 +282,7 @@ export function cardStallCause(c: TaskCard, agentNow: StallAgent | null, wsPath:
   return (
     about(startFailedReason(c, agentNow)) ??
     about(startWaitingReason(c, agentNow)) ??
-    about(stalledReason(c, agentNow)) ??
+    about(stalledReason(c, agentNow, undefined, forward)) ??
     about(notWatchingReason(c, notWatching), notWatchingAgent(c, notWatching)?.agentId) ??
     about(back, c.agent) ??
     about(waited(REVIEW_WAIT_STALL_MS) ? reviewWaitReason(c, watchers, Date.now(), undefined, due?.owed, due?.reviews) : null, due?.owed?.agentId) ??
@@ -437,7 +438,8 @@ export async function cardStallWith(ws: WorkspaceService, c: TaskCard, agents = 
   const returned = c.column === 'doing' && c.agent && c.project && ws.path ? await queueReturnOf(ws, join(ws.path, c.project), c.number) : null
   // An approved card whose pass went stale (HI-1763).
   const stale = c.column === 'passed' && c.agent && c.project && ws.path ? await staleApprovalOf(ws, join(ws.path, c.project), c.number) : null
-  const cause = cardStallCause(c, now, ws.path, lane, await stepWaitOf(ws, c), returned, stale, await reviewDueOf(ws, c, agents))
+  const forward = c.column === 'doing' && !c.agent && c.project && ws.path ? await forwardWaitOf(ws, join(ws.path, c.project), c.number) : null
+  const cause = cardStallCause(c, now, ws.path, lane, await stepWaitOf(ws, c), returned, stale, await reviewDueOf(ws, c, agents), forward)
   if (!cause) return null
   const context = safeguardContext(cause.agent)
   const safeguard = stallSafeguardOf(cause.agent)

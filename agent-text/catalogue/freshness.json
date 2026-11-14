@@ -1,0 +1,14 @@
+{
+  "freshness.unread.comment": {
+    "text": "Comment from the user ({date}): {text}",
+    "note": "HI-2854: a refused submit's unseen comment the user wrote, on a line of its own below the refusal. date: YYYY-MM-DD; text: the comment in full."
+  },
+  "freshness.unread.decision": {
+    "text": "Decision ({date}, recorded by {by}): {text}",
+    "note": "HI-2854: a refused submit's unseen decision, on a line of its own below the refusal. date: YYYY-MM-DD; by: who recorded it; text: the decision in full."
+  },
+  "freshness.unread.missing": {
+    "text": "A comment of the user's on this card can't be found, on the card or in its archive: ask the user what it said if you need it.",
+    "note": "HI-2854: a refused submit's line for a comment of the user's it hasn't seen that is neither on the card nor in its archive (HI-2641), which can't be given (not expected: every such comment is on one or the other); it counts as received, so the refusal doesn't repeat for ever."
+  }
+}

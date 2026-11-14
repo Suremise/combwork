@@ -152,6 +152,11 @@ describe('installing a downloaded update (#1647)', () => {
   const { fakeInstall } = require('./e2e/fakeInstall.cjs') as { fakeInstall: (dir: string, o?: { version?: string; identity?: unknown }) => string }
   const base = tempDir('cw-updater-')
   let n = 0
+  /** A window whose events a test fires (query-session-end, session-end). */
+  const fakeWindow = () => {
+    const on: Record<string, (() => void)[]> = {}
+    return { on: (ev: string, fn: () => void) => void (on[ev] ??= []).push(fn), fire: (ev: string) => (on[ev] ?? []).forEach((f) => f()) }
+  }
   /** A packaged Combwork whose install folder's resources are a stand-in (what it reads as the copy on disk), started. */
   const start = async (copy: { version?: string; identity?: unknown }) => {
     const resources = fakeInstall(join(base, `r${++n}`), copy)
@@ -161,9 +166,20 @@ describe('installing a downloaded update (#1647)', () => {
     electron.quit = () => void quits.n++
     process.env.CW_TEST_QUIET = '0'
     const updater = await import('../src/main/updater')
-    const restarts = { n: 0 }
-    updater.initUpdater({ restart: () => void restarts.n++ })
-    return { updater, resources, quits, restarts }
+    const restarts = { n: 0, versions: [] as string[] }
+    // Windows, as BrowserWindow gives them: one open as the updater starts, one created after (HI-3167's session-end watch).
+    const windows = [fakeWindow(), fakeWindow()]
+    const { app, BrowserWindow } = await import('electron')
+    vi.spyOn(BrowserWindow, 'getAllWindows').mockReturnValue([windows[0]] as never)
+    const created: ((e: unknown, w: unknown) => void)[] = []
+    type On = (ev: string, listener: (e: unknown, w: unknown) => void) => unknown
+    vi.spyOn(app as { on: On }, 'on').mockImplementation((ev, listener) => {
+      if (ev === 'browser-window-created') created.push(listener)
+      return app
+    })
+    updater.initUpdater({ restart: (v) => void (restarts.n++, restarts.versions.push(v)) })
+    for (const fn of created) fn({}, windows[1])
+    return { updater, resources, quits, restarts, windows }
   }
   /** 9.1.1 found and downloaded, as electron-updater tells it. */
   const downloaded = (updater: Awaited<ReturnType<typeof start>>['updater']) => {
@@ -172,15 +188,56 @@ describe('installing a downloaded update (#1647)', () => {
     expect(updater.updateState().status).toBe('ready')
   }
 
-  it('over an older copy: the quit installs it (no restart), Restart and Update too (with one)', async () => {
+  it("over an older copy: the quit offers it, Install now installs it with the installer shown (HI-3167), Restart and Update asks for the quit with its version", async () => {
     const { updater, restarts } = await start({ version: '9.1.0' })
     downloaded(updater)
     expect(st.toasts.map((t) => t.title)).toEqual(['Combwork 9.1.1 is ready'])
     expect(updater.installsOnQuit()).toBe(true)
-    updater.installNow(false)
-    expect(st.installs).toEqual([[true, false]])
+    // Nothing installs without the user's say: the quit only offers it.
+    expect(updater.installConsent()).toBeNull()
+    const offer = updater.installOffer()!
+    expect(offer.version).toBe('9.1.1')
+    expect(updater.acceptInstall(offer)).toBe(true)
+    updater.installNow(updater.installConsent()!)
+    // Shown, never silent (isSilent false); forceRunAfter is for a silent one: the finish page's Run Combwork reopens it.
+    expect(st.installs).toEqual([[false, true]])
     updater.restartAndInstall()
-    expect(restarts.n).toBe(1)
+    expect(restarts.versions).toEqual(['9.1.1'])
+  })
+
+  it('a consent holds for its version only, a new request clears it, and Windows ending the session voids it (HI-3167)', async () => {
+    const { updater, windows } = await start({ version: '9.1.0' })
+    downloaded(updater)
+    // An offer for another version (shown before a newer download) is refused.
+    expect(updater.acceptInstall({ version: '9.1.0', generation: 0 })).toBe(false)
+    expect(updater.installConsent()).toBeNull()
+    // Restart and Update's grant, then a new quit request's clear.
+    updater.grantInstall('9.1.1')
+    expect(updater.installConsent()).toMatchObject({ version: '9.1.1', kind: 'restart' })
+    updater.clearInstall()
+    expect(updater.installConsent()).toBeNull()
+    // A dialog shown, then Windows asks whether the session may end: its Install now no longer holds.
+    const offer = updater.installOffer()!
+    windows[0].fire('query-session-end')
+    expect(updater.acceptInstall(offer)).toBe(false)
+    // Consent given, then the session ends (a window created later is watched too): void.
+    expect(updater.acceptInstall(updater.installOffer()!)).toBe(true)
+    windows[1].fire('session-end')
+    expect(updater.installConsent()).toBeNull()
+    // The shutdown was cancelled by another app and Combwork runs on: a later explicit choice holds.
+    expect(updater.acceptInstall(updater.installOffer()!)).toBe(true)
+    expect(updater.installConsent()).toMatchObject({ version: '9.1.1', kind: 'quit' })
+    // Another version downloaded meanwhile never inherits it.
+    st.handlers['update-available']({ version: '9.1.2', files: [] })
+    st.handlers['update-downloaded']({ version: '9.1.2' })
+    expect(updater.installConsent()).toBeNull()
+  })
+
+  it('Install manually: a quit offers nothing (HI-3167)', async () => {
+    st.updates = { ...st.updates, install: 'manual' }
+    const { updater } = await start({ version: '9.1.0' })
+    downloaded(updater)
+    expect(updater.installOffer()).toBeNull()
   })
 
   it("Restart and Update keeps its notice's button until the quit goes ahead: then it says Installing (HI-2425)", async () => {
@@ -211,7 +268,7 @@ describe('installing a downloaded update (#1647)', () => {
     expect(restarts.n).toBe(0)
     expect(st.toasts.at(-1)).toMatchObject({ level: 'warning', title: "Combwork 9.1.1 wasn't installed" })
     // Reached anyway (asked before the copy changed): quits without installing.
-    updater.installNow(true)
+    updater.installNow({ version: '9.1.1', generation: 0, kind: 'restart' })
     expect(st.installs).toEqual([])
     expect(quits.n).toBe(1)
   })
@@ -257,7 +314,7 @@ describe('installing a downloaded update (#1647)', () => {
     expect(updater.installsOnQuit()).toBe(true)
     // A local 9.1.2 installed over it before the quit ends (another Combwork's quit, say).
     fakeInstall(resources, { version: '9.1.2', identity: { version: '9.1.2', commit: 'abc1234', local: true } })
-    updater.installNow(false)
+    updater.installNow({ version: '9.1.1', generation: 0, kind: 'quit' })
     expect(st.installs).toEqual([])
     expect(quits.n).toBe(1)
     expect(updater.updateState().notInstalled).toBe('notNewer')

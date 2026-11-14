@@ -395,6 +395,13 @@
       "others": "plain"
     }
   },
+  "tasks.error.targetResolution": {
+    "placeholders": {
+      "card": "plain",
+      "from": "plain",
+      "to": "plain"
+    }
+  },
   "tasks.error.tooLong": {
     "placeholders": {
       "what": "select",
@@ -590,6 +597,14 @@
       "revision": "plain"
     }
   },
+  "tasks.history.forwardResolving": {
+    "placeholders": {
+      "card": "plain",
+      "from": "plain",
+      "source": "plain",
+      "to": "plain"
+    }
+  },
   "tasks.history.fromOlder": {
     "placeholders": {
       "was": "plain"
@@ -604,6 +619,14 @@
     "placeholders": {
       "project": "plain",
       "was": "plain"
+    }
+  },
+  "tasks.history.jjCandidateReturned": {
+    "placeholders": {
+      "target": "plain",
+      "reason": "select",
+      "check": "plain",
+      "files": "select"
     }
   },
   "tasks.history.kind": {

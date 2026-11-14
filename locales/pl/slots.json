@@ -8,5 +8,6 @@
   "slots.release.otherCombwork": "Slot {slot} jest zajęty przez inny Combwork, który nadal działa (proces {pid}): zwolnij go tam albo najpierw zamknij tamten Combwork.",
   "slots.setting.bad": "Combwork nie ma takiego ustawienia slotów.",
   "slots.setting.badSize": "Liczba kopii do recenzji i sprawdzeń to liczba całkowita od {min, number} do {max, number}.",
+  "slots.setting.badSwitch": "Przygotuj submoduły i LFS jest włączone albo wyłączone.",
   "slots.setting.badText": "Skrypt slotu lub lista plików to tekst o długości najwyżej {max, number} znaków."
 }

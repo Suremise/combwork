@@ -17,7 +17,8 @@ const { stopProcessesIn, endExactly } = createRequire(import.meta.url)('./e2e/fo
 }
 
 const events: unknown[] = []
-vi.mock('../src/main/events', () => ({ emit: (e: unknown) => events.push(e) }))
+// Every export agentProcesses uses (HI-2861): a job host lost mid-run toasts, and an offer watches events.
+vi.mock('../src/main/events', () => ({ emit: (e: unknown) => events.push(e), toast: () => undefined, onCombworkEvent: () => () => undefined }))
 // Combwork's profile, where what is listed is kept across a restart (#614): this file's own, never the shared test root.
 const profile = vi.hoisted(() => ({ dir: '' }))
 vi.mock('electron', async (importOriginal) => {

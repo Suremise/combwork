@@ -2,7 +2,7 @@ import { isReservedServerName } from '@shared/assistantTools'
 import { basename } from './util'
 import { call, errorMessage } from './api'
 import { agentLimit } from './advanced'
-import { cliReadyOf, firstReadyConnection, offeredConnections } from '@shared/connectionLabel'
+import { assistantCli, cliReadyOf, firstReadyConnection, offeredConnections } from '@shared/connectionLabel'
 import { agentOf, cancelDialog, agentProviderOf, cardLabelOf, choose, openVersionControl, paneCells, shownLayout, closeTile, confirm, findProject, focusAfterRemoving, focusAgent, runOnce, whileStarting, ADDING_AGENT, isAssistantPath, setAssistantOpen, focusedAgentId, get, notify, prompt, revealAgent, set, setActivity, setProjectTab, showAgent, showView, useStore } from './store'
 import { AGENT_LIMIT_MAX, MANY_AGENTS, OPEN_WORKFLOW_OPTIONS, agentLimitText, chosenLayout, layoutColumns, layoutPanes, moveAgentTo, projectLayout, projectSessionView, sessionInAgentFolder, swapAgentsIn } from '@shared/defaults'
 import { moveToCell, neighbourCell, orderByCells, type CellDirection } from '@shared/paneCells'
@@ -297,9 +297,12 @@ export async function waitForStop(path: string, agentId?: string, timeoutMs = 80
  */
 async function ensureAgent(path: string, agentId: string, resumes?: ProviderId): Promise<boolean> {
   const a = (): ReturnType<typeof agentOf> => agentOf(project(path), agentId)
+  // HI-2899: the Assistant's CLI as its launch picks it (one naming no CLI: the first usable account's), never Automatic's
+  // guess, so a Codex account isn't checked as Claude Code.
+  const view = isAssistantPath(path) && !resumes ? await call('connections:list').catch(() => null) : null
   // Automatic's pick matters only to an agent that follows it and isn't running (a running one has its provider).
   const provider = await detectedProvider(
-    () => resumes ?? agentProviderOf(a()),
+    () => resumes ?? (view ? assistantCli(a() ?? {}, view, get().settings, cliReadyOf(get().providers), agentProviderOf(a())) : agentProviderOf(a())),
     () => !resumes && !a()?.live && !a()?.provider && autoProviderPending(get().settings)
   )
   if (!provider) return false

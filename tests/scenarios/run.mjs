@@ -8,6 +8,7 @@
 //   npm run scenarios -- --provider claude-code --model haiku --budget 2      # model trials (opt-in, cost tokens)
 //   npm run scenarios -- --provider codex --model gpt-5.6-luna --only work-on-card,review-card
 //   npm run scenarios -- --dialect "my/Opus 5.5 v2.json" --only work-on-card   # a dialect file in the model slot (HI-2439)
+//   npm run scenarios -- --only signing-blocker --advanced cw.sessions.signFailFast=false   # an Advanced setting set for the run (HI-2867: before and after)
 //   npm run scenarios -- --only work-on-card --signed-out   # the fake signed out: the trial is skipped for the environment
 //   npm run scenarios -- --only work-on-card --signed-out=launch   # its OAuth expired: it exits at launch, skipped too
 //   npm run scenarios -- --only work-on-card --signed-out=late   # signed out, shown only once the prompt is sent: skipped too
@@ -87,6 +88,18 @@ const arg = (name, fallback) => {
 const provider = arg('provider', 'fake')
 const model = arg('model', undefined)
 const effort = arg('effort', undefined)
+// Advanced settings for every scenario of the run (HI-2867): `id=value[,id=value]`, each value JSON (true, 120) or text.
+const advanced = Object.fromEntries((arg('advanced', '') || '').split(',').filter(Boolean).map((kv) => {
+  const at = kv.indexOf('=')
+  const raw = kv.slice(at + 1)
+  let value
+  try {
+    value = JSON.parse(raw)
+  } catch {
+    value = raw
+  }
+  return [kv.slice(0, at), value]
+}))
 let budget
 try {
   budget = parseBudget(arg('budget', '2'))
@@ -329,7 +342,7 @@ const metaNow = (complete) => ({
   source: sourceAtStart,
   ...(complete ? {} : { incomplete: `${results.length} of ${trials.length} trials` }),
   guidance: results.find((r) => r.guidance?.atStart)?.guidance.atStart.revision ?? null,
-  provider, model: model ?? '(default)', effort: effort ?? '(default)', mode: PROVIDERS[provider].mode, ...(dialect ? { dialect: dialectRecord(dialect) } : {}), ...(random ? { random: { ...random, picked: chosen.map((s) => s.id) } } : {}), repeats, budgetUsd: budget, when: new Date().toISOString(), spentUsd: Math.round(spent * 1000) / 1000, unknownCostTrials })
+  provider, model: model ?? '(default)', effort: effort ?? '(default)', ...(Object.keys(advanced).length ? { advanced } : {}), mode: PROVIDERS[provider].mode, ...(dialect ? { dialect: dialectRecord(dialect) } : {}), ...(random ? { random: { ...random, picked: chosen.map((s) => s.id) } } : {}), repeats, budgetUsd: budget, when: new Date().toISOString(), spentUsd: Math.round(spent * 1000) / 1000, unknownCostTrials })
 // Each trial's result written as it ends (#1457): a run cut short keeps what it had.
 // Should even that fail (the folder kept going, or another error), the run goes on: what it has stays in memory and the
 // next trial's write tries again; the writes at the end fail the run.
@@ -380,7 +393,7 @@ for (const [i, { sc, sample, name }] of trials.entries()) {
   }
   process.stdout.write(`${sc.id} (${provider}${repeats > 1 ? `, ${sample}/${repeats}` : ''})… `)
   // What the trial uses the home with, noted on its lease before it starts (HR2 on round 1): kept after a crash too.
-  const r = await runScenario(sc, provider, { model, effort, dialect, keep, workRoot, port: lane.first, evidence, signedOut, timeoutMs: fake ? 60000 : 360000, uses: consumerHooks([realHome?.lease]) })
+  const r = await runScenario(sc, provider, { model, effort, advanced, dialect, keep, workRoot, port: lane.first, evidence, signedOut, timeoutMs: fake ? 60000 : 360000, uses: consumerHooks([realHome?.lease]) })
   r.sample = sample
   if (r.environment) {
     // Not a result of the scenario: no checks, and no cost assumed.

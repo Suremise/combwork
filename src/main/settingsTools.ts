@@ -17,7 +17,7 @@ import { resolveGithubHosts } from '../shared/githubHost'
 import { workflowWrite } from './workflow/writes'
 import { withFolderRepoLocks } from './platform/repoPorts'
 import { keptTargets, problemEnglish, WorkflowRefused } from './workflow/optionsForm'
-import { offerRetarget, refuseRemovedTargets, retargetPreview, slotTargets } from './workflow/retarget'
+import { offerRetarget, refuseRemovedTargets, retargetPreview, slotUses } from './workflow/retarget'
 import { boardWrite } from './boardStore'
 import { withLanesLock } from './lanes'
 import { newlyMissing, projectTargets } from './workflow/targets'
@@ -31,6 +31,7 @@ import { providerService } from './providerService'
 import { emit } from './events'
 import { workspace } from './workspace'
 import { advanced, updateSettingsChecked } from './advanced'
+import { checkOffer } from './workflow/releaseOffer'
 
 /**
  * Combwork's settings for the Agent API and the Combwork Assistant's settings tools (#186): the catalog's entries with their
@@ -46,6 +47,7 @@ import { advanced, updateSettingsChecked } from './advanced'
 const T = {
   noSetting: agentMsg({ id: 'settings.agent.tool.noSetting', text: 'No setting "{id}": cw_list_settings lists them (query narrows it).', note: 'cw_read_setting or cw_update_setting naming no setting there is. {id} is the id as given.' }),
   projectSetting: agentMsg({ id: 'settings.agent.tool.projectSetting', text: "{id} is a project's setting: say which project.", note: "A project's setting read or changed without naming the project. {id} is the setting's id." }),
+  offerNotHere: agentMsg({ id: 'settings.agent.tool.offerNotHere', text: 'offer answers a release offer: only with project.workflow.target or project.workflow.otherTargets, not {path}.', note: 'HI-3155: cw_update_setting given a release offer’s id for another setting.' }),
   usersToChange: agentMsg({ id: 'settings.agent.tool.usersToChange', text: "{path} is the user's to change.", note: "A sensitive setting with no reason recorded (#186). {path} is where the user changes it." }),
   levelsRefused: agentMsg({ id: 'settings.agent.tool.levelsRefused', text: "These workflow defaults can't be saved: {problems} Change the other options first, or tell the user.", note: "A workflow default at Combwork's or the workspace's level that contradicts the others (#1422). {problems} are the reasons, each a sentence." }),
   optionsRefused: agentMsg({ id: 'settings.agent.tool.optionsRefused', text: "These workflow options can't be saved: {problems} Change the other options first, or tell the user.", note: "A project's workflow option that contradicts the others (#1278). {problems} are the reasons, each a sentence." }),
@@ -279,7 +281,8 @@ export async function applySetting(
   raw: unknown,
   projectPath: string | null,
   guard?: (current: unknown) => void,
-  removed?: string[]
+  removed?: string[],
+  offer?: string
 ): Promise<{ old: unknown; new: unknown; removed?: { old: string[]; new: string[] }; note?: string }> {
   if (e.sensitive) throw new SettingRefused(403, settingReadOnly(e) ?? say(T.usersToChange, { path: settingPath(e) }))
   const value = await checkedValue(e, raw, e.scope === 'project' ? projectPath : null)
@@ -300,9 +303,10 @@ export async function applySetting(
     // Its repository's lock first, as Project Settings' save takes it (#1642 round 5).
     // HI-2680: the target in force before a change of it, for what can follow the new one (Retarget).
     const before = e.workflow === 'target' ? ((await projectTargets(workspace, projectPath).catch(() => null))?.default ?? null) : null
-    // HI-2680: a branch taken out of Other branches work can merge into: refused while anything records it, in the board's
-    // write (serial with every writer of those), the file written in it.
-    const slots = e.workflow === 'otherTargets' ? await slotTargets(workspace, projectPath) : []
+    // HI-2680: a branch taken out of Other branches work can merge into: refused while anything uses it, in the board's
+    // write (serial with every writer of those), the file written in it. The pool opened here, its slots read in the write
+    // (HI-2886).
+    const slots = e.workflow === 'otherTargets' ? await slotUses(workspace, projectPath) : null
     // HI-2807: a branch newly named as a target must exist, checked in the write (one deleted since is caught too).
     const missingFirst = async (): Promise<void> => {
       const cfg = await workspace.projectConfig(projectPath)
@@ -321,7 +325,7 @@ export async function applySetting(
         const was = resolvedOf(workspace, projectPath, platform, cfg).options
         const will = resolvedOf(workspace, projectPath, platform, { ...cfg, workflow: { ...cfg.workflow!, options: { ...cfg.workflow!.options, otherTargets: value as string[] | undefined } } }).options
         try {
-          await refuseRemovedTargets(workspace, projectPath, was.otherTargets ?? [], value === null ? (will.otherTargets ?? []) : (value as string[]), will.target || null, slots)
+          await refuseRemovedTargets(workspace, projectPath, was.otherTargets ?? [], value === null ? (will.otherTargets ?? []) : (value as string[]), will.target || null, slots!)
         } catch (err) {
           throw new SettingRefused(409, agentError(err as CombworkError))
         }
@@ -331,7 +335,20 @@ export async function applySetting(
       await missingFirst()
       return write()
     }) : write // HI-2680: serial with a retarget's moves (`tasks.setTarget`'s `expectDefault`)
-    const next = e.workflow ? await withFolderRepoLocks([projectPath], () => workflowWrite(guarded), { quiet: true, project: projectPath }) : await write()
+    // HI-3155: an answer to a release offer (`offer`): only on the options it was made on, checked under these locks (where
+    // they can't change), else refused with nothing written. Only for Work merges into and Other branches.
+    if (offer && e.workflow !== 'target' && e.workflow !== 'otherTargets') throw new SettingRefused(400, say(T.offerNotHere, { path: settingPath(e) }))
+    const offered = async (): ReturnType<typeof guarded> => {
+      if (offer) {
+        try {
+          await checkOffer(workspace, projectPath, offer)
+        } catch (err) {
+          throw new SettingRefused(409, agentError(err as CombworkError))
+        }
+      }
+      return guarded()
+    }
+    const next = e.workflow ? await withFolderRepoLocks([projectPath], () => workflowWrite(offered), { quiet: true, project: projectPath }) : await write()
     if (e.workflow) workflowChanged(workspace, projectPath)
     const now = settingValue(e, config.settings, next)
     const changed = e.workflow === 'target' && JSON.stringify(old) !== JSON.stringify(now)

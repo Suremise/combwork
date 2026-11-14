@@ -6,7 +6,7 @@ import { appendFileSync, cpSync, existsSync, lstatSync, mkdirSync, readdirSync, 
 import { basename, join, resolve } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 // @ts-expect-error: plain .mjs modules without types
-import { clean, codexPlan, holdLane, plan } from './e2e/clean.mjs'
+import { clean, codexPlan, holdLane, keptWhy, plan } from './e2e/clean.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { acquireCodexHome } from './e2e/codexHomeLock.mjs'
 // @ts-expect-error: plain .mjs modules without types
@@ -284,6 +284,36 @@ describe('the clean-up (clean.mjs)', () => {
     expect(readdirSync(m.lanesDir).sort()).toEqual(['lane-1.json'])
   })
 
+  it('keeps what is set up once by hand or pinned, whatever its age, each listed with its reason (HI-2902)', async () => {
+    const m = machine()
+    tree(m.root, {
+      'agy-probe/User/settings.json': 30,
+      'tools/jj/jj.exe': 30,
+      'copilot-1.0.106/bin/copilot.exe': 30,
+      'copilot-1.0.107/bin/copilot.exe': 30,
+      'opencode-2.2.6/opencode.exe': 30,
+      'codex-home-locks/': 30,
+      // Look-alikes go by age as before.
+      'agy-probe-work/': 30,
+      'copilot-probe/': 30,
+      'opencode-2.2.6.zip': 30
+    })
+    const items = plan({ root: m.root, days: 0, ev: rules(m.root, m.cards) })
+    const item = (rel: string) => items.find((i: { rel: string }) => i.rel === rel)
+    for (const rel of ['agy-probe', 'tools', 'copilot-1.0.106', 'copilot-1.0.107', 'opencode-2.2.6', 'codex-home-locks', 'codex', 'claude', 'config.json']) {
+      expect(item(rel)?.remove, rel).toBe(false)
+      expect(item(rel)?.why, rel).toBe(keptWhy(rel))
+    }
+    expect(item('agy-probe')?.why).toMatch(/onboarded once by hand/)
+    expect(item('copilot-1.0.106')?.why).toMatch(/pinned Copilot/)
+    expect(item('opencode-2.2.6')?.why).toMatch(/pinned OpenCode/)
+    for (const rel of ['agy-probe-work', 'copilot-probe', 'opencode-2.2.6.zip']) expect(item(rel)?.remove, rel).toBe(true)
+    // And clean() leaves them, even at --days 0.
+    const r = await run(m, { days: 0 })
+    for (const p of ['agy-probe/User/settings.json', 'tools/jj/jj.exe', 'copilot-1.0.106/bin/copilot.exe', 'copilot-1.0.107/bin/copilot.exe', 'opencode-2.2.6/opencode.exe', 'codex-home-locks']) expect(there(m.root, p), p).toBe(true)
+    expect(r.removed.map((x: { rel: string }) => x.rel)).toEqual(expect.arrayContaining(['agy-probe-work', 'copilot-probe', 'opencode-2.2.6.zip']))
+  })
+
   it('a dry run removes nothing', async () => {
     const m = machine()
     const dry = await run(m, { dryRun: true })
@@ -354,7 +384,7 @@ describe('the clean-up (clean.mjs)', () => {
     expect(why('tmp/cw-git-old-x')).toMatch(/^2\.\d days old$/)
     expect(why('tmp/cw-git-new-y')).toBe('newer than 1 day')
     expect(why('tmp')).toBe(undefined)
-    expect(why('codex')).toBe(undefined)
+    expect(why('codex')).toMatch(/^the Codex test home/)
   })
 })
 

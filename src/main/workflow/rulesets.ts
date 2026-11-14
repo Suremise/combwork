@@ -168,32 +168,78 @@ export function resolvedOf(ws: Pick<WorkspaceService, 'config'>, projectPath: st
 }
 
 /**
+ * HI-3142: a project's ruleset now with its Merges into (G7) set to `target`: the id a ruleset recorded on that target
+ * has when no rule has changed since (a lane left on the release by Start the next version keeps its own G7, HI-2807,
+ * which alone isn't old rules). Null: no such project, its version control not recorded, or not readable.
+ */
+export async function rulesetNowAt(ws: Pick<WorkspaceService, 'config' | 'info' | 'projectConfig'>, project: string, target: string): Promise<string | null> {
+  const p = (ws.info()?.projects ?? []).find((x) => x.name.toLowerCase() === project.toLowerCase())
+  if (!p?.platform) return null
+  try {
+    return idOf(ws, p.path, p.platform.id, await ws.projectConfig(p.path), target)
+  } catch (e) {
+    log.warn(`the ruleset now of ${userText(p.name)} on ${userText(target)}`, e)
+    return null
+  }
+}
+
+/** What the old rules marks compare with: each project's ruleset now (`rulesetsNow`) and, by target, `rulesetNowAt`'s. */
+export interface RulesNow {
+  ids: Map<string, string>
+  /** A project's (its folder name) ruleset now on `target`, read with `ids`; null where it has none. */
+  at: (project: string, target: string) => string | null
+}
+
+/**
  * Each project's ruleset now (its id, from its options in force, not stored: a read), by its folder name in lower case:
  * what a card's or a lane's own ruleset is compared with for its old rules mark (#1421). A project whose version control
- * isn't recorded, or whose config can't be read, has none (no mark).
+ * isn't recorded, or whose config can't be read, has none (no mark). `at` (HI-3161): the same on another Merges into,
+ * for a card whose ruleset recorded G7 as it was, unmarked, as HI-3142 compares a lane.
  */
-export async function rulesetsNow(ws: Pick<WorkspaceService, 'config' | 'info' | 'projectConfig'>): Promise<Map<string, string>> {
-  const out = new Map<string, string>()
+export async function rulesNow(ws: Pick<WorkspaceService, 'config' | 'info' | 'projectConfig'>): Promise<RulesNow> {
+  const ids = new Map<string, string>()
+  const read = new Map<string, { path: string; platform: PlatformId; cfg: Pick<ProjectConfig, 'workflow'> }>()
   for (const p of ws.info()?.projects ?? []) {
     if (!p.platform) continue
     try {
       const cfg = await ws.projectConfig(p.path)
-      // Kept by what it is made from (HI-1780: every board change asks, and options resolved and compiled again cost
-      // about 2 ms a project): the platform and the three levels of options.
-      const key = JSON.stringify([p.platform.id, config.settings.workflow ?? null, ws.config.workflow ?? null, cfg.workflow?.options ?? null])
-      const was = rulesetIds.get(p.path.toLowerCase())
-      let id = was?.key === key ? was.id : undefined
-      if (id === undefined) {
-        const c = compile(resolvedOf(ws, p.path, p.platform.id, cfg).options)
-        id = c.ok ? c.ruleset.id : null
-        rulesetIds.set(p.path.toLowerCase(), { key, id })
-      }
-      if (id) out.set(p.name.toLowerCase(), id)
+      const id = idOf(ws, p.path, p.platform.id, cfg)
+      read.set(p.name.toLowerCase(), { path: p.path, platform: p.platform.id, cfg })
+      if (id) ids.set(p.name.toLowerCase(), id)
     } catch (e) {
       log.warn(`the ruleset now of ${userText(p.name)}`, e)
     }
   }
-  return out
+  const at = (project: string, target: string): string | null => {
+    const r = read.get(project.toLowerCase())
+    return r ? idOf(ws, r.path, r.platform, r.cfg, target) : null
+  }
+  return { ids, at }
 }
-/** Each project's ruleset id now (null: its options don't compile), by its path, with what it was made from. */
+
+export async function rulesetsNow(ws: Pick<WorkspaceService, 'config' | 'info' | 'projectConfig'>): Promise<Map<string, string>> {
+  return (await rulesNow(ws)).ids
+}
+
+/**
+ * A project's ruleset id now, on its own Merges into or on `target` (null: its options don't compile). Kept by what it
+ * is made from (HI-1780: every board change asks, and options resolved and compiled again cost about 2 ms a project):
+ * the platform, the three levels of options and the target asked.
+ */
+function idOf(ws: Pick<WorkspaceService, 'config'>, path: string, platform: PlatformId, cfg: Pick<ProjectConfig, 'workflow'>, target?: string): string | null {
+  const key = JSON.stringify([platform, config.settings.workflow ?? null, ws.config.workflow ?? null, cfg.workflow?.options ?? null, target ?? null])
+  const at = JSON.stringify([path.toLowerCase(), target ?? null])
+  const was = rulesetIds.get(at)
+  if (was?.key === key) return was.id
+  const options = resolvedOf(ws, path, platform, cfg).options
+  const c = compile(target ? { ...options, target } : options)
+  const id = c.ok ? c.ruleset.id : null
+  // A project's own and a few targets each; options changed leave old keys, so the whole map is let go past a bound.
+  if (rulesetIds.size >= RULESET_IDS_MAX) rulesetIds.clear()
+  rulesetIds.set(at, { key, id })
+  return id
+}
+
+/** Each project's ruleset id now (null: its options don't compile), by its path and target asked, with what it was made from. */
 const rulesetIds = new Map<string, { key: string; id: string | null }>()
+const RULESET_IDS_MAX = 512
