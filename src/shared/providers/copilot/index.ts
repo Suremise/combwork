@@ -1,4 +1,4 @@
-import { footerPatterns, lastFooterMode, type FooterModeDef, type FooterPatterns } from '../../footerModes'
+import { footerPatterns, lastFooterMode, type FooterPatterns } from '../../footerModes'
 import type { PermissionMode } from '../../types'
 import type { ModeOption, ModelGroup, ProviderDescriptor } from '..'
 import { OLDER_VERSIONS, effortLevels, gptModelLabel } from '../common'
@@ -6,6 +6,9 @@ import { withCliOwn } from '../../cliOwnMode'
 import { msg } from '../../i18n/msg'
 import { agentMsg, say } from '../../agentText'
 import { defineProvider } from '../parts'
+import { ADVANCED, OUTAGE_CHECK } from './advanced'
+import { COPILOT_FOOTER_MODES } from './footer'
+export { COPILOT_FOOTER_MODES } from './footer'
 import { TIPS } from './tips'
 
 /**
@@ -153,19 +156,6 @@ export function copilotModeFlags(mode: PermissionMode, folder: string): string[]
   }
 }
 
-/**
- * Each mode's footer, by its two parts ("Plan · Manual Approval"), read by each part's first word: in a narrow terminal
- * Copilot wraps its footer item by item ("← open ·Interactive · Manual · / commands" over "sidebar Approval next tab",
- * 1.0.93). The defaults of the advanced settings copilot.footer.<key> (#696), case sensitive. Accept edits has none: its
- * footer is Ask's. Combwork has no mode for Assisted approval.
- */
-export const COPILOT_FOOTER_MODES: readonly FooterModeDef[] = [
-  { mode: 'ask', key: 'ask', label: 'Ask', pattern: String.raw`\bInteractive ?· ?Manual\b` }, // i18n-ignore: a footer's name in Settings → Advanced (advanced.ts words it)
-  { mode: 'allow-all', key: 'allowAll', label: 'Allow all', pattern: String.raw`\bInteractive ?· ?Allow\b` }, // i18n-ignore: a footer's name in Settings → Advanced (advanced.ts words it)
-  { mode: 'plan', key: 'plan', label: 'Plan', pattern: String.raw`\bPlan ?· ?(?:Manual|Allow|Assisted)\b` }, // i18n-ignore: a footer's name in Settings → Advanced (advanced.ts words it)
-  { mode: 'autopilot', key: 'autopilot', label: 'Autopilot', pattern: String.raw`\bAutopilot ?· ?(?:Manual|Allow|Assisted)\b` } // i18n-ignore: a footer's name in Settings → Advanced (advanced.ts words it)
-]
-
 const FOOTER_DEFAULTS = footerPatterns(COPILOT_FOOTER_MODES, '')
 
 /**
@@ -308,5 +298,7 @@ export default defineProvider({
   // GitHub Copilot reports each session's cost itself, in AI credits ($0.01 each, charged at each model's API rate):
   // no table ships. Prices a user adds are used for sessions without a reported cost.
   prices: { checked: '2026-09-30', shipped: {} },
-  tips: TIPS
+  tips: TIPS,
+  advanced: ADVANCED,
+  outageCheck: OUTAGE_CHECK
 })

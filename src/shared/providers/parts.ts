@@ -1,6 +1,7 @@
 import type { ProviderDescriptor } from '.'
 import type { ModelPrice } from '../types'
 import type { Tip } from '../tips'
+import type { AdvancedSource } from '../advancedDef'
 
 /**
  * A provider's shared half (HI-3201): everything the window, the shared settings logic and main read about one provider
@@ -15,6 +16,10 @@ export interface ProviderModule {
   tips?: readonly Tip[]
   /** What Combwork spots its safeguard stops by (#606), named defaults (shared/safeguards.ts gathers them). */
   safeguards?: Readonly<Record<string, string | readonly string[]>>
+  /** Its advanced values (#367), in the order Settings lists them (advanced.ts gathers them). */
+  advanced?: readonly AdvancedSource[]
+  /** The address Combwork checks for its connection (HI-1612): a value of Combwork's own, listed under Combwork. */
+  outageCheck?: AdvancedSource
 }
 
 /**

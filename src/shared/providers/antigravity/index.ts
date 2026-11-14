@@ -4,6 +4,7 @@ import { withCliOwn } from '../../cliOwnMode'
 import { msg } from '../../i18n/msg'
 import { agentMsg, say } from '../../agentText'
 import { defineProvider } from '../parts'
+import { ADVANCED } from './advanced'
 import { TIPS } from './tips'
 
 /**
@@ -195,5 +196,6 @@ export default defineProvider({
   // Antigravity runs against the user's Google plan and publishes no per-token prices (checked 7 Nov 2026, HI-2544): no
   // table ships, and its sessions show as unpriced. Prices a user adds are used.
   prices: { checked: '2026-11-07', shipped: {} },
-  tips: TIPS
+  tips: TIPS,
+  advanced: ADVANCED
 })

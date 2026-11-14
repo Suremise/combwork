@@ -1,12 +1,15 @@
 import { OLDER_VERSIONS, effortLevels } from '../common'
 import { withCliOwn } from '../../cliOwnMode'
-import { footerPatterns, lastFooterMode, type FooterModeDef, type FooterPatterns } from '../../footerModes'
+import { footerPatterns, lastFooterMode, type FooterPatterns } from '../../footerModes'
 import { msg } from '../../i18n/msg'
 import { agentMsg, say } from '../../agentText'
 import type { Tr } from '../../tasks'
 import type { PermissionMode } from '../../types'
 import type { ModeCaveatFacts, ModeOption, ModelGroup, ModelOption, ProviderDescriptor } from '..'
 import { defineProvider } from '../parts'
+import { ADVANCED, OUTAGE_CHECK } from './advanced'
+import { CLAUDE_FOOTER_MODES } from './footer'
+export { CLAUDE_FOOTER_MODES } from './footer'
 import { TIPS } from './tips'
 import { CLAUDE_SAFEGUARDS } from './safeguards'
 import { baseModel } from './modelIds'
@@ -186,22 +189,6 @@ export const isOlderModel = (model: string): boolean => CLAUDE_MODEL_GROUPS.some
 
 /** The modes Claude Code's Shift+Tab cycles through, in order (checked with Claude Code 2.1.284). */
 export const MODE_CYCLE: PermissionMode[] = ['manual', 'acceptEdits', 'plan', 'auto']
-
-/**
- * A mode's footer: its words after Claude Code's mode symbol (⏵⏵ or ⏸), or followed by its hint ("(shift+tab to
- * cycle)" or "·"). Manual shows only "⏸ manual mode on" (Claude Code 2.1.286), so the symbol is needed.
- */
-const footer = (words: string): string => String.raw`[⏵⏸][\s⏵⏸]*${words}\s*on\b|${words}\s*on\s*(?:\(|·)`
-
-/** Each mode's footer (Claude Code 2.1.296): the defaults of the advanced settings claude-code.footer.<key> (#696), flags i. */
-export const CLAUDE_FOOTER_MODES: readonly FooterModeDef[] = [
-  { mode: 'manual', key: 'manual', label: 'Manual', pattern: footer(String.raw`manual\s*mode`) }, // i18n-ignore: a footer's name in Settings → Advanced (advanced.ts words it)
-  { mode: 'acceptEdits', key: 'acceptEdits', label: 'Accept edits', pattern: footer(String.raw`accept\s*edits`) }, // i18n-ignore: a footer's name in Settings → Advanced (advanced.ts words it)
-  { mode: 'plan', key: 'plan', label: 'Plan', pattern: footer(String.raw`plan\s*mode`) }, // i18n-ignore: a footer's name in Settings → Advanced (advanced.ts words it)
-  { mode: 'auto', key: 'auto', label: 'Auto', pattern: footer(String.raw`auto\s*mode`) }, // i18n-ignore: a footer's name in Settings → Advanced (advanced.ts words it)
-  { mode: 'bypassPermissions', key: 'bypassPermissions', label: 'Bypass permissions', pattern: footer(String.raw`bypass\s*permissions`) }, // i18n-ignore: a footer's name in Settings → Advanced (advanced.ts words it)
-  { mode: 'dontAsk', key: 'dontAsk', label: "Don't ask", pattern: footer(String.raw`don['’]?t\s*ask`) } // i18n-ignore: a footer's name in Settings → Advanced (advanced.ts words it)
-]
 
 const FOOTER_DEFAULTS = footerPatterns(CLAUDE_FOOTER_MODES, 'i')
 
@@ -396,4 +383,4 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
 
 /** Claude Code's shared half, as the registry lists it (HI-3201). */
 // agent-text: CLAUDE_DESCRIPTOR.text.safeguardHelp (a CLI's sentence stored by id in a card comment, said when read: providerMessage)
-export default defineProvider({ descriptor: CLAUDE_DESCRIPTOR, prices: CLAUDE_PRICES, tips: TIPS, safeguards: CLAUDE_SAFEGUARDS })
+export default defineProvider({ descriptor: CLAUDE_DESCRIPTOR, prices: CLAUDE_PRICES, tips: TIPS, safeguards: CLAUDE_SAFEGUARDS, advanced: ADVANCED, outageCheck: OUTAGE_CHECK })
