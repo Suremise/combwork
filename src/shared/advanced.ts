@@ -283,10 +283,14 @@ export const LANES_FRESH_START_WAIT_MINUTES = 'cw.lanes.freshStartWaitMinutes'
  */
 export const LANES_UNWATCHED_NOTICE = 'cw.lanes.unwatchedNotice'
 /**
- * Whether a process an agent's command left running (HI-2111: its parent gone, past ten minutes) is told in a notice and
- * to the agent: read by main's orphanProcesses. Activity lists it either way.
+ * Whether a process an agent's command left running (HI-2111: its parent gone, past ORPHAN_MINUTES) is told in a notice
+ * and to the agent: read by main's orphanProcesses. Activity lists it either way.
  */
 export const ORPHAN_NOTICE = 'cw.processes.orphanNotice'
+/** HI-3206: how many minutes such a process runs before it is told (10, as before). */
+export const ORPHAN_MINUTES = 'cw.processes.orphanMinutes'
+/** HI-3206: known long-lived hosts (by executable name) expected to outlive their shell: listed, never told. */
+export const ORPHAN_KNOWN_HOSTS = 'cw.processes.knownHosts'
 
 /**
  * Settings Combwork no longer lists but keeps in advanced.json as they are, never listed as unknown, read once more where a
@@ -1151,12 +1155,38 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.cw.processes.orphanNotice.title', defaultMessage: 'Processes left running: tell me and the agent', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: a process an agent's command left running, its shell gone, is told in a notice and to the agent." }),
     desc: msg({
       id: 'settings.advanced.cw.processes.orphanNotice.desc',
-      defaultMessage: "When a process an agent's command started is still running ten minutes on with the shell that started it gone, Combwork says so once in a notice, and tells the agent once at its next tool call or turn's end, so it can end it. Turned off, neither is told; Activity still lists the process as left running, with End It.",
+      defaultMessage: "When a process an agent's command started is still running with the shell that started it gone (for as long as “Processes left running: minutes before telling” says), Combwork says so once in a notice, and tells the agent once at its next tool call or turn's end, so it can end it. A process of a cw-progress run that is still running, or of a known host, isn't told. Turned off, nothing is told; Activity still lists the process as left running, with End It.",
       description: 'What the advanced setting "Processes left running: tell me and the agent" does (Settings → Advanced, under Combwork). Activity is a tab of Combwork\'s; End It is its button.'
     }),
     kind: 'boolean',
     default: true,
     applies: 'now'
+  },
+  {
+    id: ORPHAN_MINUTES,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.processes.orphanMinutes.title', defaultMessage: 'Processes left running: minutes before telling', description: "An advanced setting's title (Settings → Advanced), followed by its value in minutes (\"10 min\"): how long a process an agent's command left running, its shell gone, runs before Combwork tells it." }),
+    desc: msg({ id: 'settings.advanced.cw.processes.orphanMinutes.desc', defaultMessage: "How long a process an agent's command started may run with the shell that started it gone before Combwork tells you and the agent. A longer wait means fewer notices for processes you expect to keep running a while.", description: 'What the advanced setting "Processes left running: minutes before telling" does (Settings → Advanced, under Combwork).' }),
+    kind: 'number',
+    default: 10,
+    min: 1,
+    max: 240,
+    unit: 'min',
+    applies: 'now'
+  },
+  {
+    id: ORPHAN_KNOWN_HOSTS,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.processes.knownHosts.title', defaultMessage: 'Processes left running: known hosts', description: "An advanced setting's title (Settings → Advanced): the programs expected to keep running after the shell that started them is gone (the Windows Sandbox guest's), which Combwork never tells as left running." }),
+    desc: msg({ id: 'settings.advanced.cw.processes.knownHosts.desc', defaultMessage: "Programs expected to keep running after the shell that started them is gone, such as Windows Sandbox's guest: a regular expression matched against the program's file name. Combwork never tells these as left running; Activity still lists them, with End It. Add a program here to stop its notices.", description: 'What the advanced setting "Processes left running: known hosts" does (Settings → Advanced). Activity is a tab of Combwork\'s; End It its button. Keep "Windows Sandbox" as it is (a product).' }),
+    kind: 'pattern',
+    default: String.raw`^(WindowsSandboxRemoteSession|WindowsSandboxServer)\.exe$`,
+    flags: 'i',
+    applies: 'now',
+    samples: [
+      { from: `${FIX}/advanced/windows-sandbox-executables-26200.txt`, version: '10.0.26200', source: 'Windows', text: 'WindowsSandboxRemoteSession.exe', shows: "Windows Sandbox's guest session program, which lives as long as the guest (an agent's `wsb` start leaves it running)" },
+      { from: `${FIX}/advanced/windows-sandbox-executables-26200.txt`, version: '10.0.26200', source: 'Windows', text: 'WindowsSandboxServer.exe', shows: "Windows Sandbox's server program, which lives as long as the guest" }
+    ] // i18n-ignore: Windows' recorded program names (#367)
   },
   // A lane's end (HI-1706, SPEC §16.10.2): its builder finishes its turn, is told, and its CLI exits by itself.
   {

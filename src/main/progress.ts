@@ -384,6 +384,9 @@ export class ProgressStore {
     const estimateMs = int(body.estimateMs, 'estimateMs', 0, MAX_ESTIMATE_MS)
     const waiting = text(body.waiting, 'waiting', MAX_STEP_NAME)
     const pid = int(body.pid, 'pid', 1, 4_294_967_295)
+    // HI-3206: the reporter's own time just before it sent this, finite and recent (else none: its processes are never
+    // taken as the run's, nothing is held back for it).
+    const sentAt = pid !== undefined && typeof body.sentAt === 'number' && Number.isFinite(body.sentAt) && body.sentAt > this.deps.now() - 86_400_000 && body.sentAt <= this.deps.now() + 5_000 ? body.sentAt : null
     if (body.titleFromCommand !== undefined && typeof body.titleFromCommand !== 'boolean') throw new ProgressError(400, 'titleFromCommand must be true or false') // i18n-ignore: the Agent API's progress replies, which agents and cw-progress read
     const list = this.runs.get(key(caller.workspacePath)) ?? []
     const mine = list.filter((r) => isOpenRun(r) && this.owns(caller, r, true))
@@ -419,6 +422,7 @@ export class ProgressStore {
       waitingSince: waiting ? now : null,
       heldEstimateMs: waiting ? (estimateMs ?? null) : null,
       pid: pid ?? null,
+      ...(sentAt !== null ? { reporterSentAt: sentAt } : {}),
       summary: null,
       dismissed: false,
       seenAt: null,

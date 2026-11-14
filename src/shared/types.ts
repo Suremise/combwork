@@ -4811,6 +4811,11 @@ export interface ProgressRun {
   heldEstimateMs: number | null
   /** The reporting process, when the reporter gave it: once it is gone, an open run ends as stopped (gone). */
   pid: number | null
+  /**
+   * HI-3206: the reporter's own clock just before it sent its start (ms), when it gave one: a process by `pid` created
+   * strictly before it is the reporter (runProcesses.ts), so its process tree is the run's. Absent: none is.
+   */
+  reporterSentAt?: number
   summary: string | null
   /** The user dismissed it: listed under Recent only. */
   dismissed: boolean

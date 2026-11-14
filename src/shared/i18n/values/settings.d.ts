@@ -555,6 +555,10 @@ interface CombworkMessageValues {
   'settings.advanced.cw.outage.resumesPerHour.title': undefined
   'settings.advanced.cw.outage.waitMinutes.desc': undefined
   'settings.advanced.cw.outage.waitMinutes.title': undefined
+  'settings.advanced.cw.processes.knownHosts.desc': undefined
+  'settings.advanced.cw.processes.knownHosts.title': undefined
+  'settings.advanced.cw.processes.orphanMinutes.desc': undefined
+  'settings.advanced.cw.processes.orphanMinutes.title': undefined
   'settings.advanced.cw.processes.orphanNotice.desc': undefined
   'settings.advanced.cw.processes.orphanNotice.title': undefined
   'settings.advanced.cw.progress.lanesShown.desc': undefined

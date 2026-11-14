@@ -130,6 +130,8 @@
   "session.notice.untakenTitle": "{agent}: wiersz wpisany przez Combwork nie został przyjęty",
   "session.notice.waitingForInput": "Czeka na Twoją odpowiedź",
   "session.orphan.body": "Proces {pid}: powłoka, która go uruchomiła, zakończyła się. Aktywność go pokazuje, z przyciskiem Zakończ; agent też dostaje informację.",
+  "session.orphan.bodyRunEnded": "Proces {pid} wciąż działa po zakończeniu przebiegu cw-progress „{run}”, a powłoka, która go uruchomiła, zakończyła się. Aktywność go pokazuje, z przyciskiem Zakończ; agent też dostaje informację.",
+  "session.orphan.bodyRunUnconfirmed": "Proces {pid}: jego przebieg cw-progress „{run}” nie jest już widoczny jako trwający, a powłoka, która go uruchomiła, zakończyła się. Aktywność go pokazuje, z przyciskiem Zakończ; agent też dostaje informację.",
   "session.orphan.title": "Agent {agent} zostawił działające polecenie {command} (działa od {time})",
   "session.plan.asking": "Agent pyta Cię o coś. Najpierw odpowiedz.",
   "session.plan.noToggle": "{provider} nie ma przełącznika trybu Plan.",

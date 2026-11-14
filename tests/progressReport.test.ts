@@ -39,7 +39,8 @@ afterAll(() => {
  * as it arrives, so a command run under the wrapper can wait for what the wrapper has reported (`seenNode` below) instead of
  * guessing how long that takes on a loaded machine.
  */
-const calls: { method: string; path: string; auth: string; body: Record<string, unknown> }[] = []
+// A start's `sentAt` (HI-3206: the reporter's clock just before it sent it) kept beside its body, so bodies compare whole.
+const calls: { method: string; path: string; auth: string; body: Record<string, unknown>; sentAt?: unknown }[] = []
 /**
  * What a run is for, asked before its command starts (#1220: POST /v1/progress/resolve), kept apart from `calls`; the
  * stand-in answers as `resolveReply` says: by default 404, as a Combwork from before it does (the run isn't linked).
@@ -83,7 +84,8 @@ beforeAll(async () => {
         if (resolveDelayMs) return void setTimeout(answer, resolveDelayMs)
         return answer()
       }
-      calls.push({ method: req.method ?? '', path: req.url ?? '', auth: req.headers.authorization ?? '', body: raw ? JSON.parse(raw) : {} })
+      const { sentAt, ...body } = (raw ? JSON.parse(raw) : {}) as Record<string, unknown>
+      calls.push({ method: req.method ?? '', path: req.url ?? '', auth: req.headers.authorization ?? '', body, ...(sentAt !== undefined ? { sentAt } : {}) })
       writeFileSync(seenFile, JSON.stringify(calls))
       res.setHeader('Content-Type', 'application/json')
       if (refuse) return res.writeHead(401).end('{"error":"no"}')
@@ -525,6 +527,9 @@ describe('reporting a run', () => {
     // With its process (#549: once it is gone without a finish, Combwork says the run ended without a report).
     // Its own title: not the command line, so nothing says it is (#620).
     expect(calls[0].body).toEqual({ title: 'Build', total: 2, step: 0, stepName: 'first', command: expect.stringContaining('-e'), pid: process.pid })
+    // HI-3206: with its own clock just before it sent the start (its process's identity is bound by it), recent.
+    expect(typeof calls[0].sentAt === 'number' && Math.abs(Date.now() - (calls[0].sentAt as number)) < 60_000).toBe(true)
+    expect(calls.slice(1).every((c) => c.sentAt === undefined)).toBe(true)
     const patches = calls.filter((c) => c.method === 'PATCH')
     expect(patches.every((c) => c.path === '/v1/progress/run-1')).toBe(true)
     expect(Object.assign({}, ...patches.map((c) => c.body))).toEqual({ step: 1, stepName: 'second' })

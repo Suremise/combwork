@@ -1,0 +1,9 @@
+# Recorded 14 Nov 2026 (HI-3206) on Windows 11 Pro 10.0.26200 with Windows Sandbox installed:
+# Get-Command WindowsSandbox*.exe | Select-Object Name, Source
+
+Name                            Source
+----                            ------
+WindowsSandbox.exe              C:\WINDOWS\system32\WindowsSandbox.exe
+WindowsSandboxClient.exe        C:\WINDOWS\system32\WindowsSandboxClient.exe
+WindowsSandboxRemoteSession.exe C:\Users\<user>\AppData\Local\Microsoft\WindowsApps\WindowsSandboxRemoteSession.exe
+WindowsSandboxServer.exe        C:\Users\<user>\AppData\Local\Microsoft\WindowsApps\WindowsSandboxServer.exe

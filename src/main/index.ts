@@ -11,7 +11,7 @@ import { initSkillCopies } from './skillCopies'
 import { initLaunchFolders } from './launchFolders'
 import { offNames } from '../shared/skillDelivery'
 import { initInboxNotices } from './inboxNotices'
-import { startOrphanWatch, stopOrphanWatch } from './orphanProcesses'
+import { setOrphanRuns, startOrphanWatch, stopOrphanWatch } from './orphanProcesses'
 import { initDecisionWakes } from './decisionWakes'
 // The user's answers given to the Assistant too (HI-1734): its delivery source, registered at start.
 import './answerRelay'
@@ -1375,6 +1375,16 @@ app.whenReady().then(async () => {
 
   // A review waiting on its builder's Progress run for the card isn't stalled (HI-1993).
   setStallRuns((wsPath) => progress.list(wsPath))
+  // HI-3206: a left-running process in a live cw-progress run's tree isn't told while the run is live.
+  setOrphanRuns((projectPath) => {
+    try {
+      const ws = workspaceOf(projectPath).path
+      return ws ? progress.list(ws) : []
+    } catch {
+      // No workspace for it (closed meanwhile): no runs, so nothing is held back.
+      return []
+    }
+  })
 
   // The usage history (#1106): its tick for running sessions; each workspace's import starts as it opens.
   usageHistory.start()

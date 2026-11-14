@@ -318,7 +318,7 @@
   "tips.language.title": "Combwork dans ta langue",
   "tips.launchSettings.text": "Le menu ⋯ d’une connexion → Paramètres de lancement… → Lancer comme depuis un terminal démarre ses agents sans rien des consignes, des outils ni de la saisie de Combwork, comme si tu avais ouvert la CLI toi-même dans ce dossier. Ils sont indépendants : dans l’équipe, mais hors du flux de travail.",
   "tips.launchSettings.title": "Un agent comme depuis un terminal",
-  "tips.leftRunning.text": "Un processus lancé par la commande d’un agent qui tourne encore après la fin de son shell apparaît dans Activité comme Laissé en cours, avec son temps CPU et L’arrêter. Au-delà de dix minutes, une notification le signale une fois, et l’agent est prévenu aussi.",
+  "tips.leftRunning.text": "Un processus lancé par la commande d’un agent qui tourne encore après la fin de son shell apparaît dans Activité comme Laissé en cours, avec L’arrêter. Au-delà des minutes fixées dans Paramètres → Avancé, toi et l’agent êtes prévenus une fois, sauf s’il appartient à une exécution cw-progress en cours.",
   "tips.leftRunning.title": "Repérer ce qu’une commande a laissé en cours",
   "tips.leftoverBranches.text": "Gestion de versions → Modifications liste les branches restantes : celle d’une carte remplacée ou archivée, celle d’un agent d’avant les emplacements. Compares-en une d’abord avec ta branche cible, puis Supprimer… ; une branche avec ses propres commits les liste avant de disparaître.",
   "tips.leftoverBranches.title": "Nettoyer les branches que plus rien n’utilise",

@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Fewer false "left running" notices** (HI-3206). A process of a cw-progress run that's still running is no longer told as left running, nor is Windows Sandbox's guest (a list of known hosts you can extend in Settings → Advanced). Once the run finishes, anything it left behind is told, naming the run. Settings → Advanced has a new **Processes left running: minutes before telling** (10 by default). A lane is no longer flagged as stalled while its builder's cw-progress run on the card is running.
+
 - **Send your line comments to the builder as one fix round** (HI-3220). From Review or Approved, **Send N comments to <builder>** previews every open comment and sends them all at once: the card goes back to Doing with your comments as the review's findings, the round counts, and the builder is told through its inbox. A comment left open goes again next time. A queued card leaves the queue first; a send is refused while its merge is under way, or if anything changed since the preview.
 
 - **Comment on the lines of a card's work** (HI-3219). In a revision's **Changes**, hover a line and press **+** (or select lines first) to leave a comment in Markdown. Comments stay on the card, each on the revision it was made on, with Edit, Resolve, Reopen and Delete; the Work section counts the open ones. Agents can read them too.
