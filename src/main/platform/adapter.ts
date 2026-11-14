@@ -288,7 +288,15 @@ export interface AdvanceRef {
  * takes a repository lock.
  */
 export interface AdvanceHost {
-  /** `AdvanceAttempted`, read back: false when it couldn't be written or confirmed (the attempt then stops before any change). */
+  /**
+   * HI-3265 (HI-2709, SPEC §16.9.1): the cards this card still waits for (its blockers that aren't Done, one that can't be
+   * read among them), read now: an advance or a preview begins only while it's empty. `attempted`'s write reads it again.
+   */
+  waitsFor(card: CardRecord): string[]
+  /**
+   * `AdvanceAttempted`, read back: false when it couldn't be written or confirmed (the attempt then stops before any
+   * change), or when the card waits for a blocker in that write (HI-3265: the blockers are the advance's authority).
+   */
   attempted(card: CardRecord, cycle: number, plan: string, attempt: string): Promise<boolean>
   /** Verified: `Integrated { by: 'combwork' }` once per attempt, and the card moved to Done where the rules act. */
   advanced(card: CardRecord, ref: AdvanceRef, integrated: Pick<FactData['Integrated'], 'revision' | 'target' | 'result' | 'method' | 'platform'>, also?: (w: Write) => void): Promise<boolean>

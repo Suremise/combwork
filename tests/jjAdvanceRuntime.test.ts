@@ -90,6 +90,16 @@ function rows(w: World, table: 'jj_obligations' | 'jj_retained'): Record<string,
     db.close()
   }
 }
+/** HI-3265: the board's edit of a card's blocked-by list (tasks.ts writes these rows), on a connection of its own as another writer. */
+function block(w: World, card: { id: number }, by: { id: number }[]): void {
+  const db = new DatabaseSync(boardFile(w.home))
+  try {
+    db.prepare("DELETE FROM card_links WHERE card = ? AND kind = 'blockedBy'").run(card.id)
+    by.forEach((b, i) => db.prepare("INSERT INTO card_links (card, kind, ord, target) VALUES (?, 'blockedBy', ?, ?)").run(card.id, i, b.id))
+  } finally {
+    db.close()
+  }
+}
 const journalOf = async (w: World, card: { id: number; key: string }): Promise<AdvanceJournal[]> => (await journals(w).list(card.key, w.wf.state(w.wf.store.card(card.id)).cycle)).map((x) => x.journal as AdvanceJournal)
 
 describe.skipIf(!jjExe)(`Combwork's jj advance through the adapter (jj ${TESTED_JJ.version}), HI-3235`, { timeout: REAL_JJ_MS }, () => {
@@ -115,6 +125,42 @@ describe.skipIf(!jjExe)(`Combwork's jj advance through the adapter (jj ${TESTED_
     } finally {
       exported = true
     }
+  })
+
+  // HI-3265 (HI-2709, SPEC §16.9.1): the blockers are the advance's authority, as for Git's queue. One Git-backed mode:
+  // the rule is the adapter's and the workflow's, not jj's.
+  it("HI-3265: a card blocked by one that isn't Done gets no attempt (no fact, no journal, the target unmoved); once its blocker is Done, the next pass integrates it", async () => {
+    const w = await world(true, { candidates: true, oneSlot: true, advance: true })
+    const card = await approved(w)
+    const blocker = w.wf.createCard({ title: 'blocker' })
+    block(w, card, [blocker])
+    const head = w.main()
+    await pass(w, card)
+    await pass(w, card)
+    expect(facts(w, card, 'AdvanceAttempted')).toEqual([])
+    expect(await journalOf(w, card)).toEqual([])
+    expect(w.main()).toBe(head)
+    expect(w.wf.state(w.wf.store.card(card.id)).stage).toBe('approved')
+    moved(await w.wf.move(blocker.key, 'done', 'user', { confirm: true, reason: 'not needed' }))
+    await pass(w, card)
+    expect(facts(w, card, 'Integrated')).toHaveLength(1)
+    expect(w.wf.state(w.wf.store.card(card.id)).stage).toBe('done')
+  })
+
+  it("HI-3265: a blocker added after the adapter's read is caught in AdvanceAttempted's write: no fact, the journal abandoned, the target unmoved", async () => {
+    const w = await world(true, { candidates: true, oneSlot: true, advance: true })
+    const card = await approved(w)
+    await candidate(w, card)
+    const head = w.main()
+    const blocker = w.wf.createCard({ title: 'blocker' })
+    // The adapter read no blocker (as if the dependency landed just after its read); the write reads it again.
+    const host: AdvanceHost = { ...advanceHostOf(w.wf), waitsFor: () => [] }
+    block(w, card, [blocker])
+    expect(await advanceWith(w, card, host)).toBe('busy')
+    expect(facts(w, card, 'AdvanceAttempted')).toEqual([])
+    expect((await journalOf(w, card)).map((j) => j.phase)).toEqual(['abandoned'])
+    expect(w.main()).toBe(head)
+    expect(w.wf.state(w.wf.store.card(card.id)).advance).toBeNull()
   })
 
   describe.each([true, false] as const)('colocated: %s', (colocated) => {
