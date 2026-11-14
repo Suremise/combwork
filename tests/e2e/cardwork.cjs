@@ -300,6 +300,14 @@ const commit = (dir, file, text, message) => {
   // From elsewhere (another window, the Agent API): a comment added at line 2, then deleted.
   const k2 = await inv('tasks:lineCommentAdd', kt, { submission: ktSub, path: 'lines.ts', side: 'new', from: 2, to: 2, body: 'From another window.' })
   check('a comment arriving at line 2 from elsewhere keeps both the edit and the draft', !!(await lib.until(async () => (await ktRev.locator(`[data-line-comment="${k2}"]`).count()) === 1, HUNG_MS)) && (await editKept()) && (await draftKept()), `${await editBox.inputValue().catch(() => '(gone)')} | ${await ktDraft.locator('textarea').inputValue().catch(() => '(gone)')}`)
+  // The edit, the comment from elsewhere and the draft, each under its line, in both themes.
+  for (const theme of ['dark', 'light']) {
+    await inv('settings:update', { appearance: { theme } })
+    await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+    await ktRev.screenshot({ path: path.join(lib.WORK, `cardwork-keep-typing-${theme}.png`) })
+  }
+  await inv('settings:update', { appearance: { theme: 'dark' } })
+  check('…switching the theme keeps them too', (await editKept()) && (await draftKept()))
   await inv('tasks:lineCommentChange', kt, k2, 'delete')
   check('…and so does its deletion', !!(await lib.until(async () => (await ktRev.locator(`[data-line-comment="${k2}"]`).count()) === 0, HUNG_MS)) && (await editKept()) && (await draftKept()), `${await editBox.inputValue().catch(() => '(gone)')} | ${await ktDraft.locator('textarea').inputValue().catch(() => '(gone)')}`)
   await ktDraft.getByRole('button', { name: 'Cancel' }).click()
