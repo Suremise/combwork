@@ -6157,7 +6157,7 @@ moved on.
   it makes (its own accepted write moves what its next write expects): a later read or receipt never lets an older request
   through. The agent passes nothing: no new arguments, no reads.
 - **The check**, in every write of a project agent's own call on a card, in that write's transaction before it decides
-  anything (intents, `cw_update_task` changes and comments, a batch's cards, an Assistant request on the card and the
+  anything (intents, `cw_update_task` changes and comments, a batch's cards, files attached to it (with a change or alone, HI-3244), an Assistant request on the card and the
   waiting mark it sets, declaring paths, a kind, review skip or target),
   against the card's attempt before the write: the launch replaced → **`attempt.staleLaunch`**; a binding that isn't the
   card's attempt → **`attempt.moved`** (read it again), in every stage, Todo and Done included. The launch is checked

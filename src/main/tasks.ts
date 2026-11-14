@@ -3541,6 +3541,12 @@ export async function changeWithAttachments(actor: TaskActor, files: ChangeAttac
       const made = await run()
       const n = made.number
       const before = await getTask(n, ws)
+      // HI-3244: a project agent's files are a write on the card like any other, fenced by its request's attempt and launch
+      // in this board change: checked on the card's attempt as `run` left it (a change of its own already moved what the
+      // request expects, so it isn't refused), its launch again as the change commits (fenceOrThrow), the files' publish
+      // and the card's save undone with it. An attachments-only change (`run` only reads) is fenced here alone.
+      const g = guardOf(actor)
+      if (g) fenceOrThrow(g, n, attemptIn(ws, before.project, n), ws)
       const card = structuredClone(before)
       const comment = where === 'comment' ? card.comments.at(-1) : undefined
       const pub = await publish(ws, n, files.staging, actorName(actor), null)
@@ -3563,6 +3569,9 @@ export async function changeWithAttachments(actor: TaskActor, files: ChangeAttac
       if (comment?.id) linkToComment(ws, n, fresh.filter((id) => inComment.has(id)), comment.id)
       linkToComment(ws, n, fresh.filter((id) => !inComment.has(id)), 'description')
       await saveCard(ws, n, card, before, undefined, commit)
+      // Written: its launch is bound to the card's attempt (a first contact's binding, HI-3194).
+      const post = g ? attemptIn(ws, card.project, n) : null
+      if (g && post) g.accepted(n, post, (fn) => afterBoardWrite(ws, fn))
       changed(ws)
       return { ...card, attached: pub.attachments.map((a, i) => ({ name: a.name, path: a.path, added: pub.added[i] })) }
     })
