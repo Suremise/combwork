@@ -55,13 +55,14 @@ describe("lib.cjs's sendPrompt (HI-3210)", () => {
    * a paste is drawn into it, and Enter sends it, unless `dropEnters` are left (a busy Codex's dropped Enter). `reads`
    * counts the screen's reads between a Ctrl+U and the next paste: the wait for the clear.
    */
-  const cli = (history: string, dropEnters = 0) => {
-    const s = { history, input: '', sent: [] as string[], dropEnters, reading: false, reads: [] as number[] }
+  const cli = (history: string, dropEnters = 0, { paste = true, draws = true } = {}) => {
+    const s = { history, input: '', sent: [] as string[], dropEnters, reading: false, reads: [] as number[], written: false, readsBeforeEnter: 0 }
     const inv: Inv = async (channel, _key, data) => {
       if (channel === 'pty:size') return { cols: 200, rows: 20 }
       if (channel === 'pty:buffer') {
         if (s.reading) s.reads[s.reads.length - 1]++
-        return `\x1b[?2004h\x1b[2J\x1b[H${s.history.replace(/\n/g, '\r\n')}\r\n› ${s.input}`
+        if (s.written) s.readsBeforeEnter++
+        return `${paste ? '\x1b[?2004h' : ''}\x1b[2J\x1b[H${s.history.replace(/\n/g, '\r\n')}\r\n› ${draws ? s.input : ''}`
       }
       if (channel !== 'pty:write') return undefined
       if (data === '\x15') {
@@ -69,6 +70,7 @@ describe("lib.cjs's sendPrompt (HI-3210)", () => {
         s.reading = true
         s.reads.push(0)
       } else if (data === '\r') {
+        s.written = false
         if (s.dropEnters > 0) s.dropEnters--
         else if (s.input) {
           s.sent.push(s.input)
@@ -77,6 +79,7 @@ describe("lib.cjs's sendPrompt (HI-3210)", () => {
         }
       } else {
         s.reading = false
+        s.written = true
         s.input += String(data).replace(/\x1b\[20[01]~/g, '')
       }
       return undefined
@@ -100,5 +103,15 @@ describe("lib.cjs's sendPrompt (HI-3210)", () => {
     expect(s.sent).toEqual([PROMPT])
     // The input emptied at once: read once to see it cleared, then the count before the paste.
     expect(s.reads).toEqual([1, 2])
+  }, 20000)
+
+  it('a pasted prompt gets its Enter once it shows; a typed one into a CLI that draws nothing typed (the fake Codex) gets it with no wait', async () => {
+    const pasted = cli('Codex')
+    expect(await sendPrompt(pasted.inv, 'k', PROMPT, { submitted: async () => pasted.s.sent.length > 0 })).toBe(1)
+    const typed = cli('Codex', 0, { paste: false, draws: false })
+    expect(await sendPrompt(typed.inv, 'k', PROMPT, { submitted: async () => typed.s.sent.length > 0 })).toBe(1)
+    expect(typed.s.sent).toEqual([PROMPT])
+    // One look at the screen after the pause (the old wait read it about 40 times over its 10 s bound here).
+    expect(typed.s.readsBeforeEnter).toBe(1)
   }, 20000)
 })

@@ -1403,13 +1403,14 @@ async function sendPrompt(inv, key, text, { submitted, ready = null, tries = 3, 
     // text (a new line, not a submit), and nothing on screen says when that window ends: Copilot shows the line at once
     // and still takes an Enter right after it as part of the paste (tried in #527). submitted() is the check.
     await sleep(400)
-    // Enter once the CLI has drawn the text, as Combwork does (enterOnceDrawn, #600): a busy Codex reads the text and an
-    // Enter in one go, takes them as a paste burst and drops the Enter, pasted or typed (HI-3210: under load, all three
-    // attempts of a scenario's prompt were lost so). Not drawn within DRAWN_MS: Enter anyway, and said. Also what the next
-    // attempt of a typed prompt does (#981's evidence).
+    // A paste: Enter once the CLI has drawn it, as Combwork does (enterOnceDrawn, #600): a busy Codex reads the text and an
+    // Enter in one go, takes them as a paste burst and drops the Enter (HI-3210: under load, all three attempts of a
+    // scenario's prompt were lost so). Not drawn within DRAWN_MS: Enter anyway, and said. Typed (a CLI without bracketed
+    // paste, such as the fake Codex, which draws nothing typed): whether it is drawn now, what the next attempt does
+    // (#981's evidence), with no wait.
     const t = Date.now()
-    echoed = !enterOnly && (await until(async () => (await shown()) > before, DRAWN_MS, 250))
-    if (!enterOnly) console.log(`INFO sendPrompt attempt ${attempt}: ${echoed ? `drawn ${Date.now() - t + 400} ms after it was written` : `not drawn within ${(DRAWN_MS + 400) / 1000} s: Enter anyway`}`)
+    echoed = !enterOnly && (paste ? await until(async () => (await shown()) > before, DRAWN_MS, 250) : (await shown()) > before)
+    if (paste) console.log(`INFO sendPrompt attempt ${attempt}: ${echoed ? `drawn ${Date.now() - t + 400} ms after it was written` : `not drawn within ${(DRAWN_MS + 400) / 1000} s: Enter anyway`}`)
     await inv('pty:write', key, '\r')
     if (await until(submitted, waitMs, 500)) return attempt
     const drawn = await screen()
