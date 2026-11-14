@@ -145,6 +145,8 @@
   "tips.cardMove.title": "把对话框移开",
   "tips.cardReadFirst.text": "在卡片的“先读”中列出它需要的文档章节，比如 docs/PLAN.md#setup：智能体的启动提示会列出它们，这样它只读这些章节，而不是整份计划。点击一个即可在 Combwork 中阅读。",
   "tips.cardReadFirst.title": "告诉卡片它需要哪些文档",
+  "tips.cardRevisionChanges.text": "在卡片的“工作记录”部分，修订版本上的“更改”会显示其每个文件从工作开始处到该修订版本的差异，即提交时的样子，即使文件夹之后已有变化。",
+  "tips.cardRevisionChanges.title": "准确查看修订版本更改了什么",
   "tips.cardSummaries.text": "智能体写卡片的报告或评审结论时，会先用一行说明什么已就绪或发现了什么，细节写在下面；够用时，它们和助手只读这几行。",
   "tips.cardSummaries.title": "报告先说要点",
   "tips.cardWork.text": "打开卡片：其“工作记录”部分列出每个提交评审的修订版本，包括轮次、文件、结论和检查，以及它是如何合并的。在看板上，卡片会显示其修订版本和最近的结论。",

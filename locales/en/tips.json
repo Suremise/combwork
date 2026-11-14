@@ -591,6 +591,14 @@
     "defaultMessage": "Point a card at the docs it needs",
     "description": "A tip's title."
   },
+  "tips.cardRevisionChanges.text": {
+    "defaultMessage": "In a card’s Work section, Changes on a revision shows each of its files from where the work started to that revision, as it was submitted, even after the folder has moved on.",
+    "description": "A tip (HI-3218). Names of Combwork's menus, views, settings and commands (Work, Changes): keep them as Combwork shows them. Glossary: work, revision."
+  },
+  "tips.cardRevisionChanges.title": {
+    "defaultMessage": "See exactly what a revision changed",
+    "description": "A tip's title (HI-3218). Glossary: revision."
+  },
   "tips.cardSummaries.text": {
     "defaultMessage": "Agents start a card's report or review verdict with one line saying what is ready or what was found, the details below; they and the Assistant read just those lines when that's enough.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

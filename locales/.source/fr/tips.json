@@ -147,6 +147,8 @@
   "tips.cardMove.title": "Move a dialog out of the way",
   "tips.cardReadFirst.text": "In a card's Read first, list the doc sections it needs, like docs/PLAN.md#setup: the agent's start prompt lists them, so it reads those sections instead of a whole plan. Click one to read it in Combwork.",
   "tips.cardReadFirst.title": "Point a card at the docs it needs",
+  "tips.cardRevisionChanges.text": "In a card’s Work section, Changes on a revision shows each of its files from where the work started to that revision, as it was submitted, even after the folder has moved on.",
+  "tips.cardRevisionChanges.title": "See exactly what a revision changed",
   "tips.cardSummaries.text": "Agents start a card's report or review verdict with one line saying what is ready or what was found, the details below; they and the Assistant read just those lines when that's enough.",
   "tips.cardSummaries.title": "Reports start with the gist",
   "tips.cardWork.text": "Open a card: its Work section lists each revision submitted for review, with its round, files, verdicts and checks, and how it was merged. On the board, a card shows its revision and last verdict.",

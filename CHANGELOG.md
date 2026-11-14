@@ -4,6 +4,8 @@
 
 ### Added
 
+- **A card's revisions show their own diff** (HI-3218). In the card dialog's Work section, **Changes** on a revision shows its files and each one's diff from where the work started to that revision, read from the commits, so it's what was submitted even once the folder has moved on. Git and jj projects.
+
 - **Combwork offers to move on once a release ships** (HI-3155). When a project's Work merges into is released (tagged, as `v1.4.0`, and merged into `main`), For you offers to move it to the next version, or to start it, and to take released branches nothing uses off Other branches work can merge into. Move… opens Workflow's Save… with what can follow; Not now hides it until something changes. The Assistant sees it too, and acts only once you say so. Git and jj projects.
 
 - **jj (Jujutsu) as a project's version control** (HI-2799). In a jj repository colocated with Git, the Version Control tab offers **jj** beside None and Git; Combwork never takes it by itself, never creates a jj repository and never changes its colocation.

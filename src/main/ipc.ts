@@ -158,6 +158,7 @@ import { checkOffer, dismissOffer, releaseOffers } from './workflow/releaseOffer
 import { branchStartArg } from '../shared/nextVersion'
 import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pauseQueue, purgeQueueHistory, purgeTargetsOf, queueCardChange, queueHistory, queueViews, resolveForward, resumeQueue, settleQueueChanges } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
+import { revisionDiff } from './workflow/revisionDiff'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
 import { withSkillDelivered } from '../shared/skillDelivery'
@@ -996,6 +997,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       if (typeof project === 'string' && project) reconcileCard(ws, n, project)
       return cardWork(ws, n)
     },
+    'tasks:revisionDiff': (n, submission, file) => revisionDiff(currentWorkspace(), Number(n), Number(submission), String(file ?? '')),
     'tasks:workBadges': async () => {
       const ws = currentWorkspace()
       if (!ws.path) return []

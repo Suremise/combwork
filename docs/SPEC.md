@@ -4360,6 +4360,17 @@ A card's history text (`TaskHistoryEntry`) stays, for people; the facts are the 
   Combwork didn't read one when the card went to Review") in sentences of their own. A revision's files open in the folder
   recorded for it (the agent whose worktree it is now), else are listed as text, saying the folder is no longer an
   agent's [#1224 round 1].
+- **A revision's own diff** [HI-3218, from HI-3191]: a revision row whose submission recorded a base and a revision and
+  changed files has **Changes**: its files, and the one chosen in the diff editor from the submission's `base` to its
+  `revision` (`RevisionChanges.tsx`, IPC `tasks:revisionDiff(card, submission, file)`). Main finds both commits in the
+  card's `Submitted` fact (the window passes none) and reads only a file the submission lists, through the card's
+  project's platform's **revision reads** port (`platform/revisionReads.ts`, found by `revisionReadsOf`, never a switch
+  on a platform id): Git reads each side with `cat-file` as Compare does (`gitCompare.commitDiff`, gitlinks as their
+  line); jj with `jj file show -r` at each commit (no snapshot), a side `jj file list` doesn't list being empty. Commits
+  only, never a working copy, so what is shown is what was submitted, whatever the folder holds now. A side over the
+  diff limit is said as too large, never read; a binary one is said as binary; a failed read is an error with Retry,
+  never an empty side. A renamed file shows as added (its old path isn't recorded). None has no revision reads: no
+  Changes. `DiffView`'s `onEditor` gives the editor to a layer over it (HI-3219's line comments).
 - **Restart** resumes from the log. The merge queue rebuilds from `IntegrationRequested` entries with no
   `IntegrationCancelled`, `IntegrationFailed` or `Integrated` for the same entry id; an entry with `IntegrationStarted`
   and no outcome is reconciled first (§16.4.5) [note §4; P1, answering HR2's round 1 finding 8].

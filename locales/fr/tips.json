@@ -145,6 +145,8 @@
   "tips.cardMove.title": "Écarter une boîte de dialogue",
   "tips.cardReadFirst.text": "Dans « À lire d’abord » d’une carte, liste les sections de documents dont elle a besoin, comme docs/PLAN.md#setup : le prompt de démarrage de l’agent les cite, donc il lit ces sections plutôt qu’un plan entier. Clique sur l’une d’elles pour la lire dans Combwork.",
   "tips.cardReadFirst.title": "Indique à une carte les documents dont elle a besoin",
+  "tips.cardRevisionChanges.text": "Dans la section Travail d’une carte, Modifications sur une révision montre chacun de ses fichiers depuis le début du travail jusqu’à cette révision, tel qu’il a été soumis, même si le dossier a changé depuis.",
+  "tips.cardRevisionChanges.title": "Voir exactement ce qu’une révision a modifié",
   "tips.cardSummaries.text": "Les agents commencent le rapport ou le verdict de relecture d’une carte par une ligne qui dit ce qui est prêt ou ce qui a été trouvé, les détails en dessous ; eux et l’Assistant ne lisent que ces lignes quand cela suffit.",
   "tips.cardSummaries.title": "Les rapports commencent par l’essentiel",
   "tips.cardWork.text": "Ouvre une carte : sa section Travail liste chaque révision soumise à relecture, avec son tour, ses fichiers, ses verdicts et ses vérifications, et la façon dont elle a été fusionnée. Sur le tableau, une carte affiche sa révision et son dernier verdict.",

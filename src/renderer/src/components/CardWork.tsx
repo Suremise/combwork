@@ -16,6 +16,7 @@ import { cx, timeAgo } from '../util'
 import { CardQueue, SHOW_QUEUE_WORK } from './CardQueue'
 import { CardRoundCostTable } from './CardCost'
 import { GitlinkRow } from './GitlinkDiff'
+import { RevisionChanges } from './RevisionChanges'
 import { Icon, Tooltip } from './ui'
 
 // A card's work (#1224, SPEC §16.4; #1223's work view): the dialog's Work section and the board card's badges. What the
@@ -48,7 +49,8 @@ const M = {
   revisionNotRead: msg({ id: 'board.work.revisionNotRead', defaultMessage: "{note, select, beforeChange {No revision recorded: Combwork didn't read one when the card went to Review.} other {Revision not read when it was submitted: Combwork couldn't read {why}.}} Its next submission reads it again.", description: "In place of a revision in the card dialog's Work section. {note} picks why: Combwork read nothing when the card was moved into Review (beforeChange; the card had no agent then, say), or it couldn't read the revision when the builder submitted it, {why}: what it couldn't read (such as \"the latest commit in …\", already translated). Then: the next submission reads it again. Keep the select keys. Glossary: revision." }),
   filesNotRead: msg({ id: 'board.work.filesNotRead', defaultMessage: '{note, select, beforeChange {Files not read} noBaseOrHead {Files not read: there was no base or revision to compare} other {Files not read: Combwork couldn\'t read {why}}}', description: "In the card dialog's Work section, in place of a revision's changed files: Combwork couldn't read which files changed when it was submitted. {note} picks why: Combwork read nothing then (beforeChange: the revision's line above says why), it had no base or revision to compare (noBaseOrHead), or another reason, {why}: what it couldn't read (already translated). Keep the select keys. Glossary: revision." }),
   folderGone: msg({ id: 'board.work.folderGone', defaultMessage: 'Its folder, {folder}, is no longer an agent’s worktree: its files can’t be opened here.', description: "Under a revision's files in the card dialog's Work section: the folder the work was done in ({folder}, a path) isn't any agent's worktree now, so its files aren't opened in another folder instead." }),
-  files: msg({ id: 'board.work.files', defaultMessage: '{n, plural, =0 {No files changed} one {# file changed} other {# files changed}}', description: "A button in the card dialog's Work section: how many files the revision changed; a click shows them." }),
+  changes: msg({ id: 'board.work.changes', defaultMessage: 'Changes', description: "A button in the card dialog's Work section, on a revision (HI-3218): shows the revision's own diff, each file from the submission's base to its revision; a click again hides it." }),
+  files: msg({ id: 'board.work.files',defaultMessage: '{n, plural, =0 {No files changed} one {# file changed} other {# files changed}}', description: "A button in the card dialog's Work section: how many files the revision changed; a click shows them." }),
   openFile: msg({ id: 'board.work.openFile', defaultMessage: 'Open {path} in Files', description: "Tooltip of a file a revision changed (card dialog's Work section): opens it in the project's Files tab. {path} is the file's path." }),
   verdict: msg({ id: 'board.work.verdict', defaultMessage: '{reviewer}: {pass, select, yes {passed} other {failed}}{current, select, no { (no longer counts)} other {}}', description: "A verdict under a revision in the card dialog's Work section: who reviewed it ({reviewer}, an agent's name, then a colon) and whether it passed or failed; (no longer counts) when a newer revision or decision came since. Keep the select keys. Glossary: verdict, pass/fail." }),
   check: msg({ id: 'board.work.check', defaultMessage: '{name}: {result, select, passed {passed} failed {failed} other {stopped}}{counted, select, no { (not counted)} other {}}', description: "A check under a revision in the card dialog's Work section: its name (typecheck, as the project names it), then a colon and how it ended; (not counted) when it doesn't count for the revision (its hover says why). Keep the select keys. Glossary: check." }),
@@ -226,7 +228,7 @@ function WorkDetails({ card, view: v, project, short, agentName, reveal }: { car
         <>
           <div className="card-work-sub">{tr(M.revisions)}</div>
           {[...v.revisions].reverse().map((r) => (
-            <RevisionRow key={r.submission} r={r} noCode={v.kind === 'no-code'} verdicts={v.verdicts.filter((x) => x.submission === r.submission)} checks={r.revision ? checksOn(v, r.revision) : []} project={project} folder={v.folder} short={short} agentName={agentName} />
+            <RevisionRow key={r.submission} card={card.number} r={r} noCode={v.kind === 'no-code'} verdicts={v.verdicts.filter((x) => x.submission === r.submission)} checks={r.revision ? checksOn(v, r.revision) : []} project={project} folder={v.folder} short={short} agentName={agentName} />
           ))}
         </>
       )}
@@ -251,8 +253,11 @@ function workMarks(v: WorkView, short: (id: string) => string): string[] {
   return out
 }
 
-function RevisionRow({ r, noCode, verdicts, checks, project, folder, short, agentName }: { r: WorkRevision; noCode: boolean; verdicts: WorkVerdict[]; checks: WorkCheck[]; project: ProjectInfo | null; folder: string | null; short: (id: string) => string; agentName: (id: string | null) => string }) {
+function RevisionRow({ card, r, noCode, verdicts, checks, project, folder, short, agentName }: { card: number; r: WorkRevision; noCode: boolean; verdicts: WorkVerdict[]; checks: WorkCheck[]; project: ProjectInfo | null; folder: string | null; short: (id: string) => string; agentName: (id: string | null) => string }) {
   const [files, setFiles] = useState(false)
+  // HI-3218: its own diff, base to revision: offered where both were recorded and it changed files.
+  const [changes, setChanges] = useState(false)
+  const diffable = !noCode && !!r.revision && !!r.base && r.files.length > 0
   // Its files open in the folder it was made in (#1224 round 1, finding 1): the project folder, or the slot or worktree
   // at the recorded path, whichever agent works there now (#1442); never another tree. A folder no agent has now: its
   // files show as text.
@@ -281,6 +286,11 @@ function RevisionRow({ r, noCode, verdicts, checks, project, folder, short, agen
           {timeAgo(r.at)}
         </span>
         <span className="grow" />
+        {diffable && (
+          <button type="button" className="btn small subtle" aria-expanded={changes} data-revision-changes-toggle={r.submission} onClick={() => setChanges(!changes)}>
+            <Icon name="git-compare" /> {tr(M.changes)}
+          </button>
+        )}
         {r.files.length ? (
           <button type="button" className="btn small subtle" aria-expanded={files} onClick={() => setFiles(!files)}>
             <Icon name={files ? 'chevron-down' : 'chevron-right'} /> {tr(M.files, { n: r.files.length })}
@@ -311,6 +321,7 @@ function RevisionRow({ r, noCode, verdicts, checks, project, folder, short, agen
           {!openable && folder && <li className="faint card-work-gone">{tr(M.folderGone, { folder })}</li>}
         </ul>
       )}
+      {changes && diffable && <RevisionChanges card={card} r={r} short={short} />}
       {(verdicts.length > 0 || checks.length > 0) && (
         <ul className="card-work-results">
           {verdicts.map((x, i) => (

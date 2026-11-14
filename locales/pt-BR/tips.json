@@ -145,6 +145,8 @@
   "tips.cardMove.title": "Tire um diálogo do caminho",
   "tips.cardReadFirst.text": "Em “Ler primeiro” de um cartão, liste as seções de documentos de que ele precisa, como docs/PLAN.md#setup: o prompt inicial do agente as lista, então ele lê essas seções em vez de um plano inteiro. Clique em uma para lê-la no Combwork.",
   "tips.cardReadFirst.title": "Aponte para um cartão os documentos de que ele precisa",
+  "tips.cardRevisionChanges.text": "Na seção Trabalho de um cartão, Alterações em uma versão mostra cada um dos arquivos dela desde onde o trabalho começou até essa versão, como foi enviada, mesmo depois que a pasta avançou.",
+  "tips.cardRevisionChanges.title": "Veja exatamente o que uma versão mudou",
   "tips.cardSummaries.text": "Os agentes começam o relatório ou o veredito de revisão de um cartão com uma linha que diz o que está pronto ou o que foi encontrado, com os detalhes abaixo; eles e o Assistente leem só essas linhas quando isso basta.",
   "tips.cardSummaries.title": "Relatórios começam pelo essencial",
   "tips.cardWork.text": "Abra um cartão: a seção Trabalho lista cada versão enviada para revisão, com rodada, arquivos, vereditos e verificações, e como foi mesclada. No quadro, um cartão mostra sua versão e o último veredito.",

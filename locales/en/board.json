@@ -4111,6 +4111,58 @@
     "defaultMessage": "{commits, plural, one {change {change}} other {change {change}, # commits}}",
     "description": "Beside a jj card's revision in the card dialog's Work section (HI-2869): its jj change id (short), and how many commits its submitted work holds when more than one. “change” is jj's term."
   },
+  "board.work.changes": {
+    "defaultMessage": "Changes",
+    "description": "A button in the card dialog's Work section, on a revision (HI-3218): shows the revision's own diff, each file from the submission's base to its revision; a click again hides it."
+  },
+  "board.work.changes.between": {
+    "defaultMessage": "{base} ↔ {revision}",
+    "description": "Beside the file's name above its diff in the card dialog's view of a revision's changes: the two commits compared, the submission's base and its revision (short ids). Keep the arrow."
+  },
+  "board.work.changes.binary": {
+    "defaultMessage": "Binary file: no text to compare.",
+    "description": "In place of a file's diff in the card dialog's view of a revision's changes: the file is binary."
+  },
+  "board.work.changes.failed": {
+    "defaultMessage": "Couldn’t read this file’s changes: {error}",
+    "description": "The card dialog's view of a revision's changes when the chosen file's diff couldn't be read. {error} is why, in the words of the error."
+  },
+  "board.work.changes.files": {
+    "defaultMessage": "Files in this revision",
+    "description": "The accessible name of the list of a revision's files in the card dialog's view of its changes: choosing one shows its diff."
+  },
+  "board.work.changes.inline": {
+    "defaultMessage": "Inline",
+    "description": "A button's tooltip above a file's diff in the card dialog's view of a revision's changes: shows the changes in one column."
+  },
+  "board.work.changes.noRepository": {
+    "defaultMessage": "This project has no repository to read the revision from.",
+    "description": "A card's revision diff couldn't be shown: the card's project has no version control (None)."
+  },
+  "board.work.changes.noRevision": {
+    "defaultMessage": "This submission has no revision to compare: its commits weren't recorded.",
+    "description": "A card's revision diff couldn't be shown: the submission recorded no base or revision commit (a no-code card, or one from before revisions were recorded)."
+  },
+  "board.work.changes.noSubmission": {
+    "defaultMessage": "This card has no such submission.",
+    "description": "A card's revision diff couldn't be shown: the submission it names isn't one of the card's (the card changed meanwhile)."
+  },
+  "board.work.changes.notListed": {
+    "defaultMessage": "{path} isn't one of this submission's files.",
+    "description": "A card's revision diff couldn't be shown: the file isn't among the files the submission changed."
+  },
+  "board.work.changes.reading": {
+    "defaultMessage": "Reading its changes…",
+    "description": "The card dialog's view of a revision's changes while the chosen file's diff is being read."
+  },
+  "board.work.changes.retry": {
+    "defaultMessage": "Retry",
+    "description": "A button in the card dialog's view of a revision's changes, after a file's diff couldn't be read: reads it again."
+  },
+  "board.work.changes.sideBySide": {
+    "defaultMessage": "Side by side",
+    "description": "A button's tooltip above a file's diff in the card dialog's view of a revision's changes: shows the two versions side by side."
+  },
   "board.work.check": {
     "defaultMessage": "{name}: {result, select, passed {passed} failed {failed} other {stopped}}{counted, select, no { (not counted)} other {}}",
     "description": "A check under a revision in the card dialog's Work section: its name (typecheck, as the project names it), then a colon and how it ended; (not counted) when it doesn't count for the revision (its hover says why). Keep the select keys. Glossary: check."
