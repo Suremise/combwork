@@ -709,10 +709,28 @@
   "settings.advanced.codex.rateLimitNudge.hide.title": {
     "placeholders": {}
   },
+  "settings.advanced.codex.rateLimits.defaultLimitId.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.rateLimits.defaultLimitId.title": {
+    "placeholders": {}
+  },
   "settings.advanced.codex.rateLimits.field.desc": {
     "placeholders": {}
   },
   "settings.advanced.codex.rateLimits.field.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.rateLimits.limitId.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.rateLimits.limitId.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.rateLimits.limitName.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.rateLimits.limitName.title": {
     "placeholders": {}
   },
   "settings.advanced.codex.rateLimits.usedPercent.desc": {

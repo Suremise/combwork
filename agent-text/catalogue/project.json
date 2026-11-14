@@ -1,7 +1,7 @@
 {
   "project.limit.models": {
-    "text": "{models, select, gemini {Gemini models} otherModels {Other models} premium {Premium requests} chat {Chat messages} completions {Code completions} other {{models}}}{window, select, weekly {, weekly} other {}}",
-    "note": "The name of a plan limit that covers part of a plan (HI-2734), shown where Combwork says \"{name} limit\": which models or requests it is for (Antigravity's Gemini models, or its other providers' models; Copilot's premium requests, chat messages or code completions; else the provider's own word, {models}), and, for a weekly one, that it is weekly. \"Other models\" are the models of providers other than Google.",
+    "text": "{models, select, gemini {Gemini models} otherModels {Other models} premium {Premium requests} chat {Chat messages} completions {Code completions} other {{models}}}{window, select, weekly {, weekly} fiveHour {, 5-hour} hours {, {hours, plural, one {#-hour} other {#-hour}}} other {}}",
+    "note": "The name of a plan limit that covers part of a plan (HI-2734), shown where Combwork says \"{name} limit\": which models or requests it is for (Antigravity's Gemini models, or its other providers' models; Copilot's premium requests, chat messages or code completions; else the provider's own word, {models}, such as the name Codex gives one of its limits, HI-1125), and its window: weekly, 5-hour, or another number of hours ({hours}). \"Other models\" are the models of providers other than Google.",
     "audience": "both"
   }
 }
