@@ -277,7 +277,10 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     const directG = (await inv('tasks:facts', cG)).findLast((f) => f.kind === 'Started')?.data
     check("the window's Start of the no-code card starts it where G1 is, not refused for no slot (HI-2395)", !dG?.error && !dG?.ask && dG?.agentId === g1.id && (await card(cG))?.column === 'doing' && directG?.folder === 'project' && !directG.lease, JSON.stringify({ dG, directG }))
     check("…slot-a still the first lane's, nothing else lent", (await slotNow())?.lease?.lane === started.lane.id && (await slots()).filter((x) => x.lease).length === 1, JSON.stringify(await slots()))
-    check('…and G1 puts it back', (await intent(tg1, cG, 'put-back', { why: 'done looking again' })).status === 200 && (await card(cG))?.column === 'todo')
+    // HI-3249: the put-back's answer and the card as it is, said on a failure.
+    const backG = await intent(tg1, cG, 'put-back', { why: 'done looking again' })
+    const nowG = await card(cG)
+    check('…and G1 puts it back', backG.status === 200 && nowG?.column === 'todo', JSON.stringify({ status: backG.status, body: backG.body, column: nowG?.column, history: (nowG?.history ?? []).slice(-4).map((x) => x.what), facts: (await inv('tasks:facts', cG)).slice(-6).map((f) => f.kind) }))
     // HI-2338: every slot still lent, a lane of only no-code cards from the window starts at once, with no slot.
     const third = await inv('lanes:start', alpha, { builder: b3.id, reviewer: r3.id, cards: [cL1, cL2] })
     check('a lane of only no-code cards starts with every slot lent: not waiting, no slot, both agents started', !third.waitingForSlot && !third.slot && third.started.length === 2 && third.started.every((s) => s.how !== 'failed'), JSON.stringify(third))
