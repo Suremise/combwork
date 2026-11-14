@@ -1,5 +1,6 @@
 import type { Account, Connection, PlanLimit, PlanUsage, UsageMoveLimit, UsageMoveRecord, UsageMoveRule } from './types'
 import { connectionsOn } from './accounts'
+import { limitWindow } from './planLimits'
 
 /**
  * Usage moves (HI-2195, SPEC §11.2): an account's rule moves its agents to another account's connections when one of its
@@ -7,16 +8,19 @@ import { connectionsOn } from './accounts'
  * watches, when one is due, the period's record, the connection an agent moves to, and why a target can't take them.
  */
 
-const WEEK_MINUTES = 7 * 24 * 60
-const FIVE_HOURS = 5 * 60
-
-/** The limit kind a rule can watch, from its window: the weekly one, the 5-hour one, else none. */
-export function limitKind(l: Pick<PlanLimit, 'windowMinutes'>): Exclude<UsageMoveLimit, 'any'> | null {
-  return l.windowMinutes === WEEK_MINUTES ? 'weekly' : l.windowMinutes === FIVE_HOURS ? 'fiveHour' : null
+/**
+ * The limit kind a rule can watch: the account's own weekly or 5-hour limit, else none. A limit of part of the plan (HI-3262,
+ * Darren's decision (a)): Codex's limit for some models (`scope`, HI-1125), Antigravity's per-model weekly quotas or another
+ * named part (`models`, HI-2734), never fires a rule or a watch, whatever its window: moving every agent because one
+ * model is nearly used up is the wrong move. The same rule as what usage calls the 5-hour and weekly limits (limitWindow).
+ */
+export function limitKind(l: Pick<PlanLimit, 'windowMinutes' | 'models' | 'scope'>): Exclude<UsageMoveLimit, 'any'> | null {
+  const w = limitWindow(l)
+  return w === 'other' ? null : w
 }
 
 /** The limits a rule watches: of its kind, or (`any`) the weekly and 5-hour ones, each on its own. */
-export function ruleLimits<L extends Pick<PlanLimit, 'windowMinutes'>>(rule: Pick<UsageMoveRule, 'limit'>, limits: readonly L[]): L[] {
+export function ruleLimits<L extends Pick<PlanLimit, 'windowMinutes' | 'models' | 'scope'>>(rule: Pick<UsageMoveRule, 'limit'>, limits: readonly L[]): L[] {
   return limits.filter((l) => {
     const k = limitKind(l)
     return !!k && (rule.limit === 'any' || rule.limit === k)
