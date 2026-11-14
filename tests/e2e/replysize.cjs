@@ -1137,7 +1137,8 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
   check('line comments: the card is started on Coder', lcStart === null, String(lcStart))
   fs.writeFileSync(path.join(alpha, 'lines.txt'), Array.from({ length: 60 }, (_, i) => `line ${i + 1}: ${'w'.repeat(150)}`).join('\n') + '\n')
   lib.git(alpha, ['add', 'lines.txt'])
-  lib.git(alpha, ['commit', '-qm', 'Lines to comment on'])
+  // Its card's trailer: other cards' agents work in this folder too.
+  lib.git(alpha, ['commit', '-qm', 'Lines to comment on', '-m', `Combwork-Card: ${lcKey}`])
   const lcSubmit = tool('cw_submit', { card: lcKey, summary: 'Lines to comment on.' })
   check('line comments: Coder submits it', !lcSubmit.isError, lcSubmit.text)
   const lcSub = (await inv('tasks:work', lcCard.number))?.revisions.at(-1)?.submission
