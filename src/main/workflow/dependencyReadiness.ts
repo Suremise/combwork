@@ -24,6 +24,6 @@ export function writeReadiness(tx: Tx, card: number, after: number | null, actor
   })
   const now = foldCard(tx.facts(card), rec.stage).ready
   if (now === ready || (now === null && !list.length)) return false
-  tx.append(card, { kind: 'Readiness', actor, source: 'recorded', data: { ready, after } })
+  tx.append(card, { kind: 'Readiness', actor, source: 'recorded', data: { ready, after } }) // i18n-ignore: a fact's kind and codes, not text
   return true
 }

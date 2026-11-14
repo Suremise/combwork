@@ -1828,7 +1828,7 @@ function attemptReassigned(ws: WorkspaceService, project: string, n: number, age
     } catch {
       return
     }
-    if (ATTEMPT_STAGES.includes(stage)) tx.append(n, { kind: 'AttemptBound', actor, source: 'recorded', data: { why: 'reassigned', assignee: agent } })
+    if (ATTEMPT_STAGES.includes(stage)) tx.append(n, { kind: 'AttemptBound', actor, source: 'recorded', data: { why: 'reassigned', assignee: agent } }) // i18n-ignore: a fact's kind and codes, not text
   })
 }
 
