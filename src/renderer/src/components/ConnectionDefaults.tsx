@@ -172,7 +172,7 @@ function ConnectionForm({ account: a, row, settings, projectPath, onClose }: { a
     const patch: ConnectionPatch & { name: string } = { name, model: model || null, permissionMode: (mode || null) as PermissionMode | null, extraArgs: args.trim() || null, tag: tag.trim() || null }
     if (!server) {
       patch.effort = (effort || null) as EffortLevel | null
-      if (p.capabilities.contextLimit) patch.use200kContext = ctx || null
+      if (p.capabilities.compaction?.contextLimit) patch.use200kContext = ctx || null
     }
     try {
       const saved = row ? await call('connection:update', row.id, patch) : await call('connection:add', a.id, patch)
@@ -224,7 +224,7 @@ function ConnectionForm({ account: a, row, settings, projectPath, onClose }: { a
             <EffortPicker provider={cli} connection={a} projectPath={projectPath} model={runModel} value={effort} base={{ value: '', label: defEffort ? tr(M.cliDefaultIs, { provider: p.name, which: effortName(cli, defEffort, settings ?? undefined, tr) }) : tr(M.cliDefault, { provider: p.name }) }} onChange={setEffort} />
           </>
         )}
-        {!server && p.capabilities.contextLimit && (
+        {!server && p.capabilities.compaction?.contextLimit && (
           <>
             <label>{tr(M.context)}</label>
             <select className="select" aria-label={tr(M.context)} data-context value={ctx ? 'on' : ''} onChange={(e) => setCtx(e.target.value === 'on')}>

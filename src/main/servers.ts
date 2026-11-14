@@ -1146,7 +1146,7 @@ route('GET', '/v1/providers', async () => {
       models,
       efforts: fallbackEfforts(p.id, s),
       // Whether agents can be given context200k (a 200K window instead of the model's 1M).
-      context200k: p.capabilities.contextLimit,
+      context200k: p.capabilities.compaction?.contextLimit ?? false,
       modes: offeredModes(p.id, s).map((m) => ({ value: m.value, label: m.label, description: m.description })),
       // Its connections usable in the caller's workspace (HI-2108), in the order: what cw_add_agent's connection names. Each
       // with its own account's default and, where they aren't the provider's, its models (HI-2856).

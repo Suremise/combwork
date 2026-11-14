@@ -747,7 +747,7 @@ export class CodexAdapter implements ProviderAdapter {
   typedNewline(version: string | null): TypedNewline | null {
     const chosen = advanced.get<string>(NEWLINE_KEY)
     const key = chosen === 'auto' ? (version && NEWLINE_TRIED.includes(version) ? 'alt-enter' : null) : chosen
-    return this.descriptor.capabilities.typedNewlines?.find((k) => k === key) ?? null
+    return this.descriptor.capabilities.terminal?.typedNewlines?.find((k) => k === key) ?? null
   }
 
   /** Codex's Windows sandbox is set up once (windows.sandbox in its config); without it every command needs approval. */

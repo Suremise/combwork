@@ -249,7 +249,7 @@ function launchOf(a: AgentDef, cfg: ProjectConfig): LaunchValues | null {
 
 /** Whether a value moved onto an agent is one its connection can't use (an effort its model doesn't take; context where the CLI has none). */
 function unusable(a: AgentDef, values: LaunchValues, cli: ProviderId, field: MovedField): boolean {
-  if (field === 'use200kContext') return !providerDescriptor(cli).capabilities.contextLimit
+  if (field === 'use200kContext') return !providerDescriptor(cli).capabilities.compaction?.contextLimit
   if (field !== 'effort' || !values.effort) return false
   const account = accountById((getConnection(a.connection) as Connection | undefined)?.account) ?? null
   return !effortUsable(cli, values.model || null, account, values.effort)

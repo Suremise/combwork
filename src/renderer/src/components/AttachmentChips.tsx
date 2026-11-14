@@ -24,7 +24,7 @@ export function AttachmentChips({ ptyKey, provider, projectPath, agentId }: { pt
   return (
     <div className="attachment-chips" aria-label={tr(msg({ id: 'sessions.chips.label', defaultMessage: 'Attached to this prompt', description: "The attachment chips' accessible name, over an agent's terminal: files attached to the prompt being written." }))}>
       {chips.map((c) => {
-        const l = attachmentLabel(c.kind, d.capabilities.attachments, d.name)
+        const l = attachmentLabel(c.kind, d.capabilities.terminal?.attachments ?? [], d.name)
         return (
           <Tooltip key={c.path} content={<span style={{ whiteSpace: 'pre-line' }}>{`${c.path}\n${l.detail}`}</span>}>
             <span className={cx('attachment-chip', !l.native && 'by-path')} data-kind={c.kind}>

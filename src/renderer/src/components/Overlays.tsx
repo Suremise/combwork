@@ -1412,8 +1412,8 @@ export function CompactDialog() {
   const live = agent.live
   // A watching agent can be compacted: its watch is kept, and a wake waits for the compaction to end.
   const idle = !!live && (live.status === 'ready' || live.status === 'finished' || live.status === 'watching')
-  const cache = usage && provider.capabilities.promptCacheTtl ? cacheState(usage, ttl) : null
-  const focusOk = provider.capabilities.compactFocus
+  const cache = usage && provider.capabilities.usage?.promptCacheTtl ? cacheState(usage, ttl) : null
+  const focusOk = provider.capabilities.compaction?.compactFocus
   const run = async (): Promise<void> => {
     const r = await action.run('compact', () => call('session:compact', project.path, (focusOk && focus.trim()) || undefined, agent.id))
     if (r) close()

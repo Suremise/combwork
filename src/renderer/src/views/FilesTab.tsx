@@ -1287,7 +1287,7 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
                 {formatLongDay(a.modified)}
               </div>
             ) : null
-            const label = g.provider ? attachmentLabel(a.kind, providerDescriptor(g.provider).capabilities.attachments, providerDescriptor(g.provider).name) : null
+            const label = g.provider ? attachmentLabel(a.kind, providerDescriptor(g.provider).capabilities.terminal?.attachments ?? [], providerDescriptor(g.provider).name) : null
             const tile = (
               <Tooltip key={a.path} content={`${a.name} · ${attachmentTime(a)} · ${formatBytes(a.size)}${label ? `\n${label.detail}` : ''}`}>
                 <div

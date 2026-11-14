@@ -29,7 +29,7 @@ export function cliDefaults(settings: Pick<AppSettings, 'providers'>, provider: 
   return {
     ...(g.defaultModel ? { model: g.defaultModel } : {}),
     ...(g.defaultEffort ? { effort: g.defaultEffort } : {}),
-    ...(providerDescriptor(provider).capabilities.contextLimit && g.use200kContext ? { use200kContext: true } : {})
+    ...(providerDescriptor(provider).capabilities.compaction?.contextLimit && g.use200kContext ? { use200kContext: true } : {})
   }
 }
 
@@ -59,7 +59,7 @@ export function projectOverrides(cfg: Pick<ProjectConfig, 'providers'>, provider
   return {
     ...(pc.model && pc.model !== 'inherit' ? { model: pc.model } : {}),
     ...(pc.effort && pc.effort !== 'inherit' ? { effort: pc.effort } : {}),
-    ...(providerDescriptor(provider).capabilities.contextLimit && (pc.use200kContext === 'on' || pc.use200kContext === 'off') ? { use200kContext: pc.use200kContext === 'on' } : {})
+    ...(providerDescriptor(provider).capabilities.compaction?.contextLimit && (pc.use200kContext === 'on' || pc.use200kContext === 'off') ? { use200kContext: pc.use200kContext === 'on' } : {})
   }
 }
 
@@ -142,7 +142,7 @@ export function legacyLaunchSettings(agent: Pick<AgentDef, 'provider' | 'model' 
   let permissionMode = agent?.permissionMode ?? projectMode
   if (!modeAllowed(provider, permissionMode, settings)) permissionMode = modeAllowed(provider, projectMode, settings) ? projectMode : fallbackMode
   const extraArgs = [g.extraArgs, pc.extraArgs].filter((a) => a && a.trim())
-  const contextLimit = providerDescriptor(provider).capabilities.contextLimit
+  const contextLimit = providerDescriptor(provider).capabilities.compaction?.contextLimit ?? false
   if (layer.kind === 'connection') {
     const d = layer.conn?.defaults
     if (layer.conn?.kind === 'server') return { provider, model: agent?.model || d?.model || null, effort: null, permissionMode, extraArgs, use200kContext: false }

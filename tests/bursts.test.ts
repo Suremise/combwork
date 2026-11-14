@@ -275,14 +275,14 @@ describe('a group of finishes, when it is shown', () => {
       const s = await manager()
       const st = { ...agent(), status: 'background' }
       s.emitState(st)
-      s.settleBackground({ state: st, tasks: new Map(), adapter: { descriptor: { capabilities: { backgroundWakes: true } } } }, false)
+      s.settleBackground({ state: st, tasks: new Map(), adapter: { descriptor: { capabilities: { background: { backgroundWakes: true } } } } }, false)
       expect(st.status).toBe('finished')
       await goes(st, 'working')
       await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
       expect(shown).toEqual([])
       // Without a new turn, the same finish is told.
       await goes(st, 'background')
-      s.settleBackground({ state: st, tasks: new Map(), adapter: { descriptor: { capabilities: { backgroundWakes: true } } } }, false)
+      s.settleBackground({ state: st, tasks: new Map(), adapter: { descriptor: { capabilities: { background: { backgroundWakes: true } } } } }, false)
       await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
       expect(shown.map((n) => n.body)).toEqual(['Its background tasks have ended.'])
     })

@@ -242,38 +242,50 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
   modelGroups: COPILOT_MODEL_GROUPS,
   modelPlaceholder: 'Model ID, e.g. claude-sonnet-5.5 or auto', // i18n-ignore: English (text.modelPlaceholder is the window's)
   capabilities: {
-    modelAliases: ['auto'],
-    // --session-id <uuid> names a new session; --resume <id> reopens it.
-    fixedSessionId: true,
-    liveModeSwitch: 'cycle',
-    planModeToggle: false,
-    promptCacheTtl: false,
-    // Its transcript counts the session's AI credits (session.usage_checkpoint), and one credit is $0.01.
-    reportsCost: true,
-    defersMcpTools: false,
-    // /compact takes focus instructions.
-    compactFocus: true,
-    contextLimit: false,
-    autoCompactReserve: null,
-    imagePaste: false,
-    githubHost: true,
-    // Its view tool returns images as images and text as text; a PDF comes back as its raw bytes (checked with 1.0.95).
-    attachments: ['image', 'text'],
-    // A PreToolUse "ask" brings up Copilot's own approval dialog, even with --allow-all (checked with 1.0.93).
-    lockAsk: true,
-    backgroundSessions: false,
-    backgroundWakes: false,
-    typedTurnsWithoutPrompt: false,
-    // Its interface fills the screen: drawn while its terminal changed size, it can stay at the old width (#486).
-    startupSizeRefresh: true,
-    // A model call it gave up on ends the turn with a session.error and no Stop (1.0.105, HI-1960).
-    failureEndsTurn: true,
-    // A line typed in pieces that a busy Copilot reads with its Enter in one go isn't sent by that Enter; pasted, it is,
-    // as text (#600, checked with 1.0.98).
-    bracketedPaste: true,
-    enterOnceDrawn: false,
-    // --add-dir (1.0.100).
-    extraDirs: true
+    terminal: {
+      imagePaste: false,
+      // Its view tool returns images as images and text as text; a PDF comes back as its raw bytes (checked with 1.0.95).
+      attachments: ['image', 'text'],
+      // Its interface fills the screen: drawn while its terminal changed size, it can stay at the old width (#486).
+      startupSizeRefresh: true,
+      // A line typed in pieces that a busy Copilot reads with its Enter in one go isn't sent by that Enter; pasted, it is,
+      // as text (#600, checked with 1.0.98).
+      bracketedPaste: true,
+      enterOnceDrawn: false
+    },
+    session: {
+      modelAliases: ['auto'],
+      // --session-id <uuid> names a new session; --resume <id> reopens it.
+      fixedSessionId: true,
+      defersMcpTools: false,
+      // A PreToolUse "ask" brings up Copilot's own approval dialog, even with --allow-all (checked with 1.0.93).
+      lockAsk: true,
+      typedTurnsWithoutPrompt: false,
+      // A model call it gave up on ends the turn with a session.error and no Stop (1.0.105, HI-1960).
+      failureEndsTurn: true,
+      // --add-dir (1.0.100).
+      extraDirs: true
+    },
+    modes: {
+      liveModeSwitch: 'cycle',
+      planModeToggle: false
+    },
+    usage: {
+      promptCacheTtl: false,
+      // Its transcript counts the session's AI credits (session.usage_checkpoint), and one credit is $0.01.
+      reportsCost: true
+    },
+    compaction: {
+      // /compact takes focus instructions.
+      compactFocus: true,
+      contextLimit: false,
+      autoCompactReserve: null
+    },
+    background: {
+      backgroundSessions: false,
+      backgroundWakes: false
+    },
+    githubHost: true
   },
   reservedKeys: [],
   instructionsFile: 'AGENTS.md',

@@ -405,7 +405,7 @@ export const workspaceDefs = (): AdvancedDef[] => ADVANCED_DEFS.filter((d) => d.
  */
 export function waitMaxSeconds(kind: 'cards' | 'agents'): number {
   const own = advanced.number(kind === 'cards' ? 'cw.wait.cardMaxSeconds' : 'cw.wait.agentsMaxSeconds')
-  const limits = PROVIDERS.flatMap((p) => (p.capabilities.mcpToolTimeoutSetting ? [advanced.number(p.capabilities.mcpToolTimeoutSetting) - 60] : []))
+  const limits = PROVIDERS.flatMap((p) => (p.capabilities.session?.mcpToolTimeoutSetting ? [advanced.number(p.capabilities.session?.mcpToolTimeoutSetting) - 60] : []))
   return Math.max(30, Math.min(own, ...limits))
 }
 

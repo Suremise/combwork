@@ -52,7 +52,7 @@ describe('cards in play for a loop agent (#376)', () => {
     expect(unwatched({ provider: 'claude-code', status: 'finished', backgroundTasks: 1 })).toBe(false)
     expect(unwatched({ provider: 'claude-code', status: 'background', backgroundTasks: 1 })).toBe(false)
     // Codex tracks tasks but isn't woken when they end: nothing will wake it.
-    expect(providerDescriptor('codex').capabilities.backgroundWakes).toBe(false)
+    expect(providerDescriptor('codex').capabilities.background?.backgroundWakes).toBe(false)
     expect(unwatched({ provider: 'codex', status: 'finished', backgroundTasks: 1 })).toBe(true)
     expect(unwatched({ provider: 'claude-code', status: 'watching', watch: { cards: [1], changes: ['column'], label: '', since: '', limitAt: '' } })).toBe(false)
     expect(unwatched(null)).toBe(false)

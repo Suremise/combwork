@@ -80,7 +80,7 @@ export function priceRows(provider: ProviderId, settings?: Pick<AppSettings, 'pr
  * reported cost otherwise, even when the CLI's own price table lags a price change (#442).
  */
 export function usesOwnPrices(provider: ProviderId, settings?: Pick<AppSettings, 'providers'> | null): boolean {
-  return providerDescriptor(provider).capabilities.reportsCost && providerSettings(settings, provider).costSource === 'prices'
+  return !!providerDescriptor(provider).capabilities.usage?.reportsCost && providerSettings(settings, provider).costSource === 'prices'
 }
 
 /**

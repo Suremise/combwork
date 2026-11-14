@@ -94,7 +94,7 @@ function mapInputs(entries: readonly MapEntry[], contexts: ReadonlyMap<string, M
       tasks: part ? part.subagents.flatMap((n) => (n.kind === 'task' ? [{ type: n.task.type }] : [])) : [],
       processes: part ? part.processes.flatMap((n) => (n.kind === 'process' && !n.gone ? [n.process.name] : [])) : [],
       blocks: part?.blocks.length ?? 0,
-      ...(provider && providerDescriptor(provider).capabilities.activityStations ? { reported: providerDescriptor(provider).capabilities.activityStations } : {})
+      ...(provider && providerDescriptor(provider).capabilities.session?.activityStations ? { reported: providerDescriptor(provider).capabilities.session?.activityStations } : {})
     }
   })
 }

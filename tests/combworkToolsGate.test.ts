@@ -23,7 +23,7 @@ function launched(status = 'ready', tools = true): Entry {
     prompts: 0,
     ...(tools ? { combworkTools: 'connecting' as const } : {})
   }
-  Object.assign(e, { adapter: { descriptor: { capabilities: { startupSizeRefresh: false } } } })
+  Object.assign(e, { adapter: { descriptor: { capabilities: { terminal: { startupSizeRefresh: false } } } } })
   live.set(key, e)
   emit(e)
   return e

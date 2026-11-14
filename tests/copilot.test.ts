@@ -40,7 +40,7 @@ describe('Copilot descriptor', () => {
     // Only Autopilot is behind the opt-in: Allow all is Copilot's low-interaction mode, offered to all (#490).
     expect(d.permissionModes.filter((m) => m.danger).map((m) => m.value)).toEqual(['autopilot'])
     expect(d.effortLevels.map((e) => e.value)).toEqual(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
-    expect(d.capabilities).toMatchObject({ fixedSessionId: true, liveModeSwitch: 'cycle', reportsCost: true, lockAsk: true, compactFocus: true })
+    expect(d.capabilities).toMatchObject({ session: { fixedSessionId: true, lockAsk: true }, modes: { liveModeSwitch: 'cycle' }, usage: { reportsCost: true }, compaction: { compactFocus: true } })
     expect(d.modelGroups[0].models.map((m) => m.value)).toEqual(['auto'])
   })
 

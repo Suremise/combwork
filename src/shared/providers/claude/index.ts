@@ -258,37 +258,51 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
   modelGroups: CLAUDE_MODEL_GROUPS,
   modelPlaceholder: 'Full model ID, e.g. claude-opus-5-5 or claude-opus-4-6[1m]', // i18n-ignore: English (text.modelPlaceholder is the window's)
   capabilities: {
-    remoteHookPolicy: true,
-    planUsageSinceLaunch: true,
-    modelAliases: ['fable', 'opus', 'sonnet', 'haiku', 'default', 'best', 'opusplan'],
-    fixedSessionId: true,
-    liveModeSwitch: 'cycle',
-    planModeToggle: false,
-    promptCacheTtl: true,
-    reportsCost: true,
-    // Behind its tool search, but for tools listed with anthropic/alwaysLoad (HI-2229).
-    defersMcpTools: true,
-    compactFocus: true,
-    contextLimit: true,
-    autoCompactReserve: 33_000,
-    // Its parts, for a local model's declared context (HI-2682's probe, 2.1.319): the output budget, at most 20K, and 13K.
-    autoCompactParts: { outputMax: 20_000, buffer: 13_000 },
-    imagePaste: true,
-    // Its Read tool returns a PDF as a document and an image as an image (checked with 2.1.296).
-    attachments: ['image', 'pdf', 'text'],
-    lockAsk: true,
-    backgroundSessions: true,
-    backgroundWakes: true,
-    typedTurnsWithoutPrompt: true,
-    // SessionStart comes as it starts (once its folder is trusted), before any prompt.
-    startHook: true,
-    startupSizeRefresh: false,
-    bracketedPaste: true,
-    enterOnceDrawn: false,
-    // Its Ctrl+U deletes one wrapped row (HI-1974, seen on 2.1.312).
-    ctrlUClearsRow: true,
-    // --add-dir (2.1.309).
-    extraDirs: true,
+    terminal: {
+      imagePaste: true,
+      // Its Read tool returns a PDF as a document and an image as an image (checked with 2.1.296).
+      attachments: ['image', 'pdf', 'text'],
+      startupSizeRefresh: false,
+      bracketedPaste: true,
+      enterOnceDrawn: false,
+      // Its Ctrl+U deletes one wrapped row (HI-1974, seen on 2.1.312).
+      ctrlUClearsRow: true
+    },
+    session: {
+      modelAliases: ['fable', 'opus', 'sonnet', 'haiku', 'default', 'best', 'opusplan'],
+      fixedSessionId: true,
+      // Behind its tool search, but for tools listed with anthropic/alwaysLoad (HI-2229).
+      defersMcpTools: true,
+      lockAsk: true,
+      typedTurnsWithoutPrompt: true,
+      // SessionStart comes as it starts (once its folder is trusted), before any prompt.
+      startHook: true,
+      // --add-dir (2.1.309).
+      extraDirs: true
+    },
+    modes: {
+      liveModeSwitch: 'cycle',
+      planModeToggle: false
+    },
+    usage: {
+      planUsageSinceLaunch: true,
+      promptCacheTtl: true,
+      reportsCost: true
+    },
+    compaction: {
+      compactFocus: true,
+      contextLimit: true,
+      autoCompactReserve: 33_000,
+      // Its parts, for a local model's declared context (HI-2682's probe, 2.1.319): the output budget, at most 20K, and 13K.
+      autoCompactParts: { outputMax: 20_000, buffer: 13_000 }
+    },
+    background: {
+      backgroundSessions: true,
+      backgroundWakes: true
+    },
+    hooks: {
+      remoteHookPolicy: true
+    },
     // Each account a folder of its own (HI-980), its transcripts and memory shared with the others through projects\.
     connections: {
       homeEnv: 'CLAUDE_CONFIG_DIR',

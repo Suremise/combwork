@@ -145,29 +145,41 @@ export const ANTIGRAVITY_DESCRIPTOR: ProviderDescriptor = {
   modelGroups: ANTIGRAVITY_MODEL_GROUPS,
   modelPlaceholder: 'Model ID, e.g. gemini-3.8-flash-medium', // i18n-ignore: English (text.modelPlaceholder is the window's)
   capabilities: {
-    // agy can't be given a conversation id up front: Combwork learns it after the start (identity.ts).
-    fixedSessionId: false,
-    // Not verified for 1.5.0: switching needs a restart until a check shows how its terminal cycles modes.
-    liveModeSwitch: 'none',
-    planModeToggle: false,
-    promptCacheTtl: false,
-    // Its status line gives an estimated cost only (`cost.estimated`), against the Google plan: not a bill.
-    reportsCost: false,
-    defersMcpTools: false,
-    compactFocus: false,
-    contextLimit: false,
-    autoCompactReserve: null,
-    imagePaste: false,
-    attachments: ['text'],
-    lockAsk: false,
-    backgroundSessions: false,
-    backgroundWakes: false,
-    typedTurnsWithoutPrompt: false,
-    startupSizeRefresh: true,
-    bracketedPaste: false,
-    enterOnceDrawn: false,
-    // --add-dir (1.5.0).
-    extraDirs: true
+    terminal: {
+      imagePaste: false,
+      attachments: ['text'],
+      startupSizeRefresh: true,
+      bracketedPaste: false,
+      enterOnceDrawn: false
+    },
+    session: {
+      // agy can't be given a conversation id up front: Combwork learns it after the start (identity.ts).
+      fixedSessionId: false,
+      defersMcpTools: false,
+      lockAsk: false,
+      typedTurnsWithoutPrompt: false,
+      // --add-dir (1.5.0).
+      extraDirs: true
+    },
+    modes: {
+      // Not verified for 1.5.0: switching needs a restart until a check shows how its terminal cycles modes.
+      liveModeSwitch: 'none',
+      planModeToggle: false
+    },
+    usage: {
+      promptCacheTtl: false,
+      // Its status line gives an estimated cost only (`cost.estimated`), against the Google plan: not a bill.
+      reportsCost: false
+    },
+    compaction: {
+      compactFocus: false,
+      contextLimit: false,
+      autoCompactReserve: null
+    },
+    background: {
+      backgroundSessions: false,
+      backgroundWakes: false
+    }
   },
   reservedKeys: [],
   // agy reads AGENTS.md and GEMINI.md natively (HI-2448).

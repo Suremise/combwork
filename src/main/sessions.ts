@@ -2387,7 +2387,7 @@ class SessionManager {
       throw combworkError(msg({ id: 'session.start.otherFolder', defaultMessage: 'This session ran in {folder}. Resume it with the agent that works in that folder.', description: "Resuming a session is refused: it ran in another folder (another agent's worktree). {folder} is that folder's path." }), { folder: existing.cwd ?? projectPath }, { kind: 'conflict' })
     }
     // Providers that choose their own session id report it once started (see the start hook).
-    const sessionId = opts.resumeId ?? (adapter.descriptor.capabilities.fixedSessionId ? (adapter.launch.newSessionId?.() ?? randomUUID()) : '')
+    const sessionId = opts.resumeId ?? (adapter.descriptor.capabilities.session?.fixedSessionId ? (adapter.launch.newSessionId?.() ?? randomUUID()) : '')
 
     const mode = assistant ? (await this.assistantInstructions(projectPath, agent).catch(() => null))?.mode : undefined
     times.mark('assistantInstructions')
@@ -2933,7 +2933,7 @@ class SessionManager {
       times?.mark('transcript')
       if (!resume) {
         log.info(`No transcript for ${sessionId}; starting it fresh instead of resuming`)
-        if (!adapter.descriptor.capabilities.fixedSessionId) state.sessionId = ''
+        if (!adapter.descriptor.capabilities.session?.fixedSessionId) state.sessionId = ''
       }
     }
 
@@ -2995,7 +2995,7 @@ class SessionManager {
     // A reviewer's grant of the project's review copies (#1439): one fixed folder, made if new, so it never changes
     // between submissions. Never in a slot (either building there) nor with review copies off.
     const copies = copiesDirOf(workspaceOf(projectPath).worktreesRoot, projectPath)
-    const granted = grantsCopies({ capable: adapter.descriptor.capabilities.extraDirs, on: advanced.get(COPIES_REVIEW) !== false, reviews: policy.tools && reviewsWork(agentWorkflowRole(agent)), inProjectFolder: !l.slotEnv && samePlace(cwd, projectPath), assistant: workspace.isAssistantHome(projectPath) })
+    const granted = grantsCopies({ capable: adapter.descriptor.capabilities.session?.extraDirs ?? false, on: advanced.get(COPIES_REVIEW) !== false, reviews: policy.tools && reviewsWork(agentWorkflowRole(agent)), inProjectFolder: !l.slotEnv && samePlace(cwd, projectPath), assistant: workspace.isAssistantHome(projectPath) })
     const extraDirs = granted && (await mkdir(copies, { recursive: true }).then(() => true, () => false)) ? [copies] : []
     l.extraDirs = extraDirs
     l.cliVersion = info.version ?? null
@@ -3152,7 +3152,7 @@ class SessionManager {
     l.turnScreen = adapter.terminal?.turnScreen?.(info.version) ?? undefined
     l.ledger = newLedger()
     // Whether its hooks reach Combwork (#1336), and what can say why they don't.
-    l.hooksWatch = newHooksWatch(Date.now(), !!adapter.descriptor.capabilities.startHook, adapter.transcript?.transcriptTurns ? (adapter.transcript?.turnsJoin ?? 'id') : null)
+    l.hooksWatch = newHooksWatch(Date.now(), !!adapter.descriptor.capabilities.session?.startHook, adapter.transcript?.transcriptTurns ? (adapter.transcript?.turnsJoin ?? 'id') : null)
     const hooksOffIn = adapter.hooks?.hooksOffIn?.bind(adapter.hooks)
     l.hooksOffIn = hooksOffIn ? () => hooksOffIn(ctx) : undefined
     // Read once, in the background: the warning names it if its hooks don't come (HI-2777).
@@ -3204,7 +3204,7 @@ class SessionManager {
     const key = this.key(projectPath, agent.id)
     const size = startSize(key)
     const caps = l.adapter.descriptor.capabilities
-    const screen = l.adapter.modes?.footerMode || l.adapter.modes?.modeMenuKeys || l.turnScreen || caps.bracketedPaste || caps.enterOnceDrawn ? new TerminalScreen(size.cols, size.rows) : null
+    const screen = l.adapter.modes?.footerMode || l.adapter.modes?.modeMenuKeys || l.turnScreen || caps.terminal?.bracketedPaste || caps.terminal?.enterOnceDrawn ? new TerminalScreen(size.cols, size.rows) : null
     l.screen = screen
     // The developer console (#636): how it was started (launchEvent: never its arguments).
     devConsole.capture([sessionSourceId(projectPath, agent.id)], () => launchEvent({ provider: adapter.id, name: adapter.descriptor.name, file: cmd.file, args: cmd.args, cwd, version: info.version, state, resumed: !!l.resumed }))
@@ -3323,7 +3323,7 @@ class SessionManager {
       // Combwork's own instructions were given it (#1433): kept, never cleared, so later resumes refresh its prompt.
       ...(l.promptAdded ? { promptAdded: true as const } : {}),
       // Providers that choose their own ids file transcripts by date, not folder: remember where.
-      ...(l.transcriptPath && !l.adapter.descriptor.capabilities.fixedSessionId ? { transcriptPath: l.transcriptPath } : {}),
+      ...(l.transcriptPath && !l.adapter.descriptor.capabilities.session?.fixedSessionId ? { transcriptPath: l.transcriptPath } : {}),
       // Where it ran (#1434: always, the project folder too): a conversation resumes only there.
       cwd: state.cwd,
       ...(legacyWorktree(agent) ? { branch: legacyWorktree(agent)!.branch } : {}),
@@ -3630,7 +3630,7 @@ class SessionManager {
       // Settings → Advanced can leave the CLI's draft in front of it (#1286); cleared as a prompt's is (HI-1979).
       if (advanced.get<boolean>(PROMPT_CLEAR_DRAFT)) await this.clearInput(l, key, stillSame)
       // On one line, without control characters (HI-1920): typed key by key, one would press a key.
-      const text = l.adapter.descriptor.capabilities.compactFocus ? promptInput((focus ?? '').replace(/\s+/g, ' ').trim(), false, false) : ''
+      const text = l.adapter.descriptor.capabilities.compaction?.compactFocus ? promptInput((focus ?? '').replace(/\s+/g, ' ').trim(), false, false) : ''
       // Written in one go, a long line counts as a paste, and pasted input is sent as a message even when
       // it starts with "/compact". So type the command on its own, then the focus in small pieces.
       stillSame()
@@ -3853,7 +3853,7 @@ class SessionManager {
     if (st.permissionMode === mode) return { ok: true }
     if (workspace.isAssistantHome(projectPath) && isCliOwnMode(mode)) throw combworkError(M.assistantCliOwn, undefined, { kind: 'conflict' })
     if (!modeAllowed(p, mode, config.settings)) throw combworkError(msg({ id: 'session.mode.off', defaultMessage: '{mode} is turned off in Settings → {provider}.', description: "Switching an agent's permission mode is refused: that mode is turned off. {mode} is the mode's name; {provider} the coding agent's (its Settings section)." }), { mode: permissionLabel(p, mode, tr), provider: name }, { kind: 'conflict' })
-    const how = l.adapter.descriptor.capabilities.liveModeSwitch
+    const how = l.adapter.descriptor.capabilities.modes?.liveModeSwitch ?? 'none'
     // Never to or from the CLI's own setting (#1284): Combwork doesn't know where such a session started.
     if (how === 'none' || !canSwitchModeLive(l.adapter.descriptor, mode, st.permissionMode, l.launchMode) || !l.adapter.modes?.canSwitchLive(mode, st.permissionMode, l.launchMode)) {
       return { ok: false, restart: true, message: tr(msg({ id: 'session.mode.restart', defaultMessage: "{mode} can't be switched to inside a running session. Restart the session in that mode; the conversation continues.", description: "Switching an agent's permission mode needs a restart. {mode} is the mode's name." }), { mode: permissionLabel(p, mode, tr) }) }
@@ -4089,7 +4089,7 @@ class SessionManager {
     // What on the PC would keep them away (HI-2777), read at launch: a setting and where; else hooksOffIn's answer. An
     // allowlist without the token's variable sends them with no token, which Combwork refuses: the allowlist is the cause.
     const cause = l.hookCause ?? (offIn ? { why: 'off' as const, setting: 'disableAllHooks', where: offIn, snippet: false } : null) // i18n-ignore: a select key and a setting's name, never shown
-    const remote = !!l.adapter.descriptor.capabilities.remoteHookPolicy
+    const remote = !!l.adapter.descriptor.capabilities.hooks?.remoteHookPolicy
     const events = l.heard ?? new Set<string>()
     const why: HooksMissing['why'] =
       cause?.why === 'blocked' ? 'blocked'
@@ -4297,7 +4297,7 @@ class SessionManager {
    * same run, the caller's guard: the user typing there stops it, their draft theirs).
    */
   private async clearInput(l: LiveSession | undefined, key: string, check: () => void): Promise<void> {
-    if (!l?.adapter?.descriptor.capabilities.ctrlUClearsRow) {
+    if (!l?.adapter?.descriptor.capabilities.terminal?.ctrlUClearsRow) {
       writePty(key, '\x15')
       await new Promise((r) => setTimeout(r, 150))
       check()
@@ -4548,7 +4548,7 @@ class SessionManager {
       // paste is text however it arrives. A slash command is still typed: pasted, it is sent as a message.
       // Enter once the CLI has drawn the line (#600: a busy Codex drops an Enter it reads with the line): its end shows
       // on the screen once more than before it was typed.
-      const paste = !!l?.screen?.bracketedPaste() && l.adapter.descriptor.capabilities.bracketedPaste && !line.startsWith('/')
+      const paste = !!l?.screen?.bracketedPaste() && !!l.adapter.descriptor.capabilities.terminal?.bracketedPaste && !line.startsWith('/')
       // Typed as written into a CLI with a new-line key (HI-1327, Settings → Advanced): its line breaks are that key. A
       // slash command keeps spaces.
       // By the CLI's version as this run was launched, never the one installed since (HR6's round 1).
@@ -4557,7 +4557,7 @@ class SessionManager {
       // What Enter waits to see drawn: the last piece with something visible in it (a line of spaces draws nothing to
       // find); none, no wait, as for an empty line.
       const out = segments ? segments.flatMap((s) => ('text' in s && s.text.trim() ? [s.text] : [])).at(-1) ?? '' : promptInput(line, paste, asTyped)
-      const drawn = l?.screen && l.adapter.descriptor.capabilities.enterOnceDrawn && out.trim() ? drawnLine(l.screen, out) : null
+      const drawn = l?.screen && l.adapter.descriptor.capabilities.terminal?.enterOnceDrawn && out.trim() ? drawnLine(l.screen, out) : null
       typedOut = out
       if (paste) writePty(key, `\x1b[200~${out}\x1b[201~`)
       else if (segments) {
@@ -4620,7 +4620,7 @@ class SessionManager {
         // deletes one wrapped row gets a Backspace for each character instead, a few at a time as typing goes (HI-1974).
         // Each take-back is logged as its keys are written (HI-2875: a put-off line's take-back had no time in the log).
         let pressed = 0
-        const rows = !!l?.adapter.descriptor.capabilities.ctrlUClearsRow
+        const rows = !!l?.adapter.descriptor.capabilities.terminal?.ctrlUClearsRow
         const n = rows ? backspaceKeys(lines ?? typedOut) : lines ? rollbackKeys(lines) : 1
         if (rows) {
           for (let i = 0; i < n; i += 8) {
@@ -5385,7 +5385,7 @@ class SessionManager {
     }
     if (l.costFree) return this.setLiveCost(l, 0, false)
     const own = onServer || usesOwnPrices(l.state.provider, config.settings)
-    if (l.adapter.descriptor.capabilities.reportsCost && !own) return this.setLiveCost(l, l.reportedCost, false)
+    if (l.adapter.descriptor.capabilities.usage?.reportsCost && !own) return this.setLiveCost(l, l.reportedCost, false)
     if (!force && Date.now() - (l.costAt ?? 0) <= COST_INTERVAL_MS) return
     l.costAt = Date.now()
     const usage = await this.usageFor(l.state.projectPath, src, l.state.sessionId, l.state.provider, this.costPolicy(l))
@@ -5414,7 +5414,7 @@ class SessionManager {
         .filter((l) => l.state.sessionId)
         .map((l) =>
           this.liveTranscript(l)
-            .then((src) => (src ? this.liveCost(l, src, true) : l.adapter.descriptor.capabilities.reportsCost && !usesOwnPrices(l.state.provider, config.settings) ? this.setLiveCost(l, l.reportedCost, false) : undefined))
+            .then((src) => (src ? this.liveCost(l, src, true) : l.adapter.descriptor.capabilities.usage?.reportsCost && !usesOwnPrices(l.state.provider, config.settings) ? this.setLiveCost(l, l.reportedCost, false) : undefined))
             .catch((e) => log.warn('could not price a live session again', e))
         )
     )
@@ -5834,7 +5834,7 @@ class SessionManager {
 
   /** The status a turn's end (or an interruption) leaves: background while tasks will start the agent again. */
   private idleStatus(l: LiveSession, idle: 'finished' | 'ready'): SessionStatus {
-    return idleAfter({ backgroundWakes: l.adapter.descriptor.capabilities.backgroundWakes, tasks: l.tasks?.size ?? 0 }, idle)
+    return idleAfter({ backgroundWakes: l.adapter.descriptor.capabilities.background?.backgroundWakes ?? false, tasks: l.tasks?.size ?? 0 }, idle)
   }
 
   /**
@@ -5846,7 +5846,7 @@ class SessionManager {
     const before = st.backgroundTasks
     const dropped = this.sweepTasks(l)
     let changed = before !== st.backgroundTasks
-    if (l.adapter.descriptor.capabilities.backgroundWakes) {
+    if (l.adapter.descriptor.capabilities.background?.backgroundWakes) {
       if (st.status === 'background' && !l.tasks?.size) {
         if (woke) {
           st.status = 'working'
@@ -6003,7 +6003,7 @@ class SessionManager {
    */
   private refreshSize(state: LiveSessionState): void {
     const l = this.live.get(liveId(state.projectPath, state.agentId))
-    if (!l || l.state !== state || !l.adapter.descriptor.capabilities.startupSizeRefresh || state.settingUp || state.status === 'starting' || l.sizeRefreshed === 'ready') return
+    if (!l || l.state !== state || !l.adapter.descriptor.capabilities.terminal?.startupSizeRefresh || state.settingUp || state.status === 'starting' || l.sizeRefreshed === 'ready') return
     const ready = state.status !== 'waiting'
     if (l.sizeRefreshed === 'started' && !ready) return
     l.sizeRefreshed = ready ? 'ready' : 'started'
@@ -6012,7 +6012,7 @@ class SessionManager {
 
   /** A size refresh a moment from now, so the CLI has drawn what it shows by then, for a CLI that needs it (refreshSize). */
   private refreshSizeSoon(l: LiveSession): void {
-    if (!l.adapter.descriptor.capabilities.startupSizeRefresh) return
+    if (!l.adapter.descriptor.capabilities.terminal?.startupSizeRefresh) return
     const { projectPath, agentId } = l.state
     setTimeout(() => {
       if (this.live.get(liveId(projectPath, agentId)) === l) refreshPty(this.key(projectPath, agentId))
@@ -6355,7 +6355,7 @@ class SessionManager {
         l.failure = rec
         // A CLI that sends no Stop after a failed turn (Copilot, HI-1960): its record ends the running turn, failed, as
         // that Stop would (failedIfRecorded gives it the CLI's words).
-        if (l.adapter.descriptor.capabilities.failureEndsTurn && l.ledger && failureTurn(l.ledger, rec) === 'running') return this.endTurnFrom(id, l, 'transcript', `${l.adapter.descriptor.name} recorded its turn failed at ${d.turnFailedAt}`) // i18n-ignore: the log and the hook journal (English)
+        if (l.adapter.descriptor.capabilities.session?.failureEndsTurn && l.ledger && failureTurn(l.ledger, rec) === 'running') return this.endTurnFrom(id, l, 'transcript', `${l.adapter.descriptor.name} recorded its turn failed at ${d.turnFailedAt}`) // i18n-ignore: the log and the hook journal (English)
         this.settleFailure(id, l)
       })
     }
@@ -6395,7 +6395,7 @@ class SessionManager {
     if (d.turnEnded || answered.length) this.reconcileTurn(l)
     // The connection it launched on (HI-1756): its usage is that login's. Its launch dates its readings where they are all
     // its own run's (HI-3187).
-    if (d.planUsage) reportPlanUsage(l.state.provider, d.planUsage, l.state.agentName ?? l.state.agentId, l.state.launchedConnection, l.state.runId, providerDescriptor(l.state.provider).capabilities.planUsageSinceLaunch ? l.state.startedAt : undefined)
+    if (d.planUsage) reportPlanUsage(l.state.provider, d.planUsage, l.state.agentName ?? l.state.agentId, l.state.launchedConnection, l.state.runId, providerDescriptor(l.state.provider).capabilities.usage?.planUsageSinceLaunch ? l.state.startedAt : undefined)
     const learn = l.defaultEffort
     const learnModel = d.modelId ?? learn?.model
     if (learn && d.effort && learnModel) {
@@ -6540,7 +6540,7 @@ class SessionManager {
         decided('warned', who)
         return this.editAccepted(id, files, hooks.lockReply({ kind: 'warn', context: say(SESSION.lock.warn, { holder: who, file: rel }) }), keys)
       }
-      if (mode === 'ask' && !l.adapter.descriptor.capabilities.lockAsk) {
+      if (mode === 'ask' && !l.adapter.descriptor.capabilities.session?.lockAsk) {
         // The CLI can't show its own approval for this, so Combwork asks the user and the agent waits.
         const key = `${id}|${keys.get(abs)!}`
         // Allowed against this claim (HI-2386: an Allow given against another claim of the file allows nothing here, and
@@ -7228,10 +7228,10 @@ class SessionManager {
     // A CLI that wakes when its background tasks end begins that turn itself: while its transcript says one just ended
     // (never merely because one runs), a tool call it never saw may open that turn should its prompt hook be lost
     // (turnLedger rule 1).
-    const woke = l.adapter.descriptor.capabilities.backgroundWakes && !!l.woke
+    const woke = !!l.adapter.descriptor.capabilities.background?.backgroundWakes && !!l.woke
     // A CLI that may begin the turn the user's typing starts with no prompt hook (HI-2673, Claude Code's `!` command): while
     // the user's Enter into the idle pane waits for its hook, a new tool call of a turn never seen may open that turn.
-    const typed = l.adapter.descriptor.capabilities.typedTurnsWithoutPrompt && typedPending(l.hooksWatch)
+    const typed = !!l.adapter.descriptor.capabilities.session?.typedTurnsWithoutPrompt && typedPending(l.hooksWatch)
     // Its notice (#650), from the ledger as it is now, before it is admitted with what it was told.
     if (decide) {
       // A SessionStart whose CLI says what it is only once prepared (HI-2548: agy's, startReply): its start context, the
@@ -7587,7 +7587,7 @@ class SessionManager {
       statusMessage: st.statusMessage,
       askedAtStart: !!l.askedAtStart,
       compacting: l.compacting ? (l.compacting.started ? 'started' : 'requested') : null,
-      backgroundWakes: l.adapter.descriptor.capabilities.backgroundWakes,
+      backgroundWakes: l.adapter.descriptor.capabilities.background?.backgroundWakes ?? false,
       tasks: l.tasks?.size ?? 0,
       attention: l.titleAttention ? 'title' : 'hooks',
       // The mode the CLI is in: on the CLI's own setting, the one it showed (#1284).
@@ -8489,7 +8489,7 @@ class SessionManager {
         transcriptBytes: st?.size ?? null,
         ...(!ctx.stored?.has(rec.id) && (hasTranscript || hasBackup) ? { pending: true } : {}),
         usage,
-        recache: usage && providerDescriptor(provider).capabilities.promptCacheTtl ? recacheEstimate(usage, ttl) : null
+        recache: usage && providerDescriptor(provider).capabilities.usage?.promptCacheTtl ? recacheEstimate(usage, ttl) : null
       }
     })
     items.push(...listed)
@@ -8557,7 +8557,7 @@ class SessionManager {
           transcriptBytes: st?.size ?? null,
           ...(same ? {} : { pending: true }),
           usage,
-          recache: usage && adapter.descriptor.capabilities.promptCacheTtl ? recacheEstimate(usage, ttl) : null,
+          recache: usage && adapter.descriptor.capabilities.usage?.promptCacheTtl ? recacheEstimate(usage, ttl) : null,
           ...(ext.sub ? { sub: ext.sub } : {})
         })
       }
@@ -9252,7 +9252,7 @@ class SessionManager {
       titleAtRename: usage?.customTitle ?? null,
       createdAt: usage?.firstActivity ?? new Date().toISOString(),
       lastActiveAt: usage?.lastActivity ?? new Date().toISOString(),
-      ...(src && !providerDescriptor(provider).capabilities.fixedSessionId ? { transcriptPath: src.path } : {})
+      ...(src && !providerDescriptor(provider).capabilities.session?.fixedSessionId ? { transcriptPath: src.path } : {})
     })
   }
 }

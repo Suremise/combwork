@@ -124,37 +124,49 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
   modelGroups: CODEX_MODEL_GROUPS,
   modelPlaceholder: 'Model ID, e.g. gpt-6-sol', // i18n-ignore: English (text.modelPlaceholder is the window's)
   capabilities: {
-    fixedSessionId: false,
-    liveModeSwitch: 'menu',
-    planModeToggle: true,
-    promptCacheTtl: false,
-    reportsCost: false,
-    defersMcpTools: false,
-    compactFocus: false,
-    contextLimit: false,
-    autoCompactReserve: null,
-    // A pasted image path becomes [Image #n] (checked with Codex 0.159).
-    imagePaste: true,
-    // Images (pasted, or its view_image tool) and text; a PDF it can only dump with a shell command (checked with 0.162.1).
-    attachments: ['image', 'text'],
-    // Codex rejects permissionDecision "ask" (and then runs the tool), so Combwork asks the user itself.
-    lockAsk: false,
-    backgroundSessions: false,
-    // Codex isn't told when a background terminal ends: it finds out only by checking during a turn.
-    backgroundWakes: false,
-    typedTurnsWithoutPrompt: false,
-    startupSizeRefresh: false,
-    // Its paste-burst detection drops an Enter that a busy Codex reads with the line, bracketed or not; Enter once the line
-    // is drawn sends it (#600, checked with 0.163). disable_paste_burst would too, but loses a user's multi-line paste.
-    bracketedPaste: false,
-    enterOnceDrawn: true,
-    // Its editor's insert_newline keys (0.164.0's default keymap: ctrl+j, ctrl+m, enter, shift+enter, alt+enter; plain
-    // Enter sends): Alt+Enter and Ctrl+J, as Windows' console delivers them (HI-1327). Off until tried on real Codex.
-    typedNewlines: ['alt-enter', 'ctrl-j'],
-    // --add-dir, added to the writable roots of its own config (0.163.0: tests/fixtures/advanced/writable-roots-codex-0.163.0.json).
-    extraDirs: true,
-    // Its timeout for Combwork's tools (codex.mcp.toolTimeoutSeconds): waits are held a minute under it.
-    mcpToolTimeoutSetting: 'codex.mcp.toolTimeoutSeconds',
+    terminal: {
+      // A pasted image path becomes [Image #n] (checked with Codex 0.159).
+      imagePaste: true,
+      // Images (pasted, or its view_image tool) and text; a PDF it can only dump with a shell command (checked with 0.162.1).
+      attachments: ['image', 'text'],
+      startupSizeRefresh: false,
+      // Its paste-burst detection drops an Enter that a busy Codex reads with the line, bracketed or not; Enter once the line
+      // is drawn sends it (#600, checked with 0.163). disable_paste_burst would too, but loses a user's multi-line paste.
+      bracketedPaste: false,
+      enterOnceDrawn: true,
+      // Its editor's insert_newline keys (0.164.0's default keymap: ctrl+j, ctrl+m, enter, shift+enter, alt+enter; plain
+      // Enter sends): Alt+Enter and Ctrl+J, as Windows' console delivers them (HI-1327). Off until tried on real Codex.
+      typedNewlines: ['alt-enter', 'ctrl-j']
+    },
+    session: {
+      fixedSessionId: false,
+      defersMcpTools: false,
+      // Codex rejects permissionDecision "ask" (and then runs the tool), so Combwork asks the user itself.
+      lockAsk: false,
+      typedTurnsWithoutPrompt: false,
+      // --add-dir, added to the writable roots of its own config (0.163.0: tests/fixtures/advanced/writable-roots-codex-0.163.0.json).
+      extraDirs: true,
+      // Its timeout for Combwork's tools (codex.mcp.toolTimeoutSeconds): waits are held a minute under it.
+      mcpToolTimeoutSetting: 'codex.mcp.toolTimeoutSeconds'
+    },
+    modes: {
+      liveModeSwitch: 'menu',
+      planModeToggle: true
+    },
+    usage: {
+      promptCacheTtl: false,
+      reportsCost: false
+    },
+    compaction: {
+      compactFocus: false,
+      contextLimit: false,
+      autoCompactReserve: null
+    },
+    background: {
+      backgroundSessions: false,
+      // Codex isn't told when a background terminal ends: it finds out only by checking during a turn.
+      backgroundWakes: false
+    },
     // Each connection a CODEX_HOME of its own (HI-1757), its rollouts shared with the others through sessions\ and
     // archived_sessions\ (resume reads the rollout alone); its memory, thread names and prompt history stay its own.
     // Its sign-in names an email and plan, no organisation.

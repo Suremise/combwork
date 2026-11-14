@@ -608,7 +608,7 @@ describe('a prompt Combwork puts into a CLI (#597)', () => {
     it('every CLI Combwork waits for to draw a line has that wait in Settings → Advanced', async () => {
       const { PROVIDERS } = await import('../src/shared/providers')
       const { advancedDef } = await import('../src/shared/advanced')
-      const waiting = PROVIDERS.filter((d) => d.capabilities.enterOnceDrawn)
+      const waiting = PROVIDERS.filter((d) => d.capabilities.terminal?.enterOnceDrawn)
       expect(waiting.map((d) => d.id)).toEqual(['codex'])
       for (const d of waiting) expect(advancedDef(drawnWaitId(d.id))?.kind, d.id).toBe('number')
     })

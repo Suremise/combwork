@@ -48,7 +48,7 @@ function title(a: Agent, asks: boolean): Agent {
 
 function send(adapter: ProviderAdapter, a: Agent, ...bodies: Record<string, unknown>[]): Agent {
   for (const body of bodies) {
-    const step = hookStep(adapter.hooks!.normalizeHook(body).event, input(a, adapter.descriptor.capabilities.backgroundWakes))
+    const step = hookStep(adapter.hooks!.normalizeHook(body).event, input(a, adapter.descriptor.capabilities.background?.backgroundWakes))
     apply(a, step)
     // SessionManager.carryOut: the compaction Combwork asked for has begun, or is over (the step set the status).
     if (step.actions.includes('compactBegan')) a.compacting = 'started'
@@ -210,7 +210,7 @@ describe('hook → status, for each provider', () => {
       expect([queued.status, queued.statusMessage], name).toEqual(['working', undefined])
       // Compacted while waiting on its background tasks (#521): background again, not ready, where they wake it.
       const waiting = send(adapter, agent('background', { tasks: 1 }), h.compactStart, h.compactEnd)
-      expect(waiting.status, name).toBe(adapter.descriptor.capabilities.backgroundWakes ? 'background' : 'ready')
+      expect(waiting.status, name).toBe(adapter.descriptor.capabilities.background?.backgroundWakes ? 'background' : 'ready')
     }
     const shown = agent('working', { statusMessage: COMPACTING_MESSAGE })
     expect(applyStep(shown, compactionOver(shown, 'background'))).toBe(true)

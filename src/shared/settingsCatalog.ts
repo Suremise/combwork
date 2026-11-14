@@ -588,7 +588,7 @@ function providerRows(p: ProviderDescriptor): Row[] {
       }
     })
   }
-  if (p.capabilities.backgroundSessions) {
+  if (p.capabilities.background?.backgroundSessions) {
     defs.push({
       section,
       provider: p.id,
@@ -627,7 +627,7 @@ function providerRows(p: ProviderDescriptor): Row[] {
     wide: true
   })
   // Only a provider that reports its own cost has a choice (#436): for the others the table is the only source.
-  if (p.capabilities.reportsCost)
+  if (p.capabilities.usage?.reportsCost)
     defs.push({
       section,
       provider: p.id,
@@ -654,7 +654,7 @@ function providerRows(p: ProviderDescriptor): Row[] {
     key: 'prices',
     title: msg({ id: 'settings.provider.prices.title', defaultMessage: 'API prices', description: "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)." }),
     desc: withValues(
-      p.capabilities.reportsCost
+      p.capabilities.usage?.reportsCost
         ? msg({ id: 'settings.provider.prices.descReported', defaultMessage: "{provider} reports each session's cost itself; these prices are used for sessions without one, or for all of them with Session costs set to your prices. USD per million tokens.", description: 'What the setting "API prices" is (Settings → a provider page: Claude Code, Codex or GitHub Copilot), for a provider that reports its costs. {provider} is its name; Session costs is the setting above it.' })
         : msg({ id: 'settings.provider.prices.descEstimated', defaultMessage: 'Used to estimate what {provider} sessions would cost at API prices (shown with ≈ on the Overview). USD per million tokens.', description: 'What the setting "API prices" is (Settings → a provider page: Claude Code, Codex or GitHub Copilot), for a provider that reports no costs. {provider} is its name.' }),
       { provider: p.name }

@@ -304,7 +304,7 @@ class ProviderService {
       }
       // A CLI an organisation can govern remotely, staying on its version after an update (HI-2777): Provider Setup says a
       // policy may decide it rather than offer the same update as if nothing happened.
-      if (adapter.descriptor.capabilities.remoteHookPolicy) {
+      if (adapter.descriptor.capabilities.hooks?.remoteHookPolicy) {
         const expect = this.updateExpect.get(id) ?? null
         if (expect && !hasPty(`task:${id}:update`)) this.updateExpect.delete(id)
         const stayed = judgeStayed({ expect: hasPty(`task:${id}:update`) ? null : expect, prev: { path: prev.path, version: prev.version }, next: { path: found.path, version: found.version, latest }, held: this.stayed.get(id) ?? null, now: Date.now(), isNewer: (a, b) => adapter.install.isNewer(a, b) })

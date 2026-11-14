@@ -230,7 +230,7 @@ export function totals(s: PerfSelection): PerfTotals {
  */
 export function deferredEstimate(c: CatalogSeries): { starts: number; bytes: number } | null {
   const p = PROVIDERS.find((x) => x.id === c.provider)
-  if (!p?.capabilities.defersMcpTools || !c.upfrontStarts) return null
+  if (!p?.capabilities.session?.defersMcpTools || !c.upfrontStarts) return null
   return { starts: c.upfrontStarts, bytes: c.upfrontBytes }
 }
 

@@ -132,7 +132,7 @@ export function hooksMissingNote(st: Pick<LiveSessionState, 'hooksMissing' | 'pr
   const h = st?.hooksMissing
   if (!h) return null
   // A setting found here, for a CLI an organisation can also govern remotely: what it has there decides over it.
-  const remote = !!providerDescriptor(st!.provider).capabilities.remoteHookPolicy && (h.why === 'off' || h.why === 'managedOnly' || h.why === 'blocked' || h.why === 'unreadable')
+  const remote = !!providerDescriptor(st!.provider).capabilities.hooks?.remoteHookPolicy && (h.why === 'off' || h.why === 'managedOnly' || h.why === 'blocked' || h.why === 'unreadable')
   // Its status from its terminal meanwhile (HI-2802): said, with what it can't show.
   if (h.terminal) return `${hooksMissingNoteText(h, st!.provider, remote, tr)} ${tr(TERMINAL_TURN_NOTE)}`
   return hooksMissingNoteText(h, st!.provider, remote, tr)
