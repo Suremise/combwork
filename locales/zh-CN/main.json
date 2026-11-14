@@ -271,6 +271,7 @@
   "main.outcome.noLongerAsked": "已不再请求",
   "main.outcome.noLongerHeld": "已不再占用",
   "main.outcome.notResumed": "未恢复",
+  "main.outcome.nothingToResume": "已没有可恢复的内容",
   "main.outcome.offerReplaced": "已被更新的提议取代",
   "main.outcome.openHereAgain": "对话已在此重新打开",
   "main.outcome.released": "已释放",

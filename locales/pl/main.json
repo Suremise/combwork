@@ -271,6 +271,7 @@
   "main.outcome.noLongerAsked": "Już nie prosi",
   "main.outcome.noLongerHeld": "Już nie jest zajęte",
   "main.outcome.notResumed": "Nie wznowiono",
+  "main.outcome.nothingToResume": "Nie ma już nic do wznowienia",
   "main.outcome.offerReplaced": "Zastąpione nowszą propozycją",
   "main.outcome.openHereAgain": "Rozmowa jest tu znów otwarta",
   "main.outcome.released": "Zwolniono",
