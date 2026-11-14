@@ -26,7 +26,7 @@ import type { CardRecord } from '../workflow/factStore'
 import type { ReconcileHooks } from '../workflow/reconcile'
 import type { Workflow } from '../workflow/runtime'
 import type { AdvanceAnswer, AdvanceHost, AdvanceRef, AdvanceStep, AdvanceWords, PreviewWords, CheckBracket, FinishInputs, HeadMove, KeptWork, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
-import { AdvanceJournals, basePrint, classifyUndoNow, commitsAdded, fingerprintHash, journalAbandoned, journalNewUndo, journalRequested, journalSettled, journalUndoAs, planIdOf, recoverAdvance, resultContained, runAdvance, runUndo, underLock, undoOfferedNow, undoPreMutation, type AdvanceJournal, type AdvanceOutcome, type Held, type JjAdvanceDeps, type JjAdvancePlan } from './jjAdvance'
+import { AdvanceJournals, baseRefusalNow, classifyUndoNow, commitsAdded, fingerprintHash, journalAbandoned, journalNewUndo, journalRequested, journalSettled, journalUndoAs, planIdOf, recoverAdvance, resultContained, runAdvance, runUndo, underLock, undoOfferedNow, undoPreMutation, type AdvanceJournal, type AdvanceOutcome, type Held, type JjAdvanceDeps, type JjAdvancePlan } from './jjAdvance'
 import { ADVANCE_GATES, ADVANCE_PREVIEW_GATE, ADVANCE_UNCERTAIN_GATE, advanceUnresolved, approvedByUser } from '../../shared/workflow/facts'
 import { finishAdvances, finishPreviews } from '../../shared/workflow/options'
 
@@ -1022,7 +1022,7 @@ export class JjPlatform implements PlatformAdapter {
         if (!this.consentHolds(c, s, 'auto')) return 'notReady'
         // HI-3265 (HI-2709): a blocker that isn't Done holds the advance; the card is tried again once it's Done.
         if (host.waitsFor(c).length) return 'notReady'
-        const ready = await this.readyPlan(h, integ, journals, c, s)
+        const ready = await this.readyPlan(h, integ, journals, c, s, host)
         if (!ready) return 'notReady'
         await host.noteDefault(c)
         const out = await this.attemptUnder(h, integ, journals, c, s, ready.plan, ready.planId, host, 'auto')
@@ -1037,18 +1037,22 @@ export class JjPlatform implements PlatformAdapter {
   /**
    * The card's plan when it is ready to be integrated now (HI-3235's readiness, under the locks): its candidate ready for
    * its fingerprint, its checks passed under the key now, the offer current in jj (T at E, the candidate the visible
-   * commit recorded), the plan not undone this cycle, and not refused at the base on a repository unchanged since.
+   * commit recorded), the plan not undone this cycle, and the repository as the base check needs it now.
+   * HI-3264: that check is read-only, before any journal or fact. A refusal writes nothing but the card's comment (once
+   * per cycle, plan and reason; none for a target that moved, whose candidate is built again), so a cause that persists
+   * while jj operations come and go costs a read on each pass, never a journal or facts; jj unreadable: not ready.
    */
-  private async readyPlan(h: Held, integ: JjIntegrationDeps, journals: AdvanceJournals, c: CardRecord, s: CardState): Promise<{ plan: JjAdvancePlan; planId: string } | null> {
+  private async readyPlan(h: Held, integ: JjIntegrationDeps, journals: AdvanceJournals, c: CardRecord, s: CardState, host: AdvanceHost): Promise<{ plan: JjAdvancePlan; planId: string } | null> {
     const ready = await this.advancePlan(c, s, integ)
     if (!ready) return null
     const planId = planIdOf(ready.plan)
     if (this.planUndone(c, s, planId) || !(await this.offerCurrent(ready.plan.target, ready.offer))) return null
-    // The same plan refused at the base before, on a repository that hasn't changed since: not tried again yet.
-    const refusals = (await journals.list(c.key, s.cycle)).map((x) => x.journal).filter((x): x is AdvanceJournal => x !== 'unreadable' && x.planId === planId && !!x.refusedAt)
-    if (refusals.length) {
-      const now = await basePrint(h, this.advanceDeps(integ, journals, () => true), integ.view.store)
-      if (now === null || refusals.some((x) => x.refusedAt === now)) return null
+    const refused = await baseRefusalNow(h, this.advanceDeps(integ, journals, () => true), ready.plan)
+    if (refused === 'unreadable') return null
+    if (refused) {
+      const detail = refused.kind === 'nothingMoved' ? (refused.detail ?? '') : ''
+      if (refused.kind === 'nothingMoved' && refused.code !== 'moved') await host.refused(c, s.cycle, planId, { target: ready.plan.target, result: ready.plan.result, why: refused.code, detail })
+      return null
     }
     return { plan: ready.plan, planId }
   }
@@ -1091,7 +1095,7 @@ export class JjPlatform implements PlatformAdapter {
         if (pending) return 'busy'
         // HI-3265: no preview while a blocker isn't Done (its Integrate couldn't start the attempt).
         if (host.waitsFor(c).length) return 'notReady'
-        const ready = await this.readyPlan(h, integ, journals, c, s)
+        const ready = await this.readyPlan(h, integ, journals, c, s, host)
         if (!ready || host.previewDeclined(c, s.cycle, ready.planId)) return 'notReady'
         const open = s.requests.find((r) => r.gate === ADVANCE_PREVIEW_GATE)
         if (open?.result === ready.planId) return 'notReady'
@@ -1133,7 +1137,7 @@ export class JjPlatform implements PlatformAdapter {
       return false
     }
     if (c.stage !== 'approved' || s.integrated || advanceUnresolved(s) || !this.consentHolds(c, s, 'preview') || host.waitsFor(c).length) return false
-    const ready = await this.readyPlan(h, integ, journals, c, s)
+    const ready = await this.readyPlan(h, integ, journals, c, s, host)
     if (!ready || ready.planId !== ans.plan) return false
     return (await this.attemptUnder(h, integ, journals, c, s, ready.plan, ready.planId, host, 'preview')).integrated
   }

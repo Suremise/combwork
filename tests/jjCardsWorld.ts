@@ -42,7 +42,7 @@ export const BUSY = (slot: string) => ({ held: false, print: `lease:open:${slot}
 /** `candidates`: HI-2871's candidate step on (its attempts journalled in the database, as the app's). */
 /** `oneSlot`: slot-a only, for a file whose cards are all B1's (HI-3018: a slot is a dozen jj runs a test never uses). */
 /** `advance` (HI-3235): the finish is Combwork's advance ('preview', HI-3236: preview and click), its hook placed at `advanceHook`. */
-export async function world(colocated: boolean, o: { hook?: (point: JjIntegrationPoint) => Promise<void> | void; candidates?: boolean; oneSlot?: boolean; advance?: boolean | 'preview'; advanceHook?: JjCardDeps['advanceHook'] } = {}) {
+export async function world(colocated: boolean, o: { hook?: (point: JjIntegrationPoint) => Promise<void> | void; candidates?: boolean; oneSlot?: boolean; advance?: boolean | 'preview'; advanceHook?: JjCardDeps['advanceHook']; advanceTestStop?: boolean } = {}) {
   const h = harness()
   const { repo, root } = h.repo(`cards${colocated ? 'c' : 'n'}`, colocated)
   const home = tempDir('jjcards-')
@@ -113,6 +113,7 @@ export async function world(colocated: boolean, o: { hook?: (point: JjIntegratio
         : {})
     },
     ...(o.advanceHook ? { advanceHook: o.advanceHook } : {}),
+    ...(o.advanceTestStop ? { advanceTestStop: true } : {}),
     slotHold: (lease) => holds.get(lease) ?? null,
     pins: { read: (ref) => pins.get(ref) ?? null, write: async (ref, rec) => void pins.set(ref, rec) }
   }
