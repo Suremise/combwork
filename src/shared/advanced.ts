@@ -1184,9 +1184,9 @@ const SOURCES: readonly AdvancedSource[] = [
     flags: 'i',
     applies: 'now',
     samples: [
-      { from: `${FIX}/advanced/windows-sandbox-executables-26200.txt`, version: '10.0.26200', source: 'Windows', text: 'WindowsSandboxRemoteSession.exe', shows: "Windows Sandbox's guest session program, which lives as long as the guest (an agent's `wsb` start leaves it running)" },
-      { from: `${FIX}/advanced/windows-sandbox-executables-26200.txt`, version: '10.0.26200', source: 'Windows', text: 'WindowsSandboxServer.exe', shows: "Windows Sandbox's server program, which lives as long as the guest" }
-    ] // i18n-ignore: Windows' recorded program names (#367)
+      { from: `${FIX}/advanced/windows-sandbox-executables-26200.txt`, version: '10.0.26200', source: 'Windows', text: 'WindowsSandboxRemoteSession.exe', shows: "Windows Sandbox's guest session program, which lives as long as the guest (an agent's `wsb` start leaves it running)" }, // i18n-ignore: Windows' recorded program names (#367)
+      { from: `${FIX}/advanced/windows-sandbox-executables-26200.txt`, version: '10.0.26200', source: 'Windows', text: 'WindowsSandboxServer.exe', shows: "Windows Sandbox's server program, which lives as long as the guest" } // i18n-ignore: Windows' recorded program names (#367)
+    ]
   },
   // A lane's end (HI-1706, SPEC §16.10.2): its builder finishes its turn, is told, and its CLI exits by itself.
   {
