@@ -48,13 +48,15 @@ export interface Applied {
 /** A request key reused for another request. */
 export class KeyReused extends Error {
   constructor() {
-    super('request key reused') // agent-protocol: an internal error's tag, mapped to its refusal by servers.ts
+    // agent-protocol: an internal error's tag, never said: servers.ts answers it with its refusal
+    super('request key reused') // i18n-ignore: as above
   }
 }
 /** Too many keyed requests in flight: try again in a moment. */
 export class KeysBusy extends Error {
   constructor() {
-    super('too many keyed requests in flight') // agent-protocol: as KeyReused's
+    // agent-protocol: as KeyReused's
+    super('too many keyed requests in flight') // i18n-ignore: as KeyReused's
   }
 }
 /** Its key was taken by another request's commit meanwhile (another process, or a race past the in-flight map). */
