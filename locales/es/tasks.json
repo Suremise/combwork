@@ -34,6 +34,8 @@
   "tasks.error.emptyComment": "El comentario está vacío.",
   "tasks.error.emptyDecision": "La decisión está vacía.",
   "tasks.error.failedToDoing": "Una revisión no superada devuelve la tarjeta {card} a En curso, a su autor: da el veredicto sin column.",
+  "tasks.error.followUpArchived": "followUpOf: la tarjeta {card} está archivada; recupérala primero o crea la tarjeta sin followUpOf.",
+  "tasks.error.followUpOtherProject": "followUpOf: la tarjeta {card} es de otro proyecto; un seguimiento continúa una tarjeta de su propio proyecto.",
   "tasks.error.holdCard": "Solo el usuario o el Asistente ponen tarjetas En espera. Si el usuario ya decidió aparcar la tarjeta {card}, pídeselo al Asistente (cw_ask_assistant); si no, pregunta al usuario.",
   "tasks.error.holdNew": "Solo el usuario o el Asistente ponen tarjetas En espera. Créala en Pendiente; si el usuario ya decidió aparcarla, pídeselo al Asistente (cw_ask_assistant), y si no, pregunta al usuario.",
   "tasks.error.inDoingWith": "La tarjeta {card} está en {active} con el agente {agent}, que trabaja en ella: hay trabajo más reciente en marcha, así que otro agente no puede pasarla a {stage}. Déjala donde está; el agente {agent} la pasa a {review} cuando termine, y el usuario puede moverla.",

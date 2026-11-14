@@ -374,6 +374,10 @@
   "api.change.addConnection": {
     "text": "make a connection"
   },
+  "api.change.answerSimplify": {
+    "text": "answer {card}'s simplify check",
+    "note": "HI-3188: the Assistant's answer to a card's simplify check, as its refusals and activity call it."
+  },
   "api.change.cancelMessages": {
     "text": "cancel the messages waiting for {agent} in {project}"
   },
@@ -698,6 +702,10 @@
   },
   "api.done.alreadyStopped": {
     "text": "{agent} in {project} had already stopped"
+  },
+  "api.done.answerSimplify": {
+    "text": "{card} {title}: answered its simplify check, {choice, select, carryOn {carry on} other {simplify}}",
+    "note": "HI-3188: the Assistant's answer to a card's simplify check, in its activity."
   },
   "api.done.branchCreated": {
     "text": "Created {name} from {from} ({commit}) in {project}",

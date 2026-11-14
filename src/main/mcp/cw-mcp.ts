@@ -207,6 +207,8 @@ const T = {
   'readSetting.arg.id': agentMsg({ id: 'tool.readSetting.arg.id', text: 'From cw_list_settings, e.g. sessions.transcriptWarnMB.' }),
   'updateSetting.description': agentMsg({ id: 'tool.updateSetting.description', text: "Change one of Combwork's settings, as Settings would: only when the user asked or agreed. [read-only] ones are refused: tell the user where to change them. Replies with old → new." }),
   'updateSetting.arg.value': agentMsg({ id: 'tool.updateSetting.arg.value', text: 'What cw_read_setting says it takes.' }),
+  'answerSimplify.description': agentMsg({ id: 'tool.answerSimplify.description', text: "Answer a card's simplify check, which Combwork told you of: carryOn (what still comes up is worth handling) or simplify (drop what isn't). Cutting scope, and the hard stop's question, are the user's: leave those. why: your reason, a comment on the card.", note: 'HI-3188: the Assistant-only tool for a simplify check (Workflow → Card loops).' }),
+  'answerSimplify.done': agentMsg({ id: 'tool.answerSimplify.done', text: '{card}: answered {request}, {choice, select, carryOn {carry on} other {simplify}}; its agents are woken.', note: "HI-3188: cw_answer_simplify's reply." }),
   'undo.description': agentMsg({ id: 'tool.undo.description', text: 'Undo changes of your own (kept 7 days, grouped by the user\'s message): list, then change or group ("latest": your newest). What someone changed since stays. Only your own: never the user\'s or agents\'. (detail: use-cw-api, tools.md)' }),
   'undo.arg.change': agentMsg({ id: 'tool.undo.arg.change', text: "A change's id, from list with its group." }),
   'undo.arg.group': agentMsg({ id: 'tool.undo.arg.group', text: 'A message\'s id, from list, or "latest".' }),
@@ -229,6 +231,7 @@ const T = {
   'lane.arg.cards': agentMsg({ id: 'tool.lane.arg.cards', text: 'Cards, in the order they are done.' }),
   'createTask.arg.blockedBy': agentMsg({ id: 'tool.createTask.arg.blockedBy', text: 'Cards that have to be done first.' }),
   'createTask.arg.links': agentMsg({ id: 'tool.createTask.arg.links', text: 'Related cards.' }),
+  'createTask.arg.followUpOf': agentMsg({ id: 'tool.createTask.arg.followUpOf', text: "The card this continues (its key), only for a split or follow-ups the user accepted of that card's own scope: it keeps that card's count. A separate bug or discovery: links instead.", note: 'HI-3188: cw_create_task’s followUpOf.' }),
   'updateTask.arg.blockedBy': agentMsg({ id: 'tool.updateTask.arg.blockedBy', text: 'Cards that have to be done first (replaces the list).' }),
   'updateTask.arg.links': agentMsg({ id: 'tool.updateTask.arg.links', text: 'Related cards (replaces the list).' }),
   'updateTasks.arg.numbers': agentMsg({ id: 'tool.updateTasks.arg.numbers', text: 'The cards to change, up to 100.' }),
@@ -1209,6 +1212,7 @@ const tools: Tool[] = [
         blocked: { type: 'string', description: say(T['createTask.arg.blocked']) },
         blockedBy: cardsArg(say(T['createTask.arg.blockedBy'])),
         links: cardsArg(say(T['createTask.arg.links'])),
+        followUpOf: { type: ['number', 'string'], description: say(T['createTask.arg.followUpOf']) },
         context: contextArg,
         kind: { type: 'string', enum: ['code', 'no-code'], description: ASSISTANT ? say(T['createTask.arg.kind.assistant']) : say(T['createTask.arg.kind']) },
         skipReview: { type: 'string', description: ASSISTANT ? say(T['createTask.arg.skipReview.assistant']) : say(T['createTask.arg.skipReview']) },
@@ -1222,7 +1226,7 @@ const tools: Tool[] = [
       },
       required: ['title']
     },
-    run: async (a) => createdLaneText((await api('POST', '/v1/tasks', { title: a.title, description: a.description, project: a.project ?? PROJECT, agent: a.agent, column: a.column, labels: a.labels, blocked: a.blocked, blockedBy: a.blockedBy, links: a.links, context: a.context, ...(a.kind !== undefined ? { kind: a.kind } : {}), ...(a.skipReview !== undefined ? { skipReview: a.skipReview } : {}), ...(a.target !== undefined ? { target: a.target } : {}), ...(a.attachments !== undefined ? { attachments: a.attachments } : {}), ...(a.lane !== undefined ? { lane: a.lane } : {}), reply: 'short' })) as TaskChange & { lane?: LaneChange; laneRefused?: string })
+    run: async (a) => createdLaneText((await api('POST', '/v1/tasks', { title: a.title, description: a.description, project: a.project ?? PROJECT, agent: a.agent, column: a.column, labels: a.labels, blocked: a.blocked, blockedBy: a.blockedBy, links: a.links, context: a.context, ...(a.followUpOf !== undefined ? { followUpOf: a.followUpOf } : {}), ...(a.kind !== undefined ? { kind: a.kind } : {}), ...(a.skipReview !== undefined ? { skipReview: a.skipReview } : {}), ...(a.target !== undefined ? { target: a.target } : {}), ...(a.attachments !== undefined ? { attachments: a.attachments } : {}), ...(a.lane !== undefined ? { lane: a.lane } : {}), reply: 'short' })) as TaskChange & { lane?: LaneChange; laneRefused?: string })
   },
   {
     name: 'cw_update_task',
@@ -1368,6 +1372,19 @@ const tools: Tool[] = [
       required: ['id', 'value']
     },
     run: async (a) => settingChangedText((await api('PATCH', `/v1/settings/${enc(a.id)}`, { value: a.value, project: a.project, ...(a.offer !== undefined ? { offer: a.offer } : {}) })) as Parameters<typeof settingChangedText>[0])
+  },
+  {
+    name: 'cw_answer_simplify',
+    description: say(T['answerSimplify.description']),
+    inputSchema: {
+      type: 'object',
+      properties: { card: { type: 'string' }, request: { type: 'string' }, choice: { type: 'string', enum: ['carryOn', 'simplify'] }, why: { type: 'string' } },
+      required: ['card', 'request', 'choice']
+    },
+    run: async (a) => {
+      const r = (await api('POST', `/v1/tasks/${enc(String(a.card))}/answer-simplify`, { request: a.request, choice: a.choice, ...(a.why !== undefined ? { why: a.why } : {}) })) as { card: string; request: string; choice: string }
+      return say(T['answerSimplify.done'], { card: r.card, request: r.request, choice: r.choice })
+    }
   },
   {
     name: 'cw_undo',

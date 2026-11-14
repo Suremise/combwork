@@ -3506,7 +3506,7 @@ route('POST', '/v1/tasks', async ({ body }) => {
   requireWorkspace()
   const title = String(body?.title ?? '').trim()
   if (!title) throw new HttpError(400, apiSaid(API.card.titleRequired))
-  const input = { title, description: body?.description, project: body?.project, agent: body?.agent, column: columnParam(body?.column), labels: body?.labels, blocked: body?.blocked, blockedBy: cardRefsIn(body?.blockedBy), links: cardRefsIn(body?.links), context: body?.context, ...(body?.kind !== undefined ? { kind: body.kind } : {}), ...(body?.skipReview !== undefined ? { skipReview: body.skipReview as string } : {}), ...(body?.target !== undefined ? { target: targetArg(body.target) } : {}) }
+  const input = { title, description: body?.description, project: body?.project, agent: body?.agent, column: columnParam(body?.column), labels: body?.labels, blocked: body?.blocked, blockedBy: cardRefsIn(body?.blockedBy), links: cardRefsIn(body?.links), context: body?.context, ...(body?.kind !== undefined ? { kind: body.kind } : {}), ...(body?.skipReview !== undefined ? { skipReview: body.skipReview as string } : {}), ...(body?.target !== undefined ? { target: targetArg(body.target) } : {}), ...(body?.followUpOf !== undefined && body?.followUpOf !== null ? { followUpOf: cardRefIn(body.followUpOf) as number } : {}) }
   const actor = await taskActor()
   // Placed on a lane as it is made (HI-2167): checked before the card is made; placed after, through cw_lane start's
   // own path, so nobody guesses its key.
@@ -4289,6 +4289,23 @@ export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
   }
 }
 for (const [path, intentOf] of Object.entries(INTENT_ROUTES)) route('POST', `/v1/tasks/:n/${path}`, async ({ params, body }) => cardIntent(params[0], intentOf(body)))
+
+// HI-3188: the Assistant's answer to a card's simplify check (told to it first): carry on or simplify, nothing else.
+route('POST', '/v1/tasks/:n/answer-simplify', async ({ params, body }) => {
+  requireWorkspace()
+  const ref = intentRef(params[0])
+  const actor = await taskActor()
+  if (actor.kind !== 'assistant') throw new HttpError(403, apiSaid(API.change.onlyAssistant, { what: sayNow([API.change.answerSimplify, { card: cardRef(ref.n) }]) }))
+  const request = textField(body, 'request', true)
+  const choice = textField(body, 'choice', true)
+  const why = textField(body, 'why')
+  const was = await tasks.getTask(ref.n).catch(() => null)
+  return assistantChange('agents', [API.change.answerSimplify, { card: cardRef(ref.n) }], { kind: 'update-task', card: ref.n, ...(was?.project ? { project: was.project } : {}) }, async (guard) => {
+    const card = await tasks.assistantAnswerSimplify(ref.n, request, choice, why, actor, guard)
+    const key = card.key ?? cardRef(ref.n)
+    return { done: [API.done.answerSimplify, { card: key, title: card.title, choice }], act: { column: card.column }, result: { ok: true, card: key, request, choice } }
+  })
+})
 
 // An agent asks the Combwork Assistant on a card (HI-1866): its comment, and the Assistant's inbox. An agent's alone: the
 // Assistant has its own tools, and the user acts on the board.

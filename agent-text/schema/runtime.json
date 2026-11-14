@@ -17,6 +17,12 @@
   "runtime.choice.carryOn": {
     "placeholders": {}
   },
+  "runtime.choice.cutScope": {
+    "placeholders": {}
+  },
+  "runtime.choice.simplify": {
+    "placeholders": {}
+  },
   "runtime.choice.split": {
     "placeholders": {}
   },
@@ -231,6 +237,12 @@
       "card": "plain",
       "revision": "plain",
       "submission": "plain"
+    }
+  },
+  "runtime.wake.followUpsOf": {
+    "placeholders": {
+      "said": "plain",
+      "card": "plain"
     }
   },
   "runtime.wake.inReview": {

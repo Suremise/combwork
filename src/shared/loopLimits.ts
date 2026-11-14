@@ -18,3 +18,11 @@ export const LOOP_WAIT_MAX_HOURS = LANE_MAX_WAIT_MINUTES / 60
  */
 export const LOOP_STEP_WAIT_MINUTES = 30
 export const LOOP_STEP_WAIT_MAX_MINUTES = 240
+
+/**
+ * HI-3188: a card's churn (its counted loop work, CardState.churn): the simplify check and the hard stop when nothing says
+ * otherwise (Darren, 14 Nov: 12 and 30, 0 = off), and the most either setting, or a carry on at the hard stop, can say.
+ */
+export const SIMPLIFY_AT = 12
+export const CHURN_STOP_AT = 30
+export const CHURN_MAX = 999

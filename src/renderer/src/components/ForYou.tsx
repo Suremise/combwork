@@ -2,8 +2,9 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import { msg, tr } from '@shared/i18n'
 import type { TaskCard } from '@shared/types'
 import { LANE_MAX_ROUNDS } from '@shared/lanes'
-import { approveNote, MERGE_CHOICE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type AskActionKind, type CardKind, type RoundChoice } from '@shared/workflow/facts'
-import { APPROVE_NOTE, FOR_YOU_KIND, ROUND_CHOICE, workflowLine } from '@shared/workflow/texts'
+import { approveNote, CHURN_LIMIT_GATE, MERGE_CHOICE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SIMPLIFY_CHOICES, SIMPLIFY_GATE, type AskActionKind, type CardKind, type PauseChoice } from '@shared/workflow/facts'
+import { CHURN_MAX } from '@shared/loopLimits'
+import { APPROVE_NOTE, FOR_YOU_KIND, ROUND_CHOICE, SIMPLIFY_CHOICE, workflowLine } from '@shared/workflow/texts'
 import { gist } from '@shared/gist'
 import { approveAnswer, askActionAvailable, declineAnswer, type ForYouAnswer, type ForYouItem, type WorkResolved } from '@shared/workflow/workView'
 import { formatDateTime } from '@shared/dates'
@@ -46,6 +47,7 @@ const M = {
   agree: msg({ id: 'board.forYou.agree', defaultMessage: '{action, select, done {Move to Done With This Reply} noCode {Make It No Code With This Reply} skipReview {Skip Review With This Reply} other {Unblock With This Reply}}', description: "A button under an agent's question for the user (For you), beside Send, when the question offers one action: does that action as the user, with the reply typed in the box as its reason, and answers the question. Keep the select keys as they are; translate each choice." }),
   agreeTip: msg({ id: 'board.forYou.agreeTip', defaultMessage: 'Does what the agent asked as you, with your reply as the reason, and answers the question. Send only answers it: Combwork never reads a yes into a reply.', description: "Tooltip of the button under an agent's question (For you) that does the action the question offers with the user's reply as its reason. Send is the button that only sends the reply." }),
   offerReason: msg({ id: 'board.forYou.offerReason', defaultMessage: 'Reason (optional)', description: "The label (and placeholder) of the field beside an action an agent's question offers (For you): why the user does it, filled with the agent's suggestion; it is recorded with the action." }),
+  more: msg({ id: 'board.forYou.moreChurn', defaultMessage: 'More', description: "HI-3188: the label of the number box beside Carry on, at a card's hard stop: how much more back-and-forth (failed reviews, designs, requests, questions) the card gets before it stops again." }),
   rounds: msg({ id: 'board.forYou.rounds', defaultMessage: 'More rounds', description: "The label of the number box beside Carry on, at a card loop's round limit: how many more review rounds the card gets." }),
   checklist: msg({ id: 'board.forYou.checklist', defaultMessage: 'To try:', description: 'Above the checklist of a Test request (For you): what the user is asked to try.' }),
   answering: msg({ id: 'board.forYou.answering', defaultMessage: 'Answering…', description: "A button while the user's answer to a request is being recorded." }),
@@ -233,7 +235,11 @@ function ForYouRequest({ card, kind, item, reply, setReply, setAnswering }: { ca
     if (why !== null) await answer('decline', declineAnswer(why))
   }
   const busy = (name: string): boolean => action.busy === name
-  const limit = item.gate === ROUND_LIMIT_GATE
+  // HI-3188: the hard stop asks the round limit's question on the card's churn; the simplify check has choices of its own.
+  const churnStop = item.gate === CHURN_LIMIT_GATE
+  const limit = item.gate === ROUND_LIMIT_GATE || churnStop
+  const simplify = item.gate === SIMPLIFY_GATE
+  const most = churnStop ? CHURN_MAX : LANE_MAX_ROUNDS
   const projectPath = useStore((s) => s.workspace?.projects.find((p) => p.name.toLowerCase() === card.project.toLowerCase())?.path)
   const [style, setStyle] = useState<WorkflowOptions['style']>('merge')
   // The branch's own first (HI-1997: every preset's), Combwork's marked as how it merged until now.
@@ -257,8 +263,8 @@ function ForYouRequest({ card, kind, item, reply, setReply, setAnswering }: { ca
     if (failed !== null) notify('error', tr(M.failed), failed)
     await loadTasks()
   }
-  const choose = (choice: RoundChoice): Promise<void> => answer(choice, { outcome: 'answered', choice, ...(choice === 'carryOn' ? { rounds: Number(rounds) } : {}) })
-  const roundsOk = /^\d+$/.test(rounds) && Number(rounds) >= 1 && Number(rounds) <= LANE_MAX_ROUNDS
+  const choose = (choice: PauseChoice): Promise<void> => answer(choice, { outcome: 'answered', choice, ...(choice === 'carryOn' && !simplify ? { rounds: Number(rounds) } : {}) })
+  const roundsOk = /^\d+$/.test(rounds) && Number(rounds) >= 1 && Number(rounds) <= most
   return (
     <div className={cx('for-you-request', item.kind)} data-request={item.request}>
       <div className="for-you-text">
@@ -330,11 +336,19 @@ function ForYouRequest({ card, kind, item, reply, setReply, setAnswering }: { ca
             </BusyButton>
           </div>
         </div>
+      ) : simplify ? (
+        <div className="for-you-actions">
+          {SIMPLIFY_CHOICES.map((c, i) => (
+            <BusyButton key={c} className={i === 0 ? 'primary' : undefined} busy={busy(c)} busyLabel={tr(M.answering)} disabled={!!action.busy} onClick={() => void choose(c)}>
+              {tr(SIMPLIFY_CHOICE, { choice: c })}
+            </BusyButton>
+          ))}
+        </div>
       ) : limit ? (
         <div className="for-you-actions">
           <label className="flex for-you-rounds">
-            {tr(M.rounds)}
-            <input className="input" type="number" min={1} max={LANE_MAX_ROUNDS} value={rounds} onChange={(e) => setRounds(e.target.value)} />
+            {tr(churnStop ? M.more : M.rounds)}
+            <input className="input" type="number" min={1} max={most} value={rounds} onChange={(e) => setRounds(e.target.value)} />
           </label>
           <BusyButton className="primary" busy={busy('carryOn')} busyLabel={tr(M.answering)} disabled={!!action.busy || !roundsOk} onClick={() => void choose('carryOn')}>
             {tr(ROUND_CHOICE, { choice: 'carryOn' })}

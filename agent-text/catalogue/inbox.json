@@ -43,6 +43,10 @@
     "text": "Your earlier conversation read {n, plural, one {a message} other {# messages}} it never acked ({ids}). cw_inbox shows {n, plural, one {it} other {them}} again now: act on {n, plural, one {it} other {them}}, then ack {n, plural, one {it} other {them}}.",
     "note": "HI-2463: a conversation from before the rename started fresh; what the earlier one had received and not acked is shown again in the new one. After \"[CW] \". n: how many; ids: their delivery ids (\"m3, m7\")."
   },
+  "inbox.churn.simplify": {
+    "text": "{key} reached its simplify check: {churn} rounds of back-and-forth (failed reviews, designs, requests, questions). Its loop is paused, and the user has the question ({request}) under For you. If it's clear, answer it yourself with cw_answer_simplify: carry on (what still comes up is worth handling) or simplify (drop what isn't). Cutting scope is the user's: otherwise leave it to them.",
+    "note": "HI-3188: Combwork's line to the Assistant when a card reaches its simplify check (Workflow → Card loops). {key}: the card's key; {churn}: its count (a number); {request}: the question's id (AM-12/r40). cw_answer_simplify is a tool's name."
+  },
   "inbox.create.badKey": {
     "text": "Not a delivery Combwork can keep: its source or key is too long.",
     "note": "Why a delivery isn't made: what names its producer is too long to keep."

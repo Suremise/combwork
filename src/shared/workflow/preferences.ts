@@ -3,7 +3,7 @@
 // that can't be used (a contradiction falls the rules back to All off) never take a project's loop settings with them.
 // Main reads them with workflow/preferences.ts; the window from the levels it has.
 
-import { LOOP_ROUNDS, LOOP_STEP_WAIT_MINUTES, LOOP_WAIT_HOURS } from '../loopLimits'
+import { CHURN_STOP_AT, LOOP_ROUNDS, LOOP_STEP_WAIT_MINUTES, LOOP_WAIT_HOURS, SIMPLIFY_AT } from '../loopLimits'
 import { AGENT_LIMIT_DEFAULT } from '../agentLimits'
 import type { PlatformId } from '../platform/descriptors'
 import type { ProjectConfig, WorkflowDefaults, WorkflowOptionOrigin } from '../types'
@@ -11,8 +11,11 @@ import { PREFERENCE_OPTIONS, takesOption, type PreferenceKey, type WorkflowOptio
 
 export type Preferences = Required<Pick<WorkflowOptions, PreferenceKey>>
 
-/** Each preference when no level sets it: as before 1.0's settings (wakes on, 10 rounds, 6 h, 30 min, Block, 12 agents). */
-export const PREFERENCE_DEFAULTS: Preferences = { loopWakes: true, loopRounds: LOOP_ROUNDS, loopWaitHours: LOOP_WAIT_HOURS, loopStepWaitMinutes: LOOP_STEP_WAIT_MINUTES, fileLocks: 'block', maxAgents: AGENT_LIMIT_DEFAULT }
+/**
+ * Each preference when no level sets it: as before 1.0's settings (wakes on, 10 rounds, 6 h, 30 min, Block, 12 agents);
+ * the churn's simplify check at 12 and hard stop at 30 (HI-3188).
+ */
+export const PREFERENCE_DEFAULTS: Preferences = { loopWakes: true, loopRounds: LOOP_ROUNDS, simplifyAt: SIMPLIFY_AT, churnStopAt: CHURN_STOP_AT, loopWaitHours: LOOP_WAIT_HOURS, loopStepWaitMinutes: LOOP_STEP_WAIT_MINUTES, fileLocks: 'block', maxAgents: AGENT_LIMIT_DEFAULT }
 
 /** The levels a project's preferences come from: Combwork's and the workspace's defaults, and its own options. */
 export interface PreferenceLevels {

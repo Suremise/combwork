@@ -7,6 +7,7 @@ import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX, FILE_LOCK_MODES } from '@shared/d
 import { ManyAgentsNote } from './ManyAgentsNote'
 import { NumberField } from './NumberField'
 import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from '@shared/lanes'
+import { CHURN_MAX } from '@shared/loopLimits'
 import { compile, mustCompile } from '@shared/workflow/compile'
 import { STAGE_TEXT, stageNameProblems, stageNameProblemText, type StageNames } from '@shared/workflow/stages'
 import type { StageId } from '@shared/workflow/facts'
@@ -678,6 +679,10 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
         return <Switch checked={effective.loopWakes !== false} onChange={(v) => set('loopWakes', v)} />
       case 'fileLocks':
         return select('fileLocks', FILE_LOCK_MODES.map((m) => [m.value, tr(m.text.label)]))
+      case 'simplifyAt':
+      case 'churnStopAt':
+        // HI-3188: the churn's levels, 0 turning either off.
+        return <NumberField live value={draft.options[key] ?? null} min={0} max={CHURN_MAX} step={1} label={tr(optionTitle(key, platform)!)} inherit={valueText(key, form.inherited[key])} onCommit={(v) => (v === null ? inheritKey(key) : set(key, v))} />
       case 'loopRounds':
       case 'loopWaitHours':
       case 'loopStepWaitMinutes':
@@ -884,6 +889,7 @@ export function optionValueText(key: OptionKey, v: unknown, platform: PlatformId
   }
   if (key === 'stageNames') return tr(T.stageNamesValue, { n: Object.keys((v as StageNames | undefined) ?? {}).length })
   if (key === 'reviewers' || key === 'loopRounds' || key === 'maxAgents') return fmt.number(v as number)
+  if (key === 'simplifyAt' || key === 'churnStopAt') return v === 0 ? tr(T.off) : fmt.number(v as number)
   if (key === 'loopWaitHours') return tr(T.hoursValue, { n: v as number })
   if (key === 'loopStepWaitMinutes') return tr(T.minutesValue, { n: v as number })
   if (key === 'fileLocks') {

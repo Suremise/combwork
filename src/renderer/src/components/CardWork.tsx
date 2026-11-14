@@ -20,6 +20,7 @@ import { GitlinkRow } from './GitlinkDiff'
 import { RevisionChanges } from './RevisionChanges'
 import { SendFeedback } from './LineComments'
 import { Icon, Tooltip } from './ui'
+import { cardRef } from '@shared/projectKeys'
 
 // A card's work (#1224, SPEC §16.4; #1223's work view): the dialog's Work section and the board card's badges. What the
 // card's facts say, in the glossary's words (revision, verdict, check, stale, outside Combwork, before 1.0). Revisions are
@@ -71,6 +72,7 @@ const M = {
   mergedInPart: msg({ id: 'board.work.mergedInPart', defaultMessage: 'Merged in part: some of its work is already in {target}.', description: "A mark in the card dialog's Work section: part of the unfinished card's work was found in its target ({target}, a branch such as main)." }),
   leftTarget: msg({ id: 'board.work.leftTarget', defaultMessage: 'No longer in {target}: its revision {revision} was taken out.', description: "A mark in the card dialog's Work section: a Done card's revision ({revision}, a short commit id) is no longer in its target ({target}, a branch such as main)." }),
   overridden: msg({ id: 'board.work.overridden', defaultMessage: 'Moved past its review and approvals by an override.', description: "A mark in the card dialog's Work section: the card's latest revision was moved on by an override (the user's or the Assistant's exception to the rules). Glossary: override." }),
+  churn: msg({ id: 'board.work.churn', defaultMessage: '{total, plural, one {# round of back-and-forth} other {# rounds of back-and-forth}}: {failed, plural, =0 {} one {# failed review, } other {# failed reviews, }}{declined, plural, =0 {} one {# declined, } other {# declined, }}{designs, plural, =0 {} one {# design, } other {# designs, }}{followUps, plural, =0 {} one {# follow-up, } other {# follow-ups, }}{requests, plural, =0 {} one {# reviewer request, } other {# reviewer requests, }}{asks, plural, =0 {} one {# question to you} other {# questions to you}}{inherited, plural, =0 {} other {; # from {parent}}}', description: "HI-3188: tooltip and accessible name of a card's churn count on the board: its counted loop work in all ({total}), then each kind's count (failed reviews, your declines, design steps, follow-up steps, reviewer requests, agents' questions to the user), each left out when 0, and what it inherited from the card it continues ({parent}, a card key). Translate each plural; keep the =0 cases empty." }),
   badgeStale: msg({ id: 'board.work.badgeStale', defaultMessage: 'Stale: its pass no longer counts for its revision', description: "Tooltip and accessible name of a mark on a board card: the card's pass is stale (for an older revision, or before a decision). Glossary: stale." }),
   badgeOutside: msg({ id: 'board.work.badgeOutside', defaultMessage: 'Merged outside the rules', description: "Tooltip and accessible name of a mark on a board card: the card was merged by hand before its rules passed. Glossary: rule." })
 }
@@ -399,11 +401,13 @@ function OverrideMark({ o }: { o: WorkOverride }) {
 export function WorkBadges({ b, card }: { b: WorkBadge | undefined; card: { project: string; column: string } }) {
   const { short } = useProjectOf(card)
   if (!b || b.preWorkflow) return null
-  const shown = b.revision || b.verdict || b.checks.passed + b.checks.failed > 0 || b.stale || b.outsideRules || b.override
+  const shown = b.revision || b.verdict || b.checks.passed + b.checks.failed > 0 || b.stale || b.outsideRules || b.override || b.churn
   if (!shown) return null
   const revisionText = b.revision ? tr(LANE.revision, { review: card.column === 'review' ? 'yes' : 'no', revision: short(b.revision) }) : ''
   const verdictText = b.verdict ? tr(LANE.verdict, { pass: b.verdict.pass ? 'yes' : 'no', revision: b.verdict.revision ? short(b.verdict.revision) : 'none', current: b.verdict.current ? 'yes' : 'no' }) : '' // i18n-ignore: select keys, never shown
   const checksText = tr(LANE.checks, { passed: b.checks.passed, failed: b.checks.failed })
+  // HI-3188: its churn, with each kind on hover (the continuation's parent by key).
+  const churnText = b.churn ? tr(M.churn, { total: b.churn.total, ...b.churn.parts, parent: b.churn.splitFrom ? cardRef(b.churn.splitFrom) : '' }) : ''
   return (
     <div className="task-work">
       {b.revision && (
@@ -432,6 +436,14 @@ export function WorkBadges({ b, card }: { b: WorkBadge | undefined; card: { proj
                 {b.checks.failed}
               </>
             )}
+          </span>
+        </Tooltip>
+      )}
+      {b.churn && (
+        <Tooltip content={churnText}>
+          <span className="task-work-badge" data-churn={b.churn.total} aria-label={churnText}>
+            <Icon name="comment-discussion" />
+            {b.churn.total}
           </span>
         </Tooltip>
       )}

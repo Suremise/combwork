@@ -34,6 +34,8 @@
   "tasks.error.emptyComment": "コメントが空です。",
   "tasks.error.emptyDecision": "決定事項が空です。",
   "tasks.error.failedToDoing": "レビューが不合格のとき、{card}は「進行中」に戻り、ビルダーの担当になります。columnを指定せずに判定を送ってください。",
+  "tasks.error.followUpArchived": "followUpOf：{card}はアーカイブされています。先に戻すか、followUpOfなしでカードを作成してください。",
+  "tasks.error.followUpOtherProject": "followUpOf：{card}は別のプロジェクトのカードです。フォローアップは同じプロジェクトのカードを引き継ぎます。",
   "tasks.error.holdCard": "カードを「保留」にできるのはユーザーかアシスタントだけです。ユーザーが{card}の保留を決めている場合はアシスタントに頼み（cw_ask_assistant）、そうでなければユーザーに確認してください。",
   "tasks.error.holdNew": "カードを「保留」にできるのはユーザーかアシスタントだけです。「未着手」に作成し、ユーザーが保留を決めている場合はアシスタントに頼み（cw_ask_assistant）、そうでなければユーザーに確認してください。",
   "tasks.error.inDoingWith": "{card}は「{active}」で、エージェント{agent}が作業しています。新しい作業が進んでいるため、別のエージェントが「{stage}」に移動することはできません。そのままにしてください。作業が終わればエージェント{agent}が「{review}」に移動します。ユーザーも移動できます。",

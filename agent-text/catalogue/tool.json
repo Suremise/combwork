@@ -20,6 +20,14 @@
   "tool.agentActivity.description": {
     "text": "What one agent is doing, as JSON: status, model and effort, its folder, its task and latest reply (clipped), last tool calls, retry waits and its inbox. detail=true clips less. (detail: use-cw-api, tools.md)"
   },
+  "tool.answerSimplify.description": {
+    "text": "Answer a card's simplify check, which Combwork told you of: carryOn (what still comes up is worth handling) or simplify (drop what isn't). Cutting scope, and the hard stop's question, are the user's: leave those. why: your reason, a comment on the card.",
+    "note": "HI-3188: the Assistant-only tool for a simplify check (Workflow → Card loops)."
+  },
+  "tool.answerSimplify.done": {
+    "text": "{card}: answered {request}, {choice, select, carryOn {carry on} other {simplify}}; its agents are woken.",
+    "note": "HI-3188: cw_answer_simplify's reply."
+  },
   "tool.arg.agent": {
     "text": "Its name or id; optional when the project has one agent."
   },
@@ -213,6 +221,10 @@
   },
   "tool.createTask.arg.description": {
     "text": "What to do and how to tell it is done, in full: whoever starts it reads only the card."
+  },
+  "tool.createTask.arg.followUpOf": {
+    "text": "The card this continues (its key), only for a split or follow-ups the user accepted of that card's own scope: it keeps that card's count. A separate bug or discovery: links instead.",
+    "note": "HI-3188: cw_create_task’s followUpOf."
   },
   "tool.createTask.arg.kind": {
     "text": "no-code proposes work with no commits; the user confirms it. Default code."

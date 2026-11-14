@@ -18,7 +18,7 @@
  */
 import type { AppSettings, CommandPoint, CustomCommand, ProjectConfig, ProviderId, WorkflowLevel, WorkspaceConfig } from './types'
 import type { PlatformId } from './platform/descriptors'
-import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from './loopLimits'
+import { CHURN_MAX, LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from './loopLimits'
 import { AGENT_LIMIT_MAX, DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS, FILE_LOCK_MODES, SLOT_COPY_DEFAULT } from './defaults'
 import { SLOT_COPY_TEXT } from './slotDefaults'
 import { GITHUB_HOST_TEXT } from './githubHostText'
@@ -734,6 +734,9 @@ function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Parti
     option('fileLocks', 'select', FILE_LOCK_MODES.map((m) => [m.value, m.text.label])),
     option('loopWakes', 'boolean'),
     { ...option('loopRounds', 'number'), min: 1, max: LANE_MAX_ROUNDS, step: 1 },
+    // HI-3188: the churn's two levels (0 = off).
+    { ...option('simplifyAt', 'number'), min: 0, max: CHURN_MAX, step: 1 },
+    { ...option('churnStopAt', 'number'), min: 0, max: CHURN_MAX, step: 1 },
     { ...option('loopWaitHours', 'number'), min: 1, max: LOOP_WAIT_MAX_HOURS, step: 1 },
     { ...option('loopStepWaitMinutes', 'number'), min: 1, max: LOOP_STEP_WAIT_MAX_MINUTES, step: 5 },
     // Maximum agents (HI-2001): the user's team size, read-only to the Assistant (SENSITIVE).

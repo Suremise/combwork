@@ -86,6 +86,7 @@ export const SUITES = [
   { name: 'cardwork' },
   { name: 'carryingon' },
   { name: 'changes' },
+  { name: 'churn' },
   { name: 'changescompare' },
   { name: 'changesleftovers' },
   { name: 'changespicker' },

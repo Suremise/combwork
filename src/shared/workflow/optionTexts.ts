@@ -162,6 +162,14 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
     title: msg({ id: 'workflow.option.loopRounds.title', defaultMessage: 'Rounds', description: 'A workflow option, under Card loops: how many rounds (a build and its review) a card gets before its agents ask you.' }),
     desc: msg({ id: 'workflow.option.loopRounds.desc', defaultMessage: 'How many rounds a card gets in a card loop (a build and its review each) before its agents stop and ask you, when the loop doesn’t say.', description: 'What the workflow option “Rounds” does (Card loops).' })
   },
+  simplifyAt: {
+    title: msg({ id: 'workflow.option.simplifyAt.title', defaultMessage: 'Simplify check after', description: 'A workflow option, under Card loops (HI-3188): after how much counted loop work on a card (failed reviews, design steps, requests, questions) Combwork asks whether to simplify. A number follows it; 0 turns it off.' }),
+    desc: msg({ id: 'workflow.option.simplifyAt.desc', defaultMessage: 'With a reviewer agent, once a card has had this much more back-and-forth (failed reviews, designs and follow-ups, reviewer requests, questions to you), Combwork pauses its loop to ask whether it is worth handling, or to simplify or cut scope (0 turns it off).', description: 'What the workflow option “Simplify check after” does (Card loops, HI-3188). “Back-and-forth” is the card’s counted loop work.' })
+  },
+  churnStopAt: {
+    title: msg({ id: 'workflow.option.churnStopAt.title', defaultMessage: 'Hard stop after', description: 'A workflow option, under Card loops (HI-3188): after how much counted loop work on a card Combwork stops its loop and asks you how to go on. A number follows it; 0 turns it off.' }),
+    desc: msg({ id: 'workflow.option.churnStopAt.desc', defaultMessage: 'With a reviewer agent, once a card has had this much back-and-forth in all (with any card it was split from), Combwork stops its loop to ask you to carry on, split it, accept it with follow-ups or take it over (0 turns it off).', description: 'What the workflow option “Hard stop after” does (Card loops, HI-3188).' })
+  },
   loopWaitHours: {
     title: msg({ id: 'workflow.option.loopWaitHours.title', defaultMessage: 'Wait (hours)', description: 'A workflow option, under Card loops: how many hours an agent in a card loop waits with no change before it tells you.' }),
     desc: msg({ id: 'workflow.option.loopWaitHours.desc', defaultMessage: 'How many hours, up to a day, an agent in a card loop waits with no change before it tells you, when the loop doesn’t say.', description: 'What the workflow option “Wait (hours)” does (Card loops).' })

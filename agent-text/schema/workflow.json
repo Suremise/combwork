@@ -48,6 +48,12 @@
       "why": "plain"
     }
   },
+  "workflow.forYou.churnLimit": {
+    "placeholders": {
+      "card": "plain",
+      "churn": "plural"
+    }
+  },
   "workflow.forYou.decidedAfterMerge": {
     "placeholders": {
       "card": "plain"
@@ -157,6 +163,12 @@
       "rounds": "plural"
     }
   },
+  "workflow.forYou.simplify": {
+    "placeholders": {
+      "card": "plain",
+      "churn": "plural"
+    }
+  },
   "workflow.forYou.slotDirty": {
     "placeholders": {
       "card": "plain",
@@ -236,6 +248,12 @@
     "placeholders": {}
   },
   "workflow.move.verdict": {
+    "placeholders": {}
+  },
+  "workflow.option.churnStopAt.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.churnStopAt.title": {
     "placeholders": {}
   },
   "workflow.option.commands.desc": {
@@ -419,6 +437,12 @@
     "placeholders": {}
   },
   "workflow.option.sharedFolderWarning.title": {
+    "placeholders": {}
+  },
+  "workflow.option.simplifyAt.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.simplifyAt.title": {
     "placeholders": {}
   },
   "workflow.option.slotsUpToDate.desc": {
@@ -656,6 +680,15 @@
       "card": "plain"
     }
   },
+  "workflow.refused.loop.churnPending.message": {
+    "placeholders": {
+      "card": "plain",
+      "request": "plain"
+    }
+  },
+  "workflow.refused.loop.churnPending.next": {
+    "placeholders": {}
+  },
   "workflow.refused.loop.followUpChecked.message": {
     "placeholders": {
       "card": "plain"
@@ -741,6 +774,15 @@
     }
   },
   "workflow.refused.loop.tooEarly.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.loop.usersChoice.message": {
+    "placeholders": {
+      "card": "plain",
+      "request": "plain"
+    }
+  },
+  "workflow.refused.loop.usersChoice.next": {
     "placeholders": {}
   },
   "workflow.refused.merge.combworkMerges.change": {

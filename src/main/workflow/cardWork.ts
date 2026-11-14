@@ -5,7 +5,7 @@
 import type { Db } from '../db'
 import { boardRead } from '../boardStore'
 import type { WorkspaceService } from '../workspace'
-import { CATEGORY_STAGE, foldCard, STAGE_CATEGORY, ROUND_LIMIT_GATE, type CardKind, type Category, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
+import { CATEGORY_STAGE, foldCard, STAGE_CATEGORY, PAUSE_GATES, type CardKind, type Category, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
 import { forYouItems, kindProposed, reviewSkipOf, workBadge, workView, type ForYouItem, type ForYouSummary, type WorkBadge, type WorkCard, type WorkView } from '../../shared/workflow/workView'
 import { factOf } from './factStore'
 import { QUERIES } from '../schema/v1_0'
@@ -312,7 +312,7 @@ export function forgetForYou(ws: WorkspaceService): void {
   forYous.delete(ws)
 }
 
-/** Of these cards, those waiting for the user at their round limit (§16.11.4): a round-limit request open. */
+/** Of these cards, those waiting for the user at their round limit (§16.11.4) or a churn question (HI-3188, §16.11.5): one open. */
 export function roundLimitCards(ws: WorkspaceService, numbers: readonly number[]): Set<number> {
   const out = new Set<number>()
   if (!numbers.length) return out
@@ -328,7 +328,7 @@ export function roundLimitCards(ws: WorkspaceService, numbers: readonly number[]
       let k = kept.get(n)
       if (k?.key !== key) {
         const facts = (stmt.all(n) as Row[]).map(factOf)
-        kept.set(n, (k = { key, value: facts.some((f) => f.kind === 'ApprovalRequested') && foldCard(facts).requests.some((r) => r.gate === ROUND_LIMIT_GATE) }))
+        kept.set(n, (k = { key, value: facts.some((f) => f.kind === 'ApprovalRequested') && foldCard(facts).requests.some((r) => PAUSE_GATES.includes(r.gate)) }))
       }
       if (k.value) out.add(n)
     }
@@ -523,6 +523,10 @@ export function factRow(f: Fact, short: (id: string) => string): FactRow {
       case 'Readiness': {
         const x = d as FactData['Readiness']
         return `${x.ready ? 'ready' : 'waiting'}${x.after !== null ? ` after #${x.after}` : ''}`
+      }
+      case 'SplitFrom': {
+        const x = d as FactData['SplitFrom']
+        return `#${x.parent}: churn ${x.total}`
       }
       default:
         return ''
