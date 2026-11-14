@@ -189,7 +189,7 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   },
   assistantWakes: {
     title: msg({ id: 'workflow.option.assistantWakes.title', defaultMessage: 'Wake the Assistant for', description: 'A workflow option, under Card loops (HI-3211): which events in this project’s lanes wake the Combwork Assistant while it watches them (glossary: lane, the Assistant).' }),
-    desc: msg({ id: 'workflow.option.assistantWakes.desc', defaultMessage: 'Which events in this project’s lanes wake the Assistant while it watches them; each wake costs it tokens. A question for you on a lane’s card always wakes it, unless the Assistant asked it itself. No level stops messages and decisions sent to it, or watches it starts on particular cards or agents.', description: 'What the workflow option “Wake the Assistant for” does (HI-3211). A lane: a builder and a reviewer taking cards in turn (glossary: lane). Tokens: what the Assistant’s coding agent uses up.' })
+    desc: msg({ id: 'workflow.option.assistantWakes.desc', defaultMessage: 'Which events in this project’s lanes wake the Assistant while it watches them (a question for you always does), each wake costing it tokens.', description: 'What the workflow option “Wake the Assistant for” does (HI-3211), in one sentence, as every option’s is (HI-3253). A lane: a builder and a reviewer taking cards in turn (glossary: lane). A question for you: one an agent asks the user on a lane’s card. Tokens: what the Assistant’s coding agent uses up.' })
   }
 }
 
