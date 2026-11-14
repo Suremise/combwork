@@ -1,7 +1,7 @@
 // Attachments (#387): files pasted or dropped into an agent's or the Assistant's prompt. Every one reaches the CLI the same
 // way, as a path in the prompt; what differs is whether the CLI reads that kind of file as what it is (an image it sees,
 // a PDF it reads) or only by opening the path with its tools. The kinds each CLI reads are in its descriptor
-// (capabilities.attachments).
+// (capabilities.terminal.attachments).
 
 import { msg, tr, type Msg } from './i18n'
 
@@ -54,7 +54,7 @@ export const ATTACHMENT_KIND_ICON: Record<AttachmentKind, string> = { image: 'fi
 
 /**
  * How an attachment is labelled for a CLI: its kind, and whether the CLI reads that kind itself (`native`) or the agent
- * opens it by its path. `reads` is the CLI's capabilities.attachments; `cli` its name for the explanation.
+ * opens it by its path. `reads` is the CLI's capabilities.terminal.attachments; `cli` its name for the explanation.
  */
 export function attachmentLabel(kind: AttachmentKind, reads: readonly AttachmentKind[], cli: string): { label: string; native: boolean; detail: string } {
   const native = reads.includes(kind)

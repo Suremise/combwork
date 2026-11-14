@@ -775,7 +775,8 @@ export function offeredModes(provider: ProviderId, settings: Pick<AppSettings, '
  */
 export function canSwitchModeLive(provider: ProviderId | ProviderDescriptor, target: PermissionMode, current: PermissionMode | undefined, launched: PermissionMode | null | undefined): boolean {
   const d = typeof provider === 'string' ? providerDescriptor(provider) : provider
-  if ((d.capabilities.modes?.liveModeSwitch ?? 'none') === 'none') return false
+  // No modes part: it can't switch live either.
+  if (!d.capabilities.modes?.liveModeSwitch || d.capabilities.modes.liveModeSwitch === 'none') return false
   if ([target, current, launched].some((m) => !!m && !!d.permissionModes.find((o) => o.value === m)?.cliOwn)) return false
   return d.canSwitchLive(target, current, launched)
 }
@@ -787,7 +788,7 @@ export interface AgentLaunchSettings {
   permissionMode: PermissionMode
   /** Its extra arguments, as typed (split by the main process): its connection's (before HI-2106, the CLI's then the project's). */
   extraArgs: string[]
-  /** A 200K context window instead of 1M (only for providers with capabilities.contextLimit). */
+  /** A 200K context window instead of 1M (only for providers with capabilities.compaction.contextLimit). */
   use200kContext: boolean
 }
 

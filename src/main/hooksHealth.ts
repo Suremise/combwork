@@ -7,7 +7,7 @@ import { promptKey } from './providers/turns'
  * a turn never over, lines typed into it that were never confirmed. This reads only what Combwork already has, no status of
  * its own: the hooks themselves (as the turn ledger takes them) and its screen reading (the ledger's last check). Two
  * signs, each needing time and evidence, never time alone:
- * - its start: a CLI that sends a hook as it starts (capabilities.startHook) sent none within the bound of starting,
+ * - its start: a CLI that sends a hook as it starts (capabilities.session.startHook) sent none within the bound of starting,
  *   with no question at its start in the way (the time a question waits for the user doesn't count);
  * - a prompt: one sent while it was idle (the user's Enter, a line Combwork typed, its launch's task) had no hook of a current
  *   turn after it for the bound, while its screen showed it working (it was idle when the prompt went, so that work is

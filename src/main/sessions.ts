@@ -358,7 +358,7 @@ interface LiveSession {
   costFree?: boolean
   /** The terminal as rendered, for an adapter that reads it (its footer's mode, or a menu to pick from: #396). */
   screen?: TerminalScreen | null
-  /** The size refreshes given so far, for a CLI that needs them (capabilities.startupSizeRefresh, #486). */
+  /** The size refreshes given so far, for a CLI that needs them (capabilities.terminal.startupSizeRefresh, #486). */
   sizeRefreshed?: 'started' | 'ready'
   /** The transcript's modified time and size at the last look ("mtime:size"). */
   transcriptMtime: string
@@ -594,7 +594,7 @@ interface LiveSession {
   lastReply?: string
   /** Its latest hooks (what they were, when, and the status they left), for the log when the CLI turns out idle (#612). */
   recentHooks?: { kind: HookEvent['kind']; at: number; status: SessionStatus }[]
-  /** Its hooks for its Hooks dialog (HI-982): what its launch has (adapter.launchHooks), and what Combwork received, newest last. */
+  /** Its hooks for its Hooks dialog (HI-982): what its launch has (adapter.hooks.launchHooks), and what Combwork received, newest last. */
   hooks?: LaunchHooks
   hookHistory?: HookFired[]
   /**
@@ -935,7 +935,7 @@ export function rollbackKeys(typed: readonly number[]): number {
 
 /**
  * How many Backspaces take back a prompt Combwork stopped part-way in an input box whose Ctrl+U deletes only the row the
- * cursor is on (capabilities.ctrlUClearsRow, HI-1974: Claude Code 2.1.312 kept a stopped wake's first rows, and the
+ * cursor is on (capabilities.terminal.ctrlUClearsRow, HI-1974: Claude Code 2.1.312 kept a stopped wake's first rows, and the
  * next wake was sent after them): one for each code point Combwork wrote (`written`: the one-line prompt, or what
  * typeSegments recorded, each line's UTF-16 units and a key between lines). A Backspace deletes characters, however
  * wide they are drawn or wherever its rows wrapped (tried on 2.1.312 with CJK text, an emoji sequence and long words).
@@ -3853,9 +3853,9 @@ class SessionManager {
     if (st.permissionMode === mode) return { ok: true }
     if (workspace.isAssistantHome(projectPath) && isCliOwnMode(mode)) throw combworkError(M.assistantCliOwn, undefined, { kind: 'conflict' })
     if (!modeAllowed(p, mode, config.settings)) throw combworkError(msg({ id: 'session.mode.off', defaultMessage: '{mode} is turned off in Settings → {provider}.', description: "Switching an agent's permission mode is refused: that mode is turned off. {mode} is the mode's name; {provider} the coding agent's (its Settings section)." }), { mode: permissionLabel(p, mode, tr), provider: name }, { kind: 'conflict' })
-    const how = l.adapter.descriptor.capabilities.modes?.liveModeSwitch ?? 'none'
+    const how = l.adapter.descriptor.capabilities.modes?.liveModeSwitch
     // Never to or from the CLI's own setting (#1284): Combwork doesn't know where such a session started.
-    if (how === 'none' || !canSwitchModeLive(l.adapter.descriptor, mode, st.permissionMode, l.launchMode) || !l.adapter.modes?.canSwitchLive(mode, st.permissionMode, l.launchMode)) {
+    if (!how || how === 'none' || !canSwitchModeLive(l.adapter.descriptor, mode, st.permissionMode, l.launchMode) || !l.adapter.modes?.canSwitchLive(mode, st.permissionMode, l.launchMode)) {
       return { ok: false, restart: true, message: tr(msg({ id: 'session.mode.restart', defaultMessage: "{mode} can't be switched to inside a running session. Restart the session in that mode; the conversation continues.", description: "Switching an agent's permission mode needs a restart. {mode} is the mode's name." }), { mode: permissionLabel(p, mode, tr) }) }
     }
     if (st.status === 'waiting') throw combworkError(msg({ id: 'session.mode.asking', defaultMessage: 'The agent is asking you something. Answer it first, then switch the mode.', description: "Switching an agent's permission mode is refused: it waits for the user's answer." }), undefined, { kind: 'conflict' })
@@ -4286,8 +4286,8 @@ class SessionManager {
   /**
    * Clears a CLI's input before Combwork types into it (Settings → Advanced: Clear the CLI's draft before Combwork types). One
    * Ctrl+U where it clears the whole line, as before. Where it deletes only the row the cursor is on
-   * (capabilities.ctrlUClearsRow, HI-1979: Claude Code 2.1.312), Ctrl+U a key at a time while its input box
-   * (adapter.promptBox) holds anything. Empty is only ever what a key of Combwork's draws now, never a box already on the
+   * (capabilities.terminal.ctrlUClearsRow, HI-1979: Claude Code 2.1.312), Ctrl+U a key at a time while its input box
+   * (adapter.terminal.promptBox) holds anything. Empty is only ever what a key of Combwork's draws now, never a box already on the
    * screen (its redraw may be late, HR6's round 1): a letter typed (CLEAR_PROBE) must show alone in the box, then the
    * Backspace that takes it back must leave the box empty; a draft left shows the letter at its end, and is cleared with
    * it. Each key must be answered within Advanced's wait for each key, by the box drawn differently, or, while the box
@@ -4306,7 +4306,7 @@ class SessionManager {
     const screen = l.screen
     const { projectPath, agentId, runId } = l.state
     const since = Date.now()
-    // The box as drawn (adapter.promptBox): a key that deletes only an empty row (a line break's) changes it too. Empty
+    // The box as drawn (adapter.terminal.promptBox): a key that deletes only an empty row (a line break's) changes it too. Empty
     // is nothing but spacing in it.
     const drawn = (): string | null => (screen && l.adapter.terminal?.promptBox ? l.adapter.terminal?.promptBox(screen.textWithoutDim()) : null)
     const read = (): string | null => {

@@ -106,7 +106,7 @@ const SESSION_READINGS_KEPT = 500
  * status line carries no reading time, and a session repeats its latest API call's reading until it calls again
  * (tests/fixtures/planusage-2026-10-19.json): a figure the session hadn't reported before was taken since its report
  * before; one it repeats is as old as its first report of it. `launchedAt` (HI-3187): its run's launch, where every
- * reading of a run was taken since (capabilities.planUsageSinceLaunch). Exported for tests (`memo` there).
+ * reading of a run was taken since (capabilities.usage.planUsageSinceLaunch). Exported for tests (`memo` there).
  */
 export function readingAges(session: string, report: PlanUsage, memo = sessionReadings, launchedAt?: string): Record<string, { firstSeenAt: string; changedAfter?: string; takenAfter?: string }> {
   const ages: Record<string, { firstSeenAt: string; changedAfter?: string; takenAfter?: string }> = {}

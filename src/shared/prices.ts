@@ -76,7 +76,7 @@ export function priceRows(provider: ProviderId, settings?: Pick<AppSettings, 'pr
 
 /**
  * Whether a provider's session costs come from Combwork's price table rather than the CLI's own report (#436): only for a
- * provider that reports one (capabilities.reportsCost), when the user chose their prices. Combwork never recomputes a
+ * provider that reports one (capabilities.usage.reportsCost), when the user chose their prices. Combwork never recomputes a
  * reported cost otherwise, even when the CLI's own price table lags a price change (#442).
  */
 export function usesOwnPrices(provider: ProviderId, settings?: Pick<AppSettings, 'providers'> | null): boolean {

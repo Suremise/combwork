@@ -128,9 +128,9 @@ export interface LaunchContext {
   signInHost?: LaunchedSignInHost
   /** Its project's GitHub hosts as resolved for this launch (HI-2779), for a CLI with capabilities.githubHost. */
   githubHosts?: ResolvedGithubHosts
-  /** The user lets sessions move into the CLI's own background service (see capabilities.backgroundSessions). */
+  /** The user lets sessions move into the CLI's own background service (see capabilities.background.backgroundSessions). */
   allowBackgroundSessions: boolean
-  /** A 200K context window instead of the model's 1M one (capabilities.contextLimit). */
+  /** A 200K context window instead of the model's 1M one (capabilities.compaction.contextLimit). */
   use200kContext: boolean
   /**
    * Combwork's record of the skill copies it made in folders (#1431, skillCopies.ts), for CLIs that read copies in the folder
@@ -143,7 +143,7 @@ export interface LaunchContext {
    */
   othersHere?: () => boolean
   /**
-   * Folders outside `cwd` the session may read and write (#1439, capabilities.extraDirs): a reviewer's grant of its
+   * Folders outside `cwd` the session may read and write (#1439, capabilities.session.extraDirs): a reviewer's grant of its
    * project's review copies, one fixed folder. Given on the command line, never in the CLI's config; none when missing.
    */
   extraDirs?: string[]
@@ -561,7 +561,7 @@ export interface ProviderLaunchPart {
   /** Where this launch's CLI reads a delivered Combwork skill (its copy), for measuring what the session got. */
   skillCopyPath(ctx: LaunchContext, skill: string): string
   buildCommand(executable: string, ctx: LaunchContext): CommandSpec
-  /** A new session's id, for a provider Combwork picks it for (capabilities.fixedSessionId) in a form of its own (HI-2759: OpenCode's `ses_…`); absent: a UUID. */
+  /** A new session's id, for a provider Combwork picks it for (capabilities.session.fixedSessionId) in a form of its own (HI-2759: OpenCode's `ses_…`); absent: a UUID. */
   newSessionId?(): string
   /** Something the user should know about this launch (a mode the CLI can't fully give there), shown once per agent while Combwork runs. */
   launchNotice?(ctx: LaunchContext): { title: string; message: string } | null
@@ -955,7 +955,7 @@ export interface ProviderProjectFilesPart {
   /** MCP servers a project defines in the CLI's own config, which Combwork leaves off until copied to the workspace. */
   projectMcpServers(projectPath: string): Promise<Record<string, McpServerDef>>
 }
-/** Background sessions (Claude Code's agent view), which Combwork stops or keeps (capabilities.backgroundSessions). */
+/** Background sessions (Claude Code's agent view), which Combwork stops or keeps (capabilities.background.backgroundSessions). */
 export interface ProviderBackgroundPart {
   /** The CLI's background job named in what it printed when it refused to resume a session held there; null if none. */
   backgroundJobIn(output: string): string | null
@@ -1002,7 +1002,7 @@ export interface ProviderAdapter {
   readonly compaction?: ProviderCompactionPart
   /** A project's instructions, memory, skills and MCP servers as the CLI reads them; absent: none of it. */
   readonly projectFiles?: ProviderProjectFilesPart
-  /** Background sessions (Claude Code's agent view), which Combwork stops or keeps (capabilities.backgroundSessions); absent: none of it. */
+  /** Background sessions (Claude Code's agent view), which Combwork stops or keeps (capabilities.background.backgroundSessions); absent: none of it. */
   readonly background?: ProviderBackgroundPart
 }
 

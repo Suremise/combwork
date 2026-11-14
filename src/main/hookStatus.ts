@@ -31,7 +31,7 @@ export interface HookStatusInput {
   askedAtStart: boolean
   /** A Compact Combwork asked for: not begun yet, under way, or none. */
   compacting: 'requested' | 'started' | null
-  /** The CLI starts a new turn by itself when its background tasks end (capabilities.backgroundWakes). */
+  /** The CLI starts a new turn by itself when its background tasks end (capabilities.background.backgroundWakes). */
   backgroundWakes: boolean
   /** Background tasks still counted (for a stop, after reading the transcript). */
   tasks: number

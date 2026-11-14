@@ -300,7 +300,7 @@ export function ptySize(key: string): { cols: number; rows: number } {
 /**
  * Makes a terminal's process redraw its screen at the size it has, as resizing the window by hand does: one row
  * shorter for a moment, then its size again. For a CLI whose full-screen interface a resize while it started can leave
- * drawn at the wrong width (capabilities.startupSizeRefresh, #486). A resize meanwhile is the size it ends at.
+ * drawn at the wrong width (capabilities.terminal.startupSizeRefresh, #486). A resize meanwhile is the size it ends at.
  */
 export function refreshPty(key: string): void {
   const e = entries.get(key)
