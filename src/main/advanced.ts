@@ -95,25 +95,65 @@ export class AdvancedStore {
         this.fileErrorText = null
         this.values = parsed.values
         this.unknown = parsed.unknown
-        // A value edited by hand is made for the CLI installed now: its old record was for another value. Written back to
-        // the file (writeRecords), so the record outlives a restart after the CLI updates.
-        const made: Record<string, MadeFor> = {}
-        for (const [id, value] of Object.entries(parsed.values)) {
-          const def = advancedDef(id)
-          if (!def || !cliFacing(def)) continue
-          const was = parsed.madeFor[id]
-          const installed = this.cli[def.group as ProviderId] ?? null
-          // A record of no version yet takes the one Combwork knows now.
-          made[id] = was && JSON.stringify(was.value) === JSON.stringify(value) ? (was.version || !installed ? was : { version: installed, value }) : { version: installed, value }
-        }
+        const made = this.records(parsed.values, parsed.madeFor)
         this.madeFor = made
         this.recordsDue = JSON.stringify(made) !== JSON.stringify(parsed.madeFor)
-        if (this.unknown.length) log.warn(`advanced.json names settings this Combwork doesn't know: ${this.unknown.join(', ')}`)
+        if (this.definitionsKnown) this.warnUnknown()
       }
     }
     this.warned.clear()
     this.patterns.clear()
     return true
+  }
+
+  /**
+   * The version records of `values`, from those `given`. A value edited by hand is made for the CLI installed now: its old
+   * record was for another value. Written back to the file (writeRecords), so the record outlives a restart after the CLI
+   * updates. An id with no definition yet (a user's own CLI's, read before its description is: HI-3267) keeps its record
+   * as it is, worked out once it has one (definitionsChanged).
+   */
+  private records(values: Record<string, unknown>, given: Record<string, MadeFor>): Record<string, MadeFor> {
+    const made: Record<string, MadeFor> = {}
+    for (const [id, value] of Object.entries(values)) {
+      const def = advancedDef(id)
+      const was = given[id]
+      if (!def) {
+        if (was) made[id] = was
+        continue
+      }
+      if (!cliFacing(def)) continue
+      const installed = this.cli[def.group as ProviderId] ?? null
+      // A record of no version yet takes the one Combwork knows now.
+      made[id] = was && JSON.stringify(was.value) === JSON.stringify(value) ? (was.version || !installed ? was : { version: installed, value }) : { version: installed, value }
+    }
+    return made
+  }
+
+  /** The user's own CLIs' definitions are registered (HI-3267): until then an id of theirs isn't told apart from an unknown one. */
+  private definitionsKnown = false
+
+  /**
+   * The user's own CLIs' advanced values were registered or changed (clis.ts' applyClis): their overrides' records are
+   * worked out now, and only ids still unknown are logged.
+   */
+  definitionsChanged(): void {
+    this.definitionsKnown = true
+    this.patterns.clear()
+    this.warned.clear()
+    if (this.fileError) return
+    this.warnUnknown()
+    const made = this.records(this.values, this.madeFor)
+    if (JSON.stringify(made) === JSON.stringify(this.madeFor)) return
+    this.madeFor = made
+    this.recordsDue = true
+    if (!this.loaded) return
+    this.changed()
+    this.writeRecords()
+  }
+
+  private warnUnknown(): void {
+    const unknown = this.unknown.filter((id) => !advancedDef(id))
+    if (unknown.length) log.warn(`advanced.json names settings this Combwork doesn't know: ${unknown.join(', ')}`)
   }
 
   /** Watches the profile folder for advanced.json (an editor saves by replacing it, which a watch on the file loses). */

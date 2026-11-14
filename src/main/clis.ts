@@ -8,6 +8,7 @@ import { BUILT_IN_PROVIDERS } from '../shared/providers/registry'
 import { CLI_BOUNDS, checkCliDescription, cliModule, type CliDescription } from '../shared/providers/cliDescription'
 import { registerCliSnapshot, type CliSnapshotView } from '../shared/providers/cliSnapshot'
 import { ensureHomeAccount } from './accounts'
+import { advanced } from './advanced'
 import { emit } from './events'
 import { createLogger, userText } from './logger'
 import { genericAdapter, registerCliAdapters } from './providers'
@@ -133,6 +134,8 @@ export function applyClis(view: CliSnapshotView): CliSnapshotView {
   generation++
   const snapshot = { ...view, generation }
   registerCliSnapshot(snapshot)
+  // advanced.json was read before the descriptions (index.ts): its records of their values are worked out now (HI-3267).
+  advanced.definitionsChanged()
   registerCliAdapters(snapshot.clis.map((c) => genericAdapter({ ...cliModule(c), cli: c })))
   current = snapshot
   emit({ type: 'clis', snapshot })

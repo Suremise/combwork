@@ -6,6 +6,7 @@ import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ADVANCED_DEFS, advancedDef, advancedFileText, advancedUnit, advancedRow, checkAdvanced, cliFacing, groupName, onConnection, parseAdvancedFile, sampleMiss, shownText, type AdvancedDef } from '../src/shared/advanced'
+import { setCliAdvancedDefs } from '../src/shared/advancedDef'
 import { CLAUDE_FOOTER_MODES } from '../src/shared/providers/claude'
 import { COPILOT_FOOTER_MODES } from '../src/shared/providers/copilot'
 import { SETTINGS_CATALOG, checkSettingValue, settingDefault, settingEntry, settingPatch, settingValue, settingValueText } from '../src/shared/settingsCatalog'
@@ -327,6 +328,26 @@ describe('the advanced store', () => {
     again.load(dir)
     expect(advancedRow(def('codex.trust.prompt'), again.state(null)).madeForOther).toBe('0.162.1')
     expect(again.diagnostics([null])).toContain('  - made for another CLI version than the installed one: codex.trust.prompt, codex.ready.placeholder')
+  })
+
+  it('keeps the record of a user’s own CLI’s override, read before its description registers (HI-3267)', async () => {
+    const { s, dir, file } = store()
+    const id = 'mycli.status.ready'
+    const written = { format: 1, values: { [id]: 'ready>' }, madeFor: { [id]: { version: '1.0.0', value: 'ready>' } } }
+    writeFileSync(file, JSON.stringify(written))
+    try {
+      // At startup advanced.json is read first, then the CLI's description registers, then the CLI is found (now 2.0).
+      s.load(dir)
+      expect(s.state(null).madeFor[id]).toEqual({ version: '1.0.0', value: 'ready>' })
+      setCliAdvancedDefs([{ id, group: 'mycli', title: 'Ready', desc: 'Ready', text: def('codex.trust.prompt').text, kind: 'pattern', default: '>', flags: 'im', applies: 'sessions' } as AdvancedDef])
+      s.definitionsChanged()
+      s.noteCli('mycli' as never, '2.0.0')
+      // Still made for 1.0, so Settings flags it; the file keeps its record.
+      expect(advancedRow(def(id), s.state(null)).madeForOther).toBe('1.0.0')
+      expect(read(file)).toEqual(written)
+    } finally {
+      setCliAdvancedDefs([])
+    }
   })
 
   it("tracks the version for every value of a CLI's, those Combwork gives it too (hooks, title, tool timeout)", async () => {
