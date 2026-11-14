@@ -20,7 +20,7 @@ export type ReviewBy = 'none' | 'agent' | 'agentThenYou' | 'you'
  * G5: who finishes a code card. None's only way is acceptance; jj's (HI-2799, option A: no automatic advance) is the user
  * integrating the reviewed work themselves, reported as a merge Combwork doesn't make.
  */
-export type Finisher = 'combworkMerges' | 'agentMerges' | 'committed' | 'notChecked' | 'accept' | 'userIntegrates' | 'combworkAdvances'
+export type Finisher = 'combworkMerges' | 'agentMerges' | 'committed' | 'notChecked' | 'accept' | 'userIntegrates' | 'combworkAdvances' | 'previewAdvance'
 
 /**
  * HI-3235: whether Combwork itself integrates a passed card by its platform's advance (jj's bookmark move, HI-2840's
@@ -28,8 +28,13 @@ export type Finisher = 'combworkMerges' | 'agentMerges' | 'committed' | 'notChec
  * target. Never a platform check: the descriptor declares the finish, the adapter implements the port.
  */
 export const finishAdvances = (f: Finisher): boolean => f === 'combworkAdvances'
-/** HI-3235: a finish whose candidate and merge checks come before integration where work isn't merged by the queue (jj's two). */
-export const finishOnCandidate = (f: Finisher): boolean => f === 'userIntegrates' || f === 'combworkAdvances'
+/**
+ * HI-3236: whether Combwork integrates a passed card by its platform's advance once the user clicks Integrate on its
+ * preview (jj's preview and click): the adapter's `advancePreview` port asks, bound to one plan.
+ */
+export const finishPreviews = (f: Finisher): boolean => f === 'previewAdvance'
+/** HI-3235/HI-3236: a finish whose candidate and merge checks come before integration where work isn't merged by the queue (jj's three). */
+export const finishOnCandidate = (f: Finisher): boolean => f === 'userIntegrates' || f === 'combworkAdvances' || f === 'previewAdvance'
 
 /** A finish whose merge someone reports (the agent's excepted): a merge Combwork doesn't check, or jj's user integrating. */
 export const userReportsMerge = (f: Finisher): boolean => f === 'notChecked' || f === 'userIntegrates'
@@ -496,7 +501,7 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
   preChecks: strings,
   otherTargets: (v) => strings(v) && (v as string[]).every((b) => b.trim() === b && b.length > 0) && new Set(v as string[]).size === (v as string[]).length,
   sameness: oneOf<WorkflowOptions['sameness']>(['change', 'exact']),
-  finish: oneOf<Finisher>(['combworkMerges', 'agentMerges', 'committed', 'notChecked', 'accept', 'userIntegrates', 'combworkAdvances']),
+  finish: oneOf<Finisher>(['combworkMerges', 'agentMerges', 'committed', 'notChecked', 'accept', 'userIntegrates', 'combworkAdvances', 'previewAdvance']),
   style: oneOf<WorkflowOptions['style']>(['merge', 'squash', 'rebase']),
   target: (v) => typeof v === 'string',
   targetOwn: (v) => v === true,

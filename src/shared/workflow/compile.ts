@@ -8,7 +8,7 @@
 import { accepts, deliversCommits, hasCapability, merges } from '../platform/descriptors'
 import type { Category, StageId } from './facts'
 import { STAGE_CATEGORY } from './facts'
-import { contradictions, finishAdvances, finishOnCandidate, reviewerAgent, userReportsMerge, type Contradiction, type WorkflowOptions } from './options'
+import { contradictions, finishAdvances, finishOnCandidate, finishPreviews, reviewerAgent, userReportsMerge, type Contradiction, type WorkflowOptions } from './options'
 import { GUARDS, isGuard, MOVES, type GuardId, type MoveId } from './pieces'
 
 export const RULESET_VERSION = 1
@@ -82,7 +82,7 @@ export function producedStages(o: WorkflowOptions): StageId[] {
   // Where its user integrates (jj, HI-2799), your integration follows the approval, as a merge Combwork doesn't check follows Git's.
   // HI-3235: where Combwork advances the target itself (jj's automatic advance), Approved always: the card waits there for
   // its candidate and merge checks, as a Git card waits in Merging, review or no review.
-  const approved = finishAdvances(o.finish) || (merging ? approves && (o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'notChecked') : accepts(o.platform) ? o.review === 'agentThenYou' : approves && o.finish === 'userIntegrates')
+  const approved = finishAdvances(o.finish) || finishPreviews(o.finish) || (merging ? approves && (o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'notChecked') : accepts(o.platform) ? o.review === 'agentThenYou' : approves && o.finish === 'userIntegrates')
   const out: StageId[] = ['hold', 'todo', 'active']
   if (review) out.push('review')
   if (approved) out.push('approved')

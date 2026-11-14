@@ -39,6 +39,13 @@ export const FOR_YOU = {
     description:
       'A For you request (Approve, HI-3235): Combwork’s automatic advance of a jj target bookmark ({target}) to a card’s candidate ({result}: a short commit id) ended in a state it couldn’t prove (a crash, a read it couldn’t make, a stopped undo). {detail}: what was read, kept as it is; {op}: Combwork’s jj operation id, or none. Approve: the user says the work is integrated (recorded as the user’s word, an override, never as checked). Decline: start again, only once the target is known not to contain the work. {again}: a code saying why it is asked again (none: asked the first time); keep the select keys. {card} a card key like AM-12. Keep the select keys.'
   }),
+  advancePreview: msg({
+    id: 'workflow.forYou.advancePreview',
+    defaultMessage:
+      '{again, select, planChanged {Asked again: the plan changed since the last preview. } other {}}Integrate {card} into {target}? Combwork moves {target} from {expected} to its candidate {result} ({style, select, squash {one squashed commit} rebase {its commits copied on top} other {a merge commit}}), adding: {commits}{more, plural, =0 {} other {, and # more}}. Integrate moves it now; Not for this plan dismisses this preview until the plan changes (a new candidate after the target moves or new work), and you can still integrate it yourself.',
+    description:
+      'A For you request (HI-3236, preview and click): Combwork shows what its jj advance would move, and moves the target bookmark ({target}) from its commit {expected} to the card’s candidate {result} (short commit ids) only when the user clicks Integrate. {commits}: the commits the move adds, each a short id and its first line, kept as they are; {more}: how many more there are. {style}: how the candidate was built (keep the select keys). {again}: planChanged when asked again because the plan changed. “Integrate” and “Not for this plan” are the buttons’ names, as translated there. {card} a card key like AM-12; a bookmark is jj’s name for a branch.'
+  }),
   advanceRefused: msg({
     id: 'workflow.forYou.advanceRefused',
     defaultMessage:
@@ -134,6 +141,7 @@ export const MOVE_NAMES: Record<string, Msg> = {
 
 /** A rule as the user reads it (glossary 3: a gate is a rule), for a refusal's {rule} and {rules}: the option it comes from. */
 export const RULE_NAMES: Record<string, Msg> = {
+  'advance.verified': msg({ id: 'workflow.rule.advance.verified', defaultMessage: 'A card Combwork integrates is Done once its integration is proved', description: 'HI-3236: a rule of the workflow, named where the user skips it: the user said a jj card is integrated (It’s integrated) where Combwork couldn’t prove its own move of the target bookmark, so the card is Done on their word.' }),
   'card.kind': msg({ id: 'workflow.rule.card.kind', defaultMessage: "A card's kind is set when it is made", description: "A rule of the workflow, named where a change skips it: a card is code or no code (a decision, a write-up, a trial) from when it is made; changing it later is an exception the user makes (glossary: override)." }),
   'move.doingNobody': msg({ id: 'workflow.rule.move.doingNobody', defaultMessage: 'A card in Active has someone on it, unless you say otherwise', description: "A rule of the workflow, named where a move skips it (HI-2062): the Combwork Assistant moves a card into Active with nobody on it only with the user's reason (glossary: override). Active is a stage's name." }),
   'start.released': msg({ id: 'workflow.rule.start.released', defaultMessage: 'New work starts only on a branch that isn’t released', description: 'HI-3148: a rule of the workflow, named where a start skips it (the user’s Start anyway on a released branch, for a hotfix): a card doesn’t start on a branch already released (tagged and merged into the default branch).' }),

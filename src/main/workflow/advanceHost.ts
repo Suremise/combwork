@@ -6,7 +6,7 @@
 // write's transaction); these writes take no repository lock and leave their actions for the caller to run once its
 // locks are let go (`runActions: false`).
 
-import { ADVANCE_STOPPED_GATE, ADVANCE_UNCERTAIN_GATE, advanceUnresolved, type CardState, type FactData } from '../../shared/workflow/facts'
+import { ADVANCE_PREVIEW_GATE, ADVANCE_STOPPED_GATE, ADVANCE_UNCERTAIN_GATE, advanceUnresolved, type CardState, type FactData } from '../../shared/workflow/facts'
 import { basename } from 'path'
 import { PLATFORMS, type PlatformId } from '../../shared/platform/descriptors'
 import { FOR_YOU, workflowText } from '../../shared/workflow/texts'
@@ -20,6 +20,9 @@ import type { Workflow, Write } from './runtime'
 import { createLogger, userText } from '../logger'
 
 const log = createLogger('advance')
+
+/** HI-3236: the project's meta marking a plan's preview dismissed by the user (Not for this plan), for the card's cycle. */
+export const previewDeclinedKey = (card: string, cycle: number, plan: string): string => `advance_declined:${card.toLowerCase()}:${cycle}:${plan}`
 
 /** The project's meta (scoped to it) marking its one-time note about the advance being its default (HI-3235). */
 export const advanceNoteKey = (project: string): string => `advance_note:${project.toLowerCase()}`
@@ -227,6 +230,46 @@ export function advanceHostOf(wf: Workflow): AdvanceHost {
           quiet
         )
       }),
+    askPreview: (card, cycle, plan, words) =>
+      guarded('askPreview', card, async () => {
+        const s = wf.state(wf.store.card(card.id))
+        return wf.write(
+          card,
+          wf.rulesetOf(card, s),
+          'combwork',
+          (w) => {
+            const now = w.state()
+            if (now.cycle !== cycle || w.current !== 'approved' || advanceUnresolved(now)) return false
+            // One preview per card: any earlier one closed in this write (it can start no attempt once this one exists).
+            for (const r of now.requests) if (r.gate === ADVANCE_PREVIEW_GATE) w.fact('RequestClosed', { request: r.request, why: 'advance' }) // i18n-ignore: a fact's kind and codes, not text
+            const platform = wf.rulesetOf(card, now).options.platform
+            const short = PLATFORMS[platform].revisionShort
+            const text = workflowText(FOR_YOU.advancePreview, { card: card.key, target: words.target, expected: short(words.expected), result: short(words.result), style: words.style, commits: clip(words.commits) || '—', more: words.more, again: words.again ?? 'none' })
+            wf.askUser(w, 'approve', ADVANCE_PREVIEW_GATE, text, { unbound: true, entry: plan, result: plan })
+            return true
+          },
+          undefined,
+          quiet
+        )
+      }),
+    declinePreview: (card, cycle, plan) =>
+      guarded('declinePreview', card, async () => {
+        const key = previewDeclinedKey(card.key, cycle, plan)
+        const s = wf.state(wf.store.card(card.id))
+        return wf.write(
+          card,
+          wf.rulesetOf(card, s),
+          'user',
+          (w) => {
+            if (w.state().cycle !== cycle) return false
+            w.tx.setMeta(key, new Date().toISOString())
+            return true
+          },
+          undefined,
+          quiet
+        )
+      }),
+    previewDeclined: (card, cycle, plan) => !!wf.store.meta(previewDeclinedKey(card.key, cycle, plan)),
     noteDefault: async (card) => {
       if (!wf.cfg.finishInherited?.()) return
       const key = advanceNoteKey(wf.cfg.projectId?.() ?? wf.cfg.project)

@@ -1,8 +1,8 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { msg, tr } from '@shared/i18n'
+import { msg, tr, type Msg } from '@shared/i18n'
 import type { TaskCard } from '@shared/types'
 import { LANE_MAX_ROUNDS } from '@shared/lanes'
-import { approveNote, MERGE_CHOICE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type AskActionKind, type CardKind, type RoundChoice } from '@shared/workflow/facts'
+import { ADVANCE_PREVIEW_GATE, ADVANCE_STOPPED_GATE, ADVANCE_UNCERTAIN_GATE, approveNote, MERGE_CHOICE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type AskActionKind, type CardKind, type RoundChoice } from '@shared/workflow/facts'
 import { APPROVE_NOTE, FOR_YOU_KIND, ROUND_CHOICE, workflowLine } from '@shared/workflow/texts'
 import { gist } from '@shared/gist'
 import { approveAnswer, askActionAvailable, declineAnswer, type ForYouAnswer, type ForYouItem, type WorkResolved } from '@shared/workflow/workView'
@@ -20,6 +20,32 @@ import type { CommitMessage, WorkflowOptions } from '@shared/workflow/options'
 // For you in the window (#1276, SPEC §16.8.5): a card's requests for the user, as a chip on its tile and a section in
 // its dialog where the user answers them (tasks:answer, #1269: only the user answers). Combwork's own requests are shown
 // through their messages (in the window's language), an agent's question in its own words.
+
+/**
+ * HI-3236: the named answers of Combwork's advance questions (jj), each an Approve or a Decline as main takes it: the
+ * preview's Integrate and Not for this plan, a stopped move's Undo and Leave it, an uncertain one's attestation and start
+ * again. Each with its tooltip saying what it does.
+ */
+const ADVANCE_ACTIONS: Record<string, { yes: Msg; yesTip: Msg; no: Msg; noTip: Msg }> = {
+  [ADVANCE_PREVIEW_GATE]: {
+    yes: msg({ id: 'board.forYou.advanceIntegrate', defaultMessage: 'Integrate', description: 'A button on a For you preview of Combwork’s jj advance (HI-3236): Combwork moves the target bookmark to the card’s candidate now, as the preview shows.' }),
+    yesTip: msg({ id: 'board.forYou.advanceIntegrateTip', defaultMessage: 'Combwork moves the target to the candidate now, checking first that nothing changed since this preview.', description: 'Tooltip of the Integrate button on a For you preview of Combwork’s jj advance (HI-3236). The target: the bookmark the card merges into.' }),
+    no: msg({ id: 'board.forYou.advanceNotThisPlan', defaultMessage: 'Not for this plan', description: 'A button on a For you preview of Combwork’s jj advance (HI-3236): dismisses this preview until the plan changes.' }),
+    noTip: msg({ id: 'board.forYou.advanceNotThisPlanTip', defaultMessage: 'Dismisses this preview until the plan changes (a new candidate after the target moves or new work). You can still integrate it yourself.', description: 'Tooltip of the Not for this plan button on a For you preview of Combwork’s jj advance (HI-3236). Never promise to ask again later for the same plan.' })
+  },
+  [ADVANCE_STOPPED_GATE]: {
+    yes: msg({ id: 'board.forYou.advanceUndo', defaultMessage: 'Undo Combwork’s move', description: 'A button on a For you item about Combwork’s jj advance that stopped (HI-3236): reverts Combwork’s own jj operation, checking again first.' }),
+    yesTip: msg({ id: 'board.forYou.advanceUndoTip', defaultMessage: 'Combwork reverts its own jj operation, after checking again that nothing else changed, and frees the card.', description: 'Tooltip of the Undo button on a stopped Combwork jj advance (HI-3236).' }),
+    no: msg({ id: 'board.forYou.advanceLeave', defaultMessage: 'Leave it to me', description: 'A button on a For you item about Combwork’s jj advance that stopped (HI-3236): the user settles it themselves.' }),
+    noTip: msg({ id: 'board.forYou.advanceLeaveTip', defaultMessage: 'Combwork changes nothing. It asks you next whether the card is integrated.', description: 'Tooltip of the Leave it to me button on a stopped Combwork jj advance (HI-3236).' })
+  },
+  [ADVANCE_UNCERTAIN_GATE]: {
+    yes: msg({ id: 'board.forYou.advanceAttest', defaultMessage: 'It’s integrated', description: 'A button on a For you item about Combwork’s jj advance whose outcome it couldn’t prove (HI-3236): the user says the card’s work is in its target.' }),
+    yesTip: msg({ id: 'board.forYou.advanceAttestTip', defaultMessage: 'Done on your word: Combwork marks the card Done without proving its integration.', description: 'Tooltip of the It’s integrated button (HI-3236): recorded as the user’s override, never as a checked integration.' }),
+    no: msg({ id: 'board.forYou.advanceStartAgain', defaultMessage: 'Not integrated, start again', description: 'A button on a For you item about Combwork’s jj advance whose outcome it couldn’t prove (HI-3236): start again with a new candidate.' }),
+    noTip: msg({ id: 'board.forYou.advanceStartAgainTip', defaultMessage: 'Only once the target is known not to contain the work: then a new candidate and its checks.', description: 'Tooltip of the Not integrated, start again button (HI-3236).' })
+  }
+}
 
 const M = {
   chip: msg({ id: 'board.forYou.chip', defaultMessage: 'For you', description: "A chip on a board card: something on the card waits for the user (an approval, a decision, a question). Glossary: For you." }),
@@ -299,7 +325,20 @@ function ForYouRequest({ card, kind, item, reply, setReply, setAnswering }: { ca
           </div>
         </div>
       )}
-      {item.gate === MERGE_CHOICE_GATE ? (
+      {ADVANCE_ACTIONS[item.gate] ? (
+        <div className="for-you-actions" data-advance={item.gate}>
+          <Tooltip content={tr(ADVANCE_ACTIONS[item.gate].yesTip)}>
+            <BusyButton className="primary" data-action="advance-yes" busy={busy('advanceYes')} busyLabel={tr(M.answering)} disabled={!!action.busy} onClick={() => void answer('advanceYes', { outcome: 'approved' })}>
+              {tr(ADVANCE_ACTIONS[item.gate].yes)}
+            </BusyButton>
+          </Tooltip>
+          <Tooltip content={tr(ADVANCE_ACTIONS[item.gate].noTip)}>
+            <BusyButton data-action="advance-no" busy={busy('advanceNo')} busyLabel={tr(M.answering)} disabled={!!action.busy} onClick={() => void answer('advanceNo', { outcome: 'declined' })}>
+              {tr(ADVANCE_ACTIONS[item.gate].no)}
+            </BusyButton>
+          </Tooltip>
+        </div>
+      ) : item.gate === MERGE_CHOICE_GATE ? (
         <div className="for-you-merge-choice" data-merge-choice="">
           <label className="flex">
             {tr(OPTION_TEXT.style!.title)}
