@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tempRoot } from './tempDir'
 import type { PlanUsage } from '../src/shared/types'
 
@@ -37,6 +37,9 @@ const copilotSnapshots = JSON.parse(copilotLine).data.quotaSnapshots
 const WEEK = 7 * 24 * 60
 // A time inside the recorded quotas' week, so their resets are ahead of it.
 const AT = Date.parse('2026-11-07T13:00:00Z')
+// Resets kept relative to AT (HI-3229): a fixed date passes on the real clock, and a limit past its reset is an old period.
+const GEMINI_RESET = new Date(AT + (WEEK - 600) * 60e3).toISOString()
+const MONTH_ON = new Date(AT + 30 * 24 * 3600e3).toISOString()
 
 describe("Antigravity's plan limits (agy's status line)", () => {
   it('reads every recorded line with a quota: a weekly limit for Gemini models and one for the other models, with the plan', () => {
@@ -67,7 +70,7 @@ describe("Antigravity's plan limits (agy's status line)", () => {
   it('leaves out a quota without a share from 0 to 1; one of another window keeps its own name and no window', () => {
     const u = agyPlanUsage({
       quota: {
-        'gemini-weekly': { remaining_fraction: 1.5, reset_time: '2026-11-14T00:00:00Z' },
+        'gemini-weekly': { remaining_fraction: 1.5, reset_time: GEMINI_RESET },
         '3p-weekly': { remaining_fraction: '0.5' },
         'x-weekly': { remaining_fraction: Number.NaN },
         'y-weekly': [0.5],
@@ -100,8 +103,8 @@ describe("Copilot's plan limits (a model call's quota snapshots)", () => {
 
   it('an unlimited quota is reported as unlimited, not as a figure or as nothing', () => {
     for (const s of [{ isUnlimitedEntitlement: true, entitlementRequests: 1000, remainingPercentage: 100 }, { isUnlimitedEntitlement: false, entitlementRequests: -1, remainingPercentage: 100 }]) {
-      const u = copilotPlanUsage({ premium_interactions: { ...s, usedRequests: 3, resetDate: '2026-12-01T00:00:00Z' } }, '2026-11-07T10:00:00Z')!
-      expect(u.limits).toEqual([{ id: 'premium_interactions', label: 'premium_interactions', windowMinutes: null, usedPercent: 0, resetsAt: '2026-12-01T00:00:00.000Z', models: 'premium', unlimited: true }])
+      const u = copilotPlanUsage({ premium_interactions: { ...s, usedRequests: 3, resetDate: MONTH_ON } }, '2026-11-07T10:00:00Z')!
+      expect(u.limits).toEqual([{ id: 'premium_interactions', label: 'premium_interactions', windowMinutes: null, usedPercent: 0, resetsAt: MONTH_ON, models: 'premium', unlimited: true }])
     }
   })
 
@@ -122,7 +125,7 @@ describe("Copilot's plan limits (a model call's quota snapshots)", () => {
 
 describe('plan limits of part of a plan, kept and shown (HI-2734)', () => {
   const agy = (gemini: number, other = 1, at = AT, extra: Record<string, unknown> = {}): PlanUsage =>
-    agyPlanUsage({ quota: { 'gemini-weekly': { remaining_fraction: gemini, reset_time: '2026-11-14T02:04:21Z' }, '3p-weekly': { remaining_fraction: other, reset_time: new Date(at + WEEK * 60e3).toISOString() } }, ...extra }, new Date(at))!
+    agyPlanUsage({ quota: { 'gemini-weekly': { remaining_fraction: gemini, reset_time: GEMINI_RESET }, '3p-weekly': { remaining_fraction: other, reset_time: new Date(at + WEEK * 60e3).toISOString() } }, ...extra }, new Date(at))!
   const pct = (u: PlanUsage, id: string) => u.limits.find((l) => l.id === id)?.usedPercent
 
   it('merges each limit by its id: a lower reading later keeps the higher; one left out stays until its reset', () => {
@@ -175,7 +178,7 @@ describe('plan limits of part of a plan, kept and shown (HI-2734)', () => {
   })
 
   describe('what the plan allows changing within a period (unlimited now or no longer, another entitlement)', () => {
-    const resets = '2026-12-01T00:00:00Z'
+    const resets = MONTH_ON
     const premium = (s: Record<string, unknown>, at: number): PlanUsage => copilotPlanUsage({ premium_interactions: { usedRequests: 0, resetDate: resets, ...s } }, new Date(at).toISOString())!
     const metered = (entitlement: number, left: number, at: number) => premium({ isUnlimitedEntitlement: false, entitlementRequests: entitlement, usedRequests: entitlement * (1 - left / 100), remainingPercentage: left }, at)
     const unlimited = (at: number) => premium({ isUnlimitedEntitlement: true, entitlementRequests: -1, remainingPercentage: 100 }, at)
@@ -242,7 +245,13 @@ describe('plan limits of part of a plan, kept and shown (HI-2734)', () => {
   })
 
   describe('reported', () => {
+    // reportPlanUsage merges on the clock: pinned to AT, so the resets above stay ahead of it.
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(AT)
+    })
     afterEach(() => {
+      vi.useRealTimers()
       delete config.get().planUsage.antigravity
       delete config.get().planUsage.copilot
     })
@@ -261,7 +270,7 @@ describe('plan limits of part of a plan, kept and shown (HI-2734)', () => {
         expect(told).toHaveLength(2)
         expect(told[1]).toContain('gemini-pro')
         // Copilot's counts alone changing (its share and reset the same): told too.
-        const counts = (used: number) => copilotPlanUsage({ chat: { isUnlimitedEntitlement: false, entitlementRequests: 200, usedRequests: used, remainingPercentage: 99, resetDate: '2099-12-01T00:00:00Z' } }, new Date().toISOString())!
+        const counts = (used: number) => copilotPlanUsage({ chat: { isUnlimitedEntitlement: false, entitlementRequests: 200, usedRequests: used, remainingPercentage: 99, resetDate: MONTH_ON } }, new Date().toISOString())!
         reportPlanUsage('copilot', counts(2))
         reportPlanUsage('copilot', counts(3))
         expect(told).toHaveLength(4)
@@ -277,13 +286,13 @@ describe('plan limits of part of a plan, kept and shown (HI-2734)', () => {
       const key = 'copilot:premium_interactions'
       try {
         delete config.get().planWarnings[key]
-        const snapshot = (unlimited: boolean) => ({ premium_interactions: { isUnlimitedEntitlement: unlimited, entitlementRequests: unlimited ? -1 : 300, usedRequests: 297, remainingPercentage: 1, resetDate: '2099-12-01T00:00:00Z' } })
+        const snapshot = (unlimited: boolean) => ({ premium_interactions: { isUnlimitedEntitlement: unlimited, entitlementRequests: unlimited ? -1 : 300, usedRequests: 297, remainingPercentage: 1, resetDate: MONTH_ON } })
         const u = copilotPlanUsage(snapshot(true), new Date().toISOString())!
         reportPlanUsage('copilot', { ...u, limits: u.limits.map((l) => ({ ...l, usedPercent: 99 })) })
         expect(config.get().planWarnings[key]).toBeUndefined()
         // Nor of one the plan doesn't include (its allowance 0), whatever its placeholder says.
         delete config.get().planUsage.copilot
-        const none = copilotPlanUsage({ premium_interactions: { isUnlimitedEntitlement: false, entitlementRequests: 0, usedRequests: 0, remainingPercentage: 0, resetDate: '2099-12-01T00:00:00Z' } }, new Date().toISOString())!
+        const none = copilotPlanUsage({ premium_interactions: { isUnlimitedEntitlement: false, entitlementRequests: 0, usedRequests: 0, remainingPercentage: 0, resetDate: MONTH_ON } }, new Date().toISOString())!
         reportPlanUsage('copilot', { ...none, limits: none.limits.map((l) => ({ ...l, usedPercent: 100 })) })
         expect(config.get().planWarnings[key]).toBeUndefined()
         delete config.get().planUsage.copilot
