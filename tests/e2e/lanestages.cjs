@@ -227,6 +227,25 @@ const beta = path.join(fx.ws, 'beta')
     check("the Merging card's hover keeps Ready | Merging, its own marked", !!(await hover(seg(m.n), (t) => t.includes('Merging card') && t.includes('Ready'))) && (await page.locator('.tip .lane-seg-stage.own').innerText()) === 'Merging' && (await page.locator('.tip .lane-stage-divider').count()) === 1, await tipText())
     check('…and the legend keeps Ready and Merging (an old-rules lane has them)', !!(await hover(bar, (t) => t.includes('Each colour is a category'))) && JSON.stringify(await legendRow('passed').locator('.lanes-legend-stage').allInnerTexts()) === '["Ready","Merging"]', await tipText())
     await shoot('3b-old-rules-solo', () => hover(seg(m.n), (t) => t.includes('Merging card')))
+    // A crowded header (HI-3209): old rules, "into integration", the card and the count beside the pair and its slot. The
+    // project's link keeps a few letters, there to be seen and clicked (it was squeezed to nothing): the target gives way.
+    await page.mouse.move(5, 5)
+    for (const id of [l1, l2]) {
+      const crowded = row(id)
+      const link = crowded.locator('.progress-lane-project')
+      const shown = await waitHung(async () => {
+        if ((await crowded.locator('.lane-target').count()) !== 1) return null
+        return link.evaluate((el) => {
+          const b = el.getBoundingClientRect()
+          const top = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2)
+          const header = el.parentElement.getBoundingClientRect()
+          // …and the header still fits its row: the count, its last part, inside it.
+          const count = el.parentElement.querySelector('.progress-lane-count')?.getBoundingClientRect()
+          return b.width >= 20 && !!top && el.contains(top) && !!count && count.right <= header.right + 0.5 ? { width: b.width } : null
+        })
+      })
+      check(`a crowded lane header (into integration) keeps its project's link visible and clickable (${id === l1 ? 'l1' : 'l2'})`, !!shown, `${await crowded.locator('.progress-lane-top').innerText()} | ${JSON.stringify(await link.boundingBox())}`)
+    }
 
     // The lane ends: its mark goes. A new lane uses the new options.
     const ended = await api('POST', `/v1/lanes/${l1}/end`, { abandoned: true })

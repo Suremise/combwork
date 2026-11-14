@@ -14844,11 +14844,14 @@ button.progress-lane-why:focus-visible,
   color: var(--warning);
   font-size: 11px;
 }
-/* A lane's project after its pair (#1421): a link to its Version Control tab's Workflow section, cut short before the rest. */
+/* A lane's project after its pair (#1421): a link to its Version Control tab's Workflow section, cut short before the rest.
+   It keeps a few letters (HI-3209: a crowded header, "into <branch>" among its parts, squeezed it to nothing, a link no
+   one could see or click); its title names it whole. */
 .progress-lane-project {
   flex: 0 1 auto;
-  min-width: 0;
+  min-width: 3em;
   max-width: 30%;
+  text-align: start;
   padding: 0;
   border: 0;
   background: none;
@@ -14879,6 +14882,19 @@ button.progress-lane-why:focus-visible,
 /* Its tooltip's wrap keeps the tag whole beside a long "why it waits". */
 .progress-lane-top > .tip-wrap:has(> .progress-lane-state) {
   flex-shrink: 0;
+}
+/* Its target ("into <branch>", HI-3113) gives way before the project's link does (HI-3209): a branch name can be long, and
+   its tooltip names it whole. It keeps a few letters. */
+.progress-lane-top > .tip-wrap:has(> .progress-lane-state.lane-target) {
+  flex-shrink: 1;
+  min-width: 3em;
+}
+.progress-lane-state.lane-target {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* Retry an agent's new conversation (HI-2034): the reason's own place, kept whole (short: "⟳ Retry B1"); the project's name gives way. */
 button.progress-lane-retry {
