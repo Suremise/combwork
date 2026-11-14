@@ -3,19 +3,55 @@
 // bracketed paste on and drew a header once, then only updates a few cells, is shown as it is, not as the suffix alone.
 import { Terminal } from '@xterm/headless'
 import { describe, expect, it, vi } from 'vitest'
-import { MAX_RAW, TerminalHistory } from '../src/main/terminalHistory'
+import { completeUpTo, MAX_RAW, TerminalHistory } from '../src/main/terminalHistory'
 
 vi.mock('../src/main/logger', () => ({ createLogger: () => ({ info: () => undefined, warn: () => undefined }) }))
 
 const write = (t: Terminal, d: string): Promise<void> => new Promise((r) => t.write(d, r))
 
-/** What a view shows and how it takes input: the screen in use, its lines, the cursor and the input modes. */
+/**
+ * What a view shows and how it takes input: the screen in use, its lines, each cell's rendition (colours, bold), the
+ * cursor and the input modes.
+ */
 function state(t: Terminal): unknown {
   const b = t.buffer.active
   const lines: string[] = []
-  for (let i = 0; i < t.rows; i++) lines.push(b.getLine(b.viewportY + i)?.translateToString(true) ?? '')
+  const attrs: string[] = []
+  for (let i = 0; i < t.rows; i++) {
+    const line = b.getLine(b.viewportY + i)
+    // What it shows: a narrowed buffer that doesn't re-wrap keeps cells beyond its width, hidden.
+    lines.push(line?.translateToString(true, 0, t.cols) ?? '')
+    let a = ''
+    // A 256-colour index under 16 is the same colour as the 16-colour one: the serializer writes it as that.
+    const colour = (palette: boolean, mode: number, n: number): string => (palette && n < 16 ? `p/${n}` : `${mode}/${n}`)
+    for (let x = 0; x < (line ? t.cols : 0); x++) {
+      const c = line!.getCell(x)!
+      // Its rendition, not its hyperlink: links drawn before the cut aren't kept (the serializer writes none).
+      if (c.getFgColorMode() || c.getBgColorMode() || c.isBold() || c.isUnderline() || c.isItalic() || c.isInverse() || c.isDim()) a += `${x}:${colour(c.isFgPalette(), c.getFgColorMode(), c.getFgColor())}/${colour(c.isBgPalette(), c.getBgColorMode(), c.getBgColor())}/${c.isBold()}/${c.isUnderline()} `
+    }
+    attrs.push(a)
+  }
   const core = (t as unknown as { _core: { coreMouseService: { activeEncoding: string }; coreService: { isCursorHidden: boolean; decPrivateModes: { cursorStyle?: string } } } })._core
-  return { buffer: b.type, lines, cursor: [b.cursorX, b.cursorY], modes: { ...t.modes }, encoding: core.coreMouseService.activeEncoding, hidden: core.coreService.isCursorHidden, cursorStyle: core.coreService.decPrivateModes.cursorStyle }
+  return { buffer: b.type, lines, attrs, cursor: [b.cursorX, b.cursorY], modes: { ...t.modes }, encoding: core.coreMouseService.activeEncoding, hidden: core.coreService.isCursorHidden, cursorStyle: core.coreService.decPrivateModes.cursorStyle }
+}
+
+/** A terminal and a history given the same output and resizes, in order. */
+function pair(cols: number, rows: number, max: number): { live: Terminal; history: TerminalHistory; out: (d: string) => Promise<void>; resize: (c: number, r: number) => Promise<void> } {
+  const live = new Terminal({ cols, rows, allowProposedApi: true })
+  const history = new TerminalHistory(cols, rows, max)
+  return {
+    live,
+    history,
+    out: async (d) => {
+      history.push(d)
+      await write(live, d)
+    },
+    resize: async (c, r) => {
+      await write(live, '')
+      live.resize(c, r)
+      history.resized(c, r)
+    }
+  }
 }
 
 /** A fresh view of the size given, with the replay written into it. */
@@ -122,5 +158,104 @@ describe("a running terminal's replay", () => {
     expect(snapshot).not.toContain('?1006h')
     expect(snapshot).not.toContain('?25l')
     expect(snapshot).not.toMatch(/\x1b\[3;10r/)
+  })
+
+  // HR1's round 1, finding 1: output comes in chunks cut anywhere, inside an escape sequence or a character too.
+  it('is the same wherever a chunk cuts what fell off the queue from what is kept', async () => {
+    const stream = '\x1b[?1049h\x1b[?1000h\x1b[?1006h\x1b]0;a title\x07\x1bP$qm\x1b\\\x1b[2;3H\x1b[31;1mred \u{1f600}\x1b[38;5;0mzero\x1b[48:2::10:20:30mrgb\x1b]8;;https://example.com\x1b\\link\x1b]8;;\x1b\\\x1b[0;4munder'
+    const filler = '\x1b[5;1Hfiller'
+    for (let k = 1; k < stream.length; k++) {
+      // At most what follows the cut: the first chunk falls off, the second stays.
+      const { live, history, out } = pair(40, 8, stream.length - k + filler.length)
+      await out(stream.slice(0, k))
+      await out(stream.slice(k))
+      await out(filler)
+      expect(state(await view(history, 40, 8)), `cut at ${k}: ${JSON.stringify(stream.slice(k - 3, k + 3))}`).toEqual(state(live))
+    }
+  })
+
+  it('restores mouse encoding split across the cut, and the rendition text after it is drawn with', async () => {
+    // HR1's probe: the mode's parameter cut in two, the second half in the kept output.
+    const { live, history, out } = pair(80, 8, 32)
+    await out('\x1b[?1049h\x1b[?1000h')
+    await out('\x1b[?100')
+    await out('6h' + 'x'.repeat(32))
+    const shown = await view(history, 80, 8)
+    expect(state(shown)).toEqual(state(live))
+    expect(state(shown)).toMatchObject({ encoding: 'SGR' })
+    expect((state(shown) as { lines: string[] }).lines[0]).toBe('x'.repeat(32))
+
+    const sgr = pair(40, 6, 40)
+    await sgr.out('\x1b[31;1m')
+    await sgr.out('\x1b[3;1H' + '·'.repeat(36))
+    await sgr.out('\x1b[1;1Hred text')
+    expect(sgr.history.raw()).not.toContain('31;1m')
+    expect(state(await view(sgr.history, 40, 6))).toEqual(state(sgr.live))
+  })
+
+  // HR1's round 1, finding 2: resizes still in the kept output, or with nothing after them.
+  it('draws output still kept at the size it was drawn at, after a resize', async () => {
+    for (const alternate of [true, false]) {
+      // HR1's probe: 80 wide, then 20, the wide rows' chunk partly kept.
+      const { live, history, out, resize } = pair(80, 10, 100)
+      await out(`${alternate ? '\x1b[?1049h' : ''}${'A'.repeat(50)}`)
+      await out(`\x1b[5;1H${'b'.repeat(70)}`)
+      await resize(20, 10)
+      await out('\x1b[9;1HZ')
+      expect(state(await view(history, 20, 10)), alternate ? 'alternate' : 'classic').toEqual(state(live))
+
+      // A resize with no output after it, and one while nothing has fallen off the queue.
+      const quiet = pair(60, 8, 120)
+      await quiet.out(`${alternate ? '\x1b[?1049h' : ''}${'w'.repeat(50)}`)
+      await quiet.out(`\x1b[4;1H${'v'.repeat(55)}`)
+      await quiet.out(`\x1b[6;1H${'u'.repeat(40)}`)
+      await quiet.resize(30, 8)
+      expect(state(await view(quiet.history, 30, 8)), `${alternate ? 'alternate' : 'classic'}, nothing after`).toEqual(state(quiet.live))
+      const small = pair(60, 8, 10_000)
+      await small.out(`${alternate ? '\x1b[?1049h' : ''}${'w'.repeat(50)}`)
+      await small.resize(30, 8)
+      await small.out('\x1b[3;1Hafter')
+      expect(state(await view(small.history, 30, 8)), `${alternate ? 'alternate' : 'classic'}, under the limit`).toEqual(state(small.live))
+    }
+  })
+
+  it('finds where output stops inside an escape sequence or a character', () => {
+    for (const [text, at] of [
+      ['plain', 5],
+      ['ab\x1b', 2],
+      ['ab\x1b[?100', 2],
+      ['ab\x1b[?1006h', 10],
+      ['a\x1b]0;title', 1],
+      ['a\x1b]0;title\x07b', 12],
+      ['a\x1b]0;t\x1b\\b', 9],
+      ['a\x1bP$qm\x1b', 1],
+      // An ESC in a string that isn't its end ends it, and starts a sequence of its own.
+      ['a\x1b]0;t\x1b[3', 6],
+      // CAN cancels the sequence.
+      ['a\x1b[12\x18b', 7],
+      ['a\x1b(', 1],
+      ['a\x1b(B', 4],
+      ['x\u{1f600}', 3],
+      ['x\ud83d', 1],
+      ['\x9b1;2', 0]
+    ] as const)
+      expect(completeUpTo(text), JSON.stringify(text)).toBe(at)
+  })
+
+  it('keeps the hyperlink open at the cut for the text after it', async () => {
+    const history = new TerminalHistory(40, 6, 40)
+    history.push('\x1b]8;;https://example.com\x1b\\')
+    history.push('\x1b[3;1H' + '·'.repeat(36))
+    history.push('link')
+    const replay = await history.replay()
+    expect(replay.indexOf('\x1b]8;;https://example.com\x1b\\')).toBeGreaterThanOrEqual(0)
+    expect(replay.indexOf('\x1b]8;;https://example.com\x1b\\')).toBeLessThan(replay.lastIndexOf('link'))
+  })
+
+  it('is the output as it came, under the limit, when only a first fit came before it', async () => {
+    const history = new TerminalHistory(120, 32, 1000)
+    history.resized(90, 30)
+    history.push('\x1b[?1049hfirst screen')
+    expect(await history.replay()).toBe('\x1b[?1049hfirst screen')
   })
 })
