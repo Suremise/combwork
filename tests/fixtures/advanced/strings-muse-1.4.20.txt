@@ -1,0 +1,12 @@
+Strings found in muse.exe 1.4.20 (1.4.20-R8619.1, Authenticode-signed by Meta, SHA-256 2d223f7f992f02c...6618a), extracted
+with grep -a for HI-3202; each line below is verbatim from the binary (non-printing bytes shown as '.').
+
+META_API_KEY always takes priority over the account login
+note: META_API_KEY overrides your Meta account login; unset it to use the account login, or run `muse logout` to remove the login
+MUSE_CUSTOM_HEADERS contains invalid provider header input; affected headers will not be sent
+output_too_large: hook .. exceeded its .G-byte ceiling; the process tree was terminated and no stream was parsed./CCOMSPEC
+pathedit_filewrite_fileapply_patchpatchcontentreplacefind
+*** Update File: *** Delete File: *** Add File:
+context.foreign_personal_rulescontext.foreign_personal_skills
+Log in with your Meta account: approve a code in your browser.
+

@@ -3342,7 +3342,8 @@ class SessionManager {
     // turn of its own runs yet.
     // A CLI whose first prompt is typed (HI-3196, data-only): kept until its screen first says it is ready, then typed as
     // any line Combwork types is (sendPrompt, its guards): never on its command line.
-    if (l.initialPrompt && adapter.launch.promptTyped) l.typedFirstPrompt = l.initialPrompt
+    // A resume whose CLI takes no prompt with it (HI-3202) types it the same way.
+    if (l.initialPrompt && (adapter.launch.promptTyped || (l.resumed && adapter.launch.resumePromptTyped))) l.typedFirstPrompt = l.initialPrompt
     else if (l.initialPrompt) this.notePrompt(l, true)
     l.initialPrompt = undefined
     l.startAllowed = undefined
@@ -6405,8 +6406,28 @@ class SessionManager {
   /** The launch a hook call belongs to: named by its run id, else (older launch folders) by session id. */
   /** A hook's occurrence identity (HI-2777: hookTwins), as its launch's CLI gives one; null when it gives none. */
   hookOccurrence(runId: string, body: Record<string, any>): HookOccurrence | null {
+    body = this.canonicalHook(runId, body)
     const l = this.findLaunch(runId, body.session_id)?.[1]
     return l?.adapter.hooks?.hookOccurrence?.(body) ?? null
+  }
+
+  /** Each hook body as it came, and the body its launch's CLI says it is in Combwork's vocabulary (canonicalHook). */
+  private canonical = new WeakMap<object, Record<string, any>>()
+
+  /**
+   * A hook's body in the vocabulary shared hook code reads (HI-3202: the CLI's hooks part, canonicalHook; Muse's names
+   * are settings, mapped by its launch), the same object each time it is asked for one body, so every step of one hook
+   * (its occurrence, observation, reply and handling, keyed by its body) reads that one. Found by its run id: before the
+   * body is read. A body of no launch, or of a CLI that reads its own as they come, is itself.
+   */
+  canonicalHook(runId: string | null, body: Record<string, any>): Record<string, any> {
+    const done = this.canonical.get(body)
+    if (done) return done
+    const hooks = this.findLaunch(runId, body.session_id)?.[1]?.adapter.hooks
+    const out = hooks?.canonicalHook?.(body) ?? body
+    this.canonical.set(body, out)
+    if (out !== body) this.canonical.set(out, out)
+    return out
   }
 
   /**
@@ -6761,6 +6782,7 @@ class SessionManager {
    * hook's reply, or null to let the edit go ahead as usual.
    */
   preToolUse(runId: string | null, body: Record<string, any>): Record<string, unknown> | null {
+    body = this.canonicalHook(runId, body)
     const found = this.findLaunch(runId, body.session_id)
     if (!found) return null
     const [id, l] = found
@@ -7081,6 +7103,8 @@ class SessionManager {
    * own); else nothing.
    */
   hookReply(runId: string | null, body: Record<string, any>): Promise<Record<string, unknown> | null> {
+    // Routed by what it is in Combwork's vocabulary (HI-3202: a renamed event still reaches the file locks).
+    body = this.canonicalHook(runId, body)
     // What a hook's reply says is said to its session, in its pinned chain (HI-2443).
     return this.inLaunchDialect(runId, body.session_id, () => this.hookReplyHere(runId, body))
   }
@@ -7258,13 +7282,16 @@ class SessionManager {
    * A hook arriving on its launch's own authenticated route (the hook server, HI-982): its observation, which its lock
    * decision and the turn ledger fill in, for the launch's Hooks dialog; null when no launch of Combwork's has it.
    */
-  observeHook(runId: string | null, body: Record<string, any>): HookObservation | null {
+  observeHook(runId: string | null, given: Record<string, any>): HookObservation | null {
+    // Recorded under the body as it came and as it is read (canonicalHook), which the later steps look it up by.
+    const body = this.canonicalHook(runId, given)
     const l = this.findLaunch(runId, body.session_id)?.[1]
     if (!l?.hookHistory) return null
     const event = clip(typeof body.hook_event_name === 'string' ? body.hook_event_name : '?', HOOK_SHORT_MAX).text
     ;(l.heard ??= new Set()).add(event)
     const obs: HookObservation = { l, started: performance.now(), fired: { at: Date.now(), event, receiver: l.hooks?.receivers[event] ?? 'combwork', response: 'none', ledger: 'none', ms: 0 } }
     this.hookObs.set(body, obs)
+    if (given !== body) this.hookObs.set(given, obs)
     return obs
   }
 
@@ -7380,6 +7407,8 @@ class SessionManager {
    * session) must not land after a newer one's status.
    */
   handleHook(runId: string | null, body: Record<string, any>, reply: unknown = null): Promise<void> {
+    // Read in Combwork's vocabulary (HI-3202), the same body hookReply routed (canonicalHook).
+    body = this.canonicalHook(runId, body)
     // A turn's end releases only the locks claimed before it arrived: PreToolUse claims them at once, outside this queue.
     const arrived = this.lockSeq
     // When it reached Combwork, before it waits its turn: a turn begins then, for comparing with the CLI's records (#648).
@@ -7569,6 +7598,8 @@ class SessionManager {
       if (ev.kind !== 'stop') this.settleFailure(id, l)
       this.carryOut(id, l, step, String(body.hook_event_name ?? ''), ev, arrived)
       actions = step.actions
+      // A first prompt still waiting to be typed (resumePromptTyped): its start hook, or a turn's end, may make it safe now.
+      if (l.typedFirstPrompt) queueMicrotask(() => this.typeFirstPrompt(l))
       if (ev.kind !== 'ignore') (l.recentHooks ??= []).push({ kind: ev.kind, at: Date.now(), status: st.status })
       if ((l.recentHooks?.length ?? 0) > RECENT_HOOKS) l.recentHooks!.shift()
     } else if (guard && hook.event.kind === 'ask') {

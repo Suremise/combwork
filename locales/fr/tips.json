@@ -388,6 +388,8 @@
   "tips.moreAgents.title": "Plus de {usual, plural, one {# agent} many {# agents} other {# agents}}",
   "tips.moveAnyway.text": "Faire glisser une carte au-delà d’une règle de son projet (vers Terminé avant sa relecture, par exemple) demande d’abord confirmation et nomme les règles contournées. Déplacer quand même enregistre une dérogation sur la carte, avec ta raison : un cadenas ouvert sur la carte indique qui, quelles règles et pourquoi.",
   "tips.moveAnyway.title": "Déplacer une carte en dérogeant à ses règles, avec une raison",
+  "tips.muse.text": "Les agents peuvent utiliser Muse Code de Meta. Installe-le avec le programme d’installation de Meta, ajoute un compte Muse Code dans Paramètres → Comptes et connexions et connecte-le là. Chaque compte garde sa propre connexion, ses paramètres et ses sessions, à part de ton propre Muse.",
+  "tips.muse.title": "Exécuter des agents avec Muse Code",
   "tips.myPrices.text": "Le coût de Claude Code est son propre chiffre, tiré de sa grille de prix. Tu as d’autres tarifs (une remise, un autre niveau) ? Mets Coûts des sessions sur Mes prix, et Combwork calcule le prix de chaque session avec ta grille.",
   "tips.myPrices.title": "Tes propres prix pour Claude Code",
   "tips.newCard.text": "Appuie sur {key} pour une nouvelle carte dans le projet où tu es, sans quitter ce que tu fais.",

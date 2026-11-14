@@ -587,6 +587,11 @@ export interface ProviderLaunchPart {
   /** Its first prompt is typed once its screen is ready (sessions.ts), not passed on its command line (HI-3196). */
   readonly promptTyped?: boolean
   /**
+   * A resumed session's first prompt is typed once it is ready (as promptTyped's), its new sessions' passed on its command
+   * line (HI-3202: Muse 1.4.20's `resume <id>` takes no prompt). Ready is its start hook's, or its screen's.
+   */
+  readonly resumePromptTyped?: boolean
+  /**
    * Its start (readyOutput, startupQuestion) is read from its rendered screen, a line each, as each draw lands, not from
    * its output's tail run together (HI-3196: a description's patterns anchor ^ and $ at each line).
    */
@@ -624,6 +629,13 @@ export interface ProviderLaunchPart {
 }
 /** The CLI calls Combwork's hooks: what each tells, and what Combwork answers. */
 export interface ProviderHooksPart {
+  /**
+   * A hook's body in the vocabulary Combwork's shared hook code reads (`hook_event_name`, `session_id`, `cwd` and the
+   * events' own names: SessionStart, PreToolUse…), for a CLI whose own names are settings (HI-3202: Muse's, mapped by its
+   * launch). Called once per body as it arrives (sessions.canonicalHook), before anything routes on it, so file locks,
+   * start replies and the turn's record all read it the same way; normalizeHook then gets that body. Absent: as it came.
+   */
+  canonicalHook?(body: Record<string, any>): Record<string, any>
   normalizeHook(body: Record<string, any>): NormalizedHook
   lockReply(decision: LockDecision): Record<string, unknown>
   /**

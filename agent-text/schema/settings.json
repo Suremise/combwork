@@ -1707,6 +1707,18 @@
       "title": "plain"
     }
   },
+  "settings.advanced.error.roles": {
+    "placeholders": {
+      "title": "plain",
+      "roles": "plain"
+    }
+  },
+  "settings.advanced.error.rolesTwice": {
+    "placeholders": {
+      "title": "plain",
+      "name": "plain"
+    }
+  },
   "settings.advanced.error.text": {
     "placeholders": {
       "title": "plain"
@@ -1743,6 +1755,90 @@
       "version": "plain",
       "shown": "plain"
     }
+  },
+  "settings.advanced.muse.guidance.maxBytes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.guidance.maxBytes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.hooks.editTools.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.hooks.editTools.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.hooks.pathField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.hooks.pathField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.hooks.timeoutSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.hooks.timeoutSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.configKeys.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.configKeys.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.hookEvents.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.hookEvents.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.hookFields.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.hookFields.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.sessionLog.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.sessionLog.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.override.keepPersonalOut.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.override.keepPersonalOut.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.override.keepProjectConfigOut.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.override.keepProjectConfigOut.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.override.stripAccountVars.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.override.stripAccountVars.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.ready.input.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.ready.input.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.sandbox.setupRequired.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.sandbox.setupRequired.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.sandbox.setupScreen.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.sandbox.setupScreen.title": {
+    "placeholders": {}
   },
   "settings.advanced.opencode.ambient.integrations.desc": {
     "placeholders": {}
@@ -1885,6 +1981,11 @@
   "settings.advanced.takes.patternFlags": {
     "placeholders": {
       "flags": "plain"
+    }
+  },
+  "settings.advanced.takes.roles": {
+    "placeholders": {
+      "roles": "plain"
     }
   },
   "settings.advanced.takes.text": {

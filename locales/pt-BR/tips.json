@@ -388,6 +388,8 @@
   "tips.moreAgents.title": "Mais de {usual, plural, one {# agente} other {# agentes}}",
   "tips.moveAnyway.text": "Arrastar um cartão além de uma regra do projeto (para Concluído antes da revisão, por exemplo) pergunta antes e nomeia as regras puladas. Mover mesmo assim registra uma exceção no cartão, com o seu motivo: um cadeado aberto no cartão mostra quem, quais regras e por quê.",
   "tips.moveAnyway.title": "Mover um cartão passando por cima das regras, com um motivo",
+  "tips.muse.text": "Os agentes podem usar o Muse Code da Meta. Instale-o com o instalador da Meta, adicione uma conta do Muse Code em Configurações → Contas e conexões e entre nela ali. Cada conta tem o próprio login, configurações e sessões, separados do seu próprio Muse.",
+  "tips.muse.title": "Execute agentes no Muse Code",
   "tips.myPrices.text": "O custo do Claude Code é o número dele mesmo, da tabela de preços dele. Tem outras tarifas (um desconto, outro plano)? Defina Custos de sessão como Meus preços, e o Combwork calcula o preço de cada sessão pela sua tabela.",
   "tips.myPrices.title": "Seus próprios preços para o Claude Code",
   "tips.newCard.text": "Pressione {key} para criar um cartão no projeto em que você está, sem sair do que está fazendo.",

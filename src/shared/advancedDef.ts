@@ -68,6 +68,8 @@ export interface AdvancedSample {
   version: string
   /** Text the CLI showed or sent, which the value must find (a pattern or a text). */
   text?: string
+  /** For a `roles` list: the role whose name `text` holds as the CLI sent it. */
+  role?: string
   /** The fields the CLI sent where this one is looked up (a field). */
   fields?: string[]
   /** For a value Combwork gives the CLI: what the recording shows of it taking the value. */
@@ -97,6 +99,13 @@ export interface AdvancedDef {
   flags?: string
   /** A `list` of folders (HI-2480): full paths (a %VARIABLE% at the start allowed), separated by semicolons; none is the default, not a value. */
   paths?: boolean
+  /**
+   * A `list` that maps (HI-3202): each entry `role=name`, every one of these roles exactly once and no other, a name being a
+   * CLI's own (an event, a field, a key: letters, digits, `_`, `.` and `-`). Read whole or not at all (advancedRoles).
+   */
+  roles?: readonly string[]
+  /** With `roles`: no two roles may name the same thing (a CLI's events, which one name can't stand for twice). */
+  distinct?: boolean
   /** A `choice` value's choices, in the order Settings lists them. */
   choices?: readonly AdvancedChoice[]
   min?: number

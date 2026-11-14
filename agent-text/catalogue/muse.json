@@ -1,0 +1,26 @@
+{
+  "muse.asks.continue": {
+    "text": "Muse asks to continue",
+    "note": "A Muse Code agent's status while it asks permission for something it doesn't name."
+  },
+  "muse.asks.editFile": {
+    "text": "Muse asks to edit a file",
+    "note": "A Muse Code agent's status while it asks permission to edit a file it doesn't name."
+  },
+  "muse.asks.editFiles": {
+    "text": "Muse asks to edit {files}",
+    "note": "A Muse Code agent's status while it asks permission to edit files. {files}: their paths, joined."
+  },
+  "muse.asks.run": {
+    "text": "Muse asks to run {command}",
+    "note": "A Muse Code agent's status while it asks permission to run a command. {command}: its first line, shortened."
+  },
+  "muse.asks.use": {
+    "text": "Muse asks to use {tool}",
+    "note": "A Muse Code agent's status while it asks permission to use a tool. {tool}: the tool's name."
+  },
+  "muse.guidance.pointer": {
+    "text": "Combwork's guidance for this session, this agent's instructions and the Workspace notes are too long for Muse's start context ({size} bytes; Muse keeps {max}). Read the whole file now, before anything else, and follow it as your instructions: {file}",
+    "note": "What a Muse Code agent reads at its start in place of its guidance, when that is over Muse’s limit: a pointer to the file holding it. {size} and {max} are byte counts, {file} a path."
+  }
+}

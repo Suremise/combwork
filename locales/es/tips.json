@@ -388,6 +388,8 @@
   "tips.moreAgents.title": "Más de {usual, plural, one {# agente} many {# agentes} other {# agentes}}",
   "tips.moveAnyway.text": "Si arrastras una tarjeta más allá de una regla de su proyecto (a Hecho antes de su revisión, por ejemplo), Combwork pregunta primero y nombra las reglas que se salta. Mover de todos modos registra una excepción en la tarjeta, con tu motivo: un candado abierto en la tarjeta indica quién, qué reglas y por qué.",
   "tips.moveAnyway.title": "Mueve una tarjeta saltándote sus reglas, con un motivo",
+  "tips.muse.text": "Los agentes pueden usar Muse Code de Meta. Instálalo con el instalador de Meta, añade una cuenta de Muse Code en Configuración → Cuentas y conexiones e inicia sesión en ella allí. Cada cuenta tiene su propio inicio de sesión, su configuración y sus sesiones, aparte de tu propio Muse.",
+  "tips.muse.title": "Ejecutar agentes con Muse Code",
   "tips.myPrices.text": "El costo de Claude Code es su propia cifra, de su tabla de precios. ¿Tienes otras tarifas (un descuento, otro nivel)? Pon Costos de las sesiones en Mis precios, y Combwork calcula el precio de cada sesión con tu tabla.",
   "tips.myPrices.title": "Tus propios precios para Claude Code",
   "tips.newCard.text": "Presiona {key} para crear una tarjeta nueva en el proyecto en el que estás, sin dejar lo que haces.",

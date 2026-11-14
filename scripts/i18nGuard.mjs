@@ -52,6 +52,7 @@ export const ALLOW_DIR = 'i18n/allow'
  */
 export const EXCLUDED = [
   [/^src\/main\/(launchGate|screenRecognition|terminalScreen)\.ts$/, "CLI-facing: a CLI's screen and text (#367)"],
+  [/^src\/shared\/providers\/muse\/names\.ts$/, "CLI-facing: Muse Code's own event, field and key names, its advanced mappings' defaults (HI-3202, #367)"],
   [/^src\/shared\/windowHealth\.ts$/, "combwork.log's lines of a window's long tasks and hangs (HI-1775): English, as main's stall warnings are"],
   // The 1.0 workflow core's files with no text the window shows (#1264): the rest of src/main/workflow and platform is
   // checked, its window text messages in src/shared/workflow (refusals.ts, texts.ts) kept as data beside the English.

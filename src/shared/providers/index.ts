@@ -402,8 +402,8 @@ export interface ModeCaveatFacts {
 
 /** A provider's badge (ProviderIcon draws each shape and glyph): its own, so badges tell apart in one colour too. */
 export interface ProviderBadge {
-  shape: 'circle' | 'square' | 'diamond' | 'hexagon' | 'octagon'
-  glyph: 'tilde' | 'braces' | 'chevrons' | 'rise' | 'brackets'
+  shape: 'circle' | 'square' | 'diamond' | 'hexagon' | 'octagon' | 'pentagon'
+  glyph: 'tilde' | 'braces' | 'chevrons' | 'rise' | 'brackets' | 'spark'
   color: string
 }
 
