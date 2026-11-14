@@ -269,6 +269,8 @@ const commit = (dir, file, text, message) => {
 
   // --- HI-3239: what is being typed in a thread survives other spots coming and going: a draft opened at another line,
   // and a comment added or deleted there from elsewhere (another window), never remount it (each spot keeps its zone).
+  // Its base has the file with line 1 changed by the card, so the diff has an original side (HI-3274's inline flip).
+  commit(alpha, 'lines.ts', 'export const one = 0\nexport const two = 2\nexport const three = 3\n', 'Lines before')
   const kt = (await inv('tasks:create', { title: 'Keep typing', project: 'alpha', agent: builder.id, column: 'todo' })).number
   await say(alpha, builder.id, `boardmove ${kt} doing`)
   await lib.until(async () => (await card(kt))?.column === 'doing', HUNG_MS)
@@ -310,6 +312,92 @@ const commit = (dir, file, text, message) => {
   check('…switching the theme keeps them too', (await editKept()) && (await draftKept()))
   await inv('tasks:lineCommentChange', kt, k2, 'delete')
   check('…and so does its deletion', !!(await lib.until(async () => (await ktRev.locator(`[data-line-comment="${k2}"]`).count()) === 0, HUNG_MS)) && (await editKept()) && (await draftKept()), `${await editBox.inputValue().catch(() => '(gone)')} | ${await ktDraft.locator('textarea').inputValue().catch(() => '(gone)')}`)
+  // --- HI-3274: a + elsewhere while a draft has text opens another draft beside it, never in its place; an empty draft
+  // gives way; and a draft or an edit on the original side keeps its text while the diff shows inline, and back.
+  const ktComposers = ktRev.locator('[data-comment-composer]')
+  const plusAt = async (side, lineText) => {
+    await ktRev.locator(`[data-revision-diff="lines.ts"] .editor.${side} .view-line`, { hasText: lineText }).hover()
+    const p = ktRev.locator(`[data-revision-diff="lines.ts"] .editor.${side} .cw-comment-add`)
+    if (!(await lib.until(async () => (await p.count()) === 1, HUNG_MS))) await ktRev.screenshot({ path: path.join(lib.WORK, `cardwork-no-plus-${side}.png`) })
+    await p.click()
+  }
+  await plusAt('modified', 'two')
+  const atTwo = ktComposers.filter({ hasText: 'Changed 2' }).filter({ hasNotText: 'Changed 2–3' })
+  check('a + at line 2 opens a draft there and keeps the draft typed at line 3, in the same box', !!(await lib.until(async () => (await atTwo.count()) === 1, HUNG_MS)) && (await draftKept()) && (await editKept()), await ktRev.innerText().catch(() => ''))
+  // Lines 2–3 selected, then the + on line 3: a draft on the range, ending where the line-3 draft does.
+  await ktRev.locator('[data-revision-diff="lines.ts"] .editor.modified .view-line', { hasText: 'two' }).click()
+  await page.keyboard.press('Shift+ArrowDown')
+  await plusAt('modified', 'three')
+  const range = ktComposers.filter({ hasText: 'Changed 2–3' })
+  check('a + on lines 2–3 selected opens a draft on them beside the line-3 one, kept; the empty line-2 draft gives way', !!(await lib.until(async () => (await range.count()) === 1 && (await atTwo.count()) === 0, HUNG_MS)) && (await draftKept()) && (await editKept()), await ktRev.innerText().catch(() => ''))
+  await range.locator('textarea').fill('On the range')
+  await plusAt('modified', 'three')
+  check('a + on an open draft’s own line goes back to it: no other box opens', !!(await lib.until(async () => (await ktComposers.count()) === 3, HUNG_MS)) && (await draftKept()) && (await range.locator('textarea').inputValue()) === 'On the range', String(await ktComposers.count()))
+  // The original side. The dialog's diff is narrower than Monaco's breakpoint (900 px), so Monaco shows it inline on its own,
+  // keeping the original editor as wide as its line numbers: an original-side comment is listed above the diff, not in that
+  // strip. The dialog widened, the diff goes side by side; narrowed again, Monaco flips it inline: what is typed on the
+  // original side (a draft, an edit) is kept both ways, and through the Inline button too.
+  const kOld = await inv('tasks:lineCommentAdd', kt, { submission: ktSub, path: 'lines.ts', side: 'old', from: 1, to: 1, body: 'On the old one.' })
+  const elsewhere = ktRev.locator('[data-comments-elsewhere]')
+  const oldWidth = () => ktRev.locator('[data-revision-diff="lines.ts"] .editor.original').evaluate((e) => e.offsetWidth).catch(() => -1)
+  check('narrow, Monaco shows the diff inline, and an original-side comment is listed above it', !!(await lib.until(async () => (await elsewhere.locator(`[data-line-comment="${kOld}"]`).count()) === 1, HUNG_MS)), `original ${await oldWidth()} px | ${await ktRev.innerText().catch(() => '')}`)
+  const ktDialog = lib.cardDialog(page, await lib.cardLabel(inv, kt))
+  const widen = (on) => ktDialog.evaluate((e, w) => { e.style.width = w ? '1400px' : '' }, on)
+  await widen(true)
+  check('widened, the diff goes side by side, and the comment goes under its line', !!(await lib.until(async () => (await oldWidth()) > 200 && (await elsewhere.count()) === 0 && (await ktRev.locator(`[data-line-comment="${kOld}"]`).count()) === 1, HUNG_MS)), `original ${await oldWidth()} px`)
+  const oldThread = ktRev.locator(`[data-line-comment="${kOld}"]`)
+  await oldThread.getByRole('button', { name: 'Edit' }).click()
+  await oldThread.locator('textarea').fill('Old edit')
+  await plusAt('original', 'one')
+  const oldDraft = ktRev.locator('[data-draft="old:1-1"]')
+  const oldDraftBox = oldDraft.locator('textarea')
+  check('a + on the original side opens a draft there', !!(await lib.until(async () => (await oldDraftBox.count()) === 1, HUNG_MS)))
+  await oldDraftBox.fill('Old side draft')
+  const oldKept = async (draft) => (await oldDraftBox.inputValue().catch(() => '')) === draft && (await oldThread.locator('textarea').inputValue().catch(() => '')) === 'Old edit'
+  await widen(false)
+  check('narrowed, Monaco flips it inline: the draft and the edit are listed above the diff with their text', !!(await lib.until(async () => (await elsewhere.locator('[data-draft="old:1-1"]').count()) === 1 && (await oldKept('Old side draft')), HUNG_MS)), await ktRev.innerText().catch(() => ''))
+  await oldDraftBox.fill('Old side draft, typed inline')
+  for (const theme of ['dark', 'light']) {
+    await inv('settings:update', { appearance: { theme } })
+    await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+    await ktRev.screenshot({ path: path.join(lib.WORK, `cardwork-drafts-inline-${theme}.png`) })
+  }
+  await inv('settings:update', { appearance: { theme: 'dark' } })
+  await widen(true)
+  check('widened again, both are back under their line with what was typed; the other drafts and the edit kept', !!(await lib.until(async () => (await elsewhere.count()) === 0 && (await oldKept('Old side draft, typed inline')), HUNG_MS)) && (await draftKept()) && (await editKept()) && (await range.locator('textarea').inputValue()) === 'On the range', await ktRev.innerText().catch(() => ''))
+  await ktRev.getByRole('button', { name: 'Inline' }).click()
+  check('the Inline button lists them above the diff, still with their text', !!(await lib.until(async () => (await elsewhere.locator('[data-draft="old:1-1"]').count()) === 1 && (await oldKept('Old side draft, typed inline')), HUNG_MS)), await ktRev.innerText().catch(() => ''))
+  await ktRev.getByRole('button', { name: 'Side by side' }).click()
+  check('…and Side by side puts them back, as typed', !!(await lib.until(async () => (await elsewhere.count()) === 0 && (await oldKept('Old side draft, typed inline')), HUNG_MS)), await ktRev.innerText().catch(() => ''))
+  // HR1's round 1: a save under way is held with the text. Main holds the add (CW_TEST_HOLD_IPC) while the box is made again
+  // (Monaco's flip): the new box stays read-only, Save and Cancel off; the add failing leaves the text to save again, and the
+  // next save, across the flip back, writes exactly one comment.
+  const holdAdd = (on) => app.evaluate((_e, v) => void (v ? (process.env.CW_TEST_HOLD_IPC = 'tasks:lineCommentAdd') : delete process.env.CW_TEST_HOLD_IPC), on)
+  const addsHeld = () => app.evaluate(() => globalThis.__cwHeldIpc?.['tasks:lineCommentAdd'] ?? 0)
+  const oldComments = async () => (await inv('tasks:work', kt)).lineComments.filter((c) => c.side === 'old')
+  const locked = async () => (await oldDraftBox.evaluate((e) => e.readOnly).catch(() => false)) && (await oldDraft.getByRole('button', { name: 'Save' }).isDisabled().catch(() => false)) && (await oldDraft.getByRole('button', { name: 'Cancel' }).isDisabled().catch(() => false))
+  // Main reads CW_TEST_FAIL_IPC as a call comes in, before holding it: set first, it fails this add once it is let go.
+  await app.evaluate(() => { process.env.CW_TEST_FAIL_IPC = 'tasks:lineCommentAdd*1' })
+  await holdAdd(true)
+  await oldDraft.getByRole('button', { name: 'Save' }).click()
+  check('Save on the original-side draft: main holds its add, and the box is locked', !!(await lib.until(async () => (await addsHeld()) === 1 && (await locked()), HUNG_MS)), String(await addsHeld()))
+  await widen(false)
+  check('flipped inline while the save runs, the box listed above the diff has the text and stays locked', !!(await lib.until(async () => (await elsewhere.locator('[data-draft="old:1-1"]').count()) === 1 && (await oldDraftBox.inputValue().catch(() => '')) === 'Old side draft, typed inline' && (await locked()), HUNG_MS)), await ktRev.innerText().catch(() => ''))
+  await oldDraftBox.press('Control+Enter')
+  await holdAdd(false)
+  check('the held add fails: the box says so, keeps the text and opens again; nothing was saved', !!(await lib.until(async () => /failed \(CW_TEST_FAIL_IPC\)/.test(await oldDraft.innerText().catch(() => '')) && !(await oldDraftBox.evaluate((e) => e.readOnly).catch(() => true)) && (await oldDraftBox.inputValue().catch(() => '')) === 'Old side draft, typed inline', HUNG_MS)) && (await oldComments()).length === 1, `${await oldDraft.innerText().catch(() => '')} | ${JSON.stringify(await oldComments())}`)
+  await app.evaluate(() => { delete process.env.CW_TEST_FAIL_IPC })
+  await holdAdd(true)
+  await oldDraft.getByRole('button', { name: 'Save' }).click()
+  await lib.until(async () => (await addsHeld()) === 1 && (await locked()), HUNG_MS)
+  await widen(true)
+  check('saved again and flipped back while it runs: locked under its line', !!(await lib.until(async () => (await elsewhere.count()) === 0 && (await oldDraftBox.count()) === 1 && (await locked()), HUNG_MS)), await ktRev.innerText().catch(() => ''))
+  await holdAdd(false)
+  check('the add goes through: exactly one comment, with the text, and the draft closes', !!(await lib.until(async () => (await oldDraftBox.count()) === 0 && (await oldComments()).length === 2, HUNG_MS)) && (await oldComments()).filter((c) => c.body === 'Old side draft, typed inline').length === 1 && (await addsHeld()) === 0, JSON.stringify(await oldComments()))
+  await oldThread.getByRole('button', { name: 'Cancel' }).click()
+  await range.getByRole('button', { name: 'Cancel' }).click()
+  check('cancelled drafts and edits close', !!(await lib.until(async () => (await oldDraftBox.count()) === 0 && (await range.count()) === 0 && (await oldThread.locator('textarea').count()) === 0, HUNG_MS)))
+  await widen(false)
   await ktDraft.getByRole('button', { name: 'Cancel' }).click()
   check('cancelling the draft keeps the edit too', !!(await lib.until(async () => (await ktDraft.count()) === 0, HUNG_MS)) && (await editKept()))
   await closeDialogs()

@@ -3,9 +3,11 @@
 // on one of them), as a Monaco view zone, and Ctrl+Enter saves it. Saved comments show as threads under their last line,
 // with Edit, Resolve or Reopen, and Delete while unsent. They are the card's facts: main writes them
 // (tasks:lineCommentAdd/Change) and the window reads them back with the card's work, so every change shows once written.
-// A side the diff doesn't show (the original, inline) lists its comments above the diff instead.
+// A side the diff doesn't show (the original, inline) lists its comments, and its drafts, above the diff instead.
+// HI-3274: what is typed (a draft, an edit) is held by the layer, not the box, so a box made again (another spot's +, the
+// diff flipping to inline and back) keeps it; a "+" elsewhere opens another draft beside a draft with text in it.
 import { createPortal } from 'react-dom'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type * as Monaco from 'monaco-editor'
 import { msg, tr } from '@shared/i18n'
 import { formatDateTime } from '@shared/dates'
@@ -44,12 +46,48 @@ type Draft = { side: LineSide; from: number; to: number }
 type Change = { edit: { body: string; version: number } } | 'resolve' | 'reopen' | 'delete'
 type Zone = { key: string; side: LineSide; id: string; zone: Monaco.editor.IViewZone; node: HTMLDivElement }
 
-/** The comment layer over `editor` (a revision's diff of `path`): its threads, its draft, its "+" in each glyph margin. */
+const draftKey = (d: Draft): string => `${d.side}:${d.from}-${d.to}`
+
+/** State held by the layer for its boxes (HI-3274), by key, telling those that read it of each change. */
+type HeldStore = { values: Map<string, unknown>; subs: Set<() => void> }
+const heldStore = (): HeldStore => ({ values: new Map(), subs: new Set() })
+
+/** The layer's store: a draft's text, an edit's text, a box's save under way and its error, a thread's open edit. */
+const Held = createContext<HeldStore | null>(null)
+
+/**
+ * State held by the layer under `key` (`shared`), not by the component: one made again (a new portal, or listed above the
+ * diff while inline) has it, and a change made by the one it replaced (a save it started, ending) reaches it. Set back to
+ * `initial`, the layer forgets it. Not shared, or outside a layer, it is the component's own. The third value: it was held
+ * when the component was made.
+ */
+function useHeld<T>(key: string, initial: T, shared = true): [T, (v: T) => void, boolean] {
+  const layer = useContext(Held)
+  const own = useRef<HeldStore | null>(null)
+  const store = shared && layer ? layer : (own.current ??= heldStore())
+  const kept = useRef(store.values.has(key)).current
+  const subscribe = useCallback((tell: () => void) => {
+    store.subs.add(tell)
+    return () => void store.subs.delete(tell)
+  }, [store])
+  const v = useSyncExternalStore(subscribe, () => (store.values.has(key) ? (store.values.get(key) as T) : initial))
+  const set = (next: T): void => {
+    if (next === initial) store.values.delete(key)
+    else store.values.set(key, next)
+    for (const tell of [...store.subs]) tell()
+  }
+  return [v, set, kept]
+}
+
+/** The comment layer over `editor` (a revision's diff of `path`): its threads, its drafts, its "+" in each glyph margin. */
 export function CommentLayer({ editor, card, submission, path, comments, agentName }: { editor: Monaco.editor.IStandaloneDiffEditor; card: number; submission: number; path: string; comments: LineCommentView[]; agentName: (id: string | null) => string }) {
-  const [draft, setDraft] = useState<Draft | null>(null)
+  const [drafts, setDrafts] = useState<Draft[]>([])
   const [zones, setZones] = useState<Zone[]>([])
   const [oldHidden, setOldHidden] = useState(false)
+  const store = useRef(heldStore()).current
+  const held = store.values
   const sideEditor = (side: LineSide): Monaco.editor.ICodeEditor => (side === 'new' ? editor.getModifiedEditor() : editor.getOriginalEditor())
+  const dropDraft = (d: Draft): void => setDrafts((ds) => ds.filter((x) => draftKey(x) !== draftKey(d)))
 
   // The "+" on the line under the mouse, in either side's glyph margin; pressing it opens a draft there.
   useEffect(() => {
@@ -75,13 +113,28 @@ export function CommentLayer({ editor, card, submission, path, comments, agentNa
           // The lines selected, if the "+" is on one of them (a selection ending at a line's start leaves that line out).
           const last = sel && sel.endColumn === 1 && sel.endLineNumber > sel.startLineNumber ? sel.endLineNumber - 1 : (sel?.endLineNumber ?? line)
           const inSel = !!sel && !sel.isEmpty() && sel.startLineNumber <= line && line <= last
-          setDraft({ side, from: inSel ? sel.startLineNumber : line, to: inSel ? last : line })
+          const d: Draft = { side, from: inSel ? sel.startLineNumber : line, to: inSel ? last : line }
+          // HI-3274: drafts with text stay open (and keep it) beside the new one; empty ones give way to it. A "+" on an open
+          // draft's own lines goes back to its box.
+          const key = draftKey(d)
+          setDrafts((ds) => {
+            if (ds.some((x) => draftKey(x) === key)) return ds
+            // Its text, as its Composer holds it (`text:` and its hold); a draft being saved stays.
+            const typed = (x: Draft): boolean => !!String(held.get(`text:draft:${draftKey(x)}`) ?? '').trim() || held.has(`busy:draft:${draftKey(x)}`)
+            for (const x of ds) if (!typed(x)) held.delete(`text:draft:${draftKey(x)}`)
+            return [...ds.filter(typed), d]
+          })
+          requestAnimationFrame(() => editor.getContainerDomNode().querySelector<HTMLTextAreaElement>(`[data-draft="${key}"] textarea`)?.focus())
         }))
       }
-      // Inline, the original side isn't shown: its comments go above the diff.
-      const check = (): void => setOldHidden((editor.getOriginalEditor().getDomNode()?.offsetWidth ?? 0) === 0)
+      // Inline, the original side isn't shown: its comments go above the diff. Monaco's inline view (asked for, or its own
+      // when the diff is narrow) keeps the original editor as wide as its line numbers, never as its text (HI-3274).
+      const check = (): void => {
+        const li = editor.getOriginalEditor().getLayoutInfo()
+        setOldHidden(li.width <= li.contentLeft)
+      }
       check()
-      subs.push(editor.getModifiedEditor().onDidLayoutChange(check))
+      subs.push(editor.getModifiedEditor().onDidLayoutChange(check), editor.getOriginalEditor().onDidLayoutChange(check))
     })
     return () => {
       gone = true
@@ -90,18 +143,19 @@ export function CommentLayer({ editor, card, submission, path, comments, agentNa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor])
 
-  // What shows under each line: its side's threads ending there, and the draft.
+  // What shows under each line: its side's threads ending there, and the drafts ending there.
   const spots = useMemo(() => {
-    const by = new Map<string, { side: LineSide; line: number; items: LineCommentView[]; draft: Draft | null }>()
+    const by = new Map<string, { side: LineSide; line: number; items: LineCommentView[]; drafts: Draft[] }>()
     const at = (side: LineSide, line: number) => {
       const key = `${side}:${line}`
-      if (!by.has(key)) by.set(key, { side, line, items: [], draft: null })
+      if (!by.has(key)) by.set(key, { side, line, items: [], drafts: [] })
       return by.get(key)!
     }
     for (const c of comments) at(c.side, c.to).items.push(c)
-    if (draft) at(draft.side, draft.to).draft = draft
+    for (const d of drafts) at(d.side, d.to).drafts.push(d)
+    for (const s of by.values()) s.drafts.sort((a, b) => a.from - b.from)
     return by
-  }, [comments, draft])
+  }, [comments, drafts])
   const spotKeys = [...spots.keys()].filter((k) => !(oldHidden && k.startsWith('old:'))).sort().join('|')
 
   // A view zone for each spot, kept by its side and line while the spot is there (HI-3239): only spots that come or go are
@@ -155,34 +209,40 @@ export function CommentLayer({ editor, card, submission, path, comments, agentNa
     sideEditor(z.side).changeViewZones((acc) => acc.layoutZone(z.id))
   }
 
-  const content = (s: { side: LineSide; items: LineCommentView[]; draft: Draft | null }): ReactNode => (
+  const composer = (d: Draft): ReactNode => (
+    <Composer key={draftKey(d)} hold={`draft:${draftKey(d)}`} where={d} onCancel={() => dropDraft(d)} onSave={async (body) => {
+      await call('tasks:lineCommentAdd', card, { submission, path, side: d.side, from: d.from, to: d.to, body })
+      dropDraft(d)
+    }} />
+  )
+  const content = (s: { side: LineSide; items: LineCommentView[]; drafts: Draft[] }): ReactNode => (
     <>
       {s.items.map((c) => (
         <Thread key={c.id} card={card} c={c} agentName={agentName} />
       ))}
-      {s.draft && <Composer key={`${s.draft.side}:${s.draft.from}-${s.draft.to}`} where={s.draft} onCancel={() => setDraft(null)} onSave={async (body) => {
-        await call('tasks:lineCommentAdd', card, { submission, path, side: s.draft!.side, from: s.draft!.from, to: s.draft!.to, body })
-        setDraft(null)
-      }} />}
+      {s.drafts.map(composer)}
     </>
   )
 
+  // Inline, the original side's threads and drafts are listed here, each keeping what is typed in it (HI-3274).
   const elsewhere = oldHidden ? comments.filter((c) => c.side === 'old') : []
+  const elsewhereDrafts = oldHidden ? drafts.filter((d) => d.side === 'old') : []
   return (
-    <>
-      {elsewhere.length > 0 && (
+    <Held.Provider value={store}>
+      {elsewhere.length + elsewhereDrafts.length > 0 && (
         <div className="cw-comments-elsewhere" data-comments-elsewhere="">
           <div className="faint">{tr(M.elsewhere)}</div>
           {elsewhere.map((c) => (
             <Thread key={c.id} card={card} c={c} agentName={agentName} />
           ))}
+          {elsewhereDrafts.map(composer)}
         </div>
       )}
       {zones.map((z) => {
         const s = spots.get(z.key)
         return s ? createPortal(<Fitted onSize={(h) => fit(z, h)}>{content(s)}</Fitted>, z.node, z.key) : null
       })}
-    </>
+    </Held.Provider>
   )
 }
 
@@ -209,30 +269,49 @@ function Fitted({ onSize, children }: { onSize: (h: number) => void; children: R
 /** Where a comment is: its side and lines. */
 export const whereOf = (w: { side: LineSide; from: number; to: number }): string => tr(M.lines, { side: w.side, from: w.from, to: w.to, same: w.from === w.to ? 'yes' : 'no' })
 
-/** A box to write a comment in (or edit one): Ctrl+Enter saves, Escape cancels; what went wrong said under it. */
-function Composer({ where, initial = '', onSave, onCancel }: { where?: Draft; initial?: string; onSave: (body: string) => Promise<void>; onCancel: () => void }) {
-  const [text, setText] = useState(initial)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+/**
+ * A box to write a comment in (or edit one): Ctrl+Enter saves, Escape cancels; what went wrong said under it. Its text is
+ * held by the layer under `hold` (HI-3274), so the box made again keeps it; a new box takes the focus, one made again doesn't.
+ * So are its save under way and its error (HR1's round 1): a box made again while its save runs stays read-only, with Save and
+ * Cancel off, until that save ends, so it can't save twice, and nothing typed meanwhile is lost when the save clears the box.
+ */
+function Composer({ where, hold, initial = '', onSave, onCancel }: { where?: Draft; hold?: string; initial?: string; onSave: (body: string) => Promise<void>; onCancel: () => void }) {
+  const shared = hold !== undefined
+  const [text, setText, restored] = useHeld(`text:${hold}`, initial, shared)
+  const [busy, setBusy] = useHeld(`busy:${hold}`, false, shared)
+  const [error, setError] = useHeld<string | null>(`error:${hold}`, null, shared)
   const ref = useRef<HTMLTextAreaElement>(null)
-  useEffect(() => ref.current?.focus(), [])
+  useEffect(() => {
+    if (!restored) ref.current?.focus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const cancel = (): void => {
+    if (busy) return
+    setText(initial)
+    setError(null)
+    onCancel()
+  }
   const save = async (): Promise<void> => {
     if (!text.trim() || busy) return
     setBusy(true)
     setError(null)
     try {
       await onSave(text)
+      setText(initial)
     } catch (e) {
+      // The text stays, to change and save again.
       setError(errorMessage(e))
+    } finally {
       setBusy(false)
     }
   }
   return (
-    <div className="cw-comment-composer" data-comment-composer="">
+    <div className="cw-comment-composer" data-comment-composer="" data-draft={where ? draftKey(where) : undefined}>
       {where && <div className="faint cw-comment-where">{whereOf(where)}</div>}
       <textarea
         ref={ref}
         value={text}
+        readOnly={busy}
         maxLength={LINE_COMMENT_LIMITS.body}
         placeholder={tr(M.placeholder)}
         onChange={(e) => setText(e.target.value)}
@@ -242,14 +321,14 @@ function Composer({ where, initial = '', onSave, onCancel }: { where?: Draft; in
             void save()
           } else if (e.key === 'Escape') {
             e.preventDefault()
-            onCancel()
+            cancel()
           }
         }}
       />
       <div className="cw-comment-actions">
         <span className="faint">{tr(M.count, { n: text.length, max: LINE_COMMENT_LIMITS.body })}</span>
         <span className="grow" />
-        <button type="button" className="btn small subtle" onClick={onCancel}>
+        <button type="button" className="btn small subtle" disabled={busy} onClick={cancel}>
           {tr(M.cancel)}
         </button>
         <button type="button" className="btn small primary" disabled={!text.trim() || busy} onClick={() => void save()}>
@@ -264,7 +343,8 @@ function Composer({ where, initial = '', onSave, onCancel }: { where?: Draft; in
 /** One saved comment: who and when, where, its Markdown, and what can be done with it. */
 export function Thread({ card, c, agentName }: { card: number; c: LineCommentView; agentName: (id: string | null) => string }) {
   // The version Edit was opened on (HR1's round 1): saved against it, so an edit made meanwhile is refused, never overwritten.
-  const [editing, setEditing] = useState<{ version: number; body: string } | null>(null)
+  // Held by the layer (HI-3274): the thread listed above the diff while inline, or back under its line, keeps it open.
+  const [editing, setEditing] = useHeld<{ version: number; body: string } | null>(`edit:${c.id}`, null)
   const [error, setError] = useState<string | null>(null)
   const change = async (what: Change): Promise<void> => {
     setError(null)
@@ -304,7 +384,7 @@ export function Thread({ card, c, agentName }: { card: number; c: LineCommentVie
         )}
       </div>
       {editing ? (
-        <Composer initial={editing.body} onCancel={() => setEditing(null)} onSave={async (body) => {
+        <Composer hold={`edit-text:${c.id}`} initial={editing.body} onCancel={() => setEditing(null)} onSave={async (body) => {
           await call('tasks:lineCommentChange', card, c.id, { edit: { body, version: editing.version } })
           setEditing(null)
         }} />
