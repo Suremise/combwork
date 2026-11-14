@@ -1,8 +1,13 @@
-import { EFFORT_TEXT, OLDER_VERSIONS } from './claude'
-import { withCliOwn } from './cliOwnMode'
-import { msg } from './i18n/msg'
-import { agentMsg, say } from './agentText'
-import type { ModeOption, ModelGroup, ProviderDescriptor } from './providers'
+import { OLDER_VERSIONS, effortLevels, gptModelLabel } from '../common'
+import { withCliOwn } from '../../cliOwnMode'
+import { msg } from '../../i18n/msg'
+import { agentMsg, say } from '../../agentText'
+import type { ModeOption, ModelGroup, ProviderDescriptor } from '..'
+import { defineProvider } from '../parts'
+import { ADVANCED, OUTAGE_CHECK } from './advanced'
+import { TIPS } from './tips'
+import { CODEX_SAFEGUARDS } from './safeguards'
+import { CODEX_PRICES } from './prices'
 
 /**
  * Codex's side of the shared provider data: its permission presets (the /permissions menu), reasoning
@@ -89,19 +94,7 @@ export const CODEX_MODE_FLAGS: Record<string, string[]> = {
   'cli-own': []
 }
 
-/** "gpt-6-luna" → "GPT-6 Luna", "gpt-5.6-terra" → "GPT-5.6 Terra"; anything else as it is. */
-export function codexModelLabel(model: string): string {
-  const m = /^gpt-(\d+(?:\.\d+)?)(?:-(.+))?$/i.exec(model.trim())
-  if (!m) return model
-  const rest = (m[2] ?? '')
-    .split('-')
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ')
-  return `GPT-${m[1]}${rest ? ` ${rest}` : ''}`
-}
-
-const models = (...ids: string[]) => ids.map((id) => ({ value: id, label: codexModelLabel(id) }))
+const models = (...ids: string[]) => ids.map((id) => ({ value: id, label: gptModelLabel(id) }))
 
 /**
  * Models offered in the pickers when Codex can't be asked (codex debug models gives the real list, #125): the starting
@@ -121,53 +114,61 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
   company: 'OpenAI', // i18n-ignore: a company name
   cliName: 'codex',
   icon: 'codex',
+  badge: { shape: 'square', glyph: 'braces', color: '#14a89a' },
   setupUrl: 'https://developers.openai.com/codex/cli',
   pricingUrl: 'https://openai.com/api/pricing/',
   permissionModes: withCliOwn(CODEX_PERMISSION_MODES),
   defaultPermissionMode: 'approve-for-me',
   assistantMode: 'approve-for-me',
-  effortLevels: [
-    { value: 'low', label: 'Low', text: EFFORT_TEXT.low }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'medium', label: 'Medium', text: EFFORT_TEXT.medium }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'high', label: 'High', text: EFFORT_TEXT.high }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'xhigh', label: 'Extra high', text: EFFORT_TEXT.xhigh }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'max', label: 'Max', text: EFFORT_TEXT.max }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'ultra', label: 'Ultra', text: EFFORT_TEXT.ultra } // i18n-ignore: agent-facing English (text is the window's)
-  ],
+  effortLevels: effortLevels('low', 'medium', 'high', 'xhigh', 'max', 'ultra'),
   modelGroups: CODEX_MODEL_GROUPS,
   modelPlaceholder: 'Model ID, e.g. gpt-6-sol', // i18n-ignore: English (text.modelPlaceholder is the window's)
   capabilities: {
-    fixedSessionId: false,
-    liveModeSwitch: 'menu',
-    planModeToggle: true,
-    promptCacheTtl: false,
-    reportsCost: false,
-    // Every MCP tool behind its tool search, marked or not (HI-3225: 0.167 and 0.169, every listed model; checked offline
-    // against a stand-in and once signed in): its model sees `mcp__combwork` only.
-    defersMcpTools: 'all',
-    compactFocus: false,
-    contextLimit: false,
-    autoCompactReserve: null,
-    // A pasted image path becomes [Image #n] (checked with Codex 0.159).
-    imagePaste: true,
-    // Images (pasted, or its view_image tool) and text; a PDF it can only dump with a shell command (checked with 0.162.1).
-    attachments: ['image', 'text'],
-    // Codex rejects permissionDecision "ask" (and then runs the tool), so Combwork asks the user itself.
-    lockAsk: false,
-    backgroundSessions: false,
-    // Codex isn't told when a background terminal ends: it finds out only by checking during a turn.
-    backgroundWakes: false,
-    typedTurnsWithoutPrompt: false,
-    startupSizeRefresh: false,
-    // Its paste-burst detection drops an Enter that a busy Codex reads with the line, bracketed or not; Enter once the line
-    // is drawn sends it (#600, checked with 0.163). disable_paste_burst would too, but loses a user's multi-line paste.
-    bracketedPaste: false,
-    enterOnceDrawn: true,
-    // Its editor's insert_newline keys (0.164.0's default keymap: ctrl+j, ctrl+m, enter, shift+enter, alt+enter; plain
-    // Enter sends): Alt+Enter and Ctrl+J, as Windows' console delivers them (HI-1327). Off until tried on real Codex.
-    typedNewlines: ['alt-enter', 'ctrl-j'],
-    // --add-dir, added to the writable roots of its own config (0.163.0: tests/fixtures/advanced/writable-roots-codex-0.163.0.json).
-    extraDirs: true,
+    terminal: {
+      // A pasted image path becomes [Image #n] (checked with Codex 0.159).
+      imagePaste: true,
+      // Images (pasted, or its view_image tool) and text; a PDF it can only dump with a shell command (checked with 0.162.1).
+      attachments: ['image', 'text'],
+      startupSizeRefresh: false,
+      // Its paste-burst detection drops an Enter that a busy Codex reads with the line, bracketed or not; Enter once the line
+      // is drawn sends it (#600, checked with 0.163). disable_paste_burst would too, but loses a user's multi-line paste.
+      bracketedPaste: false,
+      enterOnceDrawn: true,
+      // Its editor's insert_newline keys (0.164.0's default keymap: ctrl+j, ctrl+m, enter, shift+enter, alt+enter; plain
+      // Enter sends): Alt+Enter and Ctrl+J, as Windows' console delivers them (HI-1327). Off until tried on real Codex.
+      typedNewlines: ['alt-enter', 'ctrl-j']
+    },
+    session: {
+      fixedSessionId: false,
+      // Every MCP tool behind its tool search, marked or not (HI-3225: 0.167 and 0.169, every listed model; checked offline
+      // against a stand-in and once signed in): its model sees `mcp__combwork` only.
+      defersMcpTools: 'all',
+      // Codex rejects permissionDecision "ask" (and then runs the tool), so Combwork asks the user itself.
+      lockAsk: false,
+      typedTurnsWithoutPrompt: false,
+      // --add-dir, added to the writable roots of its own config (0.163.0: tests/fixtures/advanced/writable-roots-codex-0.163.0.json).
+      extraDirs: true,
+      // Its timeout for Combwork's tools (codex.mcp.toolTimeoutSeconds): waits are held a minute under it.
+      mcpToolTimeoutSetting: 'codex.mcp.toolTimeoutSeconds'
+    },
+    modes: {
+      liveModeSwitch: 'menu',
+      planModeToggle: true
+    },
+    usage: {
+      promptCacheTtl: false,
+      reportsCost: false
+    },
+    compaction: {
+      compactFocus: false,
+      contextLimit: false,
+      autoCompactReserve: null
+    },
+    background: {
+      backgroundSessions: false,
+      // Codex isn't told when a background terminal ends: it finds out only by checking during a turn.
+      backgroundWakes: false
+    },
     // Each connection a CODEX_HOME of its own (HI-1757), its rollouts shared with the others through sessions\ and
     // archived_sessions\ (resume reads the rollout alone); its memory, thread names and prompt history stay its own.
     // Its sign-in names an email and plan, no organisation.
@@ -195,7 +196,11 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
     safeguardHelp: msg({ id: 'agents.codex.safeguardHelp', defaultMessage: 'Codex sends a request it flags to another model, or stops the turn. For security work, OpenAI’s Trusted Access for Cyber program lifts that.', description: "What happens after Codex's safety check flags a request (an agent's safeguard note). Trusted Access for Cyber is the name of OpenAI's program: keep it." }),
     modelPlaceholder: msg({ id: 'agents.codex.modelPlaceholder', defaultMessage: 'Model ID, e.g. gpt-6-sol', description: 'Placeholder of the custom model ID box (Codex). Keep the model ID exactly as it is.' })
   },
-  modelLabel: codexModelLabel,
+  modelLabel: gptModelLabel,
   // Every preset is in Codex's /permissions menu, so each can be switched to in a running session.
   canSwitchLive: () => true
 }
+
+/** Codex's shared half, as the registry lists it (HI-3201). */
+// agent-text: CODEX_DESCRIPTOR.text.safeguardHelp (a CLI's sentence stored by id in a card comment, said when read: providerMessage)
+export default defineProvider({ descriptor: CODEX_DESCRIPTOR, prices: CODEX_PRICES, tips: TIPS, safeguards: CODEX_SAFEGUARDS, advanced: ADVANCED, outageCheck: OUTAGE_CHECK })

@@ -1,7 +1,7 @@
 import { join } from 'path'
 import { mkdir, writeFile } from 'original-fs/promises'
 import type { McpServerDef } from '../../../shared/types'
-import { CLAUDE_AGENT_PROVIDER } from '../../../shared/opencode'
+import { CLAUDE_AGENT_PROVIDER } from '../../../shared/providers/opencode'
 import { writeJsonAtomic } from '../../fsutil'
 
 // OpenCode's private config folder (OPENCODE_CONFIG_DIR, HI-2759; HI-2758's Q2 and Q3, checked against 2.2.6): the

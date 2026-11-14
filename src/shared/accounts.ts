@@ -360,7 +360,7 @@ export function launchValues(v: LaunchValues | null | undefined, cli: ProviderId
   const out: LaunchValues = {}
   if (v?.model?.trim()) out.model = v.model.trim()
   if (v?.effort && !server) out.effort = v.effort
-  if (v?.use200kContext === true && !server && d.capabilities.contextLimit) out.use200kContext = true
+  if (v?.use200kContext === true && !server && d.capabilities.compaction?.contextLimit) out.use200kContext = true
   if (v?.permissionMode && v.permissionMode !== d.defaultPermissionMode) out.permissionMode = v.permissionMode
   if (v?.extraArgs?.trim()) out.extraArgs = v.extraArgs.trim()
   return out

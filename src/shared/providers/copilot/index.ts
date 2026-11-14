@@ -1,11 +1,15 @@
-import { footerPatterns, lastFooterMode, type FooterModeDef, type FooterPatterns } from './footerModes'
-import type { PermissionMode } from './types'
-import type { ModeOption, ModelGroup, ProviderDescriptor } from './providers'
-import { codexModelLabel } from './codex'
-import { EFFORT_TEXT, OLDER_VERSIONS } from './claude'
-import { withCliOwn } from './cliOwnMode'
-import { msg } from './i18n/msg'
-import { agentMsg, say } from './agentText'
+import { footerPatterns, lastFooterMode, type FooterPatterns } from '../../footerModes'
+import type { PermissionMode } from '../../types'
+import type { ModeOption, ModelGroup, ProviderDescriptor } from '..'
+import { OLDER_VERSIONS, effortLevels, gptModelLabel } from '../common'
+import { withCliOwn } from '../../cliOwnMode'
+import { msg } from '../../i18n/msg'
+import { agentMsg, say } from '../../agentText'
+import { defineProvider } from '../parts'
+import { ADVANCED, OUTAGE_CHECK } from './advanced'
+import { COPILOT_FOOTER_MODES } from './footer'
+export { COPILOT_FOOTER_MODES } from './footer'
+import { TIPS } from './tips'
 
 /**
  * GitHub Copilot's side of the shared provider data (the Copilot CLI, `copilot`): its modes, reasoning levels and models.
@@ -18,6 +22,9 @@ import { agentMsg, say } from './agentText'
  */
 
 export const COPILOT = 'copilot'
+
+/** Copilot's one PC-wide sign-in as an account (decision C): made by Combwork, never removed, on the CLI's own home (pcAccountId). */
+export const COPILOT_ACCOUNT = COPILOT
 
 // Combwork's own tools (the combwork MCP server) never ask, in any mode: the adapter pre-approves them.
 /** GitHub Copilot's permission modes as agents and the Agent API read them (dialects, HI-2065): said when read (the getters below), so in the reader's dialect. The window has its own messages (`text`). */
@@ -152,19 +159,6 @@ export function copilotModeFlags(mode: PermissionMode, folder: string): string[]
   }
 }
 
-/**
- * Each mode's footer, by its two parts ("Plan · Manual Approval"), read by each part's first word: in a narrow terminal
- * Copilot wraps its footer item by item ("← open ·Interactive · Manual · / commands" over "sidebar Approval next tab",
- * 1.0.93). The defaults of the advanced settings copilot.footer.<key> (#696), case sensitive. Accept edits has none: its
- * footer is Ask's. Combwork has no mode for Assisted approval.
- */
-export const COPILOT_FOOTER_MODES: readonly FooterModeDef[] = [
-  { mode: 'ask', key: 'ask', label: 'Ask', pattern: String.raw`\bInteractive ?· ?Manual\b` }, // i18n-ignore: a footer's name in Settings → Advanced (advanced.ts words it)
-  { mode: 'allow-all', key: 'allowAll', label: 'Allow all', pattern: String.raw`\bInteractive ?· ?Allow\b` }, // i18n-ignore: a footer's name in Settings → Advanced (advanced.ts words it)
-  { mode: 'plan', key: 'plan', label: 'Plan', pattern: String.raw`\bPlan ?· ?(?:Manual|Allow|Assisted)\b` }, // i18n-ignore: a footer's name in Settings → Advanced (advanced.ts words it)
-  { mode: 'autopilot', key: 'autopilot', label: 'Autopilot', pattern: String.raw`\bAutopilot ?· ?(?:Manual|Allow|Assisted)\b` } // i18n-ignore: a footer's name in Settings → Advanced (advanced.ts words it)
-]
-
 const FOOTER_DEFAULTS = footerPatterns(COPILOT_FOOTER_MODES, '')
 
 /**
@@ -197,7 +191,7 @@ const WORDS: Record<string, string> = { gpt: 'GPT', mai: 'MAI', k3: 'K3' }
 /** "claude-sonnet-5.5" → "Claude Sonnet 5.5", "gpt-6-luna" → "GPT-6 Luna", "auto" → "Auto"; anything else word by word. */
 export function copilotModelLabel(model: string): string {
   const m = model.trim()
-  if (/^gpt-/i.test(m)) return codexModelLabel(m)
+  if (/^gpt-/i.test(m)) return gptModelLabel(m)
   if (!/^[a-z0-9][a-z0-9.-]*$/i.test(m)) return m
   return m
     .split('-')
@@ -236,6 +230,7 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
   company: 'GitHub', // i18n-ignore: a company name
   cliName: 'copilot',
   icon: 'copilot',
+  badge: { shape: 'diamond', glyph: 'chevrons', color: '#8b6cf0' },
   setupUrl: 'https://docs.github.com/copilot/how-tos/copilot-cli',
   pricingUrl: 'https://docs.github.com/copilot/reference/ai-models/supported-models',
   permissionModes: withCliOwn(COPILOT_PERMISSION_MODES),
@@ -243,50 +238,54 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
   defaultPermissionMode: 'accept-edits',
   // Reads are approved by Copilot itself, and Combwork's own tools are pre-approved (the Assistant's: trustedCombworkTools).
   assistantMode: 'ask',
-  effortLevels: [
-    { value: 'none', label: 'None', text: EFFORT_TEXT.none }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'minimal', label: 'Minimal', text: EFFORT_TEXT.minimal }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'low', label: 'Low', text: EFFORT_TEXT.low }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'medium', label: 'Medium', text: EFFORT_TEXT.medium }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'high', label: 'High', text: EFFORT_TEXT.high }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'xhigh', label: 'Extra high', text: EFFORT_TEXT.xhigh }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'max', label: 'Max', text: EFFORT_TEXT.max } // i18n-ignore: agent-facing English (text is the window's)
-  ],
+  effortLevels: effortLevels('none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'),
   modelGroups: COPILOT_MODEL_GROUPS,
   modelPlaceholder: 'Model ID, e.g. claude-sonnet-5.5 or auto', // i18n-ignore: English (text.modelPlaceholder is the window's)
   capabilities: {
-    modelAliases: ['auto'],
-    // --session-id <uuid> names a new session; --resume <id> reopens it.
-    fixedSessionId: true,
-    liveModeSwitch: 'cycle',
-    planModeToggle: false,
-    promptCacheTtl: false,
-    // Its transcript counts the session's AI credits (session.usage_checkpoint), and one credit is $0.01.
-    reportsCost: true,
-    defersMcpTools: false,
-    // /compact takes focus instructions.
-    compactFocus: true,
-    contextLimit: false,
-    autoCompactReserve: null,
-    imagePaste: false,
-    githubHost: true,
-    // Its view tool returns images as images and text as text; a PDF comes back as its raw bytes (checked with 1.0.95).
-    attachments: ['image', 'text'],
-    // A PreToolUse "ask" brings up Copilot's own approval dialog, even with --allow-all (checked with 1.0.93).
-    lockAsk: true,
-    backgroundSessions: false,
-    backgroundWakes: false,
-    typedTurnsWithoutPrompt: false,
-    // Its interface fills the screen: drawn while its terminal changed size, it can stay at the old width (#486).
-    startupSizeRefresh: true,
-    // A model call it gave up on ends the turn with a session.error and no Stop (1.0.105, HI-1960).
-    failureEndsTurn: true,
-    // A line typed in pieces that a busy Copilot reads with its Enter in one go isn't sent by that Enter; pasted, it is,
-    // as text (#600, checked with 1.0.98).
-    bracketedPaste: true,
-    enterOnceDrawn: false,
-    // --add-dir (1.0.100).
-    extraDirs: true
+    terminal: {
+      imagePaste: false,
+      // Its view tool returns images as images and text as text; a PDF comes back as its raw bytes (checked with 1.0.95).
+      attachments: ['image', 'text'],
+      // Its interface fills the screen: drawn while its terminal changed size, it can stay at the old width (#486).
+      startupSizeRefresh: true,
+      // A line typed in pieces that a busy Copilot reads with its Enter in one go isn't sent by that Enter; pasted, it is,
+      // as text (#600, checked with 1.0.98).
+      bracketedPaste: true,
+      enterOnceDrawn: false
+    },
+    session: {
+      modelAliases: ['auto'],
+      // --session-id <uuid> names a new session; --resume <id> reopens it.
+      fixedSessionId: true,
+      defersMcpTools: false,
+      // A PreToolUse "ask" brings up Copilot's own approval dialog, even with --allow-all (checked with 1.0.93).
+      lockAsk: true,
+      typedTurnsWithoutPrompt: false,
+      // A model call it gave up on ends the turn with a session.error and no Stop (1.0.105, HI-1960).
+      failureEndsTurn: true,
+      // --add-dir (1.0.100).
+      extraDirs: true
+    },
+    modes: {
+      liveModeSwitch: 'cycle',
+      planModeToggle: false
+    },
+    usage: {
+      promptCacheTtl: false,
+      // Its transcript counts the session's AI credits (session.usage_checkpoint), and one credit is $0.01.
+      reportsCost: true
+    },
+    compaction: {
+      // /compact takes focus instructions.
+      compactFocus: true,
+      contextLimit: false,
+      autoCompactReserve: null
+    },
+    background: {
+      backgroundSessions: false,
+      backgroundWakes: false
+    },
+    githubHost: true
   },
   reservedKeys: [],
   instructionsFile: 'AGENTS.md',
@@ -307,3 +306,14 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
   modelLabel: copilotModelLabel,
   canSwitchLive: copilotCanSwitchLive
 }
+
+/** GitHub Copilot's shared half, as the registry lists it (HI-3201). */
+export default defineProvider({
+  descriptor: COPILOT_DESCRIPTOR,
+  // GitHub Copilot reports each session's cost itself, in AI credits ($0.01 each, charged at each model's API rate):
+  // no table ships. Prices a user adds are used for sessions without a reported cost.
+  prices: { checked: '2026-09-30', shipped: {} },
+  tips: TIPS,
+  advanced: ADVANCED,
+  outageCheck: OUTAGE_CHECK
+})

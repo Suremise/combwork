@@ -17,6 +17,7 @@ import { sessions } from './sessions'
 import { workspace, workspaceFor } from './workspace'
 import { trash as toTrash } from './trash'
 import { followMovedLink } from './combworkMove'
+import { LEGACY_PROVIDER } from '../shared/providers'
 
 const log = createLogger('files')
 
@@ -485,7 +486,7 @@ export async function listAttachments(projectPath: string): Promise<SessionAttac
     // Names start with the time (see sessions.attachmentFile), so they order reliably even after copying.
     attachments.sort((a, b) => b.name.localeCompare(a.name) || b.modified.localeCompare(a.modified))
     const rec = records.get(d.name)
-    groups.push({ sessionId: d.name, name: rec?.name ?? null, archived: rec?.archived ?? false, provider: rec ? rec.agent || 'claude-code' : null, attachments })
+    groups.push({ sessionId: d.name, name: rec?.name ?? null, archived: rec?.archived ?? false, provider: rec ? rec.agent || LEGACY_PROVIDER : null, attachments })
   }
   return groups.sort((a, b) => b.attachments[0].name.localeCompare(a.attachments[0].name))
 }

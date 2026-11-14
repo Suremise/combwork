@@ -18,7 +18,7 @@ const { ambientBlockers, credentialPattern, opencodeEnv, opencodeRoots } = await
 const { chosenAmbient, checkConfig, launchConfig, loginConfig, mcpPolicies, opencodeServer, parseAuthList, providerPolicies } = await import('../src/main/providers/opencode/config')
 const { isSessionId, newSessionId, protectedArg, launchGuidance } = await import('../src/main/providers/opencode/adapter')
 const { LAUNCHER_SOURCE, launcherEnv } = await import('../src/main/providers/opencode/launcher')
-const { OPENCODE_DESCRIPTOR, isClaudeAgentModel, isOpencodeModelId, opencodeAgentOf, opencodeModeFlags, opencodeModelLabel } = await import('../src/shared/opencode')
+const { OPENCODE_DESCRIPTOR, isClaudeAgentModel, isOpencodeModelId, opencodeAgentOf, opencodeModeFlags, opencodeModelLabel } = await import('../src/shared/providers/opencode')
 const { effortName } = await import('../src/shared/models')
 const { TOOLS_SERVER } = await import('../src/shared/assistantTools')
 

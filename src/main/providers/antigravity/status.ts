@@ -1,5 +1,5 @@
 import type { PlanLimit, PlanUsage } from '../../../shared/types'
-import { ANTIGRAVITY } from '../../../shared/antigravity'
+import { ANTIGRAVITY } from '../../../shared/providers/antigravity'
 import { advanced } from '../../advanced'
 import { isoTime } from '../../../shared/planLimits'
 import type { LiveDetails } from '../types'

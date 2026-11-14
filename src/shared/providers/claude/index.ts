@@ -1,10 +1,20 @@
-import { withCliOwn } from './cliOwnMode'
-import { footerPatterns, lastFooterMode, type FooterModeDef, type FooterPatterns } from './footerModes'
-import { msg } from './i18n/msg'
-import { agentMsg, say } from './agentText'
-import type { Tr } from './tasks'
-import type { PermissionMode } from './types'
-import type { ModeCaveatFacts, ModeOption, ModelGroup, ModelOption, ProviderDescriptor } from './providers'
+import { OLDER_VERSIONS, effortLevels } from '../common'
+import { withCliOwn } from '../../cliOwnMode'
+import { footerPatterns, lastFooterMode, type FooterPatterns } from '../../footerModes'
+import { msg } from '../../i18n/msg'
+import { agentMsg, say } from '../../agentText'
+import type { Tr } from '../../tasks'
+import type { PermissionMode } from '../../types'
+import type { ModeCaveatFacts, ModeOption, ModelGroup, ModelOption, ProviderDescriptor } from '..'
+import { defineProvider } from '../parts'
+import { CLAUDE_ADMIN_SNIPPET } from './hookHandlers'
+import { ADVANCED, OUTAGE_CHECK } from './advanced'
+import { CLAUDE_FOOTER_MODES } from './footer'
+export { CLAUDE_FOOTER_MODES } from './footer'
+import { TIPS } from './tips'
+import { CLAUDE_SAFEGUARDS } from './safeguards'
+import { baseModel } from './modelIds'
+import { CLAUDE_PRICES } from './prices'
 
 /**
  * Claude Code's side of the shared provider data: its permission modes, effort levels and models,
@@ -12,25 +22,6 @@ import type { ModeCaveatFacts, ModeOption, ModelGroup, ModelOption, ProviderDesc
  */
 
 export const CLAUDE_CODE = 'claude-code'
-
-/**
- * Effort levels' names in the window's words (#800), every provider's: the descriptors' effortLevels keep the English
- * for agents and the Agent API. Here, in the first descriptor's module, so codex.ts and copilot.ts take them without a
- * cycle.
- */
-export const EFFORT_TEXT = {
-  none: msg({ id: 'agents.efforts.none', defaultMessage: 'None', description: 'An effort level (how hard the model thinks) in the effort picker: no reasoning. Keep it short.' }),
-  minimal: msg({ id: 'agents.efforts.minimal', defaultMessage: 'Minimal', description: 'An effort level (how hard the model thinks) in the effort picker. Keep it short.' }),
-  low: msg({ id: 'agents.efforts.low', defaultMessage: 'Low', description: 'An effort level (how hard the model thinks) in the effort picker. Keep it short.' }),
-  medium: msg({ id: 'agents.efforts.medium', defaultMessage: 'Medium', description: 'An effort level (how hard the model thinks) in the effort picker. Keep it short.' }),
-  high: msg({ id: 'agents.efforts.high', defaultMessage: 'High', description: 'An effort level (how hard the model thinks) in the effort picker. Keep it short.' }),
-  xhigh: msg({ id: 'agents.efforts.xhigh', defaultMessage: 'Extra high', description: 'An effort level (how hard the model thinks) in the effort picker, between High and Max. Keep it short.' }),
-  max: msg({ id: 'agents.efforts.max', defaultMessage: 'Max', description: 'The highest effort level (how hard the model thinks) of most models, in the effort picker. Keep it short.' }),
-  ultra: msg({ id: 'agents.efforts.ultra', defaultMessage: 'Ultra', description: "Codex's effort level above Max (how hard the model thinks), in the effort picker. Keep it short." })
-}
-
-/** The model pickers' group of older models, every provider's (#800). */
-export const OLDER_VERSIONS = msg({ id: 'agents.models.olderGroup', defaultMessage: 'Older versions', description: 'A group of the model picker: earlier models, hidden until shown.' })
 
 /** Claude Code's permission modes as agents and the Agent API read them (dialects, HI-2065): said when read (the getters below), so in the reader's dialect. The window has its own messages (`text`). */
 const M = {
@@ -189,11 +180,7 @@ export const CLAUDE_MODEL_GROUPS: ModelGroup[] = [
   }
 ]
 
-/**
- * The model without its 1M-context suffix. Current models have the 1M window without it; only Opus 4.6 and
- * Sonnet 4.6 need "[1m]" (typed as a custom model ID), and Claude Code rejects it when 1M is turned off.
- */
-export const baseModel = (model: string): string => model.replace(/\[1m\]$/i, '')
+export { baseModel } from './modelIds'
 
 export const isOlderModel = (model: string): boolean => CLAUDE_MODEL_GROUPS.some((g) => g.older && g.models.some((m) => m.value === baseModel(model)))
 
@@ -203,22 +190,6 @@ export const isOlderModel = (model: string): boolean => CLAUDE_MODEL_GROUPS.some
 
 /** The modes Claude Code's Shift+Tab cycles through, in order (checked with Claude Code 2.1.284). */
 export const MODE_CYCLE: PermissionMode[] = ['manual', 'acceptEdits', 'plan', 'auto']
-
-/**
- * A mode's footer: its words after Claude Code's mode symbol (⏵⏵ or ⏸), or followed by its hint ("(shift+tab to
- * cycle)" or "·"). Manual shows only "⏸ manual mode on" (Claude Code 2.1.286), so the symbol is needed.
- */
-const footer = (words: string): string => String.raw`[⏵⏸][\s⏵⏸]*${words}\s*on\b|${words}\s*on\s*(?:\(|·)`
-
-/** Each mode's footer (Claude Code 2.1.296): the defaults of the advanced settings claude-code.footer.<key> (#696), flags i. */
-export const CLAUDE_FOOTER_MODES: readonly FooterModeDef[] = [
-  { mode: 'manual', key: 'manual', label: 'Manual', pattern: footer(String.raw`manual\s*mode`) }, // i18n-ignore: a footer's name in Settings → Advanced (advanced.ts words it)
-  { mode: 'acceptEdits', key: 'acceptEdits', label: 'Accept edits', pattern: footer(String.raw`accept\s*edits`) }, // i18n-ignore: a footer's name in Settings → Advanced (advanced.ts words it)
-  { mode: 'plan', key: 'plan', label: 'Plan', pattern: footer(String.raw`plan\s*mode`) }, // i18n-ignore: a footer's name in Settings → Advanced (advanced.ts words it)
-  { mode: 'auto', key: 'auto', label: 'Auto', pattern: footer(String.raw`auto\s*mode`) }, // i18n-ignore: a footer's name in Settings → Advanced (advanced.ts words it)
-  { mode: 'bypassPermissions', key: 'bypassPermissions', label: 'Bypass permissions', pattern: footer(String.raw`bypass\s*permissions`) }, // i18n-ignore: a footer's name in Settings → Advanced (advanced.ts words it)
-  { mode: 'dontAsk', key: 'dontAsk', label: "Don't ask", pattern: footer(String.raw`don['’]?t\s*ask`) } // i18n-ignore: a footer's name in Settings → Advanced (advanced.ts words it)
-]
 
 const FOOTER_DEFAULTS = footerPatterns(CLAUDE_FOOTER_MODES, 'i')
 
@@ -275,6 +246,7 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
   company: 'Anthropic', // i18n-ignore: a company name
   cliName: 'claude',
   icon: 'claude',
+  badge: { shape: 'circle', glyph: 'tilde', color: '#e8705f' },
   setupUrl: 'https://code.claude.com/docs/en/setup',
   pricingUrl: 'https://platform.claude.com/docs/en/about-claude/pricing',
   permissionModes: withCliOwn(CLAUDE_PERMISSION_MODES),
@@ -282,47 +254,55 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
   // Plan mode would block the Combwork tools.
   assistantMode: 'auto',
   modeCaveat: claudeModeCaveat,
-  effortLevels: [
-    { value: 'low', label: 'Low', text: EFFORT_TEXT.low }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'medium', label: 'Medium', text: EFFORT_TEXT.medium }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'high', label: 'High', text: EFFORT_TEXT.high }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'xhigh', label: 'Extra high', text: EFFORT_TEXT.xhigh }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'max', label: 'Max', text: EFFORT_TEXT.max } // i18n-ignore: agent-facing English (text is the window's)
-  ],
+  effortLevels: effortLevels('low', 'medium', 'high', 'xhigh', 'max'),
   modelGroups: CLAUDE_MODEL_GROUPS,
   modelPlaceholder: 'Full model ID, e.g. claude-opus-5-5 or claude-opus-4-6[1m]', // i18n-ignore: English (text.modelPlaceholder is the window's)
   capabilities: {
-    remoteHookPolicy: true,
-    planUsageSinceLaunch: true,
-    modelAliases: ['fable', 'opus', 'sonnet', 'haiku', 'default', 'best', 'opusplan'],
-    fixedSessionId: true,
-    liveModeSwitch: 'cycle',
-    planModeToggle: false,
-    promptCacheTtl: true,
-    reportsCost: true,
-    // Behind its tool search, but for tools listed with anthropic/alwaysLoad (HI-2229).
-    defersMcpTools: 'unmarked',
-    compactFocus: true,
-    contextLimit: true,
-    autoCompactReserve: 33_000,
-    // Its parts, for a local model's declared context (HI-2682's probe, 2.1.319): the output budget, at most 20K, and 13K.
-    autoCompactParts: { outputMax: 20_000, buffer: 13_000 },
-    imagePaste: true,
-    // Its Read tool returns a PDF as a document and an image as an image (checked with 2.1.296).
-    attachments: ['image', 'pdf', 'text'],
-    lockAsk: true,
-    backgroundSessions: true,
-    backgroundWakes: true,
-    typedTurnsWithoutPrompt: true,
-    // SessionStart comes as it starts (once its folder is trusted), before any prompt.
-    startHook: true,
-    startupSizeRefresh: false,
-    bracketedPaste: true,
-    enterOnceDrawn: false,
-    // Its Ctrl+U deletes one wrapped row (HI-1974, seen on 2.1.312).
-    ctrlUClearsRow: true,
-    // --add-dir (2.1.309).
-    extraDirs: true,
+    terminal: {
+      imagePaste: true,
+      // Its Read tool returns a PDF as a document and an image as an image (checked with 2.1.296).
+      attachments: ['image', 'pdf', 'text'],
+      startupSizeRefresh: false,
+      bracketedPaste: true,
+      enterOnceDrawn: false,
+      // Its Ctrl+U deletes one wrapped row (HI-1974, seen on 2.1.312).
+      ctrlUClearsRow: true
+    },
+    session: {
+      modelAliases: ['fable', 'opus', 'sonnet', 'haiku', 'default', 'best', 'opusplan'],
+      fixedSessionId: true,
+      // Behind its tool search, but for tools listed with anthropic/alwaysLoad (HI-2229).
+      defersMcpTools: 'unmarked',
+      lockAsk: true,
+      typedTurnsWithoutPrompt: true,
+      // SessionStart comes as it starts (once its folder is trusted), before any prompt.
+      startHook: true,
+      // --add-dir (2.1.309).
+      extraDirs: true
+    },
+    modes: {
+      liveModeSwitch: 'cycle',
+      planModeToggle: false
+    },
+    usage: {
+      planUsageSinceLaunch: true,
+      promptCacheTtl: true,
+      reportsCost: true
+    },
+    compaction: {
+      compactFocus: true,
+      contextLimit: true,
+      autoCompactReserve: 33_000,
+      // Its parts, for a local model's declared context (HI-2682's probe, 2.1.319): the output budget, at most 20K, and 13K.
+      autoCompactParts: { outputMax: 20_000, buffer: 13_000 }
+    },
+    background: {
+      backgroundSessions: true,
+      backgroundWakes: true
+    },
+    hooks: {
+      remoteHookPolicy: true
+    },
     // Each account a folder of its own (HI-980), its transcripts and memory shared with the others through projects\.
     connections: {
       homeEnv: 'CLAUDE_CONFIG_DIR',
@@ -415,3 +395,7 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
   modelLabel: claudeModelLabel,
   canSwitchLive
 }
+
+/** Claude Code's shared half, as the registry lists it (HI-3201). */
+// agent-text: CLAUDE_DESCRIPTOR.text.safeguardHelp (a CLI's sentence stored by id in a card comment, said when read: providerMessage)
+export default defineProvider({ descriptor: CLAUDE_DESCRIPTOR, prices: CLAUDE_PRICES, tips: TIPS, safeguards: CLAUDE_SAFEGUARDS, adminSnippet: CLAUDE_ADMIN_SNIPPET, advanced: ADVANCED, outageCheck: OUTAGE_CHECK })

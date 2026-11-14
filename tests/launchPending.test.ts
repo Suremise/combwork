@@ -76,7 +76,7 @@ describe("no line of Combwork's before its CLI takes the launch's task (#721)", 
   function launched(): Entry {
     const e = running({ launchTask: true })
     Object.assign(e.state, { projectPath: project, agentId: id, agentName: 'B1', runtime: { lifecycle: 'running', maintenance: null, attention: null, composer: 'free' }, turn: { state: 'over' } })
-    Object.assign(e, { adapter: { descriptor: { capabilities: { startupSizeRefresh: false } } } })
+    Object.assign(e, { adapter: { descriptor: { capabilities: { terminal: { startupSizeRefresh: false } } } } })
     return e
   }
   const emit = (e: Entry) => (sessions as unknown as { emitState(s: unknown): void }).emitState(e.state)

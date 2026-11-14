@@ -84,14 +84,14 @@ beforeAll(async () => {
   config.settings.providers['claude-code'].enabled = true
   providerService.info = ((id: string) => ({ provider: id, found: true, path: 'claude.exe' })) as never
   // No CLI starts here: an account's models read (HI-2852, at its sign-in) answers nothing.
-  vi.spyOn(provider('claude-code'), 'listModels').mockResolvedValue(null)
-  vi.spyOn(provider('codex'), 'listModels').mockResolvedValue(null)
-  vi.spyOn(provider('claude-code'), 'accountStatus').mockImplementation(async (_exe, env) => {
+  vi.spyOn(provider('claude-code').models!, 'listModels').mockResolvedValue(null)
+  vi.spyOn(provider('codex').models!, 'listModels').mockResolvedValue(null)
+  vi.spyOn(provider('claude-code').accounts!, 'accountStatus').mockImplementation(async (_exe, env) => {
     const s = [...status].find(([k]) => k.toLowerCase() === env.CLAUDE_CONFIG_DIR!.toLowerCase())?.[1]
     return s ? s() : { ok: true, loggedIn: false }
   })
   // Codex's accounts (HI-2106's tests add some): signed out, never its CLI run.
-  vi.spyOn(provider('codex'), 'accountStatus').mockImplementation(async () => ({ ok: true, loggedIn: false }))
+  vi.spyOn(provider('codex').accounts!, 'accountStatus').mockImplementation(async () => ({ ok: true, loggedIn: false }))
   w = createWorkspaceService()
   await w.open(wsPath)
 })
@@ -380,7 +380,7 @@ describe('what is read from a connection’s home', () => {
     const a = await signedInConnection('Personal', 'me@example.com')
     const homes = here(() => accounts.connectionHomes('claude-code', w.config))!
     expect(homes.map((h) => h.home)).toEqual([accounts.accountFolder(a.id)])
-    const sources = await provider('claude-code').memorySources(wsPath, homes)
+    const sources = await provider('claude-code').projectFiles!.memorySources(wsPath, homes)
     const users = sources.filter((s) => s.id.startsWith('user'))
     expect(users.map((s) => s.path)).toEqual([join(accounts.accountFolder(a.id), 'CLAUDE.md')])
     expect(users[0].label).toContain('Personal')
@@ -392,7 +392,7 @@ describe('what is read from a connection’s home', () => {
   it('files: a connection’s memory and skills allowed, never its login or settings, never another home', async () => {
     const a = await signedInConnection('Personal', 'me@example.com')
     const f = accounts.accountFolder(a.id)
-    const allowed = (p: string, write = false) => provider('claude-code').fileAllowed(p, write, [f])
+    const allowed = (p: string, write = false) => provider('claude-code').projectFiles?.fileAllowed(p, write, [f])
     expect(allowed(join(f, 'CLAUDE.md'))).toBe(true)
     expect(allowed(join(f, '.credentials.json'))).toBe(false)
     expect(allowed(join(f, 'settings.json'), true)).toBe(false)
@@ -409,9 +409,9 @@ describe('what is read from a connection’s home', () => {
     mkdirSync(join(home, 'projects', key, 'memory', 'sub'), { recursive: true })
     for (const name of ['MEMORY.md', 'note.md']) writeFileSync(join(home, 'projects', key, 'memory', name), '# memory\n')
     const homes = here(() => accounts.connectionHomes('claude-code', w.config))!
-    const autos = (await provider('claude-code').memorySources(project, homes)).filter((s) => s.kind === 'auto-memory')
+    const autos = (await provider('claude-code').projectFiles!.memorySources(project, homes)).filter((s) => s.kind === 'auto-memory')
     expect(autos.map((s) => s.label)).toEqual(['MEMORY.md', 'note.md'])
-    const allowed = (p: string, write = false) => provider('claude-code').fileAllowed(p, write, homes.map((h) => h.home))
+    const allowed = (p: string, write = false) => provider('claude-code').projectFiles?.fileAllowed(p, write, homes.map((h) => h.home))
     for (const s of autos) {
       expect(allowed(s.path)).toBe(true)
       expect(allowed(s.path, true)).toBe(true)
@@ -431,7 +431,7 @@ describe('what is read from a connection’s home', () => {
     const a = await signedInConnection('Personal', 'me@example.com')
     writeFileSync(join(accounts.accountFolder(a.id), 'settings.json'), JSON.stringify({ model: 'claude-own-model' }))
     writeFileSync(join(home, 'settings.json'), JSON.stringify({ model: 'claude-home-model' }))
-    expect(provider('claude-code').configuredDefaultModel(accounts.accountFolder(a.id))).toBe('claude-own-model')
+    expect(provider('claude-code').models?.configuredDefaultModel(accounts.accountFolder(a.id))).toBe('claude-own-model')
   })
 })
 

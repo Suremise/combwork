@@ -82,7 +82,7 @@ export type WindowTextField =
   | 'notFilteredText'
 
 export type ThemeSetting = 'dark' | 'light' | 'system'
-/** A coding-agent CLI Combwork can run ("claude-code", "codex"). See src/shared/providers.ts. */
+/** A coding-agent CLI Combwork can run ("claude-code", "codex"): its descriptor's id (src/shared/providers/registry.ts lists them). */
 export type ProviderId = string
 /** A permission mode id from the agent's provider (e.g. Claude Code's "auto", Codex's "approve-for-me"). */
 export type PermissionMode = string
@@ -467,7 +467,7 @@ export interface AssistantProviderSettings {
   effort: EffortLevel | ''
   permissionMode: PermissionMode | ''
   extraArgs: string
-  /** Run with a 200K context window instead of the model's 1M one (capabilities.contextLimit); '' follows the provider's settings. */
+  /** Run with a 200K context window instead of the model's 1M one (capabilities.compaction.contextLimit); '' follows the provider's settings. */
   use200kContext: '' | 'on' | 'off'
 }
 
@@ -505,12 +505,12 @@ export interface ProviderSettings {
   enableDangerousMode: boolean
   extraArgs: string
   checkUpdatesOnLaunch: boolean
-  /** Let sessions move into the CLI's own background service (capabilities.backgroundSessions). Off: Combwork turns it off. */
+  /** Let sessions move into the CLI's own background service (capabilities.background.backgroundSessions). Off: Combwork turns it off. */
   allowBackgroundSessions: boolean
-  /** Run sessions with a 200K context window instead of the model's 1M one (capabilities.contextLimit). */
+  /** Run sessions with a 200K context window instead of the model's 1M one (capabilities.compaction.contextLimit). */
   use200kContext: boolean
   /**
-   * Where a session's cost comes from when the provider reports one (capabilities.reportsCost, #436): the CLI's own
+   * Where a session's cost comes from when the provider reports one (capabilities.usage.reportsCost, #436): the CLI's own
    * report (the truth, from its own price table: Combwork never recomputes it), or Combwork's estimate from the price table.
    */
   costSource: 'reported' | 'prices'
@@ -736,7 +736,7 @@ export interface PlanLimit {
    * `firstSeenAt` (the session's first report of this figure), and after `changedAfter` (its report before, of another
    * figure; absent for a session's first). Two readings so ordered: the newer one is what it is now, even lower.
    * `takenAfter` (HI-3187): its run's launch, where the provider's readings all come from the run's own API calls
-   * (capabilities.planUsageSinceLaunch), so a run's first report is dated too.
+   * (capabilities.usage.planUsageSinceLaunch), so a run's first report is dated too.
    */
   firstSeenAt?: string
   changedAfter?: string
@@ -2061,7 +2061,7 @@ export interface ProjectProviderConfig {
   effort: Inherit<EffortLevel>
   permissionMode: Inherit<PermissionMode>
   extraArgs: string
-  /** 200K context instead of 1M (capabilities.contextLimit). */
+  /** 200K context instead of 1M (capabilities.compaction.contextLimit). */
   use200kContext: Inherit<'on' | 'off'>
 }
 
@@ -2082,7 +2082,7 @@ export interface AgentDef {
   model?: string
   effort?: EffortLevel
   permissionMode?: PermissionMode
-  /** 200K context instead of 1M (capabilities.contextLimit); as model. */
+  /** 200K context instead of 1M (capabilities.compaction.contextLimit); as model. */
   use200kContext?: boolean
   /** Session to resume for this agent. */
   lastSessionId?: string

@@ -178,7 +178,7 @@ function PriceTable({ provider }: { provider: ProviderId }) {
   const edited = Object.keys(own).length > 0 || removed.length > 0
   return (
     <div className="fallback-table">
-      {!p.capabilities.reportsCost && (
+      {!p.capabilities.usage?.reportsCost && (
         <div className="fallback-source price-note">
           <Icon name="info" />
           <span>

@@ -1,9 +1,9 @@
 import { join } from 'path'
-import { OPENCODE } from '../../../shared/opencode'
+import { OPENCODE } from '../../../shared/providers/opencode'
 import { overrides } from '../../advancedValues'
 import { advanced } from '../../advanced'
 import { testHomeSeam } from '../../connectionSeam'
-import { localDataRoot } from '../antigravity/home'
+import { localDataRoot } from '../localData'
 
 // OpenCode's environment (HI-2759; HI-2758's recipe, checked against 2.2.6): an account's private roots, the variables
 // that would hand OpenCode a credential nobody chose for it, the ambient credential files those chains would read, and

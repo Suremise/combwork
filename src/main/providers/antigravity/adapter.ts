@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'path'
 import { existsSync, mkdirSync, writeFileSync } from 'original-fs'
 import { cp, mkdir, rm, stat, writeFile } from 'original-fs/promises'
 import type { AgentInstallInfo, McpServerDef, MemorySource, PathDataCopy, PermissionMode, ReadinessIssue, SessionUsage, SubSession } from '../../../shared/types'
-import { ANTIGRAVITY, ANTIGRAVITY_DESCRIPTOR, antigravityModeFlags } from '../../../shared/antigravity'
+import { ANTIGRAVITY, ANTIGRAVITY_DESCRIPTOR, antigravityModeFlags } from '../../../shared/providers/antigravity'
 import { ASSISTANT_AGENT_ID } from '../../../shared/assistant'
 import { TOOLS_SERVER } from '../../../shared/assistantTools'
 import { isProviderEnabled } from '../../../shared/providers'
@@ -259,6 +259,38 @@ export function statusLineConversation(body: Record<string, any>): string | null
 export class AntigravityAdapter implements ProviderAdapter {
   readonly id = ANTIGRAVITY
   readonly descriptor = ANTIGRAVITY_DESCRIPTOR
+  // Its capability parts (ProviderAdapter), each implemented by this class's own members: a getter, so an object made from
+  // this one (Object.create) is its own parts too.
+  get install(): this {
+    return this
+  }
+  get launch(): this {
+    return this
+  }
+  get hooks(): this {
+    return this
+  }
+  get status(): this {
+    return this
+  }
+  get modes(): this {
+    return this
+  }
+  get transcript(): this {
+    return this
+  }
+  get usage(): this {
+    return this
+  }
+  get models(): this {
+    return this
+  }
+  get compaction(): this {
+    return this
+  }
+  get projectFiles(): this {
+    return this
+  }
   /** agy's account and updater variables are handled in its own environment (antigravityEnv): nothing for every child. */
   readonly envToStrip: string[] = []
   /** agy is checked in its sessions' environment (antigravityEnv), which these switches change. */
@@ -649,3 +681,6 @@ export class AntigravityAdapter implements ProviderAdapter {
 }
 
 export const antigravity = new AntigravityAdapter()
+
+/** The adapter, as the registry finds it (src/main/providers/index.ts, HI-3201). */
+export default antigravity

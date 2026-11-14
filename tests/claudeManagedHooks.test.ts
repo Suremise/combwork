@@ -16,7 +16,8 @@ const runContext = createRequire(import.meta.url)('./e2e/runContext.cjs') as { c
 const userData = await vi.hoisted(async () => (await import('./tempDir')).tempDir('cw-managed-hooks-'))
 vi.mock('electron', () => ({ app: { getPath: () => userData, getVersion: () => '0.0.0-test', isPackaged: false } }))
 
-const { CLAUDE_HOOK_EVENTS, claudeHookHandlers, claudeManagedSnippet, fixedHookUrl, forwardCommand, forwardScript } = await import('../src/shared/claudeHookHandlers')
+const { CLAUDE_HOOK_EVENTS, claudeHookHandlers, claudeManagedSnippet, forwardCommand, forwardScript } = await import('../src/shared/providers/claude/hookHandlers')
+const { fixedHookUrl } = await import('../src/shared/hooks')
 const { hookCause, urlAllowed } = await import('../src/main/providers/claude/hookPolicy')
 const { usedAdminSources, parseRegSettings, managedFiles } = await import('../src/main/providers/claude/updateChannel')
 
@@ -67,7 +68,7 @@ describe('the admin snippet (HI-2777)', () => {
   it("the user guide's snippet is the one Combwork makes for port 47821 and the default timeouts, its script decoded", async () => {
     const { advancedDef } = await import('../src/shared/advanced')
     const defaults = { hook: advancedDef('claude-code.hooks.timeoutSeconds')!.default as number, preToolUse: advancedDef('claude-code.hooks.preToolUseTimeoutSeconds')!.default as number }
-    const { claudeManagedSnippetText, MANAGED_POLICY_GUIDE } = await import('../src/shared/claudeHookHandlers')
+    const { claudeManagedSnippetText, MANAGED_POLICY_GUIDE } = await import('../src/shared/providers/claude/hookHandlers')
     const guide = readFileSync(join(__dirname, '..', 'docs', 'USER_GUIDE.md'), 'utf8').replace(/\r\n/g, '\n')
     const section = guide.slice(guide.indexOf(`<a id="${MANAGED_POLICY_GUIDE}"></a>`))
     expect(section.length).toBeLessThan(guide.length)

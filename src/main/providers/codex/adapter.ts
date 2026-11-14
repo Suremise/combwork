@@ -1,7 +1,7 @@
 import { createHash } from 'crypto'
 import { msg, tr } from '../../../shared/i18n'
 import { spawn } from 'child_process'
-import { codexCheckHeld, ownedAppServerRequest, type CheckAnswer } from '../../codexChecks'
+import { codexCheckHeld, ownedAppServerRequest, stopCodexChecks, type CheckAnswer } from './checks'
 import { homedir, tmpdir } from 'os'
 import { basename, join, resolve } from 'path'
 import { readdir, readFile, stat } from 'original-fs/promises'
@@ -10,7 +10,7 @@ import { parse as parseToml } from 'smol-toml'
 import type { AgentInstallInfo, McpServerDef, MemorySource, PermissionMode, ReadinessIssue, RetryWait, SubSession } from '../../../shared/types'
 import { assertSessionId, isSessionId } from '../../../shared/defaults'
 import type { StartHint } from '../../../shared/startFailure'
-import { CODEX, CODEX_DESCRIPTOR, CODEX_MODE_FLAGS, CODEX_PERMISSION_MODES } from '../../../shared/codex'
+import { CODEX, CODEX_DESCRIPTOR, CODEX_MODE_FLAGS, CODEX_PERMISSION_MODES } from '../../../shared/providers/codex'
 import { providerSettings } from '../../../shared/providers'
 import type { TypedNewline } from '../../../shared/terminalInput'
 import { CW_TOOLS, TOOLS_SERVER } from '../../../shared/assistantTools'
@@ -36,7 +36,7 @@ import { permissionsMenuLabel, permissionsMenuNumber } from './permissionsMenu'
 import { strayCodexWarning } from './strayFolder'
 import { advanced } from '../../advanced'
 import { launchOverrides } from '../../advancedValues'
-import { codexListedHooks } from '../../hookListing'
+import { codexListedHooks } from './hookListing'
 import type { HookListing, HookRow } from '../../../shared/hooks'
 import { withoutCombworkAuth } from '../../../shared/hooks'
 
@@ -441,7 +441,7 @@ function askAppServer(executable: string, args: string[], cwd: string, method: s
 
 /**
  * One request's answer from Codex's app server: its result, its error (`ok: false`, `error` its message), or none
- * (`error` says why). Run through Combwork's process ownership (codexChecks.ts, HI-1757): owned before it runs and confirmed
+ * (`error` says why). Run through Combwork's process ownership (checks.ts, HI-1757): owned before it runs and confirmed
  * gone before the answer is given; an end not confirmed is a failed answer, its connection held until it is.
  */
 function appServerAnswer(executable: string, args: string[], cwd: string, method: string, params: unknown, env: NodeJS.ProcessEnv | undefined, timeoutMs: number): Promise<CheckAnswer> {
@@ -602,6 +602,43 @@ const idFromFile = (f: string): string | null => /-([0-9a-f]{8}-[0-9a-f]{4}-[0-9
 export class CodexAdapter implements ProviderAdapter {
   readonly id = CODEX
   readonly descriptor = CODEX_DESCRIPTOR
+  // Its capability parts (ProviderAdapter), each implemented by this class's own members: a getter, so an object made from
+  // this one (Object.create) is its own parts too.
+  get install(): this {
+    return this
+  }
+  get launch(): this {
+    return this
+  }
+  get hooks(): this {
+    return this
+  }
+  get terminal(): this {
+    return this
+  }
+  get modes(): this {
+    return this
+  }
+  get transcript(): this {
+    return this
+  }
+  get usage(): this {
+    return this
+  }
+  get accounts(): this {
+    return this
+  }
+  get models(): this {
+    return this
+  }
+  get compaction(): this {
+    return this
+  }
+  get projectFiles(): this {
+    return this
+  }
+  /** Its connections' checks (HI-1757): those under way settled as Combwork closes (codex/checks.ts). */
+  readonly lifecycle = { closing: (): Promise<void> => stopCodexChecks() }
   /** A parent Codex session's identity, when Combwork runs inside one. User configuration (CODEX_HOME…) is kept. */
   readonly envToStrip = ['CODEX_SANDBOX', 'CODEX_SANDBOX_NETWORK_DISABLED', 'CODEX_THREAD_ID', 'CODEX_SESSION_ID', 'CODEX_CI']
   readonly compactFailure = null
@@ -710,7 +747,7 @@ export class CodexAdapter implements ProviderAdapter {
   typedNewline(version: string | null): TypedNewline | null {
     const chosen = advanced.get<string>(NEWLINE_KEY)
     const key = chosen === 'auto' ? (version && NEWLINE_TRIED.includes(version) ? 'alt-enter' : null) : chosen
-    return this.descriptor.capabilities.typedNewlines?.find((k) => k === key) ?? null
+    return this.descriptor.capabilities.terminal?.typedNewlines?.find((k) => k === key) ?? null
   }
 
   /** Codex's Windows sandbox is set up once (windows.sandbox in its config); without it every command needs approval. */
@@ -872,7 +909,7 @@ export class CodexAdapter implements ProviderAdapter {
     return advanced.get<string[]>('codex.accounts.dropEnv')
   }
 
-  /** Whether a connection's folder is held by a check of Codex not yet confirmed ended (codexChecks.ts). */
+  /** Whether a connection's folder is held by a check of Codex not yet confirmed ended (checks.ts). */
   accountHeld(home: string): boolean {
     return codexCheckHeld(home)
   }
@@ -1492,3 +1529,6 @@ export class CodexAdapter implements ProviderAdapter {
 }
 
 export const codex = new CodexAdapter()
+
+/** The adapter, as the registry finds it (src/main/providers/index.ts, HI-3201). */
+export default codex

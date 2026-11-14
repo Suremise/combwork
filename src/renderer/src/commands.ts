@@ -1,5 +1,5 @@
 import { PROJECT_KEYBINDING_CATEGORIES, SESSION_LAYOUTS, projectSessionView, resolveKeybinding } from '@shared/defaults'
-import { PROVIDERS, providerDescriptor } from '@shared/providers'
+import { PROVIDERS, adminSnippetProvider, providerDescriptor } from '@shared/providers'
 import { batchCounts, type BatchCounts } from '@shared/startAll'
 import { appTakesTerminalKey } from '@shared/terminalInput'
 import type { ProjectInfo, ProviderId, SessionLayout, ToastTarget } from '@shared/types'
@@ -430,6 +430,7 @@ const COMMAND_DEFS: CommandDef[] = [
     id: 'hooks.adminSnippet',
     name: msg({ id: 'shell.command.hooks.adminSnippet', defaultMessage: 'Claude Code Admin Snippet…', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: opens the admin snippet, a block of Claude Code settings an organisation's administrator pastes into its managed settings so Combwork's hooks run where policy allows only managed hooks (HI-2777). The … says it opens a dialog first: keep it." }),
     category: 'session',
+    when: () => !!adminSnippetProvider(),
     run: () => set({ adminSnippetOpen: true })
   },
   {

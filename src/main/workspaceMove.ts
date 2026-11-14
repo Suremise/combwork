@@ -439,8 +439,8 @@ async function sessionCwds(ws: WorkspaceService, host: string, moves: PathMove[]
 async function copyFor(m: Move, apply: boolean): Promise<PathDataCopy[]> {
   const out: PathDataCopy[] = []
   for (const p of allProviders()) {
-    if (!p.copyPathData) continue
-    const rs = await p.copyPathData(m.from, m.to, apply).catch((e): PathDataCopy[] => {
+    if (!p.transcript?.copyPathData) continue
+    const rs = await p.transcript?.copyPathData(m.from, m.to, apply).catch((e): PathDataCopy[] => {
       log.warn(`copying ${p.id}'s data for ${userText(m.to)}`, e)
       return [{ provider: p.id, from: m.from, to: m.to, copy: 0, kept: [], failed: [String(e instanceof Error ? e.message : e)] }]
     })

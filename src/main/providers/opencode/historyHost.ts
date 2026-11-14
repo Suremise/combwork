@@ -1,13 +1,13 @@
 import { join } from 'path'
-import { OPENCODE } from '../shared/opencode'
-import { onAccountRemoving } from './accounts'
-import { localDataRoot } from './providers/antigravity/home'
-import { opencode } from './providers/opencode/adapter'
-import { opencodeHistory } from './providers/opencode/history'
-import { untrackContextRun } from './providers/opencode/context'
-import { opencodeCommand } from './providers/opencode/install'
-import { providerService } from './providerService'
-import { sessions } from './sessions'
+import { OPENCODE } from '../../../shared/providers/opencode'
+import { onAccountRemoving } from '../../accounts'
+import { localDataRoot } from '../localData'
+import type { OpencodeAdapter } from './adapter'
+import { opencodeHistory } from './history'
+import { untrackContextRun } from './context'
+import { opencodeCommand } from './install'
+import { providerService } from '../../providerService'
+import { sessions } from '../../sessions'
 
 let started = false
 
@@ -17,7 +17,7 @@ let started = false
  * provider's status reports do); an account's removal waits until nothing writes into its folder, and is refused when that
  * can't be known.
  */
-export function startOpencodeHistory(): void {
+export function startOpencodeHistory(opencode: Pick<OpencodeAdapter, 'allHomes'>): void {
   if (started) return
   started = true
   opencodeHistory.start({
@@ -31,9 +31,4 @@ export function startOpencodeHistory(): void {
   // The run's server credentials for its state view go with it (HI-2771).
   sessions.onLaunchEnded.add((_projectPath, _agentId, runId) => untrackContextRun(runId))
   onAccountRemoving((id) => opencodeHistory.removeRoot(join(localDataRoot(), 'accounts', id)))
-}
-
-/** Quitting: the history's worker ends what it started (its exports) and ends. */
-export function stopOpencodeHistory(): void {
-  void opencodeHistory.stop()
 }

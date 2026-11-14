@@ -9,8 +9,8 @@ import { provider as adapterOf } from './providers'
 /** The memory `provider` saves for the workspace's folder: its folder and files, or none shown (`folder: null`). */
 export async function assistantMemoryFor(workspacePath: string, provider: ProviderId): Promise<AssistantMemory> {
   const adapter = adapterOf(provider)
-  if (!adapter.autoMemory) return { provider, folder: null, files: [] }
-  const m = await adapter.autoMemory(workspacePath)
+  if (!adapter.projectFiles?.autoMemory) return { provider, folder: null, files: [] }
+  const m = await adapter.projectFiles?.autoMemory(workspacePath)
   return { provider, folder: m.folder, files: m.files }
 }
 

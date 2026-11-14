@@ -12,6 +12,7 @@ import { emit } from './events'
 import { writeTextUnlessChanged } from './fsutil'
 import { createLogger } from './logger'
 import { readAdvancedFrom } from './advancedValues'
+import { PROVIDERS } from '../shared/providers'
 
 const log = createLogger('advanced')
 
@@ -399,12 +400,13 @@ export interface ChangeHooks {
 export const workspaceDefs = (): AdvancedDef[] => ADVANCED_DEFS.filter((d) => d.workspace)
 
 /**
- * The longest a card wait or an agents wait holds a call (seconds): the advanced setting, kept a minute under Codex's
- * timeout for Combwork's tools so the reply always arrives in time.
+ * The longest a card wait or an agents wait holds a call (seconds): the advanced setting, kept a minute under each CLI's
+ * timeout for Combwork's tools (its descriptor's mcpToolTimeoutSetting: Codex's) so the reply always arrives in time.
  */
 export function waitMaxSeconds(kind: 'cards' | 'agents'): number {
   const own = advanced.number(kind === 'cards' ? 'cw.wait.cardMaxSeconds' : 'cw.wait.agentsMaxSeconds')
-  return Math.max(30, Math.min(own, advanced.number('codex.mcp.toolTimeoutSeconds') - 60))
+  const limits = PROVIDERS.flatMap((p) => (p.capabilities.session?.mcpToolTimeoutSetting ? [advanced.number(p.capabilities.session?.mcpToolTimeoutSetting) - 60] : []))
+  return Math.max(30, Math.min(own, ...limits))
 }
 
 /** What the combwork MCP server needs of the advanced settings, as its environment (it runs outside Combwork: Node built-ins only). */

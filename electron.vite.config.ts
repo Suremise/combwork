@@ -1,5 +1,6 @@
 import { execFileSync } from 'child_process'
-import { resolve } from 'path'
+import { existsSync, readdirSync } from 'fs'
+import { join, resolve } from 'path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -45,6 +46,21 @@ export function signLauncher(): Plugin {
   }
 }
 
+/**
+ * Each provider's own worker threads (HI-3201): src/main/providers/<folder>/threads/<name>.ts, built as
+ * <folder>-<name in kebab case> (codex/threads/logWorker.ts: codex-log-worker.js), the name its host starts it by.
+ */
+export function providerThreads(): Record<string, string> {
+  const root = resolve(__dirname, 'src/main/providers')
+  const out: Record<string, string> = {}
+  for (const folder of readdirSync(root, { withFileTypes: true }).filter((d) => d.isDirectory())) {
+    const threads = join(root, folder.name, 'threads')
+    if (!existsSync(threads)) continue
+    for (const f of readdirSync(threads).filter((n) => n.endsWith('.ts'))) out[`${folder.name}-${f.slice(0, -3).replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`] = join(threads, f)
+  }
+  return out
+}
+
 export default defineConfig({
   main: {
     // Agent text's formatter (HI-2433, shared/agentText/icu.ts) is bundled into the chunks, not loaded from node_modules:
@@ -66,6 +82,8 @@ export default defineConfig({
           'cw-close-runner': resolve(__dirname, 'src/main/closeCommand/cw-close-runner.ts'),
           // The usage history's worker thread (#1106).
           'usage-worker': resolve(__dirname, 'src/main/usageWorker.ts'),
+          // Each provider's own worker threads (src/main/providers/<folder>/threads, HI-3201): Codex's log's, OpenCode's history.
+          ...providerThreads(),
           // The repository lock's worker thread (HI-1680).
           'repo-lock-worker': resolve(__dirname, 'src/main/repoLockWorker.ts'),
           // A None project's whole-project read (HI-2340).
@@ -82,10 +100,6 @@ export default defineConfig({
           'log-writer': resolve(__dirname, 'src/main/logWriter.ts'),
           // The WAL checkpoints' worker thread (HI-1691).
           'wal-checkpoint-worker': resolve(__dirname, 'src/main/walCheckpointWorker.ts'),
-          // Codex's log's worker thread (HI-1972).
-          'codex-log-worker': resolve(__dirname, 'src/main/codexLogWorker.ts'),
-          // The OpenCode history's worker thread (HI-2762).
-          'opencode-history-worker': resolve(__dirname, 'src/main/opencodeHistoryWorker.ts'),
           // The 1.0 data folders' move to .combwork: its card rewrite (HI-2462).
           'cw-move-worker': resolve(__dirname, 'src/main/combworkMoveWorker.ts')
         }

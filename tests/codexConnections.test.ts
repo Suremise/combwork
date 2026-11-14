@@ -9,7 +9,7 @@ import { createRequire } from 'module'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { CODEX_DESCRIPTOR } from '../src/shared/codex'
+import { CODEX_DESCRIPTOR } from '../src/shared/providers/codex'
 import { acceptable } from '../src/shared/accounts'
 import type { Account } from '../src/shared/types'
 import { tempDir } from './tempDir'
@@ -29,7 +29,7 @@ const { providerService } = await import('../src/main/providerService')
 const { withoutAccountEnv } = await import('../src/main/providers/common')
 const seam = await import('../src/main/connectionSeam')
 const { CONNECTION_STORE, codex, codexAccountStatus } = await import('../src/main/providers/codex/adapter')
-const { codexCheckHeld, codexCheckSeams, resetCodexChecksForTests, stopCodexChecks } = await import('../src/main/codexChecks')
+const { codexCheckHeld, codexCheckSeams, resetCodexChecksForTests, stopCodexChecks } = await import('../src/main/providers/codex/checks')
 const { queueHost } = await import('../src/main/workflow/queueJobs')
 const { windowsProbe } = await import('../src/main/workflow/queueProcs')
 type Listed = import('../src/main/workflow/queueProcs').Listed
@@ -57,8 +57,8 @@ beforeAll(async () => {
   config.settings.providers.codex.enabled = true
   providerService.info = ((id: string) => ({ provider: id, found: true, path: 'codex.exe' })) as never
   // No CLI starts here: an account's models read (HI-2852, at its sign-in) answers nothing.
-  vi.spyOn(provider('codex'), 'listModels').mockResolvedValue(null)
-  statusSpy = vi.spyOn(provider('codex'), 'accountStatus').mockImplementation(async (_exe, env) => {
+  vi.spyOn(provider('codex').models!, 'listModels').mockResolvedValue(null)
+  statusSpy = vi.spyOn(provider('codex').accounts!, 'accountStatus').mockImplementation(async (_exe, env) => {
     checked.set(env.CODEX_HOME!, env)
     return { ok: true, loggedIn: true, email: 'one@example.com', plan: 'plus' }
   })

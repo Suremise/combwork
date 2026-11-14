@@ -28,6 +28,7 @@ import { crashDumpLines, crashDumps, crashDumpsDir } from './exitLog'
 import { lastRunDiagnostics } from './lastRun'
 import { memoryDiagnostics } from './memory'
 import { workerThreadLines } from './workerThreads'
+import { PROVIDER_WORKERS } from './providers/workers'
 import { queryMetrics } from './metrics'
 import { toolListRows, type ToolListRow } from '../shared/metricsView'
 
@@ -122,7 +123,7 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
       ...(set?.executablePath ? ['  - its path is set in Settings'] : []), // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
       ...(set?.extraArgs ? ['  - extra arguments are set'] : []), // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
       ...(info.editorExtensionOnly ? ["  - only an editor extension's copy was found"] : []), // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
-      ...(provider(id).diagnostics?.() ?? []).map((l) => `  - ${l}`),
+      ...(provider(id).install.diagnostics?.() ?? []).map((l) => `  - ${l}`),
       ...(info.readiness ?? []).map((r) => `  - ${r.level}: ${r.message}`)
     ]
     return [head, ...extra]
@@ -205,7 +206,7 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
     // How each worker thread runs (HI-1880): an installed Combwork ran their work on main's thread, unseen.
     '### Worker threads',
     '',
-    ...workerThreadLines()
+    ...workerThreadLines(PROVIDER_WORKERS.flatMap((w) => w.threads ?? []))
   ].join('\n')
 
   // The log goes back further than what is open now: earlier workspaces and their projects are taken out too.

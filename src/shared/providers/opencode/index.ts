@@ -1,7 +1,10 @@
-import type { ModeOption, ModelGroup, ProviderDescriptor } from './providers'
-import { withCliOwn } from './cliOwnMode'
-import { msg } from './i18n/msg'
-import { agentMsg, say } from './agentText'
+import type { ModeOption, ModelGroup, ProviderDescriptor } from '..'
+import { withCliOwn } from '../../cliOwnMode'
+import { msg } from '../../i18n/msg'
+import { agentMsg, say } from '../../agentText'
+import { defineProvider } from '../parts'
+import { ADVANCED } from './advanced'
+import { TIPS } from './tips'
 
 /**
  * OpenCode (Anomaly's anomalyco/opencode **V2**, the `@opencode/cli` package, executable `opencode`), Combwork's fifth
@@ -112,6 +115,7 @@ export const OPENCODE_DESCRIPTOR: ProviderDescriptor = {
   company: 'Anomaly', // i18n-ignore: a company name
   cliName: 'opencode',
   icon: 'opencode',
+  badge: { shape: 'octagon', glyph: 'brackets', color: '#d4892a' },
   setupUrl: 'https://opencode.ai/docs',
   pricingUrl: 'https://opencode.ai/docs/providers',
   permissionModes: withCliOwn(OPENCODE_PERMISSION_MODES),
@@ -122,33 +126,45 @@ export const OPENCODE_DESCRIPTOR: ProviderDescriptor = {
   modelGroups: OPENCODE_MODEL_GROUPS,
   modelPlaceholder: 'Model ID, e.g. ollama/qwen3:8b', // i18n-ignore: English (text.modelPlaceholder is the window's)
   capabilities: {
-    // Combwork picks the session's id (`ses_…`, accepted by 2.2.6's POST /api/session) and the launcher creates it.
-    fixedSessionId: true,
-    // Not verified: switching needs a restart.
-    liveModeSwitch: 'none',
-    planModeToggle: false,
-    promptCacheTtl: false,
-    // Each request's cost as OpenCode prices it, and the session's total (HI-2762): $0 for a model it gives no price.
-    reportsCost: true,
-    defersMcpTools: false,
-    compactFocus: false,
-    contextLimit: false,
-    autoCompactReserve: null,
-    imagePaste: false,
-    attachments: [],
-    lockAsk: false,
-    // The machine-wide background service is off for every launch (service.json, HI-2758 Q2).
-    backgroundSessions: false,
-    backgroundWakes: false,
-    typedTurnsWithoutPrompt: false,
-    startupSizeRefresh: true,
-    bracketedPaste: false,
-    enterOnceDrawn: false,
-    // 2.2.6's agents reach folders outside the session's own unasked (every agent's default rules begin `* * allow`,
-    // HI-2772), so a launch's private config asks external_directory for every outside folder and allows the review
-    // copies and Combwork's own folders it needs (HI-2775, askOutsideFolder: config.ts outsidePermissions). A reviewer is
-    // lent its review copy that way; Plan still edits nothing.
-    extraDirs: true,
+    terminal: {
+      imagePaste: false,
+      attachments: [],
+      startupSizeRefresh: true,
+      bracketedPaste: false,
+      enterOnceDrawn: false
+    },
+    session: {
+      // Combwork picks the session's id (`ses_…`, accepted by 2.2.6's POST /api/session) and the launcher creates it.
+      fixedSessionId: true,
+      defersMcpTools: false,
+      lockAsk: false,
+      typedTurnsWithoutPrompt: false,
+      // 2.2.6's agents reach folders outside the session's own unasked (every agent's default rules begin `* * allow`,
+      // HI-2772), so a launch's private config asks external_directory for every outside folder and allows the review
+      // copies and Combwork's own folders it needs (HI-2775, askOutsideFolder: config.ts outsidePermissions). A reviewer is
+      // lent its review copy that way; Plan still edits nothing.
+      extraDirs: true
+    },
+    modes: {
+      // Not verified: switching needs a restart.
+      liveModeSwitch: 'none',
+      planModeToggle: false
+    },
+    usage: {
+      promptCacheTtl: false,
+      // Each request's cost as OpenCode prices it, and the session's total (HI-2762): $0 for a model it gives no price.
+      reportsCost: true
+    },
+    compaction: {
+      compactFocus: false,
+      contextLimit: false,
+      autoCompactReserve: null
+    },
+    background: {
+      // The machine-wide background service is off for every launch (service.json, HI-2758 Q2).
+      backgroundSessions: false,
+      backgroundWakes: false
+    },
     // Each account a private data root (XDG_DATA_HOME, with its config, state and cache roots beside it): its sign-ins
     // and its sessions in its own database. Nothing shared between accounts.
     connections: {
@@ -177,3 +193,13 @@ export const OPENCODE_DESCRIPTOR: ProviderDescriptor = {
   modelLabel: opencodeModelLabel,
   canSwitchLive: () => false
 }
+
+/** OpenCode's shared half, as the registry lists it (HI-3201). */
+export default defineProvider({
+  descriptor: OPENCODE_DESCRIPTOR,
+  // OpenCode reaches many vendors' models through the account's own sign-ins and keys, each priced by its vendor (checked
+  // 9 Nov 2026, HI-2759): no table ships, and its sessions show as unpriced. Prices a user adds are used.
+  prices: { checked: '2026-11-09', shipped: {} },
+  tips: TIPS,
+  advanced: ADVANCED
+})

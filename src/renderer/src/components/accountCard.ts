@@ -63,7 +63,7 @@ export function connectionCells(c: Pick<Connection, 'model' | 'effort' | 'use200
   return {
     model: c.model ? { text: server ? c.model : modelLabel(c.model, cli) } : own,
     effort: server ? none : c.effort ? { text: effortName(cli, c.effort, settings ?? undefined, tr) } : own,
-    context: server || !providerDescriptor(cli).capabilities.contextLimit ? none : c.use200kContext ? { text: tr(M.context200k) } : own,
+    context: server || !providerDescriptor(cli).capabilities.compaction?.contextLimit ? none : c.use200kContext ? { text: tr(M.context200k) } : own,
     mode: c.permissionMode ? { text: permissionLabel(cli, c.permissionMode, tr) } : own,
     args: c.extraArgs ? { text: c.extraArgs } : { text: tr(M.cellNoArgs), own: true }
   }

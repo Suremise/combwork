@@ -230,7 +230,7 @@ export function totals(s: PerfSelection): PerfTotals {
  * be off, a model or gateway can turn it off; Codex's hidden models get the whole list) and how it worded it aren't observable.
  */
 export function deferredEstimate(c: CatalogSeries): { starts: number; bytes: number } | null {
-  const defers = PROVIDERS.find((x) => x.id === c.provider)?.capabilities.defersMcpTools
+  const defers = PROVIDERS.find((x) => x.id === c.provider)?.capabilities.session?.defersMcpTools
   if (defers === 'all') return c.starts ? { starts: c.starts, bytes: 0 } : null
   if (!defers || !c.upfrontStarts) return null
   return { starts: c.upfrontStarts, bytes: c.upfrontBytes }

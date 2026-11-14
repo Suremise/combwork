@@ -1,16 +1,8 @@
 import { deserialize, serialize } from 'v8'
 import { brotliCompressSync, brotliDecompressSync, constants } from 'zlib'
 import type { ProviderId, SessionUsage } from '../shared/types'
-import { CLAUDE_CODE } from '../shared/claude'
-import { CODEX } from '../shared/codex'
-import { COPILOT } from '../shared/copilot'
-import { ANTIGRAVITY } from '../shared/antigravity'
-import { OPENCODE } from '../shared/opencode'
-import { ClaudeUsageParser } from './providers/claude/usage'
-import { CodexUsageParser } from './providers/codex/rollout'
-import { CopilotUsageParser } from './providers/copilot/events'
-import { AntigravityUsageParser } from './providers/antigravity/transcript'
-import { OpencodeUsageParser } from './providers/opencode/mirror'
+import type { UsageParserClass } from './providers/types'
+import { PROVIDER_WORKERS } from './providers/workers'
 
 /**
  * The CLIs' usage parsers without their adapters (#1106), for the usage worker, which can't load Electron: a parser
@@ -24,16 +16,10 @@ export interface RawUsageParser {
   result(): SessionUsage
 }
 
-/** A parser's class: `rewritten`, its CLI may write a transcript again in place (not only append), so it is read whole again. */
-type ParserClass = (new (sessionId: string) => { feed(text: string): void; result(title?: string | null): SessionUsage }) & { readonly rewritten?: boolean }
-
-const PARSERS: Partial<Record<ProviderId, ParserClass>> = {
-  [CLAUDE_CODE]: ClaudeUsageParser,
-  [CODEX]: CodexUsageParser,
-  [COPILOT]: CopilotUsageParser,
-  [ANTIGRAVITY]: AntigravityUsageParser,
-  [OPENCODE]: OpencodeUsageParser
-}
+/** Each provider's parser, from its worker-safe parts (providers/<folder>/worker.ts, HI-3201): a provider without one has none. */
+const PARSERS: Partial<Record<ProviderId, UsageParserClass>> = Object.fromEntries(
+  PROVIDER_WORKERS.filter((w) => w.usageParser).map((w) => [w.id, w.usageParser])
+)
 
 /**
  * Whether a provider's transcripts are read whole again whenever they change (HI-2546: agy may write its transcript again in

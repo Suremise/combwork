@@ -92,7 +92,7 @@ describe("the grant of the project's copies folder (extraDirs)", () => {
   })
 
   it("every provider Combwork has can be given folders (OpenCode since HI-2772: 2.2.6's default rules reach the copies, no grant needed)", () => {
-    for (const p of PROVIDERS) expect(p.capabilities.extraDirs, p.id).toBe(true)
+    for (const p of PROVIDERS) expect(p.capabilities.session?.extraDirs, p.id).toBe(true)
   })
 
   it('Claude Code: --add-dir, always followed by an option (it takes several), never with none granted', () => {

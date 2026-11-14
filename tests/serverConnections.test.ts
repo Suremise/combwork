@@ -62,7 +62,7 @@ beforeAll(async () => {
   writeFileSync(join(wsPath, 'alpha', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }] }))
   config.settings.providers['claude-code'].enabled = true
   providerService.info = ((id: string) => ({ provider: id, found: true, path: 'claude.exe' })) as never
-  vi.spyOn(provider('claude-code'), 'accountStatus').mockImplementation(async () => ({ ok: true, loggedIn: false }))
+  vi.spyOn(provider('claude-code').accounts!, 'accountStatus').mockImplementation(async () => ({ ok: true, loggedIn: false }))
   w = createWorkspaceService()
   await w.open(wsPath)
 })
@@ -298,7 +298,7 @@ describe('launching on a server connection', () => {
       })
       // What this PC's environment had of its own goes first, any spelling.
       const inherited = { PATH: 'x', anthropic_api_key: 'machine-key-000000', ANTHROPIC_BASE_URL: 'https://elsewhere', CLAUDE_CODE_USE_BEDROCK: '1', CLAUDE_CODE_OAUTH_TOKEN: 'oauth-000000000000' }
-      const env = withServerEnv(conn.server!.env, withoutAccountEnv(provider('claude-code'), inherited))
+      const env = withServerEnv(conn.server!.env, withoutAccountEnv(provider('claude-code').accounts ?? null, inherited))
       expect(env).toEqual({ PATH: 'x', ...conn.server!.env })
       expect(maskKeys(`token ${KEY}`)).toBe('token <key>')
     } finally {
@@ -313,7 +313,7 @@ describe('launching on a server connection', () => {
     const conn = (await launch(local.id))!
     try {
       expect(conn.server!.env).toMatchObject({ ANTHROPIC_BASE_URL: 'http://localhost:11434', ANTHROPIC_AUTH_TOKEN: 'none', ANTHROPIC_MODEL: 'qwen3:8b' })
-      const env = withServerEnv(conn.server!.env, withoutAccountEnv(provider('claude-code'), { ANTHROPIC_API_KEY: 'machine-key-000000', ANTHROPIC_AUTH_TOKEN: 'machine-token-0000' }))
+      const env = withServerEnv(conn.server!.env, withoutAccountEnv(provider('claude-code').accounts ?? null, { ANTHROPIC_API_KEY: 'machine-key-000000', ANTHROPIC_AUTH_TOKEN: 'machine-token-0000' }))
       expect(env.ANTHROPIC_API_KEY).toBeUndefined()
       expect(env.ANTHROPIC_AUTH_TOKEN).toBe('none')
     } finally {
@@ -326,7 +326,7 @@ describe('launching on a server connection', () => {
     const local = await serverOn({ name: 'Ollama', preset: 'ollama', baseUrl: 'http://localhost:11434', models: [{ id: 'qwen3:8b', as: ['opus'] }] })
     const conn = (await launch(local.id))!
     try {
-      const env = withServerEnv(conn.server!.env, withoutAccountEnv(provider('claude-code'), { PATH: 'x', ...inherited }))
+      const env = withServerEnv(conn.server!.env, withoutAccountEnv(provider('claude-code').accounts ?? null, { PATH: 'x', ...inherited }))
       expect(env).toEqual({ PATH: 'x', ...conn.server!.env })
     } finally {
       conn.release()

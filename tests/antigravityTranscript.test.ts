@@ -15,7 +15,7 @@ process.env.CW_USER_DATA = join(base, 'userdata')
 
 const { AntigravityConversationParser, AntigravityUsageParser, annotationTitle, parseAgyTranscript, stepOutput, userRequestText } = await import('../src/main/providers/antigravity/transcript')
 const { TRANSCRIPT_FILE, knownTitle, learnTitle, listConversations, mediaData, profileOf, profileTranscript, transcriptIn, trustedTranscript } = await import('../src/main/providers/antigravity/conversations')
-const { formatToolInput } = await import('../src/main/providers/claude/conversation')
+const { formatToolInput } = await import('../src/main/providers/conversation')
 const { antigravity, profileFolder } = await import('../src/main/providers/antigravity/adapter')
 const { profilesRoot } = await import('../src/main/providers/antigravity/home')
 const { advanced } = await import('../src/main/advanced')

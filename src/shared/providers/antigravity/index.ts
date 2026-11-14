@@ -1,8 +1,11 @@
-import type { ModeOption, ModelGroup, ProviderDescriptor } from './providers'
-import { COPILOT_DESCRIPTOR } from './copilot'
-import { withCliOwn } from './cliOwnMode'
-import { msg } from './i18n/msg'
-import { agentMsg, say } from './agentText'
+import type { ModeOption, ModelGroup, ProviderDescriptor } from '..'
+import { effortLevels } from '../common'
+import { withCliOwn } from '../../cliOwnMode'
+import { msg } from '../../i18n/msg'
+import { agentMsg, say } from '../../agentText'
+import { defineProvider } from '../parts'
+import { ADVANCED } from './advanced'
+import { TIPS } from './tips'
 
 /**
  * Google's Antigravity CLI (`agy`), Combwork's fourth provider (HI-2544; the research HI-2448, the runtime facts HI-2543,
@@ -130,6 +133,7 @@ export const ANTIGRAVITY_DESCRIPTOR: ProviderDescriptor = {
   company: 'Google', // i18n-ignore: a company name
   cliName: 'agy',
   icon: 'antigravity',
+  badge: { shape: 'hexagon', glyph: 'rise', color: '#3d8fd6' },
   setupUrl: 'https://antigravity.google/docs/getting-started/',
   pricingUrl: 'https://antigravity.google/docs/models/',
   permissionModes: withCliOwn(ANTIGRAVITY_PERMISSION_MODES),
@@ -137,33 +141,45 @@ export const ANTIGRAVITY_DESCRIPTOR: ProviderDescriptor = {
   // Combwork's own tools are pre-approved for its sessions (the Assistant's: trustedCombworkTools); the rest asks.
   assistantMode: 'ask',
   // 1.5.0's --effort: low|medium|high|xhigh|max (the levels Combwork already names for the other CLIs).
-  effortLevels: COPILOT_DESCRIPTOR.effortLevels.filter((e) => ['low', 'medium', 'high', 'xhigh', 'max'].includes(e.value)),
+  effortLevels: effortLevels('low', 'medium', 'high', 'xhigh', 'max'),
   modelGroups: ANTIGRAVITY_MODEL_GROUPS,
   modelPlaceholder: 'Model ID, e.g. gemini-3.8-flash-medium', // i18n-ignore: English (text.modelPlaceholder is the window's)
   capabilities: {
-    // agy can't be given a conversation id up front: Combwork learns it after the start (identity.ts).
-    fixedSessionId: false,
-    // Not verified for 1.5.0: switching needs a restart until a check shows how its terminal cycles modes.
-    liveModeSwitch: 'none',
-    planModeToggle: false,
-    promptCacheTtl: false,
-    // Its status line gives an estimated cost only (`cost.estimated`), against the Google plan: not a bill.
-    reportsCost: false,
-    defersMcpTools: false,
-    compactFocus: false,
-    contextLimit: false,
-    autoCompactReserve: null,
-    imagePaste: false,
-    attachments: ['text'],
-    lockAsk: false,
-    backgroundSessions: false,
-    backgroundWakes: false,
-    typedTurnsWithoutPrompt: false,
-    startupSizeRefresh: true,
-    bracketedPaste: false,
-    enterOnceDrawn: false,
-    // --add-dir (1.5.0).
-    extraDirs: true
+    terminal: {
+      imagePaste: false,
+      attachments: ['text'],
+      startupSizeRefresh: true,
+      bracketedPaste: false,
+      enterOnceDrawn: false
+    },
+    session: {
+      // agy can't be given a conversation id up front: Combwork learns it after the start (identity.ts).
+      fixedSessionId: false,
+      defersMcpTools: false,
+      lockAsk: false,
+      typedTurnsWithoutPrompt: false,
+      // --add-dir (1.5.0).
+      extraDirs: true
+    },
+    modes: {
+      // Not verified for 1.5.0: switching needs a restart until a check shows how its terminal cycles modes.
+      liveModeSwitch: 'none',
+      planModeToggle: false
+    },
+    usage: {
+      promptCacheTtl: false,
+      // Its status line gives an estimated cost only (`cost.estimated`), against the Google plan: not a bill.
+      reportsCost: false
+    },
+    compaction: {
+      compactFocus: false,
+      contextLimit: false,
+      autoCompactReserve: null
+    },
+    background: {
+      backgroundSessions: false,
+      backgroundWakes: false
+    }
   },
   reservedKeys: [],
   // agy reads AGENTS.md and GEMINI.md natively (HI-2448).
@@ -185,3 +201,13 @@ export const ANTIGRAVITY_DESCRIPTOR: ProviderDescriptor = {
   // No live switching (liveModeSwitch: none): a change of mode restarts the session.
   canSwitchLive: () => false
 }
+
+/** The Antigravity CLI's shared half, as the registry lists it (HI-3201). */
+export default defineProvider({
+  descriptor: ANTIGRAVITY_DESCRIPTOR,
+  // Antigravity runs against the user's Google plan and publishes no per-token prices (checked 7 Nov 2026, HI-2544): no
+  // table ships, and its sessions show as unpriced. Prices a user adds are used.
+  prices: { checked: '2026-11-07', shipped: {} },
+  tips: TIPS,
+  advanced: ADVANCED
+})

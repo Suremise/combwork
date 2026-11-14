@@ -121,7 +121,7 @@ function menuItems(project: ProjectInfo, a: AgentInfo, settings: AppSettings, vi
           onClick: () => void switchLive(project, a, m.value)
         }
       }),
-      ...(desc.capabilities.planModeToggle
+      ...(desc.capabilities.modes?.planModeToggle
         ? [
             { separator: true } as MenuEntry,
             {
@@ -198,11 +198,11 @@ export function ModeBadge({ project, a, variant }: { project: ProjectInfo; a: Ag
       : modeBadgeLabel(provider, mode, tr)
   const kb = commandKeybinding('session.permissionMode')
   // Shift+Tab still cycles the CLI's modes in one on its own setting, but Combwork can't say where it starts (#1284).
-  const cycles = providerDescriptor(provider).capabilities.liveModeSwitch === 'cycle' && !option?.cliOwn
+  const cycles = providerDescriptor(provider).capabilities.modes?.liveModeSwitch === 'cycle' && !option?.cliOwn
   const note = a.live && !a.live.modeSwitching && option?.cliNote ? shownText(option.cliNote, option.text?.cliNote, tr) : undefined
   const tip = tr(
     msg({ id: 'agents.permission.badgeTip', defaultMessage: '{live, select, yes {Permission mode of the running session} other {Permission mode new sessions start in}}: {mode}.{note, select, none {} other { {note}}} Click to change{key, select, none {} other { ({key})}}.{cycles, select, yes { You can also press Shift+Tab in the terminal.} other {}}{plan, select, yes { Shift+Tab in the terminal turns Plan mode on and off.} other {}}', description: "Tooltip of an agent's permission mode badge: whose mode it is (the running session's, or new sessions'), the mode ({mode}), why the CLI's own screen names it differently ({note}; none: leave that branch empty), the shortcut that opens the menu ({key}; none: empty), and whether Shift+Tab switches it in the terminal. Shift+Tab is a key: keep it." }),
-    { live: a.live ? 'yes' : 'no', mode: label, note: note ?? 'none', key: kb ? formatKeybinding(kb) : 'none', cycles: a.live && cycles ? 'yes' : 'no', plan: a.live && providerDescriptor(provider).capabilities.planModeToggle ? 'yes' : 'no' }
+    { live: a.live ? 'yes' : 'no', mode: label, note: note ?? 'none', key: kb ? formatKeybinding(kb) : 'none', cycles: a.live && cycles ? 'yes' : 'no', plan: a.live && providerDescriptor(provider).capabilities.modes?.planModeToggle ? 'yes' : 'no' }
   )
   const open = (e: React.MouseEvent): void => {
     e.stopPropagation()

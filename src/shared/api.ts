@@ -7,7 +7,7 @@ import type { IgnoreTarget } from './gitIgnoreRules'
 import type { DialectCatalogue, DialectFile, DialectFileView, DialectRefusal, DialectRow, DialectUsage } from './dialects'
 import type { ActivityCardAgent, ActivityDetail, ActivityNow, ActivityTurns, EndProcessResult } from './activity'
 import type { SessionHooks } from './hooks'
-import type { ClaudeSnippetFacts } from './claudeHookHandlers'
+import type { AdminSnippetFacts } from './hooks'
 import type { AgentLeftovers } from './agentProcesses'
 import type { FreshRow, FreshWhy } from './freshStarts'
 import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestionReply } from './antivirus'
@@ -1306,7 +1306,7 @@ export interface CombworkRequests {
 
   'api:info': () => AgentApiInfo
   /** What the Claude Code admin snippet is made from (HI-2777): ports and the hooks' timeouts. */
-  'api:claudeSnippet': () => ClaudeSnippetFacts
+  'api:adminSnippet': (provider: ProviderId) => AdminSnippetFacts
   'api:regenerateToken': () => AgentApiInfo
   /** A new read-only viewer token with this name (#620). */
   'api:createViewer': (name: string) => AgentApiInfo

@@ -6,7 +6,7 @@ import { copilot, copilotHooks, copilotMcpServer, toolNamesLine } from '../src/m
 import { COPILOT_ENV_STRIP, copilotEnv } from '../src/main/providers/copilot/home'
 import { parseCopilotModels } from '../src/main/providers/copilot/models'
 import type { LaunchContext } from '../src/main/providers/types'
-import { COPILOT_DESCRIPTOR, copilotCanApproveEdits, copilotCanSwitchLive, copilotFooterMode, copilotModeFlags, copilotModelLabel, copilotPathGlob } from '../src/shared/copilot'
+import { COPILOT_DESCRIPTOR, copilotCanApproveEdits, copilotCanSwitchLive, copilotFooterMode, copilotModeFlags, copilotModelLabel, copilotPathGlob } from '../src/shared/providers/copilot'
 import { isKnownProvider, providerDescriptor } from '../src/shared/providers'
 import { tempDir } from './tempDir'
 import { resolveGithubHosts } from '../src/shared/githubHost'
@@ -40,7 +40,7 @@ describe('Copilot descriptor', () => {
     // Only Autopilot is behind the opt-in: Allow all is Copilot's low-interaction mode, offered to all (#490).
     expect(d.permissionModes.filter((m) => m.danger).map((m) => m.value)).toEqual(['autopilot'])
     expect(d.effortLevels.map((e) => e.value)).toEqual(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
-    expect(d.capabilities).toMatchObject({ fixedSessionId: true, liveModeSwitch: 'cycle', reportsCost: true, lockAsk: true, compactFocus: true })
+    expect(d.capabilities).toMatchObject({ session: { fixedSessionId: true, lockAsk: true }, modes: { liveModeSwitch: 'cycle' }, usage: { reportsCost: true }, compaction: { compactFocus: true } })
     expect(d.modelGroups[0].models.map((m) => m.value)).toEqual(['auto'])
   })
 

@@ -1,10 +1,6 @@
 import type { AppSettings, ModelCatalog, ModelPrice, ProviderId, SessionUsage } from './types'
-import { CLAUDE_CODE, baseModel } from './claude'
-import { CODEX } from './codex'
-import { COPILOT } from './copilot'
-import { ANTIGRAVITY } from './antigravity'
-import { OPENCODE } from './opencode'
-import { providerDescriptor, providerSettings } from './providers'
+import { providerDescriptor, providerModule, providerSettings } from './providers'
+import { PROVIDER_MODULES } from './providers/registry'
 import { msg, tr } from './i18n'
 
 /**
@@ -15,73 +11,21 @@ import { msg, tr } from './i18n'
  * for sessions without one, unless the user chooses their prices over the report (`costSource`, #436). Each table also
  * lists the models the CLI has (its model list), priced or not, so a model a CLI update adds shows without a Combwork release.
  *
- * Sources, each provider's checked on its date in PRICES_CHECKED: Anthropic's model table (Claude API docs; cache writes
- * 1.25× input and cache reads 0.1× input unless listed) and OpenAI's API pricing page (developers.openai.com/api/docs/pricing,
- * standard tier). A model with no published price (Codex's own `codex-auto-review`, its approval reviewer) has no row:
- * its sessions show as unpriced, never $0.
+ * Each provider's table, its sources and the date it was checked are in its shared half (src/shared/providers/<folder>,
+ * `prices`). A model with no published price has no row: its sessions show as unpriced, never $0.
  */
-const claude = (input: number, output: number, cachedInput = input / 10): ModelPrice => ({ input, output, cachedInput, cacheWrite: input * 1.25 })
-const openai = (input: number, cachedInput: number, output: number, cacheWrite?: number): ModelPrice => ({ input, cachedInput, output, ...(cacheWrite !== undefined ? { cacheWrite } : {}) })
 
 /** When each provider's shipped prices were last checked against its published ones (Settings → <provider> → API prices says so). */
-export const PRICES_CHECKED: Record<ProviderId, string> = { [CLAUDE_CODE]: '2026-09-30', [CODEX]: '2026-11-07', [COPILOT]: '2026-09-30', [ANTIGRAVITY]: '2026-11-07', [OPENCODE]: '2026-11-09' }
+export const PRICES_CHECKED: Record<ProviderId, string> = Object.fromEntries(PROVIDER_MODULES.map((m) => [m.descriptor.id, m.prices.checked]))
 
-export const SHIPPED_PRICES: Record<ProviderId, Record<string, ModelPrice>> = {
-  [CLAUDE_CODE]: {
-    'claude-fable-5-1': claude(10, 50, 0.25),
-    'claude-fable-5': claude(10, 50),
-    'claude-opus-5-5': claude(4, 20, 0.2),
-    'claude-opus-5': claude(5, 25),
-    'claude-opus-4-8': claude(5, 25),
-    'claude-opus-4-7': claude(5, 25),
-    'claude-opus-4-6': claude(5, 25),
-    // Sonnet 5.5's cache reads are 0.05× input, $0.10 (#435): Anthropic's pricing page, checked 8 Oct 2026. Claude Code
-    // agrees from 2.1.296 (its tier_2_10_cache_read_0_10 table, #442).
-    'claude-sonnet-5-5': claude(2, 10, 0.1),
-    'claude-sonnet-5': claude(2, 10),
-    'claude-sonnet-4-6': claude(3, 15),
-    // Haiku 5.5 (released 7 Oct 2026): Anthropic's pricing page, checked 8 Oct 2026, and the Claude Code 2.1.294 model catalog's
-    // haiku_55 table (both agree). Prompts over 100,000 tokens cost more ($0.50 in, $2.50 out); not modelled, as Codex's
-    // 272K prompts aren't.
-    'claude-haiku-5-5': claude(0.1, 0.5),
-    'claude-haiku-4-5': claude(1, 5)
-  },
-  [CODEX]: {
-    // All checked against OpenAI's pricing page on 7 Nov 2026 (HI-2675): unchanged but for gpt-6.1-terra, added. Prompts
-    // over 272K input tokens cost more (2× input and cached, 1.5× output); not modelled. GPT-5.6 Sol's is a promotional
-    // price, to 30 Nov 2026 by that page.
-    // Codex's default from 0.160 (Oct 2026): OpenAI's model page (developers.openai.com/api/docs/models/gpt-6.1-sol),
-    // checked 5 Oct 2026, with cache writes at $2.50 (Codex reports none today).
-    'gpt-6.1-sol': openai(2, 0.1, 10, 2.5),
-    'gpt-6.1-terra': openai(1, 0.05, 5),
-    'gpt-6-astra': openai(10, 1, 50),
-    'gpt-6-sol': openai(2, 0.2, 10),
-    'gpt-6-luna': openai(0.1, 0.01, 0.5),
-    'gpt-5.6-sol': openai(4, 0.4, 20),
-    'gpt-5.6-terra': openai(2, 0.2, 12),
-    'gpt-5.6-luna': openai(0.2, 0.02, 1.2),
-    'gpt-5.5': openai(5, 0.5, 30),
-    'gpt-5.3-codex': openai(1.75, 0.175, 14)
-  },
-  // GitHub Copilot reports each session's cost itself, in AI credits ($0.01 each, charged at each model's API rate):
-  // no table ships. Prices a user adds are used for sessions without a reported cost.
-  [COPILOT]: {},
-  // Antigravity runs against the user's Google plan and publishes no per-token prices (checked 7 Nov 2026, HI-2544): no
-  // table ships, and its sessions show as unpriced. Prices a user adds are used.
-  [ANTIGRAVITY]: {},
-  // OpenCode reaches many vendors' models through the account's own sign-ins and keys, each priced by its vendor (checked
-  // 9 Nov 2026, HI-2759): no table ships, and its sessions show as unpriced. Prices a user adds are used.
-  [OPENCODE]: {}
-}
+/** Each provider's shipped prices, in USD per million tokens (its shared half's). */
+export const SHIPPED_PRICES: Record<ProviderId, Record<string, ModelPrice>> = Object.fromEntries(PROVIDER_MODULES.map((m) => [m.descriptor.id, m.prices.shipped]))
 
-/** Claude Code's aliases, and the dated ids its transcripts show, map to the table's ids. */
-const CLAUDE_ALIASES: Record<string, string> = { fable: 'claude-fable-5-1', opus: 'claude-opus-5-5', sonnet: 'claude-sonnet-5-5', haiku: 'claude-haiku-5-5' }
-
+/** A model as its provider's price table names it: in lower case, through the provider's own key (an alias by the id it stands for). */
 function priceKey(provider: ProviderId, model: string): string {
   const m = model.trim().toLowerCase()
-  if (provider !== CLAUDE_CODE) return m
-  const base = baseModel(m)
-  return CLAUDE_ALIASES[base] ?? base.replace(/-\d{8}$/, '')
+  const key = providerModule(provider)?.prices.key
+  return key ? key(m) : m
 }
 
 /** The price for a model: the user's override, else the shipped one (unless they removed it); null when unknown. */
@@ -132,11 +76,11 @@ export function priceRows(provider: ProviderId, settings?: Pick<AppSettings, 'pr
 
 /**
  * Whether a provider's session costs come from Combwork's price table rather than the CLI's own report (#436): only for a
- * provider that reports one (capabilities.reportsCost), when the user chose their prices. Combwork never recomputes a
+ * provider that reports one (capabilities.usage.reportsCost), when the user chose their prices. Combwork never recomputes a
  * reported cost otherwise, even when the CLI's own price table lags a price change (#442).
  */
 export function usesOwnPrices(provider: ProviderId, settings?: Pick<AppSettings, 'providers'> | null): boolean {
-  return providerDescriptor(provider).capabilities.reportsCost && providerSettings(settings, provider).costSource === 'prices'
+  return !!providerDescriptor(provider).capabilities.usage?.reportsCost && providerSettings(settings, provider).costSource === 'prices'
 }
 
 /**

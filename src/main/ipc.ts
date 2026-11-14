@@ -87,7 +87,7 @@ import { missingWorktree, recreateWorktree, unlinkMissingWorktree } from './agen
 import { CW_DIR, projectAgents as agentsOf } from '../shared/defaults'
 import type { MoveOptions, TaskCard } from '../shared/types'
 import { killPty, ptyBuffer, ptySize, resizePty, writePty } from './ptyHost'
-import { apiInfo, claudeSnippetFacts, createViewer, regenerateToken, revokeViewer } from './servers'
+import { adminSnippetFacts, apiInfo, createViewer, regenerateToken, revokeViewer } from './servers'
 import * as projectAgents from './projectAgents'
 import * as templates from './templates'
 import * as branchWatch from './branchWatch'
@@ -304,7 +304,7 @@ function assertExtraArgs(args: unknown): void {
 function guardFile(path: string, write = false): string {
   if (insideArchive(path)) throw combworkError(M.insideArchive, undefined, { kind: 'forbidden' })
   // A CLI's own files: its connections' homes on in this workspace (HI-1755), else the CLI's own home.
-  if (workspace.isAllowedPath(path) || allProviders().some((p) => p.fileAllowed(path, write, connectionHomes(p.id, workspace.path ? workspace.config : null)?.map((h) => h.home)))) return path
+  if (workspace.isAllowedPath(path) || allProviders().some((p) => p.projectFiles?.fileAllowed(path, write, connectionHomes(p.id, workspace.path ? workspace.config : null)?.map((h) => h.home)))) return path
   // The skills that ship with Combwork, to view one the workspace doesn't have.
   if (!write && insideReal(path, [skills.bundledSkillsDir()])) return path
   throw combworkError(M.outsideWorkspace, undefined, { kind: 'forbidden' })
@@ -1791,7 +1791,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
     'memory:list': async (p) => {
       const project = workspace.assertProject(p)
-      return (await Promise.all(allProviders().map((a) => a.memorySources(project, connectionHomes(a.id, workspace.config))))).flat()
+      return (await Promise.all(allProviders().map((a) => a.projectFiles?.memorySources(project, connectionHomes(a.id, workspace.config)) ?? []))).flat()
     },
     'memory:instructionsShared': async (p, ids) => {
       const project = workspace.assertProject(p)
@@ -1948,7 +1948,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'session:restartForTools': (p, agentId, when) => sessions.restartForTools(p, agentId, { when: when === 'atSafePoint' ? 'atSafePoint' : 'ifIdle' }),
 
     'api:info': () => apiInfo(),
-    'api:claudeSnippet': () => claudeSnippetFacts(),
+    'api:adminSnippet': (id: ProviderId) => adminSnippetFacts(id),
     'api:regenerateToken': async () => {
       await regenerateToken()
       return apiInfo()

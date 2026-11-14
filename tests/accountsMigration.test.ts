@@ -3,8 +3,9 @@ import type { Account, AgentDef, AppSettings, Connection, LegacyConnection, Proj
 import { DEFAULT_APP_CONFIG, DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS, mergeDefaults, migrateConfig, migrateProjectConfig, withLegacyProjectFields } from '../src/shared/defaults'
 import { agentLaunchSettings, autoProvider, setInstalledCheck, splitArgs } from '../src/shared/providers'
 import { connectionName, joinArgs, launchValues, matchingConnection, resolveAgentConnection, sameValues } from '../src/shared/accounts'
-import { type AccountStore, type LegacyInputs, COPILOT_ACCOUNT, assistantHasSetup, baseValues, connectionFor, legacyEffective, legacyLaunchSettings, migrateAccounts, migrateAssistant, migrateProject, migrateWorkspaceFile, placeUnplaced, seamAccountId, unpinAssistant } from '../src/shared/connectionDefaults'
+import { type AccountStore, type LegacyInputs, assistantHasSetup, baseValues, connectionFor, legacyEffective, legacyLaunchSettings, migrateAccounts, migrateAssistant, migrateProject, migrateWorkspaceFile, placeUnplaced, seamAccountId, unpinAssistant } from '../src/shared/connectionDefaults'
 import { ASSISTANT_AGENT_ID, assistantProjectConfig } from '../src/shared/assistant'
+import { COPILOT_ACCOUNT } from '../src/shared/providers/copilot'
 
 /**
  * The accounts migration (HI-2106): the data model, each row of HI-2105's table (s11 as revised by s13), and the full

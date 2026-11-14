@@ -148,3 +148,28 @@ export interface ActivityHookBlock {
   kind: 'blocked' | 'asked'
   at: number
 }
+
+/** The variables a launch sets for its hook commands (a CLI's hook handlers read them: claude/hookHandlers.ts). */
+export const HOOK_URL_ENV = 'CW_HOOK_URL' // i18n-ignore: an environment variable's name
+export const HOOK_AUTH_FILE_ENV = 'CW_HOOK_AUTH_FILE' // i18n-ignore: an environment variable's name
+export const HOOK_TOKEN_ENV = 'CW_HOOK_TOKEN' // i18n-ignore: an environment variable's name
+
+/** The fixed URL a CLI's HTTP hooks post to, for Combwork's Agent API on `port` (HI-2777: an HTTP hook's URL takes no variables). */
+export const fixedHookUrl = (port: number): string => `http://127.0.0.1:${port}/hook`
+
+/**
+ * What a provider's admin snippet is made from (HI-2777: servers.ts adminSnippetFacts): a block of the CLI's settings an
+ * organisation's administrator pastes into its managed settings, so Combwork's hooks run where policy allows only those.
+ */
+export interface AdminSnippetFacts {
+  /** This Combwork's Agent API port. */
+  port: number
+  /** The other build's default port (a development build's beside the installed app's), when it isn't this one. */
+  otherPort: number | null
+  /** An installed copy (else a development build). */
+  packaged: boolean
+  /** Whether the Agent API is listening on its port now (the fixed hook URL is there). */
+  listening: boolean
+  /** The provider's own values it is made from (Claude Code's: its hooks' timeouts, by name). */
+  settings: Record<string, number>
+}

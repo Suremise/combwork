@@ -568,7 +568,7 @@ export function OverviewTab({ project }: { project: ProjectInfo }) {
               </h2>
               <div className="cards">
                 <Card title={tr(M.tokens)} value={formatTokens(tokens(t))} sub={tr(M.outputSub, { tokens: formatTokens(t.output) })} />
-                <Card title={tr(M.cost)} value={costText(t)} sub={t.unpriced ? tr(M.withoutPriceShort, { count: t.unpriced }) : tr(!t.estimated ? M.asReported : p.capabilities.reportsCost && !usesOwnPrices(p.id, settings) ? M.partlyEstimated : M.estimated)} tip={costTip} />
+                <Card title={tr(M.cost)} value={costText(t)} sub={t.unpriced ? tr(M.withoutPriceShort, { count: t.unpriced }) : tr(!t.estimated ? M.asReported : p.capabilities.usage?.reportsCost && !usesOwnPrices(p.id, settings) ? M.partlyEstimated : M.estimated)} tip={costTip} />
                 <Card title={tr(M.sessions)} value={formatNumber(t.sessions)} sub={tr(M.promptsSub, { count: t.prompts })} />
               </div>
               <PlanLimits provider={p.id} />
@@ -769,7 +769,7 @@ function SessionDetails({ project, items }: { project: ProjectInfo; items: Sessi
   const u: SessionUsage | null = current?.usage ?? null
 
   const provider = providerDescriptor(u?.provider ?? current?.provider)
-  const cacheTtl = provider.capabilities.promptCacheTtl
+  const cacheTtl = provider.capabilities.usage?.promptCacheTtl
   const ttl = u ? (settings?.sessions.cacheTtl === '5m' ? 300 : settings?.sessions.cacheTtl === '1h' ? 3600 : u.cacheTtlSeconds) : 300
   const elapsed = u?.lastActivity ? (now - Date.parse(u.lastActivity)) / 1000 : Infinity
   const warm = elapsed < ttl

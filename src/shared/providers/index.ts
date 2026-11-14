@@ -1,19 +1,16 @@
-import type { AgentDef, AppSettings, AutoCompactSetting, EffortLevel, LaunchValues, ModelAlias, PermissionMode, ProjectConfig, ProjectProviderConfig, ProviderId, ProviderSettings, ServerModel } from './types'
-import type { AttachmentKind } from './attachments'
-import type { MapStation } from './activityMap'
-import type { TypedNewline } from './terminalInput'
-import { msg, type Msg } from './i18n/msg'
-import type { Tr } from './tasks'
-import { CLAUDE_CODE, CLAUDE_DESCRIPTOR } from './claude'
-import { CODEX_DESCRIPTOR } from './codex'
-import { COPILOT_DESCRIPTOR } from './copilot'
-import { ANTIGRAVITY_DESCRIPTOR } from './antigravity'
-import { OPENCODE_DESCRIPTOR } from './opencode'
+import type { AgentDef, AppSettings, AutoCompactSetting, EffortLevel, LaunchValues, ModelAlias, PermissionMode, ProjectConfig, ProjectProviderConfig, ProviderId, ProviderSettings, ServerModel } from '../types'
+import type { AttachmentKind } from '../attachments'
+import type { MapStation } from '../activityMap'
+import type { TypedNewline } from '../terminalInput'
+import { msg, type Msg } from '../i18n/msg'
+import type { Tr } from '../tasks'
+import { PROVIDER_MODULES } from './registry'
+import type { ProviderModule } from './parts'
 
 /**
- * Providers: the coding-agent CLIs Combwork can run (Claude Code, Codex, GitHub Copilot, Antigravity CLI, OpenCode). Everything the UI and the shared
- * settings logic need to know about one lives in its descriptor, so a new provider needs a descriptor
- * here and an adapter in src/main/providers — nothing else checks which provider an agent uses.
+ * Providers: the coding-agent CLIs Combwork can run. Everything the UI and the shared settings logic need to know about one
+ * lives in its shared half (src/shared/providers/<folder>/, listed in registry.ts), and its adapter in
+ * src/main/providers/<folder>/ (HI-3201): nothing else checks which provider an agent uses.
  */
 
 /**
@@ -80,34 +77,52 @@ export interface ModelGroup {
   models: ModelOption[]
 }
 
-export interface ProviderCapabilities {
+/** How the CLI's terminal takes what Combwork types and pastes. Absent: none of it (plain typing, attachments by path). */
+export interface ProviderTerminalCaps {
+  /** A pasted image path is attached as an image. */
+  imagePaste?: boolean
   /**
-   * An organisation can govern the CLI with remote settings Combwork can't read (HI-2777: Claude Code's server-managed
-   * settings), which may allow only their own hooks: the hooks warning says so when nothing local explains them, and
-   * offers the admin snippet.
+   * The kinds of attachment (#387) the CLI reads as what they are when the agent opens its path: an image it sees, a PDF
+   * it reads. Every attachment goes as a path in the prompt; other kinds are labelled "by path" (the agent opens them
+   * with its tools). Checked against the installed CLIs in test homes (fixtures in tests/fixtures/attachments).
    */
-  remoteHookPolicy?: boolean
+  attachments?: AttachmentKind[]
   /**
-   * Every plan usage reading a run reports comes from that run's own API calls, so was taken after its launch (HI-3187:
-   * Claude Code's status line has no rate limits until its process calls the API, fresh or resumed). Not Codex, whose
-   * resumed rollout can carry a reading days old.
+   * The CLI draws a full-screen interface that a resize while it starts can leave drawn at the wrong width, until the
+   * next resize (Copilot, #486): Combwork gives it a size refresh, as resizing the window by hand would, once it has
+   * started (its first status), again once it is ready, and after Combwork switches its mode live.
    */
-  planUsageSinceLaunch?: boolean
+  startupSizeRefresh?: boolean
   /**
-   * The CLI signs in on a GitHub host (HI-2779: Copilot): it follows the workspace's and project's GitHub host settings,
-   * and Provider Setup checks its sign-in per host in use (AgentInstallInfo.hostChecks), with Sign in per host.
+   * The CLI reads a bracketed paste as text however its input arrives (#597), so Combwork's typed prompts go in as one
+   * while its terminal has bracketed paste on. Typed in pieces, a prompt that reaches a busy Claude Code in one read
+   * with Combwork's Ctrl+U or Enter is taken as a paste with those keys in it, and isn't sent by Enter or by Enter again.
    */
-  githubHost?: boolean
+  bracketedPaste?: boolean
+  /**
+   * Combwork presses Enter after a line it typed only once the CLI has drawn that line (#600), at most a few seconds. A
+   * Codex busy for a moment reads the line and its Enter in one go, takes them as a paste burst and drops the Enter
+   * (typed or bracketed alike: 0.163); Enter again sends it. Drawn, the line is in its prompt, and the Enter sends it.
+   */
+  enterOnceDrawn?: boolean
+  /**
+   * Its input box's Ctrl+U deletes only the row the cursor is on of a line wrapped onto several, not the whole line
+   * (HI-1974: Claude Code 2.1.312; Codex and Copilot clear the line). Combwork then presses it once for each row a prompt it
+   * stopped part-way took, or the rest stays in the input and goes with the next prompt. Absent: it clears the line.
+   */
+  ctrlUClearsRow?: boolean
+  /**
+   * The keys its input box takes as a new line rather than a send (HI-1327), which Combwork may press for a line break in a
+   * prompt it types when prompts go as typed: the one it presses is the adapter's `typedNewline()` (an Advanced choice).
+   * Absent: a CLI whose prompts go in as a bracketed paste, or none known, and line breaks typed become spaces.
+   */
+  typedNewlines?: readonly TypedNewline[]
+}
+
+/** How a session runs and reports itself. Absent: none of it. */
+export interface ProviderSessionCaps {
   /** Combwork chooses the session id at launch (Claude Code); otherwise the provider reports it once started. */
-  fixedSessionId: boolean
-  /** How a running session changes permission mode: cycling a key (Claude's Shift+Tab), a menu, or not at all. */
-  liveModeSwitch: 'cycle' | 'menu' | 'none'
-  /** Plan mode is a toggle separate from the permission mode (Codex). */
-  planModeToggle: boolean
-  /** The prompt cache expires after a known time, so resuming may re-cache (Anthropic's 5 min / 1 h). */
-  promptCacheTtl: boolean
-  /** The provider reports the session's API-equivalent cost itself. */
-  reportsCost: boolean
+  fixedSessionId?: boolean
   /**
    * How the CLI defers MCP tools (HI-2553, HI-3225); false: it is given the whole list at the start.
    * - `unmarked`: its model sees their names and loads a tool's definition when it uses one, but for those Combwork marks to
@@ -116,47 +131,9 @@ export interface ProviderCapabilities {
    *   description, and is given no schema before it calls it (Codex 0.167 and 0.169 on every listed model; it reads no
    *   mark, server or tool setting that keeps one loaded). A call with arguments the tool doesn't take is told what it takes.
    */
-  defersMcpTools: false | 'unmarked' | 'all'
-  /** Compacting takes focus instructions. */
-  compactFocus: boolean
-  /**
-   * Sessions can be held to a 200K context window instead of the model's 1M one (Claude Code's
-   * CLAUDE_CODE_DISABLE_1M_CONTEXT): the "Use 200K context" setting.
-   */
-  contextLimit: boolean
-  /**
-   * How far below the context window the CLI compacts by itself, in tokens (Claude Code: the output it keeps room for,
-   * 20K, and a 13K buffer: about 167K on a 200K window); null when Combwork doesn't know.
-   */
-  autoCompactReserve: number | null
-  /**
-   * HI-2682: that reserve's parts, for a local model whose context Combwork declares: the output it keeps room for (its
-   * output budget, at most `outputMax`) and the buffer. Claude Code 2.1.319 compacted a 32,768 declared context with a
-   * 4,096 budget at 19,447 tokens, after not compacting at 12,401 (HI-2682's probe): consistent with 32,768 − 4,096 −
-   * 13,000 = 15,672, so the figure is an estimate. Absent: Combwork doesn't know.
-   */
-  autoCompactParts?: { outputMax: number; buffer: number }
-  /** A pasted image path is attached as an image. */
-  imagePaste: boolean
-  /**
-   * The kinds of attachment (#387) the CLI reads as what they are when the agent opens its path: an image it sees, a PDF
-   * it reads. Every attachment goes as a path in the prompt; other kinds are labelled "by path" (the agent opens them
-   * with its tools). Checked against the installed CLIs in test homes (fixtures in tests/fixtures/attachments).
-   */
-  attachments: AttachmentKind[]
+  defersMcpTools?: false | 'unmarked' | 'all'
   /** Hooks can hand an edit to the CLI's own approval prompt (the "Ask me" file lock). Without it, Combwork asks the user itself. */
-  lockAsk: boolean
-  /**
-   * The CLI can move a session into its own background service (Claude Code's agent view, opened with ← on an
-   * empty prompt), where Combwork can no longer see or stop it. Combwork turns that off unless allowBackgroundSessions.
-   */
-  backgroundSessions: boolean
-  /**
-   * The CLI starts a new turn by itself when one of the agent's background tasks ends (Claude Code's task
-   * notifications). An agent with such tasks open is then shown as background, not finished; without it the
-   * tasks are only counted.
-   */
-  backgroundWakes: boolean
+  lockAsk?: boolean
   /**
    * The Activity map's stations its transcript parse reports (HI-2903), set only from a recorded fixture showing a gap
    * (tests/activityMap.test.ts); absent: all six. The map shows the others as not reported, never as an observed zero.
@@ -167,7 +144,7 @@ export interface ProviderCapabilities {
    * command's output and sends no UserPromptSubmit): while the user's Enter into the idle pane waits for its hook, a hook
    * of a turn never seen shows its hooks arrive, and its first new tool call opens that turn (turnLedger rule 1).
    */
-  typedTurnsWithoutPrompt: boolean
+  typedTurnsWithoutPrompt?: boolean
   /**
    * The CLI sends a hook as it starts, before any prompt (Claude Code's SessionStart; Codex's and Copilot's come with the
    * first prompt): none within a while of its start means its hooks aren't reaching Combwork (#1336).
@@ -186,40 +163,103 @@ export interface ProviderCapabilities {
    */
   modelAliases?: readonly string[]
   /**
-   * The CLI draws a full-screen interface that a resize while it starts can leave drawn at the wrong width, until the
-   * next resize (Copilot, #486): Combwork gives it a size refresh, as resizing the window by hand would, once it has
-   * started (its first status), again once it is ready, and after Combwork switches its mode live.
-   */
-  startupSizeRefresh: boolean
-  /**
-   * The CLI reads a bracketed paste as text however its input arrives (#597), so Combwork's typed prompts go in as one
-   * while its terminal has bracketed paste on. Typed in pieces, a prompt that reaches a busy Claude Code in one read
-   * with Combwork's Ctrl+U or Enter is taken as a paste with those keys in it, and isn't sent by Enter or by Enter again.
-   */
-  bracketedPaste: boolean
-  /**
-   * Combwork presses Enter after a line it typed only once the CLI has drawn that line (#600), at most a few seconds. A
-   * Codex busy for a moment reads the line and its Enter in one go, takes them as a paste burst and drops the Enter
-   * (typed or bracketed alike: 0.163); Enter again sends it. Drawn, the line is in its prompt, and the Enter sends it.
-   */
-  enterOnceDrawn: boolean
-  /**
-   * Its input box's Ctrl+U deletes only the row the cursor is on of a line wrapped onto several, not the whole line
-   * (HI-1974: Claude Code 2.1.312; Codex and Copilot clear the line). Combwork then presses it once for each row a prompt it
-   * stopped part-way took, or the rest stays in the input and goes with the next prompt. Absent: it clears the line.
-   */
-  ctrlUClearsRow?: boolean
-  /**
-   * The keys its input box takes as a new line rather than a send (HI-1327), which Combwork may press for a line break in a
-   * prompt it types when prompts go as typed: the one it presses is the adapter's `typedNewline()` (an Advanced choice).
-   * Absent: a CLI whose prompts go in as a bracketed paste, or none known, and line breaks typed become spaces.
-   */
-  typedNewlines?: readonly TypedNewline[]
-  /**
    * The CLI can be given folders outside its own to read and write, on its command line (#1439, `LaunchContext.extraDirs`):
    * how a reviewer reaches the project's review copies. Without it, its reviewers review the builder's folder read-only.
    */
-  extraDirs: boolean
+  extraDirs?: boolean
+  /**
+   * The advanced value (seconds) that bounds one call of Combwork's tools in this CLI (Codex's tool_timeout_sec for the
+   * combwork MCP server): a card or agents wait holds a call a minute less, so its reply always arrives in time. Absent: none.
+   */
+  mcpToolTimeoutSetting?: string
+}
+
+/** Switching a running session's permission mode. Absent: it can't (a restart switches it). */
+export interface ProviderModesCaps {
+  /** How a running session changes permission mode: cycling a key (Claude's Shift+Tab), a menu, or not at all. */
+  liveModeSwitch?: 'cycle' | 'menu' | 'none'
+  /** Plan mode is a toggle separate from the permission mode (Codex). */
+  planModeToggle?: boolean
+}
+
+/** What the CLI reports of a session's cost and plan usage. Absent: none of it (cost estimated from prices). */
+export interface ProviderUsageCaps {
+  /**
+   * Every plan usage reading a run reports comes from that run's own API calls, so was taken after its launch (HI-3187:
+   * Claude Code's status line has no rate limits until its process calls the API, fresh or resumed). Not Codex, whose
+   * resumed rollout can carry a reading days old.
+   */
+  planUsageSinceLaunch?: boolean
+  /** The prompt cache expires after a known time, so resuming may re-cache (Anthropic's 5 min / 1 h). */
+  promptCacheTtl?: boolean
+  /** The provider reports the session's API-equivalent cost itself. */
+  reportsCost?: boolean
+}
+
+/** Compacting a session's context. Absent: Combwork knows nothing of it. */
+export interface ProviderCompactionCaps {
+  /** Compacting takes focus instructions. */
+  compactFocus?: boolean
+  /**
+   * Sessions can be held to a 200K context window instead of the model's 1M one (Claude Code's
+   * CLAUDE_CODE_DISABLE_1M_CONTEXT): the "Use 200K context" setting.
+   */
+  contextLimit?: boolean
+  /**
+   * How far below the context window the CLI compacts by itself, in tokens (Claude Code: the output it keeps room for,
+   * 20K, and a 13K buffer: about 167K on a 200K window); null when Combwork doesn't know.
+   */
+  autoCompactReserve?: number | null
+  /**
+   * HI-2682: that reserve's parts, for a local model whose context Combwork declares: the output it keeps room for (its
+   * output budget, at most `outputMax`) and the buffer. Claude Code 2.1.319 compacted a 32,768 declared context with a
+   * 4,096 budget at 19,447 tokens, after not compacting at 12,401 (HI-2682's probe): consistent with 32,768 − 4,096 −
+   * 13,000 = 15,672, so the figure is an estimate. Absent: Combwork doesn't know.
+   */
+  autoCompactParts?: { outputMax: number; buffer: number }
+}
+
+/** Background sessions and tasks. Absent: none. */
+export interface ProviderBackgroundCaps {
+  /**
+   * The CLI can move a session into its own background service (Claude Code's agent view, opened with ← on an
+   * empty prompt), where Combwork can no longer see or stop it. Combwork turns that off unless allowBackgroundSessions.
+   */
+  backgroundSessions?: boolean
+  /**
+   * The CLI starts a new turn by itself when one of the agent's background tasks ends (Claude Code's task
+   * notifications). An agent with such tasks open is then shown as background, not finished; without it the
+   * tasks are only counted.
+   */
+  backgroundWakes?: boolean
+}
+
+/** What governs the CLI's hooks beyond what Combwork reads. Absent: nothing more. */
+export interface ProviderHooksCaps {
+  /**
+   * An organisation can govern the CLI with remote settings Combwork can't read (HI-2777: Claude Code's server-managed
+   * settings), which may allow only their own hooks: the hooks warning says so when nothing local explains them, and
+   * offers the admin snippet.
+   */
+  remoteHookPolicy?: boolean
+}
+/**
+ * What a provider's CLI can do, in parts (HI-3201): a part only where it has any of it, each absent part none of it
+ * (no booleans to set false, no lists to leave empty).
+ */
+export interface ProviderCapabilities {
+  terminal?: ProviderTerminalCaps
+  session?: ProviderSessionCaps
+  modes?: ProviderModesCaps
+  usage?: ProviderUsageCaps
+  compaction?: ProviderCompactionCaps
+  background?: ProviderBackgroundCaps
+  hooks?: ProviderHooksCaps
+  /**
+   * The CLI signs in on a GitHub host (HI-2779: Copilot): it follows the workspace's and project's GitHub host settings,
+   * and Provider Setup checks its sign-in per host in use (AgentInstallInfo.hostChecks), with Sign in per host.
+   */
+  githubHost?: boolean
   /**
    * The CLI keeps its login in a home folder given at launch (HI-980: Claude Code's CLAUDE_CONFIG_DIR), so Combwork can keep
    * an account per folder: `homeEnv` names the variable, `shared` the home's folders each account's folder links to by a
@@ -321,6 +361,13 @@ export interface ModeCaveatFacts {
   label?: string
 }
 
+/** A provider's badge (ProviderIcon draws each shape and glyph): its own, so badges tell apart in one colour too. */
+export interface ProviderBadge {
+  shape: 'circle' | 'square' | 'diamond' | 'hexagon' | 'octagon'
+  glyph: 'tilde' | 'braces' | 'chevrons' | 'rise' | 'brackets'
+  color: string
+}
+
 export interface ProviderDescriptor {
   id: ProviderId
   /** Product name: "Claude Code". */
@@ -331,6 +378,11 @@ export interface ProviderDescriptor {
   cliName: string
   /** Icon key for the renderer (see ProviderIcon). */
   icon: string
+  /**
+   * Combwork's own badge for it (ProviderIcon), never the provider's logo (#470): an outline, a glyph and a colour, always
+   * shown with its name or as its tooltip. Absent: a neutral terminal icon.
+   */
+  badge?: ProviderBadge
   setupUrl: string
   /** The provider's published API prices, which its price table is checked against (#436). */
   pricingUrl: string
@@ -380,19 +432,24 @@ export interface ProviderDescriptor {
   canSwitchLive: (target: PermissionMode, current: PermissionMode | undefined, launched: PermissionMode | null | undefined) => boolean
 }
 
-export const DEFAULT_PROVIDER: ProviderId = CLAUDE_CODE
+/** Every provider Combwork knows, in display order (the registry's). */
+export const PROVIDERS: ProviderDescriptor[] = PROVIDER_MODULES.map((m) => m.descriptor)
 
-/** Every provider Combwork knows, in display order. */
-export const PROVIDERS: ProviderDescriptor[] = [CLAUDE_DESCRIPTOR, CODEX_DESCRIPTOR, COPILOT_DESCRIPTOR, ANTIGRAVITY_DESCRIPTOR, OPENCODE_DESCRIPTOR]
+/** The default provider: the registry's first. */
+export const DEFAULT_PROVIDER: ProviderId = PROVIDERS[0].id
 
+export { LEGACY_PROVIDER } from './registry'
+
+/** A provider id this version doesn't know: the default's descriptor, with nothing of its own (no modes, no models). */
 const UNKNOWN: ProviderDescriptor = {
-  ...CLAUDE_DESCRIPTOR,
+  ...PROVIDERS[0],
   id: 'unknown',
   name: 'Unknown provider', // i18n-ignore: a stand-in name for a provider id Combwork doesn't know (agents read names as they are)
   assistant: 'Agent', // i18n-ignore: a stand-in name for a provider id Combwork doesn't know
   company: '',
   cliName: '',
   icon: 'question',
+  badge: undefined,
   permissionModes: [],
   modelGroups: [],
   modelLabel: (m) => m,
@@ -403,7 +460,7 @@ const UNKNOWN: ProviderDescriptor = {
 
 /** Where a provider's CLI compacts by itself on a context window, in tokens; null when Combwork doesn't know (no window, or no rule). */
 export function autoCompactAt(id: ProviderId | null | undefined, window: number | null | undefined): number | null {
-  const reserve = PROVIDERS.find((p) => p.id === id)?.capabilities.autoCompactReserve ?? null
+  const reserve = PROVIDERS.find((p) => p.id === id)?.capabilities.compaction?.autoCompactReserve ?? null
   return reserve !== null && window && window > reserve ? window - reserve : null
 }
 
@@ -427,7 +484,7 @@ export function autoCompactLine(provider: ProviderId, contextWindow: number | nu
   // A local model's declared window (HI-2682, `declared`): Claude Code keeps room below it for the output budget it was
   // given (at most its usual output reserve) and its buffer, as HI-2682's probe showed it doing; always an estimate. An
   // auto-compact window set too is taken as capped by the declared context.
-  const parts = providerDescriptor(provider).capabilities.autoCompactParts
+  const parts = providerDescriptor(provider).capabilities.compaction?.autoCompactParts
   if (o.declared && parts && tr && auto?.window !== 'off' && window) {
     const reserve = Math.min(o.declared.output ?? parts.outputMax, parts.outputMax) + parts.buffer
     if (window <= reserve) return null
@@ -489,8 +546,14 @@ export function contextLines(u: { provider: ProviderId; contextTokens: number; c
 }
 
 /** A message of a provider's own text (`text`) by its id, or null: a comment Combwork wrote on a card names one (#866). */
-// agent-text: CLAUDE_DESCRIPTOR.text.safeguardHelp, CODEX_DESCRIPTOR.text.safeguardHelp (a CLI's sentences stored by id in a card comment, said when read)
+// Each provider's sentences a card comment stores by id are marked agent-text in its own module (HI-3201).
 export const providerMessage = (id: string): Msg | null => PROVIDERS.flatMap((p) => Object.values(p.text ?? {})).find((m): m is Msg => !!m && m.id === id) ?? null
+
+/** The provider with an admin snippet (HI-2777), or null: Help's and the hooks banner's Admin Snippet shows its. */
+export const adminSnippetProvider = (): ProviderModule | null => PROVIDER_MODULES.find((m) => m.adminSnippet) ?? null
+
+/** A provider's shared half (registry.ts), or undefined for an id this version doesn't know. */
+export const providerModule = (id: ProviderId | null | undefined): ProviderModule | undefined => PROVIDER_MODULES.find((m) => m.descriptor.id === id)
 
 export function providerDescriptor(id: ProviderId | null | undefined): ProviderDescriptor {
   return PROVIDERS.find((p) => p.id === (id || DEFAULT_PROVIDER)) ?? { ...UNKNOWN, id: id ?? 'unknown', name: id ?? 'Unknown provider' } // i18n-ignore: a stand-in name for a provider id Combwork doesn't know
@@ -501,7 +564,7 @@ export function providerDescriptor(id: ProviderId | null | undefined): ProviderD
  * them (`backgroundWakes`). A CLI that doesn't (Codex) leaves the agent idle, so they don't count as something waking it.
  */
 export function tasksWillWake(st: { provider?: ProviderId | null; backgroundTasks?: number }): boolean {
-  return !!st.backgroundTasks && providerDescriptor(st.provider).capabilities.backgroundWakes
+  return !!st.backgroundTasks && !!providerDescriptor(st.provider).capabilities.background?.backgroundWakes
 }
 
 export function isKnownProvider(id: unknown): id is ProviderId {
@@ -716,7 +779,8 @@ export function offeredModes(provider: ProviderId, settings: Pick<AppSettings, '
  */
 export function canSwitchModeLive(provider: ProviderId | ProviderDescriptor, target: PermissionMode, current: PermissionMode | undefined, launched: PermissionMode | null | undefined): boolean {
   const d = typeof provider === 'string' ? providerDescriptor(provider) : provider
-  if (d.capabilities.liveModeSwitch === 'none') return false
+  // No modes part: it can't switch live either.
+  if (!d.capabilities.modes?.liveModeSwitch || d.capabilities.modes.liveModeSwitch === 'none') return false
   if ([target, current, launched].some((m) => !!m && !!d.permissionModes.find((o) => o.value === m)?.cliOwn)) return false
   return d.canSwitchLive(target, current, launched)
 }
@@ -728,7 +792,7 @@ export interface AgentLaunchSettings {
   permissionMode: PermissionMode
   /** Its extra arguments, as typed (split by the main process): its connection's (before HI-2106, the CLI's then the project's). */
   extraArgs: string[]
-  /** A 200K context window instead of 1M (only for providers with capabilities.contextLimit). */
+  /** A 200K context window instead of 1M (only for providers with capabilities.compaction.contextLimit). */
   use200kContext: boolean
 }
 
@@ -761,7 +825,7 @@ export function extraArgsProblem(input: string | string[], tr?: Tr): string | nu
 export function agentLaunchSettings(provider: ProviderId, values: LaunchValues | null | undefined, settings: Pick<AppSettings, 'providers'> | null | undefined, server = false): AgentLaunchSettings {
   const d = providerDescriptor(provider)
   const permissionMode = values?.permissionMode && modeAllowed(provider, values.permissionMode, settings) ? values.permissionMode : d.defaultPermissionMode
-  return { provider, model: values?.model || null, effort: server ? null : values?.effort || null, permissionMode, extraArgs: values?.extraArgs?.trim() ? [values.extraArgs] : [], use200kContext: !server && d.capabilities.contextLimit && !!values?.use200kContext }
+  return { provider, model: values?.model || null, effort: server ? null : values?.effort || null, permissionMode, extraArgs: values?.extraArgs?.trim() ? [values.extraArgs] : [], use200kContext: !server && !!d.capabilities.compaction?.contextLimit && !!values?.use200kContext }
 }
 
 /** Whether a project's agents (without their own choice) use a 200K context: the project's choice, else the global one. */

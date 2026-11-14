@@ -398,7 +398,7 @@ describe('the suites a change needs (affected.mjs)', () => {
     const pick = (...files: string[]) => affectedSuites(files, names, realNames)
     for (const p of REAL_TIER as string[]) expect(existsSync(join(root, p.replace(/\/$/, ''))), p).toBe(true)
     // Combwork's side of every CLI: every real suite, with every fake one.
-    for (const f of ['src/main/sessions.ts', 'src/main/providers/types.ts', 'tests/e2e/lib.cjs', 'src/shared/providers.ts']) expect(pick(f), f).toMatchObject({ all: true, real: realNames })
+    for (const f of ['src/main/sessions.ts', 'src/main/providers/types.ts', 'tests/e2e/lib.cjs', 'src/shared/providers/index.ts']) expect(pick(f), f).toMatchObject({ all: true, real: realNames })
     // Not shared by every part of Combwork, but still every CLI's: every real suite and the area's fakes.
     expect(pick('src/main/transcripts.ts').suites).toEqual(expect.arrayContaining([...realNames, 'transcript']))
     // A provider's own adapter: only its area's real suites.
