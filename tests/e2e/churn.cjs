@@ -99,11 +99,13 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     check('the card shows its count', !!(await lib.until(async () => (await badge.getAttribute('data-churn').catch(() => null)) === '2', HUNG_MS)), String(await badge.getAttribute('data-churn').catch(() => null)))
     const tip = await lib.hoverTip(page, badge, (t) => t.includes('back-and-forth'), HUNG_MS)
     check('…its hover says each kind', tip.includes('2 rounds of back-and-forth') && tip.includes('2 reviewer requests'), tip)
+    // The tooltip away first, so the shots show the card as it stands.
+    await page.mouse.move(5, 5)
+    await lib.until(async () => (await page.locator('.tip:visible').count()) === 0, HUNG_MS)
     for (const theme of ['light', 'dark']) {
       await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
       await page.locator(`.task-card[data-task="${n}"]`).screenshot({ path: path.join(lib.WORK, `churn-badge-${theme}.png`) })
     }
-    await page.mouse.move(5, 5)
 
     // For you in the card's dialog: the simplify check's three choices; Worth handling resumes the loop.
     await openByTitle(page, n)
