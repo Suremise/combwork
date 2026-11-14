@@ -4,6 +4,7 @@
 // and advise). The drain's own rules (once a turn, each CLI's Stop reply) are
 // inboxNotices.test.ts's.
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { setChainResolver } from '../src/shared/agentText'
 import { unwatchedLanesNotice } from '../src/shared/doorbell'
 
 const HOME = 'C:\\ws\\.combwork\\assistant'
@@ -104,6 +105,22 @@ describe('the Assistant ending a turn with lanes running and no watch (HI-2069)'
     state.lanes = [lane('l1', 'HB1'), lane('l2', 'HB2')]
     state.unread = [{ id: 'm7', kind: 'rebrief', state: 'offered', expires: new Date(Date.now() + 3600_000).toISOString() }]
     expect(await noticeFor(assistant, 'drain')).toBe(`[CW] Before you finish: your inbox has 1 message (m7) you haven't read. Call cw_inbox, act on it and ack it before you end your turn. ${LINE}`)
+  })
+
+  it("is said in the Assistant's dialect, with the drain before it, and alone with nothing unread (HI-3230)", async () => {
+    setChainResolver((scope) =>
+      scope.kind === 'session' && scope.session.agentId === 'assistant'
+        ? { texts: { 'doorbell.notice.lanesUnwatched': 'Lanes run ({shown}): watch them.', 'doorbell.notice.drain': 'Unread: {what}.' }, files: ['test.json'], hash: 'test' }
+        : null
+    )
+    try {
+      state.lanes = [lane('l1', 'HB1'), lane('l2', 'HB2')]
+      expect(await noticeFor(assistant, 'drain')).toBe('[CW] Lanes run (HB1, HB2): watch them.')
+      state.unread = [{ id: 'm7', kind: 'rebrief', state: 'offered', expires: new Date(Date.now() + 3600_000).toISOString() }]
+      expect(await noticeFor(assistant, 'drain')).toBe('[CW] Unread: 1 message (m7). [CW] Lanes run (HB1, HB2): watch them.')
+    } finally {
+      setChainResolver(null)
+    }
   })
 })
 
