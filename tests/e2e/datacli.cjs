@@ -75,6 +75,8 @@ const held = { ...noSession, id: 'fake-held', name: 'Fake Held CLI', launch: { p
     await lib.until(async () => (['waiting', 'ready'].includes((await assistantLive())?.status) ? true : null), HUNG_MS, 200)
     if ((await assistantLive())?.status === 'waiting') await inv('pty:write', lib.ptyKey(home, 'assistant'), '\r')
     await lib.until(async () => ((await assistantLive())?.status === 'ready' ? true : null), HUNG_MS, 200)
+    // Never on a CLI without Combwork's tools, though a described CLI's account may come first (HI-3196).
+    check('the Assistant runs on a CLI with its tools, not a described one', (await assistantLive())?.provider === 'claude-code', (await assistantLive())?.provider)
     const token = JSON.parse(fs.readFileSync(path.join(userData, 'assistant-api', `${createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`), 'utf8')).token
     api = (method, url, body) =>
       fetch(`http://127.0.0.1:${lib.port(47899)}${url}`, { method, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, ...(body && method !== 'GET' ? { body: JSON.stringify(body) } : {}) }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }))
@@ -256,7 +258,7 @@ const held = { ...noSession, id: 'fake-held', name: 'Fake Held CLI', launch: { p
     const afterRestart = await api('POST', `/v1/projects/demo/agents/${a.id}/start`, { resume: true })
     const seventh = await lib.until(async () => launches()[8], HUNG_MS)
     check('…and resumes it by its id', afterRestart.status === 200 && arg(seventh, '--resume') === quietId && !lines().some((e) => e.kind === 'resumeRefused'), JSON.stringify({ afterRestart, args: seventh?.args }))
-    await statusIs('ready')
+    check('…ready at its prompt', !!(await statusIs('ready')), JSON.stringify({ status: (await live())?.status, screen: lib.plainText((await inv('pty:buffer', lib.ptyKey(proj, a.id)).catch(() => '')) ?? '').slice(-300) }))
     await inv('session:stop', proj, a.id)
     await stopped()
 

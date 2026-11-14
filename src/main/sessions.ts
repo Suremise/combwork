@@ -3819,6 +3819,12 @@ class SessionManager {
             : l.turnScreen && screen
               ? ((r) => (r === 'idle' ? 'ready' : r))(l.turnScreen(screen))
               : null
+    // Still starting, and its terminal says its turn is idle (its OSC 7501 state or its turn rules, which come with its output
+    // and not only with a draw): its start is over, as its prompt showing says (startupDrawn), whichever comes first.
+    if (l.state.status === 'starting' && reading === 'ready' && l.adapter.launch.startupOnScreen && !l.askedAtStart) {
+      log.info(`${userText(this.label(l.state))}: ready, as its terminal says its turn is idle`) // i18n-ignore: for the log
+      return this.startupReady(l, screen)
+    }
     const step = screenStep(reading, this.statusInput(l))
     if (step.next === null && !step.actions.length) return
     const runId = l.state.runId
@@ -3882,15 +3888,18 @@ class SessionManager {
       setStatus(l.state, asks)
       this.notify(l.state.projectPath, withValues(M.needsInput, { agent: this.label(l.state) }), asks, 'waiting', undefined, l.state.agentId)
       this.emitState(l.state)
-    } else if (seen === 'ready') {
-      // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
-      devConsole.capture([sessionSourceId(l.state.projectPath, l.state.agentId)], () => ({ kind: 'terminal', name: 'ready', provider: l.state.provider, raw: { screen: text.replace(/\s+/g, ' ').slice(-200) }, made: { status: 'ready' }, safe: { made: { status: true } }, summary: 'terminal: its prompt shows; ready' }))
-      this.startupAnswered(l)
-      this.fact(l.state, { lifecycle: 'running' })
-      l.state.status = 'ready'
-      this.emitState(l.state)
-      this.typeFirstPrompt(l)
-    }
+    } else if (seen === 'ready') this.startupReady(l, text)
+  }
+
+  /** Its start is over, its prompt showing: ready, and its typed first prompt tried. */
+  private startupReady(l: LiveSession, text: string): void {
+    // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
+    devConsole.capture([sessionSourceId(l.state.projectPath, l.state.agentId)], () => ({ kind: 'terminal', name: 'ready', provider: l.state.provider, raw: { screen: text.replace(/\s+/g, ' ').slice(-200) }, made: { status: 'ready' }, safe: { made: { status: true } }, summary: 'terminal: its prompt shows; ready' }))
+    this.startupAnswered(l)
+    this.fact(l.state, { lifecycle: 'running' })
+    l.state.status = 'ready'
+    this.emitState(l.state)
+    this.typeFirstPrompt(l)
   }
 
   /**
