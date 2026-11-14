@@ -31,6 +31,7 @@ import { ADVANCE_GATES, ADVANCE_PREVIEW_GATE, ADVANCE_UNCERTAIN_GATE, advanceUnr
 import { finishPreviews } from '../../shared/workflow/options'
 import { okBeforeApplies } from '../../shared/workflow/guards'
 import { dirname } from 'path'
+import { samePath } from '../../shared/movePaths'
 import type { HistoryPort } from './history'
 import { historyFor, observePort } from './historyPorts'
 import type { Disposable, ObserveEvent } from './observe'
@@ -1102,7 +1103,7 @@ export class JjPlatform implements PlatformAdapter {
     const asked = newest && (newest.data as FactData['ApprovalRequested']).request === ans.request ? (newest.data as FactData['ApprovalRequested']) : null
     const answered = s.approvals.findLast((a) => a.request === ans.request)
     const attemptedSince = facts.some((f) => f.kind === 'AdvanceAttempted' && (f.data as FactData['AdvanceAttempted']).plan === ans.plan && f.seq > (newest?.seq ?? Infinity))
-    const bound = ans.project === wf.cfg.project && s.cycle === ans.cycle && !!asked && asked.entry === ans.plan && asked.result === ans.plan && answered?.answer === ans.answer && !attemptedSince
+    const bound = samePath(ans.project, wf.cfg.project) && s.cycle === ans.cycle && !!asked && asked.entry === ans.plan && asked.result === ans.plan && answered?.answer === ans.answer && !attemptedSince
     if (!bound) return false
     if (ans.answer === 'declined') {
       await host.declinePreview(c, s.cycle, ans.plan)
@@ -1148,7 +1149,7 @@ export class JjPlatform implements PlatformAdapter {
     const ref: AdvanceRef = { cycle: ans.cycle, attempt: ans.attempt }
     const asked = s.made[ans.request]
     const answered = s.approvals.findLast((a) => a.request === ans.request)
-    const bound = ans.project === wf.cfg.project && s.cycle === ans.cycle && s.advance?.attempt === ans.attempt && advanceUnresolved(s) && s.advance.state === ans.state && s.advance.plan === ans.plan && asked?.gate === ans.gate && asked.entry === ans.attempt && asked.result === ans.plan && answered?.answer === ans.answer
+    const bound = samePath(ans.project, wf.cfg.project) && s.cycle === ans.cycle && s.advance?.attempt === ans.attempt && advanceUnresolved(s) && s.advance.state === ans.state && s.advance.plan === ans.plan && asked?.gate === ans.gate && asked.entry === ans.attempt && asked.result === ans.plan && answered?.answer === ans.answer
     const read = await journals.read(c.key, ans.cycle, ans.attempt)
     const j = read && read !== 'unreadable' && read.planId === ans.plan ? read : null
     if (!bound) return this.keepAsked(c, j, host, ans.request, 'stale') // i18n-ignore: a code, worded by the question's message (FOR_YOU.advance*)
