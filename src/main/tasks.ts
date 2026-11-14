@@ -43,7 +43,7 @@ import { answerFits, approveNote, ASK_ACTIONS, ATTEMPT_STAGES, CATEGORY_STAGE, D
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { refusal as refusalOf, refusalText, type Refusal } from '../shared/workflow/refusals'
-import { archiveBatchDocs, boardReadToken, boardGeneration, boardSavepoint, afterBoardWrite, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, headChanges, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, cardRevs, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, archiveComments, archivedComments, commentArchiveOf, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, decisionChanges, cardsOnBoard, inBoardWrite, type CardQuery } from './boardStore'
+import { archiveBatchDocs, boardReadToken, boardGeneration, boardSavepoint, afterBoardWrite, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, headChanges, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, cardRevs, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, archiveComments, archivedComments, commentArchiveOf, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, decisionChanges, cardsOnBoard, inBoardWrite, beforeBoardCommit, type CardQuery } from './boardStore'
 import type { Evicted } from './schema/commentArchive'
 import { keysForSearch } from './projectKeys'
 import { config } from './config'
@@ -1843,10 +1843,18 @@ export function attemptRead(ws: WorkspaceService, project: string, n: number): A
   }
 }
 
-/** HI-3194: refused unless the agent request's fence holds for card n at attempt `pre` (null: only its launch is checked). */
-function fenceOrThrow(g: AttemptGuard, n: number, pre: AttemptKey | null): void {
+/**
+ * HI-3194: refused unless the agent request's fence holds for card n at attempt `pre` (null: only its launch is checked).
+ * Its launch is checked again as the board change commits (beforeBoardCommit), after every await the change makes (the
+ * card's own save included): a launch replaced meanwhile undoes the whole change, its facts too, `attempt.staleLaunch`.
+ */
+function fenceOrThrow(g: AttemptGuard, n: number, pre: AttemptKey | null, ws: WorkspaceService = workspace): void {
   const r = g.check(n, cardRef(n), pre ?? null)
   if (r) throw new WorkflowRefusedError(r)
+  beforeBoardCommit(ws, `attempt:${g.fence.runId}:${n}`, () => {
+    const late = g.check(n, cardRef(n), null)
+    if (late) throw new WorkflowRefusedError(late)
+  })
 }
 
 /**
@@ -2768,7 +2776,7 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     // HI-3194: an agent's own change (a comment, a plain update) checked against its request's fence, on the card's attempt
     // as this change finds it, under the board's lock; an intent's writes were checked by runIntent with their facts.
     const g = opts.fenced ? undefined : guardOf(actor)
-    if (g) fenceOrThrow(g, n, attemptIn(ws, card.project, n))
+    if (g) fenceOrThrow(g, n, attemptIn(ws, card.project, n), ws)
     if (card.archived && actor.kind !== 'user') throw new TaskPermissionError(withValues(ERR.archived, { card: cardRef(n) }))
     // A card in Doing with another agent is that agent's work in progress: a project agent can't move it on to Review or
     // Done (a reviewer whose review ended when it came back for more work, say). Checked on the card as it is, before
@@ -3350,7 +3358,7 @@ export async function commentTask(n: number, comment: string, actor: TaskActor, 
     // HI-3194: an agent's comment fenced as any of its writes, on the card's attempt as this change finds it.
     const g = guardOf(actor)
     const pre = g ? attemptIn(ws, c.project, n) : null
-    if (g) fenceOrThrow(g, n, pre)
+    if (g) fenceOrThrow(g, n, pre, ws)
     if (c.archived && actor.kind !== 'user') throw new TaskPermissionError(withValues(ERR.archived, { card: cardRef(n) }))
     // A loop's request or reply (HI-2428), as updateTask's comment: its history line, which watches count and the
     // recorder wakes the other side with, in the same change.
@@ -3381,6 +3389,11 @@ export async function askAssistantOn(n: number, asked: string, actor: TaskActor,
   return recordingAs(actor, () => boardLock(ws, async () => {
     const c = await getTask(n, ws)
     if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
+    // HI-3194: an agent's request on a card fenced as any of its writes (its comment, and the waiting mark it may set),
+    // on the card's attempt as this change finds it, its launch again as the change commits.
+    const g = guardOf(actor)
+    const pre = g ? attemptIn(ws, c.project, n) : null
+    if (g) fenceOrThrow(g, n, pre, ws)
     check(c)
     const by = actorName(actor)
     note(c, by, storedText(HISTORY.assistantAsked, { text: clip(t) }))
@@ -3391,6 +3404,7 @@ export async function askAssistantOn(n: number, asked: string, actor: TaskActor,
       note(c, by, storedText(HISTORY.waiting, { reason }))
     }
     await saveCard(ws, n, c)
+    if (g && pre) g.accepted(n, pre, (fn) => afterBoardWrite(ws, fn))
     changed(ws)
     return c
   }))

@@ -84,6 +84,8 @@ const read = async (w: WS, l: { projectPath: string; agentId: string; runId: str
 }
 const facts = (w: WS, card: number) => FactStore.forBoard(w, { project: 'p', key: 'p' }).facts(card)
 const key = (w: WS, card: number) => foldCard(facts(w, card)).attempt
+/** The card as saved (committed). */
+const cardDocOf = (w: WS, card: number) => store.cardDoc(w, card) as unknown as { comments: unknown[]; history: unknown[]; title: string; waitingFor?: { ask?: string } }
 const create = (w: WS, title = 'Work', blockedBy?: number[]) => inWorkspace(w, async () => (await tasks.createTask({ title, project: 'p', ...(blockedBy ? { blockedBy } : {}) }, user)).number)
 type Intent = Parameters<typeof runCardIntent>[2]
 type Actor = Parameters<typeof runCardIntent>[1]
@@ -334,6 +336,108 @@ describe('the fence on an agent write (HI-3194)', () => {
     const oldReviewer = arrive(r)
     await launch(repo, 'a2', 'r2b')
     expect(await refused(act(w, card, oldReviewer, { kind: 'verdict', pass: true, comment: 'ok' }))).toBe('attempt.staleLaunch')
+  })
+
+  /**
+   * HR3's round 1: the launch replaced after the fence's first check, during the change's own awaits (the card's save
+   * reads the project ids), is refused as the change commits, nothing of it kept: its renewal happens on the first
+   * project-id read after an AttemptGuard check, so the first check has passed.
+   */
+  const renewedMidChange = (w: WS, renew: () => Promise<unknown>) => {
+    let checked = false
+    let renewed = false
+    const check = fence.AttemptGuard.prototype.check
+    const checkSpy = vi.spyOn(fence.AttemptGuard.prototype, 'check').mockImplementation(function (this: InstanceType<typeof fence.AttemptGuard>, ...a: Parameters<typeof check>) {
+      const r = check.apply(this, a)
+      if (!r) checked = true
+      return r
+    })
+    const ids = w.projectIds.bind(w)
+    const idsSpy = vi.spyOn(w, 'projectIds').mockImplementation(async (o) => {
+      if (checked && !renewed) {
+        renewed = true
+        await renew()
+      }
+      return ids(o)
+    })
+    return {
+      get renewed() {
+        return renewed
+      },
+      restore: () => {
+        checkSpy.mockRestore()
+        idsSpy.mockRestore()
+      }
+    }
+  }
+
+  it("a launch replaced during a change's awaits, after its fence was checked, is refused as it commits: a comment, a plain update, an intent", async () => {
+    const { w, repo, wt } = await workspace()
+    const card = await create(w)
+    let l = await launch(repo, 'a1', 'r1')
+    await act(w, card, arrive(l), { kind: 'start' })
+    commit(wt, 'b.txt')
+    const seen = () => {
+      const c = cardDocOf(w, card)
+      return { comments: c.comments.length, history: c.history.length, title: c.title }
+    }
+    let run = 1
+    const cases: [string, (a: Actor) => Promise<unknown>][] = [
+      ['comment', (a) => comment(w, card, a, 'From the replaced launch')],
+      ['update', (a) => update(w, card, a, { title: 'Renamed by the replaced launch' })],
+      ['submit', (a) => act(w, card, a, { kind: 'submit', summary: 'From the replaced launch' })]
+    ]
+    for (const [what, call] of cases) {
+      const before = seen()
+      const factsBefore = facts(w, card).length
+      const next = `r1-${++run}`
+      const r = renewedMidChange(w, () => launch(repo, 'a1', next))
+      try {
+        expect(await refused(call(arrive(l))), what).toBe('attempt.staleLaunch')
+        expect(r.renewed, what).toBe(true)
+      } finally {
+        r.restore()
+      }
+      expect(seen(), what).toEqual(before)
+      expect(facts(w, card).length, what).toBe(factsBefore)
+      l = { projectPath: repo, agentId: 'a1', runId: next }
+      fence.issueAttempt(l, card, key(w, card))
+    }
+    expect(facts(w, card).some((f) => f.kind === 'Submitted')).toBe(false)
+  })
+
+  it("an agent's Assistant request is fenced: a moved attempt and a launch replaced mid-change leave no comment or waiting mark", async () => {
+    const { w, repo, wt } = await workspace()
+    const card = await create(w)
+    const l = await launch(repo, 'a1', 'r1')
+    await act(w, card, arrive(l), { kind: 'start' })
+    commit(wt, 'b.txt')
+    const ask = (a: Actor, ref: string) => inWorkspace(w, () => tasks.askAssistantOn(card, 'Which way?', a, () => undefined, w, ref))
+    const seen = () => {
+      const c = cardDocOf(w, card)
+      return { comments: c.comments.length, waiting: c.waitingFor ?? null }
+    }
+    // The card restarted on the same agent: the launch's binding is the old attempt's.
+    const old = arrive(l)
+    await restart(w, card)
+    const before = seen()
+    expect(await refused(ask(old, '#1/aaaa0001'))).toBe('attempt.moved')
+    expect(seen()).toEqual(before)
+    // Read again, then replaced while the request's change awaits.
+    await read(w, l, card)
+    const r = renewedMidChange(w, () => launch(repo, 'a1', 'r2'))
+    try {
+      expect(await refused(ask(arrive(l), '#1/aaaa0002'))).toBe('attempt.staleLaunch')
+      expect(r.renewed).toBe(true)
+    } finally {
+      r.restore()
+    }
+    expect(seen()).toEqual(before)
+    // The current launch's request goes through, marking the card waiting.
+    const now = { projectPath: repo, agentId: 'a1', runId: 'r2' }
+    fence.issueAttempt(now, card, key(w, card))
+    await ask(arrive(now), '#1/aaaa0003')
+    expect(seen().waiting?.ask).toBe('#1/aaaa0003')
   })
 
   it('the user, the Assistant and scripts are never fenced', async () => {

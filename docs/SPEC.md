@@ -5975,9 +5975,12 @@ moved on.
   it makes (its own accepted write moves what its next write expects): a later read or receipt never lets an older request
   through. The agent passes nothing: no new arguments, no reads.
 - **The check**, in every write of a project agent's own call on a card, in that write's transaction before it decides
-  anything (intents, `cw_update_task` changes and comments, a batch's cards, declaring paths, a kind, review skip or target),
+  anything (intents, `cw_update_task` changes and comments, a batch's cards, an Assistant request on the card and the
+  waiting mark it sets, declaring paths, a kind, review skip or target),
   against the card's attempt before the write: the launch replaced → **`attempt.staleLaunch`**; a binding that isn't the
-  card's attempt → **`attempt.moved`** (read it again), in every stage, Todo and Done included. **No binding is first
+  card's attempt → **`attempt.moved`** (read it again), in every stage, Todo and Done included. The launch is checked
+  again as the board change commits, after its last await (the card's save, an attachment's publish): one replaced
+  meanwhile undoes the whole change, its facts too, `attempt.staleLaunch` (HR3's round 1). **No binding is first
   contact** (a reviewer prompted to review, a question to the user on a card, a comment on a Todo card, a resumed agent
   after a restart): allowed, and the write binds the launch to the card's attempt then. The card asks that a stale call
   can't act, not that an agent read a card first (Darren, 14 Nov: no read-first rule, no binding from listings, no saved
