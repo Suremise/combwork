@@ -6,7 +6,8 @@ import type { Lineage, Orphan } from '../src/main/orphanProcesses'
 
 const switchOn = vi.hoisted(() => ({ on: true }))
 // HI-3206: the minutes (10, the default) and the known hosts' pattern, as Settings → Advanced has them by default.
-vi.mock('../src/main/advanced', () => ({ advanced: { get: () => switchOn.on, number: () => 10, pattern: () => /^(WindowsSandboxRemoteSession|WindowsSandboxServer)\.exe$/i } }))
+const hostsNow = vi.hoisted(() => ({ re: /^(WindowsSandboxRemoteSession|WindowsSandboxServer)\.exe$/i as RegExp | null }))
+vi.mock('../src/main/advanced', () => ({ advanced: { get: () => switchOn.on, number: () => 10, pattern: () => hostsNow.re } }))
 const toasts = vi.hoisted(() => ({ list: [] as unknown[][] }))
 vi.mock('../src/main/events', () => ({ emit: () => undefined, toast: (...a: unknown[]) => void toasts.list.push(a), onCombworkEvent: () => () => undefined }))
 // The launches running now (r1 unless a test stops it), the host's lineage of each and their listed processes.
@@ -282,6 +283,98 @@ describe('processes of a cw-progress run (HI-3206)', () => {
     const created = ft(Date.now() - 12 * MIN)
     setOrphansForTests('r1', [{ ...launch, pid: 20, created, cpuMs: 3, present: true, shown: false, told: false, nameTries: 0, held: true, run: { runId: 'run-1', title: 'Sandbox: baseline cycle', life: 'live' } }])
     expect(markOrphans('r1', [{ pid: 20, created, name: 'node.exe', label: 'node' }])[0].orphan).toEqual({ cpuMs: 3, run: 'Sandbox: baseline cycle' })
+    setOrphansForTests('r1', null)
+  })
+})
+
+describe('the polling layer’s runs (HR1’s round 1 of HI-3206)', () => {
+  const T = Date.now() - 60 * MIN
+  const wrapper = { pid: 30, created: ft(T - 60_000), parent: 20, parentCreated: '0', cpu: 1 }
+  const reporter = { pid: 40, created: ft(T - 1000), parent: 30, parentCreated: ft(T - 60_000), cpu: 1 }
+  const run = (over: Record<string, unknown> = {}) => ({ id: 'run-x', title: 'Sandbox cycle', agentId: 'a1', projectPath: launch.projectPath, pid: 40, reporterSentAt: T, state: 'running', finishedAt: null, ...over }) as never
+
+  it('a held orphan whose association is no longer there (the cap dropped it) is never live: due at the next look', async () => {
+    const { lookAtLaunch, ORPHAN_MS } = await import('../src/main/orphanProcesses')
+    const now = Date.now()
+    const aged: Lineage = { pid: 30, created: ft(now - 30 * MIN), parent: 20, parentCreated: '0', cpu: 1 }
+    const live = () => ({ runId: 'run-x', title: 'Sandbox cycle', life: 'live' as const })
+    let r = lookAtLaunch(new Map(), launch, [aged], now, ORPHAN_MS, live)
+    r = lookAtLaunch(r.orphans, launch, [aged], now + MIN, ORPHAN_MS, live)
+    expect(r.due).toEqual([])
+    // Evicted: runOf gives nothing now. Kept to name it, not live.
+    r = lookAtLaunch(r.orphans, launch, [aged], now + 2 * MIN, ORPHAN_MS, () => null)
+    expect(r.due.map((o) => [o.pid, o.run?.life])).toEqual([[30, 'unconfirmed']])
+  })
+
+  for (const order of [['r1', 'r2'], ['r2', 'r1']]) {
+    it(`two launches of one agent in one project, the reporter only in r2, looked at ${order.join(' then ')}: its wrapper held`, async () => {
+      const { lookForTests, markOrphans, setOrphanRuns, setOrphansForTests, stopOrphanWatch } = await import('../src/main/orphanProcesses')
+      stopOrphanWatch()
+      host.ids = order
+      host.lineage = { r1: [{ pid: 70, created: ft(T), parent: 10, parentCreated: ft(T - 5000), cpu: 0 }], r2: [wrapper, reporter] }
+      host.processes = async () => [proc(30, wrapper.created, 'cmd /c cw-progress --title "Sandbox cycle"')]
+      setOrphanRuns(() => [run()])
+      toasts.list = []
+      await lookForTests()
+      await lookForTests()
+      expect(toasts.list).toEqual([])
+      expect(markOrphans('r2', [proc(30, wrapper.created)])[0].orphan).toEqual({ cpuMs: 1, run: 'Sandbox cycle' })
+      setOrphanRuns(null)
+      setOrphansForTests('r1', null)
+      setOrphansForTests('r2', null)
+      host.ids = ['r1']
+      host.lineage = null
+      host.processes = async () => null
+      stopOrphanWatch()
+    })
+  }
+
+  it('keeps a run’s binding and title only while needed: pruned as runs end and launches go; cleared when the watch stops', async () => {
+    const { lookForTests, runStateForTests, setOrphanRuns, setOrphansForTests, stopOrphanWatch } = await import('../src/main/orphanProcesses')
+    stopOrphanWatch()
+    host.ids = ['r1']
+    host.lineage = { r1: [reporter] }
+    let runs = [run(), run({ id: 'run-y', pid: 41 }), run({ id: 'run-z', pid: 42 })]
+    setOrphanRuns(() => runs)
+    await lookForTests()
+    expect(runStateForTests().reporters).toBe(3)
+    // Two ended and gone from the list (history evicted): no longer kept.
+    runs = [run()]
+    await lookForTests()
+    expect(runStateForTests()).toMatchObject({ reporters: 1, titles: 1 })
+    // The launch gone: nothing kept.
+    host.ids = []
+    runs = []
+    await lookForTests()
+    expect(runStateForTests()).toEqual({ reporters: 0, titles: 0, trees: 0 })
+    host.ids = ['r1']
+    runs = [run()]
+    await lookForTests()
+    stopOrphanWatch()
+    expect(runStateForTests()).toEqual({ reporters: 0, titles: 0, trees: 0 })
+    setOrphanRuns(null)
+    setOrphansForTests('r1', null)
+    host.lineage = null
+  })
+
+  it('a known host’s pattern removed: its process is told at the next look, once', async () => {
+    const { lookForTests, setOrphansForTests } = await import('../src/main/orphanProcesses')
+    const created = ft(Date.now() - 30 * MIN)
+    host.lineage = { r1: [{ pid: 91, created, parent: 10, parentCreated: '0', cpu: 2 }] }
+    host.processes = async () => [{ pid: 91, created, name: 'WindowsSandboxServer.exe', label: 'WindowsSandboxServer', command: 'WindowsSandboxServer' }]
+    toasts.list = []
+    await lookForTests()
+    await lookForTests()
+    expect(toasts.list).toEqual([])
+    hostsNow.re = /^nothing$/
+    await lookForTests()
+    await lookForTests()
+    expect(toasts.list.length).toBe(1)
+    await lookForTests()
+    expect(toasts.list.length).toBe(1)
+    hostsNow.re = /^(WindowsSandboxRemoteSession|WindowsSandboxServer)\.exe$/i
+    host.processes = async () => null
+    host.lineage = null
     setOrphansForTests('r1', null)
   })
 })

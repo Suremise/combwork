@@ -111,7 +111,7 @@ export function parseLineage(raw: unknown): Lineage[] {
  * readable then) is kept, not present, with what it was told, until its launch ends (HR2's round 1: an unknown look never
  * makes it due again), at most MAX_KEPT a launch.
  */
-export function lookAtLaunch(known: ReadonlyMap<string, Orphan>, launch: LaunchRef, lineage: readonly Lineage[], now: number, bound = ORPHAN_MS, runOf: (key: string) => Orphan['run'] | null = () => null): { orphans: Map<string, Orphan>; due: Orphan[] } {
+export function lookAtLaunch(known: ReadonlyMap<string, Orphan>, launch: LaunchRef, lineage: readonly Lineage[], now: number, bound = ORPHAN_MS, runOf: (key: string, before?: Orphan['run']) => Orphan['run'] | null = () => null): { orphans: Map<string, Orphan>; due: Orphan[] } {
   const orphans = new Map<string, Orphan>()
   const due: Orphan[] = []
   for (const l of lineage) {
@@ -121,7 +121,9 @@ export function lookAtLaunch(known: ReadonlyMap<string, Orphan>, launch: LaunchR
     const started = filetimeMs(l.created)
     const shown = !!before?.shown
     // HI-3206: in a cw-progress run's tree (by identity and ancestry): held back while that run is live; named when told.
-    const run = runOf(key) ?? before?.run
+    // Its life is worked out at each look; an association no longer in the tree (the cap dropped it) is never live: the
+    // run kept to name it, finished or no longer seen running (HR1's round 1).
+    const run = runOf(key, before?.run) ?? (before?.run ? { ...before.run, life: before.run.life === 'finished' ? ('finished' as const) : ('unconfirmed' as const) } : undefined)
     const held = run?.life === 'live'
     const { held: _was, run: _run, ...rest } = before ?? ({ ...launch, pid: l.pid, created: l.created, told: false, nameTries: 0 } as Orphan)
     const o: Orphan = { ...rest, cpuMs: l.cpu, present: true, shown, ...(run ? { run } : {}), ...(held ? { held: true as const } : {}) }
@@ -170,22 +172,50 @@ const boundMs = (): number => testMs('CW_TEST_ORPHAN_MS', advanced.number(ORPHAN
  * HI-3206: a launch's cw-progress runs (its agent's, in its project only), their reporters bound once, and its processes'
  * runs as remembered now; a key's run and its life, for lookAtLaunch.
  */
-function runsOfLaunch(launch: LaunchRef, lineage: readonly Lineage[]): (key: string) => Orphan['run'] | null {
-  const runs = (runsFor?.(launch.projectPath) ?? []).filter((r) => r.agentId === launch.agentId && !!r.projectPath && r.projectPath.toLowerCase() === launch.projectPath.toLowerCase())
+function runsOfLaunch(launch: LaunchRef, lineage: readonly Lineage[], eligible: readonly Lineage[]): (key: string, before?: Orphan['run']) => Orphan['run'] | null {
+  const runs = runsForLaunch(launch)
   for (const r of runs) {
-    if (!reporters.has(r.id)) reporters.set(r.id, r.reporterSentAt === undefined ? null : bindReporter(lineage, r.pid, r.reporterSentAt))
+    // Bound once (never again), from every eligible launch's lineage read at this look (HR1's round 1: the run's
+    // reporter is in one of its agent's launches in that project, whichever is looked at first).
+    if (!reporters.has(r.id)) reporters.set(r.id, r.reporterSentAt === undefined ? null : bindReporter(eligible, r.pid, r.reporterSentAt))
     runTitles.set(r.id, r.title)
   }
   const tree = runTrees(lineage, runs.map((r) => ({ runId: r.id, reporter: reporters.get(r.id) ?? null })), inRuns.get(launch.runId) ?? new Map())
   inRuns.set(launch.runId, tree)
   const present = new Set(lineage.map(keyOf))
-  return (key) => {
+  return (key, before) => {
     const id = tree.get(key)
-    if (!id) return null
+    if (!id) {
+      // No longer associated now: kept to name it, but never live (finished once its record says so).
+      if (!before) return null
+      const rec = runs.find((r) => r.id === before.runId)
+      return { ...before, life: rec && rec.finishedAt !== null ? 'finished' : 'unconfirmed' }
+    }
     const rec = runs.find((r) => r.id === id)
     return { runId: id, title: runTitles.get(id) ?? '', life: runLife(rec, reporters.get(id), present) }
   }
 }
+
+/** A launch's agent's cw-progress runs in its project (no other agent's, no other project's). */
+function runsForLaunch(launch: LaunchRef): ProgressRun[] {
+  return (runsFor?.(launch.projectPath) ?? []).filter((r) => r.agentId === launch.agentId && !!r.projectPath && r.projectPath.toLowerCase() === launch.projectPath.toLowerCase())
+}
+
+/**
+ * 3. What is kept of runs, pruned at each look (HR1's round 1): a run's binding and title only while it is in its agent's
+ * runs now, or an orphan still followed names it; everything once the watch stops.
+ */
+function pruneRuns(launches: readonly LaunchRef[]): void {
+  const keep = new Set<string>()
+  for (const l of launches) for (const r of runsForLaunch(l)) keep.add(r.id)
+  for (const m of byLaunch.values()) for (const o of m.values()) if (o.run) keep.add(o.run.runId)
+  for (const m of inRuns.values()) for (const id of m.values()) keep.add(id)
+  for (const id of [...reporters.keys()]) if (!keep.has(id)) reporters.delete(id)
+  for (const id of [...runTitles.keys()]) if (!keep.has(id)) runTitles.delete(id)
+}
+
+/** For tests: how much is kept of runs. */
+export const runStateForTests = (): { reporters: number; titles: number; trees: number } => ({ reporters: reporters.size, titles: runTitles.size, trees: inRuns.size })
 let timer: ReturnType<typeof setInterval> | null = null
 let looking = false
 
@@ -200,6 +230,9 @@ export function startOrphanWatch(): void {
 export function stopOrphanWatch(): void {
   if (timer) clearInterval(timer)
   timer = null
+  inRuns.clear()
+  reporters.clear()
+  runTitles.clear()
 }
 
 async function look(): Promise<void> {
@@ -209,14 +242,27 @@ async function look(): Promise<void> {
     const launches = runningLaunches()
     for (const run of [...byLaunch.keys()]) if (!launches.some((l) => l.runId === run)) byLaunch.delete(run)
     for (const run of [...inRuns.keys()]) if (!launches.some((l) => l.runId === run)) inRuns.delete(run)
-    if (!launches.length) return
+    if (!launches.length) {
+      pruneRuns([])
+      return
+    }
     const all = await launchLineage(launches.map((l) => l.runId))
     if (!all) return
     const now = Date.now()
+    const lineages = new Map(launches.filter((l) => l.runId in all).map((l) => [l.runId, parseLineage(all[l.runId])]))
+    // 4. Known hosts as Settings → Advanced says now (applies at once): a host mark it no longer gives is cleared.
+    const hosts = advanced.pattern(ORPHAN_KNOWN_HOSTS)
     for (const launch of launches) {
-      if (!(launch.runId in all)) continue
-      const lineage = parseLineage(all[launch.runId])
-      const { orphans, due } = lookAtLaunch(byLaunch.get(launch.runId) ?? new Map(), launch, lineage, now, boundMs(), runsOfLaunch(launch, lineage))
+      const lineage = lineages.get(launch.runId)
+      if (!lineage) continue
+      // Its agent's launches in its project, read at this look: where a run's reporter is looked for.
+      const eligible = launches.filter((l) => l.agentId === launch.agentId && l.projectPath.toLowerCase() === launch.projectPath.toLowerCase()).flatMap((l) => lineages.get(l.runId) ?? [])
+      const before = byLaunch.get(launch.runId) ?? new Map<string, Orphan>()
+      for (const o of before.values()) {
+        if (o.host && !(o.exe && hosts?.test(o.exe))) delete o.host
+        else if (!o.host && !o.shown && o.exe && hosts?.test(o.exe)) o.host = true
+      }
+      const { orphans, due } = lookAtLaunch(before, launch, lineage, now, boundMs(), runsOfLaunch(launch, lineage, eligible))
       // Named before any is shown (HR2's round 1): nothing reads a due orphan until its command line is known.
       const shown = due.length ? nameDue(due, (await launchProcessesNow(launch.runId)) ?? []) : []
       // Stopped meanwhile: its leftovers are listed as such.
@@ -226,7 +272,6 @@ async function look(): Promise<void> {
       for (const [key, o] of orphans) if (current?.get(key)?.told) o.told = true
       byLaunch.set(launch.runId, orphans)
       // A known long-lived host (the Windows Sandbox guest's, Settings → Advanced): listed, never told.
-      const hosts = advanced.pattern(ORPHAN_KNOWN_HOSTS)
       for (const o of shown) {
         if (o.exe && hosts?.test(o.exe)) {
           o.shown = false
@@ -237,6 +282,7 @@ async function look(): Promise<void> {
         notice(launch, o)
       }
     }
+    pruneRuns(launches)
   } catch (e) {
     log.warn('looking for processes left running', e)
   } finally {
