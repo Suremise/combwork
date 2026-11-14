@@ -93,6 +93,8 @@
 
 ### Fixed
 
+- **A pane made again keeps a full-screen CLI's screen and modes** (HI-3252). After a window reload, a long session's pane showed only its latest output, on the normal screen with mouse reporting and bracketed paste off, so a full-screen CLI could lose its header and wheel turns, clicks and pastes until it turned them on again. The pane now gets the terminal as it is: its screen, cursor and input modes, then the latest output.
+
 - **Agents can clear a card's waiting mark and block again** (HI-3234). `cw_update_task` with `waitingFor` or `blocked` set to `null`, `false` or empty clears it, as the Agent API says. Before, Claude Code passed `null` as the text "null", and the card showed it as the reason. The texts "null" and "false" now clear too, and are never kept as a reason.
 
 - **Compare no longer shows an unreadable file as added or deleted** (HI-3227). When a commit lists a file whose contents Git can't read (a damaged or incomplete repository), the Changes tab's comparison says the diff failed, with Try again, as a revision's Changes already does. Before, the file showed as added or deleted.
