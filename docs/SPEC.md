@@ -4231,7 +4231,9 @@ with s34, its mapping HI-3235/s7, s10, s13 and s16. gate:advance is open.
   on its own. HI-3264: a journal settled for good (`nothingMoved`, `integrated`, `resolved`, `undone`: its outcome on
   the card) moves to `jj-advance/settled/`, written whole there before the live file goes, and is pruned 30 days on;
   recovery and a card's listing read only the live folder (unsettled, stopped or uncertain attempts), so their cost
-  doesn't grow with history.
+  doesn't grow with history. A journal settled for good found in the live folder (left there before HI-3264) is moved
+  to `settled/` by the reader that finds it, its file time kept, so it is read once and retention covers it. A crash
+  between the archive and the live file's removal leaves the previous live version, which recovery settles again.
 - **Blockers** (HI-3265, §16.9.1's HI-2709 rule): a card blocked by one that isn't Done (or can't be read) gets no
   attempt and no preview, and an Integrate click on an earlier preview runs nothing; it is tried again once they are
   Done. The authority is `AdvanceAttempted`'s write, which reads `closeWaitsFor` as the Git queue's `IntegrationStarted`

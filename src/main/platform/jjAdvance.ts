@@ -276,7 +276,8 @@ export const SETTLED_KEPT_MS = 30 * 24 * 60 * 60 * 1000
 /**
  * Where a project's advance journals live (`<workspace>/.combwork/jj-advance`), one file per attempt. Only live ones
  * (unsettled, stopped or uncertain) are in the folder itself, so recovery and a card's listing read only those (HI-3264);
- * one settled for good moves to `settled/`, pruned after SETTLED_KEPT_MS.
+ * one settled for good moves to `settled/`, pruned after SETTLED_KEPT_MS. One found settled for good in the live folder
+ * (written there before HI-3264) is moved there by the reader that finds it, so it is read once, not at every pass.
  */
 export class AdvanceJournals {
   constructor(readonly dir: string) {}
@@ -293,12 +294,27 @@ export class AdvanceJournals {
     await mkdir(this.dir, { recursive: true })
     const live = this.file(j.plan.card, j.plan.cycle, j.attempt)
     if (!settledForGood(j)) return writeDurable(live, JSON.stringify(j))
-    // Settled for good: written whole into settled/ first, then the live file goes (a crash between leaves a live file
-    // settled for good, which every reader passes over as settled).
+    // Settled for good: written whole into settled/ first, then the live file goes. A crash between leaves the live file
+    // as it was before (its previous phase, unsettled, stopped or uncertain), so recovery still finds it and settles it
+    // again from the card's facts; the settled/ copy is replaced then.
     await mkdir(this.settledDir, { recursive: true })
     await writeDurable(join(this.settledDir, this.name(j.plan.card, j.plan.cycle, j.attempt)), JSON.stringify(j))
     await gone(live)
     await this.prune()
+  }
+  /**
+   * HI-3264 (HR2's round 1): a journal settled for good found in the live folder (one written there before HI-3264; the
+   * new write order never leaves one) moved to settled/ as it is, its file's time kept, so retention covers it. No lock
+   * is needed: once settled for good nothing writes its live file again. A move that fails is tried by the next reader.
+   */
+  private async drain(name: string): Promise<boolean> {
+    try {
+      await mkdir(this.settledDir, { recursive: true })
+      await rename(join(this.dir, name), join(this.settledDir, name))
+      return true
+    } catch {
+      return false
+    }
   }
   /** Journals settled for good longer ago than SETTLED_KEPT_MS, removed (at each archive: as rare as attempts). */
   private async prune(now = Date.now()): Promise<void> {
@@ -361,11 +377,14 @@ export class AdvanceJournals {
     }
     const prefix = `${safe(card)}.${cycle}.`
     const out: { attempt: string; journal: AdvanceJournal | 'unreadable' }[] = []
+    let drained = false
     for (const n of names.filter((x) => x.startsWith(prefix) && x.endsWith('.json')).sort()) {
       const attempt = n.slice(prefix.length, -'.json'.length)
       const j = await this.read(card, cycle, attempt)
-      if (j && (j === 'unreadable' || !settledForGood(j))) out.push({ attempt, journal: j })
+      if (j && j !== 'unreadable' && settledForGood(j)) drained = (await this.drain(n)) || drained
+      else if (j) out.push({ attempt, journal: j })
     }
+    if (drained) await this.prune()
     return out
   }
   /** Every journal in the folder (recovery's pass over the project's cards). */
@@ -377,14 +396,20 @@ export class AdvanceJournals {
       return []
     }
     const out: AdvanceJournal[] = []
+    let drained = false
     for (const n of names.filter((x) => x.endsWith('.json'))) {
+      let j: AdvanceJournal
       try {
-        const j = JSON.parse(await readFile(join(this.dir, n), 'utf8')) as AdvanceJournal
-        if (j?.v === 1 && j.plan && !settledForGood(j)) out.push(j)
+        j = JSON.parse(await readFile(join(this.dir, n), 'utf8')) as AdvanceJournal
       } catch {
         // An unreadable journal is found again by its card's own listing, which counts it as such.
+        continue
       }
+      if (j?.v !== 1 || !j.plan) continue
+      if (settledForGood(j)) drained = (await this.drain(n)) || drained
+      else out.push(j)
     }
+    if (drained) await this.prune()
     return out
   }
 }
