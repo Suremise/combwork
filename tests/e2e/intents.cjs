@@ -262,8 +262,8 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
         const now = await card(n)
         const setOk = !set.isError && (field === 'waitingFor' ? now?.waitingFor?.reason : now?.blocked) === 'Held for a quiet window'
         const cleared = tool('cw_update_task', { number: key, [field]: clear })
-        const after = await card(n)
-        const value = field === 'waitingFor' ? (after?.waitingFor ?? null) : (after?.blocked ?? null)
+        const now2 = await card(n)
+        const value = field === 'waitingFor' ? (now2?.waitingFor ?? null) : (now2?.blocked ?? null)
         if (!setOk || cleared.isError || value !== null) kept.push({ field, clear, setOk, cleared: cleared.content?.[0]?.text, value })
       }
     }
