@@ -347,6 +347,7 @@
   "main.restart.why.removed": "ele foi removido",
   "main.restart.why.running": "ele já está em execução",
   "main.restart.why.stopped": "ele foi parado enquanto iniciava",
+  "main.server.check.otherApi": "Verificar servidor testa um servidor que usa a API da Anthropic; a CLI de {name} fala com o servidor dela na API da OpenAI.",
   "main.server.context.invalid": "Um tamanho de contexto é um número inteiro de tokens, de 1 a {max, number}.",
   "main.server.context.noModel": "A conexão não tem mais o modelo {model}.",
   "main.server.key.chars": "Uma chave não tem espaços nem caracteres especiais fora do ASCII simples. Confira o que foi colado.",

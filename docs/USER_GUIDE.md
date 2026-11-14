@@ -125,7 +125,7 @@ This one runs Ollama's chat with a model on your PC (tested with Ollama 0.40.15 
 
 #### A model server of yours <a id="a-model-server-of-yours"></a>
 
-A CLI whose description has a `server` section can run on a model server of yours, such as Ollama, LM Studio, llama.cpp or vLLM on this PC. Add it in **Settings → Accounts & Connections → Add**: its server's address (or a preset), a key if the server needs one, and its models, typed or read from the server. Set each model's context and output there if the CLI needs them. Then give an agent a connection on it with a model. An agent on the CLI's own account runs it as you set it up yourself.
+A CLI whose description has a `server` section can run on a model server of yours, such as Ollama, LM Studio, llama.cpp or vLLM on this PC. Add it in **Settings → Accounts & Connections → Add**: its server's address (or a preset), a key if the server needs one, and its models, typed or read from the server. Set each model's context and output there if the CLI needs them (Claude Code's names, labels and Set Up aren't offered: they are Claude Code's; nor is **Check Server…** for a server spoken to in OpenAI's protocol, as it tests Anthropic's). Then give an agent a connection on it with a model. An agent on the CLI's own account runs it as you set it up yourself.
 
 ```json
 "server": {

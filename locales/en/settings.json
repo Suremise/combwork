@@ -4251,6 +4251,10 @@
     "defaultMessage": "Context size and Output budget are used when an agent starts on that model (not for IDs Claude Code reads as its own, nor where the session’s settings map the ID to a Claude model). A change applies when its agents next start.",
     "description": "Under a server connection's model list (HI-2682): when the models' Context size and Output budget fields are used. Context size and Output budget are the fields' names."
   },
+  "settings.connections.server.limitsHintGeneric": {
+    "defaultMessage": "Context size and Output budget go to the CLI when an agent starts on that model, where its description passes them ('{context}' and '{output}').",
+    "description": "Under a server connection's model list (HI-3197), for a CLI that runs from a description: when a model's context size and output budget are used. Keep '{context}' and '{output}' as they are (quoted in ICU): they are the description's placeholders, not values."
+  },
   "settings.connections.server.local": {
     "defaultMessage": "{name} (on this PC)",
     "description": "A preset of a server connection that runs on the user's own computer ({name}: \"Ollama\")."

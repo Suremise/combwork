@@ -1062,6 +1062,7 @@
   "settings.connections.server.keyTitle": "{name}'s API key",
   "settings.connections.server.label": "Label",
   "settings.connections.server.limitsHint": "Context size and Output budget are used when an agent starts on that model (not for IDs Claude Code reads as its own, nor where the session’s settings map the ID to a Claude model). A change applies when its agents next start.",
+  "settings.connections.server.limitsHintGeneric": "Context size and Output budget go to the CLI when an agent starts on that model, where its description passes them ('{context}' and '{output}').",
   "settings.connections.server.local": "{name} (on this PC)",
   "settings.connections.server.modelId": "Model id",
   "settings.connections.server.models": "Models",

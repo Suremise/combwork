@@ -1391,6 +1391,10 @@
     "defaultMessage": "it was stopped while it started",
     "description": "Why an agent was not resumed after Combwork restarted: its launch ended (the user stopped it, or its CLI exited) before it was ready."
   },
+  "main.server.check.otherApi": {
+    "defaultMessage": "Check Server tests a server that speaks Anthropic's API; {name}'s CLI talks to its server in OpenAI's.",
+    "description": "An error (HI-3197): Check Server was asked for a server connection ({name}, its name in Settings → Accounts & Connections) whose coding agent CLI speaks OpenAI's API, which the check doesn't test. Check Server is a button's name: keep it as Combwork shows it."
+  },
   "main.server.context.invalid": {
     "defaultMessage": "A context size is a whole number of tokens, from 1 to {max, number}.",
     "description": "An error saving the context size a user typed for a server connection's model (its Server diagnostics): not a whole number in range. {max} is a number."

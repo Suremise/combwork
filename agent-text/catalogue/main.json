@@ -494,6 +494,11 @@
     "note": "A notice after Combwork quit without asking, its sessions stopped.",
     "audience": "both"
   },
+  "main.server.check.otherApi": {
+    "text": "Check Server tests a server that speaks Anthropic's API; {name}'s CLI talks to its server in OpenAI's.",
+    "note": "An error (HI-3197): Check Server was asked for a server connection ({name}, its name in Settings → Accounts & Connections) whose coding agent CLI speaks OpenAI's API, which the check doesn't test. Check Server is a button's name: keep it as Combwork shows it.",
+    "audience": "both"
+  },
   "main.server.context.invalid": {
     "text": "A context size is a whole number of tokens, from 1 to {max, number}.",
     "note": "An error saving the context size a user typed for a server connection's model (its Server diagnostics): not a whole number in range. {max} is a number.",

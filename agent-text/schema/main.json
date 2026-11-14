@@ -470,6 +470,11 @@
   "main.quit.closed": {
     "placeholders": {}
   },
+  "main.server.check.otherApi": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
   "main.server.context.invalid": {
     "placeholders": {
       "max": "number"

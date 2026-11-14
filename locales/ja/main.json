@@ -347,6 +347,7 @@
   "main.restart.why.removed": "削除されています",
   "main.restart.why.running": "すでに実行中です",
   "main.restart.why.stopped": "起動中に停止されました",
+  "main.server.check.otherApi": "「サーバーを確認」が試すのはAnthropicのAPIを使うサーバーです。{name}のCLIはOpenAIのAPIでサーバーと通信します。",
   "main.server.context.invalid": "コンテキストサイズはトークン数の整数で、1から{max, number}までです。",
   "main.server.context.noModel": "この接続には現在モデル{model}がありません。",
   "main.server.key.chars": "キーには空白や、通常のASCII以外の特殊文字は含まれません。貼り付けた内容を確認してください。",

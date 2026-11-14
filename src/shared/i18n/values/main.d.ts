@@ -349,6 +349,7 @@ interface CombworkMessageValues {
   'main.restart.why.removed': undefined
   'main.restart.why.running': undefined
   'main.restart.why.stopped': undefined
+  'main.server.check.otherApi': { name: string | number }
   'main.server.context.invalid': { max: number }
   'main.server.context.noModel': { model: string | number }
   'main.server.key.chars': undefined

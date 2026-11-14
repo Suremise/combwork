@@ -347,6 +347,7 @@
   "main.restart.why.removed": "został usunięty",
   "main.restart.why.running": "już działa",
   "main.restart.why.stopped": "został zatrzymany podczas uruchamiania",
+  "main.server.check.otherApi": "Sprawdź serwer testuje serwer, który używa API Anthropic; CLI połączenia {name} komunikuje się ze swoim serwerem przez API OpenAI.",
   "main.server.context.invalid": "Rozmiar kontekstu to liczba całkowita tokenów, od 1 do {max, number}.",
   "main.server.context.noModel": "Połączenie nie ma już modelu {model}.",
   "main.server.key.chars": "Klucz nie zawiera spacji ani znaków specjalnych spoza zwykłego ASCII. Sprawdź, co zostało wklejone.",

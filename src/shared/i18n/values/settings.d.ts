@@ -1064,6 +1064,7 @@ interface CombworkMessageValues {
   'settings.connections.server.keyTitle': { name: string | number }
   'settings.connections.server.label': undefined
   'settings.connections.server.limitsHint': undefined
+  'settings.connections.server.limitsHintGeneric': undefined
   'settings.connections.server.local': { name: string | number }
   'settings.connections.server.modelId': undefined
   'settings.connections.server.models': undefined

@@ -347,6 +347,7 @@
   "main.restart.why.removed": "wurde entfernt",
   "main.restart.why.running": "läuft bereits",
   "main.restart.why.stopped": "wurde beim Starten gestoppt",
+  "main.server.check.otherApi": "„Server prüfen“ testet einen Server, der die API von Anthropic spricht; die CLI von {name} spricht mit ihrem Server über die API von OpenAI.",
   "main.server.context.invalid": "Eine Kontextgröße ist eine ganze Zahl von Tokens, von 1 bis {max, number}.",
   "main.server.context.noModel": "Die Verbindung hat jetzt kein Modell {model} mehr.",
   "main.server.key.chars": "Ein Schlüssel enthält keine Leerzeichen und keine Sonderzeichen außerhalb von einfachem ASCII. Prüfe, was eingefügt wurde.",

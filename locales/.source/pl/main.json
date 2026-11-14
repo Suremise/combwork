@@ -347,6 +347,7 @@
   "main.restart.why.removed": "it was removed",
   "main.restart.why.running": "it is running already",
   "main.restart.why.stopped": "it was stopped while it started",
+  "main.server.check.otherApi": "Check Server tests a server that speaks Anthropic's API; {name}'s CLI talks to its server in OpenAI's.",
   "main.server.context.invalid": "A context size is a whole number of tokens, from 1 to {max, number}.",
   "main.server.context.noModel": "The connection has no model {model} now.",
   "main.server.key.chars": "A key has no spaces or special characters outside plain ASCII. Check what was pasted.",

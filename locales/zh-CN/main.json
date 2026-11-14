@@ -347,6 +347,7 @@
   "main.restart.why.removed": "它已被移除",
   "main.restart.why.running": "它已在运行",
   "main.restart.why.stopped": "它在启动时被停止了",
+  "main.server.check.otherApi": "“检查服务器”测试的是使用 Anthropic API 的服务器；{name} 的 CLI 使用 OpenAI 的 API 与其服务器通信。",
   "main.server.context.invalid": "上下文大小是 Token 数的整数，范围为 1 到 {max, number}。",
   "main.server.context.noModel": "该连接现在已没有模型 {model}。",
   "main.server.key.chars": "密钥不包含空格，也不包含普通 ASCII 以外的特殊字符。请检查粘贴的内容。",
