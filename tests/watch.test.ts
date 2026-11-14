@@ -2534,3 +2534,14 @@ describe("a card's history read by its lines' messages, not their words (dialect
     expect(handoffsSince(cardOf({ history: [{ at: at(3), by: 'B', what: 'Recorded a decision: "x"' }] }), at(2), { changes: ['verdict'] })).toEqual(['decision'])
   })
 })
+
+describe("a loop wake beside the agent's own card watch (HI-3211, Darren's decision (b))", () => {
+  it("says it is the loop's handoff and the watch is still on only when told so; otherwise as before", () => {
+    const c = { ...cardChange(7, cardOf({ column: 'doing' }), ['comment']), about: { owner: null, verdict: null } }
+    const plain = loopWakeLine(c, 'stepAnswer', 'OK for d1')
+    const on = loopWakeLine(c, 'stepAnswer', 'OK for d1', undefined, true)
+    expect(on).toBe(`${plain} This is your card loop's handoff (Wake reviewers and builders), not your card watch, which is still on.`)
+    expect(plain).not.toMatch(/still on/)
+    expect(Buffer.byteLength(JSON.stringify(on))).toBeLessThanOrEqual(WAKE_MAX_BYTES)
+  })
+})

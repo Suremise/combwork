@@ -5422,6 +5422,28 @@ Project Settings loses its **Card loops** and **Workflow** sections (the second 
   Project Settings → Card loops, → Agents → File locks and → Workflow. The settings tool's rows are the options'
   (`workflow.<p>.loopRounds`, `workspace.workflow.<p>.…`, `project.workflow.loopRounds`…); cw_lane's rounds and wait
   left out are "the project's workflow options (Card loops)".
+- **Wake the Assistant for** (`assistantWakes`, HI-3211; Darren's decisions, 14 Nov: today's behaviour the default, each
+  level clearly described): a preference under Card loops, `{ level, events }` (`shared/laneEvents.ts`). **Everything**
+  (every lane event), **Standard** (the default: the lane watch's default before it, `LANE_DEFAULT_EVENTS`), **Important
+  only** (failed, blocked, merge-due, ended, abandoned, waiting), **Quiet** (waiting, ended, abandoned) and **Custom** (the
+  events ticked; switching to it starts from the level left). The form says under the choice what the level wakes the
+  Assistant for. It applies **only to the Assistant's lane watch that names no `events`** (`readLaneCondition` saves it as
+  `follow`; a watch saved before has no `follow` and keeps its list): its host the workspace's Assistant home and its
+  agent the Assistant (`isAssistantWatch`), in that watch's own workspace. Each lane counts its project's level, read at
+  each check (`laneEventsFor`), with what every watch counts (`withAlwaysEvents`: a question for the user, a named lane's
+  end); an agent waiting for the user counts by its project's level. A change applies from the next check, in either
+  direction, and replays nothing: a lane's marks move on at every check whatever is counted. Another agent's lane watch
+  with no `events` keeps the default, and a watch naming `events` counts those. Card watches, agent watches, messages and
+  decisions sent to the Assistant and loop wakes aren't filtered (the user's choice of scope, r18). The watch's reply says
+  it follows the setting. **A request the watcher asked itself never counts as `paused-user` for it** (its echo): left out
+  per request before the card's newest is taken (`newestAsk`), by the request's asker (an agent's id) or, for the
+  Assistant, the request's fact's actor (`byAssistant`), never a name, so another agent's request on the same card still
+  wakes it, and the left-out one moves no mark. The Assistant suggests a level (tune-settings) and changes it with
+  `cw_update_setting` only when the user agrees.
+- **A loop wake says it isn't the agent's card watch** (HI-3211, Darren's decision (b), 14 Nov): when the agent's own card
+  watch on the card is still on and hasn't fired as its line is made just before it is given (`watchStillOn`), the line
+  ends "This is your card loop's handoff (Wake reviewers and builders), not your card watch, which is still on." A watch
+  filtering `changes` to `column` is woken by a design's step, which is the loop's, not the watch's.
 
 #### 16.6.8 Maximum agents (HI-2001)
 

@@ -19,6 +19,7 @@
 import type { AppSettings, CommandPoint, CustomCommand, ProjectConfig, ProviderId, WorkflowLevel, WorkspaceConfig } from './types'
 import type { PlatformId } from './platform/descriptors'
 import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from './loopLimits'
+import { LANE_EVENTS, WAKE_LEVELS } from './laneEvents'
 import { AGENT_LIMIT_MAX, DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS, FILE_LOCK_MODES, SLOT_COPY_DEFAULT } from './defaults'
 import { SLOT_COPY_TEXT } from './slotDefaults'
 import { GITHUB_HOST_TEXT } from './githubHostText'
@@ -736,6 +737,8 @@ function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Parti
     { ...option('loopRounds', 'number'), min: 1, max: LANE_MAX_ROUNDS, step: 1 },
     { ...option('loopWaitHours', 'number'), min: 1, max: LOOP_WAIT_MAX_HOURS, step: 1 },
     { ...option('loopStepWaitMinutes', 'number'), min: 1, max: LOOP_STEP_WAIT_MAX_MINUTES, step: 5 },
+    // Wake the Assistant for (HI-3211): a level, or Custom's events.
+    option('assistantWakes', 'custom'),
     // Maximum agents (HI-2001): the user's team size, read-only to the Assistant (SENSITIVE).
     { ...option('maxAgents', 'number'), min: 1, max: AGENT_LIMIT_MAX, step: 1 }
   ]
@@ -890,7 +893,7 @@ const CUSTOM_VALUES: Record<string, SettingEntry['value']> = {
   'notifications.chimeSound': 'select',
   'general.language': 'select',
   'assistant.mode': 'text',
-  ...Object.fromEntries(['preChecks', 'mergeChecks', 'commands', 'okBefore', 'identity', 'excluded', 'stageNames', 'otherTargets'].map((k): [string, SettingEntry['value']] => [`project.workflow.${k}`, 'table'])),
+  ...Object.fromEntries(['preChecks', 'mergeChecks', 'commands', 'okBefore', 'identity', 'excluded', 'stageNames', 'otherTargets', 'assistantWakes'].map((k): [string, SettingEntry['value']] => [`project.workflow.${k}`, 'table'])),
   'board.colors': 'table'
 }
 /** A provider's custom controls whose value the tools can set (checked by checkSettingValue). */
@@ -934,6 +937,9 @@ const RESTART: [RegExp, NonNullable<SettingEntry['restart']>][] = [
 ]
 
 /** When a setting is worth suggesting: the signal to look for (the tune-settings skill reads these). */
+/** When Wake the Assistant for is worth suggesting (HI-3211), at each level. */
+const ASSISTANT_WAKES_HELPS = agentMsg({ id: 'settings.agent.helps.assistantWakes', text: "Many of your lane watch's wakes are ones you only acknowledge (a busy project of small cards: Important only), or the user wants you told more of a few big cards (Everything); quieter during a long unattended run.", note: 'When the workflow option assistantWakes (Wake the Assistant for) is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill). Important only and Everything are its levels as Settings names them.' })
+
 const HELPS: Record<string, AgentMsg> = {
   'general.progressPanel': agentMsg({ id: 'settings.agent.helps.general.progressPanel', text: "Agents run long tests or builds and the user can't see how far along they are.", note: 'When the setting general.progressPanel is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill).' }),
   'general.progressCommands': agentMsg({ id: 'settings.agent.helps.general.progressCommands', text: "Agents' long commands don't show in the Progress panel, or the user wants them shown only on request.", note: 'When the setting general.progressCommands is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill).' }),
@@ -961,6 +967,8 @@ const HELPS: Record<string, AgentMsg> = {
   'assistant.compactSuggestTokens': agentMsg({ id: 'settings.agent.helps.assistant.compactSuggestTokens', text: "The Assistant's own conversation gets long and slow: a lower threshold suggests compacting it sooner.", note: 'When the setting assistant.compactSuggestTokens is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill).' }),
   'assistant.panelSide': agentMsg({ id: 'settings.agent.helps.assistant.panelSide', text: 'Windows notifications or other apps cover the right of the screen.', note: 'When the setting assistant.panelSide is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill).' }),
   'board.archiveDoneDays': agentMsg({ id: 'settings.agent.helps.board.archiveDoneDays', text: 'The Done column has grown long with finished cards.', note: 'When the setting board.archiveDoneDays is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill).' }),
+  // HI-3211: the Assistant's own wakes, at each level a project's lanes take theirs from.
+  ...Object.fromEntries(['workflow.git.assistantWakes', 'workflow.none.assistantWakes', 'workspace.workflow.git.assistantWakes', 'workspace.workflow.none.assistantWakes', 'project.workflow.assistantWakes'].map((id): [string, AgentMsg] => [id, ASSISTANT_WAKES_HELPS])),
   'workflow.git.slotCopy': agentMsg({ id: 'settings.agent.helps.workflow.git.slotCopy', text: "New slots and review copies miss git-ignored files such as .env, so agents' builds or tests fail there.", note: 'When the setting workflow.git.slotCopy is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill).' }),
   'agents.leftoverProcesses': agentMsg({ id: 'settings.agent.helps.agents.leftoverProcesses', text: "A folder can't be renamed or deleted (in use), or a port is taken, after its agents have stopped: processes they started are still running.", note: 'When the setting agents.leftoverProcesses is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill).' }),
   'agents.backgroundTaskMinutes': agentMsg({ id: 'settings.agent.helps.agents.backgroundTaskMinutes', text: "Agents' background tasks (long test runs) count as finished too soon, or a dev server keeps an agent waiting long after its work is done.", note: 'When the setting agents.backgroundTaskMinutes is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill).' }),
@@ -1252,6 +1260,7 @@ const AGENT = {
   mergeChecks: agentMsg({ id: 'settings.agent.takes.mergeChecks', text: 'a list of check names the merge queue runs on the merged result when Combwork merges, e.g. ["typecheck", "lint"] (each with its command in project.workflow.commands)', note: "What the workflow option mergeChecks takes. The JSON and project.workflow.commands (a setting's id) are code: keep them." }),
   commands: agentMsg({ id: 'settings.agent.takes.commands', text: 'an object of check name → command, e.g. {example}', note: 'What the workflow option commands takes. {example} is JSON: code.' }),
   okBefore: agentMsg({ id: 'settings.agent.takes.okBefore', text: 'an object {shape}', note: "What the workflow option okBefore takes. {shape} is the object's JSON form: code." }),
+  assistantWakes: agentMsg({ id: 'settings.agent.takes.assistantWakes', text: 'an object {shape} (events: Custom\'s, any of {events}; kept, unused, at the other levels)', note: "What the workflow option assistantWakes takes (HI-3211). {shape} is the object's JSON form and {events} the lane events' ids: code." }),
   identity: agentMsg({ id: 'settings.agent.takes.identity', text: 'null (off) or {shape}', note: "What the workflow option identity takes. {shape} is the object's JSON form: code." }),
   excluded: agentMsg({ id: 'settings.agent.takes.excluded', text: 'a list of folders and files left out of the work, e.g. ["node_modules"]', note: 'What the workflow option excluded takes. The JSON is code: keep it.' }),
   stageNames: agentMsg({ id: 'settings.agent.takes.stageNames', text: 'an object of stage id → the name the user gives it, e.g. {example} (ids: hold, todo, active, review, approved, merging, done; names are for the user, agents keep the ids; each at most 24 characters, unique, applies at once)', note: "What the workflow option stageNames takes (#1417). {example} is JSON; the stage ids are code: keep them." }),
@@ -1437,6 +1446,7 @@ export function workflowTakes(e: SettingEntry, kind: ReturnType<typeof settingKi
     mergeChecks: () => say(AGENT.mergeChecks),
     commands: () => say(AGENT.commands, { example: '{"lint": "npm run lint"}' }), // agent-protocol: JSON
     okBefore: () => say(AGENT.okBefore, { shape: '{"mode": "never" | "labels" | "every", "labels": [...]}' }), // agent-protocol: JSON
+    assistantWakes: () => say(AGENT.assistantWakes, { shape: `{"level": ${WAKE_LEVELS.map((l) => `"${l}"`).join(' | ')}, "events": [...]}`, events: LANE_EVENTS.join(', ') }), // agent-protocol: JSON
     identity: () => say(AGENT.identity, { shape: '{"name": ..., "email": ...}' }), // agent-protocol: JSON
     excluded: () => say(AGENT.excluded),
     otherTargets: () => say(AGENT.otherTargets),

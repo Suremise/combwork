@@ -5,6 +5,7 @@
 import { msg, type Msg } from '../i18n/msg'
 import { accepts, merges, type PlatformId } from '../platform/descriptors'
 import type { FormGroupId, OptionKey, PresetId } from './options'
+import type { LaneEvent, WakeLevel } from '../laneEvents'
 
 interface OptionText {
   title: Msg
@@ -169,6 +170,10 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   loopStepWaitMinutes: {
     title: msg({ id: 'workflow.option.loopStepWaitMinutes.title', defaultMessage: 'Design check wait (minutes)', description: 'A workflow option, under Card loops: how long a builder waits for its reviewer to check a design it posted.' }),
     desc: msg({ id: 'workflow.option.loopStepWaitMinutes.desc', defaultMessage: 'How many minutes, up to 4 hours, a card loop’s builder waits for its reviewer to check a design it posted before it goes ahead as posted.', description: 'What the workflow option “Design check wait (minutes)” does (Card loops). A design: the plan a builder posts on its card before building.' })
+  },
+  assistantWakes: {
+    title: msg({ id: 'workflow.option.assistantWakes.title', defaultMessage: 'Wake the Assistant for', description: 'A workflow option, under Card loops (HI-3211): which events in this project’s lanes wake the Combwork Assistant while it watches them (glossary: lane, the Assistant).' }),
+    desc: msg({ id: 'workflow.option.assistantWakes.desc', defaultMessage: 'Which events in this project’s lanes wake the Assistant while it watches them; each wake costs it tokens. A question for you on a lane’s card always wakes it, unless the Assistant asked it itself. No level stops messages and decisions sent to it, or watches it starts on particular cards or agents.', description: 'What the workflow option “Wake the Assistant for” does (HI-3211). A lane: a builder and a reviewer taking cards in turn (glossary: lane). Tokens: what the Assistant’s coding agent uses up.' })
   }
 }
 
@@ -215,11 +220,44 @@ export const VALUE_TEXT = {
     slots: msg({ id: 'workflow.value.folder.slots', defaultMessage: 'Each card in its own folder', description: 'A value of the workflow option “Where cards are built” (glossary 2.6, G11). The folder is a slot, a worktree Combwork lends to the card or its lane (glossary 2.5: slot).' }),
     project: msg({ id: 'workflow.value.folder.project', defaultMessage: 'Everyone in the project folder', description: 'A value of the workflow option “Where cards are built” (glossary 2.6, G11).' })
   },
+  assistantWakes: {
+    everything: msg({ id: 'workflow.value.assistantWakes.everything', defaultMessage: 'Everything', description: 'A value of the workflow option “Wake the Assistant for” (HI-3211): every event in a lane.' }),
+    standard: msg({ id: 'workflow.value.assistantWakes.standard', defaultMessage: 'Standard', description: 'A value of the workflow option “Wake the Assistant for” (HI-3211), the default: what woke it before this option existed.' }),
+    important: msg({ id: 'workflow.value.assistantWakes.important', defaultMessage: 'Important only', description: 'A value of the workflow option “Wake the Assistant for” (HI-3211): failures, blocks, merges due, lanes ending and agents waiting for you.' }),
+    quiet: msg({ id: 'workflow.value.assistantWakes.quiet', defaultMessage: 'Quiet', description: 'A value of the workflow option “Wake the Assistant for” (HI-3211): only agents waiting for you and lanes ending.' }),
+    custom: msg({ id: 'workflow.value.assistantWakes.custom', defaultMessage: 'Custom', description: 'A value of the workflow option “Wake the Assistant for” (HI-3211): the events you tick.' })
+  },
   reviewerMode: {
     lane: msg({ id: 'workflow.value.reviewerMode.lane', defaultMessage: 'One per lane', description: 'A value of the workflow option “Reviewers” (glossary 2.6, G17): each lane has its own reviewer agent.' }),
     pool: msg({ id: 'workflow.value.reviewerMode.pool', defaultMessage: 'A shared pool', description: 'A value of the workflow option “Reviewers” (glossary 2.6, G17): lanes share a pool of reviewer agents, each card going to the next free one.' })
   }
 } satisfies Record<string, Record<string, Msg>>
+
+/** What each level of “Wake the Assistant for” wakes it for (HI-3211), said under the choice. */
+export const WAKE_LEVEL_TEXT: Record<WakeLevel, Msg> = {
+  everything: msg({ id: 'workflow.wakeLevel.everything', defaultMessage: 'Every event in a lane: also each card passing review, each card moving, and a lane waiting for a merge. For a few big cards you want to follow closely.', description: 'Under the workflow option “Wake the Assistant for” while Everything is chosen (HI-3211): what wakes the Assistant.' }),
+  standard: msg({ id: 'workflow.wakeLevel.standard', defaultMessage: 'A failed review, a card blocked, unblocked or stalled, a lane whose merge is due or stalled, a lane ending, and an agent waiting for you. What Combwork has always woken it for.', description: 'Under the workflow option “Wake the Assistant for” while Standard (the default) is chosen (HI-3211): what wakes the Assistant.' }),
+  important: msg({ id: 'workflow.wakeLevel.important', defaultMessage: 'A failed review, a card blocked, a lane whose merge is due, a lane ending, and an agent waiting for you. No stalls or unblocks: for busy projects of many small cards.', description: 'Under the workflow option “Wake the Assistant for” while Important only is chosen (HI-3211): what wakes the Assistant.' }),
+  quiet: msg({ id: 'workflow.wakeLevel.quiet', defaultMessage: 'Only an agent waiting for you and a lane ending. The Assistant hears of failures and blocks when it next looks, or when you ask.', description: 'Under the workflow option “Wake the Assistant for” while Quiet is chosen (HI-3211): what wakes the Assistant.' }),
+  custom: msg({ id: 'workflow.wakeLevel.custom', defaultMessage: 'The events you tick.', description: 'Under the workflow option “Wake the Assistant for” while Custom is chosen (HI-3211); the events follow as ticks.' })
+}
+
+/** Each lane event as the Custom ticks of “Wake the Assistant for” name it (HI-3211). A question for you is always on. */
+export const WAKE_EVENT_TEXT: Record<LaneEvent, Msg> = {
+  failed: msg({ id: 'workflow.wakeEvent.failed', defaultMessage: 'A card fails review', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane.' }),
+  passed: msg({ id: 'workflow.wakeEvent.passed', defaultMessage: 'A card passes review', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane.' }),
+  blocked: msg({ id: 'workflow.wakeEvent.blocked', defaultMessage: 'A card is blocked', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane.' }),
+  reblocked: msg({ id: 'workflow.wakeEvent.reblocked', defaultMessage: 'A blocked card has news', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): a blocked card’s reason changed, or its agent commented.' }),
+  unblocked: msg({ id: 'workflow.wakeEvent.unblocked', defaultMessage: 'A card is unblocked', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane.' }),
+  stalled: msg({ id: 'workflow.wakeEvent.stalled', defaultMessage: 'A card or a merge stalls', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): nothing has happened on a card for a long time, or a lane’s merge isn’t being done.' }),
+  moved: msg({ id: 'workflow.wakeEvent.moved', defaultMessage: 'A card moves', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): a card goes to another board column.' }),
+  'merge-due': msg({ id: 'workflow.wakeEvent.mergeDue', defaultMessage: 'A lane’s merge is due', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): every card of a lane passed review.' }),
+  'paused-merge': msg({ id: 'workflow.wakeEvent.pausedMerge', defaultMessage: 'A lane waits for a merge', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): a lane taking one card at a time waits for its last card to be merged.' }),
+  ended: msg({ id: 'workflow.wakeEvent.ended', defaultMessage: 'A lane ends', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane.' }),
+  abandoned: msg({ id: 'workflow.wakeEvent.abandoned', defaultMessage: 'A lane is abandoned', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane.' }),
+  waiting: msg({ id: 'workflow.wakeEvent.waiting', defaultMessage: 'An agent waits for you', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an agent of the project stops to wait for the user (a permission prompt, a question).' }),
+  'paused-user': msg({ id: 'workflow.wakeEvent.pausedUser', defaultMessage: 'A question for you on a lane’s card (always)', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211), always on and not changeable: an agent or Combwork asks the user something on a lane’s card.' })
+}
 
 /** The presets' names (glossary 2.1). */
 export const PRESET_TEXT: Record<PresetId | 'custom', Msg> = {

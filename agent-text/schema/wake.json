@@ -574,6 +574,9 @@
       "who": "plain"
     }
   },
+  "wake.loop.watchOn": {
+    "placeholders": {}
+  },
   "wake.many.count": {
     "placeholders": {
       "n": "plain",

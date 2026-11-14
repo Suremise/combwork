@@ -87,6 +87,8 @@ interface CombworkMessageValues {
   'tips.assistantUndo.title': undefined
   'tips.assistantWaits.text': undefined
   'tips.assistantWaits.title': undefined
+  'tips.assistantWakes.text': undefined
+  'tips.assistantWakes.title': undefined
   'tips.attachFiles.text': undefined
   'tips.attachFiles.title': undefined
   'tips.attachmentsTabs.text': undefined

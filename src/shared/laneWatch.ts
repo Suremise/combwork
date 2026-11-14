@@ -9,6 +9,7 @@ import { NOTICE_PREFIX } from './doorbell'
 // Types only: agentWatch loads the translations, which cw-mcp (toolReplies imports this) never does.
 import type { AgentEvent, WatchedAgent } from './agentWatch'
 import type { StallSafeguard } from './stallSafeguard'
+import { LANE_DEFAULT_EVENTS, LANE_EVENTS, type LaneEvent } from './laneEvents'
 
 const T = {
   mergeStallIdle: agentMsg({ id: 'wake.lane.mergeStallIdle', text: 'Every card passed, but {builder} has been idle for {minutes} min with no merge slot claimed.', note: "Why a lane's merge has stalled (#869), in a lane watch's wake and the Agent API: its builder idle with no merge slot claimed. builder: its name; minutes: how long." }),
@@ -66,14 +67,8 @@ const T = {
  * blocked), and wakes when an agent of the projects it follows starts waiting for the user (`waiting`).
  */
 
-/**
- * What a lane watch counts. The default is all but `passed`, `moved` and `paused-merge`. HI-1991: `paused` was split in
- * two, a lane paused for a merge (`paused-merge`) and a question for the user on a lane's card (`paused-user`), so an
- * Assistant dropping the merge noise no longer drops the questions with it (one sat unnoticed under For you for 20 min).
- */
-export const LANE_EVENTS = ['failed', 'blocked', 'stalled', 'merge-due', 'ended', 'abandoned', 'waiting', 'passed', 'moved', 'paused-merge', 'paused-user', 'unblocked', 'reblocked'] as const
-export type LaneEvent = (typeof LANE_EVENTS)[number]
-export const LANE_DEFAULT_EVENTS: LaneEvent[] = ['failed', 'blocked', 'unblocked', 'reblocked', 'stalled', 'merge-due', 'ended', 'abandoned', 'waiting', 'paused-user']
+// What a lane watch counts (laneEvents.ts, kept there for the workflow options' Wake the Assistant for, HI-3211).
+export { LANE_EVENTS, LANE_DEFAULT_EVENTS, type LaneEvent } from './laneEvents'
 /** What every lane watch counts, whatever its `events` (HI-1991): a question for the user is never filtered out. */
 export const LANE_ALWAYS_EVENTS: LaneEvent[] = ['paused-user']
 /**
@@ -93,7 +88,14 @@ export const LANE_WATCH_MAX = 50
 export interface LaneWatchCondition {
   /** The lanes by id, or "all": every lane of the watcher's view running when it is checked (started later too). */
   ids: string[] | 'all'
+  /** What it counts: the events named, else the default (with those always counted). */
   events: LaneEvent[]
+  /**
+   * HI-3211: it named no events, so the Assistant's watch follows Wake the Assistant for (each lane its project's level,
+   * read at each check) instead of `events`; another agent's keeps `events`, the default. Saved as it was asked: a watch
+   * saved before has no `follow`, so its list stays as named.
+   */
+  follow?: true
 }
 
 /** A lane's card as a lane watch last saw it: its column, whether blocked and stalled, its latest failed and passed verdicts. */
@@ -133,6 +135,8 @@ export interface LaneNow {
   label: string
   /** HI-2522: its name, else "B1 / R1": a wake line too long names it so, never by its id. Left out: by its id. */
   short?: string
+  /** HI-3211: its project's folder name, whose Wake the Assistant for the Assistant's watch follows. */
+  project?: string
   mark: LaneMark
   /** `stalledSafeguard` (HI-2754): the stall's agent idle with its latest turn stopped by a safety filter (stallSafeguard.ts). */
   cards: { number: number; blocked: string | null; stalled: string | null; stalledSafeguard?: StallSafeguard; failedBy: string | null; passedBy: string | null; asked?: LaneAsked | null }[]
@@ -458,7 +462,7 @@ export function readLaneCondition(args: { lanes?: unknown; events?: unknown }): 
   else if (Array.isArray(l) && l.length && l.length <= LANE_WATCH_MAX && l.every((x) => typeof x === 'string' && /^[\w-]{1,64}$/.test(x)) && new Set(l).size === l.length) ids = l as string[]
   else return sayWithId(T.badLanes, { max: String(LANE_WATCH_MAX) })
   const e = Array.isArray(args.events) ? args.events.map((x) => (typeof x === 'string' && Object.hasOwn(LANE_EVENT_ALIASES, x) ? LANE_EVENT_ALIASES[x] : x)) : args.events
-  if (e === undefined) return { ids, events: withAlwaysEvents(ids, LANE_DEFAULT_EVENTS) }
+  if (e === undefined) return { ids, events: withAlwaysEvents(ids, LANE_DEFAULT_EVENTS), follow: true }
   if (!Array.isArray(e) || !e.length || e.some((x) => !LANE_EVENTS.includes(x as LaneEvent))) return sayWithId(T.badEvents, { events: LANE_EVENTS.join(', ') })
   // A question for the user always counts (HI-1991), whatever was asked for; so does named lanes' end (HI-2521), in a
   // watch read back from before too.
@@ -469,7 +473,8 @@ export function readLaneCondition(args: { lanes?: unknown; events?: unknown }): 
 export function readSavedLaneCondition(v: unknown): LaneWatchCondition | null {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null
   const r = readLaneCondition({ lanes: (v as { ids?: unknown }).ids === 'all' ? 'all' : (v as { ids?: unknown }).ids, events: (v as { events?: unknown }).events })
-  return isSaid(r) || !Array.isArray((v as { events?: unknown }).events) ? null : r
+  if (isSaid(r) || !Array.isArray((v as { events?: unknown }).events)) return null
+  return (v as { follow?: unknown }).follow === true ? { ...r, follow: true } : r
 }
 
 const STATES = ['active', 'paused', 'ended', 'abandoned', 'gone']

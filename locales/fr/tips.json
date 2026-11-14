@@ -83,6 +83,8 @@
   "tips.assistantUndo.title": "Annuler les modifications de l’Assistant",
   "tips.assistantWaits.text": "Demande à l’Assistant de te prévenir quand un agent finit un build ou une série de tests : il attend sans vérifier tout seul, et Combwork le réveille quand l’agent termine, a besoin de toi ou s’arrête.",
   "tips.assistantWaits.title": "L’Assistant te prévient quand un agent a fini",
+  "tips.assistantWakes.text": "Réveiller l’Assistant pour, dans Boucles de cartes de Gestion de versions → Flux de travail, choisit les événements des couloirs d’un projet qui réveillent l’Assistant : Tout, Standard, L’important seulement, Calme ou ta propre liste. Chaque réveil lui coûte des jetons.",
+  "tips.assistantWakes.title": "Choisis ce qui réveille l’Assistant",
   "tips.attachFiles.text": "Dépose un PDF, un journal ou n’importe quel fichier sur le terminal d’un agent : Combwork en garde une copie avec la session et colle son chemin. Une puce montre ce qui est joint, et indique quand la CLI de l’agent ne lit pas elle-même ce type de fichier, pour que l’agent l’ouvre par son chemin.",
   "tips.attachFiles.title": "Joindre n’importe quel fichier à un prompt",
   "tips.attachmentsTabs.text": "L’onglet Pièces jointes a Pièces jointes des volets et Pièces jointes des cartes. Afficher dans Pièces jointes, à côté des pièces jointes d’une carte, ouvre Pièces jointes des cartes sur cette carte ; Afficher les pièces jointes de la session, dans le menu ⋯ d’un agent, ouvre Pièces jointes des volets sur sa session.",

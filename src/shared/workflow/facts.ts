@@ -549,8 +549,11 @@ export interface Submission extends SubmittedData {
   by: string | null
 }
 
-/** A request to the user (For you, §16.8.5), with when it was asked (`asker`: the agent whose own question it is). */
-export type Request = FactData['ApprovalRequested'] & { at: string }
+/**
+ * A request to the user (For you, §16.8.5), with when it was asked (`asker`: the agent whose own question it is;
+ * `byAssistant`, HI-3211: the Assistant asked it, by the fact's actor, so its own lane watch isn't woken by its echo).
+ */
+export type Request = FactData['ApprovalRequested'] & { at: string; byAssistant?: true }
 
 export interface QueueEntry {
   id: string
@@ -787,7 +790,7 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         break
       }
       case 'ApprovalRequested': {
-        const d: Request = { ...(f.data as FactData['ApprovalRequested']), at: f.at }
+        const d: Request = { ...(f.data as FactData['ApprovalRequested']), at: f.at, ...(f.actor === 'assistant' ? { byAssistant: true as const } : {}) }
         // The merge queue asks again (the target moved, a new test merge): its earlier request of that gate is retired.
         if (d.entry) s.requests = s.requests.filter((r) => !r.entry || r.gate !== d.gate)
         s.requests.push(d)

@@ -238,6 +238,12 @@
   "workflow.move.verdict": {
     "placeholders": {}
   },
+  "workflow.option.assistantWakes.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.assistantWakes.title": {
+    "placeholders": {}
+  },
   "workflow.option.commands.desc": {
     "placeholders": {}
   },
