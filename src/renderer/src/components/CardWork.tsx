@@ -442,7 +442,7 @@ export function WorkBadges({ b, card }: { b: WorkBadge | undefined; card: { proj
       {b.churn && (
         <Tooltip content={churnText}>
           <span className="task-work-badge" data-churn={b.churn.total} aria-label={churnText}>
-            <Icon name="comment-discussion" />
+            <Icon name="sync" />
             {b.churn.total}
           </span>
         </Tooltip>
