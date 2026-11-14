@@ -10,7 +10,7 @@
 // refuses this one's (Combwork's lock) while a free file is written; its transcript and usage (tokens only, no price);
 // stopped and resumed by its id with a first prompt, typed once it is up (1.4.20's resume takes none on its command
 // line). The sandbox not set up: Provider Setup says so, and a launch waits at Muse's screen, never answered. What the user
-// sees, light and dark (kept with --keep-files). The fake proves the adapter's side only (tests/sandbox/muse-real checks 1.4.20 itself in a Windows Sandbox).
+// sees, light and dark (kept with --keep-files). The fake proves the adapter's side only (1.4.20 itself is checked in a Windows Sandbox, HI-3202).
 // Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
 const fs = require('fs')
