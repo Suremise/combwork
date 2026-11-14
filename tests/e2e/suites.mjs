@@ -406,6 +406,7 @@ export const SUITES = [
   { name: 'templatesv2' },
   { name: 'templateworkflow' },
   { name: 'terminalinput' },
+  { name: 'terminalreplay' },
   { name: 'termsize' },
   { name: 'testedclis' },
   { name: 'tilestrip' },

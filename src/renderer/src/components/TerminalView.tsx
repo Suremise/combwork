@@ -132,11 +132,14 @@ function countAtlasMerges(): boolean {
   return runs
 }
 
-/** A terminal's size and scroll, for tests: scrolled to the bottom when viewportY is baseY; `mouse`, the mouse tracking its program turned on. */
-;(window as unknown as { __cwTerminalState?: (key: string) => { cols: number; rows: number; viewportY: number; baseY: number; mouse: string } | null }).__cwTerminalState = (key) => {
+/**
+ * A terminal's size and scroll, for tests: scrolled to the bottom when viewportY is baseY; `mouse`, the mouse tracking its
+ * program turned on; `buffer`, the screen it draws on (normal, alternate); `paste`, whether it turned bracketed paste on.
+ */
+;(window as unknown as { __cwTerminalState?: (key: string) => { cols: number; rows: number; viewportY: number; baseY: number; mouse: string; buffer: string; paste: boolean } | null }).__cwTerminalState = (key) => {
   const term = terminals.get(key)
   if (!term) return null
-  return { cols: term.cols, rows: term.rows, viewportY: term.buffer.active.viewportY, baseY: term.buffer.active.baseY, mouse: term.modes.mouseTrackingMode }
+  return { cols: term.cols, rows: term.rows, viewportY: term.buffer.active.viewportY, baseY: term.buffer.active.baseY, mouse: term.modes.mouseTrackingMode, buffer: term.buffer.active.type, paste: term.modes.bracketedPasteMode }
 }
 
 /** The lines a terminal shows now, as drawn (trailing spaces kept), for tests that check what is on screen. */

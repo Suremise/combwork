@@ -631,6 +631,8 @@ export const AREAS = [
   { paths: ['src/main/providers/codex/', 'src/main/advancedValues.ts', 'src/renderer/src/components/TerminalView.tsx', 'tests/e2e/codexoverrides.cjs'], suites: ['codexoverrides'] },
   // The switches for an agent pane's Ctrl+C and Ctrl+V and for what Combwork types (#1286).
   { paths: ['src/renderer/src/components/TerminalView.tsx', 'src/shared/terminalInput.ts', 'src/main/sessions.ts', 'tests/e2e/fake-claude/fake-claude.cjs', 'tests/e2e/terminalinput.cjs', 'src/renderer/src/commands.ts', 'src/main/taskStart.ts'], suites: ['terminalinput'] },
+  // A pane made again while its CLI runs: its terminal's snapshot and modes after the kept output (HI-3252).
+  { paths: ['src/main/terminalHistory.ts', 'src/main/ptyHost.ts', 'src/renderer/src/components/TerminalView.tsx', 'tests/e2e/fake-claude/fake-claude.cjs', 'tests/e2e/terminalreplay.cjs'], suites: ['terminalreplay'] },
   // Claude Code's status line, Combwork's guidance and the user's own Codex hooks (#1285).
   { paths: ['src/main/providers/claude/launchSettings.ts', 'src/main/providers/claude/adapter.ts', 'src/main/servers.ts', 'tests/e2e/claudestatusline.cjs'], suites: ['claudestatusline'] },
   { paths: ['src/main/mcp/cw-mcp.ts', 'src/main/index.ts', 'tests/e2e/agentguidance.cjs'], suites: ['agentguidance'] },

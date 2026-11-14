@@ -73,6 +73,7 @@ This document explains how Combwork is put together, for anyone changing the cod
 │ providers/      adapters by folder, in the registry's order; parts in types  │
 │ providerService.ts  each provider's install info, setup tasks                │
 │ ptyHost.ts      node-pty processes, output buffers                           │
+│ terminalHistory.ts  a terminal's replay: kept output after a snapshot        │
 │ agentProcesses.ts  each launch's process tree (a job object), leftovers      │
 │ processSupervisor.ts  the job host (C#) agents and the merge queue share     │
 │ launchGate.ts   holds a terminal's command until its job is made             │
