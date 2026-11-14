@@ -9,7 +9,7 @@
 // here; and whether reconciliation acts on what it observes is the Advanced switch "Workflow rules are enforced"
 // (`cw.workflow.enforce`), read at each use: off, Combwork is as P3 left it (facts recorded, nothing refused or moved).
 
-import { projectPreferences } from './preferences'
+import { PREFERENCE_DEFAULTS } from '../../shared/workflow/preferences'
 import { createLogger, userText } from '../logger'
 import { SIMPLIFY_GATE } from '../../shared/workflow/facts'
 import type { JjCardDeps } from '../platform/jjPlatform'
@@ -301,9 +301,10 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
       if ((to === 'approved' || to === 'todo' || to === 'done') && alive()) void Promise.all([import('./reconciler'), import('../workspace')]).then(([m, w]) => m.reconcileCard(w.workspaceOf(project.path), card.id, project.name)).catch(() => undefined)
     },
     // HI-3188: the churn's levels as the project's preferences say now, and a simplify check told to the Assistant first.
+    // The resolved options (read afresh by each workflowFor) carry the preferences, the defaults filled in.
     churnLevels: () => {
-      const p = projectPreferences(ws, project.path)
-      return { simplifyAt: p.simplifyAt, churnStopAt: p.churnStopAt }
+      const o = options()
+      return { simplifyAt: o.simplifyAt ?? PREFERENCE_DEFAULTS.simplifyAt, churnStopAt: o.churnStopAt ?? PREFERENCE_DEFAULTS.churnStopAt }
     },
     churnAsked: (card, request, gate, churn) => {
       if (gate !== SIMPLIFY_GATE || !alive()) return
