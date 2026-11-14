@@ -952,8 +952,8 @@
     "description": "Above the plan limits. {plan} is the plan's name (none when unknown); {when} how long ago they were reported."
   },
   "project.limit.models": {
-    "defaultMessage": "{models, select, gemini {Gemini models} otherModels {Other models} premium {Premium requests} chat {Chat messages} completions {Code completions} other {{models}}}{window, select, weekly {, weekly} fiveHour {, 5-hour} hours {, {hours, plural, one {#-hour} other {#-hour}}} other {}}",
-    "description": "The name of a plan limit that covers part of a plan (HI-2734), shown where Combwork says \"{name} limit\": which models or requests it is for (Antigravity's Gemini models, or its other providers' models; Copilot's premium requests, chat messages or code completions; else the provider's own word, {models}, such as the name Codex gives one of its limits, HI-1125), and its window: weekly, 5-hour, or another number of hours ({hours}). \"Other models\" are the models of providers other than Google."
+    "defaultMessage": "{models, select, gemini {Gemini models} otherModels {Other models} premium {Premium requests} chat {Chat messages} completions {Code completions} other {{models}}}{window, select, weekly {, weekly} other {}}",
+    "description": "The name of a plan limit that covers part of a plan (HI-2734), shown where Combwork says \"{name} limit\": which models or requests it is for (Antigravity's Gemini models, or its other providers' models; Copilot's premium requests, chat messages or code completions; else the provider's own word, {models}), and, for a weekly one, that it is weekly. \"Other models\" are the models of providers other than Google."
   },
   "project.limit.noConnections": {
     "defaultMessage": "No {provider} account is on in this workspace. Turn one on in Settings → Accounts & Connections to see its plan limits here.",
@@ -982,6 +982,10 @@
   "project.limit.resets": {
     "defaultMessage": "used · resets {when}",
     "description": "Under a plan limit's percent. {when} is when it resets: \"in 2 h 5 min\", or a day and time."
+  },
+  "project.limit.scoped": {
+    "defaultMessage": "{name}{window, select, weekly {, weekly} fiveHour {, 5-hour} hours {, {hours, plural, one {#-hour} other {#-hour}}} other {}}",
+    "description": "The name of a plan limit the provider names itself (HI-1125: one of Codex's limits other than its own, such as \"gpt-5.2-codex-sonic\"), shown where Combwork says \"{name} limit\": its name as the provider gives it ({name}, never translated), and its window: weekly, 5-hour, or another number of hours ({hours})."
   },
   "project.limit.tip": {
     "defaultMessage": "How much of your plan’s {window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} allowance is used, across all your {provider} sessions (not just Combwork).",

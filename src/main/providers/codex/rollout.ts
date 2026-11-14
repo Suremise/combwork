@@ -81,7 +81,7 @@ export function rolloutPlanUsage(rateLimits: Record<string, any> | null | undefi
     const label = minutes === 300 ? '5-hour' : minutes === 10080 ? 'weekly' : minutes ? `${Math.round(minutes / 60)}-hour` : key
     const resets = typeof w.resets_at === 'number' ? new Date(w.resets_at * 1000).toISOString() : typeof w.resets_in_seconds === 'number' ? new Date(Date.parse(now) + w.resets_in_seconds * 1000).toISOString() : null
     const own = minutes ? `w${minutes}` : key
-    limits.push({ id: scope ? `${scope.id}/${own}` : own, label, windowMinutes: minutes, usedPercent: Math.max(0, Math.min(100, used)), resetsAt: resets, ...(scope ? { models: scope.name } : {}) })
+    limits.push({ id: scope ? `${scope.id}/${own}` : own, label, windowMinutes: minutes, usedPercent: Math.max(0, Math.min(100, used)), resetsAt: resets, ...(scope ? { scope: scope.name } : {}) })
   }
   if (!limits.length) return null
   return { provider: CODEX, plan: typeof rateLimits.plan_type === 'string' ? rateLimits.plan_type : null, limits, updatedAt: now }

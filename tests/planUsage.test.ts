@@ -540,9 +540,9 @@ describe("Codex's limits other than its own (HI-1125)", () => {
   afterEach(() => readAdvancedFrom(valuesReader({})))
 
   it("keeps Codex's own limits under their old ids, and gives another its id and name", () => {
-    expect(parsed[0].limits.map((l) => [l.id, l.models])).toEqual([['w300', undefined], ['w10080', undefined]])
-    expect(parsed[1].limits.map((l) => [l.id, l.models, l.windowMinutes])).toEqual([['codex_other/w300', 'codex_other', 300]])
-    expect(parsed[2].limits.map((l) => [l.id, l.models, l.windowMinutes])).toEqual([['codex_bengalfox/w60', 'gpt-5.2-codex-sonic', 60], ['codex_bengalfox/w1440', 'gpt-5.2-codex-sonic', 1440]])
+    expect(parsed[0].limits.map((l) => [l.id, l.scope])).toEqual([['w300', undefined], ['w10080', undefined]])
+    expect(parsed[1].limits.map((l) => [l.id, l.scope, l.windowMinutes])).toEqual([['codex_other/w300', 'codex_other', 300]])
+    expect(parsed[2].limits.map((l) => [l.id, l.scope, l.windowMinutes])).toEqual([['codex_bengalfox/w60', 'gpt-5.2-codex-sonic', 60], ['codex_bengalfox/w1440', 'gpt-5.2-codex-sonic', 1440]])
     // No id, an empty one, or the default: Codex's own (codex-rs defaults a missing id to "codex").
     for (const id of [undefined, null, '', '  ', 'codex']) expect(snapshot({ limit_id: id }).id).toBe('w300')
   })
@@ -563,10 +563,10 @@ describe("Codex's limits other than its own (HI-1125)", () => {
     const a = snapshot({ limit_id: 'codex/other' })
     const b = snapshot({ limit_id: long })
     const c = snapshot({ limit_id: 'CODEX' })
-    expect([a.id, a.models]).toEqual(['codex/other/w300', 'codex/other'])
+    expect([a.id, a.scope]).toEqual(['codex/other/w300', 'codex/other'])
     expect(b.id).toBe(`${long}/w300`)
-    expect(b.models).toHaveLength(LIMIT_NAME_MAX)
-    expect(b.models!.endsWith('…')).toBe(true)
+    expect(b.scope).toHaveLength(LIMIT_NAME_MAX)
+    expect(b.scope!.endsWith('…')).toBe(true)
     // Never folded into the default: "CODEX" isn't "codex".
     expect(c.id).toBe('CODEX/w300')
     expect(new Set([a.id, b.id, c.id, 'w300']).size).toBe(4)
@@ -575,13 +575,13 @@ describe("Codex's limits other than its own (HI-1125)", () => {
   it('reads the fields and the default id as the advanced settings say', () => {
     readAdvancedFrom(valuesReader({ 'codex.rateLimits.limitId': 'bucket', 'codex.rateLimits.limitName': 'bucket_name', 'codex.rateLimits.defaultLimitId': 'main' }))
     expect(snapshot({ bucket: 'main', limit_id: 'codex_other' }).id).toBe('w300')
-    expect([snapshot({ bucket: 'codex', bucket_name: 'Sonic' }).id, snapshot({ bucket: 'codex', bucket_name: 'Sonic' }).models]).toEqual(['codex/w300', 'Sonic'])
+    expect([snapshot({ bucket: 'codex', bucket_name: 'Sonic' }).id, snapshot({ bucket: 'codex', bucket_name: 'Sonic' }).scope]).toEqual(['codex/w300', 'Sonic'])
   })
 
   it("names them in the window's language, a weekly and a 5-hour one; Codex's own as before", () => {
-    const weekly = { label: 'weekly', windowMinutes: 10080, models: 'gpt-5.2-codex-sonic' }
-    const fiveHour = { label: '5-hour', windowMinutes: 300, models: 'codex_other' }
-    const day = { label: '24-hour', windowMinutes: 1440, models: 'gpt-5.2-codex-sonic' }
+    const weekly = { label: 'weekly', windowMinutes: 10080, scope: 'gpt-5.2-codex-sonic' }
+    const fiveHour = { label: '5-hour', windowMinutes: 300, scope: 'codex_other' }
+    const day = { label: '24-hour', windowMinutes: 1440, scope: 'gpt-5.2-codex-sonic' }
     expect([weekly, fiveHour, day].map(limitName)).toEqual(['gpt-5.2-codex-sonic, weekly', 'codex_other, 5-hour', 'gpt-5.2-codex-sonic, 24-hour'])
     expect(limitName(parsed[0].limits[0])).toBe('5-hour')
     const de = JSON.parse(readFileSync(join(__dirname, '..', 'locales', 'de', 'project.json'), 'utf8')) as Record<string, string>
@@ -593,6 +593,25 @@ describe("Codex's limits other than its own (HI-1125)", () => {
       const n = planNotice('codex', { ...fiveHour, usedPercent: 85, resetsAt: null }, 80)
       expect(n.title).toContain('codex_other, 5 Stunden')
       expect(n.apiTitle).toContain('codex_other, 5-hour')
+    } finally {
+      setLanguage('en', {})
+    }
+  })
+
+  it("a name that looks like another provider's kind (chat, premium, gemini…) is shown as it is, parsed to formatted (HR1's round 1)", () => {
+    // Copilot's and Antigravity's limits keep their kinds in `models`, which the names translate; Codex's names are its own.
+    const reserved = ['chat', 'premium', 'completions', 'gemini', 'otherModels']
+    const named = reserved.map((id) => snapshot({ limit_id: id }))
+    expect(named.map((l) => [l.id, l.scope, l.models])).toEqual(reserved.map((id) => [`${id}/w300`, id, undefined]))
+    expect(named.map(limitName)).toEqual(reserved.map((id) => `${id}, 5-hour`))
+    expect(limitName(snapshot({ limit_id: 'codex_other', limit_name: 'premium' }))).toBe('premium, 5-hour')
+    const de = JSON.parse(readFileSync(join(__dirname, '..', 'locales', 'de', 'project.json'), 'utf8')) as Record<string, string>
+    try {
+      setLanguage('de', de)
+      expect(named.map(limitName)).toEqual(reserved.map((id) => `${id}, 5 Stunden`))
+      expect(planNotice('codex', { ...named[0], usedPercent: 85 }, 80).title).toContain('chat, 5 Stunden')
+      // Copilot's own kind is still translated.
+      expect(limitName({ label: 'chat', windowMinutes: null, models: 'chat' })).toBe('Chatnachrichten')
     } finally {
       setLanguage('en', {})
     }

@@ -239,7 +239,7 @@ interface CombworkMessageValues {
   'project.leftovers.unmerged': { target: string | number }
   'project.limit.counts': { used: number; entitlement: number }
   'project.limit.heading': { plan: string; when: string | number }
-  'project.limit.models': { models: string; window: string; hours: number }
+  'project.limit.models': { models: string; window: string }
   'project.limit.noConnections': { provider: string | number }
   'project.limit.noneConnection': { name: string | number }
   'project.limit.notIncluded': undefined
@@ -247,6 +247,7 @@ interface CombworkMessageValues {
   'project.limit.notReported': { provider: string | number }
   'project.limit.planOnly': { plan: string | number; provider: string | number }
   'project.limit.resets': { when: string | number }
+  'project.limit.scoped': { name: string | number; window: string; hours: number }
   'project.limit.tip': { window: string; label: string | number; provider: string | number }
   'project.limit.tipConnection': { window: string; label: string | number; name: string | number }
   'project.limit.title': { window: string; label: string | number }
