@@ -155,7 +155,16 @@ const blocks = (file, source) => records(file).map((r) => r.payload?.event).filt
     const skills = file ? blocks(file, 'skills') : []
     check('…and the skill Combwork delivered is offered as a project skill (.agents\\skills, its own copy)', skills.some((b) => /id="cw-muse-probe" scope="project"/.test(b.text ?? '')), JSON.stringify(skills.map((b) => (b.text ?? '').match(/<skill id="cw-[^"]*"[^>]*>/g))))
 
-    // A turn: typed in its pane; its UserPromptSubmit and Stop hooks make it a turn; the reply in its transcript.
+    // A turn: typed in its pane; its UserPromptSubmit and Stop hooks make it a turn; the reply in its transcript. Typed
+    // only while Combwork says the session is ready and no screen of Muse's own shows (HI-3202: never a raw write after a
+    // failed check): otherwise the run stops here, having typed nothing.
+    const readyNow = async () => (await live(agent.id))?.status === 'ready' && !SANDBOX_SCREEN.test(await screen())
+    if (!(await readyNow())) {
+      await inv('session:stop', alpha, agent.id).catch(() => undefined)
+      console.log(`FAIL stopped before typing anything: the session isn't ready (${(await live(agent.id))?.status ?? 'gone'})`)
+      await app.close().catch(() => undefined)
+      process.exit(1)
+    }
     const taken = await lib.sendPrompt(inv, key, 'hello from combwork', { submitted: async () => (await live(agent.id))?.status === 'working' || !!(await live(agent.id))?.turn?.id, tries: 1, waitMs: HUNG_MS })
     check('a prompt starts a turn (its UserPromptSubmit hook)', taken > 0, (await live(agent.id))?.status)
     const items = await lib.until(async () => {
