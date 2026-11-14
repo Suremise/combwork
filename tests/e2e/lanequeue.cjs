@@ -267,10 +267,10 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
       cards.map((c) => {
         const head = c.querySelector('.progress-lane-picker-head')
         const s = c.querySelector('.progress-lane-picker-status')?.getBoundingClientRect()
-        const box = c.getBoundingClientRect()
+        const own = c.getBoundingClientRect()
         const h = head.getBoundingClientRect()
         const lineH = parseFloat(getComputedStyle(head).lineHeight) || 16
-        return { card: c.dataset.card, headOneLine: h.height <= lineH * 1.5, statusUnder: !s || s.top >= h.bottom - 0.5, inside: !s || (s.right <= box.right + 0.5 && s.bottom <= box.bottom + 0.5), line: getComputedStyle(c.parentElement).borderTopStyle }
+        return { card: c.dataset.card, headOneLine: h.height <= lineH * 1.5, statusUnder: !s || s.top >= h.bottom - 0.5, inside: !s || (s.right <= own.right + 0.5 && s.bottom <= own.bottom + 0.5), line: getComputedStyle(c.parentElement).borderTopStyle }
       })
     )
   const laid = await results()
@@ -282,9 +282,9 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     if (!c || !status) return null
     const was = status.textContent
     status.textContent = said
-    const box = c.getBoundingClientRect()
+    const own = c.getBoundingClientRect()
     const s = status.getBoundingClientRect()
-    const ok = s.right <= box.right + 0.5 && s.bottom <= box.bottom + 0.5 && c.scrollWidth <= c.clientWidth + 1
+    const ok = s.right <= own.right + 0.5 && s.bottom <= own.bottom + 0.5 && c.scrollWidth <= c.clientWidth + 1
     status.textContent = was
     return ok
   }, longestOnOther)

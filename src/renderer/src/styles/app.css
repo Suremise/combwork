@@ -13608,7 +13608,7 @@ button.progress-run-show:focus-visible {
 }
 /* Each result a little card of its own (HI-3217): a thin line between them. */
 .progress-lane-picker-list > li + li {
-  border-top: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--border);
 }
 /* Two rows: the key and the title on the first, the title given the width; the lane that has it under them. */
 .progress-lane-picker-card {
