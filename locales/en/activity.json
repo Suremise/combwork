@@ -268,12 +268,20 @@
     "description": "A button in the Activity tab's details: opens the session's transcript in the Sessions tab."
   },
   "activity.orphanFact": {
-    "defaultMessage": "The process that started it has exited, and it has run for over ten minutes. The agent is told; Combwork doesn’t end it.",
-    "description": "The value beside Left running in the Activity tab's details (HI-2111): why this process counts as left running."
+    "defaultMessage": "The process that started it has exited, and it has run for longer than Settings → Advanced allows. The agent is told; Combwork doesn’t end it.",
+    "description": "The value beside Left running in the Activity tab's details (HI-2111): why this process counts as left running (its wait is an advanced setting, “Processes left running: minutes before telling”)."
   },
   "activity.orphanFor": {
     "defaultMessage": "Left running · process {pid} · running {time} · CPU {cpu}",
     "description": "A process node's second line in the Activity tab when the agent's command left it running, the shell that started it gone (HI-2111): its process id ({pid}), how long it has run ({time}: \"12 min\") and the processor time it has used ({cpu}: \"3 min\")."
+  },
+  "activity.orphanHeld": {
+    "defaultMessage": "The process that started it has exited, but it belongs to the cw-progress run “{run}”, which is still running: nobody is told unless it outlives the run.",
+    "description": "The value beside Left running in the Activity tab's details (HI-3206): the process is part of a cw-progress run ({run}, its title) that is still running, so no notice goes out yet. Keep cw-progress as it is (a command)."
+  },
+  "activity.orphanHost": {
+    "defaultMessage": "The process that started it has exited, but it is a known host that keeps running on purpose (Settings → Advanced): nobody is told.",
+    "description": "The value beside Left running in the Activity tab's details (HI-3206): the process is a known long-lived host (the Windows Sandbox guest's, an advanced setting), so no notice goes out for it."
   },
   "activity.orphanLabel": {
     "defaultMessage": "Left running",

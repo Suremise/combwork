@@ -130,6 +130,8 @@
   "session.notice.untakenTitle": "{agent} hat eine von Combwork getippte Zeile nicht angenommen",
   "session.notice.waitingForInput": "Wartet auf deine Eingabe",
   "session.orphan.body": "Prozess {pid}: Die Shell, die ihn gestartet hat, ist beendet. Der Tab „Aktivität“ führt ihn auf, mit „Beenden…“; auch der Agent wird informiert.",
+  "session.orphan.bodyRunEnded": "Prozess {pid} läuft noch, nachdem sein cw-progress-Lauf „{run}“ beendet ist, und die Shell, die ihn gestartet hat, ist beendet. Der Tab „Aktivität“ führt ihn auf, mit „Beenden…“; auch der Agent wird informiert.",
+  "session.orphan.bodyRunUnconfirmed": "Prozess {pid}: Sein cw-progress-Lauf „{run}“ ist nicht mehr als laufend zu sehen, und die Shell, die ihn gestartet hat, ist beendet. Der Tab „Aktivität“ führt ihn auf, mit „Beenden…“; auch der Agent wird informiert.",
   "session.orphan.title": "{agent} hat {command} laufen gelassen: läuft seit {time}",
   "session.plan.asking": "Der Agent fragt dich etwas. Antworte zuerst.",
   "session.plan.noToggle": "{provider} hat keinen Schalter für den Planmodus.",

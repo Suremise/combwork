@@ -1349,6 +1349,18 @@
   "settings.advanced.cw.outage.waitMinutes.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.processes.knownHosts.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.processes.knownHosts.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.processes.orphanMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.processes.orphanMinutes.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.processes.orphanNotice.desc": {
     "placeholders": {}
   },

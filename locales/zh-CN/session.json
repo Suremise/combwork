@@ -130,6 +130,8 @@
   "session.notice.untakenTitle": "{agent} 尚未接收 Combwork 输入的一行内容",
   "session.notice.waitingForInput": "正在等待你的输入",
   "session.orphan.body": "进程 {pid}：启动它的 shell 已退出。“活动”中列出了它，并提供“结束…”；也会告知智能体。",
+  "session.orphan.bodyRunEnded": "进程 {pid} 在其 cw-progress 运行“{run}”结束后仍在运行，启动它的 shell 已退出。“活动”中列出了它，并提供“结束…”；也会告知智能体。",
+  "session.orphan.bodyRunUnconfirmed": "进程 {pid}：其 cw-progress 运行“{run}”已不再显示为运行中，启动它的 shell 也已退出。“活动”中列出了它，并提供“结束…”；也会告知智能体。",
   "session.orphan.title": "{agent} 遗留了 {command}，已运行 {time}",
   "session.plan.asking": "智能体正在向你提问。请先回答。",
   "session.plan.noToggle": "{provider} 没有计划模式开关。",

@@ -2209,8 +2209,28 @@
     "note": "An advanced setting's title (Settings → Advanced), followed by its value in minutes (\"120 min\").",
     "audience": "both"
   },
+  "settings.advanced.cw.processes.knownHosts.desc": {
+    "text": "Programs expected to keep running after the shell that started them is gone, such as Windows Sandbox's guest: a regular expression matched against the program's file name. Combwork never tells these as left running; Activity still lists them, with End It. Add a program here to stop its notices.",
+    "note": "What the advanced setting \"Processes left running: known hosts\" does (Settings → Advanced). Activity is a tab of Combwork's; End It its button. Keep \"Windows Sandbox\" as it is (a product).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.processes.knownHosts.title": {
+    "text": "Processes left running: known hosts",
+    "note": "An advanced setting's title (Settings → Advanced): the programs expected to keep running after the shell that started them is gone (the Windows Sandbox guest's), which Combwork never tells as left running.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.processes.orphanMinutes.desc": {
+    "text": "How long a process an agent's command started may run with the shell that started it gone before Combwork tells you and the agent. A longer wait means fewer notices for processes you expect to keep running a while.",
+    "note": "What the advanced setting \"Processes left running: minutes before telling\" does (Settings → Advanced, under Combwork).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.processes.orphanMinutes.title": {
+    "text": "Processes left running: minutes before telling",
+    "note": "An advanced setting's title (Settings → Advanced), followed by its value in minutes (\"10 min\"): how long a process an agent's command left running, its shell gone, runs before Combwork tells it.",
+    "audience": "both"
+  },
   "settings.advanced.cw.processes.orphanNotice.desc": {
-    "text": "When a process an agent's command started is still running ten minutes on with the shell that started it gone, Combwork says so once in a notice, and tells the agent once at its next tool call or turn's end, so it can end it. Turned off, neither is told; Activity still lists the process as left running, with End It.",
+    "text": "When a process an agent's command started is still running with the shell that started it gone (for as long as “Processes left running: minutes before telling” says), Combwork says so once in a notice, and tells the agent once at its next tool call or turn's end, so it can end it. A process of a cw-progress run that is still running, or of a known host, isn't told. Turned off, nothing is told; Activity still lists the process as left running, with End It.",
     "note": "What the advanced setting \"Processes left running: tell me and the agent\" does (Settings → Advanced, under Combwork). Activity is a tab of Combwork's; End It is its button.",
     "audience": "both"
   },

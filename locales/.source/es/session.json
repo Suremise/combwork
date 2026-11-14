@@ -130,6 +130,8 @@
   "session.notice.untakenTitle": "{agent} hasn't taken a line Combwork typed",
   "session.notice.waitingForInput": "Waiting for your input",
   "session.orphan.body": "Process {pid}: the shell that started it has exited. Activity lists it, with End It; the agent is told too.",
+  "session.orphan.bodyRunEnded": "Process {pid} is still running after its cw-progress run “{run}” ended, the shell that started it gone. Activity lists it, with End It; the agent is told too.",
+  "session.orphan.bodyRunUnconfirmed": "Process {pid}: its cw-progress run “{run}” is no longer seen running, and the shell that started it has exited. Activity lists it, with End It; the agent is told too.",
   "session.orphan.title": "{agent} left {command} running for {time}",
   "session.plan.asking": "The agent is asking you something. Answer it first.",
   "session.plan.noToggle": "{provider} has no Plan mode toggle.",

@@ -14,6 +14,17 @@ if (role === 'app-starter') {
 } else if (role === 'starter') {
   spawn(process.execPath, [__filename, 'linger', file, agent], { detached: true, stdio: 'ignore', windowsHide: true }).unref()
   setTimeout(() => process.exit(0), 200)
+} else if (role === 'progress-starter') {
+  // fake-claude's "progress-orphan N" (HI-3206): cmd → cw-progress → "progress-child", started detached, then this exits,
+  // so the run's wrapper has no living parent while the run goes on.
+  const q = (x) => `"${x}"`
+  const command = ['cw-progress', '--title', q('Sandbox cycle'), '--', q(process.execPath), q(__filename), 'progress-child', q(file), agent, appDir].join(' ')
+  spawn('cmd.exe', ['/d', '/s', '/c', q(command)], { env: process.env, detached: true, stdio: 'ignore', windowsHide: true, windowsVerbatimArguments: true }).unref()
+  setTimeout(() => process.exit(0), 200)
+} else if (role === 'progress-child') {
+  // The run's command: a detached "linger" (its child while this runs), then it ends after N seconds (appDir carries N).
+  spawn(process.execPath, [__filename, 'linger', file, agent], { detached: true, stdio: 'ignore', windowsHide: true }).unref()
+  setTimeout(() => process.exit(0), (Number(appDir) || 10) * 1000)
 } else if (role === 'unnamed-starter') {
   // fake-claude's "hidden-linger" (HI-2217): the same, but what is left names no test folder on its command line (its
   // file comes in its environment), as a model's `find / -name x` did: only its launch's job (Combwork's) knows it.

@@ -132,6 +132,8 @@ interface CombworkMessageValues {
   'session.notice.untakenTitle': { agent: string | number }
   'session.notice.waitingForInput': undefined
   'session.orphan.body': { pid: string | number }
+  'session.orphan.bodyRunEnded': { pid: string | number; run: string | number }
+  'session.orphan.bodyRunUnconfirmed': { pid: string | number; run: string | number }
   'session.orphan.title': { agent: string | number; command: string | number; time: string | number }
   'session.plan.asking': undefined
   'session.plan.noToggle': { provider: string | number }

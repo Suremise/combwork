@@ -130,6 +130,8 @@
   "session.notice.untakenTitle": "{agent}がCombworkの入力した行を受け取っていません",
   "session.notice.waitingForInput": "入力を待っています",
   "session.orphan.body": "プロセス{pid}：起動したシェルは終了しています。アクティビティに一覧され、終了できます。エージェントにも知らせます。",
+  "session.orphan.bodyRunEnded": "プロセス{pid}は、cw-progress の実行「{run}」が終わった後も、起動したシェルが終了したまま実行を続けています。アクティビティに一覧され、終了できます。エージェントにも知らせます。",
+  "session.orphan.bodyRunUnconfirmed": "プロセス{pid}：cw-progress の実行「{run}」は実行中として確認できなくなり、起動したシェルも終了しています。アクティビティに一覧され、終了できます。エージェントにも知らせます。",
   "session.orphan.title": "{agent}が{command}を{time}実行したままにしています",
   "session.plan.asking": "エージェントが質問しています。先に回答してください。",
   "session.plan.noToggle": "{provider}にはプランモードの切り替えがありません。",

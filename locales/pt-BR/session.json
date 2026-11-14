@@ -130,6 +130,8 @@
   "session.notice.untakenTitle": "{agent} não aceitou uma linha que o Combwork digitou",
   "session.notice.waitingForInput": "Aguardando sua resposta",
   "session.orphan.body": "Processo {pid}: o shell que o iniciou terminou. A Atividade o lista, com Encerrar; o agente também é avisado.",
+  "session.orphan.bodyRunEnded": "O processo {pid} continua em execução depois que a execução do cw-progress “{run}” terminou, sem o shell que o iniciou. A Atividade o lista, com Encerrar; o agente também é avisado.",
+  "session.orphan.bodyRunUnconfirmed": "Processo {pid}: a execução do cw-progress “{run}” não é mais vista em andamento, e o shell que o iniciou terminou. A Atividade o lista, com Encerrar; o agente também é avisado.",
   "session.orphan.title": "{agent} deixou {command} em execução há {time}",
   "session.plan.asking": "O agente está perguntando algo a você. Responda primeiro.",
   "session.plan.noToggle": "{provider} não tem uma opção para ativar o modo Planejar.",

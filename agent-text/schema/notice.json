@@ -48,7 +48,10 @@
       "pid": "plain",
       "known": "select",
       "command": "plain",
-      "min": "plain"
+      "min": "plain",
+      "run": "select",
+      "title": "plain",
+      "runId": "plain"
     }
   },
   "notice.orphan.running": {
