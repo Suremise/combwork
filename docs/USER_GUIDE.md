@@ -155,6 +155,7 @@ A CLI whose description has a `server` section can run on a model server of your
 - **Only that launch's.** Combwork passes these values in the CLI's environment and arguments for that launch alone, and never changes the CLI's own config. On a server connection, they win over the description's own `launch.env` and anything in Combwork's own environment. On the CLI's own account, the CLI gets none of the variables the `server` section names, even if Combwork's environment or `launch.env` has them.
 - **The key** is kept encrypted, bound to the server's address, and hidden in Combwork's logs and diagnostics, as for Claude Code's server connections.
 - **Large models.** Combwork sets no time limit on a turn or on the start, so a large model that takes minutes to load shows **starting** until its prompt is ready.
+- **A description removed or renamed.** Its server connections are kept, with their keys, and come back as they were once a description with that id is back. Meanwhile Accounts & Connections lists each one with a warning that its CLI's description is gone and **Remove…** only.
 
 ### Git <a id="git"></a>
 

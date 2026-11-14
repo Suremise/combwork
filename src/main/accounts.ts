@@ -1851,7 +1851,7 @@ export function accountsView(check = false): ConnectionsView {
     return k && k.origin === originOf(a.server?.baseUrl ?? '') ? { key: { last4: k.last4, at: k.at } } : {}
   }
   const intro = !config.get().ui.connectionsIntroShown && !all.length ? providers.filter((p) => !testHome.includes(p)) : []
-  return { ...(intro.length ? { intro } : {}), providers, connections: all.map((a) => ({ ...shownServer(a), defaults: defaultsOf(a), signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id), ...keyOf(a), ...(setUpRead.has(a.id) ? { setUp: setUpRead.get(a.id) } : {}), ...trustOf(a) })), workspace: ws, testHome, masking: coverageView(), order: allAccounts().map((a) => a.id), homes: allAccounts().filter((a) => a.home), connectionRows: connectionRows() }
+  return { ...(intro.length ? { intro } : {}), providers, connections: all.map((a) => ({ ...shownServer(a), ...(hasProvider(a.provider) ? {} : { gone: true as const }), defaults: defaultsOf(a), signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id), ...keyOf(a), ...(setUpRead.has(a.id) ? { setUp: setUpRead.get(a.id) } : {}), ...trustOf(a) })), workspace: ws, testHome, masking: coverageView(), order: allAccounts().map((a) => a.id), homes: allAccounts().filter((a) => a.home), connectionRows: connectionRows() }
 }
 
 /** An account's defaults as today's screens show them (HI-2106, until HI-2107): its base connection's model, effort and context. */

@@ -798,10 +798,14 @@ describe("a CLI's description removed while its server connection is kept (HI-32
       // Its description gone: the view lists every connection still, its own included, and nothing throws.
       expect(view().connections.map((c) => c.id)).toEqual(expect.arrayContaining([kept.id, other.id]))
       expect(here(() => accounts.accountsView(true)).connections.map((c) => c.id)).toContain(kept.id)
+      // Marked so the window lists it with Remove alone (HI-3270); the others aren't.
+      expect(view().connections.find((c) => c.id === kept.id)?.gone).toBe(true)
+      expect(view().connections.find((c) => c.id === other.id)?.gone).toBeUndefined()
       await accounts.readSetUp(kept.id)
       // Restored: the same connection, as it was.
       described([r.cli])
       expect(view().connections.find((c) => c.id === kept.id)).toMatchObject({ name: 'Local', provider: 'gone-cli' })
+      expect(view().connections.find((c) => c.id === kept.id)?.gone).toBeUndefined()
       // Gone again, it can be removed.
       described([])
       await accounts.removeAccount(kept.id)

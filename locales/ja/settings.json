@@ -7,6 +7,7 @@
   "settings.accounts.changeFailed": "接続を変更できませんでした",
   "settings.accounts.changedTo": "現在は{now}でサインインしています（以前は{was}）",
   "settings.accounts.checkedAt": "{when}に確認",
+  "settings.accounts.cliGone": "{cli}の記述ファイルがありません（削除されたか、IDが変わりました）。そのため、この接続は使えません。削除するか、記述ファイルを戻して「再読み込み」を選んでください。",
   "settings.accounts.closeRunningConfirm": "ターミナルを閉じる",
   "settings.accounts.closeRunningMessage": "{cli}はまだ実行中です。ターミナルを閉じると終了します。",
   "settings.accounts.closeRunningTitle": "ターミナルを閉じますか？",

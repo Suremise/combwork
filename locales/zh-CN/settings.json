@@ -7,6 +7,7 @@
   "settings.accounts.changeFailed": "无法更改连接",
   "settings.accounts.changedTo": "现在以 {now} 登录，之前是 {was}",
   "settings.accounts.checkedAt": "检查时间：{when}",
+  "settings.accounts.cliGone": "{cli} 的描述文件已不在（被删除或 ID 已更改），因此无法使用此连接。请删除它，或放回描述文件后点“重新加载”。",
   "settings.accounts.closeRunningConfirm": "关闭终端",
   "settings.accounts.closeRunningMessage": "{cli} 仍在其中运行。关闭终端会结束它。",
   "settings.accounts.closeRunningTitle": "关闭终端？",

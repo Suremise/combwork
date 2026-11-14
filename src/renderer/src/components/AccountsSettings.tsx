@@ -68,6 +68,7 @@ const M = {
   removeFailed: msg({ id: 'settings.accounts.removeFailed', defaultMessage: "Couldn't remove the connection", description: "An error's title: removing a connection failed." }),
   sameLogin: msg({ id: 'settings.accounts.sameLoginAccount', defaultMessage: 'Signed in to the same login as another account: {names}', description: 'A warning on an account (Settings → Accounts & Connections, HI-2107): other accounts are signed in as the same login. {names} is their names, listed.' }),
   leftover: msg({ id: 'settings.accounts.leftover', defaultMessage: "Not all removed: {what}. Remove tries again; nothing outside its folder was touched.", description: "A warning on a connection (Settings → Accounts & Connections) whose removal stopped partway. {what} is what's left, in English." }),
+  cliGone: msg({ id: 'settings.accounts.cliGone', defaultMessage: "{cli}'s description is gone (removed, or its id changed), so this connection can't be used. Remove it, or put the description back and choose Reload.", description: "A warning on a connection (Settings → Accounts & Connections, HI-3270) whose coding agent CLI ran from a description file the user removed or renamed. {cli} is the CLI's id from that file (such as mycli). Reload is the button in Settings that reads the CLIs' descriptions again." }),
   changedTo: msg({ id: 'settings.accounts.changedTo', defaultMessage: 'Now signed in as {now}, was {was}', description: 'A warning on a connection (Settings → Accounts & Connections): its login changed (a /login typed in a pane). {now} and {was} are emails.' }),
   affected: msg({ id: 'settings.accounts.affected', defaultMessage: '{n, plural, one {# running agent runs on another connection than the one chosen for it now.} other {# running agents run on another connection than the one chosen for them now.}}', description: 'Banner in Settings → Accounts & Connections after a connection was turned off or the default changed (HI-1755): how many running agents are on a connection other than the one chosen now.' }),
   switchAffected: msg({ id: 'settings.accounts.switchAffected', defaultMessage: 'Switch Them When Their Turn Is Over', description: 'Button on that banner: each of those agents ends once its turn is over and carries on, on the connection chosen now.' }),
@@ -217,9 +218,9 @@ export function AccountsSettings() {
   const dups = duplicateLogins(view.connections)
   const nameOf = (id: string): string => view.connections.find((a) => a.id === id)?.name ?? id
   // One list in the one order (decision A): Combwork's accounts of the CLIs turned on, and each PC-wide sign-in (Copilot's,
-  // the Antigravity CLI's: HI-2544) while its CLI is on.
+  // the Antigravity CLI's: HI-2544) while its CLI is on; and those of a CLI whose description is gone (HI-3270), to remove.
   const byId = new Map<string, AccountView | Account>([...view.connections, ...view.homes].map((a) => [a.id, a]))
-  const shown = view.order.map((id) => byId.get(id)).filter((a): a is AccountView | Account => !!a && (a.home ? pcWideSignIn(a.provider) && a.id === pcAccountId(a.provider) && isProviderEnabled(settings, a.provider) : view.providers.includes(a.provider)))
+  const shown = view.order.map((id) => byId.get(id)).filter((a): a is AccountView | Account => !!a && (a.home ? pcWideSignIn(a.provider) && a.id === pcAccountId(a.provider) && isProviderEnabled(settings, a.provider) : view.providers.includes(a.provider) || !!(a as AccountView).gone))
   // Its place in the one order, every account counted (those hidden here too): what a move names.
   const placeOf = (id: string): number => view.order.indexOf(id)
   const move = (id: string, index: number): Promise<void> => act(M.moveFailed, () => call('connections:move', id, Math.max(0, index)))
@@ -529,6 +530,25 @@ export function AccountsSettings() {
         {shown.map((x, place) => {
           if (x.home) return pcRow(x)
           const a = x as AccountView
+          // Its CLI's description is gone (HI-3270): nothing can run on it, so Remove is all it offers.
+          if (a.gone)
+            return (
+              <div key={a.id} className="account-block" data-account={a.id} data-cli={a.provider} data-gone data-order={place + 1}>
+                <div className="account-row">
+                  <div className="account-main">
+                    <div className="account-name">{a.name}</div>
+                    <div className="account-warning" data-warning="cli-gone">
+                      <Icon name="warning" /> {tr(M.cliGone, { cli: a.provider })}
+                    </div>
+                  </div>
+                  <div className="account-actions">
+                    <button className="btn danger" data-remove onClick={() => void remove(a.id, a.name, false)}>
+                      {tr(M.remove)}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
           const ws = view.workspace[a.provider]
           const server = a.kind === 'server'
           const state = accountState(a)
