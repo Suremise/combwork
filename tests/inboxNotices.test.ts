@@ -6,6 +6,7 @@ import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
+import { inDialectOf, setChainResolver } from '../src/shared/agentText'
 import { inboxNotice, noticeCounts } from '../src/shared/doorbell'
 import { tempDir } from './tempDir'
 import { bound } from './keepType'
@@ -161,6 +162,28 @@ describe('notices in the hook replies (#650)', () => {
     const rec = (await run(() => deliveries.deliveriesOf(p, st.agentId))).find((r) => r.id === e.id)!
     const bell = withCardNames(workspaceFor(p), () => offerLine([rec], null), scopeOfHost(p))
     expect(bell).toContain(`1 card event (${card.key}) (${e.id})`)
+  })
+
+  // The hook route's own dialect scope (sessions.inLaunchDialect, HI-2443) and inboxNotices.ts's both say it; this holds
+  // the result whichever one does (unwatchedLanes.test.ts calls the notice outside a hook, where only inboxNotices.ts's can).
+  it("HI-3230: said in the agent's dialect at its checkpoint and drain, as the doorbell typed as its prompt is; another agent's stays the Default", async () => {
+    const st = agent()
+    const other = agent()
+    const texts = { 'doorbell.notice.checkpoint': 'Unread now: {what}.', 'doorbell.notice.drain': 'Unread at the end: {what}.', 'doorbell.notice.doorbell': 'Unread: {what}.', 'doorbell.count.message': '{n, plural, one {{count} note} other {{count} notes}}{cards}' }
+    setChainResolver((scope) => (scope.kind === 'session' && scope.session.agentId === st.agentId ? { texts, files: ['test.json'], hash: 'test' } : null))
+    try {
+      for (const a of [st, other]) await hook(a, { hook_event_name: 'UserPromptSubmit', prompt_id: 'p1', prompt: 'go' })
+      const m = await leave(st)
+      const o = await leave(other)
+      expect(context(await hook(st, tool('p1', 'c1')))).toBe(`[CW] New in your inbox: Unread now: 1 note (${m.id}).`)
+      expect(context(await hook(st, { hook_event_name: 'Stop', prompt_id: 'p1' }))).toBe(`[CW] Unread at the end: 1 note (${m.id}).`)
+      expect(context(await hook(other, tool('p1', 'c1')))).toBe(`[CW] New in your inbox: 1 message (${o.id}). Call cw_inbox now to read it; act on it and ack it, then carry on.`)
+      // The doorbell typed as its prompt (deliveries.ts: offerLine in the agent's dialect) says it in the same dialect.
+      const rec = (await run(() => deliveries.deliveriesOf(p, st.agentId))).find((r) => r.id === m.id)!
+      expect(inDialectOf({ projectPath: p, agentId: st.agentId }, () => offerLine([rec], null))).toBe(`[CW] New in your inbox: Unread: 1 note (${m.id}).`)
+    } finally {
+      setChainResolver(null)
+    }
   })
 
   it("HI-2670: an agent made Independent while it runs gets no notice in its hooks, which still report its status; back in the workflow, its launch's own switches allowing, it is told again, without a restart", async () => {
