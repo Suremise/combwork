@@ -114,10 +114,14 @@ export function CommentLayer({ editor, card, submission, path, comments, agentNa
           requestAnimationFrame(() => editor.getContainerDomNode().querySelector<HTMLTextAreaElement>(`[data-draft="${key}"] textarea`)?.focus())
         }))
       }
-      // Inline, the original side isn't shown: its comments go above the diff.
-      const check = (): void => setOldHidden((editor.getOriginalEditor().getDomNode()?.offsetWidth ?? 0) === 0)
+      // Inline, the original side isn't shown: its comments go above the diff. Monaco's inline view (asked for, or its own
+      // when the diff is narrow) keeps the original editor as wide as its line numbers, never as its text (HI-3274).
+      const check = (): void => {
+        const li = editor.getOriginalEditor().getLayoutInfo()
+        setOldHidden(li.width <= li.contentLeft)
+      }
       check()
-      subs.push(editor.getModifiedEditor().onDidLayoutChange(check))
+      subs.push(editor.getModifiedEditor().onDidLayoutChange(check), editor.getOriginalEditor().onDidLayoutChange(check))
     })
     return () => {
       gone = true
