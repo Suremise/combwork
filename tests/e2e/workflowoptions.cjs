@@ -204,9 +204,11 @@ async function theForm(page, app, inv) {
     // Card loops (HI-1766): options of their own, from the defaults; File locks with them.
     check('Card loops: the defaults, Default as their origin', (await row('loopRounds').locator('input').getAttribute('placeholder')) === '10' && (await row('loopWaitHours').locator('input').getAttribute('placeholder')) === '6 hours' && (await row('loopStepWaitMinutes').locator('input').getAttribute('placeholder')) === '30 minutes' && (await row('loopRounds').locator('.workflow-origin').innerText()).includes('Default'), await section.locator('.workflow-group[data-group="loops"]').innerText())
     // HI-3211: Wake the Assistant for, Standard by default, each level said in full under the choice; Custom ticks the events.
+    await themes('assistant-wakes', row('assistantWakes'))
     check('Wake the Assistant for: Standard, said in full', (await row('assistantWakes').locator('select').inputValue()) === 'standard' && (await row('assistantWakes').locator('[data-note="assistant-wakes"]').innerText()).includes('What Combwork has always woken it for.'), await row('assistantWakes').innerText())
     await row('assistantWakes').locator('select').selectOption('custom')
     await lib.until(async () => (await row('assistantWakes').locator('[data-note="assistant-wake-events"] input[type="checkbox"]').count()) === 13, HUNG_MS)
+    await themes('assistant-wakes-custom', row('assistantWakes'))
     check('…Custom: a tick per event, from the level left; a question for you always on', (await row('assistantWakes').locator('[data-note="assistant-wake-events"] input:checked').count()) === 10 && (await row('assistantWakes').locator('[data-note="assistant-wake-events"] input:disabled').count()) === 1, await row('assistantWakes').innerText())
     await discard()
     await lib.until(async () => (await row('assistantWakes').locator('select').inputValue()) === 'standard', HUNG_MS)

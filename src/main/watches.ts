@@ -1701,8 +1701,10 @@ export function lanesNowIn(ws: WorkspaceService, laneMarks: Record<string, LaneM
   return lanesIn(ws, { scope: null, lanes: { ids: 'all', events: [] }, laneMarks, since }, laneBoard(ws))
 }
 
-async function lanesIn(ws: WorkspaceService, rec: Pick<WatchRecord, 'scope' | 'lanes' | 'laneMarks'> & { since?: string; laneSince?: string; agentId?: string }, board: LaneBoard): Promise<LaneNow[]> {
+async function lanesIn(ws: WorkspaceService, rec: Pick<WatchRecord, 'scope' | 'lanes' | 'laneMarks'> & { since?: string; laneSince?: string; agentId?: string; projectPath?: string }, board: LaneBoard): Promise<LaneNow[]> {
   const cond = rec.lanes!
+  // HI-3211 (HR1's round 1): the Assistant's echo is left out only for its workspace's Assistant, by host and id.
+  const assistant = !!rec.projectPath && !!rec.agentId && isAssistantWatch(ws, { projectPath: rec.projectPath, agentId: rec.agentId })
   const inView = (await listLanes(ws, { all: true })).filter((l) => rec.scope === null || same(l.project, rec.scope))
   // Every running lane, and a lane it follows until its end has been told (round 1 finding: one that ended between a
   // wake and the watch after it, which starts from what the wake told).
@@ -1736,7 +1738,7 @@ async function lanesIn(ws: WorkspaceService, rec: Pick<WatchRecord, 'scope' | 'l
       const stalled = stall?.why ?? null
       // An ended lane's cards are another lane's or nobody's: no requests of theirs are told for it.
       // HI-3211: for the Assistant, never one it asked itself (its echo), by the request's actor, never a name.
-      const asked = running(l) && asks ? newestAsk(asks.get(lc.number), rec.agentId) : undefined
+      const asked = running(l) && asks ? newestAsk(asks.get(lc.number), assistant) : undefined
       marks[lc.number] = laneCardMark(card, stalled, asked)
       changed.push({ mark: marks[lc.number], updatedAt: card?.updatedAt })
       const v = card ? verdictsOf(card) : null
@@ -1768,12 +1770,12 @@ interface LaneBoard {
 
 /**
  * A card's newest open request for the user (HI-1991), as a lane watch tells it; null for none. For the Assistant's watch
- * (`self` the Assistant), never one the Assistant asked (HI-3211, Darren's decision (c): its echo, an exception of the
+ * (`assistant`: isAssistantWatch, its host and id), never one the Assistant asked (HI-3211, Darren's decision (c): its echo, an exception of the
  * Assistant's alone): left out before the newest is taken, so another agent's on the same card is still told, and the
  * left-out one never moves the card's mark.
  */
-function newestAsk(items: readonly ForYouItem[] | undefined, self?: string): LaneAsked | null {
-  const own = (x: ForYouItem): boolean => self === ASSISTANT_AGENT_ID && !!x.byAssistant
+function newestAsk(items: readonly ForYouItem[] | undefined, assistant = false): LaneAsked | null {
+  const own = (x: ForYouItem): boolean => assistant && !!x.byAssistant
   const i = items?.filter((x) => !own(x)).reduce<ForYouItem | null>((a, b) => (!a || b.since > a.since ? b : a), null)
   return i ? { since: i.since, by: i.asker, text: i.text, ...(i.shown ? { shown: i.shown } : {}) } : null
 }

@@ -1440,6 +1440,15 @@ describe('lane watches (main/watches.ts, #531)', async () => {
       await watches.evaluateWatches(w)
       await watches.settled()
       expect(st.told).toHaveLength(1)
+      // HR1's round 1: an agent of alpha whose id is "assistant" isn't the Assistant (its host is the project): the
+      // Assistant's question is told to it, as any question is.
+      st.agents.assistant = 'watching'
+      await watches.registerLaneWatch(w, alpha, 'assistant', readLaneCondition({ lanes: ['all'], events: ['paused-user'] }) as never)
+      const typed = st.typed.length
+      await inWorkspace(w, () => wf.askTheUser(`#${a}`, 'assistant', { kind: 'decide', text: 'Or on Tuesday?' }))
+      await watches.evaluateWatches(w)
+      await vi.waitFor(() => expect(st.typed.length).toBe(typed + 1), { timeout: HUNG_MS })
+      expect(await follow(alpha, 'assistant', st.typed.at(-1)!)).toContain('"Or on Tuesday?"')
       await disposeWorkspaceService(w)
     })
   })
