@@ -23,11 +23,11 @@ const actions = (await import(/* @vite-ignore */ rendererActions)) as {
   resumeTarget: (p: ProjectInfo | undefined, item: Item, preferred?: string) => string | null
 }
 
-const project = { path: 'D:\\HIVE\\mcp', name: 'mcp', agents: [{ id: 'a-mb1', name: 'MB1', place: { is: 'slot', folder: 'D:\\HIVE.worktrees\\mcp\\slot-a' } }, { id: 'a-mr1', name: 'MR1', place: { is: 'project', folder: 'D:\\HIVE\\mcp' } }] } as unknown as ProjectInfo
+const project = { path: 'D:\\ws\\mcp', name: 'mcp', agents: [{ id: 'a-mb1', name: 'MB1', place: { is: 'slot', folder: 'D:\\ws.worktrees\\mcp\\slot-a' } }, { id: 'a-mr1', name: 'MR1', place: { is: 'project', folder: 'D:\\ws\\mcp' } }] } as unknown as ProjectInfo
 
 describe('what a restart resumes (HI-3213)', () => {
   it('a conversation that ran in a slot keeps its slot, so its own agent resumes it', () => {
-    const listed = { name: 'mcp · MB1', cwd: 'D:\\HIVE.worktrees\\mcp\\slot-a', slot: 'slot-a' }
+    const listed = { name: 'mcp · MB1', cwd: 'D:\\ws.worktrees\\mcp\\slot-a', slot: 'slot-a' }
     const item = actions.restartItem({ sessionId: '47045579', agentId: 'a-mb1' }, listed)
     expect(item).toMatchObject({ id: '47045579', agentId: 'a-mb1', cwd: listed.cwd, slot: 'slot-a' })
     expect(actions.resumeTarget(project, item, 'a-mb1')).toBe('a-mb1')
