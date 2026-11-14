@@ -247,6 +247,21 @@ describe('its start, read from its rendered screen a line each (startupOnScreen)
     // Answered, it is ready once its prompt shows.
     expect(startupScreen({ status: 'waiting', askedAtStart: true, settled: false }, 'Allow? (y/n) y\n> ', launch)).toBe('ready')
   })
+
+  it('reads the latest of its question and its prompt on the screen (HI-3246): an old prompt above its question is no answer', () => {
+    const launch = new CliAdapter({ ...cliModule(ok(desc())), cli: ok(desc()) }).forLaunch().launch
+    const starting = { status: 'starting', askedAtStart: false, settled: false } as const
+    const asked = { status: 'waiting', askedAtStart: true, settled: false } as const
+    const oldPromptThenQuestion = 'fakecli 1.2.3\n> \nAllow? (y/n)'
+    // An old prompt above its question: asked, and drawn again unanswered, still asked (not ready, nothing new).
+    expect(startupScreen(starting, oldPromptThenQuestion, launch)).toEqual({ asked: 'Allow?' })
+    expect(startupScreen(asked, oldPromptThenQuestion, launch)).toBeNull()
+    // An old, answered question above its new prompt: ready, at the start or once asked.
+    expect(startupScreen(starting, 'Allow? (y/n) y\n> ', launch)).toBe('ready')
+    expect(startupScreen(asked, 'Allow? (y/n) y\nfakecli 1.2.3\n> ', launch)).toBe('ready')
+    // Ready but not yet settled, its question drawn below the prompt: asked (#679's order, from the screen).
+    expect(startupScreen({ status: 'ready', askedAtStart: false, settled: false }, oldPromptThenQuestion, launch)).toEqual({ asked: 'Allow?' })
+  })
 })
 
 describe('its screen’s rules: the one matched last says what it is doing', () => {
