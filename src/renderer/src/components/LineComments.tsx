@@ -101,6 +101,9 @@ export function CommentLayer({ editor, card, submission, path, comments, agentNa
     const made: Zone[] = []
     for (const side of ['new', 'old'] as const) {
       const ed = sideEditor(side)
+      // Monaco hides its view zones from assistive technology (aria-hidden, set once as it makes them): they hold only its
+      // own empty alignment spacers and these threads, whose words and buttons must be reachable.
+      ed.getDomNode()?.querySelector('.view-zones')?.removeAttribute('aria-hidden')
       ed.changeViewZones((acc) => {
         for (const key of spotKeys ? spotKeys.split('|') : []) {
           const s = spots.get(key)
