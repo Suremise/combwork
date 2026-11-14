@@ -282,6 +282,11 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { target: '1.3.0', otherTargets: ['integration'] }) })
     const [b11, r11] = [await q.agent(fx, h, 'B11'), await q.agent(fx, h, 'R11')]
     const n11 = (await inv('tasks:create', { title: 'On the release', project: 'alpha' })).number
+    // HI-3240: q.agent returns once its session's token is there, which can be before its status leaves `starting`, and a
+    // lane start refuses a starting agent ("Start the lane once it's idle"). Both idle as laneStart counts it (ready or
+    // finished, not lib.agentIdle's watching or background) before the start.
+    const laneIdle = async (id) => ['ready', 'finished'].includes((await inv('session:live')).find((s) => s.projectPath.toLowerCase() === fx.alpha.toLowerCase() && s.agentId === id)?.status)
+    check('HI-3240: B11 and R11 are idle before their lane starts', !!(await waitHung(async () => (await laneIdle(b11.id)) && (await laneIdle(r11.id)))), JSON.stringify((await inv('session:live')).filter((s) => [b11.id, r11.id].includes(s.agentId)).map((s) => s.status)))
     const lane11 = (await inv('lanes:start', fx.alpha, { builder: b11.id, reviewer: r11.id, cards: [n11] })).lane
     check('HI-3113: a lane started on the project’s own 1.3.0 names no branch of its own', !!lane11?.id && !lane11.target, JSON.stringify(lane11?.target))
     await waitHung(async () => (await page.locator('[data-action="next-version"]').count()) === 1 && !(await page.locator('[data-action="next-version"]').isDisabled()))
