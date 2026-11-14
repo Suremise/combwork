@@ -368,6 +368,23 @@ describe("a running terminal's replay, for what the dropped part set and later o
     expect(inAlt[0]).toEqual(inAlt[1])
   })
 
+  // HR1's round 1: xterm keeps a saved cursor's row among the buffer's lines, scrollback included: the replay restores it
+  // to the same screen row once the normal screen has scrollback, and to the top row once it has scrolled off.
+  const SCROLLED = Array.from({ length: 15 }, (_, i) => `line${i}\r\n`).join('')
+  it('3. …with scrollback above: on the screen row it was saved on (DECSC, and ?1049h’s)', async () => {
+    const decsc = await afterReplay(`${SCROLLED}\x1b[3;4H\x1b[32m\x1b7\x1b[0m\x1b[1;1H`, 'top', '\x1b8X')
+    expect(decsc[0]).toEqual(decsc[1])
+    expect((decsc[1] as { cursor: number[] }).cursor).toEqual([4, 2])
+    const alt = await afterReplay(`${SCROLLED}\x1b[3;4H\x1b[32m\x1b[?1049h\x1b[0m`, 'alt', '\x1b[?1049lY')
+    expect(alt[0]).toEqual(alt[1])
+  })
+
+  it('3. …and saved on a row that has scrolled off since: restored to the top row, as xterm does', async () => {
+    const [shown, live] = await afterReplay(`\x1b[6;3H\x1b[35m\x1b7\x1b[0m${'\r\n'.repeat(12)}more`, 'top', '\x1b8Q')
+    expect(shown).toEqual(live)
+    expect((live as { cursor: number[] }).cursor).toEqual([3, 0])
+  })
+
   it('3. …and a restore in the dropped part sets the rendition text after it is drawn with back to the one saved', async () => {
     const [shown, live] = await afterReplay('\x1b[32m\x1b7\x1b[31m\x1b8', 'a', 'Z')
     expect(shown).toEqual(live)

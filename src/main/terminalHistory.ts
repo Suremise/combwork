@@ -84,12 +84,17 @@ interface ExtraState {
   link?: string
 }
 
-/** What xterm keeps of a buffer and doesn't show: its scroll region and its saved cursor, 0-based. */
+/**
+ * What xterm keeps of a buffer and doesn't show, 0-based: its scroll region, in screen rows; its saved cursor, the row in
+ * the buffer's lines (scrollback included: `ybase` plus the screen row, as xterm 6's saveCursor stores it), and `ybase`,
+ * the first line on screen (HR1's round 1).
+ */
 interface CoreBuffer {
   scrollTop: number
   scrollBottom: number
   savedX: number
   savedY: number
+  ybase: number
 }
 
 /**
@@ -99,7 +104,7 @@ interface CoreBuffer {
  */
 function coreBuffers(term: Terminal): { normal: CoreBuffer; alternate: CoreBuffer } | null {
   const b = (term as unknown as { _core?: { buffers?: { normal?: Partial<CoreBuffer>; alt?: Partial<CoreBuffer> } } })._core?.buffers
-  const ok = (x: Partial<CoreBuffer> | undefined): x is CoreBuffer => !!x && [x.scrollTop, x.scrollBottom, x.savedX, x.savedY].every(Number.isSafeInteger)
+  const ok = (x: Partial<CoreBuffer> | undefined): x is CoreBuffer => !!x && [x.scrollTop, x.scrollBottom, x.savedX, x.savedY, x.ybase].every(Number.isSafeInteger)
   return ok(b?.normal) && ok(b?.alt) ? { normal: b.normal, alternate: b.alt } : null
 }
 
@@ -240,7 +245,12 @@ class Mirror {
     // A buffer's scroll region (it moves the cursor home), and its saved cursor saved again (DECSC): a restore in the output
     // that follows finds them as the program left them (HI-3275). A full-screen region, and nothing saved, are left out.
     const region = (b: CoreBuffer): string => (b.scrollTop > 0 || b.scrollBottom < term.rows - 1 ? `\x1b[${b.scrollTop + 1};${b.scrollBottom + 1}r` : '')
-    const saved = (b: CoreBuffer, type: 'normal' | 'alternate'): string => (b.savedX || b.savedY || extra.saved[type].length ? `${at(b.savedX, b.savedY)}${sgr(extra.saved[type])}\x1b7` : '')
+    // Its screen row as xterm's restore takes it: the saved line less the first line on screen, the top row if it has
+    // scrolled off since (HR1's round 1). Saved again on that row, the replay's restore lands where the reference's does.
+    const saved = (b: CoreBuffer, type: 'normal' | 'alternate'): string => {
+      const row = Math.max(b.savedY - b.ybase, 0)
+      return b.savedX || row || extra.saved[type].length ? `${at(b.savedX, row)}${sgr(extra.saved[type])}\x1b7` : ''
+    }
     // The serializer's moves of 0 columns (a blank row before a wrapped one) move 1, leaving its "-" in the first column.
     let s = this.serializer.serialize({ scrollback: this.scrollback }).replace(/\x1b\[0[CD]/g, '')
     // Switching to the alternate screen: the normal one's region and saved cursor first, its cursor where it is (the
