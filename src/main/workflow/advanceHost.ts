@@ -79,6 +79,7 @@ export function advanceHostOf(wf: Workflow): AdvanceHost {
     }
   }
   return {
+    waitsFor: (card) => wf.queueWaitingOn(card.id),
     attempted: (card, cycle, plan, attempt) =>
       guarded('attempted', card, async () => {
         const s = wf.state(wf.store.card(card.id))
@@ -90,6 +91,9 @@ export function advanceHostOf(wf: Workflow): AdvanceHost {
           (w) => {
             const now = w.state()
             if (now.cycle !== cycle || w.current !== 'approved' || advanceUnresolved(now)) return
+            // HI-3265 (HI-2709): the advance's authority over the card's blockers, read in this write as the Git queue's
+            // IntegrationStarted reads it: one that isn't Done holds it, so nothing is attempted and nothing moves.
+            if (wf.closeWaitsFor(w).length) return
             w.fact('AdvanceAttempted', { plan, attempt }) // i18n-ignore: a fact's kind and codes, not text
           },
           undefined,

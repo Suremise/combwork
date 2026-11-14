@@ -22,6 +22,8 @@ import { opts, started, world, type World } from './jjCardsWorld'
 import { APPLY_OPTIONS } from '../src/shared/workflow/workView'
 import type { WorkflowOptions } from '../src/shared/workflow/options'
 import { AdvanceJournals } from '../src/main/platform/jjAdvance'
+import { DatabaseSync } from 'node:sqlite'
+import { boardFile } from '../src/main/boardStore'
 
 if (!jjExe) console.warn(`jjAdvancePreview.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
@@ -65,6 +67,17 @@ function moveTarget(w: World, file: string): string {
 const payloadOf = (w: World, card: { id: number }, request: string, answer: 'approved' | 'declined', cycle = w.wf.state(w.wf.store.card(card.id)).cycle): AdvanceAnswer => {
   const made = w.wf.state(w.wf.store.card(card.id)).made[request]!
   return { request, gate: ADVANCE_PREVIEW_GATE, attempt: made.entry!, plan: made.result!, cycle, state: 'preview', answer, project: w.wf.cfg.project }
+}
+
+/** HI-3265: the board's edit of a card's blocked-by list (tasks.ts writes these rows), on a connection of its own as another writer. */
+function block(w: World, card: { id: number }, by: { id: number }[]): void {
+  const db = new DatabaseSync(boardFile(w.home))
+  try {
+    db.prepare("DELETE FROM card_links WHERE card = ? AND kind = 'blockedBy'").run(card.id)
+    by.forEach((b, i) => db.prepare("INSERT INTO card_links (card, kind, ord, target) VALUES (?, 'blockedBy', ?, ?)").run(card.id, i, b.id))
+  } finally {
+    db.close()
+  }
 }
 
 /** Options applied to the card in flight, as the window's Apply to cards in flight records it (optionsForm.ts). */
@@ -150,6 +163,38 @@ describe.skipIf(!jjExe)(`preview and click for jj (jj ${TESTED_JJ.version}), HI-
       const n = w.store.facts(card.id).length
       await jjp(w, card).advanceAnswer!(w.wf.store.card(card.id), payloadOf(w, card, p.request, 'approved'), advanceHostOf(w.wf))
       expect(w.store.facts(card.id).length).toBe(n)
+    })
+
+    // HI-3265 (HI-2709): the blockers hold a preview and its click, as they hold the automatic advance.
+    it("HI-3265: a card blocked by one that isn't Done isn't previewed; an Integrate on a preview made before its dependency was added runs nothing; once its blockers are Done it is previewed, and its click integrates", async () => {
+      const w = await world(colocated, { candidates: true, oneSlot: true, advance: 'preview' })
+      const card = await approved(w)
+      const head = w.main()
+      const first = w.wf.createCard({ title: 'first blocker' })
+      block(w, card, [first])
+      await pass(w, card)
+      expect(previews(w, card)).toHaveLength(0)
+      moved(await w.wf.move(first.key, 'done', 'user', { confirm: true, reason: 'not needed' }))
+      await pass(w, card)
+      const [p1] = previews(w, card)
+      expect(p1).toBeTruthy()
+      // A dependency added once the preview is shown: its Integrate moves nothing, and no preview comes while it waits.
+      const second = w.wf.createCard({ title: 'second blocker' })
+      block(w, card, [first, second])
+      await click(w, card, p1.request, 'approved')
+      await w.wf.runActions()
+      expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(0)
+      expect(w.main()).toBe(head)
+      await pass(w, card)
+      expect(previews(w, card)).toHaveLength(0)
+      moved(await w.wf.move(second.key, 'done', 'user', { confirm: true, reason: 'not needed' }))
+      await pass(w, card)
+      const [p2] = previews(w, card)
+      expect(p2).toBeTruthy()
+      await click(w, card, p2.request, 'approved')
+      await w.wf.runActions()
+      expect(facts(w, card, 'Integrated')).toHaveLength(1)
+      expect(w.wf.state(w.wf.store.card(card.id)).stage).toBe('done')
     })
 
     it('a stale click: the target moved by jj with no reconcile since, the old click delivered at once: nothing runs and no preview is claimed; the next reconcile previews the new plan, whose click integrates', async () => {

@@ -40,7 +40,7 @@ import { linkToComment, moveCardFolder, publish, removeCardAttachments, trashCar
 import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } from '../shared/cardAttachments'
 import { hasStage, laneTargetOf, skipReviewOf } from '../shared/workflow/compile'
 import { isStageId, STAGE_TEXT, stageName, type StageNames } from '../shared/workflow/stages'
-import { answerFits, CHURN_GATES, churnTotal, approveNote, ASK_ACTIONS, ATTEMPT_STAGES, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, foldCard, openEntry, type Actor, type AttemptKey, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type PauseChoice, type StageId } from '../shared/workflow/facts'
+import { answerFits, CHURN_GATES, churnTotal, approveNote, ASK_ACTIONS, ATTEMPT_STAGES, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, advanceUnresolved, foldCard, openEntry, type Actor, type AttemptKey, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type PauseChoice, type StageId } from '../shared/workflow/facts'
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { refusal as refusalOf, refusalText, type Refusal } from '../shared/workflow/refusals'
@@ -1107,11 +1107,20 @@ function queueDependencyEdit(ws: WorkspaceService, card: TaskCard, had: number[]
   }
   const own = stage(card.number)
   if (!own) return
-  const e = openEntry(foldCard(store.facts(card.number), own))
+  const folded = foldCard(store.facts(card.number), own)
+  const late = (): number[] => card.blockedBy.filter((b) => !had.includes(b) && stage(b) !== 'done')
+  const tooLate = (target: string, cards: number[]): CombworkError => combworkError(ERR.dependencyTooLate, { card: cardRef(card.number), cards: cards.map(cardRef).join(', '), target }, { kind: 'conflict' })
+  // HI-3265: a platform's advance attempted and not yet settled (jj's, `AdvanceAttempted`) is begun as IntegrationStarted
+  // is: its blockers were read in that write, so one added now can't hold it.
+  if (advanceUnresolved(folded)) {
+    const added = late()
+    if (added.length) throw tooLate(folded.started?.target ?? '', added)
+  }
+  const e = openEntry(folded)
   if (!e) return
   if (e.state === 'started') {
-    const late = card.blockedBy.filter((b) => !had.includes(b) && stage(b) !== 'done')
-    if (late.length) throw combworkError(ERR.dependencyTooLate, { card: cardRef(card.number), cards: late.map(cardRef).join(', '), target: e.target }, { kind: 'conflict' })
+    const added = late()
+    if (added.length) throw tooLate(e.target, added)
     return
   }
   if (had.some((b) => !card.blockedBy.includes(b))) store.tx((tx) => tx.action(card.number, 'enqueue', { target: e.target }, null))

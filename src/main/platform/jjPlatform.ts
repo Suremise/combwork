@@ -1020,6 +1020,8 @@ export class JjPlatform implements PlatformAdapter {
         if (c.stage !== 'approved' || s.integrated || advanceUnresolved(s)) return 'busy'
         // The rules now, not those this call was chosen under: an automatic attempt only while the card still advances.
         if (!this.consentHolds(c, s, 'auto')) return 'notReady'
+        // HI-3265 (HI-2709): a blocker that isn't Done holds the advance; the card is tried again once it's Done.
+        if (host.waitsFor(c).length) return 'notReady'
         const ready = await this.readyPlan(h, integ, journals, c, s)
         if (!ready) return 'notReady'
         await host.noteDefault(c)
@@ -1087,6 +1089,8 @@ export class JjPlatform implements PlatformAdapter {
         if (c.stage !== 'approved' || s.integrated || advanceUnresolved(s)) return 'busy'
         const pending = wf.store.pendingActions().some((x) => x.card === c.id && x.kind === 'advanceAnswer' && x.payload.gate === ADVANCE_PREVIEW_GATE && x.payload.cycle === s.cycle)
         if (pending) return 'busy'
+        // HI-3265: no preview while a blocker isn't Done (its Integrate couldn't start the attempt).
+        if (host.waitsFor(c).length) return 'notReady'
         const ready = await this.readyPlan(h, integ, journals, c, s)
         if (!ready || host.previewDeclined(c, s.cycle, ready.planId)) return 'notReady'
         const open = s.requests.find((r) => r.gate === ADVANCE_PREVIEW_GATE)
@@ -1108,7 +1112,7 @@ export class JjPlatform implements PlatformAdapter {
    * HI-3236's answer to a preview, under the card's lock and the repository lock. Bound (s10, s13): this project, the
    * card's cycle, the request the card's newest preview (by its fact's seq), its plan, the user's recorded answer, and no
    * attempt of this plan since that request. Not for this plan: dismissed. Integrate: every consent identity read again
-   * now (the finish still previews, the OK given, Approved, nothing unsettled, the plan rebuilt with the same id, its
+   * now (the finish still previews, the OK given, Approved, nothing unsettled, no blocker waited for (HI-3265), the plan rebuilt with the same id, its
    * offer current in jj); any of them not holding, or unreadable: nothing runs, and the next reconcile asks for the plan
    * then ready. Holding: HI-3235's attempt.
    */
@@ -1128,7 +1132,7 @@ export class JjPlatform implements PlatformAdapter {
       await host.declinePreview(c, s.cycle, ans.plan)
       return false
     }
-    if (c.stage !== 'approved' || s.integrated || advanceUnresolved(s) || !this.consentHolds(c, s, 'preview')) return false
+    if (c.stage !== 'approved' || s.integrated || advanceUnresolved(s) || !this.consentHolds(c, s, 'preview') || host.waitsFor(c).length) return false
     const ready = await this.readyPlan(h, integ, journals, c, s)
     if (!ready || ready.planId !== ans.plan) return false
     return (await this.attemptUnder(h, integ, journals, c, s, ready.plan, ready.planId, host, 'preview')).integrated

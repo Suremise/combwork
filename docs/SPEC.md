@@ -4227,6 +4227,11 @@ with s34, its mapping HI-3235/s7, s10, s13 and s16. gate:advance is open.
   before both. `AdvanceStopped`, `AdvanceResolved { nothingMoved | undone | attested | startAgain }` and `Integrated`
   settle it; until then the card takes no other advance (no outside proof either). A plan undone isn't advanced again
   on its own.
+- **Blockers** (HI-3265, §16.9.1's HI-2709 rule): a card blocked by one that isn't Done (or can't be read) gets no
+  attempt and no preview, and an Integrate click on an earlier preview runs nothing; it is tried again once they are
+  Done. The authority is `AdvanceAttempted`'s write, which reads `closeWaitsFor` as the Git queue's `IntegrationStarted`
+  does: one waited for there writes no fact, so the journal is abandoned and nothing moves. A dependency added while an
+  attempt is unsettled is refused ("being merged into main now").
 - **Recovery**, under the card's lock and the repository lock (so never an active writer's half), at each advance and
   in each reconciler run: a journal with no fact at `requested` (or abandoned for a fact not confirmed) is nothing
   moved; any later phase without a fact, or a fact without a journal, is uncertain; an `…ing` phase is classified on
