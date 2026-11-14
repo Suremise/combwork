@@ -1057,6 +1057,7 @@ function boardWriteLocked<T>(ws: WorkspaceService, path: string, key: string, fn
     } catch (e) {
       state.changed = false
       state.after = []
+      partHooks?.undone()
       try {
         if (db.isTransaction) db.exec('ROLLBACK')
       } catch {
@@ -1118,6 +1119,16 @@ export function afterBoardWrite(ws: WorkspaceService, fn: () => void): void {
 let commitHook: ((db: DatabaseSync, afterCommit: (fn: () => void) => void, changed: boolean) => void) | null = null
 export function setBoardCommitHook(fn: typeof commitHook): void {
   commitHook = fn
+}
+
+/**
+ * HI-3271: what a request running board changes keeps of each part (requestReceipts.ts): `part()` as a part begins
+ * (boardSavepoint) returns what puts the request's notes back if that part throws (`kept`: its writes kept all the same, a
+ * refusal's record); `undone()` when a whole change is undone.
+ */
+let partHooks: { part: () => (kept: boolean) => void; undone: () => void } | null = null
+export function setBoardPartHooks(hooks: typeof partHooks): void {
+  partHooks = hooks
 }
 
 /**
@@ -1293,11 +1304,14 @@ export async function boardSavepoint<T>(ws: WorkspaceService, fn: () => Promise<
   const undone = state.undone.length
   const changed = state.changed
   db.exec(`SAVEPOINT ${name}`)
+  const restore = partHooks?.part()
   try {
     const out = await fn()
     db.exec(`RELEASE ${name}`)
     return out
   } catch (e) {
+    // HI-3271: what the part told the request it runs for (a keyed request's marker) goes with it: all of it when undone.
+    restore?.(!state.lost && db.isTransaction && keep(e))
     // Undone part way by SQLite meanwhile: the whole change fails (boardWrite), nothing to undo here.
     if (!state.lost && db.isTransaction) {
       if (!keep(e)) {
