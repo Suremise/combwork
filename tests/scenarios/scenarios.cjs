@@ -3240,8 +3240,10 @@ module.exports.SCENARIOS = [
     },
     prompt: (c) => `Review card #${c.cards.q} as the reviewer of a card loop (rounds: 10). It is back for its third review; the earlier reviews and fixes are in its comments.`,
     fake: (c) => `skill card-loop then skill review-agent-work then ${fakeStartReview(c.cards.q)} then cw cw_ask_user {"card":"#${c.cards.q}","kind":"decide","text":"Round 3 would be a third new edge case in a row (a first name with spaces around it keeps them: \\"  Ann  Lee\\"). Worth handling, or simplify or cut scope?"}`,
-    expect: (o) => {
-      const asked = called(o, 'cw_ask_assistant').length > 0 || called(o, 'cw_ask_user').length > 0
+    expect: (o, c) => {
+      // HR3's round 2: only a question that went through on this card counts: an open Decide request of its own
+      // (cw_ask_user), or a cw_ask_assistant call on it that worked; a refused call, or one about another card, asks nothing.
+      const asked = openAsks(o, c, 'q').length > 0 || ran(o, 'cw_ask_assistant').some((x) => cardIs(o, argsOf(x).card, c.cards.q))
       // Its two earlier rounds are comments (reviewedWork's), not verdicts: any failed verdict here is the third round.
       const failedAgain = history(o.cards.q).includes('Review failed')
       return [

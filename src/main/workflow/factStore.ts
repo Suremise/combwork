@@ -479,8 +479,8 @@ export class FactStore {
   cardsAsking(gates: readonly string[]): CardRecord[] {
     if (!gates.length) return []
     const asked = this.conn.read((db) => db.prepare(`SELECT DISTINCT f.card AS card FROM card_facts f JOIN cards c ON c.number = f.card WHERE c.project = ? AND c.archived = 0 AND f.kind = 'ApprovalRequested' AND json_extract(f.data, '$.gate') IN (${gates.map(() => '?').join(', ')})`).all(this.scope.project, ...gates) as { card: number }[]).map((r) => r.card) // i18n-ignore: SQL
-    const wanted = new Set(asked)
-    return this.cards().filter((c) => wanted.has(c.id))
+    // Only those cards' records (HR3's round 2): nothing else of the project is read, none at all when none was asked.
+    return [...this.cardsNumbered(asked).values()]
   }
 
   /** This project's cards (not archived) in a stage, by number (#1443: whom each card in Review has reviewing it). */
