@@ -1,3 +1,5 @@
+import { keyedWrite } from '../shared/requestKeys'
+import { fingerprintOf, KeyReused, KeysBusy, onceFor, REQUEST_KEY, type KeyedRequest } from './requestReceipts'
 import http, { type IncomingMessage, type ServerResponse } from 'http'
 import { AsyncLocalStorage } from 'async_hooks'
 import { randomBytes, timingSafeEqual } from 'crypto'
@@ -138,7 +140,7 @@ import { apiOutcome, appMetrics, clock as metricsClock, knownRoute, metricsHandl
 import { metricsReport } from './metricsUsage'
 import { apiLabel, beginWork, hookLabel } from './mainStalls'
 import type { GuidanceSeries, MetricOutcome, MetricsPart, MetricsQuery, MetricsReport } from '../shared/metrics'
-import { agentForToken, agentToken, agentTokenFile, onAgentTokenEnded, type AgentIdentity, type EndedLaunch } from './agentTokens'
+import { agentForToken, agentToken, agentTokenFile, currentAgentRun, onAgentTokenEnded, type AgentIdentity, type EndedLaunch } from './agentTokens'
 import { AttemptGuard, captureFence, issueAttempt, type RequestFence } from './attemptFence'
 import { API_EVENTS, apiEventFor, publicRun } from './apiEvents'
 import { clearDiscovery, writeDiscovery } from './apiDiscovery'
@@ -1911,10 +1913,24 @@ route('POST', '/v1/inbox', async ({ body }) => {
   if (body?.ack !== undefined) {
     if (!Array.isArray(body.ack) || !body.ack.length || body.ack.length > 200 || !body.ack.every((x: unknown) => typeof x === 'string' && x.length <= 32)) throw new HttpError(400, apiSaid(API.inbox.ackArg))
     const ids = (body.ack as string[]).map((x) => x.trim())
-    return body.read === true ? named(await ackThenRead(host, agentId, ids, receivedAttempts)) : ackDeliveries(host, agentId, ids)
+    return body.read === true ? named(await ackThenRead(host, agentId, ids, receivedAttempts, inboxFence())) : ackDeliveries(host, agentId, ids, inboxFence())
   }
-  return named(await readInbox(host, agentId, receivedAttempts))
+  return named(await readInbox(host, agentId, receivedAttempts, { fence: inboxFence() }))
 })
+
+/**
+ * HI-3195: a project agent's inbox read or ack fenced to the launch its request came from (captured as it arrived): one
+ * replaced since, before the read's or ack's save commits, is refused (409), nothing received or acked through it. The
+ * Assistant's inbox has no launch fence (its token is the workspace's Assistant's).
+ */
+function inboxFence(): (() => void) | undefined {
+  const me = agentCaller()
+  if (!me?.runId) return undefined
+  const { projectPath, agentId, runId } = me
+  return () => {
+    if (currentAgentRun(projectPath, agentId) !== runId) throw new HttpError(409, apiSaid(API.inbox.staleLaunch))
+  }
+}
 
 /**
  * HI-3194: an inbox read's deliveries about cards, each stamped with the attempt it was made in: each such attempt is issued
@@ -5038,7 +5054,10 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
       if (!res.writableEnded) gone.abort()
     })
     // Its replies name cards by key (#1219: "HI-12 (#40)"), its workspace's.
-    const run = (): Promise<unknown> => withCardNames(ws, () => r.handler({ params, query: url.searchParams, body, signal: gone.signal }), callerScope())
+    const plain = (): Promise<unknown> => withCardNames(ws, () => r.handler({ params, query: url.searchParams, body, signal: gone.signal }), callerScope())
+    // HI-3195: a project agent's write sent with a request key is applied once (requestReceipts.ts).
+    const keyed = ws ? keyedRequest(req, url.pathname, r.template, params, body) : null
+    const run = keyed && ws ? (): Promise<unknown> => onceFor(ws, keyed, plain) : plain
     // A project agent's replies say when a card it works on or reviews has a new decision (#357), whatever it called:
     // the Combwork tools add the line to their reply. (The bridge's own reports about its calls aren't the agent's.) Its
     // cards as they were when the call began count too, so the call that moves a card on (to Review, say) still hears
@@ -5058,6 +5077,25 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
     if (status >= 400 && status < 500) m.reason = reasonOf(e)
     send(res, status, body)
   }
+}
+
+/** HI-3195: the agent writes applied once with a request key: the card intents, its changes, a new card, a batch, comments. */
+
+/**
+ * HI-3195: a project agent's write on a keyed route sent with `X-Combwork-Request`: its launch, key, fingerprint and route,
+ * or null (no key, not an agent's, not a keyed route). A malformed key is a wrong call (400).
+ */
+function keyedRequest(req: IncomingMessage, path: string, template: string, params: readonly string[], body: unknown): KeyedRequest | null {
+  const header = req.headers['x-combwork-request']
+  const key = Array.isArray(header) ? header[0] : header
+  if (key === undefined) return null
+  const me = agentCaller()
+  // The writes cw-mcp keys (shared/requestKeys.ts), a project agent's only: the same list both sides read.
+  if (!me?.runId || !keyedWrite(req.method ?? '', path)) return null
+  if (!REQUEST_KEY.test(key)) throw new HttpError(400, apiSaid(API.http.requestKey))
+  // HR3's round 1: the marker is the agent's, not its launch's, so a retry after a restart (its next launch, the same
+  // key from cw-mcp's kept keys) finds it. A replaced launch's token is refused before this (401), and its writes fenced.
+  return { run: `${me.projectPath.toLowerCase()}#${me.agentId}`, key, fingerprint: fingerprintOf(req.method ?? '', template, params, body), route: `${req.method} ${template}`, ...(params[0] ? { card: params[0] } : {}) }
 }
 
 /**
@@ -5115,6 +5153,9 @@ async function decisionsNotice(ws: WorkspaceService | null, before: Map<number, 
  * dialect (dialects, HI-2440: a CombworkError's text, also one answered with another status, said in the request's scope).
  */
 export function apiErrorReply(e: unknown): { status: number; body: Record<string, unknown> } {
+  // HI-3195: a request key reused for another request; too many keyed requests in flight (try again in a moment).
+  if (e instanceof KeyReused) return { status: 409, body: { error: say(API.http.requestKeyReused), rule: 'request.keyReused' } }
+  if (e instanceof KeysBusy) return { status: 503, body: { error: say(API.http.requestsBusy) } }
   // A refusal's `error` is its `message`, word for word (HI-3136: the same sentence, filled as the reader's).
   if (e instanceof tasks.WorkflowRefusedError) {
     const refused = refusalBody(e.refusal)

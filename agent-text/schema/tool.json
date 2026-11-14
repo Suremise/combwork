@@ -150,6 +150,11 @@
       "preview": "plain"
     }
   },
+  "tool.call.appliedEarlier": {
+    "placeholders": {
+      "made": "select"
+    }
+  },
   "tool.call.error": {
     "placeholders": {
       "message": "plain"
@@ -169,6 +174,11 @@
   "tool.call.error.unknownTool": {
     "placeholders": {
       "name": "plain"
+    }
+  },
+  "tool.call.keyNotKept": {
+    "placeholders": {
+      "message": "plain"
     }
   },
   "tool.cannotWithinRules.arg.rule": {

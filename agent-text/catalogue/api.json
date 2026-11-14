@@ -875,6 +875,18 @@
   "api.http.portInUse": {
     "text": "Port {port} is already in use"
   },
+  "api.http.requestKey": {
+    "text": "X-Combwork-Request must be 16 to 64 letters, digits, - or _.",
+    "note": "HI-3195: a malformed request key header (cw-mcp makes it; X-Combwork-Request is a header name)."
+  },
+  "api.http.requestKeyReused": {
+    "text": "That request key was used for another request: nothing was done. Send a new request without reusing its key.",
+    "note": "HI-3195: an Agent API write sent with a request key that an earlier, different request of the same launch used."
+  },
+  "api.http.requestsBusy": {
+    "text": "Too many writes are in flight right now: nothing was done. Try again in a moment.",
+    "note": "HI-3195: the keyed writes in flight are at their limit; the request may be sent again."
+  },
   "api.http.tokenFileNote": {
     "text": "Bearer token for the Combwork Agent API. Regenerate it in Settings → Agent API."
   },
@@ -889,6 +901,10 @@
   },
   "api.inbox.readArg": {
     "text": "read is true or false"
+  },
+  "api.inbox.staleLaunch": {
+    "text": "This launch of yours was replaced (a restart or a new conversation): nothing was read or acked through it. Your current launch reads its inbox.",
+    "note": "HI-3195: an inbox read or ack from an agent launch that has since been replaced."
   },
   "api.intent.acceptArg": {
     "text": "accept must be a list of at most {max} test ids.",

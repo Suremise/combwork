@@ -3,7 +3,7 @@ import { createHash } from 'crypto'
 import { copyFileSync, existsSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'original-fs'
 import { mkdir, writeFile } from 'original-fs/promises'
 import { basename, join } from 'path'
-import type { StatementSync } from 'node:sqlite'
+import type { DatabaseSync, StatementSync } from 'node:sqlite'
 import { app } from 'electron'
 import { CW_DIR } from '../shared/defaults'
 import { msg } from '../shared/i18n'
@@ -17,6 +17,7 @@ import { NAMES_STEP } from './schema/namesStep'
 import { VALUES_STEP } from './schema/valuesStep'
 import { WORKSPACE_IDENTITY_STEP } from './schema/workspaceIdentityStep'
 import { JJ_PUBLISH_STEP } from './schema/jjPublishStep'
+import { REQUEST_RECEIPTS_STEP } from './schema/requestReceiptsStep'
 import { addCommentArchive, allArchivedComments, archivedCommentCount, archivedCommentRows, archiveCommentRows, COMMENT_ARCHIVE_STEP, mayHaveLostCards, type Evicted } from './schema/commentArchive'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, isIoError, openDb, OPENABLE_WAIT_MS, schemaVersion, soleCopy, untilOpenable, type Db, type Migration, type PendingGroup } from './db'
 import { checkpointsReleased, checkpointWhenIdle, timedCommit } from './walCheckpoint'
@@ -367,6 +368,14 @@ export const BOARD_MIGRATIONS: Migration[] = [
     name: JJ_PUBLISH_STEP.name,
     group: UPGRADE_GROUP_ID,
     up: (db) => JJ_PUBLISH_STEP.up(db)
+  },
+  {
+    // HI-3195: each keyed Agent API write's durable "applied" marker, saved in the write's transaction
+    // (schema/requestReceiptsStep.ts, requestReceipts.ts). In the 1.0 group, as 25–29 are.
+    version: 30,
+    name: REQUEST_RECEIPTS_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => REQUEST_RECEIPTS_STEP.up(db)
   }
 ]
 
@@ -1032,6 +1041,9 @@ function boardWriteLocked<T>(ws: WorkspaceService, path: string, key: string, fn
       // HI-3194: what the change's callers need to still hold as it commits (a request's launch still current), with no
       // await between them and the commit: one that no longer holds undoes it whole.
       for (const check of state.checks.values()) check()
+      // HI-3195: a keyed Agent API request's applied marker, in this same transaction (requestReceipts.ts): its key already
+      // taken undoes the change.
+      commitHook?.(db, (then) => state.after.push(then), state.changed)
       if (!boards.has(key)) throw combworkError(M.noWorkspace, undefined, { kind: 'conflict' })
       // Undone part way, whatever the change made of the error meanwhile (a batch skips a card that fails): it fails whole.
       if (state.lost) throw state.lost
@@ -1100,6 +1112,12 @@ export function afterBoardWrite(ws: WorkspaceService, fn: () => void): void {
   const w = writing.getStore()
   if (ws.path && w && w.open && w.key === keyOf(ws.path)) w.after.push(fn)
   else writing.exit(fn)
+}
+
+/** HI-3195: what runs in every board change just before its COMMIT, on its connection (requestReceipts.ts's marker). */
+let commitHook: ((db: DatabaseSync, afterCommit: (fn: () => void) => void, changed: boolean) => void) | null = null
+export function setBoardCommitHook(fn: typeof commitHook): void {
+  commitHook = fn
 }
 
 /**

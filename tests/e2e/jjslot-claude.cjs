@@ -134,10 +134,9 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
     fs.writeFileSync(path.join(w1.folder, 'shop.txt'), 'shop work\n')
     jj(w1.folder, 'commit', '-m', 'shop work')
     const P = jj(w1.folder, '--ignore-working-copy', 'log', '--no-graph', '-r', '@-', '-T', 'commit_id').trim()
-    // B1's token (its only agent: the one file in the profile's agent-api folder).
-    const tokens = path.join(userData, 'agent-api')
-    const tokenFile = fs.existsSync(tokens) ? fs.readdirSync(tokens).filter((f) => f.endsWith('.json')).map((f) => path.join(tokens, f)) : []
-    const token = tokenFile.length === 1 ? JSON.parse(fs.readFileSync(tokenFile[0], 'utf8')).token : null
+    // B1's token (its only agent: its launch's own file, HI-3195).
+    const tokenFile = lib.launchTokens(userData).map((t) => t.file)
+    const token = lib.launchTokens(userData)[0]?.token ?? null
     check("B1's Agent API token", !!token, JSON.stringify(tokenFile))
     const res = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${encodeURIComponent(cardKey)}/submit`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ summary: 'Done.' }) })
     check('submitted: in Review', res.status === 200 && !!(await until(async () => (await card(n))?.column === 'review', HUNG_MS)), JSON.stringify({ status: res.status, body: await res.json().catch(() => null), column: (await card(n))?.column }))

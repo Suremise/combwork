@@ -122,6 +122,10 @@
     "text": "Started {name} from {from} ({commit}); {added, select, yes {{from} added to other branches; } other {}}target {name}.{retarget, select, yes { Can follow {name}: {move}. Stay: {stay}. To move them, ask the user, then cw_queue retarget with preview {preview} and the items they agree to.} other {}}",
     "note": "HI-2807: cw_branch nextVersion. {move} and {stay} are lists (\"-\" for none); {preview} an id."
   },
+  "tool.call.appliedEarlier": {
+    "text": "Done earlier: Combwork had already applied this call ({made, select, other {{made}} none {its card}}), whose reply was lost. Read the card for its state now; don't send it again.",
+    "note": "HI-3195: a retried write Combwork had already applied (its first reply lost). {made}: the card it made or was about (a key or #n), or none."
+  },
   "tool.call.error": {
     "text": "Combwork error: {message}",
     "note": "{message}: the call's error (the Agent API's refusal, or one below). What the call takes follows on its own line when it gave the wrong arguments (HI-2229)."
@@ -138,6 +142,10 @@
   },
   "tool.call.error.unknownTool": {
     "text": "Unknown tool: {name}"
+  },
+  "tool.call.keyNotKept": {
+    "text": "Not sent: Combwork's tools couldn't keep this write's request key ({message}), so a retry after a restart could apply it twice. Nothing was written; try the call again.",
+    "note": "HI-3195 (HR3's round 2): a keyed write's key is kept in the agent's file before it is sent; when that fails, the write isn't sent. {message}: the file system's error."
   },
   "tool.cannotWithinRules.arg.rule": {
     "text": "The rule, as a refusal named it."

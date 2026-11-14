@@ -1338,6 +1338,15 @@
       "port": "plain"
     }
   },
+  "api.http.requestKey": {
+    "placeholders": {}
+  },
+  "api.http.requestKeyReused": {
+    "placeholders": {}
+  },
+  "api.http.requestsBusy": {
+    "placeholders": {}
+  },
   "api.http.tokenFileNote": {
     "placeholders": {}
   },
@@ -1351,6 +1360,9 @@
     "placeholders": {}
   },
   "api.inbox.readArg": {
+    "placeholders": {}
+  },
+  "api.inbox.staleLaunch": {
     "placeholders": {}
   },
   "api.intent.acceptArg": {

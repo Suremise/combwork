@@ -363,14 +363,12 @@ const check = (name, ok, extra = '') => {
   fs.mkdirSync(path.join(ws, 'beta'), { recursive: true })
   await inv('workspace:refresh')
   const c5 = (await inv('tasks:create', { title: 'Beta card', project: 'beta' })).number
-  // Every agent here is alpha's: its newest token (the files don't name the project) is an alpha agent's.
-  const tokenDir = path.join(userData, 'agent-api')
-  const newest = fs.readdirSync(tokenDir).map((f) => ({ f, t: fs.statSync(path.join(tokenDir, f)).mtimeMs })).sort((x, y) => y.t - x.t)[0]
-  const agentToken = newest ? JSON.parse(fs.readFileSync(path.join(tokenDir, newest.f), 'utf8')).token : null
+  // Every agent here is alpha's: its newest launch's token (HI-3195: each launch's own file) is an alpha agent's.
+  const agentToken = lib.launchTokens(userData)[0]?.token ?? null
   if (agentToken) {
     const r = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/wait`, { method: 'POST', headers: { Authorization: `Bearer ${agentToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ cards: [c5], timeoutSeconds: 1 }) })
     check("an alpha agent can't wait on beta's card (unknown to it)", r.status === 404, String(r.status))
-  } else check('an agent token was found to test scope with', false, fs.readdirSync(path.join(userData, 'agent-api')).join(','))
+  } else check('an agent token was found to test scope with', false, JSON.stringify(lib.launchTokens(userData).map((t) => t.file)))
 
   await page.screenshot({ path: path.join(lib.WORK, 'cardloop.png') })
 
