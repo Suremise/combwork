@@ -251,7 +251,7 @@ export function Thread({ card, c, agentName }: { card: number; c: LineCommentVie
     }
   }
   return (
-    <div className={cx('cw-comment', c.state === 'resolved' && 'resolved')} data-line-comment={c.id} data-state={c.state}>
+    <div className={cx('cw-comment', c.state === 'resolved' && 'resolved')} data-line-comment={c.id} data-state={c.state} data-version={c.version}>
       <div className="cw-comment-head">
         <strong>{c.by === 'user' ? tr(M.you) : agentName(c.by)}</strong>
         <span className="faint" title={formatDateTime(c.at)}>

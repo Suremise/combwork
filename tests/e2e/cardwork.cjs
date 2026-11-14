@@ -175,7 +175,7 @@ const commit = (dir, file, text, message) => {
   await thread.getByRole('button', { name: 'Edit' }).click()
   await thread.locator('textarea').fill('A stale draft.')
   await inv('tasks:lineCommentChange', g, one.id, { edit: { body: 'Newer, from elsewhere.', version: 2 } })
-  check('the comment changes elsewhere while its editor is open, and the window reads it', !!(await lib.until(async () => { const c = (await comments())[0]; return c?.version === 3 && c.body === 'Newer, from elsewhere.' && (await thread.locator('textarea').count()) === 1 && (await thread.locator('textarea').inputValue().catch(() => '')) === 'A stale draft.' }, HUNG_MS)), JSON.stringify(await comments()))
+  check('the comment changes elsewhere while its editor is open, and its thread in the window has version 3', !!(await lib.until(async () => { const c = (await comments())[0]; return c?.version === 3 && c.body === 'Newer, from elsewhere.' && (await thread.getAttribute('data-version').catch(() => '')) === '3' && (await thread.locator('textarea').count()) === 1 && (await thread.locator('textarea').inputValue().catch(() => '')) === 'A stale draft.' }, HUNG_MS)), JSON.stringify(await comments()))
   await thread.locator('textarea').press('Control+Enter')
   check('saving the stale draft is refused, saying so, and the newer text stays', !!(await lib.until(async () => /changed meanwhile/.test(await thread.innerText().catch(() => '')), HUNG_MS)) && (await comments())[0]?.body === 'Newer, from elsewhere.' && (await comments())[0]?.version === 3, `${await thread.innerText().catch(() => '')} | ${JSON.stringify(await comments())}`)
   await thread.getByRole('button', { name: 'Cancel' }).click()
