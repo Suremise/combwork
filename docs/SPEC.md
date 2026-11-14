@@ -1630,6 +1630,14 @@ offered, and its row says why [#1112 plan, note "Core model v2"].
 | **authorship** | Who made the change? | Combwork's records of which agent worked the card, plus each commit's author identity (§16.3.4). | Combwork's records (edits attributed by hooks and file locks). |
 | **observe** | Tell Combwork when the content changes outside an intent. | Watch the repository's refs and HEAD (§16.4.4). | Watch the deliverables (the Files tab's watcher). |
 
+**Integration modes** (HI-2840, Darren's decisions of 14 Nov). The ways a card can finish on a platform are its
+descriptor's `finishes`, in the form's order, and `defaultFinish` is the one a project gets with every check off: Git's
+four (Combwork merges, the agent merges, Committed, Not checked; default Not checked), None's acceptance, jj's You
+integrate it yourself. The options form offers exactly these, a saved finish outside them is a contradiction, and no code
+outside the descriptor lists them (`tests/gitAudit.mjs`'s `modeDeclarations`, in check:repo): a new mode is a descriptor
+entry and its adapter's work, never a platform check in the workflow, the queue or the window. jj's Combwork-run advance
+(automatic, the default, then preview and click) joins its list with its adapter in HI-2840's later stages.
+
 Every adapter answer is a value or **unknown** (git missing, a failed read, a folder gone). **Unknown never satisfies
 a rule** [P1, following §8's "fail safe"]: a gate whose fact is unknown refuses, saying what couldn't be read and the
 fix (Provider Setup, Retry).
@@ -1638,7 +1646,8 @@ The adapter's interface (P2 proves it, P3 builds it; names are the builders'):
 
 ```ts
 interface PlatformDescriptor { id: 'none' | 'git' | 'jj'; capabilities: Capability[]; revisionShort(id: string): string
-  integration: 'merge' | 'accept' | 'user'; deliverables: 'commits' | 'paths'; repository: boolean }  // HI-2822's workflow facts
+  integration: 'merge' | 'accept' | 'user'; deliverables: 'commits' | 'paths'; repository: boolean   // HI-2822's workflow facts
+  finishes: Finisher[]; defaultFinish: Finisher }                                                  // HI-2840's integration modes
 interface PlatformAdapter {
   detect(folder): Detection                               // §16.3.5
   head(where: Folder): Revision | Unknown                 // revisions: reads without side effects (no snapshot)

@@ -6,7 +6,7 @@
 // them; the Version Control tab (#1278) edits them.
 
 import { msg, type Msg } from '../i18n/msg'
-import { accepts, hasCapability, hasGate, merges, type PlatformId } from '../platform/descriptors'
+import { accepts, hasCapability, hasGate, merges, PLATFORMS, type PlatformId } from '../platform/descriptors'
 import type { FileLockMode } from '../types'
 import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from '../loopLimits'
 import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX } from '../agentLimits'
@@ -247,11 +247,10 @@ const BASE: Omit<WorkflowOptions, 'platform'> = {
 }
 
 /**
- * The finishes the options form offers a platform, in its order (HI-3140, by the descriptor, never the id): the user's
- * integration alone where the user integrates (jj, HI-2799: option A), else Git's four (the form's list since P5's queue,
- * #1355; None's form shows them too, as before).
+ * The finishes the options form offers a platform, in its order: its descriptor's (HI-2840, `finishes`; HI-3140: never
+ * the id). None's form has no finish row: its one finish is acceptance.
  */
-export const formFinishes = (platform: PlatformId): readonly Finisher[] => (!merges(platform) && !accepts(platform) ? ['userIntegrates'] : ['combworkMerges', 'agentMerges', 'committed', 'notChecked'])
+export const formFinishes = (platform: PlatformId): readonly Finisher[] => PLATFORMS[platform].finishes
 
 /** The folders the options form offers a platform, in its order (HI-3140): slots only where the gate sharedFolder is closed (jj, HI-2799). */
 export const formFolders = (platform: PlatformId): readonly FolderMode[] => (hasGate(platform, 'sharedFolder') ? ['slots'] : ['slots', 'project'])
@@ -261,10 +260,9 @@ export const formFolders = (platform: PlatformId): readonly FolderMode[] => (has
  * before a preset is chosen (§16.7.4). None has no G17, so no level sets it there.
  */
 export function allOff(platform: PlatformId): WorkflowOptions {
-  // A platform that accepts work where it is (None) finishes by accepting; one that merges, Not checked; one its user
-  // integrates (jj, HI-2799: option A), You integrate (HI-2822: by the descriptor's integration, never the id). Slots only
-  // where the gate sharedFolder is closed (jj). G17 only where its form has it.
-  const finish = merges(platform) ? 'notChecked' : accepts(platform) ? 'accept' : 'userIntegrates'
+  // The descriptor's default finish (HI-2840): None accepts, Git's is Not checked, jj's You integrate (HI-2799: option A).
+  // Slots only where the gate sharedFolder is closed (jj). G17 only where its form has it.
+  const finish = PLATFORMS[platform].defaultFinish
   const off: WorkflowOptions = { ...BASE, platform, finish, ...(hasGate(platform, 'sharedFolder') ? { folder: 'slots' as const } : {}) }
   if (!platformHasOption(platform, 'reviewerMode')) delete off.reviewerMode
   return off
@@ -435,13 +433,13 @@ export function contradictions(o: WorkflowOptions, where: ContradictionPlace = {
   if (reviewerAgent(o.review) && !o.noSelfReview) out.push('selfReview')
   if (o.reviewers === 2 && !reviewerAgent(o.review)) out.push('quorumNeedsAgent')
   if (reviewerModeOf(o) === 'pool' && !reviewerAgent(o.review)) out.push('poolNeedsAgent')
-  // By the platform's descriptor (HI-2822): acceptance is the finisher of a platform that accepts, and only of one; You
-  // integrate that of a platform its user integrates (jj, HI-2799: option A, no automatic advance), and never of one that
-  // merges; separate folders need isolation, and a closed gate sharedFolder needs slots (jj).
+  // By the platform's descriptor (HI-2840, `finishes`): a finish it doesn't declare is a contradiction, worded for the
+  // platform's own way when that is the user integrating (jj, HI-2799), or for You integrate chosen where work merges,
+  // else as acceptance and merging not mixing (HI-2822). Separate folders need isolation, and a closed gate sharedFolder
+  // needs slots (jj).
   const merging = merges(o.platform)
-  const userIntegrates = !merging && !accepts(o.platform)
-  if (!userIntegrates && (accepts(o.platform) ? o.finish !== 'accept' : o.finish === 'accept')) out.push('combworkMergesNeedsGit')
-  if (userIntegrates ? o.finish !== 'userIntegrates' : merging && o.finish === 'userIntegrates') out.push('jjYouIntegrate')
+  const finishes = PLATFORMS[o.platform].finishes
+  if (!finishes.includes(o.finish)) out.push(finishes.includes('userIntegrates') || (merging && o.finish === 'userIntegrates') ? 'jjYouIntegrate' : 'combworkMergesNeedsGit')
   if (!hasCapability(o.platform, 'isolation') && o.folder !== 'project') out.push('noneHasNoSlots')
   if (hasGate(o.platform, 'sharedFolder') && o.folder !== 'slots') out.push('jjNeedsSlots')
   if (merging) {

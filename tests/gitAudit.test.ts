@@ -8,7 +8,7 @@ import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error: a plain .mjs module without types, shared with scripts/gitInventory.mjs
-import { audit, EDGES, JJ_EDGES, JJ_HOMES, NOT_PLATFORM, platformIdsIn, SEAMS, SWITCHES } from './gitAudit.mjs'
+import { audit, EDGES, JJ_EDGES, JJ_HOMES, modeDeclarations, NOT_PLATFORM, platformIdsIn, SEAMS, SWITCHES } from './gitAudit.mjs'
 
 type Edge = { file: string; module: string; class: string; names?: string[]; op?: string; card?: string; why: string }
 type Audit = { found: unknown[]; unlisted: string[]; stale: string[]; extraNames: string[]; seams: string[]; switches: string[]; compat: string[]; jj: string[] }
@@ -95,6 +95,29 @@ describe('the Git/None cutover audit', () => {
     const file = 'src/main/antivirus.ts'
     const gone = text(file).replace(/^import \{ worktreesRoot \} from '\.\/worktrees'\r?\n/m, "const worktreesRoot = (s: string): string => s\n")
     expect(run({ [file]: gone }).stale).toEqual(['src/main/antivirus -> src/main/worktrees'])
+  })
+
+  it("finds a platform's integration modes declared only in its descriptor: a second list anywhere else fails (HI-2840)", () => {
+    expect(modeDeclarations(root)).toEqual([])
+    // A list beside the workflow's, the window's, or the platform layer's own adapters: each is a second declaration. A
+    // field of that name holding no mode (a count, another word) is not one.
+    const runtime = 'src/main/workflow/runtime.ts'
+    const form = 'src/renderer/src/components/WorkflowOptions.tsx'
+    const adapter = 'src/main/platform/jjPlatform.ts'
+    const over = {
+      [runtime]: `${text(runtime)}
+const modes = { finishes: ['userIntegrates'] as const }
+`,
+      [form]: `${text(form)}
+const told = { finishes: 3, defaultFinish: 'later' }
+const row = { defaultFinish: ('notChecked' satisfies string) }
+`,
+      [adapter]: `${text(adapter)}
+class Modes { 'finishes' = ['userIntegrates'] }
+`
+    }
+    const lines = (f: string): number => over[f].split(/\n/).length - 1
+    expect(modeDeclarations(root, over)).toEqual([`src/main/platform/jjPlatform.ts:${lines(adapter)} finishes`, `src/main/workflow/runtime.ts:${lines(runtime)} finishes`, `src/renderer/src/components/WorkflowOptions.tsx:${lines(form)} defaultFinish`])
   })
 
   it("fails a switch on a platform's id outside the descriptors, adapters and registry, and one more in a justified file (HI-2822)", () => {
