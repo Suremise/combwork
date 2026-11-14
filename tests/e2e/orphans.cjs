@@ -160,6 +160,8 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
     const runFile = path.join(claudeHome, 'fake-progress-orphan.jsonl')
     const leftByRun = () => (fs.existsSync(runFile) ? fs.readFileSync(runFile, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l).pid) : [])
     const mark = (await toasts()).length
+    // Its left-running notices only (an agent's turn ending says so in a notice of its own).
+    const leftNotices = async () => (await toasts()).slice(mark).filter((t) => /^HB2 left /.test(t.title ?? ''))
     await lib.sendPrompt(inv, lib.ptyKey(alpha, hb2.id), 'progress-orphan 14', { submitted: async () => leftByRun().length > 0 })
     await until(async () => (await liveOf())?.status === 'finished')
     const lpid = leftByRun()[0]
@@ -175,12 +177,12 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
       return held && Date.now() - ms > 4000 + 2000 ? held : null
     }, HUNG_MS)
     check('a live cw-progress run whose shell is gone: Activity marks its process as the run’s, past the bound', !!heldPast, JSON.stringify(await hb2Processes()))
-    check('…and nothing is told while the run is live', (await toasts()).length === mark, JSON.stringify((await toasts()).slice(mark)))
+    check('…and nothing is told while the run is live', (await leftNotices()).length === 0, JSON.stringify(await leftNotices()))
     // The run ends (its command exits): the linger it started is told, naming the run.
     check('the run ends', !!(await until(async () => (await sandboxRun())?.finishedAt, HUNG_MS)), JSON.stringify(await sandboxRun()))
-    const told = await until(async () => (await toasts()).slice(mark).find((t) => t.message?.includes(String(lpid))) ?? null, HUNG_MS)
-    check('what it left behind is told once the run has ended, naming the run', !!told && /cw-progress run “Sandbox cycle” ended/.test(told.message), JSON.stringify((await toasts()).slice(mark)))
-    check('…and only that: the run’s own wrapper, gone with it, is never told', (await toasts()).slice(mark).every((t) => t.message?.includes(String(lpid))), JSON.stringify((await toasts()).slice(mark)))
+    const told = await until(async () => (await leftNotices()).find((t) => t.message?.includes(String(lpid))) ?? null, HUNG_MS)
+    check('what it left behind is told once the run has ended, naming the run', !!told && /cw-progress run “Sandbox cycle” ended/.test(told.message), JSON.stringify(await leftNotices()))
+    check('…and only that: the run’s own wrapper, gone with it, is never told', (await leftNotices()).every((t) => t.message?.includes(String(lpid))), JSON.stringify(await leftNotices()))
     const left = (await hb2Processes()).find((p) => p.pid === lpid)
     if (left?.created) await inv('activity:endProcess', alpha, hb2.id, lpid, left.created)
     check('…and End It ends it', !!(await until(async () => !alive(lpid))), String(lpid))
