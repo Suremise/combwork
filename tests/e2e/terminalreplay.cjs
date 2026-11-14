@@ -54,6 +54,7 @@ const check = (name, ok, extra = '') => {
     const key = lib.ptyKey(alpha, def.id)
     const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === def.id)
     await inv('session:start', alpha, { agentId: def.id })
+    // Before any turn: a fresh start is ready, not finished.
     check('the fake Claude Code is ready', !!(await lib.until(async () => (await live())?.status === 'ready', HUNG_MS)), JSON.stringify(await live().then((l) => l && { status: l.status })))
 
     const state = () => page.evaluate((k) => window.__cwTerminalState(k), key)
