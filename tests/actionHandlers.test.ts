@@ -893,6 +893,35 @@ describe('writers at once (#1266 round 3)', () => {
     expect({ ...(store.workspaceDb(ws).reader.prepare('SELECT state, received FROM deliveries WHERE action = 99999').get() as object) }).toEqual({ state: 'received', received: at })
   })
 
+  it("HI-3272: an ack-then-read whose save is planned again on the other Combwork's acks in that plan too: what it says it acked is saved acked", async () => {
+    const { w, ws, alpha } = await open()
+    fake(alpha, { b1: 'working', r1: 'working' })
+    await inReview(w)
+    await settled()
+    const from = { kind: 'combwork' as const, name: 'Combwork' }
+    const first = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'task', from, body: 'read, then acked' })
+    await deliveries.readInbox(alpha, 'b1')
+    const second = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'task', from, body: 'received elsewhere meanwhile' })
+    // The other Combwork receives the second as this one's first save is made: that save is stale, and planned again.
+    let stale = 0
+    deliveries.setBeforeSaveForTests(() => {
+      if (stale++) return
+      return outside(ws, (db) => void db.prepare("UPDATE deliveries SET state = 'received', received = ?, received_via = 'inbox' WHERE id = ?").run(new Date().toISOString(), second.id))
+    })
+    let reply: Awaited<ReturnType<typeof deliveries.ackThenRead>>
+    try {
+      reply = await deliveries.ackThenRead(alpha, 'b1', [first.id])
+    } finally {
+      deliveries.setBeforeSaveForTests(null)
+    }
+    // The premise: its first save was stale (the other Combwork's receipt kept, not given again here).
+    expect(stale).toBeGreaterThan(0)
+    expect(reply.items.flatMap((i) => i.ids)).not.toContain(second.id)
+    expect(reply.acked).toEqual([first.id])
+    expect(reply.unacked).not.toContain(first.id)
+    expect((store.workspaceDb(ws).reader.prepare('SELECT state FROM deliveries WHERE id = ?').get(first.id) as { state: string }).state).toBe('acked')
+  })
+
   it("an overlapping change is planned again on the other Combwork's: a cancel of a delivery it received meanwhile cancels nothing", async () => {
     const { w, ws, alpha } = await open()
     fake(alpha, { b1: 'working', r1: 'working' })
