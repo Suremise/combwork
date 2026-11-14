@@ -139,6 +139,9 @@ function foldHistory(facts: readonly Fact[]): Map<string, { view: LineCommentVie
 export interface FeedbackItem {
   id: string
   version: number
+  /** The submission its lines are on (HI-3220 round 1: a comment left open is sent again from the revision it was made on), and that submission's revision. */
+  submission: number
+  revision: string | null
   path: string
   side: LineSide
   from: number
@@ -157,13 +160,19 @@ export function feedbackBatch(facts: readonly Fact[], batch: string): { submissi
   const sent = facts.find((f): f is Fact<'FeedbackSent'> => f.kind === 'FeedbackSent' && (f.data as Fact<'FeedbackSent'>['data']).batch === batch)
   if (!sent) return null
   const history = foldHistory(facts.filter((f) => f.seq < sent.seq))
+  const revisionOf = submissionRevisions(facts)
   const items = sent.data.items.flatMap((it): FeedbackItem[] => {
     const h = history.get(it.id)
     if (!h) return []
     const c = h.view
-    return [{ id: it.id, version: it.version, path: c.path, side: c.side, from: c.from, to: c.to, lines: c.lines, before: c.before, after: c.after, body: h.bodies[it.version - 1] ?? c.body }]
+    return [{ id: it.id, version: it.version, submission: c.submission, revision: revisionOf.get(c.submission) ?? null, path: c.path, side: c.side, from: c.from, to: c.to, lines: c.lines, before: c.before, after: c.after, body: h.bodies[it.version - 1] ?? c.body }]
   })
   return { submission: sent.data.submission, round: sent.data.round, items }
+}
+
+/** Each submission's revision, by its fact's seq (a comment's `submission`). */
+export function submissionRevisions(facts: readonly Fact[]): Map<number, string | null> {
+  return new Map(facts.flatMap((f) => (f.kind === 'Submitted' ? [[f.seq, (f.data as Fact<'Submitted'>['data']).revision] as [number, string | null]] : [])))
 }
 
 /** Whether a batch id was sent on the card already (a second send of it is refused). */

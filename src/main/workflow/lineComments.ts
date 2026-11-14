@@ -8,7 +8,7 @@ import { combworkError } from '../combworkError'
 import type { WorkspaceService } from '../workspace'
 import { msg } from '../../shared/i18n'
 import { randomUUID } from 'crypto'
-import { anchorOf, feedbackBatch, feedbackExpectOf, foldLineComments, LINE_COMMENT_LIMITS, openReviewOf, pageOf, type FeedbackExpect, type FeedbackItem, type LineCommentView, type LineSide } from '../../shared/workflow/lineComments'
+import { anchorOf, submissionRevisions, feedbackBatch, feedbackExpectOf, foldLineComments, LINE_COMMENT_LIMITS, openReviewOf, pageOf, type FeedbackExpect, type FeedbackItem, type LineCommentView, type LineSide } from '../../shared/workflow/lineComments'
 import { foldCard } from '../../shared/workflow/facts'
 import { revisionShort } from '../../shared/platform/descriptors'
 import { platformIdOf } from '../platform/registry'
@@ -147,6 +147,8 @@ export async function sendFeedback(ws: WorkspaceService, n: number, a: FeedbackS
   const cfg = await ws.projectConfig(projectPath).catch(() => null)
   const platform = platformIdOf(projectPath, cfg?.platform)
   const batch = String(a?.batch ?? '')
+  // Each comment named with its own submission's revision: one left open is sent again from where it was made.
+  const revisions = submissionRevisions(cardFacts(ws, n))
   const items = Array.isArray(a?.items) ? a.items.map((it) => ({ id: String(it?.id ?? ''), version: Number(it?.version) })) : []
   // The verdict's comment is the card's comment too, in the same write (as an agent's verdict's is): what the builder's wake
   // names and its read of the card gives.
@@ -161,7 +163,7 @@ export async function sendFeedback(ws: WorkspaceService, n: number, a: FeedbackS
         items,
         expect: a?.expect,
         replaces: a?.replaces ?? null,
-        message: (chosen, latest) => (comment = feedbackComment(chosen, { revision: latest.revision ? revisionShort(platform, latest.revision) : '—', card: card.key, batch }))
+        message: (chosen) => (comment = feedbackComment(chosen, { revisionOf: (sub) => { const r = revisions.get(sub); return r ? revisionShort(platform, r) : '—' }, card: card.key, batch }))
       }),
     (_w, first) => (first && comment ? { opts: { comment, keepAgent: true } } : {})
   )

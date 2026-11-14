@@ -1,11 +1,11 @@
 {
   "feedback.header": {
-    "text": "{n, plural, one {# line comment} other {# line comments}} from the user on {revision}:",
-    "note": "HI-3220: the first line of the failed verdict a send of the user's line comments writes, read by the card's builder; {revision}: the short revision the comments are on."
+    "text": "{n, plural, one {# line comment} other {# line comments}} from the user, each on the revision it names:",
+    "note": "HI-3220: the first line of the failed verdict a send of the user's line comments writes, read by the card's builder. A comment left open goes again later, still on the revision it was made on, so each names its own."
   },
   "feedback.item": {
-    "text": "[{id}] {path}:{lines} ({side, select, old {removed lines} other {new}})",
-    "note": "HI-3220: each line comment's heading in the failed verdict sent to the builder: its id, file, line or lines (12 or 12-14) and side (lines removed, in the base, or the revision's). Keep the select keys."
+    "text": "[{id}] {path}:{lines} ({side, select, old {removed lines} other {new}}) on {revision}",
+    "note": "HI-3220: each line comment's heading in the failed verdict sent to the builder: its id, file, line or lines (12 or 12-14) as they are in its own revision, its side (lines removed, in the base, or the revision's), and that revision (short). Keep the select keys."
   },
   "feedback.more": {
     "text": "And {m} more: cw_read_task with number {card}, feedback \"{batch}\" and offset {offset}.",

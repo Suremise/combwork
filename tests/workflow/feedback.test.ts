@@ -6,7 +6,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { B1, commit, GIT_HEAVY_MS, moved, R1, refusedBy, setup, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
-import { feedbackBatch, feedbackExpectOf, foldLineComments, pageOf, type FeedbackExpect } from '../../src/shared/workflow/lineComments'
+import { feedbackBatch, feedbackExpectOf, foldLineComments, pageOf, submissionRevisions, type FeedbackExpect } from '../../src/shared/workflow/lineComments'
+import { feedbackComment } from '../../src/main/workflow/feedbackText'
 import type { CardRecord } from '../../src/main/workflow/factStore'
 
 let env: Env | undefined
@@ -24,11 +25,11 @@ async function submitted(e: Env, title = 'Change') {
 }
 
 /** The user's comment on the latest submission (written as main writes it, quote and all); its id. */
-async function comment(e: Env, card: CardRecord, body: string, line = 1): Promise<string> {
+async function comment(e: Env, card: CardRecord, body: string, line = 1, lines = 'one'): Promise<string> {
   const sub = e.wf.state(card).latest!.id
   return e.wf.write(card, null, 'user', (w) => {
     const id = `lc-${card.key}-${w.state().lastSeq + 1}`
-    w.fact('LineComment', { id, submission: sub, side: 'new', path: 'src/c.txt', from: line, to: line, lines: 'one', before: '', after: 'two', body })
+    w.fact('LineComment', { id, submission: sub, side: 'new', path: 'src/c.txt', from: line, to: line, lines, before: '', after: 'two', body })
     return id
   })
 }
@@ -74,6 +75,37 @@ describe('sending line comments to the builder (HI-3220)', { timeout: GIT_HEAVY_
     moved(await send(e, card, { batch: 'b2' }))
     expect(e.wf.state(card).rounds).toBe(2)
     expect(feedbackBatch(facts(e, card), 'b2')!.items.map((x) => x.id)).toEqual([kept])
+  })
+
+  it('a comment left open is sent again from the revision it was made on: each item keeps its own submission, revision, lines and quote (HR1, round 1)', async () => {
+    const e = team()
+    const card = await submitted(e)
+    const subA = e.wf.state(card).latest!
+    const onA = await comment(e, card, 'On A, line 2.', 2, 'two')
+    moved(await send(e, card, { batch: 'r1' }))
+    // B inserts a line above it: A's line 2 is B's line 3. Nothing follows it.
+    commit(e.wf.state(card).started!.folder, { 'src/c.txt': 'zero\none\ntwo\nthree\n' }, 'B')
+    moved(await e.wf.submit(card.key, B1, { summary: 'B' }))
+    const subB = e.wf.state(card).latest!
+    const onB = await comment(e, card, 'On B, line 1.', 1, 'zero')
+    const revisionOf = (sub: number) => (submissionRevisions(facts(e, card)).get(sub) ?? '').slice(0, 7)
+    let text = ''
+    moved(await e.wf.feedback(card.key, 'user', { batch: 'r2', items: open(e, card).map((c) => ({ id: c.id, version: c.version })), expect: expectOf(e, card), message: (items) => (text = feedbackComment(items, { revisionOf, card: card.key, batch: 'r2' })) }))
+    // The builder's words: each on its own revision, at its own lines; the header claims none of them.
+    expect(text.split('\n')[0]).toBe('2 line comments from the user, each on the revision it names:')
+    expect(text).toContain(`[${onA}] src/c.txt:2 (new) on ${subA.revision!.slice(0, 7)}\n> two\nOn A, line 2.`)
+    expect(text).toContain(`[${onB}] src/c.txt:1 (new) on ${subB.revision!.slice(0, 7)}\n> zero\nOn B, line 1.`)
+    // Edited and resolved afterwards: the batch read still gives each as sent, with its source.
+    await e.wf.write(card, null, 'user', (w) => {
+      w.fact('LineCommentEdited', { id: onA, body: 'Changed later.', version: 2 })
+      w.fact('LineCommentResolved', { id: onA })
+    })
+    const b = feedbackBatch(facts(e, card), 'r2')!
+    expect(b.items.map(({ id, submission, revision, from, to, lines, body }) => ({ id, submission, revision, from, to, lines, body }))).toEqual([
+      { id: onA, submission: subA.id, revision: subA.revision, from: 2, to: 2, lines: 'two', body: 'On A, line 2.' },
+      { id: onB, submission: subB.id, revision: subB.revision, from: 1, to: 1, lines: 'zero', body: 'On B, line 1.' }
+    ])
+    expect(subA.revision).not.toBe(subB.revision)
   })
 
   it('a batch sent twice makes one round: the second is refused, nothing written', async () => {

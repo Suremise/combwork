@@ -1,8 +1,7 @@
 {
   "feedback.header": {
     "placeholders": {
-      "n": "plural",
-      "revision": "plain"
+      "n": "plural"
     }
   },
   "feedback.item": {
@@ -10,7 +9,8 @@
       "id": "plain",
       "path": "plain",
       "lines": "plain",
-      "side": "select"
+      "side": "select",
+      "revision": "plain"
     }
   },
   "feedback.more": {
