@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import { existsSync } from 'original-fs'
+import { statSync } from 'original-fs'
 import { join } from 'path'
 import { msg } from '../../shared/i18n'
 import { providerSettings } from '../../shared/providers'
@@ -28,6 +28,28 @@ type Patterns = Partial<Record<CliPattern, RegExp>>
 
 /** A folder or file from a description, a %VARIABLE% at its start expanded. */
 const expand = (p: string): string => p.replace(/^%([A-Za-z_][A-Za-z0-9_]*)%/, (all, name: string) => process.env[name] ?? all)
+
+const isFile = (p: string): boolean => {
+  try {
+    return statSync(p).isFile()
+  } catch {
+    return false
+  }
+}
+
+/**
+ * A description's path as candidates: a folder gives its names in it (on Windows ".exe", ".cmd", ".bat" added to a name
+ * without one, a name with one as written), else the path.
+ */
+function inFolder(p: string, names: readonly string[]): string[] {
+  try {
+    if (!statSync(p).isDirectory()) return [p]
+  } catch {
+    return [p]
+  }
+  const exts = (n: string): string[] => (process.platform !== 'win32' || /\.(exe|cmd|bat)$/i.test(n) ? [''] : ['.exe', '.cmd', '.bat'])
+  return names.flatMap((n) => exts(n).map((e) => join(p, n + e)))
+}
 
 /**
  * An argument with the launch's values put in; null when it names a value the launch hasn't (no model). Only the names
@@ -142,7 +164,7 @@ export class CliAdapter implements ProviderAdapter {
   async locate(): Promise<AgentInstallInfo> {
     const info: AgentInstallInfo = { provider: this.id, found: false, path: null, version: null, source: null, latestVersion: null, updateAvailable: false, loggedIn: null, authMethod: null, account: null, rejected: [] }
     for (const c of await this.candidates()) {
-      if (!existsSync(c.path)) continue
+      if (!isFile(c.path)) continue
       // Only the standalone CLI (SPEC §11): a copy inside an editor's extensions is never run, whoever names it.
       if (EDITOR_EXTENSION_PATH.test(c.path)) {
         info.rejected!.push(c.path)
@@ -160,7 +182,8 @@ export class CliAdapter implements ProviderAdapter {
     const out: { path: string; source: string }[] = []
     const custom = providerSettings(config.settings, this.id).executablePath.trim()
     if (custom) out.push({ path: custom, source: 'settings' })
-    for (const p of this.cli.binary.paths ?? []) out.push({ path: expand(p), source: 'description' })
+    // A folder is looked in for its names (HI-3269): a folder itself is never the executable.
+    for (const p of this.cli.binary.paths ?? []) for (const path of inFolder(expand(p), this.cli.binary.names)) out.push({ path, source: 'description' })
     for (const name of this.cli.binary.names) {
       const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', [name], 5000)
       for (const line of where.stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {
