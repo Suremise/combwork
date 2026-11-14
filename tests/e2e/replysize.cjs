@@ -250,7 +250,8 @@ const prose = (seed, n) => {
   check('projects: a line each, with their agents and their roles in the workflow (#1430)', /^alpha \(on, \w+\): Coder \[claude-code, either\] idle; Tester \[claude-code, either\] stopped$/m.test(projects), projects)
   // About 3,030 characters: each Claude Code agent's connection fields (HI-1771), there for everyone since HI-1774.
   // Each agent row names its connection (HI-2108: every agent has one, its id and name).
-  measure('cw_project_status', tool('cw_project_status', {}), 3300)
+  // HI-3188: two more preferences in its workflow options (simplifyAt, churnStopAt), about 35 characters.
+  measure('cw_project_status', tool('cw_project_status', {}), 3350)
   const usage = measure('cw_session_usage', tool('cw_session_usage', {}), 1500)
   check('usage leaves out its days unless asked', !usage.includes('"days"') && tool('cw_session_usage', { days: true }).text.includes('"days"'))
   const notes = measure('cw_list_shared_notes', tool('cw_list_shared_notes', {}), 1500)
