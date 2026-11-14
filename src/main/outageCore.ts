@@ -1,6 +1,6 @@
 import { request as httpRequest } from 'http'
 import { request as httpsRequest } from 'https'
-import { OUTAGE_NOT_CONNECTION, outagePatternId } from '../shared/advanced'
+import { advancedDef, OUTAGE_NOT_CONNECTION, outagePatternId } from '../shared/advanced'
 import { agentMsg, inDialectOf, say } from '../shared/agentText'
 import type { ProviderId } from '../shared/types'
 import { createLogger, userText } from './logger'
@@ -19,10 +19,12 @@ const T = {
 /**
  * Whether a failed turn's words are a dropped connection of its CLI's: its CLI's pattern finds them, and Combwork's for
  * what is never one (a usage limit, a sign-in, "overloaded") doesn't. `pattern` gives an advanced pattern by its id.
+ * A CLI with no such pattern (only Claude Code, Codex and Copilot have one: OpenCode, Antigravity and Muse have no
+ * recorded connection error) never has a dropped connection, so its failed turns start no wait (HI-3276).
  */
 export function connectionDropped(provider: ProviderId, words: string, pattern: (id: string) => RegExp): boolean {
   const said = words.trim()
-  if (!said || pattern(OUTAGE_NOT_CONNECTION).test(said)) return false
+  if (!said || !advancedDef(outagePatternId(provider)) || pattern(OUTAGE_NOT_CONNECTION).test(said)) return false
   return pattern(outagePatternId(provider)).test(said)
 }
 

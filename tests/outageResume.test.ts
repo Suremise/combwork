@@ -55,6 +55,16 @@ describe('a dropped connection, by what the CLI said (connectionDropped)', () =>
     expect(pattern(OUTAGE_NOT_CONNECTION).test('API Error: Connection refused (ECONNREFUSED)')).toBe(false)
     for (const p of ['claude-code', 'codex', 'copilot'] as const) expect(advancedDef(outagePatternId(p))?.group).toBe(p)
   })
+
+  it.each(['opencode', 'antigravity', 'muse'])('never takes a failed turn of %s, a CLI with no connection pattern, as a dropped connection, and never throws (HI-3276)', (provider) => {
+    // As main's advanced.pattern does: an id with no setting throws.
+    const strict = (id: string): RegExp => {
+      if (!advancedDef(id)) throw new Error(`No advanced setting "${id}"`)
+      return pattern(id)
+    }
+    expect(advancedDef(outagePatternId(provider))).toBeUndefined()
+    for (const words of [REFUSED, 'read ECONNRESET', 'stream disconnected before completion: Transport error']) expect(connectionDropped(provider, words, strict)).toBe(false)
+  })
 })
 
 describe('the checks back off (checkDelay)', () => {
@@ -189,6 +199,17 @@ describe('the wait (OutageResume)', () => {
     expect(h.waiting).toEqual([])
     expect(h.checks).toBe(0)
     expect(h.notes).toEqual([])
+    expect(pending()).toBe(0)
+  })
+
+  it('starts no wait for a failed turn of a CLI with no connection pattern (HI-3276)', async () => {
+    const { h, host, advance, pending } = fakeHost({ up: true })
+    const o = new OutageResume(host)
+    expect(() => o.failed(agent({ provider: 'opencode' }), REFUSED)).not.toThrow()
+    await advance(3_600_000)
+    expect(h.waiting).toEqual([])
+    expect(h.checks).toBe(0)
+    expect(o.waitingKeys()).toEqual([])
     expect(pending()).toBe(0)
   })
 

@@ -1,6 +1,9 @@
 import type { BrowserWindow } from 'electron'
 import { randomUUID } from 'crypto'
 import type { CombworkEvent, ToastAction, ToastLevel, ToastMessage, ToastTarget } from '../shared/types'
+import { createLogger } from './logger'
+
+const log = createLogger('events')
 
 /**
  * Where events and terminal output go. With several windows, each shows one workspace: an event about a
@@ -25,21 +28,34 @@ function send(wins: BrowserWindow[], channel: string, ...args: unknown[]): void 
   for (const w of wins) if (!w.isDestroyed()) w.webContents.send(channel, ...args)
 }
 
+/**
+ * Gives an event to each in-process listener. One that throws is logged and skipped (HI-3276): the listeners after it
+ * still get the event, and the code that emitted it carries on.
+ */
+function tellEach(event: CombworkEvent): void {
+  for (const l of listeners)
+    try {
+      l(event)
+    } catch (e) {
+      log.error(`a listener of the ${event.type} event failed`, e)
+    }
+}
+
 /** Sends an event to the window(s) it is for and to in-process listeners (e.g. the Agent API event stream). */
 export function emit(event: CombworkEvent): void {
   send(router.forEvent(event), 'cw:event', event)
-  for (const l of listeners) l(event)
+  tellEach(event)
 }
 
 /** Sends an event to one window (e.g. its own maximized state, or its workspace's changes). */
 export function emitTo(win: BrowserWindow, event: CombworkEvent): void {
   send([win], 'cw:event', event)
-  for (const l of listeners) l(event)
+  tellEach(event)
 }
 
 /** Tells in-process listeners only (the Agent API's event stream), no window: a notice shown as a Windows notification. */
 export function tellListeners(event: CombworkEvent): void {
-  for (const l of listeners) l(event)
+  tellEach(event)
 }
 
 export function onCombworkEvent(listener: (e: CombworkEvent) => void): () => void {
