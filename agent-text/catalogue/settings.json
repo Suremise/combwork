@@ -2825,7 +2825,7 @@
     "audience": "both"
   },
   "settings.advanced.muse.names.configKeys.desc": {
-    "text": "The keys of the settings Combwork gives each Muse launch for that run only (its hooks, its MCP servers and an MCP server's mode, other CLIs' personal skills and rules off). Nothing is written to Muse's own settings. Wrong, Muse refuses the launch or runs without Combwork's tools.",
+    "text": "The keys of the settings Combwork gives each Muse launch for that run only (its hooks, its MCP servers and an MCP server's mode, the skills and rules other CLIs keep for you left out). Nothing is written to Muse's own settings. Wrong, Muse refuses the launch or runs without Combwork's tools.",
     "note": "What the advanced setting \"Launch setting keys\" is for, and what goes wrong when it is wrong (Settings → Advanced, under Muse Code). MCP is a protocol name: keep it.",
     "audience": "both"
   },

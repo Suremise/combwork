@@ -195,7 +195,7 @@ export const ADVANCED: readonly AdvancedSource[] = [
     id: MUSE_NAME_IDS.config,
     group: 'muse',
     title: msg({ id: 'settings.advanced.muse.names.configKeys.title', defaultMessage: 'Launch setting keys', description: "An advanced setting's title (Settings → Advanced, under Muse Code): the names of the CLI's settings that Combwork gives each launch with -c, mapped from Combwork's roles." }),
-    desc: msg({ id: 'settings.advanced.muse.names.configKeys.desc', defaultMessage: "The keys of the settings Combwork gives each Muse launch for that run only (its hooks, its MCP servers and an MCP server's mode, other CLIs' personal skills and rules off). Nothing is written to Muse's own settings. Wrong, Muse refuses the launch or runs without Combwork's tools.", description: 'What the advanced setting "Launch setting keys" is for, and what goes wrong when it is wrong (Settings → Advanced, under Muse Code). MCP is a protocol name: keep it.' }),
+    desc: msg({ id: 'settings.advanced.muse.names.configKeys.desc', defaultMessage: "The keys of the settings Combwork gives each Muse launch for that run only (its hooks, its MCP servers and an MCP server's mode, the skills and rules other CLIs keep for you left out). Nothing is written to Muse's own settings. Wrong, Muse refuses the launch or runs without Combwork's tools.", description: 'What the advanced setting "Launch setting keys" is for, and what goes wrong when it is wrong (Settings → Advanced, under Muse Code). MCP is a protocol name: keep it.' }),
     kind: 'list',
     roles: CONFIG_ROLES,
     distinct: true,

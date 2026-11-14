@@ -676,7 +676,7 @@
   "settings.advanced.muse.hooks.pathField.title": "Hooks: an edit's file",
   "settings.advanced.muse.hooks.timeoutSeconds.desc": "How long Muse waits for Combwork to take one of its hooks (an edit waits for a file lock). Too short, Combwork misses what Muse reports, an agent may look stuck, and an edit of a locked file can go ahead before Combwork refuses it.",
   "settings.advanced.muse.hooks.timeoutSeconds.title": "Hooks: timeout",
-  "settings.advanced.muse.names.configKeys.desc": "The keys of the settings Combwork gives each Muse launch for that run only (its hooks, its MCP servers and an MCP server's mode, other CLIs' personal skills and rules off). Nothing is written to Muse's own settings. Wrong, Muse refuses the launch or runs without Combwork's tools.",
+  "settings.advanced.muse.names.configKeys.desc": "The keys of the settings Combwork gives each Muse launch for that run only (its hooks, its MCP servers and an MCP server's mode, the skills and rules other CLIs keep for you left out). Nothing is written to Muse's own settings. Wrong, Muse refuses the launch or runs without Combwork's tools.",
   "settings.advanced.muse.names.configKeys.title": "Launch setting keys",
   "settings.advanced.muse.names.hookEvents.desc": "Muse's name for each hook event Combwork gives it and reads back (a session's start, a prompt, a tool's use, a question, a turn's end…). Wrong, Muse refuses the launch or the agent's status stops following it.",
   "settings.advanced.muse.names.hookEvents.title": "Hook events",
