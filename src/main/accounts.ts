@@ -7,7 +7,7 @@ import type { AccountModels, AgentDef, AgentInfo, AppConfig, Account, Connection
 import { CW_DIR } from '../shared/defaults'
 import { readKeptJson, withFileLock } from './fsutil'
 import { baseValues, cliDefaults, connectionFor, homeAccount, pcAccountId, pcWideSignIn, seamAccountId, type AccountStore } from '../shared/connectionDefaults'
-import { acceptable, accountState, baseConnection, cleanTag, connectionsOn, TAG_MAX, launchValues, movedInGroup, resolveAgentConnection, type AgentConnection, type ConnectionPatch, type ConnectionRow, type ConnectionTrust, type ConnectionUser, movedConnection, valuesOf, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
+import { acceptable, accountState, baseConnection, cleanTag, connectionsOn, TAG_MAX, launchValues, movedInGroup, resolveAgentConnection, type AgentConnection, type MatchedBy, type ConnectionPatch, type ConnectionRow, type ConnectionTrust, type ConnectionUser, movedConnection, valuesOf, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
 import { ASSISTANT_NAME } from '../shared/assistant'
 import { launchesWithoutTools } from '../shared/launchPolicy'
 import { profileFolder } from '../shared/appName'
@@ -1922,6 +1922,8 @@ export interface LaunchConnection {
   homeEnv: string
   /** Why it isn't exactly what was chosen, or what its check couldn't say: shown on the agent. */
   note?: 'offFallback' | 'missing' | 'unknownLogin' | 'loginChanged'
+  /** With `offFallback` (HI-3213): how its connection was matched on the account it runs on (the same tag, name, or its first). */
+  by?: MatchedBy
   /** Who it launches as, from its fresh check (planUsage.ts usageLogin; a check that failed keeps the last one): its usage's. */
   login?: string
   /** Ends the launch's claim: once its session runs (its live state then keeps it from removal) or it failed. */
@@ -2076,6 +2078,7 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
         folder: accountFolder(id),
         homeEnv: caps.homeEnv,
         ...(choice.note ? { note: choice.note } : {}),
+        ...(choice.by ? { by: choice.by } : {}),
         release,
         server: part,
         stillValid: (wanted) => same() && sameAs(choose(wanted), id)
@@ -2094,6 +2097,7 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
       folder: accountFolder(id),
       homeEnv: caps.homeEnv,
       ...(note ? { note } : {}),
+      ...(choice.by ? { by: choice.by } : {}),
       ...(usageLogin(observed) ? { login: usageLogin(observed)! } : {}),
       release,
       stillValid: (wanted) => generation(id) === gen && !!getAccount(id) && sameAs(choose(wanted), id)

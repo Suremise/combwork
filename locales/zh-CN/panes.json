@@ -46,7 +46,7 @@
   "panes.footer.compactions": "{n, plural, other {目前已压缩 # 次}}{over, select, yes {，建议压缩} other {}}",
   "panes.footer.connectionChanged": "自添加以来它的登录身份已变更：请查看“设置”→“账号与连接”。",
   "panes.footer.connectionEmail": "已登录为 {email}。",
-  "panes.footer.connectionOffHere": "为它选择的连接所在的账号在此工作区中已停用，因此它使用其 CLI 的第一个可用连接运行。",
+  "panes.footer.connectionOffHere": "为它选择的连接所在的账号在此工作区中已停用，因此它在此处第一个已启用的账号上运行：使用那里标签相同的连接，没有则用名称相同的，再没有则用该账号的第一个连接。",
   "panes.footer.connectionRemoved": "为它选择的连接已被移除，因此它使用其 CLI 的第一个可用连接运行。请在它的“智能体设置”中另选一个。",
   "panes.footer.connectionSwitching": "回合结束后切换",
   "panes.footer.connectionSwitchingTip": "当前回合结束后，它会结束并在现在为它选择的连接上继续。",

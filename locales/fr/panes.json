@@ -46,7 +46,7 @@
   "panes.footer.compactions": "{n, plural, one {# compactage jusqu’ici} many {# compactages jusqu’ici} other {# compactages jusqu’ici}}{over, select, yes { – pense à compacter} other {}}",
   "panes.footer.connectionChanged": "Ses identifiants ont changé depuis son ajout : voir Paramètres → Comptes et connexions.",
   "panes.footer.connectionEmail": "Connecté en tant que {email}.",
-  "panes.footer.connectionOffHere": "La connexion choisie pour lui est sur un compte désactivé dans cet espace de travail : il fonctionne donc avec la première connexion utilisable de sa CLI.",
+  "panes.footer.connectionOffHere": "La connexion choisie pour lui est sur un compte désactivé dans cet espace de travail : il fonctionne donc sur le premier compte activé ici, avec la connexion de ce compte qui a la même étiquette, sinon le même nom, sinon la première de ce compte.",
   "panes.footer.connectionRemoved": "La connexion choisie pour lui a été supprimée : il fonctionne donc avec la première connexion utilisable de sa CLI. Choisis-en une autre dans les Paramètres de l’agent.",
   "panes.footer.connectionSwitching": "change une fois son tour terminé",
   "panes.footer.connectionSwitchingTip": "Une fois son tour terminé, il s’arrête et reprend sur la connexion choisie maintenant pour lui.",

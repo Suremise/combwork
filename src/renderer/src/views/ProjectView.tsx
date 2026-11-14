@@ -543,7 +543,8 @@ export function ProjectView({ visible }: { visible: boolean }) {
     await call('session:stop', project.path, live.agentId)
     const start = Date.now()
     while (Date.now() - start < 8000 && (await call('session:live')).some((l) => l.projectPath === project.path && l.agentId === live.agentId)) await new Promise((r) => setTimeout(r, 150))
-    await actions.resumeSession(project.path, { id: live.sessionId, recache: null, title: null, name: item?.name, agentId: live.agentId, cwd: item?.cwd }, live.agentId)
+    // Its slot too (HI-3213): one that ran in a slot resumes with its own agent, never read as a worktree no agent uses.
+    await actions.resumeSession(project.path, actions.restartItem(live, item), live.agentId)
   }
 
   return (

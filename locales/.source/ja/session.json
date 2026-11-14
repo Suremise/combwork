@@ -22,6 +22,7 @@
   "session.compact.waiting": "The agent is waiting for your answer. Compact after it has finished.",
   "session.connection.fallback": "{why, select, missing {The connection chosen for it was removed} other {Its connection {wanted} is off in this workspace}}, so it started on {name}, its CLI's first usable one here. Choose another in its Agent Settings.",
   "session.connection.fallbackTitle": "{agent} runs on another connection",
+  "session.connection.offMatched": "Its connection {wanted} is on an account that's off in this workspace, so it started on {name} ({account}): {by, select, tag {the connection there with the same tag, {tag}} name {the connection there with the same name} other {that account's first connection, as none there has its tag or name}}. Choose another in its Agent Settings.",
   "session.error.agentGone": "That agent no longer exists.",
   "session.error.inUseElsewhere": "Another program has its transcript open. Close it, then try again.",
   "session.error.noAgents": "This project has no agents yet. Add one first.",
