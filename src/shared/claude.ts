@@ -301,7 +301,7 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
     promptCacheTtl: true,
     reportsCost: true,
     // Behind its tool search, but for tools listed with anthropic/alwaysLoad (HI-2229).
-    defersMcpTools: true,
+    defersMcpTools: 'unmarked',
     compactFocus: true,
     contextLimit: true,
     autoCompactReserve: 33_000,

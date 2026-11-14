@@ -225,12 +225,14 @@ export function totals(s: PerfSelection): PerfTotals {
  * Combwork's estimate of what a catalog series' CLI got at the start if it deferred the tools (HI-2553 round 1), in all:
  * the up-front part its starts reported (the tools sent in full and the others' names), for a CLI that can defer MCP
  * tools only; null for one that doesn't (it gets the whole list), a provider not known, or starts that reported none.
- * An estimate, never an observation: whether that launch's CLI deferred (Claude Code's tool search can be off, a model
- * or gateway can turn it off) and how it worded the list aren't observable.
+ * A CLI that defers every MCP tool (`all`, HI-3225: Codex) gets none of the list up front, only the server's namespace:
+ * 0 for each start. An estimate, never an observation: whether that launch's CLI deferred (Claude Code's tool search can
+ * be off, a model or gateway can turn it off; Codex's hidden models get the whole list) and how it worded it aren't observable.
  */
 export function deferredEstimate(c: CatalogSeries): { starts: number; bytes: number } | null {
-  const p = PROVIDERS.find((x) => x.id === c.provider)
-  if (!p?.capabilities.defersMcpTools || !c.upfrontStarts) return null
+  const defers = PROVIDERS.find((x) => x.id === c.provider)?.capabilities.defersMcpTools
+  if (defers === 'all') return c.starts ? { starts: c.starts, bytes: 0 } : null
+  if (!defers || !c.upfrontStarts) return null
   return { starts: c.upfrontStarts, bytes: c.upfrontBytes }
 }
 
