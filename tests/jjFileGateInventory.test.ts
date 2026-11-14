@@ -13,7 +13,7 @@ const GATED = /jjFileGate\.(read|readSync|acquire|recheck)\(|storeGitGated\(|sto
 
 /** Files that name those paths without using the gate themselves: where their reads are gated. */
 const ALLOW: Record<string, string> = {
-  'src/main/platform/jjAdvanceProbe.ts': "its git is the caller's (jjCards' gitOn, storeGitGated); its writes go through the runner (gated)",
+  'src/main/platform/jjAdvance.ts': "its git is J5's (jjCards' gitOn, storeGitGated); its writes go through the runner (gated, with the lease's recheck)",
   'src/main/platform/jjCandidates.ts': "its git is jjCards' gitOn (storeGitGated); its writes go through the runner, with a recheck",
   'src/main/platform/jjIntegration.ts': "its git is jjCards' gitOn (storeGitGated); its prints are jjPublishTail's (readSync)",
   'src/main/platform/jjRecovery.ts': "its git is slotsApp's (storeGitGated); its jj writes go through the port, with rechecks",

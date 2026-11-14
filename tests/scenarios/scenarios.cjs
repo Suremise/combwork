@@ -983,8 +983,11 @@ const jjOpHeads = (c) => {
 // jj's card scenarios (HI-2870, J9d): what nothing an agent does may do in a jj project, a failed attempt too (moving a
 // bookmark or a tag, pushing, setting up a repository: jjPublishes.cjs, unit-tested).
 const { publishes } = require('./jjPublishes.cjs')
-/** jj's Pair (preset('jj', 'pair') in src/shared/workflow/options.ts, which the harness can't load): a reviewer agent, cards in slots, the user integrating. */
-const JJ_PAIR = { review: 'agent', noSelfReview: true, preChecks: [], folder: 'slots', identity: null, stopOwnRuns: true, dependenciesDone: true, commands: {} }
+/**
+ * jj's Pair (preset('jj', 'pair') in src/shared/workflow/options.ts, which the harness can't load): a reviewer agent, cards
+ * in slots, the user integrating (named: since HI-3235 the default finish is Combwork's advance, not these scenarios' premise).
+ */
+const JJ_PAIR = { review: 'agent', noSelfReview: true, preChecks: [], folder: 'slots', identity: null, stopOwnRuns: true, dependenciesDone: true, commands: {}, finish: 'userIntegrates' }
 /** The project's bookmarks, local and remote, as jj lists them (no snapshot). */
 const jjBookmarks = (c) => jjIn(c, '--ignore-working-copy', 'bookmark', 'list', '--all-remotes')
 /** A revision's commit as `<commit id> <change id> <empty> <parent commit ids…>`, read without a snapshot, or '' if it can't be read. */

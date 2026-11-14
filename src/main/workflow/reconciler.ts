@@ -20,6 +20,7 @@ import { historyOf, observePort, repoWatchOf } from '../platform/historyPorts'
 import { openWorkspaces, WorkspaceService } from '../workspace'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import { reconcile } from './reconcile'
+import { advanceHostOf } from './advanceHost'
 import { workflowFor } from './service'
 import { isUnknown } from '../platform/types'
 
@@ -236,6 +237,15 @@ async function reconcileProject(f: Followed): Promise<void> {
   // The platform's own pass, once per run, unfinished cards or none (HI-2882: jj's publish observations and retained
   // bundles); more to do, a continuation run after a pause (a timer, never a loop), while the follow lives.
   const adapter = wf.platform(wf.cfg.options())
+  // HI-3235: the project's journaled advances settled (a crash's, a card no pass reached), before the platform's pass.
+  if (adapter.recoverAdvances && f.alive()) {
+    try {
+      await adapter.recoverAdvances(advanceHostOf(wf))
+      await wf.runActions()
+    } catch (e) {
+      log.warn('recovering advances', e) // i18n-ignore: the log (English)
+    }
+  }
   if (!adapter.afterRun || !f.alive()) return
   const { more } = await adapter.afterRun(f.abort.signal)
   if (more && f.alive() && !f.again2) {

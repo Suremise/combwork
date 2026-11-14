@@ -43,14 +43,22 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   },
   finish: {
     title: msg({ id: 'workflow.option.finish.title', defaultMessage: 'Who merges', description: 'A workflow option (glossary 2.6, G5).' }),
-    desc: msg({ id: 'workflow.option.finish.desc', defaultMessage: 'When a card is done: once Combwork’s merge queue has merged it, once its agent has merged it and Combwork finds the work in the target branch, once it is committed, or whenever it is moved there.', description: 'What the workflow option “Who merges” does (glossary 2.1: merge queue).' })
+    desc: msg({ id: 'workflow.option.finish.desc', defaultMessage: 'When a card is done: once Combwork’s merge queue has merged it, once its agent has merged it and Combwork finds the work in the target branch, once it is committed, or whenever it is moved there.', description: 'What the workflow option “Who merges” does (glossary 2.1: merge queue).' }),
+    integrates: {
+      title: msg({ id: 'workflow.option.finish.jjTitle', defaultMessage: 'Who integrates', description: 'The workflow option “Who merges” (G5) for a project using jj (HI-3235): who moves the target bookmark to a passed card’s candidate.' }),
+      desc: msg({
+        id: 'workflow.option.finish.jjDesc',
+        defaultMessage: 'Once a card passes and its merge checks pass on its candidate, Combwork moves the target bookmark to the candidate, or you do it yourself. Combwork refuses first when anything is unexpected, and stops and tells you when it sees something change during the move. jj can’t make that move conditional, so a few races can still happen while Combwork moves it: a bookmark moved away and back, a move to an earlier commit of the candidate, or a Git checkout or another bookmark changed during the export. Only You integrate it yourself avoids them.',
+        description: 'What the workflow option “Who integrates” does, for a project using jj (HI-3235, HI-2840/s30 and s34): the four residual races, in plain words; never call it safe. A bookmark is jj’s name for a branch: keep it as jj’s term. “You integrate it yourself” is the option’s other value, as translated there.'
+      })
+    }
   },
   style: {
     title: msg({ id: 'workflow.option.style.title', defaultMessage: 'Merge style', description: 'A workflow option (glossary 2.6, G6).' }),
     desc: msg({ id: 'workflow.option.style.desc', defaultMessage: 'How a card’s work is merged into the target branch.', description: 'What the workflow option “Merge style” does.' }),
     integrates: {
       title: msg({ id: 'workflow.option.style.jjTitle', defaultMessage: 'Candidate style', description: 'The workflow option “Merge style” (G6) for a project using jj (HI-2871): how the candidate commit Combwork builds for the user to integrate is made (merge commit, squash or rebase). Candidate: the commit Combwork builds.' }),
-      desc: msg({ id: 'workflow.option.style.jjDesc', defaultMessage: 'Once a card passes, Combwork builds a candidate from it on the target bookmark: a merge commit, one squashed commit, or its commits copied on top. You move the bookmark to the candidate yourself; Combwork never does.', description: 'What the workflow option “Candidate style” does, for a project using jj (HI-2871). A bookmark is jj’s name for a branch: keep it as jj’s term.' })
+      desc: msg({ id: 'workflow.option.style.jjDesc', defaultMessage: 'Once a card passes, Combwork builds a candidate from it on the target bookmark: a merge commit, one squashed commit, or its commits copied on top. Who integrates says whether Combwork or you then move the bookmark to it.', description: 'What the workflow option “Candidate style” does, for a project using jj (HI-2871, HI-3235). A bookmark is jj’s name for a branch: keep it as jj’s term. “Who integrates” is another option’s name, as translated there.' })
     }
   },
   target: {
@@ -190,6 +198,7 @@ export const VALUE_TEXT = {
     agentMerges: msg({ id: 'workflow.value.finish.agentMerges', defaultMessage: 'The agent merges, Combwork checks', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
     committed: msg({ id: 'workflow.value.finish.committed', defaultMessage: 'Committed is done', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
     notChecked: msg({ id: 'workflow.value.finish.notChecked', defaultMessage: 'Not checked', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
+    combworkAdvances: msg({ id: 'workflow.value.finish.combworkAdvances', defaultMessage: 'Combwork integrates after the checks', description: 'A value of the workflow option “Who integrates” (glossary 2.6, G5) for a project using jj (Jujutsu, HI-3235): once a card passes and its merge checks pass on its candidate, Combwork moves the target bookmark to the candidate itself. The default for jj.' }),
     userIntegrates: msg({ id: 'workflow.value.finish.userIntegrates', defaultMessage: 'You integrate it yourself', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5) for a project using jj (Jujutsu, HI-2799): Combwork never merges under jj; you bring the reviewed work into its target with jj.' })
   },
   style: {

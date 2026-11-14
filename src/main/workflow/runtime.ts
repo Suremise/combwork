@@ -10,7 +10,7 @@
 
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
-import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, overridableEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
+import { ADVANCE_GATES, ADVANCE_STOPPED_GATE, agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, overridableEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
 import { awaitsAgentMerge, baseRulesetId, compile, hasStage, mergeCommitOf, skipReviewOf, targetedOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
@@ -27,7 +27,8 @@ import { parseCardRef } from '../../shared/workflow/cardRefs'
 import type { ForwardOverride } from '../../shared/workflow/forwardOrder'
 import { changeList, nextCard, type LaneList } from '../../shared/workflow/laneList'
 import { LANE_MAX_ROUNDS } from '../../shared/lanes'
-import type { FinishInputs, LineNow, PlatformAdapter, Unsubmitted } from '../platform/adapter'
+import type { AdvanceAnswer, FinishInputs, LineNow, PlatformAdapter, Unsubmitted } from '../platform/adapter'
+import { advanceHostOf } from './advanceHost'
 import type { JjCardDeps } from '../platform/jjPlatform'
 import { adaptersFor } from '../platform/adapters'
 import { historyOf } from '../platform/historyPorts'
@@ -223,6 +224,8 @@ export interface WorkflowConfig {
   projectId?: () => string
   /** The project's resolved options (§16.6.6); a card in flight keeps its own ruleset. */
   options: () => WorkflowOptions
+  /** HI-3235: whether the project's finish is its platform's default, set at no level (the one-time note's condition). */
+  finishInherited?: () => boolean
   /** Where cards' own folders go (the P2 spike's stand-in for slots, its unit tests only: the app lends slots, `slotFor`). */
   slots?: string
   /**
@@ -771,7 +774,7 @@ export class Workflow {
    * decides on that lives outside the card's facts (a design's reviewer, #1382), read inside the same lock (in the app,
    * the same board change) just before the transaction, so nothing that change orders against comes between.
    */
-  async write<T, P = undefined>(card: CardRecord, ruleset: Ruleset | null, actor: Actor, fn: (w: Write, prepared: P) => T, prepare?: () => Promise<P>): Promise<T> {
+  async write<T, P = undefined>(card: CardRecord, ruleset: Ruleset | null, actor: Actor, fn: (w: Write, prepared: P) => T, prepare?: () => Promise<P>, opts: { runActions?: boolean } = {}): Promise<T> {
     const also = alongsideOf.getStore()
     let movedTo: { from: StageId; to: StageId } | null = null
     const out = await this.locked(async () => {
@@ -811,7 +814,9 @@ export class Workflow {
         // A hook's own failure never undoes or fails the committed write.
       }
     }
-    if (this.cfg.autoRun !== false) await this.runActions()
+    // HI-3235: a write made holding a platform's repository lock (an advance's records) leaves its actions for its caller to
+    // run once that lock is let go, so none of them (an advance answer's) runs nested inside it.
+    if (this.cfg.autoRun !== false && opts.runActions !== false) await this.runActions()
     return out
   }
 
@@ -1803,6 +1808,12 @@ export class Workflow {
         if (hasStage(r, 'approved')) w.move('approved', 'derived')
         if (needOk) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.okBefore, { card: w.card.key }))
         return
+      case 'combworkAdvances':
+        // HI-3235: Combwork integrates what passed (its platform's advance port): it waits in Approved, its OK asked there
+        // first where G10 applies, for its candidate and merge checks; the reconcile then calls the adapter's advance.
+        w.move('approved', 'derived')
+        if (needOk) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.okBefore, { card: w.card.key }))
+        return
       default:
         return
     }
@@ -2337,12 +2348,14 @@ export class Workflow {
    * a Decide answer, or an agent's question approved with a note, HI-2286) is the board's to record, beside this. The agent waiting on it is woken: whoever asked (an agent's own question), else the builder;
    * at the round limit the builder and the reviewer, whose lane paused for it.
    */
-  async answer(ref: unknown, request: string, answer: 'approved' | 'declined' | 'answered', opts: { note?: string; choice?: RoundChoice; rounds?: number; decided?: boolean; action?: AskActionKind } = {}): Promise<Reply> {
+  async answer(ref: unknown, request: string, answer: 'approved' | 'declined' | 'answered', opts: { note?: string; choice?: RoundChoice; rounds?: number; decided?: boolean; action?: AskActionKind; /** HI-3235: who answers (the window: the user): an advance's question takes only the user's. */ by?: string } = {}): Promise<Reply> {
     const card = this.resolve(ref)
     if (isRefusal(card)) return card
     const s = this.state(card)
     const req = s.requests.find((x) => x.request === request)
     if (!req) return this.refuse(card, 'user', 'answer', { rule: 'move.notFromHere', values: { card: card.key, stage: s.stage, move: 'answer', moves: '' } })
+    // HI-3235: an advance's question is the user's alone (its Approve can be an attestation): only the window's answer.
+    if (ADVANCE_GATES.includes(req.gate) && ((opts.by ?? 'user') !== 'user' || (answer !== 'approved' && answer !== 'declined'))) return this.refuse(card, 'user', 'answer', { rule: 'move.notFromHere', values: { card: card.key, stage: s.stage, move: 'answer', moves: '' } })
     const r = this.rulesetOf(card, s)
     const before = await this.evidenceOf(card, s, r.options)
     const fin = await this.finishInputs(card, s, r, s.approved?.revision ?? s.latest?.revision)
@@ -2394,6 +2407,13 @@ export class Workflow {
         // `publishUnknown` pause lifted, rather than waiting for a Resume, another card or a restart).
         const e = st.entries.find((x) => x.id === req.entry)
         if (e) w.action('enqueue', { target: e.target, ...(req.gate === QUEUE_STUCK_GATE ? { recheck: true } : {}) })
+      }
+      if (ADVANCE_GATES.includes(req.gate) && req.entry && req.result && (answer === 'approved' || answer === 'declined')) {
+        // HI-3235: the platform adapter takes the answer up in a durable action bound to what was asked (its request,
+        // attempt, plan, cycle and state): one per answer, its handler reading the attempt's journal before anything.
+        const payload: AdvanceAnswer = { request, gate: req.gate, attempt: req.entry, plan: req.result, cycle: st.cycle, state: req.gate === ADVANCE_STOPPED_GATE ? 'stopped' : 'uncertain', answer, project: this.cfg.project }
+        w.action('advanceAnswer', { ...payload })
+        return null
       }
       if (req.gate === MERGE_CHOICE_GATE) {
         // HI-1697: the merge style and commit message are saved with the answer (chooseMerge); its queue looks again now.
@@ -3696,6 +3716,11 @@ export class Workflow {
       case 'prepareSlot':
       case 'pin':
         await this.platformOf(card).perform(kind, payload)
+        return
+      case 'advanceAnswer':
+        // HI-3235: the platform's handler (its journal first: a replay after a crash runs nothing it may have run), then the
+        // actions its records left (run here, outside its locks).
+        await this.platformOf(card).advanceAnswer?.(card, payload as unknown as AdvanceAnswer, advanceHostOf(this))
         return
       // A finish (HI-2014) ends its lane once all its cards are Done, as `endLaneIfDone` (written before it) still does.
       case 'finish':

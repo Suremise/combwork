@@ -1,4 +1,17 @@
 {
+  "workflow.advance.note": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "workflow.advance.refused": {
+    "placeholders": {
+      "target": "plain",
+      "card": "plain",
+      "why": "plain",
+      "detail": "plain"
+    }
+  },
   "workflow.contradiction.combworkMergesNeedsGit": {
     "placeholders": {}
   },
@@ -46,6 +59,40 @@
   "workflow.focused.resultsUnread": {
     "placeholders": {
       "why": "plain"
+    }
+  },
+  "workflow.forYou.advanceNote": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "workflow.forYou.advanceRefused": {
+    "placeholders": {
+      "target": "plain",
+      "result": "plain",
+      "card": "plain",
+      "why": "select",
+      "detail": "plain"
+    }
+  },
+  "workflow.forYou.advanceStopped": {
+    "placeholders": {
+      "again": "select",
+      "target": "plain",
+      "result": "plain",
+      "card": "plain",
+      "why": "select",
+      "detail": "plain"
+    }
+  },
+  "workflow.forYou.advanceUncertain": {
+    "placeholders": {
+      "again": "select",
+      "target": "plain",
+      "result": "plain",
+      "card": "plain",
+      "detail": "plain",
+      "op": "select"
     }
   },
   "workflow.forYou.decidedAfterMerge": {
@@ -272,6 +319,12 @@
     "placeholders": {}
   },
   "workflow.option.finish.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.finish.jjDesc": {
+    "placeholders": {}
+  },
+  "workflow.option.finish.jjTitle": {
     "placeholders": {}
   },
   "workflow.option.finish.title": {
@@ -1700,6 +1753,9 @@
     "placeholders": {}
   },
   "workflow.value.finish.agentMerges": {
+    "placeholders": {}
+  },
+  "workflow.value.finish.combworkAdvances": {
     "placeholders": {}
   },
   "workflow.value.finish.combworkMerges": {

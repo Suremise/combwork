@@ -1644,11 +1644,12 @@ offered, and its row says why [#1112 plan, note "Core model v2"].
 
 **Integration modes** (HI-2840, Darren's decisions of 14 Nov). The ways a card can finish on a platform are its
 descriptor's `finishes`, in the form's order, and `defaultFinish` is the one a project gets with every check off: Git's
-four (Combwork merges, the agent merges, Committed, Not checked; default Not checked), None's acceptance, jj's You
-integrate it yourself. The options form offers exactly these, a saved finish outside them is a contradiction, and no code
+four (Combwork merges, the agent merges, Committed, Not checked; default Not checked), None's acceptance, jj's
+Combwork's advance (the default, HI-3235) and You integrate it yourself. The options form offers exactly these, a saved finish outside them is a contradiction, and no code
 outside the descriptor lists them (`tests/gitAudit.mjs`'s `modeDeclarations`, in check:repo): a new mode is a descriptor
-entry and its adapter's work, never a platform check in the workflow, the queue or the window. jj's Combwork-run advance
-(automatic, the default, then preview and click) joins its list with its adapter in HI-2840's later stages.
+entry and its adapter's work, never a platform check in the workflow, the queue or the window. A finish that advances
+(`finishAdvances`) has Approved whatever the review, and reaches its platform only through the adapter's optional ports
+(`advance`, `advanceAnswer`, `recoverAdvances`): jj's, §16.3.6's jj's target advance. Preview and click joins with HI-3236.
 
 Every adapter answer is a value or **unknown** (git missing, a failed read, a folder gone). **Unknown never satisfies
 a rule** [P1, following §8's "fail safe"]: a gate whose fact is unknown refuses, saying what couldn't be read and the
@@ -2324,7 +2325,7 @@ works.
 | Observe | Refs, reflogs and the write record | The deliverables' watcher | Operation heads (read without snapshotting) **plus** the file watch; a colocated repository's Git refs and index too | J3 |
 | Attribution | Trailers, only card, assigned (§16.3.2) | Combwork's records | Lease and change association, trailers where the project's messages allow; divergence shown, never resolved by choice | J3 |
 | Integration: candidate | Merge, squash, rebase in the queue's worktree | Acceptance | Private new commits (duplicated, squashed or merged) for the user to integrate (decision A); conflicts read from the commits, evidence pinned (`platform/jjCandidates.ts`), built for an approved card by J9b2's reconciliation since HI-2871 | J4, HI-2871 |
-| **Integration: target advance** | CAS (§16.9.2) | — | **Not supported**: no automatic advance; the user merges and containment records it (J1 decided, below) | **gate: advance** (closed, HI-2794) |
+| **Integration: target advance** | CAS (§16.9.2) | — | Combwork's advance (HI-3235, the default finish; below, jj's target advance): refused at the base on anything unexpected, integrated only on its full lineage, its residual races documented; or the user integrates | **gate: advance** open (HI-3235) |
 | Publish | G18's push of a captured head containing the owed result (R4.6); follow mode's exact compare-and-swap publication (G21, §16.9.4) | — | Decision A: the user pushes; Combwork observes the remote and keeps an obligation per integration until the exact result is seen there (`platform/jjIntegration.ts`), tested against a local bare remote | **gate: publish** stays closed for pushing (J5) |
 | Recovery, undo | Journal (§16.9.2) | — | J4/J5 write no jj operation to undo (J4's are its own new commits, recovered by provenance; J5 writes none); never global latest-operation undo unattended; a named-operation undo with a preview stays J7's | J5, J7 |
 | **Attributes and filters** (`.gitattributes` eol/text, clean/smudge, diff and merge drivers) | Supported (git applies them) | — | **Not supported** by jj (v0.47.1's Git compatibility page) | **gate: attributes**: a repository using them can't switch to jj |
@@ -4165,6 +4166,64 @@ between steps and between the observation's reads. It shows where the protocol f
 On jj 0.47.1, a read is a write when operation heads have diverged: any command not pinned with `--at-op`, even with
 `--ignore-working-copy`, merges them into a new "reconcile divergent operations" operation. Ports that must not write
 (R5.3) read pinned.
+
+##### jj's target advance (HI-2840, HI-3235)
+
+**Decided since** (Darren, 14 Nov [HI-2840]: "yes default frictionless, keep the other two as options"; the residual races
+accepted, (A)): jj projects integrate a passed card by **Combwork's advance** by default (`combworkAdvances`), with *You
+integrate it yourself* (`userIntegrates`) as the other finish, and Preview and click to come (HI-3236). J1's protocol is
+the base; what J1 showed it can't do is now stated as the guarantee's limits, never as safety. The design is HI-2840/s30
+with s34, its mapping HI-3235/s7, s10, s13 and s16. gate:advance is open.
+
+- **The seam.** jj's descriptor declares the finish (§16.3.1); the generic reconcile calls the adapter's optional
+  `advance` port for a card in Approved whose finish is an advance, its OK given where G10 applies and no advance
+  unsettled; the user's answers go to `advanceAnswer` in a durable action; the reconciler's run calls
+  `recoverAdvances`. Facts are written through the workflow's `AdvanceHost` (`workflow/advanceHost.ts`). Only
+  `platform/jjPlatform.ts` reaches `platform/jjAdvance.ts`.
+- **The plan** is the consent identity: card, cycle, submission, the candidate fingerprint's hash, T, E, R and its
+  change id, the candidate style, the merge checks' key and the revision they ran at. Its id is a hash of those. An
+  attempt adds P0, the Git refs and every worktree's HEAD; an attempt never advances a plan other than the one rebuilt
+  from the board at its lease checks.
+- **Refused at the base**, nothing written: more than one operation head; T conflicted or divergent; T ≠ E in jj, jj's
+  record of Git or Git; T checked out in any Git worktree; anything else pending export. The card stays Approved and
+  its comments say why, once per plan and reason; the same plan isn't tried again until the repository's heads or Git
+  side change. (In a repository with no Git working copy beside it, jj exports nothing by itself: the target and any
+  other bookmark must be exported first.)
+- **The steps**, each journaled before its command: `--at-op P0 --no-integrate-operation bookmark move T --from E --to
+  R` (O, validated: parent P0, the attempt's marker, its view P0's but for T), `op integrate O`, `git export`, then
+  every head, view and the Git side read twice. The lease (the plan unchanged, the card in Approved, the workspace
+  open) is checked before each write, in the runner's write gate too.
+- **Integrated only on the full lineage**: one head; every operation after P0 carrying the attempt's marker, O among
+  them with parent P0; the view differing from P0's only in T, E → R; Git's T = R; every other ref and worktree as at
+  the base. Then `Integrated { by: 'combwork', platform.advance }`, once per attempt, and Done. **Detected and
+  stopped**: any other operation after P0, a second head, T conflicted or elsewhere, a failed or partial export, Git's
+  T ≠ R, another ref changed, a worktree changed, added or removed, the view changed beyond T. Anything not proved
+  either way (a torn or failed read, an ancestry cut short) is **uncertain**.
+- **Not detected (accepted residuals, documented in the options' help and the user guide, never called safe)**: (a)
+  ABA on T between P0 and the move (on Git's side; jj's own moves leave operations the lineage stops at); (b′) a
+  racer's move of T to an ancestor of R; (d1) a Git worktree switched to T during the export, detached by it; (d2) a
+  ref made pending during the attempt, exported with ours (what it leaves is detected and stops the attempt, never
+  prevented or undone). Preview and click has the same races once clicked; only *You integrate it yourself* avoids
+  them.
+- **Durable records** (s34 §2). The journal file (`.combwork/jj-advance/<card>.<cycle>.<attempt>.json`, written whole
+  and synced) comes first, with the whole plan; then `AdvanceAttempted { plan, attempt }`, read back; no jj write runs
+  before both. `AdvanceStopped`, `AdvanceResolved { nothingMoved | undone | attested | startAgain }` and `Integrated`
+  settle it; until then the card takes no other advance (no outside proof either). A plan undone isn't advanced again
+  on its own.
+- **Recovery**, under the card's lock and the repository lock (so never an active writer's half), at each advance and
+  in each reconciler run: a journal with no fact at `requested` (or abandoned for a fact not confirmed) is nothing
+  moved; any later phase without a fact, or a fact without a journal, is uncertain; an `…ing` phase is classified on
+  the state now (before an integrate, no marked operation in any history is nothing moved); `verified` without its
+  Integrated records it once. Nothing is ever run again blind.
+- **For you** (the user's alone: an agent's or the Assistant's answer is refused). A stop whose undo conditions hold
+  (s30 §2: Combwork's operations alone since P0, one head, T = R in jj and Git, the rest as at the base, T checked out
+  nowhere) asks *advanceStopped*: Approve undoes it (each Approve its own undo: `--at-op H --no-integrate-operation op
+  revert O`, its delta exactly T: R → E, integrate, export, observe; verified, `undone`), Decline leaves it to the user.
+  Otherwise *advanceUncertain*: Approve is the user's attestation (`Override { rules: ['advance.verified'] }`, Finished
+  `override`, never `Integrated`), Decline starts again only once T is known not to contain R (a new candidate, fresh
+  checks). An answer is one durable action bound to its request, attempt, plan, cycle and state; it reads the journal
+  first, so a replay after a crash runs nothing that may have run, and an answer that can't be acted on asks afresh
+  with the reason: an unsettled attempt always has one open question or one pending answer.
 
 ##### Type map
 

@@ -13,7 +13,10 @@
 
 import { statSync } from 'original-fs'
 import { join } from 'path'
-import { foldCard, openEntry, passingReviewers, type CardState, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
+import { advanceUnresolved, approvedByUser, foldCard, openEntry, passingReviewers, type CardState, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
+import { finishAdvances } from '../../shared/workflow/options'
+import { okBeforeApplies } from '../../shared/workflow/guards'
+import { advanceHostOf } from './advanceHost'
 import { awaitsAgentMerge, hasStage, type Ruleset } from '../../shared/workflow/compile'
 import { notApproved } from '../../shared/workflow/guards'
 import type { HistoryPort } from '../platform/history'
@@ -266,7 +269,28 @@ export async function reconcile(wf: Workflow, card: CardRecord, hooks: Reconcile
   const c = wf.store.card(card.id)
   const s = wf.state(c)
   if (!s.started) return
-  return wf.platformOf(c, s).reconcile(c, hooks)
+  await wf.platformOf(c, s).reconcile(c, hooks)
+  await advanceStep(wf, c)
+}
+
+/**
+ * HI-3235 (HI-3235/s10 §D): a card whose finish is its platform's advance (`finishAdvances`, the descriptor's), in
+ * Approved, its pass holding and its OK given where G10 applies (bound to its latest submission and generation): its
+ * adapter's `advance` port, which settles the card's earlier attempts first and integrates it once its platform finds it
+ * ready. Generic: no platform is named, and a platform without the port is never asked. The actions its records left run
+ * here, after the adapter has let its locks go.
+ */
+export async function advanceStep(wf: Workflow, card0: CardRecord): Promise<void> {
+  const card = wf.store.card(card0.id)
+  const s = wf.state(card)
+  if (!wf.cfg.reconcileActs || card.stage !== 'approved' || !s.started || s.integrated || s.stale) return
+  const p = wf.platformOf(card, s)
+  if (!p.advance) return
+  const r = wf.rulesetOf(card, s)
+  if (!finishAdvances(r.options.finish)) return
+  if (wf.enforced() && okBeforeApplies(r, card.labels) && !approvedByUser(s, 'okBefore')) return
+  await p.advance(card, s, advanceHostOf(wf))
+  await wf.runActions()
 }
 
 /**
@@ -996,6 +1020,9 @@ export async function reconcileJj(wf: Workflow, card0: CardRecord, hooks: Reconc
   }
   const snap = approvalOf(card, s)
   if (!snap) return
+  // HI-3235: an advance of Combwork's unsettled (in flight, stopped or uncertain): only it and the user settle the card,
+  // so no outside proof (it would record Integrated over a stop) and no new candidate meanwhile.
+  if (advanceUnresolved(s)) return
   const approved = { base: snap.base, revision: snap.revision, key: snap.key }
   if (approved.revision !== s.started!.base) {
     // HI-2869: this observation's generation, reserved before anything is read (the window's containment record is
