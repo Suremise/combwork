@@ -406,7 +406,7 @@
   "performance.toolList.params": "参数",
   "performance.toolList.schemas": "模式",
   "performance.toolList.starts": "启动次数",
-  "performance.toolList.tip": "每个会话的 CLI 收到的 Combwork 工具的名称、说明和架构，每次启动一次，取平均值，按提供方列出（未知：Combwork 开始记录提供方之前的启动）。字符是列表的 JSON；说明和参数是其中工具的说明及其参数的说明；架构是其余部分：名称、类型、键、标点和转义。延迟加载时是估算，不是测量值：Claude Code 延迟加载 MCP 工具时在开始时放入提示词的内容（工具名称，以及 Combwork 标记的少数完整工具）。某次启动是否真的延迟加载无法观测。Codex 和 Copilot 会收到整个列表。列表位于提示词开头，提供方的提示词缓存可以在第一轮之后保留它；是否保留了，这里不测量。短横线：未测量（Combwork 开始测量之前的会话）。",
+  "performance.toolList.tip": "每个会话的 CLI 收到的 Combwork 工具的名称、说明和架构，每次启动一次，取平均值，按提供方列出（未知：Combwork 开始记录提供方之前的启动）。字符是列表的 JSON；说明和参数是其中工具的说明及其参数的说明；架构是其余部分：名称、类型、键、标点和转义。延迟加载时是估算，不是测量值：Claude Code 延迟加载 MCP 工具时在开始时放入提示词的内容（工具名称，以及 Combwork 标记的少数完整工具）。某次启动是否真的延迟加载无法观测。Codex 会延迟加载全部工具，包括标记的工具，因此开始时收不到列表中的任何内容（0），只有服务器的名称。Copilot 会收到整个列表。列表位于提示词开头，提供方的提示词缓存可以在第一轮之后保留它；是否保留了，这里不测量。短横线：未测量（Combwork 开始测量之前的会话）。",
   "performance.toolList.tools": "工具",
   "performance.tools.calls": "调用",
   "performance.tools.chars": "字符",
