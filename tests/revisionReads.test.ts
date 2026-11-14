@@ -49,6 +49,29 @@ describe('Git: a submission file from its base to its revision (HI-3218)', () =>
     const link = await reads.fileDiff(r, base, revision, 'sub')
     expect(link.gitlink?.to).toMatchObject({ kind: 'gitlink', commit: base })
   })
+
+  it("a file the revision's tree lists whose blob can't be read is an error, never an empty side (HR1, round 1)", async () => {
+    const r = join(tempDir('cw-revdiff-missing-'), 'p')
+    mkdirSync(r, { recursive: true })
+    git(r, 'init', '-q', '-b', 'main')
+    writeFileSync(join(r, 'a.txt'), 'one\n')
+    writeFileSync(join(r, 'b.txt'), 'kept\n')
+    git(r, 'add', '-A')
+    git(r, 'commit', '-q', '-m', 'base')
+    const base = git(r, 'rev-parse', 'HEAD')
+    // The revision's tree names a blob for a.txt that the store doesn't have; b.txt as it was.
+    const entries = git(r, 'ls-tree', base).split('\n').map((l) => (l.endsWith('\ta.txt') ? l.replace(/blob [0-9a-f]{40}/, `blob ${'d'.repeat(40)}`) : l))
+    const tree = execFileSync('git', ['mktree', '--missing'], { cwd: r, input: entries.join('\n') + '\n', encoding: 'utf8' }).trim()
+    const revision = git(r, 'commit-tree', tree, '-p', base, '-m', 'revision')
+    expect(git(r, 'diff', '--raw', '--no-ext-diff', base, revision, '--', 'a.txt')).toMatch(/M\ta\.txt$/)
+    await expect(reads.fileDiff(r, base, revision, 'a.txt')).rejects.toThrow(/cat-file/)
+    // A file the tree doesn't list is still empty on that side, not an error.
+    writeFileSync(join(r, 'c.txt'), 'new\n')
+    git(r, 'add', 'c.txt')
+    git(r, 'commit', '-q', '-m', 'add c')
+    const withC = git(r, 'rev-parse', 'HEAD')
+    expect(await reads.fileDiff(r, base, withC, 'c.txt')).toEqual({ path: 'c.txt', original: '', modified: 'new\n', binary: false })
+  })
 })
 
 describe.skipIf(!jjExe)('jj: a submission file from its base to its revision (HI-3218)', () => {

@@ -131,11 +131,16 @@ const commit = (dir, file, text, message) => {
   const changes = rev0.locator(`[data-revision-changes="${sub}"]`)
   const shown = rev0.locator('[data-revision-diff="greet.ts"] .monaco')
   check('Changes shows the revision’s file and its diff, base to revision', !!(await lib.until(async () => (await changes.locator('[data-revision-file="greet.ts"][aria-current="true"]').count()) === 1 && (await shown.innerText().catch(() => '')).includes('"Hi"') && (await changes.innerText().catch(() => '')).includes(`${base.slice(0, 7)} ↔ ${rev.slice(0, 7)}`), HUNG_MS)), await changes.innerText().catch(() => ''))
+  // Through the setting (HR1's round 1): the editor's theme follows it, not the page's attribute alone. Each shot once the
+  // editor shows that theme (Monaco's own class: vs-dark or vs).
   for (const theme of ['dark', 'light']) {
-    await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+    await inv('settings:update', { appearance: { theme } })
+    const editorIn = await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme && (await shown.evaluate((e) => e.closest('.monaco-diff-editor')?.querySelector('.monaco-editor')?.classList.contains('vs-dark') ?? null).catch(() => null)) === (theme === 'dark'), HUNG_MS)
+    check(`the diff shows in the ${theme} theme`, !!editorIn)
     await changes.screenshot({ path: path.join(lib.WORK, `cardwork-changes-${theme}.png`) })
   }
-  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+  await inv('settings:update', { appearance: { theme: 'dark' } })
+  await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === 'dark', HUNG_MS)
   await rev0.getByRole('button', { name: 'Changes' }).click()
   check('…and hides on a second click', !!(await lib.until(async () => (await changes.count()) === 0, HUNG_MS)))
   lib.git(alpha, ['checkout', '--', 'greet.ts'])
