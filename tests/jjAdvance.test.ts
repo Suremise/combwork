@@ -2,10 +2,10 @@
 // refusals, the classifier (`advanced` only on the full lineage; a detected difference stops; anything unproved is
 // uncertain), the undo's conditions and its lineage, the plan's identity, the durable journal and the lock token. The
 // real-jj cases are tests/jjAdvanceReal.test.ts; the recovery and answers through the adapter, tests/jjAdvanceRuntime.test.ts.
-import { readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
-import { AdvanceJournals, baseRefusal, classifyAdvance, classifyUndo, journalRequested, onlyTarget, parseBookmarks, parseOps, parseWorktrees, pendingExports, planIdOf, undoOffered, undoTxn, underLock, writeDurable, type AdvanceJournal, type BookmarkRow, type GitSnapshot, type HeadObservation, type JjAdvanceDeps, type JjAdvancePlan, type JjObservation, type OpView, type UndoEntry } from '../src/main/platform/jjAdvance'
+import { AdvanceJournals, baseRefusal, classifyAdvance, classifyUndo, journalRequested, onlyTarget, parseBookmarks, parseOps, parseWorktrees, pendingExports, planIdOf, SETTLED_KEPT_MS, undoOffered, undoTxn, underLock, writeDurable, type AdvanceJournal, type BookmarkRow, type GitSnapshot, type HeadObservation, type JjAdvanceDeps, type JjAdvancePlan, type JjObservation, type OpView, type UndoEntry } from '../src/main/platform/jjAdvance'
 import { tempDir } from './tempDir'
 
 const E = 'e'.repeat(40)
@@ -196,6 +196,78 @@ describe("the plan's identity and the journal", () => {
     // A journal whose plan doesn't hash to its id (edited) is unreadable too.
     writeFileSync(file, JSON.stringify({ ...j, plan: { ...plan, result: X } }))
     expect(await js.read('AM-1', 7, ATTEMPT)).toBe('unreadable')
+  })
+
+  // HI-3264: only live journals in the folder itself, so recovery's and a card's reads don't grow with history.
+  it('a journal settled for good moves to settled/ (live listing and recovery no longer read it); stopped or uncertain stays live; settled/ is pruned after SETTLED_KEPT_MS', async () => {
+    const dir = tempDir('adv-settled-')
+    const js = new AdvanceJournals(dir)
+    const deps = { journals: js } as unknown as JjAdvanceDeps
+    const j = await underLock('S', (fn) => fn(), (h) => journalRequested(h, deps, ATTEMPT, plan))
+    await js.write({ ...j, settled: 'stopped' })
+    expect((await js.list('AM-1', 7)).map((x) => x.attempt)).toEqual([ATTEMPT])
+    expect((await js.all()).map((x) => x.settled)).toEqual(['stopped'])
+    await js.write({ ...j, settled: 'resolved' })
+    expect(await js.list('AM-1', 7)).toEqual([])
+    expect(await js.all()).toEqual([])
+    expect(await js.read('AM-1', 7, ATTEMPT)).toBeNull()
+    expect((await js.settled('AM-1', 7)).map((x) => x.settled)).toEqual(['resolved'])
+    // Pruned at the next archive once older than the bound.
+    const old = join(dir, 'settled', `AM-1.7.${ATTEMPT}.json`)
+    const long = new Date(Date.now() - SETTLED_KEPT_MS - 60_000)
+    utimesSync(old, long, long)
+    await js.write({ ...j, attempt: 'second', settled: 'nothingMoved' })
+    expect(existsSync(old)).toBe(false)
+    expect((await js.settled('AM-1', 7)).map((x) => x.attempt)).toEqual(['second'])
+  })
+
+  // HR2's round 1: the write order's interruption (archived, the live file not yet gone) leaves the previous live version,
+  // which stays recoverable; settling it again replaces the archived copy.
+  it('a crash between archiving and removing the live file leaves the previous live version listed and recovered; settled again, it leaves', async () => {
+    const dir = tempDir('adv-crash-')
+    const js = new AdvanceJournals(dir)
+    const deps = { journals: js } as unknown as JjAdvanceDeps
+    const j = await underLock('S', (fn) => fn(), (h) => journalRequested(h, deps, ATTEMPT, plan))
+    const stopped = { ...j, phase: 'verified' as const, settled: 'stopped' as const }
+    await js.write(stopped)
+    // The interrupted archive of its undo: settled/ has the new version, the live folder still the stopped one.
+    mkdirSync(join(dir, 'settled'), { recursive: true })
+    writeFileSync(join(dir, 'settled', `AM-1.7.${ATTEMPT}.json`), JSON.stringify({ ...stopped, settled: 'undone' }))
+    expect((await js.list('AM-1', 7)).map((x) => (x.journal as AdvanceJournal).settled)).toEqual(['stopped'])
+    expect((await js.all()).map((x) => x.settled)).toEqual(['stopped'])
+    // Recovery settles it again from the card's facts (resolved): it leaves the live folder, its archived copy replaced.
+    await js.write({ ...stopped, settled: 'resolved' })
+    expect(await js.list('AM-1', 7)).toEqual([])
+    expect((await js.settled('AM-1', 7)).map((x) => x.settled)).toEqual(['resolved'])
+  })
+
+  // HR2's round 1: journals settled for good that an earlier version left in the live folder are drained once, by the
+  // reader that finds them, so later passes don't read them, and retention covers them by their own file times.
+  it('settled journals left in the live folder before HI-3264 are moved to settled/ by the first list or all, kept live otherwise, and pruned by their age', async () => {
+    const dir = tempDir('adv-legacy-')
+    const js = new AdvanceJournals(dir)
+    const deps = { journals: js } as unknown as JjAdvanceDeps
+    const j = await underLock('S', (fn) => fn(), (h) => journalRequested(h, deps, ATTEMPT, plan))
+    const legacy = (attempt: string, settled: AdvanceJournal['settled'], card = 'AM-1'): string => {
+      const f = join(dir, `${card}.7.${attempt}.json`)
+      writeFileSync(f, JSON.stringify({ ...j, attempt, plan: { ...plan, card }, settled }))
+      return f
+    }
+    const old = legacy('old', 'nothingMoved')
+    const long = new Date(Date.now() - SETTLED_KEPT_MS - 60_000)
+    utimesSync(old, long, long)
+    legacy('recent', 'integrated')
+    legacy('other-card', 'resolved', 'AM-2')
+    const live = (): string[] => readdirSync(dir).filter((n) => n.endsWith('.json')).sort()
+    // A card's listing drains its own: the old one pruned at once by its age, the recent one kept in settled/.
+    expect((await js.list('AM-1', 7)).map((x) => x.attempt)).toEqual([ATTEMPT])
+    expect(live()).toEqual([`AM-1.7.${ATTEMPT}.json`, 'AM-2.7.other-card.json'])
+    expect((await js.settled('AM-1', 7)).map((x) => x.attempt)).toEqual(['recent'])
+    // Recovery's pass drains the rest; the next pass reads only the live journal.
+    expect((await js.all()).map((x) => x.attempt)).toEqual([ATTEMPT])
+    expect(live()).toEqual([`AM-1.7.${ATTEMPT}.json`])
+    expect((await js.settled('AM-2', 7)).map((x) => x.attempt)).toEqual(['other-card'])
+    expect((await js.all()).map((x) => x.attempt)).toEqual([ATTEMPT])
   })
 
   it('writeDurable replaces a file whole', async () => {

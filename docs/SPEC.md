@@ -4202,9 +4202,11 @@ with s34, its mapping HI-3235/s7, s10, s13 and s16. gate:advance is open.
   from the board at its lease checks.
 - **Refused at the base**, nothing written: more than one operation head; T conflicted or divergent; T ≠ E in jj, jj's
   record of Git or Git; T checked out in any Git worktree; anything else pending export. The card stays Approved and
-  its comments say why, once per plan and reason; the same plan isn't tried again until the repository's heads or Git
-  side change. (In a repository with no Git working copy beside it, jj exports nothing by itself: the target and any
-  other bookmark must be exported first.)
+  its comments say why, once per plan and reason. HI-3264: the check is read-only and comes before any journal or fact
+  (`baseRefusalNow`, under the locks), so a cause that persists while jj operations come and go costs reads on each
+  pass, never a journal, an attempt or facts; no preview is asked meanwhile either. The attempt's own base read
+  checks the same again (a change in between refuses it as before, journaled). (In a repository with no Git working
+  copy beside it, jj exports nothing by itself: the target and any other bookmark must be exported first.)
 - **The steps**, each journaled before its command: `--at-op P0 --no-integrate-operation bookmark move T --from E --to
   R` (O, validated: parent P0, the attempt's marker, its view P0's but for T), `op integrate O`, `git export`, then
   every head, view and the Git side read twice. The lease (the plan unchanged, the card in Approved, the workspace
@@ -4227,7 +4229,12 @@ with s34, its mapping HI-3235/s7, s10, s13 and s16. gate:advance is open.
   and synced) comes first, with the whole plan; then `AdvanceAttempted { plan, attempt }`, read back; no jj write runs
   before both. `AdvanceStopped`, `AdvanceResolved { nothingMoved | undone | attested | startAgain }` and `Integrated`
   settle it; until then the card takes no other advance (no outside proof either). A plan undone isn't advanced again
-  on its own.
+  on its own. HI-3264: a journal settled for good (`nothingMoved`, `integrated`, `resolved`, `undone`: its outcome on
+  the card) moves to `jj-advance/settled/`, written whole there before the live file goes, and is pruned 30 days on;
+  recovery and a card's listing read only the live folder (unsettled, stopped or uncertain attempts), so their cost
+  doesn't grow with history. A journal settled for good found in the live folder (left there before HI-3264) is moved
+  to `settled/` by the reader that finds it, its file time kept, so it is read once and retention covers it. A crash
+  between the archive and the live file's removal leaves the previous live version, which recovery settles again.
 - **Blockers** (HI-3265, §16.9.1's HI-2709 rule): a card blocked by one that isn't Done (or can't be read) gets no
   attempt and no preview, and an Integrate click on an earlier preview runs nothing; it is tried again once they are
   Done. The authority is `AdvanceAttempted`'s write, which reads `closeWaitsFor` as the Git queue's `IntegrationStarted`
