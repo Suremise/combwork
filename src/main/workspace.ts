@@ -44,6 +44,7 @@ import { classify, finishMove, moveFolders, recordNewWorkspace, type MoveOptions
 import { projectNamesDone } from './nameUpgrade'
 import { NAMES_IGNORE } from './nameUpgradeFiles'
 import { movedPathOf } from '../shared/combworkFolderMove'
+import { LEGACY_PROVIDER } from '../shared/providers'
 
 const log = createLogger('workspace')
 
@@ -1745,7 +1746,7 @@ export class WorkspaceService {
       else {
         const now = new Date().toISOString()
         // Callers name the provider; records from before providers are Claude Code's.
-        existing = { agent: 'claude-code', name: '', createdAt: now, lastActiveAt: now, archived: false, ...created, ...rec }
+        existing = { agent: LEGACY_PROVIDER, name: '', createdAt: now, lastActiveAt: now, archived: false, ...created, ...rec }
         f.sessions.push(existing)
         // A deleted session that runs again (e.g. resumed inside the CLI) is Combwork's again.
         if (f.deleted?.includes(rec.id)) f.deleted = f.deleted.filter((id) => id !== rec.id)

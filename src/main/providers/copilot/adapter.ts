@@ -21,7 +21,7 @@ import { overrideId } from '../../../shared/advanced'
 import { copilotTranscriptTurns } from './turns'
 import { CopilotConversationParser, CopilotUsageParser, copilotDetailsMemo, copilotEventsPath, copilotImageData, eventsDetails, listCopilotSessions, parseEvents, workspaceInfo, type CopilotDetailsMemo } from './events'
 import { COPILOT_HOST_TEXT, copilotInstallCommand, copilotLatestVersion, copilotLoginCommand, copilotReadiness, copilotUpdateCommand, copilotUpdateRetry, copilotUpdateUpToDate, launchRoute, locateCopilot, primaryContext, primaryModels } from './install'
-import { signInSnapshot } from './hosts'
+import { newGeneration, signInSnapshot } from './hosts'
 import { resolveGithubHosts, type ResolvedGithubHosts } from '../../../shared/githubHost'
 import { combworkError } from '../../combworkError'
 import { advanced } from '../../advanced'
@@ -223,6 +223,11 @@ export class CopilotAdapter implements ProviderAdapter {
   }
 
   /** What a launch on these hosts would sign in as (HI-2779): as prepareLaunch records it, with the switches as they are now. */
+
+  githubHostsChanged(): void {
+    newGeneration()
+  }
+
   signInHostFor(hosts: ResolvedGithubHosts, env: Record<string, string>): Promise<LaunchedSignInHost | null> {
     return signInSnapshot(hosts, copilotEnv(launchRoute(hosts, env).env))
   }

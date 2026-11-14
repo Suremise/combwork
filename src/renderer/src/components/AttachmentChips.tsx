@@ -20,7 +20,7 @@ export function AttachmentChips({ ptyKey, provider, projectPath, agentId }: { pt
   const menu = useContextMenu()
   useLanguage()
   if (!chips.length) return null
-  const d = providerDescriptor(provider ?? 'claude-code')
+  const d = providerDescriptor(provider)
   return (
     <div className="attachment-chips" aria-label={tr(msg({ id: 'sessions.chips.label', defaultMessage: 'Attached to this prompt', description: "The attachment chips' accessible name, over an agent's terminal: files attached to the prompt being written." }))}>
       {chips.map((c) => {

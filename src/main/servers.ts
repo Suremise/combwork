@@ -142,8 +142,8 @@ import { clearDiscovery, writeDiscovery } from './apiDiscovery'
 import { createViewerToken, loadViewerTokens, revokeViewerToken, viewerForToken, viewerTokens } from './viewerTokens'
 import { hookTokenMatches, refusedHookNote, runForHookToken } from './hookTokens'
 import { answering, carrying, claimTwin, hasContext, type TwinEntry } from './hookTwins'
-import { fixedHookUrl, type ClaudeSnippetFacts } from '../shared/claudeHookHandlers'
-import { launchHookTimeouts } from './providers/claude/adapter'
+import { fixedHookUrl, type AdminSnippetFacts } from '../shared/hooks'
+import { provider as providerAdapter } from './providers'
 import { unusedWorktreeCounts } from './unusedWorktrees'
 import { devConsole, combworkSourceId, sessionSourceId } from './devConsole'
 import { consoleSources } from './devConsoleSources'
@@ -490,14 +490,14 @@ function apiPort(): number {
 }
 
 /**
- * What the Claude Code admin snippet is made from (HI-2777): this Combwork's Agent API port, the other build's default
- * one (an installed app's 47821, a development build's 47822) and the hooks' timeouts as Settings → Advanced has them,
- * so a snippet made now matches the handlers Combwork's launches pass.
+ * What a provider's admin snippet is made from (HI-2777): this Combwork's Agent API port, the other build's default one
+ * (an installed app's 47821, a development build's 47822) and the provider's own values (Claude Code's hooks' timeouts as
+ * Settings → Advanced has them), so a snippet made now matches the handlers Combwork's launches pass.
  */
-export function claudeSnippetFacts(): ClaudeSnippetFacts {
+export function adminSnippetFacts(id: ProviderId): AdminSnippetFacts {
   const port = apiPort()
   const other = app.isPackaged ? DEFAULT_API_PORT + 1 : DEFAULT_API_PORT
-  return { port, otherPort: other === port ? null : other, packaged: app.isPackaged, listening: !!apiServer?.listening, timeouts: launchHookTimeouts() }
+  return { port, otherPort: other === port ? null : other, packaged: app.isPackaged, listening: !!apiServer?.listening, settings: providerAdapter(id).adminSnippet?.settings() ?? {} }
 }
 
 export function apiInfo(): AgentApiInfo {

@@ -1,3 +1,5 @@
+import { HOOK_AUTH_FILE_ENV, HOOK_TOKEN_ENV, HOOK_URL_ENV, fixedHookUrl, type AdminSnippetFacts } from '../../hooks'
+
 /**
  * Claude Code's hook handlers as Combwork gives them (HI-2777), in one place for its launch settings and for the admin
  * snippet an organisation pastes into its managed settings. Claude Code runs a handler defined in more than one settings
@@ -19,32 +21,11 @@ export const MANAGED_POLICY_GUIDE = 'claude-code-managed-policy'
 /** Claude Code's hook events Combwork takes. */
 export const CLAUDE_HOOK_EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Notification', 'Stop', 'StopFailure', 'PreCompact', 'PostCompact', 'SessionEnd'] as const // i18n-ignore: Claude Code's hook event names
 
-/** The variables a launch sets for its hook commands. */
-export const HOOK_URL_ENV = 'CW_HOOK_URL' // i18n-ignore: an environment variable's name
-export const HOOK_AUTH_FILE_ENV = 'CW_HOOK_AUTH_FILE' // i18n-ignore: an environment variable's name
-export const HOOK_TOKEN_ENV = 'CW_HOOK_TOKEN' // i18n-ignore: an environment variable's name
-
 /** The hooks' timeouts in seconds (Settings → Advanced: claude-code.hooks.timeoutSeconds and preToolUseTimeoutSeconds). */
 export interface HookTimeouts {
   hook: number
   preToolUse: number
 }
-
-/** What the admin snippet is made from (HI-2777: servers.ts claudeSnippetFacts). */
-export interface ClaudeSnippetFacts {
-  /** This Combwork's Agent API port. */
-  port: number
-  /** The other build's default port (a development build's beside the installed app's), when it isn't this one. */
-  otherPort: number | null
-  /** An installed copy (else a development build). */
-  packaged: boolean
-  /** Whether the Agent API is listening on its port now (the fixed hook URL is there). */
-  listening: boolean
-  timeouts: HookTimeouts
-}
-
-/** The fixed URL Claude Code's HTTP hooks post to, for Combwork's Agent API on `port`. */
-export const fixedHookUrl = (port: number): string => `http://127.0.0.1:${port}/hook`
 
 /**
  * The PowerShell script the hook command runs: posts stdin to the launch's URL (`suffix` added) with the auth file's
@@ -105,3 +86,12 @@ export function claudeManagedSnippet(ports: readonly number[], t: HookTimeouts, 
 
 /** The snippet as an admin pastes it. */
 export const claudeManagedSnippetText = (ports: readonly number[], t: HookTimeouts, opts: { statusLine?: boolean } = {}): string => JSON.stringify(claudeManagedSnippet(ports, t, opts), null, 2)
+
+/**
+ * Claude Code's admin snippet (HI-2777) as the window's dialog shows it: from the facts main gives (its `settings`, the
+ * hooks' timeouts as Settings → Advanced has them), for the ports chosen.
+ */
+export const CLAUDE_ADMIN_SNIPPET = {
+  guide: MANAGED_POLICY_GUIDE,
+  text: (ports: readonly number[], facts: AdminSnippetFacts, opts: { statusLine?: boolean } = {}): string => claudeManagedSnippetText(ports, { hook: facts.settings.hook ?? 0, preToolUse: facts.settings.preToolUse ?? 0 }, opts)
+}

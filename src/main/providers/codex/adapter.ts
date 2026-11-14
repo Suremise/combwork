@@ -36,7 +36,7 @@ import { permissionsMenuLabel, permissionsMenuNumber } from './permissionsMenu'
 import { strayCodexWarning } from './strayFolder'
 import { advanced } from '../../advanced'
 import { launchOverrides } from '../../advancedValues'
-import { codexListedHooks } from '../../hookListing'
+import { codexListedHooks } from './hookListing'
 import type { HookListing, HookRow } from '../../../shared/hooks'
 import { withoutCombworkAuth } from '../../../shared/hooks'
 
@@ -441,7 +441,7 @@ function askAppServer(executable: string, args: string[], cwd: string, method: s
 
 /**
  * One request's answer from Codex's app server: its result, its error (`ok: false`, `error` its message), or none
- * (`error` says why). Run through Combwork's process ownership (codexChecks.ts, HI-1757): owned before it runs and confirmed
+ * (`error` says why). Run through Combwork's process ownership (checks.ts, HI-1757): owned before it runs and confirmed
  * gone before the answer is given; an end not confirmed is a failed answer, its connection held until it is.
  */
 function appServerAnswer(executable: string, args: string[], cwd: string, method: string, params: unknown, env: NodeJS.ProcessEnv | undefined, timeoutMs: number): Promise<CheckAnswer> {
@@ -874,7 +874,7 @@ export class CodexAdapter implements ProviderAdapter {
     return advanced.get<string[]>('codex.accounts.dropEnv')
   }
 
-  /** Whether a connection's folder is held by a check of Codex not yet confirmed ended (codexChecks.ts). */
+  /** Whether a connection's folder is held by a check of Codex not yet confirmed ended (checks.ts). */
   accountHeld(home: string): boolean {
     return codexCheckHeld(home)
   }

@@ -214,6 +214,11 @@ export interface ProviderCapabilities {
    */
   extraDirs: boolean
   /**
+   * The advanced value (seconds) that bounds one call of Combwork's tools in this CLI (Codex's tool_timeout_sec for the
+   * combwork MCP server): a card or agents wait holds a call a minute less, so its reply always arrives in time. Absent: none.
+   */
+  mcpToolTimeoutSetting?: string
+  /**
    * The CLI keeps its login in a home folder given at launch (HI-980: Claude Code's CLAUDE_CONFIG_DIR), so Combwork can keep
    * an account per folder: `homeEnv` names the variable, `shared` the home's folders each account's folder links to by a
    * junction (the adapter's accountSharedTarget says where), `userHome` the CLI's own home in the user's folder
@@ -501,6 +506,9 @@ export function contextLines(u: { provider: ProviderId; contextTokens: number; c
 /** A message of a provider's own text (`text`) by its id, or null: a comment Combwork wrote on a card names one (#866). */
 // Each provider's sentences a card comment stores by id are marked agent-text in its own module (HI-3201).
 export const providerMessage = (id: string): Msg | null => PROVIDERS.flatMap((p) => Object.values(p.text ?? {})).find((m): m is Msg => !!m && m.id === id) ?? null
+
+/** The provider with an admin snippet (HI-2777), or null: Help's and the hooks banner's Admin Snippet shows its. */
+export const adminSnippetProvider = (): ProviderModule | null => PROVIDER_MODULES.find((m) => m.adminSnippet) ?? null
 
 /** A provider's shared half (registry.ts), or undefined for an id this version doesn't know. */
 export const providerModule = (id: ProviderId | null | undefined): ProviderModule | undefined => PROVIDER_MODULES.find((m) => m.descriptor.id === id)

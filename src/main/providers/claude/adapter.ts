@@ -11,14 +11,16 @@ import { CLAUDE_CODE, CLAUDE_DESCRIPTOR, CLAUDE_FOOTER_MODES, baseModel, canSwit
 import { providerSettings } from '../../../shared/providers'
 import { samePath } from '../../../shared/movePaths'
 import { config } from '../../config'
-import { claudeAutoMemory, claudeFileAllowed, containsPlace, contentHash, ContentTooLarge, copyMissing, copySkillTree, sourceProblem, tooBigToDeliver, isDir, isFile, linksNotCopied, placeMatcher, readJson, realPath, removePath, writeJsonAtomic, type PlannedCopies } from '../../fsutil'
+import { containsPlace, contentHash, ContentTooLarge, copyMissing, copySkillTree, sourceProblem, tooBigToDeliver, isDir, isFile, linksNotCopied, placeMatcher, readJson, realPath, removePath, writeJsonAtomic, type PlannedCopies } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
 import { plainHttpsJson } from '../../plainHttpsJson'
 import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, keepBounded, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, updateStayedIssue, userMemoryLabel } from '../common'
 import type { StartHint } from '../../../shared/startFailure'
 import type { ConnectionStatus, TrustReading, TrustTarget, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, HookOccurrence, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
 import { autoCompactOf, effectiveEnv, settingsScopes } from './autoCompact'
-import { claudeScopeHooks, rowsOfHooksTable } from '../../hookListing'
+import { rowsOfHooksTable } from '../../hookListing'
+import { claudeAutoMemory, claudeFileAllowed } from './files'
+import { claudeScopeHooks } from './hookListing'
 import type { HookListing } from '../../../shared/hooks'
 import { connectionsManaged } from '../../connectionSeam'
 import { combworkStatusLine, mergeLaunchSettings, ownStatusLine, userSettings, withoutSettingsArgs } from './launchSettings'
@@ -29,7 +31,8 @@ import { claudeSafeguards } from './safeguards'
 import { claudeTranscriptTurns } from './turns'
 import { claudeUpdateChannel, windowsChannelSources, type UpdateChannel } from './updateChannel'
 import { readHookCause } from './hookPolicy'
-import { CLAUDE_HOOK_EVENTS, HOOK_TOKEN_ENV, claudeHookHandlers, type HookTimeouts } from '../../../shared/claudeHookHandlers'
+import { CLAUDE_HOOK_EVENTS, claudeHookHandlers, type HookTimeouts } from '../../../shared/providers/claude/hookHandlers'
+import { HOOK_TOKEN_ENV } from '../../../shared/hooks'
 import { isWingetPath, wingetUpgradeCommand, wingetUpToDate, wingetVersion } from '../winget'
 import type { SafeguardEvent } from '../../../shared/safeguards'
 import { ConversationParser, claudeImageData } from './conversation'
@@ -260,6 +263,8 @@ export function launchModel(ctx: Pick<LaunchContext, 'model' | 'use200kContext' 
 export class ClaudeCodeAdapter implements ProviderAdapter {
   readonly id = CLAUDE_CODE
   readonly descriptor = CLAUDE_DESCRIPTOR
+  /** Its admin snippet's values (HI-2777): the hooks' timeouts as Settings → Advanced has them, so it matches its launches. */
+  readonly adminSnippet = { settings: (): Record<string, number> => ({ ...launchHookTimeouts() }) }
   /** If Combwork itself was started from inside a Claude Code session, don't leak that session's identity. User configuration such as CLAUDE_CODE_GIT_BASH_PATH is kept. */
   readonly envToStrip = ['CLAUDECODE', 'CLAUDE_PID', 'CLAUDE_AGENT_SDK_VERSION', 'CLAUDE_CODE_ENTRYPOINT', 'CLAUDE_CODE_CHILD_SESSION', 'CLAUDE_CODE_SESSION_ID', 'CLAUDE_CODE_SESSION_ATTENDED', 'CLAUDE_CODE_MESSAGING_SOCKET', 'CLAUDE_CODE_MESSAGING_TOKEN', 'CLAUDE_CODE_SSE_PORT', 'CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING', 'MCP_CONNECTION_NONBLOCKING']
   readonly compactFailure = /not enough messages to compact|error during compaction|compaction failed/i

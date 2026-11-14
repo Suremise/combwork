@@ -637,7 +637,7 @@ export const AREAS = [
   // A typed prompt's line breaks for Codex (HI-1327): the fake Codex's (codexnewline) and the real one's (codex-newline).
   { paths: ['tests/e2e/codexnewline.cjs', 'tests/e2e/codex-newline.cjs', 'src/shared/terminalInput.ts', 'src/main/providers/codex/'], suites: ['codexnewline', 'codex-newline'] },
   // An agent's Hooks dialog and Activity's lock blocks (HI-982), on the fake Claude Code and the fake Codex.
-  { paths: ['tests/e2e/claudemanaged.cjs', 'tests/e2e/fake-claude/', 'src/shared/claudeHookHandlers.ts', 'src/main/hookTwins.ts', 'src/main/hookTokens.ts', 'src/main/providers/claude/hookPolicy.ts', 'src/main/providers/claude/adapter.ts', 'src/main/providers/claude/updateChannel.ts', 'src/main/servers.ts', 'src/renderer/src/components/AdminSnippetDialog.tsx', 'src/renderer/src/views/ProjectView.tsx'], suites: ['claudemanaged'] },
+  { paths: ['tests/e2e/claudemanaged.cjs', 'tests/e2e/fake-claude/', 'src/shared/providers/claude/hookHandlers.ts', 'src/main/hookTwins.ts', 'src/main/hookTokens.ts', 'src/main/providers/claude/hookPolicy.ts', 'src/main/providers/claude/adapter.ts', 'src/main/providers/claude/updateChannel.ts', 'src/main/servers.ts', 'src/renderer/src/components/AdminSnippetDialog.tsx', 'src/renderer/src/views/ProjectView.tsx'], suites: ['claudemanaged'] },
   { paths: ['tests/e2e/claudemanagedreal.cjs'], suites: ['claudemanagedreal'] },
   { paths: ['tests/e2e/hooksview.cjs', 'src/main/hookListing.ts', 'src/shared/hooks.ts', 'src/renderer/src/components/HooksDialog.tsx', 'src/main/servers.ts', 'src/main/providers/codex/', 'src/main/providers/claude/', 'src/main/providers/copilot/'], suites: ['hooksview'] },
   // The fake Codex CLI: every suite that runs it.
@@ -921,6 +921,9 @@ export const UNIT_SCANS = [
   // Every source file: no control character (#1040), no mixed line endings (#149).
   { test: 'tests/controlCharacters.test.ts', lines: ['[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f]'] },
   { test: 'tests/lineEndings.test.ts' },
+  // HI-3201: no code outside a provider's folders names a provider or imports its folder; the folders match the registry.
+  { test: 'tests/providerRegistry.test.ts', adds: true },
+  { test: 'tests/providerRegistry.test.ts', paths: ['src/'], lines: ['claude|codex|copilot|antigravity|agy|opencode', 'providers/'] },
   { test: 'tests/changelog.test.ts', paths: ['CHANGELOG.md'] }, // HI-2968: a version's section once, in order
   // Every jj file that reads the files a jj write replaces calls Combwork's file gate, or says where (HI-2918).
   { test: 'tests/jjFileGateInventory.test.ts', paths: ['src/main/'], adds: true },

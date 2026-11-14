@@ -7,7 +7,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { HOOK_FIRED_MAX, HOOK_ROWS_MAX, HOOK_TEXT_MAX, clip, groupFired, withoutCombworkAuth, type HookFired } from '../src/shared/hooks'
-import { claudeScopeHooks, codexListedHooks, rowsOfHooksTable } from '../src/main/hookListing'
+import { rowsOfHooksTable } from '../src/main/hookListing'
+import { claudeScopeHooks } from '../src/main/providers/claude/hookListing'
+import { codexListedHooks } from '../src/main/providers/codex/hookListing'
 
 const base = tempDir('cw-hooksview-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')

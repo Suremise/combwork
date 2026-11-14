@@ -5,7 +5,7 @@ import { emptyDay, localDay } from '../../../shared/usageDays'
 import { TimelineBuilder } from '../../../shared/usageTimeline'
 import { withValues, type Text } from '../../../shared/advanced'
 import { msg } from '../../../shared/i18n'
-import { formatToolInput } from '../claude/conversation'
+import { formatToolInput } from '../conversation'
 import { NOTICE_TEXT, firstLine, noticeOf, shortPath, type NewItem } from '../conversation'
 import type { ConversationParserLike, ImageLocation } from '../types'
 

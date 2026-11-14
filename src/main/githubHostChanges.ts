@@ -8,7 +8,6 @@ import { toast } from './events'
 import { githubHostsFor, onGithubHostsChanged } from './githubHosts'
 import { allProviders, provider } from './providers'
 import { childEnv } from './ptyHost'
-import { newGeneration } from './providers/copilot/hosts'
 import { providerService } from './providerService'
 import { createLogger } from './logger'
 import { WorkspaceService } from './workspace'
@@ -41,7 +40,7 @@ export async function movedAgents(ws: WorkspaceService, live: readonly LiveSessi
 export function watchGithubHostChanges(liveStates: () => LiveSessionState[], env: () => Record<string, string> = () => childEnv()): void {
   // A workspace closing (HI-2779): checks still running for its hosts are dropped, and the hosts in use checked again.
   WorkspaceService.closingListeners.add(() => {
-    newGeneration()
+    for (const p of allProviders()) p.githubHostsChanged?.()
     // Superseded at once, and checked again (forgetCatalog: a refresh running for the old routes publishes nothing).
     for (const p of allProviders()) {
       if (!p.descriptor.capabilities.githubHost) continue
@@ -50,7 +49,7 @@ export function watchGithubHostChanges(liveStates: () => LiveSessionState[], env
     }
   })
   onGithubHostsChanged((ws, projectPath) => {
-    newGeneration()
+    for (const p of allProviders()) p.githubHostsChanged?.()
     // A refresh running for the old hosts is superseded now, in this turn, and nothing of their catalogues shows while they
     // are checked again (the replacement starts once the workspace has read the projects again, below).
     for (const p of allProviders()) if (p.descriptor.capabilities.githubHost) providerService.forgetCatalog(p.id)

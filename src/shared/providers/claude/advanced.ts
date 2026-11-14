@@ -1,4 +1,4 @@
-import { FIXTURES as FIX, withValues, outagePatternId, overrideId, rightClickToCliId, outageCheckUrlId, type AdvancedSource, type AdvancedSample } from '../../advancedDef'
+import { FIXTURES as FIX, withValues, outagePatternId, overrideId, rightClickToCliId, outageCheckUrlId, type AdvancedSource, type AdvancedSample, clearKeyWaitId } from '../../advancedDef'
 import { msg } from '../../i18n/msg'
 import { CLAUDE_SAFEGUARDS } from './safeguards'
 import { CLAUDE_FOOTER_MODES } from './footer'
@@ -505,7 +505,7 @@ export const ADVANCED: readonly AdvancedSource[] = [
       { from: `${FIX}/advanced/input-claude-2.1.312.txt`, version: '2.1.312', text: `${'─'.repeat(120)}\n❯ test wake line typed and not sent\n${'─'.repeat(120)}` }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
-    id: 'claude-code.prompt.clearKeySeconds',
+    id: clearKeyWaitId('claude-code'),
     group: 'claude-code',
     title: msg({ id: 'settings.advanced.claude-code.prompt.clearKeySeconds.title', defaultMessage: 'Clearing the input: wait for each key', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.prompt.clearKeySeconds.desc', defaultMessage: "Claude Code's Ctrl+U deletes one row of a draft that wraps onto several, so before Combwork types into it, it presses Ctrl+U a key at a time until the input box (Screen: input box) shows empty. This is how long Combwork waits for Claude Code to show each key's effect. Not shown in time, Combwork types nothing and tries again later: too short, and a busy Claude Code makes Combwork put its messages off more often.", description: 'What the advanced setting "Clearing the input: wait for each key" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1979). Ctrl+U names keys: use the key names your language uses. "Screen: input box" is another advanced setting\'s title: use its translation.' }),

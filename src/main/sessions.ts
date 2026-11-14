@@ -95,7 +95,7 @@ import { presentWindow, testNotifyLog, testQuiet } from './testQuiet'
 import { admitLaunch, endAdmission, setLiveFolders } from './launchHolds'
 import { hashText, heldOpen, insideReal, isInUse, placeRelative, removePath, samePlace, treeSignature, syncCopy, syncCopyLocked, syncCopyNow, trashAllOrNothing, withFileLock } from './fsutil'
 import { createLogger, hookJournal, userText } from './logger'
-import { HOOK_AUTH_FILE_ENV, HOOK_URL_ENV } from '../shared/claudeHookHandlers'
+import { HOOK_AUTH_FILE_ENV, HOOK_URL_ENV } from '../shared/hooks'
 import { COMPACTING_TEXT, HOOKS_DOUBLED_NOTE, hooksMissingNote, addRetryWaited, retryWaitCurrent } from '../shared/runtime'
 import { applyStep, compactionOver, expireTasks, failedTurnStep, hookStep, idleAfter, idleQuestionGone, markedIdle, safeguardAnswered, SAFEGUARD_IDLE_MESSAGE, startupScreen, startupWatched, titleStep, type HookStatusInput, type HookStep } from './hookStatus'
 import { latestStop, memoModel, memoTools, memoTurn, newTurn, noteSafeguard, placeEvent, safeguardComment, safeguardText, seenInTurn, withScreenStops, type GuardTurns, type SafeguardEvent, type ScreenStop } from '../shared/safeguards'
@@ -171,6 +171,8 @@ import { driveExitKeys, type ExitKeysIO } from './exitKeys'
 import { movedFolders, movedPath } from './combworkMove'
 import { freshReasonOf, SESSION_NAMES, type FreshReason } from '../shared/sessionFresh'
 import type { FolderMove } from '../shared/combworkFolderMove'
+import { LEGACY_PROVIDER } from '../shared/providers'
+import { clearKeyWaitId } from '../shared/advancedDef'
 
 const log = createLogger('sessions')
 
@@ -1209,7 +1211,7 @@ class Moves {
   }
 }
 
-export const recordProvider = (rec: Pick<SessionRecord, 'agent'> | undefined): ProviderId => rec?.agent || 'claude-code'
+export const recordProvider = (rec: Pick<SessionRecord, 'agent'> | undefined): ProviderId => rec?.agent || LEGACY_PROVIDER
 
 /** A usage with the safeguard stops seen only on screen added (#606: kept on its record; the transcript's count doesn't have them). */
 function withScreenStopsIn(usage: SessionUsage, screen: SessionRecord['screenStops']): SessionUsage {
@@ -1261,8 +1263,6 @@ const USER_REPLY_MS = 15_000
 /** How long a prompt Combwork typed counts as pending (the agent just given a task) while its CLI hasn't taken it (#416). */
 const PENDING_MS = 30_000
 
-/** Settings → Advanced: how long a Ctrl+U clearing Claude Code's input has to be answered on its screen (HI-1979). */
-const CLEAR_KEY_WAIT = 'claude-code.prompt.clearKeySeconds'
 /**
  * The most Ctrl+U clearing an input may press (HI-1979): one deletes a row of a draft, so this is a draft of as many
  * rows; more ends the try, unseen empty.
@@ -4315,7 +4315,7 @@ class SessionManager {
       log.info(`${userText(this.label(l.state))}: its input wasn't seen empty, so nothing is typed into it: ${why}`) // i18n-ignore: why, for the log
       return combworkError(msg({ id: 'session.prompt.inputNotCleared', defaultMessage: "Its input couldn't be seen empty after Combwork cleared it: nothing is typed into it until it can be.", description: "Typing into an agent is refused (a message's notice is put off and tried again; Compact fails): Combwork pressed keys to clear the draft in its coding agent's input, and didn't see the input empty afterwards." }), undefined, { kind: 'conflict' })
     }
-    const waitMs = advanced.number(CLEAR_KEY_WAIT) * 1000
+    const waitMs = advanced.number(clearKeyWaitId(l.adapter.id)) * 1000
     // Refused because a key went unanswered while the box read empty (HI-2191): something else may take its keys.
     let unanswered = false
     /** The box once the key just pressed is answered: drawn differently from `before`, or null while it can't be read and the screen changed. */
@@ -8280,7 +8280,7 @@ class SessionManager {
     if (rec) return recordProvider(rec)
     const live = this.projectStates(projectPath).find((s) => s.sessionId === sessionId)
     if (live) return live.provider
-    return (await this.providerTranscript(projectPath, sessionId, ctx))?.provider ?? 'claude-code'
+    return (await this.providerTranscript(projectPath, sessionId, ctx))?.provider ?? LEGACY_PROVIDER
   }
 
   /**
@@ -9200,7 +9200,7 @@ class SessionManager {
 
   private async adoptNow(projectPath: string, sessionId: string): Promise<void> {
     const src = await this.providerTranscript(projectPath, sessionId)
-    const provider = src?.provider ?? 'claude-code'
+    const provider = src?.provider ?? LEGACY_PROVIDER
     // As its record says, if it has one (HI-1829): a conversation that ran on a server is never read Claude-priced.
     const rec = await workspace.sessionRecord(projectPath, sessionId).catch(() => undefined)
     const usage = src ? await this.usageFor(projectPath, src.path, sessionId, provider, { reportsIgnored: !!rec?.serverRan, costFree: !!rec?.serverLocal && !rec?.notLocal }) : null

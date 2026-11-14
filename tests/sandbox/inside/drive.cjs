@@ -70,7 +70,7 @@ const TRUST_FOLDERS = Object.keys(TRUST_JSON.projects)
 /** A connection home's files an upgrade must keep by content (kept.cjs connectionSnapshot): their texts, null when missing. */
 const connectionFiles = (home) => Object.fromEntries(['fake-account.json', '.claude.json'].map((n) => [n, (() => { try { return fs.readFileSync(path.join(home, n), 'utf8') } catch { return null } })()]))
 const MARK = { userName: 'Sandbox Check', theme: 'light' }
-// The providers Combwork knows, by their descriptors' ids (src/shared/providers.ts PROVIDERS; a unit test holds them equal).
+// The providers Combwork knows, by their descriptors' ids (src/shared/providers' PROVIDERS, from its registry; a unit test holds them equal).
 const PROVIDER_IDS = ['claude-code', 'codex', 'copilot', 'antigravity', 'opencode']
 // Scenario 4's workspace, made before the upgrade and opened after it (HI-2506), and its card.
 const KEPT_WS = path.join(process.env.USERPROFILE, 'Workspaces', 'Kept')
@@ -503,7 +503,7 @@ const steps = {
     const providers = await api('/v1/providers')
     res.facts.providers = providers
     const list = providers.providers || providers
-    // By the descriptors' ids (HI-2727; a unit test holds PROVIDER_IDS to src/shared/providers.ts), not a count.
+    // By the descriptors' ids (HI-2727; a unit test holds PROVIDER_IDS to src/shared/providers' PROVIDERS), not a count.
     const ids = Array.isArray(list) ? list.map(p => p.id) : []
     check('2.api-providers', `Agent API: every provider known (${PROVIDER_IDS.join(', ')}), none on, none installed`, Array.isArray(list) && JSON.stringify([...ids].sort()) === JSON.stringify([...PROVIDER_IDS].sort()) && list.every(p => !p.enabled && !p.installed), JSON.stringify(list.map?.(p => ({ id: p.id, enabled: p.enabled, installed: p.installed })) ?? list))
 

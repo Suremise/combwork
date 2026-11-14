@@ -134,6 +134,12 @@ export const rightClickToCliId = (provider: string): string => `${provider}.mous
 export const overrideId = (provider: ProviderId, what: string): string => `${provider}.override.${what}`
 
 /**
+ * How long Combwork waits for a provider's CLI to show each Ctrl+U clearing its input took effect (HI-1979):
+ * `<provider>.prompt.clearKeySeconds`, for a provider whose capabilities say `ctrlUClearsRow`.
+ */
+export const clearKeyWaitId = (provider: string): string => `${provider}.prompt.clearKeySeconds`
+
+/**
  * How long Combwork waits for a provider's CLI to draw a line it typed before pressing Enter anyway (#600):
  * `<provider>.prompt.drawnSeconds`, for a provider whose capabilities say `enterOnceDrawn`.
  */

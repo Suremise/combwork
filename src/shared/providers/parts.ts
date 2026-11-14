@@ -2,6 +2,7 @@ import type { ProviderDescriptor } from '.'
 import type { ModelPrice } from '../types'
 import type { Tip } from '../tips'
 import type { AdvancedSource } from '../advancedDef'
+import type { AdminSnippetFacts } from '../hooks'
 
 /**
  * A provider's shared half (HI-3201): everything the window, the shared settings logic and main read about one provider
@@ -20,6 +21,11 @@ export interface ProviderModule {
   advanced?: readonly AdvancedSource[]
   /** The address Combwork checks for its connection (HI-1612): a value of Combwork's own, listed under Combwork. */
   outageCheck?: AdvancedSource
+  /**
+   * Its admin snippet (HI-2777), where an organisation's policy can allow only managed hooks: the user guide's section on
+   * it, and the block as an administrator pastes it, for the ports chosen. Absent: none.
+   */
+  adminSnippet?: { guide: string; text(ports: readonly number[], facts: AdminSnippetFacts, opts?: { statusLine?: boolean }): string }
 }
 
 /**

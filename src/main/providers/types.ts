@@ -513,6 +513,9 @@ export interface ProviderAdapter {
   /** Its own work at Combwork's start and end (ProviderLifecycle); absent: none. */
   readonly lifecycle?: ProviderLifecycle
 
+  /** Its admin snippet's own values (HI-2777: the shared half's adminSnippet builds the block from them); absent: none. */
+  readonly adminSnippet?: { settings(): Record<string, number> }
+
   // Installation
   locate(): Promise<AgentInstallInfo>
   /**
@@ -543,6 +546,8 @@ export interface ProviderAdapter {
    * agents' records.
    */
   signInHostFor?(hosts: ResolvedGithubHosts, env: Record<string, string>): Promise<LaunchedSignInHost | null>
+  /** A GitHub host setting changed or a workspace closed (HI-2779): checks under way for the old hosts are dropped. */
+  githubHostsChanged?(): void
   /** The CLI's sign-in; `host`: the GitHub host it signs in on (HI-2779, capabilities.githubHost), else its default. */
   loginCommand(executable: string, host?: string): CommandSpec
   /**

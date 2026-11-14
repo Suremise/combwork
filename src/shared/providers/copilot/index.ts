@@ -23,6 +23,9 @@ import { TIPS } from './tips'
 
 export const COPILOT = 'copilot'
 
+/** Copilot's one PC-wide sign-in as an account (decision C): made by Combwork, never removed, on the CLI's own home (pcAccountId). */
+export const COPILOT_ACCOUNT = COPILOT
+
 // Combwork's own tools (the combwork MCP server) never ask, in any mode: the adapter pre-approves them.
 /** GitHub Copilot's permission modes as agents and the Agent API read them (dialects, HI-2065): said when read (the getters below), so in the reader's dialect. The window has its own messages (`text`). */
 const M = {

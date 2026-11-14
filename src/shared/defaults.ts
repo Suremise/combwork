@@ -1,11 +1,10 @@
 import type { AgentBranchStatus, AgentDef, AppConfig, AppSettings, CompactionEvent, KeybindingOverrides, FileLockMode, PageLayout, PlanLimit, PlanUsage, ProjectConfig, ProjectProviderConfig, ProviderId, ProviderSettings, LaunchedLimits, SessionLayout, SessionRecord, SessionStatus, SessionView, WorkspaceConfig } from './types'
-import { CLAUDE_CODE } from './providers/claude'
 import { MIGRATED_QUIT, migrateCombworkCommands } from './commands'
 import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX } from './agentLimits'
 import { DEFAULT_COLUMN_COLORS } from './tasks'
 import { formatDateTime } from './dates'
 import { formatGigabytes, formatSize } from './units'
-import { AUTO_PROVIDER, DEFAULT_PROVIDER, PROVIDERS, defaultProviderSettings, isDefaultProviderValue, providerDescriptor } from './providers'
+import { AUTO_PROVIDER, DEFAULT_PROVIDER, LEGACY_PROVIDER, PROVIDERS, defaultProviderSettings, isDefaultProviderValue, providerDescriptor } from './providers'
 import { chosenName, effortName, modelIdName, resolvedModel, runsAsName, type ModelInfo } from './models'
 import { msg, tr as trNow, type Msg } from './i18n'
 import type { Tr } from './tasks'
@@ -594,7 +593,7 @@ const V1_LIMITS: Record<string, Pick<PlanLimit, 'id' | 'label' | 'windowMinutes'
  * in), so version 1 (Claude Code only, 0.1.x) can be told apart from a fresh install.
  */
 /** The Assistant's model and effort defaults before 0.3, saved into every config. */
-const OLD_ASSISTANT_DEFAULTS: Record<string, { model?: string; effort: string }> = { 'claude-code': { model: 'sonnet', effort: 'low' }, codex: { effort: 'low' } }
+const OLD_ASSISTANT_DEFAULTS: Record<string, { model?: string; effort: string }> = { [LEGACY_PROVIDER]: { model: 'sonnet', effort: 'low' }, codex: { effort: 'low' } }
 
 export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppConfig {
   // HI-1954: Combwork's commands cleaned, and HI-1368's When Combwork quits, run adopted as one of them (once; written next save).
@@ -609,15 +608,15 @@ export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppCon
   if (raw && (raw.version ?? 1) < 2) {
     // 0.1.x ran Claude Code only: its settings become Claude Code's, and it stays enabled.
     const old = (raw.settings?.claude ?? {}) as Record<string, any>
-    const c: ProviderSettings = { ...cfg.settings.providers[CLAUDE_CODE], enabled: true }
+    const c: ProviderSettings = { ...cfg.settings.providers[LEGACY_PROVIDER], enabled: true }
     for (const k of ['executablePath', 'defaultModel', 'defaultEffort', 'defaultPermissionMode', 'extraArgs', 'checkUpdatesOnLaunch'] as const) {
       if (old[k] !== undefined) (c as unknown as Record<string, unknown>)[k] = old[k]
     }
     if (typeof old.enableBypassOption === 'boolean') c.enableDangerousMode = old.enableBypassOption
-    cfg.settings.providers[CLAUDE_CODE] = c
-    cfg.settings.defaultProvider = CLAUDE_CODE
+    cfg.settings.providers[LEGACY_PROVIDER] = c
+    cfg.settings.defaultProvider = LEGACY_PROVIDER
     const oldModel = raw.observedDefaultModel
-    cfg.observedDefaultModel = typeof oldModel === 'string' && oldModel ? { [CLAUDE_CODE]: oldModel } : {}
+    cfg.observedDefaultModel = typeof oldModel === 'string' && oldModel ? { [LEGACY_PROVIDER]: oldModel } : {}
     const oldUsage = raw.planUsage
     cfg.planUsage = {}
     if (oldUsage && typeof oldUsage === 'object' && !('limits' in oldUsage)) {
@@ -626,12 +625,12 @@ export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppCon
         const l = oldUsage[key]
         if (l && typeof l.usedPercent === 'number') limits.push({ ...meta, usedPercent: l.usedPercent, resetsAt: l.resetsAt ?? null })
       }
-      if (limits.length) cfg.planUsage[CLAUDE_CODE] = { provider: CLAUDE_CODE, plan: null, limits, updatedAt: oldUsage.updatedAt ?? new Date(0).toISOString() } as PlanUsage
+      if (limits.length) cfg.planUsage[LEGACY_PROVIDER] = { provider: LEGACY_PROVIDER, plan: null, limits, updatedAt: oldUsage.updatedAt ?? new Date(0).toISOString() } as PlanUsage
     }
     const warnings: AppConfig['planWarnings'] = {}
     for (const [k, v] of Object.entries(raw.planWarnings ?? {})) {
       const meta = V1_LIMITS[k]
-      warnings[meta ? `${CLAUDE_CODE}:${meta.id}` : k] = v as AppConfig['planWarnings'][string]
+      warnings[meta ? `${LEGACY_PROVIDER}:${meta.id}` : k] = v as AppConfig['planWarnings'][string]
     }
     cfg.planWarnings = warnings
   }
@@ -659,7 +658,7 @@ export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppCon
     const was = cfg.settings.assistant.mode
     if (RETIRED_PERSONAS[was]) cfg.settings.assistant.mode = RETIRED_PERSONAS[was]
   }
-  if (raw && (raw.version ?? 1) < 8 && cfg.settings.defaultProvider === CLAUDE_CODE) {
+  if (raw && (raw.version ?? 1) < 8 && cfg.settings.defaultProvider === LEGACY_PROVIDER) {
     // Claude Code was the default up to 0.4.x (saved into every config), so nobody could tell it from a choice: it
     // becomes Automatic (#474), which still picks Claude Code wherever it is turned on and installed. A Codex or
     // Copilot default was chosen, and stays.
@@ -695,7 +694,7 @@ export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppCon
  * an older version keeps them. Newer versions ignore it.
  */
 export function withLegacySettings(cfg: AppConfig): AppConfig & { settings: AppSettings & { claude: Record<string, unknown> } } {
-  const c = cfg.settings.providers[CLAUDE_CODE] ?? defaultProviderSettings(providerDescriptor(CLAUDE_CODE))
+  const c = cfg.settings.providers[LEGACY_PROVIDER] ?? defaultProviderSettings(providerDescriptor(LEGACY_PROVIDER))
   const legacyMode = c.defaultPermissionMode === 'bypassPermissions' ? 'auto' : c.defaultPermissionMode
   return {
     ...cfg,
@@ -769,7 +768,7 @@ export function migrateProjectConfig(raw: Record<string, any>): Record<string, a
     const legacy: Partial<ProjectProviderConfig> = {}
     for (const k of ['model', 'effort', 'permissionMode', 'extraArgs'] as const) if (out[k] !== undefined) legacy[k] = out[k]
     const { model: _m, effort: _e, permissionMode: _p, extraArgs: _x, ...rest } = out
-    out = { ...rest, providers: Object.keys(legacy).length ? { [CLAUDE_CODE]: legacy } : {} }
+    out = { ...rest, providers: Object.keys(legacy).length ? { [LEGACY_PROVIDER]: legacy } : {} }
   }
   if ((Number(out.version) || 1) < 2) {
     // 0.2.0: agents are all equal and none is made by default, so 0.1's agents (and their layout) are
@@ -818,7 +817,7 @@ export function withLegacyProjectFields(cfg: ProjectConfig): ProjectConfig & Par
     const { providers: _p, defaultProvider: _d, model: _m, effort: _e, permissionMode: _pm, extraArgs: _x, ...rest } = cfg as ProjectConfig & Partial<ProjectProviderConfig>
     return rest as ProjectConfig
   }
-  const c = cfg.providers?.[CLAUDE_CODE]
+  const c = cfg.providers?.[LEGACY_PROVIDER]
   return c ? { ...cfg, model: c.model, effort: c.effort, permissionMode: c.permissionMode, extraArgs: c.extraArgs } : cfg
 }
 

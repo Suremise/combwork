@@ -210,12 +210,9 @@ export function legacyEffective(agent: AgentDef, pc: ProjectConfig, assistant: b
 // The migration: accounts, connections made by the rule, deduplicated.
 // ---------------------------------------------------------------------------
 
-/** Copilot's one PC-wide sign-in as an account (decision C): made by Combwork, never removed, on the CLI's own home. */
-export const COPILOT_ACCOUNT = 'copilot'
-
 /**
  * A CLI's one PC-wide sign-in as an account (decision C, HI-2544): for each CLI without connections (Copilot, the
- * Antigravity CLI), its own, named by the CLI's id: Copilot's is COPILOT_ACCOUNT. Never another CLI's.
+ * Antigravity CLI), its own, named by the CLI's id (Copilot's: COPILOT_ACCOUNT). Never another CLI's.
  */
 export const pcAccountId = (cli: ProviderId): string => cli
 

@@ -6,7 +6,7 @@ import { TimelineBuilder, pendingRows, secondOf, spreadTokens, type PendingReque
 import { isSessionId } from '../../../shared/defaults'
 import { placeMatcher } from '../../places'
 import { COPILOT } from '../../../shared/providers/copilot'
-import { formatToolInput } from '../claude/conversation'
+import { formatToolInput } from '../conversation'
 import { NOTICE_TEXT, firstLine, noticeOf, shortPath, type NewItem } from '../conversation'
 import type { ConversationParserLike, ExternalSession, ImageLocation, LiveDetails } from '../types'
 import { advancedValues as advanced } from '../../advancedValues'

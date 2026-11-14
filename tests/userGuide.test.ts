@@ -12,7 +12,8 @@ import { GIT_VIEW_GUIDE } from '../src/shared/gitRepo'
 import { GIT_GUIDE } from '../src/shared/gitTool'
 import { CW_FOLDER_GUIDE } from '../src/shared/combworkVcsText'
 import { UNUSED_WORKTREES_GUIDE } from '../src/shared/unusedWorktrees'
-import { MANAGED_POLICY_GUIDE } from '../src/shared/claudeHookHandlers'
+import { MANAGED_POLICY_GUIDE } from '../src/shared/providers/claude/hookHandlers'
+import { PROVIDER_MODULES } from '../src/shared/providers/registry'
 
 const root = join(__dirname, '..')
 const guide = readFileSync(join(root, 'docs', 'USER_GUIDE.md'), 'utf8')
@@ -25,7 +26,9 @@ const CONSTANTS: Record<string, string> = { BOARD_UPGRADE_GUIDE, GIT_VIEW_GUIDE,
 const appLinks = (): [string, string][] => [
   ...TIPS.filter((t) => t.docs).map((t): [string, string] => [`tip ${t.id}`, t.docs!]),
   ...SETTINGS_CATALOG.map((e): [string, string] => [`setting ${e.id}`, e.docs]),
-  ...Object.entries(CONSTANTS)
+  ...Object.entries(CONSTANTS),
+  // A provider's admin snippet's guide (HI-3201: the dialog's Where it goes… opens it as adminSnippet.guide).
+  ...PROVIDER_MODULES.flatMap((m): [string, string][] => (m.adminSnippet ? [[`admin snippet ${m.descriptor.id}`, m.adminSnippet.guide]] : []))
 ]
 
 const sources = (dir: string): string[] =>
@@ -51,7 +54,7 @@ describe("the user guide's heading ids", () => {
 
   it("the window calls openGuideAt only with a tip's docs or a constant checked here", () => {
     const calls = sources(join(root, 'src', 'renderer', 'src')).flatMap((f) => [...readFileSync(f, 'utf8').matchAll(/openGuideAt\(([^)]*)\)/g)].map((m) => m[1].trim()))
-    const unchecked = calls.filter((a) => a !== 'id: string' && a !== 'tip.docs!' && !(a in CONSTANTS))
+    const unchecked = calls.filter((a) => a !== 'id: string' && a !== 'tip.docs!' && a !== 'adminSnippet.guide' && !(a in CONSTANTS))
     expect(unchecked, 'a new Learn more link: put its id in a shared constant and add it to CONSTANTS here').toEqual([])
   })
 

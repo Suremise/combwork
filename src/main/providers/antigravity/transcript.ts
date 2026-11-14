@@ -2,7 +2,7 @@ import type { CompactionEvent, DayUsage, SessionUsage, TranscriptImageRef, Trans
 import { emptyDay, localDay } from '../../../shared/usageDays'
 import { TimelineBuilder } from '../../../shared/usageTimeline'
 import { ANTIGRAVITY } from '../../../shared/providers/antigravity'
-import { formatToolInput } from '../claude/conversation'
+import { formatToolInput } from '../conversation'
 import { firstLine, shortPath, type NewItem } from '../conversation'
 import type { ConversationParserLike, ImageLocation } from '../types'
 import { advancedValues as advanced } from '../../advancedValues'

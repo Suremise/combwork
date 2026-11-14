@@ -141,7 +141,7 @@ function mustGet(id: string): Account {
 
 /**
  * Refuses a sign-in or removal while the CLI's own check of the folder isn't confirmed ended (HI-1757: Codex's app
- * server, held by codexChecks.ts until it is gone, across a restart too).
+ * server, held by providers/codex/checks.ts until it is gone, across a restart too).
  */
 function assertNotHeld(a: Account): void {
   if (!provider(a.provider).accountHeld?.(accountFolder(a.id))) return

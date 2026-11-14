@@ -24,7 +24,7 @@ const SHUTDOWN_MS = 25_000
 
 type Body = CoreRequest extends infer R ? (R extends { id: number } ? Omit<R, 'id'> : never) : never
 
-/** Where Combwork's other parts take what the history finds for a run (set at startup: opencodeHistoryHost). */
+/** Where Combwork's other parts take what the history finds for a run (set at startup: historyHost.ts). */
 export interface HistorySink {
   /** A run's plan limits as its server reported them (null: its account has none: clear its connection's). */
   limits(runId: string, usage: PlanUsage | null): void

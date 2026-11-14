@@ -15,7 +15,7 @@
     "native": ["image", "text"],
     "evidence": {
       "pdf": "no file tool for PDFs: it ran PowerShell Get-Content -Raw report.pdf and read the raw bytes (readable only because the probe's PDF is uncompressed)",
-      "image": "a pasted image path becomes [Image #n] (src/shared/codex.ts); it also has view_image"
+      "image": "a pasted image path becomes [Image #n] (src/shared/providers/codex/index.ts); it also has view_image"
     }
   },
   "copilot": {

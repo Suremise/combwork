@@ -82,7 +82,7 @@ export type WindowTextField =
   | 'notFilteredText'
 
 export type ThemeSetting = 'dark' | 'light' | 'system'
-/** A coding-agent CLI Combwork can run ("claude-code", "codex"). See src/shared/providers.ts. */
+/** A coding-agent CLI Combwork can run ("claude-code", "codex"): its descriptor's id (src/shared/providers/registry.ts lists them). */
 export type ProviderId = string
 /** A permission mode id from the agent's provider (e.g. Claude Code's "auto", Codex's "approve-for-me"). */
 export type PermissionMode = string

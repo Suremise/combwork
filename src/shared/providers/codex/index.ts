@@ -153,6 +153,8 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
     typedNewlines: ['alt-enter', 'ctrl-j'],
     // --add-dir, added to the writable roots of its own config (0.163.0: tests/fixtures/advanced/writable-roots-codex-0.163.0.json).
     extraDirs: true,
+    // Its timeout for Combwork's tools (codex.mcp.toolTimeoutSeconds): waits are held a minute under it.
+    mcpToolTimeoutSetting: 'codex.mcp.toolTimeoutSeconds',
     // Each connection a CODEX_HOME of its own (HI-1757), its rollouts shared with the others through sessions\ and
     // archived_sessions\ (resume reads the rollout alone); its memory, thread names and prompt history stay its own.
     // Its sign-in names an email and plan, no organisation.

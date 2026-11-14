@@ -7,6 +7,7 @@ import type { Tr } from '../../tasks'
 import type { PermissionMode } from '../../types'
 import type { ModeCaveatFacts, ModeOption, ModelGroup, ModelOption, ProviderDescriptor } from '..'
 import { defineProvider } from '../parts'
+import { CLAUDE_ADMIN_SNIPPET } from './hookHandlers'
 import { ADVANCED, OUTAGE_CHECK } from './advanced'
 import { CLAUDE_FOOTER_MODES } from './footer'
 export { CLAUDE_FOOTER_MODES } from './footer'
@@ -383,4 +384,4 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
 
 /** Claude Code's shared half, as the registry lists it (HI-3201). */
 // agent-text: CLAUDE_DESCRIPTOR.text.safeguardHelp (a CLI's sentence stored by id in a card comment, said when read: providerMessage)
-export default defineProvider({ descriptor: CLAUDE_DESCRIPTOR, prices: CLAUDE_PRICES, tips: TIPS, safeguards: CLAUDE_SAFEGUARDS, advanced: ADVANCED, outageCheck: OUTAGE_CHECK })
+export default defineProvider({ descriptor: CLAUDE_DESCRIPTOR, prices: CLAUDE_PRICES, tips: TIPS, safeguards: CLAUDE_SAFEGUARDS, adminSnippet: CLAUDE_ADMIN_SNIPPET, advanced: ADVANCED, outageCheck: OUTAGE_CHECK })

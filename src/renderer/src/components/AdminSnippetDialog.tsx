@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { call, errorMessage } from '../api'
 import { notify, set, useStore } from '../store'
 import { msg, tr } from '@shared/i18n'
-import { MANAGED_POLICY_GUIDE, claudeManagedSnippetText, type ClaudeSnippetFacts } from '@shared/claudeHookHandlers'
+import { adminSnippetProvider } from '@shared/providers'
+import type { AdminSnippetFacts } from '@shared/hooks'
 import { openGuideAt } from '../tips'
 import { LoadFailed, Modal } from './ui'
 
@@ -21,10 +22,11 @@ const M = {
   loadWhat: msg({ id: 'hooks.snippet.loadWhat', defaultMessage: 'the admin snippet', description: "What couldn't be loaded, in a 'couldn't load …' message of the admin snippet dialog." })
 }
 
-/** Claude Code's admin snippet (HI-2777), with this Combwork's port filled in, to copy for an organisation's administrator. */
+/** The admin snippet (HI-2777) of the provider that has one (Claude Code's), with this Combwork's port filled in, to copy for an organisation's administrator. */
 export function AdminSnippetDialog() {
   const open = useStore((s) => s.adminSnippetOpen)
-  const [facts, setFacts] = useState<ClaudeSnippetFacts | null>(null)
+  const snippet = adminSnippetProvider()
+  const [facts, setFacts] = useState<AdminSnippetFacts | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [statusLine, setStatusLine] = useState(true)
   const [both, setBoth] = useState(false)
@@ -32,20 +34,21 @@ export function AdminSnippetDialog() {
   useEffect(() => {
     setFacts(null)
     setError(null)
-    if (!open) return
+    if (!open || !snippet) return
     let current = true
-    void call('api:claudeSnippet').then(
+    void call('api:adminSnippet', snippet.descriptor.id).then(
       (f) => current && setFacts(f),
       (e) => current && setError(errorMessage(e))
     )
     return () => {
       current = false
     }
-  }, [open, attempt])
-  if (!open) return null
+  }, [open, attempt, snippet])
+  if (!open || !snippet?.adminSnippet) return null
+  const adminSnippet = snippet.adminSnippet
   const close = (): void => set({ adminSnippetOpen: false })
   const ports = facts ? [facts.port, ...(both && facts.otherPort ? [facts.otherPort] : [])] : []
-  const text = facts ? claudeManagedSnippetText(ports, facts.timeouts, { statusLine }) : ''
+  const text = facts ? adminSnippet.text(ports, facts, { statusLine }) : ''
   const copy = (): void => {
     void navigator.clipboard.writeText(text).then(() => notify('success', tr(M.copied)))
   }
@@ -61,7 +64,7 @@ export function AdminSnippetDialog() {
             className="btn subtle"
             onClick={() => {
               close()
-              openGuideAt(MANAGED_POLICY_GUIDE)
+              openGuideAt(adminSnippet.guide)
             }}
           >
             {tr(M.guide)}
