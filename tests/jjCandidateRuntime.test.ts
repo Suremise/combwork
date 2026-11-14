@@ -782,8 +782,13 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
   // (a fast-forward), or onto their own work on top of it. Before, a rebase's copy was not the same change and returned
   // the card with its work in the target, stuck; a merge's or squash's empty build stayed in the user's log as uncertain.
   describe.each([true, false] as const)('integrated their own way between the proof and the step (HI-3044), colocated: %s', (colocated) => {
+    // HI-3241 (design HI-3241/s11): main onto the reviewed commit itself, for rebase only. The step's HI-3044 check
+    // (jjCandidateStep.ts, ancestry) and the proof (jjIntegration.ts, merge-base --is-ancestor) count the reviewed commit
+    // as its own ancestor, so main at it and main past it take the same branch; each style's own parts (its candidate,
+    // its drop by the sweeps after Done) are its "work on top of it" test's. Rebase, the style whose copy wasn't the
+    // same change, keeps the exact head in both modes.
     for (const style of ['rebase', 'squash', 'merge'] as const) {
-      for (const onto of ['reviewed', 'descendant'] as const) {
+      for (const onto of style === 'rebase' ? (['reviewed', 'descendant'] as const) : (['descendant'] as const)) {
         it(`${style}, main onto the ${onto === 'reviewed' ? 'reviewed commit' : 'user’s work on top of it'}: nothing built or returned; the next proof makes it Done; nothing left in the log`, async () => {
           const w = await world(colocated, { candidates: true, oneSlot: true })
           const { card, P } = await approved(w)
