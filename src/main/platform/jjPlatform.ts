@@ -28,7 +28,10 @@ import type { Workflow } from '../workflow/runtime'
 import type { AdvanceAnswer, AdvanceHost, AdvanceRef, AdvanceStep, AdvanceWords, PreviewWords, CheckBracket, FinishInputs, HeadMove, KeptWork, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
 import { AdvanceJournals, basePrint, classifyUndoNow, commitsAdded, fingerprintHash, journalAbandoned, journalNewUndo, journalRequested, journalSettled, journalUndoAs, planIdOf, recoverAdvance, resultContained, runAdvance, runUndo, underLock, undoOfferedNow, undoPreMutation, type AdvanceJournal, type AdvanceOutcome, type Held, type JjAdvanceDeps, type JjAdvancePlan } from './jjAdvance'
 import { ADVANCE_GATES, ADVANCE_PREVIEW_GATE, ADVANCE_UNCERTAIN_GATE, advanceUnresolved, approvedByUser } from '../../shared/workflow/facts'
-import { finishPreviews } from '../../shared/workflow/options'
+import { finishAdvances, finishPreviews } from '../../shared/workflow/options'
+
+/** HI-3236: the consent an attempt runs under: the automatic finish's, or a preview's click. */
+type AdvanceMode = 'auto' | 'preview'
 import { okBeforeApplies } from '../../shared/workflow/guards'
 import { dirname } from 'path'
 import { samePath } from '../../shared/movePaths'
@@ -842,13 +845,27 @@ export class JjPlatform implements PlatformAdapter {
   }
 
   /** Whether a card's plan now is still `planId` (the attempt's lease: the card in Approved, its consent unchanged). */
-  private async planStill(cardId: number, planId: string, integ: JjIntegrationDeps): Promise<boolean> {
+  private async planStill(cardId: number, planId: string, integ: JjIntegrationDeps, mode: AdvanceMode): Promise<boolean> {
     const wf = this.wf
     if (!wf || this.deps?.candidateChecks?.signal?.aborted) return false
     const c = wf.store.card(cardId)
-    if (c.stage !== 'approved') return false
-    const p = await this.advancePlan(c, wf.state(c), integ)
+    const s = wf.state(c)
+    if (c.stage !== 'approved' || !this.consentHolds(c, s, mode)) return false
+    const p = await this.advancePlan(c, s, integ)
     return !!p && planIdOf(p.plan) === planId
+  }
+
+  /**
+   * HI-3236 (HR1's round 1): whether the card's rules now still consent to an attempt of this mode: its finish (an
+   * automatic one advances; a clicked one previews) and its OK where G10 applies. Read under the locks at the attempt's
+   * boundary and at every write of its lease: a call chosen under earlier rules (Preview or By hand applied to the card
+   * in flight meanwhile) never adopts the new mode's plan.
+   */
+  private consentHolds(c: CardRecord, s: CardState, mode: AdvanceMode): boolean {
+    const wf = this.wf!
+    const r = wf.rulesetOf(c, s)
+    if (mode === 'auto' ? !finishAdvances(r.options.finish) : !finishPreviews(r.options.finish)) return false
+    return !(wf.enforced() && okBeforeApplies(r, c.labels) && !approvedByUser(s, 'okBefore'))
   }
 
   /** Whether the cycle had an attempt for this plan that was undone (it isn't advanced again on its own). */
@@ -1001,10 +1018,12 @@ export class JjPlatform implements PlatformAdapter {
         const c = wf.store.card(card.id)
         const s = wf.state(c)
         if (c.stage !== 'approved' || s.integrated || advanceUnresolved(s)) return 'busy'
+        // The rules now, not those this call was chosen under: an automatic attempt only while the card still advances.
+        if (!this.consentHolds(c, s, 'auto')) return 'notReady'
         const ready = await this.readyPlan(h, integ, journals, c, s)
         if (!ready) return 'notReady'
         await host.noteDefault(c)
-        const out = await this.attemptUnder(h, integ, journals, c, s, ready.plan, ready.planId, host)
+        const out = await this.attemptUnder(h, integ, journals, c, s, ready.plan, ready.planId, host, 'auto')
         if (out.integrated) integrated = s.cycle
         return out.step
       })
@@ -1033,9 +1052,9 @@ export class JjPlatform implements PlatformAdapter {
   }
 
   /** One attempt of a ready plan (HI-3235's write order: journal, fact read back, the protocol, its outcome recorded). */
-  private async attemptUnder(h: Held, integ: JjIntegrationDeps, journals: AdvanceJournals, c: CardRecord, s: CardState, plan: JjAdvancePlan, planId: string, host: AdvanceHost): Promise<{ step: AdvanceStep; integrated: boolean }> {
+  private async attemptUnder(h: Held, integ: JjIntegrationDeps, journals: AdvanceJournals, c: CardRecord, s: CardState, plan: JjAdvancePlan, planId: string, host: AdvanceHost, mode: AdvanceMode): Promise<{ step: AdvanceStep; integrated: boolean }> {
     const attempt = randomUUID()
-    const deps = this.advanceDeps(integ, journals, () => this.planStill(c.id, planId, integ))
+    const deps = this.advanceDeps(integ, journals, () => this.planStill(c.id, planId, integ, mode))
     const j = await journalRequested(h, deps, attempt, plan)
     if (!(await host.attempted(c, s.cycle, planId, attempt))) {
       await journalAbandoned(h, deps, j)
@@ -1109,12 +1128,10 @@ export class JjPlatform implements PlatformAdapter {
       await host.declinePreview(c, s.cycle, ans.plan)
       return false
     }
-    const r = wf.rulesetOf(c, s)
-    if (!finishPreviews(r.options.finish) || c.stage !== 'approved' || s.integrated || advanceUnresolved(s)) return false
-    if (wf.enforced() && okBeforeApplies(r, c.labels) && !approvedByUser(s, 'okBefore')) return false
+    if (c.stage !== 'approved' || s.integrated || advanceUnresolved(s) || !this.consentHolds(c, s, 'preview')) return false
     const ready = await this.readyPlan(h, integ, journals, c, s)
     if (!ready || ready.planId !== ans.plan) return false
-    return (await this.attemptUnder(h, integ, journals, c, s, ready.plan, ready.planId, host)).integrated
+    return (await this.attemptUnder(h, integ, journals, c, s, ready.plan, ready.planId, host, 'preview')).integrated
   }
 
   /**
