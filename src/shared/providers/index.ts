@@ -455,6 +455,15 @@ export function registerCliModules(modules: readonly ProviderModule[], defs: rea
   PROVIDERS.splice(BUILT_IN_PROVIDERS, PROVIDERS.length - BUILT_IN_PROVIDERS, ...modules.map((m) => m.descriptor))
   setCliAdvancedDefs(defs)
   cliGen = generation
+  for (const fn of PROVIDERS_CHANGED) fn()
+}
+
+/** What rebuilds a table made from the providers when a snapshot of the user's own CLIs registers (settingsCatalog.ts). */
+const PROVIDERS_CHANGED: (() => void)[] = []
+
+/** Calls `fn` each time the registered providers change (a snapshot of the user's own CLIs, HI-3196), after they have. */
+export function onProvidersChanged(fn: () => void): void {
+  PROVIDERS_CHANGED.push(fn)
 }
 
 /** The user's own CLIs' snapshot this process registered last (0: none yet). */
@@ -580,8 +589,28 @@ export const adminSnippetProvider = (): ProviderModule | null => PROVIDER_MODULE
 /** A provider's shared half (registry.ts), or undefined for an id this version doesn't know. */
 export const providerModule = (id: ProviderId | null | undefined): ProviderModule | undefined => PROVIDER_MODULES.find((m) => m.descriptor.id === id)
 
+/** Descriptors a launch still preparing holds (holdDescriptor), the newest last. */
+const HELD: { id: ProviderId; descriptor: ProviderDescriptor }[] = []
+
 export function providerDescriptor(id: ProviderId | null | undefined): ProviderDescriptor {
-  return PROVIDERS.find((p) => p.id === (id || DEFAULT_PROVIDER)) ?? { ...UNKNOWN, id: id ?? 'unknown', name: id ?? 'Unknown provider' } // i18n-ignore: a stand-in name for a provider id Combwork doesn't know
+  const want = id || DEFAULT_PROVIDER
+  for (let i = HELD.length - 1; i >= 0; i--) if (HELD[i].id === want) return HELD[i].descriptor
+  return PROVIDERS.find((p) => p.id === want) ?? { ...UNKNOWN, id: id ?? 'unknown', name: id ?? 'Unknown provider' } // i18n-ignore: a stand-in name for a provider id Combwork doesn't know
+}
+
+/**
+ * Holds the descriptor a launch pinned (HI-3196: a CLI from a description, its copy taken at the launch's start) while it
+ * runs: what main reads by id meanwhile (its launch policy, modes, models, its status) is that copy, whatever a reload
+ * registers or removes; a new launch still needs its CLI registered (main's provider(id)). The newest hold of an id wins.
+ * Released (the function returned) when it exits or fails to start.
+ */
+export function holdDescriptor(descriptor: ProviderDescriptor): () => void {
+  const held = { id: descriptor.id, descriptor }
+  HELD.push(held)
+  return () => {
+    const i = HELD.indexOf(held)
+    if (i >= 0) HELD.splice(i, 1)
+  }
 }
 
 /**
@@ -634,7 +663,12 @@ export function projectProviderConfig(cfg: Pick<ProjectConfig, 'providers'> | nu
 }
 
 export function isProviderEnabled(settings: Pick<AppSettings, 'providers'> | null | undefined, id: ProviderId): boolean {
-  return isKnownProvider(id) && !!settings?.providers?.[id]?.enabled
+  return isKnownProvider(id) && providerSwitchOn(settings, id)
+}
+
+/** Its switch in Settings → Providers alone, whether or not the provider is registered now (a launch already under way, HI-3196). */
+export function providerSwitchOn(settings: Pick<AppSettings, 'providers'> | null | undefined, id: ProviderId): boolean {
+  return !!settings?.providers?.[id]?.enabled
 }
 
 /** The providers turned on, in Combwork's order (PROVIDERS': HI-2139, no order of the user's). */

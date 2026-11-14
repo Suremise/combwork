@@ -10,7 +10,7 @@ import type { AgentInstallInfo, ReadinessIssue } from '../../shared/types'
 import { advanced } from '../advanced'
 import { config } from '../config'
 import { createLogger, userText } from '../logger'
-import { installText, run, toSpawnable } from './common'
+import { EDITOR_EXTENSION_PATH, installText, run, toSpawnable } from './common'
 import type { CommandSpec, LaunchContext, ProviderAdapter, SkillDelivery } from './types'
 
 // The generic adapter (HI-3196): one class runs every data-only provider from its description (shared/providers/
@@ -136,6 +136,11 @@ export class CliAdapter implements ProviderAdapter {
     const info: AgentInstallInfo = { provider: this.id, found: false, path: null, version: null, source: null, latestVersion: null, updateAvailable: false, loggedIn: null, authMethod: null, account: null, rejected: [] }
     for (const c of await this.candidates()) {
       if (!existsSync(c.path)) continue
+      // Only the standalone CLI (SPEC §11): a copy inside an editor's extensions is never run, whoever names it.
+      if (EDITOR_EXTENSION_PATH.test(c.path)) {
+        info.rejected!.push(c.path)
+        continue
+      }
       const version = await this.version(c.path)
       Object.assign(info, { found: true, path: c.path, version, source: c.source })
       break

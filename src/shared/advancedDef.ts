@@ -159,4 +159,9 @@ export const CLI_ADVANCED_DEFS: readonly AdvancedDef[] = []
 export function setCliAdvancedDefs(defs: readonly AdvancedDef[]): void {
   const all = CLI_ADVANCED_DEFS as AdvancedDef[]
   all.splice(0, all.length, ...defs)
+  cliDefsVersion++
 }
+
+let cliDefsVersion = 0
+/** How many times the user's own CLIs' advanced values were replaced: what a list made from them is kept by. */
+export const cliAdvancedVersion = (): number => cliDefsVersion

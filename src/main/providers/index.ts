@@ -1,24 +1,36 @@
 import type { ProviderId } from '../../shared/types'
-import { PROVIDERS } from '../../shared/providers'
-import { BUILT_IN_PROVIDERS } from '../../shared/providers/registry'
+import { BUILT_IN_PROVIDERS, PROVIDER_MODULES } from '../../shared/providers/registry'
+import type { CliDescription } from '../../shared/providers/cliDescription'
+import type { ProviderModule } from '../../shared/providers/parts'
+import { CliAdapter } from './cliAdapter'
 import type { ProviderAdapter } from './types'
 import { msg } from '../../shared/i18n/msg'
 import { combworkError } from '../combworkError'
 
+/** The generic adapter for a module that is a description (HI-3196): a built-in data-only provider's, or a user's own CLI's. */
+export const genericAdapter = (m: ProviderModule & { cli: CliDescription }): ProviderAdapter => new CliAdapter(m)
+
 /**
- * Each provider's adapter (HI-3201), found in its folder here (<folder>/adapter.ts, its default export) and put in the
- * registry's order (shared/providers/registry.ts, which lists each provider once): adding a provider is its two folders and
- * the registry's line, with no list here.
+ * Each provider's adapter (HI-3201), in the registry's order (shared/providers/registry.ts, which lists each provider
+ * once): a full provider's found in its folder here (<folder>/adapter.ts, its default export); a data-only one's (its
+ * shared half a description, HI-3196: no main folder) the generic adapter. Adding a provider is its folders and the
+ * registry's line, with no list here.
  */
-export function orderedAdapters(found: readonly ProviderAdapter[], ids: readonly ProviderId[]): ProviderAdapter[] {
+export function orderedAdapters(found: readonly ProviderAdapter[], modules: readonly ProviderModule[], generic: (m: ProviderModule & { cli: CliDescription }) => ProviderAdapter = genericAdapter): ProviderAdapter[] {
+  const ids = modules.map((m) => m.descriptor.id)
   const seen = new Set<ProviderId>()
   for (const a of found) {
     if (seen.has(a.id)) throw new Error(`Two adapters for the provider "${a.id}"`) // i18n-ignore: a build mistake, for the developer
     seen.add(a.id)
     if (!ids.includes(a.id)) throw new Error(`The adapter for "${a.id}" has no line in shared/providers/registry.ts`) // i18n-ignore: a build mistake, for the developer
   }
-  return ids.map((id) => {
+  return modules.map((m) => {
+    const id = m.descriptor.id
     const a = found.find((x) => x.id === id)
+    if (m.cli) {
+      if (a) throw new Error(`The provider "${id}" is a description (data-only) and has an adapter in src/main/providers too: one or the other`) // i18n-ignore: a build mistake, for the developer
+      return generic({ ...m, cli: m.cli })
+    }
     if (!a) throw new Error(`The provider "${id}" has no adapter in src/main/providers/<folder>/adapter.ts`) // i18n-ignore: a build mistake, for the developer
     return a
   })
@@ -26,7 +38,7 @@ export function orderedAdapters(found: readonly ProviderAdapter[], ids: readonly
 
 const ADAPTERS: ProviderAdapter[] = orderedAdapters(
   Object.values(import.meta.glob<ProviderAdapter>('./*/adapter.ts', { eager: true, import: 'default' })),
-  PROVIDERS.slice(0, BUILT_IN_PROVIDERS).map((d) => d.id)
+  PROVIDER_MODULES.slice(0, BUILT_IN_PROVIDERS)
 )
 
 /**

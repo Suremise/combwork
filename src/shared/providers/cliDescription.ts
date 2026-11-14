@@ -1,6 +1,6 @@
 import { msg } from '../i18n/msg'
 import { agentMsg, say } from '../agentText'
-import { withValues, type AdvancedDef, type Text } from '../advancedDef'
+import { withValues, type AdvancedDef, type AdvancedSource, type Text } from '../advancedDef'
 import { CLI_OWN_MODE, withCliOwn } from '../cliOwnMode'
 import type { ModeOption, ModelGroup, ProviderDescriptor } from '.'
 import { defineProvider, type ProviderModule } from './parts'
@@ -339,6 +339,14 @@ const PATTERN_TEXT: Record<CliPattern, { title: Text; desc: Text }> = {
   }
 }
 
+/**
+ * A description's patterns as the advanced values' sources (#367), as a provider's shared half lists them: a built-in
+ * data-only provider's are gathered with every provider's (advanced.ts); a user's own CLI's are cliAdvancedDefs'.
+ */
+export function cliAdvancedSources(cli: CliDescription): AdvancedSource[] {
+  return cliAdvancedDefs(cli, () => '').map(({ text, ...d }) => ({ ...d, title: text.title, desc: text.desc }))
+}
+
 /** A description's patterns as advanced values (#367): their defaults the description's, no samples (no recording of the user's own CLI). */
 export function cliAdvancedDefs(cli: CliDescription, englishText: (t: Text) => string): AdvancedDef[] {
   const values: Partial<Record<CliPattern, string>> = {
@@ -357,7 +365,12 @@ export function cliAdvancedDefs(cli: CliDescription, englishText: (t: Text) => s
   })
 }
 
-/** A description as the shared half the registry lists (no prices, tips or advanced of its own: those are built-in tables). */
+/**
+ * A description as the shared half the registry lists (no prices or tips of its own): a built-in data-only provider's
+ * folder exports `cliModule(itsDescription)` and has no main folder (main/providers/index.ts runs it on the generic
+ * adapter); a user's own CLI's is made at each reload. Its patterns are its advanced values (gathered with the built-in
+ * providers' for a built-in one; a user's own are registered with its snapshot).
+ */
 export function cliModule(cli: CliDescription): ProviderModule {
-  return defineProvider({ descriptor: cliDescriptor(cli), prices: { checked: '', shipped: {} }, cli })
+  return defineProvider({ descriptor: cliDescriptor(cli), prices: { checked: '', shipped: {} }, advanced: cliAdvancedSources(cli), cli })
 }

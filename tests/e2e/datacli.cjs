@@ -20,6 +20,7 @@ const fakeLog = path.join(lib.WORK, 'datacli-fake.jsonl')
 const fakeStore = path.join(lib.WORK, 'datacli-store.json')
 const hold = path.join(lib.WORK, 'datacli-hold')
 const trust = path.join(lib.WORK, 'datacli-trust')
+const holdLaunch = path.join(lib.WORK, 'datacli-hold-launch')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -36,19 +37,22 @@ const description = {
   binary: { names: ['datacli'], paths: [path.join(__dirname, 'fake-datacli', 'datacli.cmd')], versionArgs: ['--version'], versionPattern: 'datacli (\\d+\\.\\d+\\.\\d+)' },
   launch: { prompt: 'typed', modes: [{ value: 'yolo', label: 'Yolo', args: ['--yolo'] }], env: { FAKE_DATACLI_MARK: 'from-description' } },
   session: { new: ['--session-id', '{id}'], resume: ['--resume', '{id}'] },
-  status: { ready: '^> ?$', working: 'Working…', asks: '(Allow|Trust this folder)\\? \\(y/n\\)', osc7501: true, exit: '/exit' }
+  status: { ready: '^> ', working: 'Working…', asks: '(Allow|Trust this folder)\\? \\(y/n\\)', osc7501: true, exit: '/exit' }
 }
 /** The same CLI described with no way to resume a session. */
 const noSession = { ...description, id: 'fake-nosession', name: 'Fake No-Session CLI', launch: { prompt: 'typed' }, session: undefined }
+/** One the suite removes while a launch of it prepares: that launch keeps it (its arguments say which). */
+const held = { ...noSession, id: 'fake-held', name: 'Fake Held CLI', launch: { prompt: 'typed', args: ['--from', 'first'] } }
 
 ;(async () => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
-  for (const f of [fakeLog, fakeStore, hold, trust]) fs.rmSync(f, { force: true })
+  for (const f of [fakeLog, fakeStore, hold, trust, holdLaunch, `${holdLaunch}.held`]) fs.rmSync(f, { force: true })
   fs.mkdirSync(path.join(userData, 'clis'), { recursive: true })
   fs.writeFileSync(path.join(userData, 'clis', 'fake-data.json'), JSON.stringify(description, null, 2))
   fs.writeFileSync(path.join(userData, 'clis', 'fake-nosession.json'), JSON.stringify(noSession, null, 2))
+  fs.writeFileSync(path.join(userData, 'clis', 'fake-held.json'), JSON.stringify(held, null, 2))
   lib.gitProject(proj)
-  lib.enableProviders(userData, ['claude-code', 'fake-data', 'fake-nosession'])
+  lib.enableProviders(userData, ['claude-code', 'fake-data', 'fake-nosession', 'fake-held'])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, 'fake-claude', 'fake-claude.cmd')
@@ -58,7 +62,7 @@ const noSession = { ...description, id: 'fake-nosession', name: 'Fake No-Session
   let app, page, inv, api
   /** Combwork started on the profile, its workspace open, and the Assistant running on the fake Claude Code for its token. */
   const boot = async () => {
-    ;({ app, page, inv } = await lib.launch({ userData, env: { FAKE_DATACLI_LOG: fakeLog, FAKE_DATACLI_STORE: fakeStore, FAKE_DATACLI_HOLD: hold, FAKE_DATACLI_TRUST: trust, CW_API_PORT: lib.port(47899) }, viewport: { width: 1400, height: 900 } }))
+    ;({ app, page, inv } = await lib.launch({ userData, env: { FAKE_DATACLI_LOG: fakeLog, FAKE_DATACLI_STORE: fakeStore, FAKE_DATACLI_HOLD: hold, FAKE_DATACLI_TRUST: trust, CW_TEST_HOLD_LAUNCH: holdLaunch, CW_API_PORT: lib.port(47899) }, viewport: { width: 1400, height: 900 } }))
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
     // The Assistant's token (only it starts agents and gives them tasks through the Agent API): its session on the fake Claude Code.
@@ -84,6 +88,36 @@ const noSession = { ...description, id: 'fake-nosession', name: 'Fake No-Session
     check('GET /v1/providers lists it with what it lacks', !!listed && [/tools/, /hooks/, /transcript/, /cost/].every((g) => listed.gaps?.some((t) => g.test(t))) && !listed.gaps.some((t) => /resum/.test(t)), JSON.stringify(listed?.gaps))
     check('…and a full provider with no gaps', providers.body.find((p) => p.id === 'claude-code')?.gaps === undefined)
     check('…and one described without a session lacks resume too', providers.body.find((p) => p.id === 'fake-nosession')?.gaps?.some((t) => /resum/.test(t)), JSON.stringify(providers.body.find((p) => p.id === 'fake-nosession')?.gaps))
+
+    // --- Settings has each CLI's page and its advanced values (registered at start), and follows a Reload: a CLI added,
+    // changed (its name, how it is found) and removed.
+    await page.keyboard.press('Control+,')
+    const navRow = (text) => page.locator('.settings-nav .row', { hasText: text })
+    await lib.until(async () => ((await navRow('Fake Data CLI').count()) === 1 ? true : null), HUNG_MS)
+    await navRow('Fake Data CLI').click()
+    check("Settings has a described CLI's page, with its CLI path", !!(await lib.until(async () => ((await page.locator('[data-setting="fake-data.executablePath"]').count()) === 1 ? true : null), HUNG_MS)))
+    await navRow('Advanced').click()
+    const advTab = (id) => page.locator(`.advanced-list .advanced-tabs [role="tab"][data-tab="${id}"]`)
+    check('…and Settings → Advanced has its tab', !!(await lib.until(async () => ((await advTab('fake-data').count()) === 1 ? true : null), HUNG_MS)))
+    const extraFile = path.join(userData, 'clis', 'fake-extra.json')
+    const moved = path.join(lib.WORK, 'datacli-moved')
+    fs.rmSync(moved, { recursive: true, force: true })
+    fs.mkdirSync(moved, { recursive: true })
+    for (const f of ['datacli.cmd', 'fake-datacli.cjs']) fs.copyFileSync(path.join(__dirname, 'fake-datacli', f), path.join(moved, f))
+    fs.writeFileSync(extraFile, JSON.stringify({ ...noSession, id: 'fake-extra', name: 'Fake Extra CLI' }, null, 2))
+    await inv('clis:reload')
+    check('a Reload adds a new CLI: its Advanced tab', !!(await lib.until(async () => ((await advTab('fake-extra').count()) === 1 ? true : null), HUNG_MS)))
+    check('…and its page', !!(await lib.until(async () => ((await navRow('Fake Extra CLI').count()) === 1 ? true : null), HUNG_MS)))
+    const extraPath = async () => String((await inv('provider:info'))['fake-extra']?.path ?? '').toLowerCase()
+    check('…and looks for it', !!(await lib.until(async () => ((await extraPath()).endsWith(path.join('fake-datacli', 'datacli.cmd').toLowerCase()) ? true : null), HUNG_MS)), await extraPath())
+    fs.writeFileSync(extraFile, JSON.stringify({ ...noSession, id: 'fake-extra', name: 'Fake Renamed CLI', binary: { ...noSession.binary, paths: [path.join(moved, 'datacli.cmd')] } }, null, 2))
+    await inv('clis:reload')
+    check('a Reload with it changed renames its page', !!(await lib.until(async () => ((await navRow('Fake Renamed CLI').count()) === 1 && (await navRow('Fake Extra CLI').count()) === 0 ? true : null), HUNG_MS)))
+    check('…and looks for it again where it now says it is', !!(await lib.until(async () => ((await extraPath()) === path.join(moved, 'datacli.cmd').toLowerCase() ? true : null), HUNG_MS)), await extraPath())
+    fs.rmSync(extraFile)
+    await inv('clis:reload')
+    check('a Reload with it removed takes away its tab and page', !!(await lib.until(async () => ((await advTab('fake-extra').count()) === 0 && (await navRow('Fake Renamed CLI').count()) === 0 ? true : null), HUNG_MS)))
+    await page.keyboard.press('Escape')
 
     const a = await lib.addAgent(inv, proj, { name: 'Data', provider: 'fake-data' })
     const live = async () => (await inv('session:live')).find((s) => s.agentId === a.id && s.status !== 'stopped') ?? null
@@ -169,6 +203,29 @@ const noSession = { ...description, id: 'fake-nosession', name: 'Fake No-Session
     check('…and resumes it by its id', arg(sixth, '--resume') === fifthId && !lines().some((e) => e.kind === 'resumeRefused'), JSON.stringify(sixth?.args))
     await statusIs('ready')
 
+    // --- A first prompt waits for a safe point: a question before it, the user's answer with a draft after it, the
+    // draft's own question; typed only once its prompt is free, the draft never cleared or lost, typed once.
+    await inv('session:stop', proj, a.id)
+    await stopped()
+    fs.writeFileSync(trust, '')
+    const draftStart = await api('POST', `/v1/projects/demo/agents/${a.id}/start`, { prompt: 'builder task' })
+    const draftLaunch = await lib.until(async () => launches()[6], HUNG_MS)
+    const draftId = arg(draftLaunch, '--session-id')
+    await statusIs('waiting')
+    fs.rmSync(trust, { force: true })
+    const linesOf = () => lines().filter((e) => e.kind === 'line' && e.id === draftId).map((e) => e.text)
+    // The answer, then a draft not sent.
+    await inv('pty:write', lib.ptyKey(proj, a.id), 'y\rask')
+    await lib.until(async () => (linesOf().includes('y') ? true : null), HUNG_MS)
+    // The draft sent: it asks its question; answered, its prompt is free at last.
+    await inv('pty:write', lib.ptyKey(proj, a.id), '\r')
+    await lib.until(async () => (linesOf().includes('ask') ? true : null), HUNG_MS)
+    await statusIs('waiting')
+    await inv('pty:write', lib.ptyKey(proj, a.id), 'n\r')
+    await lib.until(async () => (linesOf().includes('builder task') ? true : null), HUNG_MS)
+    check('a first prompt waits for its question, the user’s draft and the draft’s question: then typed once', draftStart.status === 200 && JSON.stringify(linesOf()) === JSON.stringify(['y', 'ask', 'n', 'builder task']) && !lines().some((e) => e.kind === 'typedWhileBusy' && e.id === draftId), JSON.stringify({ lines: linesOf(), status: (await live())?.status, screen: lib.plainText((await inv('pty:buffer', lib.ptyKey(proj, a.id)).catch(() => '')) ?? '').slice(-400) }))
+    await lib.until(async () => (['ready', 'finished'].includes((await live())?.status) ? true : null), HUNG_MS, 150)
+
     // --- Combwork quits while it runs, and starts again: the session it had is kept, and resumes by its id.
     await inv('pty:write', lib.ptyKey(proj, a.id), 'before quitting')
     await inv('pty:write', lib.ptyKey(proj, a.id), '\r')
@@ -177,10 +234,10 @@ const noSession = { ...description, id: 'fake-nosession', name: 'Fake No-Session
     await app.close()
     await boot()
     await lib.waitForProvider(inv, 'fake-data')
-    check('after a restart, its Resume still names the session', (await resumeId()) === fifthId, String(await resumeId()))
+    check('after a restart, its Resume still names the session', (await resumeId()) === draftId, String(await resumeId()))
     const afterRestart = await api('POST', `/v1/projects/demo/agents/${a.id}/start`, { resume: true })
-    const seventh = await lib.until(async () => launches()[6], HUNG_MS)
-    check('…and resumes it by its id', afterRestart.status === 200 && arg(seventh, '--resume') === fifthId && !lines().some((e) => e.kind === 'resumeRefused'), JSON.stringify({ afterRestart, args: seventh?.args }))
+    const seventh = await lib.until(async () => launches()[7], HUNG_MS)
+    check('…and resumes it by its id', afterRestart.status === 200 && arg(seventh, '--resume') === draftId && !lines().some((e) => e.kind === 'resumeRefused'), JSON.stringify({ afterRestart, args: seventh?.args }))
     await statusIs('ready')
     await inv('session:stop', proj, a.id)
     await stopped()
@@ -189,9 +246,9 @@ const noSession = { ...description, id: 'fake-nosession', name: 'Fake No-Session
     const b = await lib.addAgent(inv, proj, { name: 'NoSession', provider: 'fake-nosession' })
     const liveB = async () => (await inv('session:live')).find((s) => s.agentId === b.id && s.status !== 'stopped') ?? null
     await inv('session:start', proj, { agentId: b.id })
-    const eighth = await lib.until(async () => launches()[7], HUNG_MS)
+    const eighth = await lib.until(async () => launches()[8], HUNG_MS)
     check('a CLI without a session starts with no session id', !!eighth && !eighth.args.includes('--session-id'), JSON.stringify(eighth?.args))
-    await lib.until(async () => ((await liveB())?.status === 'ready' ? true : null), HUNG_MS, 150)
+    check('…and is ready at its prompt', !!(await lib.until(async () => ((await liveB())?.status === 'ready' ? true : null), HUNG_MS, 150)), JSON.stringify({ status: (await liveB())?.status, screen: lib.plainText((await inv('pty:buffer', lib.ptyKey(proj, b.id)).catch(() => '')) ?? '').slice(-300) }))
     await inv('pty:write', lib.ptyKey(proj, b.id), 'no session here')
     await inv('pty:write', lib.ptyKey(proj, b.id), '\r')
     await lib.until(async () => lines().find((e) => e.kind === 'line' && e.text === 'no session here'), HUNG_MS)
@@ -199,7 +256,27 @@ const noSession = { ...description, id: 'fake-nosession', name: 'Fake No-Session
     await inv('session:stop', proj, b.id)
     await lib.until(async () => !(await liveB()), HUNG_MS, 150)
     const noResume = await api('POST', `/v1/projects/demo/agents/${b.id}/start`, { resume: true })
-    check('…and a resume of it is refused, saying there is none', noResume.status === 409 && launches().length === 8, JSON.stringify(noResume))
+    check('…and a resume of it is refused, saying there is none', noResume.status === 409 && launches().length === 9, JSON.stringify(noResume))
+
+    // --- A launch held while it prepares, its CLI's description removed and reloaded meanwhile: it launches from the
+    // copy it took (its arguments), not refused as turned off; the next start is refused (its CLI is gone).
+    const c = await lib.addAgent(inv, proj, { name: 'Held', provider: 'fake-held' })
+    const liveC = async () => (await inv('session:live')).find((x) => x.agentId === c.id && x.status !== 'stopped') ?? null
+    fs.writeFileSync(holdLaunch, '')
+    const heldStart = inv('session:start', proj, { agentId: c.id }).then(() => 'started', (e) => `refused: ${e.message}`)
+    await lib.until(async () => (fs.existsSync(`${holdLaunch}.held`) ? true : null), HUNG_MS)
+    fs.rmSync(path.join(userData, 'clis', 'fake-held.json'))
+    await inv('clis:reload')
+    await lib.until(async () => (!(await inv('clis:snapshot')).clis.some((x) => x.id === 'fake-held') ? true : null), HUNG_MS)
+    fs.rmSync(holdLaunch)
+    const heldOutcome = await heldStart
+    const heldLaunch = await lib.until(async () => launches().find((e) => arg(e, '--from') === 'first'), HUNG_MS)
+    check('a launch whose description is removed while it prepares launches from its own copy', heldOutcome === 'started' && !!heldLaunch, JSON.stringify({ heldOutcome, args: heldLaunch?.args }))
+    check('…and runs on it: ready at its prompt', !!(await lib.until(async () => ((await liveC())?.status === 'ready' ? true : null), HUNG_MS, 150)), JSON.stringify({ status: (await liveC())?.status, screen: lib.plainText((await inv('pty:buffer', lib.ptyKey(proj, c.id)).catch(() => '')) ?? '').slice(-300) }))
+    await inv('session:stop', proj, c.id)
+    await lib.until(async () => !(await liveC()), HUNG_MS, 150)
+    const after = await inv('session:start', proj, { agentId: c.id }).then(() => 'started', (e) => String(e.message))
+    check('…and the next start is refused: its CLI is gone', /Unknown provider/.test(after), after)
   } finally {
     await app.close().catch(() => undefined)
   }

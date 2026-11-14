@@ -10,8 +10,7 @@ import { registerCliSnapshot, type CliSnapshotView } from '../shared/providers/c
 import { ensureHomeAccount } from './accounts'
 import { emit } from './events'
 import { createLogger, userText } from './logger'
-import { registerCliAdapters } from './providers'
-import { CliAdapter } from './providers/cliAdapter'
+import { genericAdapter, registerCliAdapters } from './providers'
 import { providerService } from './providerService'
 
 // The user's own CLIs (HI-3196): one JSON description per CLI in the profile's `clis` folder (per machine: a binary's path
@@ -35,14 +34,24 @@ export const clisFolder = (): string => join(app.getPath('userData'), 'clis')
 
 let generation = 0
 let current: CliSnapshotView = { generation: 0, folder: '', clis: [], problems: [] }
-/** Each file's last description that checked out, for this run: a later malformed edit keeps it (said beside it). */
-const lastGood = new Map<string, CliDescription>()
+/**
+ * Each file's last description that checked out, for this run: a later malformed edit keeps it (said beside it). Replaced
+ * whole by the read a reload applies, never changed while one reads.
+ */
+let lastGood: ReadonlyMap<string, CliDescription> = new Map()
 
 /** The snapshot every window registers (its initial state and each `clis` event). */
 export const cliSnapshot = (): CliSnapshotView => current
 
-/** Reads the folder and checks each description: the snapshot it makes, not applied yet. */
-export async function readClis(folder = clisFolder()): Promise<CliSnapshotView> {
+/** What a read of the folder makes, not applied yet: its snapshot, and each file's last good description with it. */
+export interface CliRead {
+  view: CliSnapshotView
+  lastGood: ReadonlyMap<string, CliDescription>
+}
+
+/** Reads the folder and checks each description, from the last good ones `prior` (nothing shared changes). */
+export async function readClis(folder = clisFolder(), prior: ReadonlyMap<string, CliDescription> = lastGood): Promise<CliRead> {
+  const good = new Map<string, CliDescription>()
   const problems: CliSnapshotView['problems'] = []
   let names: string[] = []
   try {
@@ -96,36 +105,43 @@ export async function readClis(folder = clisFolder()): Promise<CliSnapshotView> 
     }
     if (cli) {
       clis.push(cli)
-      lastGood.set(p.file, cli)
+      good.set(p.file, cli)
       continue
     }
-    // A file that had a good version this run keeps it (unless another file now has its id).
-    const kept = lastGood.get(p.file)
+    // A file that had a good version this run keeps it (unless another file now has its id). A file gone is gone: its
+    // last good version too (only files read now are kept).
+    const kept = prior.get(p.file)
     const usable = kept && !clis.some((c) => c.id === kept.id) && (byId.get(kept.id) ?? [p.file]).every((f) => f === p.file)
-    if (usable) clis.push(kept)
+    if (usable) {
+      clis.push(kept)
+      good.set(p.file, kept)
+    }
     problems.push({ file: p.file, problems: fileProblems, ...(usable ? { usingLastGood: true } : {}) })
   }
-  // A file gone is gone: its last good version too.
-  for (const f of [...lastGood.keys()]) if (!names.includes(f)) lastGood.delete(f)
-  return { generation: 0, folder, clis, problems }
+  return { view: { generation: 0, folder, clis, problems }, lastGood: good }
 }
+
+/** What Combwork looks for a CLI by: changed, its executable is looked for again. */
+const binaryOf = (c: CliDescription): string => JSON.stringify(c.binary)
 
 /**
  * Applies a snapshot in one step (no await between): the shared registry's tail and advanced values, and main's adapters;
  * then tells every window, and looks for each new CLI's executable.
  */
 export function applyClis(view: CliSnapshotView): CliSnapshotView {
-  const was = new Set(current.clis.map((c) => c.id))
+  const was = new Map(current.clis.map((c) => [c.id, binaryOf(c)]))
   generation++
   const snapshot = { ...view, generation }
   registerCliSnapshot(snapshot)
-  registerCliAdapters(snapshot.clis.map((c) => new CliAdapter({ ...cliModule(c), cli: c })))
+  registerCliAdapters(snapshot.clis.map((c) => genericAdapter({ ...cliModule(c), cli: c })))
   current = snapshot
   emit({ type: 'clis', snapshot })
   for (const c of snapshot.clis) {
     // Its agents run on its PC-wide account (it has no sign-in connections): made once, as Copilot's was.
     ensureHomeAccount(c.id)
-    if (!was.has(c.id)) void providerService.refresh(c.id).catch((e) => log.warn(`looking for ${userText(c.name)} failed`, e))
+    // New, or how it is found changed (its names, paths or version command): looked for again, any look still under way on
+    // the old one dropped (providerService keeps each CLI's newest). A launch under way keeps the executable it took.
+    if (was.get(c.id) !== binaryOf(c)) void providerService.refresh(c.id).catch((e) => log.warn(`looking for ${userText(c.name)} failed`, e))
   }
   for (const p of snapshot.problems) log.warn(`CLI description ${userText(p.file)} wasn't used${p.usingLastGood ? ' (its last good version is)' : ''}`)
   return snapshot
@@ -148,9 +164,22 @@ export async function cliSnapshotForWindow(): Promise<CliSnapshotView> {
   return current
 }
 
-/** Reads and applies the folder (at startup and on Settings' Reload). */
-export async function reloadClis(): Promise<CliSnapshotView> {
-  return applyClis(await readClis())
+/** The reload under way, which the next one waits for. */
+let reloading: Promise<unknown> = Promise.resolve()
+
+/**
+ * Reads and applies the folder (at startup and on Settings' Reload), one at a time: a reload reads only once the one
+ * before it has applied, so the newer read is always the one applied last, and each reads from the last good versions the
+ * one before it kept.
+ */
+export function reloadClis(folder = clisFolder(), read: typeof readClis = readClis): Promise<CliSnapshotView> {
+  const run = reloading.then(async () => {
+    const got = await read(folder, lastGood)
+    lastGood = got.lastGood
+    return applyClis(got.view)
+  })
+  reloading = run.catch(() => undefined)
+  return run
 }
 
 /** Opens the folder in Explorer, made first. */
