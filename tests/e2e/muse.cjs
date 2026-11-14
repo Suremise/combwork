@@ -255,6 +255,13 @@ const under = (p, dir) => !!p && path.resolve(p).toLowerCase().startsWith(path.r
     }, HUNG_MS)
     check('Settings → Advanced has a Muse Code tab with its values', (rows ?? 0) >= 6, String(rows))
     await shots('advanced')
+    // Its protocol's names (HI-3202): four mappings, each shown as its role=name entries; one missing a role is refused.
+    const names = page.locator('.advanced-row[data-advanced^="muse.names."]')
+    check('…with its four name mappings, each as role=name entries', (await names.count()) === 4 && /start=SessionStart/.test(await page.locator('.advanced-row[data-advanced="muse.names.hookEvents"]').innerText().catch(() => '') + (await page.locator('.advanced-row[data-advanced="muse.names.hookEvents"] input, .advanced-row[data-advanced="muse.names.hookEvents"] textarea').first().inputValue().catch(() => ''))), String(await names.count()))
+    const refused = await inv('advanced:set', 'muse.names.hookEvents', ['start=SessionStart']).then(() => null, (e) => String(e?.message ?? e))
+    check('…and a mapping missing a role is refused, saying what it takes', !!refused && /takes each of start, prompt/.test(refused), refused ?? 'taken')
+    await names.first().scrollIntoViewIfNeeded()
+    await shots('advanced-names')
     await page.keyboard.press('Escape')
   } finally {
     await app.close().catch(() => undefined)
