@@ -202,6 +202,14 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     lib.git(b10.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', '-A'])
     lib.git(b10.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', 'Dialog'])
     const head10 = git(fx.alpha, 'rev-parse', line10)
+    // HI-3247: picked only once the card has settled (B10 placed in its slot, its commit observed). A move refuses as
+    // "changed" when any fact lands on the card between its check and its write (stillAsChecked's seq), as these two do
+    // late under load; the window then says "Try again" in a toast, and the card stays on 1.2.0.
+    const settled10 = await waitHung(async () => {
+      const f = await inv('tasks:facts', n10)
+      return f.some((x) => x.kind === 'BuilderPlaced') && f.some((x) => x.kind === 'HeadMoved' && x.data?.to === head10) ? true : null
+    }).catch(() => null)
+    check('…the card settled before it is moved: its builder placed, its commit observed', !!settled10, JSON.stringify(await h.kinds(n10)))
     q.mergeOn(fx, 'integration', '1.2.0', '1.2.0 released into integration')
     // The card dialog: its Merges into shows 1.2.0 (the project's) and is open for a card in flight; integration picked.
     await q.showBoard(page)
