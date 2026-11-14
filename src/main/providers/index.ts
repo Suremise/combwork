@@ -1,15 +1,32 @@
 import type { ProviderId } from '../../shared/types'
-import { claudeCode } from './claude/adapter'
-import { codex } from './codex/adapter'
-import { copilot } from './copilot/adapter'
-import { antigravity } from './antigravity/adapter'
-import { opencode } from './opencode/adapter'
+import { PROVIDERS } from '../../shared/providers'
 import type { ProviderAdapter } from './types'
 import { msg } from '../../shared/i18n/msg'
 import { combworkError } from '../combworkError'
 
-/** Every provider adapter, in display order. Adding a provider: its descriptor in shared/providers.ts and its adapter here. */
-const ADAPTERS: ProviderAdapter[] = [claudeCode, codex, copilot, antigravity, opencode]
+/**
+ * Each provider's adapter (HI-3201), found in its folder here (<folder>/adapter.ts, its default export) and put in the
+ * registry's order (shared/providers/registry.ts, which lists each provider once): adding a provider is its two folders and
+ * the registry's line, with no list here.
+ */
+export function orderedAdapters(found: readonly ProviderAdapter[], ids: readonly ProviderId[]): ProviderAdapter[] {
+  const seen = new Set<ProviderId>()
+  for (const a of found) {
+    if (seen.has(a.id)) throw new Error(`Two adapters for the provider "${a.id}"`) // i18n-ignore: a build mistake, for the developer
+    seen.add(a.id)
+    if (!ids.includes(a.id)) throw new Error(`The adapter for "${a.id}" has no line in shared/providers/registry.ts`) // i18n-ignore: a build mistake, for the developer
+  }
+  return ids.map((id) => {
+    const a = found.find((x) => x.id === id)
+    if (!a) throw new Error(`The provider "${id}" has no adapter in src/main/providers/<folder>/adapter.ts`) // i18n-ignore: a build mistake, for the developer
+    return a
+  })
+}
+
+const ADAPTERS: ProviderAdapter[] = orderedAdapters(
+  Object.values(import.meta.glob<ProviderAdapter>('./*/adapter.ts', { eager: true, import: 'default' })),
+  PROVIDERS.map((d) => d.id)
+)
 
 export function allProviders(): ProviderAdapter[] {
   return ADAPTERS

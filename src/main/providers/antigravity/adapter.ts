@@ -649,3 +649,6 @@ export class AntigravityAdapter implements ProviderAdapter {
 }
 
 export const antigravity = new AntigravityAdapter()
+
+/** The adapter, as the registry finds it (src/main/providers/index.ts, HI-3201). */
+export default antigravity

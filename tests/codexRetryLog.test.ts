@@ -8,7 +8,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { build } from 'esbuild'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { ADVANCED_DEFS } from '../src/shared/advanced'
-import { handleRequest, type LogAnswer, type LogRequest } from '../src/main/codexLogWorker'
+import { handleRequest, type LogAnswer, type LogRequest } from '../src/main/providers/codex/threads/logWorker'
 import { DEADLINE_MS, MAX_PENDING, codexRetryWait, parseRetry, pendingReads, useCodexLogTransport } from '../src/main/providers/codex/retryLog'
 import { tempDir } from './tempDir'
 
@@ -165,7 +165,7 @@ describe("the reads main waits on (HI-1972)", () => {
 describe("Codex's log's worker as a thread (HI-1972)", () => {
   const bundle = join(tmp, 'codex-log-worker.cjs')
   beforeAll(async () => {
-    await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'codexLogWorker.ts')], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
+    await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'providers', 'codex', 'threads', 'logWorker.ts')], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
   }, 60_000)
   afterAll(() => useCodexLogTransport(null))
 

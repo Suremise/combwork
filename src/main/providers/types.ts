@@ -478,9 +478,40 @@ export type StartContextDelivery = 'put' | 'removed' | 'notSent' | 'tooLarge' | 
  * Everything Combwork needs from a coding-agent CLI. One adapter per provider, registered in
  * providers/index.ts; the rest of Combwork never checks which provider it is talking to.
  */
+/**
+ * A provider's usage parser class (usageParsers.ts): reads a transcript's whole lines and gives the usage so far. `rewritten`:
+ * its CLI may write a transcript again in place (not only append), so it is read whole again.
+ */
+export type UsageParserClass = (new (sessionId: string) => { feed(text: string): void; result(title?: string | null): SessionUsage }) & { readonly rewritten?: boolean }
+
+/**
+ * A provider's worker-safe parts (HI-3201), in src/main/providers/<folder>/worker.ts: what Combwork's threads read without
+ * its adapter, which loads Electron. Each is optional: a provider without one has none of it. `threads`: the names Copy
+ * Diagnostics gives its own worker threads.
+ */
+export interface ProviderWorker {
+  id: ProviderId
+  usageParser?: UsageParserClass
+  threads?: readonly string[]
+}
+
+/**
+ * A provider's own work at Combwork's start and end (HI-3201), each optional: `start` once the app is ready, `closing`
+ * during an orderly close (awaited, after the agents have stopped), `quitting` as the app quits (synchronous, also when the
+ * close couldn't wait).
+ */
+export interface ProviderLifecycle {
+  start?(): void
+  closing?(): Promise<void>
+  quitting?(): void
+}
+
 export interface ProviderAdapter {
   readonly id: ProviderId
   readonly descriptor: ProviderDescriptor
+
+  /** Its own work at Combwork's start and end (ProviderLifecycle); absent: none. */
+  readonly lifecycle?: ProviderLifecycle
 
   // Installation
   locate(): Promise<AgentInstallInfo>

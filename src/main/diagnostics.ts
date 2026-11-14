@@ -28,6 +28,7 @@ import { crashDumpLines, crashDumps, crashDumpsDir } from './exitLog'
 import { lastRunDiagnostics } from './lastRun'
 import { memoryDiagnostics } from './memory'
 import { workerThreadLines } from './workerThreads'
+import { PROVIDER_WORKERS } from './providers/workers'
 import { queryMetrics } from './metrics'
 import { toolListRows, type ToolListRow } from '../shared/metricsView'
 
@@ -205,7 +206,7 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
     // How each worker thread runs (HI-1880): an installed Combwork ran their work on main's thread, unseen.
     '### Worker threads',
     '',
-    ...workerThreadLines()
+    ...workerThreadLines(PROVIDER_WORKERS.flatMap((w) => w.threads ?? []))
   ].join('\n')
 
   // The log goes back further than what is open now: earlier workspaces and their projects are taken out too.

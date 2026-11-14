@@ -1238,3 +1238,6 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
 }
 
 export const claudeCode = new ClaudeCodeAdapter()
+
+/** The adapter, as the registry finds it (src/main/providers/index.ts, HI-3201). */
+export default claudeCode

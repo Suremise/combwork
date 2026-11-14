@@ -6,6 +6,7 @@ import { spawn, type ChildProcess } from 'child_process'
 import { dirname, join } from 'path'
 import { Worker } from 'worker_threads'
 import { build } from 'esbuild'
+import { esbuildEagerGlob } from './esbuildGlob'
 import { describe, expect, it, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { handleRequest, logInProcess, openableWaits, openFiles, type IngestJob, type IngestResult, type WorkerReply, type WorkerRequest } from '../src/main/usageWorker'
@@ -592,7 +593,7 @@ describe('the usage worker as main starts it (HI-1729)', () => {
     const stub = join(base, 'electron-in-worker.cjs')
     writeFileSync(stub, "module.exports = 'C:\\\\electron\\\\electron.exe'\n")
     const script = join(base, 'usage-worker.cjs')
-    await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'usageWorker.ts')], outfile: script, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs', electron: stub }, logLevel: 'silent' })
+    await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'usageWorker.ts')], outfile: script, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs', electron: stub }, plugins: [esbuildEagerGlob()], logLevel: 'silent' })
     const w = new Worker(script)
     try {
       const reply = await new Promise<WorkerReply>((resolve, reject) => {

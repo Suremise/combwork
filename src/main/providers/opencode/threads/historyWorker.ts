@@ -1,5 +1,5 @@
 import { parentPort } from 'worker_threads'
-import { HistoryCore, type CoreReply, type CoreRequest } from './providers/opencode/historyCore'
+import { HistoryCore, type CoreReply, type CoreRequest } from '../historyCore'
 
 /**
  * The OpenCode history's worker (HI-2762): a thread of its own running historyCore, so the reads of OpenCode sessions from

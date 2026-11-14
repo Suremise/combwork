@@ -16,7 +16,7 @@ import { POWERSHELL } from '../../launchGate'
 import { compareVersions, exportSubtitleText, readFirstLine, toSpawnable } from '../common'
 import { placeMatcher } from '../../places'
 import type { AdoptionHandle, CatalogRead, CommandSpec, ConnectionStatus, StartContextDelivery, StartContextTrigger, ConversationParserLike, ExternalSession, ImageLocation, LaunchContext, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
-import { localDataRoot } from '../antigravity/home'
+import { localDataRoot } from '../localData'
 import { AMBIENT_DIRS, AMBIENT_FILES, DATA_ENV, ambientIntegrations, opencodeEnv, opencodeHome } from './home'
 import { chosenAmbient, launchConfig, projectDecidesMcp, withTestProvider, writeConfigDir, type SavedCredentials } from './config'
 import { copyOpencodeSkills, opencodeSkillsDir } from './skills'
@@ -26,6 +26,7 @@ import { LAUNCHER_ARGS, LAUNCHER_SOURCE, launcherEnv, launcherSourcePath, ownerT
 import { OpencodeConversationParser, OpencodeUsageParser, mirrorState, opencodeImageData, parseMirrorUsage, type MirrorHeader } from './mirror'
 import { mirrorDir, mirrorPath } from './historyCore'
 import { opencodeHistory } from './history'
+import { createLogger } from '../../logger'
 import { contextTrigger, deliverContext, trackContextRun } from './context'
 
 // OpenCode 2 as a Combwork provider (HI-2759, against 2.2.6; the runtime facts are HI-2758's). Each launch runs its own
@@ -59,6 +60,8 @@ export function newSessionId(): string {
 }
 
 /** Whether a session id is one OpenCode's API takes (Session.ID: `^ses`), safe in a URL path and a command line. */
+const log = createLogger('opencode')
+
 export const isSessionId = (id: string): boolean => /^ses_?[A-Za-z0-9]{8,64}$/.test(id)
 
 /** An agent's extra argument Combwork sets itself, if any. */
@@ -94,6 +97,14 @@ const homeOf = (env: NodeJS.ProcessEnv): string | undefined => env[DATA_ENV] || 
 export class OpencodeAdapter implements ProviderAdapter {
   readonly id = OPENCODE
   readonly descriptor = OPENCODE_DESCRIPTOR
+  /**
+   * Its history (HI-2762), read from its servers: joined to the rest of Combwork once it has started (historyHost.ts, loaded
+   * then: it reaches the sessions, which reach the providers), its worker ended as Combwork quits.
+   */
+  readonly lifecycle = {
+    start: (): void => void import('./historyHost').then((h) => h.startOpencodeHistory(this), (e) => log.warn('starting the OpenCode history', e)),
+    quitting: (): void => void opencodeHistory.stop()
+  }
   /** OpenCode's environment is built whole by the adapter (home.ts): nothing for every child. */
   readonly envToStrip: string[] = []
   /** Its checks run with these switches (the update hold, the credentials), which change what they see. */
@@ -562,3 +573,6 @@ export function launchGuidance(ctx: Pick<LaunchContext, 'guidance' | 'instructio
 }
 
 export const opencode = new OpencodeAdapter()
+
+/** The adapter, as the registry finds it (src/main/providers/index.ts, HI-3201). */
+export default opencode

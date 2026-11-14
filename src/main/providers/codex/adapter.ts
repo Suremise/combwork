@@ -1,7 +1,7 @@
 import { createHash } from 'crypto'
 import { msg, tr } from '../../../shared/i18n'
 import { spawn } from 'child_process'
-import { codexCheckHeld, ownedAppServerRequest, type CheckAnswer } from '../../codexChecks'
+import { codexCheckHeld, ownedAppServerRequest, stopCodexChecks, type CheckAnswer } from './checks'
 import { homedir, tmpdir } from 'os'
 import { basename, join, resolve } from 'path'
 import { readdir, readFile, stat } from 'original-fs/promises'
@@ -602,6 +602,8 @@ const idFromFile = (f: string): string | null => /-([0-9a-f]{8}-[0-9a-f]{4}-[0-9
 export class CodexAdapter implements ProviderAdapter {
   readonly id = CODEX
   readonly descriptor = CODEX_DESCRIPTOR
+  /** Its connections' checks (HI-1757): those under way settled as Combwork closes (codex/checks.ts). */
+  readonly lifecycle = { closing: (): Promise<void> => stopCodexChecks() }
   /** A parent Codex session's identity, when Combwork runs inside one. User configuration (CODEX_HOME…) is kept. */
   readonly envToStrip = ['CODEX_SANDBOX', 'CODEX_SANDBOX_NETWORK_DISABLED', 'CODEX_THREAD_ID', 'CODEX_SESSION_ID', 'CODEX_CI']
   readonly compactFailure = null
@@ -1492,3 +1494,6 @@ export class CodexAdapter implements ProviderAdapter {
 }
 
 export const codex = new CodexAdapter()
+
+/** The adapter, as the registry finds it (src/main/providers/index.ts, HI-3201). */
+export default codex

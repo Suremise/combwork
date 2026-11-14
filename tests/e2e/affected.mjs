@@ -168,7 +168,7 @@ export const AREAS = [
   // The Combwork tools' description limits (HI-2012): replysize checks them.
   { paths: ['tests/e2e/toolLimits.cjs'], suites: ['replysize'] },
   { paths: ['tests/e2e/toolsides.cjs', 'src/shared/assistantTools.ts', 'src/main/mcp/cw-mcp.ts', 'src/main/sessions.ts', 'src/shared/workflow/roles.ts', 'src/main/launchSides.ts', 'src/main/workflowTools.ts', 'src/renderer/src/components/AgentDialogs.tsx'], suites: ['toolsides', 'replysize'] },
-  { paths: ['src/main/providers/opencode/', 'src/shared/providers/opencode/', 'src/main/opencodeHistoryHost.ts', 'src/main/opencodeHistoryWorker.ts', 'tests/e2e/fake-opencode/'], suites: ['opencode', 'opencode-assistant', 'opencode-history', 'opencode-isolation', 'opencode-launch', 'opencode-providers', 'opencode-status', 'opencode-tools', 'opencodereal', 'opencodereal-dirs'] },
+  { paths: ['src/main/providers/opencode/', 'src/shared/providers/opencode/', 'tests/e2e/fake-opencode/'], suites: ['opencode', 'opencode-assistant', 'opencode-history', 'opencode-isolation', 'opencode-launch', 'opencode-providers', 'opencode-status', 'opencode-tools', 'opencodereal', 'opencodereal-dirs'] },
   { paths: ['src/main/providers/antigravity/', 'src/main/statusLineState.ts', 'src/shared/providers/antigravity/', 'tests/e2e/fake-agy/'], suites: ['antigravity', 'antigravity-windows', 'antigravityreal'] },
   { paths: ['src/main/assistantMemory.ts', 'src/shared/assistantMemory.ts', 'src/renderer/src/components/AssistantMemory.tsx', 'src/renderer/src/components/AssistantView.tsx'], suites: ['assistantmemory', 'assistantimages'] },
   { paths: ['src/main/journal.ts', 'src/main/journalService.ts', 'src/main/walCheckpoint.ts', 'src/main/walCheckpointWorker.ts','src/shared/journal.ts', 'src/renderer/src/components/JournalSettings.tsx', 'tests/e2e/journal.cjs'], suites: ['journal', 'replysize'] },
@@ -287,7 +287,7 @@ export const AREAS = [
   // The turn ledger (#648): status by the CLIs' turn ids, reconciliation, the unknown state and Mark idle.
   { paths: ['src/main/turnLedger.ts', 'src/shared/runtime.ts'], suites: ['turnledger', 'idlestatus', 'background', 'attention', 'signin', 'lanewatch', 'replysize', 'hookshealth'] },
   // A CLI's retry wait (HI-1972): Codex's log read in its worker, shown as the agent's status.
-  { paths: ['src/main/codexLogWorker.ts', 'src/main/providers/codex/retryLog.ts', 'src/main/retryNotice.ts'], suites: ['turnledger'] },
+  { paths: ['src/main/providers/codex/retryLog.ts', 'src/main/retryNotice.ts'], suites: ['turnledger'] },
   // Hooks health (#1336): an agent whose hooks stop arriving shows as unknown, takes no lines, and pauses its lane.
   { paths: ['src/main/hooksHealth.ts', 'src/main/readiness.ts'], suites: ['hookshealth', 'hookstranscript', 'turnledger', 'idlestatus'] },
   { paths: ['src/main/turnsReader.ts', 'src/main/providers/turns.ts', 'src/main/providers/claude/turns.ts', 'src/main/providers/codex/turns.ts', 'src/main/providers/copilot/turns.ts', 'tests/e2e/hookstranscript.cjs', 'tests/e2e/hookscopilot.cjs'], suites: ['hookstranscript', 'hookscopilot', 'hookshealth'] },
@@ -631,7 +631,7 @@ export const AREAS = [
   { paths: ['src/main/mcp/cw-mcp.ts', 'src/main/index.ts', 'tests/e2e/agentguidance.cjs'], suites: ['agentguidance'] },
   { paths: ['src/main/providers/codex/adapter.ts', 'tests/e2e/codexownhooks.cjs'], suites: ['codexownhooks'] },
   // Codex's app server asked one thing, owned until it ends (HI-1757): a connection's sign-in check, a launch's hook check.
-  { paths: ['src/main/codexChecks.ts'], suites: ['connections-codex', 'codexownhooks'] },
+  { paths: ['src/main/providers/codex/checks.ts'], suites: ['connections-codex', 'codexownhooks'] },
   // The CLI's own setting and the Assistant's other MCP servers (#1284).
   { paths: ['src/shared/cliOwnMode.ts', 'src/renderer/src/components/PermissionMode.tsx', 'src/main/providers/claude/', 'tests/e2e/cliownmode.cjs'], suites: ['cliownmode'] },
   // A typed prompt's line breaks for Codex (HI-1327): the fake Codex's (codexnewline) and the real one's (codex-newline).
@@ -669,7 +669,7 @@ export const AREAS = [
   // The installer's copies (npm run dist first).
   { paths: ['electron-builder.yml', 'scripts/dist.mjs', 'scripts/distCopy.mjs'], suites: ['packaged', 'packaged-mcp', 'packaged-progress', 'packaged-sign', 'packaged-transcript', 'packaged-workers'] },
   // Combwork's worker threads in the installed copy, their scripts inside app.asar (HI-1880).
-  { paths: ['src/main/workerThreads.ts', 'src/main/places.ts', 'src/main/usageWorker.ts', 'src/main/gitWorker.ts', 'src/main/repoLockWorker.ts', 'src/main/walCheckpointWorker.ts', 'src/main/codexLogWorker.ts', 'src/main/noneBaselineWorker.ts', 'src/main/stallWatchdog.ts', 'tests/e2e/packaged-workers.cjs'], suites: ['packaged-workers'] },
+  { paths: ['src/main/workerThreads.ts', 'src/main/places.ts', 'src/main/usageWorker.ts', 'src/main/gitWorker.ts', 'src/main/repoLockWorker.ts', 'src/main/walCheckpointWorker.ts', 'src/main/noneBaselineWorker.ts', 'src/main/stallWatchdog.ts', 'tests/e2e/packaged-workers.cjs'], suites: ['packaged-workers'] },
   // Session records in the workspace's database (#1061): the suites that read or write them, Remove from Combwork and Repair.
   { paths: ['src/main/sessionStore.ts', 'tests/e2e/storeDocs.cjs', 'src/main/schema/sessionDeliveryTables.ts', 'src/main/schema/sessionDeliveryCodec.ts', 'tests/e2e/sessionDeliveryCodec.cjs'], suites: ['agents', 'assistantimages', 'assistantmode', 'cardchip', 'overview', 'providerdetect', 'quit', 'restart', 'resume', 'review', 'safeguards', 'sessionname', 'sessioncleanup', 'sessionorigin', 'sessionsize', 'sessiontree', 'wtrecreate', 'storage', 'transcript', 'wsmove', 'changespicker', 'dialogs', 'files', 'i18nlive', 'performance', 'projectrename', 'wsoverview', 'removeall', 'codex', 'codex-handover'] },
 ]

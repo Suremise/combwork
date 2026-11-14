@@ -14,12 +14,12 @@
 import { randomBytes } from 'crypto'
 import { basename } from 'path'
 import type { ChildProcess } from 'child_process'
-import { processSupervisor } from './agentProcesses'
-import { advanced } from './advanced'
-import { createLogger, userText } from './logger'
-import type { JobHost } from './processSupervisor'
-import { LeaseJob, leaseJobGone } from './workflow/queueJobs'
-import { startLauncher } from './workflow/launcher'
+import { processSupervisor } from '../../agentProcesses'
+import { advanced } from '../../advanced'
+import { createLogger, userText } from '../../logger'
+import type { JobHost } from '../../processSupervisor'
+import { LeaseJob, leaseJobGone } from '../../workflow/queueJobs'
+import { startLauncher } from '../../workflow/launcher'
 
 const log = createLogger('codex')
 

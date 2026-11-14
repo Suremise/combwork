@@ -1,7 +1,5 @@
 import { homedir } from 'os'
-import { app } from 'electron'
-import { profileFolder } from '../../../shared/appName'
-import { localProfileInUse } from '../../profileFolders'
+import { localDataRoot } from '../localData'
 import { join, resolve } from 'path'
 import { ANTIGRAVITY } from '../../../shared/providers/antigravity'
 import { overrides } from '../../advancedValues'
@@ -49,17 +47,6 @@ export function inProfile(env: Record<string, string>, profile: string, realHome
   return out
 }
 
-/**
- * Combwork's local data folder (%LOCALAPPDATA%\Combwork, or a test copy's), as accounts.ts's accountsRoot finds it, whose
- * `accounts` sits beside the profiles: computed here, since accounts.ts reaches the providers (an import cycle).
- */
-export function localDataRoot(): string {
-  const inUse = localProfileInUse()
-  if (inUse) return inUse
-  if (process.env.CW_USER_DATA) return process.env.CW_USER_DATA
-  const local = process.env.LOCALAPPDATA || join(app.getPath('home'), 'AppData', 'Local')
-  return join(local, profileFolder(app.isPackaged))
-}
 
 /**
  * The folder of every agent's private profile, under Combwork's local data. A profile is keyed by the agent's own id

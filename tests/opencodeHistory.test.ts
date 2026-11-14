@@ -491,7 +491,7 @@ describe("the OpenCode history's main side (HI-2762)", () => {
   it('runs its core in a thread of its own once built (the worker answers begin, repair and shutdown)', async () => {
     const { build } = await import('esbuild')
     const out = join(tempDir('cw-oc-worker-'), 'opencode-history-worker.cjs')
-    await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'opencodeHistoryWorker.ts')], outfile: out, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
+    await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'providers', 'opencode', 'threads', 'historyWorker.ts')], outfile: out, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
     const h = await historyWorkerForTests(out)
     const home = tempDir('cw-oc-main-')
     mkdirSync(join(home, 'combwork-sessions'), { recursive: true })
@@ -585,7 +585,7 @@ describe("the history's ownership across a removal and a new worker (HI-2762, HR
   it('gives a new worker its live runs again after the last one ended: it publishes again, and the old epoch counts for nothing', async () => {
     const { build } = await import('esbuild')
     const out = join(tempDir('cw-oc-worker-'), 'opencode-history-worker.cjs')
-    await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'opencodeHistoryWorker.ts')], outfile: out, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
+    await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'providers', 'opencode', 'threads', 'historyWorker.ts')], outfile: out, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
     // An agent's server, as the fake's recordings answer: its session, its pages, its log's watermark.
     const srv = server({ info: { ...SHELL.info, id: 'ses_wkwkwkwkwkwkwkwkwkwkwkwkwk' } })
     const g = fakeGet(srv)

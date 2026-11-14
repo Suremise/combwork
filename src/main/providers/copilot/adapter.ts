@@ -636,3 +636,6 @@ export class CopilotAdapter implements ProviderAdapter {
 }
 
 export const copilot = new CopilotAdapter()
+
+/** The adapter, as the registry finds it (src/main/providers/index.ts, HI-3201). */
+export default copilot

@@ -2,7 +2,7 @@ import { homedir } from 'os'
 import { join } from 'path'
 import { Worker } from 'worker_threads'
 import type { RetryWait } from '../../../shared/types'
-import type { LogAnswer, LogReply, LogRequest, LogRow, NoRow } from '../../codexLogWorker'
+import type { LogAnswer, LogReply, LogRequest, LogRow, NoRow } from './threads/logWorker'
 import { advanced } from '../../advanced'
 import { createLogger, userText } from '../../logger'
 import { bundledScriptExists, workerHere, workerStarted } from '../../workerThreads'
@@ -14,7 +14,7 @@ const log = createLogger('codexLog')
  * rollout and hooks are silent): its only record is a row in its log database, `logs_2.sqlite` in its CODEX_HOME,
  * `target` codex_core::responses_retry, `thread_id` the conversation, its message "stream disconnected - retrying
  * sampling request (1/5 in 399.9997619s)... last status: 429 Too Many Requests". Combwork reads the newest such row of a
- * session's turn there, read-only, in a worker of its own (codexLogWorker.ts: main's thread never waits on that file);
+ * session's turn there, read-only, in a worker of its own (threads/logWorker.ts: main's thread never waits on that file);
  * the row's target and the message's pattern are Settings → Advanced's (codex.retry.*), so a Codex that words it
  * otherwise can be followed without a release.
  */
@@ -95,7 +95,7 @@ class LogThread {
       if (!bundledScriptExists(workerScript())) {
         workerHere("Codex's log", "its script isn't there") // i18n-ignore: Copy Diagnostics' report, in English
         // Unit tests and an unbuilt run: the worker's code on this thread.
-        this.here = async (r) => (await import('../../codexLogWorker')).handleRequest(r)
+        this.here = async (r) => (await import('./threads/logWorker')).handleRequest(r)
         return this.send(m)
       }
       this.start()
@@ -143,7 +143,7 @@ let thread = new LogThread()
 
 /**
  * Tests: reads go through `transport` (null: the worker, or its code here when it isn't built), or the worker from
- * `script` (a build of codexLogWorker.ts); a new thread either way, the old one ended.
+ * `script` (a build of threads/logWorker.ts); a new thread either way, the old one ended.
  */
 export async function useCodexLogTransport(transport: Transport | null, script: string | null = null): Promise<void> {
   await thread.stop()
