@@ -622,6 +622,8 @@ interface LiveSession {
   prompted?: boolean
   /** Its first prompt, to type once its screen first says it is ready (HI-3196: a CLI whose prompt is typed). */
   typedFirstPrompt?: string
+  /** Its first prompt went on its command line: work its screen shows during its start is that turn (HI-3266, screenStatus). */
+  promptOnCommandLine?: boolean
   /** Its screen's reading of the CLI's turn (idle, working, not sure), for this launch's CLI version (ProviderAdapter.turnScreen). */
   turnScreen?: (screen: string) => 'idle' | 'working' | null
   /** The environment it was launched with: where its CLI keeps its records (HI-1972, ProviderAdapter.retryWait). */
@@ -3356,7 +3358,10 @@ class SessionManager {
     // any line Combwork types is (sendPrompt, its guards): never on its command line.
     // A resume whose CLI takes no prompt with it (HI-3202) types it the same way.
     if (l.initialPrompt && (adapter.launch.promptTyped || (l.resumed && adapter.launch.resumePromptTyped))) l.typedFirstPrompt = l.initialPrompt
-    else if (l.initialPrompt) this.notePrompt(l, true)
+    else if (l.initialPrompt) {
+      this.notePrompt(l, true)
+      l.promptOnCommandLine = true
+    }
     l.initialPrompt = undefined
     l.startAllowed = undefined
     // After each look at the transcript, whether its CLI waits to retry (HI-1972), then the silence check: what the CLI
@@ -3849,6 +3854,17 @@ class SessionManager {
     if (l.state.status === 'starting' && reading === 'ready' && l.adapter.launch.startupOnScreen && !l.askedAtStart) {
       log.info(`${userText(this.label(l.state))}: ready, as its terminal says its turn is idle`) // i18n-ignore: for the log
       return this.startupReady(l, screen)
+    }
+    // Still starting (or at its question before its start), its first prompt given on its command line, and its terminal
+    // says it works (HI-3266): that prompt is its first turn. Its start is over, and its screen's steps carry the turn from
+    // here: working (its prompt taken), then finished when its prompt is back. A CLI working by itself before a typed prompt
+    // has no turn to end: left to its start.
+    if ((l.state.status === 'starting' || l.askedAtStart) && reading === 'working' && l.promptOnCommandLine && l.adapter.launch.startupOnScreen) {
+      log.info(`${userText(this.label(l.state))}: working on the prompt on its command line, as its terminal says: its start is over`) // i18n-ignore: for the log
+      this.startupAnswered(l)
+      l.startupDone = true
+      this.fact(l.state, { lifecycle: 'running' })
+      l.state.status = 'ready'
     }
     const step = screenStep(reading, this.statusInput(l))
     if (step.next === null && !step.actions.length) return
