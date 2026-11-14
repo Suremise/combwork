@@ -277,7 +277,15 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     const directG = (await inv('tasks:facts', cG)).findLast((f) => f.kind === 'Started')?.data
     check("the window's Start of the no-code card starts it where G1 is, not refused for no slot (HI-2395)", !dG?.error && !dG?.ask && dG?.agentId === g1.id && (await card(cG))?.column === 'doing' && directG?.folder === 'project' && !directG.lease, JSON.stringify({ dG, directG }))
     check("…slot-a still the first lane's, nothing else lent", (await slotNow())?.lease?.lane === started.lane.id && (await slots()).filter((x) => x.lease).length === 1, JSON.stringify(await slots()))
-    check('…and G1 puts it back', (await intent(tg1, cG, 'put-back', { why: 'done looking again' })).status === 200 && (await card(cG))?.column === 'todo')
+    // HI-3249: the window's Start began a new attempt (HI-3194's fence), which G1's launch learns only by reading the card
+    // or the start's delivery in its inbox, as an agent does before it acts on a card it is given. The fake G1 reads its
+    // inbox when it gets to it (late under load), so G1 reads the card here first: else its put-back is refused
+    // (attempt.moved) for an attempt it never saw. Its answer and the card as it is are said on a failure.
+    const readG = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${encodeURIComponent((await card(cG)).key)}`, { headers: { Authorization: `Bearer ${tg1}` } })
+    check('…G1 reads its card again, as the start it was given has it do', readG.status === 200, String(readG.status))
+    const backG = await intent(tg1, cG, 'put-back', { why: 'done looking again' })
+    const nowG = await card(cG)
+    check('…and G1 puts it back', backG.status === 200 && nowG?.column === 'todo', JSON.stringify({ status: backG.status, body: backG.body, column: nowG?.column, history: (nowG?.history ?? []).slice(-4).map((x) => x.what), facts: (await inv('tasks:facts', cG)).slice(-6).map((f) => f.kind) }))
     // HI-2338: every slot still lent, a lane of only no-code cards from the window starts at once, with no slot.
     const third = await inv('lanes:start', alpha, { builder: b3.id, reviewer: r3.id, cards: [cL1, cL2] })
     check('a lane of only no-code cards starts with every slot lent: not waiting, no slot, both agents started', !third.waitingForSlot && !third.slot && third.started.length === 2 && third.started.every((s) => s.how !== 'failed'), JSON.stringify(third))

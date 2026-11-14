@@ -508,6 +508,11 @@
   "api.change.addConnection": {
     "placeholders": {}
   },
+  "api.change.answerSimplify": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
   "api.change.cancelMessages": {
     "placeholders": {
       "agent": "plain",
@@ -978,6 +983,13 @@
     "placeholders": {
       "agent": "plain",
       "project": "plain"
+    }
+  },
+  "api.done.answerSimplify": {
+    "placeholders": {
+      "card": "plain",
+      "title": "plain",
+      "choice": "select"
     }
   },
   "api.done.branchCreated": {

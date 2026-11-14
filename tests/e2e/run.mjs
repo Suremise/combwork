@@ -393,6 +393,8 @@ const cliInstalled = {
   agy: () => cliPath('agy', [join(process.env.LOCALAPPDATA || '', 'agy', 'bin', 'agy.exe')]),
   // The pinned build only (HI-2763: a real-tier run of OpenCode is of the tested version), never one on the PATH.
   opencode: () => [join(process.env.LOCALAPPDATA || '', 'combwork-test', 'opencode-2.2.6', 'opencode.exe')].find((p) => existsSync(p)) || null
+  // Muse Code has no real suite here: nothing of Muse's runs on the host (HI-3202, its first screen asks for elevation);
+  // its real binary is checked in a Windows Sandbox instead.
 }
 /**
  * False only when Claude Code itself says it isn't signed in to its test home (`claude auth status --json`, with

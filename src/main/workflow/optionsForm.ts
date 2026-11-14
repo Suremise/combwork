@@ -33,7 +33,7 @@ import { compile, mustCompile, type Ruleset } from '../../shared/workflow/compil
 import type { WorkspaceService } from '../workspace'
 import { FactStore } from './factStore'
 import { checkOptions, problemText, problemShownOf, resolvedOf, resolveOptions, workflowChanged, type OptionLevels } from './rulesets'
-import { workflowEnforced, workflowFor } from './service'
+import { closeStaleChurn, workflowEnforced, workflowFor } from './service'
 import { APPLY_OPTIONS } from './runtime'
 import { kickQueue, queueChanged } from './queueHost'
 import { isUnknown } from '../platform/types'
@@ -447,6 +447,8 @@ export async function saveWorkflowOptions(ws: WorkspaceService, projectPath: str
   }
   log.info(`the workflow options of ${userText(project.name)} changed: ${plan.changed.join(', ') || 'none'}${plan.chosen ? ' (the merge question answered)' : ''}`)
   workflowChanged(ws, project.path)
+  // HI-3188: a churn question its new options no longer hold is closed now.
+  await closeStaleChurn(ws, project.path)
   // Names alone change no card's rules (#1417): nothing to apply to cards in flight, nor any queue to read again.
   if (namesOnly(plan.changed) && !plan.chosen) return workflowForm(ws, project.path)
   // Whether Combwork merges, and into what, may have changed: the windows read the project's queues again (#1356: which

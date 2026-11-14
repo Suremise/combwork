@@ -73,6 +73,7 @@ This document explains how Combwork is put together, for anyone changing the cod
 │ providers/      adapters by folder, in the registry's order; parts in types  │
 │ providerService.ts  each provider's install info, setup tasks                │
 │ ptyHost.ts      node-pty processes, output buffers                           │
+│ terminalHistory.ts  a terminal's replay: kept output after a snapshot        │
 │ agentProcesses.ts  each launch's process tree (a job object), leftovers      │
 │ processSupervisor.ts  the job host (C#) agents and the merge queue share     │
 │ launchGate.ts   holds a terminal's command until its job is made             │
@@ -266,6 +267,16 @@ facts, its stage and the actions they cause are written in that same change (bel
 diverge. Git runs through `git()` (`git.ts`); `mergeWorktree` (`worktrees.ts`) refuses a dirty worktree, takes a
 target and returns the merge commit (#1347). The Git view's actions fence the folder (`folderFence.ts`, `gitRepo.ts`)
 and take the repository lock (`repoLock.ts`).
+
+**A card's back-and-forth** (HI-3188, SPEC §16.11.5). `CardState.churn` is folded from the facts (`foldCard`; what counts is
+`countsChurn`), with `churnStop` and `simplifyBase` moved by the answers and inherited through `SplitFrom` (written by
+`tasks.ts` `followUpParent`'s create). The levels are preferences (`simplifyAt`, `churnStopAt`), left out of rulesets
+(`compile.ts` `ruleOptions`) and read live through `WorkflowConfig.churnLevels` (service.ts: `projectPreferences`).
+`runtime.write` calls `churnAfter` in each write's transaction after `closeSettled`: it closes a churn question that no
+longer holds (`churnGateHolds`) and asks a due one (`askAtChurn`); `churnPending`, from `check()` and the step, request
+and ask writes, refuses an agent's or the Assistant's loop work while one holds. `closeStaleChurn` sweeps a project after
+an options or level save and when the rules toggle. A simplify check is told to the Assistant (`churnAssistant.ts`, via
+`WorkflowConfig.churnAsked`), which answers through `tasks.assistantAnswerSimplify` (`answer`'s `by: 'assistant'`).
 
 **Attempts and their fences** (HI-3194, SPEC §16.8.7). A card's attempt key is folded from its facts
 (`CardState.attempt`, `shared/workflow/facts.ts`): `Started`/`Adopted` start one, `AttemptBound` (written by `tasks.ts`

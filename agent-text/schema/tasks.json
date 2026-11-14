@@ -134,6 +134,16 @@
       "card": "plain"
     }
   },
+  "tasks.error.followUpArchived": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.error.followUpOtherProject": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
   "tasks.error.holdCard": {
     "placeholders": {
       "card": "plain"

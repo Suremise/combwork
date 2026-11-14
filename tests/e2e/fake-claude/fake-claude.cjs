@@ -830,6 +830,20 @@ async function runPrompt(text, enter = null) {
   // "pad N": N KB more transcript, as a long conversation has.
   const pad = /\bpad\s+(\d+)/i.exec(text)
   if (pad) write({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_pad', content: 'x'.repeat(Number(pad[1]) * 1024) }] } })
+  // "fullscreen N" (HI-3252): as a full-screen renderer draws, once: the alternate screen, mouse reporting (SGR) and
+  // bracketed paste on, and a header; then N frames updating the rows under it only, so a pane made after them has to
+  // be given the screen and the modes, not the latest output alone. Each frame changes whole rows, one write each: the
+  // pseudoconsole sends on what changed, so that is what reaches Combwork (300 frames: about 600 KB).
+  const fullscreen = /\bfullscreen\s+(\d+)/i.exec(text)
+  if (fullscreen) {
+    rawOut('\x1b[?1049h\x1b[?2004h\x1b[?1000h\x1b[?1006h\x1b[2J\x1b[1;1H\x1b[1;33mFULLSCREEN HEADER\x1b[0m')
+    for (let i = 0; i < Number(fullscreen[1]); i++) {
+      let f = `\x1b[2;1H\x1b[32mframe ${i}\x1b[0m\x1b[K`
+      for (let r = 3; r <= 30; r++) f += `\x1b[${r};1H${String(i * 31 + r).repeat(25).slice(0, 100)}`
+      rawOut(f)
+      await sleep(0)
+    }
+  }
   // Steps joined by "then" run in order ("work N" in a step waits N seconds before the next).
   const steps = text.split(/\s+then\s+/i)
   for (const [i, step] of steps.entries()) {

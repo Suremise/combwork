@@ -29,6 +29,7 @@ const { foldCard } = await import('../src/shared/workflow/facts')
 const fence = await import('../src/main/attemptFence')
 const { newAgentToken } = await import('../src/main/agentTokens')
 const { readDelivery } = await import('../src/shared/deliveries')
+const att = await import('../src/main/cardAttachments')
 
 advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
@@ -438,6 +439,48 @@ describe('the fence on an agent write (HI-3194)', () => {
     fence.issueAttempt(now, card, key(w, card))
     await ask(arrive(now), '#1/aaaa0003')
     expect(seen().waiting?.ask).toBe('#1/aaaa0003')
+  })
+
+  /** HI-3244: an agent's attachments-only change (the PATCH's: `run` only reads the card), as servers.ts makes it. */
+  const attachOnly = async (w: WS, card: number, a: ReturnType<typeof arrive>) => {
+    const src = join(tempDir('cw-attempts-src-'), 'shot.png')
+    writeFileSync(src, 'png bytes')
+    const real = await inWorkspace(w, () => att.attachableSource(w, { kind: 'workspace' }, src))
+    const staging = await att.stage(join(w.path!, 'p'), null, [{ path: real, name: 'shot.png' }])
+    return inWorkspace(w, () => tasks.changeWithAttachments(a, { staging, drafts: [null] }, 'description', () => tasks.readTask(card, a)))
+  }
+  const attachmentRows = (w: WS): number => (store.boardRead(w, (db) => db.prepare('SELECT COUNT(*) AS n FROM card_attachments').get()) as { n: number }).n
+  const descriptionOf = async (w: WS, card: number): Promise<string> => (await inWorkspace(w, () => tasks.getTask(card))).description
+
+  it("HI-3244: an agent's attachments-only change is fenced: a moved attempt and a launch replaced during its publish save nothing; first contact is allowed and binds", async () => {
+    const { w, repo, wt } = await workspace()
+    const card = await create(w)
+    let l = await launch(repo, 'a1', 'r1')
+    await act(w, card, arrive(l), { kind: 'start' })
+    commit(wt, 'b.txt')
+    const before = await descriptionOf(w, card)
+    // Read on attempt A; the card restarted (attempt B): the old request's files are refused, nothing kept.
+    const old = arrive(l)
+    await restart(w, card)
+    expect(await refused(attachOnly(w, card, old))).toBe('attempt.moved')
+    expect([attachmentRows(w), await descriptionOf(w, card)]).toEqual([0, before])
+    // Read again, then the launch replaced while the files are published (after the fence's first check).
+    await read(w, l, card)
+    const r = renewedMidChange(w, () => launch(repo, 'a1', 'r2'))
+    try {
+      expect(await refused(attachOnly(w, card, arrive(l)))).toBe('attempt.staleLaunch')
+      expect(r.renewed).toBe(true)
+    } finally {
+      r.restore()
+    }
+    expect([attachmentRows(w), await descriptionOf(w, card)]).toEqual([0, before])
+    // A launch with no binding (first contact): its files are kept, and it is bound to the card's attempt now.
+    l = { projectPath: repo, agentId: 'a1', runId: 'r2' }
+    expect(fence.boundAttempt('r2', card)).toBeNull()
+    const kept = await attachOnly(w, card, arrive(l))
+    expect(kept.attached?.length).toBe(1)
+    expect(attachmentRows(w)).toBe(1)
+    expect(fence.boundAttempt('r2', card)).toEqual(key(w, card))
   })
 
   it('the user, the Assistant and scripts are never fenced', async () => {

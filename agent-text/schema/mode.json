@@ -138,6 +138,24 @@
   "mode.copilot.plan.label": {
     "placeholders": {}
   },
+  "mode.muse.never.desc": {
+    "placeholders": {}
+  },
+  "mode.muse.never.label": {
+    "placeholders": {}
+  },
+  "mode.muse.onRequest.desc": {
+    "placeholders": {}
+  },
+  "mode.muse.onRequest.label": {
+    "placeholders": {}
+  },
+  "mode.muse.untrusted.desc": {
+    "placeholders": {}
+  },
+  "mode.muse.untrusted.label": {
+    "placeholders": {}
+  },
   "mode.opencode.auto.desc": {
     "placeholders": {}
   },

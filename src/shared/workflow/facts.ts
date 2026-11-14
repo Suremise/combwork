@@ -11,6 +11,7 @@ import type { GitlinkSide } from '../gitlink'
 import type { StoredText, TransientCause } from '../types'
 import { samePath } from '../movePaths'
 import type { ForwardOverride } from './forwardOrder'
+import { CHURN_MAX } from '../loopLimits'
 
 /** Who caused a fact. */
 export type Actor = 'user' | 'assistant' | 'combwork' | 'outside' | `agent:${string}`
@@ -141,6 +142,22 @@ export type RoundChoice = (typeof ROUND_CHOICES)[number]
 /** The gate of Combwork's question at a card's round limit (§16.11.4). */
 export const ROUND_LIMIT_GATE = 'roundLimit'
 
+/**
+ * HI-3188: the gates of Combwork's two questions on a card's churn (§16.11.5): the simplify check ("worth handling, or
+ * simplify or cut scope?") and the hard stop (the round limit's question, on the churn). Both pause the card's loop.
+ */
+export const SIMPLIFY_GATE = 'simplify'
+export const CHURN_LIMIT_GATE = 'churnLimit'
+/** The gates that pause a card's loop until answered (§16.11.4, §16.11.5). */
+export const PAUSE_GATES: readonly string[] = [ROUND_LIMIT_GATE, CHURN_LIMIT_GATE, SIMPLIFY_GATE]
+/** HI-3188: the churn's two gates. */
+export const CHURN_GATES: readonly string[] = [CHURN_LIMIT_GATE, SIMPLIFY_GATE]
+/** What the user (or, for carry on and simplify, the Assistant) chose at a simplify check (HI-3188). */
+export const SIMPLIFY_CHOICES = ['carryOn', 'simplify', 'cutScope'] as const
+export type SimplifyChoice = (typeof SIMPLIFY_CHOICES)[number]
+/** A choice at a question that pauses a loop. */
+export type PauseChoice = RoundChoice | SimplifyChoice
+
 /** The gate of Combwork's questions about a builder's line held up between a lane's cards (§16.19.2, #1271). */
 export const LINE_GATE = 'lineUpdate'
 
@@ -224,7 +241,7 @@ export const ASK_ACTIONS_MAX = 3
  * A request under any other gate is a question someone asked: an agent, the Assistant (`ask`), or a rule it couldn't
  * keep. A question settled another way is closed (#1638); Combwork's own requests stay until met.
  */
-const CW_GATES: ReadonlySet<string> = new Set(['review', 'okBefore', ROUND_LIMIT_GATE, LINE_GATE, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, QUEUE_PUBLISH_GATE, FOCUSED_SKIP_GATE, SLOT_DIRTY_GATE, ADVANCE_STOPPED_GATE, ADVANCE_UNCERTAIN_GATE, ADVANCE_PREVIEW_GATE, 'decision'])
+const CW_GATES: ReadonlySet<string> = new Set(['review', 'okBefore', ROUND_LIMIT_GATE, CHURN_LIMIT_GATE, SIMPLIFY_GATE, LINE_GATE, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, QUEUE_PUBLISH_GATE, FOCUSED_SKIP_GATE, SLOT_DIRTY_GATE, ADVANCE_STOPPED_GATE, ADVANCE_UNCERTAIN_GATE, ADVANCE_PREVIEW_GATE, 'decision'])
 export const askedQuestion = (r: Pick<FactData['ApprovalRequested'], 'gate'>): boolean => !CW_GATES.has(r.gate)
 
 /** An answer as the user gives it (§16.8.5): its outcome, whether it has a reply or a decision, a choice and its rounds, or an action offered (#1630). */
@@ -232,7 +249,7 @@ export interface AnswerShape {
   outcome: 'approved' | 'declined' | 'answered'
   reply?: boolean
   decision?: boolean
-  choice?: RoundChoice
+  choice?: PauseChoice
   rounds?: number
   action?: AskActionKind
 }
@@ -244,7 +261,13 @@ export interface AnswerShape {
  * question, answered with a reply or a decision, or with one of the actions it offers (#1630), never both.
  */
 export function answerFits(req: Pick<FactData['ApprovalRequested'], 'kind' | 'gate' | 'actions'>, a: AnswerShape, maxRounds: number): boolean {
-  if (req.gate === ROUND_LIMIT_GATE) return a.outcome === 'answered' && !!a.choice && ROUND_CHOICES.includes(a.choice) && !a.decision && !a.action && (a.choice !== 'carryOn' || (Number.isInteger(a.rounds) && a.rounds! >= 1 && a.rounds! <= maxRounds))
+  if (req.gate === ROUND_LIMIT_GATE || req.gate === CHURN_LIMIT_GATE) {
+    // HI-3188: a carry on at the hard stop adds counted work, up to CHURN_MAX; at the round limit, rounds.
+    const most = req.gate === CHURN_LIMIT_GATE ? CHURN_MAX : maxRounds
+    return a.outcome === 'answered' && !!a.choice && (ROUND_CHOICES as readonly string[]).includes(a.choice) && !a.decision && !a.action && (a.choice !== 'carryOn' || (Number.isInteger(a.rounds) && a.rounds! >= 1 && a.rounds! <= most))
+  }
+  // HI-3188: a simplify check's answer is a choice alone.
+  if (req.gate === SIMPLIFY_GATE) return a.outcome === 'answered' && !!a.choice && (SIMPLIFY_CHOICES as readonly string[]).includes(a.choice) && !a.decision && !a.action && a.rounds === undefined
   if (a.choice !== undefined) return false
   if (a.action !== undefined) return a.outcome === 'answered' && !a.decision && !!req.actions?.some((x) => x.kind === a.action)
   if (req.kind === 'approve') return (a.outcome === 'approved' || a.outcome === 'declined') && (!a.decision || (a.outcome === 'approved' && !!a.reply && approveNote(req) === 'decision'))
@@ -377,10 +400,11 @@ export interface FactData {
    * on itself (`carriedOn`: answered some other way, such as in its pane). It leaves For you as an answer does.
    */
   /** `slotClean` (HI-2014): a finished card's slot asked about (SLOT_DIRTY_GATE) became clean, or another card's. */
-  RequestClosed: { request: string; why: 'done' | 'carriedOn' | 'slotClean' | 'advance' }
+  /** HI-3188 `settingChanged`: a churn question that no longer holds (its setting 0 or raised, no agent reviewer, rules off). */
+  RequestClosed: { request: string; why: 'done' | 'carriedOn' | 'slotClean' | 'advance' | 'settingChanged' }
   /** An answer (§16.8.5): `note` the user's reply; at the round limit, their `choice` and the rounds a carry on adds; `action`, an action the question offered, done (#1630; `note` its reason). */
   /** `byDecision` (HI-1932): answered by a decision the user made, recorded on the card (its id), by whom (the authenticated recorder), when. */
-  Approval: { request: string; answer: 'approved' | 'declined' | 'answered'; note?: string; generation: number; submission?: number; choice?: RoundChoice; rounds?: number; action?: AskActionKind; byDecision?: { decision: string; recordedBy: string; at: string } }
+  Approval: { request: string; answer: 'approved' | 'declined' | 'answered'; note?: string; generation: number; submission?: number; choice?: PauseChoice; rounds?: number; action?: AskActionKind; byDecision?: { decision: string; recordedBy: string; at: string } }
   IntegrationRequested: { entry: string; revision: string; key: string | null; target: string; style: 'merge' | 'squash' | 'rebase'; requeue?: 'transient' | 'retry' }
   /** `followUp`: a follow-up posted on the queued card (#1623), so the queue can't merge the revision while its line changes. */
   IntegrationCancelled: { entry: string; reason: 'removed' | 'stale' | 'hold' | 'user' | 'decision' | 'integratedOutside' | 'followUp' | 'feedback' }
@@ -545,6 +569,12 @@ export interface FactData {
    */
   Readiness: { ready: boolean; after: number | null }
   /**
+   * HI-3188: made as a continuation of card `parent` (`followUpOf`: a split, or follow-ups the user accepted), written in its
+   * creation: its churn starts at the parent's then (`total`, which already counts what the parent inherited), with the
+   * parent's hard-stop and simplify bases, so a chain of cards keeps its count and only an answer gives it more room.
+   */
+  SplitFrom: { parent: number; total: number; stop: ChurnStop | null; simplifyBase: number }
+  /**
    * HI-3219: a comment on lines `from`..`to` of one submission's file (lineComments.ts): `new` in its revision, `old` (deleted
    * lines) in its base. `lines`, `before` and `after` are the quote and its context as main read them from the commits,
    * cut by characters (LINE_COMMENT_LIMITS); `body` is the writer's Markdown. Its id: `lc-<card key>-<this fact's seq>`.
@@ -686,6 +716,18 @@ export interface CardState {
   rounds: number
   /** The rounds the user added at the round limit ("carry on"), over the card's whole history. */
   moreRounds: number
+  /**
+   * HI-3188: the card's churn, its counted loop work over its whole history (§16.11.5), each 1: failed reviews and declines
+   * (as `rounds`), design and follow-up steps, reviewer requests, agents' questions and test asks to the user; and what it
+   * inherited as a continuation (`SplitFrom`). Merge-queue returns and Combwork's own questions aren't counted.
+   */
+  churn: Churn
+  /** HI-3188: the hard stop's base, from its last answer (or inherited); null: none yet (the stop is at its setting). */
+  churnStop: ChurnStop | null
+  /** HI-3188: the churn at the last answer to a churn question (or inherited): the simplify check counts from it. */
+  simplifyBase: number
+  /** HI-3188: the card it continues (`SplitFrom`), or null. */
+  splitFrom: number | null
   /** Every agent recorded working the card (Started, Submitted): no-self-review reads these, never commit authors. */
   builders: string[]
   overrides: FactData['Override'][]
@@ -777,6 +819,10 @@ export const emptyState = (): CardState => ({
   advance: null,
   rounds: 0,
   moreRounds: 0,
+  churn: { failed: 0, declined: 0, designs: 0, followUps: 0, requests: 0, asks: 0, inherited: 0 },
+  churnStop: null,
+  simplifyBase: 0,
+  splitFrom: null,
   builders: [],
   overrides: [],
   approvalOverridden: false,
@@ -811,6 +857,56 @@ const retireEntry = (s: CardState, entry: string): void => {
   s.requests = s.requests.filter((r) => r.entry !== entry)
 }
 
+/** HI-3188: a card's churn by kind (CardState.churn). */
+export interface Churn {
+  failed: number
+  declined: number
+  designs: number
+  followUps: number
+  requests: number
+  asks: number
+  inherited: number
+}
+/** HI-3188: the hard stop's base: the churn at its last answer, and a carry on's amount (null: the setting). */
+export interface ChurnStop {
+  base: number
+  more: number | null
+}
+
+/** HI-3188: a card's churn in all, what it inherited included (once: a continuation's `inherited` is its parent's total). */
+export const churnTotal = (s: Pick<CardState, 'churn'>): number => Object.values(s.churn).reduce((a, b) => a + b, 0)
+
+/** HI-3188: the churn at which the hard stop asks, with `setting` (`churnStopAt`); null when off (0). */
+export function churnStopAt(s: Pick<CardState, 'churnStop'>, setting: number): number | null {
+  if (!(setting > 0)) return null
+  return s.churnStop ? s.churnStop.base + (s.churnStop.more ?? setting) : setting
+}
+/** HI-3188: the churn at which the simplify check asks, with `setting` (`simplifyAt`); null when off (0). */
+export const simplifyAt = (s: Pick<CardState, 'simplifyBase'>, setting: number): number | null => (setting > 0 ? s.simplifyBase + setting : null)
+
+/**
+ * HI-3188: whether churn question `gate` is due on the card by its count and setting (`churnLimit`: `churnStopAt`,
+ * `simplify`: `simplifyAt`). The runtime asks when it is and none is open; an open one holds only while it is, with an
+ * agent reviewer and the rules enforced (runtime's `churnGateHolds`).
+ */
+export function churnDue(s: Pick<CardState, 'churn' | 'churnStop' | 'simplifyBase'>, gate: string, setting: number): boolean {
+  const at = gate === CHURN_LIMIT_GATE ? churnStopAt(s, setting) : gate === SIMPLIFY_GATE ? simplifyAt(s, setting) : null
+  return at !== null && churnTotal(s) >= at
+}
+
+/**
+ * HI-3188: whether a fact a write appended adds to the card's churn (as the fold counts it): a failed verdict, a design or
+ * follow-up step, a reviewer request, an agent's question to the user. A decline is counted by the fold (it needs the
+ * request's gate); the runtime asks after the decline's own write (askAtLimit's), so it isn't needed here.
+ */
+export function countsChurn(f: Pick<Fact, 'kind' | 'data'>): boolean {
+  if (f.kind === 'Verdict') return !(f.data as FactData['Verdict']).pass
+  if (f.kind === 'LoopStep') return (f.data as FactData['LoopStep']).step === 'design' || (f.data as FactData['LoopStep']).step === 'followUp'
+  if (f.kind === 'ReviewerRequest') return true
+  if (f.kind === 'ApprovalRequested') return !!(f.data as FactData['ApprovalRequested']).asker
+  return f.kind === 'Approval' && (f.data as FactData['Approval']).answer === 'declined'
+}
+
 /** Folds a card's facts (in seq order) into its state. Pure: the stage is the last `Moved`'s, never a claim. */
 export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): CardState {
   const s = emptyState()
@@ -825,9 +921,10 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'Adopted': {
         const d = f.data as StartedData
         // A new cycle: earlier submissions, verdicts and entries stay in history but don't count (§16.7.4).
-        // A question at the round limit outlives the cycle: it waits for the user's answer (§16.11.4).
-        const limit = s.requests.filter((r) => r.gate === ROUND_LIMIT_GATE)
-        Object.assign(s, { ...emptyState(), stage: s.stage, generation: s.generation, received: s.received, commentGeneration: s.commentGeneration, receivedComments: s.receivedComments, rounds: s.rounds, moreRounds: s.moreRounds, builders: s.builders, overrides: s.overrides, blocked: s.blocked, resolves: s.resolves, lastSeq: s.lastSeq, lines: s.lines, ready: s.ready })
+        // A question at the round limit outlives the cycle: it waits for the user's answer (§16.11.4); so do the churn's
+        // (HI-3188, §16.11.5), and the churn itself, over the card's whole history.
+        const limit = s.requests.filter((r) => PAUSE_GATES.includes(r.gate))
+        Object.assign(s, { ...emptyState(), stage: s.stage, generation: s.generation, received: s.received, commentGeneration: s.commentGeneration, receivedComments: s.receivedComments, rounds: s.rounds, moreRounds: s.moreRounds, churn: s.churn, churnStop: s.churnStop, simplifyBase: s.simplifyBase, splitFrom: s.splitFrom, builders: s.builders, overrides: s.overrides, blocked: s.blocked, resolves: s.resolves, lastSeq: s.lastSeq, lines: s.lines, ready: s.ready })
         s.requests = limit
         for (const r of limit) s.made[r.request] = r
         s.cycle = f.seq
@@ -861,7 +958,10 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'Verdict': {
         const d = f.data as FactData['Verdict']
         s.verdicts.push({ ...d, seq: f.seq })
-        if (!d.pass) s.rounds++
+        if (!d.pass) {
+          s.rounds++
+          s.churn = { ...s.churn, failed: s.churn.failed + 1 }
+        }
         break
       }
       case 'CarriedOver': {
@@ -896,6 +996,19 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         if (d.entry) s.requests = s.requests.filter((r) => !r.entry || r.gate !== d.gate)
         s.requests.push(d)
         s.made[d.request] = d
+        // HI-3188: an agent's question or test ask to the user is churn; Combwork's own requests have no asker.
+        if (d.asker) s.churn = { ...s.churn, asks: s.churn.asks + 1 }
+        break
+      }
+      case 'ReviewerRequest':
+        s.churn = { ...s.churn, requests: s.churn.requests + 1 }
+        break
+      case 'SplitFrom': {
+        const d = f.data as FactData['SplitFrom']
+        s.churn = { ...s.churn, inherited: d.total }
+        s.churnStop = d.stop
+        s.simplifyBase = d.simplifyBase
+        s.splitFrom = d.parent
         break
       }
       case 'CannotWithinRules':
@@ -905,6 +1018,8 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         // A design or a follow-up (a new one replaces the one waiting); anything else ends the one it names (the runtime
         // refuses others).
         s.step = d.step === 'design' || d.step === 'followUp' ? { step: d.step, id: d.design ?? '', seq: f.seq, at: f.at, until: d.until ?? null, by } : null
+        if (d.step === 'design') s.churn = { ...s.churn, designs: s.churn.designs + 1 }
+        if (d.step === 'followUp') s.churn = { ...s.churn, followUps: s.churn.followUps + 1 }
         break
       }
       case 'RequestClosed':
@@ -916,8 +1031,15 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         s.requests = s.requests.filter((r) => r.request !== d.request)
         // A decline of a gate's request is a reviewed round (§16.11.4); of an agent's own question, only its answer.
         const made = s.made[d.request]
-        if (d.answer === 'declined' && (!made || isGateRequest(made))) s.rounds++
-        if (d.rounds) s.moreRounds += d.rounds
+        if (d.answer === 'declined' && (!made || isGateRequest(made))) {
+          s.rounds++
+          s.churn = { ...s.churn, declined: s.churn.declined + 1 }
+        }
+        // HI-3188: an answer to a churn question moves its bases to the churn now: the hard stop's next is a carry on's
+        // amount past it (else its setting past it), and the simplify check counts again from it. Rounds are the round limit's.
+        if (made?.gate === CHURN_LIMIT_GATE) s.churnStop = { base: churnTotal(s), more: d.choice === 'carryOn' ? d.rounds ?? null : null }
+        else if (d.rounds) s.moreRounds += d.rounds
+        if (made && CHURN_GATES.includes(made.gate)) s.simplifyBase = churnTotal(s)
         break
       }
       case 'ForwardRequested': {

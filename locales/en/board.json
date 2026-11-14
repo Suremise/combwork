@@ -1491,6 +1491,10 @@
     "defaultMessage": "For you",
     "description": "A heading in the card dialog, above what on the card waits for the user (approvals, decisions, questions). Glossary: For you."
   },
+  "board.forYou.moreChurn": {
+    "defaultMessage": "More",
+    "description": "HI-3188: the label of the number box beside Carry on, at a card's hard stop: how much more back-and-forth (failed reviews, designs, requests, questions) the card gets before it stops again."
+  },
   "board.forYou.offer": {
     "defaultMessage": "{action, select, done {Move to Done} noCode {Make It No Code} skipReview {Skip Review} other {Unblock}}",
     "description": "A button under an agent's question for the user (For you): an action the agent offers on its card, done with one click. Keep the select keys as they are; translate each choice."
@@ -4218,6 +4222,10 @@
   "board.work.check": {
     "defaultMessage": "{name}: {result, select, passed {passed} failed {failed} other {stopped}}{counted, select, no { (not counted)} other {}}",
     "description": "A check under a revision in the card dialog's Work section: its name (typecheck, as the project names it), then a colon and how it ended; (not counted) when it doesn't count for the revision (its hover says why). Keep the select keys. Glossary: check."
+  },
+  "board.work.churn": {
+    "defaultMessage": "{total, plural, one {# round of back-and-forth} other {# rounds of back-and-forth}}: {failed, plural, =0 {} one {# failed review, } other {# failed reviews, }}{declined, plural, =0 {} one {# declined, } other {# declined, }}{designs, plural, =0 {} one {# design, } other {# designs, }}{followUps, plural, =0 {} one {# follow-up, } other {# follow-ups, }}{requests, plural, =0 {} one {# reviewer request, } other {# reviewer requests, }}{asks, plural, =0 {} one {# question to you} other {# questions to you}}{inherited, plural, =0 {} other {; # from {parent}}}",
+    "description": "HI-3188: tooltip and accessible name of a card's churn count on the board: its counted loop work in all ({total}), then each kind's count (failed reviews, your declines, design steps, follow-up steps, reviewer requests, agents' questions to the user), each left out when 0, and what it inherited from the card it continues ({parent}, a card key). Translate each plural; keep the =0 cases empty."
   },
   "board.work.comments.add": {
     "defaultMessage": "Comment on this line, or on the lines selected",

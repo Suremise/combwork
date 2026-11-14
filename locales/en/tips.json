@@ -591,6 +591,14 @@
     "defaultMessage": "Let two agents build and review in turn",
     "description": "A tip's title."
   },
+  "tips.cardLoopChurn.text": {
+    "defaultMessage": "With a reviewer agent, Combwork counts each card’s back-and-forth and asks you whether to simplify at 12, and how to go on at 30. Set both under Card loops in Version Control → Workflow.",
+    "description": "A tip (HI-3188): a card's back-and-forth is its failed reviews, designs, requests and questions. Names of Combwork's menus, views, settings and commands (Card loops, Version Control, Workflow): keep them as Combwork shows them."
+  },
+  "tips.cardLoopChurn.title": {
+    "defaultMessage": "A card that goes round in circles stops",
+    "description": "A tip's title (HI-3188)."
+  },
   "tips.cardMove.text": {
     "defaultMessage": "Drag any dialog by its header (a card, Add Agent, Agent Settings…) to see what's behind it; Escape while dragging puts it back.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
@@ -1586,6 +1594,14 @@
   "tips.moveAnyway.title": {
     "defaultMessage": "Move a card past its rules, with a reason",
     "description": "A tip's title (glossary: rule)."
+  },
+  "tips.muse.text": {
+    "defaultMessage": "Agents can use Meta’s Muse Code. Install it with Meta’s installer, add a Muse Code account in Settings → Accounts & Connections and sign it in there. Each account keeps its own sign-in, settings and sessions, apart from your own Muse.",
+    "description": "A tip. Muse Code and Meta are names. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
+  },
+  "tips.muse.title": {
+    "defaultMessage": "Run agents on Muse Code",
+    "description": "A tip's title. Muse Code is a product name."
   },
   "tips.myPrices.text": {
     "defaultMessage": "Claude Code's cost is its own figure, from its price table. On other rates (a discount, another tier)? Set Session costs to My prices, and Combwork prices every session from your table instead.",

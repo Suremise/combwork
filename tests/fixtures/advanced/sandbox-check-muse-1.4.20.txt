@@ -1,0 +1,13 @@
+backend=windows_elevated
+status=setup_required
+reason=sandbox users are not ready
+runner_path=C:\Users\user\AppData\Local\combwork-test\muse-1.4.20\muse.exe
+runner_trusted=true
+runner_version_matches=true
+sandbox_users_ready=false
+capabilities_ready=false
+restricted_network_required=true
+wfp_ready=false
+diagnostic=sandbox_users_missing:required Windows sandbox users are missing or stale
+diagnostic=setup_credentials_unavailable:open setup path without following reparse points failed for C:\ProgramData\muse: The system cannot find the file specified. (os error 2)
+sandbox users are not ready

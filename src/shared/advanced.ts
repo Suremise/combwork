@@ -288,6 +288,43 @@ const NAME = /^[a-z0-9][a-z0-9_-]*$/i
 /** A folder as a paths list takes it (HI-2480): a drive's or a share's full path, or one starting with a %VARIABLE%. */
 const FOLDER = /^(?:[a-z]:[\\/]|\\\\[^\\/]|%[a-z_][a-z0-9_]*%)/i
 const MAX_FOLDER = 1000
+/** A mapping's entry (HI-3202, `roles`): `role=name`, a CLI's own name of at most 100 characters. */
+const ROLE_ENTRY = /^([A-Za-z][A-Za-z0-9]*)=([A-Za-z_][A-Za-z0-9_.-]{0,99})$/
+
+/** Why a mapping isn't taken: its entries' shape, or one name given to two roles of a `distinct` mapping. */
+type RolesProblem = { shape: true } | { twice: string }
+
+/**
+ * A `roles` list's entries as a map (HI-3202), or why not: every role of `def.roles` exactly once, each a well-formed
+ * `role=name`, no other role, and in a `distinct` one no name twice. The one parser for saving (checkAdvanced) and
+ * reading (advancedRoles): a map is taken whole or not at all. Its keys are the declared roles only, kept off the object's
+ * prototype, and its names are data (a dotted name is one name, never a path).
+ */
+export function parseRoles(def: Pick<AdvancedDef, 'roles' | 'distinct'>, raw: unknown): { entries: string[]; map: Readonly<Record<string, string>> } | RolesProblem {
+  const roles = def.roles ?? []
+  const entries = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(',').map((s) => s.trim()).filter(Boolean) : null
+  if (!entries || entries.length !== roles.length) return { shape: true }
+  const map: Record<string, string> = Object.create(null)
+  for (const e of entries) {
+    const m = typeof e === 'string' ? ROLE_ENTRY.exec(e.trim()) : null
+    if (!m || !roles.includes(m[1]) || m[1] in map) return { shape: true }
+    map[m[1]] = m[2]
+  }
+  if (def.distinct) {
+    const seen = new Set<string>()
+    for (const name of Object.values(map)) {
+      if (seen.has(name)) return { twice: name }
+      seen.add(name)
+    }
+  }
+  return { entries: entries.map((e) => String(e).trim()), map: Object.freeze(map) }
+}
+
+/** A `roles` value read as its map (HI-3202): null when it isn't one whole (a stored value checkAdvanced would refuse). */
+export function advancedRoles(def: Pick<AdvancedDef, 'roles' | 'distinct'>, value: unknown): Readonly<Record<string, string>> | null {
+  const r = parseRoles(def, value)
+  return 'map' in r ? r.map : null
+}
 
 /**
  * A list of folders' text (HI-2538): the parse and format pair that Settings' box, the tools and advanced.json's check
@@ -1498,6 +1535,8 @@ const NOT_TAKEN = {
   field: msg({ id: 'settings.advanced.error.field', defaultMessage: '{title} takes a field name: letters, digits and _ (not starting with a digit).', description: "Why an advanced setting's new value isn't taken: it must be a field name of a CLI's data. {title} is the setting's title." }),
   list: msg({ id: 'settings.advanced.error.list', defaultMessage: '{title} takes 1 to 10 names (letters, digits, - and _), as a list or separated by commas.', description: "Why an advanced setting's new value isn't taken. {title} is the setting's title." }),
   folders: msg({ id: 'settings.advanced.error.folders', defaultMessage: '{title} takes up to {most} folders, each a full path (C:\\…, \\\\server\\…, or starting with a variable such as %LOCALAPPDATA%), separated by semicolons.', description: "Why an advanced setting's new value (a list of folders) isn't taken. {title} is the setting's title; {most} a number of folders. C:\\…, \\\\server\\… and %LOCALAPPDATA% are written as Windows writes them: keep them." }),
+  roles: msg({ id: 'settings.advanced.error.roles', defaultMessage: '{title} takes each of {roles} once, as role=name (a name of letters, digits, _, . and -, at most 100 characters), separated by commas.', description: "Why an advanced setting's new value (a mapping from Combwork's roles to a CLI's own names) isn't taken. {title} is the setting's title; {roles} lists the roles, as advanced.json writes them: keep them as they are. role=name is the form, keep it." }),
+  rolesTwice: msg({ id: 'settings.advanced.error.rolesTwice', defaultMessage: '{title} gives {name} to more than one role: each needs a name of its own.', description: "Why an advanced setting's new value (a mapping from Combwork's roles to a CLI's own names) isn't taken. {title} is the setting's title; {name} is the CLI's name given twice, as written." }),
   folder: msg({ id: 'settings.advanced.error.folder', defaultMessage: "{title} takes one folder's full path (C:\\…, \\\\server\\…, or starting with a variable such as %LOCALAPPDATA%).", description: "Why an advanced setting's new value (one folder) isn't taken. {title} is the setting's title. C:\\…, \\\\server\\… and %LOCALAPPDATA% are written as Windows writes them: keep them." }),
   choice: msg({ id: 'settings.advanced.error.choice', defaultMessage: '{title} takes one of {choices}.', description: "Why an advanced setting's new value isn't taken. {title} is the setting's title; {choices} lists the values it takes as advanced.json writes them (allow, ask, block): keep them." }),
   boolean: msg({ id: 'settings.advanced.error.boolean', defaultMessage: '{title} takes true or false.', description: "Why an advanced setting's new value isn't taken. {title} is the setting's title; true and false are the values as written: keep them." }),
@@ -1544,6 +1583,12 @@ export function checkAdvanced(def: AdvancedDef, raw: unknown): { value: string |
         if (!folders || !folders.length || folders.length > (def.max ?? 10) || folders.some((x) => typeof x !== 'string' || x.length > MAX_FOLDER || !FOLDER.test(x))) return refused(def.max === 1 ? withValues(NOT_TAKEN.folder, { title }) : withValues(NOT_TAKEN.folders, { title, most: String(def.max ?? 10) }))
         return { value: folders as string[] }
       }
+      if (def.roles) {
+        const r = parseRoles(def, raw)
+        if ('twice' in r) return refused(withValues(NOT_TAKEN.rolesTwice, { title, name: r.twice }))
+        if ('shape' in r) return refused(withValues(NOT_TAKEN.roles, { title, roles: def.roles.join(', ') }))
+        return { value: r.entries }
+      }
       const list = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(',').map((s) => s.trim()).filter(Boolean) : null
       if (!list || !list.length || list.length > (def.max ?? 10) || list.some((x) => typeof x !== 'string' || !NAME.test(x))) return refused(withValues(NOT_TAKEN.list, { title }))
       return { value: list as string[] }
@@ -1580,6 +1625,11 @@ function reads(def: AdvancedDef, value: unknown, s: AdvancedSample): boolean {
   if (def.kind === 'pattern' && typeof value === 'string' && s.text !== undefined) return advancedRegExp(def, value).test(s.text)
   if (def.kind === 'text' && typeof value === 'string' && s.text !== undefined) return s.text.includes(value)
   if (def.kind === 'field' && typeof value === 'string' && s.fields) return s.fields.includes(value)
+  // A mapping's sample records one role's name as the CLI sent it: still found under that role.
+  if (def.kind === 'list' && def.roles && s.role !== undefined && s.text !== undefined) {
+    const name = advancedRoles(def, value)?.[s.role]
+    return !!name && s.text.includes(name)
+  }
   if (def.kind === 'list' && Array.isArray(value) && s.fields) return s.fields.every((f) => value.includes(f))
   return true
 }
@@ -1801,6 +1851,7 @@ export function advancedTakesText(d: AdvancedDef): Text {
     case 'list':
       if (d.paths && d.max === 1) return msg({ id: 'settings.advanced.takes.folder', defaultMessage: "A folder's full path (a variable such as %LOCALAPPDATA% at the start is filled in).", description: 'What an advanced setting takes (Settings → Advanced): one folder. %LOCALAPPDATA% is a Windows variable: keep it.' })
       if (d.paths) return msg({ id: 'settings.advanced.takes.folders', defaultMessage: 'Folders, each a full path, separated by semicolons (a variable such as %LOCALAPPDATA% at the start is filled in).', description: 'What an advanced setting takes (Settings → Advanced): a list of folders. %LOCALAPPDATA% is a Windows variable: keep it.' })
+      if (d.roles) return withValues(msg({ id: 'settings.advanced.takes.roles', defaultMessage: 'Each of {roles} once, as role=name, separated by commas: the name being what the CLI calls it.', description: "What an advanced setting takes (Settings → Advanced): a mapping from Combwork's roles to a CLI's own names. {roles} lists the roles as advanced.json writes them: keep them. role=name is the form, keep it." }), { roles: d.roles.join(', ') })
       return msg({ id: 'settings.advanced.takes.list', defaultMessage: 'Names separated by commas.', description: 'What an advanced setting takes (Settings → Advanced).' })
     case 'text':
       return msg({ id: 'settings.advanced.takes.text', defaultMessage: 'Text, found as it is.', description: "What an advanced setting takes (Settings → Advanced): text Combwork looks for on a CLI's screen, as it is." })

@@ -139,6 +139,14 @@
     "defaultMessage": "A failed review sends {card} back to Doing, to its builder: give the verdict without column.",
     "description": "An error: a failed review also tried to move card {card} (its key, such as HI-12) somewhere other than Doing; a failed card goes back to Doing, to the agent that built it. \"column\" is the name of the call's field: keep it as it is."
   },
+  "tasks.error.followUpArchived": {
+    "defaultMessage": "followUpOf: {card} is archived; bring it back first, or make the card without followUpOf.",
+    "description": "An error (HI-3188): a new card named an archived card as the card it continues (followUpOf, a field’s name: keep it as it is). {card} is a card key."
+  },
+  "tasks.error.followUpOtherProject": {
+    "defaultMessage": "followUpOf: {card} is another project’s card; a follow-up continues a card of its own project.",
+    "description": "An error (HI-3188): a new card named a card of another project as the card it continues (followUpOf, a field’s name: keep it as it is). {card} is a card key."
+  },
   "tasks.error.holdCard": {
     "defaultMessage": "Only the user or the Assistant puts cards On Hold. Where the user has decided to park {card}, ask the Assistant (cw_ask_assistant); otherwise ask the user.",
     "description": "An error: an agent tried to move card {card} (its key, such as HI-12) On Hold (a board column), which only the user or the Assistant may do (HI-2227): a decision already made goes to the Assistant, cw_ask_assistant (a tool name: keep it as it is), else the user is asked."

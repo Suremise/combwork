@@ -149,6 +149,8 @@ interface CombworkMessageValues {
   'tips.cardLinks.title': undefined
   'tips.cardLoop.text': undefined
   'tips.cardLoop.title': undefined
+  'tips.cardLoopChurn.text': undefined
+  'tips.cardLoopChurn.title': undefined
   'tips.cardMove.text': undefined
   'tips.cardMove.title': undefined
   'tips.cardReadFirst.text': undefined
@@ -398,6 +400,8 @@ interface CombworkMessageValues {
   'tips.moreAgents.title': { usual: number }
   'tips.moveAnyway.text': undefined
   'tips.moveAnyway.title': undefined
+  'tips.muse.text': undefined
+  'tips.muse.title': undefined
   'tips.myPrices.text': undefined
   'tips.myPrices.title': undefined
   'tips.newCard.text': { key: string | number }

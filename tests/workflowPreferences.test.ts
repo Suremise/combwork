@@ -20,7 +20,7 @@ describe('the preferences resolve on their own (HI-1766)', () => {
     expect(preferencesOf('git', {}).values).toEqual(PREFERENCE_DEFAULTS)
     const r = preferencesOf('git', { global: { git: { fileLocks: 'off', loopRounds: 4 } }, workspace: { git: { loopRounds: 5 }, none: { loopWaitHours: 9 } }, project: { loopWakes: false } })
     expect(r.values).toEqual({ ...PREFERENCE_DEFAULTS, fileLocks: 'off', loopRounds: 5, loopWakes: false })
-    expect(r.origins).toEqual({ fileLocks: 'global', loopRounds: 'workspace', loopWakes: 'project', loopWaitHours: 'platform', loopStepWaitMinutes: 'platform', assistantWakes: 'platform', maxAgents: 'platform' })
+    expect(r.origins).toEqual({ fileLocks: 'global', loopRounds: 'workspace', loopWakes: 'project', loopWaitHours: 'platform', loopStepWaitMinutes: 'platform', assistantWakes: 'platform', maxAgents: 'platform', simplifyAt: 'platform', churnStopAt: 'platform' })
   })
 
   it('Wake the Assistant for (HI-3211): Standard (as before) unless a level sets it, each level over the one before; one it doesn’t take is passed over', () => {
@@ -72,9 +72,11 @@ describe('they aren’t rules (HI-1766)', () => {
     }
   })
 
-  it('no preset or All off sets them but Maximum agents (HI-2001), and the form’s Custom never counts them', () => {
+  it('no preset or All off sets them but Maximum agents (HI-2001), and Solo the churn’s levels, off (HI-3188); the form’s Custom never counts them', () => {
     for (const platform of ['none', 'git'] as const) {
-      for (const o of [allOff(platform), preset(platform, 'pair')]) for (const k of PREFERENCE_OPTIONS) expect(o[k], k).toBe(k === 'maxAgents' ? o.maxAgents : undefined)
+      for (const o of [allOff(platform), preset(platform, 'pair'), preset(platform, 'team')]) for (const k of PREFERENCE_OPTIONS) expect(o[k], k).toBe(k === 'maxAgents' ? o.maxAgents : undefined)
+      const solo = preset(platform, 'solo')
+      for (const k of PREFERENCE_OPTIONS) expect(solo[k], k).toBe(k === 'maxAgents' ? solo.maxAgents : k === 'simplifyAt' || k === 'churnStopAt' ? 0 : undefined)
       expect([allOff(platform).maxAgents, preset(platform, 'pair').maxAgents]).toEqual([12, 2])
       for (const k of PREFERENCE_OPTIONS) expect(FORM_OPTIONS[platform]).not.toContain(k)
     }

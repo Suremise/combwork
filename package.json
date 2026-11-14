@@ -49,6 +49,7 @@
     "@formatjs/icu-messageformat-parser": "3.5.20",
     "@formatjs/intl": "6.1.2",
     "@lydell/node-pty": "^1.2.0-beta.15",
+    "@xterm/addon-serialize": "^0.14.0",
     "@xterm/headless": "^6.0.0",
     "chokidar": "^5.0.0",
     "electron-updater": "^6.8.9",

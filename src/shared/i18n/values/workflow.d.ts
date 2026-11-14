@@ -22,6 +22,7 @@ interface CombworkMessageValues {
   'workflow.forYou.advanceRefused': { target: string | number; result: string | number; card: string | number; why: string; detail: string | number }
   'workflow.forYou.advanceStopped': { again: string; target: string | number; result: string | number; card: string | number; why: string; detail: string | number }
   'workflow.forYou.advanceUncertain': { again: string; target: string | number; result: string | number; card: string | number; detail: string | number; op: string }
+  'workflow.forYou.churnLimit': { card: string | number; churn: number }
   'workflow.forYou.decidedAfterMerge': { card: string | number }
   'workflow.forYou.focusedSkip': { card: string | number; tests: string | number }
   'workflow.forYou.lineAsk': { line: string | number; card: string | number; target: string | number; next: string | number }
@@ -38,6 +39,7 @@ interface CombworkMessageValues {
   'workflow.forYou.queueStuck': { card: string | number; target: string | number; folder: string | number; files: number; how: string; finish: string | number; project: string | number; undo: string | number }
   'workflow.forYou.review': { card: string | number }
   'workflow.forYou.roundLimit': { card: string | number; rounds: number }
+  'workflow.forYou.simplify': { card: string | number; churn: number }
   'workflow.forYou.slotDirty': { card: string | number; slot: string | number; line: string | number; target: string | number }
   'workflow.forYouKind': { kind: string }
   'workflow.form.addCheck': undefined
@@ -205,6 +207,8 @@ interface CombworkMessageValues {
   'workflow.nextVersion.upstream': { name: string | number; how: string; remote: string | number; publish: string | number; track1: string | number; track2: string | number }
   'workflow.option.assistantWakes.desc': undefined
   'workflow.option.assistantWakes.title': undefined
+  'workflow.option.churnStopAt.desc': undefined
+  'workflow.option.churnStopAt.title': undefined
   'workflow.option.commands.desc': undefined
   'workflow.option.commands.title': undefined
   'workflow.option.commitMessage.desc': undefined
@@ -268,6 +272,8 @@ interface CombworkMessageValues {
   'workflow.option.sameness.title': undefined
   'workflow.option.sharedFolderWarning.desc': undefined
   'workflow.option.sharedFolderWarning.title': undefined
+  'workflow.option.simplifyAt.desc': undefined
+  'workflow.option.simplifyAt.title': undefined
   'workflow.option.slotsUpToDate.desc': undefined
   'workflow.option.slotsUpToDate.title': undefined
   'workflow.option.stageNames.desc': undefined
@@ -331,6 +337,8 @@ interface CombworkMessageValues {
   'workflow.refused.lane.oneAtATime.change': undefined
   'workflow.refused.lane.oneAtATime.message': { card: string | number; earlier: string | number }
   'workflow.refused.lane.oneAtATime.next': { earlier: string | number; card: string | number }
+  'workflow.refused.loop.churnPending.message': { card: string | number; request: string | number }
+  'workflow.refused.loop.churnPending.next': undefined
   'workflow.refused.loop.followUpChecked.message': { card: string | number }
   'workflow.refused.loop.followUpChecked.next': { reader: string }
   'workflow.refused.loop.followUpMerging.message': { card: string | number }
@@ -350,6 +358,8 @@ interface CombworkMessageValues {
   'workflow.refused.loop.tooEarly.change': undefined
   'workflow.refused.loop.tooEarly.message': { card: string | number; minutes: number }
   'workflow.refused.loop.tooEarly.next': undefined
+  'workflow.refused.loop.usersChoice.message': { card: string | number; request: string | number }
+  'workflow.refused.loop.usersChoice.next': undefined
   'workflow.refused.merge.combworkMerges.change': undefined
   'workflow.refused.merge.combworkMerges.message': { card: string | number }
   'workflow.refused.merge.combworkMerges.next': undefined
@@ -518,6 +528,7 @@ interface CombworkMessageValues {
   'workflow.rule.submit.trailer': undefined
   'workflow.rule.verdict.currentSubmission': undefined
   'workflow.rule.verdict.reviewing': undefined
+  'workflow.simplifyChoice': { choice: string }
   'workflow.slots.archive': undefined
   'workflow.slots.archiveDesc': undefined
   'workflow.slots.branches': undefined

@@ -374,6 +374,7 @@ interface CombworkMessageValues {
   'board.forYou.declineWhy': undefined
   'board.forYou.failed': undefined
   'board.forYou.heading': undefined
+  'board.forYou.moreChurn': undefined
   'board.forYou.offer': { action: string }
   'board.forYou.offerReason': undefined
   'board.forYou.offerTip': { action: string }
@@ -1056,6 +1057,7 @@ interface CombworkMessageValues {
   'board.work.changes.retry': undefined
   'board.work.changes.sideBySide': undefined
   'board.work.check': { name: string | number; result: string; counted: string }
+  'board.work.churn': { total: number; failed: number; declined: number; designs: number; followUps: number; requests: number; asks: number; inherited: number; parent: string | number }
   'board.work.comments.add': undefined
   'board.work.comments.binary': undefined
   'board.work.comments.cancel': undefined
