@@ -60,7 +60,7 @@
     "description": "Provider Setup, for a CLI that runs from a description: editor extensions are never looked for."
   },
   "clis.note.install": {
-    "defaultMessage": "It runs from a description in your Combwork folder (clis): install it yourself, then Reload in Settings → Coding agents.",
+    "defaultMessage": "It runs from a description in your Combwork folder (clis): install it yourself, then Reload in Settings → Providers → Your own CLIs.",
     "description": "Provider Setup, under a CLI that runs from a description (HI-3196): how it is installed. clis is a folder’s name: keep it. Names of Combwork’s settings: keep them as Combwork shows them."
   },
   "clis.note.modelPlaceholder": {
@@ -149,27 +149,27 @@
   },
   "clis.settings.heading": {
     "defaultMessage": "Your own CLIs",
-    "description": "Settings → Coding agents (HI-3196): the heading over the CLIs that run from a description (a JSON file each in Combwork’s clis folder)."
+    "description": "Settings → Providers (HI-3196): the heading over the CLIs that run from a description (a JSON file each in Combwork’s clis folder)."
   },
   "clis.settings.lastGood": {
     "defaultMessage": "{file} has a problem; its last good version stays in use until it is fixed:",
-    "description": "Settings → Coding agents (HI-3196): a description file changed into one that can’t be used, while its earlier version is still used for this run. {file} is its name."
+    "description": "Settings → Providers (HI-3196): a description file changed into one that can’t be used, while its earlier version is still used for this run. {file} is its name."
   },
   "clis.settings.none": {
     "defaultMessage": "No descriptions yet.",
-    "description": "Settings → Coding agents (HI-3196): the clis folder holds no descriptions."
+    "description": "Settings → Providers (HI-3196): the clis folder holds no descriptions."
   },
   "clis.settings.notUsed": {
     "defaultMessage": "{file} isn’t used:",
-    "description": "Settings → Coding agents (HI-3196): before the reasons a description file was refused. {file} is its name."
+    "description": "Settings → Providers (HI-3196): before the reasons a description file was refused. {file} is its name."
   },
   "clis.settings.open": {
     "defaultMessage": "Open Folder",
-    "description": "Button in Settings → Coding agents (HI-3196): opens the clis folder in Explorer."
+    "description": "Button in Settings → Providers (HI-3196): opens the clis folder in Explorer."
   },
   "clis.settings.reload": {
     "defaultMessage": "Reload",
-    "description": "Button in Settings → Coding agents (HI-3196): reads the clis folder’s descriptions again."
+    "description": "Button in Settings → Providers (HI-3196): reads the clis folder’s descriptions again."
   },
   "clis.settings.reloaded": {
     "defaultMessage": "{n, plural, =0 {No CLIs from descriptions} one {# CLI from a description} other {# CLIs from descriptions}}{problems, plural, =0 {} one {; # description not used} other {; # descriptions not used}}",
@@ -177,6 +177,6 @@
   },
   "clis.settings.what": {
     "defaultMessage": "A CLI with no provider of its own runs from a description: a JSON file in the clis folder of your Combwork profile. Combwork reads its status from its screen, and never changes its own config.",
-    "description": "Settings → Coding agents (HI-3196): what the CLIs that run from a description are. clis is a folder’s name: keep it."
+    "description": "Settings → Providers (HI-3196): what the CLIs that run from a description are. clis is a folder’s name: keep it."
   }
 }

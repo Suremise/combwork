@@ -308,6 +308,7 @@
   "service.nextVersion.sameName": "次のバージョンには{from}ではなく専用のブランチが必要です。",
   "service.providers.keysStopped": "{task}：{why}ため、Combworkは入力を停止しました。ターミナルで完了してください。",
   "service.providers.noSetup": "{cli}にはセットアップ作業がありません。",
+  "service.providers.noTask": "Combworkには{cli}の{task, select, install {インストール} update {更新} login {サインイン} other {セットアップ}}タスクがありません。",
   "service.providers.notInstalled": "{cli}がインストールされていません。",
   "service.providers.pickNotFound": "{task}：Combworkは{item}を見つけられませんでした。ターミナルで操作するか、Combworkを更新してください。",
   "service.providers.retryUnavailable": "この更新の再試行は利用できなくなりました。「再確認」を選んでから、「更新」を試してください。",

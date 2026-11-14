@@ -10,14 +10,14 @@ import { notify, useStore } from '../store'
 import { Icon } from './ui'
 
 const M = {
-  heading: msg({ id: 'clis.settings.heading', defaultMessage: 'Your own CLIs', description: 'Settings → Coding agents (HI-3196): the heading over the CLIs that run from a description (a JSON file each in Combwork’s clis folder).' }),
-  what: msg({ id: 'clis.settings.what', defaultMessage: 'A CLI with no provider of its own runs from a description: a JSON file in the clis folder of your Combwork profile. Combwork reads its status from its screen, and never changes its own config.', description: 'Settings → Coding agents (HI-3196): what the CLIs that run from a description are. clis is a folder’s name: keep it.' }),
-  none: msg({ id: 'clis.settings.none', defaultMessage: 'No descriptions yet.', description: 'Settings → Coding agents (HI-3196): the clis folder holds no descriptions.' }),
-  reload: msg({ id: 'clis.settings.reload', defaultMessage: 'Reload', description: 'Button in Settings → Coding agents (HI-3196): reads the clis folder’s descriptions again.' }),
-  open: msg({ id: 'clis.settings.open', defaultMessage: 'Open Folder', description: 'Button in Settings → Coding agents (HI-3196): opens the clis folder in Explorer.' }),
+  heading: msg({ id: 'clis.settings.heading', defaultMessage: 'Your own CLIs', description: 'Settings → Providers (HI-3196): the heading over the CLIs that run from a description (a JSON file each in Combwork’s clis folder).' }),
+  what: msg({ id: 'clis.settings.what', defaultMessage: 'A CLI with no provider of its own runs from a description: a JSON file in the clis folder of your Combwork profile. Combwork reads its status from its screen, and never changes its own config.', description: 'Settings → Providers (HI-3196): what the CLIs that run from a description are. clis is a folder’s name: keep it.' }),
+  none: msg({ id: 'clis.settings.none', defaultMessage: 'No descriptions yet.', description: 'Settings → Providers (HI-3196): the clis folder holds no descriptions.' }),
+  reload: msg({ id: 'clis.settings.reload', defaultMessage: 'Reload', description: 'Button in Settings → Providers (HI-3196): reads the clis folder’s descriptions again.' }),
+  open: msg({ id: 'clis.settings.open', defaultMessage: 'Open Folder', description: 'Button in Settings → Providers (HI-3196): opens the clis folder in Explorer.' }),
   reloaded: msg({ id: 'clis.settings.reloaded', defaultMessage: '{n, plural, =0 {No CLIs from descriptions} one {# CLI from a description} other {# CLIs from descriptions}}{problems, plural, =0 {} one {; # description not used} other {; # descriptions not used}}', description: 'A notice after Reload (HI-3196): how many CLIs run from descriptions now, and how many description files couldn’t be used.' }),
-  notUsed: msg({ id: 'clis.settings.notUsed', defaultMessage: '{file} isn’t used:', description: 'Settings → Coding agents (HI-3196): before the reasons a description file was refused. {file} is its name.' }),
-  lastGood: msg({ id: 'clis.settings.lastGood', defaultMessage: '{file} has a problem; its last good version stays in use until it is fixed:', description: 'Settings → Coding agents (HI-3196): a description file changed into one that can’t be used, while its earlier version is still used for this run. {file} is its name.' }),
+  notUsed: msg({ id: 'clis.settings.notUsed', defaultMessage: '{file} isn’t used:', description: 'Settings → Providers (HI-3196): before the reasons a description file was refused. {file} is its name.' }),
+  lastGood: msg({ id: 'clis.settings.lastGood', defaultMessage: '{file} has a problem; its last good version stays in use until it is fixed:', description: 'Settings → Providers (HI-3196): a description file changed into one that can’t be used, while its earlier version is still used for this run. {file} is its name.' }),
   gapsLine: msg({ id: 'clis.gaps.line', defaultMessage: '{cli} runs from a description: {gaps}.', description: 'A note in Agent Settings (HI-3196) about an agent whose CLI runs from a description: what it lacks. {cli} is its name; {gaps} a list of what it lacks.' }),
   gapsHeading: msg({ id: 'clis.gaps.heading', defaultMessage: '{cli} runs from a description, so it has:', description: 'Provider Setup (HI-3196): the heading over the list of what a CLI that runs from a description lacks. {cli} is its name.' })
 }
@@ -50,7 +50,7 @@ export function ProviderGapsNote({ provider }: { provider: ProviderId }) {
   )
 }
 
-/** Settings → Coding agents: the clis folder, its Reload and Open Folder, and each description that isn't used, with why. */
+/** Settings → Providers: the clis folder, its Reload and Open Folder, and each description that isn't used, with why. */
 export function ClisFolder() {
   const view = useStore((s) => s.clis)
   const [busy, setBusy] = useState(false)

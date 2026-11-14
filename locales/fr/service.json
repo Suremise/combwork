@@ -308,6 +308,7 @@
   "service.nextVersion.sameName": "La prochaine version a besoin de sa propre branche, pas de {from}.",
   "service.providers.keysStopped": "{task} : Combwork a cessé d’y saisir des touches, car {why}. Termine dans le terminal.",
   "service.providers.noSetup": "La CLI {cli} n’a pas de tâche de configuration.",
+  "service.providers.noTask": "{cli} n’a aucune tâche {task, select, install {d’installation} update {de mise à jour} login {de connexion} other {de configuration}} dans Combwork.",
   "service.providers.notInstalled": "La CLI {cli} n’est pas installée.",
   "service.providers.pickNotFound": "{task} : Combwork n’a pas trouvé {item}. Fais-le dans le terminal, ou mets à jour Combwork.",
   "service.providers.retryUnavailable": "Cette nouvelle tentative de mise à jour n’est plus disponible. Choisis Vérifier à nouveau, puis Mettre à jour.",

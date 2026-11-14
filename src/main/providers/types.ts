@@ -580,6 +580,11 @@ export interface ProviderLaunchPart {
   readonly resumesById?: boolean
   /** Its first prompt is typed once its screen is ready (sessions.ts), not passed on its command line (HI-3196). */
   readonly promptTyped?: boolean
+  /**
+   * Its start (readyOutput, startupQuestion) is read from its rendered screen, a line each, as each draw lands, not from
+   * its output's tail run together (HI-3196: a description's patterns anchor ^ and $ at each line).
+   */
+  readonly startupOnScreen?: boolean
   /** Something the user should know about this launch (a mode the CLI can't fully give there), shown once per agent while Combwork runs. */
   launchNotice?(ctx: LaunchContext): { title: string; message: string } | null
   /** Something in a folder agents work in (any provider's) that stops this CLI working there (#509: a stray .codex), or null. */

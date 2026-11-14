@@ -308,6 +308,7 @@
   "service.nextVersion.sameName": "La próxima versión necesita una rama propia, no {from}.",
   "service.providers.keysStopped": "{task}: Combwork dejó de escribir en la terminal porque {why}. Termina la tarea allí.",
   "service.providers.noSetup": "{cli} no tiene ninguna tarea de configuración.",
+  "service.providers.noTask": "{cli} no tiene ninguna tarea de {task, select, install {instalación} update {actualización} login {inicio de sesión} other {configuración}} en Combwork.",
   "service.providers.notInstalled": "{cli} no está instalado.",
   "service.providers.pickNotFound": "{task}: Combwork no encontró {item}. Hazlo en la terminal o actualiza Combwork.",
   "service.providers.retryUnavailable": "Este reintento de actualización ya no está disponible. Elige Volver a comprobar y luego Actualizar.",

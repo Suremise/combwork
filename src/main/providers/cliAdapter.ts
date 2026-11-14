@@ -3,7 +3,8 @@ import { existsSync } from 'original-fs'
 import { join } from 'path'
 import { msg } from '../../shared/i18n'
 import { providerSettings } from '../../shared/providers'
-import { cliPatternId, type CliDescription, type CliPattern } from '../../shared/providers/cliDescription'
+import { OSC7501_DEFAULT, cliPatternId, type CliDescription, type CliPattern } from '../../shared/providers/cliDescription'
+import { advancedDef } from '../../shared/advanced'
 import type { ProviderModule } from '../../shared/providers/parts'
 import type { AgentInstallInfo, ReadinessIssue } from '../../shared/types'
 import { advanced } from '../advanced'
@@ -97,7 +98,19 @@ export class CliAdapter implements ProviderAdapter {
   /** A pattern of its description: this launch's (pinned), else its effective value now (its advanced value, #367). */
   private pattern(kind: CliPattern): RegExp | null {
     if (this.pinned) return this.pinned[kind] ?? null
-    return this.has(kind) ? advanced.pattern(cliPatternId(this.id, kind)) : null
+    return this.effective(kind)
+  }
+
+  /**
+   * A pattern's effective value now: its advanced value (an override, or the description's default), or the description's
+   * own where its advanced value isn't registered (a newer snapshot replaced this description meanwhile).
+   */
+  private effective(kind: CliPattern): RegExp | null {
+    if (!this.has(kind)) return null
+    const id = cliPatternId(this.id, kind)
+    if (advancedDef(id)) return advanced.pattern(id)
+    const own = kind === 'version' ? this.cli.binary.versionPattern : kind === 'osc7501' ? OSC7501_DEFAULT : this.cli.status[kind]
+    return own ? new RegExp(own, 'im') : null
   }
 
   private has(kind: CliPattern): boolean {
@@ -109,7 +122,10 @@ export class CliAdapter implements ProviderAdapter {
   forLaunch(): ProviderAdapter {
     const kinds: CliPattern[] = ['ready', 'working', 'asks', 'titleAsks', 'osc7501', 'version']
     const pinned: Patterns = {}
-    for (const k of kinds) if (this.has(k)) pinned[k] = advanced.pattern(cliPatternId(this.id, k))
+    for (const k of kinds) {
+      const re = this.effective(k)
+      if (re) pinned[k] = re
+    }
     return new CliAdapter(this.module, pinned)
   }
 
@@ -189,6 +205,10 @@ export class CliAdapter implements ProviderAdapter {
     return this.cli.launch.prompt === 'typed'
   }
 
+  get startupOnScreen(): boolean {
+    return true
+  }
+
   get readyOutput(): RegExp | undefined {
     return this.pattern('ready') ?? undefined
   }
@@ -202,15 +222,29 @@ export class CliAdapter implements ProviderAdapter {
   }
 
   // ---- terminal
+  /**
+   * What its screen says now: the rule (its question, work, its prompt) matched last on it, as what came before stays on
+   * the screen (an answered question, a finished turn's "Working…").
+   */
+  private latest(screen: string): { kind: 'asks' | 'working' | 'ready'; text: string } | null {
+    let found: { kind: 'asks' | 'working' | 'ready'; text: string; at: number } | null = null
+    for (const kind of ['ready', 'working', 'asks'] as const) {
+      const m = lastMatch(this.pattern(kind), screen)
+      if (m && (!found || m.at >= found.at)) found = { kind, ...m }
+    }
+    return found
+  }
+
   turnScreen(): ((screen: string) => 'idle' | 'working' | null) | null {
-    const working = this.pattern('working')
-    const ready = this.pattern('ready')
-    return (screen) => (this.idleQuestion(screen) ? null : working?.test(screen) ? 'working' : ready?.test(screen) ? 'idle' : null)
+    return (screen) => {
+      const now = this.latest(screen)?.kind
+      return now === 'working' ? 'working' : now === 'ready' ? 'idle' : null
+    }
   }
 
   idleQuestion(screen: string): string | null {
-    const m = this.pattern('asks')?.exec(screen)
-    return m ? m[0].trim() || m[0] : null
+    const now = this.latest(screen)
+    return now?.kind === 'asks' ? now.text.trim() || now.text : null
   }
 
   terminalTurn(): RegExp | null {
@@ -221,4 +255,17 @@ export class CliAdapter implements ProviderAdapter {
     const re = this.pattern('titleAsks')
     return re ? (title) => re.test(title) : null
   }
+}
+
+/** Each pattern's global copy, to find its last match (made once a pattern). */
+const GLOBAL = new WeakMap<RegExp, RegExp>()
+
+/** Where a pattern last matches on a screen, and what it matched; null when it doesn't. */
+export function lastMatch(re: RegExp | null, screen: string): { at: number; text: string } | null {
+  if (!re) return null
+  let g = GLOBAL.get(re)
+  if (!g) GLOBAL.set(re, (g = new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`)))
+  let last: { at: number; text: string } | null = null
+  for (const m of screen.matchAll(g)) last = { at: m.index, text: m[0] }
+  return last
 }

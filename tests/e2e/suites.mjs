@@ -139,6 +139,7 @@ export const SUITES = [
   { name: 'copyquiet' },
   { name: 'crashdumps' },
   { name: 'ctxpercent' },
+  { name: 'datacli' },
   { name: 'decisions' },
   { name: 'decisionwake' },
   { name: 'defaultprovider' },

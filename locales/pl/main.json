@@ -340,6 +340,7 @@
   "main.restart.why.held": "jego folder roboczy jest zajęty przez inną pracę (wznów go ręcznie)",
   "main.restart.why.idle": "był bezczynny i nie czekała na niego żadna karta ani tor",
   "main.restart.why.movedOn": "ma nowszą rozmowę",
+  "main.restart.why.noResume": "jego CLI nie może wznowić rozmowy",
   "main.restart.why.notReady": "nie był gotowy na czas, więc go zatrzymano",
   "main.restart.why.notStopped": "nie był gotowy na czas i jeszcze się nie zatrzymał; pozostali zostaną wznowieni, gdy to nastąpi",
   "main.restart.why.removed": "został usunięty",

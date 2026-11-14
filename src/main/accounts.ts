@@ -1929,9 +1929,7 @@ export function agentLaunchView(a: AgentDef, cfg: Pick<ProjectConfig, 'migration
   if (!cfg.migrations?.accounts1 || !a.connection) return {}
   const c = getConnection(a.connection)
   // Its connection launches without Combwork's tools (HI-2670): Independent, as the window reads its role.
-  // Or its CLI takes none of Combwork's tools (HI-3196: a CLI that runs from a description): Independent too.
-  const noTools = launchesWithoutTools(c) || (!!a.provider && providerDescriptor(a.provider).capabilities.session?.combworkTools === false)
-  return { model: c?.model, effort: c?.effort, use200kContext: c?.use200kContext, permissionMode: c?.permissionMode, ...(noTools ? { toolsOff: true as const } : {}) }
+  return { model: c?.model, effort: c?.effort, use200kContext: c?.use200kContext, permissionMode: c?.permissionMode, ...(launchesWithoutTools(c) ? { toolsOff: true as const } : {}) }
 }
 
 // ---------------------------------------------------------------------------

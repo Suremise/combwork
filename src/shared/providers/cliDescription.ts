@@ -251,12 +251,12 @@ export function checkCliDescription(raw: unknown, taken: ReadonlyMap<string, str
 
 /** A description's notes as agents and the Agent API read them (said when read; the window's are the messages beside them). */
 const NOTE = {
-  install: agentMsg({ id: 'clis.note.install', text: 'It runs from a description in your Combwork folder (clis): install it yourself, then Reload in Settings → Coding agents.', note: "A CLI that runs from a description (HI-3196): how it is installed, as the Agent API's provider listing says it." }),
+  install: agentMsg({ id: 'clis.note.install', text: 'It runs from a description in your Combwork folder (clis): install it yourself, then Reload in Settings → Providers → Your own CLIs.', note: "A CLI that runs from a description (HI-3196): how it is installed, as the Agent API's provider listing says it." }),
   signIn: agentMsg({ id: 'clis.note.signIn', text: 'Sign it in as its own documentation says, in a terminal: Combwork runs no sign-in for it.', note: 'A CLI that runs from a description (HI-3196): how to sign it in again, as agents read it.' })
 }
 
 const TEXT = {
-  installNote: msg({ id: 'clis.note.install', defaultMessage: 'It runs from a description in your Combwork folder (clis): install it yourself, then Reload in Settings → Coding agents.', description: 'Provider Setup, under a CLI that runs from a description (HI-3196): how it is installed. clis is a folder’s name: keep it. Names of Combwork’s settings: keep them as Combwork shows them.' }),
+  installNote: msg({ id: 'clis.note.install', defaultMessage: 'It runs from a description in your Combwork folder (clis): install it yourself, then Reload in Settings → Providers → Your own CLIs.', description: 'Provider Setup, under a CLI that runs from a description (HI-3196): how it is installed. clis is a folder’s name: keep it. Names of Combwork’s settings: keep them as Combwork shows them.' }),
   extensionNote: msg({ id: 'clis.note.extension', defaultMessage: 'No editor copy is used.', description: 'Provider Setup, for a CLI that runs from a description: editor extensions are never looked for.' }),
   signInHelp: msg({ id: 'clis.note.signIn', defaultMessage: 'Sign it in as its own documentation says, in a terminal: Combwork runs no sign-in for it.', description: 'For a CLI that runs from a description (HI-3196): how to sign it in again, Combwork having no sign-in task for it.' }),
   modelPlaceholder: msg({ id: 'clis.note.modelPlaceholder', defaultMessage: 'Model ID', description: 'The custom model ID box’s placeholder for a CLI that runs from a description without its own example.' })

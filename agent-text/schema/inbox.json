@@ -253,6 +253,11 @@
       "name": "plain"
     }
   },
+  "inbox.refused.noTools": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
   "inbox.refused.plain": {
     "placeholders": {
       "name": "plain"

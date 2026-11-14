@@ -308,6 +308,7 @@
   "service.nextVersion.sameName": "下一个版本需要自己的分支，而不是 {from}。",
   "service.providers.keysStopped": "{task}：由于{why}，Combwork 已停止向其输入。请在终端中完成。",
   "service.providers.noSetup": "{cli} 没有配置任务。",
+  "service.providers.noTask": "Combwork 中没有 {cli} 的{task, select, install {安装} update {更新} login {登录} other {配置}}任务。",
   "service.providers.notInstalled": "{cli} 未安装。",
   "service.providers.pickNotFound": "{task}：Combwork 找不到 {item}。请在终端中操作，或更新 Combwork。",
   "service.providers.retryUnavailable": "此更新重试已不可用。请选择“重新检查”，然后尝试“更新”。",

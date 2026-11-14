@@ -164,6 +164,7 @@
   "session.start.archived": "此会话已归档。请先取消归档再恢复。",
   "session.start.args": "{problem}请在“设置”→“账号与连接”中修复它的连接“{connection}”。",
   "session.start.beingOpened": "另一个智能体正在打开此对话。",
+  "session.start.cantResume": "{provider} 无法恢复对话：请改为开始新的对话。",
   "session.start.cleaning": "Combwork 正在归档、删除或清理此会话的文件。请稍后重试。",
   "session.start.cliRequired": "运行会话需要 {provider}。",
   "session.start.closing": "Combwork 正在停止此工作区的智能体，现在无法启动任何智能体。",

@@ -308,6 +308,7 @@
   "service.nextVersion.sameName": "Następna wersja potrzebuje własnej gałęzi, nie {from}.",
   "service.providers.keysStopped": "{task}: Combwork przestał wpisywać klawisze, bo {why}. Dokończ w terminalu.",
   "service.providers.noSetup": "{cli} nie ma zadania konfiguracji.",
+  "service.providers.noTask": "{cli} nie ma w Combwork zadania {task, select, install {instalacji} update {aktualizacji} login {logowania} other {konfiguracji}}.",
   "service.providers.notInstalled": "{cli} nie jest zainstalowany.",
   "service.providers.pickNotFound": "{task}: Combwork nie znalazł pozycji {item}. Zrób to w terminalu albo zaktualizuj Combwork.",
   "service.providers.retryUnavailable": "Ponowienie tej aktualizacji nie jest już dostępne. Wybierz Sprawdź ponownie, a następnie Zaktualizuj.",

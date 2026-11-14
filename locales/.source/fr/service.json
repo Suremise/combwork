@@ -308,6 +308,7 @@
   "service.nextVersion.sameName": "The next version needs a branch of its own, not {from}.",
   "service.providers.keysStopped": "{task}: Combwork stopped typing into it, as {why}. Finish it in the terminal.",
   "service.providers.noSetup": "{cli} has no setup task.",
+  "service.providers.noTask": "{cli} has no {task, select, install {install} update {update} login {sign-in} other {setup}} task in Combwork.",
   "service.providers.notInstalled": "{cli} is not installed.",
   "service.providers.pickNotFound": "{task}: Combwork couldn't find {item}. Do it in the terminal, or update Combwork.",
   "service.providers.retryUnavailable": "This update retry is no longer available. Check again, then try Update.",

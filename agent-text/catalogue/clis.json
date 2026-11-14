@@ -1,6 +1,6 @@
 {
   "clis.note.install": {
-    "text": "It runs from a description in your Combwork folder (clis): install it yourself, then Reload in Settings → Coding agents.",
+    "text": "It runs from a description in your Combwork folder (clis): install it yourself, then Reload in Settings → Providers → Your own CLIs.",
     "note": "A CLI that runs from a description (HI-3196): how it is installed, as the Agent API's provider listing says it."
   },
   "clis.note.signIn": {

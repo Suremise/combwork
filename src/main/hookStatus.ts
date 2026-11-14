@@ -170,15 +170,16 @@ export type TerminalReading = 'asks' | 'working' | 'ready' | null
 
 /**
  * How a CLI with no hooks moves on, from its terminal alone (HI-3196): a question waits for the user (told once); its
- * question gone, it works or is ready again; work begun is working; ready after work is finished (told, its turn ended);
- * nothing else changes it. The start is its startup's (startupScreen), and the end its process's.
+ * question gone, it works or is ready again; work begun is working, a prompt taken (nothing else says one was); ready after
+ * work is finished (told, its turn ended); nothing else changes it. The start is its startup's (startupScreen), and the
+ * end its process's.
  */
 export function screenStep(reading: TerminalReading, s: HookStatusInput): HookStep {
   const none: HookStep = { next: null, actions: [] }
   if (reading === null || s.status === 'starting' || s.status === 'stopped') return none
   if (reading === 'asks') return s.status === 'waiting' ? none : raise(null, s)
   if (s.status === 'waiting') return reading === 'working' ? lower(s) : { next: idleAfter(s, 'ready'), message: null, question: null, ...RESOLVED, actions: [] }
-  if (reading === 'working') return s.status === 'working' ? none : { next: 'working', message: null, failed: null, actions: [] }
+  if (reading === 'working') return s.status === 'working' ? none : { next: 'working', message: null, failed: null, actions: ['prompted'] }
   return s.status === 'working' ? { next: idleAfter(s, 'finished'), review: null, ...RESOLVED, actions: ['notifyFinished', 'turnEnded'] } : none
 }
 
