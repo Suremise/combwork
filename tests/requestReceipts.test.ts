@@ -21,6 +21,7 @@ const store = await import('../src/main/boardStore')
 const receipts = await import('../src/main/requestReceipts')
 const { advanced } = await import('../src/main/advanced')
 const { runCardIntent } = await import('../src/main/cardIntents')
+const { FactStore } = await import('../src/main/workflow/factStore')
 const { allOff } = await import('../src/shared/workflow/options')
 const { INTENT_PATHS, keyedWrite } = await import('../src/shared/requestKeys')
 const { INTENT_ROUTES } = await import('../src/main/servers')
@@ -170,6 +171,88 @@ describe('a keyed write is applied once (HI-3195)', () => {
     // Nothing committed to submit: refused (its Refused fact written), and refused again on retry, never "applied".
     expect(await refusedRule()).toBe('submit.empty')
     expect(await refusedRule()).toBe('submit.empty')
+  })
+
+  it('HI-3271: a batch with one card refused and one applied takes the marker, in either order: its retry applies nothing again', async () => {
+    for (const order of ['refused first', 'applied first'] as const) {
+      const { w, path } = await workspace(undefined, { ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project' })
+      const make = (title: string) => inWorkspace(w, async () => (await tasks.createTask({ title, project: 'p' }, user)).number)
+      // A, started with nothing committed: its submit is refused (submit.empty). B, started with a commit: submitted.
+      const b = await make('Applied')
+      await inWorkspace(w, () => runCardIntent({ n: b, plain: false }, agent, { kind: 'start' }))
+      writeFileSync(join(path, 'p', 'b.txt'), 'b\n')
+      execFileSync('git', ['add', '-A'], { cwd: join(path, 'p') })
+      execFileSync('git', ['commit', '-qm', `b\n\nCombwork-Card: p-${b}`], { cwd: join(path, 'p') })
+      const a = await make('Refused')
+      await inWorkspace(w, () => runCardIntent({ n: a, plain: false }, agent, { kind: 'start' }))
+      const cards = order === 'refused first' ? [a, b] : [b, a]
+      const body = { numbers: cards, column: 'review' }
+      const r = { run: 'p#a1', key: KEY(order === 'refused first' ? 20 : 21), fingerprint: receipts.fingerprintOf('POST', '/v1/tasks/batch', [], body), route: 'POST /v1/tasks/batch' }
+      const batch = () => inWorkspace(w, () => tasks.updateTasks(cards, { column: 'review' }, agent))
+      const first = (await inWorkspace(w, () => receipts.onceFor(w, r, batch))) as { number: number; error: string | null }[]
+      expect(first.find((i) => i.number === a)?.error).toBeTruthy()
+      expect(first.find((i) => i.number === b)?.error).toBeNull()
+      const kinds = (card: number) => inWorkspace(w, () => FactStore.forBoard(w, { project: 'p', key: '' }).facts(card).map((f) => f.kind))
+      const before = { a: await kinds(a), b: await kinds(b) }
+      // The reply lost: the same key again is "already applied", nothing written a second time (no Refused doubled).
+      expect(await inWorkspace(w, () => receipts.onceFor(w, r, batch))).toMatchObject({ replayed: true, applied: true })
+      expect({ a: await kinds(a), b: await kinds(b) }).toEqual(before)
+      expect(before.a.filter((k) => k === 'Refused')).toHaveLength(1)
+      expect(before.b.filter((k) => k === 'Submitted')).toHaveLength(1)
+    }
+  })
+
+  it('HI-3271: a write undone (a part of a change, or a whole change) takes back its claim: a later bookkeeping commit takes no marker', async () => {
+    const { w } = await workspace()
+    const card = await inWorkspace(w, async () => (await tasks.createTask({ title: 'Work', project: 'p' }, user)).number)
+    let calls = 0
+    // Combwork's own bookkeeping after it (a board value changed), a change that applies nothing the request asked.
+    const undoneThenBookkeeping = (part: boolean) => () => inWorkspace(w, async () => {
+      calls++
+      const undone = () => tasks.commentTask(card, 'Undone', agent).then(() => Promise.reject(new Error('undone')))
+      if (part) {
+        await store.boardWrite(w, async () => {
+          await store.boardSavepoint(w, undone).catch(() => undefined)
+          store.setBoardValue(w, 'probe', `part-${calls}`)
+          store.boardChanged(w)
+        })
+      } else {
+        await store.boardWrite(w, undone).catch(() => undefined)
+        await store.boardWrite(w, async () => {
+          store.setBoardValue(w, 'probe', `whole-${calls}`)
+          store.boardChanged(w)
+        })
+      }
+    })
+    for (const [i, part] of [[30, true], [31, false]] as const) {
+      calls = 0
+      await inWorkspace(w, () => receipts.onceFor(w, req(KEY(i)), undoneThenBookkeeping(part)))
+      // No marker: its retry runs again, and the comment was never written.
+      await inWorkspace(w, () => receipts.onceFor(w, req(KEY(i)), undoneThenBookkeeping(part)))
+      expect(calls).toBe(2)
+    }
+    expect(await comments(w, card)).toBe(0)
+  })
+
+  it("HI-3271: the scope ends with its handler: a write it left running after its reply takes no marker, so a retry runs again", async () => {
+    const { w } = await workspace()
+    const card = await inWorkspace(w, async () => (await tasks.createTask({ title: 'Work', project: 'p' }, user)).number)
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    let later: Promise<unknown> = Promise.resolve()
+    let calls = 0
+    // The request writes nothing itself; what it started (in its async context) commits after it has replied.
+    const startsLater = () => {
+      calls++
+      if (calls === 1) later = gate.then(() => inWorkspace(w, () => tasks.commentTask(card, 'Combwork later', agent)))
+      return Promise.resolve('replied')
+    }
+    expect(await inWorkspace(w, () => receipts.onceFor(w, req(KEY(40)), startsLater))).toBe('replied')
+    release()
+    await later
+    expect(await comments(w, card)).toBe(1)
+    expect(await inWorkspace(w, () => receipts.onceFor(w, req(KEY(40)), startsLater))).toBe('replied')
+    expect(calls).toBe(2)
   })
 
   it("the keyed writes are one list, both sides: every card intent, never a write the server doesn't deduplicate", () => {

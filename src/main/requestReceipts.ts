@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import { createHash } from 'crypto'
 import type { DatabaseSync } from 'node:sqlite'
-import { boardRead, setBoardCommitHook } from './boardStore'
+import { boardRead, setBoardCommitHook, setBoardPartHooks } from './boardStore'
 import type { WorkspaceService } from './workspace'
 
 /**
@@ -68,10 +68,12 @@ class KeyTaken extends Error {}
 /** The request's scope while its handler runs: what its first board commit records. */
 interface Scope extends KeyedRequest {
   produced: Record<string, unknown>
+  /** Its marker saved, or its handler over (HI-3271): nothing more is noted or saved for it. */
   written: boolean
   /**
    * The request was refused (runtime.refuse recorded it) before anything it asked was applied: nothing it commits from
    * then on (the refusal's record, the history line after it) takes a marker, so its retry is refused (or done) again.
+   * Within a part of a change that throws (a batch's card refused, HI-3271), the part's alone: put back as it ends.
    */
   auditOnly: boolean
   /**
@@ -137,6 +139,26 @@ setBoardCommitHook((db: DatabaseSync, afterCommit, changed) => {
   afterCommit(() => void (s.written = true))
 })
 
+// HI-3271: what a part of a change told the request (a refusal recorded, something applied) is that part's alone. A batch's
+// card refused is a part that throws: its refusal no longer makes the other cards' change audit-only, in either order. A
+// part undone (or a whole change) takes back what it applied; one kept with its error (a refusal's record) keeps that.
+setBoardPartHooks({
+  part: () => {
+    const s = scope.getStore()
+    if (!s || s.written) return () => undefined
+    const was = { applies: s.applies, auditOnly: s.auditOnly }
+    return (kept) => {
+      if (s.written) return
+      s.auditOnly = was.auditOnly
+      if (!kept) s.applies = was.applies
+    }
+  },
+  undone: () => {
+    const s = scope.getStore()
+    if (s && !s.written) s.applies = false
+  }
+})
+
 /** The marker of (run, key) on the board, unexpired, or null. */
 function receipt(ws: WorkspaceService, run: string, key: string): { fingerprint: string; produced: Record<string, unknown> } | null {
   const row = boardRead(ws, (db) => db.prepare('SELECT fingerprint, produced, at FROM request_receipts WHERE run = ? AND key = ?').get(run, key)) as { fingerprint: string; produced: string | null; at: string } | undefined // i18n-ignore: SQL
@@ -178,7 +200,18 @@ export async function onceFor<T>(ws: WorkspaceService, req: KeyedRequest, handle
   const saved = receipt(ws, req.run, req.key)
   if (saved) return fromReceipt(saved, req)
   if (inFlight.size >= IN_FLIGHT_MAX && !inFlight.has(id)) throw new KeysBusy()
-  const outcome = scope.run({ ...req, produced: {}, written: false, auditOnly: false, applies: false }, handler).catch((e: unknown) => {
+  const s: Scope = { ...req, produced: {}, written: false, auditOnly: false, applies: false }
+  // HI-3271 (HG1's suspicion on HI-3258): the scope ends with its handler. What the handler started that runs on after it
+  // (a change after a board write, a timer) keeps the scope's async context but is Combwork's own: it takes no marker, nor
+  // trips on one a retry saved meanwhile.
+  const ended = async (): Promise<T> => {
+    try {
+      return await handler()
+    } finally {
+      s.written = true
+    }
+  }
+  const outcome = scope.run(s, ended).catch((e: unknown) => {
     // Taken by another request's commit meanwhile (this one's change undone): answered as that one's applied write.
     if (e instanceof KeyTaken) {
       const r = receipt(ws, req.run, req.key)
