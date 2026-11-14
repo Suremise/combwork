@@ -14,7 +14,7 @@ For each card, in order:
 3. **Passed**: its finish is the project's, and the card says what's next (work-on-card, Finish). **Done**: the lane goes on, whatever the card's own prompt named: with the rules on Combwork starts the next card for you (end your turn), else take it unprompted (`cw_lane` `next`) until none is left.
 4. **Failed**: the verdict sent it back to Doing. Fix the **blocking** findings (committed, for a code card in Git or jj), and submit again with what changed (naming the commit): the next round. Suggestions that aren't blocking become follow-up cards (`cw_create_task`).
 
-**New edge cases round after round:** the reviewer stops to ask whether to simplify (review-agent-work, Review). Wait for that answer rather than posting another design or round.
+**New edge cases round after round:** the reviewer asks whether to simplify (review-agent-work); wait for the answer.
 
 **Checks in a round:** each submission carries a run record (work-on-card). After a round's fixes rerun the checks they affect; to pass, its final code needs the checks the project's notes require (if they don't say, its full checks).
 

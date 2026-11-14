@@ -524,7 +524,8 @@ describe('the skills follow the gates (#1524)', () => {
     // HI-2870 (J9d): jj's clauses (a jj card's commit; a passed one waits for the user to integrate it): 9850 before.
     expect(catalog.get('work-on-card')!.text.replace(/\r/g, '').length).toBeLessThan(9950)
     // HI-2870 (J9d): its commit clauses scoped to a code card "in Git or jj": 11850 before.
-    expect(catalog.get('card-loop')!.text.replace(/\r/g, '').length).toBeLessThan(11900)
+    // HI-3188 (Darren's Q6): the builder's pointer to the reviewer's simplify rule: 11900 before.
+    expect(catalog.get('card-loop')!.text.replace(/\r/g, '').length).toBeLessThan(12100)
   })
 })
 
@@ -614,7 +615,8 @@ describe('the review and merge skills follow the gates (#1525)', () => {
   it('stay smaller than before P8 (review-agent-work 7,475 and merge-ready 5,291 characters, LF)', () => {
     // HI-2011's split added each reference file's heading and SKILL.md's list of them (7,475 and 5,291 before it).
     // HI-2870 (J9d): a jj copy's change read from its base, a jj card's missing commit asked for: 8150 before.
-    expect(review().replace(/\r/g, '').length).toBeLessThan(8200)
+    // HI-3188 (Darren's Q6): the simplify rule, its one owner (verdict.md): 8200 before.
+    expect(review().replace(/\r/g, '').length).toBeLessThan(8700)
     // Round 2: merging back in SKILL.md, what is rarer in who-merges.md under headings of its own.
     expect(merge().replace(/\r/g, '').length).toBeLessThan(5800)
   })

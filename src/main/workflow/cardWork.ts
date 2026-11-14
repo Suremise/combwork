@@ -526,7 +526,7 @@ export function factRow(f: Fact, short: (id: string) => string): FactRow {
       }
       case 'SplitFrom': {
         const x = d as FactData['SplitFrom']
-        return `#${x.parent}: churn ${x.total}`
+        return `#${x.parent}: churn ${x.total}` // agent-protocol: a fact's codes (its parent card and count), as the facts listing shows each kind's data
       }
       default:
         return ''

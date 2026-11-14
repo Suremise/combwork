@@ -27,8 +27,6 @@ Read the whole change, and the code around it where needed. In order of importan
 4. **Tests**: new behaviour without tests, or tests that don't test it. A new or changed test that sleeps and then checks, reads state once just after an action, depends on another test's leftovers, or raises a timeout with no stated reason is a blocking finding: it fails on a loaded or slower machine.
 5. **Clarity**: only where it will cause real trouble later.
 
-**New edge cases, round after round**: when two or three rounds or design checks in a row each turn up a different new edge case, don't open another. Ask whether it is worth handling, or to simplify or cut scope: `cw_ask_assistant` when the Assistant can act, else (or when it's refused) `cw_ask_user` (`kind: "decide"`). If Combwork has already asked it (a simplify check or hard stop under For you), wait for that answer instead. Until it's answered: no ok or gaps, request or verdict on the card.
-
 **Reuse the builder's run, don't repeat it**: a result recorded at the exact revision you review stands (`cw_start_review`'s `checksAtRevision`; a summary's record once its fingerprint and coverage check out). Run only what no record covers, what the workflow asks of you, your own probes, and a rerun for a doubt your verdict names ([checks.md](checks.md)), in the review copy (§1), changing nothing.
 
 ## 4. Report
@@ -49,4 +47,4 @@ Read one only when it applies. Each is in this skill's own folder, beside this S
 
 - [other-targets.md](other-targets.md): not a card, a card with no workflow, a pool's card, work sent uncommitted.
 - [checks.md](checks.md): what you run, screenshots to look at, or proof you can't open.
-- [verdict.md](verdict.md): giving the verdict on a card, or reviewing work again.
+- [verdict.md](verdict.md): the verdict, reviewing again, or new edge cases piling up.
