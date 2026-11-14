@@ -41,8 +41,8 @@ export const BUSY = (slot: string) => ({ held: false, print: `lease:open:${slot}
 /** A jj project with a workspace database, two slots, J9a's port on its bindings, and a Workflow composed with jj's deps. */
 /** `candidates`: HI-2871's candidate step on (its attempts journalled in the database, as the app's). */
 /** `oneSlot`: slot-a only, for a file whose cards are all B1's (HI-3018: a slot is a dozen jj runs a test never uses). */
-/** `advance` (HI-3235): the finish is Combwork's advance, its hook placed at `advanceHook`. */
-export async function world(colocated: boolean, o: { hook?: (point: JjIntegrationPoint) => Promise<void> | void; candidates?: boolean; oneSlot?: boolean; advance?: boolean; advanceHook?: JjCardDeps['advanceHook'] } = {}) {
+/** `advance` (HI-3235): the finish is Combwork's advance ('preview', HI-3236: preview and click), its hook placed at `advanceHook`. */
+export async function world(colocated: boolean, o: { hook?: (point: JjIntegrationPoint) => Promise<void> | void; candidates?: boolean; oneSlot?: boolean; advance?: boolean | 'preview'; advanceHook?: JjCardDeps['advanceHook'] } = {}) {
   const h = harness()
   const { repo, root } = h.repo(`cards${colocated ? 'c' : 'n'}`, colocated)
   const home = tempDir('jjcards-')
@@ -121,7 +121,7 @@ export async function world(colocated: boolean, o: { hook?: (point: JjIntegratio
       store: s,
       project: repo,
       projectKey: 'AM',
-      options: () => (o.advance ? { ...opts, finish: 'combworkAdvances' as const } : opts),
+      options: () => (o.advance ? { ...opts, finish: o.advance === 'preview' ? ('previewAdvance' as const) : ('combworkAdvances' as const) } : opts),
       slotFor: async (_card, builder) => ({ slot: builder === 'B2' ? 'slot-b' : 'slot-a', folder: slotOf(builder).folder, lease: slotOf(builder).lease, fresh: true }),
       slotUnused: async () => undefined,
       autoRun: false,

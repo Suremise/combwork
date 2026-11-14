@@ -829,6 +829,25 @@ export async function runUndo(h: Held, deps: JjAdvanceDeps, j0: AdvanceJournal, 
   }
 }
 
+/**
+ * HI-3236: the commits a plan's move adds (E..R), read pinned at the single operation head: up to `max` lines (a short id
+ * and its first line) and how many there are in all. Null when they can't be read (more than one head, a read that
+ * failed): a preview then says nothing it couldn't read.
+ */
+export async function commitsAdded(h: Held, deps: JjAdvanceDeps, plan: JjAdvancePlan, max = 10): Promise<{ lines: string[]; total: number } | null> {
+  assertHeld(h, plan.store)
+  const s = steps(deps)
+  try {
+    const hs = await s.heads()
+    if (hs.length !== 1) return null
+    const all = lines(await s.read(['--at-op', hs[0], 'log', '--no-graph', '-r', `${plan.expected}..${plan.result}`, '-T', 'commit_id.short(12) ++ " " ++ description.first_line() ++ "\\n"']))
+    return { lines: all.slice(0, max), total: all.length }
+  } catch (e) {
+    if (e instanceof Unreadable) return null
+    throw e
+  }
+}
+
 /** An undo's classification on the state read now (s16 §1's replay): read-only, never a write. */
 export async function classifyUndoNow(h: Held, deps: JjAdvanceDeps, j: AdvanceJournal, u: UndoEntry): Promise<AdvanceOutcome> {
   assertHeld(h, j.plan.store)

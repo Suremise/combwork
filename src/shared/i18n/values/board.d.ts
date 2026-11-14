@@ -346,6 +346,18 @@ interface CombworkMessageValues {
   'board.field.project': undefined
   'board.field.title': undefined
   'board.filter.noProject': undefined
+  'board.forYou.advanceAttest': undefined
+  'board.forYou.advanceAttestTip': undefined
+  'board.forYou.advanceIntegrate': undefined
+  'board.forYou.advanceIntegrateTip': undefined
+  'board.forYou.advanceLeave': undefined
+  'board.forYou.advanceLeaveTip': undefined
+  'board.forYou.advanceNotThisPlan': undefined
+  'board.forYou.advanceNotThisPlanTip': undefined
+  'board.forYou.advanceStartAgain': undefined
+  'board.forYou.advanceStartAgainTip': undefined
+  'board.forYou.advanceUndo': undefined
+  'board.forYou.advanceUndoTip': undefined
   'board.forYou.agree': { action: string }
   'board.forYou.agreeTip': undefined
   'board.forYou.answering': undefined

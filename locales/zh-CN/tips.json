@@ -300,6 +300,8 @@
   "tips.jjCards.title": "jj 项目中的卡片",
   "tips.jjOperations.text": "在 jj 项目中，“版本控制”→“操作”按名称列出 jj 的操作。“预览撤销”会显示撤销其中某个操作会改变什么，并在不会改变其他内容时给出要运行的命令。Combwork 从不运行它。",
   "tips.jjOperations.title": "预览撤销 jj 操作",
+  "tips.jjPreview.text": "在 jj 项目中，请在“版本控制”→“工作流程”→“由谁整合”中选择“你点击后由 Combwork 整合”：“待你处理”会预览每次移动，只有在你点击“整合”后 Combwork 才会执行。",
+  "tips.jjPreview.title": "一键整合 jj 卡片",
   "tips.keepAwake.text": "智能体工作时，Combwork 会阻止 Windows 进入睡眠（屏幕仍可锁定），等它们完成后再允许睡眠。在“设置”→“常规”中选择何时这样做。",
   "tips.keepAwake.title": "智能体在工作，电脑保持唤醒",
   "tips.laneApplyNow.text": "在为通道的构建者打开“启动通道”时，勾选“立即应用”会立即更改顺序：正在处理的卡片回到待办，其工作保留在它的分支上，并会告知构建者。",

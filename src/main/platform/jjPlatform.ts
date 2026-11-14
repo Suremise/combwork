@@ -25,10 +25,16 @@ import { UNREADABLE } from '../../shared/workflow/texts'
 import type { CardRecord } from '../workflow/factStore'
 import type { ReconcileHooks } from '../workflow/reconcile'
 import type { Workflow } from '../workflow/runtime'
-import type { AdvanceAnswer, AdvanceHost, AdvanceRef, AdvanceStep, AdvanceWords, CheckBracket, FinishInputs, HeadMove, KeptWork, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
-import { AdvanceJournals, basePrint, classifyUndoNow, fingerprintHash, journalAbandoned, journalNewUndo, journalRequested, journalSettled, journalUndoAs, planIdOf, recoverAdvance, resultContained, runAdvance, runUndo, underLock, undoOfferedNow, undoPreMutation, type AdvanceJournal, type AdvanceOutcome, type Held, type JjAdvanceDeps, type JjAdvancePlan } from './jjAdvance'
-import { ADVANCE_GATES, ADVANCE_UNCERTAIN_GATE, advanceUnresolved } from '../../shared/workflow/facts'
+import type { AdvanceAnswer, AdvanceHost, AdvanceRef, AdvanceStep, AdvanceWords, PreviewWords, CheckBracket, FinishInputs, HeadMove, KeptWork, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
+import { AdvanceJournals, basePrint, classifyUndoNow, commitsAdded, fingerprintHash, journalAbandoned, journalNewUndo, journalRequested, journalSettled, journalUndoAs, planIdOf, recoverAdvance, resultContained, runAdvance, runUndo, underLock, undoOfferedNow, undoPreMutation, type AdvanceJournal, type AdvanceOutcome, type Held, type JjAdvanceDeps, type JjAdvancePlan } from './jjAdvance'
+import { ADVANCE_GATES, ADVANCE_PREVIEW_GATE, ADVANCE_UNCERTAIN_GATE, advanceUnresolved, approvedByUser } from '../../shared/workflow/facts'
+import { finishAdvances, finishPreviews } from '../../shared/workflow/options'
+
+/** HI-3236: the consent an attempt runs under: the automatic finish's, or a preview's click. */
+type AdvanceMode = 'auto' | 'preview'
+import { okBeforeApplies } from '../../shared/workflow/guards'
 import { dirname } from 'path'
+import { samePath } from '../../shared/movePaths'
 import type { HistoryPort } from './history'
 import { historyFor, observePort } from './historyPorts'
 import type { Disposable, ObserveEvent } from './observe'
@@ -142,6 +148,12 @@ export interface JjCardDeps {
   candidateHook?: JjCandidateDeps['hook']
   /** HI-3235, tests only: where an advance or an undo pauses (jjAdvance's points), so a race or a crash goes exactly there. */
   advanceHook?: JjAdvanceDeps['hook']
+  /**
+   * HI-3236, an unpackaged test launch only (CW_TEST_ADVANCE_STOP=undo, jjCards.ts): a verified move is recorded as a stop
+   * with its undo offered (the move itself real, the undo the real protocol under its real conditions), so e2e can reach
+   * the Undo button: s30 §2's conditions exclude every naturally detected stop.
+   */
+  advanceTestStop?: boolean
   /**
    * HI-2938: the app's side of the merge checks on a candidate: the project's setup command, a check copy leased at a
    * revision with its job's spawn (and whether a lease is freed through the pool's barrier), the queue's runner and
@@ -833,13 +845,27 @@ export class JjPlatform implements PlatformAdapter {
   }
 
   /** Whether a card's plan now is still `planId` (the attempt's lease: the card in Approved, its consent unchanged). */
-  private async planStill(cardId: number, planId: string, integ: JjIntegrationDeps): Promise<boolean> {
+  private async planStill(cardId: number, planId: string, integ: JjIntegrationDeps, mode: AdvanceMode): Promise<boolean> {
     const wf = this.wf
     if (!wf || this.deps?.candidateChecks?.signal?.aborted) return false
     const c = wf.store.card(cardId)
-    if (c.stage !== 'approved') return false
-    const p = await this.advancePlan(c, wf.state(c), integ)
+    const s = wf.state(c)
+    if (c.stage !== 'approved' || !this.consentHolds(c, s, mode)) return false
+    const p = await this.advancePlan(c, s, integ)
     return !!p && planIdOf(p.plan) === planId
+  }
+
+  /**
+   * HI-3236 (HR1's round 1): whether the card's rules now still consent to an attempt of this mode: its finish (an
+   * automatic one advances; a clicked one previews) and its OK where G10 applies. Read under the locks at the attempt's
+   * boundary and at every write of its lease: a call chosen under earlier rules (Preview or By hand applied to the card
+   * in flight meanwhile) never adopts the new mode's plan.
+   */
+  private consentHolds(c: CardRecord, s: CardState, mode: AdvanceMode): boolean {
+    const wf = this.wf!
+    const r = wf.rulesetOf(c, s)
+    if (mode === 'auto' ? !finishAdvances(r.options.finish) : !finishPreviews(r.options.finish)) return false
+    return !(wf.enforced() && okBeforeApplies(r, c.labels) && !approvedByUser(s, 'okBefore'))
   }
 
   /** Whether the cycle had an attempt for this plan that was undone (it isn't advanced again on its own). */
@@ -864,6 +890,10 @@ export class JjPlatform implements PlatformAdapter {
     const wf = this.wf!
     const ref: AdvanceRef = { cycle: j.plan.cycle, attempt: j.attempt }
     const s = wf.state(wf.store.card(card.id))
+    if (out.kind === 'advanced' && this.deps?.advanceTestStop && j.phase === 'verified') {
+      if (await host.stopped(card, ref, j.planId, { code: 'testStop', undo: true, uncertain: false }, this.advanceWords(j, s, 'other', 'testStop'))) await journalSettled(h, deps, j, 'stopped', { detail: 'testStop' }) // i18n-ignore: codes (a test seam's)
+      return false
+    }
     if (out.kind === 'advanced') {
       // J5's proof of the result, as the outside path records it (HR1's round 1, finding 3): its bundle retained and the
       // integration's publish obligation written with Integrated, so the card is tracked for publishing either way. A proof
@@ -988,31 +1018,120 @@ export class JjPlatform implements PlatformAdapter {
         const c = wf.store.card(card.id)
         const s = wf.state(c)
         if (c.stage !== 'approved' || s.integrated || advanceUnresolved(s)) return 'busy'
-        const ready = await this.advancePlan(c, s, integ)
+        // The rules now, not those this call was chosen under: an automatic attempt only while the card still advances.
+        if (!this.consentHolds(c, s, 'auto')) return 'notReady'
+        const ready = await this.readyPlan(h, integ, journals, c, s)
         if (!ready) return 'notReady'
-        const planId = planIdOf(ready.plan)
-        if (this.planUndone(c, s, planId) || !(await this.offerCurrent(ready.plan.target, ready.offer))) return 'notReady'
-        // The same plan refused at the base before, on a repository that hasn't changed since: not tried again yet.
-        const refusals = (await journals.list(c.key, s.cycle)).map((x) => x.journal).filter((x): x is AdvanceJournal => x !== 'unreadable' && x.planId === planId && !!x.refusedAt)
-        if (refusals.length) {
-          const now = await basePrint(h, this.advanceDeps(integ, journals, () => true), integ.view.store)
-          if (now === null || refusals.some((x) => x.refusedAt === now)) return 'notReady'
-        }
         await host.noteDefault(c)
-        const attempt = randomUUID()
-        const deps = this.advanceDeps(integ, journals, () => this.planStill(card.id, planId, integ))
-        const j = await journalRequested(h, deps, attempt, ready.plan)
-        if (!(await host.attempted(c, s.cycle, planId, attempt))) {
-          await journalAbandoned(h, deps, j)
-          return 'busy'
-        }
-        const { outcome, journal } = await runAdvance(h, deps, j)
-        if (await this.recordAdvance(h, deps, c, journal, outcome, host)) integrated = s.cycle
-        return { attempted: attempt }
+        const out = await this.attemptUnder(h, integ, journals, c, s, ready.plan, ready.planId, host, 'auto')
+        if (out.integrated) integrated = s.cycle
+        return out.step
       })
     )
     if (integrated !== null) await this.candidatesDone(card, integrated)
     return step
+  }
+
+  /**
+   * The card's plan when it is ready to be integrated now (HI-3235's readiness, under the locks): its candidate ready for
+   * its fingerprint, its checks passed under the key now, the offer current in jj (T at E, the candidate the visible
+   * commit recorded), the plan not undone this cycle, and not refused at the base on a repository unchanged since.
+   */
+  private async readyPlan(h: Held, integ: JjIntegrationDeps, journals: AdvanceJournals, c: CardRecord, s: CardState): Promise<{ plan: JjAdvancePlan; planId: string } | null> {
+    const ready = await this.advancePlan(c, s, integ)
+    if (!ready) return null
+    const planId = planIdOf(ready.plan)
+    if (this.planUndone(c, s, planId) || !(await this.offerCurrent(ready.plan.target, ready.offer))) return null
+    // The same plan refused at the base before, on a repository that hasn't changed since: not tried again yet.
+    const refusals = (await journals.list(c.key, s.cycle)).map((x) => x.journal).filter((x): x is AdvanceJournal => x !== 'unreadable' && x.planId === planId && !!x.refusedAt)
+    if (refusals.length) {
+      const now = await basePrint(h, this.advanceDeps(integ, journals, () => true), integ.view.store)
+      if (now === null || refusals.some((x) => x.refusedAt === now)) return null
+    }
+    return { plan: ready.plan, planId }
+  }
+
+  /** One attempt of a ready plan (HI-3235's write order: journal, fact read back, the protocol, its outcome recorded). */
+  private async attemptUnder(h: Held, integ: JjIntegrationDeps, journals: AdvanceJournals, c: CardRecord, s: CardState, plan: JjAdvancePlan, planId: string, host: AdvanceHost, mode: AdvanceMode): Promise<{ step: AdvanceStep; integrated: boolean }> {
+    const attempt = randomUUID()
+    const deps = this.advanceDeps(integ, journals, () => this.planStill(c.id, planId, integ, mode))
+    const j = await journalRequested(h, deps, attempt, plan)
+    if (!(await host.attempted(c, s.cycle, planId, attempt))) {
+      await journalAbandoned(h, deps, j)
+      return { step: 'busy', integrated: false }
+    }
+    const { outcome, journal } = await runAdvance(h, deps, j)
+    return { step: { attempted: attempt }, integrated: await this.recordAdvance(h, deps, c, journal, outcome, host) }
+  }
+
+  /**
+   * HI-3236 (HI-3236/s7, s10, s13): the adapter's preview port, under the card's lock and the repository lock. Earlier
+   * attempts settled first; then, the plan ready and not dismissed: its preview asked, unless one is open for it already
+   * or an answer to a preview of this card's cycle is pending (the queued click's request is never replaced). Never an
+   * attempt: only the user's Integrate starts one (advanceAnswer).
+   */
+  async advancePreview(card: CardRecord, _s: CardState, host: AdvanceHost): Promise<AdvanceStep> {
+    const d = this.deps
+    const wf = this.wf
+    const journals = this.advanceJournals()
+    if (!wf || !d?.records || !journals) return 'notReady'
+    const integ = await d.integration()
+    if (!integ) return 'notReady'
+    return this.withCardLock(card.id, () =>
+      underLock(integ.view.store, integ.lock, async (h): Promise<AdvanceStep> => {
+        const c0 = wf.store.card(card.id)
+        if (c0.stage !== 'approved') return 'notReady'
+        if (!(await this.settleAdvances(h, integ, journals, c0, host))) return 'busy'
+        const c = wf.store.card(card.id)
+        const s = wf.state(c)
+        if (c.stage !== 'approved' || s.integrated || advanceUnresolved(s)) return 'busy'
+        const pending = wf.store.pendingActions().some((x) => x.card === c.id && x.kind === 'advanceAnswer' && x.payload.gate === ADVANCE_PREVIEW_GATE && x.payload.cycle === s.cycle)
+        if (pending) return 'busy'
+        const ready = await this.readyPlan(h, integ, journals, c, s)
+        if (!ready || host.previewDeclined(c, s.cycle, ready.planId)) return 'notReady'
+        const open = s.requests.find((r) => r.gate === ADVANCE_PREVIEW_GATE)
+        if (open?.result === ready.planId) return 'notReady'
+        const words = await this.previewWords(h, integ, journals, ready.plan, open ? 'planChanged' : undefined)
+        await host.askPreview(c, s.cycle, ready.planId, words)
+        return 'notReady'
+      })
+    )
+  }
+
+  /** A preview's words: the move, how the candidate was built, and the commits it adds (read pinned; none when unreadable). */
+  private async previewWords(h: Held, integ: JjIntegrationDeps, journals: AdvanceJournals, plan: JjAdvancePlan, again?: 'planChanged'): Promise<PreviewWords> {
+    const added = await commitsAdded(h, this.advanceDeps(integ, journals, () => true), plan)
+    return { target: plan.target, expected: plan.expected, result: plan.result, style: plan.style, commits: added ? added.lines.join('; ') : '', more: added ? Math.max(0, added.total - added.lines.length) : 0, ...(again ? { again } : {}) }
+  }
+
+  /**
+   * HI-3236's answer to a preview, under the card's lock and the repository lock. Bound (s10, s13): this project, the
+   * card's cycle, the request the card's newest preview (by its fact's seq), its plan, the user's recorded answer, and no
+   * attempt of this plan since that request. Not for this plan: dismissed. Integrate: every consent identity read again
+   * now (the finish still previews, the OK given, Approved, nothing unsettled, the plan rebuilt with the same id, its
+   * offer current in jj); any of them not holding, or unreadable: nothing runs, and the next reconcile asks for the plan
+   * then ready. Holding: HI-3235's attempt.
+   */
+  private async previewAnswer(h: Held, integ: JjIntegrationDeps, journals: AdvanceJournals, card: CardRecord, ans: AdvanceAnswer, host: AdvanceHost): Promise<boolean> {
+    const wf = this.wf!
+    const c = wf.store.card(card.id)
+    const s = wf.state(c)
+    const facts = wf.store.facts(c.id).filter((f) => f.seq >= s.cycle)
+    const previews = facts.filter((f) => f.kind === 'ApprovalRequested' && (f.data as FactData['ApprovalRequested']).gate === ADVANCE_PREVIEW_GATE)
+    const newest = previews.at(-1)
+    const asked = newest && (newest.data as FactData['ApprovalRequested']).request === ans.request ? (newest.data as FactData['ApprovalRequested']) : null
+    const answered = s.approvals.findLast((a) => a.request === ans.request)
+    const attemptedSince = facts.some((f) => f.kind === 'AdvanceAttempted' && (f.data as FactData['AdvanceAttempted']).plan === ans.plan && f.seq > (newest?.seq ?? Infinity))
+    const bound = samePath(ans.project, wf.cfg.project) && s.cycle === ans.cycle && !!asked && asked.entry === ans.plan && asked.result === ans.plan && answered?.answer === ans.answer && !attemptedSince
+    if (!bound) return false
+    if (ans.answer === 'declined') {
+      await host.declinePreview(c, s.cycle, ans.plan)
+      return false
+    }
+    if (c.stage !== 'approved' || s.integrated || advanceUnresolved(s) || !this.consentHolds(c, s, 'preview')) return false
+    const ready = await this.readyPlan(h, integ, journals, c, s)
+    if (!ready || ready.planId !== ans.plan) return false
+    return (await this.attemptUnder(h, integ, journals, c, s, ready.plan, ready.planId, host, 'preview')).integrated
   }
 
   /**
@@ -1030,6 +1149,11 @@ export class JjPlatform implements PlatformAdapter {
     if (!wf || !d?.records || !journals) throw new Error('advance answer: jj is not composed for this project') // i18n-ignore: an action's failure, for the log
     const integ = await d.integration()
     if (!integ) throw new Error("advance answer: jj's control workspace can't be read now") // i18n-ignore: an action's failure, for the log
+    // HI-3236: a preview's answer (Integrate or Not for this plan); its question comes back by the next reconcile if it fails.
+    if (ans.gate === ADVANCE_PREVIEW_GATE) {
+      if (await this.withCardLock(card.id, () => underLock(integ.view.store, integ.lock, (h) => this.previewAnswer(h, integ, journals, card, ans, host)))) await this.candidatesDone(card, ans.cycle)
+      return
+    }
     await this.withCardLock(card.id, () => underLock(integ.view.store, integ.lock, (h) => this.answerUnder(h, integ, journals, card, ans, host)))
   }
 
@@ -1042,7 +1166,7 @@ export class JjPlatform implements PlatformAdapter {
     const ref: AdvanceRef = { cycle: ans.cycle, attempt: ans.attempt }
     const asked = s.made[ans.request]
     const answered = s.approvals.findLast((a) => a.request === ans.request)
-    const bound = ans.project === wf.cfg.project && s.cycle === ans.cycle && s.advance?.attempt === ans.attempt && advanceUnresolved(s) && s.advance.state === ans.state && s.advance.plan === ans.plan && asked?.gate === ans.gate && asked.entry === ans.attempt && asked.result === ans.plan && answered?.answer === ans.answer
+    const bound = samePath(ans.project, wf.cfg.project) && s.cycle === ans.cycle && s.advance?.attempt === ans.attempt && advanceUnresolved(s) && s.advance.state === ans.state && s.advance.plan === ans.plan && asked?.gate === ans.gate && asked.entry === ans.attempt && asked.result === ans.plan && answered?.answer === ans.answer
     const read = await journals.read(c.key, ans.cycle, ans.attempt)
     const j = read && read !== 'unreadable' && read.planId === ans.plan ? read : null
     if (!bound) return this.keepAsked(c, j, host, ans.request, 'stale') // i18n-ignore: a code, worded by the question's message (FOR_YOU.advance*)

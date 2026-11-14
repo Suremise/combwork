@@ -1211,6 +1211,14 @@
     "defaultMessage": "Preview undoing a jj operation",
     "description": "A tip's title (HI-2800). Keep jj."
   },
+  "tips.jjPreview.text": {
+    "defaultMessage": "In a jj project, choose Combwork integrates when you click under Version Control → Workflow → Who integrates: For you then previews each move, and Combwork makes it only when you click Integrate.",
+    "description": "A tip (HI-3236). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. “Who integrates” and “Combwork integrates when you click” are a workflow option and its value, “Integrate” a button, as translated there. Keep jj."
+  },
+  "tips.jjPreview.title": {
+    "defaultMessage": "Integrate a jj card with one click",
+    "description": "A tip's title (HI-3236). Keep jj."
+  },
   "tips.keepAwake.text": {
     "defaultMessage": "While an agent works, Combwork stops Windows from sleeping (the screen can still lock), and lets it sleep once they're done. Choose when in Settings → General.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

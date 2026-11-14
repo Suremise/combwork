@@ -12,6 +12,7 @@
 
 import { knownStamp, setupStampOf } from './jjSetupStamp'
 import { basename } from 'path'
+import { app } from 'electron'
 import { git } from './git'
 import { jjRunner, storeGatedHistory, storeGitGated } from './platform/jjRunner'
 import { historyFor } from './platform/historyPorts'
@@ -43,6 +44,8 @@ export function jjCardsFor(ws: WorkspaceService, projectPath: string, projectId:
   }
   return {
     runner: jjRunner,
+    // HI-3236's e2e seam (HR1's bounds on HI-3236/s7): an unpackaged test launch only, never an installed Combwork.
+    ...(!app.isPackaged && process.env.CW_TEST_ADVANCE_STOP === 'undo' ? { advanceTestStop: true } : {}),
     port: () => jjPort(),
     lock: (store) => (fn) => storeLock(store, fn),
     git: gitOn,

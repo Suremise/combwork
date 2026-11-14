@@ -10,7 +10,7 @@
 
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
-import { ADVANCE_GATES, ADVANCE_STOPPED_GATE, agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, overridableEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type StageId, CHURN_GATES, CHURN_LIMIT_GATE, PAUSE_GATES, SIMPLIFY_GATE, churnDue, churnTotal, countsChurn, type PauseChoice } from '../../shared/workflow/facts'
+import { ADVANCE_GATES, ADVANCE_PREVIEW_GATE, ADVANCE_STOPPED_GATE, agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, overridableEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type StageId, CHURN_GATES, CHURN_LIMIT_GATE, PAUSE_GATES, SIMPLIFY_GATE, churnDue, churnTotal, countsChurn, type PauseChoice } from '../../shared/workflow/facts'
 import { awaitsAgentMerge, baseRulesetId, compile, hasStage, mergeCommitOf, skipReviewOf, targetedOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
@@ -1942,7 +1942,8 @@ export class Workflow {
         if (needOk) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.okBefore, { card: w.card.key }))
         return
       case 'combworkAdvances':
-        // HI-3235: Combwork integrates what passed (its platform's advance port): it waits in Approved, its OK asked there
+      case 'previewAdvance':
+        // HI-3235 (HI-3236: its preview too): Combwork integrates what passed (its platform's advance port): it waits in Approved, its OK asked there
         // first where G10 applies, for its candidate and merge checks; the reconcile then calls the adapter's advance.
         w.move('approved', 'derived')
         if (needOk) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.okBefore, { card: w.card.key }))
@@ -2551,7 +2552,7 @@ export class Workflow {
       if (ADVANCE_GATES.includes(req.gate) && req.entry && req.result && (answer === 'approved' || answer === 'declined')) {
         // HI-3235: the platform adapter takes the answer up in a durable action bound to what was asked (its request,
         // attempt, plan, cycle and state): one per answer, its handler reading the attempt's journal before anything.
-        const payload: AdvanceAnswer = { request, gate: req.gate, attempt: req.entry, plan: req.result, cycle: st.cycle, state: req.gate === ADVANCE_STOPPED_GATE ? 'stopped' : 'uncertain', answer, project: this.cfg.project }
+        const payload: AdvanceAnswer = { request, gate: req.gate, attempt: req.entry, plan: req.result, cycle: st.cycle, state: req.gate === ADVANCE_STOPPED_GATE ? 'stopped' : req.gate === ADVANCE_PREVIEW_GATE ? 'preview' : 'uncertain', answer, project: this.cfg.project }
         w.action('advanceAnswer', { ...payload })
         return null
       }
