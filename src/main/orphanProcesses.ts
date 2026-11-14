@@ -156,7 +156,10 @@ export function nameDue(due: readonly Orphan[], processes: readonly ActivityProc
 const byLaunch = new Map<string, Map<string, Orphan>>()
 /** HI-3206: each launch's processes remembered as cw-progress runs' (runProcesses.ts), by launch, then by "pid:created". */
 const inRuns = new Map<string, Map<string, string>>()
-/** HI-3206: each run's reporter, bound once (null: none; never bound again), and its title, kept to name it once it is gone. */
+/**
+ * HI-3206: each run's reporter, bound once (null: not found yet, looked for again at each look, HI-3245), and its title,
+ * kept to name it once it is gone.
+ */
 const reporters = new Map<string, string | null>()
 const runTitles = new Map<string, string>()
 /** The runs main knows of for a project (progress.list, set at start: setOrphanRuns). */
@@ -175,9 +178,14 @@ const boundMs = (): number => testMs('CW_TEST_ORPHAN_MS', advanced.number(ORPHAN
 function runsOfLaunch(launch: LaunchRef, lineage: readonly Lineage[], eligible: readonly Lineage[]): (key: string, before?: Orphan['run']) => Orphan['run'] | null {
   const runs = runsForLaunch(launch)
   for (const r of runs) {
-    // Bound once (never again), from every eligible launch's lineage read at this look (HR1's round 1: the run's
-    // reporter is in one of its agent's launches in that project, whichever is looked at first).
-    if (!reporters.has(r.id)) reporters.set(r.id, r.reporterSentAt === undefined ? null : bindReporter(eligible, r.pid, r.reporterSentAt))
+    // Bound from every eligible launch's lineage read at this look (HR1's round 1: the run's reporter is in one of its
+    // agent's launches in that project, whichever is looked at first). Once bound, never again; not bound yet (HI-3245: a
+    // look whose snapshot was read before the run registered), tried again at each look, by the same identity (started
+    // before its reporter sent), so a pid used again by a later process never binds.
+    if (!reporters.get(r.id) && r.reporterSentAt !== undefined) {
+      const found = bindReporter(eligible, r.pid, r.reporterSentAt)
+      if (found || !reporters.has(r.id)) reporters.set(r.id, found)
+    } else if (!reporters.has(r.id)) reporters.set(r.id, null)
     runTitles.set(r.id, r.title)
   }
   const tree = runTrees(lineage, runs.map((r) => ({ runId: r.id, reporter: reporters.get(r.id) ?? null })), inRuns.get(launch.runId) ?? new Map())
