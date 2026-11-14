@@ -138,7 +138,7 @@ function notify(level: 'warning' | 'error' | 'info', title: Msg, body: Msg, valu
   tell({ kind: 'usage', level, title: tr(title, values), message: tr(body, values), apiTitle: englishText({ m: title, values }), apiTitleText: { m: title, values } })
 }
 
-const windowOf = (l: Pick<PlanLimit, 'windowMinutes'>): 'weekly' | 'fiveHour' => limitKind(l) ?? 'fiveHour'
+const windowOf = (l: Pick<PlanLimit, 'windowMinutes' | 'models' | 'scope'>): 'weekly' | 'fiveHour' => limitKind(l) ?? 'fiveHour'
 
 /** A reason a firing couldn't move agents, noticed once per period (HR1: never on every report, nor again as reasons alternate). */
 function blocked(from: Account, l: PlanLimit, rec: UsageMoveRecord, reason: UsageMoveProblem, extra: { workspace?: string; agents?: string[] } = {}): void {
