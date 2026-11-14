@@ -104,31 +104,47 @@ export function CommentLayer({ editor, card, submission, path, comments, agentNa
   }, [comments, draft])
   const spotKeys = [...spots.keys()].filter((k) => !(oldHidden && k.startsWith('old:'))).sort().join('|')
 
-  // A view zone for each spot, made again when the spots change; each one's height follows its content (ResizeObserver).
+  // A view zone for each spot, kept by its side and line while the spot is there (HI-3239): only spots that come or go are
+  // added or removed, so another spot's container, and the thread or box React keeps in it, is never made again. A new
+  // container would remount its portal and lose what is being typed there (an edit, a draft). Each zone's height follows
+  // its content (ResizeObserver).
+  const kept = useRef(new Map<string, Zone>())
   useEffect(() => {
-    const made: Zone[] = []
+    // The editor's zones go with it (a new editor, or the layer closing).
+    const mine = kept.current
+    return () => {
+      for (const side of ['new', 'old'] as const) sideEditor(side).changeViewZones((acc) => [...mine.values()].filter((z) => z.side === side).forEach((z) => acc.removeZone(z.id)))
+      mine.clear()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor])
+  useEffect(() => {
+    const mine = kept.current
+    const want = new Set(spotKeys ? spotKeys.split('|') : [])
     for (const side of ['new', 'old'] as const) {
       const ed = sideEditor(side)
       // Monaco hides its view zones from assistive technology (aria-hidden, set once as it makes them): they hold only its
       // own empty alignment spacers and these threads, whose words and buttons must be reachable.
       ed.getDomNode()?.querySelector('.view-zones')?.removeAttribute('aria-hidden')
       ed.changeViewZones((acc) => {
-        for (const key of spotKeys ? spotKeys.split('|') : []) {
+        for (const [key, z] of mine) {
+          if (z.side !== side || want.has(key)) continue
+          acc.removeZone(z.id)
+          mine.delete(key)
+        }
+        for (const key of want) {
           const s = spots.get(key)
-          if (!s || s.side !== side) continue
+          if (mine.has(key) || !s || s.side !== side) continue
           const node = document.createElement('div')
           node.className = 'cw-comment-zone'
           // The zone's own keys and clicks stay in it: the editor never takes them (its text box keeps the focus).
           for (const ev of ['mousedown', 'keydown', 'keyup', 'keypress', 'wheel'] as const) node.addEventListener(ev, (e) => e.stopPropagation())
           const zone: Monaco.editor.IViewZone = { afterLineNumber: s.line, heightInPx: 60, domNode: node, suppressMouseDown: true }
-          made.push({ key, side, id: acc.addZone(zone), zone, node })
+          mine.set(key, { key, side, id: acc.addZone(zone), zone, node })
         }
       })
     }
-    setZones(made)
-    return () => {
-      for (const side of ['new', 'old'] as const) sideEditor(side).changeViewZones((acc) => made.filter((z) => z.side === side).forEach((z) => acc.removeZone(z.id)))
-    }
+    setZones([...mine.values()])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, spotKeys])
 
