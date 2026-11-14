@@ -1674,8 +1674,8 @@ describe('an account turned off moves every running agent on it, whatever its st
     // a draft left in its prompt until the user clears it).
     const s = sessions as unknown as { live: Map<string, any>; userInput: Map<string, { at: number; enter: boolean }> }
     const prompt: Record<string, string | null> = { working: '', watching: '', idle: '', lane: 'half a line' }
-    const state = (id: string, status: string) => ({ provider: 'claude-code', runId: `r-${id}`, sessionId: `s-${id}`, projectPath: off1, agentId: id, agentName: `Off ${id}`, cwd: id === 'lane' ? join(base, 'slots', 'slot-a') : off1, status, launchedConnection: { id: a1.id, name: 'Anthropic-1', connection: { id: own[id], name: accounts.getConnection(own[id])!.name } } })
-    for (const [id, status] of [['working', 'working'], ['watching', 'watching'], ['idle', 'finished'], ['lane', 'finished']]) s.live.set(liveKey(id), { state: state(id, status), adapter: Object.assign(Object.create(provider('claude-code')), { promptText: () => prompt[id] }), screen: { textWithoutDim: () => '' } })
+    const state = (id: string, now: string) => ({ provider: 'claude-code', runId: `r-${id}`, sessionId: `s-${id}`, projectPath: off1, agentId: id, agentName: `Off ${id}`, cwd: id === 'lane' ? join(base, 'slots', 'slot-a') : off1, status: now, launchedConnection: { id: a1.id, name: 'Anthropic-1', connection: { id: own[id], name: accounts.getConnection(own[id])!.name } } })
+    for (const [id, now] of [['working', 'working'], ['watching', 'watching'], ['idle', 'finished'], ['lane', 'finished']]) s.live.set(liveKey(id), { state: state(id, now), adapter: Object.assign(Object.create(provider('claude-code')), { promptText: () => prompt[id] }), screen: { textWithoutDim: () => '' } })
     // Keys the user pressed long before (outside the typing pause), none of them Enter.
     for (const id of ['idle', 'lane']) s.userInput.set(sessions.key(off1, id), { at: Date.now() - 60_000, enter: false })
     // In a turn as main's own rule reads it (setAgentBusy's statuses); the rest of the lane-end checks have nothing here.
