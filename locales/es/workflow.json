@@ -422,8 +422,6 @@
   "workflow.refused.attempt.staleLaunch.next": "Tu sesión actual tiene la tarjeta: léela allí (cw_read_task) y sigue según lo que dice ahora.",
   "workflow.refused.attempt.moved.message": "{card} se reinició, se devolvió, se terminó o se dio a otro agente después de que la leyeras por última vez (ahora está en el intento {attempt}.{generation}), así que esto no se aplicó.",
   "workflow.refused.attempt.moved.next": "Vuelve a leer {card} (cw_read_task) y actúa sobre ella tal como está ahora, si todavía te toca.",
-  "workflow.refused.attempt.unread.message": "No has leído {card} en esta sesión (está en el intento {attempt}.{generation}), así que Combwork no puede saber para cuál de sus intentos es esto: no se aplicó.",
-  "workflow.refused.attempt.unread.next": "Lee primero {card} (cw_read_task) y vuelve a intentarlo.",
   "workflow.refused.attempt.notAssignee.message": "{card} es ahora de {assignee, select, nobody {ningún agente} other {{assignee}}}: tú no trabajas en ella, así que esto no se aplicó.",
   "workflow.refused.attempt.notAssignee.next": "Déjalo a su autor, o pide al usuario que te la devuelva.",
   "workflow.refused.submit.identity.change": "Esta regla se configura en Control de versiones → Los commits usan la identidad del proyecto.",

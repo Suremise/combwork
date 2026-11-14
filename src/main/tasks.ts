@@ -1772,8 +1772,8 @@ async function moveAsAgent(g: AgentGate, n: number, patch: TaskPatch, actor: Tas
       }
     },
     undefined,
-    // HI-3194: a move to Review or Done is its submit or merge report (#1268), the builder's own; into Doing, its start.
-    { builder: !g.review && (g.column === 'review' || g.column === 'done'), start: !g.review && g.column === 'doing' }
+    // HI-3194: a move to Review or Done is its submit or merge report (#1268), the builder's own.
+    { builder: !g.review && (g.column === 'review' || g.column === 'done') }
   )
   if (isRefusal(reply)) throw new WorkflowRefusedError(reply)
   const intent = String((reply as { data?: { useNextTime?: string } }).data?.useNextTime ?? '')
@@ -1844,8 +1844,8 @@ export function attemptRead(ws: WorkspaceService, project: string, n: number): A
 }
 
 /** HI-3194: refused unless the agent request's fence holds for card n at attempt `pre` (null: only its launch is checked). */
-function fenceOrThrow(g: AttemptGuard, n: number, pre: AttemptKey | null, opts: { start?: boolean } = {}): void {
-  const r = g.check(n, cardRef(n), pre ?? null, opts)
+function fenceOrThrow(g: AttemptGuard, n: number, pre: AttemptKey | null): void {
+  const r = g.check(n, cardRef(n), pre ?? null)
   if (r) throw new WorkflowRefusedError(r)
 }
 
@@ -1869,7 +1869,9 @@ export function fenceCommit(actor: TaskActor, n: number): (() => void) | undefin
   if (!g) return undefined
   return () => {
     const doc = cardDoc(workspace, n)
-    fenceOrThrow(g, n, attemptIn(workspace, typeof doc?.project === 'string' ? doc.project : '', n))
+    const pre = attemptIn(workspace, typeof doc?.project === 'string' ? doc.project : '', n)
+    fenceOrThrow(g, n, pre)
+    if (pre) g.accepted(n, pre, (fn) => afterBoardWrite(workspace, fn))
   }
 }
 
@@ -1883,6 +1885,7 @@ export function fenceNow(wf: Workflow, n: number, actor: TaskActor): void {
   const pre = wf.store.tx((tx) => foldCard(tx.facts(n), tx.card(n).stage))
   fenceOrThrow(g, n, pre.attempt)
   assigneeOrThrow(workspace, wf.store, n, actor.self.agentId, pre)
+  g.accepted(n, pre.attempt, (fn) => afterBoardWrite(workspace, fn))
 }
 
 export async function runIntent<R>(
@@ -1894,9 +1897,8 @@ export async function runIntent<R>(
   // A revocable caller's check (HI-2420, the Assistant's guard): made as each of the card's writes saves the card, in
   // the write's own transaction after the runtime's facts, so a refusal undoes its facts too.
   commit?: () => void,
-  // HI-3194: the intent is one of the builder's own moves (assigneeOrThrow), or a start (the one move a launch with no
-  // binding may make, on a card never started).
-  fence: { builder?: boolean; start?: boolean } = {}
+  // HI-3194: the intent is one of the builder's own moves (assigneeOrThrow).
+  fence: { builder?: boolean } = {}
 ): Promise<{ reply: R; saved: TaskCard | null }> {
   let saved: TaskCard | null = null
   let first = true
@@ -1911,7 +1913,7 @@ export async function runIntent<R>(
               before: (w: Write) => {
                 if (w.card.id !== n) return
                 const pre = w.state()
-                fenceOrThrow(g, n, pre.attempt, { start: fence.start })
+                fenceOrThrow(g, n, pre.attempt)
                 if (fence.builder && actor.kind === 'agent' && actor.self) assigneeOrThrow(workspace, wf.store, n, actor.self.agentId, pre)
               }
             }
@@ -3347,7 +3349,8 @@ export async function commentTask(n: number, comment: string, actor: TaskActor, 
     if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
     // HI-3194: an agent's comment fenced as any of its writes, on the card's attempt as this change finds it.
     const g = guardOf(actor)
-    if (g) fenceOrThrow(g, n, attemptIn(ws, c.project, n))
+    const pre = g ? attemptIn(ws, c.project, n) : null
+    if (g) fenceOrThrow(g, n, pre)
     if (c.archived && actor.kind !== 'user') throw new TaskPermissionError(withValues(ERR.archived, { card: cardRef(n) }))
     // A loop's request or reply (HI-2428), as updateTask's comment: its history line, which watches count and the
     // recorder wakes the other side with, in the same change.
@@ -3357,6 +3360,8 @@ export async function commentTask(n: number, comment: string, actor: TaskActor, 
     if (own) note(c, by, own, at)
     addComment(c, by, t, undefined, undefined, at)
     await saveCard(ws, n, c, undefined, undefined, opts.commit)
+    // Written: its launch is bound to the card's attempt (a first contact's binding, HI-3194).
+    if (g && pre) g.accepted(n, pre, (fn) => afterBoardWrite(ws, fn))
     changed(ws)
     return c
   }))

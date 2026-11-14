@@ -2,8 +2,8 @@
 // reassignment and end of an attempt; an agent launch is bound to the attempt it was handed (its own start, a read of the
 // card, a delivery stamped with its attempt, an accepted write of its own), and each agent write on a card checks the
 // binding its request captured as it arrived against the card's attempt before the write, in that write's transaction:
-// a replaced launch, a moved attempt, an unread card and a builder's move by an agent that no longer builds it are
-// refused. Readiness (every blocker Done) is written in the same write as the blocker's Done.
+// a replaced launch, a moved attempt and a builder's move by an agent that no longer builds it are refused; a launch
+// with no binding is in first contact, allowed and bound. Readiness (every blocker Done) is written in the same write as the blocker's Done.
 import { execFileSync } from 'child_process'
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -279,29 +279,27 @@ describe('the fence on an agent write (HI-3194)', () => {
     expect(await queued).toBe('attempt.moved')
   })
 
-  it('an agent with no binding: refused on a card it never read, Todo included; a first start of a never-started card is the one exception', async () => {
+  it("an agent with no binding: its first contact is allowed and binds it; once bound, a later attempt refuses it (the Assistant's call, 14 Nov)", async () => {
     const { w, repo, wt } = await workspace()
     const card = await create(w)
     const l1 = await launch(repo, 'a1', 'r1')
     const l2 = await launch(repo, 'a2', 'r2')
-    // A comment on a Todo card it never read.
-    expect(await refused(comment(w, card, arrive(l2)))).toBe('attempt.unread')
-    // A first start of a never-started card.
+    // A comment on a Todo card it never read: first contact, allowed, and its launch is bound to the card's attempt then.
+    expect(await refused(comment(w, card, arrive(l2)))).toBeNull()
+    expect(fence.boundAttempt('r2', card)).toEqual({ id: 0, generation: 0 })
     await act(w, card, arrive(l1), { kind: 'start' })
     commit(wt, 'b.txt')
-    // A reviewer that reads the card first, then starts its review: through.
     await act(w, card, arrive(l1), { kind: 'submit', summary: 'Ready' })
-    expect(await refused(act(w, card, arrive(l2), { kind: 'startReview' }))).toBe('attempt.unread')
+    // Bound to the card before its start, the reviewer's review start is refused until it reads the card.
+    expect(await refused(act(w, card, arrive(l2), { kind: 'startReview' }))).toBe('attempt.moved')
     await read(w, l2, card)
     expect(await refused(act(w, card, arrive(l2), { kind: 'startReview' }))).toBeNull()
-    // A card started before and put back: an unbound start is refused, a read lets it start.
+    // A reviewer prompted to review a card it was never shown: first contact, through.
     const card2 = await create(w, 'Second')
     await update(w, card2, user, { column: 'doing', agent: 'a3' })
-    await act(w, card2, user, { kind: 'putBack', why: 'Again' })
     const l3 = await launch(repo, 'a3', 'r3')
-    expect(await refused(act(w, card2, arrive(l3), { kind: 'start' }))).toBe('attempt.unread')
-    await read(w, l3, card2)
-    expect(await refused(act(w, card2, arrive(l3), { kind: 'start' }))).toBeNull()
+    expect(await refused(comment(w, card2, arrive(l3), 'On it'))).toBeNull()
+    expect(fence.boundAttempt('r3', card2)).toEqual(key(w, card2))
   })
 
   it('a pending start across Todo → attempt → Todo is refused (no ABA)', async () => {
@@ -360,8 +358,8 @@ describe('readiness promoted in the completing write (HI-3194)', () => {
     const other = new DatabaseSync(join(w.path!, '.combwork', 'combwork.db'), { readOnly: true })
     const count = (sql: string, card: number): number => (other.prepare(sql).get(card) as { c: number }).c
     let between: { inside: [boolean, boolean]; outside: [number, number] } | null = null
-    tasks.taskTestHooks.beforeUpdate = async (n) => {
-      if (n !== blocker || between) return
+    tasks.taskTestHooks.beforeUpdate = async (num) => {
+      if (num !== blocker || between) return
       const inside: [boolean, boolean] = [foldCard(facts(w, blocker)).stage === 'done', foldCard(facts(w, dep)).ready === true]
       const outside: [number, number] = [count("SELECT count(*) AS c FROM card_facts WHERE card = ? AND kind = 'Moved' AND json_extract(data, '$.to') = 'done'", blocker), count("SELECT count(*) AS c FROM card_facts WHERE card = ? AND kind = 'Readiness'", dep)]
       between = { inside, outside }

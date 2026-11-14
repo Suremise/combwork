@@ -189,7 +189,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
   // `commit` (HI-2420): the Assistant's guard, checked again in each write as the card is saved (runIntent).
   // HI-3194: the builder's own moves are only its attempt's builder's (tasks.ts assigneeOrThrow).
   const builder = intent.kind === 'submit' || intent.kind === 'reportMerge' || (intent.kind === 'loopStep' && (intent.step === 'design' || intent.step === 'proceed' || intent.step === 'followUp'))
-  const { reply, saved } = await runIntent(wf, ref.n, actor, call, zero9, opts.commit, { builder, start: intent.kind === 'start' })
+  const { reply, saved } = await runIntent(wf, ref.n, actor, call, zero9, opts.commit, { builder })
   if (isRefusal(reply)) throw new WorkflowRefusedError(reply)
   const card = saved ?? (await readTask(ref.n, actor))
   const m = reply as Moved

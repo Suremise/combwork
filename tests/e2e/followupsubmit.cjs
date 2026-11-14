@@ -77,9 +77,6 @@ const lines = (file) => {
       return JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token
     }
     const call = async (token, method, p, body) => {
-      // HI-3194: an agent reads a card before it changes it (its session is then handed the card's current attempt).
-      const card0 = typeof p === 'string' ? p.match(/^\/v1\/tasks\/([^/?]+)(?:\/[a-z-]+)?$/)?.[1] : null
-      if (card0 && card0 !== 'wait' && method !== 'GET') await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${card0}`, { headers: { Authorization: `Bearer ${token}` } })
       const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
       return { status: res.status, body: await res.json().catch(() => null) }
     }

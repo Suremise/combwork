@@ -292,8 +292,6 @@ interface CombworkMessageValues {
   'workflow.refused.attempt.notAssignee.next': undefined
   'workflow.refused.attempt.staleLaunch.message': { card: string | number }
   'workflow.refused.attempt.staleLaunch.next': undefined
-  'workflow.refused.attempt.unread.message': { card: string | number; attempt: string | number; generation: string | number }
-  'workflow.refused.attempt.unread.next': { card: string | number }
   'workflow.refused.card.plainNumber.message': undefined
   'workflow.refused.card.plainNumber.next': { key: string | number }
   'workflow.refused.check.revisionMismatch.message': { why: string; revision: string | number; head: string | number }

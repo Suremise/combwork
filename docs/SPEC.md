@@ -5952,7 +5952,8 @@ report it this way rather than retry.
 
 #### 16.8.7 Attempts and their fences (HI-3194)
 
-[HI-3194, 1.6.0, from the Orca spike HI-2911; design HI-3194/s10–s16, approved by HR3 14 Nov] The card stays the lasting
+[HI-3194, 1.6.0, from the Orca spike HI-2911; design HI-3194/s10–s16, approved by HR3 14 Nov; s28's question settled by
+the Assistant the same night: no "must have read the card" rule, a first contact binds] The card stays the lasting
 unit the user sees; **each start of it is an attempt**, and no agent's stale call can act through an attempt that has
 moved on.
 
@@ -5968,16 +5969,20 @@ moved on.
   launch, gone with its token): its own start (the attempt it made), its read of the card (`GET /v1/tasks/{n}` in any form:
   the attempt in the read's snapshot; the newest comment alone issues nothing), a delivery about the card (each is stamped
   with the card's attempt as it is made, `DeliveryRecord.attempt`; receiving it issues that attempt, never a later one), a
-  card it creates, and each accepted write of its own. A binding only moves forward; a list read and a call's arrival issue
-  nothing.
+  card it creates, and each accepted write of its own, a first contact's included. A binding only moves forward; a list
+  read and a call's arrival issue nothing.
 - **Each request captures its launch's bindings as it arrives**, before anything is awaited, and keeps them for every write
   it makes (its own accepted write moves what its next write expects): a later read or receipt never lets an older request
   through. The agent passes nothing: no new arguments, no reads.
 - **The check**, in every write of a project agent's own call on a card, in that write's transaction before it decides
   anything (intents, `cw_update_task` changes and comments, a batch's cards, declaring paths, a kind, review skip or target),
   against the card's attempt before the write: the launch replaced → **`attempt.staleLaunch`**; a binding that isn't the
-  card's attempt → **`attempt.moved`** (read it again); no binding → **`attempt.unread`** (read it first), in every stage,
-  Todo included, but for one exception: a launch's own **start of a card never started** (`(0, 0)` at the write). The
+  card's attempt → **`attempt.moved`** (read it again), in every stage, Todo and Done included. **No binding is first
+  contact** (a reviewer prompted to review, a question to the user on a card, a comment on a Todo card, a resumed agent
+  after a restart): allowed, and the write binds the launch to the card's attempt then. The card asks that a stale call
+  can't act, not that an agent read a card first [the Assistant, 14 Nov, on Darren's simplify rule; he may overrule it].
+  What that leaves: a launch that saw a card only in a listing (which issues nothing), or a conversation resumed after a
+  Combwork restart (bindings are in memory), writing after a later attempt is taken as first contact. The
   builder's own moves (submit and its requeue, a merge report, a move to Review or Done, declaring paths, a design, going
   ahead, a follow-up) are refused **`attempt.notAssignee`** for an agent that isn't the attempt's builder (the card's agent
   now, or its cycle's builder when it has none). A put-back by another agent stays allowed (anyone moves a card), fenced by

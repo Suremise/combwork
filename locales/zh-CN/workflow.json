@@ -422,8 +422,6 @@
   "workflow.refused.attempt.staleLaunch.next": "你当前的会话持有这张卡片：在那里读取它（cw_read_task），并按它现在的内容继续。",
   "workflow.refused.attempt.moved.message": "{card} 在你上次读取后已被重新开始、退回、完成或交给其他代理（现在是第 {attempt}.{generation} 次尝试），因此未被应用。",
   "workflow.refused.attempt.moved.next": "请重新读取 {card}（cw_read_task），如果它仍归你处理，请按它现在的状态操作。",
-  "workflow.refused.attempt.unread.message": "你在此会话中没有读取过 {card}（现在是第 {attempt}.{generation} 次尝试），因此 Combwork 无法判断这是针对哪一次尝试的：未被应用。",
-  "workflow.refused.attempt.unread.next": "请先读取 {card}（cw_read_task），然后重试。",
   "workflow.refused.attempt.notAssignee.message": "{card} 现在{assignee, select, nobody {没有构建者} other {由 {assignee} 构建}}：你不是它的构建者，因此未被应用。",
   "workflow.refused.attempt.notAssignee.next": "交给它的构建者，或请用户把它交还给你。",
   "workflow.refused.submit.identity.change": "此规则在“版本控制”→“提交使用项目的身份”中设置。",

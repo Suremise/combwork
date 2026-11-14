@@ -8,7 +8,8 @@ import { refusal, type Refusal } from '../shared/workflow/refusals'
  * was handed (issued: its own start, a full read of the card, a delivery stamped with its attempt, an accepted write of
  * its own), and every agent write on a card checks, in that write's own transaction, the binding its request captured as
  * it arrived (never the shared binding then, which a later read may have moved) against the card's attempt before the
- * write. The agent passes nothing: the token says which launch calls.
+ * write. A launch with no binding for the card is in first contact with it: allowed, and bound by its write (the
+ * Assistant's call on HI-3194, 14 Nov). The agent passes nothing: the token says which launch calls.
  */
 
 /** A launch's bindings, by its run id and card number; gone with the launch's token. */
@@ -61,15 +62,16 @@ export class AttemptGuard {
 
   /**
    * The refusal for a write on card `card` (`key`: its key, as refusals name it) whose attempt before the write is `pre`
-   * (null: a card with no workflow record, whose launch alone is checked), or null. `start`: the write is the caller's own start of the card, which alone needs no binding, and only on a card
-   * never started.
+   * (null: a card with no workflow record, whose launch alone is checked), or null. A request with no binding for the card
+   * is its launch's first contact with it (the Assistant's call on HI-3194, 14 Nov: the card never asked that an agent
+   * must have read a card first): allowed, and bound to the attempt by its write.
    */
-  check(card: number, key: string, pre: AttemptKey | null, opts: { start?: boolean } = {}): Refusal | null {
+  check(card: number, key: string, pre: AttemptKey | null): Refusal | null {
     if (currentAgentRun(this.fence.projectPath, this.fence.agentId) !== this.fence.runId) return refusal('attempt.staleLaunch', { card: key }, null)
     // A card with no workflow record (a workspace card, a project without one): only the launch is fenced.
     if (!pre) return null
     const exp = this.expect.get(card) ?? this.fence.bound.get(card) ?? null
-    if (!exp) return opts.start && pre.id === 0 && pre.generation === 0 ? null : refusal('attempt.unread', { card: key, attempt: pre.id, generation: pre.generation }, null)
+    if (!exp) return null
     return sameAttempt(exp, pre) ? null : refusal('attempt.moved', { card: key, attempt: pre.id, generation: pre.generation }, null)
   }
 

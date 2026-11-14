@@ -145,8 +145,6 @@ function helpers(h) {
   /** An agent's intent on a card, its token read afresh each time (a restarted session has a new one). */
   const intent = async (p, a, n, name, body = {}) => {
     const token = await tokenOf(p, a)
-    // HI-3194: an agent reads a card before it acts on it (its session is then handed the card's current attempt).
-    await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${encodeURIComponent(`#${n}`)}`, { headers: { Authorization: `Bearer ${token}` } })
     let res = null
     // "Try again: Combwork reads it afresh" (what it read moved as it decided), as an agent does, a few times at most.
     for (let tries = 0; tries < 5; tries++) {

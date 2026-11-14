@@ -422,8 +422,6 @@
   "workflow.refused.attempt.staleLaunch.next": "現在のセッションがこのカードを持っています。そちらで読み（cw_read_task）、今の内容に沿って続けてください。",
   "workflow.refused.attempt.moved.message": "{card}は、最後に読んだ後で再開、差し戻し、完了、または別のエージェントへの割り当てが行われました（現在は試行{attempt}.{generation}）。そのため、適用されませんでした。",
   "workflow.refused.attempt.moved.next": "{card}をもう一度読み（cw_read_task）、まだあなたの担当なら、今の状態に沿って対応してください。",
-  "workflow.refused.attempt.unread.message": "このセッションでは{card}を読んでいません（現在は試行{attempt}.{generation}）。どの試行に対するものか判断できないため、適用されませんでした。",
-  "workflow.refused.attempt.unread.next": "先に{card}を読み（cw_read_task）、もう一度試してください。",
   "workflow.refused.attempt.notAssignee.message": "{card}のビルダーは現在{assignee, select, nobody {いません} other {{assignee}です}}。あなたはビルダーではないため、適用されませんでした。",
   "workflow.refused.attempt.notAssignee.next": "ビルダーに任せるか、カードを戻してもらうようユーザーに頼んでください。",
   "workflow.refused.submit.identity.change": "このルールは「バージョン管理」→「コミットにプロジェクトのIDを使う」で設定します。",
