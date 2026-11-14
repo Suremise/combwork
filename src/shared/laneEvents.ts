@@ -26,6 +26,9 @@ export interface AssistantWakes {
   events: LaneEvent[]
 }
 
+/** The events as Custom's ticks list them: each card's, then each lane's, then the user's (HI-3211). */
+export const WAKE_EVENT_ORDER: readonly LaneEvent[] = ['failed', 'passed', 'blocked', 'reblocked', 'unblocked', 'stalled', 'moved', 'merge-due', 'paused-merge', 'ended', 'abandoned', 'waiting', 'paused-user']
+
 export const ASSISTANT_WAKES_DEFAULT: AssistantWakes = { level: 'standard', events: [] }
 
 /**
