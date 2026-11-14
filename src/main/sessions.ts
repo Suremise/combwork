@@ -614,6 +614,8 @@ interface LiveSession {
   stopsAnswered?: number[]
   /** Its typed first prompt is being typed now (HI-3196: typeFirstPrompt), so no second try starts meanwhile. */
   firstPromptTyping?: boolean
+  /** Why its first prompt last waited (firstPromptHeld), said in the log once each time it changes (HI-3261). */
+  firstPromptHeld?: string
   /** Its first prompt's try when the user's typing pause ends (firstPromptWhenQuiet): cancelled when it is sent or the run ends. */
   firstPromptWait?: { at: number; timer: ReturnType<typeof setTimeout> }
   /** Its first prompt is on its record (HI-3196: a CLI that resumes by Combwork's id; notePrompted). */
@@ -1413,8 +1415,12 @@ class SessionManager {
   onAssistantPrompt: (projectPath: string) => void = () => undefined
   /** The Combwork Assistant's process ended (its token is revoked, its questions withdrawn). */
   onAssistantExit: (projectPath: string) => void = () => undefined
-  /** When the user last typed in each terminal (by pty key), so nothing else types over them. */
-  private userInput = new Map<string, { at: number; enter: boolean }>()
+  /**
+   * When the user last typed in each terminal (by pty key), so nothing else types over them: its run's own (HI-3261: a run's
+   * start forgets an earlier run's). `answer`: one key alone typed while its CLI's question before its start showed (y, 1,
+   * Esc), the first since the run began or since an Enter: the question took it, so it leaves no draft.
+   */
+  private userInput = new Map<string, { at: number; enter: boolean; answer?: boolean }>()
   /** The Combwork Assistant's instructions for a launch (who it is, and its mode's), and the mode's name and id. */
   assistantInstructions: (projectPath: string, agent: AgentDef) => Promise<{ text: string; mode: string; modeId: string; modeText: string }> = async () => ({ text: '', mode: '', modeId: '', modeText: '' })
   /**
@@ -2475,6 +2481,8 @@ class SessionManager {
       launchSignature: '',
       unseen: false
     }
+    // What the user typed into an earlier run went to its process (HI-3261): no draft or typing of theirs in this one.
+    this.userInput.delete(key)
     this.live.set(id, { state, adapter, transcriptMtime: '', defaultModel: false, modeTail: '', recognition: new ScreenRecognition({ readyOutput: adapter.launch.readyOutput, footerMode: adapter.modes?.footerMode?.bind(adapter.modes) }), launchMode: null, configuredMode: undefined, modeOverride: opts.permissionMode, name: sessionName, transcriptPath: existing?.transcriptPath, initialPrompt: opts.prompt?.trim() || undefined, ...(opts.prompt?.trim() ? { launchTask: true as const } : {}), ...(opts.handedOverFrom ? { handedOverFrom: opts.handedOverFrom } : {}), startAllowed: opts.allowed, resumed: !!opts.resumeId, ...(place.lease ? { lease: place.lease } : {}), ...(place.lease && place.slot ? { slotEnv: slotEnv(place.slot) } : {}) })
     this.runs.set(runId, id)
 
@@ -3512,7 +3520,7 @@ class SessionManager {
     if (this.lineBlocked(l)) return "a line Combwork typed isn't taken yet" // i18n-ignore: a reason for the log
     if (this.userMayBeTyping(projectPath, agentId)) return 'the user is typing there' // i18n-ignore: a reason for the log
     const u = this.userInput.get(key)
-    if (u && !u.enter && userDraftShown(l.adapter.terminal?.promptText && l.screen ? l.adapter.terminal.promptText(l.screen.textWithoutDim()) : null)) return "the user's draft is in its prompt" // i18n-ignore: a reason for the log
+    if (u && !u.enter && !u.answer && userDraftShown(l.adapter.terminal?.promptText && l.screen ? l.adapter.terminal.promptText(l.screen.textWithoutDim()) : null)) return "the user's draft is in its prompt" // i18n-ignore: a reason for the log
     return null
   }
 
@@ -3941,7 +3949,7 @@ class SessionManager {
     // Only at a safe point: at its prompt, nothing on its screen asking or taking its keys, nobody typing there, no draft
     // of the user's in it and no line of Combwork's waiting (inputHeld). Not yet: kept, and tried again as its screen
     // draws, as its status changes, and when the user's typing pause ends (which neither of those says).
-    if (!this.firstPromptSafe(l)) return this.firstPromptWhenQuiet(l)
+    if (this.firstPromptHeld(l)) return this.firstPromptWhenQuiet(l)
     this.cancelFirstPromptWait(l)
     l.firstPromptTyping = true
     const since = Date.now()
@@ -3991,12 +3999,17 @@ class SessionManager {
     l.firstPromptWait = undefined
   }
 
-  /** Whether a launch's first prompt can be typed now (typeFirstPrompt): the same guards any line of Combwork's has. */
-  private firstPromptSafe(l: LiveSession): boolean {
+  /**
+   * Why a launch's first prompt can't be typed now (typeFirstPrompt), or null: the same guards any line of Combwork's has.
+   * A reason other than the last is logged (HI-3261: a draft of the user's holds it until they press Enter there).
+   */
+  private firstPromptHeld(l: LiveSession): string | null {
     const { projectPath, agentId } = l.state
-    if (!AT_PROMPT.has(l.state.status) || l.askedAtStart) return false
-    if (this.cliAsks(projectPath, agentId) || this.inputBlocked(projectPath, agentId)) return false
-    return this.inputHeld(projectPath, agentId) === null
+    if (!AT_PROMPT.has(l.state.status) || l.askedAtStart) return 'not at its prompt' // i18n-ignore: a reason, not logged (its start's own wait)
+    const why = this.cliAsks(projectPath, agentId) ? 'its CLI asks something' : this.inputBlocked(projectPath, agentId) ? 'something on its screen takes its keys' : this.inputHeld(projectPath, agentId) // i18n-ignore: reasons for the log
+    if (why && why !== l.firstPromptHeld) log.info(`${userText(this.label(l.state))}: its first prompt waits: ${why}`) // i18n-ignore: for the log
+    l.firstPromptHeld = why ?? undefined
+    return why
   }
 
   private startupAnswered(l: LiveSession): void {
@@ -4263,11 +4276,16 @@ class SessionManager {
   noteUserInput(key: string, data: string): void {
     // xterm's own replies (focus in/out, cursor reports, colour queries) aren't typing.
     const typed = typedText(data)
-    if (typed) this.userInput.set(key, { at: Date.now(), enter: typed.endsWith('\r') })
+    const l = typed ? [...this.live.values()].find((x) => this.key(x.state.projectPath, x.state.agentId) === key) : undefined
+    // One key alone (y, 1, Esc) while its question before its start shows went to that question (HI-3261): no draft of the
+    // user's. Only the first key since the run began or since an Enter: more text in the same write (a paste, keys sent
+    // together: `ydraft`), or a later key before its screen says the question is gone, may be a draft left in its prompt.
+    const prev = this.userInput.get(key)
+    const answer = !!typed && !!l?.askedAtStart && [...typed].length === 1 && (!prev || prev.enter)
+    if (typed) this.userInput.set(key, { at: Date.now(), enter: typed.endsWith('\r'), ...(answer ? { answer: true } : {}) })
     if (typed?.includes('\r')) {
       this.userEnter.set(key, Date.now())
       // A prompt of the user's, perhaps (#1336): a hook should follow it if it starts a turn.
-      const l = [...this.live.values()].find((x) => this.key(x.state.projectPath, x.state.agentId) === key)
       if (l) this.notePrompt(l, false, true)
     }
   }
