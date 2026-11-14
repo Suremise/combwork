@@ -46,14 +46,15 @@ function fill(arg: string, values: Record<string, string | null>): string | null
 
 /**
  * Arguments with the launch's values: one naming a value the launch hasn't is left out, with the option before it (an
- * argument starting with "-" and naming no value: `--model {model}` goes whole when no model is chosen).
+ * argument starting with "-" and naming no value: `--model {model}` goes whole when no model is chosen). Only a bare value
+ * takes its option with it: a left-out `--model={model}` is an option of its own, and the flag before it stays (HI-3268).
  */
 export function fillArgs(args: readonly string[], values: Record<string, string | null>): string[] {
   const out: string[] = []
   args.forEach((a, i) => {
     const v = fill(a, values)
     if (v !== null) out.push(v)
-    else if (i > 0 && args[i - 1].startsWith('-') && !/\{\w+\}/.test(args[i - 1]) && out[out.length - 1] === args[i - 1]) out.pop()
+    else if (i > 0 && !a.startsWith('-') && args[i - 1].startsWith('-') && !/\{\w+\}/.test(args[i - 1]) && out[out.length - 1] === args[i - 1]) out.pop()
   })
   return out
 }
