@@ -7,6 +7,7 @@
   "settings.accounts.changeFailed": "Não foi possível alterar a conexão",
   "settings.accounts.changedTo": "Agora conectada como {now}, antes como {was}",
   "settings.accounts.checkedAt": "Verificada: {when}",
+  "settings.accounts.cliGone": "A descrição de {cli} não existe mais (foi removida ou o id dela mudou), então esta conexão não pode ser usada. Remova-a, ou coloque a descrição de volta e escolha Recarregar.",
   "settings.accounts.closeRunningConfirm": "Fechar terminal",
   "settings.accounts.closeRunningMessage": "O {cli} ainda está rodando nele. Fechar o terminal encerra o {cli}.",
   "settings.accounts.closeRunningTitle": "Fechar o terminal?",

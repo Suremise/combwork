@@ -7,6 +7,7 @@
   "settings.accounts.changeFailed": "Couldn't change the connection",
   "settings.accounts.changedTo": "Now signed in as {now}, was {was}",
   "settings.accounts.checkedAt": "Checked {when}",
+  "settings.accounts.cliGone": "{cli}'s description is gone (removed, or its id changed), so this connection can't be used. Remove it, or put the description back and choose Reload.",
   "settings.accounts.closeRunningConfirm": "Close Terminal",
   "settings.accounts.closeRunningMessage": "{cli} is still running in it. Closing the terminal ends it.",
   "settings.accounts.closeRunningTitle": "Close the terminal?",
