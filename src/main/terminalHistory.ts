@@ -331,19 +331,20 @@ export class TerminalHistory {
       const from = this.dropped
       const chunks = [...this.chunks]
       const resizes = this.resizes.filter((r) => r.at >= from)
-      const start = this.snapshot() + this.unfinished
-      // The queue's end may stop inside an escape sequence: drawn up to it, that part goes after the drawing, as output
-      // still to come (completeUpTo).
-      const queued = chunks.join('')
-      let cut = completeUpTo(queued)
-      if (queued.length - cut > MAX_UNFINISHED) cut = queued.length
+      // What follows the snapshot: the sequence it was left inside (held back from the base), then the queue. Its end may
+      // stop inside an escape sequence too, one begun in either (HR1's round 2): drawn up to it, that part goes after the
+      // drawing, as output still to come (completeUpTo, read from the snapshot's ground state).
+      const held = this.unfinished
+      const text = held + chunks.join('')
+      let cut = completeUpTo(text)
+      if (text.length - cut > MAX_UNFINISHED) cut = text.length
       let mirror: Mirror | null = null
       try {
         mirror = new Mirror(this.cols, this.rows, REBUILT_SCROLLBACK)
         let failure: unknown = null
         const failed = (err: unknown): void => void (failure ??= err)
-        mirror.write(start)
-        let at = 0
+        mirror.write(this.snapshot() + held.slice(0, cut))
+        let at = held.length
         for (const [i, chunk] of chunks.entries()) {
           while (resizes.length && resizes[0].at <= from + i) {
             const r = resizes.shift()!
@@ -357,7 +358,7 @@ export class TerminalHistory {
         if (failure) throw failure
         if (this.resizeCount !== resizesBefore || this.dropped > from + chunks.length || this.broken) continue
         // In one step from here: what arrived while it was drawn comes after it.
-        return mirror.serialize() + queued.slice(cut) + this.chunks.slice(from + chunks.length - this.dropped).join('')
+        return mirror.serialize() + text.slice(cut) + this.chunks.slice(from + chunks.length - this.dropped).join('')
       } catch (err) {
         log.warn('terminal history: rebuilding its replay at the terminal’s size failed, so a view replays the output as it came', err)
         return null

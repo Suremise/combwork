@@ -160,17 +160,87 @@ describe("a running terminal's replay", () => {
     expect(snapshot).not.toMatch(/\x1b\[3;10r/)
   })
 
+  /**
+   * Runs each case at once (an xterm write waits for a timer, about 15 ms on Windows, so one after another the sweeps
+   * below take a minute) and says which differed.
+   */
+  async function sweep(cases: { name: string; run: () => Promise<[unknown, unknown]> }[]): Promise<void> {
+    const differed: string[] = []
+    for (let i = 0; i < cases.length; i += 40)
+      await Promise.all(cases.slice(i, i + 40).map(async (c) => {
+        const [shown, live] = await c.run()
+        try {
+          expect(shown).toEqual(live)
+        } catch (e) {
+          differed.push(`${c.name}\n${(e as Error).message}`)
+        }
+      }))
+    expect(differed.slice(0, 3).join('\n\n'), `${differed.length} differed`).toBe('')
+  }
+
+  const STREAM = '\x1b[?1049h\x1b[?1000h\x1b[?1006h\x1b]0;a title\x07\x1bP$qm\x1b\\\x1b[2;3H\x1b[31;1mred \u{1f600}\x1b[38;5;0mzero\x1b[48:2::10:20:30mrgb\x1b]8;;https://example.com\x1b\\link\x1b]8;;\x1b\\\x1b[0;4munder'
+
   // HR1's round 1, finding 1: output comes in chunks cut anywhere, inside an escape sequence or a character too.
   it('is the same wherever a chunk cuts what fell off the queue from what is kept', async () => {
-    const stream = '\x1b[?1049h\x1b[?1000h\x1b[?1006h\x1b]0;a title\x07\x1bP$qm\x1b\\\x1b[2;3H\x1b[31;1mred \u{1f600}\x1b[38;5;0mzero\x1b[48:2::10:20:30mrgb\x1b]8;;https://example.com\x1b\\link\x1b]8;;\x1b\\\x1b[0;4munder'
     const filler = '\x1b[5;1Hfiller'
-    for (let k = 1; k < stream.length; k++) {
-      // At most what follows the cut: the first chunk falls off, the second stays.
-      const { live, history, out } = pair(40, 8, stream.length - k + filler.length)
-      await out(stream.slice(0, k))
-      await out(stream.slice(k))
-      await out(filler)
-      expect(state(await view(history, 40, 8)), `cut at ${k}: ${JSON.stringify(stream.slice(k - 3, k + 3))}`).toEqual(state(live))
+    await sweep(Array.from({ length: STREAM.length - 1 }, (_, i) => i + 1).map((k) => ({
+      name: `cut at ${k}: ${JSON.stringify(STREAM.slice(k - 3, k + 3))}`,
+      run: async () => {
+        // At most what follows the cut: the first chunk falls off, the second stays.
+        const { live, history, out } = pair(40, 8, STREAM.length - k + filler.length)
+        await out(STREAM.slice(0, k))
+        await out(STREAM.slice(k))
+        await out(filler)
+        return [state(await view(history, 40, 8)), state(live)]
+      }
+    })))
+  })
+
+  // HR1's round 2: a resize before a sequence cut at the queue's start is finished, the rest arriving after the replay.
+  it('is the same wherever the cut and the end of what came fall, with a resize between, and the rest after the replay', async () => {
+    const rest = '\x1b[5;1Hafter'
+    const cases = []
+    for (let k = 1; k < STREAM.length - 1; k++)
+      for (const span of [1, 2, 5]) {
+        const end = Math.min(k + span, STREAM.length)
+        cases.push({
+          name: `cut at ${k}, ending at ${end}: ${JSON.stringify(STREAM.slice(k - 2, end + 2))}`,
+          run: async (): Promise<[unknown, unknown]> => {
+            // The first chunk falls off as the second comes; the second, up to `end`, stays; then the pane narrows.
+            const { live, history, out, resize } = pair(40, 8, end - k)
+            await out(STREAM.slice(0, k))
+            await out(STREAM.slice(k, end))
+            await resize(30, 8)
+            const shown = await view(history, 30, 8)
+            const later = STREAM.slice(end) + rest
+            history.push(later)
+            await write(shown, later)
+            await write(live, later)
+            return [state(shown), state(live)]
+          }
+        })
+      }
+    await sweep(cases)
+  })
+
+  it('finishes a sequence cut at the queue’s start and still unfinished at its end after a resize', async () => {
+    // HR1's probe: ESC[?100 fell off, 6 is kept, the pane resized, and h comes after the replay.
+    for (const [head, tail, after] of [
+      ['\x1b[?100', '6', 'hX'],
+      ['\x1b]0;a ti', 'tle', '\x07X'],
+      ['\x1bP$', 'q', 'm\x1b\\X']
+    ]) {
+      const { live, history, out, resize } = pair(80, 8, 1)
+      await out('\x1b[?1049h\x1b[?1000h')
+      await out(head)
+      await out(tail)
+      await resize(40, 8)
+      const shown = await view(history, 40, 8)
+      history.push(after)
+      await write(shown, after)
+      await write(live, after)
+      expect(state(shown), JSON.stringify(head + tail)).toEqual(state(live))
+      expect((state(shown) as { lines: string[] }).lines[0], JSON.stringify(head + tail)).toBe('X')
     }
   })
 
