@@ -3240,7 +3240,7 @@ module.exports.SCENARIOS = [
     },
     prompt: (c) => `Review card #${c.cards.q} as the reviewer of a card loop (rounds: 10). It is back for its third review; the earlier reviews and fixes are in its comments.`,
     fake: (c) => `skill card-loop then skill review-agent-work then ${fakeStartReview(c.cards.q)} then cw cw_ask_user {"card":"#${c.cards.q}","kind":"decide","text":"Round 3 would be a third new edge case in a row (a first name with spaces around it keeps them: \\"  Ann  Lee\\"). Worth handling, or simplify or cut scope?"}`,
-    expect: (o, c) => {
+    expect: (o) => {
       const asked = called(o, 'cw_ask_assistant').length > 0 || called(o, 'cw_ask_user').length > 0
       // Its two earlier rounds are comments (reviewedWork's), not verdicts: any failed verdict here is the third round.
       const failedAgain = history(o.cards.q).includes('Review failed')
