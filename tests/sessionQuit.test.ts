@@ -126,6 +126,25 @@ describe("a lane's builder ended by its CLI's own exit", () => {
     expect(a.typed()).toContain('/exit')
   })
 
+  // HI-3261: a CLI whose prompt can't be read counts any key not sent as a draft. The one key that answered its question
+  // before its start (y, 1, Esc) went to that question, so it leaves none; text typed after an Enter there still does.
+  it("its question before its start took a key with no Enter: no draft; text after an Enter, or any key once started, is one", () => {
+    const a = live(codex)
+    const l = a.l as typeof a.l & { askedAtStart?: boolean }
+    const past = (): void => void ((priv.userInput.get(a.key) as { at: number }).at = 0)
+    l.askedAtStart = true
+    priv.noteUserInput(a.key, 'y')
+    past()
+    expect(sessions.inputHeld(P, a.agentId)).toBeNull()
+    priv.noteUserInput(a.key, 'y\rask')
+    past()
+    expect(sessions.inputHeld(P, a.agentId)).toBe("the user's draft is in its prompt")
+    l.askedAtStart = false
+    priv.noteUserInput(a.key, '\x1b')
+    past()
+    expect(sessions.inputHeld(P, a.agentId)).toBe("the user's draft is in its prompt")
+  })
+
   it('a fence lost (a new lease, a restart) before or while it types: nothing more written, nothing killed', async () => {
     const a = live()
     expect(await sessions.quit(P, a.agentId, a.run, { fenced: () => false, why: 'its lane ended' })).toBe('gone')

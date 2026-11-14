@@ -4,7 +4,8 @@
 // screen is ready, under Combwork's session id, with the description's variables; its status follows its screen and its
 // OSC 7501 (working, then finished); its question waits for the user and a prompt from the API is refused meanwhile. A
 // session that took a prompt resumes by its id; one stopped before any prompt, or whose only answer was to a question
-// before its prompt, is never resumed (Resume names the agent's earlier conversation); a prompt the user types counts.
+// before its prompt, is never resumed (Resume names the agent's earlier conversation); a prompt the user types counts. A
+// key the user left unsent in an earlier run (an Esc) holds no first prompt of the next (HI-3261).
 // Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -259,6 +260,18 @@ const held = { ...noSession, id: 'fake-held', name: 'Fake Held CLI', launch: { p
     const seventh = await lib.until(async () => launches()[8], HUNG_MS)
     check('…and resumes it by its id', afterRestart.status === 200 && arg(seventh, '--resume') === quietId && !lines().some((e) => e.kind === 'resumeRefused'), JSON.stringify({ afterRestart, args: seventh?.args }))
     check('…ready at its prompt', !!(await statusIs('ready')), JSON.stringify({ status: (await live())?.status, screen: lib.plainText((await inv('pty:buffer', lib.ptyKey(proj, a.id)).catch(() => '')) ?? '').slice(-300) }))
+
+    // --- HI-3261: the user's last key in its pane an Esc (not sent, nothing in its prompt), then a start with a task: that
+    // key went to the run before, so the next run's first prompt is typed.
+    await inv('pty:write', lib.ptyKey(proj, a.id), '\x1b')
+    await inv('session:stop', proj, a.id)
+    await stopped()
+    await api('POST', `/v1/projects/demo/agents/${a.id}/start`, { prompt: 'after esc' })
+    const escLaunch = await lib.until(async () => launches()[9], HUNG_MS)
+    const escId = arg(escLaunch, '--session-id')
+    const escLines = () => lines().filter((e) => e.kind === 'line' && e.id === escId).map((e) => e.text)
+    check("a key from the run before (an Esc) is no draft in the next: its first prompt typed", !!(await lib.until(async () => (escLines().includes('after esc') ? true : null), HUNG_MS)) && JSON.stringify(escLines()) === JSON.stringify(['after esc']), JSON.stringify(escLines()))
+    await lib.until(async () => (['ready', 'finished'].includes((await live())?.status) ? true : null), HUNG_MS, 150)
     await inv('session:stop', proj, a.id)
     await stopped()
 
@@ -266,7 +279,7 @@ const held = { ...noSession, id: 'fake-held', name: 'Fake Held CLI', launch: { p
     const b = await lib.addAgent(inv, proj, { name: 'NoSession', provider: 'fake-nosession' })
     const liveB = async () => (await inv('session:live')).find((s) => s.agentId === b.id && s.status !== 'stopped') ?? null
     await inv('session:start', proj, { agentId: b.id })
-    const eighth = await lib.until(async () => launches()[9], HUNG_MS)
+    const eighth = await lib.until(async () => launches()[10], HUNG_MS)
     check('a CLI without a session starts with no session id', !!eighth && !eighth.args.includes('--session-id'), JSON.stringify(eighth?.args))
     check('…and is ready at its prompt', !!(await lib.until(async () => ((await liveB())?.status === 'ready' ? true : null), HUNG_MS, 150)), JSON.stringify({ status: (await liveB())?.status, screen: lib.plainText((await inv('pty:buffer', lib.ptyKey(proj, b.id)).catch(() => '')) ?? '').slice(-300) }))
     await inv('pty:write', lib.ptyKey(proj, b.id), 'no session here')
@@ -276,7 +289,7 @@ const held = { ...noSession, id: 'fake-held', name: 'Fake Held CLI', launch: { p
     await inv('session:stop', proj, b.id)
     await lib.until(async () => !(await liveB()), HUNG_MS, 150)
     const noResume = await api('POST', `/v1/projects/demo/agents/${b.id}/start`, { resume: true })
-    check('…and a resume of it is refused, saying there is none', noResume.status === 409 && launches().length === 10, JSON.stringify(noResume))
+    check('…and a resume of it is refused, saying there is none', noResume.status === 409 && launches().length === 11, JSON.stringify(noResume))
 
     // --- A launch held while it prepares, its CLI's description removed and reloaded meanwhile: it launches from the
     // copy it took (its arguments), not refused as turned off; the next start is refused (its CLI is gone).
