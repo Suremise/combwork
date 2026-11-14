@@ -6,7 +6,7 @@ import { enabledProviders, providerDescriptor, providerName, providersInUse, pro
 import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
 import { notify, set, setActivity, useStore } from '../store'
-import { cliReadyOf, connectionCli, connectionOf, firstReadyConnection, firstUsableConnection, offeredConnections, offHereChoice, orderedAccounts, type AssistantNeed, type ConnectionShown } from '@shared/connectionLabel'
+import { cliReadyOf, connectionCli, connectionOf, firstReadyConnection, firstUsableConnection, offeredConnections, noneSignedInHere, offHereChoice, orderedAccounts, type AssistantNeed, type ConnectionShown } from '@shared/connectionLabel'
 
 export { cliReadyOf, connectionCli, firstReadyConnection, firstUsableConnection, offeredConnections }
 import { Icon, Tooltip } from './ui'
@@ -231,6 +231,7 @@ const SETUP = {
   add: msg({ id: 'project.banner.connectionSetupAdd', defaultMessage: 'Add an Account', description: 'Button on the banner asking for an account (HI-2108): opens Settings → Accounts & Connections.' }),
   setupLine: msg({ id: 'shell.setup.connections', defaultMessage: '{n, plural, =0 {{cli} signs in per account, and none is on in this workspace yet: add one and sign it in.} one {{cli} signs in per account: # is on in this workspace.} other {{cli} signs in per account: # are on in this workspace.}}', description: 'Provider Setup, for a coding agent CLI ({cli}: "Claude Code") that signs in per account (Settings → Accounts & Connections) rather than here (HI-1774; HI-2108). {n} is how many of its accounts are on in the open workspace.' }),
   setupLineOff: msg({ id: 'shell.setup.connectionsOff', defaultMessage: '{cli} signs in per account, and none is on in this workspace: {n, plural, one {{names} is off here.} other {{names} are off here.}} Turn one on with On here.', description: 'Provider Setup (HI-2650), for a coding agent CLI ({cli}: "Claude Code") that signs in per account, when it has accounts but none is on in the open workspace. {names}: their names, joined ("Work and Personal"); {n}: how many. On here is the switch on each account\'s row in Settings → Accounts & Connections, which the button beside it opens.' }),
+  setupLineSignedOut: msg({ id: 'shell.setup.connectionsSignedOut', defaultMessage: '{cli} signs in per account, and {n, plural, one {the one on in this workspace is not signed in: sign it in.} other {none of the # on in this workspace is signed in: sign one in.}}', description: 'Provider Setup (HI-3278), for a coding agent CLI ({cli}: "Codex") that signs in per account (Settings → Accounts & Connections), when every account of it on in the open workspace is signed out, so its agents can\'t start. {n}: how many are on. The button beside it opens Settings → Accounts & Connections.' }),
   open: msg({ id: 'shell.setup.openConnections', defaultMessage: 'Open Accounts & Connections', description: "Provider Setup's button (HI-2108): opens Settings → Accounts & Connections, where a coding agent CLI's accounts are added and signed in." })
 }
 
@@ -374,10 +375,12 @@ export function ConnectionSetupLine({ cli, onOpen }: { cli: ProviderId; onOpen: 
   // None on, but some added (HI-2650): they are off here, never "add one".
   const off = n ? null : offHereChoice(view, cliReadyOf(providers), cli)
   const offNames = off?.kind === 'one' ? [off.name] : off?.kind === 'several' ? off.names : []
+  // Some on, but each signed out (HI-3278): its agents can't start, so it warns, as none on does.
+  const signedOut = !!n && noneSignedInHere(view, cli)
   return (
-    <div className={['banner', n ? 'info' : 'warn'].join(' ')} data-connection-setup-line={n} style={{ borderRadius: 6, marginBottom: 10 }}>
+    <div className={['banner', n && !signedOut ? 'info' : 'warn'].join(' ')} data-connection-setup-line={n} data-signed-out={signedOut || undefined} style={{ borderRadius: 6, marginBottom: 10 }}>
       <Icon name="plug" />
-      <span className="grow">{offNames.length ? tr(SETUP.setupLineOff, { cli: providerDescriptor(cli).name, n: offNames.length, names: fmt.list(offNames) }) : tr(SETUP.setupLine, { cli: providerDescriptor(cli).name, n })}</span>
+      <span className="grow">{offNames.length ? tr(SETUP.setupLineOff, { cli: providerDescriptor(cli).name, n: offNames.length, names: fmt.list(offNames) }) : signedOut ? tr(SETUP.setupLineSignedOut, { cli: providerDescriptor(cli).name, n }) : tr(SETUP.setupLine, { cli: providerDescriptor(cli).name, n })}</span>
       <button className="btn small primary" data-open-connections onClick={() => {
           onOpen()
           openConnections()

@@ -328,6 +328,7 @@
   "shell.setup.checkAgain": "Verificar de novo",
   "shell.setup.connections": "{n, plural, =0 {O {cli} faz login por conta, e nenhuma está ativada neste espaço de trabalho ainda: adicione uma e faça login nela.} one {O {cli} faz login por conta: # está ativada neste espaço de trabalho.} other {O {cli} faz login por conta: # estão ativadas neste espaço de trabalho.}}",
   "shell.setup.connectionsOff": "O {cli} faz login por conta, e nenhuma está ativada neste espaço de trabalho: {n, plural, one {{names} está desativada aqui.} other {{names} estão desativadas aqui.}} Ative uma com “Ativada neste espaço de trabalho”.",
+  "shell.setup.connectionsSignedOut": "O {cli} faz login por conta, e {n, plural, one {a que está ativada neste espaço de trabalho não está com login feito: faça login nela.} other {nenhuma das # ativadas neste espaço de trabalho está com login feito: faça login em uma.}}",
   "shell.setup.docs": "Documentação do {provider}",
   "shell.setup.done": "{what} Você pode fechar esta janela.",
   "shell.setup.found": "<b>{provider} {version}</b> <muted>— encontrado via {source}</muted>",

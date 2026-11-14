@@ -3,7 +3,8 @@
 // in or spending tokens. It sends the hooks, in the order, and sets the terminal title the way Codex 0.160.0 did
 // (tests/hookStatus.test.ts has the sequences):
 // - `--version`, `login status` and the app server (hooks/list, account/read) answer as a signed-in Codex; in a
-//   connection's folder (HI-1757), `login` signs it in and account/read says who, signed out until then. With fake-busy
+//   connection's folder (HI-1757), `login` signs it in and account/read says who, signed out until then; outside one,
+//   `login status` says not logged in with fake-signed-out in CODEX_HOME (HI-3278). With fake-busy
 //   there, every run in it writes there all the time, as Codex's databases do (HI-1873).
 // - It titles its terminal "<project>", and "[ ! ] Action Required | <project>" (blinking with "[ . ]") while a
 //   person must act: one title for everything asked. It sends SessionStart with the first prompt, as Codex does.
@@ -102,6 +103,11 @@ if (args[0] === 'login' && inConnection && args[1] !== 'status') {
   return
 }
 if (args[0] === 'login') {
+  // Its own home signed out (HI-3278): fake-signed-out there, as `codex login status` says it on a PC never signed in.
+  if (!inConnection && connectionHome && fs.existsSync(path.join(connectionHome, 'fake-signed-out'))) {
+    console.log('Not logged in')
+    process.exit(1)
+  }
   console.log('Logged in using ChatGPT')
   process.exit(0)
 }
