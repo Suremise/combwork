@@ -37,15 +37,18 @@ const isFile = (p: string): boolean => {
   }
 }
 
-/** A description's path as candidates: a folder gives its names in it (".exe", ".cmd", ".bat" on Windows), else the path. */
+/**
+ * A description's path as candidates: a folder gives its names in it (on Windows ".exe", ".cmd", ".bat" added to a name
+ * without one, a name with one as written), else the path.
+ */
 function inFolder(p: string, names: readonly string[]): string[] {
   try {
     if (!statSync(p).isDirectory()) return [p]
   } catch {
     return [p]
   }
-  const exts = process.platform === 'win32' ? ['.exe', '.cmd', '.bat'] : ['']
-  return names.flatMap((n) => exts.map((e) => join(p, n + e)))
+  const exts = (n: string): string[] => (process.platform !== 'win32' || /\.(exe|cmd|bat)$/i.test(n) ? [''] : ['.exe', '.cmd', '.bat'])
+  return names.flatMap((n) => exts(n).map((e) => join(p, n + e)))
 }
 
 /**
