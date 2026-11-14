@@ -79,6 +79,8 @@
 
 ### Fixed
 
+- **An agent told of its inbox while it works names cards by key** (HI-3226). The notice Combwork adds to a working agent's tool calls and turn end named a card by its workspace-wide number (`#3170`), which finds another card, where the doorbell typed as its prompt said `HI-2911`. Both now name it by key.
+
 - **Codex's other plan limits are no longer mixed into its own** (HI-1125). When Codex reports a limit besides its 5-hour and weekly ones (one for a particular model), Combwork shows it as a limit of its own, by the name Codex gives it and its window, rather than folding its figure into Codex's limit of the same window. Its field names and Codex's own id are in **Settings → Advanced**.
 
 - **The offer to resume agents shows once at a start, listing only agents that can resume** (HI-3214). After a quit, it could appear twice with the same agents, the first marked *Replaced by a newer offer*, and it could list an agent offered at an earlier start and started in a newer conversation since, which Resume then skipped. Now an identical offer isn't shown again, a changed one updates the notice in place, and an agent that couldn't resume isn't offered.
