@@ -23,7 +23,7 @@ import { createLogger, userText } from './logger'
 import { connectionLoginChanged, forgetConnectionUsage, usageLogin } from './planUsage'
 import { childEnv, hasPty, killPty, ptyGone } from './ptyHost'
 import { connectionsManaged, testHomeSeam } from './connectionSeam'
-import { provider } from './providers'
+import { hasProvider, provider } from './providers'
 import type { ProviderAccountsPart, TrustReading, TrustTarget } from './providers/types'
 import { trustRoot } from './platform/repoPorts'
 import { withoutAccountEnv } from './providers/common'
@@ -145,9 +145,15 @@ function mustGet(id: string): Account {
  * server, held by providers/codex/checks.ts until it is gone, across a restart too).
  */
 function assertNotHeld(a: Account): void {
-  if (!provider(a.provider).accounts?.accountHeld?.(accountFolder(a.id))) return
+  if (!accountsPart(a)?.accountHeld?.(accountFolder(a.id))) return
   throw combworkError(msg({ id: 'main.accounts.checkHeld', defaultMessage: "{name} is being checked: Combwork is still making sure {cli}'s check of it has ended. Try again in a moment.", description: "An error signing in or removing a connection ({name}, its name in Settings → Accounts & Connections): the coding agent CLI's ({cli}: \"Codex\") check of who it is signed in as hasn't been confirmed ended yet, so the connection is held." }), { name: a.name, cli: providerDescriptor(a.provider).name }, { kind: 'conflict' })
 }
+
+/**
+ * A kept account's adapter part, none for a CLI not registered now (HI-3238: a description removed or renamed keeps its
+ * accounts, shown and removable, until it is back). Launches and sign-ins still refuse it, through support().
+ */
+const accountsPart = (a: Account | undefined): ProviderAccountsPart | undefined => (a && hasProvider(a.provider) ? provider(a.provider).accounts : undefined)
 
 /** Whether the CLI's sign-in names an organisation, which an identity then needs (HI-1757: Codex's names none). */
 const namesOrgs = (id: ProviderId): boolean => signInConnections(providerDescriptor(id))?.orgs !== false
@@ -1182,7 +1188,7 @@ async function readTrustOnce(id: string, projects: Projects): Promise<TrustAnswe
   await trustTestHold()
   const a = getAccount(id)
   // Each part's member is called on its part (HI-3201: a part may be an object of its own, not the adapter).
-  const accounts = a ? provider(a.provider).accounts : undefined
+  const accounts = accountsPart(a)
   const read = accounts?.connectionTrusts?.bind(accounts)
   if (!a || !read) return null
   // No folder it would be used in here (HI-1871): nothing to read, nothing pending.
@@ -1307,7 +1313,7 @@ const projectsFor = (a: Account): { name: string; path: string }[] => {
 export async function readSetUp(id: string): Promise<void> {
   const a = getAccount(id)
   if (!a) return
-  const accounts = provider(a.provider).accounts
+  const accounts = accountsPart(a)
   const read = accounts?.connectionSetUp?.bind(accounts)
   if (!read) return
   const gen = generation(id)
@@ -1643,7 +1649,7 @@ function changed(id: string): void {
  */
 async function loginStamp(id: string): Promise<string | null> {
   const a = getAccount(id)
-  const accounts = a ? provider(a.provider).accounts : undefined
+  const accounts = accountsPart(a)
   const isLogin = accounts?.accountLoginFile.bind(accounts)
   if (!isLogin) return null
   const dir = accountFolder(id)
@@ -1696,7 +1702,7 @@ export const accountWatched = (id: string): boolean => !!watched.get(id)?.w
 export function accountFolderEvent(id: string, name: string | Buffer | null): void {
   const a = getAccount(id)
   if (!a) return
-  const accounts = provider(a.provider).accounts
+  const accounts = accountsPart(a)
   const isLogin = accounts?.accountLoginFile.bind(accounts)
   // No name (some changes on Windows, a busy folder's above all): compared like a login file's.
   if (typeof name !== 'string' || !isLogin || isLogin(name)) noticed(id)
@@ -1825,7 +1831,7 @@ export function accountsView(check = false): ConnectionsView {
   if (workspace.path) for (const [id, here] of hereOf) if (check || trustState.get(trustKey(id, workspace.path))?.sig !== JSON.stringify(here)) requestTrust(id, workspace.path, here)
   const trustOf = (a: Account): { trust?: ConnectionTrust } => {
     const here = hereOf.get(a.id)
-    if (!workspace.path || !here || !provider(a.provider).accounts?.connectionTrusts) return {}
+    if (!workspace.path || !here || !accountsPart(a)?.connectionTrusts) return {}
     const t = trustShown(a.id, workspace.path, here)
     const setUpIn = setUpTarget(a, t.pending)
     return { trust: { ...t, ...(setUpIn ? { setUpIn } : {}) } }
