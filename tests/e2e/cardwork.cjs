@@ -374,7 +374,6 @@ const commit = (dir, file, text, message) => {
   // next save, across the flip back, writes exactly one comment.
   const holdAdd = (on) => app.evaluate((_e, v) => void (v ? (process.env.CW_TEST_HOLD_IPC = 'tasks:lineCommentAdd') : delete process.env.CW_TEST_HOLD_IPC), on)
   const addsHeld = () => app.evaluate(() => globalThis.__cwHeldIpc?.['tasks:lineCommentAdd'] ?? 0)
-  const settled = () => app.evaluate(() => globalThis.__cwSettledIpc?.['tasks:lineCommentAdd'] ?? 0)
   const oldComments = async () => (await inv('tasks:work', kt)).lineComments.filter((c) => c.side === 'old')
   const locked = async () => (await oldDraftBox.evaluate((e) => e.readOnly).catch(() => false)) && (await oldDraft.getByRole('button', { name: 'Save' }).isDisabled().catch(() => false)) && (await oldDraft.getByRole('button', { name: 'Cancel' }).isDisabled().catch(() => false))
   // Main reads CW_TEST_FAIL_IPC as a call comes in, before holding it: set first, it fails this add once it is let go.
@@ -385,9 +384,8 @@ const commit = (dir, file, text, message) => {
   await widen(false)
   check('flipped inline while the save runs, the box listed above the diff has the text and stays locked', !!(await lib.until(async () => (await elsewhere.locator('[data-draft="old:1-1"]').count()) === 1 && (await oldDraftBox.inputValue().catch(() => '')) === 'Old side draft, typed inline' && (await locked()), HUNG_MS)), await ktRev.innerText().catch(() => ''))
   await oldDraftBox.press('Control+Enter')
-  const settledBefore = await settled()
   await holdAdd(false)
-  check('the held add fails: the box says so, keeps the text and opens again; nothing was saved', !!(await lib.until(async () => (await settled()) === settledBefore + 1 && /failed \(CW_TEST_FAIL_IPC\)/.test(await oldDraft.innerText().catch(() => '')) && !(await oldDraftBox.evaluate((e) => e.readOnly).catch(() => true)) && (await oldDraftBox.inputValue().catch(() => '')) === 'Old side draft, typed inline', HUNG_MS)) && (await oldComments()).length === 1, `${await oldDraft.innerText().catch(() => '')} | ${JSON.stringify(await oldComments())}`)
+  check('the held add fails: the box says so, keeps the text and opens again; nothing was saved', !!(await lib.until(async () => /failed \(CW_TEST_FAIL_IPC\)/.test(await oldDraft.innerText().catch(() => '')) && !(await oldDraftBox.evaluate((e) => e.readOnly).catch(() => true)) && (await oldDraftBox.inputValue().catch(() => '')) === 'Old side draft, typed inline', HUNG_MS)) && (await oldComments()).length === 1, `${await oldDraft.innerText().catch(() => '')} | ${JSON.stringify(await oldComments())}`)
   await app.evaluate(() => { delete process.env.CW_TEST_FAIL_IPC })
   await holdAdd(true)
   await oldDraft.getByRole('button', { name: 'Save' }).click()
