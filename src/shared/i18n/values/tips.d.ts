@@ -296,6 +296,8 @@ interface CombworkMessageValues {
   'tips.inboxNotices.title': undefined
   'tips.isolatedChecks.text': undefined
   'tips.isolatedChecks.title': undefined
+  'tips.jjAdvance.text': undefined
+  'tips.jjAdvance.title': undefined
   'tips.jjCandidates.text': undefined
   'tips.jjCandidates.title': undefined
   'tips.jjCards.text': undefined

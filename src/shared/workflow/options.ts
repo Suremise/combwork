@@ -20,7 +20,16 @@ export type ReviewBy = 'none' | 'agent' | 'agentThenYou' | 'you'
  * G5: who finishes a code card. None's only way is acceptance; jj's (HI-2799, option A: no automatic advance) is the user
  * integrating the reviewed work themselves, reported as a merge Combwork doesn't make.
  */
-export type Finisher = 'combworkMerges' | 'agentMerges' | 'committed' | 'notChecked' | 'accept' | 'userIntegrates'
+export type Finisher = 'combworkMerges' | 'agentMerges' | 'committed' | 'notChecked' | 'accept' | 'userIntegrates' | 'combworkAdvances'
+
+/**
+ * HI-3235: whether Combwork itself integrates a passed card by its platform's advance (jj's bookmark move, HI-2840's
+ * stage 2): the card waits in Approved for its candidate and merge checks, then the adapter's `advance` port moves the
+ * target. Never a platform check: the descriptor declares the finish, the adapter implements the port.
+ */
+export const finishAdvances = (f: Finisher): boolean => f === 'combworkAdvances'
+/** HI-3235: a finish whose candidate and merge checks come before integration where work isn't merged by the queue (jj's two). */
+export const finishOnCandidate = (f: Finisher): boolean => f === 'userIntegrates' || f === 'combworkAdvances'
 
 /** A finish whose merge someone reports (the agent's excepted): a merge Combwork doesn't check, or jj's user integrating. */
 export const userReportsMerge = (f: Finisher): boolean => f === 'notChecked' || f === 'userIntegrates'
@@ -460,7 +469,7 @@ export function contradictions(o: WorkflowOptions, where: ContradictionPlace = {
   // needs slots (jj).
   const merging = merges(o.platform)
   const finishes = PLATFORMS[o.platform].finishes
-  if (!finishes.includes(o.finish)) out.push(finishes.includes('userIntegrates') || (merging && o.finish === 'userIntegrates') ? 'jjYouIntegrate' : 'combworkMergesNeedsGit')
+  if (!finishes.includes(o.finish)) out.push(finishes.includes('userIntegrates') || (merging && finishOnCandidate(o.finish)) ? 'jjYouIntegrate' : 'combworkMergesNeedsGit')
   if (!hasCapability(o.platform, 'isolation') && o.folder !== 'project') out.push('noneHasNoSlots')
   if (hasGate(o.platform, 'sharedFolder') && o.folder !== 'slots') out.push('jjNeedsSlots')
   if (merging) {
@@ -507,7 +516,7 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
   preChecks: strings,
   otherTargets: (v) => strings(v) && (v as string[]).every((b) => b.trim() === b && b.length > 0) && new Set(v as string[]).size === (v as string[]).length,
   sameness: oneOf<WorkflowOptions['sameness']>(['change', 'exact']),
-  finish: oneOf<Finisher>(['combworkMerges', 'agentMerges', 'committed', 'notChecked', 'accept', 'userIntegrates']),
+  finish: oneOf<Finisher>(['combworkMerges', 'agentMerges', 'committed', 'notChecked', 'accept', 'userIntegrates', 'combworkAdvances']),
   style: oneOf<WorkflowOptions['style']>(['merge', 'squash', 'rebase']),
   target: (v) => typeof v === 'string',
   targetOwn: (v) => v === true,
@@ -644,13 +653,13 @@ export function previewRows(options: WorkflowOptions, effective: WorkflowOptions
  */
 export function formShows(key: OptionKey, o: WorkflowOptions): boolean {
   // HI-2938: G9 also where the user integrates (jj's candidate); G20 stays the merge queue's.
-  if (key === 'mergeChecks') return o.finish === 'combworkMerges' || o.finish === 'userIntegrates'
+  if (key === 'mergeChecks') return o.finish === 'combworkMerges' || finishOnCandidate(o.finish)
   if (key === 'focusedTests') return o.finish === 'combworkMerges'
   // The install comes before G9's checks and G20's run alike (HI-1367): focused tests alone install too.
-  if (key === 'mergeInstall') return (o.finish === 'combworkMerges' && (o.mergeChecks.length > 0 || o.focusedTests)) || (o.finish === 'userIntegrates' && o.mergeChecks.length > 0)
+  if (key === 'mergeInstall') return (o.finish === 'combworkMerges' && (o.mergeChecks.length > 0 || o.focusedTests)) || (finishOnCandidate(o.finish) && o.mergeChecks.length > 0)
   // G8 strict (#1352): the merge queue brings work up to date, so only when Combwork merges; or (HI-2871) jj's candidate,
   // where the user integrates.
-  if (key === 'strict') return o.finish === 'combworkMerges' || o.finish === 'userIntegrates'
+  if (key === 'strict') return o.finish === 'combworkMerges' || finishOnCandidate(o.finish)
   // G18 (#1179): only the merge queue pushes.
   if (key === 'pushTarget') return o.finish === 'combworkMerges'
   // G21 (HI-1183): only the merge queue fetches and publishes.

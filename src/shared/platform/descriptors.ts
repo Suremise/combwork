@@ -59,7 +59,8 @@ export const OPERATIONS: readonly Operation[] = ['switchLine', 'createLine', 'de
 /**
  * How a platform's integration combines approved work (SPEC §16.3.1, HI-2822): merged from the card's line into a target
  * line (Git: targets, the merging finishers, the merge queue and its options), accepted where it is (None), or integrated
- * by the user once it passes (jj, HI-2799: option A, no automatic advance; Combwork merges nothing).
+ * on its candidate once it passes, never by the merge queue (jj: Combwork's advance by default, HI-3235, or the user's own
+ * move, HI-2799's option A).
  */
 export type Integration = 'merge' | 'accept' | 'user'
 
@@ -151,9 +152,10 @@ export const PLATFORMS: Record<PlatformId, PlatformDescriptor> = {
   // None: content hashes as revisions, acceptance as integration, no isolation in 1.0 (OP-16). No repository to change:
   // Initialise repository is on Git's page (HI-1905), gated by Git's operations.
   none: { id: 'none', name: 'None', ownedWorkspaces: false, detectionSteady: false, capabilities: ['revisions', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'accept', deliverables: 'paths', finishes: ['accept'], defaultFinish: 'accept', repository: false, defaultTarget: false, operations: [], revisionShort: short, gates: [] }, // i18n-ignore: a product name, the same in every language
-  // jj (HI-2799, J6; SPEC §16.3.6): workspaces for isolation (J2), pinned history and attribution (J3). No integration, ever,
-  // under Darren's option A (HI-2794: no automatic advance, the user integrates), and no operation in the window (R5.2):
-  // jj itself changes bookmarks. Every gate is closed until its J card's evidence opens it.
+  // jj (HI-2799, J6; SPEC §16.3.6): workspaces for isolation (J2), pinned history and attribution (J3). No merge queue:
+  // a passed card's candidate is integrated by the adapter's advance (HI-3235, Darren's decision of 14 Nov, its residual
+  // races documented) or by the user, and no operation in the window (R5.2). Every other gate stays closed until its J
+  // card's evidence opens it.
   // Its workspaces are its own commands' records (HI-2795, HI-2866), and its agents get the jj rule (HI-2800): `jj`, or
   // `jj-separate` for a repository with no Git working copy beside it (HI-2896).
   jj: {
@@ -162,16 +164,17 @@ export const PLATFORMS: Record<PlatformId, PlatformDescriptor> = {
     capabilities: ['revisions', 'isolation', 'containment', 'sameness', 'authorship', 'observe'],
     integration: 'user',
     deliverables: 'commits',
-    // HI-2840: the user integrates for now; Combwork's advance (automatic, then preview and click) joins this list with
-    // its adapter's work (HI-2840's stages 2 and 3), automatic then its default.
-    finishes: ['userIntegrates'],
-    defaultFinish: 'userIntegrates',
+    // HI-2840/HI-3235: Combwork's advance after the merge checks (its adapter's `advance` port), the default, or the user
+    // integrating by hand; preview and click joins with HI-3236.
+    finishes: ['combworkAdvances', 'userIntegrates'],
+    defaultFinish: 'combworkAdvances',
     repository: true,
     defaultTarget: false,
     operations: [],
     revisionShort: short12,
     changeShort: short12,
-    gates: GATES,
+    // HI-3235: `advance` is open since Combwork's advance (HI-2840/s30's protocol, its residual races accepted).
+    gates: GATES.filter((g) => g !== 'advance'),
     ownedWorkspaces: true,
     guidance: { keys: ['jj', 'jj-separate'], key: (d) => (d?.jj && !d.jj.colocated ? 'jj-separate' : 'jj') },
     detectionSteady: true

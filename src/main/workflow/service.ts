@@ -208,7 +208,7 @@ export async function workflowFor(ws: WorkspaceService, projectPath: string): Pr
   // Another lifetime's (closed, or another workspace in this window), or the project's platform changed: a new one.
   if (!inst || inst.life !== life || inst.wsPath !== wsPath || inst.resolved.options.platform !== resolved.options.platform) {
     const made: Omit<Instance, 'wf'> & { wf?: Workflow } = { life, wsPath, resolved, syncedAt: Date.now(), sync: Promise.resolve() }
-    made.wf = make(ws, project, life, wsPath, () => made.resolved.options)
+    made.wf = make(ws, project, life, wsPath, () => made.resolved.options, () => made.resolved.origins.finish === 'platform')
     inst = made as Instance
     byProject.set(key, inst)
   }
@@ -254,7 +254,7 @@ export async function optionsFor(ws: WorkspaceService, projectPath: string): Pro
   return wf ? (instances.get(ws)?.get(keyOf(wf.cfg.project))?.resolved ?? null) : null
 }
 
-function make(ws: WorkspaceService, project: { path: string; name: string }, life: AbortSignal, wsPath: string, options: () => WorkflowOptions): Workflow {
+function make(ws: WorkspaceService, project: { path: string; name: string }, life: AbortSignal, wsPath: string, options: () => WorkflowOptions, finishInherited: () => boolean): Workflow {
   const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === wsPath
   const store = FactStore.forBoard(ws, { project: project.name, key: project.name, projectId: () => ws.projectIdsNow().byPath.get(resolvePath(project.path).toLowerCase()) ?? null })
   let jjDeps: JjCardDeps | undefined
@@ -268,6 +268,7 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
       return store.projectKey()
     },
     options,
+    finishInherited,
     // Slots (#1438, SPEC §16.10): the card's builder's slot, lent by slotCards.ts (none set: no slots).
     slotFor: (card, builder, o) => slotStarts?.leaseFor(ws, project.path, card, builder, o) ?? Promise.resolve(null),
     slotUnused: (lease) => slotStarts?.unused(ws, project.path, lease) ?? Promise.resolve(),
