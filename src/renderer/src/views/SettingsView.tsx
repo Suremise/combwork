@@ -9,7 +9,7 @@ import { PRICES_CHECKED, SHIPPED_PRICES, listedPriceModels, priceRows } from '@s
 import { APP_SETTINGS_CATALOG, SETTINGS_SECTIONS, providerSection, settingDefault, settingPatch, settingValue, shownSetting, type SettingEntry, type SettingsSection, type SettingsSectionInfo } from '@shared/settingsCatalog'
 import { fallbackEfforts, fallbackModels, modelSource, modelSourceText } from '@shared/models'
 import type { SettingsPatch } from '@shared/api'
-import { PROVIDERS, isProviderEnabled, installSourceText, providerDescriptor, providerSettings, shownText as providerText } from '@shared/providers'
+import { PROVIDERS, cliGeneration, isProviderEnabled, installSourceText, providerDescriptor, providerSettings, shownText as providerText } from '@shared/providers'
 import { modeName, useModes } from '../components/Assistant'
 import { NumberField } from '../components/NumberField'
 import { ProviderIcon } from '../components/ProviderIcon'
@@ -24,13 +24,14 @@ import { WorkspaceStorageList } from '../components/Storage'
 import { AntivirusPanel } from '../components/Antivirus'
 import { AccountsSettings } from '../components/AccountsSettings'
 import { AdvancedSettings } from '../components/AdvancedSettings'
-import { LISTED_ADVANCED, groupName, shownText, type AdvancedState } from '@shared/advanced'
+import { listedAdvanced, groupName, shownText, type AdvancedState } from '@shared/advanced'
 import { choose, chooseTab, confirm, get, notify, set, showView, useLanguage, useRememberedTab, useStore, WORKFLOW_DEFAULTS_TAB, WORKFLOW_DEFAULTS_TABS } from '../store'
 import { TabPanel, Tabs } from '../components/Tabs'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { LANGUAGES, SOURCE_LANGUAGE, languageOf } from '@shared/i18n/languages'
 import { LANGUAGE_TEXT } from '@shared/i18n/languageText'
 import { cx, timeAgo } from '../util'
+import { ClisFolder } from '../components/Clis'
 
 /**
  * What is half typed in a box that only saves on its button (a model to add, a viewer token's name…), kept while Combwork
@@ -59,7 +60,20 @@ interface SettingDef extends SettingEntry {
 
 const SECTION_ICONS: Record<string, string> = { general: 'settings-gear', updates: 'cloud-download', appearance: 'symbol-color', providers: 'hubot', accounts: 'plug', notifications: 'bell', sessions: 'history', assistant: 'person', workspace: 'root-folder', board: 'project', workflow: 'git-pull-request', agents: 'organization', keybindings: 'keyboard', mcpCatalogs: 'package', agentApi: 'broadcast', advanced: 'tools' }
 
-const SECTIONS: (SettingsSectionInfo<Section> & { icon: string })[] = SETTINGS_SECTIONS.map((s) => ({ ...s, icon: SECTION_ICONS[s.id] ?? 'blank' }))
+/** Made again when the providers change (HI-3196: a user's own CLI has its page): by the snapshot's generation. */
+function byGeneration<T>(make: () => T): () => T {
+  let at = -1
+  let made: T
+  return () => {
+    if (at !== cliGeneration()) {
+      made = make()
+      at = cliGeneration()
+    }
+    return made
+  }
+}
+
+const sectionsNow = byGeneration((): (SettingsSectionInfo<Section> & { icon: string })[] => SETTINGS_SECTIONS.map((s) => ({ ...s, icon: SECTION_ICONS[s.id] ?? 'blank' })))
 
 /** The controls Settings draws itself (custom rows), by catalog id; the catalog has their text (settingsCatalog.ts). */
 const CONTROLS: Record<string, () => React.ReactNode> = {
@@ -115,7 +129,7 @@ function providerControl(provider: ProviderId, key: string): (() => React.ReactN
 }
 
 // Fields drawn as part of another row (the Assistant's "With <provider>") aren't rows of their own.
-const SETTINGS: SettingDef[] = APP_SETTINGS_CATALOG.filter((e) => !e.hidden).map((e) => ({ ...e, render: e.provider ? providerControl(e.provider, e.key) : CONTROLS[e.id] }))
+const settingsNow = byGeneration((): SettingDef[] => APP_SETTINGS_CATALOG.filter((e) => !e.hidden).map((e) => ({ ...e, render: e.provider ? providerControl(e.provider, e.key) : CONTROLS[e.id] })))
 
 /** A message's <link> part, opening a page in the browser. */
 const linkTo =
@@ -536,6 +550,8 @@ function ProviderStatus({ provider }: { provider: ProviderId }) {
 function ProvidersList() {
   const settings = useStore((s) => s.settings)
   const providers = useStore((s) => s.providers)
+  // The user's own CLIs (HI-3196): listed after the built-in providers, drawn again on each snapshot.
+  useStore((s) => s.clis?.generation)
   return (
     <div className="provider-list">
       {PROVIDERS.map((p) => {
@@ -558,6 +574,7 @@ function ProvidersList() {
           </div>
         )
       })}
+      <ClisFolder />
     </div>
   )
 }
@@ -751,7 +768,7 @@ function LanguagePicker() {
   useLanguage()
   const value = useStore((s) => s.settings?.general.language ?? 'auto')
   const info = useStore((s) => s.appInfo?.language)
-  const def = SETTINGS.find((d) => d.id === 'general.language')!
+  const def = settingsNow().find((d) => d.id === 'general.language')!
   const automatic = languageOf(info?.automatic ?? SOURCE_LANGUAGE)
   const noted = languageOf(value === 'auto' ? (info?.automatic ?? SOURCE_LANGUAGE) : value)
   return (
@@ -946,7 +963,7 @@ function advancedMatches(q: string, modifiedOnly: boolean, advanced: AdvancedSta
   const words = q.split(/\s+/).filter(Boolean)
   const hits = (text: string): boolean => words.every((w) => text.toLowerCase().includes(w))
   // Its English matches as well as what it shows, as Settings' own rows do.
-  return LISTED_ADVANCED.some((d) => (!modifiedOnly || advanced?.values[d.id] !== undefined || advanced?.workspace?.[d.id] !== undefined) && hits(`${d.id} ${d.setting ?? ''} ${groupName(d.group)} ${d.title} ${d.desc} ${shownText(d.text.title)} ${shownText(d.text.desc)}`))
+  return listedAdvanced().some((d) => (!modifiedOnly || advanced?.values[d.id] !== undefined || advanced?.workspace?.[d.id] !== undefined) && hits(`${d.id} ${d.setting ?? ''} ${groupName(d.group)} ${d.title} ${d.desc} ${shownText(d.text.title)} ${shownText(d.text.desc)}`))
 }
 
 function DataFolder() {
@@ -1008,7 +1025,7 @@ function WorkflowDefaultsTabs({ rows, searching }: { rows: SettingDef[]; searchi
   const workspaceName = useStore((s) => s.workspace?.name ?? null)
   const idBase = useId()
   const [dirty, setDirty] = useState<Record<string, boolean>>({})
-  const all = SETTINGS.filter((d) => d.id === WORKFLOW_DEFAULTS_TAB.global || (d.id === WORKFLOW_DEFAULTS_TAB.workspace && workspaceName))
+  const all = settingsNow().filter((d) => d.id === WORKFLOW_DEFAULTS_TAB.global || (d.id === WORKFLOW_DEFAULTS_TAB.workspace && workspaceName))
   // Searching: only the parts it finds are offered, the one shown among them.
   const offered = searching ? all.filter((d) => rows.includes(d)) : all
   const shown = useRememberedTab(WORKFLOW_DEFAULTS_TABS, offered.map((d) => d.id), WORKFLOW_DEFAULTS_TAB.global)
@@ -1047,10 +1064,13 @@ export function SettingsView() {
   const workspaceName = useStore((s) => s.workspace?.name ?? null)
   // Searching matches the text as shown, in the language shown.
   const shownLanguage = useLanguage()
+  // A user's own CLI registered, changed or removed (HI-3196): its page and rows, at once (a new list then).
+  useStore((s) => s.clis?.generation)
+  const defs = settingsNow()
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return SETTINGS.filter((d) => {
+    return defs.filter((d) => {
       if (d.id === 'workflow.workspaceDefaults' && !workspaceName) return false
       if (d.id === 'advanced.values' && (q || modifiedOnly)) return advancedMatches(q, modifiedOnly, advanced)
       // Its English matches as well as what it shows: Settings can be searched in either.
@@ -1059,14 +1079,14 @@ export function SettingsView() {
       if (!q && !modifiedOnly && d.section !== section) return false
       return true
     })
-  }, [query, section, settings, modifiedOnly, advanced, shownLanguage, workspaceName])
+  }, [query, section, settings, modifiedOnly, advanced, shownLanguage, workspaceName, defs])
 
   if (!settings) return null
-  const sections = SECTIONS
+  const sections = sectionsNow()
   const grouped = sections.map((s) => ({ ...s, items: visible.filter((d) => d.section === s.id) })).filter((g) => g.items.length)
   // Shown in the user's language: a provider's page is its name.
-  const sectionText = (s: (typeof SECTIONS)[number]): { label: string; desc: string } => ({ label: shownText(s.text.label), desc: shownText(s.text.desc) })
-  const navIcon = (s: (typeof SECTIONS)[number]): React.ReactNode => (s.provider ? <ProviderIcon provider={s.provider} /> : <Icon name={s.icon} />)
+  const sectionText = (s: ReturnType<typeof sectionsNow>[number]): { label: string; desc: string } => ({ label: shownText(s.text.label), desc: shownText(s.text.desc) })
+  const navIcon = (s: ReturnType<typeof sectionsNow>[number]): React.ReactNode => (s.provider ? <ProviderIcon provider={s.provider} /> : <Icon name={s.icon} />)
 
   return (
     <div className="settings">

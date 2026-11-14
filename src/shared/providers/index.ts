@@ -4,7 +4,8 @@ import type { MapStation } from '../activityMap'
 import type { TypedNewline } from '../terminalInput'
 import { msg, type Msg } from '../i18n/msg'
 import type { Tr } from '../tasks'
-import { PROVIDER_MODULES } from './registry'
+import { BUILT_IN_PROVIDERS, PROVIDER_MODULES } from './registry'
+import { setCliAdvancedDefs, type AdvancedDef } from '../advancedDef'
 import type { ProviderModule } from './parts'
 
 /**
@@ -172,6 +173,11 @@ export interface ProviderSessionCaps {
    * combwork MCP server): a card or agents wait holds a call a minute less, so its reply always arrives in time. Absent: none.
    */
   mcpToolTimeoutSetting?: string
+  /**
+   * false: its CLI takes no MCP server or skills from Combwork (a data-only provider, HI-3196), so its launches get neither
+   * Combwork's tools nor its guidance (launchPolicy clamps both off). Absent: it takes them.
+   */
+  combworkTools?: false
 }
 
 /** Switching a running session's permission mode. Absent: it can't (a restart switches it). */
@@ -432,8 +438,36 @@ export interface ProviderDescriptor {
   canSwitchLive: (target: PermissionMode, current: PermissionMode | undefined, launched: PermissionMode | null | undefined) => boolean
 }
 
-/** Every provider Combwork knows, in display order (the registry's). */
+/** Every provider Combwork knows, in display order (the registry's), then the user's own CLIs (registerCliModules). */
 export const PROVIDERS: ProviderDescriptor[] = PROVIDER_MODULES.map((m) => m.descriptor)
+
+let cliGen = 0
+
+/**
+ * The user's own CLIs (HI-3196): a reload's snapshot replaces them whole, in one step, after the built-in providers in
+ * PROVIDER_MODULES and PROVIDERS (the same arrays, changed in place, so every reader sees the snapshot at once) and their
+ * advanced values in CLI_ADVANCED_DEFS. Built-in providers and their tables are never changed. Each process (main, each
+ * window) registers the same snapshot, main's, before it reads a provider (main/clis.ts). `generation` is the snapshot's.
+ */
+export function registerCliModules(modules: readonly ProviderModule[], defs: readonly AdvancedDef[], generation: number): void {
+  const all = PROVIDER_MODULES as ProviderModule[]
+  all.splice(BUILT_IN_PROVIDERS, all.length - BUILT_IN_PROVIDERS, ...modules)
+  PROVIDERS.splice(BUILT_IN_PROVIDERS, PROVIDERS.length - BUILT_IN_PROVIDERS, ...modules.map((m) => m.descriptor))
+  setCliAdvancedDefs(defs)
+  cliGen = generation
+  for (const fn of PROVIDERS_CHANGED) fn()
+}
+
+/** What rebuilds a table made from the providers when a snapshot of the user's own CLIs registers (settingsCatalog.ts). */
+const PROVIDERS_CHANGED: (() => void)[] = []
+
+/** Calls `fn` each time the registered providers change (a snapshot of the user's own CLIs, HI-3196), after they have. */
+export function onProvidersChanged(fn: () => void): void {
+  PROVIDERS_CHANGED.push(fn)
+}
+
+/** The user's own CLIs' snapshot this process registered last (0: none yet). */
+export const cliGeneration = (): number => cliGen
 
 /** The default provider: the registry's first. */
 export const DEFAULT_PROVIDER: ProviderId = PROVIDERS[0].id
@@ -555,8 +589,19 @@ export const adminSnippetProvider = (): ProviderModule | null => PROVIDER_MODULE
 /** A provider's shared half (registry.ts), or undefined for an id this version doesn't know. */
 export const providerModule = (id: ProviderId | null | undefined): ProviderModule | undefined => PROVIDER_MODULES.find((m) => m.descriptor.id === id)
 
+/** A launch's own copy of a descriptor, in that launch's own steps alone (main's launchScope.ts); none elsewhere. */
+let scoped: (id: ProviderId) => ProviderDescriptor | undefined = () => undefined
+
+/** Main sets how a launch's own steps find its pinned descriptor (HI-3196: launchScope.ts); the window has none. */
+export function setDescriptorScope(find: (id: ProviderId) => ProviderDescriptor | undefined): void {
+  scoped = find
+}
+
 export function providerDescriptor(id: ProviderId | null | undefined): ProviderDescriptor {
-  return PROVIDERS.find((p) => p.id === (id || DEFAULT_PROVIDER)) ?? { ...UNKNOWN, id: id ?? 'unknown', name: id ?? 'Unknown provider' } // i18n-ignore: a stand-in name for a provider id Combwork doesn't know
+  const want = id || DEFAULT_PROVIDER
+  const own = scoped(want)
+  if (own) return own
+  return PROVIDERS.find((p) => p.id === want) ?? { ...UNKNOWN, id: id ?? 'unknown', name: id ?? 'Unknown provider' } // i18n-ignore: a stand-in name for a provider id Combwork doesn't know
 }
 
 /**
@@ -609,7 +654,12 @@ export function projectProviderConfig(cfg: Pick<ProjectConfig, 'providers'> | nu
 }
 
 export function isProviderEnabled(settings: Pick<AppSettings, 'providers'> | null | undefined, id: ProviderId): boolean {
-  return isKnownProvider(id) && !!settings?.providers?.[id]?.enabled
+  return isKnownProvider(id) && providerSwitchOn(settings, id)
+}
+
+/** Its switch in Settings → Providers alone, whether or not the provider is registered now (a launch already under way, HI-3196). */
+export function providerSwitchOn(settings: Pick<AppSettings, 'providers'> | null | undefined, id: ProviderId): boolean {
+  return !!settings?.providers?.[id]?.enabled
 }
 
 /** The providers turned on, in Combwork's order (PROVIDERS': HI-2139, no order of the user's). */

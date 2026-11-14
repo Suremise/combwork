@@ -591,6 +591,8 @@
   "tips.workspaceMovedDefender.title": "Wykluczenia Defendera idą za przeniesionym obszarem roboczym",
   "tips.workspaceNotes.text": "Workspace notes, przypięta na górze Notatek wspólnych, jest na to, co dotyczy tego komputera, np. pełną ścieżkę. Każdy agent dostaje ją przy starcie, w każdym folderze, więc nie trzeba tego wpisywać do commitowanego AGENTS.md. Sekcja z nazwą projektu w nagłówku należy tylko do tego projektu.",
   "tips.workspaceNotes.title": "Notatki o tym komputerze dla każdego agenta",
+  "tips.yourOwnClis.text": "Plik JSON opisujący CLI, umieszczony w folderze clis Twojego profilu Combwork, pozwala Twoim agentom je uruchamiać: jak je uruchomić, jak trafia do niego pierwszy prompt i jak odczytywać jego ekran. Ustawienia → Dostawcy → Własne CLI otwiera folder i wczytuje go ponownie.",
+  "tips.yourOwnClis.title": "Uruchom CLI, dla którego Combwork nie ma dostawcy",
   "tips.modelSwitched.title": "Agent na innym modelu jest oznaczony",
   "tips.modelSwitched.text": "Jeśli agent trafi na inny model, niż dało mu połączenie (propozycja Codex tańszego modelu blisko Twojego limitu albo /model), jego stopka oznacza model ostrzeżeniem, a Aktywność pokazuje Model zmieniony. Uruchom agenta ponownie, aby wrócić.",
   "tips.waitingOnPurpose.title": "Karta, która celowo czeka",

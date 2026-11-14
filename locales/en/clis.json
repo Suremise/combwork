@@ -1,0 +1,182 @@
+{
+  "clis.advanced.asks.desc": {
+    "defaultMessage": "What its screen shows when it asks you something: the agent waits for you, and nothing is typed into it meanwhile. Wrong, a question could be answered by what Combwork types.",
+    "description": "What the advanced setting \"Screen: asks you something\" is for (Settings → Advanced, a CLI that runs from a description)."
+  },
+  "clis.advanced.asks.title": {
+    "defaultMessage": "Screen: asks you something",
+    "description": "An advanced setting's title (Settings → Advanced, under a CLI that runs from a description, HI-3196)."
+  },
+  "clis.advanced.osc7501.desc": {
+    "defaultMessage": "The terminal sequence it writes its turn’s state in (OSC 7501), its first group the state (working, idle). Wrong, its status is read from its screen alone.",
+    "description": "What the advanced setting \"Terminal: its turn’s state\" is for (Settings → Advanced, a CLI that runs from a description). Keep OSC 7501, working and idle as they are."
+  },
+  "clis.advanced.osc7501.title": {
+    "defaultMessage": "Terminal: its turn’s state",
+    "description": "An advanced setting's title (Settings → Advanced, under a CLI that runs from a description, HI-3196)."
+  },
+  "clis.advanced.ready.desc": {
+    "defaultMessage": "What its screen shows when it is ready for a line: Combwork types the first prompt then, and shows it ready. Wrong, it shows as working and nothing is typed into it.",
+    "description": "What the advanced setting \"Screen: ready for a line\" is for (Settings → Advanced, a CLI that runs from a description)."
+  },
+  "clis.advanced.ready.title": {
+    "defaultMessage": "Screen: ready for a line",
+    "description": "An advanced setting's title (Settings → Advanced, under a CLI that runs from a description, HI-3196)."
+  },
+  "clis.advanced.titleAsks.desc": {
+    "defaultMessage": "What its terminal title says when it asks you something. Wrong, the agent doesn’t show as waiting for you when it does.",
+    "description": "What the advanced setting \"Title: asks you something\" is for (Settings → Advanced, a CLI that runs from a description)."
+  },
+  "clis.advanced.titleAsks.title": {
+    "defaultMessage": "Title: asks you something",
+    "description": "An advanced setting's title (Settings → Advanced, under a CLI that runs from a description, HI-3196)."
+  },
+  "clis.advanced.version.desc": {
+    "defaultMessage": "Where its version is in what its version command prints: the first group. Wrong, Provider Setup shows no version.",
+    "description": "What the advanced setting \"Its version\" is for (Settings → Advanced, a CLI that runs from a description)."
+  },
+  "clis.advanced.version.title": {
+    "defaultMessage": "Its version",
+    "description": "An advanced setting's title (Settings → Advanced, under a CLI that runs from a description, HI-3196)."
+  },
+  "clis.advanced.working.desc": {
+    "defaultMessage": "What its screen shows while it works on a turn. Wrong, Combwork may show it idle while it works, or the other way round.",
+    "description": "What the advanced setting \"Screen: working\" is for (Settings → Advanced, a CLI that runs from a description)."
+  },
+  "clis.advanced.working.title": {
+    "defaultMessage": "Screen: working",
+    "description": "An advanced setting's title (Settings → Advanced, under a CLI that runs from a description, HI-3196)."
+  },
+  "clis.gaps.heading": {
+    "defaultMessage": "{cli} runs from a description, so it has:",
+    "description": "Provider Setup (HI-3196): the heading over the list of what a CLI that runs from a description lacks. {cli} is its name."
+  },
+  "clis.gaps.line": {
+    "defaultMessage": "{cli} runs from a description: {gaps}.",
+    "description": "A note in Agent Settings (HI-3196) about an agent whose CLI runs from a description: what it lacks. {cli} is its name; {gaps} a list of what it lacks."
+  },
+  "clis.note.extension": {
+    "defaultMessage": "No editor copy is used.",
+    "description": "Provider Setup, for a CLI that runs from a description: editor extensions are never looked for."
+  },
+  "clis.note.install": {
+    "defaultMessage": "It runs from a description in your Combwork folder (clis): install it yourself, then Reload in Settings → Providers → Your own CLIs.",
+    "description": "Provider Setup, under a CLI that runs from a description (HI-3196): how it is installed. clis is a folder’s name: keep it. Names of Combwork’s settings: keep them as Combwork shows them."
+  },
+  "clis.note.modelPlaceholder": {
+    "defaultMessage": "Model ID",
+    "description": "The custom model ID box’s placeholder for a CLI that runs from a description without its own example."
+  },
+  "clis.note.signIn": {
+    "defaultMessage": "Sign it in as its own documentation says, in a terminal: Combwork runs no sign-in for it.",
+    "description": "For a CLI that runs from a description (HI-3196): how to sign it in again, Combwork having no sign-in task for it."
+  },
+  "clis.problem.badEnv": {
+    "defaultMessage": "“launch.env” can’t set {name}: {why, select, name {it isn’t a variable’s name} combwork {Combwork’s own variables (CW_…) are Combwork’s} other {}}.",
+    "description": "Why a CLI description is refused: it sets an environment variable it may not. {name} is the variable’s name (keep it)."
+  },
+  "clis.problem.badId": {
+    "defaultMessage": "“id” must be lower case letters, digits and dashes, starting with a letter (2 to 31 characters).",
+    "description": "Why a CLI description is refused: its \"id\" field (keep it as it is) isn’t a short slug."
+  },
+  "clis.problem.badMode": {
+    "defaultMessage": "“launch.modes” has a mode {value} that isn’t a short lower-case name, or is given twice.",
+    "description": "Why a CLI description is refused: a permission mode’s \"value\" (keep the field names) is invalid or repeated. {value} is the value."
+  },
+  "clis.problem.badPattern": {
+    "defaultMessage": "“{field}” isn’t a valid regular expression: {error}",
+    "description": "Why a CLI description is refused: a pattern in it doesn’t compile. {field} is its name as written in the file (keep it); {error} the English reason."
+  },
+  "clis.problem.badPlaceholder": {
+    "defaultMessage": "“{field}” names {name}, which isn’t one of {known}.",
+    "description": "Why a CLI description is refused: an argument names a placeholder Combwork doesn’t fill. {field} is its name as written in the file; {name} the placeholder ({x}); {known} the ones it fills. Keep them as they are."
+  },
+  "clis.problem.badType": {
+    "defaultMessage": "“{field}” must be {kind, select, text {text} list {a list of texts} object {an object} yesNo {true or false} other {{kind}}}.",
+    "description": "Why a CLI description is refused: a field has the wrong kind of value. {field} is its name as written in the file (keep it)."
+  },
+  "clis.problem.duplicate": {
+    "defaultMessage": "Its id {id} is also in {other}: neither is used.",
+    "description": "Why a CLI description file is refused (HI-3196): another file in the clis folder has the same id. {id} is the id; {other} the other file’s name."
+  },
+  "clis.problem.fileBadJson": {
+    "defaultMessage": "It isn’t valid JSON: {error}",
+    "description": "Why a CLI description file is refused (HI-3196): it can’t be read as JSON. {error} is the parser’s English message."
+  },
+  "clis.problem.fileTooBig": {
+    "defaultMessage": "It is larger than {max, number} bytes.",
+    "description": "Why a CLI description file is refused (HI-3196): it is too large. {max} is the limit in bytes."
+  },
+  "clis.problem.idTaken": {
+    "defaultMessage": "“id” {id} is taken: {by}.",
+    "description": "Why a CLI description is refused: another provider or another description has the same id. {id} is the id; {by} names what has it (a provider’s name, or a file)."
+  },
+  "clis.problem.missing": {
+    "defaultMessage": "“{field}” is missing.",
+    "description": "Why a CLI description is refused: a required field is missing. {field} is its name, as written in the file (keep it)."
+  },
+  "clis.problem.noId": {
+    "defaultMessage": "“session.{which}” must name '{id}'.",
+    "description": "Why a CLI description is refused: its session arguments (new or resume) don’t name the session id placeholder. Keep \"session\" and {id} as they are; {which} is new or resume."
+  },
+  "clis.problem.noPrompt": {
+    "defaultMessage": "“launch.prompt” must be 'typed', or an object whose 'arg' names '{prompt}'.",
+    "description": "Why a CLI description is refused: how its first prompt goes in isn’t one of the two forms. Keep \"typed\", \"arg\" and {prompt} as they are."
+  },
+  "clis.problem.notObject": {
+    "defaultMessage": "It isn’t a description: a JSON object is expected.",
+    "description": "Why a CLI description (a JSON file in Combwork’s clis folder, HI-3196) is refused: the file holds something other than a JSON object."
+  },
+  "clis.problem.tooLong": {
+    "defaultMessage": "“{field}” is longer than {max, number} characters.",
+    "description": "Why a CLI description is refused: a text in it is too long. {field} is its name as written in the file (keep it); {max} the limit."
+  },
+  "clis.problem.tooMany": {
+    "defaultMessage": "“{field}” has more than {max, number} items.",
+    "description": "Why a CLI description is refused: a list in it is too long. {field} is its name as written in the file (keep it); {max} the limit."
+  },
+  "clis.problem.tooManyFiles": {
+    "defaultMessage": "Only the first {max, number} descriptions are read: this one is left out.",
+    "description": "Why a CLI description file is left out (HI-3196): the clis folder holds more files than Combwork reads."
+  },
+  "clis.problem.unreadable": {
+    "defaultMessage": "It couldn’t be read: {error}",
+    "description": "Why a CLI description file is refused (HI-3196): reading it failed. {error} is the English reason."
+  },
+  "clis.readiness.notFound": {
+    "defaultMessage": "{provider} isn’t found: install it yourself (its description names where it is looked for), then choose Check again.",
+    "description": "Provider Setup, for a CLI that runs from a description (HI-3196): its executable wasn’t found. Combwork has no install task for it."
+  },
+  "clis.settings.heading": {
+    "defaultMessage": "Your own CLIs",
+    "description": "Settings → Providers (HI-3196): the heading over the CLIs that run from a description (a JSON file each in Combwork’s clis folder)."
+  },
+  "clis.settings.lastGood": {
+    "defaultMessage": "{file} has a problem; its last good version stays in use until it is fixed:",
+    "description": "Settings → Providers (HI-3196): a description file changed into one that can’t be used, while its earlier version is still used for this run. {file} is its name."
+  },
+  "clis.settings.none": {
+    "defaultMessage": "No descriptions yet.",
+    "description": "Settings → Providers (HI-3196): the clis folder holds no descriptions."
+  },
+  "clis.settings.notUsed": {
+    "defaultMessage": "{file} isn’t used:",
+    "description": "Settings → Providers (HI-3196): before the reasons a description file was refused. {file} is its name."
+  },
+  "clis.settings.open": {
+    "defaultMessage": "Open Folder",
+    "description": "Button in Settings → Providers (HI-3196): opens the clis folder in Explorer."
+  },
+  "clis.settings.reload": {
+    "defaultMessage": "Reload",
+    "description": "Button in Settings → Providers (HI-3196): reads the clis folder’s descriptions again."
+  },
+  "clis.settings.reloaded": {
+    "defaultMessage": "{n, plural, =0 {No CLIs from descriptions} one {# CLI from a description} other {# CLIs from descriptions}}{problems, plural, =0 {} one {; # description not used} other {; # descriptions not used}}",
+    "description": "A notice after Reload (HI-3196): how many CLIs run from descriptions now, and how many description files couldn’t be used."
+  },
+  "clis.settings.what": {
+    "defaultMessage": "A CLI with no provider of its own runs from a description: a JSON file in the clis folder of your Combwork profile. Combwork reads its status from its screen, and never changes its own config.",
+    "description": "Settings → Providers (HI-3196): what the CLIs that run from a description are. clis is a folder’s name: keep it."
+  }
+}

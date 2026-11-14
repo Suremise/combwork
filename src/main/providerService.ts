@@ -434,7 +434,7 @@ class ProviderService {
     // server connection's Set Up (HI-1772) runs the CLI itself instead, with its server's variables, for its first-run
     // screens: the user answers them in the CLI's own way.
     const home = env[adapter.descriptor.capabilities.connections?.homeEnv ?? '']
-    const cmd: CommandSpec = setUp ? ((home && adapter.accounts?.accountSetUpCommand?.(info.path, home)) || { file: info.path, args: (home && adapter.accounts?.connectionSetUpArgs?.(home)) || [] }) : (adapter.accounts?.accountLoginCommand?.(info.path, home) ?? adapter.launch.loginCommand(info.path))
+    const cmd: CommandSpec = setUp ? ((home && adapter.accounts?.accountSetUpCommand?.(info.path, home)) || { file: info.path, args: (home && adapter.accounts?.connectionSetUpArgs?.(home)) || [] }) : (adapter.accounts?.accountLoginCommand?.(info.path, home) ?? adapter.launch.loginCommand?.(info.path) ?? noTask(adapter.descriptor.name, 'login'))
     const s = cmd.line !== undefined ? cmd : toSpawnable(cmd.file, cmd.args)
     log.info(`${adapter.descriptor.name} ${setUp ? 'set-up' : 'sign-in'} for account ${accountId}`)
     spawnPty(key, { file: s.file, args: ptyArgs(s), cwd: setUp?.cwd ?? homedir(), env: { ...withServerEnv(setUp?.env, withoutAccountEnv(adapter.accounts ?? null, childEnv(env))), ...cmd.env }, onExit })
@@ -449,7 +449,7 @@ class ProviderService {
     // The task's name: English for the log, in the window's language when its toasts say it.
     const shown = (): string => tr(TASK, { task, cli: name })
     if (task === 'install') {
-      const cmd = adapter.install.installCommand()
+      const cmd = adapter.install.installCommand?.() ?? noTask(name, task)
       return this.runTask(id, task, cmd, `${name} install`, undefined, shown) // i18n-ignore: the task's name in the log
     }
     if (!info.path) throw combworkError(msg({ id: 'service.providers.notInstalled', defaultMessage: '{cli} is not installed.', description: 'An error running a coding agent CLI\'s task (update, sign-in, setup): the CLI {cli} ("Codex") is not installed.' }), { cli: name }, { kind: 'conflict' })
@@ -458,7 +458,7 @@ class ProviderService {
       const pending = this.updateRetries.get(id)
       if (retryUpdate && (!pending || pending.path !== info.path || pending.version !== info.version)) throw combworkError(msg({ id: 'service.providers.retryUnavailable', defaultMessage: 'This update retry is no longer available. Check again, then try Update.', description: 'Provider Setup error when a user tries to retry an update whose failure is no longer current. Check again and Update are buttons.' }), undefined, { kind: 'conflict' })
       if (hasPty(`task:${id}:${task}`)) return `task:${id}:${task}`
-      const cmd = retryUpdate ? pending!.retry.command : adapter.install.updateCommand(info.path)
+      const cmd = retryUpdate ? pending!.retry.command : (adapter.install.updateCommand?.(info.path) ?? noTask(name, task))
       // What the check after it compares (HI-2777: a version that stays put).
       this.updateExpect.set(id, { path: info.path, from: info.version, offered: info.latestVersion })
       const key = this.runTask(id, task, cmd, `${name} update`, undefined, shown, (code) => { // i18n-ignore: the task's name in the log
@@ -478,13 +478,21 @@ class ProviderService {
       if (connectionsManaged(id)) throw combworkError(msg({ id: 'service.providers.signInConnections', defaultMessage: '{cli} signs in per account: sign in from Settings → Accounts & Connections.', description: 'An error: Provider Setup was asked to sign a coding agent CLI ({cli}: "Claude Code") in, but its logins are accounts (Settings → Accounts & Connections names a section).' }), { cli: name }, { kind: 'conflict' })
       // On a GitHub host (HI-2779): only one its checks found in use, and its own sign-in there, in its environment.
       if (host !== undefined && (!adapter.descriptor.capabilities.githubHost || !info.hostChecks?.some((c) => c.host === host))) throw combworkError(msg({ id: 'service.providers.unknownHost', defaultMessage: 'No project uses that GitHub host for {cli} now. Check again, then sign in.', description: 'An error: Provider Setup was asked to sign a coding agent CLI ({cli}: "GitHub Copilot") in on a GitHub host none of the open projects uses any more (HI-2779). Check again is the button.' }), { cli: name }, { kind: 'conflict' })
-      const cmd = adapter.launch.loginCommand(info.path, host)
+      const cmd = adapter.launch.loginCommand?.(info.path, host) ?? noTask(name, task)
       return this.runTask(id, task, cmd, `${name} sign-in`, undefined, shown, undefined, cmd.env || host ? { ...(cmd.env ? { env: cmd.env } : {}), ...(host ? { keySuffix: host } : {}) } : undefined) // i18n-ignore: the task's name in the log
     }
     if (!adapter.install.setupCommand) throw combworkError(msg({ id: 'service.providers.noSetup', defaultMessage: '{cli} has no setup task.', description: 'An error: the coding agent CLI {cli} ("Codex") has no setup task for Combwork to run.' }), { cli: name }, { kind: 'invalid' })
     const cmd = adapter.install.setupCommand(info.path)
     return this.runTask(id, task, cmd, `${name} setup`, cmd.keys ? { keys: cmd.keys, ready: cmd.readyPattern, busyTitle: cmd.busyTitle, busyScreen: cmd.busyScreen, done: cmd.done } : undefined, shown, undefined, { env: cmd.env, cwd: cmd.cwd })
   }
+}
+
+/**
+ * A task its CLI has none of (HI-3196: a data-only provider has no install, update or sign-in task): refused, whoever asks
+ * (Provider Setup hides the button; IPC and the Agent API asking anyway get this).
+ */
+function noTask(cli: string, task: ProviderTask): never {
+  throw combworkError(msg({ id: 'service.providers.noTask', defaultMessage: '{cli} has no {task, select, install {install} update {update} login {sign-in} other {setup}} task in Combwork.', description: 'An error: a task was asked of a coding agent CLI that has none (HI-3196: a CLI that runs from a description has no install, update or sign-in task in Combwork). {cli} is its name.' }), { cli, task }, { kind: 'invalid' })
 }
 
 export const providerService = new ProviderService()

@@ -1415,6 +1415,14 @@
     "defaultMessage": "{agent} reviews now, and reviewers never run in a slot ({slot}). Read its transcript, or start fresh with a handover.",
     "description": "Why a conversation can't resume (#1434): its agent ({agent}) has the reviewer role now, and reviewers work in the project folder, never in a slot ({slot}: \"slot-b\")."
   },
+  "agents.resume.noPrompt": {
+    "defaultMessage": "It never had a prompt, so {cli} has nothing to resume.",
+    "description": "Why a session in the Sessions tab can't be resumed (HI-3196): its CLI (which runs from a description) was never given a prompt in it. {cli} is the CLI's name."
+  },
+  "agents.resume.noResume": {
+    "defaultMessage": "{cli} can't resume a session: its description has no resume.",
+    "description": "Why a session in the Sessions tab can't be resumed (HI-3196): its CLI runs from a description that says no way to resume. {cli} is the CLI's name."
+  },
   "agents.resume.noRoom": {
     "defaultMessage": "No agent works in the project folder, and the project has no room for another agent.",
     "description": "Why a session can't be resumed: no agent works in the project's own folder, and the project has as many agents as it may have."

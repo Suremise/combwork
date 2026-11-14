@@ -24,7 +24,7 @@ import { SLOT_COPY_TEXT } from './slotDefaults'
 import { GITHUB_HOST_TEXT } from './githubHostText'
 import { parseCopilotChoice, parseGithubHost } from './githubHost'
 import { PRICES_CHECKED } from './prices'
-import { LISTED_ADVANCED, advancedDef, advancedTakesText, advancedText, agentText, checkAdvanced, cliFacing, englishText, groupName, linesOf, listOf, shownText, withValues, type Text, type TextPart } from './advanced'
+import { listedAdvanced, advancedDef, advancedTakesText, advancedText, agentText, checkAdvanced, cliFacing, englishText, groupName, linesOf, listOf, shownText, withValues, type Text, type TextPart } from './advanced'
 import { agentMsg, say, type AgentMsg } from './agentText'
 import { language, msg } from './i18n'
 import { FORM_GROUPS, takesOption, type OptionKey } from './workflow/options'
@@ -32,7 +32,7 @@ import { OPTION_TEXT, optionDesc, optionTitle, VALUE_TEXT } from './workflow/opt
 import { writeWorkflow } from './workflow/projectWorkflow'
 import { LANGUAGE_TEXT } from './i18n/languageText'
 import { LANGUAGES, SOURCE_LANGUAGE } from './i18n/languages'
-import { PROVIDERS, dangerModes, defaultProviderSettings, permissionLabel, providerDescriptor, providerSettings, type ModeOption, type ProviderDescriptor } from './providers'
+import { PROVIDERS, dangerModes, onProvidersChanged, defaultProviderSettings, permissionLabel, providerDescriptor, providerSettings, type ModeOption, type ProviderDescriptor } from './providers'
 import { LEGACY_CONSUMED, ownOrLegacy } from './workflow/preferences'
 import { EMPTY_CW, EMPTY_WORKSPACE, resolvePoint } from './commands'
 
@@ -104,7 +104,7 @@ function modeLabel(m: Pick<ModeOption, 'label' | 'text'>): TextPart {
 /** Advanced's values (#367) as catalog rows, drawn by Settings → Advanced's list: one each, and a workspace's own where it takes one. */
 function advancedRows(): Row[] {
   // One of Combwork's settings (Show developer features) keeps its own entry, under its settings key.
-  return LISTED_ADVANCED.filter((d) => !d.setting).flatMap((d): Row[] => {
+  return listedAdvanced().filter((d) => !d.setting).flatMap((d): Row[] => {
     const title = withValues(msg({ id: 'settings.advancedRow.title', defaultMessage: '{group}: {title}', description: "An advanced setting's title where it is named alone: {group} is Combwork or the CLI it belongs to, {title} the setting's own title." }), { group: groupName(d.group), title: d.text.title })
     const tip = withValues(
       msg({
@@ -198,8 +198,8 @@ export const SETTINGS_TEXT = {
   providerOff: msg({ id: 'settings.provider.off', defaultMessage: '{provider} (off)', description: "A provider in a list of providers (Settings → Providers → Default provider, Settings → Assistant → Provider) while it is turned off. {provider} is its name." })
 }
 
-/** Settings' sections, in order (the view adds their icons). */
-export const SETTINGS_SECTIONS: SettingsSectionInfo<SettingsSection>[] = [
+/** Settings' sections, in order (the view adds their icons), as the providers registered now make them. */
+const settingsSections = (): SettingsSectionInfo<SettingsSection>[] => [
   sectionInfo('general', msg({ id: 'settings.section.general.label', defaultMessage: 'General', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.general.desc', defaultMessage: 'Startup, window and tray behaviour.', description: 'Under the heading of the section "General" of Settings: what it holds.' })),
   sectionInfo('updates', msg({ id: 'settings.section.updates.label', defaultMessage: 'Updates', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.updates.desc', defaultMessage: "Keeping Combwork itself up to date. New versions come from Combwork's GitHub releases and are verified before they install.", description: 'Under the heading of the section "Updates" of Settings: what it holds.' })),
   sectionInfo('appearance', msg({ id: 'settings.section.appearance.label', defaultMessage: 'Appearance', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.appearance.desc', defaultMessage: 'Theme, fonts and terminal look.', description: 'Under the heading of the section "Appearance" of Settings: what it holds.' })),
@@ -227,7 +227,13 @@ export const SETTINGS_SECTIONS: SettingsSectionInfo<SettingsSection>[] = [
   sectionInfo('advanced', msg({ id: 'settings.section.advanced.label', defaultMessage: 'Advanced', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.advanced.desc', defaultMessage: 'Developer features, the details Combwork relies on that a CLI update can break (advanced.json), logs, data and resetting Combwork.', description: 'Under the heading of the section "Advanced" of Settings: what it holds.' }))
 ]
 
-const APP_ROWS: Row[] = [
+/**
+ * Settings' sections, in order: rebuilt in place when the providers change (HI-3196: a user's own CLI registered, changed or
+ * removed has its page), so every reader sees them as they are.
+ */
+export const SETTINGS_SECTIONS: readonly SettingsSectionInfo<SettingsSection>[] = settingsSections()
+
+const appRows = (): Row[] => [
   // General
   { section: 'general', key: 'closeToTray', title: msg({ id: 'settings.general.closeToTray.title', defaultMessage: 'Close to tray', description: "A setting's title (Settings → General)." }), desc: msg({ id: 'settings.general.closeToTray.desc', defaultMessage: 'Closing the window keeps Combwork running in the system tray so sessions continue.', description: 'What the setting "Close to tray" does, under its title (Settings → General).' }), tip: msg({ id: 'settings.general.closeToTray.tip', defaultMessage: 'When off, closing the window quits Combwork (asking first if sessions are running). Use File → Exit or the tray menu to quit.', description: 'The info tip of the setting "Close to tray" (Settings → General): more on what it does and when it applies.' }), type: 'boolean' },
   { section: 'general', key: 'minimizeToTray', title: msg({ id: 'settings.general.minimizeToTray.title', defaultMessage: 'Minimise to tray', description: "A setting's title (Settings → General)." }), desc: msg({ id: 'settings.general.minimizeToTray.desc', defaultMessage: 'Minimising hides Combwork to the system tray instead of the taskbar.', description: 'What the setting "Minimise to tray" does, under its title (Settings → General).' }), tip: msg({ id: 'settings.general.minimizeToTray.tip', defaultMessage: 'Click the tray icon to bring Combwork back.', description: 'The info tip of the setting "Minimise to tray" (Settings → General): more on what it does and when it applies.' }), type: 'boolean' },
@@ -874,9 +880,10 @@ const ACTIONS = new Set([
   'project.keybindings',
   'project.agents',
   'project.metadata',
-  'project.reset',
-  ...PROVIDERS.map((p) => `${p.id}.status`)
+  'project.reset'
 ])
+/** A provider's rows that hold no value, for whichever providers are registered when an entry is made. */
+const isAction = (id: string): boolean => ACTIONS.has(id) || PROVIDERS.some((p) => id === `${p.id}.status`)
 
 /** Custom controls whose value the tools can set (checked by checkSettingValue). */
 const CUSTOM_VALUES: Record<string, SettingEntry['value']> = {
@@ -884,21 +891,22 @@ const CUSTOM_VALUES: Record<string, SettingEntry['value']> = {
   'general.language': 'select',
   'assistant.mode': 'text',
   ...Object.fromEntries(['preChecks', 'mergeChecks', 'commands', 'okBefore', 'identity', 'excluded', 'stageNames', 'otherTargets'].map((k): [string, SettingEntry['value']] => [`project.workflow.${k}`, 'table'])),
-  'board.colors': 'table',
-  ...Object.fromEntries(
-    PROVIDERS.flatMap((p): [string, SettingEntry['value']][] => [
-      [`${p.id}.enabled`, 'boolean'],
-      [`${p.id}.modelFallback`, 'table'],
-      [`${p.id}.effortFallback`, 'table'],
-      [`${p.id}.prices`, 'table'],
-      [`assistant.${p.id}.model`, 'text'],
-      [`assistant.${p.id}.effort`, 'effort'],
-      [`assistant.${p.id}.permissionMode`, 'select'],
-      [`assistant.${p.id}.use200kContext`, 'select'],
-      [`assistant.${p.id}.extraArgs`, 'text']
-    ])
-  )
+  'board.colors': 'table'
 }
+/** A provider's custom controls whose value the tools can set (checked by checkSettingValue). */
+const providerCustom = (p: ProviderId): [string, SettingEntry['value']][] => [
+      [`${p}.enabled`, 'boolean'],
+      [`${p}.modelFallback`, 'table'],
+      [`${p}.effortFallback`, 'table'],
+      [`${p}.prices`, 'table'],
+      [`assistant.${p}.model`, 'text'],
+      [`assistant.${p}.effort`, 'effort'],
+      [`assistant.${p}.permissionMode`, 'select'],
+      [`assistant.${p}.use200kContext`, 'select'],
+      [`assistant.${p}.extraArgs`, 'text']
+]
+/** A custom control's value kind: Combwork's, or a provider's registered when the entry is made. */
+const customValue = (id: string): SettingEntry['value'] | undefined => CUSTOM_VALUES[id] ?? PROVIDERS.flatMap((p) => providerCustom(p.id)).find(([k]) => k === id)?.[1]
 
 /** Read-only to the Assistant because they decide what agents or the Assistant may do, or what runs (#186). */
 const SENSITIVE: [RegExp, AgentMsg][] = [
@@ -1015,7 +1023,7 @@ const DOCS_BY_ID: Record<string, string> = {
 
 /** Where a setting is, in English (the tools name it so) or as the user sees it: "Settings → Sessions → Suggest compacting above". */
 function settingPathOf(e: Pick<SettingEntry, 'section' | 'text' | 'workflowLevel' | 'slotLevel' | 'githubLevel'>, scope: SettingScope, format: (t: TextPart) => string): string {
-  const where = (list: SettingsSectionInfo[]): string => {
+  const where = (list: readonly SettingsSectionInfo[]): string => {
     const found = list.find((x) => x.id === e.section)
     return found ? format(found.text.label) : e.section
   }
@@ -1048,8 +1056,8 @@ const toOption = (o: RowOption): SettingOption => ({ value: o.value, label: engl
 function entry(row: Row, id: string, scope: SettingScope, docs: string): SettingEntry {
   const sensitive = SENSITIVE.find(([re]) => re.test(id))
   const readOnly = READ_ONLY.find(([re]) => re.test(id))
-  const action = ACTIONS.has(id)
-  const value = row.type === 'custom' ? CUSTOM_VALUES[id] : undefined
+  const action = isAction(id)
+  const value = row.type === 'custom' ? customValue(id) : undefined
   const applies = row.advanced ? advancedDef(row.advanced.id)?.applies : undefined
   const restart = row.advanced ? (applies === 'sessions' ? 'sessions' : applies === 'restart' ? 'combwork' : undefined) : RESTART.find(([re]) => re.test(id))?.[1]
   const { title, desc, tip, options, off, confirmOn, englishTitle, ...rest } = row
@@ -1079,22 +1087,22 @@ function entry(row: Row, id: string, scope: SettingScope, docs: string): Setting
  * Where the user finds it, as the tools name it (in English, said in the reader's chain): "Settings → Sessions → Suggest
  * compacting above", "Project Settings → Claude Code → Model". A record kept for later says it in the Default.
  */
-// agent-text: PATHS, LEVEL_PART, SETTINGS_SECTIONS, PROJECT_SETTINGS_SECTIONS
+// agent-text: PATHS, LEVEL_PART, settingsSections, PROJECT_SETTINGS_SECTIONS
 export const settingPath = (e: SettingEntry): string => settingPathOf(e, e.scope, agentText)
 
 /** A setting's text as an agent reads it (dialects, HI-2441): said from its messages in the reader's chain; with none, exactly the entry's English. */
 export function agentSetting(e: SettingEntry): { title: string; desc: string; tip: string; off?: string } {
   const t = e.text
   return {
-    title: agentText(t.title), // agent-text: APP_ROWS, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
-    desc: t.desc ? agentText(t.desc) : '', // agent-text: APP_ROWS, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
-    tip: t.tip ? agentText(t.tip) : '', // agent-text: APP_ROWS, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
-    ...(t.off ? { off: agentText(t.off) } : {}) // agent-text: APP_ROWS, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
+    title: agentText(t.title), // agent-text: appRows, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
+    desc: t.desc ? agentText(t.desc) : '', // agent-text: appRows, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
+    tip: t.tip ? agentText(t.tip) : '', // agent-text: appRows, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
+    ...(t.off ? { off: agentText(t.off) } : {}) // agent-text: appRows, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
   }
 }
 
 /** A setting's title as an agent reads it (agentSetting's). */
-export const agentTitle = (e: SettingEntry): string => agentText(e.text.title) // agent-text: APP_ROWS, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
+export const agentTitle = (e: SettingEntry): string => agentText(e.text.title) // agent-text: appRows, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
 
 /** Why the Assistant can't change it, with where the user does, a level default's level too (undefined: it can; HI-2470). */
 export const settingReadOnly = (e: SettingEntry): string | undefined => (e.readOnly ? say(e.readOnly, { path: settingPath(e) }) : undefined)
@@ -1105,16 +1113,30 @@ export const settingHelps = (e: SettingEntry): string | undefined => (e.helps ? 
 /** Where the user finds it, as the user sees it, in the language Combwork shows: "Ustawienia → Sesje → …". */
 export const shownSettingPath = (e: SettingEntry): string => settingPathOf(e, e.scope, shownText)
 
-/** Settings' entries (Combwork's and the providers' pages), in their order. */
-export const APP_SETTINGS_CATALOG: readonly SettingEntry[] = [...APP_ROWS, ...levelRows()].map((r) =>
+/** Settings' entries (Combwork's and the providers' pages), in their order, as the providers registered now make them. */
+const appCatalog = (): SettingEntry[] => [...appRows(), ...levelRows()].map((r) =>
   r.provider ? entry(r, `${r.provider}.${r.key}`, 'provider', 'coding-agents-claude-code-codex-and-github-copilot') : entry(r, `${r.section}.${r.key}`, r.section === 'workspace' ? 'workspace' : 'app', DOCS[r.section] ?? 'getting-started') // i18n-ignore: a user guide heading's id (#1535)
 )
+
+/** Settings' entries (Combwork's and the providers' pages), in their order: rebuilt in place when the providers change (HI-3196). */
+export const APP_SETTINGS_CATALOG: readonly SettingEntry[] = appCatalog()
 
 /** Project Settings' entries, in their order. */
 export const PROJECT_SETTINGS_CATALOG: readonly SettingEntry[] = PROJECT_ROWS.map((r) => entry(r, r.provider ? `project.${r.provider}.${r.key}` : `project.${r.key}`, 'project', 'project-settings')) // i18n-ignore: a user guide heading's id (#1535)
 
 /** Every setting, Settings' then Project Settings'. */
 export const SETTINGS_CATALOG: readonly SettingEntry[] = [...APP_SETTINGS_CATALOG, ...PROJECT_SETTINGS_CATALOG]
+
+/** An array refilled in place: its readers hold the same array, and see its new contents. */
+const refill = <T>(a: readonly T[], next: readonly T[]): void => void (a as T[]).splice(0, a.length, ...next)
+
+// A user's own CLI registered, changed or removed (HI-3196): its page, its rows and its advanced values' rows, for every
+// reader (the window's Settings, the Assistant's settings tools), from the providers as they are now.
+onProvidersChanged(() => {
+  refill(SETTINGS_SECTIONS, settingsSections())
+  refill(APP_SETTINGS_CATALOG, appCatalog())
+  refill(SETTINGS_CATALOG, [...APP_SETTINGS_CATALOG, ...PROJECT_SETTINGS_CATALOG])
+})
 
 export function settingEntry(id: string): SettingEntry | undefined {
   return SETTINGS_CATALOG.find((e) => e.id === id)
@@ -1250,7 +1272,7 @@ const AGENT = {
 /** The values a select setting (or a custom one the tools set as a select) takes. */
 export function settingOptions(e: SettingEntry): { value: string; label: string }[] | null {
   // The tools' choices, in English: the Assistant sets a value by it or by its label as the tools name it.
-  if (e.options) return e.options.map((o) => ({ ...o, label: agentText(o.text) })) // agent-text: APP_ROWS, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, INHERIT, ON_OFF, FILE_LOCK_MODES
+  if (e.options) return e.options.map((o) => ({ ...o, label: agentText(o.text) })) // agent-text: appRows, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, INHERIT, ON_OFF, FILE_LOCK_MODES
   if (e.id === 'notifications.chimeSound') return ['chime', 'bell', 'soft', 'pop'].map((v) => ({ value: v, label: v.charAt(0).toUpperCase() + v.slice(1) }))
   // The Assistant's tools name languages in English (Polish, or pl); Settings shows each by its own name.
   if (e.id === 'general.language') return [{ value: 'auto', label: say(AGENT.automatic) }, ...LANGUAGES.map((l) => ({ value: l.code, label: l.english }))]

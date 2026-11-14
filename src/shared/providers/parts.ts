@@ -3,6 +3,7 @@ import type { ModelPrice } from '../types'
 import type { Tip } from '../tips'
 import type { AdvancedSource } from '../advancedDef'
 import type { AdminSnippetFacts } from '../hooks'
+import type { CliDescription } from './cliDescription'
 
 /**
  * A provider's shared half (HI-3201): everything the window, the shared settings logic and main read about one provider
@@ -26,6 +27,8 @@ export interface ProviderModule {
    * it, and the block as an administrator pastes it, for the ports chosen. Absent: none.
    */
   adminSnippet?: { guide: string; text(ports: readonly number[], facts: AdminSnippetFacts, opts?: { statusLine?: boolean }): string }
+  /** A data-only provider's description (HI-3196): the generic adapter runs it, and it has no main folder of its own. */
+  cli?: CliDescription
 }
 
 /**

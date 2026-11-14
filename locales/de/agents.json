@@ -342,6 +342,8 @@
   "agents.resume.hold.holds": "{agent} behält bereits {slot}. Gib diesen Slot frei, um diese Unterhaltung in ihrem eigenen fortzusetzen.",
   "agents.resume.hold.reused": "Im Slot dieser Unterhaltung ({slot}) liegt jetzt {kind, select, card {die Arbeit von {work}} other {die Arbeit einer Lane}}. Lies das Transkript oder beginne mit einer Übergabe neu.",
   "agents.resume.hold.reviewer": "{agent} reviewt jetzt, und Reviewer laufen nie in einem Slot ({slot}). Lies das Transkript oder beginne mit einer Übergabe neu.",
+  "agents.resume.noPrompt": "Sie hatte nie einen Prompt, daher kann {cli} nichts fortsetzen.",
+  "agents.resume.noResume": "{cli} kann keine Sitzung fortsetzen: Die Beschreibung sieht kein Fortsetzen vor.",
   "agents.resume.noRoom": "Kein Agent arbeitet im Projektordner, und das Projekt hat keinen Platz für einen weiteren Agenten.",
   "agents.resume.noTranscript": "Weder {cli} noch Combwork hat das Transkript noch, daher gibt es nichts fortzusetzen.",
   "agents.resume.notInstalled": "{cli} ist nicht installiert. Richte den Anbieter in der Anbieter-Einrichtung ein, um die Sitzung fortzusetzen.",

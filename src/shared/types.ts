@@ -2486,6 +2486,11 @@ export interface SessionRecord {
   serverLocal?: true
   notLocal?: true
   id: string
+  /**
+   * It has had its first prompt (HI-3196): a CLI that resumes by Combwork's id alone (no transcript Combwork reads) has a
+   * conversation to resume only then. Kept once set.
+   */
+  prompted?: true
   /** The provider that ran it ("claude-code", "codex"). The field name predates providers. */
   agent: ProviderId
   name: string
@@ -4309,6 +4314,8 @@ export interface OpenProgress {
 
 /** Events pushed from main to renderer. */
 export type CombworkEvent =
+  /** The user's own CLIs as main read them now (HI-3196): every window registers this snapshot, replacing the last. */
+  | { type: 'clis'; snapshot: import('./providers/cliSnapshot').CliSnapshotView }
   | { type: 'workspace-changed'; workspace: WorkspaceInfo | null }
   /** A workspace's team paused or resumed (HI-2081): its pause now, or null. */
   | { type: 'team-pause-changed'; workspacePath: string; pause: import('./teamPause').TeamPause | null; was?: import('./teamPause').TeamPause | null }

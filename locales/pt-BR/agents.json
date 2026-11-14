@@ -342,6 +342,8 @@
   "agents.resume.hold.holds": "{agent} já mantém {slot}. Libere esse slot para retomar esta conversa no slot dela.",
   "agents.resume.hold.reused": "O slot desta conversa ({slot}) agora tem {kind, select, card {o trabalho de {work}} other {o trabalho de uma raia}}. Leia a transcrição ou comece de novo com uma passagem de trabalho.",
   "agents.resume.hold.reviewer": "{agent} agora revisa, e revisores nunca rodam em um slot ({slot}). Leia a transcrição ou comece de novo com uma passagem de trabalho.",
+  "agents.resume.noPrompt": "Ela nunca teve um prompt, então {cli} não tem nada para retomar.",
+  "agents.resume.noResume": "{cli} não consegue retomar uma sessão: a descrição dela não tem como retomar.",
   "agents.resume.noRoom": "Nenhum agente trabalha na pasta do projeto, e o projeto não tem espaço para outro agente.",
   "agents.resume.noTranscript": "Nem {cli} nem o Combwork têm mais a transcrição, então não há nada para retomar.",
   "agents.resume.notInstalled": "{cli} não está instalado. Configure-o na Configuração de provedores para retomar a sessão.",

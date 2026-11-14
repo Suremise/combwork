@@ -100,6 +100,29 @@ Combwork runs **OpenCode 2** (the `opencode` command from opencode.ai). Turn it 
 - **Instructions.** Combwork's guidance and the agent's instructions (Agent Settings) are in the agent's private config folder, in an `AGENTS.md` OpenCode loads as it starts; an **Independent** agent gets none of Combwork's guidance. The project's own `AGENTS.md` is given to OpenCode by name, so the agent reads it even while the project's OpenCode config is kept out.
 - **What Combwork doesn't run.** OpenCode's **Claude Agent** provider: an agent whose model is one of its models doesn't start, as Combwork runs Claude Code itself instead. OpenCode's **machine-wide background service**: it's off for everything Combwork runs, so each agent has only its own private server.
 
+### Your own CLIs <a id="your-own-clis"></a>
+
+A CLI Combwork has no provider for can still run your agents, from a **description**: a JSON file in the `clis` folder of your Combwork profile (`%APPDATA%\Combwork\clis`). **Settings → Providers → Your own CLIs** has **Open Folder** and **Reload**: add or change a file, press Reload, then turn the CLI on in Settings → Providers and choose it when you add an agent. A description is plain data, never code, and Combwork never changes the CLI's own config.
+
+```json
+{
+  "id": "ollama-chat",
+  "name": "Ollama",
+  "binary": { "names": ["ollama"], "versionArgs": ["--version"], "versionPattern": "version is (\\d+\\.\\d+\\.\\d+)" },
+  "launch": { "args": ["run", "{model}", "--think=false"], "prompt": "typed", "env": { "OLLAMA_NOHISTORY": "1" } },
+  "status": { "ready": "^>>> Send a message", "working": "^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]", "exit": "/bye" },
+  "models": { "list": ["qwen3:8b"] }
+}
+```
+
+This one runs Ollama's chat with a model on your PC (tested with Ollama 0.40.15 and `qwen3:8b`): its connection names the model. Ollama keeps no session Combwork can resume, so it has no `session`.
+
+- **What a description says.** `id` (lower-case letters, digits and dashes, no other provider's) and `name`. `binary`: its names on PATH, `paths` where it may be otherwise, and how to read its version. `launch`: its `args`, how the first prompt goes in (`"typed"` once its prompt is ready, or `{ "arg": [...] }` naming `{prompt}`), its permission `modes` (each a `value`, a `label` and the `args` that give it) and `env` (never Combwork's `CW_` variables). `session`: the arguments that start a session under Combwork's id and resume it (`{ "new": ["--session-id", "{id}"], "resume": ["--resume", "{id}"] }`); without it, its sessions can't be resumed. `status`: regular expressions for its screen (`ready`, its prompt's line, whether or not something is typed after it; and if it has them `working`, `asks` for a question or permission, `titleAsks` for its window title: the one found lowest on its screen says what it is doing), `osc7501` if it writes its turn's state that way, and `exit`, the line that ends it. Arguments may name `{model}`, `{cwd}`, `{prompt}` and `{id}`.
+- **A file Combwork can't use** is listed under Your own CLIs with each reason (a field missing or of the wrong kind, a pattern that isn't valid, an id that's taken), and isn't used. If a file that worked breaks, its last good version stays in use until you fix it or restart. A copy of the CLI inside an editor's extensions (VS Code, Cursor and the like) is never used, even if the description or the CLI path names it: Provider Setup says it was ignored.
+- **What such a CLI lacks.** It gets none of Combwork's tools, skills or guidance (no board or inbox), no hooks (no file locks or notices), no transcript (no conversation view, usage or context), no cost, and no live mode switch (a restart changes its mode); without `session`, no resume. Provider Setup and Agent Settings list what it lacks. Combwork doesn't install, update or sign it in: do that as its own instructions say. A task the Assistant or a script starts it on is typed as its first prompt; while it runs, it can't be sent tasks or messages, so type to it in its pane.
+- **Its status** comes from its screen: **working** while its `working` pattern (or its OSC 7501 state) says so, **waiting for you** while it asks something (answer in its pane; nothing is typed over it), and **finished** when its prompt is back after work. **Settings → Advanced** has each CLI's patterns, if one needs changing.
+- **Resuming.** A session resumes by its id once it has had a prompt: its first task, a line Combwork typed, or one you typed at its prompt. Answering a question it asked as it started doesn't count: a session stopped before any prompt isn't kept, and the agent's Resume opens its previous conversation, if it has one.
+
 ### Git <a id="git"></a>
 
 Worktree agents, merging, the **Git** tab, what's left to merge on **Merge…**, agent templates with worktrees and **Remove All**'s clean-up all use **git**. Install **Git for Windows**, version **2.38 or later** (git-scm.com). **Help → Provider Setup…** shows a **Git** row under every tab: the version Combwork found and where, or **Git not found** with how to fix it and a **Git for Windows** button. With an older git, the row says what doesn't work (for example, squash-merged branches still count as unmerged, so their worktrees are kept).

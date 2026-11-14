@@ -3,7 +3,7 @@ import { watch, type FSWatcher } from 'original-fs'
 import { readFile } from 'original-fs/promises'
 import { readFileSync } from 'original-fs'
 import { join } from 'path'
-import { ADVANCED_DEFS, LEGACY_ADVANCED, advancedDef, advancedFileText, advancedRegExp, advancedRow, checkAdvanced, cliFacing, literalRegExp, onConnection, parseAdvancedFile, withValues, type AdvancedDef, type AdvancedState, type MadeFor, type Text } from '../shared/advanced'
+import { ADVANCED_DEFS, LEGACY_ADVANCED, allAdvancedDefs, advancedDef, advancedFileText, advancedRegExp, advancedRow, checkAdvanced, cliFacing, literalRegExp, onConnection, parseAdvancedFile, withValues, type AdvancedDef, type AdvancedState, type MadeFor, type Text } from '../shared/advanced'
 import { msg } from '../shared/i18n'
 import { CombworkError, combworkError } from './combworkError'
 import type { AppSettings, ProviderId } from '../shared/types'
@@ -222,7 +222,7 @@ export class AdvancedStore {
 
   /** The state Settings → Advanced shows, with a workspace's own values. */
   state(workspaceValues: Record<string, unknown> | null): AdvancedState {
-    return { file: this.loaded ? this.path : '', fileError: this.fileError, fileErrorText: this.fileErrorText, values: { ...this.values }, madeFor: { ...this.madeFor }, unknown: [...this.unknown], workspace: workspaceValues ? { ...workspaceValues } : null, cli: { ...this.cli }, atStart: { ...this.atStart } }
+    return { file: this.loaded ? this.path : '', fileError: this.fileError, fileErrorText: this.fileErrorText, values: { ...this.values }, madeFor: { ...this.madeFor }, unknown: this.unknown.filter((id) => !advancedDef(id)), workspace: workspaceValues ? { ...workspaceValues } : null, cli: { ...this.cli }, atStart: { ...this.atStart } }
   }
 
   /** What the values that apply at a restart were when Combwork started: Settings offers a restart once one differs. */
@@ -362,7 +362,7 @@ export class AdvancedStore {
   /** Help → Copy Diagnostics: how many overrides, which (Combwork's names, no values), and which need a look. */
   diagnostics(workspaces: (Record<string, unknown> | null)[]): string[] {
     const ids = Object.keys(this.values).filter((id) => advancedDef(id)).sort()
-    const rows = ADVANCED_DEFS.map((d) => advancedRow(d, { values: this.values, madeFor: this.madeFor, workspace: null, cli: this.cli }))
+    const rows = allAdvancedDefs().map((d) => advancedRow(d, { values: this.values, madeFor: this.madeFor, workspace: null, cli: this.cli }))
     const invalid = rows.filter((r) => r.problem).map((r) => r.def.id)
     const other = rows.filter((r) => r.madeForOther).map((r) => r.def.id)
     const own = workspaces.reduce((n, w) => n + Object.keys(w ?? {}).length, 0)
@@ -370,7 +370,7 @@ export class AdvancedStore {
       `- Advanced settings: ${ids.length ? `${ids.length} override${ids.length === 1 ? '' : 's'} (${ids.join(', ')})` : 'no overrides'}${own ? `; ${own} workspace value${own === 1 ? '' : 's'}` : ''}`, // i18n-ignore: Help → Copy Diagnostics, a report in English
       ...(invalid.length ? [`  - not valid, so the default is used: ${invalid.join(', ')}`] : []), // i18n-ignore: Help → Copy Diagnostics, a report in English
       ...(other.length ? [`  - made for another CLI version than the installed one: ${other.join(', ')}`] : []), // i18n-ignore: Help → Copy Diagnostics, a report in English
-      ...(this.unknown.length ? [`  - unknown to this Combwork: ${this.unknown.length}`] : []), // i18n-ignore: Help → Copy Diagnostics, a report in English
+      ...(this.unknown.filter((id) => !advancedDef(id)).length ? [`  - unknown to this Combwork: ${this.unknown.filter((id) => !advancedDef(id)).length}`] : []), // i18n-ignore: Help → Copy Diagnostics, a report in English
       ...(this.fileError ? ["  - advanced.json can't be read as it is now"] : []) // i18n-ignore: Help → Copy Diagnostics, a report in English
     ]
   }

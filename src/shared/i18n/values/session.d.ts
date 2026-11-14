@@ -166,6 +166,7 @@ interface CombworkMessageValues {
   'session.start.archived': undefined
   'session.start.args': { problem: string | number; connection: string | number }
   'session.start.beingOpened': undefined
+  'session.start.cantResume': { provider: string | number }
   'session.start.cleaning': undefined
   'session.start.cliRequired': { provider: string | number }
   'session.start.closing': undefined

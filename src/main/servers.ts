@@ -91,7 +91,7 @@ import { agentNowOf, cardStall, laneOrderView, reviewDueOf, stepWaitOf, type Sta
 import { forwardWaitOf } from './queueReturn'
 import { cancelMessages, leaveMessage, MESSAGE_MAX_CHARS } from './agentMessages'
 import { giveUnseen } from './cardFreshness'
-import { ackCardTask, ackDeliveries, ackThenRead, onCardTaskReceived, deliveriesOf, deliverNow, deliveryView, inboxSwitch, launchWith, NotGiven, readInbox } from './deliveries'
+import { ackCardTask, ackDeliveries, ackThenRead, onCardTaskReceived, deliveriesOf, deliverNow, deliveryView, inboxSwitch, launchWith, NoInbox, NotGiven, readInbox } from './deliveries'
 import { INBOX_SWITCHES, type InboxSwitch } from '../shared/inboxSwitches'
 import { isDoorbell } from '../shared/doorbell'
 import type { DeliverySender, InboxItem } from '../shared/deliveries'
@@ -157,6 +157,7 @@ import { CONSOLE_KINDS, combworkName, mayRead, type ConsoleEvent, type ConsoleKi
 import { cardLabel, cardName, cardRef, namesOf } from '../shared/projectKeys'
 import { pauseTeam, resumeTeam } from './teamPause'
 import { scanWorkspace } from './teamParked'
+import { providerGaps, providerGapsForAgents } from '../shared/providers/gaps'
 
 const log = createLogger('servers')
 const MAX_BODY = 2 * 1024 * 1024
@@ -1150,6 +1151,8 @@ route('GET', '/v1/providers', async () => {
       // Whether agents can be given context200k (a 200K window instead of the model's 1M).
       context200k: p.capabilities.compaction?.contextLimit ?? false,
       modes: offeredModes(p.id, s).map((m) => ({ value: m.value, label: m.label, description: m.description })),
+      // What its CLI can't do in Combwork (HI-3196: one that runs from a description), only where it lacks something.
+      ...(providerGaps(p.id).length ? { gaps: providerGapsForAgents(p.id) } : {}),
       // Its connections usable in the caller's workspace (HI-2108), in the order: what cw_add_agent's connection names. Each
       // with its own account's default and, where they aren't the provider's, its models (HI-2856).
       ...(here ? { connections: listedConnections(p.id, connectionsHere(here).filter((c) => accountById(c.account)?.provider === p.id), accountById, at, s, models) } : {})
@@ -1734,6 +1737,8 @@ route('POST', '/v1/projects/:name/agents/:agent/prompt', async ({ params, body }
     // A task delivery (#649), given now or not at all: never queued behind the agent's work.
     const r = await deliverNow(p, { agentId, agentName: a.name, conversation: st.sessionId || null, kind: 'task', from: callerSender(), body: text, need: 'free' }).catch((e: Error) => {
       if (e instanceof NotGiven) throw new HttpError(409, apiSaid(API.agent.promptFailed, { agent: a.name, error: e.message }))
+      // It has no inbox (an Independent agent, a launch as if from a terminal, a CLI without Combwork's tools): said as such.
+      if (e instanceof NoInbox) throw new HttpError(409, apiSaid(API.agent.promptFailed, { agent: a.name, error: e.message }))
       throw e
     })
     return { done: [API.done.prompted, { agent: a.name, project: basename(p), given: r ? 'yes' : 'no', id: r?.id ?? '' }], said: `: ${clip(text.replace(/\s+/g, ' '), 80)}`, result: { ok: true, ...(r ? { id: r.id } : {}) } }

@@ -389,6 +389,11 @@
   "session.start.beingOpened": {
     "placeholders": {}
   },
+  "session.start.cantResume": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
   "session.start.cleaning": {
     "placeholders": {}
   },

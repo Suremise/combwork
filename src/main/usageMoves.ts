@@ -84,7 +84,7 @@ function agentKey(ws: WorkspaceService, projectPath: string, projectId: string |
  * is that CLI's rules that move it, never another's.
  */
 function launchCli(ws: WorkspaceService, projectPath: string, a: Pick<AgentDef, 'provider' | 'connection'>): ProviderId {
-  if (ws.isAssistantHome(projectPath) && !a.provider && !a.connection) return firstUsableAccount(ws.config)?.provider ?? agentProvider(a, config.settings)
+  if (ws.isAssistantHome(projectPath) && !a.provider && !a.connection) return firstUsableAccount(ws.config, { withTools: true })?.provider ?? agentProvider(a, config.settings)
   return agentProvider(a, config.settings)
 }
 

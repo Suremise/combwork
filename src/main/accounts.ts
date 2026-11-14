@@ -762,9 +762,11 @@ export function accountHere(cli: ProviderId, cfg: WorkspaceConfig | null): Accou
  * The account a new agent named nothing for goes on (decision A, HI-2106: no default provider): the first in the one
  * order that's usable here (on in the workspace, or the CLI's own home), whose CLI is on and installed.
  */
-export function firstUsableAccount(cfg: WorkspaceConfig | null): Account | null {
+export function firstUsableAccount(cfg: WorkspaceConfig | null, opts: { withTools?: boolean } = {}): Account | null {
   for (const a of allAccounts()) {
     if (!isProviderEnabled(config.settings, a.provider) || !providerService.info(a.provider).path) continue
+    // The Assistant's (withTools): never a CLI that takes none of Combwork's tools (HI-3196: one from a description).
+    if (opts.withTools && providerDescriptor(a.provider).capabilities.session?.combworkTools === false) continue
     if (accountHere(a.provider, cfg)?.id === a.id) return a
   }
   return null
@@ -776,7 +778,7 @@ export function firstUsableAccount(cfg: WorkspaceConfig | null): Account | null 
  * settings and the accounts it uses, so they never disagree.
  */
 export function launchCli(agent: Pick<AgentDef, 'provider' | 'connection'> | null | undefined, cfg: WorkspaceConfig | null, assistant: boolean): ProviderId {
-  return assistant && !agent?.provider && !agent?.connection ? (firstUsableAccount(cfg)?.provider ?? agentProvider(agent, config.settings)) : agentProvider(agent, config.settings)
+  return assistant && !agent?.provider && !agent?.connection ? (firstUsableAccount(cfg, { withTools: true })?.provider ?? agentProvider(agent, config.settings)) : agentProvider(agent, config.settings)
 }
 
 /** Whether a test copy runs a CLI on its CLI test home (connectionSeam.ts). */
@@ -789,6 +791,18 @@ const seamOn = (cli: ProviderId): boolean => {
 export function firstAccountHere(cli: ProviderId, cfg: WorkspaceConfig | null): Account | null {
   const here = accountHere(cli, cfg)
   if (here || !seamOn(cli)) return here
+  return ensureHomeAccount(cli)
+}
+
+/**
+ * A CLI's own home's account (its PC-wide sign-in's, or a test home's) and its base connection, made if missing: a test
+ * home the first time the seam needs it, and a user's own CLI as its description registers (HI-3196, main/clis.ts: it has
+ * no sign-in connections, so its agents run on its PC-wide account).
+ */
+export function ensureHomeAccount(cli: ProviderId): Account | null {
+  const id = pcWideSignIn(cli) ? pcAccountId(cli) : seamAccountId(cli)
+  const found = accountById(id)
+  if (found && baseConnection(found.id, allConnections())) return found
   let a: Account | undefined
   config.update((c) => {
     const store: AccountStore = { accounts: [...(c.accounts ?? [])], connections: [...(c.connections ?? [])], newId: newConnectionId }

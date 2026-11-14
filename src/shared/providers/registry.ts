@@ -12,6 +12,9 @@ import opencode from './opencode'
  */
 export const PROVIDER_MODULES: readonly ProviderModule[] = [claude, codex, copilot, antigravity, opencode]
 
+/** How many of PROVIDER_MODULES are built in: the user's own CLIs (HI-3196, data-only) come after them (index.ts). */
+export const BUILT_IN_PROVIDERS = PROVIDER_MODULES.length
+
 /**
  * The provider whose records were written before Combwork had providers (0.x): a session, agent or setting with no
  * provider of its own is its. An upgrade input, never a default for anything new.

@@ -515,8 +515,10 @@ export interface ProviderInstallPart {
    */
   latestVersion(executable?: string | null): Promise<string | null>
   isNewer(latest: string, current: string): boolean
-  installCommand(): CommandSpec
-  updateCommand(executable: string): CommandSpec
+  /** Its install task; absent: Combwork can't install it (a data-only provider, HI-3196), and the task is refused. */
+  installCommand?(): CommandSpec
+  /** Its update task; absent: none, and the task is refused. */
+  updateCommand?(executable: string): CommandSpec
   /** A known update failure's explanation and explicit retry, if this installer supports one. */
   updateRetry?(executable: string, exitCode: number): UpdateRetry | null
   /**
@@ -550,7 +552,8 @@ export interface ProviderInstallPart {
 /** Starting and resuming a session in a terminal, and typing into it. Every provider has it. */
 export interface ProviderLaunchPart {
   /** The CLI's sign-in; `host`: the GitHub host it signs in on (HI-2779, capabilities.githubHost), else its default. */
-  loginCommand(executable: string, host?: string): CommandSpec
+  /** Its sign-in task; absent: Combwork runs no sign-in for it (a data-only provider, HI-3196), and the task is refused. */
+  loginCommand?(executable: string, host?: string): CommandSpec
   /**
    * The key Combwork presses for a line break in a prompt it types (HI-1327), for the CLI at `version`: one of the
    * descriptor's `typedNewlines`, as Settings → Advanced chooses it; null: a space (as before). Absent: always a space.
@@ -563,6 +566,25 @@ export interface ProviderLaunchPart {
   buildCommand(executable: string, ctx: LaunchContext): CommandSpec
   /** A new session's id, for a provider Combwork picks it for (capabilities.session.fixedSessionId) in a form of its own (HI-2759: OpenCode's `ses_…`); absent: a UUID. */
   newSessionId?(): string
+  /**
+   * The adapter a launch uses from its start to its end (HI-3196): a data-only provider's makes a copy of itself with its
+   * description and its patterns' effective values (advanced overrides included) taken now, so a reload or an override
+   * changed later never reaches a launch under way. Called once, synchronously, before anything of the launch is made.
+   * Absent: the launch uses the registry's adapter.
+   */
+  forLaunch?(): ProviderAdapter
+  /**
+   * The CLI resumes a session by Combwork's id alone, with no transcript Combwork reads (HI-3196: a data-only provider with
+   * a resume in its description): a session is resumable once it has had a prompt (SessionRecord.prompted).
+   */
+  readonly resumesById?: boolean
+  /** Its first prompt is typed once its screen is ready (sessions.ts), not passed on its command line (HI-3196). */
+  readonly promptTyped?: boolean
+  /**
+   * Its start (readyOutput, startupQuestion) is read from its rendered screen, a line each, as each draw lands, not from
+   * its output's tail run together (HI-3196: a description's patterns anchor ^ and $ at each line).
+   */
+  readonly startupOnScreen?: boolean
   /** Something the user should know about this launch (a mode the CLI can't fully give there), shown once per agent while Combwork runs. */
   launchNotice?(ctx: LaunchContext): { title: string; message: string } | null
   /** Something in a folder agents work in (any provider's) that stops this CLI working there (#509: a stray .codex), or null. */

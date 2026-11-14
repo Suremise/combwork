@@ -164,6 +164,7 @@
   "session.start.archived": "Esta sessão está arquivada. Desarquive-a antes de retomar.",
   "session.start.args": "{problem} Corrija na conexão dele, {connection}, em Configurações → Contas e conexões.",
   "session.start.beingOpened": "Esta conversa já está sendo aberta em outro agente.",
+  "session.start.cantResume": "{provider} não consegue retomar uma conversa: comece uma nova.",
   "session.start.cleaning": "O Combwork está arquivando, excluindo ou limpando os arquivos desta sessão. Tente de novo em instantes.",
   "session.start.cliRequired": "É preciso ter {provider} para executar sessões.",
   "session.start.closing": "O Combwork está parando os agentes deste espaço de trabalho, então nenhum pode iniciar agora.",

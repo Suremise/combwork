@@ -1192,6 +1192,12 @@
       "cli": "plain"
     }
   },
+  "service.providers.noTask": {
+    "placeholders": {
+      "cli": "plain",
+      "task": "select"
+    }
+  },
   "service.providers.notInstalled": {
     "placeholders": {
       "cli": "plain"

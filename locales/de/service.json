@@ -308,6 +308,7 @@
   "service.nextVersion.sameName": "Die nächste Version braucht einen eigenen Branch, nicht {from}.",
   "service.providers.keysStopped": "{task}: Combwork gibt dort keine Tasten mehr ein, da {why}. Schließe es im Terminal ab.",
   "service.providers.noSetup": "Für {cli} gibt es keine Einrichtung.",
+  "service.providers.noTask": "{cli} hat in Combwork keine Aufgabe zum {task, select, install {Installieren} update {Aktualisieren} login {Anmelden} other {Einrichten}}.",
   "service.providers.notInstalled": "{cli} ist nicht installiert.",
   "service.providers.pickNotFound": "{task}: Combwork konnte {item} nicht finden. Erledige es im Terminal oder aktualisiere Combwork.",
   "service.providers.retryUnavailable": "Dieser erneute Aktualisierungsversuch ist nicht mehr verfügbar. Wähle Erneut prüfen und dann Aktualisieren.",

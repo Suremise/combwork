@@ -164,6 +164,7 @@
   "session.start.archived": "This session is archived. Unarchive it before resuming.",
   "session.start.args": "{problem} Fix it in its connection, {connection}, in Settings → Accounts & Connections.",
   "session.start.beingOpened": "This conversation is already being opened in another agent.",
+  "session.start.cantResume": "{provider} can't resume a conversation: start a new one instead.",
   "session.start.cleaning": "Combwork is archiving, deleting or cleaning up this session's files. Try again in a moment.",
   "session.start.cliRequired": "{provider} is required to run sessions.",
   "session.start.closing": "Combwork is stopping this workspace's agents, so none can start now.",

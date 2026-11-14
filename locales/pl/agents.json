@@ -342,6 +342,8 @@
   "agents.resume.hold.holds": "Agent {agent} już zajmuje {slot}. Zwolnij ten slot, aby wznowić tę rozmowę w jej własnym.",
   "agents.resume.hold.reused": "W slocie tej rozmowy ({slot}) jest teraz {kind, select, card {praca karty {work}} other {praca toru}}. Przeczytaj jej transkrypcję albo zacznij od nowa z przekazaniem.",
   "agents.resume.hold.reviewer": "Agent {agent} teraz recenzuje, a recenzenci nigdy nie działają w slocie ({slot}). Przeczytaj transkrypcję rozmowy albo zacznij od nowa z przekazaniem.",
+  "agents.resume.noPrompt": "Ta sesja nigdy nie dostała promptu, więc {cli} nie ma czego wznowić.",
+  "agents.resume.noResume": "{cli} nie może wznowić sesji: opis nie przewiduje wznawiania.",
   "agents.resume.noRoom": "Żaden agent nie pracuje w folderze projektu, a w projekcie nie ma miejsca na kolejnego agenta.",
   "agents.resume.noTranscript": "Ani {cli}, ani Combwork nie ma już jej transkrypcji, więc nie ma czego wznowić.",
   "agents.resume.notInstalled": "{cli} nie jest zainstalowany. Zainstaluj go w Konfiguracji dostawców, aby ją wznowić.",

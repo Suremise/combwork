@@ -591,6 +591,8 @@
   "tips.workspaceMovedDefender.title": "Defenderの除外は移動したワークスペースに付いていきます",
   "tips.workspaceNotes.text": "共有ノートの先頭に固定されたWorkspace notesは、フルパスなど、このマシンに固有のことを書く場所です。すべてのエージェントが、どのフォルダーでも起動時に受け取るので、コミットされるAGENTS.mdに書く必要はありません。プロジェクト名を見出しにしたセクションは、そのプロジェクトだけのものです。",
   "tips.workspaceNotes.title": "このマシンについてのノートを全エージェントに",
+  "tips.yourOwnClis.text": "CLIを記述したJSONファイルをCombworkのプロファイルのclisフォルダーに置くと、エージェントがそのCLIを実行できます。起動方法、最初のプロンプトの渡し方、画面の読み取り方を記述します。「設定」→「プロバイダー」→「独自のCLI」でフォルダーを開いたり、再読み込みしたりできます。",
+  "tips.yourOwnClis.title": "CombworkにプロバイダーがないCLIを実行する",
   "tips.modelSwitched.title": "別のモデルのエージェントは印が付きます",
   "tips.modelSwitched.text": "エージェントが接続の指定とは別のモデルで動いている場合（上限付近でのCodexの安いモデルの提案や/model）、フッターのモデルに警告が付き、「アクティビティ」に「モデル変更」と表示されます。戻すにはエージェントを再起動してください。",
   "tips.waitingOnPurpose.title": "意図的に待っているカード",

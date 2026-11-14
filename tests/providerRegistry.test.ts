@@ -10,6 +10,9 @@ import traverseModule from '@babel/traverse'
 import { PROVIDERS } from '../src/shared/providers'
 import { PROVIDER_MODULES } from '../src/shared/providers/registry'
 import { orderedAdapters } from '../src/main/providers/index'
+import { CliAdapter } from '../src/main/providers/cliAdapter'
+import { cliModule } from '../src/shared/providers/cliDescription'
+import type { ProviderModule } from '../src/shared/providers/parts'
 import type { ProviderAdapter } from '../src/main/providers/types'
 import type { CallExpression } from '@babel/types'
 
@@ -143,7 +146,9 @@ describe('the provider registry (HI-3201)', () => {
     expect(PROVIDER_MODULES.map((m) => m.descriptor.id)).toEqual(IDS)
     const shared = folders(SHARED)
     const main = folders(MAIN).filter((f) => existsSync(join(MAIN, f, 'adapter.ts')))
-    expect(main.sort()).toEqual(shared.sort())
+    // A data-only provider's shared half is a description (HI-3196: cliModule) and has no main folder: the generic adapter runs it.
+    const described = shared.filter((f) => /\bcliModule\(/.test(readFileSync(join(SHARED, f, 'index.ts'), 'utf8')))
+    expect(main.sort()).toEqual(shared.filter((f) => !described.includes(f)).sort())
     expect(shared.length).toBe(IDS.length)
     // Each main folder's adapter is a registered provider's (src/main/providers/index.ts finds them by these names).
     for (const f of main) expect(readFileSync(join(MAIN, f, 'adapter.ts'), 'utf8')).toMatch(/^export default \w+\s*$/m)
@@ -198,9 +203,24 @@ describe('the provider registry (HI-3201)', () => {
 
   it("puts the adapters in the registry's order, and refuses one missing, one unregistered or two for a provider", () => {
     const a = (id: string): ProviderAdapter => ({ id }) as unknown as ProviderAdapter
-    expect(orderedAdapters([a('b'), a('a')], ['a', 'b']).map((x) => x.id)).toEqual(['a', 'b'])
-    expect(() => orderedAdapters([a('a')], ['a', 'b'])).toThrow(/"b" has no adapter/)
-    expect(() => orderedAdapters([a('a'), a('c')], ['a'])).toThrow(/"c" has no line/)
-    expect(() => orderedAdapters([a('a'), a('a')], ['a'])).toThrow(/Two adapters/)
+    const m = (id: string): ProviderModule => ({ descriptor: { id } }) as unknown as ProviderModule
+    expect(orderedAdapters([a('b'), a('a')], [m('a'), m('b')]).map((x) => x.id)).toEqual(['a', 'b'])
+    expect(() => orderedAdapters([a('a')], [m('a'), m('b')])).toThrow(/"b" has no adapter/)
+    expect(() => orderedAdapters([a('a'), a('c')], [m('a')])).toThrow(/"c" has no line/)
+    expect(() => orderedAdapters([a('a'), a('a')], [m('a')])).toThrow(/Two adapters/)
+  })
+
+  it('runs a built-in data-only provider (its shared half a description, no main folder) on the generic adapter', () => {
+    const a = (id: string): ProviderAdapter => ({ id }) as unknown as ProviderAdapter
+    const m = (id: string): ProviderModule => ({ descriptor: { id } }) as unknown as ProviderModule
+    const shipped = cliModule({ id: 'shipped-cli', name: 'Shipped CLI', binary: { names: ['shipped'] }, launch: { prompt: 'typed' }, status: { ready: '^> ' } })
+    const adapters = orderedAdapters([a('a')], [m('a'), shipped])
+    expect(adapters.map((x) => x.id)).toEqual(['a', 'shipped-cli'])
+    expect(adapters[1]).toBeInstanceOf(CliAdapter)
+    expect(adapters[1].launch.readyOutput?.source).toBe('^> ')
+    // Its patterns are advanced values like any provider's, from its shared half.
+    expect(shipped.advanced?.map((d) => d.id)).toEqual(['shipped-cli.status.ready'])
+    // A description with an adapter of its own as well is a mistake.
+    expect(() => orderedAdapters([a('a'), a('shipped-cli')], [m('a'), shipped])).toThrow(/is a description/)
   })
 })

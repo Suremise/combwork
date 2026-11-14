@@ -1235,6 +1235,10 @@
     "defaultMessage": "{cli} has no setup task.",
     "description": "An error: the coding agent CLI {cli} (\"Codex\") has no setup task for Combwork to run."
   },
+  "service.providers.noTask": {
+    "defaultMessage": "{cli} has no {task, select, install {install} update {update} login {sign-in} other {setup}} task in Combwork.",
+    "description": "An error: a task was asked of a coding agent CLI that has none (HI-3196: a CLI that runs from a description has no install, update or sign-in task in Combwork). {cli} is its name."
+  },
   "service.providers.notInstalled": {
     "defaultMessage": "{cli} is not installed.",
     "description": "An error running a coding agent CLI's task (update, sign-in, setup): the CLI {cli} (\"Codex\") is not installed."
