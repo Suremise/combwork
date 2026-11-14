@@ -162,8 +162,8 @@ const T = {
   // Within HI-2012's agent total: the description's forYou gloss and summary's "and its length" were cut to pay for it.
   'readTask.arg.archived': agentMsg({ id: 'tool.readTask.arg.archived', text: 'Archived older comments from this offset.' }),
   'readTask.arg.lineComments': agentMsg({ id: 'tool.readTask.arg.lineComments', text: 'Its line comments as rows.' }),
-  'readTask.arg.offset': agentMsg({ id: 'tool.readTask.arg.offset', text: "With lineComments or feedback: the reply's next." }),
-  'readTask.arg.feedback': agentMsg({ id: 'tool.readTask.arg.feedback', text: 'A batch of comments sent to you, by its id.' }),
+  'readTask.arg.offset': agentMsg({ id: 'tool.readTask.arg.offset', text: "With either: the reply's next." }),
+  'readTask.arg.feedback': agentMsg({ id: 'tool.readTask.arg.feedback', text: 'A sent batch, by its id.' }),
   // HI-2561: Codex asked for the history to see why an agent stopped, which forYou already says. Within HI-2012's
   // total (toolLimits.cjs): the description dropped its history clause, and summary's words were cut, to pay for it.
   'readTask.arg.history': agentMsg({ id: 'tool.readTask.arg.history', text: 'Long; rarely needed.' }),

@@ -554,7 +554,7 @@
     "text": "Only the newest n."
   },
   "tool.readTask.arg.feedback": {
-    "text": "A batch of comments sent to you, by its id."
+    "text": "A sent batch, by its id."
   },
   "tool.readTask.arg.history": {
     "text": "Long; rarely needed."
@@ -566,7 +566,7 @@
     "text": "Its line comments as rows."
   },
   "tool.readTask.arg.offset": {
-    "text": "With lineComments or feedback: the reply's next."
+    "text": "With either: the reply's next."
   },
   "tool.readTask.arg.summary": {
     "text": "Each comment's first line."

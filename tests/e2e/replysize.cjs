@@ -1132,8 +1132,14 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
   // submits a card with a 60-line file, and the user leaves 30 comments on it, each with a body at the limit.
   const lcCard = await inv('tasks:create', { title: 'Line comments', project: 'alpha', agent: coder.id, column: 'todo' })
   const lcKey = lcCard.key || `#${lcCard.number}`
-  // Started as the user does from the board (an agent can't start a card on itself through the Agent API).
+  // Started as the user does from the board (an agent can't start a card on itself through the Agent API), under rules with
+  // a review (alpha's have none; a card keeps the rules it started under, HI-3220: its send needs Review), put back after.
+  const lcRules = await inv('workflow:form', alpha)
+  await inv('workflow:setOptions', alpha, { preset: lcRules.preset, options: { ...lcRules.own, review: 'agent', noSelfReview: true } })
+  await toolsSettled()
   const lcStart = await inv('tasks:start', lcCard.number, { kind: 'agent', agentId: coder.id }).then(() => null, (e) => String(e?.message ?? e))
+  await inv('workflow:setOptions', alpha, { preset: lcRules.preset, options: lcRules.own })
+  await toolsSettled()
   check('line comments: the card is started on Coder', lcStart === null, String(lcStart))
   fs.writeFileSync(path.join(alpha, 'lines.txt'), Array.from({ length: 60 }, (_, i) => `line ${i + 1}: ${'w'.repeat(150)}`).join('\n') + '\n')
   lib.git(alpha, ['add', 'lines.txt'])
@@ -1155,7 +1161,7 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
   check('line comments: sent to Coder as one fix round', lcSent === null, String(lcSent))
   const lcComment = (await inv('tasks:list')).find((x) => x.number === lcCard.number)?.comments.at(-1)?.text ?? ''
   measure('the comments sent: the verdict’s comment', lcComment, 18600)
-  check('line comments: the comment names the batch read for those that didn’t fit', /^30 line comments from the user on /.test(lcComment) && new RegExp(`And \\d+ more: cw_read_task with number ${lcKey}, feedback "${lcPreview.batch}" and offset \\d+\\.$`).test(lcComment), lcComment.slice(-200))
+  check('line comments: the comment names the batch read for those that didn’t fit', lcComment.startsWith('30 line comments from the user on ') && new RegExp(`And \\d+ more: cw_read_task with number ${lcKey}, feedback "${lcPreview.batch}" and offset \\d+\\.$`).test(lcComment), lcComment.slice(-200))
   const lcBatch = JSON.parse(measure('cw_read_task (feedback, a page)', tool('cw_read_task', { number: lcKey, feedback: lcPreview.batch }), 24500))
   check('line comments: the batch read gives the comments sent, a page at a time', lcBatch.items?.length > 0 && lcBatch.next === lcBatch.items.length && lcBatch.round === 1, JSON.stringify({ items: lcBatch.items?.length, next: lcBatch.next, round: lcBatch.round }))
   await inv('tasks:delete', lcCard.number).catch(() => undefined)
