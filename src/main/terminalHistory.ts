@@ -76,12 +76,31 @@ interface ExtraState {
   cursorHidden?: boolean
   /** The cursor's style (DECSCUSR), as its parameter. */
   cursorStyle?: number
-  /** The scroll region (DECSTBM) each buffer has, as its parameters; a full-screen one is left out. */
-  region: { normal?: string; alternate?: string }
   /** The rendition (SGR) changes since its last reset, as their parameters: what text written next is drawn with. */
   sgr: string[]
+  /** The rendition each buffer's saved cursor (DECSC, ?1049h) holds, as `sgr` was then: a restore draws with it (HI-3275). */
+  saved: { normal: string[]; alternate: string[] }
   /** The hyperlink (OSC 8) open now, as its parameters and address: text written next links to it. */
   link?: string
+}
+
+/** What xterm keeps of a buffer and doesn't show: its scroll region and its saved cursor, 0-based. */
+interface CoreBuffer {
+  scrollTop: number
+  scrollBottom: number
+  savedX: number
+  savedY: number
+}
+
+/**
+ * Each buffer's scroll region and saved cursor, read from xterm's own buffers (HI-3275): tracked from the output instead,
+ * the alternate screen's region outlived its session, and a restore came back home. Null if this xterm keeps them elsewhere
+ * (a version that changed them): then neither is carried, as before.
+ */
+function coreBuffers(term: Terminal): { normal: CoreBuffer; alternate: CoreBuffer } | null {
+  const b = (term as unknown as { _core?: { buffers?: { normal?: Partial<CoreBuffer>; alt?: Partial<CoreBuffer> } } })._core?.buffers
+  const ok = (x: Partial<CoreBuffer> | undefined): x is CoreBuffer => !!x && [x.scrollTop, x.scrollBottom, x.savedX, x.savedY].every(Number.isSafeInteger)
+  return ok(b?.normal) && ok(b?.alt) ? { normal: b.normal, alternate: b.alt } : null
 }
 
 /** SGR's parameters as written (sub-parameters after a colon, an empty one -1 in xterm's), from xterm's parsed ones. */
@@ -126,7 +145,7 @@ function widthBound(term: Terminal): Terminal {
 class Mirror {
   readonly term: Terminal
   private readonly serializer = new SerializeAddon()
-  private readonly extra: ExtraState = { region: {}, sgr: [] }
+  private readonly extra: ExtraState = { sgr: [], saved: { normal: [], alternate: [] } }
   private written = 0
   private parsed = 0
 
@@ -134,26 +153,30 @@ class Mirror {
     const term = (this.term = new Terminal({ cols, rows, scrollback, allowProposedApi: true }))
     this.serializer.activate(widthBound(term) as unknown as Parameters<SerializeAddon['activate']>[0])
     const extra = this.extra
+    // The cursor saved (DECSC, CSI s, ?1049h) in the buffer in use keeps the rendition; restored (DECRC, CSI u, ?1049l,
+    // which restores the normal screen's), it is the rendition again, as xterm's own does (HI-3275).
+    const save = (): void => void (extra.saved[term.buffer.active.type] = [...extra.sgr])
+    const restore = (buffer: 'normal' | 'alternate'): void => void (extra.sgr = [...extra.saved[buffer]])
     // Each handler notes the switch and lets xterm's own handle it (false).
     const mode = (on: boolean) => (params: (number | number[])[]): boolean => {
       for (const p of params) {
         if (typeof p !== 'number') continue
         if (MOUSE_ENCODINGS.has(p)) extra.mouseEncoding = on ? p : extra.mouseEncoding === p ? undefined : extra.mouseEncoding
         else if (p === 25) extra.cursorHidden = !on
+        else if (p === 1049 && on) save()
+        else if (p === 1049) restore('normal')
       }
       return false
     }
+    term.parser.registerEscHandler({ final: '7' }, () => (save(), false))
+    term.parser.registerEscHandler({ final: '8' }, () => (restore(term.buffer.active.type), false))
+    term.parser.registerCsiHandler({ final: 's' }, () => (save(), false))
+    term.parser.registerCsiHandler({ final: 'u' }, () => (restore(term.buffer.active.type), false))
     term.parser.registerCsiHandler({ prefix: '?', final: 'h' }, mode(true))
     term.parser.registerCsiHandler({ prefix: '?', final: 'l' }, mode(false))
     term.parser.registerCsiHandler({ intermediates: ' ', final: 'q' }, (params) => {
       const p = params[0]
       extra.cursorStyle = typeof p === 'number' && p > 0 ? p : undefined
-      return false
-    })
-    term.parser.registerCsiHandler({ final: 'r' }, (params) => {
-      const [top, bottom] = params.map((p) => (typeof p === 'number' ? p : 0))
-      const full = (!top || top === 1) && (!bottom || bottom >= term.rows)
-      extra.region[term.buffer.active.type] = full ? undefined : `${top || 1};${bottom || term.rows}`
       return false
     })
     term.parser.registerCsiHandler({ final: 'm' }, (params) => {
@@ -179,8 +202,8 @@ class Mirror {
     // A full reset (RIS) clears them all, as it does xterm's own.
     term.parser.registerEscHandler({ final: 'c' }, () => {
       extra.mouseEncoding = extra.cursorHidden = extra.cursorStyle = extra.link = undefined
-      extra.region = {}
       extra.sgr = []
+      extra.saved = { normal: [], alternate: [] }
       return false
     })
   }
@@ -197,7 +220,6 @@ class Mirror {
       this.parsed++
       try {
         this.term.resize(cols, rows)
-        this.extra.region = {}
       } catch (err) {
         failed(err)
       }
@@ -212,17 +234,30 @@ class Mirror {
   /** It as escape sequences that redraw it in a fresh terminal of its size. */
   serialize(): string {
     const { term, extra } = this
-    // The serializer leaves the normal screen's rendition set as it switches to the alternate one, which a terminal clears
-    // with that background: the alternate screen's own cells come after.
-    let s = this.serializer.serialize({ scrollback: this.scrollback }).replace('\x1b[?1049h', '\x1b[0m\x1b[?1049h')
+    const core = coreBuffers(term)
+    const at = (x: number, y: number): string => (x < term.cols ? `\x1b[${y + 1};${x + 1}H` : '')
+    const sgr = (list: string[]): string => '\x1b[0m' + list.map((p) => `\x1b[${p}m`).join('')
+    // A buffer's scroll region (it moves the cursor home), and its saved cursor saved again (DECSC): a restore in the output
+    // that follows finds them as the program left them (HI-3275). A full-screen region, and nothing saved, are left out.
+    const region = (b: CoreBuffer): string => (b.scrollTop > 0 || b.scrollBottom < term.rows - 1 ? `\x1b[${b.scrollTop + 1};${b.scrollBottom + 1}r` : '')
+    const saved = (b: CoreBuffer, type: 'normal' | 'alternate'): string => (b.savedX || b.savedY || extra.saved[type].length ? `${at(b.savedX, b.savedY)}${sgr(extra.saved[type])}\x1b7` : '')
+    // The serializer's moves of 0 columns (a blank row before a wrapped one) move 1, leaving its "-" in the first column.
+    let s = this.serializer.serialize({ scrollback: this.scrollback }).replace(/\x1b\[0[CD]/g, '')
+    // Switching to the alternate screen: the normal one's region and saved cursor first, its cursor where it is (the
+    // serializer's move back from a full row's end lands a column short), then the switch without a save of its own
+    // (?1047h), the rendition reset (the alternate screen is cleared with its background) before its cells come.
+    const normal = term.buffer.normal
+    const toAlternate = core ? `${region(core.normal)}${saved(core.normal, 'normal')}${at(normal.cursorX, normal.cursorY)}\x1b[0m\x1b[?1047h` : '\x1b[0m\x1b[?1049h'
+    s = s.replace('\x1b[?1049h', () => toAlternate)
     if (extra.mouseEncoding) s += `\x1b[?${extra.mouseEncoding}h`
     if (extra.cursorStyle) s += `\x1b[${extra.cursorStyle} q`
     const buffer = term.buffer.active
-    const region = extra.region[buffer.type]
-    if (region) s += `\x1b[${region}r`
+    if (core) s += region(core[buffer.type])
+    // Origin mode, set by the serializer above, would place cursors inside the region: then they are left out, as before.
+    if (core && !term.modes.originMode) s += saved(core[buffer.type], buffer.type)
     // The cursor where it is: the scroll region moves it home, and the serializer's own move back from a full row's
     // end lands a column short. One past the last column (a line feed due) is left as the serializer put it.
-    if (buffer.cursorX < term.cols && !term.modes.originMode) s += `\x1b[${buffer.cursorY + 1};${buffer.cursorX + 1}H`
+    if (!term.modes.originMode) s += at(buffer.cursorX, buffer.cursorY)
     if (extra.cursorHidden) s += '\x1b[?25l'
     // What text written next is drawn with: the cells serialized leave their own rendition.
     s += '\x1b[0m' + extra.sgr.map((p) => `\x1b[${p}m`).join('')
