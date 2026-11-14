@@ -66,6 +66,9 @@ const identity = (stat) => `${stat.dev}:${stat.ino}`
     const before = identity(fs.fstatSync(fd, { bigint: true }))
     check('an open ignored file holds the slot before writer release', renameState() === 'held')
     await inv('lanes:end', first.lane.id, true)
+    // The lane's card put back, as the user would (HI-3118): ended with its card in flight, the lane's lease became that
+    // card's, so B1 would keep slot-a; put back, the card's lease ends and B1 is stopped once idle.
+    await inv('tasks:move', c1, 'todo', { confirm: true, reason: 'slotwriterhold frees slot-a' })
     check('the CLI stopped and its writer and lease were released while the handle stayed open', !!(await until(async () => {
       const s = await slot()
       return !(await live()) && s?.state === 'ready' && !s.writer && !s.lease

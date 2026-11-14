@@ -1,6 +1,6 @@
 # Release Notes
 
-## Unreleased
+## 1.5.0 — 2026-11-14
 
 ### Added
 
@@ -117,6 +117,7 @@
 - **The offer to resume agents shows once at a start, listing only agents that can resume** (HI-3214). After a quit, it could appear twice with the same agents, the first marked *Replaced by a newer offer*, and it could list an agent offered at an earlier start and started in a newer conversation since, which Resume then skipped. Now an identical offer isn't shown again, a changed one updates the notice in place, and an agent that couldn't resume isn't offered.
 - **Every running agent on an account you turn off switches, not only most of them** (HI-3213). An idle agent whose last key from you wasn't Enter (an Esc, a Shift+Tab) stayed *switches once its turn is over* for good, because that key counted as a draft in its prompt even when the prompt was empty. Now only text still in its prompt holds the switch, and a waiting switch looks again every few seconds rather than only when the agent's status changes. Its log says what it waits for.
 - **Restarting an agent that works in a slot resumes its conversation** (HI-3213). The project's Restart, and the Assistant's restart for a new mode, said *Can't resume this session: it ran in a worktree no agent uses any more*, naming the agent's own slot.
+- **The signing check knows a locked key with Windows' own ssh-keygen** (HI-3208). Where git signs with Windows' OpenSSH `ssh-keygen` (its own, or the first found on PATH), a key with a passphrase made the check wait 5 seconds and say **Couldn't sign unattended**, and the merge queue paused saying the signer didn't finish. It now says **Would ask for a passphrase** at once, with ssh-keygen's own words, as it does for Git's ssh-keygen.
 - **Activity: an agent whose context is between 70 % and 90 % no longer shows a solid amber hex** (HI-3190). Its context ring was painted as a filled hex, covering the centre's face so its name and state could barely be read, and the agent's mark under the map was filled the same way. The ring is now an amber outline, as the green and red ones are.
 - **Activity: the tab and the map's strip always show the same agent** (HI-3186). Clicking a ring under the map showed that agent's map while the tab above stayed on another, so the two could disagree, and choosing an agent that isn't running could leave the map on a different one. Now a ring's click selects that agent's tab too, a tab's click switches the map shown, and an agent that isn't running says so in the map's place, with the others' rings still below.
 - **Activity: clicking an agent in the map's strip keeps your selection** (HI-3180). With several agents selected, clicking one's ring under the map switched the whole view to that agent alone, and the selection was lost. Now it shows that agent's map, and the rings stay listed below, the one shown marked, so you can switch to another with one click. Click it again, or press Escape, to show them all.

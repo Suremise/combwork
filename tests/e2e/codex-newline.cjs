@@ -99,7 +99,8 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').
       return { started, got: got || [], all: await prompts() }
     }
     const written = 'Reply with just: ok\r\n\r\n  indented line\n\tafter a tab\nlast line'
-    const asWritten = (title) => `${title}\n\nReply with just: ok\n\n  indented line\n after a tab\nlast line`
+    // A card Combwork started says so after its title (HI-2854).
+    const asWritten = (title) => `${title}\n\nIt is in Doing and yours.\n\nReply with just: ok\n\n  indented line\n after a tab\nlast line`
 
     for (const [choice, label] of [['alt-enter', 'Alt+Enter'], ['ctrl-j', 'Ctrl+J']]) {
       await lib.cliStep(`a multi-line prompt with ${label}`, { session: key }, async () => {
