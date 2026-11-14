@@ -5,12 +5,20 @@
 // and working tree are the same before and after.
 import { execFileSync } from 'child_process'
 import { readFileSync, statSync, writeFileSync } from 'fs'
+import { createRequire } from 'module'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
 import { compareBranches, compareDiff, compareLines } from '../src/main/gitCompare'
 import { COMPARE_COMMITS } from '../src/shared/gitRepo'
+
+// Git fed on stdin (fast-import, mktree) runs with the run context's environment and the test's own global config, never
+// the shell's (tests/README.md, Isolation; HI-3227's round 1).
+const runContext = createRequire(import.meta.url)('./e2e/runContext.cjs') as { gitEnv: (vars?: Record<string, string>) => NodeJS.ProcessEnv; writeGitConfig: (file: string) => void }
+const gitConfigFile = join(tempDir('gitcompare-gitconfig-'), 'gitconfig')
+runContext.writeGitConfig(gitConfigFile)
+const GIT_ENV = runContext.gitEnv({ GIT_CONFIG_GLOBAL: gitConfigFile })
 
 /** main with one commit of its own after 1.0.0 left it; 1.0.0 with `n` commits, changing, adding and deleting a file. */
 function fixture(n: number): string {
@@ -34,7 +42,7 @@ function fixture(n: number): string {
       const when = `<test@example.invalid> ${t + k} +0000`
       return ['commit refs/heads/1.0.0', `author Combwork Test ${when}`, `committer Combwork Test ${when}`, `data ${Buffer.byteLength(msg)}`, msg, ...(k === 0 ? [`from ${sh(repo, 'rev-parse', '1.0.0')}`] : []), 'M 100644 inline count.txt', `data ${Buffer.byteLength(file)}`, file].join('\n')
     })
-    execFileSync('git', ['fast-import', '--quiet'], { cwd: repo, input: `${commits.join('\n')}\n`, stdio: ['pipe', 'pipe', 'pipe'] })
+    execFileSync('git', ['fast-import', '--quiet'], { cwd: repo, input: `${commits.join('\n')}\n`, stdio: ['pipe', 'pipe', 'pipe'], env: GIT_ENV })
   }
   writeFileSync(join(repo, 'src', 'a.txt'), 'edited, not committed\n')
   return repo
@@ -160,7 +168,7 @@ describe('compareBranches and compareDiff: 1.0.0 against main', () => {
     // A branch off 1.0.0 whose commit's tree names a blob for new.txt that the store doesn't have; the rest as it was.
     const at = sh(repo, 'rev-parse', '1.0.0')
     const entries = sh(repo, 'ls-tree', at).split('\n').map((l) => (l.endsWith('\tnew.txt') ? l.replace(/blob [0-9a-f]{40}/, `blob ${'d'.repeat(40)}`) : l))
-    const tree = execFileSync('git', ['mktree', '--missing'], { cwd: repo, input: entries.join('\n') + '\n', encoding: 'utf8' }).trim()
+    const tree = execFileSync('git', ['mktree', '--missing'], { cwd: repo, input: entries.join('\n') + '\n', encoding: 'utf8', env: GIT_ENV }).trim()
     sh(repo, 'branch', 'broken', sh(repo, 'commit-tree', tree, '-p', at, '-m', 'missing blob'))
     await expect(compareDiff(repo, 'main', 'broken', 'new.txt')).rejects.toThrow(/cat-file/)
     // Added and deleted files still show with an empty side.
