@@ -11,7 +11,8 @@
 // (d) a stopped attempt's Undo, through the unpackaged test seam CW_TEST_ADVANCE_STOP=undo (HR1's bounds on HI-3236/s7:
 //     the move real, recorded as a stop with its undo offered, the undo the real protocol): Undo Combwork's move puts main
 //     back, the card stays Approved with nothing integrated.
-// Screenshots of the four For you items in both themes and at a narrow width.
+// Screenshots of the four For you items in both themes and at a narrow width. Dev build only: (d) needs
+// CW_TEST_ADVANCE_STOP, a test seam a packaged build ignores (never in an installed Combwork).
 const lib = require('./lib.cjs')
 const { showBoard, openByTitle } = require('./queueFixture.cjs')
 const fs = require('fs')
@@ -29,7 +30,7 @@ if (!exe) {
 }
 
 const SUITE = 'jjadvance'
-const PORT = Number(lib.port(47951))
+const PORT = Number(lib.port(47601))
 const work = path.join(lib.WORK, SUITE)
 const userData = path.join(work, 'profile')
 const ws = path.join(work, 'ws')
