@@ -155,6 +155,19 @@ describe('compareBranches and compareDiff: 1.0.0 against main', () => {
     expect(await compareDiff(repo, 'main', '1.0.0', 'new.txt', { base: '0'.repeat(40), head: 'HEAD' })).toMatchObject({ modified: 'moved on\n' })
   })
 
+  it("a file the head's tree lists whose blob can't be read is an error, never shown as added or deleted (HI-3227)", async () => {
+    const repo = fixture(2)
+    // A branch off 1.0.0 whose commit's tree names a blob for new.txt that the store doesn't have; the rest as it was.
+    const at = sh(repo, 'rev-parse', '1.0.0')
+    const entries = sh(repo, 'ls-tree', at).split('\n').map((l) => (l.endsWith('\tnew.txt') ? l.replace(/blob [0-9a-f]{40}/, `blob ${'d'.repeat(40)}`) : l))
+    const tree = execFileSync('git', ['mktree', '--missing'], { cwd: repo, input: entries.join('\n') + '\n', encoding: 'utf8' }).trim()
+    sh(repo, 'branch', 'broken', sh(repo, 'commit-tree', tree, '-p', at, '-m', 'missing blob'))
+    await expect(compareDiff(repo, 'main', 'broken', 'new.txt')).rejects.toThrow(/cat-file/)
+    // Added and deleted files still show with an empty side.
+    expect(await compareDiff(repo, 'main', 'broken', 'src/a.txt')).toMatchObject({ modified: expect.stringContaining('TWO') })
+    expect(await compareDiff(repo, 'main', 'broken', 'README.md')).toMatchObject({ original: 'hello\n', modified: '' })
+  })
+
   it("refuses a branch that isn't one, and never takes a name as an option", async () => {
     const repo = fixture(3)
     const before = state(repo)
