@@ -148,6 +148,11 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
     const workItem = page.locator(`.statusbar .status-item[data-plan-connection="${work.id}"]`)
     const workText = async () => ((await workItem.count()) === 1 ? (await workItem.innerText()).replace(/\s+/g, ' ') : '')
     check('…and the status bar shows Work’s: 5h 12% · Week 57%', !!(await lib.until(async () => /Work.*5h 12%.*Week 57%/.test(await workText()), HUNG_MS)), await workText())
+    // A second of Codex's limits, of the same windows (HI-1125): its own item beside Codex's, by its name, never mixed in.
+    await inv('pty:write', lib.ptyKey(alpha, 'a-two'), 'planusage 70 20 id=codex_bengalfox name=gpt-5.2-codex-sonic')
+    await lib.sleep(300) // on purpose: the fake takes a typed line before its Enter, as Codex does
+    await inv('pty:write', lib.ptyKey(alpha, 'a-two'), '\r')
+    check("…a second Codex limit (another limit_id) shows by its name, Codex's own figures unchanged", !!(await lib.until(async () => /5h 12%.*Week 57%/.test(await workText()) && /gpt-5\.2-codex-sonic 5h 70%/.test(await workText()) && /gpt-5\.2-codex-sonic wk 20%/.test(await workText()), HUNG_MS)), await workText())
 
     // --- A third agent on a busy connection (HI-1873): One and Two run on Work, writing in its folder all the time as
     // Codex's databases do (and so does each check's app server), its login untouched. Three starts there, every time.

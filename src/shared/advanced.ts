@@ -425,6 +425,8 @@ export const folderList = (text: string): string[] => text.split(';').map((s) =>
 export const foldersText = (folders: readonly string[]): string => folders.join(';')
 
 const FIX = 'tests/fixtures'
+/** A Codex token_count's rate-limit snapshot, its fields as recorded (Codex 0.159.0, tests/fixtures/codex-0.159.jsonl). */
+const RATE_LIMIT_FIELDS = ['limit_id', 'limit_name', 'primary', 'secondary', 'credits', 'individual_limit', 'spend_control_reached', 'plan_type', 'rate_limit_reached_type']
 // The plan's limits as CLIs record them (HI-2734): agy 1.5.0's status line with its quota, one of its quotas, and a Copilot
 // 1.0.93 quota snapshot (each a recorded object's fields).
 const AGY_QUOTA_LINE = ['agent_state', 'context_window', 'conversation_id', 'cwd', 'cycle_mode', 'email', 'exceeds_200k_tokens', 'model', 'plan_tier', 'product', 'quota', 'sandbox', 'session_id', 'terminal_width', 'transcript_path', 'vcs', 'version', 'workspace'] // i18n-ignore: a CLI's field names (#367)
@@ -2354,6 +2356,37 @@ const SOURCES: readonly AdvancedSource[] = [
     default: 'window_minutes',
     applies: 'now',
     samples: [{ from: `${FIX}/codex-0.159.jsonl`, version: '0.159.0', fields: ['used_percent', 'window_minutes', 'resets_at'] }]
+  },
+  // HI-1125: which of Codex's limits a reading is (its rate-limit snapshot's id, codex-rs RateLimitSnapshot.limit_id).
+  {
+    id: 'codex.rateLimits.limitId',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.rateLimits.limitId.title', defaultMessage: "Session file: limit's id field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.codex.rateLimits.limitId.desc', defaultMessage: "The plan limits' field naming which of Codex's limits they are. Wrong, Combwork takes every reading for Codex's own limit, and a second limit's figures are mixed into it.", description: 'What the advanced setting "Session file: limit\'s id field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'field',
+    default: 'limit_id',
+    applies: 'now',
+    samples: [{ from: `${FIX}/codex-0.159.jsonl`, version: '0.159.0', fields: RATE_LIMIT_FIELDS }]
+  },
+  {
+    id: 'codex.rateLimits.limitName',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.rateLimits.limitName.title', defaultMessage: "Session file: limit's name field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.codex.rateLimits.limitName.desc', defaultMessage: "The plan limits' field with the name Codex gives a limit other than its own. Wrong, Combwork names such a limit by its id.", description: 'What the advanced setting "Session file: limit\'s name field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'field',
+    default: 'limit_name',
+    applies: 'now',
+    samples: [{ from: `${FIX}/codex-0.159.jsonl`, version: '0.159.0', fields: RATE_LIMIT_FIELDS }]
+  },
+  {
+    id: 'codex.rateLimits.defaultLimitId',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.rateLimits.defaultLimitId.title', defaultMessage: "Session file: Codex's own limit id", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.codex.rateLimits.defaultLimitId.desc', defaultMessage: "The id of Codex's own plan limits (its 5-hour and weekly ones). A reading with another id is a limit of its own, shown by its name. Wrong, Codex's own limits are shown as a separate limit, and their earlier readings and warnings start again.", description: 'What the advanced setting "Session file: Codex\'s own limit id" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'text',
+    default: 'codex', // i18n-ignore: a CLI's recorded value (#367)
+    applies: 'now',
+    samples: [{ from: `${FIX}/codex-0.159.jsonl`, version: '0.159.0', text: '"limit_id": "codex"' }] // i18n-ignore: a CLI's recorded text (#367)
   },
   // Connections (HI-1757): what Combwork asks Codex's app server in a connection's CODEX_HOME, never a token.
   {

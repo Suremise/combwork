@@ -942,7 +942,8 @@ function LimitCards({ kept, now, tip, none, provider }: { kept: PlanUsage | unde
   const usage = kept && { ...kept, limits: kept.limits.filter((l) => !l.resetsAt || Date.parse(l.resetsAt) > now) }
   const title = (l: PlanLimit): string => {
     const name = limitName(l)
-    return tr(M.limitTitle, { window: limitWindow(l), label: `${name.charAt(0).toUpperCase()}${name.slice(1)}` })
+    // A name the provider gives (HI-1125) is shown as it is, never capitalised ("gpt-5.2-codex-sonic").
+    return tr(M.limitTitle, { window: limitWindow(l), label: l.scope ? name : `${name.charAt(0).toUpperCase()}${name.slice(1)}` })
   }
   // Its counts, where the provider says them (HI-2734: Copilot's requests), in its (i).
   const tipOf = (l: PlanLimit): string => (l.used !== undefined && l.entitlement !== undefined ? `${tip(l)}\n${tr(M.limitCounts, { used: l.used, entitlement: l.entitlement })}` : tip(l))

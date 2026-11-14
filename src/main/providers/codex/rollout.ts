@@ -47,9 +47,29 @@ function isContextMessage(text: string): boolean {
   return /^<(environment_context|user_instructions|skills_instructions|permissions instructions|collaboration_mode|turn_aborted|subagent)/i.test(t) || t.startsWith('# AGENTS.md') || t.startsWith('<INSTRUCTIONS>')
 }
 
-/** Rate limits from a token_count record, as plan usage. */
+/** The most of a limit's name (Codex's `limit_name`, else its id) kept for showing it (HI-1125); its id is kept whole. */
+export const LIMIT_NAME_MAX = 60
+
+/**
+ * Which of Codex's limits a snapshot is (HI-1125): null for Codex's own (no id, or the default `codex`), whose readings
+ * keep their `w<minutes>` ids (stored readings and warnings carry on); else its id, as Codex sends it, never folded into
+ * the default, with the name to show it by (its `limit_name`, else the id), bounded.
+ */
+function limitScope(rateLimits: Record<string, any>): { id: string; name: string } | null {
+  const id = rateLimits[advanced.get<string>('codex.rateLimits.limitId')]
+  if (typeof id !== 'string' || !id.trim() || id === advanced.get<string>('codex.rateLimits.defaultLimitId')) return null
+  const named = rateLimits[advanced.get<string>('codex.rateLimits.limitName')]
+  const name = (typeof named === 'string' && named.trim() ? named : id).trim()
+  return { id, name: name.length > LIMIT_NAME_MAX ? `${name.slice(0, LIMIT_NAME_MAX - 1)}…` : name }
+}
+
+/**
+ * Rate limits from a token_count record, as plan usage. One record is one of Codex's limits (its `limit_id`, HI-1125):
+ * a rollout's records can alternate them, two of one window too, each kept as its own limit.
+ */
 export function rolloutPlanUsage(rateLimits: Record<string, any> | null | undefined, now: string): PlanUsage | null {
   if (!rateLimits || typeof rateLimits !== 'object') return null
+  const scope = limitScope(rateLimits)
   const limits: PlanLimit[] = []
   for (const key of ['primary', 'secondary'] as const) {
     const w = rateLimits[key]
@@ -60,7 +80,8 @@ export function rolloutPlanUsage(rateLimits: Record<string, any> | null | undefi
     const minutes = typeof window === 'number' ? window : null
     const label = minutes === 300 ? '5-hour' : minutes === 10080 ? 'weekly' : minutes ? `${Math.round(minutes / 60)}-hour` : key
     const resets = typeof w.resets_at === 'number' ? new Date(w.resets_at * 1000).toISOString() : typeof w.resets_in_seconds === 'number' ? new Date(Date.parse(now) + w.resets_in_seconds * 1000).toISOString() : null
-    limits.push({ id: minutes ? `w${minutes}` : key, label, windowMinutes: minutes, usedPercent: Math.max(0, Math.min(100, used)), resetsAt: resets })
+    const own = minutes ? `w${minutes}` : key
+    limits.push({ id: scope ? `${scope.id}/${own}` : own, label, windowMinutes: minutes, usedPercent: Math.max(0, Math.min(100, used)), resetsAt: resets, ...(scope ? { scope: scope.name } : {}) })
   }
   if (!limits.length) return null
   return { provider: CODEX, plan: typeof rateLimits.plan_type === 'string' ? rateLimits.plan_type : null, limits, updatedAt: now }
@@ -154,7 +175,8 @@ export function rolloutDetails(text: string): LiveDetails {
     }
     if (r.type === 'event_msg' && p.type === 'token_count') {
       const u = rolloutPlanUsage(p[advanced.get<string>('codex.rateLimits.field')], r.timestamp ?? new Date().toISOString())
-      if (u) out.planUsage = u
+      // Each limit's latest reading in these lines (HI-1125: records alternate Codex's limits, so the last alone would drop one).
+      if (u) out.planUsage = { ...u, limits: [...(out.planUsage?.limits ?? []).filter((k) => !u.limits.some((l) => l.id === k.id)), ...u.limits] }
     } else if (r.type === 'event_msg' && p.type === 'thread_settings_applied') {
       const ts = p.thread_settings ?? {}
       if (typeof ts.model === 'string') {
