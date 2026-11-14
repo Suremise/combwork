@@ -267,6 +267,44 @@ const commit = (dir, file, text, message) => {
   // The card is back in Doing: refused by its stage first (Workflow.feedback's checks; a batch sent twice in Review is the unit test's).
   check('the same send again is refused', /Review or Approved only/.test(twice ?? ''), String(twice))
 
+  // --- HI-3239: what is being typed in a thread survives other spots coming and going: a draft opened at another line,
+  // and a comment added or deleted there from elsewhere (another window), never remount it (each spot keeps its zone).
+  const kt = (await inv('tasks:create', { title: 'Keep typing', project: 'alpha', agent: builder.id, column: 'todo' })).number
+  await say(alpha, builder.id, `boardmove ${kt} doing`)
+  await lib.until(async () => (await card(kt))?.column === 'doing', HUNG_MS)
+  commit(alpha, 'lines.ts', 'export const one = 1\nexport const two = 2\nexport const three = 3\n', 'Keep typing')
+  await say(alpha, builder.id, `boardmove ${kt} review`)
+  await lib.until(async () => (await card(kt))?.column === 'review', HUNG_MS)
+  const ktSub = (await inv('tasks:work', kt)).revisions.at(-1).submission
+  const k1 = await inv('tasks:lineCommentAdd', kt, { submission: ktSub, path: 'lines.ts', side: 'new', from: 1, to: 1, body: 'On one.' })
+  const ktRev = (await openCard(kt)).locator('.card-work[data-work="recorded"] .card-work-rev').first()
+  await ktRev.getByRole('button', { name: 'Changes' }).click()
+  const k1Thread = ktRev.locator(`[data-line-comment="${k1}"]`)
+  check('a card with three lines and a comment on line 1 shows its thread', !!(await lib.until(async () => (await k1Thread.count()) === 1, HUNG_MS)))
+  await k1Thread.getByRole('button', { name: 'Edit' }).click()
+  const editBox = k1Thread.locator('textarea')
+  await editBox.fill('Half-typed edit')
+  // Mark the box itself: a remounted one is a new element without the mark.
+  await editBox.evaluate((e) => { e.dataset.probe = 'kept' })
+  const editKept = async () => (await k1Thread.locator('textarea[data-probe="kept"]').count()) === 1 && (await editBox.inputValue().catch(() => '')) === 'Half-typed edit'
+  await ktRev.locator('[data-revision-diff="lines.ts"] .editor.modified .view-line').nth(2).hover()
+  const ktPlus = ktRev.locator('[data-revision-diff="lines.ts"] .editor.modified .cw-comment-add')
+  await lib.until(async () => (await ktPlus.count()) === 1, HUNG_MS)
+  await ktPlus.click()
+  const ktDraft = ktRev.locator('[data-comment-composer]').filter({ hasText: 'Changed 3' })
+  check('a draft opened at line 3 keeps the edit typed at line 1, in the same box', !!(await lib.until(async () => (await ktDraft.count()) === 1, HUNG_MS)) && (await editKept()), `${await editBox.inputValue().catch(() => '(gone)')} | ${await ktRev.innerText().catch(() => '')}`)
+  await ktDraft.locator('textarea').fill('Draft at three')
+  await ktDraft.locator('textarea').evaluate((e) => { e.dataset.probe = 'kept' })
+  const draftKept = async () => (await ktDraft.locator('textarea[data-probe="kept"]').count()) === 1 && (await ktDraft.locator('textarea').inputValue().catch(() => '')) === 'Draft at three'
+  // From elsewhere (another window, the Agent API): a comment added at line 2, then deleted.
+  const k2 = await inv('tasks:lineCommentAdd', kt, { submission: ktSub, path: 'lines.ts', side: 'new', from: 2, to: 2, body: 'From another window.' })
+  check('a comment arriving at line 2 from elsewhere keeps both the edit and the draft', !!(await lib.until(async () => (await ktRev.locator(`[data-line-comment="${k2}"]`).count()) === 1, HUNG_MS)) && (await editKept()) && (await draftKept()), `${await editBox.inputValue().catch(() => '(gone)')} | ${await ktDraft.locator('textarea').inputValue().catch(() => '(gone)')}`)
+  await inv('tasks:lineCommentChange', kt, k2, 'delete')
+  check('…and so does its deletion', !!(await lib.until(async () => (await ktRev.locator(`[data-line-comment="${k2}"]`).count()) === 0, HUNG_MS)) && (await editKept()) && (await draftKept()), `${await editBox.inputValue().catch(() => '(gone)')} | ${await ktDraft.locator('textarea').inputValue().catch(() => '(gone)')}`)
+  await ktDraft.getByRole('button', { name: 'Cancel' }).click()
+  check('cancelling the draft keeps the edit too', !!(await lib.until(async () => (await ktDraft.count()) === 0, HUNG_MS)) && (await editKept()))
+  await closeDialogs()
+
   // --- A submission whose repository couldn't be read (#1224 round 1, finding 2): its revision and files say they
   // weren't read, and why, never "no files changed". HEAD is unreadable while it is submitted, then put back.
   const u = (await inv('tasks:create', { title: 'Read failure', project: 'alpha', agent: builder.id, column: 'todo' })).number
