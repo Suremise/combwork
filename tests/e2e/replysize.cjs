@@ -1161,7 +1161,7 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
   check('line comments: sent to Coder as one fix round', lcSent === null, String(lcSent))
   const lcComment = (await inv('tasks:list')).find((x) => x.number === lcCard.number)?.comments.at(-1)?.text ?? ''
   measure('the comments sent: the verdict’s comment', lcComment, 18600)
-  check('line comments: the comment names the batch read for those that didn’t fit', lcComment.startsWith('30 line comments from the user, each on the revision it names:') && new RegExp(`And \\d+ more: cw_read_task with number ${lcKey}, feedback "${lcPreview.batch}" and offset \\d+\\.$`).test(lcComment), lcComment.slice(-200))
+  check('line comments: the comment names the batch read for those that didn’t fit', lcComment.startsWith('30 line comments from the user, each at the commit it names:') && new RegExp(`And \\d+ more: cw_read_task with number ${lcKey}, feedback "${lcPreview.batch}" and offset \\d+\\.$`).test(lcComment), lcComment.slice(-200))
   const lcBatch = JSON.parse(measure('cw_read_task (feedback, a page)', tool('cw_read_task', { number: lcKey, feedback: lcPreview.batch }), 24500))
   check('line comments: the batch read gives the comments sent, a page at a time', lcBatch.items?.length > 0 && lcBatch.next === lcBatch.items.length && lcBatch.round === 1, JSON.stringify({ items: lcBatch.items?.length, next: lcBatch.next, round: lcBatch.round }))
   await inv('tasks:delete', lcCard.number).catch(() => undefined)

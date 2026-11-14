@@ -139,9 +139,15 @@ function foldHistory(facts: readonly Fact[]): Map<string, { view: LineCommentVie
 export interface FeedbackItem {
   id: string
   version: number
-  /** The submission its lines are on (HI-3220 round 1: a comment left open is sent again from the revision it was made on), and that submission's revision. */
+  /**
+   * The submission its lines are on (HI-3220 round 1: a comment left open is sent again from where it was made), that
+   * submission's revision and base, and `source`: the commit its lines and quote are in, the base for the old side (lines
+   * removed; a deleted file's are in the base alone), the revision for the new.
+   */
   submission: number
   revision: string | null
+  base: string | null
+  source: string | null
   path: string
   side: LineSide
   from: number
@@ -165,15 +171,25 @@ export function feedbackBatch(facts: readonly Fact[], batch: string): { submissi
     const h = history.get(it.id)
     if (!h) return []
     const c = h.view
-    return [{ id: it.id, version: it.version, submission: c.submission, revision: revisionOf.get(c.submission) ?? null, path: c.path, side: c.side, from: c.from, to: c.to, lines: c.lines, before: c.before, after: c.after, body: h.bodies[it.version - 1] ?? c.body }]
+    const at = revisionOf.get(c.submission)
+    return [{ id: it.id, version: it.version, submission: c.submission, revision: at?.revision ?? null, base: at?.base ?? null, source: sourceOf(at, c.side), path: c.path, side: c.side, from: c.from, to: c.to, lines: c.lines, before: c.before, after: c.after, body: h.bodies[it.version - 1] ?? c.body }]
   })
   return { submission: sent.data.submission, round: sent.data.round, items }
 }
 
-/** Each submission's revision, by its fact's seq (a comment's `submission`). */
-export function submissionRevisions(facts: readonly Fact[]): Map<number, string | null> {
-  return new Map(facts.flatMap((f) => (f.kind === 'Submitted' ? [[f.seq, (f.data as Fact<'Submitted'>['data']).revision] as [number, string | null]] : [])))
+/** Each submission's revision and base, by its fact's seq (a comment's `submission`). */
+export function submissionRevisions(facts: readonly Fact[]): Map<number, { revision: string | null; base: string | null }> {
+  return new Map(
+    facts.flatMap((f) => {
+      if (f.kind !== 'Submitted') return []
+      const d = f.data as Fact<'Submitted'>['data']
+      return [[f.seq, { revision: d.revision, base: d.base }] as [number, { revision: string | null; base: string | null }]]
+    })
+  )
 }
+
+/** The commit a comment's lines are in: its submission's base for the old side (lines removed), its revision for the new. */
+export const sourceOf = (at: { revision: string | null; base: string | null } | undefined, side: LineSide): string | null => (side === 'old' ? at?.base : at?.revision) ?? null
 
 /** Whether a batch id was sent on the card already (a second send of it is refused). */
 export const batchSent = (facts: readonly Fact[], batch: string): boolean => facts.some((f) => f.kind === 'FeedbackSent' && (f.data as Fact<'FeedbackSent'>['data']).batch === batch)

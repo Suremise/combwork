@@ -21,8 +21,8 @@ export const FEEDBACK_REFUSED = {
 
 /** What the builder reads: its words (agent text). */
 const T = {
-  header: agentMsg({ id: 'feedback.header', text: '{n, plural, one {# line comment} other {# line comments}} from the user, each on the revision it names:', note: "HI-3220: the first line of the failed verdict a send of the user's line comments writes, read by the card's builder. A comment left open goes again later, still on the revision it was made on, so each names its own." }),
-  item: agentMsg({ id: 'feedback.item', text: '[{id}] {path}:{lines} ({side, select, old {removed lines} other {new}}) on {revision}', note: "HI-3220: each line comment's heading in the failed verdict sent to the builder: its id, file, line or lines (12 or 12-14) as they are in its own revision, its side (lines removed, in the base, or the revision's), and that revision (short). Keep the select keys." }),
+  header: agentMsg({ id: 'feedback.header', text: '{n, plural, one {# line comment} other {# line comments}} from the user, each at the commit it names:', note: "HI-3220: the first line of the failed verdict a send of the user's line comments writes, read by the card's builder. A comment left open goes again later, still on the revision it was made on, so each names its own." }),
+  item: agentMsg({ id: 'feedback.item', text: '[{id}] {path}:{lines} {side, select, old {(removed lines) at base {commit}} other {(new) at {commit}}}', note: "HI-3220: each line comment's heading in the failed verdict sent to the builder: its id, file, and line or lines (12 or 12-14) as they are in the commit named: for lines removed, its submission's base; for new lines, its submission's revision (short). Keep the select keys." }),
   more: agentMsg({ id: 'feedback.more', text: 'And {m} more: cw_read_task with number {card}, feedback "{batch}" and offset {offset}.', note: "HI-3220: the failed verdict's last line when not every comment sent fits in it: how many more there are, and the batch read that gives them all (the card, the send's batch id, where to start)." })
 }
 
@@ -30,13 +30,13 @@ const T = {
 export const FEEDBACK_COMMENT_BUDGET = 18000
 
 /** The failed verdict's comment for a send: the header, then each comment as fits, then the batch read for the rest. */
-export function feedbackComment(items: readonly LineCommentView[], o: { revisionOf: (submission: number) => string; card: string; batch: string }): string {
+export function feedbackComment(items: readonly LineCommentView[], o: { commitOf: (submission: number, side: LineCommentView['side']) => string; card: string; batch: string }): string {
   const head = say(T.header, { n: items.length })
   const parts: string[] = []
   let used = 0
   for (const c of items) {
     const quote = c.lines.split('\n').map((l) => `> ${l}`).join('\n')
-    const part = `${say(T.item, { id: c.id, path: c.path, lines: c.from === c.to ? String(c.from) : `${c.from}-${c.to}`, side: c.side, revision: o.revisionOf(c.submission) })}\n${quote}\n${c.body}`
+    const part = `${say(T.item, { id: c.id, path: c.path, lines: c.from === c.to ? String(c.from) : `${c.from}-${c.to}`, side: c.side, commit: o.commitOf(c.submission, c.side) })}\n${quote}\n${c.body}`
     if (used + part.length + 2 > FEEDBACK_COMMENT_BUDGET) break
     parts.push(part)
     used += part.length + 2

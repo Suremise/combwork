@@ -8,7 +8,7 @@ import { combworkError } from '../combworkError'
 import type { WorkspaceService } from '../workspace'
 import { msg } from '../../shared/i18n'
 import { randomUUID } from 'crypto'
-import { anchorOf, submissionRevisions, feedbackBatch, feedbackExpectOf, foldLineComments, LINE_COMMENT_LIMITS, openReviewOf, pageOf, type FeedbackExpect, type FeedbackItem, type LineCommentView, type LineSide } from '../../shared/workflow/lineComments'
+import { anchorOf, sourceOf, submissionRevisions, feedbackBatch, feedbackExpectOf, foldLineComments, LINE_COMMENT_LIMITS, openReviewOf, pageOf, type FeedbackExpect, type FeedbackItem, type LineCommentView, type LineSide } from '../../shared/workflow/lineComments'
 import { foldCard } from '../../shared/workflow/facts'
 import { revisionShort } from '../../shared/platform/descriptors'
 import { platformIdOf } from '../platform/registry'
@@ -163,7 +163,7 @@ export async function sendFeedback(ws: WorkspaceService, n: number, a: FeedbackS
         items,
         expect: a?.expect,
         replaces: a?.replaces ?? null,
-        message: (chosen) => (comment = feedbackComment(chosen, { revisionOf: (sub) => { const r = revisions.get(sub); return r ? revisionShort(platform, r) : '—' }, card: card.key, batch }))
+        message: (chosen) => (comment = feedbackComment(chosen, { commitOf: (sub, side) => { const r = sourceOf(revisions.get(sub), side); return r ? revisionShort(platform, r) : '—' }, card: card.key, batch }))
       }),
     (_w, first) => (first && comment ? { opts: { comment, keepAgent: true } } : {})
   )
