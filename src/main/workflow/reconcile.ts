@@ -290,7 +290,9 @@ export async function advanceStep(wf: Workflow, card0: CardRecord): Promise<void
   if (!finishAdvances(r.options.finish)) return
   if (wf.enforced() && okBeforeApplies(r, card.labels) && !approvedByUser(s, 'okBefore')) return
   await p.advance(card, s, advanceHostOf(wf))
-  await wf.runActions()
+  // Its records' actions: the runtime's own runner only where it runs them (a harness); in the app, the actions worker,
+  // which runs a change's actions once it commits (HR1's round 1, finding 1).
+  if (wf.cfg.autoRun !== false) await wf.runActions()
 }
 
 /**

@@ -240,8 +240,8 @@ async function reconcileProject(f: Followed): Promise<void> {
   // HI-3235: the project's journaled advances settled (a crash's, a card no pass reached), before the platform's pass.
   if (adapter.recoverAdvances && f.alive()) {
     try {
+      // Its records' actions are the actions worker's (the runtime here doesn't run them: autoRun is off in the app).
       await adapter.recoverAdvances(advanceHostOf(wf))
-      await wf.runActions()
     } catch (e) {
       log.warn('recovering advances', e) // i18n-ignore: the log (English)
     }

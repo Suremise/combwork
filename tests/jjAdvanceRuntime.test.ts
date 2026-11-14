@@ -12,8 +12,12 @@
 // Where a case needs the adapter's records to go a certain way, it builds the candidate with the adapter's own reconcile
 // and calls its advance with a host of its own (the generic reconcile would advance at once with the real one).
 // Skipped without the fetched jj (npm run jj:fetch); with CW_JJ_REAL=1 its absence fails.
+import { execFileSync } from 'child_process'
 import { writeFileSync } from 'fs'
 import { join } from 'path'
+import { DatabaseSync } from 'node:sqlite'
+import { boardFile } from '../src/main/boardStore'
+import { tempDir } from './tempDir'
 import { describe, expect, it } from 'vitest'
 import type { AdvanceAnswer, AdvanceHost } from '../src/main/platform/adapter'
 import { AdvanceJournals, planIdOf, type AdvanceJournal, type AdvancePoint } from '../src/main/platform/jjAdvance'
@@ -77,6 +81,15 @@ const answer = async (w: World, card: { key: string }, request: string, a: 'appr
   moved(await w.wf.answer(card.key, request, a, { by: 'user' }))
   await w.wf.runActions()
 }
+/** The project's publish obligations (or retained bundles), as J5 records them. */
+function rows(w: World, table: 'jj_obligations' | 'jj_retained'): Record<string, unknown>[] {
+  const db = new DatabaseSync(boardFile(w.home), { readOnly: true })
+  try {
+    return db.prepare(`SELECT * FROM ${table} WHERE project = 'p-jj'`).all() as Record<string, unknown>[]
+  } finally {
+    db.close()
+  }
+}
 const journalOf = async (w: World, card: { id: number; key: string }): Promise<AdvanceJournal[]> => (await journals(w).list(card.key, w.wf.state(w.wf.store.card(card.id)).cycle)).map((x) => x.journal as AdvanceJournal)
 
 describe.skipIf(!jjExe)(`Combwork's jj advance through the adapter (jj ${TESTED_JJ.version}), HI-3235`, { timeout: REAL_JJ_MS }, () => {
@@ -122,6 +135,66 @@ describe.skipIf(!jjExe)(`Combwork's jj advance through the adapter (jj ${TESTED_
       expect((await journalOf(w, card)).map((j) => j.settled)).toEqual(['integrated'])
       await pass(w, card)
       expect(facts(w, card, 'Integrated')).toHaveLength(1)
+    })
+
+    it("its Integrated carries the publish obligation, as the outside path's does: owed, then published once the user pushes (HR1's round 1, finding 3)", async () => {
+      const w = await world(colocated, { candidates: true, oneSlot: true, advance: true })
+      const remote = join(tempDir('jjremote-'), 'remote.git')
+      execFileSync('git', ['init', '--bare', '-q', remote], { env: w.h.env })
+      w.h.jj(w.repo, 'git', 'remote', 'add', 'origin', remote)
+      const card = await approved(w)
+      await pass(w, card)
+      const [integrated] = facts(w, card, 'Integrated')
+      expect(integrated).toMatchObject({ by: 'combwork', platform: { jj: expect.any(Object), advance: expect.any(Object) } })
+      expect(rows(w, 'jj_obligations')).toMatchObject([{ state: 'owed', result: integrated.result }])
+      expect(rows(w, 'jj_retained').length).toBe(1)
+      execFileSync('git', ['--git-dir', w.ctx.store, 'push', '-q', remote, `${integrated.result}:refs/heads/main`], { env: w.h.env })
+      await jjp(w, card).afterRun!()
+      expect(rows(w, 'jj_obligations')).toMatchObject([{ state: 'published', pushed: integrated.result }])
+    })
+
+    it("an answer that comes while jj can't be read fails its action, never done silently; recovery (jj unreadable or back) asks exactly one fresh question, nothing run again (HR1's round 1, finding 2)", async () => {
+      const box: { w?: World } = {}
+      let raced = false
+      const w = await world(colocated, {
+        candidates: true,
+        oneSlot: true,
+        advance: true,
+        advanceHook: (p, j) => {
+          if (p !== 'beforeIntegrate' || raced) return
+          raced = true
+          box.w!.h.jj(box.w!.repo, '--at-op', j.base!.op, 'bookmark', 'move', 'main', '--from', j.plan.expected, '--to', j.plan.result)
+        }
+      })
+      box.w = w
+      const card = await approved(w)
+      await pass(w, card)
+      const req = advanceRequest(w, card)!
+      expect(req.gate).toBe(ADVANCE_UNCERTAIN_GATE)
+      // Settled in its journal (stopped: its outcome recorded), unsettled on the card: the case the question must outlive.
+      expect((await journalOf(w, card)).map((j) => j.settled)).toEqual(['stopped'])
+      const head = w.main()
+      const real = w.deps.integration
+      w.deps.integration = async () => null
+      try {
+        moved(await w.wf.answer(card.key, req.request, 'declined', { by: 'user' }))
+        await w.wf.runActions()
+        expect(w.store.pendingActions().filter((a) => a.card === card.id && a.kind === 'advanceAnswer')).toEqual([])
+        // The question consumed, no answer pending: recovery asks again, with jj still unreadable.
+        expect(advanceRequest(w, card)).toBeUndefined()
+        await jjp(w, card).recoverAdvances!(advanceHostOf(w.wf))
+      } finally {
+        w.deps.integration = real
+      }
+      const fresh = w.wf.state(w.wf.store.card(card.id)).requests.filter((r) => r.gate === ADVANCE_UNCERTAIN_GATE)
+      expect(fresh).toHaveLength(1)
+      expect(fresh[0].request).not.toBe(req.request)
+      expect(fresh[0].text).toMatch(/^Asked again: its earlier question was answered but not acted on/)
+      // jj back: recovery again changes nothing (one question already), and runs nothing.
+      await jjp(w, card).recoverAdvances!(advanceHostOf(w.wf))
+      expect(w.wf.state(w.wf.store.card(card.id)).requests.filter((r) => r.gate === ADVANCE_UNCERTAIN_GATE)).toHaveLength(1)
+      expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(1)
+      expect(w.main()).toBe(head)
     })
 
     it('a stopped attempt keeps the card: a question, no outside proof, no second attempt; an agent can’t answer; the user attests: Override, Done, no Integrated, its dependent waits no more; a repeat does nothing', async () => {

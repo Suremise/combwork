@@ -4195,7 +4195,9 @@ with s34, its mapping HI-3235/s7, s10, s13 and s16. gate:advance is open.
   open) is checked before each write, in the runner's write gate too.
 - **Integrated only on the full lineage**: one head; every operation after P0 carrying the attempt's marker, O among
   them with parent P0; the view differing from P0's only in T, E → R; Git's T = R; every other ref and worktree as at
-  the base. Then `Integrated { by: 'combwork', platform.advance }`, once per attempt, and Done. **Detected and
+  the base. Then J5's proof of the result, and `Integrated { by: 'combwork', platform.jj, platform.advance }` once per
+  attempt with the same publish obligation and retained bundle as the outside path's, and Done (a proof not readable yet
+  leaves it to recovery; one that disagrees is uncertain). **Detected and
   stopped**: any other operation after P0, a second head, T conflicted or elsewhere, a failed or partial export, Git's
   T ≠ R, another ref changed, a worktree changed, added or removed, the view changed beyond T. Anything not proved
   either way (a torn or failed read, an ancestry cut short) is **uncertain**.
@@ -4223,7 +4225,9 @@ with s34, its mapping HI-3235/s7, s10, s13 and s16. gate:advance is open.
   `override`, never `Integrated`), Decline starts again only once T is known not to contain R (a new candidate, fresh
   checks). An answer is one durable action bound to its request, attempt, plan, cycle and state; it reads the journal
   first, so a replay after a crash runs nothing that may have run, and an answer that can't be acted on asks afresh
-  with the reason: an unsettled attempt always has one open question or one pending answer.
+  with the reason: an unsettled attempt always has one open question or one pending answer. In the app the actions
+  worker runs it (`advanceAnswer`, delivered: run again until marked); one that can't run (jj unreadable) fails, and
+  the reconciler's recovery asks again once no answer is pending, the journal settled or not.
 
 ##### Type map
 

@@ -43,7 +43,7 @@ import { ensureRetained, isRefused as integrationRefused, jjContains, jjTargetHe
 import { jjUnknown } from './jjReads'
 import { anyRetainedDue, dueRetained, markRetainedDue, publishTargets, recordIntegration, retainedVisited, sqlObligations, type SqlDb } from './jjObligations'
 import { folderIdentity, type PublishCommitAnswer, type PublishCommitRequest } from './jjPublishCommit'
-import { advanceStep, candidateFingerprint, candidateKey, candidateShown, checksAgain, clearEndedCycle, cycleOver, publishCandidateChecks, reconcileJj, type CandidateWords, type JjChecksUpdate } from '../workflow/reconcile'
+import { advanceStep, candidateFingerprint, candidateKey, candidateShown, checksAgain, clearEndedCycle, cycleOver, publishCandidateChecks, reconcileJj, type CandidateWords, type JjChecksUpdate, type JjProved } from '../workflow/reconcile'
 import { checksJournalKey, checksKeyOf, readChecksJournal, runCandidateChecks, writeChecksJournal, type CandidateChecksDeps, type ChecksJournal } from './jjCandidateChecks'
 import { jjCandidateEntry, jjReturnedComment, jjReturnedWake } from './jjCandidateReturn'
 import type { Spawn } from '../workflow/queueChecks'
@@ -773,23 +773,31 @@ export class JjPlatform implements PlatformAdapter {
         })
         return unread ? { unknown: 'sameness:replay' } : { same, base: b } // i18n-ignore: a protocol code, for the log
       },
-      prove: async (_c, s, approved) => {
-        const integ = await d.integration()
-        if (!integ || !s.started?.target) return { unknown: 'notComposed' }
-        const project = rec.projectId()
-        const consumed = rec.read((db) => (db.prepare('SELECT bundle FROM jj_retained WHERE project = ?').all(project) as { bundle: string }[]).map((r) => r.bundle)) // i18n-ignore: SQL
-        // HI-2871: the cycle's J4 records, so the user's move onto a candidate is credited as one (J5's bound candidate).
-        const candidates = (rec.attempts?.(card.key, s.cycle) ?? []).map((e) => e.record)
-        const p = await jjContains(integ, { card: card.key, cycle: s.cycle, target: s.started.target, change: approved, candidates, bundles: rec.bundles(card.key, s.cycle), consumed, token: randomUUID().replace(/-/g, '').slice(0, 16) })
-        if (isJjUnknown(p)) return { unknown: `${p.jjUnknown}${p.detail ? `: ${p.detail}` : ''}` }
-        if (integrationRefused(p)) return { unknown: `refused: ${p.refused}` }
-        if (!p.containment || !p.provenance) return { contained: false }
-        return { contained: true, method: p.containment.method, result: p.provenance.head, bundle: p.provenance.bundle, platform: jjIntegratedPlatform(p.provenance as JjIntegratedIds) }
-      },
+      prove: (_c, s, approved) => this.proof(card, s, approved),
       record: (w, row) => w.tx.sql((db) => recordIntegration(db as unknown as SqlDb, rec.projectId(), row)),
       projectId: () => rec.projectId(),
       ...(rec.attempts && rec.saveAttempt ? { candidate: (_c: CardRecord, s: CardState, fp: JjCandidateFingerprint, still: () => boolean) => this.withCardLock(card.id, () => this.candidateStep(card, s, fp, still)), headIs: (target: string, expected: string) => this.headIs(target, expected), offerCurrent: (target: string, offer: JjCandidateOffer) => this.offerCurrent(target, offer), candidatesDone: (_c: CardRecord, cycle: number) => this.candidatesDone(card, cycle), checksNow: (_c: CardRecord, s: CardState) => this.checksNow(card, s), checksWanted: () => this.checksWanted() } : {})
     })
+  }
+
+  /**
+   * J5's proof that the card's approved change is in its target (jjContains), with the bundle of pins that retains what
+   * it names: reconcileJj's, and a verified advance's (HI-3235, so its Integrated carries the same obligation rows).
+   */
+  private async proof(card: CardRecord, s: CardState, approved: { base: string; revision: string; key?: string | null }): Promise<JjProved> {
+    const d = this.deps
+    const rec = d?.records
+    const integ = rec ? await d!.integration() : null
+    if (!rec || !integ || !s.started?.target) return { unknown: 'notComposed' }
+    const project = rec.projectId()
+    const consumed = rec.read((db) => (db.prepare('SELECT bundle FROM jj_retained WHERE project = ?').all(project) as { bundle: string }[]).map((r) => r.bundle)) // i18n-ignore: SQL
+    // HI-2871: the cycle's J4 records, so the user's move onto a candidate is credited as one (J5's bound candidate).
+    const candidates = (rec.attempts?.(card.key, s.cycle) ?? []).map((e) => e.record)
+    const p = await jjContains(integ, { card: card.key, cycle: s.cycle, target: s.started.target, change: approved, candidates, bundles: rec.bundles(card.key, s.cycle), consumed, token: randomUUID().replace(/-/g, '').slice(0, 16) })
+    if (isJjUnknown(p)) return { unknown: `${p.jjUnknown}${p.detail ? `: ${p.detail}` : ''}` }
+    if (integrationRefused(p)) return { unknown: `refused: ${p.refused}` }
+    if (!p.containment || !p.provenance) return { contained: false }
+    return { contained: true, method: p.containment.method, result: p.provenance.head, bundle: p.provenance.bundle, platform: jjIntegratedPlatform(p.provenance as JjIntegratedIds) }
   }
 
   // --- HI-3235: Combwork's advance of a target (jjAdvance.ts; HI-2840/s30, s34; HI-3235/s7, s10, s13, s16).
@@ -857,8 +865,24 @@ export class JjPlatform implements PlatformAdapter {
     const ref: AdvanceRef = { cycle: j.plan.cycle, attempt: j.attempt }
     const s = wf.state(wf.store.card(card.id))
     if (out.kind === 'advanced') {
+      // J5's proof of the result, as the outside path records it (HR1's round 1, finding 3): its bundle retained and the
+      // integration's publish obligation written with Integrated, so the card is tracked for publishing either way. A proof
+      // that can't be read yet leaves the attempt as journaled (`verified`): recovery records it once the proof comes; one
+      // that says the target doesn't contain the work disagrees with the lineage just proved, so only the user settles it.
+      const rec = this.deps?.records
+      const approved = s.approved?.revision && s.approved.base ? { base: s.approved.base, revision: s.approved.revision, key: s.latest?.key ?? null } : null
+      const p = approved ? await this.proof(card, s, approved) : ({ unknown: 'noApproval' } as JjProved)
+      if ('unknown' in p) {
+        checksLog.warn(`advance of #${userText(card.key)} verified; its proof isn't readable yet (${p.unknown}): recorded once it is`) // i18n-ignore: a log line, English
+        return false
+      }
+      if (!p.contained || p.result !== j.plan.result || !rec) {
+        if (await host.stopped(card, ref, j.planId, { code: 'proofDisagrees', detail: p.contained ? p.result : 'notContained', undo: false, uncertain: true }, this.advanceWords(j, s, 'other', 'proofDisagrees'))) await journalSettled(h, deps, j, 'uncertain', { detail: 'proofDisagrees' }) // i18n-ignore: codes
+        return false
+      }
       const method = j.plan.style === 'squash' ? 'squash' : j.plan.style === 'rebase' ? 'fastForward' : 'merge'
-      const ok = await host.advanced(card, ref, { revision: s.approved?.revision ?? s.latest?.revision ?? '', target: j.plan.target, result: j.plan.result, method, platform: { advance: { plan: j.planId, op: out.op, ...(out.exportOp ? { exportOp: out.exportOp } : {}), change: j.plan.change } } })
+      const row = { card: card.key, cycle: s.cycle, bundle: p.bundle, target: j.plan.target, result: p.result, since: Date.now() }
+      const ok = await host.advanced(card, ref, { revision: s.approved?.revision ?? s.latest?.revision ?? '', target: j.plan.target, result: j.plan.result, method, platform: { ...p.platform, advance: { plan: j.planId, op: out.op, ...(out.exportOp ? { exportOp: out.exportOp } : {}), change: j.plan.change } } }, (w) => w.tx.sql((db) => recordIntegration(db as unknown as SqlDb, rec.projectId(), row)))
       if (ok) await journalSettled(h, deps, j, 'integrated')
       return ok
     }
@@ -907,13 +931,15 @@ export class JjPlatform implements PlatformAdapter {
         else if (recorded) await this.keepAsked(card, null, host, null, 'unreadable') // i18n-ignore: a code, worded by the question's message (FOR_YOU.advance*)
         continue
       }
-      if (journal.settled) continue
+      // A stopped or uncertain attempt is settled in its journal but not on the card: it keeps its question (HR1's round 1,
+      // finding 2: an answer consumed and its action gone must never leave it with none).
+      if (journal.settled && journal.settled !== 'stopped' && journal.settled !== 'uncertain') continue
       if (!recorded) {
         // A journal with no fact (s34 §2): `requested` or `abandoned`, nothing can have run; any later phase broke the
         // protocol and is uncertain, recorded as an attempt so only the user settles it.
         if (journal.phase === 'requested' || journal.phase === 'abandoned') await journalSettled(h, recovery, journal, 'nothingMoved', { detail: 'noFact' }) // i18n-ignore: a code
         else if (!advanceUnresolved(s) && (await host.attempted(card, cycle, journal.planId, attempt))) {
-          if (await host.stopped(card, { cycle, attempt }, journal.planId, { code: 'noFact', detail: journal.phase, undo: false, uncertain: true }, this.advanceWords(journal, s, 'noFact', journal.phase))) await journalSettled(h, recovery, journal, 'uncertain', { detail: 'noFact' }) // i18n-ignore: a code // i18n-ignore: codes, worded by the question's message
+          if (await host.stopped(card, { cycle, attempt }, journal.planId, { code: 'noFact', detail: journal.phase, undo: false, uncertain: true }, this.advanceWords(journal, s, 'noFact', journal.phase))) await journalSettled(h, recovery, journal, 'uncertain', { detail: 'noFact' }) // i18n-ignore: codes, worded by the question's message
         }
         continue
       }
@@ -995,9 +1021,11 @@ export class JjPlatform implements PlatformAdapter {
     const d = this.deps
     const wf = this.wf
     const journals = this.advanceJournals()
-    if (!wf || !d?.records || !journals) return
+    // Not answered here (jj can't be reached now): failed, never done silently; its question comes back by recovery's
+    // keepAsked once no answer is pending (HR1's round 1, finding 2).
+    if (!wf || !d?.records || !journals) throw new Error('advance answer: jj is not composed for this project') // i18n-ignore: an action's failure, for the log
     const integ = await d.integration()
-    if (!integ) return
+    if (!integ) throw new Error("advance answer: jj's control workspace can't be read now") // i18n-ignore: an action's failure, for the log
     await this.withCardLock(card.id, () => underLock(integ.view.store, integ.lock, (h) => this.answerUnder(h, integ, journals, card, ans, host)))
   }
 
@@ -1080,11 +1108,15 @@ export class JjPlatform implements PlatformAdapter {
     const wf = this.wf
     const journals = this.advanceJournals()
     if (!wf || !d?.records || !journals) return
-    const keys = new Set((await journals.all()).filter((j) => !j.settled).map((j) => j.plan.card.toLowerCase()))
+    const keys = new Set((await journals.all()).filter((j) => !j.settled || j.settled === 'stopped' || j.settled === 'uncertain').map((j) => j.plan.card.toLowerCase()))
     const cards = wf.store.cards().filter((c) => keys.has(c.key.toLowerCase()) || advanceUnresolved(wf.state(c)))
     if (!cards.length) return
     const integ = await d.integration()
-    if (!integ) return
+    if (!integ) {
+      // jj unreadable now: nothing classified, but an unsettled attempt keeps a question (its journal read only for its words).
+      for (const c of cards) await this.withCardLock(c.id, () => this.keepAsked(wf.store.card(c.id), null, host, null, 'answered')) // i18n-ignore: a code, worded by the question's message (FOR_YOU.advance*)
+      return
+    }
     for (const c of cards) await this.withCardLock(c.id, () => underLock(integ.view.store, integ.lock, (h) => this.settleAdvances(h, integ, journals, c, host)))
   }
 
