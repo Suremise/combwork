@@ -1326,8 +1326,10 @@ export async function readInbox(host: string, agentId: string, receivedAbout?: (
   const store = await load(host)
   const given: DeliveryRecord[] = []
   let unacked: string[] | null = null
-  // HI-3195: ack-then-read's acks, in the read's own save (made in its first attempt): both kept, or neither.
+  // HI-3195: ack-then-read's acks, in the read's own save (made in its first attempt): both kept, or neither. HI-3272: made
+  // in each plan until that save is through, so a plan made again on another Combwork's rows (StaleDeliveries) acks too.
   let acks: AckResult | undefined
+  let acksSaved = false
   // The conversation reading (what a carried delivery is shown again to once: replayedTo), or its launch while its CLI
   // hasn't named the conversation yet.
   const live = sessions.liveFor(host, agentId)
@@ -1350,7 +1352,7 @@ export async function readInbox(host: string, agentId: string, receivedAbout?: (
           if (opts.fence) d.commit = opts.fence
           const held = applyRelevance(store, d, rel, agentId)
           recheck(store, d, agentId)
-          if (opts.ack && !acks) acks = ackIn(store, d, agentId, opts.ack)
+          if (opts.ack && !acksSaved) acks = ackIn(store, d, agentId, opts.ack)
           const may = gate(d)
           const mine = d.records.filter((x) => x.agentId === agentId)
           const give = mine.filter((x) => may(x) && !held.has(x.id))
@@ -1375,6 +1377,7 @@ export async function readInbox(host: string, agentId: string, receivedAbout?: (
       log.warn(`${userText(agentId)}'s inbox read gave what it had: trying again failed`, e)
       break
     }
+    acksSaved = true
     given.push(...r.give)
     unacked ??= r.before
     if (!r.missed) break
