@@ -135,8 +135,9 @@ const commit = (dir, file, text, message) => {
   // editor shows that theme (Monaco's own class: vs-dark or vs).
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    const editorIn = await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme && (await shown.evaluate((e) => e.closest('.monaco-diff-editor')?.querySelector('.monaco-editor')?.classList.contains('vs-dark') ?? null).catch(() => null)) === (theme === 'dark'), HUNG_MS)
-    check(`the diff shows in the ${theme} theme`, !!editorIn)
+    const editorClass = () => shown.evaluate((e) => e.querySelector('.monaco-editor')?.className ?? '').catch(() => '')
+    const editorIn = await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme && /\bvs-dark\b/.test(await editorClass()) === (theme === 'dark') && /\bvs(-dark)?\b/.test(await editorClass()), HUNG_MS)
+    check(`the diff shows in the ${theme} theme`, !!editorIn, await editorClass())
     await changes.screenshot({ path: path.join(lib.WORK, `cardwork-changes-${theme}.png`) })
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })
