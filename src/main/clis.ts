@@ -139,6 +139,8 @@ export function applyClis(view: CliSnapshotView): CliSnapshotView {
   registerCliAdapters(snapshot.clis.map((c) => genericAdapter({ ...cliModule(c), cli: c })))
   current = snapshot
   emit({ type: 'clis', snapshot })
+  // Which accounts are usable changed with it (a description gone keeps its accounts, to remove: HI-3270): Accounts reads again.
+  emit({ type: 'connections-changed' })
   for (const c of snapshot.clis) {
     // Its agents run on its PC-wide account (it has no sign-in connections): made once, as Copilot's was.
     ensureHomeAccount(c.id)
