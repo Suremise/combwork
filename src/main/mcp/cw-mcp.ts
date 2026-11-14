@@ -1828,14 +1828,14 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
         const hint = argumentHint(tool.name, tool.inputSchema, args)
         text = `${say(T['call.error'], { message: (e as Error).message })}${hint ? `\n${hint}` : ''}`
         testId = testLog(tool.name, params?.arguments, (e as Error).message, { mode: modeOf(args), chars: text.length, bytes: Buffer.byteLength(text, 'utf8') })
-        reply(id, { content: [{ type: 'text', text }], isError: true })
-        // HI-3195: a write that got no reply is remembered, so the model's retry of the same call reuses its key.
+        // HI-3195: a write that got no reply is remembered, so the model's retry of the same call reuses its key: kept before the reply goes, so a launch ended right after it still has it.
         if (call.lost) {
           unresolved.delete(hash)
           unresolved.set(hash, { base: call.base, at: Date.now() })
           while (unresolved.size > UNRESOLVED_MAX) unresolved.delete(unresolved.keys().next().value!)
           saveUnresolved()
         } else if (kind !== 'failed' && unresolved.delete(hash)) saveUnresolved()
+        reply(id, { content: [{ type: 'text', text }], isError: true })
       }
       // After the reply: the model's text exactly as sent (characters as UTF-16 code units, and UTF-8 bytes).
       calling--
