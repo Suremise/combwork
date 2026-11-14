@@ -555,6 +555,7 @@
   "workflow.summary.none.pair": "快速检查通过后，评审者智能体检查每张卡片。",
   "workflow.summary.none.solo": "不评审：构建者提交后卡片即完成。",
   "workflow.summary.none.team": "快速检查和测试通过后，先由评审者智能体、再由你检查每张卡片。",
+  "workflow.unreadable.blockerWork": "{card} 的工作是否在目标分支中（{what}）",
   "workflow.unreadable.branch": "文件夹 {folder} 中检出的分支",
   "workflow.unreadable.branchedOff": "{a} 与 {b} 的分叉点",
   "workflow.unreadable.branchedOffTarget": "工作从目标分支分出的位置",

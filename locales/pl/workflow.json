@@ -555,6 +555,7 @@
   "workflow.summary.none.pair": "Agent recenzent sprawdza każdą kartę, gdy przejdą szybkie sprawdzenia.",
   "workflow.summary.none.solo": "Bez recenzji: karta jest gotowa, gdy wykonawca ją przekaże.",
   "workflow.summary.none.team": "Każdą kartę sprawdza agent recenzent, potem Ty, gdy przejdą szybkie sprawdzenia i testy.",
+  "workflow.unreadable.blockerWork": "informacji, czy praca {card} jest w gałęzi docelowej ({what})",
   "workflow.unreadable.branch": "gałęzi wybranej w folderze {folder}",
   "workflow.unreadable.branchedOff": "punktu, w którym rozgałęziły się {a} i {b}",
   "workflow.unreadable.branchedOffTarget": "punktu, w którym praca odgałęziła się od gałęzi docelowej",

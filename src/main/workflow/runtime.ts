@@ -21,6 +21,7 @@ import { pathChanges, pickAtRevision, type PickOutcome } from './focusedRun'
 import type { GuardId, MoveId } from '../../shared/workflow/pieces'
 import { refusal, type Refusal, type RuleId } from '../../shared/workflow/refusals'
 import { FOR_YOU, UNREADABLE, workflowEnglish, workflowText } from '../../shared/workflow/texts'
+import { englishText } from '../../shared/advanced'
 import type { StoredText, TargetChanges } from '../../shared/types'
 import { parseCardRef } from '../../shared/workflow/cardRefs'
 import type { ForwardOverride } from '../../shared/workflow/forwardOrder'
@@ -1568,7 +1569,8 @@ export class Workflow {
       }
       // Done before 1.0, or never started under the rules (moved to Done by hand): nothing to look for in the target. An
       // override's Done counts as accepted (HI-2014, Darren's option A): its dependents start without its work in the target.
-      if (d.accepted || dep.preWorkflow || !d.started || finishAccepts(d.finished)) continue
+      // HI-3233: another project's card, Done, counts: its work is in its own repository, never this card's target.
+      if (d.accepted || dep.preWorkflow || !d.started || finishAccepts(d.finished) || !this.store.isOwn(id)) continue
       const revision = d.integrated?.revision ?? d.approved?.revision ?? d.latest?.revision
       const base = d.approved?.base ?? d.latest?.base ?? d.started?.base
       if (!revision || !base || !target || revision === base) {
@@ -1576,7 +1578,8 @@ export class Workflow {
         continue
       }
       const c = asCardCounts(d, await this.platform(o).contains(target, { base, revision, key: d.latest?.key }))
-      if (isUnknown(c)) return c
+      // Unknown still refuses (never started on doubt), naming the card it waits for, not only its commit.
+      if (isUnknown(c)) return { ...c, what: englishText({ m: UNREADABLE.blockerWork, values: { card: key, what: c.what } }), whatText: { id: UNREADABLE.blockerWork.id, values: { card: key, what: c.whatText ?? c.what } } }
       if (!c) out.push(key)
     }
     return out

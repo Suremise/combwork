@@ -555,6 +555,7 @@
   "workflow.summary.none.pair": "Um agente revisor verifica cada cartão, depois que as verificações rápidas passam.",
   "workflow.summary.none.solo": "Sem revisão: um cartão está concluído quando o executor o envia.",
   "workflow.summary.none.team": "Cada cartão é verificado por um agente revisor e em seguida por você, quando as verificações rápidas e os testes passam.",
+  "workflow.unreadable.blockerWork": "se o trabalho de {card} está no branch de destino ({what})",
   "workflow.unreadable.branch": "o branch em checkout na pasta {folder}",
   "workflow.unreadable.branchedOff": "o ponto em que {a} e {b} se separaram",
   "workflow.unreadable.branchedOffTarget": "o ponto em que o trabalho se separou do branch de destino",

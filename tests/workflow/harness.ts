@@ -101,6 +101,8 @@ export interface Env {
   queue: (cfg?: Partial<QueueConfig>) => MergeQueue
   /** Another Combwork on the same workspace: its own store connection and Workflow (§16.17). */
   another: () => Workflow
+  /** HI-3233: another project on the same board, with a repository of its own: its Workflow, store and folder. */
+  sibling: (name: string, key: string) => { wf: Workflow; store: FactStore; project: string }
   /** A store on a connection of its own to the workspace's combwork.db, as a restarted Combwork opens it (closed with the rest). */
   reopen: () => FactStore
   /** Facts of a card, by kind. */
@@ -126,11 +128,11 @@ export function setup(options: Partial<WorkflowOptions> & { platform: PlatformId
   const wakes: Env['wakes'] = []
   const notes: Env['notes'] = []
   const stores: FactStore[] = [store]
-  const make = (s: FactStore) =>
+  const make = (s: FactStore, dir = project, key = 'AM') =>
     new Workflow({
       store: s,
-      project,
-      projectKey: 'AM',
+      project: dir,
+      projectKey: key,
       options: () => o,
       slots: join(home, 'slots'),
       runsOf: extra.runsOf,
@@ -161,6 +163,12 @@ export function setup(options: Partial<WorkflowOptions> & { platform: PlatformId
       const s = FactStore.open(boardFile(home), scope)
       stores.push(s)
       return make(s)
+    },
+    sibling: (name, key) => {
+      const dir = gitRepo(join(home, name))
+      const s = FactStore.open(boardFile(home), { project: name, key })
+      stores.push(s)
+      return { wf: make(s, dir, key), store: s, project: dir }
     },
     reopen: () => {
       const s = FactStore.open(boardFile(home), scope)

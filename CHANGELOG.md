@@ -85,6 +85,8 @@
 
 ### Fixed
 
+- **A card waiting for Done cards of another project starts** (HI-3233). With *Cards start only when the cards they wait for are merged* on, Combwork looked for the other project's merge in this card's repository, couldn't read it, and refused the start. A card from another project now counts once it's Done. When Combwork can't read whether a card's work is in the target, the refusal names that card.
+
 - **An agent told of its inbox while it works names cards by key** (HI-3226). The notice Combwork adds to a working agent's tool calls and turn end named a card by its workspace-wide number (`#3170`), which finds another card, where the doorbell typed as its prompt said `HI-2911`. Both now name it by key.
 
 - **A verdict on a jj card is no longer refused *What Combwork read … changed while it decided* by Combwork's own jj work** (HI-3216). Right after start review, the review copy is put at the revision reviewed, a jj operation that moved what the verdict reads, so a verdict given at once was sometimes refused. It's now read again, up to three times, as a start already is, and is still refused if the card's own slot changed.
