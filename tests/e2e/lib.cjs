@@ -20,7 +20,7 @@ require('../testArea.cjs').assertReady()
 const ELECTRON = require('electron')
 const { windowsCodesIn } = require('./windowsExits.cjs')
 const { readDocs, writeDoc } = require('./boardRows.cjs')
-const { renderScreen, drawnCount } = require('./drawnScreen.cjs')
+const { renderScreen, drawnCount, inputOf } = require('./drawnScreen.cjs')
 // WORK: where suites keep their profiles, workspaces and screenshots. Stable, so Claude Code trusts its folders once.
 fs.mkdirSync(WORK, { recursive: true })
 
@@ -1380,6 +1380,7 @@ async function sendPrompt(inv, key, text, { submitted, ready = null, tries = 3, 
     return renderScreen(await raw(), size?.cols, size?.rows)
   }
   const shown = async () => drawnCount(await screen(), text)
+  const inInput = async () => drawnCount(inputOf(await screen()), text)
   if (ready && !(await until(ready, waitMs, 250))) console.log(`INFO sendPrompt: not ready within ${waitMs / 1000} s, typed anyway`)
   let echoed = false
   for (let attempt = 1; attempt <= tries; attempt++) {
@@ -1389,11 +1390,12 @@ async function sendPrompt(inv, key, text, { submitted, ready = null, tries = 3, 
     const enterOnly = !paste && echoed && attempt < tries
     let before = 0
     if (!enterOnly) {
-      const left = await shown()
+      // An attempt not taken left its text in the input: once Ctrl+U has cleared it, the count is the screen's without it.
+      // The input only (inputOf): the same prompt sent before, in the conversation above, stays (HR1's round 1).
+      const left = attempt > 1 ? await inInput() : 0
       await inv('pty:write', key, '\x15')
       await sleep(150)
-      // An attempt not taken left its text in the input: once Ctrl+U has cleared it, the count is the screen's without it.
-      if (left > 0) await until(async () => (await shown()) < left, DRAWN_MS, 250)
+      if (left > 0) await until(async () => (await inInput()) < left, DRAWN_MS, 250)
       before = await shown()
       await inv('pty:write', key, paste ? `\x1b[200~${text}\x1b[201~` : text)
     }
@@ -1411,7 +1413,7 @@ async function sendPrompt(inv, key, text, { submitted, ready = null, tries = 3, 
     await inv('pty:write', key, '\r')
     if (await until(submitted, waitMs, 500)) return attempt
     const drawn = await screen()
-    const input = drawn.slice(drawn.lastIndexOf('› ') >= 0 ? drawn.lastIndexOf('› ') : drawn.lastIndexOf('> '))
+    const input = inputOf(drawn)
     const lines = drawn.split('\n').filter((l) => l.trim())
     console.log(`INFO sendPrompt attempt ${attempt} not taken: ${enterOnly ? 'Enter only (typed, its text drawn before)' : `${paste ? 'pasted' : 'typed'}, drawn ${echoed ? 'yes' : 'no'}`}, ${drawnCount(input, text) > 0 ? 'its end on the last input line' : 'its end not on the last input line'}; screen ends: ${JSON.stringify(lines.slice(-8).join('\n'))}`)
   }

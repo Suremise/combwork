@@ -30,4 +30,15 @@ function drawnCount(screen, text) {
   return (end ? s.replace(/\s+/g, '').split(end).length - 1 : 0) + (s.match(PASTE_MARK)?.length ?? 0)
 }
 
-module.exports = { renderScreen, drawnCount }
+/**
+ * The screen from its last prompt mark (Codex's "› ", Claude Code's "❯ ", a plain "> ") to its end: the CLI's input as
+ * it shows, without the conversation above it, where the same prompt sent before can still show (HR1's round 1 of
+ * HI-3210). Empty with no mark.
+ */
+function inputOf(screen) {
+  const s = String(screen ?? '')
+  const at = Math.max(s.lastIndexOf('› '), s.lastIndexOf('❯ '), s.lastIndexOf('> '))
+  return at >= 0 ? s.slice(at) : ''
+}
+
+module.exports = { renderScreen, drawnCount, inputOf }
