@@ -243,7 +243,7 @@ const commit = (dir, file, text, message) => {
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
     await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
-    await page.locator('.dialog').filter({ has: preview }).screenshot({ path: path.join(lib.WORK, `cardwork-send-${theme}.png`) })
+    await page.getByRole('dialog', { name: 'Send comments to Builder' }).screenshot({ path: path.join(lib.WORK, `cardwork-send-${theme}.png`) })
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })
   await page.locator('[data-send-confirm]').click()
