@@ -559,6 +559,12 @@
   "tool.readTask.arg.latestComment": {
     "text": "Only the newest comment."
   },
+  "tool.readTask.arg.lineComments": {
+    "text": "The user's line comments on its revisions' diffs, as rows: open ones, or all."
+  },
+  "tool.readTask.arg.offset": {
+    "text": "With lineComments: the previous reply's next."
+  },
   "tool.readTask.arg.summary": {
     "text": "Each comment's first line."
   },

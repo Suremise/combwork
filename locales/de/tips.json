@@ -137,6 +137,8 @@
   "tips.cardCostRounds.title": "Was jede Review-Runde gekostet hat",
   "tips.cardDecisions.text": "Die Entscheidungen einer Karte, über ihren Kommentaren, halten fest, was du entschieden hast: Agenten prüfen ihre Arbeit vor dem Review daran, und Reviewer lassen Arbeit durchfallen, die eine davon missachtet. Sag dem Assistenten eine Entscheidung, und er trägt sie dort ein; ein Agent, der auf deine Antwort wartet, erfährt es.",
   "tips.cardDecisions.title": "Was du entscheidest, gehört auf die Karte",
+  "tips.cardLineComments.text": "Fahre in den Änderungen einer Revision über eine Zeile und drücke +, um sie zu kommentieren, oder wähle vorher Zeilen aus. Kommentare bleiben auf der Karte, wo du sie bearbeiten, als erledigt markieren oder wieder öffnen kannst.",
+  "tips.cardLineComments.title": "Die Zeilen der Arbeit einer Karte kommentieren",
   "tips.cardLinks.text": "Kartennummern, die ein Agent oder der Assistent ausgibt, etwa #12, sind Links: Fahre mit der Maus darüber für Titel und Spalte, und öffne die Karte mit Strg+Klick.",
   "tips.cardLinks.title": "Strg+Klick auf eine Kartennummer im Terminal",
   "tips.cardLoop.text": "Sag einem Agenten, er soll einige Karten als Bearbeiter abarbeiten, und einem anderen, er soll sie reviewen: Jeder wartet kostenlos auf den anderen, und Combwork weckt ihn, wenn sich die Karte ändert.",

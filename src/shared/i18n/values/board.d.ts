@@ -1039,10 +1039,34 @@ interface CombworkMessageValues {
   'board.work.changes.noRevision': undefined
   'board.work.changes.noSubmission': undefined
   'board.work.changes.notListed': { path: string | number }
+  'board.work.changes.openComments': { n: number }
   'board.work.changes.reading': undefined
   'board.work.changes.retry': undefined
   'board.work.changes.sideBySide': undefined
   'board.work.check': { name: string | number; result: string; counted: string }
+  'board.work.comments.add': undefined
+  'board.work.comments.binary': undefined
+  'board.work.comments.cancel': undefined
+  'board.work.comments.changed': undefined
+  'board.work.comments.delete': undefined
+  'board.work.comments.edit': undefined
+  'board.work.comments.edited': undefined
+  'board.work.comments.elsewhere': undefined
+  'board.work.comments.empty': undefined
+  'board.work.comments.length': { n: number; max: number }
+  'board.work.comments.lines': { from: string | number; to: string | number; path: string | number }
+  'board.work.comments.noCard': undefined
+  'board.work.comments.noComment': undefined
+  'board.work.comments.placeholder': undefined
+  'board.work.comments.reopen': undefined
+  'board.work.comments.resolve': undefined
+  'board.work.comments.resolved': undefined
+  'board.work.comments.save': undefined
+  'board.work.comments.sent': undefined
+  'board.work.comments.tooLong': { max: number }
+  'board.work.comments.tooMany': { max: number }
+  'board.work.comments.where': { side: string; from: string | number; same: string; to: string | number }
+  'board.work.comments.you': undefined
   'board.work.doneUnproved': { when: string | number }
   'board.work.failed': { error: string | number }
   'board.work.files': { n: number }
@@ -1059,6 +1083,7 @@ interface CombworkMessageValues {
   'board.work.none': undefined
   'board.work.notRead': { note: string; why: string | number }
   'board.work.notReady': { slot: string | number; stale: string; why: string | number }
+  'board.work.openComments': { n: number }
   'board.work.openFile': { path: string | number }
   'board.work.outsideCombwork': undefined
   'board.work.outsideRules': { rules: string | number }

@@ -161,6 +161,8 @@ const T = {
   // HI-2641: a card's oldest comments past the 500 it keeps, its archive, read from an offset (commentsArchived counts them).
   // Within HI-2012's agent total: the description's forYou gloss and summary's "and its length" were cut to pay for it.
   'readTask.arg.archived': agentMsg({ id: 'tool.readTask.arg.archived', text: 'Archived older comments from this offset.' }),
+  'readTask.arg.lineComments': agentMsg({ id: 'tool.readTask.arg.lineComments', text: "The user's line comments on its revisions' diffs, as rows: open ones, or all." }),
+  'readTask.arg.offset': agentMsg({ id: 'tool.readTask.arg.offset', text: "With lineComments: the previous reply's next." }),
   // HI-2561: Codex asked for the history to see why an agent stopped, which forYou already says. Within HI-2012's
   // total (toolLimits.cjs): the description dropped its history clause, and summary's words were cut, to pay for it.
   'readTask.arg.history': agentMsg({ id: 'tool.readTask.arg.history', text: 'Long; rarely needed.' }),
@@ -1148,13 +1150,17 @@ const tools: Tool[] = [
         summary: { type: 'boolean', description: say(T['readTask.arg.summary']) },
         history: { type: 'boolean', description: say(T['readTask.arg.history']) },
         attachments: { type: 'boolean', description: say(T['readTask.arg.attachments']) },
-        archived: { type: 'number', description: say(T['readTask.arg.archived']) }
+        archived: { type: 'number', description: say(T['readTask.arg.archived']) },
+        lineComments: { type: 'string', enum: ['open', 'all'], description: say(T['readTask.arg.lineComments']) },
+        offset: { type: 'number', description: say(T['readTask.arg.offset']) }
       },
       required: ['number']
     },
     run: (a) => {
       const n = enc(String(a.number))
       if (a.archived !== undefined && a.archived !== null) return api('GET', `/v1/tasks/${n}/comments/archived?offset=${enc(String(a.archived))}`)
+      // HI-3219: its line comments, a page of rows.
+      if (a.lineComments === 'open' || a.lineComments === 'all') return api('GET', `/v1/tasks/${n}/line-comments?state=${a.lineComments}${typeof a.offset === 'number' ? `&offset=${Math.max(0, Math.floor(a.offset))}` : ''}`)
       const all = a.attachments === true ? 'attachments=true' : ''
       if (a.latestComment) {
         const lq = [a.summary ? 'summary=true' : '', all].filter(Boolean).join('&')

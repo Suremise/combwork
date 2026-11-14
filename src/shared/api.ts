@@ -622,6 +622,10 @@ export interface CombworkRequests {
   'tasks:work': (n: number) => WorkView | null
   /** HI-3218: one file of a card's submission (its fact's number, WorkRevision.submission), from its base to its revision. */
   'tasks:revisionDiff': (n: number, submission: number, file: string) => GitDiff
+  /** HI-3219: the user's comment on lines of a card's submission's file (its side, 1-based lines); the comment's id. Read back in tasks:work's lineComments. */
+  'tasks:lineCommentAdd': (n: number, comment: { submission: number; path: string; side: 'new' | 'old'; from: number; to: number; body: string }) => string
+  /** HI-3219: a change to one of a card's line comments: its text (from the version shown), resolved, reopened or deleted. */
+  'tasks:lineCommentChange': (n: number, id: string, change: { edit: { body: string; version: number } } | 'resolve' | 'reopen' | 'delete') => void
   /** Every live card's badges from its work (#1223), in number order; archived cards aren't read. */
   'tasks:workBadges': () => WorkBadge[]
 

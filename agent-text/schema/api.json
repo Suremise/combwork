@@ -354,6 +354,11 @@
   "api.card.lanePosition": {
     "placeholders": {}
   },
+  "api.card.lineCommentsState": {
+    "placeholders": {
+      "state": "plain"
+    }
+  },
   "api.card.madeKind": {
     "placeholders": {
       "kind": "plain"

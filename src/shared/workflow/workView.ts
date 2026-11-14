@@ -8,6 +8,7 @@
 import type { ConflictsRecord } from './conflicts'
 import { askedQuestion, foldCard, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type CheckRanData, type Fact, type FactData, type LoopAsk, type FileChange, type ForYouKind, type QueueEntry, type RoundChoice, type StageId } from './facts'
 import type { StoredText } from '../types'
+import { foldLineComments, type LineCommentView } from './lineComments'
 import { baseRulesetId, REVIEW_SKIPPED, rulesBaseId } from './compile'
 
 /** An Override's move when the user applied changed options to a card in flight (§16.11.4, OP-38). */
@@ -300,6 +301,8 @@ export interface WorkView {
   /** This cycle's submissions, oldest first. */
   revisions: WorkRevision[]
   verdicts: WorkVerdict[]
+  /** HI-3219: the card's line comments on its revisions' diffs, oldest first (lineComments.ts). */
+  lineComments: LineCommentView[]
   checks: WorkCheck[]
   marks: WorkMarks
   integration: WorkIntegration | null
@@ -504,6 +507,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     card: c.card,
     stage: s.stage,
     preWorkflow: c.preWorkflow,
+    lineComments: foldLineComments(facts),
     adopted: !!started?.adopted,
     ...(started?.adoptedFrom ? { adoptedFrom: started.adoptedFrom } : {}),
     // The card's kind now, not the one its cycle started with: a change after its start shows at once (HR3's #1277 round 1).

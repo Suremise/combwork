@@ -137,6 +137,8 @@
   "tips.cardCostRounds.title": "每轮评审花了多少",
   "tips.cardDecisions.text": "卡片的“决定”位于评论上方，记录你做出的决定：智能体进入评审前会对照它们检查工作，评审者会判定忽略了某项决定的工作不通过。把决定告诉助手，它会记在那里；正在等你回答的智能体也会收到通知。",
   "tips.cardDecisions.title": "把你的决定写在卡片上",
+  "tips.cardLineComments.text": "在修订版本的“更改”中，将鼠标悬停在某行上并按 + 即可评论该行，也可以先选择多行。评论会保留在卡片上，你可以编辑、解决或重新打开它们。",
+  "tips.cardLineComments.title": "评论卡片工作中的行",
   "tips.cardLinks.text": "智能体或助手输出的卡片编号（如 #12）都是链接：悬停可查看标题和所在列，按住 Ctrl 单击即可打开卡片。",
   "tips.cardLinks.title": "在终端中 Ctrl+单击卡片编号",
   "tips.cardLoop.text": "让一个智能体作为构建者处理一些卡片，另一个负责评审：双方互相等待时不产生费用，卡片有变化时 Combwork 会唤醒它们。",

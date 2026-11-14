@@ -141,6 +141,8 @@ interface CombworkMessageValues {
   'tips.cardCostRounds.title': undefined
   'tips.cardDecisions.text': undefined
   'tips.cardDecisions.title': undefined
+  'tips.cardLineComments.text': undefined
+  'tips.cardLineComments.title': undefined
   'tips.cardLinks.text': undefined
   'tips.cardLinks.title': undefined
   'tips.cardLoop.text': undefined

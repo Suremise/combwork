@@ -559,6 +559,14 @@
     "defaultMessage": "Put what you decide on the card",
     "description": "A tip's title."
   },
+  "tips.cardLineComments.text": {
+    "defaultMessage": "In a revision’s Changes, hover a line and press + to comment on it, or select lines first. Comments stay on the card, where you can edit, resolve or reopen them.",
+    "description": "A tip (HI-3219). Names of Combwork's views and commands (Changes): keep them as Combwork shows them. Glossary: revision."
+  },
+  "tips.cardLineComments.title": {
+    "defaultMessage": "Comment on the lines of a card’s work",
+    "description": "A tip's title (HI-3219). Glossary: work."
+  },
   "tips.cardLinks.text": {
     "defaultMessage": "Card numbers an agent or the Assistant prints, like #12, are links: hover one for its title and column, and Ctrl+click it to open the card.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

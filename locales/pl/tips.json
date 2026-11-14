@@ -137,6 +137,8 @@
   "tips.cardCostRounds.title": "Ile kosztowała każda runda recenzji",
   "tips.cardDecisions.text": "Decyzje karty, nad jej komentarzami, zawierają to, co postanowiono: agenci sprawdzają z nimi swoją pracę przed Recenzją, a recenzenci odrzucają pracę, która którąś pomija. Powiedz Asystentowi o decyzji, a zapisze ją tam; agent czekający na Twoją odpowiedź dostanie informację.",
   "tips.cardDecisions.title": "Zapisz decyzje na karcie",
+  "tips.cardLineComments.text": "W Zmianach rewizji najedź na wiersz i naciśnij +, aby go skomentować, albo najpierw zaznacz wiersze. Komentarze zostają na karcie, gdzie możesz je edytować, rozwiązywać lub otwierać ponownie.",
+  "tips.cardLineComments.title": "Komentuj wiersze pracy karty",
   "tips.cardLinks.text": "Numery kart, które wypisuje agent lub Asystent, np. #12, są linkami: najedź na numer, żeby zobaczyć tytuł i kolumnę, i kliknij z Ctrl, żeby otworzyć kartę.",
   "tips.cardLinks.title": "Ctrl+klik na numerze karty w terminalu",
   "tips.cardLoop.text": "Powiedz jednemu agentowi, żeby jako wykonawca przerobił kilka kart, a drugiemu, żeby je recenzował: każdy czeka na drugiego bez kosztów, a Combwork wybudza go, gdy karta się zmieni.",

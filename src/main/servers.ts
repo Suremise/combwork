@@ -121,6 +121,8 @@ import { workspaceNotesFile } from './workspaceNotes'
 import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
 import { cardStages } from './boardStore'
 import { cardFacts, cardKind, cardReviewSkip, cardTarget, factRow, forYouOfCards } from './workflow/cardWork'
+import { lineCommentsOf } from './workflow/lineComments'
+import { lineCommentCounts, pageOf } from '../shared/workflow/lineComments'
 import type { ForYouItem } from '../shared/workflow/workView'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket, type Recorded } from './workflow/runChecks'
 import { workflowSummary } from './workflow/optionsForm'
@@ -3361,9 +3363,30 @@ route('GET', '/v1/tasks/:n', async ({ params, query }) => {
     ...told,
     ...(archive.archived ? { commentsArchived: archive.archived } : {}),
     ...(archive.mayHaveBeenLost ? { commentsMayHaveBeenLost: true, commentsNote: say(API.card.commentsMayHaveBeenLost) } : {}),
-    ...(all > SPLIT_HINT_COMMENTS ? { hint: say(API.card.splitHint, { n: String(all) }) } : {})
+    ...(all > SPLIT_HINT_COMMENTS ? { hint: say(API.card.splitHint, { n: String(all) }) } : {}),
+    // HI-3219: its line comments as counts only (read in rows from /line-comments), when it has any.
+    ...lineCommentCountsOf(seen.card.number)
   }
   return query.get('history') === 'false' ? withoutHistory(withArchive) : withArchive
+})
+
+/** A card's line comments as counts (HI-3219), or nothing when it has none: a key read only with one card, never a listing. */
+function lineCommentCountsOf(n: number): { lineComments?: { open: number; sent: number; resolved: number } } {
+  const views = lineCommentsOf(workspace, n)
+  return views.length ? { lineComments: lineCommentCounts(views) } : {}
+}
+
+// HI-3219: a card's line comments, a page of rows (state=open, the default, or all), from `offset`, `next` while more remain.
+route('GET', '/v1/tasks/:n/line-comments', async ({ params, query }) => {
+  requireWorkspace()
+  const c = await tasks.readTask(taskNumber(params[0]), await taskActor())
+  const state = query.get('state') ?? 'open'
+  if (state !== 'open' && state !== 'all') throw new HttpError(400, apiSaid(API.card.lineCommentsState, { state }))
+  const rows = lineCommentsOf(workspace, c.number)
+    .filter((x) => state === 'all' || x.state === 'open')
+    .map(({ id, path, side, from, to, state: st, version, lines, before, after, body }) => ({ id, path, side, from, to, state: st, version, lines, before, after, body }))
+  const page = pageOf(rows, Number(query.get('offset') ?? 0))
+  return { number: c.number, lineComments: page.rows, ...(page.next !== undefined ? { next: page.next } : {}) }
 })
 
 /** Past this many comments on a card (its archived ones counted), a read of it suggests splitting it (HI-2641). */

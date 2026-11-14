@@ -11686,6 +11686,75 @@ textarea.input.task-blocked-input {
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
 }
+.card-work-comment-count {
+  margin-inline-start: 8px;
+}
+/* Line comments over a revision's diff (HI-3219): the + in the glyph margin, then each line's threads and draft. */
+.monaco-editor .cw-comment-add {
+  cursor: pointer;
+  border-radius: 3px;
+  background: var(--accent-soft);
+}
+.monaco-editor .cw-comment-add::before {
+  content: '+';
+  display: block;
+  text-align: center;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent-strong);
+}
+.cw-comment-zone {
+  z-index: 5;
+  padding: 2px 12px 2px 4px;
+  box-sizing: border-box;
+}
+.cw-comment-spot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--font-ui, inherit);
+  font-size: 12px;
+  white-space: normal;
+}
+.cw-comment,
+.cw-comment-composer {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--accent);
+  border-radius: 4px;
+  padding: 4px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cw-comment.resolved {
+  border-inline-start-color: var(--border);
+  opacity: 0.75;
+}
+.cw-comment-head,
+.cw-comment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.cw-comment-body p {
+  margin: 0;
+}
+.cw-comment-composer textarea {
+  width: 100%;
+  min-height: 56px;
+  box-sizing: border-box;
+  resize: vertical;
+  font: inherit;
+}
+.cw-comments-elsewhere {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+}
 .card-work-sub {
   color: var(--fg-muted);
   margin-block-start: 4px;

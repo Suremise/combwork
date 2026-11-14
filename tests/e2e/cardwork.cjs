@@ -133,15 +133,52 @@ const commit = (dir, file, text, message) => {
   check('Changes shows the revision’s file and its diff, base to revision', !!(await lib.until(async () => (await changes.locator('[data-revision-file="greet.ts"][aria-current="true"]').count()) === 1 && (await shown.innerText().catch(() => '')).includes('"Hi"') && (await changes.innerText().catch(() => '')).includes(`${base.slice(0, 7)} ↔ ${rev.slice(0, 7)}`), HUNG_MS)), await changes.innerText().catch(() => ''))
   // Through the setting (HR1's round 1): the editor's theme follows it, not the page's attribute alone. Each shot once the
   // editor shows that theme (Monaco's own class: vs-dark or vs).
+  const editorClass = () => shown.evaluate((e) => e.querySelector('.monaco-editor')?.className ?? '').catch(() => '')
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    const editorClass = () => shown.evaluate((e) => e.querySelector('.monaco-editor')?.className ?? '').catch(() => '')
     const editorIn = await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme && /\bvs-dark\b/.test(await editorClass()) === (theme === 'dark') && /\bvs(-dark)?\b/.test(await editorClass()), HUNG_MS)
     check(`the diff shows in the ${theme} theme`, !!editorIn, await editorClass())
     await changes.screenshot({ path: path.join(lib.WORK, `cardwork-changes-${theme}.png`) })
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })
   await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === 'dark', HUNG_MS)
+
+  // --- HI-3219: a line comment on the revision's diff: added with the glyph margin's +, edited, resolved, reopened, deleted.
+  const comments = async () => (await inv('tasks:work', g))?.lineComments ?? []
+  const modifiedLine = rev0.locator('[data-revision-diff="greet.ts"] .editor.modified .view-line').first()
+  await modifiedLine.hover()
+  const plus = rev0.locator('[data-revision-diff="greet.ts"] .editor.modified .cw-comment-add')
+  check('hovering a line shows the + to comment on it', !!(await lib.until(async () => (await plus.count()) === 1, HUNG_MS)))
+  await plus.click()
+  const composer = rev0.locator('[data-comment-composer]')
+  check('pressing it opens a comment box under the line', !!(await lib.until(async () => (await composer.count()) === 1, HUNG_MS)))
+  await composer.locator('textarea').fill('Say **Hello**, not Hi.')
+  await composer.locator('textarea').press('Control+Enter')
+  const one = await lib.until(async () => { const c = await comments(); return c.length === 1 && c[0] }, HUNG_MS)
+  check('Ctrl+Enter saves it on the card: its side, line and the quote read from the commit', one?.side === 'new' && one.from === 1 && one.to === 1 && one.lines === 'export const greet = () => "Hi"' && one.body === 'Say **Hello**, not Hi.' && one.state === 'open' && one.version === 1 && /^lc-.+-\d+$/.test(one.id), JSON.stringify(one))
+  const thread = rev0.locator(`[data-line-comment="${one?.id}"]`)
+  check('it shows under its line, in Markdown, with the revision’s and the file’s open counts', !!(await lib.until(async () => (await thread.locator('.cw-comment-body strong').innerText().catch(() => '')) === 'Hello' && (await composer.count()) === 0 && (await section.locator('[data-revision-open-comments="1"]').count()) === 1 && (await rev0.locator('[data-file-comments="greet.ts"]').innerText().catch(() => '')) === '1 open comment', HUNG_MS)), await rev0.innerText().catch(() => ''))
+  for (const theme of ['dark', 'light']) {
+    await inv('settings:update', { appearance: { theme } })
+    await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme && /\bvs-dark\b/.test(await editorClass()) === (theme === 'dark'), HUNG_MS)
+    await changes.screenshot({ path: path.join(lib.WORK, `cardwork-comment-${theme}.png`) })
+  }
+  await inv('settings:update', { appearance: { theme: 'dark' } })
+  await thread.getByRole('button', { name: 'Edit' }).click()
+  await thread.locator('textarea').fill('Say Hello.')
+  await thread.locator('textarea').press('Control+Enter')
+  check('Edit changes its text and raises its version', !!(await lib.until(async () => { const c = (await comments())[0]; return c?.body === 'Say Hello.' && c.version === 2 }, HUNG_MS)), JSON.stringify(await comments()))
+  const stale = await inv('tasks:lineCommentChange', g, one.id, { edit: { body: 'Old view', version: 1 } }).then(() => null, (e) => String(e?.message ?? e))
+  check('an edit from an older version is refused', /changed meanwhile/.test(stale ?? ''), String(stale))
+  await thread.getByRole('button', { name: 'Resolve' }).click()
+  check('Resolve marks it resolved, and it no longer counts as open', !!(await lib.until(async () => (await comments())[0]?.state === 'resolved' && (await section.locator('[data-revision-open-comments]').count()) === 0 && (await thread.getAttribute('data-state').catch(() => '')) === 'resolved', HUNG_MS)))
+  await thread.getByRole('button', { name: 'Reopen' }).click()
+  check('Reopen opens it again', !!(await lib.until(async () => (await comments())[0]?.state === 'open', HUNG_MS)))
+  await thread.getByRole('button', { name: 'Delete' }).click()
+  check('Delete takes back a comment never sent', !!(await lib.until(async () => (await comments()).length === 0 && (await thread.count()) === 0, HUNG_MS)))
+  const empty = await inv('tasks:lineCommentAdd', g, { submission: sub, path: 'greet.ts', side: 'new', from: 1, to: 1, body: '   ' }).then(() => null, (e) => String(e?.message ?? e))
+  const past = await inv('tasks:lineCommentAdd', g, { submission: sub, path: 'greet.ts', side: 'new', from: 1, to: 9, body: 'x' }).then(() => null, (e) => String(e?.message ?? e))
+  check('an empty comment, and lines past the file’s end, are refused', /needs some text/.test(empty ?? '') && /aren’t in that side/.test(past ?? ''), `${empty} | ${past}`)
   await rev0.getByRole('button', { name: 'Changes' }).click()
   check('…and hides on a second click', !!(await lib.until(async () => (await changes.count()) === 0, HUNG_MS)))
   lib.git(alpha, ['checkout', '--', 'greet.ts'])

@@ -137,6 +137,8 @@
   "tips.cardCostRounds.title": "Lo que costó cada ronda de revisión",
   "tips.cardDecisions.text": "Las Decisiones de una tarjeta, encima de sus comentarios, guardan lo que decidiste: los agentes comprueban su trabajo con ellas antes de Revisión, y los revisores rechazan el trabajo que ignore alguna. Dile una decisión al Asistente y la anota ahí; si un agente espera tu respuesta, se le avisa.",
   "tips.cardDecisions.title": "Pon en la tarjeta lo que decides",
+  "tips.cardLineComments.text": "En Cambios de una versión, pasa el cursor sobre una línea y pulsa + para comentarla, o selecciona líneas antes. Los comentarios quedan en la tarjeta, donde puedes editarlos, resolverlos o reabrirlos.",
+  "tips.cardLineComments.title": "Comenta las líneas del trabajo de una tarjeta",
   "tips.cardLinks.text": "Los números de tarjeta que imprime un agente o el Asistente, como #12, son enlaces: pasa el puntero por uno para ver su título y su columna, y haz Ctrl+clic para abrir la tarjeta.",
   "tips.cardLinks.title": "Ctrl+clic en un número de tarjeta en la terminal",
   "tips.cardLoop.text": "Dile a un agente que trabaje en unas tarjetas como autor y a otro que las revise: cada uno espera al otro sin costo, y Combwork lo despierta cuando la tarjeta cambia.",

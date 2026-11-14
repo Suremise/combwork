@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Comment on the lines of a card's work** (HI-3219). In a revision's **Changes**, hover a line and press **+** (or select lines first) to leave a comment in Markdown. Comments stay on the card, each on the revision it was made on, with Edit, Resolve, Reopen and Delete; the Work section counts the open ones. Agents can read them too.
+
 - **A card's revisions show their own diff** (HI-3218). In the card dialog's Work section, **Changes** on a revision shows its files and each one's diff from where the work started to that revision, read from the commits, so it's what was submitted even once the folder has moved on. Git and jj projects.
 
 - **Combwork offers to move on once a release ships** (HI-3155). When a project's Work merges into is released (tagged, as `v1.4.0`, and merged into `main`), For you offers to move it to the next version, or to start it, and to take released branches nothing uses off Other branches work can merge into. Move… opens Workflow's Save… with what can follow; Not now hides it until something changes. The Assistant sees it too, and acts only once you say so. Git and jj projects.

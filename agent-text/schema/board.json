@@ -55,5 +55,40 @@
     "placeholders": {
       "path": "plain"
     }
+  },
+  "board.work.comments.binary": {
+    "placeholders": {}
+  },
+  "board.work.comments.changed": {
+    "placeholders": {}
+  },
+  "board.work.comments.empty": {
+    "placeholders": {}
+  },
+  "board.work.comments.lines": {
+    "placeholders": {
+      "from": "number",
+      "to": "number",
+      "path": "plain"
+    }
+  },
+  "board.work.comments.noCard": {
+    "placeholders": {}
+  },
+  "board.work.comments.noComment": {
+    "placeholders": {}
+  },
+  "board.work.comments.sent": {
+    "placeholders": {}
+  },
+  "board.work.comments.tooLong": {
+    "placeholders": {
+      "max": "number"
+    }
+  },
+  "board.work.comments.tooMany": {
+    "placeholders": {
+      "max": "number"
+    }
   }
 }

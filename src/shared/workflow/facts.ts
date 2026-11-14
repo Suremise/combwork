@@ -496,6 +496,18 @@ export interface FactData {
   Finished: { how: FinishHow; verified: string | null; claimed?: string | null; by?: 'user' | 'assistant'; reason?: string }
   /** A step of a finish done, or left (`superseded`: what it was for is no longer so), once each (HI-2014). */
   FinishStep: { finish: number; step: FinishStepId; outcome: 'done' | 'superseded'; why?: string }
+  /**
+   * HI-3219: a comment on lines `from`..`to` of one submission's file (lineComments.ts): `new` in its revision, `old` (deleted
+   * lines) in its base. `lines`, `before` and `after` are the quote and its context as main read them from the commits,
+   * cut by characters (LINE_COMMENT_LIMITS); `body` is the writer's Markdown. Its id: `lc-<card key>-<this fact's seq>`.
+   */
+  LineComment: { id: string; submission: number; side: 'new' | 'old'; path: string; from: number; to: number; lines: string; before: string; after: string; body: string }
+  /** A comment's Markdown changed: its `version` (1 as written) raised. */
+  LineCommentEdited: { id: string; body: string; version: number }
+  LineCommentResolved: { id: string }
+  LineCommentReopened: { id: string }
+  /** A comment taken back, only while it was never sent to the builder. */
+  LineCommentDeleted: { id: string }
 }
 
 /** How a card reached Done (HI-2014): the queue, a builder's merge report (checked or not), accepted, an override, a board move. */

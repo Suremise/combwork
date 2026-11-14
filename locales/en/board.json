@@ -4151,6 +4151,10 @@
     "defaultMessage": "{path} isn't one of this submission's files.",
     "description": "A card's revision diff couldn't be shown: the file isn't among the files the submission changed."
   },
+  "board.work.changes.openComments": {
+    "defaultMessage": "{n, plural, one {# open comment} other {# open comments}}",
+    "description": "Beside a file in the list of a revision's files in the card dialog (HI-3219): how many of the card's line comments on that file are open."
+  },
   "board.work.changes.reading": {
     "defaultMessage": "Reading its changes…",
     "description": "The card dialog's view of a revision's changes while the chosen file's diff is being read."
@@ -4166,6 +4170,98 @@
   "board.work.check": {
     "defaultMessage": "{name}: {result, select, passed {passed} failed {failed} other {stopped}}{counted, select, no { (not counted)} other {}}",
     "description": "A check under a revision in the card dialog's Work section: its name (typecheck, as the project names it), then a colon and how it ended; (not counted) when it doesn't count for the revision (its hover says why). Keep the select keys. Glossary: check."
+  },
+  "board.work.comments.add": {
+    "defaultMessage": "Comment on this line, or on the lines selected",
+    "description": "The tooltip of the + beside a line of a card revision's diff (HI-3219): opens a box to comment on that line, or on the lines selected if it is beside one of them."
+  },
+  "board.work.comments.binary": {
+    "defaultMessage": "Lines of a binary file, or of one too large to compare, can’t be commented on.",
+    "description": "A line comment couldn't be added: the file is binary, or too large for its diff to be shown."
+  },
+  "board.work.comments.cancel": {
+    "defaultMessage": "Cancel",
+    "description": "A button under a line comment being written or edited: drops what was typed."
+  },
+  "board.work.comments.changed": {
+    "defaultMessage": "That comment was changed meanwhile: look at it again.",
+    "description": "A line comment's edit couldn't be saved: someone changed the comment since it was opened for editing."
+  },
+  "board.work.comments.delete": {
+    "defaultMessage": "Delete",
+    "description": "A button on a line comment not yet sent to the card's builder: takes it back."
+  },
+  "board.work.comments.edit": {
+    "defaultMessage": "Edit",
+    "description": "A button on a line comment on a card revision's diff: changes its text."
+  },
+  "board.work.comments.edited": {
+    "defaultMessage": "edited",
+    "description": "A mark beside a line comment's time: its text was changed after it was written."
+  },
+  "board.work.comments.elsewhere": {
+    "defaultMessage": "Comments on the original side (shown side by side)",
+    "description": "A heading above a card revision's diff while it shows inline: the comments on lines of the original file, which the inline diff doesn't show, are listed here; side by side shows them on their lines."
+  },
+  "board.work.comments.empty": {
+    "defaultMessage": "A comment needs some text.",
+    "description": "A line comment on a card's revision diff couldn't be saved: its text is empty."
+  },
+  "board.work.comments.length": {
+    "defaultMessage": "{n, number} / {max, number}",
+    "description": "Under a line comment being written: how many characters it has, of the most it may have."
+  },
+  "board.work.comments.lines": {
+    "defaultMessage": "Lines {from} to {to} aren’t in that side of {path}.",
+    "description": "A line comment couldn't be added: the lines it names ({from} to {to}: line numbers, never formatted as amounts) aren't in that side (the original or the changed version) of the file {path}."
+  },
+  "board.work.comments.noCard": {
+    "defaultMessage": "This card’s work can’t be read, so it can’t take comments.",
+    "description": "A line comment couldn't be saved: the card's work record (its facts) can't be read: a card from before 1.0, or its project has none."
+  },
+  "board.work.comments.noComment": {
+    "defaultMessage": "That comment is no longer on this card.",
+    "description": "A line comment couldn't be changed: it was deleted meanwhile."
+  },
+  "board.work.comments.placeholder": {
+    "defaultMessage": "Comment in Markdown (Ctrl+Enter to save)",
+    "description": "The empty comment box under a line of a card revision's diff: the comment is written in Markdown, and Ctrl+Enter saves it."
+  },
+  "board.work.comments.reopen": {
+    "defaultMessage": "Reopen",
+    "description": "A button on a resolved line comment on a card revision's diff: makes it open again."
+  },
+  "board.work.comments.resolve": {
+    "defaultMessage": "Resolve",
+    "description": "A button on an open line comment on a card revision's diff: marks it dealt with."
+  },
+  "board.work.comments.resolved": {
+    "defaultMessage": "Resolved",
+    "description": "A mark on a line comment on a card revision's diff: it was dealt with."
+  },
+  "board.work.comments.save": {
+    "defaultMessage": "Save",
+    "description": "A button under a line comment being written or edited on a card revision's diff: saves it."
+  },
+  "board.work.comments.sent": {
+    "defaultMessage": "A comment sent to the builder can’t be deleted: resolve it instead.",
+    "description": "A line comment couldn't be deleted: it was already sent to the card's builder, so it can only be resolved. Glossary: builder."
+  },
+  "board.work.comments.tooLong": {
+    "defaultMessage": "A comment can be at most {max, number} characters.",
+    "description": "A line comment on a card's revision diff couldn't be saved: its text is longer than {max} characters."
+  },
+  "board.work.comments.tooMany": {
+    "defaultMessage": "This card has {max, number} open comments already: resolve some first.",
+    "description": "A line comment couldn't be added or reopened: the card already has the most open comments it can have ({max})."
+  },
+  "board.work.comments.where": {
+    "defaultMessage": "{side, select, old {Original} other {Changed}} {from}{same, select, yes {} other {–{to}}}",
+    "description": "Where a line comment is, above it: which side of the diff (old: the original file; other: the changed one) and its line, or its first and last lines (12–14): line numbers, never formatted as amounts. Keep the select keys."
+  },
+  "board.work.comments.you": {
+    "defaultMessage": "You",
+    "description": "Who wrote a line comment on a card revision's diff, when it was the user."
   },
   "board.work.doneUnproved": {
     "defaultMessage": "Done by you, integration not proved ({when}).",
@@ -4230,6 +4326,10 @@
   "board.work.notReady": {
     "defaultMessage": "Not started in {slot} yet: {stale, select, yes {another jj workspace rewrote its working copy, so it is stale. Recover it under Version Control → Slots and copies, and the card is prepared there again.} other {Combwork couldn’t get it ready ({why}).}}",
     "description": "The card dialog's Work section (HI-2913): the card's slot ({slot}, slot-a) couldn't be prepared for its start, so its work hasn't started there. {stale} yes: the slot is a stale jj workspace (another workspace rewrote the commit it works on), which the user mends with Recover… in the Slots and copies list; other: {why} is the reason, in English as its builder was told. Keep the select keys."
+  },
+  "board.work.openComments": {
+    "defaultMessage": "{n, plural, one {# open comment} other {# open comments}}",
+    "description": "In the card dialog's Work section (HI-3219): how many of the card's line comments on its revisions' diffs are open, beside the revisions heading and on each revision that has some."
   },
   "board.work.openFile": {
     "defaultMessage": "Open {path} in Files",
