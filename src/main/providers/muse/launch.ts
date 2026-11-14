@@ -38,8 +38,9 @@ export const utf8Bytes = (text: string): number => Buffer.byteLength(text, 'utf8
 
 /**
  * What the SessionStart hook prints (`printed`) and, when the guidance is over `max` bytes, the whole of it for its own
- * file (`full`): Muse keeps only the first `max` bytes of a hook's output (1.4.20 cut a 20 KB one at 16,384), so a
- * guidance that doesn't fit whole is never sent cut; a pointer to the file is, which names the very file the launch
+ * file (`full`): 1.4.20 keeps a hook's output of up to `max` bytes whole and none of a longer one (16,384 kept, 16,385
+ * dropped: tests/fixtures/muse/guidance-limit-1.4.20.json), so a guidance that doesn't fit is never printed; a pointer
+ * to the file is, which names the very file the launch
  * writes. A pointer that wouldn't fit either (a path absurdly long) leaves nothing printed: `tooLong`.
  */
 export function startContext(guidance: string, max: number, fullPath: string): { printed: string; full: string | null; tooLong?: true } {
