@@ -287,7 +287,8 @@ const commit = (dir, file, text, message) => {
   // Mark the box itself: a remounted one is a new element without the mark.
   await editBox.evaluate((e) => { e.dataset.probe = 'kept' })
   const editKept = async () => (await k1Thread.locator('textarea[data-probe="kept"]').count()) === 1 && (await editBox.inputValue().catch(() => '')) === 'Half-typed edit'
-  await ktRev.locator('[data-revision-diff="lines.ts"] .editor.modified .view-line').nth(2).hover()
+  // Line 3 by its text: Monaco's lines aren't in line order in the page.
+  await ktRev.locator('[data-revision-diff="lines.ts"] .editor.modified .view-line', { hasText: 'three' }).hover()
   const ktPlus = ktRev.locator('[data-revision-diff="lines.ts"] .editor.modified .cw-comment-add')
   await lib.until(async () => (await ktPlus.count()) === 1, HUNG_MS)
   await ktPlus.click()
