@@ -1029,6 +1029,19 @@ interface CombworkMessageValues {
   'board.work.branch': undefined
   'board.work.carriedOver': { from: string | number; to: string | number }
   'board.work.change': { commits: number; change: string | number }
+  'board.work.changes': undefined
+  'board.work.changes.between': { base: string | number; revision: string | number }
+  'board.work.changes.binary': undefined
+  'board.work.changes.failed': { error: string | number }
+  'board.work.changes.files': undefined
+  'board.work.changes.inline': undefined
+  'board.work.changes.noRepository': undefined
+  'board.work.changes.noRevision': undefined
+  'board.work.changes.noSubmission': undefined
+  'board.work.changes.notListed': { path: string | number }
+  'board.work.changes.reading': undefined
+  'board.work.changes.retry': undefined
+  'board.work.changes.sideBySide': undefined
   'board.work.check': { name: string | number; result: string; counted: string }
   'board.work.doneUnproved': { when: string | number }
   'board.work.failed': { error: string | number }

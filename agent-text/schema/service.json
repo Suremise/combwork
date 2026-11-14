@@ -896,6 +896,16 @@
   "service.intent.queueNotAgents": {
     "placeholders": {}
   },
+  "service.jj.revisionNoRepo": {
+    "placeholders": {}
+  },
+  "service.jj.revisionUnreadable": {
+    "placeholders": {
+      "path": "plain",
+      "commit": "plain",
+      "error": "plain"
+    }
+  },
   "service.keys.closed": {
     "placeholders": {}
   },

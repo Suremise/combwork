@@ -620,6 +620,8 @@ export interface CombworkRequests {
   'tasks:start': (n: number, target: TaskStartTarget, opts?: { confirm?: boolean; reason?: string; released?: string }) => { agentId: string; agentName: string; added: boolean } | { ask: string[]; released?: string }
   /** A card's work (#1223): its facts folded into its line, revisions, verdicts, checks, marks and integration; null with no such card, or on a board not upgraded to 1.0. */
   'tasks:work': (n: number) => WorkView | null
+  /** HI-3218: one file of a card's submission (its fact's number, WorkRevision.submission), from its base to its revision. */
+  'tasks:revisionDiff': (n: number, submission: number, file: string) => GitDiff
   /** Every live card's badges from its work (#1223), in number order; archived cards aren't read. */
   'tasks:workBadges': () => WorkBadge[]
 

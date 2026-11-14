@@ -1,6 +1,7 @@
 // A card's work in the window (#1224): a card a fake Claude Code builder takes through Doing → Review, and its reviewer
 // passes, shows its Work section in the card dialog (its branch, base and folder; the revision submitted, round 1, by the
-// builder, its file, which opens in Files; the reviewer's pass) and its badges on the board card (the revision, the
+// builder, its file, which opens in Files; its own diff from base to revision, read from the commits (HI-3218); the
+// reviewer's pass) and its badges on the board card (the revision, the
 // verdict); a card of a project with no version control shows its work with no branch; a card from before 1.0 says it has
 // no work record. What couldn't be read, and a card sent to Review with no agent (nothing read before the change), in the
 // window's own words, in English and German (#1477). Screenshots of the section (Git and None, both themes, narrow; the
@@ -117,6 +118,27 @@ const commit = (dir, file, text, message) => {
   await section.locator('.card-work-rev').first().getByRole('button', { name: '1 file changed' }).click()
   const file = section.locator('.card-work-files button', { hasText: 'greet.ts' })
   check('its files show on a click', !!(await lib.until(async () => (await file.count()) === 1, HUNG_MS)))
+
+  // --- HI-3218: the revision's own diff, base to revision, from the commits (the working tree moves on meanwhile).
+  const sub = work.revisions[0].submission
+  fs.writeFileSync(path.join(alpha, 'greet.ts'), 'export const greet = () => "uncommitted"\n')
+  const read = await inv('tasks:revisionDiff', g, sub, 'greet.ts').catch((e) => ({ error: String(e?.message ?? e) }))
+  check('its diff is read from the commits: added at the revision, never the working tree', read?.original === '' && read?.modified === 'export const greet = () => "Hi"\n' && read?.binary === false, JSON.stringify(read))
+  const notListed = await inv('tasks:revisionDiff', g, sub, 'package.json').then(() => null, (e) => String(e?.message ?? e))
+  check('a file the submission doesn’t list is refused', /isn't one of this submission's files/.test(notListed ?? ''), String(notListed))
+  const rev0 = section.locator('.card-work-rev').first()
+  await rev0.getByRole('button', { name: 'Changes' }).click()
+  const changes = rev0.locator(`[data-revision-changes="${sub}"]`)
+  const shown = rev0.locator('[data-revision-diff="greet.ts"] .monaco')
+  check('Changes shows the revision’s file and its diff, base to revision', !!(await lib.until(async () => (await changes.locator('[data-revision-file="greet.ts"][aria-current="true"]').count()) === 1 && (await shown.innerText().catch(() => '')).includes('"Hi"') && (await changes.innerText().catch(() => '')).includes(`${base.slice(0, 7)} ↔ ${rev.slice(0, 7)}`), HUNG_MS)), await changes.innerText().catch(() => ''))
+  for (const theme of ['dark', 'light']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+    await changes.screenshot({ path: path.join(lib.WORK, `cardwork-changes-${theme}.png`) })
+  }
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+  await rev0.getByRole('button', { name: 'Changes' }).click()
+  check('…and hides on a second click', !!(await lib.until(async () => (await changes.count()) === 0, HUNG_MS)))
+  lib.git(alpha, ['checkout', '--', 'greet.ts'])
   await section.scrollIntoViewIfNeeded()
   for (const theme of ['dark', 'light']) {
     await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)

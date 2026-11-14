@@ -167,6 +167,17 @@ export async function compareDiff(root: string, baseName: string, headName: stri
   const [pb, ph] = await Promise.all([pinnedCommit(root, pinned?.base), pinnedCommit(root, pinned?.head)])
   const [base, head] = pb && ph ? [pb, ph] : await Promise.all([branchTip(root, baseName), branchTip(root, headName)])
   const from = (await mergeBaseOf(root, base, head)) ?? base
+  return commitDiff(root, from, head, path)
+}
+
+/**
+ * One file as it was at commit `from` against commit `to` (HI-3218: a card's submission, its base to its revision; a
+ * comparison, where head left base to head). Commits only, never the working tree; a side the file isn't on is empty
+ * (added or deleted), a large side is said, never read, and a binary one is said as binary.
+ */
+export async function commitDiff(root: string, from: string, to: string, file: string): Promise<GitDiff> {
+  const path = String(file ?? '').replace(/\\/g, '/')
+  const head = to
   // HI-2864: a side that is a gitlink (by its mode, even when its commit is in this store) is git's own line, never read.
   const link = await gitlinkChange(root, [from, head], path)
   const side = (s: GitlinkSide | undefined, rev: string): Promise<{ buf: Buffer } | { size: number }> =>

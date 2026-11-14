@@ -41,5 +41,19 @@
   },
   "board.error.upgradeFirstStart": {
     "placeholders": {}
+  },
+  "board.work.changes.noRepository": {
+    "placeholders": {}
+  },
+  "board.work.changes.noRevision": {
+    "placeholders": {}
+  },
+  "board.work.changes.noSubmission": {
+    "placeholders": {}
+  },
+  "board.work.changes.notListed": {
+    "placeholders": {
+      "path": "plain"
+    }
   }
 }

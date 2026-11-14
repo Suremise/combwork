@@ -145,6 +145,8 @@
   "tips.cardMove.title": "Odsuń okno dialogowe",
   "tips.cardReadFirst.text": "W polu „Przeczytaj najpierw” karty wypisz potrzebne jej sekcje dokumentów, np. docs/PLAN.md#setup: prompt startowy agenta je wymienia, więc czyta te sekcje zamiast całego planu. Kliknij jedną, żeby ją przeczytać w Combwork.",
   "tips.cardReadFirst.title": "Wskaż karcie potrzebne dokumenty",
+  "tips.cardRevisionChanges.text": "W sekcji Praca karty przycisk Zmiany przy rewizji pokazuje każdy jej plik od miejsca, w którym zaczęła się praca, do tej rewizji, tak jak został przesłany, nawet gdy folder jest już dalej.",
+  "tips.cardRevisionChanges.title": "Zobacz dokładnie, co zmieniła rewizja",
   "tips.cardSummaries.text": "Agenci zaczynają raport lub werdykt recenzji karty jednym wierszem mówiącym, co jest gotowe lub co znaleziono, a szczegóły dają niżej; oni i Asystent czytają tylko te wiersze, gdy to wystarcza.",
   "tips.cardSummaries.title": "Raporty zaczynają się od sedna",
   "tips.cardWork.text": "Otwórz kartę: jej sekcja Praca pokazuje każdą rewizję przesłaną do recenzji, z rundą, plikami, werdyktami i sprawdzeniami, oraz to, jak ją scalono. Na tablicy karta pokazuje swoją rewizję i ostatni werdykt.",
