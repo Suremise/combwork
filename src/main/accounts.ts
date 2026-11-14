@@ -1160,12 +1160,14 @@ async function trustTestHold(): Promise<void> {
 async function readTrustOnce(id: string, projects: Projects): Promise<TrustAnswer | null> {
   await trustTestHold()
   const a = getAccount(id)
-  const read = a && provider(a.provider).accounts?.connectionTrusts
+  // Each part's member is called on its part (HI-3201: a part may be an object of its own, not the adapter).
+  const accounts = a ? provider(a.provider).accounts : undefined
+  const read = accounts?.connectionTrusts?.bind(accounts)
   if (!a || !read) return null
   // No folder it would be used in here (HI-1871): nothing to read, nothing pending.
   if (!projects.length) return { pending: [], unknown: false }
   const targets = await trustTargets(projects)
-  const got = await read.call(provider(a.provider), accountFolder(id), targets).catch(() => targets.map(() => null))
+  const got = await read(accountFolder(id), targets).catch(() => targets.map(() => null))
   // Not trusted: asked at its root, or where the CLI's own reading says (Codex: the project's own folder's entry).
   const askAt = (t: ProjectTarget, r: TrustReading): string | null => (r === false ? t.root : r && typeof r === 'object' ? r.at : null)
   return { pending: targets.flatMap((t, i) => {
@@ -1284,12 +1286,13 @@ const projectsFor = (a: Account): { name: string; path: string }[] => {
 export async function readSetUp(id: string): Promise<void> {
   const a = getAccount(id)
   if (!a) return
-  const read = provider(a.provider).accounts?.connectionSetUp
+  const accounts = provider(a.provider).accounts
+  const read = accounts?.connectionSetUp?.bind(accounts)
   if (!read) return
   const gen = generation(id)
   let now: boolean | null
   try {
-    now = await read.call(provider(a.provider), accountFolder(id))
+    now = await read(accountFolder(id))
   } catch {
     now = null
   }
@@ -1615,7 +1618,8 @@ function changed(id: string): void {
  */
 async function loginStamp(id: string): Promise<string | null> {
   const a = getAccount(id)
-  const isLogin = a && provider(a.provider).accounts?.accountLoginFile?.bind(provider(a.provider))
+  const accounts = a ? provider(a.provider).accounts : undefined
+  const isLogin = accounts?.accountLoginFile.bind(accounts)
   if (!isLogin) return null
   const dir = accountFolder(id)
   try {
@@ -1667,9 +1671,10 @@ export const accountWatched = (id: string): boolean => !!watched.get(id)?.w
 export function accountFolderEvent(id: string, name: string | Buffer | null): void {
   const a = getAccount(id)
   if (!a) return
-  const isLogin = provider(a.provider).accounts?.accountLoginFile
+  const accounts = provider(a.provider).accounts
+  const isLogin = accounts?.accountLoginFile.bind(accounts)
   // No name (some changes on Windows, a busy folder's above all): compared like a login file's.
-  if (typeof name !== 'string' || !isLogin || isLogin.call(provider(a.provider), name)) noticed(id)
+  if (typeof name !== 'string' || !isLogin || isLogin(name)) noticed(id)
 }
 
 function attach(id: string): void {

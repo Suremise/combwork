@@ -5107,7 +5107,7 @@ class SessionManager {
           { status: l.state.status, settingUp: l.state.settingUp, stopRequested: !!l.stopRequested || this.shuttingDown, backgroundJob: !!job, resumed: !!l.resumed },
           code,
           output,
-          { name: l.adapter.descriptor.name, startHint: l.adapter.launch.startHint?.bind(l.adapter) }
+          { name: l.adapter.descriptor.name, startHint: l.adapter.launch.startHint?.bind(l.adapter.launch) }
         )
       : undefined
     if (failure) {
@@ -5458,7 +5458,7 @@ class SessionManager {
    */
   private async readTurns(l: LiveSession, path: string, size: number): Promise<void> {
     const w = l.hooksWatch
-    const turnsOf = l.adapter.transcript?.transcriptTurns?.bind(l.adapter)
+    const turnsOf = l.adapter.transcript?.transcriptTurns?.bind(l.adapter.transcript)
     // Still its transcript (a hook may have named another file while the look before this read waited): else it isn't read.
     if (!w || !turnsOf || l.transcriptPath !== path) return
     const sessionId = l.state.sessionId
@@ -5719,7 +5719,7 @@ class SessionManager {
    */
   cliAsks(projectPath: string, agentId: string): boolean {
     const l = this.live.get(liveId(projectPath, agentId))
-    const ask = l?.adapter?.terminal?.idleQuestion?.bind(l.adapter)
+    const ask = l?.adapter?.terminal?.idleQuestion?.bind(l.adapter.terminal)
     const screen = ask ? l!.screen?.text() : null
     return !!screen && !!ask!(screen)
   }

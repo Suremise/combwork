@@ -11,6 +11,7 @@ import { PROVIDERS } from '../src/shared/providers'
 import { PROVIDER_MODULES } from '../src/shared/providers/registry'
 import { orderedAdapters } from '../src/main/providers/index'
 import type { ProviderAdapter } from '../src/main/providers/types'
+import type { CallExpression } from '@babel/types'
 
 const traverse = ((traverseModule as unknown as { default?: typeof traverseModule }).default ?? traverseModule) as typeof traverseModule
 const ROOT = resolve(__dirname, '..')
@@ -167,6 +168,32 @@ describe('the provider registry (HI-3201)', () => {
       }
     }
     expect(bad).toEqual([])
+  })
+
+  it("binds or calls a part's member only on that part (HR2's round 1: a part may be an object of its own)", () => {
+    const PARTS = new Set(['install', 'launch', 'hooks', 'status', 'terminal', 'modes', 'transcript', 'usage', 'accounts', 'githubHost', 'models', 'compaction', 'projectFiles', 'background', 'lifecycle', 'adminSnippet'])
+    const bad: string[] = []
+    for (const file of checkedFiles()) {
+      const code = readFileSync(file, 'utf8')
+      if (!/\.(bind|call|apply)\(/.test(code)) continue
+      const ast = parse(code, { sourceType: 'module', plugins: ['typescript', 'jsx'], errorRecovery: true })
+      const text = (n: { start?: number | null; end?: number | null }): string => code.slice(n.start ?? 0, n.end ?? 0).replace(/[?!]/g, '')
+      traverse(ast, {
+        'CallExpression|OptionalCallExpression'(p) {
+          const node = p.node as CallExpression
+          const callee = node.callee
+          if ((callee.type !== 'MemberExpression' && callee.type !== 'OptionalMemberExpression') || callee.property.type !== 'Identifier' || !['bind', 'call', 'apply'].includes(callee.property.name)) return
+          // <owner>.<part>.<member>.bind(<receiver>): the receiver must be <owner>.<part>.
+          const member = callee.object
+          if ((member.type !== 'MemberExpression' && member.type !== 'OptionalMemberExpression') || member.object.type === 'ThisExpression') return
+          const part = member.object
+          if ((part.type !== 'MemberExpression' && part.type !== 'OptionalMemberExpression') || part.property.type !== 'Identifier' || !PARTS.has(part.property.name)) return
+          const receiver = node.arguments[0]
+          if (!receiver || text(receiver) !== text(part)) bad.push(`${relative(ROOT, file)}:${p.node.loc?.start.line}: ${code.slice(p.node.start ?? 0, p.node.end ?? 0).slice(0, 120)}`)
+        }
+      })
+    }
+    expect(bad, "take the part first and bind its member to it (const part = adapter.x; part?.m?.bind(part))").toEqual([])
   })
 
   it("puts the adapters in the registry's order, and refuses one missing, one unregistered or two for a provider", () => {
