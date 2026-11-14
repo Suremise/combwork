@@ -1095,6 +1095,22 @@ interface CombworkMessageValues {
   'board.work.revisionNotRead': { note: string; why: string | number }
   'board.work.revisions': undefined
   'board.work.round': { round: number }
+  'board.work.send.alreadySent': undefined
+  'board.work.send.button': { n: number; builder: string | number }
+  'board.work.send.changed': undefined
+  'board.work.send.editedSince': undefined
+  'board.work.send.integrated': undefined
+  'board.work.send.intro': { builder: string | number }
+  'board.work.send.itemsChanged': undefined
+  'board.work.send.noBuilder': undefined
+  'board.work.send.notHere': undefined
+  'board.work.send.nothing': undefined
+  'board.work.send.reading': undefined
+  'board.work.send.replace': { reviewer: string | number }
+  'board.work.send.reviewing': { reviewer: string | number }
+  'board.work.send.send': { n: number }
+  'board.work.send.sentBefore': undefined
+  'board.work.send.title': { builder: string | number }
   'board.work.staleChange': { approved: string | number; current: string | number }
   'board.work.staleDecision': undefined
   'board.work.staleNext': { approved: string | number }

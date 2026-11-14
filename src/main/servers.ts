@@ -121,7 +121,7 @@ import { workspaceNotesFile } from './workspaceNotes'
 import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
 import { cardStages } from './boardStore'
 import { cardFacts, cardKind, cardReviewSkip, cardTarget, factRow, forYouOfCards } from './workflow/cardWork'
-import { lineCommentsOf } from './workflow/lineComments'
+import { feedbackRead, lineCommentsOf } from './workflow/lineComments'
 import { lineCommentCounts, pageOf } from '../shared/workflow/lineComments'
 import type { ForYouItem } from '../shared/workflow/workView'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket, type Recorded } from './workflow/runChecks'
@@ -3387,6 +3387,16 @@ route('GET', '/v1/tasks/:n/line-comments', async ({ params, query }) => {
     .map(({ id, path, side, from, to, state: st, version, lines, before, after, body }) => ({ id, path, side, from, to, state: st, version, lines, before, after, body }))
   const page = pageOf(rows, Number(query.get('offset') ?? 0))
   return { number: c.number, lineComments: page.rows, ...(page.next !== undefined ? { next: page.next } : {}) }
+})
+
+// HI-3220: a batch of line comments the user sent to the card's builder, each as it was sent, a page from `offset`, `next` while more remain.
+route('GET', '/v1/tasks/:n/feedback/:batch', async ({ params, query }) => {
+  requireWorkspace()
+  const c = await tasks.readTask(taskNumber(params[0]), await taskActor())
+  const batch = decodeURIComponent(params[1])
+  const read = feedbackRead(workspace, c.number, batch, Number(query.get('offset') ?? 0))
+  if (!read) throw new HttpError(404, apiSaid(API.card.noFeedback, { card: cardRef(c.number), batch }))
+  return { number: c.number, ...read }
 })
 
 /** Past this many comments on a card (its archived ones counted), a read of it suggests splitting it (HI-2641). */

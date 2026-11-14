@@ -13,7 +13,7 @@ import { LINE_COMMENT_LIMITS, type LineCommentView, type LineSide } from '@share
 import { call, errorMessage } from '../api'
 import { cx, timeAgo } from '../util'
 import { loadMonaco } from './Editors'
-import { Markdown } from './ui'
+import { Markdown, Modal } from './ui'
 
 const M = {
   add: msg({ id: 'board.work.comments.add', defaultMessage: 'Comment on this line, or on the lines selected', description: "The tooltip of the + beside a line of a card revision's diff (HI-3219): opens a box to comment on that line, or on the lines selected if it is beside one of them." }),
@@ -29,6 +29,14 @@ const M = {
   you: msg({ id: 'board.work.comments.you', defaultMessage: 'You', description: "Who wrote a line comment on a card revision's diff, when it was the user." }),
   lines: msg({ id: 'board.work.comments.where', defaultMessage: '{side, select, old {Original} other {Changed}} {from}{same, select, yes {} other {–{to}}}', description: "Where a line comment is, above it: which side of the diff (old: the original file; other: the changed one) and its line, or its first and last lines (12–14): line numbers, never formatted as amounts. Keep the select keys." }),
   elsewhere: msg({ id: 'board.work.comments.elsewhere', defaultMessage: 'Comments on the original side (shown side by side)', description: "A heading above a card revision's diff while it shows inline: the comments on lines of the original file, which the inline diff doesn't show, are listed here; side by side shows them on their lines." }),
+  sendButton: msg({ id: 'board.work.send.button', defaultMessage: '{n, plural, one {Send # comment to {builder}} other {Send # comments to {builder}}}', description: "A button in the card dialog's Work section (HI-3220): sends the card's open line comments to its builder ({builder}, an agent's name) as one fix round. Glossary: builder." }),
+  sendTitle: msg({ id: 'board.work.send.title', defaultMessage: 'Send comments to {builder}', description: "The title of the dialog that previews sending a card's open line comments to its builder ({builder}, an agent's name)." }),
+  sendIntro: msg({ id: 'board.work.send.intro', defaultMessage: 'They go to {builder} as one fix round: the card goes back to Doing, and the round counts toward its limit.', description: "At the top of the dialog sending a card's line comments to its builder ({builder}): what sending does. Glossary: round." }),
+  editedSince: msg({ id: 'board.work.send.editedSince', defaultMessage: 'edited since sent', description: "A mark on a line comment in the send dialog: it was sent before, and its text changed since." }),
+  sentBefore: msg({ id: 'board.work.send.sentBefore', defaultMessage: 'sent before', description: "A mark on a line comment in the send dialog: it was sent to the builder before and is still open, so it goes again." }),
+  replace: msg({ id: 'board.work.send.replace', defaultMessage: 'Replace {reviewer}’s review, which is under way', description: "A checkbox in the send dialog, shown while a reviewer agent ({reviewer}, its name) is reviewing the card: sending replaces that review, so it must be ticked first." }),
+  send: msg({ id: 'board.work.send.send', defaultMessage: '{n, plural, one {Send # comment} other {Send # comments}}', description: "The send dialog's button: sends this many line comments to the card's builder." }),
+  reading: msg({ id: 'board.work.send.reading', defaultMessage: 'Reading its comments…', description: "The send dialog while the card's open line comments are read." }),
   count: msg({ id: 'board.work.comments.length', defaultMessage: '{n, number} / {max, number}', description: "Under a line comment being written: how many characters it has, of the most it may have." })
 }
 
@@ -183,7 +191,7 @@ function Fitted({ onSize, children }: { onSize: (h: number) => void; children: R
 }
 
 /** Where a comment is: its side and lines. */
-const whereOf = (w: { side: LineSide; from: number; to: number }): string => tr(M.lines, { side: w.side, from: w.from, to: w.to, same: w.from === w.to ? 'yes' : 'no' })
+export const whereOf = (w: { side: LineSide; from: number; to: number }): string => tr(M.lines, { side: w.side, from: w.from, to: w.to, same: w.from === w.to ? 'yes' : 'no' })
 
 /** A box to write a comment in (or edit one): Ctrl+Enter saves, Escape cancels; what went wrong said under it. */
 function Composer({ where, initial = '', onSave, onCancel }: { where?: Draft; initial?: string; onSave: (body: string) => Promise<void>; onCancel: () => void }) {
@@ -289,5 +297,94 @@ export function Thread({ card, c, agentName }: { card: number; c: LineCommentVie
       )}
       {error && <div className="card-work-unread">{error}</div>}
     </div>
+  )
+}
+
+type Preview = Awaited<ReturnType<typeof call<'tasks:feedbackPreview'>>>
+
+/**
+ * HI-3220: "Send N comments to <builder>" and its preview: every open comment (sent before or not, edited since or not), and,
+ * while an agent reviews the card, the confirm that the send replaces its review. The send carries the preview's batch id,
+ * each comment's version and what the preview saw of the card, so main refuses it if any of them changed meanwhile.
+ */
+export function SendFeedback({ card, open, builder, agentName }: { card: number; open: number; builder: string; agentName: (id: string | null) => string }) {
+  const [preview, setPreview] = useState<Preview | null>(null)
+  const [shown, setShown] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [replace, setReplace] = useState(false)
+  const close = (): void => {
+    setShown(false)
+    setPreview(null)
+    setError(null)
+    setReplace(false)
+  }
+  const show = (): void => {
+    setShown(true)
+    call('tasks:feedbackPreview', card).then(setPreview, (e) => setError(errorMessage(e)))
+  }
+  const send = async (): Promise<void> => {
+    if (!preview?.expect) return
+    setBusy(true)
+    setError(null)
+    try {
+      await call('tasks:feedbackSend', card, { batch: preview.batch, items: preview.items.map((c) => ({ id: c.id, version: c.version })), expect: preview.expect, replaces: replace ? preview.review : null })
+      close()
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  const name = agentName(builder)
+  return (
+    <>
+      <button type="button" className="btn small primary" data-send-feedback={open} onClick={show}>
+        {tr(M.sendButton, { n: open, builder: name })}
+      </button>
+      {shown && (
+        <Modal
+          title={tr(M.sendTitle, { builder: name })}
+          icon="comment"
+          wide
+          onClose={close}
+          busy={busy}
+          error={error}
+          footer={
+            <>
+              <button type="button" className="btn subtle" onClick={close}>
+                {tr(M.cancel)}
+              </button>
+              <button type="button" className="btn primary" data-send-confirm="" disabled={!preview?.items.length || !preview.expect || (!!preview.review && !replace) || busy} onClick={() => void send()}>
+                {tr(M.send, { n: preview?.items.length ?? 0 })}
+              </button>
+            </>
+          }
+        >
+          {!preview ? (
+            <div className="faint">{tr(M.reading)}</div>
+          ) : (
+            <div className="cw-send-preview" data-send-preview={preview.batch}>
+              <p>{tr(M.sendIntro, { builder: name })}</p>
+              {preview.items.map((c) => (
+                <div key={c.id} className="cw-comment" data-send-item={c.id}>
+                  <div className="cw-comment-head">
+                    <strong>{c.path}</strong>
+                    <span className="faint">{whereOf(c)}</span>
+                    {c.edited ? <span className="badge">{tr(M.editedSince)}</span> : c.sent && <span className="badge">{tr(M.sentBefore)}</span>}
+                  </div>
+                  <Markdown className="cw-comment-body" source={c.body} />
+                </div>
+              ))}
+              {preview.review && (
+                <label className="cw-send-replace">
+                  <input type="checkbox" checked={replace} data-send-replace="" onChange={(e) => setReplace(e.target.checked)} /> {tr(M.replace, { reviewer: agentName(preview.review.reviewer) })}
+                </label>
+              )}
+            </div>
+          )}
+        </Modal>
+      )}
+    </>
   )
 }

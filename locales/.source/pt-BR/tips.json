@@ -151,6 +151,8 @@
   "tips.cardReadFirst.title": "Point a card at the docs it needs",
   "tips.cardRevisionChanges.text": "In a card’s Work section, Changes on a revision shows each of its files from where the work started to that revision, as it was submitted, even after the folder has moved on.",
   "tips.cardRevisionChanges.title": "See exactly what a revision changed",
+  "tips.cardSendComments.text": "Once you’ve commented on a card’s lines, Send in its Work section gives every open comment to its builder as one fix round, from Review or Approved. A comment left open goes again with the next send.",
+  "tips.cardSendComments.title": "Send your comments to the builder in one go",
   "tips.cardSummaries.text": "Agents start a card's report or review verdict with one line saying what is ready or what was found, the details below; they and the Assistant read just those lines when that's enough.",
   "tips.cardSummaries.title": "Reports start with the gist",
   "tips.cardWork.text": "Open a card: its Work section lists each revision submitted for review, with its round, files, verdicts and checks, and how it was merged. On the board, a card shows its revision and last verdict.",

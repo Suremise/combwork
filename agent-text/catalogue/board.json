@@ -119,5 +119,45 @@
     "text": "This card has {max, number} open comments already: resolve some first.",
     "note": "A line comment couldn't be added or reopened: the card already has the most open comments it can have ({max}).",
     "audience": "both"
+  },
+  "board.work.send.alreadySent": {
+    "text": "These comments were sent already.",
+    "note": "Sending a card's line comments was refused: this very send was made already (a second click, or a retry).",
+    "audience": "both"
+  },
+  "board.work.send.changed": {
+    "text": "The card changed since you opened this: look again.",
+    "note": "Sending a card's line comments to its builder was refused: since the preview opened, the card got a new submission, a new decision, or a reviewer started or ended a review.",
+    "audience": "both"
+  },
+  "board.work.send.integrated": {
+    "text": "This card’s work is merged already: its comments can’t go back to the builder.",
+    "note": "Sending a card's line comments to its builder was refused: the card's work has been merged into its target already.",
+    "audience": "both"
+  },
+  "board.work.send.itemsChanged": {
+    "text": "A comment changed since you opened this (edited, resolved or deleted): look again.",
+    "note": "Sending a card's line comments was refused: one of the comments in the preview was edited, resolved or deleted since it opened.",
+    "audience": "both"
+  },
+  "board.work.send.noBuilder": {
+    "text": "This card has no builder to send its comments to.",
+    "note": "Sending a card's line comments was refused: no agent built the card's work (it has no builder). Glossary: builder.",
+    "audience": "both"
+  },
+  "board.work.send.notHere": {
+    "text": "Comments can be sent to the builder from Review or Approved only.",
+    "note": "Sending a card's line comments to its builder was refused: the card is in another column (Doing, Todo, Done…). Glossary: builder.",
+    "audience": "both"
+  },
+  "board.work.send.nothing": {
+    "text": "There are no open comments to send.",
+    "note": "Sending a card's line comments was refused: none of its comments is open.",
+    "audience": "both"
+  },
+  "board.work.send.reviewing": {
+    "text": "{reviewer} is reviewing this card: confirm replacing its review to send your comments.",
+    "note": "Sending a card's line comments was refused: a reviewer agent ({reviewer}, its name) is reviewing the card, and the send replaces that review only once the user confirms it.",
+    "audience": "both"
   }
 }

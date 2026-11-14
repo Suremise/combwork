@@ -1149,6 +1149,15 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
   check('line comments: a page of rows, and where the next starts', lcPage.lineComments.length > 0 && lcPage.lineComments.length < 30 && lcPage.next === lcPage.lineComments.length && lcPage.lineComments[0].lines.startsWith('line 1: '), JSON.stringify({ rows: lcPage.lineComments?.length, next: lcPage.next }))
   const lcNext = JSON.parse(tool('cw_read_task', { number: lcKey, lineComments: 'all', offset: lcPage.next }).text)
   check('line comments: the next page goes on from there', lcNext.lineComments[0]?.id !== lcPage.lineComments[0].id && lcNext.lineComments[0]?.body.startsWith(`Comment ${lcPage.next + 1}.`), JSON.stringify(lcNext.lineComments?.[0]?.body?.slice(0, 40)))
+  // HI-3220: sent to Coder as one fix round; the verdict's comment lists what fits and names the batch read for the rest.
+  const lcPreview = await inv('tasks:feedbackPreview', lcCard.number)
+  const lcSent = await inv('tasks:feedbackSend', lcCard.number, { batch: lcPreview.batch, items: lcPreview.items.map((x) => ({ id: x.id, version: x.version })), expect: lcPreview.expect, replaces: null }).then(() => null, (e) => String(e?.message ?? e))
+  check('line comments: sent to Coder as one fix round', lcSent === null, String(lcSent))
+  const lcComment = (await inv('tasks:list')).find((x) => x.number === lcCard.number)?.comments.at(-1)?.text ?? ''
+  measure('the comments sent: the verdict’s comment', lcComment, 18600)
+  check('line comments: the comment names the batch read for those that didn’t fit', /^30 line comments from the user on /.test(lcComment) && new RegExp(`And \\d+ more: cw_read_task with number ${lcKey}, feedback "${lcPreview.batch}" and offset \\d+\\.$`).test(lcComment), lcComment.slice(-200))
+  const lcBatch = JSON.parse(measure('cw_read_task (feedback, a page)', tool('cw_read_task', { number: lcKey, feedback: lcPreview.batch }), 24500))
+  check('line comments: the batch read gives the comments sent, a page at a time', lcBatch.items?.length > 0 && lcBatch.next === lcBatch.items.length && lcBatch.round === 1, JSON.stringify({ items: lcBatch.items?.length, next: lcBatch.next, round: lcBatch.round }))
   await inv('tasks:delete', lcCard.number).catch(() => undefined)
 
   // A request that began in this workspace and ends after the window opened another: counted nowhere (not the next).

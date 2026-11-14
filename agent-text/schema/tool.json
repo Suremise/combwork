@@ -636,6 +636,9 @@
   "tool.readTask.arg.comments": {
     "placeholders": {}
   },
+  "tool.readTask.arg.feedback": {
+    "placeholders": {}
+  },
   "tool.readTask.arg.history": {
     "placeholders": {}
   },

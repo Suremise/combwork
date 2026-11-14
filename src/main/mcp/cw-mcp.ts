@@ -162,7 +162,8 @@ const T = {
   // Within HI-2012's agent total: the description's forYou gloss and summary's "and its length" were cut to pay for it.
   'readTask.arg.archived': agentMsg({ id: 'tool.readTask.arg.archived', text: 'Archived older comments from this offset.' }),
   'readTask.arg.lineComments': agentMsg({ id: 'tool.readTask.arg.lineComments', text: 'Its line comments as rows.' }),
-  'readTask.arg.offset': agentMsg({ id: 'tool.readTask.arg.offset', text: "With lineComments: the reply's next." }),
+  'readTask.arg.offset': agentMsg({ id: 'tool.readTask.arg.offset', text: "With lineComments or feedback: the reply's next." }),
+  'readTask.arg.feedback': agentMsg({ id: 'tool.readTask.arg.feedback', text: 'A batch of comments sent to you, by its id.' }),
   // HI-2561: Codex asked for the history to see why an agent stopped, which forYou already says. Within HI-2012's
   // total (toolLimits.cjs): the description dropped its history clause, and summary's words were cut, to pay for it.
   'readTask.arg.history': agentMsg({ id: 'tool.readTask.arg.history', text: 'Long; rarely needed.' }),
@@ -1152,6 +1153,7 @@ const tools: Tool[] = [
         attachments: { type: 'boolean', description: say(T['readTask.arg.attachments']) },
         archived: { type: 'number', description: say(T['readTask.arg.archived']) },
         lineComments: { type: 'string', enum: ['open', 'all'], description: say(T['readTask.arg.lineComments']) },
+        feedback: { type: 'string', description: say(T['readTask.arg.feedback']) },
         offset: { type: 'number', description: say(T['readTask.arg.offset']) }
       },
       required: ['number']
@@ -1159,6 +1161,8 @@ const tools: Tool[] = [
     run: (a) => {
       const n = enc(String(a.number))
       if (a.archived !== undefined && a.archived !== null) return api('GET', `/v1/tasks/${n}/comments/archived?offset=${enc(String(a.archived))}`)
+      // HI-3220: a batch of comments sent to its builder, a page of items.
+      if (typeof a.feedback === 'string' && a.feedback) return api('GET', `/v1/tasks/${n}/feedback/${enc(a.feedback)}${typeof a.offset === 'number' ? `?offset=${Math.max(0, Math.floor(a.offset))}` : ''}`)
       // HI-3219: its line comments, a page of rows.
       if (a.lineComments === 'open' || a.lineComments === 'all') return api('GET', `/v1/tasks/${n}/line-comments?state=${a.lineComments}${typeof a.offset === 'number' ? `&offset=${Math.max(0, Math.floor(a.offset))}` : ''}`)
       const all = a.attachments === true ? 'attachments=true' : ''
