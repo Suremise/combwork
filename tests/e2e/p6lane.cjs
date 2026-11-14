@@ -551,6 +551,10 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     check('…committed with no trailer and submitted: Done, committed is done', ssub.status === 200 && (await done(sc)) && soloIn?.data?.method === 'committed', JSON.stringify({ body: ssub.body, i: soloIn }))
     check('…its ended lane left out of Pulse: no lanes section for Solo', !!(await waitHung(async () => (await laneNow(soloLane))?.state === 'ended' && (await laneRow(soloLane).count()) === 0)), JSON.stringify(await laneNow(soloLane)))
     await showTab('lanes')
+    // A lane that ended today is in the Ended today group, closed until opened (HI-2898).
+    const endedBar = panel.locator('.progress-lanes-ended-bar')
+    await waitHung(async () => (await endedBar.count()) === 1)
+    if ((await endedBar.getAttribute('aria-expanded')) !== 'true') await endedBar.click()
     check('…the Lanes tab keeps it', !!(await waitHung(async () => (await laneRow(soloLane).count()) === 1)))
     await showTab('pulse')
 

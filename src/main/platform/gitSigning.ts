@@ -34,7 +34,7 @@ export interface SignDeps {
    * comes as git would start it (`signerRun`): its words quoted already, `verbatim` (Windows' command line as given), and
    * `argv0` its quoted first word.
    */
-  spawn: (file: string, args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv; input?: string; timeoutMs: number; signal?: AbortSignal; argv0?: string; verbatim?: boolean }) => Promise<QueueGitResult>
+  spawn: (file: string, args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv; input?: string; timeoutMs: number; signal?: AbortSignal; argv0?: string; verbatim?: boolean; noConsole?: boolean }) => Promise<QueueGitResult>
   /** The folder the commit runs in. */
   cwd: string
   /** The commit's own overrides (`-c user.name=… -c user.email=…`), before each git command. */
@@ -199,9 +199,11 @@ export async function checkSigning(d: SignDeps, timeoutMs = SIGN_CHECK_MS, signa
   // HI-2947: the signer started as git starts it (quote_arg_msvc, which also quotes ' * ? {: Git's own ssh-keygen and gpg
   // are MSYS2 programs, whose runtime unquotes a bare ' and globs those), never with Node's quoting. A known signer is a
   // .exe: no interpreter, no cmd. Its first word is the name as configured when that is a path, else the program found.
+  // HI-3208: with no console, as cw-sign runs it: Windows' own ssh-keygen otherwise asks a locked key's passphrase on the
+  // console it gets (Electron's main has none, so Windows makes it a hidden one) and waits there until the bound.
   const run = (args: string[], o: { env: NodeJS.ProcessEnv; input?: string }): Promise<QueueGitResult> => {
     const r = signerRun(program, /[\\/]/.test(name) ? name : program, args, null, () => null, envGet(d.env, 'ComSpec') ?? 'cmd.exe')
-    return d.spawn(r.file, r.args, { cwd: d.cwd, ...o, timeoutMs, ...(signal ? { signal } : {}), argv0: r.argv0, verbatim: true })
+    return d.spawn(r.file, r.args, { cwd: d.cwd, ...o, timeoutMs, ...(signal ? { signal } : {}), argv0: r.argv0, verbatim: true, noConsole: true })
   }
   // Where this git is installed, as it says itself (its own ssh-keygen and gpg are beside it).
   const exec = await d.git(d.cwd, ['--exec-path'])
