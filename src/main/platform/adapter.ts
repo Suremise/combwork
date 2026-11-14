@@ -193,12 +193,13 @@ export interface PlatformAdapter {
    */
   content(card: CardRecord, s: CardState, o: WorkflowOptions, primed: unknown): Promise<string | null>
   /**
-   * How many times a start is gathered again from the top while only its fingerprint moved and its answer by content
-   * didn't (`content`), each pass reading everything afresh; absent: once (#1206's rule for every intent). jj's
-   * (HI-2916): any jj operation, Combwork's own included (a slot made, another detached), moves the head its fingerprint
-   * keeps, so a start beside them needs a few passes. Spent, the start is refused as evidence that changed.
+   * How many times a start or a verdict is gathered again from the top while only its fingerprint moved and its answer
+   * by content didn't (`content`), each pass reading everything afresh; absent: once (#1206's rule for every intent).
+   * jj's (HI-2916, HI-3216 for the verdict): any jj operation, Combwork's own included (a slot made, another detached, a
+   * review copy put at the revision reviewed), moves the head its fingerprint keeps, so an intent beside them needs a few
+   * passes. Spent, the intent is refused as evidence that changed.
    */
-  readonly startGathers?: number
+  readonly gathers?: number
   /** A check copy at the card's revision (§16.13 `--isolated`), or null where the platform has no isolation (None). */
   checkCopy(card: CardRecord, s: CardState, folder: string): Promise<string | null>
   /** The project's changes outside an intent (§16.3.1 observe), from the watcher (observe.ts), until disposed. */
