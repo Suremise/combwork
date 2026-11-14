@@ -43,7 +43,7 @@ function question(card: CardRecord, platform: PlatformId, state: 'stopped' | 'un
   const values = {
     card: card.key,
     target: w.target,
-    result: short(w.result),
+    result: w.result ? short(w.result) : '—',
     why: w.why,
     detail: clip(w.detail) || '—',
     again: w.again ?? 'none',
