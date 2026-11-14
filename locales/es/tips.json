@@ -149,6 +149,8 @@
   "tips.cardReadFirst.title": "Señala a una tarjeta los documentos que necesita",
   "tips.cardRevisionChanges.text": "En la sección Trabajo de una tarjeta, Cambios en una versión muestra cada uno de sus archivos desde donde empezó el trabajo hasta esa versión, tal como se envió, aunque la carpeta haya avanzado después.",
   "tips.cardRevisionChanges.title": "Ver exactamente qué cambió una versión",
+  "tips.cardSendComments.text": "Cuando hayas comentado las líneas de una tarjeta, Enviar en su sección Trabajo da todos los comentarios abiertos a su autor como una sola ronda de correcciones, desde Revisión o Aprobado. Un comentario que quede abierto vuelve a ir con el siguiente envío.",
+  "tips.cardSendComments.title": "Envía tus comentarios al autor de una vez",
   "tips.cardSummaries.text": "Los agentes empiezan el informe o el veredicto de revisión de una tarjeta con una línea que dice qué está listo o qué se encontró, con los detalles debajo; ellos y el Asistente leen solo esas líneas cuando basta.",
   "tips.cardSummaries.title": "Los informes empiezan por lo esencial",
   "tips.cardWork.text": "Abre una tarjeta: su sección Trabajo muestra cada versión enviada a revisión, con su ronda, archivos, veredictos y comprobaciones, y cómo se fusionó. En el tablero, una tarjeta muestra su versión y su último veredicto.",

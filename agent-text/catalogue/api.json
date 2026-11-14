@@ -283,6 +283,9 @@
   "api.card.movedToEnd": {
     "text": "moved it to the {position} of {column}"
   },
+  "api.card.noFeedback": {
+    "text": "{card} has no sent batch \"{batch}\"."
+  },
   "api.card.notANumber": {
     "text": "\"{value}\" is not a card number or key (12, #12 or HI-12)"
   },

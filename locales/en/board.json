@@ -4375,6 +4375,70 @@
     "defaultMessage": "Round {round, number}",
     "description": "Beside a revision in the card dialog's Work section: the review round it was submitted in (1, 2…)."
   },
+  "board.work.send.alreadySent": {
+    "defaultMessage": "These comments were sent already.",
+    "description": "Sending a card's line comments was refused: this very send was made already (a second click, or a retry)."
+  },
+  "board.work.send.button": {
+    "defaultMessage": "{n, plural, one {Send # comment to {builder}} other {Send # comments to {builder}}}",
+    "description": "A button in the card dialog's Work section (HI-3220): sends the card's open line comments to its builder ({builder}, an agent's name) as one fix round. Glossary: builder."
+  },
+  "board.work.send.changed": {
+    "defaultMessage": "The card changed since you opened this: look again.",
+    "description": "Sending a card's line comments to its builder was refused: since the preview opened, the card got a new submission, a new decision, or a reviewer started or ended a review."
+  },
+  "board.work.send.editedSince": {
+    "defaultMessage": "edited since sent",
+    "description": "A mark on a line comment in the send dialog: it was sent before, and its text changed since."
+  },
+  "board.work.send.integrated": {
+    "defaultMessage": "This card’s work is merged already: its comments can’t go back to the builder.",
+    "description": "Sending a card's line comments to its builder was refused: the card's work has been merged into its target already."
+  },
+  "board.work.send.intro": {
+    "defaultMessage": "They go to {builder} as one fix round: the card goes back to Doing, and the round counts toward its limit.",
+    "description": "At the top of the dialog sending a card's line comments to its builder ({builder}): what sending does. Glossary: round."
+  },
+  "board.work.send.itemsChanged": {
+    "defaultMessage": "A comment changed since you opened this (edited, resolved or deleted): look again.",
+    "description": "Sending a card's line comments was refused: one of the comments in the preview was edited, resolved or deleted since it opened."
+  },
+  "board.work.send.noBuilder": {
+    "defaultMessage": "This card has no builder to send its comments to.",
+    "description": "Sending a card's line comments was refused: no agent built the card's work (it has no builder). Glossary: builder."
+  },
+  "board.work.send.notHere": {
+    "defaultMessage": "Comments can be sent to the builder from Review or Approved only.",
+    "description": "Sending a card's line comments to its builder was refused: the card is in another column (Doing, Todo, Done…). Glossary: builder."
+  },
+  "board.work.send.nothing": {
+    "defaultMessage": "There are no open comments to send.",
+    "description": "Sending a card's line comments was refused: none of its comments is open."
+  },
+  "board.work.send.reading": {
+    "defaultMessage": "Reading its comments…",
+    "description": "The send dialog while the card's open line comments are read."
+  },
+  "board.work.send.replace": {
+    "defaultMessage": "Replace {reviewer}’s review, which is under way",
+    "description": "A checkbox in the send dialog, shown while a reviewer agent ({reviewer}, its name) is reviewing the card: sending replaces that review, so it must be ticked first."
+  },
+  "board.work.send.reviewing": {
+    "defaultMessage": "{reviewer} is reviewing this card: confirm replacing its review to send your comments.",
+    "description": "Sending a card's line comments was refused: a reviewer agent ({reviewer}, its name) is reviewing the card, and the send replaces that review only once the user confirms it."
+  },
+  "board.work.send.send": {
+    "defaultMessage": "{n, plural, one {Send # comment} other {Send # comments}}",
+    "description": "The send dialog's button: sends this many line comments to the card's builder."
+  },
+  "board.work.send.sentBefore": {
+    "defaultMessage": "sent before",
+    "description": "A mark on a line comment in the send dialog: it was sent to the builder before and is still open, so it goes again."
+  },
+  "board.work.send.title": {
+    "defaultMessage": "Send comments to {builder}",
+    "description": "The title of the dialog that previews sending a card's open line comments to its builder ({builder}, an agent's name)."
+  },
   "board.work.staleChange": {
     "defaultMessage": "Stale: the pass was for {approved}; the card is now at {current}.",
     "description": "A mark in the card dialog's Work section: the card's pass is for an older revision ({approved}, a short commit id) that isn't the same change as its revision now ({current}). Glossary: stale, pass."

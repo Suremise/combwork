@@ -90,5 +90,31 @@
     "placeholders": {
       "max": "number"
     }
+  },
+  "board.work.send.alreadySent": {
+    "placeholders": {}
+  },
+  "board.work.send.changed": {
+    "placeholders": {}
+  },
+  "board.work.send.integrated": {
+    "placeholders": {}
+  },
+  "board.work.send.itemsChanged": {
+    "placeholders": {}
+  },
+  "board.work.send.noBuilder": {
+    "placeholders": {}
+  },
+  "board.work.send.notHere": {
+    "placeholders": {}
+  },
+  "board.work.send.nothing": {
+    "placeholders": {}
+  },
+  "board.work.send.reviewing": {
+    "placeholders": {
+      "reviewer": "plain"
+    }
   }
 }

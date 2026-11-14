@@ -75,6 +75,8 @@ const commit = (dir, file, text, message) => {
   const reviewer = await lib.addAgent(inv, alpha, { name: 'Reviewer' })
   const writer = await lib.addAgent(inv, notes, { name: 'Writer' })
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), alpha.toLowerCase(), notes.toLowerCase()]))
+  // Each read of a fake's input logged (HI-3220: a builder's doorbell seen typed), before they start.
+  lib.logFakeInput(claudeHome)
   for (const [p, a] of [[alpha, builder], [alpha, reviewer], [notes, writer]]) await inv('session:start', p, { agentId: a.id })
   check('the agents start', !!(await lib.until(async () => (await idle(alpha, builder.id)) && (await idle(alpha, reviewer.id)) && (await idle(notes, writer.id)), HUNG_MS)))
 
@@ -219,6 +221,51 @@ const commit = (dir, file, text, message) => {
     await d.waitFor({ timeout: HUNG_MS })
     return d
   }
+
+  // --- HI-3220: a card's open comments sent to its builder as one fix round: from Review (the dialog), then from Passed.
+  const fb = (await inv('tasks:create', { title: 'Feedback card', project: 'alpha', agent: builder.id, column: 'todo' })).number
+  await say(alpha, builder.id, `boardmove ${fb} doing`)
+  await lib.until(async () => (await card(fb))?.column === 'doing', HUNG_MS)
+  commit(alpha, 'feedback.ts', 'export const answer = 41\n', 'Feedback card')
+  await say(alpha, builder.id, `boardmove ${fb} review`)
+  check('a card for feedback goes to Review', !!(await lib.until(async () => (await card(fb))?.column === 'review', HUNG_MS)))
+  const fbFacts = async () => (await inv('tasks:facts', fb)) ?? []
+  const fbSub = (await inv('tasks:work', fb)).revisions.at(-1).submission
+  const c1 = await inv('tasks:lineCommentAdd', fb, { submission: fbSub, path: 'feedback.ts', side: 'new', from: 1, to: 1, body: 'The answer is **42**.' })
+  const typed = () => (fs.existsSync(path.join(claudeHome, 'fake-input.jsonl')) ? fs.readFileSync(path.join(claudeHome, 'fake-input.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((x) => x.agent === 'Builder').map((x) => x.data) : [])
+  const typedBefore = typed().length
+  const fbDialog = await openCard(fb)
+  const sendButton = fbDialog.locator('[data-send-feedback]')
+  check('in Review, Send 1 comment to Builder is offered', !!(await lib.until(async () => (await sendButton.innerText().catch(() => '')) === 'Send 1 comment to Builder', HUNG_MS)), await fbDialog.locator('.card-work').innerText().catch(() => ''))
+  await sendButton.click()
+  const preview = page.locator('[data-send-preview]')
+  check('its preview lists the comment', !!(await lib.until(async () => (await preview.locator(`[data-send-item="${c1}"]`).count()) === 1, HUNG_MS)))
+  for (const theme of ['dark', 'light']) {
+    await inv('settings:update', { appearance: { theme } })
+    await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+    await page.getByRole('dialog', { name: 'Send comments to Builder' }).screenshot({ path: path.join(lib.WORK, `cardwork-send-${theme}.png`) })
+  }
+  await inv('settings:update', { appearance: { theme: 'dark' } })
+  await page.locator('[data-send-confirm]').click()
+  const sentFacts = async (n) => (await fbFacts()).filter((f) => f.kind === 'FeedbackSent').length === n
+  check('Send: the user’s failed verdict in round 1 (the card’s latest comment too), FeedbackSent, the card back in Doing', !!(await lib.until(async () => { const f = await fbFacts(); const v = f.filter((x) => x.kind === 'Verdict').at(-1)?.data; return (await sentFacts(1)) && v?.reviewer === 'user' && v.pass === false && v.round === 1 && v.comment.includes(`[${c1}] feedback.ts:1 (new)`) && (await card(fb))?.column === 'doing' && (await card(fb))?.comments.at(-1)?.text === v.comment }, HUNG_MS)), JSON.stringify((await fbFacts()).slice(-4)))
+  check('its builder is woken: Combwork types its inbox’s doorbell', !!(await lib.until(() => typed().slice(typedBefore).some((d) => d.includes('[CW]')), HUNG_MS)), JSON.stringify(typed().slice(typedBefore)))
+  // Round 2: the builder submits again and the reviewer passes it; the comment, still open, goes again from Passed.
+  await closeDialogs()
+  commit(alpha, 'feedback.ts', 'export const answer = 42\n', 'The answer')
+  await say(alpha, builder.id, `boardmove ${fb} review`)
+  await lib.until(async () => (await card(fb))?.column === 'review', HUNG_MS)
+  await say(alpha, reviewer.id, `boardreview ${fb} start`)
+  await lib.until(async () => (await card(fb))?.review?.agent === reviewer.id, HUNG_MS)
+  await say(alpha, reviewer.id, `boardreview ${fb} passed passed`)
+  check('round 2 passes', !!(await lib.until(async () => (await card(fb))?.column === 'passed', HUNG_MS)))
+  const again = await inv('tasks:feedbackPreview', fb)
+  check('the open comment, sent before, is in the next send’s preview', again.items.length === 1 && again.items[0].id === c1 && again.items[0].sent === true && again.items[0].edited === false, JSON.stringify(again.items))
+  const fromPassed = await inv('tasks:feedbackSend', fb, { batch: again.batch, items: again.items.map((c) => ({ id: c.id, version: c.version })), expect: again.expect, replaces: null }).then(() => null, (e) => String(e?.message ?? e))
+  check('from Passed: sent, round 2 counted, the card back in Doing', fromPassed === null && !!(await lib.until(async () => (await sentFacts(2)) && (await fbFacts()).filter((x) => x.kind === 'Verdict' && x.data.reviewer === 'user').at(-1)?.data.round === 2 && (await card(fb))?.column === 'doing', HUNG_MS)), String(fromPassed))
+  const twice = await inv('tasks:feedbackSend', fb, { batch: again.batch, items: again.items.map((c) => ({ id: c.id, version: c.version })), expect: again.expect, replaces: null }).then(() => null, (e) => String(e?.message ?? e))
+  // The card is back in Doing: refused by its stage first (Workflow.feedback's checks; a batch sent twice in Review is the unit test's).
+  check('the same send again is refused', /Review or Approved only/.test(twice ?? ''), String(twice))
 
   // --- A submission whose repository couldn't be read (#1224 round 1, finding 2): its revision and files say they
   // weren't read, and why, never "no files changed". HEAD is unreadable while it is submitted, then put back.

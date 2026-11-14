@@ -153,6 +153,8 @@ interface CombworkMessageValues {
   'tips.cardReadFirst.title': undefined
   'tips.cardRevisionChanges.text': undefined
   'tips.cardRevisionChanges.title': undefined
+  'tips.cardSendComments.text': undefined
+  'tips.cardSendComments.title': undefined
   'tips.cardSummaries.text': undefined
   'tips.cardSummaries.title': undefined
   'tips.cardWork.text': undefined

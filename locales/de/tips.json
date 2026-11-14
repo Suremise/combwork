@@ -149,6 +149,8 @@
   "tips.cardReadFirst.title": "Eine Karte auf die Dokumente verweisen, die sie braucht",
   "tips.cardRevisionChanges.text": "Im Abschnitt Arbeit einer Karte zeigt Änderungen bei einer Revision jede ihrer Dateien vom Beginn der Arbeit bis zu dieser Revision, so wie sie eingereicht wurde, auch wenn der Ordner inzwischen weiter ist.",
   "tips.cardRevisionChanges.title": "Genau sehen, was eine Revision geändert hat",
+  "tips.cardSendComments.text": "Wenn du die Zeilen einer Karte kommentiert hast, gibt Senden in ihrem Abschnitt Arbeit alle offenen Kommentare als eine Korrekturrunde an den Bearbeiter, aus Review oder Genehmigt. Ein offen gelassener Kommentar geht mit dem nächsten Senden noch einmal mit.",
+  "tips.cardSendComments.title": "Deine Kommentare auf einmal an den Bearbeiter senden",
   "tips.cardSummaries.text": "Agenten beginnen den Bericht oder das Review-Ergebnis einer Karte mit einer Zeile, die sagt, was fertig ist oder was gefunden wurde, die Details darunter; sie und der Assistent lesen nur diese Zeilen, wenn das genügt.",
   "tips.cardSummaries.title": "Berichte beginnen mit dem Wesentlichen",
   "tips.cardWork.text": "Öffne eine Karte: Ihr Abschnitt Arbeit listet jede zum Review eingereichte Revision mit Runde, Dateien, Urteilen und Checks auf, und wie sie gemergt wurde. Auf dem Board zeigt eine Karte ihre Revision und ihr letztes Urteil.",

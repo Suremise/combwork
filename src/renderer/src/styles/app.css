@@ -11689,6 +11689,23 @@ textarea.input.task-blocked-input {
 .card-work-comment-count {
   margin-inline-start: 8px;
 }
+/* Sending a card's comments to its builder (HI-3220): the button beside the count, the preview's comments. */
+.card-work-send {
+  margin-inline-start: 8px;
+}
+.cw-send-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+.cw-send-replace {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
 /* Line comments over a revision's diff (HI-3219): the + in the glyph margin, then each line's threads and draft. */
 .monaco-editor .cw-comment-add {
   cursor: pointer;

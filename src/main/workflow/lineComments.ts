@@ -7,7 +7,14 @@ import { boardChanged } from '../boardStore'
 import { combworkError } from '../combworkError'
 import type { WorkspaceService } from '../workspace'
 import { msg } from '../../shared/i18n'
-import { anchorOf, foldLineComments, LINE_COMMENT_LIMITS, type LineCommentView, type LineSide } from '../../shared/workflow/lineComments'
+import { randomUUID } from 'crypto'
+import { anchorOf, sourceOf, submissionRevisions, feedbackBatch, feedbackExpectOf, foldLineComments, LINE_COMMENT_LIMITS, openReviewOf, pageOf, type FeedbackExpect, type FeedbackItem, type LineCommentView, type LineSide } from '../../shared/workflow/lineComments'
+import { foldCard } from '../../shared/workflow/facts'
+import { revisionShort } from '../../shared/platform/descriptors'
+import { platformIdOf } from '../platform/registry'
+import { runIntent, WorkflowRefusedError } from '../tasks'
+import { feedbackComment } from './feedbackText'
+import { isRefusal } from './runtime'
 import { cardFacts } from './recorder'
 import { projectPathOf, revisionDiff } from './revisionDiff'
 import { workflowFor } from './service'
@@ -106,4 +113,68 @@ export async function changeLineComment(ws: WorkspaceService, n: number, id: str
     }
   })
   boardChanged(ws)
+}
+
+/** What a send's preview shows (HI-3220): its batch id, the card as it saw it, the open comments (each edited since last sent, or not), its builder and an open review. */
+export interface FeedbackPreview {
+  batch: string
+  expect: FeedbackExpect | null
+  builder: string | null
+  review: { reviewer: string; submission: number } | null
+  items: (LineCommentView & { edited: boolean })[]
+}
+
+/** Card `n`'s send preview: every comment not resolved, sent before or not, at its version now. */
+export function feedbackPreview(ws: WorkspaceService, n: number): FeedbackPreview {
+  const facts = cardFacts(ws, n)
+  const st = foldCard(facts)
+  const items = foldLineComments(facts).filter((c) => c.state === 'open').map((c) => ({ ...c, edited: c.sent && (c.sentVersion ?? 0) < c.version }))
+  return { batch: randomUUID(), expect: feedbackExpectOf(st), builder: st.started?.builder ?? null, review: openReviewOf(st), items }
+}
+
+/** What the window sends: the preview's batch, the items it showed (each at its version), what it saw, and the review the user confirmed replacing. */
+export interface FeedbackSend {
+  batch: string
+  items: { id: string; version: number }[]
+  expect: FeedbackExpect
+  replaces?: { reviewer: string; submission: number } | null
+}
+
+/** Sends card `n`'s comments to its builder as one fix round (Workflow.feedback), refused as it refuses. */
+export async function sendFeedback(ws: WorkspaceService, n: number, a: FeedbackSend): Promise<void> {
+  const projectPath = projectPathOf(ws, n)
+  const { wf, card } = await cardOf(ws, n)
+  const cfg = await ws.projectConfig(projectPath).catch(() => null)
+  const platform = platformIdOf(projectPath, cfg?.platform)
+  const batch = String(a?.batch ?? '')
+  // Each comment named with its own submission's revision: one left open is sent again from where it was made.
+  const revisions = submissionRevisions(cardFacts(ws, n))
+  const items = Array.isArray(a?.items) ? a.items.map((it) => ({ id: String(it?.id ?? ''), version: Number(it?.version) })) : []
+  // The verdict's comment is the card's comment too, in the same write (as an agent's verdict's is): what the builder's wake
+  // names and its read of the card gives.
+  let comment = ''
+  const { reply } = await runIntent(
+    wf,
+    n,
+    { kind: 'user' },
+    (w) =>
+      w.feedback(card.key, 'user', {
+        batch,
+        items,
+        expect: a?.expect,
+        replaces: a?.replaces ?? null,
+        message: (chosen) => (comment = feedbackComment(chosen, { commitOf: (sub, side) => { const r = sourceOf(revisions.get(sub), side); return r ? revisionShort(platform, r) : '—' }, card: card.key, batch }))
+      }),
+    (_w, first) => (first && comment ? { opts: { comment, keepAgent: true } } : {})
+  )
+  if (isRefusal(reply)) throw new WorkflowRefusedError(reply)
+  boardChanged(ws)
+}
+
+/** A page of a sent batch's items (HI-3220), each as it was sent; null when card `n` sent no such batch. */
+export function feedbackRead(ws: WorkspaceService, n: number, batch: string, offset: number): { submission: number; round: number; items: FeedbackItem[]; next?: number } | null {
+  const b = feedbackBatch(cardFacts(ws, n), batch)
+  if (!b) return null
+  const page = pageOf(b.items, offset)
+  return { submission: b.submission, round: b.round, items: page.rows, ...(page.next !== undefined ? { next: page.next } : {}) }
 }

@@ -362,7 +362,7 @@ export interface FactData {
   Approval: { request: string; answer: 'approved' | 'declined' | 'answered'; note?: string; generation: number; submission?: number; choice?: RoundChoice; rounds?: number; action?: AskActionKind; byDecision?: { decision: string; recordedBy: string; at: string } }
   IntegrationRequested: { entry: string; revision: string; key: string | null; target: string; style: 'merge' | 'squash' | 'rebase'; requeue?: 'transient' | 'retry' }
   /** `followUp`: a follow-up posted on the queued card (#1623), so the queue can't merge the revision while its line changes. */
-  IntegrationCancelled: { entry: string; reason: 'removed' | 'stale' | 'hold' | 'user' | 'decision' | 'integratedOutside' | 'followUp' }
+  IntegrationCancelled: { entry: string; reason: 'removed' | 'stale' | 'hold' | 'user' | 'decision' | 'integratedOutside' | 'followUp' | 'feedback' }
   /**
    * `publish` (HI-1183, follow mode): the attempt's endpoint as it may be kept (the remote's name, its URL without
    * credentials, the full ref), the remote's head it was tested on (`onto`), and its protected snapshot's id and digest
@@ -508,6 +508,12 @@ export interface FactData {
   LineCommentReopened: { id: string }
   /** A comment taken back, only while it was never sent to the builder. */
   LineCommentDeleted: { id: string }
+  /**
+   * HI-3220: the user sent these comments, each at its version then, to the card's builder as one fix round (with the
+   * failed `Verdict` written beside it). `batch`: the send's own id, made when its preview opened (a second send of it is
+   * refused); `items` in the order sent, which the batch read keeps.
+   */
+  FeedbackSent: { batch: string; submission: number; round: number; items: { id: string; version: number }[] }
 }
 
 /** How a card reached Done (HI-2014): the queue, a builder's merge report (checked or not), accepted, an override, a board move. */

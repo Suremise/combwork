@@ -4394,6 +4394,26 @@ A card's history text (`TaskHistoryEntry`) stays, for people; the facts are the 
   `offset`) gives rows `{id, path, side, from, to, state, version, lines, before, after, body}`, at most 24,000
   characters of rows a page (always one), `next` while more remain. Only the user writes them in this version: reviewer
   agents' comments are HI-3222 (On Hold).
+- **Send to builder** [HI-3220, Darren's decision of 14 Nov]: "Send N comments to <builder>" (the Work section, while the
+  card is in Review, Approved or queued and has open comments) opens a preview (IPC `tasks:feedbackPreview`: a new batch
+  id, every open comment at its version, sent before or edited since marked, its builder, and `expect`: the latest
+  submission, the decision generation and an agent's open review). Send (`tasks:feedbackSend`) is the runtime's own
+  operation, **`Workflow.feedback`** (§16's intents; `Workflow.verdict` refuses outside Review). In **one write** it
+  refuses, writing nothing: a stage other than Review, Approved or queued; an integrated card; `expect` unlike the card
+  now ("The card changed since you opened this"); no builder; a batch sent before (a second click or a retry); an item
+  not open at the version shown; an agent's open review not named exactly by `replaces` (the preview's confirm); and a
+  queue entry whose merge has begun (`queue.advancing`, as "remove from queue" refuses). Then a queued entry gets
+  `IntegrationCancelled {reason: 'feedback'}`, and it writes the user's `Verdict {reviewer: 'user', pass: false, round}`,
+  `FeedbackSent {batch, submission, round, items: [{id, version}]}`, the move to Active and the builder's wake
+  (`W.failedReview`, through its inbox, never typed into its pane); the round counts and its limit is asked as for any
+  failed verdict (`askAtLimit`). An agent's late verdict on the replaced review is refused (the card left Review). The
+  verdict's comment is agent text (`workflow/feedbackText.ts`): "N line comments from the user on <rev>:", then each item
+  (`[lc-…] path:from-to (new or removed lines)`, its lines quoted, its body) for as many as fit in 18,000 characters,
+  then "And M more: cw_read_task with number <card>, feedback "<batch>" and offset K." The **batch read**
+  (`GET /v1/tasks/:n/feedback/:batch?offset=`, `cw_read_task` `feedback` and `offset`) gives the batch's items in the
+  order sent, each rebuilt from the facts at the version sent (`feedbackBatch`), 24,000 characters a page with `next`:
+  edits, resolves and later rounds never change it. A comment once sent can only be resolved; an open one goes again
+  with the next send.
 - **Restart** resumes from the log. The merge queue rebuilds from `IntegrationRequested` entries with no
   `IntegrationCancelled`, `IntegrationFailed` or `Integrated` for the same entry id; an entry with `IntegrationStarted`
   and no outcome is reconciled first (§16.4.5) [note §4; P1, answering HR2's round 1 finding 8].

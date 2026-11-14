@@ -607,6 +607,14 @@
     "defaultMessage": "See exactly what a revision changed",
     "description": "A tip's title (HI-3218). Glossary: revision."
   },
+  "tips.cardSendComments.text": {
+    "defaultMessage": "Once you’ve commented on a card’s lines, Send in its Work section gives every open comment to its builder as one fix round, from Review or Approved. A comment left open goes again with the next send.",
+    "description": "A tip (HI-3220). Names of Combwork's views and commands (Work, Send, Review, Approved): keep them as Combwork shows them. Glossary: builder, round."
+  },
+  "tips.cardSendComments.title": {
+    "defaultMessage": "Send your comments to the builder in one go",
+    "description": "A tip's title (HI-3220). Glossary: builder."
+  },
   "tips.cardSummaries.text": {
     "defaultMessage": "Agents start a card's report or review verdict with one line saying what is ready or what was found, the details below; they and the Assistant read just those lines when that's enough.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

@@ -382,6 +382,12 @@
       "column": "plain"
     }
   },
+  "api.card.noFeedback": {
+    "placeholders": {
+      "card": "plain",
+      "batch": "plain"
+    }
+  },
   "api.card.notANumber": {
     "placeholders": {
       "value": "plain"

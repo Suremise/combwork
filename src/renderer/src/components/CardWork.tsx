@@ -18,6 +18,7 @@ import { CardQueue, SHOW_QUEUE_WORK } from './CardQueue'
 import { CardRoundCostTable } from './CardCost'
 import { GitlinkRow } from './GitlinkDiff'
 import { RevisionChanges } from './RevisionChanges'
+import { SendFeedback } from './LineComments'
 import { Icon, Tooltip } from './ui'
 
 // A card's work (#1224, SPEC §16.4; #1223's work view): the dialog's Work section and the board card's badges. What the
@@ -235,6 +236,12 @@ function WorkDetails({ card, view: v, project, short, agentName, reveal }: { car
             {openComments > 0 && (
               <span className="badge card-work-comment-count" data-open-comments={openComments}>
                 {tr(M.openComments, { n: openComments })}
+              </span>
+            )}
+            {/* HI-3220: sent to its builder as one fix round, from Review, Passed or queued. */}
+            {openComments > 0 && v.builder && (v.stage === 'review' || v.stage === 'approved' || v.stage === 'merging') && (
+              <span className="card-work-send">
+                <SendFeedback card={card.number} open={openComments} builder={v.builder} agentName={agentName} />
               </span>
             )}
           </div>

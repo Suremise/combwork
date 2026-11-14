@@ -41,6 +41,9 @@ import { finishAccepts, recordFinish } from './finish'
 import { NOT_RUN_HERE, pauseWait, queueLine, queueStateOf, type QueueLive } from './queueState'
 import { checksView } from '../../shared/toolReplies'
 import { agentMsg, say, type AgentMsg, type AgentValues } from '../../shared/agentText'
+import { batchSent, feedbackExpectOf, foldLineComments, openReviewOf, sameExpect, type FeedbackExpect, type LineCommentView } from '../../shared/workflow/lineComments'
+import { FEEDBACK_REFUSED } from './feedbackText'
+import { combworkError } from '../combworkError'
 import { inDefaultDialect } from '../../shared/agentText/asyncScope'
 import { HISTORY, storedText } from '../../shared/taskHistory'
 
@@ -2215,6 +2218,58 @@ export class Workflow {
     }
     if (out) return this.refuse(card, actor, 'verdict', out)
     return this.ok(card, 'review', this.state(card).stage, acceptance.accepted.length ? { accepted: acceptance.accepted } : undefined, acceptance.warnings)
+  }
+
+  /**
+   * HI-3220 (HI-3191's design, Darren's decision of 14 Nov): the user's open line comments sent to the card's builder as one
+   * fix round, from Review, Approved or queued. One write checks, refusing with nothing written: the stage; the card as the
+   * preview saw it (`expect`: its latest submission, decision generation and open review); a builder; the batch not sent
+   * before; every item open at the version shown; an agent's open review replaced only as confirmed (`replaces`, that very
+   * review); no merge under way (`queue.advancing`) and nothing integrated. Then a queued entry is taken out, and the
+   * user's failed verdict (its comment `message`'s), `FeedbackSent`, the move to Active and the builder's wake are written,
+   * the round counted and its limit asked as for any failed verdict. The window's refusals are thrown (FEEDBACK_REFUSED).
+   */
+  async feedback(ref: unknown, actor: Actor, args: { batch: string; items: readonly { id: string; version: number }[]; expect: FeedbackExpect; replaces?: { reviewer: string; submission: number } | null; message: (items: LineCommentView[], latest: { id: number; revision: string | null }) => string }): Promise<Reply> {
+    const card = this.resolve(ref, actor)
+    if (isRefusal(card)) return card
+    const s = this.state(card)
+    const r = s.started ? this.rulesetOf(card, s) : null
+    const out = await this.writeWhole(card, r, actor, (w) => {
+      const st = w.state()
+      if (st.stage !== 'review' && st.stage !== 'approved' && st.stage !== 'merging') throw combworkError(FEEDBACK_REFUSED.notHere)
+      if (st.integrated) throw combworkError(FEEDBACK_REFUSED.integrated)
+      if (!sameExpect(feedbackExpectOf(st), args.expect)) throw combworkError(FEEDBACK_REFUSED.changed)
+      const builder = st.started?.builder
+      if (!builder) throw combworkError(FEEDBACK_REFUSED.noBuilder)
+      const facts = w.tx.facts(card.id)
+      if (batchSent(facts, args.batch)) throw combworkError(FEEDBACK_REFUSED.alreadySent)
+      const views = foldLineComments(facts)
+      if (!args.items.length) throw combworkError(FEEDBACK_REFUSED.nothing)
+      const chosen = args.items.map((it) => {
+        const c = views.find((v) => v.id === it.id)
+        if (!c || c.state !== 'open' || c.version !== it.version) throw combworkError(FEEDBACK_REFUSED.itemsChanged)
+        return c
+      })
+      const review = openReviewOf(st)
+      if (review && (args.replaces?.reviewer !== review.reviewer || args.replaces?.submission !== review.submission)) throw combworkError(FEEDBACK_REFUSED.reviewing, { reviewer: review.reviewer })
+      const e = openEntry(st)
+      if (e?.state === 'started') return { rule: 'queue.advancing', values: { card: card.key, target: e.target } } as GuardRefusal
+      if (e) w.fact('IntegrationCancelled', { entry: e.id, reason: 'feedback' }) // i18n-ignore: a fact's kind and codes, not text
+      const latest = st.latest!
+      const round = st.rounds + 1
+      // agent-protocol: a fact's kind and codes; its comment is agent text, made in feedbackText.ts
+      const verdict = w.fact('Verdict', { reviewer: 'user', submission: latest.id, revision: latest.revision, pass: false, round, generation: st.generation, comment: args.message(chosen, { id: latest.id, revision: latest.revision }) }) // i18n-ignore: a fact's kind and codes; its comment is agent text (feedbackText.ts)
+      w.fact('FeedbackSent', { batch: args.batch, submission: latest.id, round, items: args.items.map(({ id, version }) => ({ id, version })) })
+      w.move('active', 'intent')
+      // Its wake names the user's verdict, not the move: a verdict of the user's reaches the builder whether or not the
+      // card has a reviewer (loopWakes.ts' targetOf), where a loop's handoffs need one.
+      w.action('wake', { agent: builder, why: stored(W.failedReview, { card: card.key }) }, verdict.seq)
+      w.woken.push(builder)
+      this.askAtLimit(w)
+      return null
+    })
+    if (out) return this.refuse(card, actor, 'feedback', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    return this.ok(card, s.stage, this.state(card).stage)
   }
 
   /**

@@ -117,7 +117,8 @@ export const API = {
     unknownPosition: agentMsg({ id: 'api.card.unknownPosition', text: 'Unknown position "{position}": top or bottom.' }),
     unknownReview: agentMsg({ id: 'api.card.unknownReview', text: 'Unknown review "{review}": start, passed or failed.' }),
     unknownView: agentMsg({ id: 'api.card.unknownView', text: 'Unknown view "{view}": short or full.' }),
-    lineCommentsState: agentMsg({ id: 'api.card.lineCommentsState', text: 'Unknown state "{state}": open or all.' })
+    lineCommentsState: agentMsg({ id: 'api.card.lineCommentsState', text: 'Unknown state "{state}": open or all.' }),
+    noFeedback: agentMsg({ id: 'api.card.noFeedback', text: '{card} has no sent batch "{batch}".' })
   },
   change: {
     activateProject: agentMsg({ id: 'api.change.activateProject', text: 'activate the project {project}', note: 'What an Assistant\'s change is called: in its refusals ("Only the Combwork Assistant can …", "don\'t let you …") and, capitalised, in its activity.' }),

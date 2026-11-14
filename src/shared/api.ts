@@ -1,3 +1,4 @@
+import type { FeedbackExpect, LineCommentView } from './workflow/lineComments'
 import type { CardAttachment, CardAttachmentGroup, CardDrafts } from './cardAttachments'
 import type { CardCleanupItem } from './cardCleanup'
 import type { SigningInfo } from './gitSigning'
@@ -626,6 +627,10 @@ export interface CombworkRequests {
   'tasks:lineCommentAdd': (n: number, comment: { submission: number; path: string; side: 'new' | 'old'; from: number; to: number; body: string }) => string
   /** HI-3219: a change to one of a card's line comments: its text (from the version shown), resolved, reopened or deleted. */
   'tasks:lineCommentChange': (n: number, id: string, change: { edit: { body: string; version: number } } | 'resolve' | 'reopen' | 'delete') => void
+  /** HI-3220: a send's preview: its batch id, what it saw of the card, its builder, an open review, and the open comments (each edited since sent or not). */
+  'tasks:feedbackPreview': (n: number) => { batch: string; expect: FeedbackExpect | null; builder: string | null; review: { reviewer: string; submission: number } | null; items: (LineCommentView & { edited: boolean })[] }
+  /** HI-3220: sends the preview's comments to the card's builder as one fix round; refused as Workflow.feedback refuses. */
+  'tasks:feedbackSend': (n: number, send: { batch: string; items: { id: string; version: number }[]; expect: FeedbackExpect; replaces?: { reviewer: string; submission: number } | null }) => void
   /** Every live card's badges from its work (#1223), in number order; archived cards aren't read. */
   'tasks:workBadges': () => WorkBadge[]
 
