@@ -4259,7 +4259,10 @@ with s34, its mapping HI-3235/s7, s10, s13 and s16. gate:advance is open.
   preview's Integrate / Not for this plan, a stop's Undo Combwork's move / Leave it to me, an uncertain attempt's It's
   integrated / Not integrated, start again (an attested card shows *Done by you, integration not proved*). A stop whose undo conditions hold
   (s30 §2: Combwork's operations alone since P0, one head, T = R in jj and Git, the rest as at the base, T checked out
-  nowhere) asks *advanceStopped*: Approve undoes it (each Approve its own undo: `--at-op H --no-integrate-operation op
+  nowhere) asks *advanceStopped*. HI-3281: every stop the lineage detects breaks one of those conditions, so the one
+  stop that offers it is `proofDisagrees`: the lineage proved exactly Combwork's move (the conditions read again then),
+  yet J5's proof says the target doesn't contain the approved change; where they no longer hold, it is uncertain.
+  Approve undoes it (each Approve its own undo: `--at-op H --no-integrate-operation op
   revert O`, its delta exactly T: R → E, integrate, export, observe; verified, `undone`), Decline leaves it to the user.
   Otherwise *advanceUncertain*: Approve is the user's attestation (`Override { rules: ['advance.verified'] }`, Finished
   `override`, never `Integrated`), Decline starts again only once T is known not to contain R (a new candidate, fresh
