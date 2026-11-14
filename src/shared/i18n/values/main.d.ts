@@ -16,6 +16,7 @@ interface CombworkMessageValues {
   'main.accounts.nothingToKeep': { name: string | number }
   'main.accounts.removeFailed': { name: string | number; error: string | number }
   'main.accounts.running': { name: string | number }
+  'main.accounts.serverOnly': { cli: string | number }
   'main.accounts.setUpCancelled': { name: string | number }
   'main.accounts.usageMove.bad': undefined
   'main.antivirus.allExcluded': undefined

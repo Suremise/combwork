@@ -14,6 +14,7 @@
   "main.accounts.nothingToKeep": "Combwork no pudo comprobar con quién inició sesión la conexión {name}, así que no hay ningún inicio de sesión que conservar.",
   "main.accounts.removeFailed": "No se quitó la conexión {name}: {error}. No se tocó nada fuera de su carpeta; Quitar lo vuelve a intentar.",
   "main.accounts.running": "La conexión {name} tiene agentes en marcha: detenlos y después quítala.",
+  "main.accounts.serverOnly": "{cli} solo se conecta a un servidor tuyo: añade una conexión a un servidor.",
   "main.accounts.setUpCancelled": "Configurar no se abrió para la conexión {name}: se quitó la conexión o se cerró su espacio de trabajo mientras Combwork revisaba sus carpetas.",
   "main.accounts.usageMove.bad": "Elige un porcentaje del 1 % al 100 %, un límite y otra cuenta de la misma CLI a la que mover sus agentes.",
   "main.antivirus.allExcluded": "Todas las carpetas que Combwork puede ofrecer ya están excluidas.",

@@ -216,8 +216,14 @@ export function legacyEffective(agent: AgentDef, pc: ProjectConfig, assistant: b
  */
 export const pcAccountId = (cli: ProviderId): string => cli
 
-/** Whether a CLI signs in once for the PC (no connections of its own): its account is pcAccountId's. */
-export const pcWideSignIn = (cli: ProviderId): boolean => !providerDescriptor(cli).capabilities.connections
+/**
+ * Whether a CLI signs in once for the PC (no sign-in connections of its own): its account is pcAccountId's. A server-only
+ * CLI (HI-3197) too: its own home is its PC-wide account, beside its server accounts.
+ */
+export const pcWideSignIn = (cli: ProviderId): boolean => {
+  const c = providerDescriptor(cli).capabilities.connections
+  return !c || c.signIn === false
+}
 
 /** A test copy's CLI test home as an account (the seam, connectionSeam.ts): its id. */
 export const seamAccountId = (cli: ProviderId): string => `cli-${cli}`

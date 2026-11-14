@@ -14,7 +14,7 @@ process.env.CW_USER_DATA = join(base, 'profile')
 
 const { checkCliDescription, cliDescriptor, cliPatternId, CLI_BOUNDS } = await import('../src/shared/providers/cliDescription')
 const { englishText, advancedDef, listedAdvanced } = await import('../src/shared/advanced')
-const { PROVIDERS, providerDescriptor, DEFAULT_PROVIDER, providerSwitchOn } = await import('../src/shared/providers')
+const { PROVIDERS, providerDescriptor, DEFAULT_PROVIDER, providerSwitchOn, signInConnections } = await import('../src/shared/providers')
 const { inLaunchScope, pinInLaunchScope } = await import('../src/main/launchScope')
 const { SETTINGS_SECTIONS, settingEntry } = await import('../src/shared/settingsCatalog')
 const { BUILT_IN_PROVIDERS } = await import('../src/shared/providers/registry')
@@ -23,6 +23,8 @@ const { providerGaps, providerGapsForAgents } = await import('../src/shared/prov
 const { launchPolicy } = await import('../src/shared/launchPolicy')
 const { screenStep, startupScreen } = await import('../src/main/hookStatus')
 const { cliArgs, fillArgs, CliAdapter, lastMatch } = await import('../src/main/providers/cliAdapter')
+const { serverLaunch } = await import('../src/main/serverLaunch')
+const { pcWideSignIn } = await import('../src/shared/connectionDefaults')
 const { readClis, reloadClis, cliSnapshot } = await import('../src/main/clis')
 const { TerminalScreen } = await import('../src/main/terminalScreen')
 const { advanced } = await import('../src/main/advanced')
@@ -353,5 +355,51 @@ describe('each launch keeps its own view of its CLI (launchScope), everything el
     expect(seen.outside).toEqual({ name: 'New CLI', modes: ['new-mode', 'cli-own'] })
     // Its switch alone says whether it is off, registered or not.
     expect(providerSwitchOn({ providers: { gone: { enabled: true } } } as never, 'gone')).toBe(true)
+  })
+})
+
+describe('a server it takes (HI-3197): its description, its launch values, its accounts', () => {
+  const server = { api: 'openai', env: { OPENAI_BASE_URL: '{baseUrl}', OPENAI_API_KEY: '{key}', CTX: '{context}' }, args: ['--max-out', '{output}'] }
+  it('checks the server section: a protocol it knows, the address passed, the key never in an argument, known names only', () => {
+    expect(problems(desc({ server }))).toEqual([])
+    expect(problems(desc({ server: { ...server, api: 'grpc' } })).join(' ')).toMatch(/server\.api/)
+    expect(problems(desc({ server: { ...server, args: ['--key', '{key}'] } })).join(' ')).toMatch(/never on a command line/)
+    expect(problems(desc({ server: { api: 'openai', env: { OPENAI_API_KEY: '{key}' } } })).join(' ')).toMatch(/\{baseUrl\}/)
+    expect(problems(desc({ server: { ...server, env: { ...server.env, X: '{token}' } } })).join(' ')).toMatch(/\{token\}/)
+    expect(problems(desc({ server: { ...server, env: { ...server.env, CW_THING: '{baseUrl}' } } })).join(' ')).toMatch(/CW_THING/)
+    expect(problems(desc({ server: { api: 'openai' } })).join(' ')).toMatch(/server\.env/)
+  })
+  it('makes it server-only: its PC-wide account beside server accounts, no sign-in accounts, the protocol’s presets', () => {
+    const cli = ok(desc({ server }))
+    registerCliSnapshot({ generation: 51, clis: [cli] })
+    try {
+      const d = providerDescriptor('fake-cli')
+      expect(d.capabilities.connections).toMatchObject({ signIn: false, server: { api: 'openai', keylessToken: 'none', launch: { env: server.env, args: server.args } } })
+      expect(d.capabilities.connections?.server?.presets.map((p) => p.id)).toEqual(['ollama', 'lmstudio', 'llamacpp', 'vllm'])
+      expect(signInConnections(d)).toBeUndefined()
+      expect(pcWideSignIn('fake-cli')).toBe(true)
+      // A full provider with sign-in accounts keeps them.
+      expect(signInConnections(providerDescriptor('claude-code'))?.homeEnv).toBe('CLAUDE_CONFIG_DIR')
+      expect(pcWideSignIn('claude-code')).toBe(false)
+    } finally {
+      registerCliSnapshot({ generation: 0, clis: [] })
+    }
+  })
+  it('fills its launch values from the launch’s model and that model’s limits, leaving out what it hasn’t, never the key in an argument', () => {
+    const caps = cliDescriptor(ok(desc({ server }))).capabilities.connections!.server!
+    const on = { baseUrl: 'http://127.0.0.1:9/v1', key: 'sk-x', models: [{ id: 'big', context: 131072, output: 8192 }, { id: 'small' }] }
+    expect(serverLaunch(caps, on, 'big')).toEqual({ env: { OPENAI_BASE_URL: 'http://127.0.0.1:9/v1', OPENAI_API_KEY: 'sk-x', CTX: '131072' }, args: ['--max-out', '8192'], names: ['OPENAI_BASE_URL', 'OPENAI_API_KEY', 'CTX'] })
+    // A model without limits: those left out, with their option; a local server without a key: the CLI's stand-in.
+    expect(serverLaunch(caps, { ...on, key: null }, 'small')).toEqual({ env: { OPENAI_BASE_URL: 'http://127.0.0.1:9/v1', OPENAI_API_KEY: 'none' }, args: [], names: ['OPENAI_BASE_URL', 'OPENAI_API_KEY', 'CTX'] })
+    // Its own setup (no server): no values, and the names it must not be given.
+    expect(serverLaunch(caps, null, 'big')).toEqual({ env: {}, args: [], names: ['OPENAI_BASE_URL', 'OPENAI_API_KEY', 'CTX'] })
+  })
+  it('gives its description’s own variables never over one its server names, on a server launch or its own setup', () => {
+    const cli = ok(desc({ server, launch: { prompt: 'typed', env: { OPENAI_API_KEY: 'from-description', OTHER: 'kept' } } }))
+    const adapter = new CliAdapter({ ...cliModule(cli), cli }).forLaunch()
+    const ctx = (served: { args: string[]; names: string[] }) => ({ env: { OPENAI_API_KEY: 'sk-server' }, cwd: 'C:\\p', model: null, sessionId: '', resume: false, permissionMode: null, initialPrompt: undefined, extraArgs: [], serverLaunch: served }) as never
+    const cmd = adapter.launch.buildCommand('C:\\x\\datacli.exe', ctx({ args: ['--server-mode'], names: ['OPENAI_BASE_URL', 'OPENAI_API_KEY', 'CTX'] }))
+    expect(cmd.env).toMatchObject({ OPENAI_API_KEY: 'sk-server', OTHER: 'kept' })
+    expect(cmd.args).toContain('--server-mode')
   })
 })

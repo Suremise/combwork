@@ -14,6 +14,7 @@
   "main.accounts.nothingToKeep": "Połączenie {name} nie jest zalogowane na nikogo, kogo Combwork mógłby sprawdzić, więc nie ma logowania do zachowania.",
   "main.accounts.removeFailed": "Nie usunięto połączenia {name}: {error}. Nie ruszono niczego poza jego folderem; Usuń spróbuje jeszcze raz.",
   "main.accounts.running": "Na połączeniu {name} pracują agenci: zatrzymaj ich, a potem je usuń.",
+  "main.accounts.serverOnly": "{cli} łączy się tylko z Twoim serwerem: dodaj połączenie z serwerem.",
   "main.accounts.setUpCancelled": "Konfiguracja połączenia {name} się nie otworzyła: połączenie usunięto albo zamknięto jego obszar roboczy, gdy Combwork sprawdzał jego foldery.",
   "main.accounts.usageMove.bad": "Wybierz udział od 1% do 100%, limit i inne konto tego samego CLI, na które mają przejść jego agenci.",
   "main.antivirus.allExcluded": "Każdy folder, który Combwork może zaproponować, jest już wykluczony.",

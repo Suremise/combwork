@@ -619,6 +619,8 @@
   "tips.workspaceMovedDefender.title": "Defender exclusions follow a moved workspace",
   "tips.workspaceNotes.text": "Workspace notes, pinned first in Shared Notes, is for what's true of this machine, like a full path. Every agent gets it when it starts, in any folder, so it needn't go in a committed AGENTS.md. A section headed with a project's name is that project's alone.",
   "tips.workspaceNotes.title": "Notes about this machine for every agent",
+  "tips.yourOwnCliServer.text": "A CLI that runs from a description can run on Ollama, LM Studio, llama.cpp or vLLM on this PC: its description says how to give it the server, and you add the server in Settings → Accounts & Connections, then give an agent a connection on it.",
+  "tips.yourOwnCliServer.title": "Your own CLI on a model server of yours",
   "tips.yourOwnClis.text": "A JSON file describing a CLI, in the clis folder of your Combwork profile, lets your agents run it: how to start it, how its first prompt goes in, and how to read its screen. Settings → Providers → Your own CLIs opens the folder and reloads it.",
   "tips.yourOwnClis.title": "Run a CLI Combwork has no provider for"
 }

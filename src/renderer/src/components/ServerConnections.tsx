@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import type { Account, ModelAlias, ProviderId, ServerModel } from '@shared/types'
-import { providerDescriptor, type ServerPreset } from '@shared/providers'
+import { providerDescriptor, signInConnections, type ServerPreset } from '@shared/providers'
 import { MODEL_ALIASES, MODEL_LABEL_MAX, parseBaseUrl, type ServerModelsRead } from '@shared/serverConnection'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { serverModelLabel } from '@shared/models'
@@ -121,6 +121,8 @@ const hostOf = (url: string): string => {
 
 /** Whether a CLI can have server connections. */
 export const hasServers = (cli: ProviderId): boolean => !!providerDescriptor(cli).capabilities.connections?.server
+/** A CLI that takes server connections only (HI-3197: one from a description, combwork-cli): no sign-in to add. */
+export const serverOnly = (cli: ProviderId): boolean => providerDescriptor(cli).capabilities.connections?.signIn === false
 
 /** Reads a server connection's models, saying how it went; `request` is this reading's own id. */
 async function readModels(c: Pick<Account, 'id' | 'name'>): Promise<void> {
@@ -241,7 +243,7 @@ export function AddConnectionDialog({ clis, onClose, onSignIn }: { clis: readonl
   const servers = hasServers(cli)
   const presets = presetsOf(cli)
   const [name, setName] = useState('')
-  const [from, setFrom] = useState<'signIn' | 'server'>('signIn')
+  const [from, setFrom] = useState<'signIn' | 'server'>(serverOnly(clis[0]) ? 'server' : 'signIn')
   const [preset, setPreset] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
   const [key, setKey] = useState('')
@@ -295,7 +297,8 @@ export function AddConnectionDialog({ clis, onClose, onSignIn }: { clis: readonl
   // Another CLI: what was picked for the last one's server doesn't carry over.
   const pickCli = (p: ProviderId): void => {
     setCli(p)
-    if (!hasServers(p)) setFrom('signIn')
+    if (serverOnly(p)) setFrom('server')
+    else if (!hasServers(p)) setFrom('signIn')
     setPreset('')
     setBaseUrl('')
     setModels([])
@@ -331,7 +334,7 @@ export function AddConnectionDialog({ clis, onClose, onSignIn }: { clis: readonl
         )}
         <label htmlFor="conn-name">{tr(M.name)}</label>
         <input id="conn-name" className="input" autoFocus value={name} disabled={busy} placeholder={tr(M.namePlaceholder)} onChange={(e) => setName(e.target.value)} />
-        {servers && (
+        {servers && !serverOnly(cli) && (
           <>
             <label>{tr(M.from)}</label>
             <div className="flex" role="radiogroup" aria-label={tr(M.from)}>
@@ -567,7 +570,7 @@ export async function setUpConnection(id: string): Promise<{ key: string; in?: {
 
 /** What Set Up is for, from the CLI's descriptor (HI-1870): above its terminal, and on a connection that needs it. */
 export const setUpHint = (cli: ProviderId): string => {
-  const m = providerDescriptor(cli).capabilities.connections?.setUp
+  const m = signInConnections(providerDescriptor(cli))?.setUp
   return m ? tr(m) : ''
 }
 

@@ -74,6 +74,11 @@
       "name": "plain"
     }
   },
+  "main.accounts.serverOnly": {
+    "placeholders": {
+      "cli": "plain"
+    }
+  },
   "main.accounts.setUpCancelled": {
     "placeholders": {
       "name": "plain"

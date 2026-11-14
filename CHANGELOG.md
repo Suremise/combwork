@@ -4,6 +4,8 @@
 
 ### Added
 
+- **A CLI from a description can run on a model server of yours** (HI-3197). A description's `server` section says the protocol (OpenAI's or Anthropic's) and how a launch gets the server: variables and arguments naming its address, key, model and the model's context and output. Add the server in **Settings → Accounts & Connections** (presets for Ollama, LM Studio, llama.cpp and vLLM), then give an agent a connection on it. The values go into that launch alone, never the CLI's own config; the key stays encrypted and hidden in logs.
+
 - **Run a CLI Combwork has no provider for, from a description** (HI-3196). A JSON file in the `clis` folder of your Combwork profile says how to find and start the CLI, how its first prompt goes in, its permission modes, how a session resumes by its id, and how to read its status from its screen; **Settings → Providers → Your own CLIs** opens the folder and reloads it, and lists each file it can't use with the reasons. Such a CLI runs your agents with its status read from its screen, and resumes a session once it has had a prompt. It gets none of Combwork's tools, hooks, transcript or cost: Provider Setup and Agent Settings say what it lacks.
 
 - **Send your line comments to the builder as one fix round** (HI-3220). From Review or Approved, **Send N comments to <builder>** previews every open comment and sends them all at once: the card goes back to Doing with your comments as the review's findings, the round counts, and the builder is told through its inbox. A comment left open goes again next time. A queued card leaves the queue first; a send is refused while its merge is under way, or if anything changed since the preview.

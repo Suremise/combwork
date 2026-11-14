@@ -2479,6 +2479,14 @@
     "defaultMessage": "Notes about this machine for every agent",
     "description": "A tip's title."
   },
+  "tips.yourOwnCliServer.text": {
+    "defaultMessage": "A CLI that runs from a description can run on Ollama, LM Studio, llama.cpp or vLLM on this PC: its description says how to give it the server, and you add the server in Settings → Accounts & Connections, then give an agent a connection on it.",
+    "description": "A tip (HI-3197). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them; Ollama, LM Studio, llama.cpp and vLLM are products' names."
+  },
+  "tips.yourOwnCliServer.title": {
+    "defaultMessage": "Your own CLI on a model server of yours",
+    "description": "A tip's title (HI-3197)."
+  },
   "tips.yourOwnClis.text": {
     "defaultMessage": "A JSON file describing a CLI, in the clis folder of your Combwork profile, lets your agents run it: how to start it, how its first prompt goes in, and how to read its screen. Settings → Providers → Your own CLIs opens the folder and reloads it.",
     "description": "A tip (HI-3196). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. clis is a folder's name: keep it."

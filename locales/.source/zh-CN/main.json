@@ -14,6 +14,7 @@
   "main.accounts.nothingToKeep": "{name} isn't signed in as anyone Combwork could check, so there's no login to keep.",
   "main.accounts.removeFailed": "{name} wasn't removed: {error}. Nothing outside its folder was touched; Remove tries again.",
   "main.accounts.running": "{name} has agents running on it: stop them, then remove it.",
+  "main.accounts.serverOnly": "{cli} reaches a server of yours only: add a server connection.",
   "main.accounts.setUpCancelled": "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Combwork checked its folders.",
   "main.accounts.usageMove.bad": "Choose a share from 1% to 100%, a limit, and another account of the same CLI to move its agents to.",
   "main.antivirus.allExcluded": "Every folder Combwork may offer is already excluded.",

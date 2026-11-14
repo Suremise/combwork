@@ -74,6 +74,11 @@
     "note": "An error removing a connection ({name}, its name in Settings → Accounts & Connections): agents run on it, or one is starting.",
     "audience": "both"
   },
+  "main.accounts.serverOnly": {
+    "text": "{cli} reaches a server of yours only: add a server connection.",
+    "note": "An error adding a sign-in connection for a coding agent CLI ({cli}) that only takes server connections (a model server such as Ollama), never a sign-in (HI-3197).",
+    "audience": "both"
+  },
   "main.accounts.setUpCancelled": {
     "text": "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Combwork checked its folders.",
     "note": "An error opening a connection's Set Up (Settings → Accounts & Connections, HI-1870; {name}, its name): Combwork was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started.",

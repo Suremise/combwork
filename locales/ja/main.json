@@ -14,6 +14,7 @@
   "main.accounts.nothingToKeep": "{name}はCombworkが確認できるログインでサインインしていないため、残すログインがありません。",
   "main.accounts.removeFailed": "{name}を削除できませんでした：{error}。フォルダーの外には何も変更していません。「削除」でもう一度試せます。",
   "main.accounts.running": "{name}ではエージェントが動いています。停止してから削除してください。",
+  "main.accounts.serverOnly": "{cli}は自分のサーバーにしか接続しません。サーバー接続を追加してください。",
   "main.accounts.setUpCancelled": "{name}のセットアップは開きませんでした。Combworkがフォルダーを確認している間に、接続が削除されたか、ワークスペースが閉じられました。",
   "main.accounts.usageMove.bad": "1%から100%までの割合、上限、エージェントの移動先となる同じCLIの別のアカウントを選んでください。",
   "main.antivirus.allExcluded": "Combworkが提案できるフォルダーはすべて除外済みです。",

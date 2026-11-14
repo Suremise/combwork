@@ -63,7 +63,7 @@ export function mapsModel(json: unknown, id: string): boolean {
 export function localLimitsFor(o: { caps: ServerCaps; models: readonly ServerModel[]; connection: string; agent: string; model: string | null; env: Record<string, string | undefined>; scopes: readonly SettingsScope[]; test: (id: string) => 'alias' | 'spelling' | null }): { env: Record<string, string>; record: LaunchedLimits | null } {
   const l = o.caps.localLimits
   if (!l) return { env: {}, record: null }
-  const model = o.model ?? effectiveEnv(o.env, o.scopes).env[o.caps.modelEnv] ?? null
+  const model = o.model ?? (o.caps.modelEnv ? effectiveEnv(o.env, o.scopes).env[o.caps.modelEnv] : undefined) ?? null
   if (!model) return { env: {}, record: null }
   const base = { model, connection: o.connection }
   const entry = o.models.find((m) => m.id === model)

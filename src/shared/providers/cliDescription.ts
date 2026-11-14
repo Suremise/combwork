@@ -4,6 +4,7 @@ import { withValues, type AdvancedDef, type AdvancedSource, type Text } from '..
 import { CLI_OWN_MODE, withCliOwn } from '../cliOwnMode'
 import type { ModeOption, ModelGroup, ProviderDescriptor } from '.'
 import { defineProvider, type ProviderModule } from './parts'
+import { SERVER_PROTOCOLS } from './common'
 
 /**
  * A data-only provider (HI-3196): a CLI Combwork runs from a description alone, with one generic adapter
@@ -18,6 +19,12 @@ import { defineProvider, type ProviderModule } from './parts'
 
 /** What a launch's argument may name, each replaced by the launch's value: the model, the folder, the first prompt, the session id. */
 export const CLI_PLACEHOLDERS = ['model', 'cwd', 'prompt', 'id'] as const
+
+/**
+ * What a server connection's variables and arguments may name (HI-3197): its server's base URL, its key (variables only),
+ * the launch's model, and that model's context and output as the user set them.
+ */
+export const SERVER_PLACEHOLDERS = ['baseUrl', 'key', 'model', 'context', 'output'] as const
 
 export interface CliDescription {
   /** The provider id: a slug no other provider has. */
@@ -62,6 +69,11 @@ export interface CliDescription {
     exit?: string
   }
   models?: { placeholder?: string; list?: string[] }
+  /**
+   * It takes a server connection (HI-3197: a model server of the user's, such as Ollama): the protocol it speaks, and how a
+   * launch on one gives it the server (variables and arguments naming SERVER_PLACEHOLDERS); absent: it takes none.
+   */
+  server?: { api: 'openai' | 'anthropic'; env: Record<string, string>; args?: string[]; keyless?: string }
 }
 
 /** How big a description may be, and each part of it. */
@@ -84,6 +96,9 @@ const M = {
   badEnv: msg({ id: 'clis.problem.badEnv', defaultMessage: '“launch.env” can’t set {name}: {why, select, name {it isn’t a variable’s name} combwork {Combwork’s own variables (CW_…) are Combwork’s} other {}}.', description: 'Why a CLI description is refused: it sets an environment variable it may not. {name} is the variable’s name (keep it).' }),
   badMode: msg({ id: 'clis.problem.badMode', defaultMessage: '“launch.modes” has a mode {value} that isn’t a short lower-case name, or is given twice.', description: 'Why a CLI description is refused: a permission mode’s "value" (keep the field names) is invalid or repeated. {value} is the value.' }),
   noPrompt: msg({ id: 'clis.problem.noPrompt', defaultMessage: "“launch.prompt” must be 'typed', or an object whose 'arg' names '{prompt}'.", description: 'Why a CLI description is refused: how its first prompt goes in isn’t one of the two forms. Keep "typed", "arg" and {prompt} as they are.' }),
+  badApi: msg({ id: 'clis.problem.badApi', defaultMessage: "“server.api” must be 'openai' or 'anthropic'.", description: 'Why a CLI description is refused (HI-3197): its server section names a protocol Combwork doesn’t know. Keep server.api, openai and anthropic as they are.' }),
+  keyInArgs: msg({ id: 'clis.problem.keyInArgs', defaultMessage: "“server.args” can’t name '{key}': a key goes in a variable, never on a command line others can see.", description: 'Why a CLI description is refused (HI-3197): it puts the server key in a command-line argument. Keep server.args and {key} as they are.' }),
+  noBaseUrl: msg({ id: 'clis.problem.noBaseUrl', defaultMessage: "“server” must name '{baseUrl}' in a variable or an argument.", description: 'Why a CLI description is refused (HI-3197): its server section never passes the server’s address. Keep server and {baseUrl} as they are.' }),
   noId: msg({ id: 'clis.problem.noId', defaultMessage: "“session.{which}” must name '{id}'.", description: 'Why a CLI description is refused: its session arguments (new or resume) don’t name the session id placeholder. Keep "session" and {id} as they are; {which} is new or resume.' })
 }
 
@@ -118,14 +133,34 @@ export function checkCliDescription(raw: unknown, taken: ReadonlyMap<string, str
     if (v.some((x: string) => x.length > itemMax)) return void problems.push(withValues(M.tooLong, { field, max: itemMax }))
     return v as string[]
   }
-  const args = (v: unknown, field: string, required = false): string[] | undefined => {
+  const named = (s: string, field: string, known: readonly string[]): void => {
+    for (const m of s.matchAll(/\{([^{}]*)\}/g)) {
+      if (!known.includes(m[1])) problems.push(withValues(M.badPlaceholder, { field, name: `{${m[1]}}`, known: known.map((p) => `{${p}}`).join(', ') }))
+    }
+  }
+  const args = (v: unknown, field: string, required = false, known: readonly string[] = CLI_PLACEHOLDERS): string[] | undefined => {
     const a = list(v, field, CLI_BOUNDS.args, CLI_BOUNDS.argChars, required)
-    for (const s of a ?? []) {
-      for (const m of s.matchAll(/\{([^{}]*)\}/g)) {
-        if (!(CLI_PLACEHOLDERS as readonly string[]).includes(m[1])) problems.push(withValues(M.badPlaceholder, { field, name: `{${m[1]}}`, known: CLI_PLACEHOLDERS.map((p) => `{${p}}`).join(', ') }))
+    for (const s of a ?? []) named(s, field, known)
+    return a
+  }
+  /** Variables for its process: names that are variables' and never Combwork's own, values within bounds (and naming `known`, if given). */
+  const envMap = (v: unknown, field: string, known?: readonly string[]): Record<string, string> | undefined => {
+    if (v === undefined) return undefined
+    if (!isObj(v)) return void problems.push(withValues(M.badType, { field, kind: 'object' }))
+    const entries = Object.entries(v)
+    if (entries.length > CLI_BOUNDS.env) problems.push(withValues(M.tooMany, { field, max: CLI_BOUNDS.env }))
+    const out: Record<string, string> = {}
+    for (const [k, x] of entries) {
+      if (!ENV_NAME.test(k)) problems.push(withValues(M.badEnv, { name: k, why: 'name' })) // i18n-ignore: a select key, not text
+      else if (/^CW_/i.test(k)) problems.push(withValues(M.badEnv, { name: k, why: 'combwork' })) // i18n-ignore: a select key, not text
+      else if (typeof x !== 'string') problems.push(withValues(M.badType, { field: `${field}.${k}`, kind: 'text' }))
+      else if (x.length > CLI_BOUNDS.envValueChars) problems.push(withValues(M.tooLong, { field: `${field}.${k}`, max: CLI_BOUNDS.envValueChars }))
+      else {
+        if (known) named(x, `${field}.${k}`, known)
+        out[k] = x
       }
     }
-    return a
+    return out
   }
   const pattern = (v: unknown, field: string, required = false): string | undefined => {
     const p = text(v, field, CLI_BOUNDS.patternChars, required)
@@ -193,22 +228,7 @@ export function checkCliDescription(raw: unknown, taken: ReadonlyMap<string, str
       }
     }
   }
-  let env: Record<string, string> | undefined
-  if (launchRaw?.env !== undefined) {
-    if (!isObj(launchRaw.env)) problems.push(withValues(M.badType, { field: 'launch.env', kind: 'object' }))
-    else {
-      const entries = Object.entries(launchRaw.env)
-      if (entries.length > CLI_BOUNDS.env) problems.push(withValues(M.tooMany, { field: 'launch.env', max: CLI_BOUNDS.env }))
-      env = {}
-      for (const [k, v] of entries) {
-        if (!ENV_NAME.test(k)) problems.push(withValues(M.badEnv, { name: k, why: 'name' })) // i18n-ignore: a select key, not text
-        else if (/^CW_/i.test(k)) problems.push(withValues(M.badEnv, { name: k, why: 'combwork' })) // i18n-ignore: a select key, not text
-        else if (typeof v !== 'string') problems.push(withValues(M.badType, { field: `launch.env.${k}`, kind: 'text' }))
-        else if (v.length > CLI_BOUNDS.envValueChars) problems.push(withValues(M.tooLong, { field: `launch.env.${k}`, max: CLI_BOUNDS.envValueChars }))
-        else env[k] = v
-      }
-    }
-  }
+  const env = envMap(launchRaw?.env, 'launch.env')
 
   let session: CliDescription['session']
   const sessionRaw = obj(raw.session, 'session', false)
@@ -233,6 +253,20 @@ export function checkCliDescription(raw: unknown, taken: ReadonlyMap<string, str
   const modelsRaw = obj(raw.models, 'models', false)
   if (modelsRaw) models = { placeholder: text(modelsRaw.placeholder, 'models.placeholder', CLI_BOUNDS.nameChars, false), list: list(modelsRaw.list, 'models.list', CLI_BOUNDS.models, CLI_BOUNDS.nameChars) }
 
+  let server: CliDescription['server']
+  const serverRaw = obj(raw.server, 'server', false)
+  if (serverRaw) {
+    const api = serverRaw.api
+    if (api !== 'openai' && api !== 'anthropic') problems.push(M.badApi)
+    if (serverRaw.env === undefined) problems.push(withValues(M.missing, { field: 'server.env' }))
+    const senv = envMap(serverRaw.env, 'server.env', SERVER_PLACEHOLDERS)
+    const sargs = args(serverRaw.args, 'server.args', false, SERVER_PLACEHOLDERS)
+    if (sargs?.some((a) => a.includes('{key}'))) problems.push(M.keyInArgs)
+    const keyless = text(serverRaw.keyless, 'server.keyless', CLI_BOUNDS.nameChars, false)
+    if (senv && ![...Object.values(senv), ...(sargs ?? [])].some((x) => x.includes('{baseUrl}'))) problems.push(M.noBaseUrl)
+    if ((api === 'openai' || api === 'anthropic') && senv) server = { api, env: senv, ...(sargs?.length ? { args: sargs } : {}), ...(keyless ? { keyless } : {}) }
+  }
+
   if (problems.length || !id || !name || !names || !prompt || !ready) return { ok: false, problems }
   return {
     ok: true,
@@ -244,7 +278,8 @@ export function checkCliDescription(raw: unknown, taken: ReadonlyMap<string, str
       launch: { ...(launchArgs ? { args: launchArgs } : {}), prompt, ...(modes?.length ? { modes } : {}), ...(env && Object.keys(env).length ? { env } : {}) },
       ...(session ? { session } : {}),
       status: { ready, ...(working ? { working } : {}), ...(asks ? { asks } : {}), ...(titleAsks ? { titleAsks } : {}), ...(osc7501 === true ? { osc7501: true } : {}), ...(exit ? { exit } : {}) },
-      ...(models && (models.placeholder || models.list?.length) ? { models: { ...(models.placeholder ? { placeholder: models.placeholder } : {}), ...(models.list?.length ? { list: models.list } : {}) } } : {})
+      ...(models && (models.placeholder || models.list?.length) ? { models: { ...(models.placeholder ? { placeholder: models.placeholder } : {}), ...(models.list?.length ? { list: models.list } : {}) } } : {}),
+      ...(server ? { server } : {})
     }
   }
 }
@@ -285,7 +320,19 @@ export function cliDescriptor(cli: CliDescription): ProviderDescriptor {
     effortLevels: [],
     modelGroups: groups,
     modelPlaceholder: cli.models?.placeholder ?? 'Model ID', // i18n-ignore: English (text.modelPlaceholder is the window's)
-    capabilities: { terminal: { attachments: [] }, session: { fixedSessionId: !!cli.session, combworkTools: false } },
+    capabilities: {
+      terminal: { attachments: [] },
+      session: { fixedSessionId: !!cli.session, combworkTools: false },
+      // A server it takes (HI-3197): server accounts beside its PC-wide one, their values from its description's templates.
+      ...(cli.server
+        ? {
+            connections: {
+              signIn: false as const,
+              server: { api: cli.server.api, keylessToken: cli.server.keyless ?? 'none', launch: { env: cli.server.env, ...(cli.server.args ? { args: cli.server.args } : {}) }, ...SERVER_PROTOCOLS[cli.server.api] }
+            }
+          }
+        : {})
+    },
     reservedKeys: [],
     instructionsFile: '',
     get installNote() {

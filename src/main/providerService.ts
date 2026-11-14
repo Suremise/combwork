@@ -2,7 +2,7 @@ import { homedir } from 'os'
 import { app } from 'electron'
 import type { AccountModels, AgentInstallInfo, ModelCatalog, ProviderId, ProviderTask } from '../shared/types'
 import { cachedCatalogFor, observedEffortKey } from '../shared/models'
-import { autoProviderPending, isProviderEnabled, providerSettings, setInstalledCheck } from '../shared/providers'
+import { autoProviderPending, isProviderEnabled, providerSettings, setInstalledCheck, signInConnections } from '../shared/providers'
 import { ptyArgs, shownInstallInfo, toSpawnable, withoutAccountEnv, withServerEnv } from './providers/common'
 import { allProviders, provider } from './providers'
 import type { CommandSpec, KeySteps, UpdateRetry } from './providers/types'
@@ -433,7 +433,7 @@ class ProviderService {
     // The connection's own sign-in where the CLI has one (HI-1757), without the variables it would read as a login. A
     // server connection's Set Up (HI-1772) runs the CLI itself instead, with its server's variables, for its first-run
     // screens: the user answers them in the CLI's own way.
-    const home = env[adapter.descriptor.capabilities.connections?.homeEnv ?? '']
+    const home = env[signInConnections(adapter.descriptor)?.homeEnv ?? '']
     const cmd: CommandSpec = setUp ? ((home && adapter.accounts?.accountSetUpCommand?.(info.path, home)) || { file: info.path, args: (home && adapter.accounts?.connectionSetUpArgs?.(home)) || [] }) : (adapter.accounts?.accountLoginCommand?.(info.path, home) ?? adapter.launch.loginCommand?.(info.path) ?? noTask(adapter.descriptor.name, 'login'))
     const s = cmd.line !== undefined ? cmd : toSpawnable(cmd.file, cmd.args)
     log.info(`${adapter.descriptor.name} ${setUp ? 'set-up' : 'sign-in'} for account ${accountId}`)
@@ -491,7 +491,7 @@ class ProviderService {
  * A task its CLI has none of (HI-3196: a data-only provider has no install, update or sign-in task): refused, whoever asks
  * (Provider Setup hides the button; IPC and the Agent API asking anyway get this).
  */
-function noTask(cli: string, task: ProviderTask): never {
+export function noTask(cli: string, task: ProviderTask): never {
   throw combworkError(msg({ id: 'service.providers.noTask', defaultMessage: '{cli} has no {task, select, install {install} update {update} login {sign-in} other {setup}} task in Combwork.', description: 'An error: a task was asked of a coding agent CLI that has none (HI-3196: a CLI that runs from a description has no install, update or sign-in task in Combwork). {cli} is its name.' }), { cli, task }, { kind: 'invalid' })
 }
 
