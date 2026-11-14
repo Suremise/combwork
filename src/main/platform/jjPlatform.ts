@@ -25,7 +25,10 @@ import { UNREADABLE } from '../../shared/workflow/texts'
 import type { CardRecord } from '../workflow/factStore'
 import type { ReconcileHooks } from '../workflow/reconcile'
 import type { Workflow } from '../workflow/runtime'
-import type { CheckBracket, FinishInputs, HeadMove, KeptWork, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
+import type { AdvanceAnswer, AdvanceHost, AdvanceRef, AdvanceStep, AdvanceWords, CheckBracket, FinishInputs, HeadMove, KeptWork, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
+import { AdvanceJournals, basePrint, classifyUndoNow, fingerprintHash, journalAbandoned, journalNewUndo, journalRequested, journalSettled, journalUndoAs, planIdOf, recoverAdvance, resultContained, runAdvance, runUndo, underLock, undoOfferedNow, undoPreMutation, type AdvanceJournal, type AdvanceOutcome, type Held, type JjAdvanceDeps, type JjAdvancePlan } from './jjAdvance'
+import { ADVANCE_GATES, ADVANCE_UNCERTAIN_GATE, advanceUnresolved } from '../../shared/workflow/facts'
+import { dirname } from 'path'
 import type { HistoryPort } from './history'
 import { historyFor, observePort } from './historyPorts'
 import type { Disposable, ObserveEvent } from './observe'
@@ -40,7 +43,7 @@ import { ensureRetained, isRefused as integrationRefused, jjContains, jjTargetHe
 import { jjUnknown } from './jjReads'
 import { anyRetainedDue, dueRetained, markRetainedDue, publishTargets, recordIntegration, retainedVisited, sqlObligations, type SqlDb } from './jjObligations'
 import { folderIdentity, type PublishCommitAnswer, type PublishCommitRequest } from './jjPublishCommit'
-import { candidateFingerprint, candidateKey, candidateShown, checksAgain, clearEndedCycle, cycleOver, publishCandidateChecks, reconcileJj, type CandidateWords, type JjChecksUpdate } from '../workflow/reconcile'
+import { advanceStep, candidateFingerprint, candidateKey, candidateShown, checksAgain, clearEndedCycle, cycleOver, publishCandidateChecks, reconcileJj, type CandidateWords, type JjChecksUpdate, type JjProved } from '../workflow/reconcile'
 import { checksJournalKey, checksKeyOf, readChecksJournal, runCandidateChecks, writeChecksJournal, type CandidateChecksDeps, type ChecksJournal } from './jjCandidateChecks'
 import { jjCandidateEntry, jjReturnedComment, jjReturnedWake } from './jjCandidateReturn'
 import type { Spawn } from '../workflow/queueChecks'
@@ -137,6 +140,8 @@ export interface JjCardDeps {
   history?: HistoryPort
   /** HI-2871, tests only: where a candidate attempt pauses (J4's points), so a race can be placed exactly there. */
   candidateHook?: JjCandidateDeps['hook']
+  /** HI-3235, tests only: where an advance or an undo pauses (jjAdvance's points), so a race or a crash goes exactly there. */
+  advanceHook?: JjAdvanceDeps['hook']
   /**
    * HI-2938: the app's side of the merge checks on a candidate: the project's setup command, a check copy leased at a
    * revision with its job's spawn (and whether a lease is freed through the pool's barrier), the queue's runner and
@@ -768,23 +773,355 @@ export class JjPlatform implements PlatformAdapter {
         })
         return unread ? { unknown: 'sameness:replay' } : { same, base: b } // i18n-ignore: a protocol code, for the log
       },
-      prove: async (_c, s, approved) => {
-        const integ = await d.integration()
-        if (!integ || !s.started?.target) return { unknown: 'notComposed' }
-        const project = rec.projectId()
-        const consumed = rec.read((db) => (db.prepare('SELECT bundle FROM jj_retained WHERE project = ?').all(project) as { bundle: string }[]).map((r) => r.bundle)) // i18n-ignore: SQL
-        // HI-2871: the cycle's J4 records, so the user's move onto a candidate is credited as one (J5's bound candidate).
-        const candidates = (rec.attempts?.(card.key, s.cycle) ?? []).map((e) => e.record)
-        const p = await jjContains(integ, { card: card.key, cycle: s.cycle, target: s.started.target, change: approved, candidates, bundles: rec.bundles(card.key, s.cycle), consumed, token: randomUUID().replace(/-/g, '').slice(0, 16) })
-        if (isJjUnknown(p)) return { unknown: `${p.jjUnknown}${p.detail ? `: ${p.detail}` : ''}` }
-        if (integrationRefused(p)) return { unknown: `refused: ${p.refused}` }
-        if (!p.containment || !p.provenance) return { contained: false }
-        return { contained: true, method: p.containment.method, result: p.provenance.head, bundle: p.provenance.bundle, platform: jjIntegratedPlatform(p.provenance as JjIntegratedIds) }
-      },
+      prove: (_c, s, approved) => this.proof(card, s, approved),
       record: (w, row) => w.tx.sql((db) => recordIntegration(db as unknown as SqlDb, rec.projectId(), row)),
       projectId: () => rec.projectId(),
       ...(rec.attempts && rec.saveAttempt ? { candidate: (_c: CardRecord, s: CardState, fp: JjCandidateFingerprint, still: () => boolean) => this.withCardLock(card.id, () => this.candidateStep(card, s, fp, still)), headIs: (target: string, expected: string) => this.headIs(target, expected), offerCurrent: (target: string, offer: JjCandidateOffer) => this.offerCurrent(target, offer), candidatesDone: (_c: CardRecord, cycle: number) => this.candidatesDone(card, cycle), checksNow: (_c: CardRecord, s: CardState) => this.checksNow(card, s), checksWanted: () => this.checksWanted() } : {})
     })
+  }
+
+  /**
+   * J5's proof that the card's approved change is in its target (jjContains), with the bundle of pins that retains what
+   * it names: reconcileJj's, and a verified advance's (HI-3235, so its Integrated carries the same obligation rows).
+   */
+  private async proof(card: CardRecord, s: CardState, approved: { base: string; revision: string; key?: string | null }): Promise<JjProved> {
+    const d = this.deps
+    const rec = d?.records
+    const integ = rec ? await d!.integration() : null
+    if (!rec || !integ || !s.started?.target) return { unknown: 'notComposed' }
+    const project = rec.projectId()
+    const consumed = rec.read((db) => (db.prepare('SELECT bundle FROM jj_retained WHERE project = ?').all(project) as { bundle: string }[]).map((r) => r.bundle)) // i18n-ignore: SQL
+    // HI-2871: the cycle's J4 records, so the user's move onto a candidate is credited as one (J5's bound candidate).
+    const candidates = (rec.attempts?.(card.key, s.cycle) ?? []).map((e) => e.record)
+    const p = await jjContains(integ, { card: card.key, cycle: s.cycle, target: s.started.target, change: approved, candidates, bundles: rec.bundles(card.key, s.cycle), consumed, token: randomUUID().replace(/-/g, '').slice(0, 16) })
+    if (isJjUnknown(p)) return { unknown: `${p.jjUnknown}${p.detail ? `: ${p.detail}` : ''}` }
+    if (integrationRefused(p)) return { unknown: `refused: ${p.refused}` }
+    if (!p.containment || !p.provenance) return { contained: false }
+    return { contained: true, method: p.containment.method, result: p.provenance.head, bundle: p.provenance.bundle, platform: jjIntegratedPlatform(p.provenance as JjIntegratedIds) }
+  }
+
+  // --- HI-3235: Combwork's advance of a target (jjAdvance.ts; HI-2840/s30, s34; HI-3235/s7, s10, s13, s16).
+
+  /** The project's advance journals: beside the workspace database (`.combwork/jj-advance`), one file per attempt. */
+  private advanceJournals(): AdvanceJournals | null {
+    const rec = this.deps?.records
+    return rec ? new AdvanceJournals(join(dirname(rec.dbFile()), 'jj-advance')) : null
+  }
+
+  /** jjAdvance's dependencies on J5's control workspace; `still` the attempt's lease. */
+  private advanceDeps(integ: JjIntegrationDeps, journals: AdvanceJournals, still: () => boolean | Promise<boolean>): JjAdvanceDeps {
+    return { runner: integ.runner, git: integ.git, jjRepo: integ.view.jjRepo, root: integ.folder, journals, still, ...(this.deps?.advanceHook ? { hook: this.deps.advanceHook } : {}) }
+  }
+
+  /**
+   * The plan the card's workflow consented to, now (s34 §2): its candidate ready for its fingerprint, its merge checks
+   * passed under the checks key now (or none configured). Null: not ready (no candidate, checks running or failed, a
+   * changed key), so nothing is attempted.
+   */
+  private async advancePlan(card: CardRecord, s: CardState, integ: JjIntegrationDeps): Promise<{ plan: JjAdvancePlan; offer: JjCandidateOffer } | null> {
+    const wf = this.wf
+    const rec = this.deps?.records
+    if (!wf || !rec) return null
+    const shown = candidateShown(wf, card, s, rec.projectId(), undefined, true)
+    const fp = candidateFingerprint(wf, card, s)
+    if (!fp || !shown || shown.state !== 'ready' || !shown.offer || !s.latest) return null
+    const now = await this.checksNow(card, s)
+    if (now.names.length ? !shown.checks || shown.checks.state !== 'passed' || shown.checks.key !== now.key : !!shown.checks && shown.checks.state !== 'passed') return null
+    const offer = shown.offer
+    const plan: JjAdvancePlan = { card: card.key, cycle: s.cycle, submission: s.latest.id, fingerprint: fingerprintHash(fp), store: integ.view.store, target: fp.target, expected: offer.expected, result: offer.result, change: offer.change, style: offer.style, checks: shown.checks?.key ?? '', checked: offer.result }
+    return { plan, offer }
+  }
+
+  /** Whether a card's plan now is still `planId` (the attempt's lease: the card in Approved, its consent unchanged). */
+  private async planStill(cardId: number, planId: string, integ: JjIntegrationDeps): Promise<boolean> {
+    const wf = this.wf
+    if (!wf || this.deps?.candidateChecks?.signal?.aborted) return false
+    const c = wf.store.card(cardId)
+    if (c.stage !== 'approved') return false
+    const p = await this.advancePlan(c, wf.state(c), integ)
+    return !!p && planIdOf(p.plan) === planId
+  }
+
+  /** Whether the cycle had an attempt for this plan that was undone (it isn't advanced again on its own). */
+  private planUndone(card: CardRecord, s: CardState, planId: string): boolean {
+    const facts = this.wf!.store.facts(card.id).filter((f) => f.seq >= s.cycle)
+    const undone = new Set(facts.filter((f) => f.kind === 'AdvanceResolved' && (f.data as FactData['AdvanceResolved']).how === 'undone').map((f) => (f.data as FactData['AdvanceResolved']).attempt))
+    return facts.some((f) => f.kind === 'AdvanceAttempted' && undone.has((f.data as FactData['AdvanceAttempted']).attempt) && (f.data as FactData['AdvanceAttempted']).plan === planId)
+  }
+
+  /** Whether the card's cycle has an `AdvanceAttempted` fact for the attempt. */
+  private attemptRecorded(card: CardRecord, cycle: number, attempt: string): boolean {
+    return this.wf!.store.facts(card.id).some((f) => f.seq >= cycle && f.kind === 'AdvanceAttempted' && (f.data as FactData['AdvanceAttempted']).attempt === attempt)
+  }
+
+  /** A question's words for an attempt: its target and result, why (a code the window words), what was read. */
+  private advanceWords(j: AdvanceJournal | null, s: CardState, why: string, detail: string | undefined, again?: string): AdvanceWords {
+    return { target: j?.plan.target ?? s.started?.target ?? '', result: j?.plan.result ?? '', why, detail: detail ?? '', ...(j?.op ? { op: j.op } : {}), ...(again ? { again } : {}) }
+  }
+
+  /** An outcome recorded through the host (s10 §A), and the journal marked settled once it is. Whether Integrated was. */
+  private async recordAdvance(h: Held, deps: JjAdvanceDeps, card: CardRecord, j: AdvanceJournal, out: AdvanceOutcome, host: AdvanceHost): Promise<boolean> {
+    const wf = this.wf!
+    const ref: AdvanceRef = { cycle: j.plan.cycle, attempt: j.attempt }
+    const s = wf.state(wf.store.card(card.id))
+    if (out.kind === 'advanced') {
+      // J5's proof of the result, as the outside path records it (HR1's round 1, finding 3): its bundle retained and the
+      // integration's publish obligation written with Integrated, so the card is tracked for publishing either way. A proof
+      // that can't be read yet leaves the attempt as journaled (`verified`): recovery records it once the proof comes; one
+      // that says the target doesn't contain the work disagrees with the lineage just proved, so only the user settles it.
+      // HR1's round 2: the proof answers at the target's head now, which may have moved on past R since the attempt was
+      // verified (another card, the user): that is forward progress, not a disagreement. What must hold is that R itself,
+      // the attempt's verified result, is in the target now (read pinned); the obligation follows the proof's head.
+      const rec = this.deps?.records
+      const approved = s.approved?.revision && s.approved.base ? { base: s.approved.base, revision: s.approved.revision, key: s.latest?.key ?? null } : null
+      const p = approved ? await this.proof(card, s, approved) : ({ unknown: 'noApproval' } as JjProved)
+      const rIn = !('unknown' in p) && p.contained ? await resultContained(h, deps, j.plan) : null
+      if ('unknown' in p || rIn === 'unknown') {
+        checksLog.warn(`advance of #${userText(card.key)} verified; its proof isn't readable yet (${'unknown' in p ? p.unknown : 'result'}): recorded once it is`) // i18n-ignore: a log line, English
+        return false
+      }
+      if (!p.contained || rIn !== true || !rec) {
+        if (await host.stopped(card, ref, j.planId, { code: 'proofDisagrees', detail: p.contained ? p.result : 'notContained', undo: false, uncertain: true }, this.advanceWords(j, s, 'other', 'proofDisagrees'))) await journalSettled(h, deps, j, 'uncertain', { detail: 'proofDisagrees' }) // i18n-ignore: codes
+        return false
+      }
+      const method = j.plan.style === 'squash' ? 'squash' : j.plan.style === 'rebase' ? 'fastForward' : 'merge'
+      const row = { card: card.key, cycle: s.cycle, bundle: p.bundle, target: j.plan.target, result: p.result, since: Date.now() }
+      const ok = await host.advanced(card, ref, { revision: s.approved?.revision ?? s.latest?.revision ?? '', target: j.plan.target, result: j.plan.result, method, platform: { ...p.platform, advance: { plan: j.planId, op: out.op, ...(out.exportOp ? { exportOp: out.exportOp } : {}), change: j.plan.change } } }, (w) => w.tx.sql((db) => recordIntegration(db as unknown as SqlDb, rec.projectId(), row)))
+      if (ok) await journalSettled(h, deps, j, 'integrated')
+      return ok
+    }
+    if (out.kind === 'nothingMoved') {
+      if (await host.resolved(card, ref, 'nothingMoved', `${out.code}${out.detail ? `: ${out.detail}` : ''}`)) await journalSettled(h, deps, j, 'nothingMoved', { detail: out.code })
+      // Refused at the base for something the user can see to (s30 §1): the card says why, once.
+      if (j.refusedAt && out.code !== 'moved') await host.refused(card, j.plan.cycle, j.planId, this.advanceWords(j, s, out.code, out.detail))
+      return false
+    }
+    const stop = { code: out.code, ...(out.detail ? { detail: out.detail } : {}), undo: out.kind === 'stopped' && out.undo, uncertain: out.kind === 'uncertain' }
+    if (await host.stopped(card, ref, j.planId, stop, this.advanceWords(j, s, out.code, out.detail ? `${j.phase}: ${out.detail}` : j.phase))) await journalSettled(h, deps, j, out.kind === 'stopped' ? 'stopped' : 'uncertain', { detail: out.code })
+    return false
+  }
+
+  /**
+   * HI-3235/s16 §3: an unsettled attempt keeps exactly one open question, or one pending answer action for it (`except`:
+   * the request whose action is running now, which doesn't count): otherwise it is asked again.
+   */
+  private async keepAsked(card: CardRecord, j: AdvanceJournal | null, host: AdvanceHost, except: string | null, again: string): Promise<void> {
+    const wf = this.wf!
+    const s = wf.state(wf.store.card(card.id))
+    const a = s.advance
+    if (!a || !advanceUnresolved(s) || a.state === 'attempted') return
+    if (s.requests.some((r) => ADVANCE_GATES.includes(r.gate) && r.entry === a.attempt)) return
+    const pending = wf.store.pendingActions().some((x) => x.card === card.id && x.kind === 'advanceAnswer' && x.payload.attempt === a.attempt && x.payload.request !== except)
+    if (pending) return
+    await host.askAgain(card, { cycle: s.cycle, attempt: a.attempt }, a.plan, a.state === 'stopped' ? 'stopped' : 'uncertain', this.advanceWords(j, s, a.code ?? 'askedAgain', a.detail, again), null)
+  }
+
+  /**
+   * HI-3235/s13 §3: a card's journaled attempts this cycle settled, under its card lock and the repository lock (so an
+   * active writer, which holds both from its journal to its outcome, is never seen half way). True: none is unsettled.
+   */
+  private async settleAdvances(h: Held, integ: JjIntegrationDeps, journals: AdvanceJournals, card0: CardRecord, host: AdvanceHost): Promise<boolean> {
+    const wf = this.wf!
+    const card = wf.store.card(card0.id)
+    const cycle = wf.state(card).cycle
+    const recovery = this.advanceDeps(integ, journals, () => true)
+    const listed = await journals.list(card.key, cycle)
+    for (const { attempt, journal } of listed) {
+      const s = wf.state(wf.store.card(card.id))
+      const recorded = this.attemptRecorded(card, cycle, attempt)
+      if (journal === 'unreadable') {
+        // Unreadable: with its fact, uncertain (only the user settles it); without, no write of it can have run.
+        if (recorded && s.advance?.attempt === attempt && s.advance.state === 'attempted') await host.stopped(card, { cycle, attempt }, s.advance.plan, { code: 'journalUnreadable', undo: false, uncertain: true }, this.advanceWords(null, s, 'journalUnreadable', attempt))
+        else if (recorded) await this.keepAsked(card, null, host, null, 'unreadable') // i18n-ignore: a code, worded by the question's message (FOR_YOU.advance*)
+        continue
+      }
+      // A stopped or uncertain attempt is settled in its journal but not on the card: it keeps its question (HR1's round 1,
+      // finding 2: an answer consumed and its action gone must never leave it with none).
+      if (journal.settled && journal.settled !== 'stopped' && journal.settled !== 'uncertain') continue
+      if (!recorded) {
+        // A journal with no fact (s34 §2): `requested` or `abandoned`, nothing can have run; any later phase broke the
+        // protocol and is uncertain, recorded as an attempt so only the user settles it.
+        if (journal.phase === 'requested' || journal.phase === 'abandoned') await journalSettled(h, recovery, journal, 'nothingMoved', { detail: 'noFact' }) // i18n-ignore: a code
+        else if (!advanceUnresolved(s) && (await host.attempted(card, cycle, journal.planId, attempt))) {
+          if (await host.stopped(card, { cycle, attempt }, journal.planId, { code: 'noFact', detail: journal.phase, undo: false, uncertain: true }, this.advanceWords(journal, s, 'noFact', journal.phase))) await journalSettled(h, recovery, journal, 'uncertain', { detail: 'noFact' }) // i18n-ignore: codes, worded by the question's message
+        }
+        continue
+      }
+      if (s.advance?.attempt !== attempt || s.advance.state === 'resolved') {
+        await journalSettled(h, recovery, journal, 'resolved')
+        continue
+      }
+      if (s.advance.state === 'stopped' || s.advance.state === 'uncertain') {
+        await this.keepAsked(card, journal, host, null, 'answered') // i18n-ignore: a code, worded by the question's message (FOR_YOU.advance*)
+        continue
+      }
+      // Attempted, its outcome never recorded (a crash between them): classified read-only on the state now.
+      await this.recordAdvance(h, recovery, card, journal, await recoverAdvance(h, recovery, journal), host)
+    }
+    // A fact whose journal is gone (s34 §2): uncertain.
+    const s = wf.state(wf.store.card(card.id))
+    const a = s.advance
+    if (a && a.state === 'attempted' && !listed.some((x) => x.attempt === a.attempt)) await host.stopped(card, { cycle, attempt: a.attempt }, a.plan, { code: 'journalMissing', undo: false, uncertain: true }, this.advanceWords(null, s, 'journalMissing', a.attempt))
+    else if (a && advanceUnresolved(s) && !listed.some((x) => x.attempt === a.attempt)) await this.keepAsked(card, null, host, null, 'missing') // i18n-ignore: a code, worded by the question's message (FOR_YOU.advance*)
+    return !advanceUnresolved(wf.state(wf.store.card(card.id)))
+  }
+
+  /**
+   * HI-3235: the adapter's advance port. Under the card's lock and the repository lock: the card's earlier attempts
+   * settled first, then (ready, its plan not undone before) one attempt: journal `requested` with the plan, its fact
+   * written and read back, then jjAdvance's protocol, its outcome recorded. The cycle's other candidates are dropped after
+   * an Integrated, outside the locks.
+   */
+  async advance(card: CardRecord, _s: CardState, host: AdvanceHost): Promise<AdvanceStep> {
+    const d = this.deps
+    const wf = this.wf
+    const journals = this.advanceJournals()
+    if (!wf || !d?.records || !journals) return 'notReady'
+    const integ = await d.integration()
+    if (!integ) return 'notReady'
+    let integrated: number | null = null
+    const step = await this.withCardLock(card.id, () =>
+      underLock(integ.view.store, integ.lock, async (h): Promise<AdvanceStep> => {
+        const c0 = wf.store.card(card.id)
+        if (c0.stage !== 'approved') return 'notReady'
+        if (!(await this.settleAdvances(h, integ, journals, c0, host))) return 'busy'
+        const c = wf.store.card(card.id)
+        const s = wf.state(c)
+        if (c.stage !== 'approved' || s.integrated || advanceUnresolved(s)) return 'busy'
+        const ready = await this.advancePlan(c, s, integ)
+        if (!ready) return 'notReady'
+        const planId = planIdOf(ready.plan)
+        if (this.planUndone(c, s, planId) || !(await this.offerCurrent(ready.plan.target, ready.offer))) return 'notReady'
+        // The same plan refused at the base before, on a repository that hasn't changed since: not tried again yet.
+        const refusals = (await journals.list(c.key, s.cycle)).map((x) => x.journal).filter((x): x is AdvanceJournal => x !== 'unreadable' && x.planId === planId && !!x.refusedAt)
+        if (refusals.length) {
+          const now = await basePrint(h, this.advanceDeps(integ, journals, () => true), integ.view.store)
+          if (now === null || refusals.some((x) => x.refusedAt === now)) return 'notReady'
+        }
+        await host.noteDefault(c)
+        const attempt = randomUUID()
+        const deps = this.advanceDeps(integ, journals, () => this.planStill(card.id, planId, integ))
+        const j = await journalRequested(h, deps, attempt, ready.plan)
+        if (!(await host.attempted(c, s.cycle, planId, attempt))) {
+          await journalAbandoned(h, deps, j)
+          return 'busy'
+        }
+        const { outcome, journal } = await runAdvance(h, deps, j)
+        if (await this.recordAdvance(h, deps, c, journal, outcome, host)) integrated = s.cycle
+        return { attempted: attempt }
+      })
+    )
+    if (integrated !== null) await this.candidatesDone(card, integrated)
+    return step
+  }
+
+  /**
+   * HI-3235/s13 §1–2, s16: the user's answer to an advance's question, from its durable action. Under the card's lock
+   * and the repository lock: bound to its request, attempt, plan, cycle and state (else a stale or repeated delivery:
+   * nothing runs, and the attempt keeps its question); the journal read before anything (a replayed undo runs nothing
+   * it may have run); an answer that can't be acted on asks again, saying why.
+   */
+  async advanceAnswer(card: CardRecord, ans: AdvanceAnswer, host: AdvanceHost): Promise<void> {
+    const d = this.deps
+    const wf = this.wf
+    const journals = this.advanceJournals()
+    // Not answered here (jj can't be reached now): failed, never done silently; its question comes back by recovery's
+    // keepAsked once no answer is pending (HR1's round 1, finding 2).
+    if (!wf || !d?.records || !journals) throw new Error('advance answer: jj is not composed for this project') // i18n-ignore: an action's failure, for the log
+    const integ = await d.integration()
+    if (!integ) throw new Error("advance answer: jj's control workspace can't be read now") // i18n-ignore: an action's failure, for the log
+    await this.withCardLock(card.id, () => underLock(integ.view.store, integ.lock, (h) => this.answerUnder(h, integ, journals, card, ans, host)))
+  }
+
+  /** advanceAnswer's body, under the card's lock and the repository lock. */
+  private async answerUnder(h: Held, integ: JjIntegrationDeps, journals: AdvanceJournals, card: CardRecord, ans: AdvanceAnswer, host: AdvanceHost): Promise<void> {
+    const wf = this.wf!
+    const d = this.deps!
+    const c = wf.store.card(card.id)
+    const s = wf.state(c)
+    const ref: AdvanceRef = { cycle: ans.cycle, attempt: ans.attempt }
+    const asked = s.made[ans.request]
+    const answered = s.approvals.findLast((a) => a.request === ans.request)
+    const bound = ans.project === wf.cfg.project && s.cycle === ans.cycle && s.advance?.attempt === ans.attempt && advanceUnresolved(s) && s.advance.state === ans.state && s.advance.plan === ans.plan && asked?.gate === ans.gate && asked.entry === ans.attempt && asked.result === ans.plan && answered?.answer === ans.answer
+    const read = await journals.read(c.key, ans.cycle, ans.attempt)
+    const j = read && read !== 'unreadable' && read.planId === ans.plan ? read : null
+    if (!bound) return this.keepAsked(c, j, host, ans.request, 'stale') // i18n-ignore: a code, worded by the question's message (FOR_YOU.advance*)
+    const deps = this.advanceDeps(integ, journals, () => {
+      const now = wf.state(wf.store.card(card.id))
+      return now.cycle === ans.cycle && now.advance?.attempt === ans.attempt && advanceUnresolved(now) && !d.candidateChecks?.signal?.aborted
+    })
+    const askAgain = async (state: 'stopped' | 'uncertain', words: AdvanceWords): Promise<void> => void (await host.askAgain(c, ref, ans.plan, state, words, ans))
+    const again = (why: string, detail: string, reason: string): Promise<void> => askAgain('uncertain', this.advanceWords(j, s, why, detail, reason))
+    const missing = read === 'unreadable' ? 'unreadable' : 'missing'
+    if (ans.gate === ADVANCE_UNCERTAIN_GATE) {
+      if (ans.answer === 'approved') {
+        // The user's attestation (s16 §2): no evidence needed, the evidence there was (or its absence) named in the override.
+        // i18n-ignore: codes kept as the override's recorded reason (data, never translated): what evidence there was
+        const reason = `attested; journal=${j ? j.phase : missing}${s.advance?.code ? `; code=${s.advance.code}` : ''}`
+        if ((await host.attested(c, ref, ans, reason)) && j) await journalSettled(h, deps, j, 'resolved')
+        return
+      }
+      // Start again: only on positive proof that T doesn't contain R (s13 §2).
+      if (!j) return again('journal', missing, 'startNeedsJournal') // i18n-ignore: a code, worded by the question's message (FOR_YOU.advance*)
+      const contained = await resultContained(h, deps, j.plan)
+      if (contained !== false) return again(s.advance?.code ?? 'uncertain', j.phase, contained === true ? 'contains' : 'containsUnknown') // i18n-ignore: a code, worded by the question's message (FOR_YOU.advance*)
+      if (await host.resolved(c, ref, 'startAgain')) {
+        await journalSettled(h, deps, j, 'resolved')
+        // A new plan with fresh checks: the candidate record goes, so it is built and checked again.
+        const rec = d.records!
+        await rec.write((db) => void db.prepare('DELETE FROM board_meta WHERE key = ?').run(candidateKey(rec.projectId(), c.key, ans.cycle))) // i18n-ignore: SQL
+      }
+      return
+    }
+    // advanceStopped: Decline leaves it to the user (uncertain from now); Approve undoes, a new undo attempt each time.
+    if (ans.answer === 'declined') return again(s.advance?.code ?? 'declined', j?.phase ?? '', 'yourself') // i18n-ignore: a code, worded by the question's message (FOR_YOU.advance*)
+    if (!j) return again('journal', missing, 'undoNeedsJournal') // i18n-ignore: a code, worded by the question's message (FOR_YOU.advance*)
+    const offeredAgain = async (j2: AdvanceJournal, why: string, reason: string): Promise<void> => askAgain((await undoOfferedNow(h, deps, j2)) ? 'stopped' : 'uncertain', this.advanceWords(j2, s, s.advance?.code ?? 'stopped', why, reason))
+    const mine = j.undos.find((u) => u.request === ans.request)
+    if (mine) {
+      // A replay (s16 §1): classified read-only, never run again.
+      const out = await classifyUndoNow(h, deps, j, mine)
+      if (out.kind === 'advanced') {
+        const j2 = await journalUndoAs(h, deps, j, mine.undo, 'undone')
+        if (await host.resolved(c, ref, 'undone')) await journalSettled(h, deps, j2, 'undone')
+      } else if (out.kind === 'nothingMoved') {
+        await offeredAgain(await journalUndoAs(h, deps, j, mine.undo, 'abandoned', 'preMutation'), j.phase, 'undoNotStarted') // i18n-ignore: a code, worded by the question's message (FOR_YOU.advance*)
+      } else {
+        await journalUndoAs(h, deps, j, mine.undo, 'uncertain', out.code)
+        await again(out.code, out.detail ?? '', 'undoUnproved') // i18n-ignore: a code, worded by the question's message (FOR_YOU.advance*)
+      }
+      return
+    }
+    if (j.undos.some((u) => !undoPreMutation(u) && u.phase !== 'undone')) return again('undoUncertain', '', 'earlierUndo') // i18n-ignore: a code, worded by the question's message (FOR_YOU.advance*)
+    if (!(await undoOfferedNow(h, deps, j))) return again(s.advance?.code ?? 'stopped', j.phase, 'undoConditions') // i18n-ignore: a code, worded by the question's message (FOR_YOU.advance*)
+    const j2 = await journalNewUndo(h, deps, j, randomUUID(), ans.request)
+    const undo = j2.undos.at(-1)!.undo
+    const { outcome, journal } = await runUndo(h, deps, j2, undo)
+    if (outcome.kind === 'advanced') {
+      if (await host.resolved(c, ref, 'undone')) await journalSettled(h, deps, journal, 'undone')
+    } else if (outcome.kind === 'nothingMoved') {
+      await offeredAgain(await journalUndoAs(h, deps, journal, undo, 'abandoned', outcome.code), outcome.code, 'undoNotStarted') // i18n-ignore: a code, worded by the question's message (FOR_YOU.advance*)
+    } else {
+      await again(outcome.code, outcome.detail ?? '', 'undoUnproved') // i18n-ignore: a code, worded by the question's message (FOR_YOU.advance*)
+    }
+  }
+
+  /** HI-3235: the project's journaled advances settled (a crash, a card no reconcile reached), card by card under its locks. */
+  async recoverAdvances(host: AdvanceHost): Promise<void> {
+    const d = this.deps
+    const wf = this.wf
+    const journals = this.advanceJournals()
+    if (!wf || !d?.records || !journals) return
+    const keys = new Set((await journals.all()).filter((j) => !j.settled || j.settled === 'stopped' || j.settled === 'uncertain').map((j) => j.plan.card.toLowerCase()))
+    const cards = wf.store.cards().filter((c) => keys.has(c.key.toLowerCase()) || advanceUnresolved(wf.state(c)))
+    if (!cards.length) return
+    const integ = await d.integration()
+    if (!integ) {
+      // jj unreadable now: nothing classified, but an unsettled attempt keeps a question (its journal read only for its words).
+      for (const c of cards) await this.withCardLock(c.id, () => this.keepAsked(wf.store.card(c.id), null, host, null, 'answered')) // i18n-ignore: a code, worded by the question's message (FOR_YOU.advance*)
+      return
+    }
+    for (const c of cards) await this.withCardLock(c.id, () => underLock(integ.view.store, integ.lock, (h) => this.settleAdvances(h, integ, journals, c, host)))
   }
 
   /** Whether a target's head is still `expected` (J5's read): false when it moved or can't be read. */
@@ -932,7 +1269,11 @@ export class JjPlatform implements PlatformAdapter {
         },
         { card: { key: card0.key, number: card0.id }, fp, attempt: offer.attempt, result: offer.result, expected: offer.expected, checksKey: key, names: [...o.mergeChecks], commands: o.commands, installAlways: o.mergeInstall === 'always' }
       )
-      if ('green' in out) await publish({ passed: out.checks })
+      if ('green' in out) {
+        await publish({ passed: out.checks })
+        // HI-3235: a card whose finish is Combwork's advance goes on at once (the generic step decides; its adapter, here).
+        void advanceStep(wf, wf.store.card(card0.id)).catch((e) => checksLog.warn(`advancing #${userText(card0.key)} after its checks`, e)) // i18n-ignore: a log line, English
+      }
       else if ('red' in out) await publish({ red: { ...out.red, expected: offer.expected } })
       else if ('stopped' in out) await publish({ stopped: out.stopped.check })
       else if ('wait' in out) {

@@ -91,6 +91,10 @@
     "text": "The builder merges each approved card (merge-ready), then reports it with cw_report_merge; Combwork checks it is in.",
     "note": "Finish: the builder merges."
   },
+  "brief.rule.finish.combworkAdvances": {
+    "text": "Combwork integrates each approved card into its target with jj once its merge checks pass.",
+    "note": "Finish (jj, HI-3235): Combwork advances the target bookmark itself."
+  },
   "brief.rule.finish.combworkMerges": {
     "text": "Combwork merges each approved card.",
     "note": "Finish: Combwork merges."

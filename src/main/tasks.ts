@@ -2590,7 +2590,7 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
       wf,
       n,
       actor,
-      (w) => w.answer(n, request, outcome, { ...(reply ? { note: reply } : reason ? { note: reason } : {}), ...(decision ? { decided: true } : {}), ...(choice ? { choice } : {}), ...(choice === 'carryOn' ? { rounds: a.rounds } : {}), ...(action ? { action } : {}) }),
+      (w) => w.answer(n, request, outcome, { by: actor.kind, ...(reply ? { note: reply } : reason ? { note: reason } : {}), ...(decision ? { decided: true } : {}), ...(choice ? { choice } : {}), ...(choice === 'carryOn' ? { rounds: a.rounds } : {}), ...(action ? { action } : {}) }),
       // A reply is on the card too, as the user's comment (#1626), so the card shows it and the wake's "in full" is there.
       (_w, first) => ({ patch: first && decision ? { decision } : {}, ...(first && reply ? { opts: { comment: reply } } : {}) })
     )

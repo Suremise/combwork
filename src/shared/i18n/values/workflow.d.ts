@@ -17,6 +17,10 @@ interface CombworkMessageValues {
   'workflow.contradiction.upToDateNeedsSlots': undefined
   'workflow.earlierWork.message': { read: string; n: number; lines: string | number }
   'workflow.earlierWork.title': { read: string; card: string | number; line: string | number }
+  'workflow.forYou.advanceNote': { project: string | number }
+  'workflow.forYou.advanceRefused': { target: string | number; result: string | number; card: string | number; why: string; detail: string | number }
+  'workflow.forYou.advanceStopped': { again: string; target: string | number; result: string | number; card: string | number; why: string; detail: string | number }
+  'workflow.forYou.advanceUncertain': { again: string; target: string | number; result: string | number; card: string | number; detail: string | number; op: string }
   'workflow.forYou.decidedAfterMerge': { card: string | number }
   'workflow.forYou.focusedSkip': { card: string | number; tests: string | number }
   'workflow.forYou.lineAsk': { line: string | number; card: string | number; target: string | number; next: string | number }
@@ -212,6 +216,8 @@ interface CombworkMessageValues {
   'workflow.option.fileLocks.desc': undefined
   'workflow.option.fileLocks.title': undefined
   'workflow.option.finish.desc': undefined
+  'workflow.option.finish.jjDesc': undefined
+  'workflow.option.finish.jjTitle': undefined
   'workflow.option.finish.title': undefined
   'workflow.option.focusedTests.desc': undefined
   'workflow.option.focusedTests.title': undefined
@@ -653,6 +659,7 @@ interface CombworkMessageValues {
   'workflow.value.commitMessage.branch': undefined
   'workflow.value.commitMessage.cw': undefined
   'workflow.value.finish.agentMerges': undefined
+  'workflow.value.finish.combworkAdvances': undefined
   'workflow.value.finish.combworkMerges': undefined
   'workflow.value.finish.committed': undefined
   'workflow.value.finish.notChecked': undefined

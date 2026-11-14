@@ -1171,17 +1171,25 @@
     "defaultMessage": "A check nobody else can spoil",
     "description": "A tip's title."
   },
+  "tips.jjAdvance.text": {
+    "defaultMessage": "In a jj project, Combwork moves the target bookmark to a card’s candidate once its merge checks pass, and asks you in For you if anything else changed. To do it yourself, choose You integrate it yourself in Version Control → Workflow.",
+    "description": "A tip (HI-3235). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. “Who integrates” and “You integrate it yourself” are a workflow option and its value, as translated there. Keep jj. A candidate is the commit Combwork builds for the card; a bookmark is jj's name for a branch."
+  },
+  "tips.jjAdvance.title": {
+    "defaultMessage": "Combwork integrates jj cards",
+    "description": "A tip's title (HI-3235). Keep jj."
+  },
   "tips.jjCandidates.text": {
-    "defaultMessage": "Once a jj card passes, Combwork builds a candidate from it on the target bookmark and checks it for conflicts. Version Control → Repository shows it with the jj bookmark set command that integrates it: you run it; Combwork never moves the bookmark.",
-    "description": "A tip (HI-2871). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep jj and jj bookmark set (a command). A candidate is the commit Combwork builds for the user to integrate; a bookmark is jj's name for a branch."
+    "defaultMessage": "Once a jj card passes, Combwork builds a candidate from it on the target bookmark and checks it for conflicts. With You integrate it yourself, Version Control → Repository shows it with the jj bookmark set command that integrates it, for you to run.",
+    "description": "A tip (HI-2871, HI-3235). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep jj and jj bookmark set (a command). “You integrate it yourself” is a value of the workflow option Who integrates, as translated there. A candidate is the commit Combwork builds for the card; a bookmark is jj's name for a branch."
   },
   "tips.jjCandidates.title": {
     "defaultMessage": "Integrate a jj card’s candidate",
     "description": "A tip's title (HI-2871). Keep jj. A candidate is the commit Combwork builds for the user to integrate."
   },
   "tips.jjCards.text": {
-    "defaultMessage": "In a jj project, each card works in a slot of its own. Once one passes review, you integrate it yourself: Version Control → Repository lists what waits for you, and Combwork moves the card to Done once its work is in the target.",
-    "description": "A tip (HI-2874). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. A slot is a working folder Combwork lends to a card (glossary 2.5: slot). Keep jj."
+    "defaultMessage": "In a jj project, each card works in a slot of its own. Once one passes review, Combwork integrates it, or you do (You integrate it yourself), and the card moves to Done once its work is in the target.",
+    "description": "A tip (HI-2874, HI-3235). “You integrate it yourself” is a value of the workflow option Who integrates, as translated there. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. A slot is a working folder Combwork lends to a card (glossary 2.5: slot). Keep jj."
   },
   "tips.jjCards.title": {
     "defaultMessage": "Cards in a jj project",
@@ -2400,8 +2408,8 @@
     "description": "A tip's title (HI-2195): an account's agents move to another account when its plan's usage reaches a share."
   },
   "tips.versionControlJj.text": {
-    "defaultMessage": "In a jj repository, choose jj atop the Version Control tab: its History shows each change id beside its commit id, and Compare, Bookmarks and Conflicts read the repository without changing it. You integrate reviewed work yourself.",
-    "description": "A tip (HI-2799, HI-2896: colocated with Git or not). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep jj."
+    "defaultMessage": "In a jj repository, choose jj atop the Version Control tab: its History shows each change id beside its commit id, and Compare, Bookmarks and Conflicts read the repository without changing it. Combwork integrates reviewed work, or you do.",
+    "description": "A tip (HI-2799, HI-2896: colocated with Git or not; HI-3235). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep jj."
   },
   "tips.versionControlJj.title": {
     "defaultMessage": "See a jj repository",

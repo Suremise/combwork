@@ -173,6 +173,21 @@ export const SLOT_DIRTY_GATE = 'slotDirty'
  */
 export const QUEUE_PUBLISH_GATE = 'queuePublish'
 
+/**
+ * HI-3235 (HI-2840/s30, s34; HI-3235/s10–s16): Combwork's advance of a target stopped after it moved something, with its
+ * undo offered: Approve undoes the move (a new undo attempt each time), Decline leaves it to the user (then uncertain).
+ * Bound to the attempt (`entry`) and its plan (`result`); asked as the user's alone, answered from the window.
+ */
+export const ADVANCE_STOPPED_GATE = 'advanceStopped'
+/**
+ * HI-3235: an advance whose outcome Combwork couldn't prove (or stopped with no undo): Approve is the user's attestation
+ * that it is integrated (an Override, never `Integrated`), Decline asks to start again (only once the target is known
+ * not to contain the card's work). Bound like ADVANCE_STOPPED_GATE.
+ */
+export const ADVANCE_UNCERTAIN_GATE = 'advanceUncertain'
+/** HI-3235: the advance's two gates, whose answers only the user gives and whose handling is the platform adapter's. */
+export const ADVANCE_GATES: readonly string[] = [ADVANCE_STOPPED_GATE, ADVANCE_UNCERTAIN_GATE]
+
 /** A follow-mode attempt's endpoint as a fact keeps it (HI-1183): never a credential. */
 export interface PublishFact {
   remote: string
@@ -203,7 +218,7 @@ export const ASK_ACTIONS_MAX = 3
  * A request under any other gate is a question someone asked: an agent, the Assistant (`ask`), or a rule it couldn't
  * keep. A question settled another way is closed (#1638); Combwork's own requests stay until met.
  */
-const CW_GATES: ReadonlySet<string> = new Set(['review', 'okBefore', ROUND_LIMIT_GATE, LINE_GATE, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, QUEUE_PUBLISH_GATE, FOCUSED_SKIP_GATE, SLOT_DIRTY_GATE, 'decision'])
+const CW_GATES: ReadonlySet<string> = new Set(['review', 'okBefore', ROUND_LIMIT_GATE, LINE_GATE, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, QUEUE_PUBLISH_GATE, FOCUSED_SKIP_GATE, SLOT_DIRTY_GATE, ADVANCE_STOPPED_GATE, ADVANCE_UNCERTAIN_GATE, 'decision'])
 export const askedQuestion = (r: Pick<FactData['ApprovalRequested'], 'gate'>): boolean => !CW_GATES.has(r.gate)
 
 /** An answer as the user gives it (§16.8.5): its outcome, whether it has a reply or a decision, a choice and its rounds, or an action offered (#1630). */
@@ -356,7 +371,7 @@ export interface FactData {
    * on itself (`carriedOn`: answered some other way, such as in its pane). It leaves For you as an answer does.
    */
   /** `slotClean` (HI-2014): a finished card's slot asked about (SLOT_DIRTY_GATE) became clean, or another card's. */
-  RequestClosed: { request: string; why: 'done' | 'carriedOn' | 'slotClean' }
+  RequestClosed: { request: string; why: 'done' | 'carriedOn' | 'slotClean' | 'advance' }
   /** An answer (§16.8.5): `note` the user's reply; at the round limit, their `choice` and the rounds a carry on adds; `action`, an action the question offered, done (#1630; `note` its reason). */
   /** `byDecision` (HI-1932): answered by a decision the user made, recorded on the card (its id), by whom (the authenticated recorder), when. */
   Approval: { request: string; answer: 'approved' | 'declined' | 'answered'; note?: string; generation: number; submission?: number; choice?: RoundChoice; rounds?: number; action?: AskActionKind; byDecision?: { decision: string; recordedBy: string; at: string } }
@@ -405,6 +420,23 @@ export interface FactData {
   /** HI-2988: a Done card marked `LeftTarget` whose result is in its target again: the mark cleared. */
   BackInTarget: { revision: string; target: string }
   Accepted: { revision?: string; submission?: number }
+  /**
+   * HI-3235 (HI-2840/s34 §2): Combwork's advance of the card's target was journaled (`attempt`, its journal file's id) for
+   * the plan the user's workflow consented to (`plan`, the hash of its identity), and read back before anything moved.
+   * Until `AdvanceResolved` or `Integrated` for it, the card takes no other advance.
+   */
+  AdvanceAttempted: { plan: string; attempt: string }
+  /**
+   * HI-3235: the attempt moved something and then saw a difference it stops at (s30 §1's detections, `code`), or Combwork
+   * couldn't prove what happened (`uncertain`). `undo`: whether every condition of s30 §2's undo held when read.
+   */
+  AdvanceStopped: { attempt: string; code: string; detail?: string; undo: boolean; uncertain: boolean }
+  /**
+   * HI-3235: the attempt's end without `Integrated`: nothing moved (refused at base, the lease lost, the fact unconfirmed,
+   * or a pre-mutation crash), a verified undo, the user's attestation (with an `Override` beside it), or the user's start
+   * again (the target known not to contain the work).
+   */
+  AdvanceResolved: { attempt: string; how: 'nothingMoved' | 'undone' | 'attested' | 'startAgain'; detail?: string }
   /** `why`: the agent's own reason, given with a put back (#1267). */
   /** `repair` (HI-1674): a card the board had in Done while its stage wasn't, brought into line when its workspace opens. */
   Moved: { from: StageId; to: StageId; cause: 'intent' | 'user' | 'derived' | 'override' | 'repair'; why?: string }
@@ -642,6 +674,8 @@ export interface CardState {
   entries: QueueEntry[]
   integrated: FactData['Integrated'] | null
   accepted: FactData['Accepted'] | null
+  /** HI-3235: the cycle's latest Combwork advance of its target, and how far it is settled (null: none attempted). */
+  advance: AdvanceState | null
   /** Rounds: failed verdicts and the user's declines (§16.11.4), over the card's whole history. */
   rounds: number
   /** The rounds the user added at the round limit ("carry on"), over the card's whole history. */
@@ -675,6 +709,24 @@ export interface CardState {
   finished: (FactData['Finished'] & { seq: number; steps: FinishStepId[] }) | null
   lastSeq: number
 }
+
+/**
+ * HI-3235: a card's Combwork advance as its facts say: attempted (journaled and confirmed, its outcome not recorded yet),
+ * stopped (its undo offered or not), uncertain (only the user resolves it), or resolved (`Integrated` for it, or
+ * `AdvanceResolved`). Anything but resolved blocks another advance of the card.
+ */
+export interface AdvanceState {
+  attempt: string
+  plan: string
+  state: 'attempted' | 'stopped' | 'uncertain' | 'resolved'
+  code?: string
+  detail?: string
+  undo?: boolean
+  how?: FactData['AdvanceResolved']['how'] | 'integrated'
+}
+
+/** HI-3235: whether a card's advance is unsettled (attempted, stopped or uncertain): it takes no other advance. */
+export const advanceUnresolved = (s: Pick<CardState, 'advance'>): boolean => !!s.advance && s.advance.state !== 'resolved'
 
 /**
  * A card loop's steps (#1382, #1467, SPEC §16.8.1): the builder's `design` (posted for the reviewer's check, in Doing),
@@ -716,6 +768,7 @@ export const emptyState = (): CardState => ({
   entries: [],
   integrated: null,
   accepted: null,
+  advance: null,
   rounds: 0,
   moreRounds: 0,
   builders: [],
@@ -738,6 +791,14 @@ const addOnce = (list: string[], x: string): string[] => (list.includes(x) ? lis
 
 /** A request a gate waits on (the user's review, or the OK before merging), bound to its submission, stage and generation. */
 const isGateRequest = (r: FactData['ApprovalRequested']): boolean => r.gate === 'review' || r.gate === 'okBefore'
+
+/** HI-3235: an advance settled: resolved, and the questions bound to its attempt retired (they can't be acted on any more). */
+const settleAdvance = (s: CardState, how: NonNullable<AdvanceState['how']>): void => {
+  if (!s.advance) return
+  const attempt = s.advance.attempt
+  s.advance = { ...s.advance, state: 'resolved', how }
+  s.requests = s.requests.filter((r) => !(ADVANCE_GATES.includes(r.gate) && r.entry === attempt))
+}
 
 /** An entry's outcome retires the merge queue's requests about it (#1351): it can't be updated or stuck any more. */
 const retireEntry = (s: CardState, entry: string): void => {
@@ -917,6 +978,8 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'Integrated': {
         const d = f.data as FactData['Integrated']
         s.integrated = d
+        // HI-3235: Combwork's verified advance settles its attempt, and retires the attempt's questions.
+        if (s.advance && d.platform?.attempt === s.advance.attempt) settleAdvance(s, 'integrated')
         const e = d.entry ? s.entries.find((x) => x.id === d.entry) : undefined
         if (e) e.state = 'integrated'
         if (d.entry) s.requests = s.requests.filter((r) => r.entry !== d.entry || r.gate === QUEUE_STUCK_GATE)
@@ -939,6 +1002,21 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'Accepted':
         s.accepted = f.data as FactData['Accepted']
         break
+      case 'AdvanceAttempted': {
+        const d = f.data as FactData['AdvanceAttempted']
+        s.advance = { attempt: d.attempt, plan: d.plan, state: 'attempted' }
+        break
+      }
+      case 'AdvanceStopped': {
+        const d = f.data as FactData['AdvanceStopped']
+        if (s.advance?.attempt === d.attempt && s.advance.state !== 'resolved') Object.assign(s.advance, { state: d.uncertain ? 'uncertain' : 'stopped', code: d.code, detail: d.detail, undo: d.undo && !d.uncertain })
+        break
+      }
+      case 'AdvanceResolved': {
+        const d = f.data as FactData['AdvanceResolved']
+        if (s.advance?.attempt === d.attempt) settleAdvance(s, d.how)
+        break
+      }
       case 'Finished':
         s.finished = { ...(f.data as FactData['Finished']), seq: f.seq, steps: [] }
         break

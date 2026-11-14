@@ -115,6 +115,9 @@
   "brief.rule.finish.agentMerges": {
     "placeholders": {}
   },
+  "brief.rule.finish.combworkAdvances": {
+    "placeholders": {}
+  },
   "brief.rule.finish.combworkMerges": {
     "placeholders": {}
   },

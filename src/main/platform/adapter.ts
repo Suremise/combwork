@@ -5,11 +5,12 @@
 // P2 spike (#1118): the interface the spike proves; P3 builds it into main.
 
 import type { PlatformId } from '../../shared/platform/descriptors'
-import type { CardState, CheckRanData, FileChange, Manifest } from '../../shared/workflow/facts'
+import type { CardState, CheckRanData, FactData, FileChange, Manifest } from '../../shared/workflow/facts'
 import type { GuardInputs, GuardRefusal } from '../../shared/workflow/guards'
 import type { WorkflowOptions } from '../../shared/workflow/options'
 import type { CardRecord } from '../workflow/factStore'
 import type { ReconcileHooks } from '../workflow/reconcile'
+import type { Write } from '../workflow/runtime'
 import type { Disposable, ObserveEvent } from './observe'
 import type { Containment, Maybe, Unknown } from './types'
 import type { TargetChanges } from '../../shared/types'
@@ -214,6 +215,76 @@ export interface PlatformAdapter {
    * reconciliation run is wanted for it. Absent: always.
    */
   invalidated?(what: string): Promise<boolean>
+  /**
+   * HI-3235 (HI-2840/s30, s34; HI-3235/s10–s16): where its descriptor declares a finish Combwork advances by
+   * (`finishAdvances`), the card in Approved with its OK given and no advance unsettled: integrate it if it is ready (its
+   * candidate and checks are the platform's to judge), journaled first and recorded through `host`. Each call first
+   * settles the card's earlier attempts it finds. Called by the generic reconcile, never by a platform check.
+   */
+  advance?(card: CardRecord, s: CardState, host: AdvanceHost): Promise<AdvanceStep>
+  /** HI-3235: the user's answer to an advance's question (ADVANCE_GATES), as its durable action carries it. */
+  advanceAnswer?(card: CardRecord, answer: AdvanceAnswer, host: AdvanceHost): Promise<void>
+  /** HI-3235: the project's journaled advances settled, after a reconciliation run's cards (a crash, a card out of reach). */
+  recoverAdvances?(host: AdvanceHost): Promise<void>
+}
+
+/** HI-3235: an advance call's outcome: nothing to do yet, an earlier attempt unsettled (no new one), or this attempt made. */
+export type AdvanceStep = 'notReady' | 'busy' | { attempted: string }
+
+/** HI-3235: an advance question's answer, bound to what it was asked about (its request, attempt, plan, cycle and state). */
+export interface AdvanceAnswer {
+  request: string
+  gate: string
+  attempt: string
+  plan: string
+  cycle: number
+  state: 'stopped' | 'uncertain'
+  answer: 'approved' | 'declined'
+  /** The project the request was asked in (its workspace's path for it). */
+  project: string
+}
+
+/** HI-3235: what an advance question says: why (a code the window words), what was read, and why it is asked again. */
+export interface AdvanceWords {
+  /** The target and the commit it was to move to (shown short). */
+  target: string
+  result: string
+  why: string
+  detail: string
+  op?: string
+  /** Asked again after an answer that couldn't be acted on: why, as a code the question's message words (FOR_YOU.advance*). */
+  again?: string
+}
+
+/** HI-3235: an advance's identity on its card: the cycle it belongs to and its attempt. */
+export interface AdvanceRef {
+  cycle: number
+  attempt: string
+}
+
+/**
+ * HI-3235: the generic workflow's records of a platform's advance, each written under the card's transaction and only
+ * while the card is still where the call says (its cycle; for an attempt's outcome, that attempt unsettled). The adapter
+ * calls these holding its own card and repository locks (card → repository → the board's transaction): none of them
+ * takes a repository lock.
+ */
+export interface AdvanceHost {
+  /** `AdvanceAttempted`, read back: false when it couldn't be written or confirmed (the attempt then stops before any change). */
+  attempted(card: CardRecord, cycle: number, plan: string, attempt: string): Promise<boolean>
+  /** Verified: `Integrated { by: 'combwork' }` once per attempt, and the card moved to Done where the rules act. */
+  advanced(card: CardRecord, ref: AdvanceRef, integrated: Pick<FactData['Integrated'], 'revision' | 'target' | 'result' | 'method' | 'platform'>, also?: (w: Write) => void): Promise<boolean>
+  /** Stopped or uncertain: `AdvanceStopped`, and its question asked (one open request per attempt). */
+  stopped(card: CardRecord, ref: AdvanceRef, plan: string, stop: { code: string; detail?: string; undo: boolean; uncertain: boolean }, words: AdvanceWords): Promise<boolean>
+  /** Settled without `Integrated`: nothing moved, a verified undo, or the user's start again. */
+  resolved(card: CardRecord, ref: AdvanceRef, how: 'nothingMoved' | 'undone' | 'startAgain', detail?: string): Promise<boolean>
+  /** The user's attestation of an answered question: `AdvanceResolved attested`, an `Override` naming `reason`, and Done. */
+  attested(card: CardRecord, ref: AdvanceRef, answer: AdvanceAnswer, reason: string): Promise<boolean>
+  /** A fresh question for the attempt (the consumed `answer`'s retired), saying why it is asked again. */
+  askAgain(card: CardRecord, ref: AdvanceRef, plan: string, state: 'stopped' | 'uncertain', words: AdvanceWords, answer: AdvanceAnswer | null): Promise<boolean>
+  /** Refused at the base (nothing written): the card's comment saying why, once per cycle, plan and reason. */
+  refused(card: CardRecord, cycle: number, plan: string, words: AdvanceWords): Promise<boolean>
+  /** The one-time note that the project's default finish is Combwork's advance (once per project). */
+  noteDefault(card: CardRecord): Promise<void>
 }
 
 /** HI-3152: a waiting card's kept work (`keptWork`): none, proved on `target`, or unproved (`slot` named when one is kept). */
