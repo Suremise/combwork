@@ -29,6 +29,8 @@ import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectNam
 import { actorOf, cardFacts, changeByRuntime, commentGenerations, commentReceiptFor, decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
 import { noteCard } from './assistantChanges'
 import { FactStore } from './workflow/factStore'
+import type { AttemptGuard } from './attemptFence'
+import { writeReadiness } from './workflow/dependencyReadiness'
 import { loopReviewerOf } from './loopReviewer'
 import { readStep } from './platform/historyPorts'
 import type { CardKind, Fact } from '../shared/workflow/facts'
@@ -37,11 +39,11 @@ import { linkToComment, moveCardFolder, publish, removeCardAttachments, trashCar
 import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } from '../shared/cardAttachments'
 import { hasStage, laneTargetOf, skipReviewOf } from '../shared/workflow/compile'
 import { isStageId, STAGE_TEXT, stageName, type StageNames } from '../shared/workflow/stages'
-import { answerFits, approveNote, ASK_ACTIONS, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, foldCard, openEntry, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type RoundChoice, type StageId } from '../shared/workflow/facts'
+import { answerFits, approveNote, ASK_ACTIONS, ATTEMPT_STAGES, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, foldCard, openEntry, type Actor, type AttemptKey, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type RoundChoice, type StageId } from '../shared/workflow/facts'
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { refusal as refusalOf, refusalText, type Refusal } from '../shared/workflow/refusals'
-import { archiveBatchDocs, boardReadToken, boardGeneration, boardSavepoint, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, headChanges, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, cardRevs, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, archiveComments, archivedComments, commentArchiveOf, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, decisionChanges, cardsOnBoard, inBoardWrite, type CardQuery } from './boardStore'
+import { archiveBatchDocs, boardReadToken, boardGeneration, boardSavepoint, afterBoardWrite, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, headChanges, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, cardRevs, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, archiveComments, archivedComments, commentArchiveOf, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, decisionChanges, cardsOnBoard, inBoardWrite, beforeBoardCommit, type CardQuery } from './boardStore'
 import type { Evicted } from './schema/commentArchive'
 import { keysForSearch } from './projectKeys'
 import { config } from './config'
@@ -100,7 +102,11 @@ const ERR = {
  * `self` is the agent whose call it is (its project's folder name and id); scripts have none. `scope` confines a
  * project agent to its project's cards: others are "unknown" to it, as if they didn't exist.
  */
-export type TaskActor = { kind: 'user' } | { kind: 'assistant' } | { kind: 'agent'; name: string; self?: { project: string; agentId: string }; scope?: string }
+/**
+ * Who changes a card. A project agent's own call (`self`) carries its request's attempt fence (`guard`, HI-3194,
+ * attemptFence.ts): each of its writes on a card is checked against it in that write's transaction.
+ */
+export type TaskActor = { kind: 'user' } | { kind: 'assistant' } | { kind: 'agent'; name: string; self?: { project: string; agentId: string }; scope?: string; guard?: AttemptGuard }
 
 /** Combwork itself starting a lane's next card on its builder (HI-1990, laneStarts.ts): its start goes through the card's rules. */
 // agent-protocol: who did it, as cards' history stores it: Combwork's own name (HI-2463)
@@ -612,7 +618,7 @@ export async function cardWithFacts(ws: WorkspaceService, n: number, opts: { pro
   return { card, facts: got.facts, archived: got.archived }
 }
 
-export async function readTaskSeen(n: number, actor: TaskActor): Promise<{ card: TaskCard; generation: number; comments: number; at: number }> {
+export async function readTaskSeen(n: number, actor: TaskActor): Promise<{ card: TaskCard; generation: number; comments: number; at: number; attempt: AttemptKey | null }> {
   const ws = workspace
   if (!Number.isInteger(n) || n < 1 || !ws.path) throw unknownTask(n)
   const ids = await ws.projectIds()
@@ -620,15 +626,17 @@ export async function readTaskSeen(n: number, actor: TaskActor): Promise<{ card:
   // HI-2854: an agent's receipt of the user's comments in the same snapshot, only as far as the comments this read gives
   // (never past one archived since, HR2's round 1 finding 2); for anyone else, the newest.
   const agent = actor.kind === 'agent' ? actor.self?.agentId : undefined
-  const { raw, generation, comments, key } = boardRead(ws, () => {
+  const { raw, generation, comments, key, attempt } = boardRead(ws, () => {
     const doc = cardDoc(ws, n)
     const given = new Set(((doc as { comments?: { id?: string }[] } | null)?.comments ?? []).flatMap((x) => (x.id ? [x.id] : [])))
-    return { raw: doc, generation: decisionGenerations(ws, [n]).get(n) ?? 0, comments: agent ? commentReceiptFor(ws, n, agent, given) : (commentGenerations(ws, [n]).get(n) ?? 0), key: cardKeys(ws, [n]).get(n) }
+    // HI-3194: its attempt in the same snapshot: what this read issues to an agent's launch is the attempt it shows.
+    const project = typeof doc?.project === 'string' ? doc.project : ''
+    return { raw: doc, generation: decisionGenerations(ws, [n]).get(n) ?? 0, comments: agent ? commentReceiptFor(ws, n, agent, given) : (commentGenerations(ws, [n]).get(n) ?? 0), key: cardKeys(ws, [n]).get(n), attempt: doc ? attemptRead(ws, project, n) : null }
   })
   if (!raw) throw unknownTask(n)
   const c = withoutGone(clean(raw, n, ids, key), (x) => hasCard(ws, x))
   if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
-  return { card: c, generation, comments, at: Date.now() }
+  return { card: c, generation, comments, at: Date.now(), attempt }
 }
 
 /**
@@ -1762,7 +1770,10 @@ async function moveAsAgent(g: AgentGate, n: number, patch: TaskPatch, actor: Tas
         patch: { ...(first ? rest : {}), ...placed, ...(review && self ? { review } : {}), ...(started && rest.agent === undefined && self ? { agent: self.agentId } : {}) },
         opts: { ...(first ? { check: opts.check, commit: opts.commit } : { commit: opts.commit }), said: opts.said, ...(withComment && opts.comment !== undefined ? { comment: opts.comment } : {}), keepAgent: !started }
       }
-    }
+    },
+    undefined,
+    // HI-3194: a move to Review or Done is its submit or merge report (#1268), the builder's own.
+    { builder: !g.review && (g.column === 'review' || g.column === 'done') }
   )
   if (isRefusal(reply)) throw new WorkflowRefusedError(reply)
   const intent = String((reply as { data?: { useNextTime?: string } }).data?.useNextTime ?? '')
@@ -1790,6 +1801,101 @@ export type MoveResult = TaskMoveResult
  * by the runtime before its writes, outside the lock unless the caller holds it (a batch). Returns the intent's reply
  * and the card as last saved (null: nothing was written).
  */
+/** HI-3194: the guard of a project agent's own request (attemptFence.ts), or none: the user, the Assistant and scripts aren't fenced. */
+const guardOf = (actor: TaskActor): AttemptGuard | undefined => (actor.kind === 'agent' && actor.self ? actor.guard : undefined)
+
+/** HI-3194: a card's attempt key in the board change running here (null: it has no workflow record to fence by). */
+function attemptIn(ws: WorkspaceService, project: string, n: number): AttemptKey | null {
+  if (!project) return null
+  return FactStore.forBoard(ws, { project, key: '' }).tx((tx) => {
+    try {
+      return foldCard(tx.facts(n), tx.card(n).stage).attempt
+    } catch {
+      return null
+    }
+  })
+}
+
+/** HI-3194: the columns of a card in an attempt (Active, Review, Approved: Merging is in Approved's). */
+const ATTEMPT_COLUMNS: ReadonlySet<TaskColumn> = new Set(['doing', 'review', 'passed'])
+
+/** HI-3194: card n given to `agent` (null: nobody) while in an attempt: an `AttemptBound` moves its attempt on. */
+function attemptReassigned(ws: WorkspaceService, project: string, n: number, agent: string | null, actor: Actor): void {
+  FactStore.forBoard(ws, { project, key: '' }).tx((tx) => {
+    let stage: StageId
+    try {
+      stage = tx.card(n).stage
+    } catch {
+      return
+    }
+    if (ATTEMPT_STAGES.includes(stage)) tx.append(n, { kind: 'AttemptBound', actor, source: 'recorded', data: { why: 'reassigned', assignee: agent } }) // i18n-ignore: a fact's kind and codes, not text
+  })
+}
+
+/** HI-3194: a card's attempt key as read (outside a write: the reader's snapshot), or null with no workflow record. */
+export function attemptRead(ws: WorkspaceService, project: string, n: number): AttemptKey | null {
+  if (!project) return null
+  try {
+    const store = FactStore.forBoard(ws, { project, key: '' })
+    return foldCard(store.facts(n), store.card(n).stage).attempt
+  } catch {
+    return null
+  }
+}
+
+/**
+ * HI-3194: refused unless the agent request's fence holds for card n at attempt `pre` (null: only its launch is checked).
+ * Its launch is checked again as the board change commits (beforeBoardCommit), after every await the change makes (the
+ * card's own save included): a launch replaced meanwhile undoes the whole change, its facts too, `attempt.staleLaunch`.
+ */
+function fenceOrThrow(g: AttemptGuard, n: number, pre: AttemptKey | null, ws: WorkspaceService = workspace): void {
+  const r = g.check(n, cardRef(n), pre ?? null)
+  if (r) throw new WorkflowRefusedError(r)
+  beforeBoardCommit(ws, `attempt:${g.fence.runId}:${n}`, () => {
+    const late = g.check(n, cardRef(n), null)
+    if (late) throw new WorkflowRefusedError(late)
+  })
+}
+
+/**
+ * HI-3194: a builder's own moves (submit, a merge report, declaring paths, a design, going ahead, a follow-up) are only for
+ * the agent building the card's attempt: its agent now, else the cycle's builder. Read in the write, before it.
+ */
+function assigneeOrThrow(ws: WorkspaceService, store: FactStore, n: number, agentId: string, pre: { started: { builder: string } | null }): void {
+  const assignee = store.cardAgent(n) ?? pre.started?.builder ?? null
+  if (assignee === agentId) return
+  const name = assignee ? (cardDoc(ws, n)?.agentName as string | undefined) ?? assignee : 'nobody'
+  throw new WorkflowRefusedError(refusalOf('attempt.notAssignee', { card: cardRef(n), assignee: name }, null))
+}
+
+/**
+ * HI-3194: an agent's card change outside updateTask that moves no attempt (its kind, review skip or target), fenced
+ * through its `commit` (checked in its write): undefined for anyone else, who passes its own.
+ */
+export function fenceCommit(actor: TaskActor, n: number): (() => void) | undefined {
+  const g = guardOf(actor)
+  if (!g) return undefined
+  return () => {
+    const doc = cardDoc(workspace, n)
+    const pre = attemptIn(workspace, typeof doc?.project === 'string' ? doc.project : '', n)
+    fenceOrThrow(g, n, pre)
+    if (pre) g.accepted(n, pre, (fn) => afterBoardWrite(workspace, fn))
+  }
+}
+
+/**
+ * HI-3194: a builder's own runtime change that saves no card (declaring paths), fenced as runIntent fences a write: called
+ * in its board change, before the runtime writes, on the card's attempt as it is then.
+ */
+export function fenceNow(wf: Workflow, n: number, actor: TaskActor): void {
+  const g = guardOf(actor)
+  if (!g || actor.kind !== 'agent' || !actor.self) return
+  const pre = wf.store.tx((tx) => foldCard(tx.facts(n), tx.card(n).stage))
+  fenceOrThrow(g, n, pre.attempt)
+  assigneeOrThrow(workspace, wf.store, n, actor.self.agentId, pre)
+  g.accepted(n, pre.attempt, (fn) => afterBoardWrite(workspace, fn))
+}
+
 export async function runIntent<R>(
   wf: Workflow,
   n: number,
@@ -1798,17 +1904,33 @@ export async function runIntent<R>(
   zero9: (w: Pick<Write, 'was' | 'current' | 'written'>, first: boolean) => { patch?: TaskPatch; opts?: Parameters<typeof updateTaskLocked>[3] } = () => ({}),
   // A revocable caller's check (HI-2420, the Assistant's guard): made as each of the card's writes saves the card, in
   // the write's own transaction after the runtime's facts, so a refusal undoes its facts too.
-  commit?: () => void
+  commit?: () => void,
+  // HI-3194: the intent is one of the builder's own moves (assigneeOrThrow).
+  fence: { builder?: boolean } = {}
 ): Promise<{ reply: R; saved: TaskCard | null }> {
   let saved: TaskCard | null = null
   let first = true
+  const g = guardOf(actor)
   const reply = await recording(actor, null, () =>
     alongside(
       {
+        // HI-3194: an agent's write on this card checked against its request's fence, in the write's transaction before it
+        // decides anything (the card's attempt as it was then): refused, the write is undone whole, its own refusal too.
+        ...(g
+          ? {
+              before: (w: Write) => {
+                if (w.card.id !== n) return
+                const pre = w.state()
+                fenceOrThrow(g, n, pre.attempt)
+                if (fence.builder && actor.kind === 'agent' && actor.self) assigneeOrThrow(workspace, wf.store, n, actor.self.agentId, pre)
+              }
+            }
+          : {}),
         written: async (w) => {
           // Only this intent's own card's writes: another card's write made under its context (something it set off,
           // scheduled from inside it) is that card's business, never this card's 0.9 fields (#1287).
           if (w.card.id !== n) return
+          const own = w.written.filter((f) => f.kind !== 'Refused')
           const extra = zero9(w, first)
           first = false
           // Requests the write closed unanswered (#1638): a line each in the card's history.
@@ -1819,7 +1941,9 @@ export async function runIntent<R>(
           // Its column only when it moved: a write that moves nothing (an answer, a review's start) leaves the card's
           // place, so a failed card still in Review isn't "returned for review" by it (#1269 round 3).
           const p: TaskPatch = { ...extra.patch, ...(moved !== null ? { column: STAGE_CATEGORY[w.current] } : {}) }
-          saved = await recordingByRuntime(() => updateTaskAs(n, p, actor, { ...extra.opts, was: STAGE_CATEGORY[w.was], ...(commit ? { commit } : {}) }), moved)
+          saved = await recordingByRuntime(() => updateTaskAs(n, p, actor, { ...extra.opts, was: STAGE_CATEGORY[w.was], ...(commit ? { commit } : {}), fenced: true }), moved)
+          // Written: what this request's next write expects, and once committed its launch's binding (HI-3194).
+          if (g && own.length) g.accepted(n, foldCard(w.tx.facts(n), w.current).attempt, (fn) => afterBoardWrite(workspace, fn))
         }
       },
       // One read step (#1376): what it asks git about fixed commits is asked once in it.
@@ -2633,7 +2757,7 @@ async function stageNamesOf(ws: WorkspaceService, project: string | null | undef
   return names && Object.keys(names).length ? names : null
 }
 
-async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; note?: StoredText[]; entered?: { nobodyOk: boolean } }): Promise<TaskCard> {
+async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; note?: StoredText[]; entered?: { nobodyOk: boolean }; fenced?: boolean }): Promise<TaskCard> {
   await taskTestHooks.beforeUpdate?.(n)
   const ws = workspace
   const by = actorName(actor)
@@ -2649,6 +2773,10 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     if (!inScope(card, scope)) throw unknownTask(n)
     // The caller's own conditions, on the card as it is now (Start: not archived or done meanwhile).
     opts.check?.(card)
+    // HI-3194: an agent's own change (a comment, a plain update) checked against its request's fence, on the card's attempt
+    // as this change finds it, under the board's lock; an intent's writes were checked by runIntent with their facts.
+    const g = opts.fenced ? undefined : guardOf(actor)
+    if (g) fenceOrThrow(g, n, attemptIn(ws, card.project, n), ws)
     if (card.archived && actor.kind !== 'user') throw new TaskPermissionError(withValues(ERR.archived, { card: cardRef(n) }))
     // A card in Doing with another agent is that agent's work in progress: a project agent can't move it on to Review or
     // Done (a reviewer whose review ended when it came back for more work, say). Checked on the card as it is, before
@@ -2866,6 +2994,12 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     await saveCard(ws, n, card, before, undefined, opts.commit)
     // Nobody on it, by the user's reason: recorded as an override is (setKind's), with the rule it passes.
     if (nobody) FactStore.forBoard(ws, { project: card.project, key: '' }).tx((tx) => tx.append(n, { kind: 'Override', actor: actorOf(actor), source: 'recorded', data: { rules: ['move.doingNobody'], move: `${CATEGORY_STAGE[before.column]}→active`, by: 'assistant', reason: nobody } })) // i18n-ignore: a fact's kind and codes, not text
+    // HI-3194: given to another agent (or nobody) during an attempt: its attempt moves on, in this change.
+    // Not a start's own giving (its column before the move was Todo or On Hold: its Started began the attempt).
+    if (card.agent !== hadAgent && !transferred && card.project && ATTEMPT_COLUMNS.has(before.column)) attemptReassigned(ws, card.project, n, card.agent, actorOf(actor))
+    // HI-3194: its dependencies edited: its readiness in this change too.
+    if (patch.blockedBy !== undefined && card.project) FactStore.forBoard(ws, { project: card.project, key: '' }).tx((tx) => writeReadiness(tx, n, null, actorOf(actor), card.blockedBy))
+    if (g) g.accepted(n, attemptIn(ws, card.project, n) ?? { id: 0, generation: 0 }, (fn) => afterBoardWrite(ws, fn))
     return card
   })()
   changed(ws)
@@ -3221,6 +3355,10 @@ export async function commentTask(n: number, comment: string, actor: TaskActor, 
   return recordingAs(actor, () => boardLock(ws, async () => {
     const c = await getTask(n, ws)
     if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
+    // HI-3194: an agent's comment fenced as any of its writes, on the card's attempt as this change finds it.
+    const g = guardOf(actor)
+    const pre = g ? attemptIn(ws, c.project, n) : null
+    if (g) fenceOrThrow(g, n, pre, ws)
     if (c.archived && actor.kind !== 'user') throw new TaskPermissionError(withValues(ERR.archived, { card: cardRef(n) }))
     // A loop's request or reply (HI-2428), as updateTask's comment: its history line, which watches count and the
     // recorder wakes the other side with, in the same change.
@@ -3230,6 +3368,8 @@ export async function commentTask(n: number, comment: string, actor: TaskActor, 
     if (own) note(c, by, own, at)
     addComment(c, by, t, undefined, undefined, at)
     await saveCard(ws, n, c, undefined, undefined, opts.commit)
+    // Written: its launch is bound to the card's attempt (a first contact's binding, HI-3194).
+    if (g && pre) g.accepted(n, pre, (fn) => afterBoardWrite(ws, fn))
     changed(ws)
     return c
   }))
@@ -3249,6 +3389,11 @@ export async function askAssistantOn(n: number, asked: string, actor: TaskActor,
   return recordingAs(actor, () => boardLock(ws, async () => {
     const c = await getTask(n, ws)
     if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
+    // HI-3194: an agent's request on a card fenced as any of its writes (its comment, and the waiting mark it may set),
+    // on the card's attempt as this change finds it, its launch again as the change commits.
+    const g = guardOf(actor)
+    const pre = g ? attemptIn(ws, c.project, n) : null
+    if (g) fenceOrThrow(g, n, pre, ws)
     check(c)
     const by = actorName(actor)
     note(c, by, storedText(HISTORY.assistantAsked, { text: clip(t) }))
@@ -3259,6 +3404,7 @@ export async function askAssistantOn(n: number, asked: string, actor: TaskActor,
       note(c, by, storedText(HISTORY.waiting, { reason }))
     }
     await saveCard(ws, n, c)
+    if (g && pre) g.accepted(n, pre, (fn) => afterBoardWrite(ws, fn))
     changed(ws)
     return c
   }))

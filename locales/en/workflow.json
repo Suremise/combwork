@@ -1139,6 +1139,30 @@
     "defaultMessage": "Wait for the OK, given on the card or in For you.",
     "description": "The next step after a move refused for want of the user’s approval."
   },
+  "workflow.refused.attempt.moved.message": {
+    "defaultMessage": "{card} was restarted, put back, finished or given to another agent after you last read it (it is at attempt {attempt}.{generation} now), so this was not applied.",
+    "description": "HI-3194: a refused change to a card: the card moved to a new attempt (restarted, put back, done, or reassigned) since the agent last read it or was given it, so the change was made for an earlier attempt. {card} is a card key like AM-12; {attempt} and {generation} are numbers."
+  },
+  "workflow.refused.attempt.moved.next": {
+    "defaultMessage": "Read {card} again (cw_read_task) and act on it as it is now, if it is still yours to act on.",
+    "description": "HI-3194: the next step after a change made for an earlier attempt of the card was refused. {card} is a card key; cw_read_task is a tool name: keep it as it is."
+  },
+  "workflow.refused.attempt.notAssignee.message": {
+    "defaultMessage": "{card} is {assignee, select, nobody {no agent's} other {{assignee}'s}} to build now: you aren't building it, so this was not applied.",
+    "description": "HI-3194: a refused builder's move (a submit, a merge report, a design step): the card is given to another agent (or to nobody) now, so the caller's attempt on it ended. {card} is a card key like AM-12; {assignee} (select) is the agent's name, or nobody."
+  },
+  "workflow.refused.attempt.notAssignee.next": {
+    "defaultMessage": "Leave it to its builder, or ask the user to give it back to you.",
+    "description": "HI-3194: the next step after a builder's move by an agent that no longer has the card was refused."
+  },
+  "workflow.refused.attempt.staleLaunch.message": {
+    "defaultMessage": "{card}: this call came from a session of yours that has since been replaced (a restart or a new conversation), so it wasn't applied.",
+    "description": "HI-3194: a refused change to a card: the agent's session (its launch) was replaced while the call was on its way, so the call belongs to the old session. {card} is a card key like AM-12."
+  },
+  "workflow.refused.attempt.staleLaunch.next": {
+    "defaultMessage": "Your current session has the card: read it there (cw_read_task) and carry on from what it says now.",
+    "description": "HI-3194: the next step after a call from a replaced session was refused. cw_read_task is a tool name: keep it as it is."
+  },
   "workflow.refused.card.plainNumber.message": {
     "defaultMessage": "A plain number is not a card reference.",
     "description": "A refused intent: the card was named by a bare number."

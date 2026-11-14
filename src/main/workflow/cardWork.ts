@@ -516,6 +516,14 @@ export function factRow(f: Fact, short: (id: string) => string): FactRow {
       }
       case 'Gone':
         return (d as FactData['Gone']).what
+      case 'AttemptBound': {
+        const x = d as FactData['AttemptBound']
+        return `${x.why}: ${x.assignee ?? 'nobody'}`
+      }
+      case 'Readiness': {
+        const x = d as FactData['Readiness']
+        return `${x.ready ? 'ready' : 'waiting'}${x.after !== null ? ` after #${x.after}` : ''}`
+      }
       default:
         return ''
     }

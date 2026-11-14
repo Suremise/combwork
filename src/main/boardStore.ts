@@ -976,6 +976,8 @@ interface WriteState {
   open: boolean
   changed: boolean
   after: (() => void)[]
+  /** HI-3194: what must still hold as it commits (beforeBoardCommit), checked after the change's last await: one throwing undoes it whole. */
+  checks: Map<string, () => void>
   /** What to put back on disk if the change (or the savepoint it was asked in) is undone (onBoardUndone), newest first. */
   undone: (() => Promise<void>)[]
   /** SQLite undid its transaction part way (a full disk, an I/O error, #1017 round 1): nothing more is written, and the change fails. */
@@ -1021,12 +1023,15 @@ function boardWriteLocked<T>(ws: WorkspaceService, path: string, key: string, fn
     const b = boardOf(path)
     if (b.db.newer !== null) throw combworkError(M.newer, undefined, { kind: 'conflict' })
     if (b.db.pending) throw combworkError(M.upgradeFirst, undefined, { kind: 'conflict' })
-    const state: WriteState = { key, open: true, changed: false, after: [], undone: [], lost: null }
+    const state: WriteState = { key, open: true, changed: false, after: [], checks: new Map(), undone: [], lost: null }
     const db = b.db.writer
     let committed = false
     timedStep(`db begin ${DB_FILE}`, () => db.exec('BEGIN IMMEDIATE'))
     try {
       const out = await writing.run(state, fn)
+      // HI-3194: what the change's callers need to still hold as it commits (a request's launch still current), with no
+      // await between them and the commit: one that no longer holds undoes it whole.
+      for (const check of state.checks.values()) check()
       if (!boards.has(key)) throw combworkError(M.noWorkspace, undefined, { kind: 'conflict' })
       // Undone part way, whatever the change made of the error meanwhile (a batch skips a card that fails): it fails whole.
       if (state.lost) throw state.lost
@@ -1095,6 +1100,19 @@ export function afterBoardWrite(ws: WorkspaceService, fn: () => void): void {
   const w = writing.getStore()
   if (ws.path && w && w.open && w.key === keyOf(ws.path)) w.after.push(fn)
   else writing.exit(fn)
+}
+
+/**
+ * HI-3194: something that must still hold when the board change running here commits (an agent request's launch still
+ * the agent's current one), checked synchronously just before its COMMIT, after every await of the change: one that
+ * throws undoes the whole change, and its error is the change's. `id` names it once per change (a request's several
+ * writes ask for the same check). Outside a change of `ws`'s board it is checked now.
+ */
+export function beforeBoardCommit(ws: WorkspaceService, id: string, check: () => void): void {
+  const w = writing.getStore()
+  if (ws.path && w && w.open && w.key === keyOf(ws.path)) {
+    if (!w.checks.has(id)) w.checks.set(id, check)
+  } else check()
 }
 
 /**

@@ -497,6 +497,16 @@ export interface FactData {
   /** A step of a finish done, or left (`superseded`: what it was for is no longer so), once each (HI-2014). */
   FinishStep: { finish: number; step: FinishStepId; outcome: 'done' | 'superseded'; why?: string }
   /**
+   * HI-3194: the card's attempt moved on without a start: given to another agent (`assignee`, null: nobody) while in an
+   * attempt. Written in the board change that changes its agent; the fold's `attempt.generation` counts it.
+   */
+  AttemptBound: { why: 'reassigned'; assignee: string | null }
+  /**
+   * HI-3194: whether every card it waits for (blockedBy) is Done, written in the write that changed it (a blocker into or
+   * out of Done, its blockedBy edited), so a dependent's readiness and its blocker's Done commit together.
+   */
+  Readiness: { ready: boolean; after: number | null }
+  /**
    * HI-3219: a comment on lines `from`..`to` of one submission's file (lineComments.ts): `new` in its revision, `old` (deleted
    * lines) in its base. `lines`, `before` and `after` are the quote and its context as main read them from the commits,
    * cut by characters (LINE_COMMENT_LIMITS); `body` is the writer's Markdown. Its id: `lc-<card key>-<this fact's seq>`.
@@ -515,6 +525,23 @@ export interface FactData {
    */
   FeedbackSent: { batch: string; submission: number; round: number; items: { id: string; version: number }[] }
 }
+
+/**
+ * HI-3194: a card's attempt key: `id` the seq of its cycle's Started or Adopted (0: never started), `generation` moved on by
+ * each reassignment and by the attempt ending (the card leaving Active, Review, Approved or Merging). Never back: each
+ * lifecycle step gives a later key, so a request fenced on one key can't land on another that only looks the same.
+ */
+export interface AttemptKey {
+  id: number
+  generation: number
+}
+
+/** The stages a card is in an attempt in (HI-3194): leaving them for Todo, On Hold or Done ends the attempt. */
+export const ATTEMPT_STAGES: readonly StageId[] = ['active', 'review', 'approved', 'merging']
+
+export const sameAttempt = (a: AttemptKey, b: AttemptKey): boolean => a.id === b.id && a.generation === b.generation
+/** Whether attempt key `a` is later than `b`. */
+export const laterAttempt = (a: AttemptKey, b: AttemptKey): boolean => a.id > b.id || (a.id === b.id && a.generation > b.generation)
 
 /** How a card reached Done (HI-2014): the queue, a builder's merge report (checked or not), accepted, an override, a board move. */
 export type FinishHow = 'queue' | 'reported' | 'unchecked' | 'accepted' | 'override' | 'board'
@@ -571,6 +598,10 @@ export interface CardState {
   stage: StageId
   /** The seq of the cycle's Started (or Adopted); 0 before the first start. */
   cycle: number
+  /** HI-3194: the card's attempt key (AttemptKey), `(0, 0)` before the first start. */
+  attempt: AttemptKey
+  /** HI-3194: whether every card it waits for is Done, as last written (`Readiness`); null when never written. */
+  ready: boolean | null
   started: (StartedData & { seq: number; adopted: boolean }) | null
   /**
    * Every line it has started on (Started, Adopted), over its whole history, renames followed (HI-1823): a card back from
@@ -658,6 +689,8 @@ export const loopStepSide = (step: LoopStepId): 'builder' | 'reviewer' => (step 
 export const emptyState = (): CardState => ({
   stage: 'todo',
   cycle: 0,
+  attempt: { id: 0, generation: 0 },
+  ready: null,
   started: null,
   lines: [],
   submissions: [],
@@ -724,10 +757,11 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         // A new cycle: earlier submissions, verdicts and entries stay in history but don't count (§16.7.4).
         // A question at the round limit outlives the cycle: it waits for the user's answer (§16.11.4).
         const limit = s.requests.filter((r) => r.gate === ROUND_LIMIT_GATE)
-        Object.assign(s, { ...emptyState(), stage: s.stage, generation: s.generation, received: s.received, commentGeneration: s.commentGeneration, receivedComments: s.receivedComments, rounds: s.rounds, moreRounds: s.moreRounds, builders: s.builders, overrides: s.overrides, blocked: s.blocked, resolves: s.resolves, lastSeq: s.lastSeq, lines: s.lines })
+        Object.assign(s, { ...emptyState(), stage: s.stage, generation: s.generation, received: s.received, commentGeneration: s.commentGeneration, receivedComments: s.receivedComments, rounds: s.rounds, moreRounds: s.moreRounds, builders: s.builders, overrides: s.overrides, blocked: s.blocked, resolves: s.resolves, lastSeq: s.lastSeq, lines: s.lines, ready: s.ready })
         s.requests = limit
         for (const r of limit) s.made[r.request] = r
         s.cycle = f.seq
+        s.attempt = { id: f.seq, generation: 1 }
         s.lastHeadFact = f.seq
         s.started = { ...d, seq: f.seq, adopted: f.kind === 'Adopted' }
         if (d.line) s.lines = addOnce(s.lines, d.line)
@@ -910,12 +944,22 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         if (s.finished?.seq === d.finish && !s.finished.steps.includes(d.step)) s.finished.steps.push(d.step)
         break
       }
-      case 'Moved':
+      case 'Moved': {
         // Out of Done, its finish is over: the next move into Done is another (HI-2014).
         if ((f.data as FactData['Moved']).to !== 'done') s.finished = null
-        s.stage = (f.data as FactData['Moved']).to
+        // HI-3194: out of an attempt (put back, done, on hold): the attempt ends, its key moves on.
+        const to = (f.data as FactData['Moved']).to
+        if (ATTEMPT_STAGES.includes((f.data as FactData['Moved']).from) && !ATTEMPT_STAGES.includes(to)) s.attempt = { ...s.attempt, generation: s.attempt.generation + 1 }
+        s.stage = to
         // A gate's request belongs to the stage it was asked in: the card leaving it retires the request.
         s.requests = s.requests.filter((r) => !isGateRequest(r) || r.stage === undefined || r.stage === s.stage)
+        break
+      }
+      case 'AttemptBound':
+        s.attempt = { ...s.attempt, generation: s.attempt.generation + 1 }
+        break
+      case 'Readiness':
+        s.ready = (f.data as FactData['Readiness']).ready
         break
       case 'Override': {
         const d = f.data as FactData['Override']

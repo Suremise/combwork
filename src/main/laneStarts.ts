@@ -136,6 +136,9 @@ async function dependencyWait(ws: WorkspaceService, projectPath: string, n: numb
   try {
     const card = wf.store.card(n)
     if (!card.blockedBy.length || !wf.rulesetOf(card).guards.start.includes('start.dependenciesIntegrated')) return null
+    // HI-3194: ready as written with its last blocker's Done, in that same write: nothing waited for here (its start still
+    // checks each blocker's change is in its target). Not written yet (a card from before), or waiting: worked out.
+    if (wf.state(card.id).ready === true) return null
     // Every one not Done (HI-2618: "waiting on HI-2610, HI-2611 and HI-2612"), in its blockedBy order.
     const open = card.blockedBy.filter((id) => !wf.laneDone(id)).map((id) => wf.store.card(id).key)
     return open.length ? open : null

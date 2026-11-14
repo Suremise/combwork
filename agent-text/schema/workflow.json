@@ -480,6 +480,35 @@
   "workflow.refused.approval.given.next": {
     "placeholders": {}
   },
+  "workflow.refused.attempt.moved.message": {
+    "placeholders": {
+      "card": "plain",
+      "attempt": "plain",
+      "generation": "plain"
+    }
+  },
+  "workflow.refused.attempt.moved.next": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.attempt.notAssignee.message": {
+    "placeholders": {
+      "card": "plain",
+      "assignee": "select"
+    }
+  },
+  "workflow.refused.attempt.notAssignee.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.attempt.staleLaunch.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.attempt.staleLaunch.next": {
+    "placeholders": {}
+  },
   "workflow.refused.card.plainNumber.message": {
     "placeholders": {}
   },

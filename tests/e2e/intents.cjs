@@ -159,7 +159,8 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     await until(async () => (await live(reviewer.id))?.status === 'ready' && (await live(builder.id))?.status === 'ready', HUNG_MS)
     const [reviewerWakes, builderWakes] = [wakesOf('Reviewer').length, wakesOf('Builder').length]
     const notYours = await asReviewer(`/v1/tasks/${ref}/loop-step`, { step: 'design', text: 'Mine?' })
-    check("the reviewer can't post the builder's design (409, loop.stepNotYours)", notYours.status === 409 && notYours.body?.rule === 'loop.stepNotYours', JSON.stringify(notYours.body))
+    // HI-3194: a design is the builder's own move, refused for an agent not building the card before its loop rules are asked.
+    check("the reviewer can't post the builder's design (409, attempt.notAssignee)", notYours.status === 409 && notYours.body?.rule === 'attempt.notAssignee', JSON.stringify(notYours.body))
     const designed = await asBuilder(`/v1/tasks/${ref}/loop-step`, { step: 'design', text: 'Design: greet with Hi, tested by b.test.' })
     const designId = designed.body?.data?.design
     check('the builder posts a design in Doing: it stays, and the reply names it and when its check is due', designed.status === 200 && designed.body?.to === 'active' && /\/s\d+$/.test(designId ?? '') && designed.body.data.waitMinutes === 30 && Date.parse(designed.body.data.until) > Date.now() && (await card(n))?.column === 'doing', JSON.stringify(designed.body))
@@ -207,6 +208,9 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     const putBack = await call(assistantToken, `/v1/tasks/${n}/put-back`, { why: 'The user wants it later.' })
     check("at Control agents the Assistant puts it back, by its number: Todo", putBack.status === 200 && putBack.body?.to === 'todo' && (await card(n))?.column === 'todo' && (await card(n))?.comments.at(-1)?.text === 'The user wants it later.', JSON.stringify(putBack.body))
     check("…listed in what it did", (await inv('assistant:actions')).some((x) => x.ok && x.text.includes('put back')), JSON.stringify((await inv('assistant:actions')).map((x) => x.text)))
+    // HI-3194: the Assistant put the card back after the builder last acted on it (its attempt ended): the builder reads it
+    // again, as its put-back wake would have it do, before acting on it anew (asking the Assistant, starting it).
+    await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${ref}`, { headers: { Authorization: `Bearer ${tokens.builder}` } })
 
     // An agent asks the Assistant on a card (HI-1866): its comment and a history line, and the Assistant's inbox, whose
     // doorbell its idle session takes. Refused, with nothing written: a plain number, no text, the Assistant itself, and

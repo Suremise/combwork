@@ -71,6 +71,11 @@ export async function newAgentToken(id: AgentIdentity, runId: string): Promise<s
   return token
 }
 
+/** HI-3194: the launch whose token works now for the agent (its newest), or null: a call from any other launch is stale. */
+export function currentAgentRun(projectPath: string, agentId: string): string | null {
+  return tokens.get(key(projectPath, agentId))?.runId ?? null
+}
+
 /** The agent's current token, if it has been launched. */
 export function agentToken(projectPath: string, agentId: string): string | null {
   return tokens.get(key(projectPath, agentId))?.token ?? null

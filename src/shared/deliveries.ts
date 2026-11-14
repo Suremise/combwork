@@ -66,6 +66,11 @@ export interface DeliveryRecord {
    * one when it was made): it is relevant only while the card is in Doing or Review in that round, and stale after.
    */
   round?: number
+  /**
+   * HI-3194: the attempt of its card (`card`) when it was made, as `<id>.<generation>`: receiving it issues that attempt to
+   * the reading launch, never a later one (attemptFence.ts). Absent on one made before, or about no card.
+   */
+  attempt?: string
   /** What it says (a card event's short line, a message's text). */
   body: string
   state: DeliveryState
@@ -355,6 +360,7 @@ export function readDelivery(v: unknown): DeliveryRecord | null {
   if (!(r.conversation === null || str(r.conversation, 200))) return null
   if (r.card !== undefined && !(Number.isInteger(r.card) && (r.card as number) > 0)) return null
   if (r.round !== undefined && !(r.card !== undefined && Number.isInteger(r.round) && (r.round as number) > 0)) return null
+  if (r.attempt !== undefined && !(r.card !== undefined && typeof r.attempt === 'string' && /^\d{1,12}\.\d{1,9}$/.test(r.attempt))) return null
   if (![r.offered, r.received, r.acked, r.ended].every(optTime)) return null
   if (r.offers !== undefined && !(Number.isInteger(r.offers) && (r.offers as number) >= 0)) return null
   if (r.receivedVia !== undefined && r.receivedVia !== 'inbox' && r.receivedVia !== 'typed') return null
@@ -374,6 +380,7 @@ export function readDelivery(v: unknown): DeliveryRecord | null {
   if (r.agentName) out.agentName = r.agentName as string
   if (r.card) out.card = r.card as number
   if (r.round) out.round = r.round as number
+  if (r.attempt) out.attempt = r.attempt as string
   for (const k of ['offered', 'received', 'acked', 'ended', 'detail'] as const) if (r[k]) out[k] = r[k] as string
   if (r.offers) out.offers = r.offers as number
   if (r.receivedVia) out.receivedVia = r.receivedVia as 'inbox' | 'typed'

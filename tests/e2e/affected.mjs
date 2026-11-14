@@ -497,6 +497,8 @@ export const AREAS = [
   { paths: ['src/main/reviewsOnOpen.ts'], suites: ['review', 'stopswitch', 'recent'] },
   { paths: ['src/renderer/src/components/Board.tsx', 'src/renderer/src/components/CardWork.tsx', 'src/renderer/src/components/Overlays.tsx', 'src/shared/laneBar.ts', 'src/main/tasks.ts', 'src/shared/workflow/workView.ts', 'tests/e2e/boardgates.cjs'], suites: ['boardgates'] },
   { paths: ['src/main/cardIntents.ts', 'tests/e2e/intents.cjs'], suites: ['intents', 'replysize'] },
+  // HI-3194: every agent write on a card is fenced by its attempt; intents drives a put-back, a restart and a reviewer's design.
+  { paths: ['src/main/attemptFence.ts'], suites: ['intents'] },
   // The nudge an agent's reply adds for a long card title (HI-1872).
   { paths: ['src/main/titleNudge.ts'], suites: ['replysize'] },
   // An agent's request for the Assistant on a card, cw_ask_assistant (HI-1866).

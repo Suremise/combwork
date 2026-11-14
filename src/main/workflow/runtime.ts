@@ -39,6 +39,7 @@ import { stillAsRead, unreleasedFor, type ReleaseReads } from '../platform/relea
 import { declaresPaths, hasCapability, needsRepository, platformName, type PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
 import { finishAccepts, recordFinish } from './finish'
+import { writeReadiness } from './dependencyReadiness'
 import { NOT_RUN_HERE, pauseWait, queueLine, queueStateOf, type QueueLive } from './queueState'
 import { checksView } from '../../shared/toolReplies'
 import { agentMsg, say, type AgentMsg, type AgentValues } from '../../shared/agentText'
@@ -112,6 +113,11 @@ export interface Drag {
  */
 export interface Alongside {
   written: (w: Write) => Promise<void>
+  /**
+   * HI-3194: asked inside each write, in its transaction, before the write decides anything (the card as it was then): a
+   * throw undoes the write whole, refusals included (an agent request's attempt fence, tasks.ts runIntent).
+   */
+  before?: (w: Write) => void
 }
 const alongsideOf = new AsyncLocalStorage<Alongside>()
 
@@ -778,6 +784,7 @@ export class Workflow {
         const base = ruleset && this.skippedBases.get(ruleset.id)
         if (base) tx.saveRuleset(base)
         w = new Write(tx, tx.card(card.id), ruleset, actor, tx.card(card.id).stage)
+        also?.before?.(w)
         const written = fn(w, prepared)
         this.closeSettled(w)
         // Into Done by whatever route: its finish, once, in the move's own transaction (HI-2014).
@@ -785,6 +792,8 @@ export class Workflow {
           recordFinish(tx, w.card.id, w.actor, w.ruleset?.id ?? null, w.written, { claimed: w.claimed })
           this.kickDependents(w)
         }
+        // HI-3194: into or out of Done, its dependents' readiness in this same transaction: never one without the other.
+        if ((w.current === 'done') !== (w.was === 'done')) for (const dep of this.store.dependents(w.card.id)) writeReadiness(tx, dep, w.card.id, w.actor)
         return written
       })
       // What the call runs alongside (the board's 0.9 fields), in the same transaction, once this write changed the card.
@@ -943,7 +952,14 @@ export class Workflow {
     const out = refusal(g.rule, g.values, override)
     if (card && actor !== 'user') {
       // Under the store's lock, as every write (in the app, a change of the board).
-      await this.locked(() => this.store.tx((tx) => tx.append(card.id, { kind: 'Refused', actor, source: 'recorded', data: { move, rule: g.rule, message: out.message, next: out.next, values: g.values } }))) // i18n-ignore: a fact's kind and codes, not text
+      const also = alongsideOf.getStore()
+      await this.locked(() =>
+        this.store.tx((tx) => {
+          // HI-3194: a stale agent request is refused for that first (its fence, as in every write), not for what it found.
+          also?.before?.(new Write(tx, tx.card(card.id), null, actor, tx.card(card.id).stage))
+          tx.append(card.id, { kind: 'Refused', actor, source: 'recorded', data: { move, rule: g.rule, message: out.message, next: out.next, values: g.values } }) // i18n-ignore: a fact's kind and codes, not text
+        })
+      )
     }
     return out
   }

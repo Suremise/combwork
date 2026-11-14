@@ -23,6 +23,10 @@ const WINDOW: RefusalFormat = { one: (m, values) => tr(m, values), list: (items)
 /** A value for every placeholder the refusals have. */
 const SAMPLE: RefusalValues = {
   card: 'AM-12',
+  // attempt.* (HI-3194): the card's attempt key, and who builds it now.
+  attempt: 12,
+  generation: 3,
+  assignee: 'HB2',
   // platform.offLine (HI-3116): whether the card's line exists, its commands' arguments, the card's start.
   made: 'no',
   lineArg: 'cw/b1',

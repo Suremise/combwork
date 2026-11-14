@@ -286,6 +286,12 @@ interface CombworkMessageValues {
   'workflow.refused.approval.given.change': undefined
   'workflow.refused.approval.given.message': { card: string | number }
   'workflow.refused.approval.given.next': undefined
+  'workflow.refused.attempt.moved.message': { card: string | number; attempt: string | number; generation: string | number }
+  'workflow.refused.attempt.moved.next': { card: string | number }
+  'workflow.refused.attempt.notAssignee.message': { card: string | number; assignee: string }
+  'workflow.refused.attempt.notAssignee.next': undefined
+  'workflow.refused.attempt.staleLaunch.message': { card: string | number }
+  'workflow.refused.attempt.staleLaunch.next': undefined
   'workflow.refused.card.plainNumber.message': undefined
   'workflow.refused.card.plainNumber.next': { key: string | number }
   'workflow.refused.check.revisionMismatch.message': { why: string; revision: string | number; head: string | number }

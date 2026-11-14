@@ -6032,6 +6032,61 @@ rule for `git commit` in the agent's folder (`.claude/settings.local.json`, neve
 §10). After P5 merges are Combwork's, so only commits and release pushes remain [#907]. Guidance (P8) tells agents to
 report it this way rather than retry.
 
+#### 16.8.7 Attempts and their fences (HI-3194)
+
+[HI-3194, 1.6.0, from the Orca spike HI-2911; design HI-3194/s10–s16, approved by HR3 14 Nov; s28's question settled by
+the Assistant the same night: no "must have read the card" rule, a first contact binds] The card stays the lasting
+unit the user sees; **each start of it is an attempt**, and no agent's stale call can act through an attempt that has
+moved on.
+
+- **The attempt key** is a card's `(id, generation)`, folded from its facts (`CardState.attempt`): `(0, 0)` for a card never
+  started; a start (`Started`, `Adopted`) makes `(its seq, 1)`; the card given to another agent (or to nobody) while in
+  Active, Review or Approved writes `AttemptBound` in that board change and moves the generation on; the attempt **ending**
+  (the card leaving Active, Review, Approved or Merging for Todo, On Hold or Done, by any route) moves it on again, read from
+  that move's `Moved`. Keys are ordered and never go back, so Todo → start → Todo never looks unchanged.
+- **The consumer generation is the launch**: each agent launch has its own Agent API token, which a restart, a lane
+  renewal's new conversation or a switch replaces; a write is checked again, in its transaction, against the agent's current
+  launch (`attempt.staleLaunch`), not only as the request arrives.
+- **Binding, issued, never assumed.** Combwork binds each launch to the attempt of each card it was handed (in memory, by
+  launch, gone with its token): its own start (the attempt it made), its read of the card (`GET /v1/tasks/{n}` in any form:
+  the attempt in the read's snapshot; the newest comment alone issues nothing), a delivery about the card (each is stamped
+  with the card's attempt as it is made, `DeliveryRecord.attempt`; receiving it issues that attempt, never a later one), a
+  card it creates, and each accepted write of its own, a first contact's included. A binding only moves forward; a list
+  read and a call's arrival issue nothing.
+- **Each request captures its launch's bindings as it arrives**, before anything is awaited, and keeps them for every write
+  it makes (its own accepted write moves what its next write expects): a later read or receipt never lets an older request
+  through. The agent passes nothing: no new arguments, no reads.
+- **The check**, in every write of a project agent's own call on a card, in that write's transaction before it decides
+  anything (intents, `cw_update_task` changes and comments, a batch's cards, an Assistant request on the card and the
+  waiting mark it sets, declaring paths, a kind, review skip or target),
+  against the card's attempt before the write: the launch replaced → **`attempt.staleLaunch`**; a binding that isn't the
+  card's attempt → **`attempt.moved`** (read it again), in every stage, Todo and Done included. The launch is checked
+  again as the board change commits, after its last await (the card's save, an attachment's publish): one replaced
+  meanwhile undoes the whole change, its facts too, `attempt.staleLaunch` (HR3's round 1). **No binding is first
+  contact** (a reviewer prompted to review, a question to the user on a card, a comment on a Todo card, a resumed agent
+  after a restart): allowed, and the write binds the launch to the card's attempt then. The card asks that a stale call
+  can't act, not that an agent read a card first (Darren, 14 Nov: no read-first rule, no binding from listings, no saved
+  bindings). The gap that leaves: after a Combwork restart, an old conversation of the same agent, resumed on a card
+  restarted on that agent, isn't fenced (bindings are in memory, so its first write is first contact). The
+  builder's own moves (submit and its requeue, a merge report, a move to Review or Done, declaring paths, a design, going
+  ahead, a follow-up) are refused **`attempt.notAssignee`** for an agent that isn't the attempt's builder (the card's agent
+  now, or its cycle's builder when it has none). A put-back by another agent stays allowed (anyone moves a card), fenced by
+  launch and binding like any write. The fence runs before a write's own refusals, so a stale call is told it is stale.
+  Reordering a column is fenced by nothing more than before (the order is the board's, not an attempt's).
+- **Never fenced**: the user, the Assistant, scripts on the workspace token and Combwork itself. A card with no workflow
+  record (a workspace card) has its launch checked only.
+- **Readiness is written with the Done.** The one write path's choke point for Done (`runtime.write`) writes, on each card
+  that waits for the one moving into or out of Done, a `Readiness` fact (`ready`, `after`) whenever it changes, in the same
+  transaction; a blockedBy edit writes it in its own board change. A lane's dependency wait reads `ready` (a card without
+  one is worked out as before); each start still checks that each blocker's change is in its target (§16.7.4), which can't
+  be decided in a write.
+
+The races it closes, from our own lanes: a card given to another agent and the old builder's submit or merge report landing
+(only a follow-up was refused, HI-1832); a renewed builder's call in flight from its old conversation (HI-2232); an old run
+between a stop and its resume (HI-2815, HI-2739); a call gathered on an attempt that a put-back and restart, or a
+reassignment (#1268), replaced before its write; and a reader seeing a blocker Done before its dependents' readiness. A call
+retried after a lost reply is HI-3195's; a circuit breaker for repeated failures is HI-3188's.
+
 ### 16.9 The merge queue
 
 [note §9, #1121] Combwork performs merges. The merge slot becomes a **queue per target** (a project and target line).
