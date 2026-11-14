@@ -453,14 +453,22 @@ describe('the restart queue (HI-1707)', () => {
   describe('one offer at a start, of the agents that can resume (HI-3214)', () => {
     const offered = () => m.restartRecord()?.entries.map((e) => [e.agentId, e.state, e.why ?? null])
 
-    it('the queue offers first, then the start notices run: one notice, not a second', async () => {
+    it('the queue decides first, then the start notices run: one notice, told once the window is up', async () => {
       const ws = workspace(join(dir, 'ws'), ['a1', 'a2'])
       h.workspaces = [ws]
       await startWith([entry(ws.path, 'a1'), entry(ws.path, 'a2')], { reason: 'quit' })
-      // The workspace's merge slots recovered before the window's start notices: the queue decides and offers.
+      // The workspace's merge slots recovered before the window's start notices: the queue decides, telling nothing yet
+      // (a notice told before the window can show it is lost).
       await queueSettles(() => m.workspaceRecovering(ws.path, Promise.resolve()))
-      expect(h.toasts).toHaveLength(1)
+      expect(m.restartRecord()?.entries.map((e) => e.state)).toEqual(['offered', 'offered'])
+      expect(h.toasts).toHaveLength(0)
       await queueSettles(() => m.startRestartRecovery())
+      expect(h.toasts).toHaveLength(1)
+      // A reload's start notices, and the workspace read again: nothing more.
+      await queueSettles(async () => {
+        await m.startRestartRecovery()
+        events.emit({ type: 'workspace-changed', workspace: null })
+      })
       expect(h.toasts).toHaveLength(1)
       expect(h.resolved).toEqual([])
       expect(h.toasts[0].message).toContain('a1 (alpha) and a2 (alpha)')
