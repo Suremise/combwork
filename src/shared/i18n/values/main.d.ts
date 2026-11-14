@@ -273,6 +273,7 @@ interface CombworkMessageValues {
   'main.outcome.noLongerAsked': undefined
   'main.outcome.noLongerHeld': undefined
   'main.outcome.notResumed': undefined
+  'main.outcome.nothingToResume': undefined
   'main.outcome.offerReplaced': undefined
   'main.outcome.openHereAgain': undefined
   'main.outcome.released': undefined

@@ -271,6 +271,7 @@
   "main.outcome.noLongerAsked": "No longer asked",
   "main.outcome.noLongerHeld": "No longer held",
   "main.outcome.notResumed": "Not resumed",
+  "main.outcome.nothingToResume": "Nothing left to resume",
   "main.outcome.offerReplaced": "Replaced by a newer offer",
   "main.outcome.openHereAgain": "The conversation is open here again",
   "main.outcome.released": "Released",

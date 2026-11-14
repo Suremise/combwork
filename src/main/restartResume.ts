@@ -315,16 +315,19 @@ export async function startRestartRecovery(): Promise<void> {
   if (!record || recoveryStarted) return
   recoveryStarted = true
   stopping = false
-  const offer: RestartEntry[] = []
+  // Offered (or held) by an earlier run, its offer never answered: offered again once checked as this run's are (pump,
+  // HI-3213/HI-3214: an agent started in a newer conversation since isn't offered again). Only those whose workspace
+  // isn't ready yet, so can't be checked now, are told here; the queue tells the rest, once, as it checks them.
+  let unchecked = false
   for (const e of record.entries) {
     if (e.state === 'held') setState(e, 'offered')
-    if (e.state === 'offered') offer.push(e)
+    if (e.state === 'offered' && !readyWorkspaceOf(e)) unchecked = true
     // Skipped already, as Combwork closed (idle, HI-2909) or at this start (a day old): the report names them too, so
     // it accounts for every agent that was running.
     if (unreported(e)) skippedBefore.push(e)
   }
   // Told before the write is awaited, as pump does (HI-2356): an offer the queue told already is replaced at once.
-  if (offer.length) tellOffer()
+  if (unchecked) tellOffer()
   await save()
   // A team resuming (HI-2081): what waited for it is decided now.
   onCombworkEvent((ev) => {
@@ -356,8 +359,18 @@ function enqueue(e: RestartEntry): void {
  */
 function tellOffer(): void {
   const entries = record?.entries.filter((e) => e.state === 'offered') ?? []
-  if (!entries.length) return
+  if (!entries.length) {
+    // Every agent the open notice named was found unable to resume as the queue checked it (HI-3214): it closes.
+    if (openOffer) resolveOffer(openOffer, tr(OUTCOME.nothingToResume))
+    openOffer = null
+    return
+  }
+  // The same agents as the notice open now (HI-3214: the queue and the window's start notices both telling it): no second
+  // notice. Another list replaces it in place (the same entry id), its buttons then acting on the new list alone.
+  const named = entries.map(agentKey).sort().join('\n')
+  if (openOffer && named === openNamed) return
   if (openOffer) resolveOffer(openOffer, tr(OUTCOME.offerReplaced))
+  const toastId = openOffer && openToast ? openToast : `restart-offer:${randomUUID()}`
   const n = entries.length
   const names = fmt.list(entries.map((e) => `${e.agentName} (${e.project})`))
   const quit = policy() === 'quit'
@@ -372,11 +385,16 @@ function tellOffer(): void {
   log.info(`Offered to resume ${n} agent(s): ${entries.map((e) => userText(e.agentName)).join(', ')}`)
   // Its offer (HI-2320): Resume's report, or Don't Resume, is what it says once taken.
   openOffer = `restart:${randomUUID()}`
-  toast('info', title, body, actions, undefined, undefined, { offer: openOffer, timeoutMs: 120_000 })
+  openNamed = named
+  openToast = toastId
+  toast('info', title, body, actions, undefined, undefined, { offer: openOffer, timeoutMs: 120_000, id: toastId })
 }
 
 /** The offer to resume shown now with its buttons (HI-2320), until Resume, Don't Resume or a newer offer. */
 let openOffer: string | null = null
+/** The agents the open offer names (agentKey, sorted), and its notice's entry id, which a newer offer replaces in place. */
+let openNamed: string | null = null
+let openToast: string | null = null
 /** Offers whose Resume was taken (their buttons gone), each waiting for the report to say how it went. */
 const takenOffers: string[] = []
 
@@ -474,22 +492,42 @@ function pump(): void {
       for (;;) {
         if (stopping || gen !== generation) return
         const offer: RestartEntry[] = []
+        let dropped = false
         for (const e of record?.entries ?? []) {
-          if (e.state !== 'pending') continue
+          // An earlier run's offer, never answered (startRestartRecovery): checked once its workspace is ready, as below.
+          const carried = e.state === 'offered' && !checkedOffers.has(agentKey(e))
+          if (e.state !== 'pending' && !carried) continue
           const ws = readyWorkspaceOf(e)
           if (!ws) continue
           // Its team paused (HI-2081: a crash or a plain quit while it was, which no update's restart lifted): pending, and
           // neither resumed nor offered until the team resumes (which pumps again).
           if (pausedFor(e.projectPath)) continue
-          if (auto(ws)) enqueue(e)
+          // Never offered when it couldn't resume (HI-3214: HB6, offered by an earlier run and started in a newer
+          // conversation since, was listed and then skipped as movedOn): the resume's own check, before it is offered. Not
+          // in the report: it was never working in this close's record, nor offered this run.
+          const offerable = !auto(ws) || carried
+          const blocked = offerable ? resumeBlocked(e, ws) : null
+          if (blocked) {
+            // One the open notice names (an earlier run's offer, told before its workspace was ready): it is told again.
+            if (carried) dropped = true
+            setState(e, 'skipped', blocked)
+            e.reported = true
+            log.info(`Not offering to resume ${userText(e.agentName)} in ${userText(e.project)}: ${blocked}`)
+            continue
+          }
+          if (carried) {
+            checkedOffers.add(agentKey(e))
+            offer.push(e)
+          } else if (auto(ws)) enqueue(e)
           else {
             setState(e, 'offered')
+            checkedOffers.add(agentKey(e))
             offer.push(e)
           }
         }
         // Told in the same step as they became offered, before any await (HI-2356, HR1's round 1): an older notice's
         // buttons, which act on every offered entry, never see one it didn't name.
-        if (offer.length) {
+        if (offer.length || dropped) {
           tellOffer()
           await save()
         }
@@ -522,6 +560,8 @@ function pump(): void {
   })()
 }
 let pumpAgain = false
+/** The offered entries checked this run (resumeBlocked), by agentKey: an earlier run's offer is checked once. */
+const checkedOffers = new Set<string>()
 /** Tests: the queue's passes finished, and whether one is under way (a barrier: what a pass decided is final). */
 let queuePasses = 0
 export const queueForTests = (): { passes: number; pumping: boolean } => ({ passes: queuePasses, pumping })
@@ -559,6 +599,19 @@ async function until(fn: () => boolean, ms: number): Promise<boolean> {
  * `gen`: the queue's generation; Combwork closing meanwhile cancels it ('cancelled': nothing changed), a workspace closing
  * puts it back to pending.
  */
+/**
+ * Why an entry can't resume now, from what is so now in its ready workspace, or null when it may: its agent removed,
+ * running (or being started by another start: a card's placement resuming it, HI-1746, whose own start would be
+ * refused), or started in a newer conversation since (movedOn). The resume asks it, and so does an offer (HI-3214).
+ */
+function resumeBlocked(e: RestartEntry, ws: WorkspaceService): 'removed' | 'running' | 'movedOn' | null {
+  const agent = ws.info()?.projects.find((p) => samePlace(p.path, e.projectPath))?.agents.find((a) => a.id === e.agentId)
+  if (!agent) return 'removed'
+  if (sessions.liveFor(e.projectPath, e.agentId) || sessions.pendingStart(e.projectPath, e.agentId)) return 'running'
+  if (agent.lastSessionId && agent.lastSessionId !== e.sessionId) return 'movedOn'
+  return null
+}
+
 /** A resume refused as it spawns because its team is paused now (HI-2081): pending again, not failed. */
 class TeamPausedNow extends Error {}
 
@@ -575,15 +628,7 @@ async function resumeOne(e: RestartEntry, gen: number): Promise<'done' | 'cancel
     log.info(`Not resuming ${userText(e.agentName)} in ${userText(e.project)}: ${why}`)
     return 'done'
   }
-  /** Why it can't start now, from what is so now: null when it may. */
-  const check = (ws: WorkspaceService): string | null => {
-    const agent = ws.info()?.projects.find((p) => samePlace(p.path, e.projectPath))?.agents.find((a) => a.id === e.agentId)
-    if (!agent) return 'removed'
-    // A start of it under way (a card's placement resuming it, HI-1746) counts too: its own start would be refused.
-    if (sessions.liveFor(e.projectPath, e.agentId) || sessions.pendingStart(e.projectPath, e.agentId)) return 'running'
-    if (agent.lastSessionId && agent.lastSessionId !== e.sessionId) return 'movedOn'
-    return null
-  }
+  const check = (ws: WorkspaceService): string | null => resumeBlocked(e, ws)
   let ws = readyWorkspaceOf(e)
   if (!ws) return closed()
   // Its team paused since it was queued (HI-2081): pending again, resumed once the team resumes.
