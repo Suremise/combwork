@@ -36,6 +36,19 @@ export const TASK_COLUMNS: { id: TaskColumn; label: string }[] = [
 ]
 
 export const isTaskColumn = (v: unknown): v is TaskColumn => typeof v === 'string' && TASK_COLUMNS.some((c) => c.id === v)
+
+/** What a client makes of null, false or empty when its tool says text (HI-3234): a clear, never kept as a reason. */
+const CLEARING_TEXTS = new Set(['', 'null', 'false', '""', "''"])
+/**
+ * A reason an Agent API call sets on a card (`blocked`, `waitingFor`): null clears it. JSON null, false and empty text clear
+ * it, and so do "null", "false", '""' and "''", the texts a client's tool gives for them (HI-3234: Claude Code turned
+ * `waitingFor: null` into the reason "null").
+ */
+export function reasonArg(v: unknown): string | null {
+  if (v === null || v === undefined || v === false) return null
+  const s = String(v).trim()
+  return CLEARING_TEXTS.has(s.toLowerCase()) ? null : s
+}
 /** A board column's id (#1420): a category's, or Merging's own. */
 export const isBoardColumn = (v: unknown): v is BoardColumnId => v === 'merging' || isTaskColumn(v)
 

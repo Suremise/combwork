@@ -455,6 +455,12 @@ describe('batch requests', () => {
     expect(() => batchRequest({ numbers: [], column: 'todo' })).toThrow(/^cards:/)
   })
 
+  it("clears blocked with null, false, empty or a client's text for them; a reason is kept as given, trimmed (HI-3234)", () => {
+    for (const clear of [null, false, '', '  ', 'null', 'NULL', 'false', '""', "''"]) expect(batchRequest({ numbers: [1], blocked: clear }).patch, String(clear)).toEqual({ blocked: null })
+    expect(batchRequest({ numbers: [1], blocked: ' Waiting for the user ' }).patch).toEqual({ blocked: 'Waiting for the user' })
+    expect(batchRequest({ numbers: [1], blocked: 'null pointer in the build' }).patch).toEqual({ blocked: 'null pointer in the build' })
+  })
+
   it('takes addLabels and removeLabels as lists of text, and refuses them beside labels before any card changes (#1131)', () => {
     expect(batchRequest({ numbers: [1], addLabels: ['a'], removeLabels: ['b'] }).patch).toEqual({ addLabels: ['a'], removeLabels: ['b'] })
     expect(() => batchRequest({ numbers: [1], addLabels: 'a' })).toThrow(/addLabels is a list/)
@@ -464,7 +470,7 @@ describe('batch requests', () => {
   })
 
   it('reads the card numbers with or without #, and an empty agent takes the agent away', () => {
-    expect(batchRequest({ numbers: ['#2', 3], blocked: '' })).toEqual({ numbers: [2, 3], patch: { blocked: '' } })
+    expect(batchRequest({ numbers: ['#2', 3], blocked: '' })).toEqual({ numbers: [2, 3], patch: { blocked: null } })
     expect(batchRequest({ numbers: [4], agent: '' }).patch).toEqual({ agent: null })
   })
 })

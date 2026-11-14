@@ -1,6 +1,6 @@
 // A batch card change (cw_update_tasks, #417): the request, checked, and the Combwork Assistant's turn for it. The Agent
 // API's route turns a refusal into its status; the rules live here, so the tests reach them without the API.
-import { COLUMN_CHOICES, isTaskColumn } from '../shared/tasks'
+import { COLUMN_CHOICES, isTaskColumn, reasonArg } from '../shared/tasks'
 import * as assistant from './assistantControl'
 import { ChangeRefused } from './assistantControl'
 import * as tasks from './tasks'
@@ -33,8 +33,9 @@ export function batchRequest(body: any): { numbers: number[]; patch: tasks.Batch
     patch.position = body.position
   }
   if (body.blocked !== undefined) {
-    if (body.blocked !== null && typeof body.blocked !== 'string') throw new ChangeRefused(400, 'blocked is the reason as text, or empty to clear it.')
-    patch.blocked = body.blocked
+    if (body.blocked !== null && body.blocked !== false && typeof body.blocked !== 'string') throw new ChangeRefused(400, 'blocked is the reason as text, or empty to clear it.')
+    // A client's text for null or false ("null", "false") clears it too, never kept as the reason (HI-3234).
+    patch.blocked = reasonArg(body.blocked)
   }
   if (body.labels !== undefined) {
     if (!Array.isArray(body.labels) || !body.labels.every((x: unknown) => typeof x === 'string')) throw new ChangeRefused(400, 'labels is a list of text.')

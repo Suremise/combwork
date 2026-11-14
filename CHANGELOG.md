@@ -93,6 +93,8 @@
 
 ### Fixed
 
+- **Agents can clear a card's waiting mark and block again** (HI-3234). `cw_update_task` with `waitingFor` or `blocked` set to `null`, `false` or empty clears it, as the Agent API says. Before, Claude Code passed `null` as the text "null", and the card showed it as the reason. The texts "null" and "false" now clear too, and are never kept as a reason.
+
 - **Compare no longer shows an unreadable file as added or deleted** (HI-3227). When a commit lists a file whose contents Git can't read (a damaged or incomplete repository), the Changes tab's comparison says the diff failed, with Try again, as a revision's Changes already does. Before, the file showed as added or deleted.
 
 - **A lane's Add Card… results are easier to read** (HI-3217). Each card found is two rows: its key and title across the width, and under them, smaller, the lane that has it, with a line between cards. Before, that lane's name sat in a narrow column, wrapped over three lines, and cut the title short.

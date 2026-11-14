@@ -249,6 +249,26 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     check('cw_start_card starts it: a line saying where it went', !reply.isError && reply.content[0].text.startsWith(`${key}: todo → active.`), JSON.stringify(reply))
     check("…and it is in Doing, the builder's", (await card(n))?.column === 'doing' && (await card(n))?.agent === builder.id, JSON.stringify(await card(n)))
 
+    // HI-3234: cw_update_task clears waitingFor and blocked with null, false, empty, or the text a client's tool makes of
+    // them ("null", "false"); none is ever kept as the reason.
+    const tool = (name, args) => {
+      const o = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n', env: lib.childEnv(builderCombwork.env), timeout: HUNG_MS }).toString()
+      return JSON.parse(o.split('\n')[0]).result
+    }
+    const kept = []
+    for (const field of ['waitingFor', 'blocked']) {
+      for (const clear of [null, 'null', 'false', false, '', '""']) {
+        const set = tool('cw_update_task', { number: key, [field]: 'Held for a quiet window' })
+        const now = await card(n)
+        const setOk = !set.isError && (field === 'waitingFor' ? now?.waitingFor?.reason : now?.blocked) === 'Held for a quiet window'
+        const cleared = tool('cw_update_task', { number: key, [field]: clear })
+        const after = await card(n)
+        const value = field === 'waitingFor' ? (after?.waitingFor ?? null) : (after?.blocked ?? null)
+        if (!setOk || cleared.isError || value !== null) kept.push({ field, clear, setOk, cleared: cleared.content?.[0]?.text, value })
+      }
+    }
+    check('cw_update_task clears waitingFor and blocked with null, "null", "false", false, empty and \'""\', none kept as the reason (HI-3234)', kept.length === 0, JSON.stringify(kept))
+
     await inv('session:stop', alpha)
     await until(async () => (await inv('session:live')).length === 0, HUNG_MS)
   } finally {
