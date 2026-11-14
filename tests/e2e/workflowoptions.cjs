@@ -193,7 +193,7 @@ async function theForm(page, app, inv) {
     check('Git’s groups, in order', JSON.stringify(await groups()) === JSON.stringify(['presets', 'team', 'review', 'checks', 'merging', 'where', 'slots', 'github', 'loops', 'stages']), JSON.stringify(await groups()))
     const inGroup = async (g) => section.locator(`.workflow-group[data-group="${g}"] .workflow-option`).evaluateAll((els) => els.map((e) => e.getAttribute('data-option')))
     const layout = { review: await inGroup('review'), checks: await inGroup('checks'), merging: await inGroup('merging'), where: await inGroup('where'), loops: await inGroup('loops'), stages: await inGroup('stages') }
-    check('each group has its options (G4 and G17 in Review, G17 with a reviewer agent; G9 and G8 hidden while the agent doesn’t merge through Combwork; G15 only with slots)', JSON.stringify(layout) === JSON.stringify({ review: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'], checks: ['preChecks'], merging: ['finish', 'style', 'target', 'otherTargets', 'dependenciesDone'], where: ['folder', 'identity', 'stopOwnRuns', 'sharedFolderWarning', 'fileLocks'], loops: ['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes'], stages: ['stageNames'] }), JSON.stringify(layout))
+    check('each group has its options (G4 and G17 in Review, G17 with a reviewer agent; G9 and G8 hidden while the agent doesn’t merge through Combwork; G15 only with slots)', JSON.stringify(layout) === JSON.stringify({ review: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'], checks: ['preChecks'], merging: ['finish', 'style', 'target', 'otherTargets', 'dependenciesDone'], where: ['folder', 'identity', 'stopOwnRuns', 'sharedFolderWarning', 'fileLocks'], loops: ['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes', 'assistantWakes'], stages: ['stageNames'] }), JSON.stringify(layout))
     check('no Version control row: the header has the choice', (await section.locator('.workflow-platform').count()) === 0)
     check('no preset chosen', (await section.locator('.workflow-preset-now').innerText()).trim() === 'No preset chosen')
     check('every preset is offered, with All off', JSON.stringify(await section.locator('.workflow-choice').evaluateAll((els) => els.map((e) => e.getAttribute('data-choice')))) === JSON.stringify(['solo', 'pairAgent', 'pair', 'team', 'allOff']))
@@ -203,6 +203,13 @@ async function theForm(page, app, inv) {
     check('the shared-folder warning shows with everyone in the project folder', (await row('sharedFolderWarning').count()) === 1)
     // Card loops (HI-1766): options of their own, from the defaults; File locks with them.
     check('Card loops: the defaults, Default as their origin', (await row('loopRounds').locator('input').getAttribute('placeholder')) === '10' && (await row('loopWaitHours').locator('input').getAttribute('placeholder')) === '6 hours' && (await row('loopStepWaitMinutes').locator('input').getAttribute('placeholder')) === '30 minutes' && (await row('loopRounds').locator('.workflow-origin').innerText()).includes('Default'), await section.locator('.workflow-group[data-group="loops"]').innerText())
+    // HI-3211: Wake the Assistant for, Standard by default, each level said in full under the choice; Custom ticks the events.
+    check('Wake the Assistant for: Standard, said in full', (await row('assistantWakes').locator('select').inputValue()) === 'standard' && (await row('assistantWakes').locator('[data-note="assistant-wakes"]').innerText()).includes('What Combwork has always woken it for.'), await row('assistantWakes').innerText())
+    await row('assistantWakes').locator('select').selectOption('custom')
+    await lib.until(async () => (await row('assistantWakes').locator('[data-note="assistant-wake-events"] input[type="checkbox"]').count()) === 13, HUNG_MS)
+    check('…Custom: a tick per event, from the level left; a question for you always on', (await row('assistantWakes').locator('[data-note="assistant-wake-events"] input:checked').count()) === 10 && (await row('assistantWakes').locator('[data-note="assistant-wake-events"] input:disabled').count()) === 1, await row('assistantWakes').innerText())
+    await discard()
+    await lib.until(async () => (await row('assistantWakes').locator('select').inputValue()) === 'standard', HUNG_MS)
     check('File locks: Block, with what it applies to', (await row('fileLocks').locator('select').inputValue()) === 'block' && (await row('fileLocks').locator('[data-note="file-locks"]').innerText()) === 'Applies to agents working in the same folder, outside a slot.')
     await themes('groups-top', section.locator('.workflow-group[data-group="review"]'))
     await themes('groups-end', section.locator('.workflow-group[data-group="loops"]'))
@@ -490,7 +497,7 @@ async function theForm(page, app, inv) {
     check('None’s groups, in order', !!(await lib.until(async () => JSON.stringify(await groups()) === JSON.stringify(['presets', 'team', 'review', 'checks', 'work', 'loops', 'stages']), HUNG_MS)), JSON.stringify(await groups()))
     const noneLayout = { review: await inGroup('review'), checks: await inGroup('checks'), work: await inGroup('work') }
     check('…N1, N2 in Review, N3 in Checks, N4, N6 and N7 (File locks) in The work', JSON.stringify(noneLayout) === JSON.stringify({ review: ['review', 'noSelfReview'], checks: ['preChecks'], work: ['excluded', 'dependenciesDone', 'fileLocks'] }), JSON.stringify(noneLayout))
-    check('…and Card loops, as Git’s', JSON.stringify(await inGroup('loops')) === JSON.stringify(['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes']))
+    check('…and Card loops, as Git’s', JSON.stringify(await inGroup('loops')) === JSON.stringify(['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes', 'assistantWakes']))
     check('…N1 reads “Who checks the work before it’s done”', (await row('review').innerText()).startsWith('Who checks the work before it’s done'))
     await themes('none', section.locator('.workflow-group[data-group="review"]'))
     check('…its Card loops from the defaults, Default as their origin', (await row('loopWakes').locator('.workflow-origin').innerText()).includes('Default') && (await row('fileLocks').locator('.workflow-origin').innerText()).includes('Default'))
