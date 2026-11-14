@@ -109,7 +109,7 @@ const id = (cwd, rev, t = 'commit_id') => jj(cwd, '--ignore-working-copy', 'log'
   const passedCard = async (title, file) => {
     await until(async () => {
       const all = (await inv('slots:list', shop)) ?? []
-      return all.length === 0 || all.every((x) => x.state === 'ready')
+      return all.every((x) => x.state === 'ready')
     }, HUNG_MS * 2)
     const n = (await inv('tasks:create', { title, project: 'shop', agent: b1.id })).number
     const key = (await card(n)).key
