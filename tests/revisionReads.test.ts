@@ -3,6 +3,7 @@
 // an over-limit file, and (Git) a gitlink.
 import { execFileSync } from 'child_process'
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
+import { createRequire } from 'module'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { tempDir } from './tempDir'
@@ -11,7 +12,13 @@ import { jjRevisionReadsWith } from '../src/main/platform/jjRevisionReads'
 import { MAX_DIFF_BYTES } from '../src/main/git'
 import { harness, jjExe } from './jjWorkspaceHarness'
 
-const git = (cwd: string, ...args: string[]): string => execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.invalid', ...args], { cwd, encoding: 'utf8' }).trim()
+// The fixtures' git (HR1's round 2): the run context's allowlist, a global config of the test's own and no system config,
+// never the shell's environment or the machine's git settings (signing, hooks, filters, GIT_* overrides).
+const runContext = createRequire(import.meta.url)('./e2e/runContext.cjs') as { gitEnv: (vars?: Record<string, string>) => NodeJS.ProcessEnv; writeGitConfig: (file: string) => void }
+const gitConfigFile = join(tempDir('cw-revdiff-gitconfig-'), 'gitconfig')
+runContext.writeGitConfig(gitConfigFile)
+const GIT_ENV = runContext.gitEnv({ GIT_CONFIG_GLOBAL: gitConfigFile })
+const git = (cwd: string, ...args: string[]): string => execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.invalid', ...args], { cwd, encoding: 'utf8', env: GIT_ENV }).trim()
 const BIG = 'x'.repeat(MAX_DIFF_BYTES + 10)
 
 describe('Git: a submission file from its base to its revision (HI-3218)', () => {
@@ -61,7 +68,7 @@ describe('Git: a submission file from its base to its revision (HI-3218)', () =>
     const base = git(r, 'rev-parse', 'HEAD')
     // The revision's tree names a blob for a.txt that the store doesn't have; b.txt as it was.
     const entries = git(r, 'ls-tree', base).split('\n').map((l) => (l.endsWith('\ta.txt') ? l.replace(/blob [0-9a-f]{40}/, `blob ${'d'.repeat(40)}`) : l))
-    const tree = execFileSync('git', ['mktree', '--missing'], { cwd: r, input: entries.join('\n') + '\n', encoding: 'utf8' }).trim()
+    const tree = execFileSync('git', ['mktree', '--missing'], { cwd: r, input: entries.join('\n') + '\n', encoding: 'utf8', env: GIT_ENV }).trim()
     const revision = git(r, 'commit-tree', tree, '-p', base, '-m', 'revision')
     expect(git(r, 'diff', '--raw', '--no-ext-diff', base, revision, '--', 'a.txt')).toMatch(/M\ta\.txt$/)
     await expect(reads.fileDiff(r, base, revision, 'a.txt')).rejects.toThrow(/cat-file/)
