@@ -501,7 +501,7 @@ export const AREAS = [
   // HI-3194: every agent write on a card is fenced by its attempt; intents drives a put-back, a restart and a reviewer's design.
   { paths: ['src/main/attemptFence.ts'], suites: ['intents'] },
   // HI-3195: keyed agent writes applied once (a lost reply's retry, a key reused), and cw-mcp's own retry with its key.
-  { paths: ['src/main/requestReceipts.ts', 'src/main/schema/requestReceiptsStep.ts'], suites: ['intents'] },
+  { paths: ['src/main/requestReceipts.ts', 'src/main/schema/requestReceiptsStep.ts', 'src/shared/requestKeys.ts'], suites: ['intents'] },
   // HI-3188: a card's back-and-forth, its simplify check and hard stop, in the window.
   { paths: ['src/main/churnAssistant.ts', 'tests/e2e/churn.cjs'], suites: ['churn'] },
   // The nudge an agent's reply adds for a long card title (HI-1872).
