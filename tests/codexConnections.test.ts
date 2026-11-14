@@ -10,6 +10,7 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { CODEX_DESCRIPTOR } from '../src/shared/providers/codex'
+import { signInConnections } from '../src/shared/providers'
 import { acceptable } from '../src/shared/accounts'
 import type { Account } from '../src/shared/types'
 import { tempDir } from './tempDir'
@@ -113,7 +114,7 @@ describe("a Codex connection's folder", () => {
   it('has CODEX_HOME as its home, and sessions and archived_sessions shared', () => {
     // Its Set Up wording (HI-1870's setUp) aside; no trustInherits: a trusted folder above a repository doesn't cover it (HI-1871).
     expect(CODEX_DESCRIPTOR.capabilities.connections).toMatchObject({ homeEnv: 'CODEX_HOME', shared: ['sessions', 'archived_sessions'], userHome: '.codex', orgs: false })
-    expect(CODEX_DESCRIPTOR.capabilities.connections?.trustInherits).toBeUndefined()
+    expect(signInConnections(CODEX_DESCRIPTOR)?.trustInherits).toBeUndefined()
   })
   it('takes on a sign-in by its email alone (Codex names no organisation); Claude Code still needs both', () => {
     const o = { at: 'now', loggedIn: true as const, email: 'one@example.com', plan: 'plus' }

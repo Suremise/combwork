@@ -21,6 +21,8 @@ import { keyInfo, withKey } from './keyStore'
 import { plainHttpRequest, type PlainReply } from './plainHttpsJson'
 import { checkedUrl, onServerChanged, serverOf } from './serverConnections'
 import { createLogger } from './logger'
+import { combworkError } from './combworkError'
+import { msg } from '../shared/i18n/msg'
 
 const log = createLogger('servers')
 
@@ -77,7 +79,9 @@ function remember(id: string, model: string, part: Partial<LastCheck>): void {
  * it ends.
  */
 async function framed<T>(id: string, model: string, request: string, timeoutMs: number, body: (c: Frame) => Promise<T>, stale: T, busy: T): Promise<T> {
-  const { server } = serverOf(id)
+  const { a, server, caps } = serverOf(id)
+  // Its checks speak Anthropic's API (Claude Code's Messages API, HI-2683): never to a server speaking another (HI-3197).
+  if ((caps.api ?? 'anthropic') !== 'anthropic') throw combworkError(msg({ id: 'main.server.check.otherApi', defaultMessage: "Check Server tests a server that speaks Anthropic's API; {name}'s CLI talks to its server in OpenAI's.", description: "An error (HI-3197): Check Server was asked for a server connection ({name}, its name in Settings → Accounts & Connections) whose coding agent CLI speaks OpenAI's API, which the check doesn't test. Check Server is a button's name: keep it as Combwork shows it." }), { name: a.name }, { kind: 'conflict' })
   const b = checkedUrl(server.baseUrl)
   if (!server.models.some((m) => m.id === model)) return stale
   if (active >= CHECKS_MAX) return busy

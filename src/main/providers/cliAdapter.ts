@@ -29,10 +29,14 @@ type Patterns = Partial<Record<CliPattern, RegExp>>
 /** A folder or file from a description, a %VARIABLE% at its start expanded. */
 const expand = (p: string): string => p.replace(/^%([A-Za-z_][A-Za-z0-9_]*)%/, (all, name: string) => process.env[name] ?? all)
 
-/** An argument with the launch's values put in; null when it names a value the launch hasn't (no model). */
+/**
+ * An argument with the launch's values put in; null when it names a value the launch hasn't (no model). Only the names
+ * given are filled (a description's placeholders, or a server's: HI-3197), each checked when the description was.
+ */
 function fill(arg: string, values: Record<string, string | null>): string | null {
   let missing = false
-  const out = arg.replace(/\{(model|cwd|prompt|id)\}/g, (_all, k: string) => {
+  const out = arg.replace(/\{(\w+)\}/g, (all, k: string) => {
+    if (!(k in values)) return all
     const v = values[k]
     if (v === null || v === undefined) missing = true
     return v ?? ''
@@ -55,13 +59,15 @@ export function fillArgs(args: readonly string[], values: Record<string, string 
 }
 
 /** The command line a description gives a launch (no shell: argv as it is). */
-export function cliArgs(cli: CliDescription, ctx: Pick<LaunchContext, 'cwd' | 'model' | 'sessionId' | 'resume' | 'permissionMode' | 'initialPrompt' | 'extraArgs'>): string[] {
+export function cliArgs(cli: CliDescription, ctx: Pick<LaunchContext, 'cwd' | 'model' | 'sessionId' | 'resume' | 'permissionMode' | 'initialPrompt' | 'extraArgs' | 'serverLaunch'>): string[] {
   const values = { model: ctx.model || null, cwd: ctx.cwd, prompt: ctx.initialPrompt ?? null, id: ctx.sessionId || null }
   const mode = cli.launch.modes?.find((m) => m.value === ctx.permissionMode)
   return [
     ...fillArgs(cli.launch.args ?? [], values),
     ...(mode ? fillArgs(mode.args, values) : []),
     ...(cli.session && ctx.sessionId ? fillArgs(ctx.resume ? cli.session.resume : cli.session.new, values) : []),
+    // Its server connection's (HI-3197), filled from this launch's server and model.
+    ...(ctx.serverLaunch?.args ?? []),
     ...ctx.extraArgs,
     ...(cli.launch.prompt !== 'typed' && ctx.initialPrompt ? fillArgs(cli.launch.prompt.arg, values) : [])
   ]
@@ -198,7 +204,11 @@ export class CliAdapter implements ProviderAdapter {
 
   buildCommand(executable: string, ctx: LaunchContext): CommandSpec {
     const s = toSpawnable(executable, cliArgs(this.cli, ctx))
-    return { ...s, ...(this.cli.launch.env ? { env: { ...ctx.env, ...this.cli.launch.env } } : {}) }
+    // Its description's variables, over Combwork's environment; never one its server templates name (HI-3197): its server's
+    // win, and on its own setup there are none.
+    const served = new Set((ctx.serverLaunch?.names ?? []).map((n) => n.toLowerCase()))
+    const own = Object.fromEntries(Object.entries(this.cli.launch.env ?? {}).filter(([k]) => !served.has(k.toLowerCase())))
+    return { ...s, ...(Object.keys(own).length ? { env: { ...ctx.env, ...own } } : {}) }
   }
 
   newSessionId(): string {

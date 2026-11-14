@@ -36,7 +36,7 @@ if (argv[0] === '--version') {
 
 const resumeId = flag('--resume')
 const id = resumeId ?? flag('--session-id') ?? null
-log({ kind: 'launch', args: argv, cwd: process.cwd(), yolo: argv.includes('--yolo'), env: { FAKE_DATACLI_MARK: process.env.FAKE_DATACLI_MARK ?? null, CW_PROJECT: process.env.CW_PROJECT ?? null } })
+log({ kind: 'launch', args: argv, cwd: process.cwd(), yolo: argv.includes('--yolo'), env: { FAKE_DATACLI_MARK: process.env.FAKE_DATACLI_MARK ?? null, CW_PROJECT: process.env.CW_PROJECT ?? null, OPENAI_BASE_URL: process.env.OPENAI_BASE_URL ?? null, OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? null, DATACLI_CONTEXT: process.env.DATACLI_CONTEXT ?? null, DATACLI_OUTPUT: process.env.DATACLI_OUTPUT ?? null } })
 if (resumeId && !readStore()[resumeId]) {
   process.stdout.write(`No session ${resumeId} to resume.\r\n`)
   log({ kind: 'resumeRefused', id: resumeId })
@@ -53,6 +53,27 @@ process.stdout.write(`datacli 1.2.3 — session ${id ?? 'none'}${resumeId ? ` (r
 let trusting = !!process.env.FAKE_DATACLI_TRUST && fs.existsSync(process.env.FAKE_DATACLI_TRUST) && !resumeId
 if (trusting) process.stdout.write('Trust this folder? (y/n) ')
 else prompt()
+
+/** One chat request to the server its launch was given (OPENAI_BASE_URL, OPENAI_API_KEY, --model, DATACLI_OUTPUT). */
+const ask = (text) =>
+  new Promise((resolve, reject) => {
+    const url = new URL(`${process.env.OPENAI_BASE_URL.replace(/\/$/, '')}/chat/completions`)
+    const body = JSON.stringify({ model: flag('--model') ?? null, messages: [{ role: 'user', content: text }], ...(process.env.DATACLI_OUTPUT ? { max_tokens: Number(process.env.DATACLI_OUTPUT) } : {}) })
+    const headers = { 'content-type': 'application/json', ...(process.env.OPENAI_API_KEY ? { authorization: `Bearer ${process.env.OPENAI_API_KEY}` } : {}) }
+    const req = require('http').request(url, { method: 'POST', headers }, (res) => {
+      let data = ''
+      res.on('data', (c) => (data += c))
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data).choices[0].message.content)
+        } catch (e) {
+          reject(e)
+        }
+      })
+    })
+    req.on('error', reject)
+    req.end(body)
+  })
 
 let line = ''
 let asking = false
@@ -87,10 +108,18 @@ const take = (text) => {
   osc('working')
   process.stdout.write('\r\nWorking…')
   const hold = process.env.FAKE_DATACLI_HOLD
-  const done = () => {
+  const done = (reply) => {
     busy = false
-    process.stdout.write(`\r\nDone: ${text}`)
+    process.stdout.write(`\r\nDone: ${reply ?? text}`)
     prompt()
+  }
+  // Given a server (HI-3197: OPENAI_BASE_URL), the line goes to it as OpenAI's chat API takes it, with its key and model.
+  if (process.env.OPENAI_BASE_URL) {
+    ask(text).then(
+      (r) => done(r),
+      (e) => done(`server error: ${e.message}`)
+    )
+    return
   }
   if (hold && fs.existsSync(hold)) {
     const t = setInterval(() => {

@@ -123,6 +123,23 @@ This one runs Ollama's chat with a model on your PC (tested with Ollama 0.40.15 
 - **Its status** comes from its screen: **working** while its `working` pattern (or its OSC 7501 state) says so, **waiting for you** while it asks something (answer in its pane; nothing is typed over it), and **finished** when its prompt is back after work. **Settings → Advanced** has each CLI's patterns, if one needs changing.
 - **Resuming.** A session resumes by its id once it has had a prompt: its first task, a line Combwork typed, or one you typed at its prompt. Answering a question it asked as it started doesn't count: a session stopped before any prompt isn't kept, and the agent's Resume opens its previous conversation, if it has one.
 
+#### A model server of yours <a id="a-model-server-of-yours"></a>
+
+A CLI whose description has a `server` section can run on a model server of yours, such as Ollama, LM Studio, llama.cpp or vLLM on this PC. Add it in **Settings → Accounts & Connections → Add**: its server's address (or a preset), a key if the server needs one, and its models, typed or read from the server. Set each model's context and output there if the CLI needs them (Claude Code's names, labels and Set Up aren't offered: they are Claude Code's; nor is **Check Server…** for a server spoken to in OpenAI's protocol, as it tests Anthropic's). Then give an agent a connection on it with a model. An agent on the CLI's own account runs it as you set it up yourself.
+
+```json
+"server": {
+  "api": "openai",
+  "env": { "OPENAI_BASE_URL": "{baseUrl}", "OPENAI_API_KEY": "{key}", "MYCLI_CONTEXT": "{context}" },
+  "args": ["--provider", "openai"]
+}
+```
+
+- **What it says.** `api` is the protocol the server speaks: `openai` or `anthropic`; it decides the presets and how models are read from the server. `env` and `args` say how a launch on a server connection gets it, naming `{baseUrl}`, `{key}`, `{model}` (the connection's model), `{context}` and `{output}` (that model's, as you set them). One naming something not set is left out. `{key}` can only be in a variable, never an argument; `keyless` is what `{key}` becomes for a server with no key (`none` unless it says).
+- **Only that launch's.** Combwork passes these values in the CLI's environment and arguments for that launch alone, and never changes the CLI's own config. On a server connection, they win over the description's own `launch.env` and anything in Combwork's own environment. On the CLI's own account, the CLI gets none of the variables the `server` section names, even if Combwork's environment or `launch.env` has them.
+- **The key** is kept encrypted, bound to the server's address, and hidden in Combwork's logs and diagnostics, as for Claude Code's server connections.
+- **Large models.** Combwork sets no time limit on a turn or on the start, so a large model that takes minutes to load shows **starting** until its prompt is ready.
+
 ### Git <a id="git"></a>
 
 Worktree agents, merging, the **Git** tab, what's left to merge on **Merge…**, agent templates with worktrees and **Remove All**'s clean-up all use **git**. Install **Git for Windows**, version **2.38 or later** (git-scm.com). **Help → Provider Setup…** shows a **Git** row under every tab: the version Combwork found and where, or **Git not found** with how to fix it and a **Git for Windows** button. With an older git, the row says what doesn't work (for example, squash-merged branches still count as unmerged, so their worktrees are kept).

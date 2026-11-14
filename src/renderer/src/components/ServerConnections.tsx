@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import type { Account, ModelAlias, ProviderId, ServerModel } from '@shared/types'
-import { providerDescriptor, type ServerPreset } from '@shared/providers'
+import { providerDescriptor, signInConnections, type ServerPreset } from '@shared/providers'
 import { MODEL_ALIASES, MODEL_LABEL_MAX, parseBaseUrl, type ServerModelsRead } from '@shared/serverConnection'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { serverModelLabel } from '@shared/models'
@@ -44,6 +44,7 @@ const M = {
   context: msg({ id: 'settings.connections.server.context', defaultMessage: 'Context size', description: "A field on a server connection's model (HI-2682): the context the model has on this server, in tokens. The same value as Server diagnostics' context size." }),
   output: msg({ id: 'settings.connections.server.output', defaultMessage: 'Output budget', description: "A field on a server connection's model (HI-2682): the most tokens the model may write in one reply." }),
   tokens: msg({ id: 'settings.connections.server.tokens', defaultMessage: 'tokens', description: "Beside a server connection's model's Context size and Output budget fields (HI-2682): the unit." }),
+  notPassed: msg({ id: 'settings.connections.server.notPassed', defaultMessage: 'Not set: not passed (the CLI’s own)', description: "The placeholder of an empty Context size or Output budget field of a server connection's model (HI-3197), for a CLI that runs from a description: a value left empty isn't given to the CLI, which then uses its own. Keep it short." }),
   contextNone: msg({ id: 'settings.connections.server.contextNone', defaultMessage: 'Not set: 200,000 assumed', description: "The placeholder of a server connection's model's empty Context size field (HI-2682): with none set, Claude Code assumes a 200K context." }),
   outputDefault: msg({ id: 'settings.connections.server.outputDefault', defaultMessage: 'Default: {n, number}', description: "The placeholder of a server connection's model's empty Output budget field (HI-2682): the budget used when none is set. {n} is a number of tokens." }),
   notBelow: msg({ id: 'settings.connections.server.notBelow', defaultMessage: 'The output budget must be smaller than the context size.', description: "Under a server connection's model's fields (HI-2682): its output budget isn't smaller than its context size, so it can't be saved." }),
@@ -53,6 +54,7 @@ const M = {
   // HI-2684: a model's name in Claude Code's /model picker.
   label: msg({ id: 'settings.connections.server.label', defaultMessage: 'Label', description: "A field on a server connection's model (HI-2684): the name shown for it in Claude Code's /model picker. Its placeholder is the model's ID." }),
   pickerHint: msg({ id: 'settings.connections.server.pickerHint', defaultMessage: 'Claude Code’s /model lists these models by their exact IDs, under their labels. With no Claude model among them, its own Opus, Sonnet and Haiku rows are hidden. A lineup in your own settings is used instead.', description: "Under a server connection's model list (HI-2684): what Claude Code's model picker (/model, a command: keep it) shows on this connection. Label names the field. Opus, Sonnet and Haiku are Claude's model names: keep them." }),
+  limitsHintGeneric: msg({ id: 'settings.connections.server.limitsHintGeneric', defaultMessage: "Context size and Output budget go to the CLI when an agent starts on that model, where its description passes them ('{context}' and '{output}').", description: "Under a server connection's model list (HI-3197), for a CLI that runs from a description: when a model's context size and output budget are used. Keep '{context}' and '{output}' as they are (quoted in ICU): they are the description's placeholders, not values." }),
   modelsHint: msg({ id: 'settings.connections.server.modelsHint', defaultMessage: "Each Claude name (Opus, Sonnet, Haiku) runs the model ticked for it. A model can stand in for several.", description: "Under a server connection's model list: the CLI asks for Claude models by name, and each name runs the server model ticked for it." }),
   modelId: msg({ id: 'settings.connections.server.modelId', defaultMessage: 'Model id', description: "Placeholder of a model's id box in a server connection's model list (\"deepseek-flash\")." }),
   addModel: msg({ id: 'settings.connections.server.addModel', defaultMessage: 'Add Model', description: "Button under a server connection's model list: adds a row." }),
@@ -121,6 +123,20 @@ const hostOf = (url: string): string => {
 
 /** Whether a CLI can have server connections. */
 export const hasServers = (cli: ProviderId): boolean => !!providerDescriptor(cli).capabilities.connections?.server
+/** A CLI that takes server connections only (HI-3197: one from a description, combwork-cli): no sign-in to add. */
+export const serverOnly = (cli: ProviderId): boolean => providerDescriptor(cli).capabilities.connections?.signIn === false
+
+/**
+ * What a CLI's server connections can do (HI-3197), from its descriptor alone: the Claude names a model stands in for
+ * (`aliases`: its CLI maps them), Claude Code's own handling of a model's label and limits (`ownLimits`: its /model
+ * picker, the IDs it sizes itself), Set Up (a sign-in CLI's first-run screens), and Check server (its tool-call test
+ * speaks Anthropic's Messages API).
+ */
+export function serverFeatures(cli: ProviderId): { aliases: boolean; ownLimits: boolean; setUp: boolean; check: boolean } {
+  const d = providerDescriptor(cli)
+  const caps = d.capabilities.connections?.server
+  return { aliases: !!caps?.aliasEnv, ownLimits: !!caps?.localLimits, setUp: !!signInConnections(d), check: (caps?.api ?? 'anthropic') === 'anthropic' }
+}
 
 /** Reads a server connection's models, saying how it went; `request` is this reading's own id. */
 async function readModels(c: Pick<Account, 'id' | 'name'>): Promise<void> {
@@ -134,8 +150,12 @@ async function readModels(c: Pick<Account, 'id' | 'name'>): Promise<void> {
   }
 }
 
-/** A server's models, each with the Claude names it stands in for (each name on one model at most). */
-export function ServerModelsEditor({ models, onChange, disabled }: { models: ServerModel[]; onChange: (models: ServerModel[]) => void; disabled?: boolean }) {
+/**
+ * A server's models, each with the Claude names it stands in for (each name on one model at most) where its CLI maps them,
+ * and each model's context and output (with its /model label where its CLI's picker shows one).
+ */
+export function ServerModelsEditor({ cli, models, onChange, disabled }: { cli: ProviderId; models: ServerModel[]; onChange: (models: ServerModel[]) => void; disabled?: boolean }) {
+  const f = serverFeatures(cli)
   const set = (i: number, m: ServerModel): void => onChange(models.map((x, j) => (j === i ? m : x)))
   const toggle = (i: number, a: ModelAlias): void => {
     const on = !models[i].as?.includes(a)
@@ -148,7 +168,7 @@ export function ServerModelsEditor({ models, onChange, disabled }: { models: Ser
         <div key={i} className="server-model-row flex" data-model={m.id}>
           <input className="input" value={m.id} disabled={disabled} placeholder={tr(M.modelId)} aria-label={tr(M.modelId)} spellCheck={false} onChange={(e) => set(i, { ...m, id: e.target.value, unsupported: undefined })} />
           {m.remote && <span className="muted" data-cloud title={tr(M.cloudTip)}>{tr(M.cloud)}</span>}
-          {MODEL_ALIASES.map((a) => (
+          {f.aliases && MODEL_ALIASES.map((a) => (
             <label key={a} className="flex server-model-alias">
               <input type="checkbox" disabled={disabled} checked={!!m.as?.includes(a)} onChange={() => toggle(i, a)} /> {ALIAS_NAME[a]}
             </label>
@@ -156,15 +176,15 @@ export function ServerModelsEditor({ models, onChange, disabled }: { models: Ser
           <button className="btn subtle small" disabled={disabled} title={tr(M.removeModel, { model: m.id })} aria-label={tr(M.removeModel, { model: m.id })} onClick={() => onChange(models.filter((_, j) => j !== i))}>
             <Icon name="close" />
           </button>
-          <ModelLimits m={m} disabled={disabled} onChange={(n) => set(i, n)} />
+          <ModelLimits m={m} ownLimits={f.ownLimits} disabled={disabled} onChange={(n) => set(i, n)} />
         </div>
       ))}
       <button className="btn subtle small" disabled={disabled} onClick={() => onChange([...models, { id: '' }])}>
         <Icon name="add" /> {tr(M.addModel)}
       </button>
-      <div className="hint">{tr(M.modelsHint)}</div>
-      <div className="hint">{tr(M.limitsHint)}</div>
-      <div className="hint" data-picker-hint>{tr(M.pickerHint)}</div>
+      {f.aliases && <div className="hint" data-aliases-hint>{tr(M.modelsHint)}</div>}
+      <div className="hint" data-limits-hint>{tr(f.ownLimits ? M.limitsHint : M.limitsHintGeneric)}</div>
+      {f.ownLimits && <div className="hint" data-picker-hint>{tr(M.pickerHint)}</div>}
     </div>
   )
 }
@@ -180,9 +200,10 @@ const tokensTyped = (v: string): number | undefined => {
  * unsupported (a value kept from before stays kept); the output's default as its placeholder; an output not below the
  * context said at once (the save refuses it too), and little room left for Claude Code's first request warned of.
  */
-function ModelLimits({ m, disabled, onChange }: { m: ServerModel; disabled?: boolean; onChange: (m: ServerModel) => void }) {
+function ModelLimits({ m, ownLimits, disabled, onChange }: { m: ServerModel; ownLimits: boolean; disabled?: boolean; onChange: (m: ServerModel) => void }) {
   const off = disabled || !!m.unsupported
-  const out = defaultOutput(m.context)
+  // Claude Code's own defaults (HI-2682) where it applies limits itself; elsewhere an empty value is simply not passed (HI-3197).
+  const out = ownLimits ? defaultOutput(m.context) : null
   const field = (key: 'context' | 'output', label: Msg, placeholder: string) => (
     <label className="flex server-model-limit" data-limit={key}>
       {tr(label)}
@@ -206,6 +227,7 @@ function ModelLimits({ m, disabled, onChange }: { m: ServerModel; disabled?: boo
     <div className="server-model-limits" data-model-limits={m.id}>
       <div className="flex">
         {/* Its name in Claude Code's /model (HI-2684): display only, the ID as its placeholder. An alias isn't listed there. */}
+        {ownLimits && (
         <label className="flex server-model-limit" data-limit="label">
           {tr(M.label)}
           <input
@@ -221,12 +243,13 @@ function ModelLimits({ m, disabled, onChange }: { m: ServerModel; disabled?: boo
             }}
           />
         </label>
-        {field('context', M.context, tr(M.contextNone))}
-        {field('output', M.output, out ? tr(M.outputDefault, { n: out }) : '')}
+        )}
+        {field('context', M.context, tr(ownLimits ? M.contextNone : M.notPassed))}
+        {field('output', M.output, !ownLimits ? tr(M.notPassed) : out ? tr(M.outputDefault, { n: out }) : '')}
       </div>
       {m.unsupported && <div className="hint" data-limits-unsupported={m.unsupported}>{tr(M.unsupported, { why: m.unsupported })}</div>}
       {!m.unsupported && !outputFits(m) && <div className="error" data-limits-error>{tr(M.notBelow)}</div>}
-      {!m.unsupported && outputFits(m) && tightFit(m) && <div className="hint warn" data-limits-tight>{tr(M.tight)}</div>}
+      {ownLimits && !m.unsupported && outputFits(m) && tightFit(m) && <div className="hint warn" data-limits-tight>{tr(M.tight)}</div>}
     </div>
   )
 }
@@ -241,7 +264,7 @@ export function AddConnectionDialog({ clis, onClose, onSignIn }: { clis: readonl
   const servers = hasServers(cli)
   const presets = presetsOf(cli)
   const [name, setName] = useState('')
-  const [from, setFrom] = useState<'signIn' | 'server'>('signIn')
+  const [from, setFrom] = useState<'signIn' | 'server'>(serverOnly(clis[0]) ? 'server' : 'signIn')
   const [preset, setPreset] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
   const [key, setKey] = useState('')
@@ -295,7 +318,8 @@ export function AddConnectionDialog({ clis, onClose, onSignIn }: { clis: readonl
   // Another CLI: what was picked for the last one's server doesn't carry over.
   const pickCli = (p: ProviderId): void => {
     setCli(p)
-    if (!hasServers(p)) setFrom('signIn')
+    if (serverOnly(p)) setFrom('server')
+    else if (!hasServers(p)) setFrom('signIn')
     setPreset('')
     setBaseUrl('')
     setModels([])
@@ -331,7 +355,7 @@ export function AddConnectionDialog({ clis, onClose, onSignIn }: { clis: readonl
         )}
         <label htmlFor="conn-name">{tr(M.name)}</label>
         <input id="conn-name" className="input" autoFocus value={name} disabled={busy} placeholder={tr(M.namePlaceholder)} onChange={(e) => setName(e.target.value)} />
-        {servers && (
+        {servers && !serverOnly(cli) && (
           <>
             <label>{tr(M.from)}</label>
             <div className="flex" role="radiogroup" aria-label={tr(M.from)}>
@@ -356,7 +380,7 @@ export function AddConnectionDialog({ clis, onClose, onSignIn }: { clis: readonl
             <div className="hint span2">{url.ok && url.local ? tr(M.keyLocal) : tr(M.keyHint)}</div>
             <label>{tr(M.models)}</label>
             <div>
-              <ServerModelsEditor models={models} onChange={setModels} disabled={busy} />
+              <ServerModelsEditor cli={cli} models={models} onChange={setModels} disabled={busy} />
               {!!presets.find((x) => x.id === preset)?.listing || !preset ? (
                 <label className="flex dialog-check">
                   <input type="checkbox" checked={readAfter} disabled={busy} onChange={(e) => setReadAfter(e.target.checked)} /> {tr(M.readAfter)}
@@ -453,6 +477,7 @@ function EditServerDialog({ c, onClose }: { c: Account; onClose: () => void }) {
         {moves && <div className="account-warning span2"><Icon name="warning" /> {tr(M.moveWarn)}</div>}
         <label>{tr(M.models)}</label>
         <ServerModelsEditor
+          cli={c.provider}
           models={models}
           onChange={(m) => {
             setModels(m)
@@ -474,6 +499,7 @@ export function ServerConnectionDetail({ c, keyLast4, needsSetUp, onSetUp }: { c
   const host = hostOf(c.server?.baseUrl ?? '')
   const local = url.ok && url.local
   const caps = providerDescriptor(c.provider).capabilities.connections?.server
+  const features = serverFeatures(c.provider)
   const listing = !!caps && (caps.presets.find((p) => p.id === c.server?.preset)?.listing ?? caps.listing)
   const line = keyLast4 ? tr(M.hostKey, { host, last4: keyLast4 }) : local ? tr(M.hostLocal, { host }) : tr(M.hostNoKey, { host })
   const removeKey = (): void => {
@@ -503,8 +529,9 @@ export function ServerConnectionDetail({ c, keyLast4, needsSetUp, onSetUp }: { c
           </button>
         )}
         {/* Its model's context and a tool-call test (HI-2683): read-only. */}
-        {models.length > 0 && <button className="btn subtle small" data-check-server onClick={() => setDialog('check')}>{tr(CHECK_SERVER)}</button>}
-        <button className={needsSetUp ? 'btn primary small' : 'btn subtle small'} data-set-up onClick={() => onSetUp(c.id)}>{tr(M.setUp)}</button>
+        {models.length > 0 && features.check && <button className="btn subtle small" data-check-server onClick={() => setDialog('check')}>{tr(CHECK_SERVER)}</button>}
+        {/* Set Up is a sign-in CLI's first-run screens (HI-1870): a server-only CLI has none (HI-3197). */}
+        {features.setUp && <button className={needsSetUp ? 'btn primary small' : 'btn subtle small'} data-set-up onClick={() => onSetUp(c.id)}>{tr(M.setUp)}</button>}
       </div>
       {dialog === 'key' && <KeyDialog c={c} onClose={() => setDialog(null)} />}
       {dialog === 'edit' && <EditServerDialog c={c} onClose={() => setDialog(null)} />}
@@ -567,7 +594,7 @@ export async function setUpConnection(id: string): Promise<{ key: string; in?: {
 
 /** What Set Up is for, from the CLI's descriptor (HI-1870): above its terminal, and on a connection that needs it. */
 export const setUpHint = (cli: ProviderId): string => {
-  const m = providerDescriptor(cli).capabilities.connections?.setUp
+  const m = signInConnections(providerDescriptor(cli))?.setUp
   return m ? tr(m) : ''
 }
 

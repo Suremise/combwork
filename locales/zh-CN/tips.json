@@ -591,6 +591,8 @@
   "tips.workspaceMovedDefender.title": "Defender 排除项会跟随移动后的工作区",
   "tips.workspaceNotes.text": "固定在“共享笔记”顶部的 Workspace notes 用来记录这台机器特有的内容，比如完整路径。每个智能体在启动时都会获得它，无论在哪个文件夹，所以不必写进已提交的 AGENTS.md。以项目名为标题的章节只属于该项目。",
   "tips.workspaceNotes.title": "让每个智能体都知道的本机笔记",
+  "tips.yourOwnCliServer.text": "通过描述文件运行的 CLI 可以在这台电脑上的 Ollama、LM Studio、llama.cpp 或 vLLM 上运行：它的描述文件写明如何把服务器交给它，你在“设置”→“账号与连接”中添加该服务器，然后为智能体分配连到它的连接。",
+  "tips.yourOwnCliServer.title": "在你自己的模型服务器上运行你自己的 CLI",
   "tips.yourOwnClis.text": "在 Combwork 配置文件夹的 clis 文件夹中放一个描述 CLI 的 JSON 文件，你的智能体就能运行它：写明如何启动它、第一条提示词如何传入，以及如何读取它的屏幕。“设置”→“提供方”→“你自己的 CLI”可打开该文件夹并重新加载。",
   "tips.yourOwnClis.title": "运行 Combwork 没有提供方的 CLI",
   "tips.modelSwitched.title": "使用其他模型的智能体会被标记",

@@ -2,7 +2,7 @@ import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
 import type { AgentDef, Connection, LaunchValues, MovedField, ProjectConfig, ProviderId } from '../shared/types'
 import { type LegacyInputs, type MovedNotice, type AccountStore, migrateAssistant, migrateProject, migrateWorkspaceFile, placeUnplaced, unpinAssistant, waitsForConnection } from '../shared/connectionDefaults'
-import { autoProviderPending, providerDescriptor } from '../shared/providers'
+import { autoProviderPending, providerDescriptor, signInConnections } from '../shared/providers'
 import { CW_DIR, projectAgents } from '../shared/defaults'
 import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { msg, tr } from '../shared/i18n'
@@ -31,7 +31,7 @@ function inputsFor(ws: WorkspaceService): LegacyInputs {
     ws: ws.config,
     legacy: config.get().migrations?.accounts1?.legacy ?? [],
     seam: (cli) => {
-      const caps = providerDescriptor(cli).capabilities.connections
+      const caps = signInConnections(providerDescriptor(cli))
       return !!caps && testHomeSeam(caps.homeEnv)
     }
   }

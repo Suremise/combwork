@@ -591,6 +591,8 @@
   "tips.workspaceMovedDefender.title": "Les exclusions Defender suivent un espace de travail déplacé",
   "tips.workspaceNotes.text": "Workspace notes, épinglée en tête des Notes partagées, sert à ce qui est vrai pour cette machine, comme un chemin complet. Chaque agent la reçoit à son démarrage, dans n’importe quel dossier : inutile de le mettre dans un AGENTS.md commité. Une section portant le nom d’un projet n’est qu’à ce projet.",
   "tips.workspaceNotes.title": "Des notes sur cette machine pour chaque agent",
+  "tips.yourOwnCliServer.text": "Une CLI qui fonctionne à partir d’une description peut tourner sur Ollama, LM Studio, llama.cpp ou vLLM sur ce PC : sa description indique comment lui donner le serveur, et tu ajoutes le serveur dans Paramètres → Comptes et connexions, puis tu donnes à un agent une connexion vers lui.",
+  "tips.yourOwnCliServer.title": "Ta propre CLI sur ton propre serveur de modèles",
   "tips.yourOwnClis.text": "Un fichier JSON décrivant une CLI, dans le dossier clis de ton profil Combwork, permet à tes agents de la lancer : comment la démarrer, comment son premier prompt lui parvient et comment lire son écran. Paramètres → Fournisseurs → Tes propres CLI ouvre le dossier et le recharge.",
   "tips.yourOwnClis.title": "Lancer une CLI pour laquelle Combwork n’a pas de fournisseur",
   "tips.modelSwitched.title": "Un agent sur un autre modèle est signalé",

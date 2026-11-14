@@ -120,6 +120,12 @@ export interface LaunchContext {
   connectionHome?: string
   /** A server connection's models as they run now and its name (HI-2682: a local model's limits), absent off one. */
   server?: { models: ServerModel[]; connection: string }
+  /**
+   * A CLI whose server values come from templates (HI-3197: serverLaunch.ts): the arguments its server connection adds (none
+   * on its own setup), for an adapter building its command line, and `names`, the variables the templates name: set in
+   * `env` from its server (on its own setup, none of them), and never replaced or added by an adapter's own variables.
+   */
+  serverLaunch?: { args: string[]; names: string[] }
   /** What the adapter applied of them (HI-2682), set by prepareLaunch: the launch keeps it for the context meter. */
   localLimits?: LaunchedLimits | null
   /** The /model lineup the adapter asked for on a server connection (HI-2684), set by prepareLaunch: kept on the session. */

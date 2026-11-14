@@ -277,21 +277,50 @@ export interface ProviderCapabilities {
    * `setUp` (HI-1870): what the CLI's one-time first-run setup on a connection is, said above its Set Up terminal and on
    * a connection that still needs it.
    */
-  connections?: {
-    homeEnv: string
-    shared: readonly string[]
-    userHome: string
-    orgs: boolean
-    setUp: Msg
-    /**
-     * HI-1871: the CLI's trust of a folder covers the folders inside it that aren't Git repositories (HI-2520, measured:
-     * Claude Code 2.1.316–2.1.318; a repository asks unless its own root is trusted), so Set Up asks it once, in the
-     * workspace's folder, for every such project there, then at each Git root. Absent: once per project (Codex: its
-     * main root).
-     */
-    trustInherits?: true
-    server?: ServerCaps
-  }
+  connections?: SignInConnections | ServerOnlyConnections
+}
+
+/** A CLI with accounts of Combwork's: a home folder each, signed in through the CLI (and server accounts too, with `server`). */
+export interface SignInConnections {
+  signIn?: true
+  homeEnv: string
+  shared: readonly string[]
+  userHome: string
+  orgs: boolean
+  setUp: Msg
+  /**
+   * HI-1871: the CLI's trust of a folder covers the folders inside it that aren't Git repositories (HI-2520, measured:
+   * Claude Code 2.1.316–2.1.318; a repository asks unless its own root is trusted), so Set Up asks it once, in the
+   * workspace's folder, for every such project there, then at each Git root. Absent: once per project (Codex: its
+   * main root).
+   */
+  trustInherits?: true
+  server?: ServerCaps
+}
+
+/**
+ * A server-only CLI (HI-3197: a data-only CLI whose description takes a server; combwork-cli once it is a provider): its
+ * PC-wide home account, as a CLI without connections has, and server accounts; no sign-in accounts, no account folders.
+ */
+export interface ServerOnlyConnections {
+  signIn: false
+  server: ServerCaps
+}
+
+/** A CLI's sign-in accounts' capabilities (home folders, Set Up), or undefined: none (no connections, or server-only). */
+export function signInConnections(d: Pick<ProviderDescriptor, 'capabilities'>): SignInConnections | undefined {
+  const c = d.capabilities.connections
+  return c && c.signIn !== false ? c : undefined
+}
+
+/**
+ * How a server connection's values go into a launch from templates (HI-3197): each variable's value and each argument
+ * naming {baseUrl}, {key}, {model}, {context} or {output}; one naming a value the launch hasn't is left out ({key} never
+ * in an argument).
+ */
+export interface ServerLaunch {
+  env: Readonly<Record<string, string>>
+  args?: readonly string[]
 }
 
 /**
@@ -301,12 +330,16 @@ export interface ProviderCapabilities {
  * server connections in Combwork.
  */
 export interface ServerCaps {
-  baseUrlEnv: string
-  keyEnv: string
+  /** The protocol its server speaks (HI-3197): which presets and listing it is offered. */
+  api?: 'anthropic' | 'openai'
+  /** Its values from templates (HI-3197: data-only CLIs, combwork-cli); absent: Claude Code's fixed variables below. */
+  launch?: ServerLaunch
+  baseUrlEnv?: string
+  keyEnv?: string
   keylessToken: string
   /** The variable naming the model it runs as by default, and each alias's. */
-  modelEnv: string
-  aliasEnv: Record<ModelAlias, string>
+  modelEnv?: string
+  aliasEnv?: Record<ModelAlias, string>
   /** The variable naming its subagents' model: the haiku alias's model. */
   subagentEnv?: string
   /** How models are listed when the user asks, without a preset of its own: a path under the base URL, read as `data[].id`. */

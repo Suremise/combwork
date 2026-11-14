@@ -130,6 +130,7 @@ import { copyBook, sessionEnded } from './skillCopies'
 import { workspaceNotesFor } from './workspaceNotes'
 import { independentIn } from './independent'
 import { inLaunchScope, pinInLaunchScope } from './launchScope'
+import { serverLaunch } from './serverLaunch'
 import { skillOff } from '../shared/skillDelivery'
 import { samePath } from '../shared/movePaths'
 import { chainGuidanceRevision, GUIDANCE_REVISION, launchParts, launchRecord } from './guidance'
@@ -3137,10 +3138,21 @@ class SessionManager {
         // Its slot's name and port block (#1429's slotEnv), while it runs in one.
         ...l.slotEnv,
         // Its connection's folder as the CLI's home (HI-1755): its login, settings and memory, its transcripts shared.
-        ...(conn ? { [conn.homeEnv]: conn.folder } : {}),
+        ...(conn?.homeEnv && conn.folder ? { [conn.homeEnv]: conn.folder } : {}),
         // Not for the Assistant: it reaches the API through its Combwork tools, with its own token.
         ...(workspace.isAssistantHome(projectPath) || !policy.tools ? {} : this.apiEnv(projectPath, agent.id))
       }))), this.binDir), tempDir), this.signer && policy.tools && advanced.get<boolean>(SIGN_FAIL_FAST) ? { ...this.signer, timeoutMs: advanced.number(SIGN_TIMEOUT) * 1000 } : null)
+    }
+    // A server connection's values from its CLI's templates (HI-3197), from the model this launch runs as resolved (the one its
+    // command line names): over everything else in its environment and its description's own. On its CLI's own setup (no
+    // server), none of the variables they name, from Combwork's environment or its description alike.
+    const serverCaps = adapter.descriptor.capabilities.connections?.server
+    if (serverCaps?.launch) {
+      const served = serverLaunch(serverCaps, conn?.server?.on ?? null, ctx.model ?? null)
+      const named = new Set(served.names.map((n) => n.toLowerCase()))
+      const env = Object.fromEntries(Object.entries(ctx.env).filter(([k]) => !named.has(k.toLowerCase())))
+      ctx.env = { ...env, ...served.env }
+      ctx.serverLaunch = { args: served.args, names: served.names }
     }
     // The GitHub hosts a CLI signing in on one launches with (HI-2779): its project's, its workspace's, else the environment's.
     if (adapter.descriptor.capabilities.githubHost) ctx.githubHosts = await githubHostsFor(workspaceOf(projectPath), projectPath, ctx.env)

@@ -1,5 +1,6 @@
 import { msg, type Msg } from '../i18n/msg'
 import type { EffortLevel } from '../types'
+import type { ServerListing, ServerPreset } from '.'
 
 /**
  * What several providers' shared halves use (HI-3201): a leaf module, so a provider's module takes it without importing
@@ -40,4 +41,29 @@ export function gptModelLabel(model: string): string {
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ')
   return `GPT-${m[1]}${rest ? ` ${rest}` : ''}`
+}
+
+/**
+ * Model servers of the user's own (HI-3197) for a CLI whose description takes a server, and combwork-cli once it is a
+ * provider: by the protocol the CLI speaks, each its model listing and the presets Add Connection offers (every field
+ * editable). Claude Code keeps its own (its descriptor's: its remote-model pattern and guides are its own).
+ */
+export const SERVER_PROTOCOLS: Record<'openai' | 'anthropic', { listing: ServerListing; presets: readonly ServerPreset[] }> = {
+  openai: {
+    // OpenAI's model list, under the base URL: GET <base>/models, `data[].id`.
+    listing: { path: 'models', list: 'data', id: 'id' },
+    presets: [
+      { id: 'ollama', name: 'Ollama', baseUrl: 'http://localhost:11434/v1', keyless: true }, // i18n-ignore: a product's name
+      { id: 'lmstudio', name: 'LM Studio', baseUrl: 'http://localhost:1234/v1', keyless: true }, // i18n-ignore: a product's name
+      { id: 'llamacpp', name: 'llama.cpp', baseUrl: 'http://localhost:8080/v1', keyless: true }, // i18n-ignore: a product's name
+      { id: 'vllm', name: 'vLLM', baseUrl: 'http://localhost:8000/v1', keyless: true } // i18n-ignore: a product's name
+    ]
+  },
+  anthropic: {
+    listing: { path: 'v1/models', list: 'data', id: 'id' },
+    presets: [
+      { id: 'ollama', name: 'Ollama', baseUrl: 'http://localhost:11434', keyless: true, listing: { path: '/api/tags', list: 'models', id: 'name', remote: 'remote_host' } }, // i18n-ignore: a product's name
+      { id: 'llamacpp', name: 'llama.cpp', baseUrl: 'http://localhost:8080', keyless: true } // i18n-ignore: a product's name
+    ]
+  }
 }

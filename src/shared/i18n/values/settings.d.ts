@@ -1064,6 +1064,7 @@ interface CombworkMessageValues {
   'settings.connections.server.keyTitle': { name: string | number }
   'settings.connections.server.label': undefined
   'settings.connections.server.limitsHint': undefined
+  'settings.connections.server.limitsHintGeneric': undefined
   'settings.connections.server.local': { name: string | number }
   'settings.connections.server.modelId': undefined
   'settings.connections.server.models': undefined
@@ -1072,6 +1073,7 @@ interface CombworkMessageValues {
   'settings.connections.server.needUrl': undefined
   'settings.connections.server.needsKey': undefined
   'settings.connections.server.notBelow': undefined
+  'settings.connections.server.notPassed': undefined
   'settings.connections.server.output': undefined
   'settings.connections.server.outputDefault': { n: number }
   'settings.connections.server.pickerHint': undefined

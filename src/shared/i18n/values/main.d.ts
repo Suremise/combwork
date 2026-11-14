@@ -16,6 +16,7 @@ interface CombworkMessageValues {
   'main.accounts.nothingToKeep': { name: string | number }
   'main.accounts.removeFailed': { name: string | number; error: string | number }
   'main.accounts.running': { name: string | number }
+  'main.accounts.serverOnly': { cli: string | number }
   'main.accounts.setUpCancelled': { name: string | number }
   'main.accounts.usageMove.bad': undefined
   'main.antivirus.allExcluded': undefined
@@ -348,6 +349,7 @@ interface CombworkMessageValues {
   'main.restart.why.removed': undefined
   'main.restart.why.running': undefined
   'main.restart.why.stopped': undefined
+  'main.server.check.otherApi': { name: string | number }
   'main.server.context.invalid': { max: number }
   'main.server.context.noModel': { model: string | number }
   'main.server.key.chars': undefined

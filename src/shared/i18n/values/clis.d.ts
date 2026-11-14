@@ -19,6 +19,7 @@ interface CombworkMessageValues {
   'clis.note.install': undefined
   'clis.note.modelPlaceholder': undefined
   'clis.note.signIn': undefined
+  'clis.problem.badApi': undefined
   'clis.problem.badEnv': { name: string | number; why: string }
   'clis.problem.badId': undefined
   'clis.problem.badMode': { value: string | number }
@@ -29,7 +30,9 @@ interface CombworkMessageValues {
   'clis.problem.fileBadJson': { error: string | number }
   'clis.problem.fileTooBig': { max: number }
   'clis.problem.idTaken': { id: string | number; by: string | number }
+  'clis.problem.keyInArgs': undefined
   'clis.problem.missing': { field: string | number }
+  'clis.problem.noBaseUrl': undefined
   'clis.problem.noId': { which: string | number }
   'clis.problem.noPrompt': undefined
   'clis.problem.notObject': undefined

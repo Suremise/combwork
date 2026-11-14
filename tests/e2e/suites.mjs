@@ -140,6 +140,7 @@ export const SUITES = [
   { name: 'crashdumps' },
   { name: 'ctxpercent' },
   { name: 'datacli' },
+  { name: 'dataserver' },
   { name: 'decisions' },
   { name: 'decisionwake' },
   { name: 'defaultprovider' },

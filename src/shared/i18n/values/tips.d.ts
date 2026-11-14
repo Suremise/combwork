@@ -621,6 +621,8 @@ interface CombworkMessageValues {
   'tips.workspaceMovedDefender.title': undefined
   'tips.workspaceNotes.text': undefined
   'tips.workspaceNotes.title': undefined
+  'tips.yourOwnCliServer.text': undefined
+  'tips.yourOwnCliServer.title': undefined
   'tips.yourOwnClis.text': undefined
   'tips.yourOwnClis.title': undefined
 }
