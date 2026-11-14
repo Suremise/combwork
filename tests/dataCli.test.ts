@@ -261,6 +261,13 @@ describe('its start, read from its rendered screen a line each (startupOnScreen)
     expect(startupScreen(asked, 'Allow? (y/n) y\nfakecli 1.2.3\n> ', launch)).toBe('ready')
     // Ready but not yet settled, its question drawn below the prompt: asked (#679's order, from the screen).
     expect(startupScreen({ status: 'ready', askedAtStart: false, settled: false }, oldPromptThenQuestion, launch)).toEqual({ asked: 'Allow?' })
+    // Its prompt and question matching at the same place (overlapping patterns): the question, never ready.
+    const cli = ok(desc({ status: { ready: '^>', asks: '^> Allow this folder\\?' } }))
+    const overlapping = new CliAdapter({ ...cliModule(cli), cli }).forLaunch().launch
+    expect(startupScreen(starting, '> Allow this folder?', overlapping)).toEqual({ asked: '> Allow this folder?' })
+    expect(startupScreen(asked, '> Allow this folder?', overlapping)).toBeNull()
+    expect(startupScreen(asked, '> Allow this folder? y\n> ', overlapping)).toBe('ready')
+    expect(startupScreen(starting, 'fakecli 1.2.3', overlapping)).toBeNull()
   })
 })
 

@@ -220,11 +220,12 @@ export function startupWatched(s: StartupState, screen: StartupScreen): boolean 
 export function startupScreen(s: StartupState, text: string, screen: StartupScreen): { asked: string } | 'ready' | null {
   if (!startupWatched(s, screen)) return null
   // A whole screen keeps an old prompt above its question, and an answered question above its new prompt (HI-3246): the
-  // later of the two says where its start is. A streamed tail is emptied when its question is seen, so it has no such past.
+  // later of the two says where its start is, its question on a tie (as the terminal reader's latest). A streamed tail is
+  // emptied when its question is seen, so it has no such past.
   if (screen.startupOnScreen) {
     const q = lastMatchIn(screen.startupQuestion, text)
     const r = lastMatchIn(screen.readyOutput, text)
-    if (q.at > r.at) return s.askedAtStart ? null : { asked: q.text }
+    if (q.at >= 0 && q.at >= r.at) return s.askedAtStart ? null : { asked: q.text }
     return r.at > q.at && (s.status === 'starting' || s.askedAtStart) ? 'ready' : null
   }
   const asked = s.askedAtStart ? null : screen.startupQuestion?.exec(text)
