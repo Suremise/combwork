@@ -188,8 +188,8 @@ describe('matching', () => {
 
 describe('a preview of what a guard already matches (Darren’s decision, 15 Nov)', () => {
   it('counts every line it matches in the files it applies to, listing the first few', () => {
-    const files = [{ path: 'a.txt', text: 'secret\nno\nsecret\r\n' }, { path: 'LICENSE', text: 'secret' }, ...Array.from({ length: 6 }, (_x, i) => ({ path: `f${i}.txt`, text: 'a secret' }))]
-    const p = previewGuard(files, guard({ skip: ['LICENSE'] }))
+    const texts = [{ path: 'a.txt', text: 'secret\nno\nsecret\r\n' }, { path: 'LICENSE', text: 'secret' }, ...Array.from({ length: 6 }, (_x, i) => ({ path: `f${i}.txt`, text: 'a secret' }))]
+    const p = previewGuard(texts, guard({ skip: ['LICENSE'] }))
     expect(p.count).toBe(8)
     expect(p.files).toBe(7)
     expect(p.hits).toHaveLength(PREVIEW_HITS)
