@@ -7,7 +7,7 @@ import { formatDateTime, formatTime, formatWeekdayTime } from '../../../shared/d
 import { msg, tr } from '../../../shared/i18n'
 
 /**
- * What Settings → Accounts & Connections' tidied cards show (HI-2528, Darren's approved mockup v2), worked out apart from
+ * What Settings → Accounts & Connections' tidied cards show (HI-2528, approved mockup v2), worked out apart from
  * the components so it can be tested: an account's current limits, when each resets, its bar's level, its plan's name,
  * and a connection's values as its table's cells.
  */

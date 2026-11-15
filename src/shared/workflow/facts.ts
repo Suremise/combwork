@@ -287,7 +287,7 @@ export function answerFits(req: Pick<FactData['ApprovalRequested'], 'kind' | 'ga
 export const approveNote = (r: Pick<FactData['ApprovalRequested'], 'gate' | 'actions'>): 'decision' | 'reason' | 'comment' => (r.actions?.length === 1 ? 'reason' : r.gate === 'ask' ? 'decision' : 'comment')
 
 /**
- * Whether a decision the user made may answer a request (HI-1932, Darren's decision: the Assistant records it naming
+ * Whether a decision the user made may answer a request (HI-1932: the Assistant records it naming
  * the requests it answers): a question someone asked (an agent, the Assistant, a rule it couldn't keep), answered with a
  * decision. Never one of Combwork's own gates (a review, the OK before merging, the round limit's choice, the merge queue's),
  * the merge queue's merge choice, or an approval: those are approved, declined or chosen in For you.

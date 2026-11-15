@@ -1,4 +1,4 @@
-// The usage history's roll-up (HI-1648, Darren 27 Oct): a session that ended longer ago than Settings → Advanced's days
+// The usage history's roll-up (HI-1648): a session that ended longer ago than Settings → Advanced's days
 // of full detail (14 by default) has its timeline merged into 1-hour steps, its tokens, requests and charges unchanged,
 // and what reads its timeline (a lane's cost, its cards shared out again) gives the same totals; a recent or running
 // session is left alone; and the space it frees goes back to the disk (one whole vacuum on an older file, then
@@ -133,7 +133,7 @@ describe("an ended session's timeline in 1-hour steps (HI-1648)", () => {
     expect(b.cost).toBeCloseTo(a.cost, 9)
 
     // Its cards shared out again from the merged timeline: the same totals. A hold over its whole hours has all of it on
-    // the card (one that began or ended inside an hour would have that hour's share: the blur Darren accepted).
+    // the card (one that began or ended inside an hour would have that hour's share: the blur the user accepted).
     const hour = COARSE_STEP * 1000
     const from = Math.floor(Date.parse(was('old').firstActivity!) / hour) * hour
     const to = Math.ceil(Date.parse(was('old').lastActivity!) / hour) * hour

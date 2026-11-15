@@ -63,7 +63,7 @@ describe.skipIf(!jjExe)(`a jj card started again in its own slot (jj ${TESTED_JJ
       w.h.jj(row.folder, 'commit', '-m', 'card 1, first part')
       writeFileSync(join(row.folder, 'b.txt'), 'half done\n')
       // Another card's preparation in the slot: the edit isn't its own, refused as before (nothing changes); since HI-3115
-      // (Darren's decision B) as that card's wait, with what is there, never a failure.
+      // (decision B) as that card's wait, with what is there, never a failure.
       expect(await w.port.carries!(row.folder, jjLineKey(ws, 2, 1), base, { identity: row.identity!, target: 'main' })).toBe(false)
       const other = await w.pool.prepare(lent.lease.id, { line: jjLineKey(ws, 2, 1), base, install: false, target: 'main' })
       expect(other).toMatchObject({ held: expect.stringMatching(/integrated work/), heldWork: { why: 'extra' } })

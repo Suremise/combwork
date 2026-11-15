@@ -842,7 +842,7 @@ async function closeCommandsOnQuit(reason: CloseReason): Promise<void> {
   const global = config.settings.commands
   if (!quitRunsAny(entries.map((e) => e.ws), global)) return
   // When Combwork quits runs only once every workspace has closed and drained, theirs with a command or not (HR6's round 1).
-  // No timer: each window's saving step shows, and its Don't wait is the user's (Darren's decision, 28 Oct ~14:15).
+  // No timer: each window's saving step shows, and its Don't wait is the user's.
   const drain = quitCommandPlanned(global, reason)
   const outcomes = await Promise.all(entries.map((e) => closeWithCommand(e.ws, reason, e.win, { drain }).catch((err): RunOutcome => (log.warn("closing a window's workspace as Combwork quits", err), 'notDrained'))))
   const last = lastFocused() ?? entries[0]

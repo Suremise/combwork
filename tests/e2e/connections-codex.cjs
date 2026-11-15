@@ -106,7 +106,7 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
     await page.screenshot({ path: path.join(lib.WORK, 'connections-codex-setup-signed-in-by-account.png') })
     await page.keyboard.press('Escape')
 
-    // --- Set up for this workspace. Combwork's per-launch trust (HI-1871, Darren: on by default) gives each launch its own
+    // --- Set up for this workspace. Combwork's per-launch trust (HI-1871: on by default) gives each launch its own
     // folder trusted, so nothing is pending; with it off (Advanced), Codex's trust of the project's repository root is
     // read from the connection's config.toml (Combwork writes none) and Set Up opens there (HI-1870).
     const root = fs.realpathSync.native(alpha)

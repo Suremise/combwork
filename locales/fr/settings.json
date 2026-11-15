@@ -1108,7 +1108,7 @@
   "settings.general.timeFormat.option.24h": "24 heures (14:05)",
   "settings.general.timeFormat.tip": "S’applique partout où Combwork affiche une heure, comme une session démarrée aujourd’hui ou l’heure à laquelle une capture d’écran a été collée.",
   "settings.general.timeFormat.title": "Format de l’heure",
-  "settings.general.userName.desc": "Comment Combwork te nomme auprès de l’Assistant quand il lui dit que tu as répondu à un agent (« Darren replied to B1 on #399 »).",
+  "settings.general.userName.desc": "Comment Combwork te nomme auprès de l’Assistant quand il lui dit que tu as répondu à un agent (« Sam replied to B1 on #399 »).",
   "settings.general.userName.placeholder": "User",
   "settings.general.userName.tip": "Ce nom va dans la conversation de l’Assistant, donc utilise la forme que tu veux qu’il voie. Vide, c’est « User ».",
   "settings.general.userName.title": "Ton nom",

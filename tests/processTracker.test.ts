@@ -1,4 +1,4 @@
-// When Combwork's process tracker fails (#507, Darren's decision B): agents start all the same, untracked, and Combwork says so
+// When Combwork's process tracker fails (#507, decision B): agents start all the same, untracked, and Combwork says so
 // once, with Diagnostics saying why. A helper that starts but never says it is ready is given up on in bounded time;
 // one that dies after starting loses its jobs: said at once, kept for Diagnostics, nothing ended, and what was listed as
 // left running stays listed by pid and start time (#614), for the next helper to end exactly that. The real helper

@@ -32,7 +32,7 @@ import { providerModule } from '../shared/providers'
 /**
  * Restarts announced and resumed (HI-1707, shared/restartResume.ts). As Combwork closes for an update, an install or a
  * restart, the agents that were working, watching or in a running lane are recorded and told; at the next start they
- * resume in their conversations one at a time, each after the last is ready (Darren's decision), with a note of where
+ * resume in their conversations one at a time, each after the last is ready, with a note of where
  * they were. An ordinary quit records them too, and the next start offers to resume them. The record (restart.json in
  * the profile) keeps each agent's state until it is final, so nothing is lost to an interrupted start; this module is
  * the one owner of these resumes (lastRun.ts leaves it the agents it lists).

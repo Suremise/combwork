@@ -200,7 +200,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     await foldersCombwork.press('Enter')
     check('…edited as shown, each folder kept apart', !!(await lib.until(() => JSON.stringify(readFile().values['cw.cards.attachmentFolders']) === JSON.stringify(['C:\\Evidence, runs', 'D:\\Runs', '%LOCALAPPDATA%\\combwork-cli']), HUNG_MS)), JSON.stringify(readFile().values['cw.cards.attachmentFolders']))
     check('…a space typed after a semicolon is trimmed, not kept or added', !!(await lib.until(async () => (await foldersCombwork.inputValue()) === 'C:\\Evidence, runs;D:\\Runs;%LOCALAPPDATA%\\combwork-cli', HUNG_MS)), await foldersCombwork.inputValue())
-    // The value edited as Darren did (HI-2538): typed "a; b" saves exactly a and b, shown back "a;b", never a comma.
+    // The value edited as the user did (HI-2538): typed "a; b" saves exactly a and b, shown back "a;b", never a comma.
     await foldersCombwork.fill('%LOCALAPPDATA%\\combwork-cli; %LOCALAPPDATA%\\combwork-test\\scratch')
     await foldersCombwork.press('Enter')
     check('…"a; b" saves exactly the folders typed, shown "a;b"', !!(await lib.until(async () => JSON.stringify(readFile().values['cw.cards.attachmentFolders']) === JSON.stringify(['%LOCALAPPDATA%\\combwork-cli', '%LOCALAPPDATA%\\combwork-test\\scratch']) && (await foldersCombwork.inputValue()) === '%LOCALAPPDATA%\\combwork-cli;%LOCALAPPDATA%\\combwork-test\\scratch', HUNG_MS)), `${await foldersCombwork.inputValue()} ${JSON.stringify(readFile().values['cw.cards.attachmentFolders'])}`)

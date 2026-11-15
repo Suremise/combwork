@@ -203,7 +203,7 @@ describe('Codex: when a person must act', () => {
     }
   })
 
-  it("trusts each launch's own folder when Combwork's per-launch trust is on (HI-1871, Darren: on by default): its -c, and nothing pending", async () => {
+  it("trusts each launch's own folder when Combwork's per-launch trust is on (HI-1871: on by default): its -c, and nothing pending", async () => {
     const { rmSync } = await import('fs')
     const { codex } = await import('../src/main/providers/codex/adapter')
     const { advanced } = await import('../src/main/advanced')

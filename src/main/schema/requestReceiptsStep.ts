@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite'
 
 /**
- * HI-3195 (Darren's decision of 14 Nov, "ok (b)"; boardStore.ts BOARD_MIGRATIONS version 30): a durable "applied" marker
+ * HI-3195 (decision (b); boardStore.ts BOARD_MIGRATIONS version 30): a durable "applied" marker
  * for each keyed Agent API write, saved in the write's own transaction (requestReceipts.ts). `run` and `key` are the
  * launch and the request key cw-mcp sent; `fingerprint` binds the key to its exact request (method, route, card, body);
  * `produced` is what the write made that a retry needs back (a created card's key), as JSON. Kept 24 hours.

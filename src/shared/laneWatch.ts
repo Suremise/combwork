@@ -62,7 +62,7 @@ const T = {
  * unreviewed), and was woken on every column move, most of which needed nothing. A lane watch follows each lane's cards
  * as the lane goes on (cards added included, no card limit), and counts only what a coordinator acts on.
  *
- * #726: the release card #720 was in no lane, so HB6 waited about 45 minutes for Darren's push before the Assistant
+ * #726: the release card #720 was in no lane, so HB6 waited about 45 minutes for the user's push before the Assistant
  * noticed. The same watch takes cards beside its lanes (`cards`, told as a card watch tells them, and when one becomes
  * blocked), and wakes when an agent of the projects it follows starts waiting for the user (`waiting`).
  */

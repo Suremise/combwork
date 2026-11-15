@@ -31,7 +31,7 @@ const { setLanguage } = await import('../src/shared/i18n')
 // agy 1.5.0's status lines (HI-2545's run), with a quota (gemini-weekly, 3p-weekly) in most and its plan's name in some.
 const FIX = join(__dirname, 'fixtures')
 const agyLines: Record<string, any>[] = readFileSync(join(FIX, 'advanced', 'statusline-run-antigravity-1.5.0.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
-// A Copilot 1.0.93 model call's quota snapshots, from the user's own session (Darren's OK, 7 Nov), every other field stripped.
+// A Copilot 1.0.93 model call's quota snapshots, from the user's own session (with their OK), every other field stripped.
 const copilotLine = readFileSync(join(FIX, 'copilot', 'quota-snapshots-1.0.93.jsonl'), 'utf8')
 const copilotSnapshots = JSON.parse(copilotLine).data.quotaSnapshots
 const WEEK = 7 * 24 * 60

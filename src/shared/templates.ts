@@ -219,7 +219,7 @@ export function readTemplate(raw: unknown): AgentTemplate | Text {
   const version = raw.version
   if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) return M.noVersion
   if (version > TEMPLATE_VERSION) return M.newer
-  // 0.9's pinned agents to worktrees (#1436, Darren's 19 Oct decision on #1123: wiped, never read): made again instead.
+  // 0.9's pinned agents to worktrees (#1436, decided on #1123: wiped, never read): made again instead.
   if (version < TEMPLATE_VERSION) return M.from09
   if (!text(raw.name, TEMPLATE_NAME_MAX)) return withValues(M.badName, { max: TEMPLATE_NAME_MAX })
   if (!Array.isArray(raw.agents) || !raw.agents.length) return M.noAgents
@@ -378,7 +378,7 @@ export function templateAgentNames(agents: readonly Pick<TemplateAgent, 'name' |
  * A project's agent names as a template keeps them (#1440, Save Template's "Use the project key in names"): names
  * `<KEY>-<letters><number>` (HI-B1, HI-B2…) as `{key}-B{n}` when those of the letters are numbered 1, 2, 3… in the
  * agents' order, so loading makes them again; else each keeps its number (`{key}-B2`), as a `{n}` among fixed numbers
- * could make one of them twice. Any other name (Darren's HB1, "Docs") as it is.
+ * could make one of them twice. Any other name (HB1, "Docs") as it is.
  */
 export function namePatterns(agents: readonly Pick<TemplateAgent, 'name' | 'role'>[], key: string): string[] {
   const shape = new RegExp(`^${key.replace(/[^A-Za-z]/g, '')}-([A-Za-z]+)(\\d+)$`, 'i')

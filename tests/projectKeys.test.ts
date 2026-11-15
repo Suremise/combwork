@@ -476,7 +476,7 @@ describe('wakes, the inbox and replies name cards by key (round 1, finding 3)', 
     for (const w of [w1, w2]) await close(w)
   })
 
-  it("every card argument of the Combwork tools takes a key as well as a number (Darren, 20 Oct: tools take a key string)", () => {
+  it("every card argument of the Combwork tools takes a key as well as a number (tools take a key string)", () => {
     const src = readFileSync(join(__dirname, '..', 'src', 'main', 'mcp', 'cw-mcp.ts'), 'utf8')
     // No card argument is a number alone: a card is cardArg or cardsArg, or a number-or-string `before`.
     for (const m of src.matchAll(/(\w+): \{ type: 'number'[^}]*\}/g)) expect({ arg: m[1], card: /card|before/i.test(m[1]) }).toEqual({ arg: m[1], card: false })

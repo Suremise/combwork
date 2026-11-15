@@ -431,7 +431,7 @@ const onDb = (fn) => {
     await askForgot.getByRole('button', { name: 'Remove', exact: true }).click()
     check('…removed: the slot and its folder gone, its commit still in jj’s store', !!(await until(async () => !(await inv('slots:list', shop)).some((s) => s.name === slot4) && !fs.existsSync(w4.folder), HUNG_MS)) && id(shop, forgotCommit) === forgotCommit, JSON.stringify(await inv('slots:list', shop)))
 
-    // HI-3096 (Darren's decision (a), 12 Nov): with the repository's snapshot.auto-track narrowed, a new file jj doesn't
+    // HI-3096 (decision (a)): with the repository's snapshot.auto-track narrowed, a new file jj doesn't
     // track is the slot's work. B1's submission is refused naming the setting; put back, the slot shows it has changes
     // and the pool's removal (Changes → Unused worktrees' Remove for a colocated slot) refuses it, the file kept.
     jj(shop, 'config', 'set', '--repo', 'snapshot.auto-track', 'none()')
@@ -582,7 +582,7 @@ const onDb = (fn) => {
     check('…card 2 not started: still To Do, no Started since, not placed in the project folder', (await card(n2))?.column === 'todo' && !(work7?.folder && work7.folder.toLowerCase() === shop.toLowerCase()), JSON.stringify({ column: (await card(n2))?.column, work7, last: facts7.slice(-3) }))
     check('…its kept work still in the slot, still kept for it', JSON.stringify(fs.readdirSync(kept7.folder).filter((f) => f !== '.jj' && f !== '.git').sort()) === JSON.stringify(keptFiles7) && (await inv('slots:list', shop)).some((s) => s.name === kept7.name && s.keptFor === n2), JSON.stringify(await inv('slots:list', shop)))
 
-    // HI-3129 (Darren's decision (a), 13 Nov): the project's target changed to a new bookmark `next` while card 2's work
+    // HI-3129 (decision (a)): the project's target changed to a new bookmark `next` while card 2's work
     // is kept in its slot on main. Its dialog's Merges into lists the repository's bookmarks (`release-x`, in no Other
     // branches), and its start carries on in the kept slot on main, never refused for the target.
     onDb((db) => db.prepare('UPDATE slots SET writer_run = NULL, writer_lease = NULL, writer_agent = NULL, writer_pid = NULL, writer_started = NULL WHERE name = ?').run(kept7.name))

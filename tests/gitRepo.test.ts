@@ -398,7 +398,7 @@ describe('pull and push', () => {
 })
 
 describe('Push to…, remotes and tracking (#1385)', () => {
-  /** A second bare remote, `backup`, as Darren's NAS. */
+  /** A second bare remote, `backup`, as the maintainer's NAS. */
   const addBackup = (): string => {
     const backup = join(outer, 'backup.git')
     execFileSync('git', ['init', '-q', '--bare', '-b', 'main', backup])

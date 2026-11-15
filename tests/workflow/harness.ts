@@ -28,7 +28,7 @@ const ID = ['-c', 'user.name=Combwork Test', '-c', 'user.email=test@example.inva
 const runContext = createRequire(import.meta.url)('../e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 
 /**
- * HI-2025 (Darren's decision): the bound of a merge-queue test whose work is 65 to 110 git processes (Combwork's own git per
+ * HI-2025: the bound of a merge-queue test whose work is 65 to 110 git processes (Combwork's own git per
  * queue step, about 95% of its time; nothing in it waits for time). Alone they take 2 to 11 s. 15 such tests passed 20 s
  * (the run's limit, vitest.config.ts) in HI-2025's runs of the workflow files under load: 5 in the baseline run, 13 in
  * the run beside three other lanes' full unit runs (CPU at 80%), after git was made cheaper, and 1 in the first final

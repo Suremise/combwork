@@ -115,7 +115,7 @@ describe('messages left for agents (#530, #647)', async () => {
     expect(st.typed).toHaveLength(1)
     // #726: its turn over while its own background tasks run (a timer), a new message rings at once.
     st.status = 'background'
-    expect(await leave('Darren pushed the tag.')).toEqual({ id: 'm3', fate: 'typed', queued: 0 })
+    expect(await leave('Sam pushed the tag.')).toEqual({ id: 'm3', fate: 'typed', queued: 0 })
     expect(st.typed).toHaveLength(2)
   })
 

@@ -19,7 +19,7 @@ const M = {
   withFree: msg({ id: 'project.cost.withFree', defaultMessage: '{cost} + free (local)', description: 'A total cost ("$1.20") that also covers sessions run only on a model server on this PC (Ollama, for example), which cost nothing (HI-1772).' })
 }
 
-/** A cost of sessions run only on servers on this PC (HI-1772, Darren 27 Oct): free, its tokens counted. */
+/** A cost of sessions run only on servers on this PC (HI-1772): free, its tokens counted. */
 export const FREE_LOCAL = msg({ id: 'project.cost.freeLocal', defaultMessage: 'free (local)', description: 'The cost of sessions run only on a model server on this PC (Ollama, for example): nothing (HI-1772). Lower case, short: it stands where a cost such as "$1.20" would.' })
 
 /** How many calendar days the week and month periods take, today included. */

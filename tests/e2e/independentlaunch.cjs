@@ -1,4 +1,4 @@
-// An Independent agent launches as from a terminal (HI-2731, Darren's 7 Nov 22:15 decision: "Independent behaves as if
+// An Independent agent launches as from a terminal (HI-2731: "Independent behaves as if
 // connection level switches are off"), on the fake Claude Code and the fake Codex: one agent of each Either → Independent
 // → Either, a new session each time, beside a fresh agent only ever Independent. Either gets Combwork's server, its
 // skills and its variables (and, on Codex, its developer_instructions); made Independent its next launch gets none of

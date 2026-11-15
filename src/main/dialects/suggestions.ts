@@ -1,6 +1,6 @@
 /**
  * The model IDs the Dialects view suggests for a CLI's model file (HI-2523): only a convenience, never a list the typed
- * ID must match, and nothing curated (Darren's decision on HI-2523). Each once, in this order: the real model IDs the
+ * ID must match, and nothing curated (HI-2523). Each once, in this order: the real model IDs the
  * running sessions **of this workspace** launched with (what their dialect matched by; another window's workspace is
  * its own, HR2 on HI-2523 r1), then the CLI's connections' models (a connection's chosen model, a server connection's
  * listed or typed ones), which are the same in every workspace.

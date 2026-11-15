@@ -1326,7 +1326,7 @@ const ENDED = {
 }
 
 /**
- * Today's ended lanes (HI-2898, Darren's decision: the local calendar day): the lanes that ended since local midnight,
+ * Today's ended lanes (HI-2898: the local calendar day): the lanes that ended since local midnight,
  * read again as the lanes change, at midnight (and on a change of the date, clock or time zone, seen on focus and each
  * minute). Only while the Lanes tab shows (`on`).
  */

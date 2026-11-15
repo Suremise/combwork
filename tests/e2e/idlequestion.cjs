@@ -137,7 +137,7 @@ const check = (name, ok, extra = '') => {
     // ---- A line Combwork typed that its CLI didn't take, then taken off its input (as the question took HB4's wake).
     await app.evaluate((_, v) => void (process.env.CW_TEST_WAKE_TAKE_MS = v), '1500')
     fs.writeFileSync(path.join(claudeHome, 'fake-drop-enters-Builder.txt'), '2')
-    const second = await api('POST', '/v1/projects/alpha/agents/Builder/message', { text: 'Darren pushed the tag: carry on with the release.' })
+    const second = await api('POST', '/v1/projects/alpha/agents/Builder/message', { text: 'Sam pushed the tag: carry on with the release.' })
     const marked = await until(async () => (await live(agent.id))?.untakenLine)
     check('both Enters dropped: the line is held as not taken', second.status === 200 && !!marked, JSON.stringify(marked))
     const before = doorbells().length

@@ -103,7 +103,7 @@ export interface JjPortDeps {
   control: (repo: string) => { folder: string; journal: WorkspaceJournal }
   /**
    * The project folder held against agent launches while its control is made (HI-2887: the app's launch hold), which
-   * snapshots the project folder's working copy once (Darren's r9 on HI-2887: automatically, with no Combwork agent in
+   * snapshots the project folder's working copy once (r9 on HI-2887: automatically, with no Combwork agent in
    * the project folder). Refused (who is there) when an agent works in it or is starting there.
    */
   projectHold: (repo: string) => { release: () => void } | { busy: string }
@@ -133,7 +133,7 @@ export interface JjPortDeps {
    */
   contains?: (store: string, target: string, change: { base: string; revision: string }, at: string) => Promise<Maybe<unknown | null>>
   /**
-   * HI-2924 (Darren's decision): whether the user's own Done stands for a binding's card cycle whose containment isn't
+   * HI-2924: whether the user's own Done stands for a binding's card cycle whose containment isn't
    * proved (`doneUnproved`: a hand-resolved integration). True: the slot is reused or detached as if contained; its chain
    * must still be exactly the card's submitted work. Absent: never.
    */
@@ -1159,7 +1159,7 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
         const onPrevBase = !!j.prev && wc.empty && wc.parents.length === 1 && wc.parents[0] === j.prev.base
         // The slot's own work (HI-2995): a detach refused for it is `kept` (the card's, not a refusal to retry).
         const keptStep = (r: WorkspaceStep): WorkspaceStep => (kind === 'detach' && !!j.prev?.card ? { ...r, kept: true } : r)
-        // Also (HI-2980, Darren's decision A, with HR1's full-ancestry proof) a slot whose card's commits were rewritten
+        // Also (HI-2980, decision A, with HR1's full-ancestry proof) a slot whose card's commits were rewritten
         // as they were integrated (described, rebased onto a moved target, squashed): nothing in it that isn't in the
         // previous binding's target already. Its working copy empty, a previous binding with a target, that target one
         // known commit T at H, and everything below the working copy (its parents and all their ancestry, not only the
@@ -1601,7 +1601,7 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       const leftOut = snapshotRefused(snap.err)?.files ?? []
       const files = lines(out).map((l) => l.replace(/^[A-Z] /, ''))
       // Files jj doesn't track (HI-3096: `snapshot.auto-track` narrowed), listed by the snapshot's own `status`: on disk,
-      // in no commit, the slot's uncommitted work all the same (Darren's decision, 12 Nov).
+      // in no commit, the slot's uncommitted work all the same.
       const untracked = untrackedPaths(snap.out)
       const all = [...files, ...leftOut.filter((f) => !files.includes(f))]
       return { files: [...all, ...untracked.filter((f) => !all.includes(f))], leftOut }

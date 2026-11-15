@@ -586,7 +586,7 @@ describe('the delivery service (#647)', async () => {
     }
   })
 
-  it("no inbox (#650, Darren's decision: the Agent API or the agent's combwork server off): every delivery of every kind is refused with the reason its sender sees, and never typed instead; one already waiting is refused when next looked at; only the user's own task (Start) is typed as their input, with no delivery or receipt; a historical typed receipt still reads back", async () => {
+  it("no inbox (#650: the Agent API or the agent's combwork server off): every delivery of every kind is refused with the reason its sender sees, and never typed instead; one already waiting is refused when next looked at; only the user's own task (Start) is typed as their input, with no delivery or receipt; a historical typed receipt still reads back", async () => {
     const off = (_h: string, agentId: string): boolean => agentId === 'assistant'
     const REASON = 'B1 has no inbox: turn on the Agent API'
     const launched: string[] = []

@@ -1,4 +1,4 @@
-// #1103, the case seen on Darren's PC in the 0.9.2 release: Claude Code installed by its native installer in
+// #1103, the case seen on the maintainer's PC in the 0.9.2 release: Claude Code installed by its native installer in
 // ~\.local\bin, a folder on no PATH (Combwork's, the registry's). Provider Setup found it where it installs it, but a shell Combwork
 // started couldn't run `claude`. Once Combwork's refresh finds it, its folder is on the PATH of what Combwork starts (its child
 // environment), so a shell finds the same CLI by name; Combwork's own PATH, which it finds the CLIs on, is unchanged. The registry is a stand-in (CW_TEST_REGISTRY_PATH: none), the

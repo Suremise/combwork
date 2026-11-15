@@ -67,7 +67,7 @@ export function offeredConnections(view: ConnectionsView | null, settings: Param
 }
 
 /**
- * What to offer where nothing can start here for want of a connection (HI-2650, Darren 6 Nov: nothing is turned on by
+ * What to offer where nothing can start here for want of a connection (HI-2650: nothing is turned on by
  * itself): the accounts that are off in this workspace, never turned on until the user clicks.
  * - Eligible: Combwork's accounts (not a CLI's own home) whose CLI the view lists (on in Settings, with connections), not
  *   a test copy's CLI on its test home, and not on here. `cli`: that CLI's only (a project's agents' CLI).

@@ -1,5 +1,5 @@
 /**
- * Progress → Lanes' Ended today (HI-2898, Darren's decision: the local calendar day): from local midnight to the next,
+ * Progress → Lanes' Ended today (HI-2898: the local calendar day): from local midnight to the next,
  * as calendar dates, never UTC truncation or 24 hours, so a day that changes summer time has 23 or 25 hours.
  */
 export function dayBounds(now: Date): { start: Date; end: Date } {

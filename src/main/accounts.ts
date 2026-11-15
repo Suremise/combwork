@@ -294,7 +294,7 @@ async function makeFolder(a: Account): Promise<void> {
     await assertRealFolder(dir)
     for (const name of shared) {
       const target = sharedTarget(a.provider, name)
-      // Missing (the CLI never ran here): the empty folder, its home's only change Combwork ever makes (Darren, 26 Oct). Not
+      // Missing (the CLI never ran here): the empty folder, its home's only change Combwork ever makes. Not
       // its home: refused, rather than made.
       await mkdir(target).catch((e: NodeJS.ErrnoException) => {
         if (e.code === 'EEXIST') return
@@ -364,7 +364,7 @@ async function deleteTree(dir: string): Promise<void> {
 }
 
 /**
- * Removes an account's folder for good (Darren, 26 Oct: its login with it, not to the Recycle Bin): its junctions
+ * Removes an account's folder for good (its login with it, not to the Recycle Bin): its junctions
  * first (each the link alone, checked gone; one already gone is a removal tried again), then, only with no link left in
  * it, the folder. Anything unexpected (a real folder where a junction should be, a link elsewhere, the folder itself a
  * link) stops it before anything is deleted. Throws Unsafe or the file system's error; what is left stays.
@@ -1285,7 +1285,7 @@ export function chooseSetUpTarget(inherits: boolean, ws: string | null | undefin
 const onHere = (a: Account): boolean => !!workspace.path && !!workspaceAccounts(workspace.config, a.provider, list())?.on.includes(a.id)
 
 /**
- * The folders of this window's workspace a connection would be used in (HI-1871, Darren 27 Oct ~22:30): the projects
+ * The folders of this window's workspace a connection would be used in (HI-1871): the projects
  * with an agent whose connection, resolved as its launch would be (its own if on here, else the first in the order
  * that's on), is this one, and the Assistant's home when the Assistant's is. "Needs set up" counts only these.
  * Resolved as sessions.ts launches (HI-2162): an agent names a connection (HI-2108), whose account is the one counted.
@@ -1823,7 +1823,7 @@ export function accountsView(check = false): ConnectionsView {
   if (check) for (const a of all) void (isServer(a) ? readSetUp(a.id) : checkAccount(a.id))
   // One not read yet (just added): its set-up state read once, a few files, its answer telling the windows (HI-1870).
   else for (const a of all) if (!setUpRead.has(a.id)) void readSetUp(a.id)
-  // Its trust of the folders it would be used in here (HI-1870; HI-1871: only those, Darren), for each connection on
+  // Its trust of the folders it would be used in here (HI-1870; HI-1871: only those), for each connection on
   // here: read as shown, and when that set of projects changed.
   pruneTrust()
   const hereOf = new Map(workspace.path ? all.filter(onHere).map((a) => [a.id, projectsFor(a)] as const) : [])
@@ -2251,7 +2251,7 @@ export function initConnections(): Promise<void> {
   // No agent is given a connection that is gone or being removed (HI-2107).
   setConnectionGuard(connectionAssignable)
   // The most recent workspace default becomes the top of its CLI's preference order, once (HI-1875); what depends on
-  // the order (a launch on a connection) waits for it. A new workspace starts with none on (HI-2650, Darren 6 Nov).
+  // the order (a launch on a connection) waits for it. A new workspace starts with none on (HI-2650).
   const ready = startConnectionOrder()
   onCombworkEvent((e) => {
     if (e.type !== 'workspace-changed') return

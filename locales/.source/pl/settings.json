@@ -1223,7 +1223,7 @@
   "settings.general.timeFormat.option.24h": "24-hour (14:05)",
   "settings.general.timeFormat.tip": "Applies wherever Combwork shows a time, such as a session that started today or the time a screenshot was pasted.",
   "settings.general.timeFormat.title": "Time format",
-  "settings.general.userName.desc": "How Combwork names you to the Assistant when it tells it you replied to an agent (\"Darren replied to B1 on #399\").",
+  "settings.general.userName.desc": "How Combwork names you to the Assistant when it tells it you replied to an agent (\"Sam replied to B1 on #399\").",
   "settings.general.userName.placeholder": "User",
   "settings.general.userName.tip": "It goes into the Assistant's conversation, so use whatever form you like it to see. Empty uses \"User\".",
   "settings.general.userName.title": "Your name",

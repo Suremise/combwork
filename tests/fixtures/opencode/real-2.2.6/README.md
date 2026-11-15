@@ -3,7 +3,7 @@
 What the real OpenCode v2.2.6 did, recorded for the fake opencode (`tests/e2e/fake-opencode`) and its tests. Nothing in the fake is modelled on anything else.
 
 - **Build:** `opencode-windows-x64.zip` from the v2.2.6 release (anomalyco/opencode, dc2ffcf, 6 Nov 2026). The zip's SHA-256 is `f75c16b33b8523fe1ff41e7d97e3ae654a47d59a0e327def24db2d9291bb24be`, as GitHub's digest and the release's `SHA256SUMS` give it. Its `opencode.exe` is `98cb0aa854c7c015cf6febafa7afb872c359bfe5a823a526f3b4fd347a9e9677`.
-- **Conditions:** Darren's HI-2758 option A (8 Nov 2026). Every launch had a new throwaway root under `%LOCALAPPDATA%\combwork-test\tmp`, a minimal environment, updates off, a private `serve` on 127.0.0.1 stopped by tree, and no accounts, keys or cloud calls. Model turns went only to local Ollama `qwen3:8b`, through a logging proxy.
+- **Conditions:** HI-2758's option A. Every launch had a new throwaway root under `%LOCALAPPDATA%\combwork-test\tmp`, a minimal environment, updates off, a private `serve` on 127.0.0.1 stopped by tree, and no accounts, keys or cloud calls. Model turns went only to local Ollama `qwen3:8b`, through a logging proxy.
 - **Sources:**
   - HI-2758's probe (HB1): `cli/version.txt`, `help.txt`, `models-with-ollama-and-builtins.txt`, `auth-list-saved-and-env.json`, `shared-service-port-in-use.txt` and `events/shell-permission-reject.json`;
   - HI-2760's probe (HB1, 9 Nov 2026, offline: no model call, prompts on a denied provider failing at once): `wire/message-paging.json` (`limit`, `order`, `cursor`), `wire/log-synced.txt` (the durable log's watermark) and `events/event-types-filter.txt` (`/api/event?types=`, with each event's durable seq);

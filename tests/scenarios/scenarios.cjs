@@ -1731,7 +1731,7 @@ module.exports.SCENARIOS = [
     async during(c, status) {
       if (status === 'working' && !c.sentAt) {
         c.sentAt = Date.now()
-        c.sent = await c.assistantMessage('coder', `Darren decided on #${c.cards.a}: the greeting is "Welcome back!", not "Hi there!". Carry on with that.`)
+        c.sent = await c.assistantMessage('coder', `Sam decided on #${c.cards.a}: the greeting is "Welcome back!", not "Hi there!". Carry on with that.`)
       }
       if (c.sentAt) c.got = await c.deliveries('coder')
     },
@@ -1824,7 +1824,7 @@ module.exports.SCENARIOS = [
     async during(c, status) {
       if (!c.sentAt && ['ready', 'finished', 'watching'].includes(status) && (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body?.column === 'review') {
         c.sentAt = Date.now()
-        c.sent = await c.assistantMessage('coder', `Darren decided on #${c.cards.a}: the greeting is "Stale!", not "Hi there!". Change it.`, { card: c.cards.a })
+        c.sent = await c.assistantMessage('coder', `Sam decided on #${c.cards.a}: the greeting is "Stale!", not "Hi there!". Change it.`, { card: c.cards.a })
         c.passed = await c.inv('tasks:update', c.cards.a, { column: 'passed' })
       }
       if (c.sentAt) c.got = await c.deliveries('coder')
@@ -3635,9 +3635,9 @@ module.exports.SCENARIOS = [
     role: 'assistant',
     control: 'agents',
     async setup(c) {
-      await c.card('g', { title: 'Friendlier greeting', description: 'Change greeting.txt to the greeting Darren picks.', column: 'doing', agent: 'coder' })
+      await c.card('g', { title: 'Friendlier greeting', description: 'Change greeting.txt to the greeting Sam picks.', column: 'doing', agent: 'coder' })
       // Last week's decision, written by the Assistant (its own tool), then dated six days back; then a fresh session.
-      const reply = await c.assistantTool('cw_journal_write', { kind: 'decision', summary: 'Darren: the greeting is "Welcome back!", not "Hi there!"', why: 'He wants returning users greeted', importance: 2, project: 'alpha', links: [{ type: 'card', ref: String(c.cards.g) }] })
+      const reply = await c.assistantTool('cw_journal_write', { kind: 'decision', summary: 'Sam: the greeting is "Welcome back!", not "Hi there!"', why: 'Sam wants returning users greeted', importance: 2, project: 'alpha', links: [{ type: 'card', ref: String(c.cards.g) }] })
       const id = Number(/Entry #(\d+)/.exec(reply)?.[1])
       if (!id) throw new Error(`setup: the journal entry wasn't written: ${reply}`)
       const { DatabaseSync } = require('node:sqlite')
@@ -3940,7 +3940,7 @@ module.exports.SCENARIOS = [
       await pairRules(c)
       await c.card('s', { title: 'Greeting punctuation', description: 'greet.js returns "Hello, <name>" with a comma.', agent: 'coder' })
       c.head = c.git('rev-parse', 'HEAD').trim()
-      // Files → Exclude from Git, shared, left uncommitted (Darren's case).
+      // Files → Exclude from Git, shared, left uncommitted (the user's case).
       c.dirty = 'node_modules/\n/reference/\n'
       c.write('.gitignore', c.dirty)
     },
@@ -4605,10 +4605,10 @@ module.exports.SCENARIOS = [
     control: 'agents',
     async setup(c) {
       await c.card('r', { title: 'Pick the app icon', description: 'Coder asked the user which icon to use: A (a bee), B (a honeycomb) or C (a hexagon).', agent: 'coder', column: 'doing' })
-      await c.inv('settings:update', { general: { userName: 'Darren' } })
+      await c.inv('settings:update', { general: { userName: 'Sam' } })
     },
-    // What Combwork types into the Assistant's card watch when the user (Settings → General → Your name: Darren) answers Coder in its pane.
-    prompt: (c) => `[CW] Darren replied to Coder on #${c.cards.r}: "C, the hexagon". Your card watch has ended: carry on (cw_read_task for the card, cw_agent_activity for the agent).`,
+    // What Combwork types into the Assistant's card watch when the user (Settings → General → Your name: Sam) answers Coder in its pane.
+    prompt: (c) => `[CW] Sam replied to Coder on #${c.cards.r}: "C, the hexagon". Your card watch has ended: carry on (cw_read_task for the card, cw_agent_activity for the agent).`,
     fake: (c) => `skill coordinate-agents then cw cw_update_task {"number":${c.cards.r},"decision":"The app icon is C, the hexagon."}`,
     expect: (o, c) => {
       const decided = ran(o, 'cw_update_task').some((x) => cardIs(o, argsOf(x).number, c.cards.r) && /hexagon|\bC\b/i.test(String(argsOf(x).decision ?? '')))
@@ -4773,7 +4773,7 @@ module.exports.SCENARIOS = [
   {
     id: 'assistant-new-lane',
     // HI-2222: coordinate-agents' A new lane is cw_lane start, never a prompt to a builder Combwork gives the lane. Combwork gives
-    // an idle running builder outside slots the lane in a new conversation (#437; HI-2232, Darren's decision (a)), its last
+    // an idle running builder outside slots the lane in a new conversation (#437; HI-2232, decision (a)), its last
     // kept in the Sessions history: checked again (HI-2222 had recorded them while that was undecided).
     title: "The Assistant starting an idle agent's next lane (#437, HI-2222, HI-2232): cw_lane start (Coder, the card, rounds and wait), Coder left to Combwork, no prompt (#1169: run-lanes or coordinate-agents read); Coder in a new conversation, its last kept",
     role: 'assistant',
@@ -5541,7 +5541,7 @@ const DEPLOY_FACTS = /staging\.example\.com|deploy:staging|ALPHA_ENV=staging/
 /** And only its card's description says this: in a listing's reply, the card was in it, in full. */
 const DEPLOY_CARD_FACT = 'docs/DEPLOY.md, its Staging section'
 /**
- * HI-2239's read policy (Darren's decision, 31 Oct: simplify). A file was read when Claude Code's `Read` worked on its
+ * HI-2239's read policy (decided: simplify). A file was read when Claude Code's `Read` worked on its
  * exact absolute path and gave back its facts; Combwork's own reads are the Combwork calls' (cw_read_section, cw_list_tasks,
  * each paired with its own reply: callsWithReplies). A shell command (or a Codex script) that may have read it is
  * unobservable: never credited, and never blamed (shellLookups: the check is left out, and the run records it).
@@ -6108,7 +6108,7 @@ module.exports.SCENARIOS.push(
     fake: (c) => `skill coordinate-agents then cw cw_read_task {"number":${c.cards.p}} then cw cw_read_section {"project":"alpha","path":"docs/DEPLOY.md","heading":"Staging"}`,
     expect: (o, c) => {
       const p = c.cards.p
-      // Darren's decision (HI-2239, 31 Oct): only Combwork's recorded reads (cw_read_task of the card; cw_read_section of
+      // Decided (HI-2239): only Combwork's recorded reads (cw_read_task of the card; cw_read_section of
       // alpha's docs/DEPLOY.md and alpha's detailed cw_list_tasks, each paired with its own reply) and a Read of the
       // doc's exact absolute path count. A shell command or Codex script that may have read the doc is unobservable: with
       // no lookup credited, it leaves the check out (never blamed) and is recorded (observe).
@@ -6157,7 +6157,7 @@ module.exports.SCENARIOS.push(
 )
 
 // A natural break (#1082, #1080 gaps 1 and 3): every lane has ended, or a solo agent's card is done with nothing else
-// running. Since HI-2226 (Darren, 31 Oct) Combwork's own nudge (#1437) owns suggesting that the project's agents start fresh,
+// running. Since HI-2226 Combwork's own nudge (#1437) owns suggesting that the project's agents start fresh,
 // so the Assistant isn't checked for suggesting it; it never suggests it while work, a question or a watch remains, saves
 // what is open to its journal first, and restarts nothing itself.
 /** A reply that suggests starting fresh conversations or sessions. */
@@ -6297,7 +6297,7 @@ module.exports.SCENARIOS.push(
       await endLanes(c, ['Coder', 'Builder2'])
     },
     prompt: "Both lanes in alpha are done, thanks. Next I'm thinking about a dark mode for alpha, but I haven't decided whether it follows Windows or gets its own switch, so no card for it yet. That's all from me for this block.",
-    fake: 'skill journal then cw cw_journal_write {"kind":"plan","summary":"Darren: dark mode for alpha next; open: follows Windows or its own switch","project":"alpha","importance":1}',
+    fake: 'skill journal then cw cw_journal_write {"kind":"plan","summary":"Sam: dark mode for alpha next; open: follows Windows or its own switch","project":"alpha","importance":1}',
     expect: (o) => {
       const writes = ran(o, 'cw_journal_write')
       const saved = writes.some((x) => /dark/i.test(String(x.args)))
@@ -6355,7 +6355,7 @@ for (const [id, name] of MODES) {
 }
 
 // The QA triager's procedure (#408, triage-report): a report becomes a card with its cause and evidence, or new evidence
-// on the card that already covers it (Passed included: Darren's decision after #730 duplicated #717's unmerged fix).
+// on the card that already covers it (Passed included: decided after #730 duplicated #717's unmerged fix).
 const BANNER_JS = "// The banner shown after Save.\nconst plural = (n) => (n > 1 ? 's' : '')\nmodule.exports = (n) => `Saved ${n} card${plural(n)}`\n"
 const BANNER_REPORT = 'I saved an empty board and the banner said "Saved 0 card". Screenshot: a green banner at the top of the board, reading exactly "Saved 0 card". Can you look into it?'
 module.exports.SCENARIOS.push(

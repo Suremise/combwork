@@ -76,7 +76,7 @@ describe('a card segment', () => {
   })
 
   it('says why a blocked card is blocked, and a card not on the board', () => {
-    expect(cardSegment(7, card(7, 'doing', [], { blocked: 'waiting for Darren' }))).toMatchObject({ label: '#7 Card 7 · Active, round 1', notes: ['#7: blocked: waiting for Darren'] })
+    expect(cardSegment(7, card(7, 'doing', [], { blocked: 'waiting for Sam' }))).toMatchObject({ label: '#7 Card 7 · Active, round 1', notes: ['#7: blocked: waiting for Sam'] })
     expect(cardSegment(7, card(7, 'hold'))).toMatchObject({ label: '#7 Card 7 · On Hold, waiting for you', notes: ['#7: On Hold: waiting for you to move it on'] })
     expect(cardSegment(9, undefined)).toMatchObject({ state: 'todo', label: '#9 · not on the board', notes: [] })
   })
@@ -122,7 +122,7 @@ describe("what a segment's marks mean (#706)", () => {
   })
 
   it("the hatching: a blocked card's reason or why it is On Hold, first line, cut when long", () => {
-    expect(cardSegment(8, card(8, 'review', [], { blocked: 'Asked Darren about the colour\nmore detail' })).notes).toEqual(['#8: blocked: Asked Darren about the colour'])
+    expect(cardSegment(8, card(8, 'review', [], { blocked: 'Asked Sam about the colour\nmore detail' })).notes).toEqual(['#8: blocked: Asked Sam about the colour'])
     expect(cardSegment(8, card(8, 'hold', [], { blocked: 'parked for 0.6' })).notes).toEqual(['#8: On Hold: parked for 0.6'])
     const long = cardSegment(8, card(8, 'todo', [], { blocked: 'x'.repeat(400) })).notes[0]
     expect(long).toBe(`#8: blocked: ${'x'.repeat(SEGMENT_NOTE_MAX - 1)}…`)
@@ -199,7 +199,7 @@ describe("an ended lane's segments (#512)", () => {
     expect(frozenSegment(lc(6, 'passed', { round: 3 }))).toMatchObject({ state: 'passed', round: 3, label: '#6 Card 6 · Approved in round 3, when the lane ended' })
     expect(frozenSegment(lc(7, 'todo'))).toMatchObject({ state: 'todo', round: null, label: '#7 Card 7 · Todo, when the lane ended' })
     // Its hatching says why, as the lane left it (#706).
-    expect(frozenSegment(lc(8, 'review', { blocked: 'Asked Darren' }))).toMatchObject({ state: 'blocked', label: '#8 Card 8 · Review, round 1, when the lane ended', notes: ['#8: blocked: Asked Darren'] })
+    expect(frozenSegment(lc(8, 'review', { blocked: 'Asked Sam' }))).toMatchObject({ state: 'blocked', label: '#8 Card 8 · Review, round 1, when the lane ended', notes: ['#8: blocked: Asked Sam'] })
     expect(frozenSegment(lc(9, 'hold'))).toMatchObject({ state: 'blocked', label: '#9 Card 9 · On Hold, when the lane ended', notes: [] })
     expect(frozenSegment(lc(9, 'hold', { blocked: 'for 0.6' })).notes).toEqual(['#9: On Hold: for 0.6'])
     expect(frozenSegment(lc(10, 'gone'))).toMatchObject({ state: 'todo', round: null, label: '#10 · not on the board when the lane ended' })
@@ -372,7 +372,7 @@ describe("the lanes section's height (#569)", () => {
   })
 
   it('the lanes take priority: the floor shows however short the panel; more than it only as far as they fit, and the choice is kept', () => {
-    // Darren's two lanes: both show, whatever was chosen, and the range is only those two (no drag hides one).
+    // The user's two lanes: both show, whatever was chosen, and the range is only those two (no drag hides one).
     expect(laneRowsNow(1, 2, 300, 61)).toEqual({ chosen: 2, shown: 2, min: 2, max: 2 })
     expect(laneRowsNow(undefined, 2, 30, 61)).toEqual({ chosen: 2, shown: 2, min: 2, max: 2 })
     // Ten chosen of twelve, room for seven (61 px a lane): seven show, seven is the most, ten is still the choice.

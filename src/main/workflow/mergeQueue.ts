@@ -892,7 +892,7 @@ export class MergeQueue {
       return { pause: 'publishRefused', message: reply.refused }
     }
     if ('failed' in reply) {
-      // HI-3091 (Darren's decision): it never reached the remote (offline, a refused sign-in, a moved repository): a
+      // HI-3091: it never reached the remote (offline, a refused sign-in, a moved repository): a
       // failed push, never asked about as one that may have arrived. The remote looked at all the same (one it shows
       // after all is Done); else nothing published, the card queued again, and the queue paused with git's words until
       // Resume, which tests and publishes it again once the remote answers.
@@ -1274,7 +1274,7 @@ export class MergeQueue {
     if (isAgain(cond)) return null
     if (cond === 'retest') return 'again'
     if ('pause' in cond) return this.catchUpPause(target, c, cond.pause, cond.files, undefined, undefined, FOLDER_PAUSES.has(cond.pause) ? folder : undefined)
-    // HI-3092 (Darren's decision): Ask each time asks before the folder moves here too (a card found already on the
+    // HI-3092: Ask each time asks before the folder moves here too (a card found already on the
     // remote is Done with no ask before); a publication asked about already carries its approval.
     if (this.cfg.checkedOutTarget?.() === 'ask') {
       const ok = await this.catchUpAsked(target, c, folder)

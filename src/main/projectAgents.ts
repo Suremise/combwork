@@ -177,7 +177,7 @@ export function agentMax(projectPath: string, cfg?: Pick<ProjectConfig, 'workflo
 
 /**
  * Who adds an agent (HI-2001): the user by hand (the window), or an agent, the Assistant or a program through the Agent
- * API. Both keep to the project's Maximum agents (HI-2058, Darren's decision); each is told it in its own words.
+ * API. Both keep to the project's Maximum agents (HI-2058); each is told it in its own words.
  */
 export type AddedBy = 'user' | 'agent'
 

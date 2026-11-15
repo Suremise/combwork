@@ -95,7 +95,7 @@ describe('classifying a failed check (§16.9.1 step 8)', () => {
   })
 })
 
-// #1362 (Darren's decision on #1121): exit 75 is the project saying "temporary", and Node's and npm's network error codes
+// #1362 (decided on #1121): exit 75 is the project saying "temporary", and Node's and npm's network error codes
 // in a failed check's last 40 lines say the network failed, not the work. The codes are an Advanced setting.
 describe('which failed checks are temporary (#1362)', () => {
   const codes = new RegExp(advancedDef(QUEUE_NETWORK_CODES)!.default as string)

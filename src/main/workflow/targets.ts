@@ -3,7 +3,7 @@
 // as it is made, never at the start: the start takes what the card or its lane recorded (`card.target`, the lane's
 // targeted ruleset, compile.ts `targetedOf`), so a change of the list moves nothing already chosen.
 //
-// A card's target can change only while its branch has no work (Darren, 7 Nov: no rebase of started work): never
+// A card's target can change only while its branch has no work (no rebase of started work): never
 // started, or every line it had holds nothing that isn't in its target already.
 
 import { existsSync } from 'original-fs'
@@ -41,7 +41,7 @@ export async function projectTargets(ws: WorkspaceService, projectPath: string):
   const fallback = o.target ? null : await (H ? H.defaultTarget(projectPath) : port!.defaultLine(projectPath)).catch(() => null)
   const def = o.target || (fallback && !isUnknown(fallback) ? fallback : '')
   if (!def) return null
-  // A platform whose targets are its repository's lines (jj's local bookmarks, Darren's decision on HI-3129): read now;
+  // A platform whose targets are its repository's lines (jj's local bookmarks, HI-3129): read now;
   // unreadable, the default alone, marked (a pick of another is refused, never offered blind). Else G7b's list.
   const fixed = hasCapability(platform, 'retarget') ? {} : { fixedInFlight: true as const }
   if (port?.targetLines) {

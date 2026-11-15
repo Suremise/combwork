@@ -2071,7 +2071,7 @@ describe('removal and board under faults', () => {
 
 describe('task prompt', () => {
   const card = { number: 7, title: 'Fix it', description: 'The details.', blockedBy: [], comments: [] } as unknown as import('../src/shared/types').TaskCard
-  // A card's start in its own words (#1292, #966 row 30, Darren's choice: only the card's start has a raw variant).
+  // A card's start in its own words (#1292, #966 row 30: only the card's start has a raw variant).
   it("in its own words: the card's title, the user's note and its description, nothing of Combwork's", async () => {
     const { rawTaskPrompt } = await import('../src/shared/tasks')
     expect(rawTaskPrompt(card)).toBe('Fix it\n\nThe details.')

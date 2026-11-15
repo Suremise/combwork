@@ -164,7 +164,7 @@ describe("a quit with When Combwork quits to run (HR6's round 1, findings 1 and 
     expect(state.drains).toHaveLength(0)
   })
 
-  it("a close held, and Skip the command at its saving step: the panel stays and the close goes on; released, its command and When Combwork quits are skipped and nothing starts (Darren's decision, 15:30)", async () => {
+  it("a close held, and Skip the command at its saving step: the panel stays and the close goes on; released, its command and When Combwork quits are skipped and nothing starts", async () => {
     for (const command of ['backup', '']) {
       const held = gate()
       const ws = fakeWs('D:\\ws\\Work', command, held.wait)
@@ -224,7 +224,7 @@ describe("a quit with When Combwork quits to run (HR6's round 1, findings 1 and 
   })
 
   for (const command of ['', 'backup']) {
-    it(`a window's close under way (${command ? 'with a command' : 'plain'}) when the quit joins it: one close, its saving step shown; Skip there, then the close released: both skipped, nothing starts (Darren's decision, 15:30)`, async () => {
+    it(`a window's close under way (${command ? 'with a command' : 'plain'}) when the quit joins it: one close, its saving step shown; Skip there, then the close released: both skipped, nothing starts`, async () => {
       const held = gate()
       const ws = fakeWs('D:\\ws\\Work', command, held.wait)
       const win = fakeWin()

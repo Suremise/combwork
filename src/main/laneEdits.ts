@@ -398,11 +398,11 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
         if (x.next.length > LANE_MAX_CARDS) refuse(ws, 409, M.full, { max: LANE_MAX_CARDS, lane: pairOf(x.lane) })
         if (p.op === 'move' || p.op === 'remove') queuedHere(ws, x.lane, p.card!)
         if (p.op === 'transfer' && x.lane === p.brings?.leaving) queuedHere(ws, x.lane, p.card!, { applied: true })
-        // A lane keeps a card to do (HI-3066, Darren's decision A): taking off, or moving away, its last one not Done is
+        // A lane keeps a card to do (HI-3066, decision A): taking off, or moving away, its last one not Done is
         // refused here, nothing saved. A list of none can't be read back (the lane vanished), and one of Done cards only
         // ends the lane at once; ending it is End Lane's or Abandon Lane's.
         if ((p.op === 'remove' || (p.op === 'transfer' && x.lane === p.brings?.leaving)) && !hasWork(ws, x.next)) refuse(ws, 409, M.lastCard, { card: cardRef(p.card!), lane: pairOf(x.lane) })
-        // A card not started can be taken off wherever it is (HI-3067, Darren's decision): off its lane, or Move here's
+        // A card not started can be taken off wherever it is (HI-3067): off its lane, or Move here's
         // from its source, even inside the fixed start (before a card on hold or another agent's), which keeps its order;
         // queuedHere checked the card is waiting. Moves and cards brought in keep the fixed start's places.
         const takenOff = p.op === 'remove' || (p.op === 'transfer' && x.lane === p.brings?.leaving)

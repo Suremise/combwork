@@ -1,10 +1,10 @@
-// G19's default switched to the branch's own message (HI-1997, Darren's decisions of 29 Oct): every preset and All off now
+// G19's default switched to the branch's own message (HI-1997): every preset and All off now
 // merge with the branch's own commit messages, not Combwork's (the card's key and trailers), since card titles name people
 // and details a public history shouldn't keep. Until then the presets filled Combwork's into every level they were chosen at,
 // so a stored 'combwork' can't tell a choice from a fill. A one-time step switches the fills:
 // - a project's own Git options (in force, or kept for another platform, #1419) drop a stored 'combwork', and so inherit the
 //   new default, unless something proves the user chose it: its `commitMessageChosen` mark (projectWorkflow.ts, set by a
-//   write that changes it to Combwork's), or its merge-choice record (HI-1697) saying Combwork's. Darren's decision (09:31): an
+//   write that changes it to Combwork's), or its merge-choice record (HI-1697) saying Combwork's. Decided: an
 //   ambiguous saved 'combwork' is the old default, and switches;
 // - the workspace's and Combwork's own Git defaults drop a stored 'combwork' likewise (nothing records a choice there);
 // - a stored 'branch' is never touched.

@@ -89,7 +89,7 @@ describe('a start after an update and a quit (HI-3214)', () => {
     const dir = tempDir('cw-start-notices-')
     const wsPath = join(dir, 'ws')
     const project = join(wsPath, 'alpha')
-    // HB6 left that conversation (its last is s-hb6 now), as Darren's had by 01:00; Worker and Builder are on theirs.
+    // HB6 left that conversation (its last is s-hb6 now), as the user's had by 01:00; Worker and Builder are on theirs.
     const agents = ['worker', 'builder', 'hb6']
     const ws = { path: wsPath, config: { advanced: {} }, isAssistantHome: () => false, info: () => ({ projects: [{ path: project, agents: agents.map((id) => ({ id, name: id, lastSessionId: `s-${id}` })) }] }), projectConfig: async () => ({ agents: agents.map((id) => ({ id, name: id })) }) }
     h.workspaces = [ws]

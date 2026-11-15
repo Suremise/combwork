@@ -1,5 +1,5 @@
 /**
- * A long conversation's hand-over (#1057; Darren's choice for 0.9.0, a queued one is #1067). Past Settings → Sessions →
+ * A long conversation's hand-over (#1057; the choice for 0.9.0, a queued one is #1067). Past Settings → Sessions →
  * Warn when a transcript is over, the notice and the footer's size say so, and offer Hand Over to… only while the agent
  * may end its conversation now: idle, not on a running lane's card, not merging. That is checked again when it is
  * clicked (a notice can be old by then), and by the hand-over itself. Otherwise they only say it can hand over when it

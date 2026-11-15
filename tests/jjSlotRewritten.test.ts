@@ -1,4 +1,4 @@
-// A jj slot whose card's commit was rewritten as the user integrated it (HI-2980, Darren's decision A; design HI-2980/s7
+// A jj slot whose card's commit was rewritten as the user integrated it (HI-2980, decision A; design HI-2980/s7
 // with HR1's full-ancestry proof): the chain over the old base is no longer the submitted commits by id, but everything
 // below the slot's empty working copy is in the target's history, and the integration is proved, so the slot is reused.
 // On the real jj, in both Git-backed modes, through the pool:

@@ -189,7 +189,7 @@ describe('a session that ran on a server connection (HI-1772)', () => {
     expect(cost(l).costUsd).not.toBe(9)
   })
 
-  it('free (Darren 27 Oct): a known $0 whatever prices are set, its tokens as read; the cache answers only the policy asked', async () => {
+  it('free: a known $0 whatever prices are set, its tokens as read; the cache answers only the policy asked', async () => {
     // A price for its model: free overrides it.
     config.settings.providers = { ...DEFAULT_SETTINGS.providers, 'claude-code': { ...DEFAULT_SETTINGS.providers['claude-code'], prices: { 'deepseek-flash': { input: 5, cachedInput: 0, output: 0 } } } }
     sessions.clearUsageCache()

@@ -1,6 +1,6 @@
 // Files jj doesn't track (HI-3096): with the user's `snapshot.auto-track` narrowed (`none()`, say: jj's own setting for
-// adding files by hand), a new file is on disk and in no commit, and jj's snapshot says nothing about it. Darren's
-// decision on HI-3096 (12 Nov, option (a)): such a file is a slot's uncommitted work, as Git's untracked file is, so a
+// adding files by hand), a new file is on disk and in no commit, and jj's snapshot says nothing about it. The
+// decision on HI-3096 (option (a)): such a file is a slot's uncommitted work, as Git's untracked file is, so a
 // slot holding one is never clean, never lent to the next card and never removed with it.
 //
 // The pinned jj (0.47.1) lists them in `jj status`, after the working copy's changes:

@@ -95,7 +95,7 @@ async function attributeOnce(wf: Workflow, hooks: ReconcileHooks, H: HistoryPort
     for (const b of bases.slice(1)) if ((await H.isAncestor(project, b, from)) === true) from = b
   }
   if (from === head) return 'done'
-  // The line's own commits (HI-2382, Darren): a branch merged in keeps its commits on their own cards; the merge is
+  // The line's own commits (HI-2382): a branch merged in keeps its commits on their own cards; the merge is
   // attributed like any commit of the line.
   const list = await H.commits(project, `${from}..${head}`, { firstParent: true })
   if (isUnknown(list)) return 'done'
@@ -502,7 +502,7 @@ export async function reconcileHistory(wf: Workflow, H: HistoryPort, card0: Card
     if (published(wf, card, s)) {
       const behind = await H.isAncestor(project, th, i.result)
       if (isUnknown(behind)) return hooks.unknown?.(behind.what)
-      // HI-3041 (Darren's 2b): unless the remote no longer has the result either (undone there too): then it has left,
+      // HI-3041 (2b): unless the remote no longer has the result either (undone there too): then it has left,
       // as with a push after merging. The remote looked at only here, behind a published result (kept a minute).
       // Already marked: nothing for the remote to decide.
       if (behind && !s.marks.leftTarget) {
@@ -514,7 +514,7 @@ export async function reconcileHistory(wf: Workflow, H: HistoryPort, card0: Card
     const sub = s.latest
     const c = asCardCounts(s, await H.contains(project, i.target, { base: s.approved?.base ?? sub?.base ?? base ?? i.revision, revision: i.revision, key: sub?.key }, th))
     if (isUnknown(c)) return hooks.unknown?.(c.what)
-    // HI-3041 (Darren's 3a): merged back by hand (the card's own change in its target again, by the test that marks it
+    // HI-3041 (3a): merged back by hand (the card's own change in its target again, by the test that marks it
     // left), the mark cleared too, not only once the queue's result is back.
     if (c && s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && !!w.state().marks.leftTarget && w.tx.appendObserved(card.id, { kind: 'BackInTarget', actor: 'outside', source: 'observed', dedupe: `back:${s.cycle}:after:${lastSeq(w, card.id, LEFT)}`, data: { revision: i.revision, target: i.target } }))
     if (!c && !s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && !w.state().marks.leftTarget && w.tx.appendObserved(card.id, { kind: 'LeftTarget', actor: 'outside', source: 'observed', dedupe: `left:${s.cycle}:after:${lastSeq(w, card.id, BACK)}`, data: { revision: i.revision, target: i.target } }))

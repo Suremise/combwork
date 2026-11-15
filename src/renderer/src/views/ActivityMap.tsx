@@ -261,7 +261,7 @@ export interface ActivityMapProps {
   /** The strip's click: show this agent's map, the others still listed (HI-3180), or all again for the one shown. */
   onPick?: (key: string) => void
   /**
-   * The agents of the selection while one of them is shown alone (HI-3180, Darren's decision): the strip keeps listing
+   * The agents of the selection while one of them is shown alone (HI-3180): the strip keeps listing
    * them, that one marked (`picked`), so a click switches to another. Without it, the strip lists the shared map's.
    */
   strip?: readonly MapStripAgent[]

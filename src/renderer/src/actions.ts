@@ -1511,7 +1511,7 @@ export async function saveTemplate(path: string): Promise<void> {
   if (!p?.agents.length) return notify('info', tr(msg({ id: 'actions.template.noAgents', defaultMessage: 'No agents to save', description: "A notification's title: the project has no agents to save as a template." })), tr(msg({ id: 'actions.template.noAgentsMessage', defaultMessage: 'Add the agents first, then save them as a template.', description: 'Under the notification that there are no agents to save as a template.' })))
   let workspaceScope = false
   // Names that follow the project's key (HI-B1…) can be kept as patterns (#1440), so the template names its agents from
-  // the key of whichever project it is loaded into; Darren's HB1-style names aren't the key and stay as they are.
+  // the key of whichever project it is loaded into; the user's HB1-style names aren't the key and stay as they are.
   const key = get().projectKeys.find((k) => k.projectPath.toLowerCase() === path.toLowerCase())?.key ?? null
   const offerPatterns = namesFollowKey(p.agents.map((a) => a.name), key)
   let usePatterns = offerPatterns

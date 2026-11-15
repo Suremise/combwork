@@ -1,4 +1,4 @@
-// HI-3115 (Darren's decision B, design HI-3115/s42): a jj lane's next card whose builder worked in the slot before it was
+// HI-3115 (decision B, design HI-3115/s42): a jj lane's next card whose builder worked in the slot before it was
 // prepared. The protection of that work stays: the preparation waits (a retry with the evidence, never an error or
 // SlotPrepareFailed), nothing there is changed, and the advice's commands, built from full ids frozen at the inspected
 // operation, are run exactly as printed (through PowerShell): `jj new <base>` sets the work aside, the next pass prepares

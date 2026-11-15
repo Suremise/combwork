@@ -1,4 +1,4 @@
-// HI-3195 (Darren's decision of 14 Nov, "ok (b)"): a project agent's keyed write is applied once. Its durable "applied"
+// HI-3195 (decision (b)): a project agent's keyed write is applied once. Its durable "applied"
 // marker is saved in the write's own board transaction, so a retry with the same key (after a lost reply, a crash before
 // the reply, the board reopened) is answered "already applied" with what it produced, never written again; a retry of
 // one still in flight joins it; a key reused for another request is refused; another connection's commit of the same

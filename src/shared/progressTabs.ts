@@ -6,7 +6,7 @@ import type { MergeSlotInfo, ProgressRun } from './types'
 /**
  * The Progress panel's tabs (#1309): Pulse (today's mix: the merge, what runs, what needs your attention, the lanes),
  * Merges, Runs (what is running, then every run kept, by day, retries folded, filtered and searched) and Lanes. The word
- * stays "Runs" (Darren, 21 Oct).
+ * stays "Runs".
  */
 export type ProgressTab = 'pulse' | 'merges' | 'runs' | 'lanes'
 export const PROGRESS_TABS: readonly ProgressTab[] = ['pulse', 'merges', 'runs', 'lanes']

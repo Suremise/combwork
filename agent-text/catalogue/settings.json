@@ -4563,7 +4563,7 @@
     "audience": "both"
   },
   "settings.general.userName.desc": {
-    "text": "How Combwork names you to the Assistant when it tells it you replied to an agent (\"Darren replied to B1 on #399\").",
+    "text": "How Combwork names you to the Assistant when it tells it you replied to an agent (\"Sam replied to B1 on #399\").",
     "note": "What the setting \"Your name\" does, under its title (Settings → General).",
     "audience": "both"
   },
@@ -5989,7 +5989,7 @@
   },
   "settings.workflow.combworkDefaults.title": {
     "text": "Combwork defaults",
-    "note": "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (Darren's words, HI-1768).",
+    "note": "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (HI-1768).",
     "audience": "both"
   },
   "settings.workflow.workspaceDefaults.desc": {

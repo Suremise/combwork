@@ -1713,7 +1713,7 @@ export function PaneFooter({
         </Tooltip>
       )
     })
-  // Free (HI-1772, Darren 27 Oct): its conversation ran only on servers on this PC.
+  // Free (HI-1772): its conversation ran only on servers on this PC.
   if (live?.costFree)
     right.push({
       key: 'cost',

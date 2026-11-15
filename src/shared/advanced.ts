@@ -250,7 +250,7 @@ export const ACTIVITY_MAP_MOTION = 'cw.activity.mapMotion'
 /** A card started on an agent is typed as its own words, without Combwork's wrapper (#1292, #966 row 30): taskStart's prompt. */
 export const RAW_CARD_START = 'cw.prompt.rawCardStart'
 
-/** HI-2854 (Darren's C): the most characters a card's start task carries the whole card in (its decisions and every comment); 0: never. */
+/** HI-2854 (C): the most characters a card's start task carries the whole card in (its decisions and every comment); 0: never. */
 export const WHOLE_CARD_MAX = 'cw.prompt.wholeCardMax'
 
 /**
@@ -653,7 +653,7 @@ const SOURCES: readonly AdvancedSource[] = [
     workspace: true,
     applies: 'now'
   },
-  // Resuming agents after a connection drops (HI-1612, Darren's decision: off by default, for everyone).
+  // Resuming agents after a connection drops (HI-1612: off by default, for everyone).
   {
     id: OUTAGE_RESUME,
     group: 'cw',
@@ -752,7 +752,7 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.cw.progress.lanesShown.title', defaultMessage: 'Progress panel: lanes shown', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.cw.progress.lanesShown.desc', defaultMessage: "How many card-loop lanes the Progress panel shows before its lanes scroll, until you drag the section's top edge (the drag is kept per workspace). A workspace that runs many lanes at once can set its own.", description: 'What the advanced setting "Progress panel: lanes shown" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
-    // About six before they scroll (HI-1673, Darren: as on main, the lanes at the bottom growing upwards).
+    // About six before they scroll (HI-1673: as on main, the lanes at the bottom growing upwards).
     default: 6,
     min: 1,
     max: 24,
@@ -766,7 +766,7 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.cw.lanes.waitYouMinutes.title', defaultMessage: 'Lanes: a long wait for you', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.cw.lanes.waitYouMinutes.desc', defaultMessage: "After how long a lane waiting for you (a request in For you, or a card at its round limit) has its wait marked in the Progress panel's Lanes. Too short marks every wait; too long, a lane can sit unnoticed.", description: 'What the advanced setting "Lanes: a long wait for you" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
-    // HI-1926 (Darren's card): For you over an hour.
+    // HI-1926: For you over an hour.
     default: 60,
     min: 1,
     max: 1440,
@@ -780,7 +780,7 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.cw.lanes.waitReviewerMinutes.title', defaultMessage: 'Lanes: a long wait for a reviewer', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.cw.lanes.waitReviewerMinutes.desc', defaultMessage: "After how long a lane whose card waits in Review with nobody reviewing it has its wait marked in the Progress panel's Lanes. Too short marks every review; too long, a card can sit unreviewed.", description: 'What the advanced setting "Lanes: a long wait for a reviewer" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
-    // HI-1926 (Darren's card): a reviewer over 15 minutes.
+    // HI-1926: a reviewer over 15 minutes.
     default: 15,
     min: 1,
     max: 1440,
@@ -871,7 +871,7 @@ const SOURCES: readonly AdvancedSource[] = [
     unit: 's',
     applies: 'now'
   },
-  // Which failed merge checks count as the network's (#1362, Darren's decision on #1121): Node's and npm's own error
+  // Which failed merge checks count as the network's (#1362, decided on #1121): Node's and npm's own error
   // codes in a failed check's last 40 lines. A check exiting 75 says so itself, whatever this is.
   {
     id: QUEUE_NETWORK_CODES,
@@ -1252,7 +1252,7 @@ const SOURCES: readonly AdvancedSource[] = [
     default: true,
     applies: 'now'
   },
-  // The three terminal switches Darren chose (#1292, #966 rows 26, 27, 30; #1120 point 5): each as Combwork did by default.
+  // The three terminal switches the user chose (#1292, #966 rows 26, 27, 30; #1120 point 5): each as Combwork did by default.
   {
     id: ALL_KEYS_TO_CLI,
     group: 'cw',
@@ -1489,7 +1489,7 @@ const SOURCES: readonly AdvancedSource[] = [
     default: true,
     applies: 'now'
   },
-  // The usage history's timeline detail (HI-1648, Darren 27 Oct): sessions that ended longer ago are kept in 1-hour steps.
+  // The usage history's timeline detail (HI-1648): sessions that ended longer ago are kept in 1-hour steps.
   {
     id: USAGE_TIMELINE_DETAIL_DAYS,
     group: 'cw',

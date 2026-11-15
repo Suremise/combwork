@@ -1082,7 +1082,7 @@ export class CodexAdapter implements ProviderAdapter {
     // On a connection (HI-1757): its login kept in its own folder, and the Windows sandbox this PC has (set up once, in
     // ~/.codex's config: its accounts are the machine's), unless the connection's own config names one.
     args.push(...launchConnectionArgs(ctx))
-    // Its own folder trusted for this launch (HI-1871, Darren 27 Oct: on by default, an Advanced off switch): Codex
+    // Its own folder trusted for this launch (HI-1871: on by default, an Advanced off switch): Codex
     // looks its cwd up first, so it never asks in Combwork's folders. The table merges into the home's own for this launch
     // (config overrides.rs, merge.rs at 6aaac69) and nothing is written.
     if (advanced.get<boolean>('codex.trust.perLaunch')) args.push('-c', `projects=${toToml({ [ctx.cwd]: { trust_level: 'trusted' } })}`)

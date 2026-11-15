@@ -347,7 +347,7 @@ describe('a launch on a connection (connectionForLaunch)', () => {
       expect(c.id).toBe(b.id)
       c.release()
       await opened
-      // Nothing is turned on by itself (Darren, 6 Nov): the new workspace has no connections on.
+      // Nothing is turned on by itself: the new workspace has no connections on.
       expect(JSON.parse(readFileSync(join(fresh, '.combwork', 'workspace.json'), 'utf8')).connections).toBeUndefined()
       expect(accounts.combworkAccounts().map((x) => x.id)).toEqual([b.id, a.id])
     } finally {

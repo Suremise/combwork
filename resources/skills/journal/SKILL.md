@@ -23,7 +23,7 @@ Write an entry (`cw_journal_write`) when something happens that a later you woul
 
 How:
 
-- **summary**: one line a later you can act on from the line alone ("Darren: 0.9.1 ships the journal before intentions").
+- **summary**: one line a later you can act on from the line alone ("Sam: 0.9.1 ships the journal before intentions").
 - **why**: why it mattered, a sentence. **detail** only when the line can't carry it.
 - **links**: the cards, commits, notes, agents and entries it is about. Linked to a card, it comes back while that card is in hand.
 - **importance**: 1 for everyday entries; 2 for what must outlive retention and the size cap (decisions that shape the work, lasting preferences); 3 rarely. 0 for trivia.

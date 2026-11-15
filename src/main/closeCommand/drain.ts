@@ -26,7 +26,7 @@ export const storeDrainDeps: DrainDeps = { writes: writesAt, boardOpen, journalO
 
 /**
  * Waits until the workspace at `path` (its real place `place`) has nothing being written: woken as each write ends,
- * never polled. No timer of its own (Darren's decision of 28 Oct ~14:15: the wait is shown, as its panel's saving step):
+ * never polled. No timer of its own (the wait is shown, as its panel's saving step):
  * `cancelled`, the user's Don't wait, ends it at once, not drained; `ms` bounds it for a test.
  */
 export function drainWorkspace(path: string, place: string, o: { ms?: number; cancelled?: AbortSignal; deps?: DrainDeps } = {}): Promise<DrainResult> {

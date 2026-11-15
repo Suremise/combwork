@@ -14,7 +14,7 @@
 // The watch is what sees a file not ignored made and deleted during the run (HR1's round 1): the listings at the ends
 // can't. Each name is asked about as every kind its entry had: a folder with its slash, a file without. A watch gives
 // names only (a creation and a deletion alike), so each event's entry is stat'ed as it arrives (HR2's round 2: a file made
-// where an ignored `out/` was). The residual, Darren's decision (13 Nov, r36): a file named as an ignored folder, made and
+// where an ignored `out/` was). The residual, decided (r36): a file named as an ignored folder, made and
 // deleted while that folder is remade, gone before its event is read (milliseconds), passes as the folder; reading kinds
 // for certain needs the change journal, which needs admin rights. Anything else (a folder the watch didn't cover, a name not ignored, an unreadable entry or listing, Git failing,
 // a folder whose time moved with no name to explain it) still counts.
@@ -142,7 +142,7 @@ export class RunWatch {
       if (seen.size >= RUN_NAMES_MAX) return this.incomplete(f)
       seen.set(name, new Set())
     }
-    // Darren's decision on HI-3158 (13 Nov, r36, option 2): its kind as soon as it can be read, so a file made where an
+    // HI-3158's decision (r36, option 2): its kind as soon as it can be read, so a file made where an
     // ignored folder was is seen as one unless it's gone within moments (the residual SPEC names).
     const key = `${f}\0${name}`
     if (this.queued.has(key)) return

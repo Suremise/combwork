@@ -1,6 +1,6 @@
 // What the agents had started, after Combwork closed unexpectedly (#987): while an agent runs, the running marker keeps what
 // its launch started (its process job's members, each by id and start time). The fake Claude Code's "linger 1" leaves a
-// node running, as a test run under cw-progress was left (Darren, 17 Oct). The test copy is ended from outside (by its
+// node running, as a test run under cw-progress was left. The test copy is ended from outside (by its
 // own pid and start time, lib.identify, never by name): the node keeps running, and the next start's "Combwork closed
 // unexpectedly" notice says one process the agents started is still running, with Stop Them. Nothing is stopped on its
 // own; Stop Them ends exactly that node. A kept record whose pid names another process by then (a stranger's, with

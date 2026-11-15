@@ -222,7 +222,7 @@ export type PreferenceKey = (typeof PREFERENCE_OPTIONS)[number]
 export const PRESET_PREFERENCES: readonly OptionKey[] = ['maxAgents', 'simplifyAt', 'churnStopAt']
 
 /**
- * HI-3188: the churn's levels for Solo: off (Darren, 14 Nov: a solo user never feels them). All off and the presets with
+ * HI-3188: the churn's levels for Solo: off (a solo user never feels them). All off and the presets with
  * an agent reviewer set none, so they inherit the levels above (the defaults: SIMPLIFY_AT, CHURN_STOP_AT).
  */
 const SOLO_CHURN = { simplifyAt: 0, churnStopAt: 0 } as const
@@ -277,7 +277,7 @@ const BASE: Omit<WorkflowOptions, 'platform'> = {
   strict: false,
   pushTarget: false,
   followRemote: false,
-  // G19 (HI-1997, Darren's decision): the branch's own message in every preset, so card titles never reach a history unasked.
+  // G19 (HI-1997): the branch's own message in every preset, so card titles never reach a history unasked.
   commitMessage: 'branch',
   mergeChecks: [],
   mergeInstall: 'onManifestChange',
@@ -321,7 +321,7 @@ export function allOff(platform: PlatformId): WorkflowOptions {
 export const reviewerModeOf = (o: Pick<WorkflowOptions, 'reviewerMode'>): ReviewerMode => o.reviewerMode ?? 'lane'
 
 /**
- * Each preset's Maximum agents (HI-2001, Darren's decision): the team it describes. Solo is one agent, Pair a builder
+ * Each preset's Maximum agents (HI-2001): the team it describes. Solo is one agent, Pair a builder
  * and a reviewer, Team (and All off, `BASE`) the default of 12.
  */
 export const PRESET_TEAM: Record<PresetId, number> = { solo: 1, pair: 2, pairAgent: 2, team: AGENT_LIMIT_DEFAULT }
@@ -392,7 +392,7 @@ export function preset(platform: PlatformId, id: PresetId, checks: PresetInputs 
     maxAgents: PRESET_TEAM.pair
   }
   if (id === 'pair') return pair
-  // Team (#1361, Darren's point 1 on #1121): as Pair, with the unit tests too before review and on the merged result,
+  // Team (#1361, point 1 on #1121): as Pair, with the unit tests too before review and on the merged result,
   // each card's own focused tests there too (G20, HI-1367: only with the project's runner, else off, the form saying
   // why), installed from scratch before every merge, and your OK for cards labelled ui or release. G15 and G17 as Pair's:
   // slots up to date, one reviewer per lane (a pool is the Team 6 + pool template's choice, §16.6.3).

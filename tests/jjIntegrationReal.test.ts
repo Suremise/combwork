@@ -689,7 +689,7 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
     })
   })
 
-  describe('a settled record keeps its evidence and is re-checked (HI-2873, Darren\'s B; design HI-2873/s7, s11, s14)', () => {
+  describe('a settled record keeps its evidence and is re-checked (HI-2873, option B; design HI-2873/s7, s11, s14)', () => {
     const push = (w: World, rev: string): void => {
       w.setMain(rev)
       w.jj('git', 'push', '--bookmark', 'main')

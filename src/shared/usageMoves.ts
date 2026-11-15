@@ -10,7 +10,7 @@ import { limitWindow } from './planLimits'
 
 /**
  * The limit kind a rule can watch: the account's own weekly or 5-hour limit, else none. A limit of part of the plan (HI-3262,
- * Darren's decision (a)): Codex's limit for some models (`scope`, HI-1125), Antigravity's per-model weekly quotas or another
+ * decision (a)): Codex's limit for some models (`scope`, HI-1125), Antigravity's per-model weekly quotas or another
  * named part (`models`, HI-2734), never fires a rule or a watch, whatever its window: moving every agent because one
  * model is nearly used up is the wrong move. The same rule as what usage calls the 5-hour and weekly limits (limitWindow).
  */

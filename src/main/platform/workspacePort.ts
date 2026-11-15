@@ -252,7 +252,7 @@ export interface WorkspacePort {
   /** The repository's default target line (Git: main, else master). */
   defaultLine(repo: string): Promise<Maybe<string>>
   /**
-   * HI-3129 (Darren's decision (a), 13 Nov): the lines a card or lane may name as its Merges into, read from the
+   * HI-3129 (decision (a)): the lines a card or lane may name as its Merges into, read from the
    * repository (jj: its local bookmarks, conflicted ones left out), for a platform whose targets are its repository's.
    * Absent (Git): the project's configured Other branches are its list. Unknown when it can't be read.
    */

@@ -1,4 +1,4 @@
-// The Microsoft Store's PowerShell 7 and Codex's sandbox (#585, Darren's decision: options 1 and 3). With Codex's Windows
+// The Microsoft Store's PowerShell 7 and Codex's sandbox (#585, options 1 and 3). With Codex's Windows
 // sandbox set up and the Store's pwsh first on PATH, Provider Setup warns, names the symptom and suggests the installer's
 // PowerShell 7; Combwork never changes the shell. Detection: the first pwsh.exe on PATH, by the Store's app execution alias
 // folder or its package folder. (On a machine with the Store's pwsh the alias is a reparse point only lstat can see:

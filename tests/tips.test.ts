@@ -111,7 +111,7 @@ describe('changes from several windows', () => {
   })
 })
 
-// HI-2320 (Darren: "tips should be shown at a time that nothing else is going on only, otherwise they are ignored").
+// HI-2320: tips are shown only when nothing else is going on, otherwise they are ignored.
 describe('a tip only when nothing else goes on (quietNow)', () => {
   const now = 1_000_000
   const quiet = { focused: true, popups: 0, finishesPending: 0, waiting: 0, lastKeyAt: null, now }

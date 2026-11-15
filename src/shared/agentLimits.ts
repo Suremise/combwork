@@ -7,5 +7,5 @@
  * AGENT_LIMIT_MAX. Read it with `agentMax()` (main, per project) or `projectInfoPreferences` (renderer), never a constant.
  */
 export const AGENT_LIMIT_DEFAULT = 12
-/** The most a project can have, by hand too, and the most Maximum agents takes (Darren, 11 Oct: four pages of six). Templates hold at most this many. */
+/** The most a project can have, by hand too, and the most Maximum agents takes (four pages of six). Templates hold at most this many. */
 export const AGENT_LIMIT_MAX = 24

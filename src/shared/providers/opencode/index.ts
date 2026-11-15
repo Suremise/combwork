@@ -15,7 +15,7 @@ import { TIPS } from './tips'
  * database), signed in through OpenCode's own `auth login`. Each launch runs a private `opencode serve` on a free
  * loopback port, owned by a launcher that ends it with the agent (providers/opencode/launcher.ts), with a private
  * config folder: the project's own OpenCode config, Claude Code compatibility and self-update are off by default.
- * OpenCode's nested "Claude Agent" provider is never offered or allowed (Darren's scope, HI-2756). Used by both processes.
+ * OpenCode's nested "Claude Agent" provider is never offered or allowed (HI-2756). Used by both processes.
  */
 
 export const OPENCODE = 'opencode'

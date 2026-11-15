@@ -25,7 +25,7 @@ const M = {
   cli: msg({ id: 'settings.connections.add.cli', defaultMessage: 'For', description: 'Label of the choice in Add a Connection (Settings → Accounts & Connections) of the coding agent CLI the connection is for (Claude Code, Codex), each shown with its icon.' }),
   name: msg({ id: 'settings.connections.add.name', defaultMessage: 'Name', description: "Label of a new connection's name (Settings → Accounts & Connections → Add Connection)." }),
   namePlaceholder: msg({ id: 'settings.connections.add.namePlaceholder', defaultMessage: 'Anthropic · Max 1, Work, DeepSeek…', description: "Placeholder of a new connection's name box: examples of names." }),
-  from: msg({ id: 'settings.connections.add.from', defaultMessage: 'Gets its model from', description: 'Label of the choice in Add Connection (Settings → Accounts & Connections): where the connection gets its model, its sign-in or a server (Darren, 27 Oct).' }),
+  from: msg({ id: 'settings.connections.add.from', defaultMessage: 'Gets its model from', description: 'Label of the choice in Add Connection (Settings → Accounts & Connections): where the connection gets its model, its sign-in or a server.' }),
   fromSignIn: msg({ id: 'settings.connections.add.fromSignIn', defaultMessage: 'Its sign-in', description: "A choice of Gets its model from (Add Connection): the CLI's own sign-in (a Claude account, for example), done in a terminal after it is added." }),
   fromServer: msg({ id: 'settings.connections.add.fromServer', defaultMessage: 'A server', description: 'A choice of Gets its model from (Add Connection): a server reached by its base URL, with an API key or none (DeepSeek, Ollama, a company gateway).' }),
   preset: msg({ id: 'settings.connections.server.preset', defaultMessage: 'Preset', description: "Label of a server connection's preset (Add Connection): a filled form for a known service." }),
@@ -255,7 +255,7 @@ function ModelLimits({ m, ownLimits, disabled, onChange }: { m: ServerModel; own
 }
 
 /**
- * Add a Connection (Darren, 27 Oct): its CLI first (HI-1870: one list, one Add, the choice shown with more than one),
+ * Add a Connection: its CLI first (HI-1870: one list, one Add, the choice shown with more than one),
  * a name, then where it gets its model. Its sign-in: added, then signed in (`onSignIn`). A server: its preset, base
  * URL, key (sent once, then cleared from this dialog) and models.
  */

@@ -172,7 +172,7 @@ describe('a launch', () => {
         expect(Object.keys(e.mcpServers).sort(), r).toEqual(['combwork', 'notes', 'sandbox'])
       }
       expect(sides).toEqual({ builder: 'builder', reviewer: 'reviewer', either: 'both', generalist: 'both' })
-      // Darren's 22:15 decision: "Independent behaves as if connection level switches are off": the terminal preset.
+      // Decided: "Independent behaves as if connection level switches are off": the terminal preset.
       const { launchPolicy, terminalPreset } = await import('../src/shared/launchPolicy')
       const ind = await eff('independent')
       expect(ind.launch).toEqual(launchPolicy({ launch: terminalPreset('claude-code') }, 'claude-code'))

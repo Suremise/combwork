@@ -411,7 +411,7 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
     })
     return mode === 'single' ? out.slice(0, 1) : out
   }, [mode, shownHosts, inputs, inFilter, view.cards, view.hideFinished, view.tab])
-  // One agent of the selection shown alone (HI-3180, Darren's decision), always the current tab's (HI-3186): see the
+  // One agent of the selection shown alone (HI-3180), always the current tab's (HI-3186): see the
   // project's tab.
   const [showAlone, setShowAlone] = useState(false)
   // The selection chosen again (Agents ▾, even the same): all of it shown again.

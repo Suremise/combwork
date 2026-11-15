@@ -600,7 +600,7 @@ const ROLL_UP_BATCH_MS = 50
 const ROLL_UP_LIMIT = 500
 
 /**
- * A batch of ended sessions' timelines merged into 1-hour steps (HI-1648, Darren 27 Oct): those last active before
+ * A batch of ended sessions' timelines merged into 1-hour steps (HI-1648): those last active before
  * Settings → Advanced's days of full detail, oldest first, each in a transaction of its own, for ROLL_UP_BATCH_MS at
  * most, but always one (review round 1: a slow lookup used the time up, and the batch that tried none read as the end);
  * never one running (`live`: their ids). Main sends batches until one tries none or none are left.

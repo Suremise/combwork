@@ -245,7 +245,7 @@ const OFF = {
 }
 
 /**
- * Asks for a connection (HI-1755, Darren's 1a): where a CLI with connections has none on in the workspace, nothing of it
+ * Asks for a connection (HI-1755, 1a): where a CLI with connections has none on in the workspace, nothing of it
  * starts (never on the CLI's own login). What it offers (HI-2650, offHereChoice; nothing turned on until clicked): one
  * account off here, Turn On Here (this window's workspace only); several, Choose in Settings; none, Add an Account.
  * `where`: a project's agents (`cli`: theirs), the Assistant (HI-1774), or a project with no agents yet (`empty`, any CLI).

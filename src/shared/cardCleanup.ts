@@ -1,4 +1,4 @@
-// Card attachments' clean-up (HI-1842, Darren's decisions of 27 Oct 2026): a project's archived cards lose their
+// Card attachments' clean-up (HI-1842): a project's archived cards lose their
 // attachments some days after they were archived (Project Settings → Storage: Off, 3, 7, 30 or 90 days; 30 by default).
 // Only archived cards, never open or merely Done ones, nor cards archived because their project was hidden or removed
 // (restoring the project brings those back). Unarchiving a card before then keeps its files. What main and the window share.

@@ -1108,7 +1108,7 @@
   "settings.general.timeFormat.option.24h": "24 小时制（14:05）",
   "settings.general.timeFormat.tip": "适用于 Combwork 显示时间的所有地方，例如今天启动的会话或粘贴截图的时间。",
   "settings.general.timeFormat.title": "时间格式",
-  "settings.general.userName.desc": "Combwork 告诉助手你回复了某个智能体时用来称呼你的名字（“Darren replied to B1 on #399”）。",
+  "settings.general.userName.desc": "Combwork 告诉助手你回复了某个智能体时用来称呼你的名字（“Sam replied to B1 on #399”）。",
   "settings.general.userName.placeholder": "User",
   "settings.general.userName.tip": "它会写入助手的对话中，用你希望它看到的任何形式即可。留空则使用“User”。",
   "settings.general.userName.title": "你的名字",

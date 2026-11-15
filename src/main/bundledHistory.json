@@ -126,7 +126,8 @@
       "83fa33cc271e548d",
       "e67a6db92725c63c",
       "7e9438761eb44397",
-      "cfae75dda271182b"
+      "cfae75dda271182b",
+      "aef3eac50db2b92a"
     ],
     "generalist": [
       "f985d471d38d2ad3",
@@ -149,7 +150,8 @@
       "12049ff66579193d",
       "1b95a13e5695d92c",
       "5330da8d664b833b",
-      "e4baf3a5c7dc731d"
+      "e4baf3a5c7dc731d",
+      "4314f3784f17ac8e"
     ],
     "licence-audit": [
       "fbeedbd277f91f4c"
@@ -430,6 +432,9 @@
     ],
     "copilot/cli": [
       "2a428b5ff9d211fc"
+    ],
+    "muse/cli": [
+      "680e73bc76cd6e1e"
     ],
     "opencode/cli": [
       "4473053fbe5a4980"

@@ -678,7 +678,7 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     // It names the design, which the answer names.
     expect(st.typed[0].text).toContain(`The builder: "design ${id} posted for your check (answer with its id): Design: a step the reviewer is woken for."`)
     expect(st.typed[0].text).toContain("check it and answer with cw_loop_step (ok, or gaps saying what's missing, and its id)")
-    // HI-3211 (Darren's decision (b)): R1's own watch, for Review alone, didn't fire, and is still on: the line says so.
+    // HI-3211 (decision (b)): R1's own watch, for Review alone, didn't fire, and is still on: the line says so.
     expect(st.typed[0].text).toContain("This is your card loop's handoff (Wake reviewers and builders), not your card watch, which is still on.")
     st.status.set('b1', 'ready')
     await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, r1, { kind: 'loopStep', step: 'ok', text: 'Holds: build it.', design: id }))

@@ -309,7 +309,7 @@ describe('editLanes (HI-2898)', () => {
     })
   })
 
-  it("refuses taking off, or moving away, a lane's last card to do, saving nothing (HI-3066, Darren's decision A)", async () => {
+  it("refuses taking off, or moving away, a lane's last card to do, saving nothing (HI-3066, decision A)", async () => {
     const [a, b, x] = [await make('A'), await make('B'), await make('X')]
     const l = await start('b1', [a])
     const to = await start('b2', [x])

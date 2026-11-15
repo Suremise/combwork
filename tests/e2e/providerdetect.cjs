@@ -137,7 +137,7 @@ const check = (name, ok, extra = '') => {
   check('…and a new agent is a Claude Code one', added.provider === 'claude-code', added.provider)
 
   // 5. An agent of its own provider switched since: its conversation still resumes in the provider that recorded it
-  // (Darren's decision on #506); a new conversation runs its provider now.
+  // (#506); a new conversation runs its provider now.
   const agentLive = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === added.id)
   const agentReady = async () => ['ready', 'finished'].includes((await agentLive())?.status)
   const stopAgent = async () => {

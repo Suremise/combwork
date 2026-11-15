@@ -36,7 +36,7 @@
 // run code is on the allowlist; a test's closure only when every file in it is known; a worker entry's closure, the
 // same (else every starter counts); the global object only as `G.name`.
 //
-// The review bar (Darren, 7 Nov, HI-2677/r96: "(a)"): the gate covers the ways this repository's code and tests load
+// The review bar (HI-2677/r96's (a)): the gate covers the ways this repository's code and tests load
 // modules, or would plausibly write. A loader deliberately hidden (eval or Function reached through globals or built
 // keys, a loader or its path chosen through an environment variable, code assembled from strings to evade a token) is
 // the documented boundary, not a gap to close here: the gate still catches the forms it names (any eval, Function or

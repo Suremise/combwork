@@ -47,7 +47,7 @@ describe('copyPasteKey (#1286)', () => {
   })
 })
 
-// All keys go to the CLI (#1292, #966 row 26, Darren's choice on #1120 point 5): off, Combwork's bound shortcuts take their
+// All keys go to the CLI (#1292, #966 row 26, the choice on #1120 point 5): off, Combwork's bound shortcuts take their
 // keys but those the CLI uses itself; on, only the command palette's, so every command stays in reach.
 describe('appTakesTerminalKey (#1292)', () => {
   const o = { palette: 'Ctrl+Shift+P', reserved: new Set(['CTRL+B']), bound: ['CTRL+SHIFT+P', 'CTRL+P', 'CTRL+B', 'CTRL+,'] }

@@ -1,7 +1,7 @@
 # Combwork 1.0 glossary: the workflow layer's terms in every language
 
 **Status:** written in 1.0 P1 (#1117), 20 Oct 2026, for every 1.0 phase (P2–P8) and the translation review (#1126).
-The English labels, category and stage names were agreed by Darren as proposed on 20 Oct (SPEC §16.20, OP-1 and
+The English labels, category and stage names were agreed as proposed on 20 Oct (SPEC §16.20, OP-1 and
 OP-2, recorded on #1117). A label that changes later is translated again here first, then in `locales/`. Nothing in this file is a message: messages stay in the code (`msg()`), and their translations in
 `locales/<code>/<area>.json`.
 
@@ -35,7 +35,7 @@ and the 19 Oct decisions on #1117. Reviewers fail a string that breaks one.
 4. **No names after prepositions.** "Added by {by}" reads badly in Polish, German and Japanese. Put a noun in front
    ("Added by agent {agent}") or use a colon ("{agent}: added"), or rephrase so the name is the subject. The same goes
    for a name a past-tense verb would agree with (the style pages' *Names have no known gender*).
-5. **Outcomes, not mechanics** (Darren, 19 Oct). An option says what happens to the work: "Work is reviewed before it
+5. **Outcomes, not mechanics** (#1117). An option says what happens to the work: "Work is reviewed before it
    reaches main", not "Verdict binding: on". A mechanism (patch-id, temporary ref, merge-base) appears only in a
    description's second sentence or in Learn more, never in a label.
 6. **The user's words, not the code's.** Internal terms have a user word (section 3): the user never reads *gate*,
@@ -156,7 +156,7 @@ the *Active* and *Approved* categories; the ids agents use (`doing`, `passed`) d
 
 ### 2.6 The Version Control tab's options and values
 
-The labels of SPEC §16.6.1 (None, N1–N7) and §16.6.2 (Git, G1–G17), worded as outcomes [#1117, Darren 19 Oct], with
+The labels of SPEC §16.6.1 (None, N1–N7) and §16.6.2 (Git, G1–G17), worded as outcomes [#1117], with
 their values. **The English was agreed on 20 Oct (OP-2):** each phase copies its rows into the messages it adds; the
 translations below are AI drafts made from that English, which the phases use and the translation review (#1126)
 checks in context. N7 (File locks) and the Card loops settings keep their existing messages.

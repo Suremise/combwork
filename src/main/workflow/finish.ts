@@ -40,7 +40,7 @@ export function recordFinish(tx: Tx, card: number, actor: Actor, ruleset: string
   return f
 }
 
-/** Whether a finish counts as accepted for the cards that depend on it (Darren's option A): an override's is. */
+/** Whether a finish counts as accepted for the cards that depend on it (option A): an override's is. */
 export function finishAccepts(f: FactData['Finished'] | null | undefined): boolean {
   return !!f && (f.how === 'accepted' || f.how === 'override')
 }

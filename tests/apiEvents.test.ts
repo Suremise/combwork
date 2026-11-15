@@ -117,7 +117,7 @@ describe('apiEventFor', () => {
     const sent = publicRun(r)
     expect(JSON.stringify(sent)).not.toContain('SECRET')
     expect(sent).toMatchObject({ id: 'r1', title: 'e2e: full set', titleFromCommand: false, waiting: true, waitingSince: 5, state: 'running' })
-    // No title of its own: the command line was its title, so none of it leaves Combwork (Darren's rule): "a command".
+    // No title of its own: the command line was its title, so none of it leaves Combwork: "a command".
     for (const command of [r.command!, '"C:\\Program Files\\nodejs\\npm.cmd" test --token SECRET', 'SECRET-tool']) {
       expect(publicRun({ ...r, command, title: command })).toMatchObject({ title: COMMAND_TITLE, titleFromCommand: true })
     }

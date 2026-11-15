@@ -70,7 +70,7 @@ const M = {
   leftoverWhy: msg({ id: 'jj.leftovers.why', defaultMessage: '{why, select, unrecorded {a set-up that didn’t finish} lost {a set-up that was lost} notEmpty {not empty} unproved {not provably Combwork’s} other {kept}}{name, select, none {} other {, registered as {name}}}', description: 'Why a folder under “Left over from setting up jj slots” was kept (HI-2869), and the jj workspace name it’s registered under (none: keep that branch empty). Keep the select keys.' }),
   showFolder: msg({ id: 'jj.leftovers.show', defaultMessage: 'Show in folder', description: 'A button beside a leftover folder (HI-2869): opens it in the file manager.' }),
   leftoversMore: msg({ id: 'jj.leftovers.more', defaultMessage: '{n, plural, one {# more not shown} other {# more not shown}}', description: 'Under “Left over from setting up jj slots” (HI-2869): how many more there are than the list shows.' }),
-  noMerge: msg({ id: 'jj.integrate.noMerge', defaultMessage: 'Combwork doesn’t merge under jj: integrate the reviewed work with jj yourself.', description: 'A note under jj’s “Waiting for you to integrate” (HI-2799, Darren’s decision A). Keep jj.' }),
+  noMerge: msg({ id: 'jj.integrate.noMerge', defaultMessage: 'Combwork doesn’t merge under jj: integrate the reviewed work with jj yourself.', description: 'A note under jj’s “Waiting for you to integrate” (HI-2799, decision A). Keep jj.' }),
   // History.
   change: msg({ id: 'jj.row.change', defaultMessage: 'Change', description: 'A column of jj’s History (HI-2799): the change id (stable across rewrites).' }),
   commit: msg({ id: 'jj.row.commit', defaultMessage: 'Commit', description: 'A column of jj’s History (HI-2799): the commit id (this exact version).' }),

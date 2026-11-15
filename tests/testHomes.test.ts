@@ -12,7 +12,7 @@ import { classify, UNCLASSIFIED } from './e2e/testHomeManifest.mjs'
 // @ts-expect-error: plain .mjs module without types
 import { acquireTestHome, consumerHooks, holderLiveFor, holderOf, homesOf, leasesEnv, LEASES_VAR, MAX_CONSUMERS, noteConsumers } from './e2e/testHomeLock.mjs'
 
-// The CLI test homes start each run fresh, keeping only the sign-in (HI-2606, design s17 with Darren's answers): fake
+// The CLI test homes start each run fresh, keeping only the sign-in (HI-2606, design s17 with the user's answers): fake
 // homes with known bytes, the CLIs' sign-in status scripted, nothing real read or signed in.
 
 const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs')
@@ -61,7 +61,7 @@ const status = (answers: string[]) => {
 const deps = (answers: string[], extra: Record<string, unknown> = {}) => ({ status: status(answers).fn, users: async () => [], waitMs: 0, pollMs: 1, ...extra })
 
 describe('what a reset keeps and clears (testHomeManifest.mjs)', () => {
-  it('names the sign-in apart, and an entry it doesn\'t list as unclassified, which is kept and reported (Darren, point 4)', () => {
+  it('names the sign-in apart, and an entry it doesn\'t list as unclassified, which is kept and reported (point 4)', () => {
     expect(classify('claude', '.credentials.json')).toBe('sign-in')
     expect(classify('codex', 'auth.json')).toBe('sign-in')
     expect(classify('claude', 'projects')).toBe('clear')

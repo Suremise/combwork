@@ -1,5 +1,5 @@
 // A jj card put back with its work kept starts on the bookmark that work is on, whatever the project's target is now
-// (HI-3129, Darren's decision (a), 13 Nov): only a fresh start follows the project's new target. Its kept slot's binding
+// (HI-3129, decision (a)): only a fresh start follows the project's new target. Its kept slot's binding
 // is the proof; unproved, or the card's own Merges into or its lane naming another bookmark, the start is refused before
 // any slot is lent. And the repository's bookmarks are the targets a jj card may name, read through the port. On the
 // real jj, colocated and not; skipped without the fetched jj (npm run jj:fetch).

@@ -1,8 +1,8 @@
-// The real Antigravity CLI (agy) through Combwork (HI-2548; Darren's (b), 7 Nov: a launch and one tiny prompt a run): the
+// The real Antigravity CLI (agy) through Combwork (HI-2548's (b): a launch and one tiny prompt a run): the
 // installed agy as Combwork's detection selects it, its version for tested-clis, signed in with the PC's one sign-in
 // (Credential Manager's: read by agy, never changed here), run in this test copy's own profiles (the check profile and the
 // agent's, under its test data; never the user's ~\.gemini, which lib.cjs lists before and after) with its updates off.
-// The check profile is marked past agy's first-run screens as Set up leaves it, from the probe profile Darren onboarded
+// The check profile is marked past agy's first-run screens as Set up leaves it, from the probe profile the user onboarded
 // (only that they are done, never its installation id). One agent, one launch: its private profile (Combwork's MCP
 // servers, hooks and rules file), ready once its status line says idle, Combwork's tools connected, then one prompt on
 // the cheapest model at low effort ("Reply with just: OK"): a turn admitted from agy's own hooks and its prompt read from
@@ -22,7 +22,7 @@ const TURN_MS = 180000
 const userData = path.join(lib.WORK, 'antigravityreal-profile')
 const ws = path.join(lib.WORK, 'antigravityreal-ws')
 const alpha = path.join(ws, 'alpha')
-// The probe profile Darren onboarded and signed in (HI-2547's runs): only its onboarding markers are copied.
+// The probe profile the user onboarded and signed in (HI-2547's runs): only its onboarding markers are copied.
 const PROBE = path.join(process.env.LOCALAPPDATA || '', 'combwork-test', 'agy-probe')
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -86,7 +86,7 @@ function changes(before, after) {
   // Past agy's first-run screens, as Set up leaves the check profile: the probe profile's markers, never its installation id.
   const probeCache = path.join(PROBE, '.gemini', 'antigravity-cli', 'cache', 'onboarding.json')
   if (!fs.existsSync(probeCache)) {
-    console.log(`SKIP environment: no onboarded agy profile at ${PROBE} (Darren onboards it once by hand; tests/e2e/README.md)`)
+    console.log(`SKIP environment: no onboarded agy profile at ${PROBE} (the user onboards it once by hand; tests/e2e/README.md)`)
     process.exit(0)
   }
   const check0 = path.join(userData, 'antigravity', 'check', '.gemini', 'antigravity-cli')
@@ -109,7 +109,7 @@ function changes(before, after) {
   }, HUNG_MS)
   check('the installed agy is found, its version read', !!info?.found && /^\d+\.\d+\.\d+/.test(info.version ?? ''), JSON.stringify(info && { path: info.path, version: info.version }))
   if (info?.loggedIn !== true) {
-    console.log(`SKIP environment: agy isn't signed in on this PC (${info?.loggedIn === false ? 'signed out' : 'unknown'}): Darren signs it in by hand, never a test`)
+    console.log(`SKIP environment: agy isn't signed in on this PC (${info?.loggedIn === false ? 'signed out' : 'unknown'}): the user signs it in by hand, never a test`)
     await app.close()
     process.exit(failed ? 1 : 0)
   }
@@ -132,7 +132,7 @@ function changes(before, after) {
   const screen = lib.plainText((await inv('pty:buffer', key).catch(() => '')) ?? '')
   check('…asking no trust question and showing no first-run screen', !/trust this folder|terms of service|colou?r scheme/i.test(screen), screen.slice(-300))
 
-  // --- One prompt (Darren's (b)): a turn from agy's hooks, the reply in the transcript, its usage. Typed once only, whatever
+  // --- One prompt (HI-2548's (b)): a turn from agy's hooks, the reply in the transcript, its usage. Typed once only, whatever
   // Combwork shows (HI-2548's first run: its hooks failing, the turn went unseen and a second attempt sent it again).
   const prompt = 'Reply with just: OK'
   const taken = await lib.sendPrompt(inv, key, prompt, { submitted: async () => (await live(gem.id))?.status === 'working' || !!(await live(gem.id))?.turn?.id, tries: 1, waitMs: HUNG_MS })

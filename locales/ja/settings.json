@@ -1108,7 +1108,7 @@
   "settings.general.timeFormat.option.24h": "24時間制（14:05）",
   "settings.general.timeFormat.tip": "今日開始したセッションや、スクリーンショットを貼り付けた時刻など、Combworkが時刻を表示するすべての場所に適用されます。",
   "settings.general.timeFormat.title": "時刻の形式",
-  "settings.general.userName.desc": "エージェントに返信したことをアシスタントに伝えるときに、Combworkが使う名前です（「Darren replied to B1 on #399」）。",
+  "settings.general.userName.desc": "エージェントに返信したことをアシスタントに伝えるときに、Combworkが使う名前です（「Sam replied to B1 on #399」）。",
   "settings.general.userName.placeholder": "User",
   "settings.general.userName.tip": "アシスタントの会話に入るため、アシスタントに見せたい形で入力してください。空の場合は「User」を使います。",
   "settings.general.userName.title": "自分の名前",

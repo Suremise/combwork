@@ -1,4 +1,4 @@
-// 0.9's agent templates at the upgrade to 1.0 (#1436; Darren's 19 Oct decision on #1123, and the Assistant's 23 Oct scope
+// 0.9's agent templates at the upgrade to 1.0 (#1436; the decision on #1123, and the Assistant's 23 Oct scope
 // call: copy only): nothing is copied while the upgrade waits; once upgraded, each 0.9 template of the workspace and of
 // each project is copied into the 0.9 backup's folder (by the project's id), the originals left byte for byte as they
 // were (a 1.0 template, a damaged file and a .bak not copied); 1.0 never lists, loads or deletes a 0.9 file; it is done

@@ -1,5 +1,5 @@
 // A jj slot holding a file jj doesn't track (HI-3096, from HI-3058's hunt): with the user's `snapshot.auto-track`
-// narrowed (`none()`), a new file is in no commit and jj's snapshot says nothing of it. Darren's decision (12 Nov, (a)):
+// narrowed (`none()`), a new file is in no commit and jj's snapshot says nothing of it. Decision (a):
 // it is the slot's uncommitted work. So the record lists it (`jj status`'s "Untracked paths"), and through the pool a
 // slot holding one settles dirty, is never lent to the next card and isn't removed with it, as with auto-track all().
 // A submission under such a setting is refused naming it (`autoTrack`), and goes through once it is all() again.

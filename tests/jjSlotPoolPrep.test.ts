@@ -594,7 +594,7 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         w.h.jj(row.folder, 'commit', '-m', 'card 2, too early')
         const key2 = jjLineKey(row.identity!.workspace, 2, 2)
         const r1 = await w.pool.prepare(lent.lease.id, { line: key2, base: w.main(), install: false, target: 'main' })
-        // Refused, the work kept (HI-2923); since HI-3115 (Darren's decision B) as the cycle's wait, never a failure, with
+        // Refused, the work kept (HI-2923); since HI-3115 (decision B) as the cycle's wait, never a failure, with
         // what is there: the early commit alone, never card 1's.
         expect(r1, JSON.stringify(r1)).toMatchObject({ retry: expect.stringMatching(/isn't its last card's integrated work/), heldWork: { why: 'extra', commits: [expect.any(String)] } })
         expect(r1).not.toHaveProperty('error')

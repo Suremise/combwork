@@ -387,7 +387,7 @@ function leaveStub(ws: string, next: number): string {
   return stub
 }
 
-describe("cards an older version saved meanwhile (#1017 downgrade, Darren's decision of 17 Oct: none taken back on its own)", () => {
+describe("cards an older version saved meanwhile (#1017 downgrade: none taken back on its own)", () => {
   /** A workspace moved to the board (its board opened once and closed), and the stub 1.0 left, an older version's cards in it. */
   async function moved(files: Record<string, string>): Promise<{ ws: string; stub: string }> {
     const ws = workspaceWith(files)
@@ -472,7 +472,7 @@ describe("cards an older version saved meanwhile (#1017 downgrade, Darren's deci
   })
 })
 
-describe('reviewing the set-aside cards (#1044, Darren\'s decision on #1017: the only way they reach the board)', () => {
+describe('reviewing the set-aside cards (#1044, decided on #1017: the only way they reach the board)', () => {
   // Added and discarded files go to the Recycle Bin: a test trash folder here.
   const trashDir = join(base, 'set-aside-trash')
   beforeAll(() => {

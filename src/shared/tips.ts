@@ -486,8 +486,8 @@ export interface QuietInputs {
 }
 
 /**
- * Whether a tip may show now (HI-2320, Darren: "tips should be shown at a time that nothing else is going on only,
- * otherwise they are ignored"): the window focused, no pop-up showing or queued, no finishes about to be told, no agent
+ * Whether a tip may show now (HI-2320: tips show only when nothing else is going on,
+ * otherwise they are ignored): the window focused, no pop-up showing or queued, no finishes about to be told, no agent
  * waiting for the user, and no key pressed for TYPING_QUIET_MS.
  */
 export function quietNow(q: QuietInputs): boolean {

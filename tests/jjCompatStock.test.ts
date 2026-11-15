@@ -1,4 +1,4 @@
-// jj's compatibility gates and Git for Windows' stock system settings (HI-2872, Darren's (b) on HI-2799; SPEC §16.3.6):
+// jj's compatibility gates and Git for Windows' stock system settings (HI-2872, option (b) on HI-2799; SPEC §16.3.6):
 // its installer's own etc/gitconfig and etc/gitattributes, at system scope, aren't a use; the same keys at global or local
 // scope, a changed system value, another system file, or a repository using LFS or attributes still refuse. Real git,
 // in a test home laid out as Git for Windows is (<install>/ucrt64/libexec/git-core, <install>/etc/gitconfig): git reads
@@ -96,7 +96,7 @@ describe("jj's gates and Git for Windows' stock system settings (HI-2872)", () =
     const s = setup()
     const a = await assessJj(s.root, s.store, s.deps)
     expect(a.lfs).toEqual(CLEAR)
-    // Git's line-ending conversion really converts: still a use, flagged for the dialog's hint (Darren, 10 Nov).
+    // Git's line-ending conversion really converts: still a use, flagged for the dialog's hint.
     expect(a.attributes).toEqual({ uses: ['core.autocrlf (system) = true'], autocrlf: true })
     expect(a.submodules).toEqual(CLEAR)
     // Turned off for the repository alone, as the hint says (Git applies the last level's), a default install switches.

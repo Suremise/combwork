@@ -1,5 +1,5 @@
 // The real OpenCode (the pinned 2.2.6) and folders outside its own (HI-2772, #1439), through Combwork's production launch,
-// under Darren's HI-2758 option A as opencodereal.cjs: no account, key, sign-in or cloud call; model turns only to the PC's
+// under HI-2758's option A as opencodereal.cjs: no account, key, sign-in or cloud call; model turns only to the PC's
 // local Ollama qwen3:8b through a logging proxy here; the project's own OpenCode config kept out (the default). Combwork's
 // launch config asks external_directory for every folder outside the agent's own and allows a reviewer's review copies
 // (HI-2775: 2.2.6's default rules, `* * allow` first, would let any agent reach any folder). Three agents, each in its own
@@ -135,7 +135,7 @@ function proxy() {
   }
   const models = await ollamaModels()
   if (!models?.includes(MODEL)) {
-    console.log(`SKIP environment: no local Ollama with ${MODEL} at ${OLLAMA.host}:${OLLAMA.port} (${models ? models.join(', ') || 'no models' : 'not answering'}): Darren pulls it by hand`)
+    console.log(`SKIP environment: no local Ollama with ${MODEL} at ${OLLAMA.host}:${OLLAMA.port} (${models ? models.join(', ') || 'no models' : 'not answering'}): the user pulls it by hand`)
     process.exit(0)
   }
   const before = snapshot()

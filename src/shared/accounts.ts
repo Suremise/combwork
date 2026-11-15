@@ -194,7 +194,7 @@ export function acceptable(o: Account['observed'], orgs = true): { email: string
 
 /**
  * A workspace's connections for a provider as they apply: ids of connections that no longer exist (or are another
- * provider's) dropped, in the preference order, and its `default` **derived** (HI-1875, Darren 27 Oct): the first
+ * provider's) dropped, in the preference order, and its `default` **derived** (HI-1875): the first
  * connection in the order that's on here (`firstOn`), never a stored choice (one left in workspace.json is ignored).
  * `undefined`: not set up yet.
  */

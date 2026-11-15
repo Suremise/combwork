@@ -628,7 +628,7 @@ describe("Combwork's guidance for agents (#1285, row 13)", () => {
   })
 })
 
-// Row 11 has no switch (Darren, 21 Oct): Codex keeps the user's hooks beside Combwork's, each layer's under its own key, and
+// Row 11 has no switch: Codex keeps the user's hooks beside Combwork's, each layer's under its own key, and
 // merges the trust table (e2e codexownhooks asks the installed Codex). Combwork's part: its hooks and its trust records are
 // its own session-flags keys only, so nothing of the user's is named, replaced or trusted by Combwork.
 describe("Codex: Combwork's hooks beside the user's own (row 11)", () => {

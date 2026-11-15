@@ -8,12 +8,11 @@ import { transaction, type Migration } from './db'
 
 /**
  * The usage history's database (#1106): `.combwork/usage.db`, beside the workspace's `combwork.db`, under each session host's
- * scope (a project's id, `assistant` for the Assistant), as its session records are (#1061). Its own file (Darren, 20
- * Oct), so the usage worker's commits never wait on a board change held across awaits, never look like another
+ * scope (a project's id, `assistant` for the Assistant), as its session records are (#1061). Its own file, so the usage worker's commits never wait on a board change held across awaits, never look like another
  * process's change to the board's poll, and an older version still opens the board's database for writing. Only the usage worker opens
  * it (usageWorker.ts): it writes, and answers main's queries. No Electron here: the worker can't load it.
  *
- * Real tables, each value a typed column (Darren, 20 Oct: "proper tables, not JSON in a database"); the parser's saved
+ * Real tables, each value a typed column (proper tables, not JSON in a database); the parser's saved
  * state is the one blob (a parser's own fields, taken up as they were):
  * - `usage_sessions`: a row a session. `source`: read from its `transcript`, a `kept` usage imported from before, or an
  *   `external` session (started outside Combwork: kept for the Sessions list, never counted in totals). Who it was (provider,
@@ -186,7 +185,7 @@ export const USAGE_MIGRATIONS: Migration[] = [
   {
     version: 3,
     name: 'usage-cost-free',
-    // Free (HI-1772, Darren 27 Oct): a session that ran only on servers on this PC. Each set once, never cleared:
+    // Free (HI-1772): a session that ran only on servers on this PC. Each set once, never cleared:
     // server_local (a run on one), not_local (a run anywhere else, which wins for good).
     up: (db) => db.exec('ALTER TABLE usage_sessions ADD COLUMN server_local INTEGER NOT NULL DEFAULT 0; ALTER TABLE usage_sessions ADD COLUMN not_local INTEGER NOT NULL DEFAULT 0') // i18n-ignore: SQL
   }

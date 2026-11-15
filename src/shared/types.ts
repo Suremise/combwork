@@ -816,7 +816,7 @@ export interface Account {
   id: string
   provider: ProviderId
   /**
-   * Where it gets its model (Darren, 27 Oct ~08:55): `signIn`, a login folder of Combwork's signed in through the CLI's own
+   * Where it gets its model: `signIn`, a login folder of Combwork's signed in through the CLI's own
    * sign-in; `server`, a server it reaches by a base URL, with a key or none (HI-1772: DeepSeek, Ollama…), in a folder of
    * Combwork's too. Absent in a record from before it: signIn.
    */
@@ -1006,7 +1006,7 @@ export interface ConnectionDefaults {
 export type MovedField = 'model' | 'effort' | 'use200kContext'
 
 /**
- * A CLI's project overrides moved onto the project's agents (HI-1770, Darren's 26 Oct ~23:25 (2)): when, and each value
+ * A CLI's project overrides moved onto the project's agents (HI-1770, (2)): when, and each value
  * an agent was given (`id`: `<cli>:<agentId>:<field>`, stable, for the notice and its dismissal).
  */
 export interface ConnectionsMoved {
@@ -3085,7 +3085,7 @@ export interface MoveHostPlan {
 
 /**
  * An agent's branch in Combwork's form, cw/<workspace>/<project>/<agent>, whose workspace or project part is an old one
- * (#1305, Darren's decision on #1303: renamed, never offered): `to` is its name here. `remote`: the remote it tracks,
+ * (#1305, decided on #1303: renamed, never offered): `to` is its name here. `remote`: the remote it tracks,
  * which keeps the old name (pushing under the new one is the user's step). `kept`: why it isn't renamed now
  * (`exists`: a branch of that name is already there). `pending`: a rename a Repair before began and couldn't finish
  * (project.json's `pendingBranchRenames`), finished now from where it stopped.
@@ -3511,7 +3511,7 @@ export interface SessionUsage {
    */
   costUnreported?: Pick<SessionUsage, 'inputTokens' | 'outputTokens' | 'cacheWriteTokens' | 'cacheReadTokens'>
   /**
-   * It ran only on servers on this PC (HI-1772, Darren 27 Oct): free, its cost a known $0, shown as "free (local)"; its
+   * It ran only on servers on this PC (HI-1772): free, its cost a known $0, shown as "free (local)"; its
    * tokens counted as any session's.
    */
   costFree?: true
