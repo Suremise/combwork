@@ -276,6 +276,31 @@ describe("an agent's old moves as intents (#1268)", () => {
     expect((await inWorkspace(w, () => tasks.getTask(card, w))).column).toBe('passed')
   })
 
+  it("HI-3282: the old move to Done on a card Combwork already saw merged: its comment kept, report merge's answer said; with no merge seen, P3's plain answer", async () => {
+    const { w, repo, wt } = await workspace()
+    const card = await started(w, wt)
+    await update(w, card, builder, { column: 'review' }, 'Ready')
+    await update(w, card, reviewer, { review: 'passed', column: 'passed' }, 'PASSED')
+    await verdictSettled(w, repo)
+    // The builder merges; Combwork's reconciliation sees it first and finishes the card.
+    sh(repo, 'merge', '-q', '--no-ff', '-m', 'merge card', 'card')
+    await reconcileNow(w, repo)
+    expect(stage(w, card)).toBe('done')
+    const before = kinds(w, card)
+    const done = await update(w, card, builder, { column: 'done' }, 'Merged.')
+    expect(done.card.column).toBe('done')
+    expect(done.card.comments.at(-1)?.text).toBe('Merged.')
+    expect(done.said.some((l) => l.endsWith(' was already Done: Combwork saw its merge into main; nothing more to report.'))).toBe(true)
+    expect(done.said).toContain('As report merge: next time call cw_report_merge')
+    expect(kinds(w, card)).toEqual(before)
+    // A Done card with no merge seen (the user's): P3's answer as before, the comment kept, nothing said of a merge.
+    const other = await started(w, wt, 'o.txt')
+    await update(w, other, user, { column: 'done' })
+    const plain = await update(w, other, builder, { column: 'done' }, 'Done?')
+    expect(plain.card.comments.at(-1)?.text).toBe('Done?')
+    expect(plain.said.some((l) => l.includes('already Done') || l.includes('report merge'))).toBe(false)
+  })
+
   it('S26: a check that has not passed refuses the move to Review', async () => {
     const { w, wt } = await workspace({ ...PAIR, preChecks: ['lint'], commands: { lint: 'npm run lint' } })
     const card = await started(w, wt)

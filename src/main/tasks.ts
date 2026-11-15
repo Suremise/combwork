@@ -1654,8 +1654,29 @@ export async function updateTask(...args: Parameters<typeof updateTaskLocked>): 
   // An agent's column move or review, translated into its intent for one transition (#1268).
   const asAgent = await agentGateOf(ws, n, patch, actor)
   if (asAgent) return moveAsAgent(asAgent, n, patch, actor, opts)
+  const seen = await mergeSeenOnDone(ws, n, patch, actor)
   const reads = await gatherReads(ws, await planned(ws, [n], patch, actor))
-  return recording(actor, reads, () => boardLock(ws, () => updateTaskLocked(...args)))
+  const card = await recording(actor, reads, () => boardLock(ws, () => updateTaskLocked(...args)))
+  opts.said?.push(...seen)
+  return card
+}
+
+/**
+ * HI-3282: a project agent's old move to Done on a card already Done goes P3's way (it moves nothing; its comment is
+ * kept), and says what report merge would: the line that Combwork saw its merge, when it did this cycle. Null otherwise
+ * and the tool to call next time. None otherwise (any other Done card keeps P3's plain answer: nothing new is refused).
+ */
+async function mergeSeenOnDone(ws: WorkspaceService, n: number, patch: TaskPatch, actor: TaskActor): Promise<string[]> {
+  if (actor.kind !== 'agent' || !actor.self || patch.column !== 'done' || patch.review !== undefined) return []
+  const { workflowEnforced, workflowFor } = await import('./workflow/service')
+  const head = cardHeads(ws, [n])[0]
+  if (!ws.path || !workflowEnforced() || !head || head.column !== 'done' || typeof head.project !== 'string' || !head.project) return []
+  const wf = await workflowFor(ws, join(ws.path, head.project)).catch(() => null)
+  try {
+    return wf ? wf.mergeSeenLines(n) : []
+  } catch {
+    return []
+  }
 }
 
 /** An override is the user's or the Assistant's (SPEC §16.8.4): agents never override a rule. */
@@ -3162,8 +3183,12 @@ async function updateTasksUnbatched(numbers: number[], patch: BatchPatch, actor:
           // An agent's move, translated into its intent (#1268), as a single change's.
           const asAgent = await agentGateOf(workspace, n, patch, actor)
           if (asAgent) return await moveAsAgent(asAgent, n, patch, actor, { said, commit: opts.commit })
+          // HI-3282: a Done card's merge already seen, said as a single change's old move to Done says it.
+          const seen = await mergeSeenOnDone(workspace, n, patch, actor)
           // The locked change itself: the batch's reads were made before its lock, never under it (HR4's #1216 round 1).
-          return await updateTaskLocked(n, patch, actor, { said, commit: opts.commit })
+          const updated = await updateTaskLocked(n, patch, actor, { said, commit: opts.commit })
+          said.push(...seen)
+          return updated
         },
         (e) => e instanceof WorkflowRefusedError
       )

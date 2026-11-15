@@ -625,7 +625,7 @@
     "text": "The merge commit."
   },
   "tool.reportMerge.description": {
-    "text": "Report a card's work merged, where its agent merges it or merges aren't checked: Combwork checks the merge is in its target (unless the project doesn't check merges) and moves it to Done."
+    "text": "Report a card's work merged, where its agent merges it or merges aren't checked: Combwork checks the merge is in its target (unless the project doesn't check merges) and moves it to Done. A card Combwork already saw merged answers OK, already Done."
   },
   "tool.requestBuilder.description": {
     "text": "Ask a card's builder for something while you review it (a commit, a run); it is woken."
