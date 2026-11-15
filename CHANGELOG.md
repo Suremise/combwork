@@ -27,6 +27,7 @@
 
 ### Fixed
 
+- **Fewer typing pauses on a busy board** (HI-3291). Every change to any card made Combwork work out every project's merge queues again, reading each queue's whole history, which held up typing for a moment several times a minute with several agents at work. Now only the project whose cards changed has its queues worked out again, reading only what changed since the last time.
 - **Typing no longer waits for a burst of agent wakes** (HI-3298). When several agents were woken at once (a lane's cards moving), Combwork made and handed over each wake on the main process one after another without a break, so a key you pressed waited for all of them (about 60 ms for 20 wakes, longer on a busy machine). Your typing now gets its turn between each.
 - **Less typing lag while agents are woken** (HI-3290). Each change to a delivery (a wake, a card event, a message: about five saves each) checked, sized and read back every delivery the project keeps, a few MB with many agents, on the thread that carries your typing. A save now handles only the deliveries it changed: about 1.5 ms instead of 26 with 1,150 deliveries kept.
 - **Hovering a lane no longer slows typing** (HI-3294). Combwork worked out a lane's cost from scratch every time it was shown, on the main process every keystroke also goes through. It now keeps the cost until a session records more use, the board changes or prices change, and reads only the lane's own agents' sessions when it does work it out again.

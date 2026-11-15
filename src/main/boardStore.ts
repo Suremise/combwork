@@ -18,6 +18,7 @@ import { VALUES_STEP } from './schema/valuesStep'
 import { WORKSPACE_IDENTITY_STEP } from './schema/workspaceIdentityStep'
 import { JJ_PUBLISH_STEP } from './schema/jjPublishStep'
 import { REQUEST_RECEIPTS_STEP } from './schema/requestReceiptsStep'
+import { PROJECT_REVS_STEP } from './schema/projectRevsStep'
 import { addCommentArchive, allArchivedComments, archivedCommentCount, archivedCommentRows, archiveCommentRows, COMMENT_ARCHIVE_STEP, mayHaveLostCards, type Evicted } from './schema/commentArchive'
 import { backupsOf, beginTransaction, DbInUseError, fileSchemaVersion, groupBackupFamily, isIoError, openDb, OPENABLE_WAIT_MS, schemaVersion, soleCopy, untilOpenable, type Db, type Migration, type PendingGroup } from './db'
 import { checkpointsReleased, checkpointWhenIdle, timedCommit } from './walCheckpoint'
@@ -376,6 +377,14 @@ export const BOARD_MIGRATIONS: Migration[] = [
     name: REQUEST_RECEIPTS_STEP.name,
     group: UPGRADE_GROUP_ID,
     up: (db) => REQUEST_RECEIPTS_STEP.up(db)
+  },
+  {
+    // HI-3291: each project's revision and the facts' epoch, kept by triggers, for caches of a project's board reads (the
+    // queue listings, FactStore.factsOfKind) (schema/projectRevsStep.ts). In the 1.0 group, as 25–30 are.
+    version: 31,
+    name: PROJECT_REVS_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => PROJECT_REVS_STEP.up(db)
   }
 ]
 
@@ -929,6 +938,44 @@ export function boardReadToken(ws: WorkspaceService): string | null {
   // Inside a read's snapshot (readSnapshot), which may be older than what the token would name.
   if (b.db.reader.isTransaction) return null
   return `${b.generation}:${dbGenerationAt(b.place)}:${(b.version.get() as { data_version: number }).data_version}:${b.commits}`
+}
+
+/**
+ * HI-3291: a token for what is committed of one project's cards now: its rows, facts and the child tables a card is made
+ * of (schema/projectRevsStep.ts's `project_revs`, raised by triggers for every connection's writes), and the database's
+ * generation. With `also`, what else a cache is made from, read on the same snapshot. Null as boardReadToken is (inside a
+ * write, or a read's snapshot that may be older), and on a board without the revisions (one waiting for its upgrade): a
+ * cache keeps nothing then. Reading it changes nothing.
+ */
+export function projectRevision(ws: WorkspaceService, project: string, also?: (db: Db['reader']) => string): string | null {
+  const path = pathOf(ws)
+  if (inWrite(keyOf(path))) return null
+  const b = boardOf(path)
+  if (b.db.reader.isTransaction || b.legacy || b.db.pending) return null
+  try {
+    return readSnapshot(ws, (_b, db) => {
+      const g = (db.prepare('SELECT g FROM project_revs WHERE project = ?').get(project) as { g: number } | undefined)?.g ?? 0 // i18n-ignore: SQL
+      return [b.generation, dbGenerationAt(b.place), g, also?.(db) ?? ''].join('\n') // i18n-ignore: a key, never shown
+    })
+  } catch {
+    return null
+  }
+}
+
+/** HI-3291: which opening of which database the board reads now: another (replaced, opened again) means rowids read before name nothing. */
+export function boardDatabase(ws: WorkspaceService): string {
+  const b = boardOf(pathOf(ws))
+  return `${b.generation}:${dbGenerationAt(b.place)}`
+}
+
+/** HI-3291: the facts' epoch (schema/projectRevsStep.ts's `facts_epoch`) on a read's snapshot: raised whenever facts may have gone or changed hands. */
+export function factsEpochIn(db: Db['reader']): number {
+  return (db.prepare('SELECT g FROM facts_epoch').get() as { g: number } | undefined)?.g ?? 0 // i18n-ignore: SQL
+}
+
+/** HI-3291: the highest fact's rowid on a read's snapshot (0 for none): what a cache of facts read up to it starts above next time. */
+export function factsHighIn(db: Db['reader']): number {
+  return (db.prepare('SELECT max(rowid) AS m FROM card_facts').get() as { m: number | null }).m ?? 0 // i18n-ignore: SQL
 }
 
 /** The lanes were saved (storeTables.ts, in this process): the board's revision moves on. */

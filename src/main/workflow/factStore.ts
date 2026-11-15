@@ -13,7 +13,7 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import type { DatabaseSync } from 'node:sqlite'
 import { openDb, type Db } from '../db'
-import { BOARD_MIGRATIONS, boardChanged, boardRead, boardReadToken, boardWriteOp, takeNumberIn } from '../boardStore'
+import { BOARD_MIGRATIONS, boardChanged, boardDatabase, boardRead, boardReadToken, boardWriteOp, factsEpochIn, factsHighIn, takeNumberIn } from '../boardStore'
 import { decomposeCard, writeCardRows } from '../schema/cardRows'
 import { cardKeys, cardOfKey, currentKeys, keysHeld } from '../schema/keysStep'
 import { KEY_FORM, normalKey } from '../../shared/projectKeys'
@@ -166,6 +166,8 @@ interface Conn {
   close(): void
   /** What is committed now, as a token (boardReadToken): reads may be served from a cache while it is the same. Null: never. */
   token?(): string | null
+  /** HI-3291: which database it reads (boardDatabase): rowids kept from another name nothing. */
+  generation?(): string
 }
 
 /**
@@ -176,6 +178,7 @@ interface Conn {
 const boardConn = (ws: WorkspaceService): Conn => ({
   read: (fn) => boardRead(ws, fn),
   token: () => boardReadToken(ws),
+  generation: () => boardDatabase(ws),
   // A fact (observed ones too) changes what the window shows of a card (its work view, #1223): `tasks-changed` once
   // the change commits.
   write: (fn, quiet) => {
@@ -185,6 +188,18 @@ const boardConn = (ws: WorkspaceService): Conn => ({
   },
   close: () => undefined
 })
+
+/** HI-3291: what the facts committed now are (FactStore.marksNow): what a kept read needs no read for. */
+interface FactMarks {
+  epoch: number
+  high: number
+  from: number | null
+  cards: ReadonlySet<number>
+  kinds: ReadonlySet<string>
+}
+
+/** HI-3291: the most reads a store keeps across commits (FactStore.appended): its cards' facts and its kinds' (a queue listing reads about 60). */
+const KEPT_READS = 512
 
 /** SQLite undid a store's own transaction part way (a full disk, an I/O error): nothing of it was saved. */
 /**
@@ -212,6 +227,7 @@ export function withoutWriteFence<T>(fn: () => T): T {
 const fenced = (c: Conn): Conn => ({
   read: (fn) => c.read(fn),
   ...(c.token ? { token: () => c.token!() } : {}),
+  ...(c.generation ? { generation: () => c.generation!() } : {}),
   write: (fn, quiet) =>
     c.write((db) => {
       fences.getStore()?.()
@@ -553,15 +569,104 @@ export class FactStore {
 
   // --- Facts, rulesets, actions.
 
+  /** A card's facts, in its order. HI-3291: kept across commits as factsOfKind's are (`appended`), the card's index's range. */
   facts(card: number): Fact[] {
-    return this.cached(`card:${card}`, () => this.conn.read((db) => (db.prepare('SELECT * FROM card_facts WHERE card = ? ORDER BY seq').all(card) as Record<string, string | number | null>[]).map(factOf)))
+    const sql = (above: boolean): string => `SELECT rowid AS rid, * FROM card_facts WHERE card = ?${above ? ' AND rowid > ?' : ''} ORDER BY seq`
+    return this.cached(`card:${card}`, () => this.appended(`card:${card}`, (m) => m.cards.has(card), (db, above) => db.prepare(sql(above !== null)).all(card, ...(above === null ? [] : [above]))))
   }
 
-  /** This project's facts of a kind (or of any of these), in the order written (the queue's order). */
+  /**
+   * This project's facts of a kind (or of any of these), in the order written (the queue's order). HI-3291: kept across
+   * commits (`appended`), the kind index's range: the queue's listings, runner and host read a project's whole queue
+   * history this way at every board change, on main.
+   */
   factsOfKind(kind: FactKind | readonly FactKind[]): Fact[] {
     const kinds = typeof kind === 'string' ? [kind] : kind
-    const sql = `SELECT f.* FROM card_facts f JOIN cards c ON c.number = f.card WHERE f.kind IN (${kinds.map(() => '?').join(', ')}) AND c.project = ? ORDER BY f.rowid`
-    return this.cached(`kinds:${kinds.join(',')}`, () => this.conn.read((db) => (db.prepare(sql).all(...kinds, this.scope.project) as Record<string, string | number | null>[]).map(factOf)))
+    const sql = (above: boolean): string => `SELECT f.rowid AS rid, f.* FROM card_facts f JOIN cards c ON c.number = f.card WHERE f.kind IN (${kinds.map(() => '?').join(', ')}) AND c.project = ?${above ? ' AND f.rowid > ?' : ''} ORDER BY f.rowid`
+    return this.cached(`kinds:${kinds.join(',')}`, () => this.appended(`kinds:${kinds.join(',')}`, (m) => kinds.some((k) => m.kinds.has(k)), (db, above) => db.prepare(sql(above !== null)).all(...kinds, this.scope.project, ...(above === null ? [] : [above]))))
+  }
+
+  /**
+   * HI-3291: facts kept across commits by what was read (`key`), each commit's read only those appended since: the rows
+   * above the highest rowid kept, on the same snapshot as the facts' epoch it checks (schema/projectRevsStep.ts). An epoch
+   * moved (a fact deleted or rewritten, a card deleted or moved between projects), another database, or none kept yet, and
+   * they are all read again. A fact is appended above every rowid and seq committed before it (one writer at a time, its
+   * seq its card's next), and never changes without moving the epoch. Inside a write or an older snapshot (no read token),
+   * or on a store that never caches, nothing is kept. `read` gives the rows with their `rid`, all of them (`above` null) or
+   * those above a rowid, in the order kept. Without reading at all where the commit's marks (`marksNow`) say none of the
+   * facts appended since the kept read touch it (`touched`: its card, or one of its kinds).
+   */
+  private appended(key: string, touched: (m: FactMarks) => boolean, read: (db: DatabaseSync, above: number | null) => unknown[]): Fact[] {
+    const rows = (db: DatabaseSync, above: number | null): { rid: number; fact: Fact }[] => (read(db, above) as Record<string, string | number | null>[]).map((r) => ({ rid: r.rid as number, fact: factOf(r) }))
+    const gen = this.conn.generation?.()
+    if (gen === undefined || this.readToken() === null) return this.conn.read((db) => rows(db, null).map((r) => r.fact))
+    const m = this.marksNow(gen)
+    const was = this.kept.get(key)
+    if (m && m.from !== null && was && was.gen === gen && was.epoch === m.epoch && was.hw >= m.from && !touched(m)) {
+      was.hw = Math.max(was.hw, m.high)
+      return was.facts
+    }
+    return this.conn.read((db) => {
+      let epoch: number
+      try {
+        epoch = factsEpochIn(db)
+      } catch {
+        // A board without the epoch (waiting for its upgrade): read whole, nothing kept.
+        this.kept.delete(key)
+        return rows(db, null).map((r) => r.fact)
+      }
+      const had = this.kept.get(key)
+      const same = !!had && had.gen === gen && had.epoch === epoch
+      const got = rows(db, same ? had!.hw : null)
+      const kept = same ? had! : { gen, epoch, hw: 0, facts: [] as Fact[] }
+      for (const r of got) kept.facts.push(r.fact)
+      // Read to the board's highest fact on this snapshot, not the highest of these: the next read's range starts above
+      // every fact committed now, whoever's (a project whose last request is old would read every later one again).
+      kept.hw = factsHighIn(db)
+      // Most recently read last; the oldest dropped past KEPT_READS.
+      this.kept.delete(key)
+      this.kept.set(key, kept)
+      while (this.kept.size > KEPT_READS) this.kept.delete(this.kept.keys().next().value!)
+      return kept.facts
+    })
+  }
+
+  /** HI-3291: facts kept across commits (`appended`), by what was read, with the database, epoch and highest rowid they were read to. */
+  private readonly kept = new Map<string, { gen: string; epoch: number; hw: number; facts: Fact[] }>()
+
+  /** HI-3291: the facts appended by the commits since the store's previous marks (marksNow), as of the read token they were made at. */
+  private marks: (FactMarks & { token: string; gen: string }) | null = null
+
+  /**
+   * HI-3291: what the facts committed now are, read once per read token on one snapshot: the epoch, the highest rowid, and
+   * the cards and kinds of the facts appended since the previous marks (`from`, its highest; null when they can't say: none
+   * yet, another database or the epoch moved). A kept read at or above `from` whose card or kinds none of them touch has
+   * every fact it would read, up to `high`. Null where nothing is kept (no token; a board without the epoch).
+   */
+  private marksNow(gen: string): FactMarks | null {
+    const token = this.readToken()
+    if (token === null) return null
+    if (this.marks?.token === token && this.marks.gen === gen) return this.marks
+    const prev = this.marks
+    try {
+      this.marks = this.conn.read((db) => {
+        const epoch = factsEpochIn(db)
+        const high = factsHighIn(db)
+        const from = prev && prev.gen === gen && prev.epoch === epoch && prev.high <= high ? prev.high : null
+        const cards = new Set<number>()
+        const kinds = new Set<string>()
+        if (from !== null && high > from) {
+          for (const r of db.prepare('SELECT card, kind FROM card_facts WHERE rowid > ? AND rowid <= ?').all(from, high) as { card: number; kind: string }[]) {
+            cards.add(r.card)
+            kinds.add(r.kind)
+          }
+        }
+        return { token, gen, epoch, high, from, cards, kinds }
+      })
+    } catch {
+      this.marks = null
+    }
+    return this.marks
   }
 
   /**

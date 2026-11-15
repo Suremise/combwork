@@ -26,7 +26,8 @@ import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
 import { withFileLock } from '../fsutil'
 import { CW_DIR } from '../../shared/defaults'
-import { boardRevision } from '../boardStore'
+import { projectRevision } from '../boardStore'
+import type { DatabaseSync } from 'node:sqlite'
 import { runCardIntent } from '../cardIntents'
 import { measured } from '../stallWork'
 import { onCombworkEvent } from '../events'
@@ -131,31 +132,108 @@ onCombworkEvent((e) => {
 })
 
 /**
- * What a project's queue listings are made from, as a token: the board's revision (its facts, pauses, leases and seen
- * returns, committed here or by another process), this Combwork's hosts of the project's queues, its options written, the
- * rules switch and the test seam. Null when the board can't say (no listing is kept then).
+ * What a project's queue listings are made from, as a token (HI-3291: the project's own, so another project's change keeps
+ * them): its cards' revision (their rows, facts and child rows, committed here or by another process: projectRevision) and
+ * its queue tables on the same snapshot (queueTables), this Combwork's hosts of the project's queues, its options written,
+ * the rules switch and the test seam. Null when the board can't say (no listing is kept then).
  */
 function viewsStamp(ws: WorkspaceService, projectPath: string): string | null {
   if (!ws.path) return null
+  const name = boardName(ws, projectPath)
+  if (!name) return null
   try {
-    return [boardRevision(ws), queueHostsStamp(ws, projectPath), optionsWritten, workflowEnforced(), process.env.CW_TEST_QUEUE_RETURNS ?? ''].join('\n')
+    const rev = projectRevision(ws, name, (db) => queueTables(db, name))
+    if (rev === null) return null
+    return [rev, queueHostsStamp(ws, projectPath), optionsWritten, workflowEnforced(), process.env.CW_TEST_QUEUE_RETURNS ?? ''].join('\n')
   } catch {
     return null
   }
 }
 
+/** A project's name on the board (its cards' `project`, its store's scope), as the workflow's store has it. */
+function boardName(ws: WorkspaceService, projectPath: string): string | null {
+  return ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.name ?? null
+}
+
+/**
+ * HI-3291: a project's queue tables as a token, on the caller's snapshot: its pauses (their files and commands), seen
+ * returns, runners (who holds each target: not when a lease was renewed, which shows nothing) and its workflow values
+ * (`workflow:<project>:…` in board_meta: purge marks, catch-up, push logs). Each is a few rows.
+ */
+function queueTables(db: DatabaseSync, project: string): string {
+  const all = (sql: string, ...args: string[]): unknown[] => db.prepare(sql).all(...args)
+  const prefix = `workflow:${project.toLowerCase()}:`
+  return JSON.stringify([
+    all('SELECT * FROM workflow_queue_pauses WHERE project = ? ORDER BY target', project), // i18n-ignore: SQL
+    all('SELECT * FROM workflow_queue_pause_files WHERE project = ? ORDER BY target, ord', project), // i18n-ignore: SQL
+    all('SELECT * FROM workflow_queue_pause_commands WHERE project = ? ORDER BY target, ord', project), // i18n-ignore: SQL
+    all('SELECT * FROM workflow_queue_pause_command_args WHERE project = ? ORDER BY target, command, ord', project), // i18n-ignore: SQL
+    all('SELECT entry, seen_at FROM workflow_queue_seen WHERE project = ? ORDER BY entry', project), // i18n-ignore: SQL
+    all('SELECT target, lease, token, profile, pid, started, taken_at FROM queue_runners WHERE project = ? ORDER BY target', project), // i18n-ignore: SQL
+    // board_meta's key is its primary key: a range of it (';' is the character after ':').
+    all('SELECT key, value FROM board_meta WHERE key >= ? AND key < ? ORDER BY key', prefix, `${prefix.slice(0, -1)};`) // i18n-ignore: SQL
+  ])
+}
+
+/**
+ * HI-3291: what a project's listings take from the board alone, kept while its stamp (viewsStamp) is unchanged and until the
+ * first seen return folds (`until`): its open cards, its cards in flight and each target's view. The listing's own
+ * VIEWS_KEPT_MS is for what it reads from git (the default branch, the targets, how far behind): once that is up, a listing
+ * is made again reading git, and this part is reused. One a project, per workspace.
+ */
+interface BoardPart {
+  stamp: string
+  until: number
+  inFlight: Map<string, number[]>
+  open: ReadonlyMap<number, CardRecord>
+  views: Map<string, QueueView>
+}
+const boardParts = new WeakMap<WorkspaceService, Map<string, BoardPart>>()
+
+/** The board part for a stamp: the one kept, or a new one (none kept without a stamp). */
+function boardPart(ws: WorkspaceService, wf: Workflow, projectPath: string, stamp: string | null): BoardPart {
+  const now = Date.now()
+  let byProject = boardParts.get(ws)
+  if (!byProject) boardParts.set(ws, (byProject = new Map()))
+  const key = projectPath.toLowerCase()
+  const had = byProject.get(key)
+  if (stamp !== null && had && had.stamp === stamp && had.until > now) return had
+  // A return seen leaves RETURN_SEEN_SHOWN_MS after it was seen (recentOutcomes reads the clock): kept until the first does.
+  const folds = [...wf.store.queueSeen().values()].map((at) => Date.parse(at) + RETURN_SEEN_SHOWN_MS).filter((t) => t > now)
+  const part: BoardPart = {
+    stamp: stamp ?? '',
+    until: stamp === null ? 0 : Math.min(Infinity, ...folds),
+    // Named in a stall they make (HI-3293).
+    inFlight: measured('queue cards in flight', () => cardsInFlightByTarget(wf)), // i18n-ignore: a stall label for combwork.log, in English
+    open: measured('queue open cards', () => new Map(wf.store.cardsOpen().map((c) => [c.id, c]))), // i18n-ignore: a stall label for combwork.log, in English
+    views: new Map(),
+  }
+  if (stamp === null) byProject.delete(key)
+  else byProject.set(key, part)
+  return part
+}
+
 async function makeViews(ws: WorkspaceService, projectPath: string, target: string | undefined, window: boolean): Promise<QueueView[]> {
   const wf = await workflowFor(ws, projectPath)
   if (!wf) return []
+  // HI-3291: the board part on the stamp as it is now, after the await (a change meanwhile has a stamp of its own).
+  const part = boardPart(ws, wf, projectPath, viewsStamp(ws, projectPath))
   // HI-2994: read for every listing, the window's or the API's: a queue's cards in flight keep it from being a past
   // branch's (markPast, HI-2927), for agents as for the user.
-  const scope = await queueScope(wf, projectPath)
+  const scope = await queueScope(wf, projectPath, part)
   // HI-2679: each of the project's targets that exists, so a destination with nothing queued yet has its card (its
   // reminder and its Bring up to date… button), and its queue is cw_queue's too.
   const targets = scope.current ? await existingTargets(ws, projectPath) : []
   const also = [...scope.inFlight.keys(), ...(scope.current ? [scope.current] : []), ...targets]
+  // Each target's view from the board part, a copy (the listing marks it past and adds its forward merges).
+  const viewOf = (t: string): QueueView => {
+    const k = `${t}\n${window ? 'window' : ''}` // i18n-ignore: a key, never shown
+    let v = part.views.get(k)
+    if (!v) part.views.set(k, (v = queueView(ws, wf, projectPath, t, scope, window)))
+    return { ...v }
+  }
   // Named in a stall it makes (HI-3293): each queue's facts folded on main.
-  const views = measured('queue views', () => (target ? [target] : queueTargets(wf, also)).map((t) => queueView(ws, wf, projectPath, t, scope, window))) // i18n-ignore: a stall label for combwork.log, in English
+  const views = measured('queue views', () => (target ? [target] : queueTargets(wf, also)).map(viewOf)) // i18n-ignore: a stall label for combwork.log, in English
   markPast(views, await projectTargets(ws, projectPath).catch(() => null))
   // HI-2885: from the sources allowed (the default branch too), so a project with one target still brings it up to date with main.
   // HI-2892: only those in the release path's direction into it: none offered, none counted, against it.
@@ -261,15 +339,15 @@ export async function commitsBehind(projectPath: string, from: string, to: strin
  * started with, so after a switch to "The agent merges" its queue stays until its last entry has an outcome), and the
  * target its current options merge into.
  */
-async function queueScope(wf: Workflow, projectPath: string): Promise<QueueScope> {
-  const inFlight = measured('queue cards in flight', () => cardsInFlightByTarget(wf)) // i18n-ignore: a stall label for combwork.log, in English
+async function queueScope(wf: Workflow, projectPath: string, part?: BoardPart): Promise<QueueScope> {
+  const inFlight = part?.inFlight ?? measured('queue cards in flight', () => cardsInFlightByTarget(wf)) // i18n-ignore: a stall label for combwork.log, in English
   const o = wf.currentRuleset(false).options
   let current: string | null = null
   if (merges(o.platform) && o.finish === 'combworkMerges') {
     const def = o.target ? o.target : await lineHistory().defaultTarget(projectPath).catch(() => null)
     current = def && !isUnknown(def) ? def : null
   }
-  return { inFlight, current, open: measured('queue open cards', () => new Map(wf.store.cardsOpen().map((c) => [c.id, c]))) } // i18n-ignore: a stall label for combwork.log, in English
+  return { inFlight, current, open: part?.open ?? measured('queue open cards', () => new Map(wf.store.cardsOpen().map((c) => [c.id, c]))) } // i18n-ignore: a stall label for combwork.log, in English
 }
 
 /** Per target, the cards in flight whose own ruleset has Combwork merge into it, in number order (QueueScope.inFlight). */
