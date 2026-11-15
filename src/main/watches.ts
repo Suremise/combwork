@@ -1150,8 +1150,13 @@ export async function endWatchOf(projectPath: string, agentId: string, why: stri
  * caller's synchronous reading of the lane as it is then (HR1 on HI-2889), run under the lock just before the record is
  * removed: its cards now when the start is still due on a builder still watching, else null and nothing is ended (a lane
  * paused, ended, reassigned or changed while this waited for the lock).
+ *
+ * HI-3300: a card watch on cards of that lane alone that aren't started yet (`unstarted`: its own open cards in Todo or On
+ * Hold, from its next card on) is ended the same way. After a Done, `cw_lane next` said "waiting for the user on CL-305",
+ * so CB1 watched CL-305; the Assistant then put CL-310 ahead of it, and CL-310 sat until the stall 34 min later. Such a
+ * watch waits for the lane to reach those cards, which it does after the card now started.
  */
-export async function endOwnLaneWatch(projectPath: string, agentId: string, laneId: string, current: () => readonly number[] | null): Promise<string | null> {
+export async function endOwnLaneWatch(projectPath: string, agentId: string, laneId: string, current: () => LaneCardsNow | null): Promise<string | null> {
   const ws = workspaceFor(projectPath)
   if (!ws?.path) return null
   const store = await load(ws)
@@ -1161,8 +1166,8 @@ export async function endOwnLaneWatch(projectPath: string, agentId: string, lane
     await testHooks.inOwnLaneEnd?.()
     // Read again after any await: the record as it is now, and the lane.
     if (recordOf(store, projectPath, agentId) !== r || r.fired || store.delivering.has(r.id)) return null
-    const cards = current()
-    if (!cards || !ownLaneOnly(r, { id: laneId, cards })) return null
+    const now = current()
+    if (!now || !ownLaneOnly(r, { id: laneId, ...now })) return null
     const before = store.list
     store.list = store.list.filter((x) => x !== r)
     try {
@@ -1180,10 +1185,20 @@ export async function endOwnLaneWatch(projectPath: string, agentId: string, lane
   return infoOf(rec).label
 }
 
-/** HI-2889: a watch on lane `lane` alone (no other lane, nor "all"), no agents or usage beside it, and only cards of that lane. */
-function ownLaneOnly(r: WatchRecord, lane: { id: string; cards: readonly number[] }): boolean {
-  if (!r.lanes || r.lanes.ids === 'all' || !r.lanes.ids.length || r.lanes.ids.some((id) => id !== lane.id)) return false
+/** A lane's cards as endOwnLaneWatch's caller reads them: all of them, and those not started yet from its next card on (HI-3300). */
+export interface LaneCardsNow {
+  cards: readonly number[]
+  unstarted: readonly number[]
+}
+
+/**
+ * HI-2889: a watch on lane `lane` alone (no other lane, nor "all"), no agents or usage beside it, and only cards of that
+ * lane. HI-3300: or a card watch (no lanes, agents or usage) on only the lane's cards not started yet.
+ */
+function ownLaneOnly(r: WatchRecord, lane: { id: string } & LaneCardsNow): boolean {
   if (r.agents || r.usage) return false
+  if (!r.lanes) return r.cond.cards.length > 0 && r.cond.cards.every((n) => lane.unstarted.includes(n))
+  if (r.lanes.ids === 'all' || !r.lanes.ids.length || r.lanes.ids.some((id) => id !== lane.id)) return false
   return r.cond.cards.every((n) => lane.cards.includes(n))
 }
 

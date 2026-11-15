@@ -1,6 +1,6 @@
 import { join } from 'path'
 import type { TaskCard } from '../shared/types'
-import { laneStartDue, type LaneSlotHeld, type LaneStartWait, type LaneStartWhy } from '../shared/lanes'
+import { laneStartDue, ownOpen, type LaneSlotHeld, type LaneStartWait, type LaneStartWhy } from '../shared/lanes'
 import { cardRef } from '../shared/projectKeys'
 import { agentMsg, inDialectOf, say } from '../shared/agentText'
 import { agentNowOf } from './cardStall'
@@ -19,7 +19,7 @@ import { sessions } from './sessions'
 import { startTask } from './taskStart'
 import { CW_LANE_START, WorkflowRefusedError } from './tasks'
 import { teamPauseOf } from './teamPause'
-import { endOwnLaneWatch } from './watches'
+import { endOwnLaneWatch, type LaneCardsNow } from './watches'
 import { inWorkspace, openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
 
 /**
@@ -29,7 +29,7 @@ import { inWorkspace, openWorkspaces, workspaceFor, type WorkspaceService } from
  * through the start's rules): its slot lent and the builder placed there, typed into it idle, or started with it when
  * it isn't running. A builder in a turn (reading the Done wake, finishing a follow-up) is waited for until its turn
  * ends; one waiting on a watch, or whose last start failed, is left to the lane-next stall (HI-1741), except a watch on
- * its own lane alone, which the start ends (HI-2889, endOwnLaneWatch). LE-250's builder
+ * its own lane alone or on its cards not started yet alone, which the start ends (HI-2889, HI-3300, endOwnLaneWatch). LE-250's builder
  * read its Done and went idle, and the lane sat until the Assistant started LE-246 by hand. The lane's first card too
  * (HI-2029), once the lane's own start has launched its agents (holdLaneStart) and its builder is free: a lane started
  * over a running builder sat "active" for hours with its first card in Todo.
@@ -279,11 +279,17 @@ async function lookAt(ws: WorkspaceService, path: string, found: PassFound, fenc
     // Its turn over, watching its own lane alone (HI-2889: HB2 after each Done, the lane's card waiting 15 min for the
     // lane-next stall): that watch waits for what this start is, so it ends and the card starts. A watch on anything
     // else (another card, an agent, usage, other lanes) is the builder's own wait, still left to the stall.
+    // A watch on its lane's cards not started yet alone is the same wait (HI-3300: CB1 watched CL-305, waiting for the user,
+    // when CL-310 was put ahead of it): the lane reaches them after this card.
     // Decided again under the watch's lock, just before it is removed (HR1 on HI-2889): this look still current, the card
     // still due on the same builder, still watching, and the lane's cards as they are then.
-    const watchingOwnLane = (): readonly number[] | null => {
+    const watchingOwnLane = (): LaneCardsNow | null => {
       if (!fence.current() || !stillDue(ws, path, lane, next.number) || sessions.liveFor(projectPath, lane.builder.id)?.status !== 'watching') return null
-      return laneNow(ws, { lane: lane.id })?.cards.map((c) => c.number) ?? null
+      const v = laneNow(ws, { lane: lane.id })
+      if (!v) return null
+      const due = v.cards.findIndex((c) => c.number === next.number)
+      if (due < 0) return null
+      return { cards: v.cards.map((c) => c.number), unstarted: v.cards.slice(due).filter((c) => ownOpen(c) && (c.column === 'todo' || c.column === 'hold')).map((c) => c.number) }
     }
     if (holds === 'watching' && watchingOwnLane() && (await endOwnLaneWatch(projectPath, lane.builder.id, lane.id, watchingOwnLane)) !== null) holds = await builderWait(projectPath, lane.builder)
     if (holds) {
