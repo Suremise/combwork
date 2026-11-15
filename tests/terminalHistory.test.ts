@@ -329,3 +329,95 @@ describe("a running terminal's replay", () => {
     expect(await history.replay()).toBe('\x1b[?1049hfirst screen')
   })
 })
+
+// HI-3275 (bug hunt HI-3258): what the dropped part set that only shows later. `dropped` falls off the queue, `kept` stays,
+// and the view of the replay and a terminal given everything are then given `after` alike: they must match.
+async function afterReplay(dropped: string, kept: string, after: string, cols = 20, rows = 8): Promise<[unknown, unknown]> {
+  const { live, history, out } = pair(cols, rows, kept.length)
+  await out(dropped)
+  await out(kept)
+  // What was dropped fell off the queue (a sequence it cut in two held back, before what is kept).
+  expect(history.raw().endsWith(kept) && history.raw().length < dropped.length + kept.length).toBe(true)
+  const shown = await view(history, cols, rows)
+  await write(shown, after)
+  await write(live, after)
+  return [state(shown), state(live)]
+}
+
+const LINES = '1\r\n2\r\n3\r\n4\r\n5\r\n6'
+
+describe("a running terminal's replay, for what the dropped part set and later output uses (HI-3275)", () => {
+  it('1. a scroll region the alternate screen had in an earlier session isn’t applied to this one', async () => {
+    const [shown, live] = await afterReplay(`\x1b[?1049h\x1b[2;5r\x1b[?1049l\x1b[?1049h${LINES}`, '\x1b[1;1Htop', '\x1b[5;1Hfive\n\nnext')
+    expect(shown).toEqual(live)
+  })
+
+  it('2. the normal screen’s scroll region, snapshotted while the alternate screen is in use, applies once it is back', async () => {
+    const [shown, live] = await afterReplay(`${LINES}\x1b[2;5r\x1b[?1049h`, 'alt', '\x1b[?1049l\x1b[5;1Hfive\nnext')
+    expect(shown).toEqual(live)
+    expect((live as { lines: string[] }).lines[3]).toBe('five')
+  })
+
+  it('3. the saved cursor and rendition (DECSC, and ?1049h’s) are restored where the program restores them', async () => {
+    const decsc = await afterReplay('\x1b[3;4H\x1b[31m\x1b7\x1b[0m\x1b[1;1H', 'top', '\x1b8X')
+    expect(decsc[0]).toEqual(decsc[1])
+    const alt = await afterReplay('\x1b[3;4H\x1b[32m\x1b[?1049h\x1b[0m', 'alt', '\x1b[?1049lY')
+    expect(alt[0]).toEqual(alt[1])
+    // The alternate screen's own saved cursor, while it is in use.
+    const inAlt = await afterReplay('\x1b[?1049h\x1b[4;6H\x1b[33m\x1b7\x1b[0m\x1b[1;1H', 'alt', '\x1b8Z')
+    expect(inAlt[0]).toEqual(inAlt[1])
+  })
+
+  // HR1's round 1: xterm keeps a saved cursor's row among the buffer's lines, scrollback included: the replay restores it
+  // to the same screen row once the normal screen has scrollback, and to the top row once it has scrolled off.
+  const SCROLLED = Array.from({ length: 15 }, (_, i) => `line${i}\r\n`).join('')
+  it('3. …with scrollback above: on the screen row it was saved on (DECSC, and ?1049h’s)', async () => {
+    const decsc = await afterReplay(`${SCROLLED}\x1b[3;4H\x1b[32m\x1b7\x1b[0m\x1b[1;1H`, 'top', '\x1b8X')
+    expect(decsc[0]).toEqual(decsc[1])
+    expect((decsc[1] as { cursor: number[] }).cursor).toEqual([4, 2])
+    const alt = await afterReplay(`${SCROLLED}\x1b[3;4H\x1b[32m\x1b[?1049h\x1b[0m`, 'alt', '\x1b[?1049lY')
+    expect(alt[0]).toEqual(alt[1])
+  })
+
+  it('3. …and saved on a row that has scrolled off since: restored to the top row, as xterm does', async () => {
+    const [shown, live] = await afterReplay(`\x1b[6;3H\x1b[35m\x1b7\x1b[0m${'\r\n'.repeat(12)}more`, 'top', '\x1b8Q')
+    expect(shown).toEqual(live)
+    expect((live as { cursor: number[] }).cursor).toEqual([3, 0])
+  })
+
+  it('3. …and a restore in the dropped part sets the rendition text after it is drawn with back to the one saved', async () => {
+    const [shown, live] = await afterReplay('\x1b[32m\x1b7\x1b[31m\x1b8', 'a', 'Z')
+    expect(shown).toEqual(live)
+    const [shownAlt, liveAlt] = await afterReplay('\x1b[32m\x1b[?1049h\x1b[31m\x1b[?1049l', 'a', 'Z')
+    expect(shownAlt).toEqual(liveAlt)
+  })
+
+  it('4. the normal screen’s cursor on a full row comes back where it was, not a column short', async () => {
+    const [shown, live] = await afterReplay(`${'w'.repeat(20)}\x1b[1;10H\x1b[?1049h`, 'alt', '\x1b[?1049lZ')
+    expect(shown).toEqual(live)
+  })
+
+  it('a scroll region set with origin mode on is still restored', async () => {
+    const [shown, live] = await afterReplay(`${LINES}\x1b[3;6r\x1b[?6h`, 'x', '\x1b[4;1Hfour\n\n\nnext')
+    expect(shown).toEqual(live)
+  })
+
+  // Every cut through a stream that sets regions in both screens, saves cursors and renditions in both, and restores them.
+  it('is the same wherever the cut falls in output that saves and restores cursors and regions in both screens', async () => {
+    const stream = `${LINES}\x1b[2;5r\x1b[3;4H\x1b[32m\x1b7\x1b[0m\x1b[?1049h\x1b[3;6r\x1b[33m\x1b[2;2H\x1b7\x1b[0malt\x1b[6;1H\n\x1b8X\x1b[?1049l\x1b8Y\x1b[5;1H\n\nZ\x1b[?1049h\x1b[5;1H\n\nW`
+    const differed: string[] = []
+    await Promise.all(Array.from({ length: stream.length - 1 }, (_, i) => i + 1).map(async (k) => {
+      // completeUpTo holds back a sequence cut in two, so any cut is a fair one.
+      const [shown, live] = await afterReplay(stream.slice(0, k), stream.slice(k), '\x1b8V\x1b[?1049l\x1b8U')
+      if (JSON.stringify(shown) !== JSON.stringify(live)) differed.push(`cut at ${k}: ${JSON.stringify(stream.slice(k - 3, k + 3))}`)
+    }))
+    expect(differed.slice(0, 5), `${differed.length} differed`).toEqual([])
+  })
+
+  it('5. a blank row above a wrapped one comes back blank, with no "-" left in its first column', async () => {
+    // Row 1 full and wrapping onto row 2, then emptied: row 2 is still its continuation.
+    const [shown, live] = await afterReplay(`${'a'.repeat(25)}\x1b[1;1H\x1b[2K`, '\x1b[5;1Hx', '')
+    expect(shown).toEqual(live)
+    expect((shown as { lines: string[] }).lines[0]).toBe('')
+  })
+})
