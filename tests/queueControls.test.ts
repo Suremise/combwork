@@ -575,6 +575,23 @@ describe("the returns policy (#1356, HR3's rounds 1 to 4): every unseen return r
     expect((await view()).returns).toEqual([])
   })
 
+  it("HI-3291: with no board write, a listing made again after its git window reuses its board part, and a seen return still leaves at its 10 s", async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now(), shouldAdvanceTime: true })
+    const { card, view, see } = await returned(0)
+    const v = await view()
+    await see(shown(v))
+    const seen = await view()
+    expect(seen.returns).toMatchObject([{ card, seen: expect.any(String) }])
+    // The listing's git window (5 s) up, its return's 10 s not: made again, the board part's view the same one.
+    vi.setSystemTime(Date.now() + 5_500)
+    const again = await view()
+    expect(again).not.toBe(seen)
+    expect(again.returns).toBe(seen.returns)
+    // Its 10 s up, nothing written to the board meanwhile: gone.
+    fold()
+    expect((await view()).returns).toEqual([])
+  })
+
   it('more than two full pages on an idle queue: each page stays whole until it folds, then the next comes; the original is reached', async () => {
     vi.useFakeTimers({ toFake: ['Date'], now: Date.now(), shouldAdvanceTime: true })
     process.env.CW_TEST_QUEUE_RETURNS = '20'
@@ -879,10 +896,13 @@ describe("a project's queue listings, worked out once per state (HI-1683)", () =
     expect(second).not.toBe(first)
     expect(second).toEqual(first)
     expect(await list()).toBe(second)
-    // ...another process's commit to the board (read before Combwork's poll tells it)...
+    // ...another process's commit to the board (read before Combwork's poll tells it): one of the project's own
+    // (HI-3291: a value of its workflow), not one of nobody's, which keeps the listing...
     const other = new DatabaseSync(store.boardFile(ws), { timeout: 5000 })
     try {
       other.prepare("INSERT INTO board_meta (key, value) VALUES ('hi1683-probe', '1')").run()
+      expect(await list()).toBe(second)
+      other.prepare("INSERT INTO board_meta (key, value) VALUES ('workflow:p:hi1683-probe', '1')").run()
     } finally {
       other.close()
     }
@@ -900,5 +920,40 @@ describe("a project's queue listings, worked out once per state (HI-1683)", () =
     // A pause (a board change) shows at once.
     await inWorkspace(w, () => pauseQueue(w, repo, 'main', 'user'))
     expect((await list())[0].paused).toMatchObject({ reason: 'user' })
+  })
+
+  it("HI-3291: another project's card changing keeps the listing; each child-only write to its own card at the board's top revision makes it again", async () => {
+    const { DatabaseSync } = await import('node:sqlite')
+    const { writeCardOutside } = await import('./boardDb')
+    const { w, wt, repo, ws } = await workspace()
+    const card = await approved(w, wt)
+    const list = () => inWorkspace(w, () => queueViews(w, repo, undefined, true))
+    const first = await list()
+    // Another project's card, made and changed (another Combwork's writes): the same listing.
+    const doc = { number: 9001, title: 'Elsewhere', project: 'other', column: 'todo', order: 1, history: [], comments: [] }
+    writeCardOutside(ws, 9001, doc)
+    expect(await list()).toBe(first)
+    writeCardOutside(ws, 9001, { ...doc, title: 'Elsewhere, renamed' })
+    expect(await list()).toBe(first)
+    await inWorkspace(w, () => tasks.commentTask(9001, 'not this project', user))
+    expect(await list()).toBe(first)
+    // Two child-only writes to the queued card, each its own commit, no fact, its row as it was: made again after each.
+    const db = store.workspaceDb(ws).reader
+    const top = (): boolean => (db.prepare('SELECT rev FROM cards WHERE number = ?').get(card) as { rev: number }).rev === (db.prepare('SELECT g FROM board_rev').get() as { g: number }).g
+    await store.boardWrite(w, async () => void store.boardWriteOp(w, (d) => d.prepare("INSERT INTO card_labels (card, ord, label) VALUES (?, 0, 'one')").run(card)))
+    expect(top()).toBe(true)
+    const second = await list()
+    expect(second).not.toBe(first)
+    expect(await list()).toBe(second)
+    const other = new DatabaseSync(store.boardFile(ws), { timeout: 5000 })
+    try {
+      other.prepare("INSERT INTO card_labels (card, ord, label) VALUES (?, 1, 'two')").run(card)
+    } finally {
+      other.close()
+    }
+    expect(top()).toBe(true)
+    const third = await list()
+    expect(third).not.toBe(second)
+    expect(third[0].queued.map((q) => q.card)).toEqual([card])
   })
 })
