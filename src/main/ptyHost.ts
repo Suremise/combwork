@@ -323,11 +323,6 @@ export function ptyBuffer(key: string): Promise<string> {
   return entries.get(key)?.history.replay() ?? Promise.resolve('')
 }
 
-/** Its output as it came, the latest MAX_RAW of it (no snapshot): what came after a mark is past it (HI-3311). */
-export function ptyOutput(key: string): string {
-  return entries.get(key)?.history.raw() ?? ''
-}
-
 export function hasPty(key: string): boolean {
   return entries.has(key)
 }

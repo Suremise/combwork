@@ -864,8 +864,6 @@ export interface CombworkRequests {
   'pty:resize': (key: string, cols: number, rows: number) => void
   /** What a new view of a running terminal replays: its state where the kept output starts (screen, modes), then that output (HI-3252). */
   'pty:buffer': (key: string) => string
-  /** Test copies only (HI-3311): its output as it came, the latest of it, so a test reads what came after a mark (pty:buffer may be the screen drawn afresh). */
-  'pty:output': (key: string) => string
   /** Its process's size now, or the size the next one starts at without one (HI-2250): a terminal shown before the window has fitted it draws at that size. */
   'pty:size': (key: string) => { cols: number; rows: number }
   'pty:kill': (key: string) => void
