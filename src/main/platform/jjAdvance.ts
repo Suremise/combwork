@@ -22,7 +22,7 @@
 // the `args` attribute) are jj 0.47.1's mechanics, not an API: anything unexpected is uncertain, never worked around.
 
 import { createHash } from 'crypto'
-import { mkdir, open, readdir, readFile, rename } from 'original-fs/promises'
+import { mkdir, open, readdir, readFile, rename, stat, unlink } from 'original-fs/promises'
 import { join } from 'path'
 import type { RunResult } from './repoContext'
 import { JJ_READ, type JjRunner } from './jjRunner'
@@ -255,15 +255,102 @@ export async function writeDurable(file: string, text: string): Promise<void> {
 
 const safe = (s: string): string => s.replace(/[^A-Za-z0-9_-]/g, '_')
 
-/** Where a project's advance journals live (`<workspace>/.combwork/jj-advance`), one file per attempt. */
+/** A file removed; one already gone is fine. */
+async function gone(file: string): Promise<void> {
+  try {
+    await unlink(file)
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e
+  }
+}
+
+/**
+ * HI-3264: how an attempt settled for good, its outcome on the card (`Integrated`, `AdvanceResolved`): nothing reads its
+ * journal again, so it leaves the live folder. A stopped or uncertain one stays: its question still needs it.
+ */
+const SETTLED_FOR_GOOD: readonly AdvanceSettled[] = ['nothingMoved', 'integrated', 'resolved', 'undone']
+export const settledForGood = (j: Pick<AdvanceJournal, 'settled'>): boolean => !!j.settled && SETTLED_FOR_GOOD.includes(j.settled)
+/** HI-3264: how long a journal settled for good is kept in `settled/` (for a look after the fact), before it's pruned. */
+export const SETTLED_KEPT_MS = 30 * 24 * 60 * 60 * 1000
+
+/**
+ * Where a project's advance journals live (`<workspace>/.combwork/jj-advance`), one file per attempt. Only live ones
+ * (unsettled, stopped or uncertain) are in the folder itself, so recovery and a card's listing read only those (HI-3264);
+ * one settled for good moves to `settled/`, pruned after SETTLED_KEPT_MS. One found settled for good in the live folder
+ * (written there before HI-3264) is moved there by the reader that finds it, so it is read once, not at every pass.
+ */
 export class AdvanceJournals {
   constructor(readonly dir: string) {}
+  private name(card: string, cycle: number, attempt: string): string {
+    return `${safe(card)}.${cycle}.${safe(attempt)}.json`
+  }
   private file(card: string, cycle: number, attempt: string): string {
-    return join(this.dir, `${safe(card)}.${cycle}.${safe(attempt)}.json`)
+    return join(this.dir, this.name(card, cycle, attempt))
+  }
+  private get settledDir(): string {
+    return join(this.dir, 'settled')
   }
   async write(j: AdvanceJournal): Promise<void> {
     await mkdir(this.dir, { recursive: true })
-    await writeDurable(this.file(j.plan.card, j.plan.cycle, j.attempt), JSON.stringify(j))
+    const live = this.file(j.plan.card, j.plan.cycle, j.attempt)
+    if (!settledForGood(j)) return writeDurable(live, JSON.stringify(j))
+    // Settled for good: written whole into settled/ first, then the live file goes. A crash between leaves the live file
+    // as it was before (its previous phase, unsettled, stopped or uncertain), so recovery still finds it and settles it
+    // again from the card's facts; the settled/ copy is replaced then.
+    await mkdir(this.settledDir, { recursive: true })
+    await writeDurable(join(this.settledDir, this.name(j.plan.card, j.plan.cycle, j.attempt)), JSON.stringify(j))
+    await gone(live)
+    await this.prune()
+  }
+  /**
+   * HI-3264 (HR2's round 1): a journal settled for good found in the live folder (one written there before HI-3264; the
+   * new write order never leaves one) moved to settled/ as it is, its file's time kept, so retention covers it. No lock
+   * is needed: once settled for good nothing writes its live file again. A move that fails is tried by the next reader.
+   */
+  private async drain(name: string): Promise<boolean> {
+    try {
+      await mkdir(this.settledDir, { recursive: true })
+      await rename(join(this.dir, name), join(this.settledDir, name))
+      return true
+    } catch {
+      return false
+    }
+  }
+  /** Journals settled for good longer ago than SETTLED_KEPT_MS, removed (at each archive: as rare as attempts). */
+  private async prune(now = Date.now()): Promise<void> {
+    let names: string[]
+    try {
+      names = await readdir(this.settledDir)
+    } catch {
+      return
+    }
+    for (const n of names.filter((x) => x.endsWith('.json'))) {
+      const f = join(this.settledDir, n)
+      try {
+        if (now - (await stat(f)).mtimeMs > SETTLED_KEPT_MS) await gone(f)
+      } catch {
+        // Gone already, or held: the next archive tries again.
+      }
+    }
+  }
+  /** HI-3264: a card's attempts in a cycle settled for good (in `settled/`), for a look after the fact. */
+  async settled(card: string, cycle: number): Promise<AdvanceJournal[]> {
+    let names: string[]
+    try {
+      names = await readdir(this.settledDir)
+    } catch {
+      return []
+    }
+    const prefix = `${safe(card)}.${cycle}.`
+    const out: AdvanceJournal[] = []
+    for (const n of names.filter((x) => x.startsWith(prefix) && x.endsWith('.json')).sort()) {
+      try {
+        out.push(JSON.parse(await readFile(join(this.settledDir, n), 'utf8')) as AdvanceJournal)
+      } catch {
+        // Unreadable: nothing depends on it.
+      }
+    }
+    return out
   }
   /** An attempt's journal: null when there is no file; 'unreadable' when there is one that can't be read. */
   async read(card: string, cycle: number, attempt: string): Promise<AdvanceJournal | null | 'unreadable'> {
@@ -290,11 +377,14 @@ export class AdvanceJournals {
     }
     const prefix = `${safe(card)}.${cycle}.`
     const out: { attempt: string; journal: AdvanceJournal | 'unreadable' }[] = []
+    let drained = false
     for (const n of names.filter((x) => x.startsWith(prefix) && x.endsWith('.json')).sort()) {
       const attempt = n.slice(prefix.length, -'.json'.length)
       const j = await this.read(card, cycle, attempt)
-      if (j) out.push({ attempt, journal: j })
+      if (j && j !== 'unreadable' && settledForGood(j)) drained = (await this.drain(n)) || drained
+      else if (j) out.push({ attempt, journal: j })
     }
+    if (drained) await this.prune()
     return out
   }
   /** Every journal in the folder (recovery's pass over the project's cards). */
@@ -306,14 +396,20 @@ export class AdvanceJournals {
       return []
     }
     const out: AdvanceJournal[] = []
+    let drained = false
     for (const n of names.filter((x) => x.endsWith('.json'))) {
+      let j: AdvanceJournal
       try {
-        const j = JSON.parse(await readFile(join(this.dir, n), 'utf8')) as AdvanceJournal
-        if (j?.v === 1 && j.plan) out.push(j)
+        j = JSON.parse(await readFile(join(this.dir, n), 'utf8')) as AdvanceJournal
       } catch {
         // An unreadable journal is found again by its card's own listing, which counts it as such.
+        continue
       }
+      if (j?.v !== 1 || !j.plan) continue
+      if (settledForGood(j)) drained = (await this.drain(n)) || drained
+      else out.push(j)
     }
+    if (drained) await this.prune()
     return out
   }
 }
@@ -706,14 +802,21 @@ export async function runAdvance(h: Held, deps: JjAdvanceDeps, j0: AdvanceJourna
 /** What the repository is at the base read, hashed: its operation heads and its Git side (a refusal's, to try again only once it changes). */
 const printOf = (heads: string[], git: GitSnapshot): string => createHash('sha256').update(canonical({ heads, git })).digest('hex').slice(0, 32)
 
-/** The repository's print now (printOf), read-only; null when it can't be read. */
-export async function basePrint(h: Held, deps: JjAdvanceDeps, store: string): Promise<string | null> {
-  assertHeld(h, store)
+/**
+ * HI-3264: the base check (baseRefusal) on the repository now, read-only, before any journal or fact: what an attempt's
+ * base would refuse, null when it would go on, 'unreadable' when jj or Git can't be read. A refusal found here writes
+ * nothing, so a cause that persists costs reads on each pass, never a journal or facts.
+ */
+export async function baseRefusalNow(h: Held, deps: JjAdvanceDeps, plan: JjAdvancePlan): Promise<AdvanceOutcome | null | 'unreadable'> {
+  assertHeld(h, plan.store)
   const s = steps(deps)
   try {
-    return printOf(await s.heads(), await s.gitSnapshot())
+    const hs = await s.heads()
+    if (hs.length !== 1) return nothing('divergentStart', String(hs.length))
+    const git = await s.gitSnapshot()
+    return baseRefusal(plan, hs.length, await s.view(hs[0]), git)
   } catch (e) {
-    if (e instanceof Unreadable) return null
+    if (e instanceof Unreadable) return 'unreadable'
     throw e
   }
 }

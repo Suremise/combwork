@@ -137,6 +137,30 @@ const description = {
     await inv('session:stop', proj, a.id)
     await lib.until(async () => !(await live()), HUNG_MS, 150)
 
+    // --- Its description removed (HI-3270): its server account is still listed, saying why, with Remove alone, and goes.
+    fs.rmSync(path.join(userData, 'clis', 'fake-srv.json'))
+    await inv('clis:reload')
+    await page.keyboard.press('Control+,')
+    await page.locator('.settings-nav .row', { hasText: 'Accounts & Connections' }).click()
+    const goneRow = page.locator(`[data-account="${acc.id}"][data-gone]`)
+    await lib.until(async () => ((await goneRow.count()) === 1 ? true : null), HUNG_MS)
+    const goneText = await goneRow.innerText().catch(() => '')
+    check('with its description gone, its server account is listed, saying so', /fake-srv's description is gone/.test(goneText), goneText)
+    check('…with Remove alone: no menu, switch, Edit or Set Up', (await goneRow.locator('button').count()) === 1 && (await goneRow.locator('[data-remove]').count()) === 1 && (await goneRow.locator('[data-action="account-menu"], [data-edit-server], [data-set-up], [data-on-here]').count()) === 0)
+    // Its row as it looks, in both themes, for a visual review.
+    await page.mouse.move(5, 5)
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+      await page.screenshot({ path: path.join(lib.WORK, `dataserver-gone-${theme}.png`) })
+    }
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    await goneRow.locator('[data-remove]').click()
+    const askGone = page.locator('.dialog', { hasText: 'Remove Local stub?' })
+    await lib.until(async () => ((await askGone.count()) === 1 ? true : null), HUNG_MS)
+    await askGone.locator('.dialog-footer .btn.danger').click()
+    check('…and Remove removes it', !!(await lib.until(async () => ((await goneRow.count()) === 0 && !(await inv('connections:list')).connections.some((c) => c.id === acc.id) ? true : null), HUNG_MS)))
+    await page.keyboard.press('Escape')
+
     // --- The key in none of Combwork's own records.
     const logs = path.join(userData, 'logs')
     const logged = fs.existsSync(logs) ? fs.readdirSync(logs).map((f) => fs.readFileSync(path.join(logs, f), 'utf8')).join('\n') : ''

@@ -6,7 +6,9 @@
 // - it draws its prompt "> " when ready, and writes its turn's state as OSC 7501 (state=working / state=idle) as Copilot does;
 // - each line typed is a turn: "Working…" (state=working) until FAKE_DATACLI_HOLD's file is gone if it exists, then
 //   "Done: <line>" and its prompt again (state=idle); "ask" asks "Allow? (y/n)" and waits for a line ("y" or "n");
-//   "/exit" ends it (exit 0).
+//   "/exit" ends it (exit 0);
+// - `-p <text>` (HI-3266: a description whose prompt goes on its command line) is its first turn, taken at its start (after
+//   its question before its start, when it asks one), with no prompt drawn before it.
 // Every launch and every line taken is logged to FAKE_DATACLI_LOG (JSON lines); each session's lines are kept in
 // FAKE_DATACLI_STORE (one JSON file: { <id>: [lines] }), so a resume reopens what it had.
 const fs = require('fs')
@@ -36,6 +38,7 @@ if (argv[0] === '--version') {
 
 const resumeId = flag('--resume')
 const id = resumeId ?? flag('--session-id') ?? null
+const argPrompt = flag('-p')
 log({ kind: 'launch', args: argv, cwd: process.cwd(), yolo: argv.includes('--yolo'), env: { FAKE_DATACLI_MARK: process.env.FAKE_DATACLI_MARK ?? null, CW_PROJECT: process.env.CW_PROJECT ?? null, OPENAI_BASE_URL: process.env.OPENAI_BASE_URL ?? null, OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? null, DATACLI_CONTEXT: process.env.DATACLI_CONTEXT ?? null, DATACLI_OUTPUT: process.env.DATACLI_OUTPUT ?? null } })
 if (resumeId && !readStore()[resumeId]) {
   process.stdout.write(`No session ${resumeId} to resume.\r\n`)
@@ -52,7 +55,7 @@ process.stdout.write(`datacli 1.2.3 — session ${id ?? 'none'}${resumeId ? ` (r
 // While FAKE_DATACLI_TRUST's file exists: a question before its prompt, as a CLI asks to trust a folder; its answer is no prompt.
 let trusting = !!process.env.FAKE_DATACLI_TRUST && fs.existsSync(process.env.FAKE_DATACLI_TRUST) && !resumeId
 if (trusting) process.stdout.write('Trust this folder? (y/n) ')
-else prompt()
+else if (!argPrompt) prompt()
 
 /** One chat request to the server its launch was given (OPENAI_BASE_URL, OPENAI_API_KEY, --model, DATACLI_OUTPUT). */
 const ask = (text) =>
@@ -83,7 +86,7 @@ const take = (text) => {
   if (trusting) {
     trusting = false
     process.stdout.write(`\r\n${text === 'y' ? 'Trusted.' : 'Not trusted.'}`)
-    return prompt()
+    return argPrompt ? take(argPrompt) : prompt()
   }
   if (asking) {
     asking = false
@@ -150,3 +153,5 @@ process.stdin.on('data', (d) => {
     }
   }
 })
+// A first prompt on its command line, with no question before it: its first turn now.
+if (argPrompt && !trusting) take(argPrompt)

@@ -216,6 +216,21 @@ describe("Muse's environment, install and sandbox", () => {
     expect(startupScreen(starting, fixture('advanced/screen-muse-1.4.20-sandbox-setup.txt'), a)).toEqual({ asked: 'Set up the Windows sandbox' })
     expect(startupScreen(starting, 'Muse Code 1.4.20\nloading…', a)).toBeNull()
   })
+
+  // HI-3260: only the registry's instance runs locate (its sandbox check); every launch runs on forLaunch's copy, whose
+  // notice never said the sandbox isn't set up.
+  it("tells a launch its sandbox isn't set up, through the launch's own copy, as the registry's last check found it", async () => {
+    const { MuseAdapter } = await import('../src/main/providers/muse/adapter')
+    const registered = new MuseAdapter()
+    const checked = (state: 'ready' | 'setup' | 'unknown' | null): void => void ((registered as unknown as { sandbox: typeof state }).sandbox = state)
+    const notice = (): string | undefined => registered.forLaunch().launch.launchNotice?.({ runId: 'run-1' } as never)?.message
+    checked('setup')
+    expect(notice()).toContain("Muse's Windows sandbox isn't set up")
+    for (const state of ['ready', 'unknown', null] as const) {
+      checked(state)
+      expect(notice(), String(state)).toBeUndefined()
+    }
+  })
 })
 
 describe("Muse's names, as its advanced mappings say (HI-3202)", () => {

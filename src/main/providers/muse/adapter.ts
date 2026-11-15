@@ -65,10 +65,18 @@ export class MuseAdapter implements ProviderAdapter {
    * `pinned`: a launch's own names (forLaunch), which its hooks were given and are read back by to its end; absent (the
    * registry's instance), the names as they are now.
    */
-  constructor(private readonly pinned: MuseNames | null = null) {}
-  /** Its copy for a launch (HI-3202): Muse's names (muse.names.*) taken now and kept until it ends. */
+  constructor(
+    private readonly pinned: MuseNames | null = null,
+    sandbox: SandboxState | null = null
+  ) {
+    this.sandbox = sandbox
+  }
+  /**
+   * Its copy for a launch (HI-3202): Muse's names (muse.names.*) taken now and kept until it ends, and its sandbox as the
+   * registry's last check found it (HI-3260: only that instance runs locate, and the launch's notice says it isn't set up).
+   */
   forLaunch(): ProviderAdapter {
-    return new MuseAdapter(launchNames())
+    return new MuseAdapter(launchNames(), this.sandbox)
   }
   private get names(): MuseNames {
     return this.pinned ?? launchNames()

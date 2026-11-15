@@ -6,6 +6,8 @@
 //   start again (only once the target doesn't contain the result), the undo (a crash after its revert, the old answer
 //   replayed: nothing run twice, asked afresh; a fresh Approve: one undo), an agent's answer refused, a repeated
 //   delivery doing nothing;
+// - HI-3281: the undo offered naturally where J5's proof disagrees with a lineage proved Combwork's alone, and not
+//   where another operation came since;
 // - recovery at each one-sided state, under the card's lock: a journal with no fact, a fact with no journal, the fact's
 //   write unconfirmed, a crash after prepare, a crash after the integrate, a crash between `verified` and Integrated,
 //   an active writer.
@@ -13,7 +15,7 @@
 // and calls its advance with a host of its own (the generic reconcile would advance at once with the real one).
 // Skipped without the fetched jj (npm run jj:fetch); with CW_JJ_REAL=1 its absence fails.
 import { execFileSync } from 'child_process'
-import { writeFileSync } from 'fs'
+import { existsSync, readdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { DatabaseSync } from 'node:sqlite'
 import { boardFile } from '../src/main/boardStore'
@@ -101,27 +103,54 @@ function block(w: World, card: { id: number }, by: { id: number }[]): void {
   }
 }
 const journalOf = async (w: World, card: { id: number; key: string }): Promise<AdvanceJournal[]> => (await journals(w).list(card.key, w.wf.state(w.wf.store.card(card.id)).cycle)).map((x) => x.journal as AdvanceJournal)
+/** HI-3264: the card's journals this cycle settled for good (moved out of the live folder). */
+const settledOf = async (w: World, card: { id: number; key: string }): Promise<AdvanceJournal[]> => journals(w).settled(card.key, w.wf.state(w.wf.store.card(card.id)).cycle)
 
 describe.skipIf(!jjExe)(`Combwork's jj advance through the adapter (jj ${TESTED_JJ.version}), HI-3235`, { timeout: REAL_JJ_MS }, () => {
-  it('refused at the base (a repository with no Git working copy, its target not exported): the card says why once, nothing is tried again until the repository changes, then it advances', async () => {
+  // HI-3264: the base check is read-only, so a cause that persists while jj operations come and go writes nothing.
+  it('refused at the base (a repository with no Git working copy, its target not exported): the card says why once, with no journal, attempt or fact; other jj operations meanwhile write nothing either; once exported, it advances', async () => {
     exported = false
     try {
       const w = await world(false, { candidates: true, oneSlot: true, advance: true })
       const card = await approved(w)
       const head = w.main()
       await pass(w, card)
-      expect(facts(w, card, 'AdvanceResolved')).toEqual([expect.objectContaining({ how: 'nothingMoved', detail: expect.stringMatching(/^partialExport/) })])
+      const refusals = (): string[] => {
+        const db = new DatabaseSync(boardFile(w.home), { readOnly: true })
+        try {
+          return (db.prepare("SELECT key FROM board_meta WHERE key LIKE '%advance_refused:%'").all() as { key: string }[]).map((r) => r.key.slice(r.key.indexOf('advance_refused:')))
+        } finally {
+          db.close()
+        }
+      }
       const cycle = w.wf.state(card).cycle
-      expect(w.store.meta(`advance_refused:${card.key.toLowerCase()}:${cycle}:${facts(w, card, 'AdvanceAttempted')[0].plan}:partialExport`)).not.toBeNull()
-      // Nothing changed: no new attempt, no second comment.
+      expect(refusals()).toEqual([expect.stringMatching(new RegExp(`^advance_refused:${card.key.toLowerCase()}:${cycle}:[0-9a-f]+:partialExport$`))])
+      const quiet = (): void => {
+        expect(facts(w, card, 'AdvanceAttempted')).toEqual([])
+        expect(facts(w, card, 'AdvanceResolved')).toEqual([])
+        expect(w.wf.state(w.wf.store.card(card.id)).advance).toBeNull()
+        expect(existsSync(journals(w).dir) ? readdirSync(journals(w).dir) : []).toEqual([])
+        expect(w.main()).toBe(head)
+      }
+      quiet()
+      // Nothing changed: no second comment.
       await pass(w, card)
-      expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(1)
-      expect(w.main()).toBe(head)
-      // The user exports: the repository changed, so it is tried again, and advances.
+      quiet()
+      // Other jj operations (a builder's work elsewhere): the cause persists, so still nothing written, and one comment.
+      for (const m of ['other work', 'more work']) {
+        w.h.jj(w.repo, 'new', '-m', m)
+        await pass(w, card)
+      }
+      quiet()
+      expect(refusals()).toHaveLength(1)
+      // The user exports: it advances.
       w.h.jj(w.repo, 'git', 'export')
       await pass(w, card)
-      expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(2)
+      expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(1)
       expect(facts(w, card, 'Integrated')).toHaveLength(1)
+      // Its journal settled for good: out of the live folder, kept in settled/.
+      expect(await journalOf(w, card)).toEqual([])
+      expect((await journals(w).settled(card.key, cycle)).map((j) => j.settled)).toEqual(['integrated'])
     } finally {
       exported = true
     }
@@ -158,7 +187,8 @@ describe.skipIf(!jjExe)(`Combwork's jj advance through the adapter (jj ${TESTED_
     block(w, card, [blocker])
     expect(await advanceWith(w, card, host)).toBe('busy')
     expect(facts(w, card, 'AdvanceAttempted')).toEqual([])
-    expect((await journalOf(w, card)).map((j) => j.phase)).toEqual(['abandoned'])
+    expect(await journalOf(w, card)).toEqual([])
+    expect((await settledOf(w, card)).map((j) => j.phase)).toEqual(['abandoned'])
     expect(w.main()).toBe(head)
     expect(w.wf.state(w.wf.store.card(card.id)).advance).toBeNull()
   })
@@ -178,7 +208,8 @@ describe.skipIf(!jjExe)(`Combwork's jj advance through the adapter (jj ${TESTED_
       const s = w.wf.state(card)
       expect(s.stage).toBe('done')
       expect(s.advance).toMatchObject({ state: 'resolved', how: 'integrated' })
-      expect((await journalOf(w, card)).map((j) => j.settled)).toEqual(['integrated'])
+      expect(await journalOf(w, card)).toEqual([])
+      expect((await journals(w).settled(card.key, s.cycle)).map((j) => j.settled)).toEqual(['integrated'])
       await pass(w, card)
       expect(facts(w, card, 'Integrated')).toHaveLength(1)
     })
@@ -350,8 +381,8 @@ describe.skipIf(!jjExe)(`Combwork's jj advance through the adapter (jj ${TESTED_
       const plan = { card: card.key, cycle, submission: 1, fingerprint: 'x', store: w.ctx.store, target: 'main', expected: w.main(), result: w.main(), change: 'k'.repeat(32), style: 'merge', checks: '', checked: w.main() }
       await journals(w).write({ v: 1, attempt: 'orphan', planId: planIdOf(plan), plan, phase: 'requested', undos: [] })
       await pass(w, card)
-      const listed = await journals(w).list(card.key, cycle)
-      expect(listed.find((x) => x.attempt === 'orphan')?.journal).toMatchObject({ settled: 'nothingMoved' })
+      expect((await journals(w).list(card.key, cycle)).find((x) => x.attempt === 'orphan')).toBeUndefined()
+      expect((await journals(w).settled(card.key, cycle)).find((x) => x.attempt === 'orphan')).toMatchObject({ settled: 'nothingMoved' })
       expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(1)
       expect(facts(w, card, 'Integrated')).toHaveLength(1)
     })
@@ -384,7 +415,8 @@ describe.skipIf(!jjExe)(`Combwork's jj advance through the adapter (jj ${TESTED_
       const failing: AdvanceHost = { ...advanceHostOf(w.wf), attempted: async () => false }
       expect(await advanceWith(w, card, failing)).toBe('busy')
       expect(w.main()).toBe(head)
-      expect((await journalOf(w, card)).map((j) => j.phase)).toEqual(['abandoned'])
+      expect(await journalOf(w, card)).toEqual([])
+      expect((await settledOf(w, card)).map((j) => j.phase)).toEqual(['abandoned'])
       await pass(w, card)
       expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(1)
       expect(facts(w, card, 'Integrated')).toHaveLength(1)
@@ -494,6 +526,10 @@ describe.skipIf(!jjExe)(`Combwork's jj advance through the adapter (jj ${TESTED_
         candidates: true,
         oneSlot: true,
         advance: true,
+        // A stop over a verified move, its undo offered (the adapter's test seam, CW_TEST_ADVANCE_STOP=undo's): every
+        // condition holds, and the journal is settled `stopped` as a detected stop's is (HI-3264: a host that recorded a
+        // stop where Integrated was due left it settled `integrated`, which leaves the live folder).
+        advanceTestStop: true,
         advanceHook: (p) => {
           if (p === crashAt) {
             crashAt = null
@@ -504,11 +540,7 @@ describe.skipIf(!jjExe)(`Combwork's jj advance through the adapter (jj ${TESTED_
       const card = await approved(w)
       await candidate(w, card)
       const head0 = w.main()
-      // A stop simulated over a verified move: the host records a stop with its undo offered where it would record
-      // Integrated (as a detection whose conditions still hold would): the journal says verified, every condition holds.
-      const real = advanceHostOf(w.wf)
-      const stopping: AdvanceHost = { ...real, advanced: (c, ref, i) => real.stopped(c, ref, w.wf.state(c).advance!.plan, { code: 'test', undo: true, uncertain: false }, { target: 'main', result: i.result, why: 'other', detail: 'test' }) }
-      await advanceWith(w, card, stopping)
+      await advanceWith(w, card, advanceHostOf(w.wf))
       const req = advanceRequest(w, card)!
       expect(req.gate).toBe(ADVANCE_STOPPED_GATE)
       expect(w.main()).not.toBe(head0)
@@ -529,7 +561,7 @@ describe.skipIf(!jjExe)(`Combwork's jj advance through the adapter (jj ${TESTED_
       expect(facts(w, card, 'AdvanceResolved')).toEqual([expect.objectContaining({ how: 'undone' })])
       expect(w.main()).toBe(head0)
       expect(facts(w, card, 'Integrated')).toHaveLength(0)
-      const [j] = await journalOf(w, card)
+      const [j] = await settledOf(w, card)
       expect(j.undos.map((u) => u.phase)).toEqual(['abandoned', 'undone'])
       const n = w.store.facts(card.id).length
       await jjp(w, card).advanceAnswer!(w.wf.store.card(card.id), ans, advanceHostOf(w.wf))
@@ -538,5 +570,62 @@ describe.skipIf(!jjExe)(`Combwork's jj advance through the adapter (jj ${TESTED_
       expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(1)
       expect(w.main()).toBe(head0)
     })
+
+    it("HI-3281: J5's proof disagreeing with a lineage proved exactly Combwork's offers the undo (no test seam): Approve undoes the real move, never Integrated, the plan not advanced again", async () => {
+      const w = await world(colocated, { candidates: true, oneSlot: true, advance: true })
+      const card = await approved(w)
+      await candidate(w, card)
+      const head0 = w.main()
+      await disagreeing(w, card, () => undefined, () => advanceWith(w, card, advanceHostOf(w.wf)))
+      expect(w.main()).not.toBe(head0)
+      expect(facts(w, card, 'AdvanceStopped')).toEqual([expect.objectContaining({ code: 'proofDisagrees', detail: 'notContained', undo: true, uncertain: false })])
+      const req = advanceRequest(w, card)!
+      expect(req.gate).toBe(ADVANCE_STOPPED_GATE)
+      expect(req.text).toContain('couldn’t prove that main contains')
+      expect((await journalOf(w, card)).map((j) => j.settled)).toEqual(['stopped'])
+      await answer(w, card, req.request, 'approved')
+      expect(facts(w, card, 'AdvanceResolved')).toEqual([expect.objectContaining({ how: 'undone' })])
+      expect(w.main()).toBe(head0)
+      expect(facts(w, card, 'Integrated')).toHaveLength(0)
+      await pass(w, card)
+      expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(1)
+      expect(w.main()).toBe(head0)
+    })
+
+    it('HI-3281: the proof disagreeing after another jj operation since the move: no undo offered, the uncertain question, the target left as moved', async () => {
+      const w = await world(colocated, { candidates: true, oneSlot: true, advance: true })
+      const card = await approved(w)
+      await candidate(w, card)
+      const head0 = w.main()
+      // The user's own operation between the verified move and its record: the op log since P0 isn't Combwork's alone.
+      await disagreeing(w, card, () => void w.h.jj(w.repo, 'bookmark', 'create', 'elsewhere', '-r', head0), () => advanceWith(w, card, advanceHostOf(w.wf)))
+      const moved0 = w.main()
+      expect(moved0).not.toBe(head0)
+      expect(facts(w, card, 'AdvanceStopped')).toEqual([expect.objectContaining({ code: 'proofDisagrees', undo: false, uncertain: true })])
+      expect(advanceRequest(w, card)!.gate).toBe(ADVANCE_UNCERTAIN_GATE)
+      expect((await journalOf(w, card)).map((j) => j.settled)).toEqual(['uncertain'])
+      await pass(w, card)
+      expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(1)
+      expect(w.main()).toBe(moved0)
+    })
   })
 })
+
+/**
+ * HI-3281: J5's proof made to say the target doesn't contain the approved change, for `run` only (no real repository
+ * makes J5 disagree with a lineage jj just proved; the move, the conditions and the undo stay real). `meanwhile` runs
+ * first, inside the proof, so after the verified move and before the undo's conditions are read.
+ */
+async function disagreeing<T>(w: World, card: { id: number }, meanwhile: () => void, run: () => Promise<T>): Promise<T> {
+  const p = jjp(w, card) as unknown as { proof: (...a: unknown[]) => Promise<unknown> }
+  const real = p.proof
+  p.proof = async () => {
+    meanwhile()
+    return { contained: false }
+  }
+  try {
+    return await run()
+  } finally {
+    p.proof = real
+  }
+}

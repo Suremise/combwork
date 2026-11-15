@@ -104,9 +104,10 @@ export interface ConnectionsView {
   /** `setUp` (HI-1870): its CLI's first-run setup done in its folder, as last read; null, can't be told; absent, not read yet. */
   /**
    * The accounts (HI-2106; Combwork's folders only, not the CLI's own homes), as today's screens show them until HI-2107:
-   * `defaults`, its base connection's model, effort and context.
+   * `defaults`, its base connection's model, effort and context. `gone`: its CLI isn't registered now (HI-3270: a
+   * description removed or renamed), so it can only be removed, or used again once that description is back.
    */
-  connections: (Account & { defaults?: ConnectionDefaults; defaultsFrom?: 'cli'; signingIn: boolean; folder: string; key?: { last4: string; at: string }; setUp?: boolean | null; trust?: ConnectionTrust })[]
+  connections: (Account & { gone?: true; defaults?: ConnectionDefaults; defaultsFrom?: 'cli'; signingIn: boolean; folder: string; key?: { last4: string; at: string }; setUp?: boolean | null; trust?: ConnectionTrust })[]
   /** Per provider, as it applies (workspaceAccounts); absent: not set up in this workspace. */
   workspace: Partial<Record<ProviderId, WorkspaceConnections>>
   /** Providers a test copy runs on its CLI test home where nothing is on (the test seam, HI-1755): no setup is asked for. */

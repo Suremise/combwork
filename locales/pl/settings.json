@@ -7,6 +7,7 @@
   "settings.accounts.changeFailed": "Nie udało się zmienić połączenia",
   "settings.accounts.changedTo": "Teraz zalogowane jako {now}, wcześniej jako {was}",
   "settings.accounts.checkedAt": "Sprawdzono: {when}",
+  "settings.accounts.cliGone": "Opis {cli} zniknął (usunięto go lub zmieniono jego id), więc tego połączenia nie można używać. Usuń je albo przywróć opis i wybierz Wczytaj ponownie.",
   "settings.accounts.closeRunningConfirm": "Zamknij terminal",
   "settings.accounts.closeRunningMessage": "{cli} nadal w nim działa. Zamknięcie terminala go zakończy.",
   "settings.accounts.closeRunningTitle": "Zamknąć terminal?",

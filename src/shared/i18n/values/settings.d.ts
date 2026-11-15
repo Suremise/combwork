@@ -9,6 +9,7 @@ interface CombworkMessageValues {
   'settings.accounts.changeFailed': undefined
   'settings.accounts.changedTo': { now: string | number; was: string | number }
   'settings.accounts.checkedAt': { when: string | number }
+  'settings.accounts.cliGone': { cli: string | number }
   'settings.accounts.closeRunningConfirm': undefined
   'settings.accounts.closeRunningMessage': { cli: string | number }
   'settings.accounts.closeRunningTitle': undefined

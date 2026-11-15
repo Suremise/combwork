@@ -31,6 +31,10 @@
     "defaultMessage": "Checked {when}",
     "description": "The tooltip of a connection's state (Settings → Accounts & Connections): when it was last checked. {when} is how long ago (\"5 min ago\")."
   },
+  "settings.accounts.cliGone": {
+    "defaultMessage": "{cli}'s description is gone (removed, or its id changed), so this connection can't be used. Remove it, or put the description back and choose Reload.",
+    "description": "A warning on a connection (Settings → Accounts & Connections, HI-3270) whose coding agent CLI ran from a description file the user removed or renamed. {cli} is the CLI's id from that file (such as mycli). Reload is the button in Settings that reads the CLIs' descriptions again."
+  },
   "settings.accounts.closeRunningConfirm": {
     "defaultMessage": "Close Terminal",
     "description": "The confirm button of that dialog: ends the CLI and hides its terminal."
