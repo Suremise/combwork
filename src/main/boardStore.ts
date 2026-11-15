@@ -19,6 +19,7 @@ import { WORKSPACE_IDENTITY_STEP } from './schema/workspaceIdentityStep'
 import { JJ_PUBLISH_STEP } from './schema/jjPublishStep'
 import { REQUEST_RECEIPTS_STEP } from './schema/requestReceiptsStep'
 import { PROJECT_REVS_STEP } from './schema/projectRevsStep'
+import { QUEUE_REVS_STEP } from './schema/queueRevsStep'
 import { addCommentArchive, allArchivedComments, archivedCommentCount, archivedCommentRows, archiveCommentRows, COMMENT_ARCHIVE_STEP, mayHaveLostCards, type Evicted } from './schema/commentArchive'
 import { backupsOf, beginTransaction, DbInUseError, fileSchemaVersion, groupBackupFamily, isIoError, openDb, OPENABLE_WAIT_MS, schemaVersion, soleCopy, untilOpenable, type Db, type Migration, type PendingGroup } from './db'
 import { checkpointsReleased, checkpointWhenIdle, timedCommit } from './walCheckpoint'
@@ -385,6 +386,14 @@ export const BOARD_MIGRATIONS: Migration[] = [
     name: PROJECT_REVS_STEP.name,
     group: UPGRADE_GROUP_ID,
     up: (db) => PROJECT_REVS_STEP.up(db)
+  },
+  {
+    // HI-3296: each project's queue revision, what its queue listings are kept by: the project revision less the writes
+    // no listing reads, plus a blocker's change for the projects it blocks (schema/queueRevsStep.ts). In the 1.0 group.
+    version: 32,
+    name: QUEUE_REVS_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => QUEUE_REVS_STEP.up(db)
   }
 ]
 
@@ -948,14 +957,26 @@ export function boardReadToken(ws: WorkspaceService): string | null {
  * cache keeps nothing then. Reading it changes nothing.
  */
 export function projectRevision(ws: WorkspaceService, project: string, also?: (db: Db['reader']) => string): string | null {
+  return revisionOf(ws, 'SELECT g AS r FROM project_revs WHERE project = ?', project, also) // i18n-ignore: SQL
+}
+
+/**
+ * HI-3296: projectRevision for a project's queue listings: its queue revision (schema/queueRevsStep.ts's `queue_revs`: the
+ * project's revision less the writes no listing reads, plus its cards' blockers changing), null as projectRevision is.
+ */
+export function queueRevision(ws: WorkspaceService, project: string, also?: (db: Db['reader']) => string): string | null {
+  return revisionOf(ws, 'SELECT q AS r FROM queue_revs WHERE project = ?', project, also) // i18n-ignore: SQL
+}
+
+function revisionOf(ws: WorkspaceService, sql: string, project: string, also?: (db: Db['reader']) => string): string | null {
   const path = pathOf(ws)
   if (inWrite(keyOf(path))) return null
   const b = boardOf(path)
   if (b.db.reader.isTransaction || b.legacy || b.db.pending) return null
   try {
     return readSnapshot(ws, (_b, db) => {
-      const g = (db.prepare('SELECT g FROM project_revs WHERE project = ?').get(project) as { g: number } | undefined)?.g ?? 0 // i18n-ignore: SQL
-      return [b.generation, dbGenerationAt(b.place), g, also?.(db) ?? ''].join('\n') // i18n-ignore: a key, never shown
+      const r = (db.prepare(sql).get(project) as { r: number } | undefined)?.r ?? 0
+      return [b.generation, dbGenerationAt(b.place), r, also?.(db) ?? ''].join('\n') // i18n-ignore: a key, never shown
     })
   } catch {
     return null

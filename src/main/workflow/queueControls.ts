@@ -26,7 +26,7 @@ import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
 import { withFileLock } from '../fsutil'
 import { CW_DIR } from '../../shared/defaults'
-import { projectRevision } from '../boardStore'
+import { queueRevision } from '../boardStore'
 import type { DatabaseSync } from 'node:sqlite'
 import { runCardIntent } from '../cardIntents'
 import { measured } from '../stallWork'
@@ -133,8 +133,9 @@ onCombworkEvent((e) => {
 
 /**
  * What a project's queue listings are made from, as a token (HI-3291: the project's own, so another project's change keeps
- * them): its cards' revision (their rows, facts and child rows, committed here or by another process: projectRevision) and
- * its queue tables on the same snapshot (queueTables), this Combwork's hosts of the project's queues, its options written,
+ * them): its queue revision (HI-3296: its cards' rows, facts and child rows, committed here or by another process, less the
+ * writes no listing reads, such as comments, history and TargetMoved, plus its cards' blockers in any project changing:
+ * queueRevision) and its queue tables on the same snapshot (queueTables), this Combwork's hosts of the project's queues, its options written,
  * the rules switch and the test seam. Null when the board can't say (no listing is kept then).
  */
 function viewsStamp(ws: WorkspaceService, projectPath: string): string | null {
@@ -142,7 +143,7 @@ function viewsStamp(ws: WorkspaceService, projectPath: string): string | null {
   const name = boardName(ws, projectPath)
   if (!name) return null
   try {
-    const rev = projectRevision(ws, name, (db) => queueTables(db, name))
+    const rev = queueRevision(ws, name, (db) => queueTables(db, name))
     if (rev === null) return null
     return [rev, queueHostsStamp(ws, projectPath), optionsWritten, workflowEnforced(), process.env.CW_TEST_QUEUE_RETURNS ?? ''].join('\n')
   } catch {
