@@ -20,6 +20,7 @@ import { historyOf, observePort, repoWatchOf } from '../platform/historyPorts'
 import { openWorkspaces, WorkspaceService } from '../workspace'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import { reconcile } from './reconcile'
+import { measured } from '../stallWork'
 import { advanceHostOf } from './advanceHost'
 import { workflowFor } from './service'
 import { withoutWriteFence } from './factStore'
@@ -189,7 +190,8 @@ async function reconcileProject(f: Followed): Promise<void> {
   // one this run is for (its lifetime; the run checks `f.alive` between steps too).
   const wf = await workflowFor(f.ws, f.path)
   if (!wf || !f.alive()) return
-  const cards = wf.store.cards().map((card) => ({ card, s: wf.state(card) }))
+  // Named in a stall it makes (HI-3293): every card's state folded from its facts.
+  const cards = measured('reconcile card states', () => wf.store.cards().map((card) => ({ card, s: wf.state(card) }))) // i18n-ignore: a stall label for combwork.log, in English
   // Done cards are looked at when their target moved: an event's line, or a target whose head isn't the one this
   // project last checked its Done cards against (HR4's #1217 round 1: a reset while Combwork was closed is found at the
   // next open or focus). One read per target, however many Done cards it has.
@@ -225,7 +227,8 @@ async function reconcileProject(f: Followed): Promise<void> {
       }
     }
     try {
-      await reconcile(wf, card, { unknown: settle })
+      // Its code up to its first wait, named in a stall it makes (HI-3293).
+      await measured('reconcile card', () => reconcile(wf, card, { unknown: settle })) // i18n-ignore: a stall label for combwork.log, in English
     } catch (e) {
       settle()
       if (!f.alive()) return

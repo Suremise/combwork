@@ -111,7 +111,7 @@ import { cleanTasks, cleanWhere } from '../shared/windowHealth'
 import { setTitleBarBackdrops, setTitleBarColors } from './titleBar'
 import { showWindow } from './tray'
 import { resetMetrics } from './metrics'
-import { beginWork, recentStalls } from './mainStalls'
+import { beginWork, measured, recentStalls } from './mainStalls'
 import { metricsExport, metricsReport } from './metricsUsage'
 import { cancelWatch, stampWatchProjects } from './watches'
 import { cancelMessages, deliverWaiting } from './agentMessages'
@@ -1009,7 +1009,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       if (!ws.path) return []
       // Each project's ruleset now, for the old rules marks (#1421): read before the board, then the badges on one snapshot.
       const now = await rulesNow(ws)
-      return ws.path ? workBadges(ws, now.ids, now.at) : []
+      return ws.path ? measured('work badges', () => workBadges(ws, now.ids, now.at)) : [] // i18n-ignore: a stall label for combwork.log, in English
     },
     'project:setActive': async (p, active) => {
       p = workspace.assertProject(p)
@@ -2024,7 +2024,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       try {
         const block = take(blocking, channel)
         if (block?.ms) for (const until = Date.now() + block.ms; Date.now() < until; );
-        return await senderStore.run(e.sender, () => inWorkspace(w.ws, () => (fn as (...a: unknown[]) => unknown)(...args)))
+        // Its own code up to its first wait, named when it computed long enough to be felt (HI-3293).
+        return await senderStore.run(e.sender, () => inWorkspace(w.ws, () => measured(`ran ipc ${channel}`, () => (fn as (...a: unknown[]) => unknown)(...args)))) // i18n-ignore: a line of combwork.log, in English
       } catch (err) {
         // A failure that isn't one of Combwork's own refusals (a file that couldn't be written, HI-1749): the window shows it, and
         // combwork.log has it too, so every "Could not …" notification has its line.
