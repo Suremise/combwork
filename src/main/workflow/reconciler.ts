@@ -22,6 +22,7 @@ import type { PlatformId } from '../../shared/platform/descriptors'
 import { reconcile } from './reconcile'
 import { advanceHostOf } from './advanceHost'
 import { workflowFor } from './service'
+import { withoutWriteFence } from './factStore'
 import { isUnknown } from '../platform/types'
 
 const log = createLogger('workflow')
@@ -146,13 +147,17 @@ function schedule(f: Followed): void {
   f.timer.unref?.()
 }
 
-/** One run at a time per project: a run asked for meanwhile runs after it. Never throws. */
+/**
+ * One run at a time per project: a run asked for meanwhile runs after it. Never throws. Outside any write fence
+ * (HI-3292): a run is often asked for from a merge queue's fenced work (a commit's listener, a target the queue moved),
+ * whose fence its timer would carry, refusing every write of the run once the queue's runner let its lease go.
+ */
 function runFor(f: Followed): Promise<void> {
   if (f.running) {
     f.again = true
     return f.running
   }
-  f.running = (async () => {
+  f.running = withoutWriteFence(async () => {
     try {
       do {
         f.again = false
@@ -164,7 +169,7 @@ function runFor(f: Followed): Promise<void> {
       f.running = null
       reconcilerTestHooks.ran?.(f.path)
     }
-  })()
+  })
   return f.running
 }
 
