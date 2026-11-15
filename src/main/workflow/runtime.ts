@@ -123,11 +123,27 @@ export interface Alongside {
    */
   before?: (w: Write) => void
 }
-const alongsideOf = new AsyncLocalStorage<Alongside>()
+const alongsideOf = new AsyncLocalStorage<{ a: Alongside; live: boolean }>()
 
-/** Runs `fn` (a runtime call) with `a` run inside each of its writes that change a card. */
-export function alongside<T>(a: Alongside, fn: () => Promise<T>): Promise<T> {
-  return alongsideOf.run(a, fn)
+/**
+ * Runs `fn` (a runtime call) with `a` run inside each of its writes that change a card, while the call runs. HI-3322: what
+ * the call sets off and outlives it (a reconciliation, a candidate's checks, a timer) inherits its async context, but
+ * never its hooks: a verdict's attempt fence would otherwise refuse Combwork's own later writes on the card once the
+ * reviewer's launch ended (attempt.staleLaunch), and its 0.9 fields would be saved in the agent's name.
+ */
+export async function alongside<T>(a: Alongside, fn: () => Promise<T>): Promise<T> {
+  const scope = { a, live: true }
+  try {
+    return await alongsideOf.run(scope, fn)
+  } finally {
+    scope.live = false
+  }
+}
+
+/** The hooks of the intent running here (`alongside`), while it runs; none once it has returned. */
+const alongsideNow = (): Alongside | undefined => {
+  const s = alongsideOf.getStore()
+  return s?.live ? s.a : undefined
 }
 
 export const isRefusal = (r: unknown): r is Refusal => !!r && typeof r === 'object' && (r as Refusal).refused === true
@@ -805,7 +821,7 @@ export class Workflow {
    * the same board change) just before the transaction, so nothing that change orders against comes between.
    */
   async write<T, P = undefined>(card: CardRecord, ruleset: Ruleset | null, actor: Actor, fn: (w: Write, prepared: P) => T, prepare?: () => Promise<P>, opts: { runActions?: boolean } = {}): Promise<T> {
-    const also = alongsideOf.getStore()
+    const also = alongsideNow()
     let movedTo: { from: StageId; to: StageId } | null = null
     const asked: string[] = []
     const out = await this.locked(async () => {
@@ -1006,7 +1022,7 @@ export class Workflow {
     const out = refusal(g.rule, g.values, override)
     if (card && actor !== 'user') {
       // Under the store's lock, as every write (in the app, a change of the board).
-      const also = alongsideOf.getStore()
+      const also = alongsideNow()
       await this.locked(() =>
         this.store.tx((tx) => {
           // HI-3194: a stale agent request is refused for that first (its fence, as in every write), not for what it found.
