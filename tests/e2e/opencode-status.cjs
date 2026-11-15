@@ -105,7 +105,7 @@ const turnEnds = () => lines().filter((e) => e.kind === 'turn-end')
     check('…saying its question', live2?.statusMessage === 'Which file should I write?', JSON.stringify({ message: live2?.statusMessage }))
     await type('a.txt')
     await lib.until(async () => turnEnds().length > ends, HUNG_MS)
-    check('…answered in the pane, the turn goes on and ends finished', (await statusIs(['finished'])) === 'finished' && lines().some((e) => e.kind === 'question-reply'), JSON.stringify(lines().filter((e) => /^question/.test(e.kind))))
+    check('…answered in the pane, the turn goes on and ends finished', (await statusIs(['finished'])) === 'finished' && lines().some((e) => e.kind === 'question-reply'), JSON.stringify(lines().filter((e) => e.kind.startsWith('question'))))
 
     // --- A failed turn: finished, its failure said.
     ends = turnEnds().length
