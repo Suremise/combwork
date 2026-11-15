@@ -86,7 +86,7 @@ import { checkMoved, finishPending, movePlan, repairMove } from './workspaceMove
 import { missingWorktree, recreateWorktree, unlinkMissingWorktree } from './agentWorktree'
 import { CW_DIR, projectAgents as agentsOf } from '../shared/defaults'
 import type { MoveOptions, TaskCard } from '../shared/types'
-import { killPty, ptyBuffer, ptySize, resizePty, writePty } from './ptyHost'
+import { killPty, ptyBuffer, ptyOutput, ptySize, resizePty, writePty } from './ptyHost'
 import { adminSnippetFacts, apiInfo, createViewer, regenerateToken, revokeViewer } from './servers'
 import * as projectAgents from './projectAgents'
 import * as templates from './templates'
@@ -1460,6 +1460,10 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
     'pty:resize': (key, cols, rows) => resizePty(key, cols, rows),
     'pty:buffer': (key) => ptyBuffer(key),
+    'pty:output': (key) => {
+      if (app.isPackaged) throw new Error('pty:output is for test copies') // i18n-ignore: a test channel, never shown
+      return ptyOutput(key)
+    },
     'pty:size': (key) => ptySize(key),
     'pty:kill': (key) => {
       if (key.startsWith('task:')) killPty(key)

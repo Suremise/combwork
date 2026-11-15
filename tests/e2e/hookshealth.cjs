@@ -91,7 +91,9 @@ const hooksOff = (agent, off) => {
         // The window is closing.
       }
     }, 100)
-    const raw = async (a) => (await inv('pty:buffer', lib.ptyKey(alpha, a.id)).catch(() => '')) ?? ''
+    // The output as it came (HI-3311): what came after a mark is past it. pty:buffer may be the screen drawn afresh (a
+    // resize in its queue), where a turn's lines land above the input box, before the mark.
+    const raw = async (a) => (await inv('pty:output', lib.ptyKey(alpha, a.id)).catch(() => '')) ?? ''
     /** Types a prompt and waits until the fake shows it working on it (its screen: hooks may be off). */
     const say = async (a, text) => {
       const mark = (await raw(a)).length
