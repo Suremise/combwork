@@ -22,7 +22,10 @@ export interface OcEvent {
   text?: string
   callID?: string
   toolName?: string
-  /** permission.asked: its request id, and the assistant message and tool call it is about. */
+  /**
+   * permission.asked: its request id, and the assistant message and tool call it is about. form.created (the question
+   * tool's form, HI-3317): its form id as the request, its tool's message and call, and `text` its first question.
+   */
   requestID?: string
   messageID?: string
   action?: string
@@ -45,8 +48,18 @@ export interface OcTokens {
 
 const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)
 
-/** The event types the launcher subscribes to (`/api/event?types=`): everything else never leaves the server. */
-export const STREAM_TYPES = ['session.inbox.enqueued', 'session.step.started', 'session.tool.called', 'session.tool.success', 'session.tool.failed', 'permission.asked', 'permission.replied', 'session.retry.scheduled', 'session.execution.succeeded', 'session.execution.failed', 'session.execution.interrupted', 'session.compaction.started', 'session.compaction.ended', 'session.usage.updated'] as const
+/**
+ * The event types the launcher subscribes to (`/api/event?types=`): everything else never leaves the server. The form
+ * events are the question tool's (HI-3317, events/question-answered.json and question-dismissed.json): it waits on a form
+ * the user answers or dismisses, as a permission waits on its reply.
+ */
+export const STREAM_TYPES = ['session.inbox.enqueued', 'session.step.started', 'session.tool.called', 'session.tool.success', 'session.tool.failed', 'permission.asked', 'permission.replied', 'form.created', 'form.replied', 'form.cancelled', 'session.retry.scheduled', 'session.execution.succeeded', 'session.execution.failed', 'session.execution.interrupted', 'session.compaction.started', 'session.compaction.ended', 'session.usage.updated'] as const
+
+/** A form's first question, as status shows it: its description (the question), else its header, else the form's title. */
+export const formQuestion = (form: Record<string, any> | undefined): string | undefined => {
+  const f = Array.isArray(form?.fields) ? form.fields[0] : undefined
+  return cut([f?.description, f?.title, form?.title].find((s) => typeof s === 'string' && s.trim()), 500)
+}
 
 /** Text cut to what status needs (a prompt's words, a resource, an error), as the launcher cuts it. */
 export const cut = (s: unknown, max: number): string | undefined => (typeof s === 'string' ? (s.length > max ? s.slice(0, max) : s) : undefined)
@@ -58,7 +71,8 @@ export const cut = (s: unknown, max: number): string | undefined => (typeof s ==
 export function projectEvent(raw: Record<string, any>, sessionID: string): OcEvent | null {
   const type = raw?.type
   const d = raw?.data ?? {}
-  if (!(STREAM_TYPES as readonly string[]).includes(type) || d.sessionID !== sessionID) return null
+  // form.created names its session in the form ({form: {id, sessionID, …}}); every other event in its data.
+  if (!(STREAM_TYPES as readonly string[]).includes(type) || (type === 'form.created' ? d.form?.sessionID : d.sessionID) !== sessionID) return null
   const e: OcEvent = { type }
   if (typeof raw.durable?.seq === 'number') e.seq = raw.durable.seq
   if (type === 'session.inbox.enqueued') Object.assign(e, { inboxID: d.inboxID, itemType: d.item?.type, text: cut(d.item?.payload?.text, 2000) })
@@ -66,6 +80,8 @@ export function projectEvent(raw: Record<string, any>, sessionID: string): OcEve
   if (type.startsWith('session.tool.')) Object.assign(e, { callID: d.id, ...(d.name ? { toolName: cut(d.name, 200) } : {}) })
   if (type === 'permission.asked') Object.assign(e, { requestID: d.id, messageID: d.source?.messageID, callID: d.source?.id, action: cut(d.action, 200), resources: cut(Array.isArray(d.resources) ? d.resources.join(' ') : undefined, 500) })
   if (type === 'permission.replied') Object.assign(e, { requestID: d.requestID, reply: d.reply })
+  if (type === 'form.created') Object.assign(e, { requestID: d.form.id, messageID: d.form.metadata?.tool?.messageID, callID: d.form.metadata?.tool?.id, text: formQuestion(d.form) })
+  if (type === 'form.replied' || type === 'form.cancelled') e.requestID = d.id
   if (d.error) e.error = { type: cut(d.error.type, 200), message: cut(d.error.message, 500), ...(typeof d.error.status === 'number' ? { status: d.error.status } : {}) }
   if (typeof d.reason === 'string') e.reason = cut(d.reason, 200)
   if (type === 'session.usage.updated') {
@@ -97,7 +113,16 @@ export interface OcPermission {
   callID?: string
 }
 
-/** A settled snapshot: the session at durable watermark `w`, its pending permissions, its messages since the boundary. */
+/** A pending form (GET /api/session/<id>/form, wire/forms.json): the question tool's, its tool's message and call. */
+export interface OcForm {
+  id: string
+  messageID?: string
+  callID?: string
+  /** Its first question (formQuestion). */
+  text?: string
+}
+
+/** A settled snapshot: the session at durable watermark `w`, its pending permissions and forms, its messages since the boundary. */
 export interface OcSnapshot {
   w: number
   /** The launch's first (its baseline): `intent` says whether the session was new or resumed. */
@@ -105,6 +130,7 @@ export interface OcSnapshot {
   intent?: 'new' | 'resume'
   session: { busy?: number; idle?: number; outcome?: string; error?: { type?: string; message?: string } }
   permissions: OcPermission[]
+  forms?: OcForm[]
   messages: OcMessage[]
   /** Where the messages start: a user message already known, the session's start, or bounded out (partial). */
   boundary: 'known' | 'start' | 'partial'
@@ -123,14 +149,20 @@ export interface OcTracker {
   ended: Set<string>
   /** Assistant message → its execution's turn. */
   msgTurn: Map<string, string>
-  /** Pending permission request → its call and turn. */
-  asks: Map<string, { call: string | null; turn: string }>
+  /** Pending permission request or question form → its call and turn, and which it is (none: a permission). */
+  asks: Map<string, PendingAsk>
   /** What each pending request asks, to ask it again when another is answered. */
   askText: Map<string, string>
   answered: Set<string>
   baselined: boolean
   /** The open execution, when it is a compaction (its inbox id), and whether its start has been said. */
   compacting: { id: string; shown: boolean } | null
+}
+
+interface PendingAsk {
+  call: string | null
+  turn: string
+  kind?: 'permission' | 'question'
 }
 
 export function newTracker(): OcTracker {
@@ -218,19 +250,22 @@ function submit(t: OcTracker, out: Normalized[], id: string, text: string | unde
   out.push(hook({ kind: 'prompt', text: text ?? null }, t.open))
 }
 
-/** A permission request raised, if it is the open execution's and not answered already. */
-function raise(t: OcTracker, out: Normalized[], p: { id: string; messageID?: string; callID?: string; action?: string; resources?: string }): void {
+/**
+ * A permission request or a question form raised, if it is the open execution's and not answered already. A question
+ * (the question tool's form, HI-3317) asks in its own words; a permission says its action and resources.
+ */
+function raise(t: OcTracker, out: Normalized[], p: { id: string; messageID?: string; callID?: string; action?: string; resources?: string; text?: string }, kind: 'permission' | 'question' = 'permission'): void {
   if (t.answered.has(p.id) || t.asks.has(p.id)) return
   const turn = p.messageID ? t.msgTurn.get(p.messageID) : undefined
   if (!turn || turn !== t.open) return
-  const a = { call: p.callID ?? null, turn }
+  const a: PendingAsk = { call: p.callID ?? null, turn, kind }
   t.asks.set(p.id, a)
-  const message = [p.action, p.resources].filter(Boolean).join(': ')
+  const message = kind === 'question' ? (p.text ?? '') : [p.action, p.resources].filter(Boolean).join(': ')
   rememberIn(t.askText, p.id, message)
   out.push(askOf(p.id, a, message))
 }
 
-/** A permission answered (or gone): its call's end answers the wait on it. */
+/** A permission answered or a form replied to or dismissed (or either gone): its call's end answers the wait on it. */
 function answer(t: OcTracker, out: Normalized[], requestID: string): void {
   remember(t.answered, requestID)
   const a = t.asks.get(requestID)
@@ -244,8 +279,8 @@ function answer(t: OcTracker, out: Normalized[], requestID: string): void {
   for (const [req, other] of t.asks) if (other.turn === a.turn) out.push(askOf(req, other, t.askText.get(req) ?? ''))
 }
 
-function askOf(_req: string, a: { call: string | null; turn: string }, message: string): Normalized {
-  return hook({ kind: 'ask', ask: { kind: 'permission', blocking: true, message, ...(a.call ? { call: a.call } : {}) } }, a.turn, a.call)
+function askOf(_req: string, a: PendingAsk, message: string): Normalized {
+  return hook({ kind: 'ask', ask: { kind: a.kind ?? 'permission', blocking: true, message, ...(a.call ? { call: a.call } : {}) } }, a.turn, a.call)
 }
 
 /** A live event, as the launcher forwarded it: zero or more normalized hooks. */
@@ -283,6 +318,13 @@ export function applyEvent(t: OcTracker, gen: number, e: OcEvent): Normalized[] 
       if (e.requestID) raise(t, out, { id: e.requestID, messageID: e.messageID, callID: e.callID, action: e.action, resources: e.resources })
       break
     case 'permission.replied':
+      if (e.requestID) answer(t, out, e.requestID)
+      break
+    case 'form.created':
+      if (e.requestID) raise(t, out, { id: e.requestID, messageID: e.messageID, callID: e.callID, text: e.text }, 'question')
+      break
+    case 'form.replied':
+    case 'form.cancelled':
       if (e.requestID) answer(t, out, e.requestID)
       break
     case 'session.retry.scheduled': {
@@ -375,10 +417,12 @@ export function applySnapshot(t: OcTracker, gen: number, s: OcSnapshot): Normali
   // What the session itself says, where the messages couldn't (bounded out): idle ends the open execution by its outcome.
   const idle = typeof s.session.idle === 'number' && typeof s.session.busy === 'number' && s.session.idle >= s.session.busy && !!s.session.outcome
   if (idle && t.open) close(t, out, s.session.outcome, s.session.error)
-  // Permissions: the pending ones of the open execution raised; those gone since (answered meanwhile) answered.
-  const pending = new Set(s.permissions.map((p) => p.id))
-  for (const req of [...t.asks.keys()]) if (!pending.has(req)) answer(t, out, req)
+  // Permissions and question forms: the pending ones of the open execution raised; those gone since (answered meanwhile)
+  // answered. A snapshot without its forms (none read) leaves the questions as they were.
+  const pending = new Set([...s.permissions, ...(s.forms ?? [])].map((p) => p.id))
+  for (const [req, a] of [...t.asks]) if (!pending.has(req) && (s.forms || a.kind !== 'question')) answer(t, out, req)
   for (const p of s.permissions) raise(t, out, p)
+  for (const f of s.forms ?? []) raise(t, out, f, 'question')
   return out
 }
 

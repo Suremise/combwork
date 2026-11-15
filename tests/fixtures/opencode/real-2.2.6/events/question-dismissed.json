@@ -1,0 +1,320 @@
+[
+ {
+  "id": "evt_1e03f898c001RGyJ0iydYAEOUv",
+  "type": "server.connected",
+  "data": {}
+ },
+ {
+  "id": "evt_1e03f8e04001BY8byZkrdcIzXi",
+  "created": 1794763623940,
+  "type": "session.inbox.enqueued",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "inboxID": "msg_1e03f8e03001mpmKNhKj80ai2L",
+   "sessionID": "ses_abde6db583766ccdf4b67e53c6",
+   "item": {
+    "type": "user",
+    "payload": {
+     "text": "PROBE-QUESTION two: ask me again."
+    },
+    "delivery": "steer"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_abde6db583766ccdf4b67e53c6",
+   "seq": 20,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e03f8e05001tAKvW1eHlHDNUE",
+  "created": 1794763623941,
+  "type": "session.execution.started",
+  "data": {
+   "sessionID": "ses_abde6db583766ccdf4b67e53c6"
+  },
+  "durable": {
+   "aggregateID": "ses_abde6db583766ccdf4b67e53c6",
+   "seq": 21,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e03f8e08001piECLX4cDQSxCV",
+  "created": 1794763623944,
+  "type": "session.inbox.delivered",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_abde6db583766ccdf4b67e53c6",
+   "inboxID": "msg_1e03f8e03001mpmKNhKj80ai2L"
+  },
+  "durable": {
+   "aggregateID": "ses_abde6db583766ccdf4b67e53c6",
+   "seq": 22,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e03f8e11001R601XBEGtpVUIc",
+  "created": 1794763623953,
+  "type": "session.step.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_abde6db583766ccdf4b67e53c6",
+   "agent": "build",
+   "model": {
+    "id": "probe-model",
+    "providerID": "probe",
+    "variant": "default"
+   },
+   "assistantMessageID": "msg_1e03f8e0b001z8tVBMrOFcAsfz",
+   "started": 1794763623950
+  },
+  "durable": {
+   "aggregateID": "ses_abde6db583766ccdf4b67e53c6",
+   "seq": 23,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e03f8e13001egu5ebZXOef9wK",
+  "created": 1794763623955,
+  "type": "session.tool.input.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_abde6db583766ccdf4b67e53c6",
+   "assistantMessageID": "msg_1e03f8e0b001z8tVBMrOFcAsfz",
+   "id": "call_a6fc37ac",
+   "name": "question"
+  },
+  "durable": {
+   "aggregateID": "ses_abde6db583766ccdf4b67e53c6",
+   "seq": 24,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e03f8e15001tdKJ9dslWEBe0I",
+  "created": 1794763623957,
+  "type": "session.tool.input.ended",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_abde6db583766ccdf4b67e53c6",
+   "assistantMessageID": "msg_1e03f8e0b001z8tVBMrOFcAsfz",
+   "id": "call_a6fc37ac",
+   "text": "{\"questions\":[{\"header\":\"Next step\",\"question\":\"Which file should I write?\",\"multiple\":false,\"options\":[{\"label\":\"a.txt\",\"description\":\"The first\"},{\"label\":\"b.txt\",\"description\":\"The second\"}]}]}"
+  },
+  "durable": {
+   "aggregateID": "ses_abde6db583766ccdf4b67e53c6",
+   "seq": 25,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e03f8e16001Ubk8Wyn0LzpWa5",
+  "created": 1794763623958,
+  "type": "session.tool.called",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_abde6db583766ccdf4b67e53c6",
+   "assistantMessageID": "msg_1e03f8e0b001z8tVBMrOFcAsfz",
+   "id": "call_a6fc37ac",
+   "input": {
+    "questions": [
+     {
+      "header": "Next step",
+      "question": "Which file should I write?",
+      "multiple": false,
+      "options": [
+       {
+        "label": "a.txt",
+        "description": "The first"
+       },
+       {
+        "label": "b.txt",
+        "description": "The second"
+       }
+      ]
+     }
+    ]
+   },
+   "executed": false
+  },
+  "durable": {
+   "aggregateID": "ses_abde6db583766ccdf4b67e53c6",
+   "seq": 26,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e03f8e17001AhwXJLFseiiZyH",
+  "created": 1794763623959,
+  "type": "session.step.streamed",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_abde6db583766ccdf4b67e53c6",
+   "assistantMessageID": "msg_1e03f8e0b001z8tVBMrOFcAsfz"
+  },
+  "durable": {
+   "aggregateID": "ses_abde6db583766ccdf4b67e53c6",
+   "seq": 27,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e03f8e1a002qm6o4a2UqHul9L",
+  "created": 1794763623962,
+  "type": "form.created",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "form": {
+    "id": "frm_1e03f8e1a001Ybqu5W5o878nCk",
+    "sessionID": "ses_abde6db583766ccdf4b67e53c6",
+    "title": "Questions",
+    "metadata": {
+     "kind": "question",
+     "tool": {
+      "messageID": "msg_1e03f8e0b001z8tVBMrOFcAsfz",
+      "id": "call_a6fc37ac"
+     }
+    },
+    "fields": [
+     {
+      "key": "q0",
+      "title": "Next step",
+      "description": "Which file should I write?",
+      "type": "string",
+      "options": [
+       {
+        "value": "a.txt",
+        "label": "a.txt",
+        "description": "The first"
+       },
+       {
+        "value": "b.txt",
+        "label": "b.txt",
+        "description": "The second"
+       }
+      ],
+      "custom": true
+     }
+    ]
+   }
+  }
+ },
+ {
+  "id": "evt_1e03f8e7800183egU08VdWmYCd",
+  "created": 1794763624056,
+  "type": "form.cancelled",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "id": "frm_1e03f8e1a001Ybqu5W5o878nCk",
+   "sessionID": "ses_abde6db583766ccdf4b67e53c6"
+  }
+ },
+ {
+  "id": "evt_1e03f8e79001iuD475T12MsHOC",
+  "created": 1794763624057,
+  "type": "session.tool.failed",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_abde6db583766ccdf4b67e53c6",
+   "assistantMessageID": "msg_1e03f8e0b001z8tVBMrOFcAsfz",
+   "id": "call_a6fc37ac",
+   "error": {
+    "type": "aborted",
+    "message": "The user dismissed this question"
+   },
+   "executed": false
+  },
+  "durable": {
+   "aggregateID": "ses_abde6db583766ccdf4b67e53c6",
+   "seq": 28,
+   "version": 2
+  }
+ },
+ {
+  "id": "evt_1e03f8e7b001mivvFLUm9b2F3U",
+  "created": 1794763624059,
+  "type": "session.step.failed",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_abde6db583766ccdf4b67e53c6",
+   "assistantMessageID": "msg_1e03f8e0b001z8tVBMrOFcAsfz",
+   "error": {
+    "type": "aborted",
+    "message": "Step interrupted"
+   },
+   "rawFinish": "tool_calls",
+   "tokens": {
+    "input": 10,
+    "output": 5,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "cost": 0
+  },
+  "durable": {
+   "aggregateID": "ses_abde6db583766ccdf4b67e53c6",
+   "seq": 29,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1e03f8e7d001NwT0H21vr3nv56",
+  "created": 1794763624061,
+  "type": "session.usage.updated",
+  "data": {
+   "sessionID": "ses_abde6db583766ccdf4b67e53c6",
+   "cost": 0,
+   "tokens": {
+    "input": 40,
+    "output": 12,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   }
+  }
+ },
+ {
+  "id": "evt_1e03f8e7d0029jfu554doGg9jn",
+  "created": 1794763624061,
+  "type": "session.execution.interrupted",
+  "data": {
+   "sessionID": "ses_abde6db583766ccdf4b67e53c6",
+   "reason": "shutdown"
+  },
+  "durable": {
+   "aggregateID": "ses_abde6db583766ccdf4b67e53c6",
+   "seq": 30,
+   "version": 1
+  }
+ }
+]
