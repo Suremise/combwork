@@ -19,8 +19,11 @@ const check = (name, ok, extra = '') => {
 }
 
 // The tips in the order they show, and the second agent's tip, from the source, with any spacing between an entry's
-// fields (one written `'language',group` was missed, so never marked seen, and showed instead: #1337).
-const src = fs.readFileSync(path.join(lib.ROOT, 'src', 'shared', 'tips.ts'), 'utf8')
+// fields (one written `'language',group` was missed, so never marked seen, and showed instead: #1337). Each provider's
+// tips are in its shared half (HI-3201: src/shared/providers/<id>/tips.ts), listed with Combwork's own.
+const providersDir = path.join(lib.ROOT, 'src', 'shared', 'providers')
+const tipFiles = [path.join(lib.ROOT, 'src', 'shared', 'tips.ts'), ...fs.readdirSync(providersDir).map((p) => path.join(providersDir, p, 'tips.ts')).filter((f) => fs.existsSync(f))]
+const src = tipFiles.map((f) => fs.readFileSync(f, 'utf8')).join('\n')
 const ORDER = [...src.matchAll(/\{\s*id: '([^']+)',\s*group: '[^']+',\s*order: (\d+)/g)].sort((a, b) => Number(a[2]) - Number(b[2])).map((m) => m[1])
 const MOMENT = /'second-agent': '([^']+)'/.exec(src)?.[1]
 // A title in English, or a message's English (#767): `title: msg({ id: '…', defaultMessage: '…'`.
