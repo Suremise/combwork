@@ -14,7 +14,7 @@ import { overrides } from './advancedValues'
 import { overrideId } from '../shared/advanced'
 import { noteCliFolder, refreshPath } from './freshPath'
 import { emit, onCombworkEvent, toast } from './events'
-import { createLogger } from './logger'
+import { createLogger, userText } from './logger'
 import { childEnv, hasPty, killPty, spawnPty, startSize, writePty } from './ptyHost'
 import { judgeStayed, type StayedRecord, type UpdateExpectation } from './updateStayed'
 import { connectionsManaged } from './connectionSeam'
@@ -413,7 +413,8 @@ class ProviderService {
         if (code === 0 || finished || endedWell) toast('success', tr(msg({ id: 'service.providers.taskDone', defaultMessage: '{task} finished', description: "A notification: a coding agent CLI's task ({task}: \"Codex install\") ended well." }), { task: shown() }))
         else toast('warning', tr(msg({ id: 'service.providers.taskFailed', defaultMessage: '{task} exited with code {code}', description: "A notification: a coding agent CLI's task ({task}: \"Codex install\") ended with the exit code {code}." }), { task: shown(), code: String(code) }))
         if (task === 'login' && code === 0) this.signedIn(id)
-        void this.refresh(id, true)
+        // Caught (HI-3285): its CLI's description may have been removed while the task ran.
+        void this.refresh(id, true).catch((e) => log.warn(`looking for ${userText(id)} after its task failed`, e))
       }
     })
     return key
@@ -506,7 +507,8 @@ const locateValues = (): Map<ProviderId, string> => new Map(allProviders().map((
 let lastLocateValues = locateValues()
 const relocate = (): void => {
   const now = locateValues()
-  for (const [id, v] of now) if (v !== lastLocateValues.get(id) && providerService.info(id).found) void providerService.refresh(id)
+  // Caught (HI-3285): a described CLI can be gone by the time its refresh runs (its description removed), and then it throws.
+  for (const [id, v] of now) if (v !== lastLocateValues.get(id) && providerService.info(id).found) void providerService.refresh(id).catch((e) => log.warn(`looking for ${userText(id)} again failed`, e))
   lastLocateValues = now
 }
 advanced.onChange(relocate)
