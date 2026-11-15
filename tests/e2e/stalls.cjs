@@ -72,6 +72,8 @@ const busyLines = () => lines().filter((l) => l.includes('[main] The main proces
     check('the Performance view lists the hour under Delays by hour, with what its stalls named first', !!hourShown && /×\d/.test(hourShown), hourShown ?? '')
     await table.scrollIntoViewIfNeeded().catch(() => undefined)
     await page.screenshot({ path: path.join(lib.WORK, 'stalls-performance.png') })
+    await hourRow.first().scrollIntoViewIfNeeded().catch(() => undefined)
+    await page.screenshot({ path: path.join(lib.WORK, 'stalls-hours.png') })
 
     // Main's thread pool (HI-1702): wider than Node's 4, and a wait for it is noted. Each read of a pipe nobody writes to
     // holds one of the pool's threads, using no CPU, until the test writes to it.
