@@ -291,6 +291,12 @@ export async function reconcileNow(ws: WorkspaceService, projectPath: string, li
   await runFor(f)
 }
 
+/** For tests: whether a project's reconciliation is asked for (its debounce running) or under way (HI-3277). */
+export function reconcilePending(projectPath: string): boolean {
+  const f = followed.get(keyOf(projectPath))
+  return !!f && (!!f.timer || !!f.running)
+}
+
 let stop: (() => void) | null = null
 let lastFocus = 0
 
