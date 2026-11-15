@@ -12,7 +12,8 @@ import { BOARD_MIGRATIONS } from '../src/main/boardStore'
 import { openDb, schemaVersion } from '../src/main/db'
 import { readDelivery } from '../src/shared/deliveries'
 import { deliveryFromRow, deliveryToRow, keptUsageFromRow, keptUsageToRow, sessionFromRows, sessionToRows } from '../src/main/schema/sessionDeliveryCodec'
-import { addDeliveries, addSessionRecords, moveStoreRows, readAgentSessionRecords, readCardSessionRecords, readDeleted, readDeletedUsage, readDeliveries, readSessionRecord, readSessionRecords, writeDeliveries, writeSessionRecords } from '../src/main/schema/sessionDeliveryTables'
+import { addDeliveries, addSessionRecords, moveStoreRows, readAgentSessionRecords, readCardSessionRecords, readDeleted, readDeletedUsage, readDeliveries, readDeliveriesWithBases, readSessionRecord, readSessionRecords, saveDeliveryChanges as saveDeliveryChanges1_0, writeDeliveries, writeSessionRecords } from '../src/main/schema/sessionDeliveryTables'
+import { saveDeliveryChanges } from '../src/main/deliveryChanges'
 import { QUERIES, V1_0_STEPS } from '../src/main/schema/v1_0'
 
 const base = tempDir('cw-store-tables-')
@@ -317,6 +318,49 @@ describe("a host's records in the tables (storeTables.ts)", () => {
     expect(readDeliveries(db, 'p1')).toEqual([fullDelivery('m2', 2, { state: 'acked', acked: at }), fullDelivery('m3', 3)])
     // Another host's are its own.
     expect(readDeliveries(db, 'p2')).toEqual([])
+  })
+
+  it("HI-3290: a delivery save that reads only the rows it touches does what the 1.0 one did, row for row and answer for answer", () => {
+    type Change = Parameters<typeof saveDeliveryChanges>[2]
+    // The same rows in two databases; another writer's commit on both; then the same change by each save.
+    const run = (save: typeof saveDeliveryChanges, change: (bases: Map<string, string>) => Change) => {
+      const db = tables()
+      db.exec('BEGIN')
+      writeDeliveries(db, 'p1', [fullDelivery('m1', 1), fullDelivery('m2', 2), fullDelivery('m3', 3)])
+      writeDeliveries(db, 'p2', [fullDelivery('m9', 9)])
+      db.exec('COMMIT')
+      const bases = readDeliveriesWithBases(db, 'p1').bases
+      // Another Combwork: m3 acked, m4 made.
+      db.exec('BEGIN')
+      writeDeliveries(db, 'p1', [fullDelivery('m1', 1), fullDelivery('m2', 2), fullDelivery('m3', 3, { state: 'acked', acked: at }), fullDelivery('m4', 4)])
+      db.exec('COMMIT')
+      db.exec('BEGIN')
+      let out: unknown
+      try {
+        const got = save(db, 'p1', change(bases))
+        out = { written: [...got.written], renamed: [...got.renamed] }
+        db.exec('COMMIT')
+      } catch (e) {
+        db.exec('ROLLBACK')
+        out = { threw: (e as Error).constructor.name, message: (e as Error).message }
+      }
+      return { out, rows: [...readDeliveries(db, 'p1'), ...readDeliveries(db, 'p2')] }
+    }
+    const cases: ((bases: Map<string, string>) => Change)[] = [
+      // m2 received, m1 dropped, a new one whose id (m4) the other writer took: renamed.
+      (base) => ({ put: [fullDelivery('m2', 2, { state: 'received', received: at }), fullDelivery('m4', 4, { body: 'mine' })], removed: ['m1'], base }),
+      // m3 changed here too: stale, nothing written.
+      (base) => ({ put: [fullDelivery('m3', 3, { state: 'cancelled', ended: at })], removed: [], base }),
+      // m3 dropped here, acked there: stale.
+      (base) => ({ put: [], removed: ['m3'], base }),
+      // Gone already (never there): nothing to drop; a new one with a free id.
+      (base) => ({ put: [fullDelivery('m7', 7)], removed: ['m5'], base }),
+      // Nothing changed.
+      (base) => ({ put: [], removed: [], base })
+    ]
+    for (const c of cases) expect(run(saveDeliveryChanges, c)).toEqual(run(saveDeliveryChanges1_0, c))
+    expect(run(saveDeliveryChanges, cases[0]).out).toMatchObject({ renamed: [['m4', { id: 'm5', seq: 5 }]] })
+    expect(run(saveDeliveryChanges, cases[1]).out).toMatchObject({ threw: 'StaleDeliveries' })
   })
 
   it("deliveries moved in that aren't of Combwork's form, or repeat an id, go with those kept aside", () => {

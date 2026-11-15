@@ -1085,6 +1085,18 @@ describe('the delivery service (#647)', async () => {
     expect(await deliveries.ackDeliveries(alpha, 'b1', ['m4'])).toEqual({ acked: ['m4'], unknown: [], unread: [] })
   })
 
+  it("HI-3290: a save's size, from each record's bytes kept, is the whole text's to the byte", () => {
+    const sizes = (records: DeliveryRecord[], next: number, invalid: unknown[] = []) => deliveries.fileBytesForTests(records, next, invalid)
+    const one = rec({ body: 'Rebase first — then «#7»\nand 🐝.', meta: { queueReturn: true } })
+    const many = [one, rec({ id: 'm2', seq: 2, state: 'acked', received: at, acked: at, ended: at, from: combwork, kind: 'card-event', card: 7 }), rec({ id: 'm3', seq: 3, body: '' })]
+    for (const [records, next, invalid] of [[[], 1, []], [[], 4, [{ id: 'nope' }]], [[one], 2, []], [many, 4, []], [many, 12, [{ id: 'nope', x: [1, { y: 'é' }] }]]] as [DeliveryRecord[], number, unknown[]][]) {
+      const got = sizes(records, next, invalid)
+      expect(got.bytes).toBe(got.text)
+    }
+    // The same records again (their bytes kept): the same total.
+    expect(sizes(many, 4).bytes).toBe(sizes(many, 4).text)
+  })
+
   it('within its byte budget: refused when full (history makes room first), and a file it wrote always reads back whole', async () => {
     deliveries.setFileBudgetForTests(40_000)
     // Multibyte text, at the longest a message may be.
