@@ -301,6 +301,8 @@ export const testHooks: {
   beforeWakeCancel?: () => Promise<void>
   /** HI-2521: a pause in a lane watch's setup, after its lanes were read and before it is saved. */
   afterLanesRead?: () => Promise<void>
+  /** HI-3280: a lane watch set up, every read done, just before it replaces the agent's watch (a receipt landing there). */
+  beforeLaneWatchSaved?: () => Promise<void>
   /** HI-2889: a pause in endOwnLaneWatch, under the store's lock, before the caller's lane reading (a lane changing meanwhile). */
   inOwnLaneEnd?: () => Promise<void>
 } = {}
@@ -2042,6 +2044,9 @@ export type LaneWatchResult = LaneWatching | { already: string[]; replaced?: str
  * out, the last lane watch's cards are kept (the one it replaces, or the one whose wake was read), less those since done
  * or gone; [] drops them. The reply says which (`cards`).
  */
+/** What an agent's last received lane wake told (Store.wokeLanes' values). */
+type WokeLanes = Store['wokeLanes'] extends Map<string, infer V> ? V : never
+
 // A watch on every running lane names no lane that has ended: it is always a watch.
 export async function registerLaneWatch(ws: WorkspaceService, projectPath: string, agentId: string, asked: LaneWatchCondition & { ids: 'all' }, limitMinutes?: number, extra?: { cards?: number[]; changes?: WatchChange[]; agents?: AgentWatchCondition }): Promise<LaneWatching>
 export async function registerLaneWatch(ws: WorkspaceService, projectPath: string, agentId: string, asked: LaneWatchCondition, limitMinutes?: number, extra?: { cards?: number[]; changes?: WatchChange[]; agents?: AgentWatchCondition }): Promise<LaneWatchResult>
@@ -2070,14 +2075,23 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
   const result = await locked(store, async (): Promise<LaneWatchResult> => {
     await assertNotPlacing(ws, projectPath, agentId, scopeFor(ws, projectPath))
     const since = new Date().toISOString()
-    const told = store.wokeLanes.get(agentKey(projectPath, agentId))
-    // After a wake, what is new is measured from when its line was made: a lane started or a card added since then is
-    // told (round 2 finding); otherwise from now.
+    const old = recordOf(store, projectPath, agentId)
+    // Replacing a lane watch: from where that one was (HI-3280), as its cards beside the lanes are kept, so what it hadn't
+    // handed over yet (an event it was waiting to tell, a wake not read with cw_inbox, whose delivery the replacement
+    // cancels) is told by this one, never lost. Else after a wake, from when its line was made: a lane started or a card
+    // added since then is told (round 2 finding); otherwise from now.
+    // A wake recorded since that watch began is its own, received (`received` records it before the watch is taken off
+    // the list): from what it told, so nothing it told is told again. A wake received while this one is set up (its receipt
+    // isn't under this lock: HR1's round 1) is taken again just before it replaces the old record, below.
+    const wakeKey = agentKey(projectPath, agentId)
+    const startOf = (woke: WokeLanes | undefined): { at: string; marks: Map<string, LaneMark> } | undefined =>
+      old?.lanes && old.laneMarks && !(woke && Date.parse(woke.at) >= Date.parse(old.since)) ? { at: old.laneSince ?? old.since, marks: new Map(Object.entries(old.laneMarks)) } : woke
+    const woke = store.wokeLanes.get(wakeKey)
+    const told = startOf(woke)
     const laneSince = told?.at ?? since
     const toldMarks = told ? Object.fromEntries(told.marks) : undefined
     const nows = await lanesNow(store, { scope, lanes: cond, laneSince, ...(toldMarks ? { laneMarks: toldMarks } : {}) })
     await testHooks.afterLanesRead?.()
-    const old = recordOf(store, projectPath, agentId)
     // HI-2521: a lane it names that has ended or been abandoned is the answer at once, as an agent not working is for an
     // agent watch: no watch starts (it would start from the end, with nothing left to tell), and one it had ends.
     const over = cond.ids === 'all' ? [] : nows.flatMap((n) => laneOverPart(n) ?? [])
@@ -2103,16 +2117,22 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
     // The watched lanes' own cards (#1531, #1346 item 3): listed as cards too, each wakes it on every move.
     const watchedIds = new Set(nows.map((n) => n.id))
     const laneCards = new Set(allLanes.filter((l) => watchedIds.has(l.id)).flatMap((l) => l.cards.map((c) => c.number)))
-    const laneMarks: Record<string, LaneMark> = {}
-    for (const n of nows) {
-      const t = told?.marks.get(n.id)
-      if (t) laneMarks[n.id] = t
-      // Started since that wake: left unmarked, so the first check measures it from an empty start.
-      else if (!(told && Date.parse(started.get(n.id) ?? '') > Date.parse(laneSince))) laneMarks[n.id] = keepAsked(null, n.mark, laneSince)
+    // Each lane's mark from where it starts. The lanes read from an earlier start are still right for a later one (a wake
+    // since: a later boundary, so they are as many or more), and a lane it no longer tells is left as it is now.
+    const marksFrom = (start: typeof told, from: string): Record<string, LaneMark> => {
+      const out: Record<string, LaneMark> = {}
+      for (const n of nows) {
+        const t = start?.marks.get(n.id)
+        if (t) out[n.id] = t
+        // Started since that wake: left unmarked, so the first check measures it from an empty start.
+        else if (!(start && Date.parse(started.get(n.id) ?? '') > Date.parse(from))) out[n.id] = keepAsked(null, n.mark, from)
+      }
+      return out
     }
+    const laneMarks = marksFrom(told, laneSince)
     // The cards beside its lanes (#726): those named, else the last lane watch's (the one it replaces, or the one whose
     // wake was read), less those done or gone since (a card named must be one it may see).
-    const last = old?.lanes ? (old.cond.cards.length ? { cards: old.cond.cards, changes: old.cond.changes } : undefined) : told?.cards
+    const last = old?.lanes ? (old.cond.cards.length ? { cards: old.cond.cards, changes: old.cond.changes } : undefined) : woke?.cards
     const keep = extra.cards === undefined
     const changes = extra.changes ?? (keep ? last?.changes : undefined) ?? LANE_CARD_CHANGES
     const toldCards = self ? store.woke.get(agentKey(projectPath, agentId)) : undefined
@@ -2145,7 +2165,7 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
     // wake didn't tell); [] drops them. One not working now isn't followed: its state is the reply, as for an agent watch.
     const watcher = agentKey(projectPath, agentId)
     const keepAgents = extra.agents === undefined
-    const wanted = extra.agents ?? (old?.lanes ? old.agents : told?.agents)
+    const wanted = extra.agents ?? (old?.lanes ? old.agents : woke?.agents)
     const toldSeqs = store.wokeAgents.get(watcher)
     const agentMarks: Record<string, AgentMark> = {}
     const followed: WatchedAgent[] = []
@@ -2175,13 +2195,22 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
         : undefined
     // The waits for the user it starts from (#726): the watch it replaces, else what its last wake told, else when this
     // call began.
-    const waitSeq = (old?.lanes ? old.waitSeq : undefined) ?? told?.waitSeq ?? waitsFrom
+    const waitSeq = (old?.lanes ? old.waitSeq : undefined) ?? woke?.waitSeq ?? waitsFrom
     const before = store.list
     if (!old && store.list.length >= MAX_WATCHES) throw saidError(T.tooMany, { max: String(MAX_WATCHES) })
     const minutes = Math.min(WATCH_MAX_LIMIT_MINUTES, Math.max(1, Math.round(limitMinutes)))
     const rec: WatchRecord = { id: randomBytes(6).toString('hex'), projectPath, ...projectIdOf(ws, projectPath), agentId, scope, cond: cardCond, lanes: cond, laneMarks, ...(titles ? { laneTitles: titles } : {}), laneSince, waitSeq, ...(followed.length ? { agents: { ignoreBackground: wanted!.ignoreBackground, agents: followed }, agentMarks } : {}), marks, current, since, ...from, limitMinutes: minutes, limitAt: new Date(Date.now() + minutes * 60_000).toISOString() }
     const next = [...store.list.filter((x) => x !== old), rec]
     if (budget(store, next) > MAX_FILE_BYTES && !((await setAside(store)) && budget(store, next) <= MAX_FILE_BYTES)) throw saidError(T.tooBig)
+    await testHooks.beforeLaneWatchSaved?.()
+    // HR1's round 1: a wake received during the reads above (its receipt isn't under this lock) is taken now, with nothing
+    // awaited from here to the replacement, so the old watch's marks from before it never start this one.
+    const wokeNow = store.wokeLanes.get(wakeKey)
+    if (wokeNow !== woke) {
+      const start = startOf(wokeNow)
+      rec.laneSince = start?.at ?? since
+      rec.laneMarks = marksFrom(start, rec.laneSince)
+    }
     store.list = next
     try {
       await save(store)
