@@ -1719,6 +1719,23 @@ The tests a card's change needs are kept with its submission, and its reviewer s
 
 The merge queue runs the list after the merge checks, once, and moves the target only when every test passed. For any file the merge changed differently from the reviewed work (a target that changed the same file, say), the tests are chosen again there. Tests that need a real CLI or the installed app aren't run by the queue: they count from the card's reviewer's own run at the revision submitted (`cw-progress --check "focused:<test>" -- <its command>`), never the builder's, shown as review evidence, and a card without that run goes back to its builder. A test skipped for its environment (a usage limit, a sign-in, the network) pauses the queue: the card's reviewer decides whether it merges with it skipped, and you can answer first under **For you**. The decision holds for that merged result only: if the target moves on, you are asked again. A test that failed, or one the command gave no result for, returns the card with the output.
 
+### Merge guards <a id="merge-guards"></a>
+
+**Merge guards** (Version Control → Workflow, shown when Combwork merges, or builds a candidate in a jj project; none by default) are patterns a merge may not add, such as an old product name, a debugging call or a TODO with no card. Each guard has:
+
+- a **name**, shown when it refuses;
+- a **pattern**: a JavaScript regular expression, matched against each line the merge adds (**Ignore case** matches capitals and small letters alike);
+- **Only these paths** and **Skip these paths** (optional): globs separated by commas, such as `src/**`, `*.ts` or `LICENSE`. One without a `/` matches a file or folder name anywhere; a folder covers everything in it;
+- a **message**: what the builder should do instead.
+
+Combwork matches only the lines the merge adds, never what the target branch already has: a file that already holds a match can still be changed, and sweeping old matches out is separate work. Binary files are skipped. A match sends the card back to its builder like a failed merge check, naming the guard, the file and line, and your message; the card's Work section shows the run. If the check can't finish (a merge adding more than **Merge guards: most lines a merge adds**, or the matching taking longer than **Merge guards: longest the check takes**, both in Settings → Advanced), the card goes back too: a guard never lets a merge through on what it didn't check. When a builder submits a card whose work adds a match, its submit reply warns it first.
+
+A change to the guards applies at once, to cards already queued too: a card checked under the old guards is checked again before it merges. Saving refuses a guard with no name, pattern or message, a pattern that isn't a valid regular expression or that matches an empty line, or a path it can't use, saying which guard.
+
+With **Your name** set in Settings → General, **Add "Keep My Name Out of the Code"** adds a ready-made guard refusing your name as a whole word, skipping the files where a name belongs (`LICENSE`, `package.json`, the installer's copyright, `CODE_OF_CONDUCT`). It's filled in once: edit or remove it like any other.
+
+A merge guard isn't secret scanning: it catches only what you name.
+
 ### When the merge queue pauses <a id="when-the-merge-queue-pauses"></a>
 
 When Combwork merges cards itself, it commits each merge with your repository's own setup. Its commits run the repository's hooks and are signed as the repository says; Combwork never skips or overrides either.

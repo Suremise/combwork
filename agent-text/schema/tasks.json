@@ -736,6 +736,15 @@
       "column": "select"
     }
   },
+  "tasks.history.queueGuarded": {
+    "placeholders": {
+      "state": "select",
+      "guard": "plain",
+      "count": "plural",
+      "where": "plain",
+      "message": "plain"
+    }
+  },
   "tasks.history.queueReturned": {
     "placeholders": {
       "reason": "select",

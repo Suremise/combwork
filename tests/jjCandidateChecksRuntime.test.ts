@@ -731,3 +731,41 @@ describe.skipIf(!jjExe)(`merge checks on a jj card's candidate (jj ${TESTED_JJ.v
     })
   })
 })
+
+// HI-3284: the merge guards on a jj card's candidate, on the real jj: jj's own diff of what the candidate adds to the
+// target bookmark, matched in the guards' worker path; a match returns the card (the check `merge guards`, its
+// diagnostics); none passes and is offered; a guard changed after it passed makes its key, and the offer's consent
+// bound to it, stale: the checks run again under the new guards before anything is offered.
+describe.skipIf(!jjExe)(`merge guards on a jj card's candidate (jj ${TESTED_JJ.version}), HI-3284`, { timeout: REAL_JJ_MS }, () => {
+  const refusing = { name: 'No work', pattern: '^work$', message: 'Name it something else.' }
+  const passing = { name: 'Nothing', pattern: 'zzz-never', message: 'n/a' }
+
+  it('a candidate adding a match: the card back to its builder, the guard, file and line named; never offered', async () => {
+    const w = await world(true, { candidates: true })
+    host(w)
+    withChecks(w, {}, { mergeGuards: [refusing] })
+    const { card } = await approved(w)
+    await settle(w, card)
+    const failed = w.store.facts(card.id).find((f) => f.kind === 'IntegrationFailed')
+    expect(failed?.data).toMatchObject({ reason: 'checks', check: 'merge guards', guards: { hits: [{ guard: 'No work', file: 'work.txt', line: 1, excerpt: 'work' }], messages: [{ guard: 'No work', message: 'Name it something else.' }] } })
+    expect(w.wf.state(card).stage).toBe('active')
+  })
+
+  it('no match: passed and offered; a guard changed after that makes it stale, checked again, and refused', async () => {
+    const w = await world(true, { candidates: true })
+    host(w)
+    withChecks(w, {}, { mergeGuards: [passing] })
+    const { card } = await approved(w)
+    await settle(w, card)
+    const cycle = w.wf.state(card).cycle
+    const before = shown(w, card, cycle)!
+    expect(before.checks).toMatchObject({ state: 'passed', names: ['merge guards'] })
+    expect(waiting(w, card.id)?.candidate).toMatchObject({ state: 'ready', checks: { state: 'passed' } })
+    // The project's guards change: the key the offer passed under is no longer the one the options give.
+    withChecks(w, {}, { mergeGuards: [passing, refusing] })
+    await settle(w, card)
+    const failed = w.store.facts(card.id).find((f) => f.kind === 'IntegrationFailed')
+    expect(failed?.data).toMatchObject({ check: 'merge guards', guards: { hits: [{ guard: 'No work' }] } })
+    expect(w.wf.state(card).stage).toBe('active')
+  })
+})

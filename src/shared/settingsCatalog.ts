@@ -717,6 +717,7 @@ function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Parti
     option('mergeChecks', 'custom'),
     option('focusedTests', 'boolean'),
     option('mergeInstall', 'select', [['onManifestChange', V.mergeInstall.onManifestChange], ['always', V.mergeInstall.always]]),
+    option('mergeGuards', 'custom'),
     option('strict', 'boolean'),
     option('pushTarget', 'boolean'),
     option('followRemote', 'boolean'),
@@ -896,7 +897,7 @@ const CUSTOM_VALUES: Record<string, SettingEntry['value']> = {
   'notifications.chimeSound': 'select',
   'general.language': 'select',
   'assistant.mode': 'text',
-  ...Object.fromEntries(['preChecks', 'mergeChecks', 'commands', 'okBefore', 'identity', 'excluded', 'stageNames', 'otherTargets', 'assistantWakes'].map((k): [string, SettingEntry['value']] => [`project.workflow.${k}`, 'table'])),
+  ...Object.fromEntries(['preChecks', 'mergeChecks', 'mergeGuards', 'commands', 'okBefore', 'identity', 'excluded', 'stageNames', 'otherTargets', 'assistantWakes'].map((k): [string, SettingEntry['value']] => [`project.workflow.${k}`, 'table'])),
   'board.colors': 'table'
 }
 /** A provider's custom controls whose value the tools can set (checked by checkSettingValue). */
@@ -1261,6 +1262,7 @@ const AGENT = {
   otherTargets: agentMsg({ id: 'settings.agent.takes.otherTargets', text: 'a list of branch names besides project.workflow.target, e.g. ["1.2.0"] (each one a lane or card may take as its target)', note: "What the workflow option otherTargets takes (HI-2556). The JSON and project.workflow.target (a setting's id) are code: keep them." }),
   preChecks: agentMsg({ id: 'settings.agent.takes.preChecks', text: 'a list of check names, e.g. ["typecheck", "lint"] (each with its command in project.workflow.commands)', note: "What the workflow option preChecks takes. The JSON and project.workflow.commands (a setting's id) are code: keep them." }),
   mergeChecks: agentMsg({ id: 'settings.agent.takes.mergeChecks', text: 'a list of check names the merge queue runs on the merged result when Combwork merges, e.g. ["typecheck", "lint"] (each with its command in project.workflow.commands)', note: "What the workflow option mergeChecks takes. The JSON and project.workflow.commands (a setting's id) are code: keep them." }),
+  mergeGuards: agentMsg({ id: 'settings.agent.takes.mergeGuards', text: 'a list of guards, each {shape} (pattern: a JavaScript regular expression matched against each line a merge adds; paths and skip: globs such as "docs/**" or "*.md"; at most 50 guards). A guard is not secret scanning: it catches only what it names', note: "What the workflow option mergeGuards takes (HI-3284). {shape} is the object's JSON form; the JSON field names and the globs are code: keep them." }),
   commands: agentMsg({ id: 'settings.agent.takes.commands', text: 'an object of check name → command, e.g. {example}', note: 'What the workflow option commands takes. {example} is JSON: code.' }),
   okBefore: agentMsg({ id: 'settings.agent.takes.okBefore', text: 'an object {shape}', note: "What the workflow option okBefore takes. {shape} is the object's JSON form: code." }),
   assistantWakes: agentMsg({ id: 'settings.agent.takes.assistantWakes', text: 'an object {shape} (events: Custom\'s, any of {events}; kept, unused, at the other levels)', note: "What the workflow option assistantWakes takes (HI-3211). {shape} is the object's JSON form and {events} the lane events' ids: code." }),
@@ -1447,6 +1449,7 @@ export function workflowTakes(e: SettingEntry, kind: ReturnType<typeof settingKi
   const shapes: Partial<Record<OptionKey, () => string>> = {
     preChecks: () => say(AGENT.preChecks),
     mergeChecks: () => say(AGENT.mergeChecks),
+    mergeGuards: () => say(AGENT.mergeGuards, { shape: '{"name": ..., "pattern": ..., "ignoreCase": false, "paths": [...], "skip": [...], "message": ...}' }), // agent-protocol: JSON
     commands: () => say(AGENT.commands, { example: '{"lint": "npm run lint"}' }), // agent-protocol: JSON
     okBefore: () => say(AGENT.okBefore, { shape: '{"mode": "never" | "labels" | "every", "labels": [...]}' }), // agent-protocol: JSON
     assistantWakes: () => say(AGENT.assistantWakes, { shape: `{"level": ${WAKE_LEVELS.map((l) => `"${l}"`).join(' | ')}, "events": [...]}`, events: LANE_EVENTS.join(', ') }), // agent-protocol: JSON

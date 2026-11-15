@@ -11,6 +11,8 @@ import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from
 import { CHURN_MAX } from '@shared/loopLimits'
 import { compile, mustCompile } from '@shared/workflow/compile'
 import { STAGE_TEXT, stageNameProblems, stageNameProblemText, type StageNames } from '@shared/workflow/stages'
+import { guardProblems, guardProblemText, type MergeGuard } from '@shared/workflow/mergeGuards'
+import { MergeGuardsEditor } from './MergeGuardsEditor'
 import type { StageId } from '@shared/workflow/facts'
 import { shownText } from '@shared/advanced'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
@@ -162,7 +164,7 @@ const LEVEL_NAME: Record<PlatformId, Msg> = { none: T.levelNone, git: T.levelGit
 const LEVEL_FOR: Record<PlatformId, Msg> = { none: T.levelForNone, git: T.levelForGit, jj: T.levelForJj }
 
 /** A problem's sentence, in the window's language (an English reason when it has no message). */
-const ownProblemText = (p: OwnWorkflowProblem): string => (p.kind === 'contradiction' ? tr(CONTRADICTIONS[p.id]) : p.kind === 'stageName' ? shownText(stageNameProblemText(p)) : p.why)
+const ownProblemText = (p: OwnWorkflowProblem): string => (p.kind === 'contradiction' ? tr(CONTRADICTIONS[p.id]) : p.kind === 'stageName' ? shownText(stageNameProblemText(p)) : p.kind === 'guard' ? shownText(guardProblemText(p)) : p.why)
 
 /** A problem's lines: an inheriting project's (a level's save, #1422) names it, its reason on a line of its own. */
 const problemLines = (p: WorkflowProblem): string[] => (p.kind === 'inheritor' ? [tr(T.inheritor, { project: p.project }), ownProblemText(p.problem)] : [ownProblemText(p)])
@@ -539,8 +541,10 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
     const origin = originOf(key)
     const reasons = live[key] ?? []
     const stageReasons = key === 'stageNames' ? stageProblems : []
+    // HI-3284: each merge guard that can't be saved, as it is typed.
+    const guardReasons = key === 'mergeGuards' ? guardProblems(effective.mergeGuards) : []
     return (
-      <div className={cx('setting', 'workflow-option', (reasons.length > 0 || stageReasons.length > 0) && 'contradicted')} key={key} data-option={key}>
+      <div className={cx('setting', 'workflow-option', (reasons.length > 0 || stageReasons.length > 0 || guardReasons.length > 0) && 'contradicted')} key={key} data-option={key}>
         <div className="s-text">
           <div className="s-title">
             {key in draft.options && <span className="modified" />}
@@ -566,6 +570,11 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
           {stageReasons.map((p) => (
             <div className="workflow-contradiction" role="alert" data-stage-problem={`${p.stage}:${p.why}`} key={`${p.stage}:${p.why}`}>
               <Icon name="warning" /> {shownText(stageNameProblemText(p))}
+            </div>
+          ))}
+          {guardReasons.map((p) => (
+            <div className="workflow-contradiction" role="alert" data-guard-problem={`${p.guard}:${p.field}:${p.why}`} key={`${p.guard}:${p.field}:${p.why}`}>
+              <Icon name="warning" /> {shownText(guardProblemText(p))}
             </div>
           ))}
         </div>
@@ -750,6 +759,9 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
       case 'otherTargets':
         // HI-2556: branch names, comma separated, each once; none left inherits.
         return <DraftText value={(effective.otherTargets ?? []).join(', ')} placeholder={tr(T.otherTargets)} onCommit={(v) => { const b = [...new Set(list(v))]; if (b.length) set('otherTargets', b); else inheritKey('otherTargets') }} />
+      case 'mergeGuards':
+        // HI-3284: none left is a list of none (the level's own), not inherited: Inherit takes the level's above.
+        return <MergeGuardsEditor guards={effective.mergeGuards ?? []} onChange={(g) => set('mergeGuards', g)} />
       case 'stageNames':
         return <StageNamesEditor options={effective} onChange={(names) => (Object.keys(names).length ? set('stageNames', names) : inheritKey('stageNames'))} />
       default:
@@ -919,6 +931,8 @@ export function optionValueText(key: OptionKey, v: unknown, platform: PlatformId
     return id ? tr(T.identityValue, { name: id.name, email: id.email }) : tr(T.off)
   }
   if (key === 'stageNames') return tr(T.stageNamesValue, { n: Object.keys((v as StageNames | undefined) ?? {}).length })
+  // HI-3284: the guards by name (the user's own words), or none.
+  if (key === 'mergeGuards') return Array.isArray(v) && v.length ? fmt.list((v as MergeGuard[]).map((g) => g.name)) : tr(T.noneValue)
   if (key === 'reviewers' || key === 'loopRounds' || key === 'maxAgents') return fmt.number(v as number)
   if (key === 'simplifyAt' || key === 'churnStopAt') return v === 0 ? tr(T.off) : fmt.number(v as number)
   if (key === 'loopWaitHours') return tr(T.hoursValue, { n: v as number })

@@ -1,0 +1,59 @@
+diff --git a/a.txt b/a.txt
+index 81644b1..d70770d 100644
+--- a/a.txt
++++ b/a.txt
+@@ -3,0 +4 @@ three
++new secret line
+diff --git a/b.txt b/b.txt
+deleted file mode 100644
+index 032099b..0000000
+--- a/b.txt
++++ /dev/null
+@@ -1,2 +0,0 @@
+-to be deleted
+-secret here
+diff --git a/bin.dat b/bin.dat
+index e66e4bd..8bfd201 100644
+Binary files a/bin.dat and b/bin.dat differ
+diff --git a/café x.txt b/café x.txt
+index d66d227..c6c1b9e 100644
+--- a/café x.txt	
++++ b/café x.txt	
+@@ -1,0 +2 @@ accent
++secret accent
+diff --git a/crlf.txt b/crlf.txt
+index b952bf5..e2b5c04 100644
+--- a/crlf.txt
++++ b/crlf.txt
+@@ -2,0 +3 @@ second
++third secret
+diff --git a/new.txt b/new.txt
+new file mode 100644
+index 0000000..6ed3640
+--- /dev/null
++++ b/new.txt
+@@ -0,0 +1,2 @@
++brand new
++secret too
+diff --git a/nonl.txt b/nonl.txt
+index 7329aed..649d1a9 100644
+--- a/nonl.txt
++++ b/nonl.txt
+@@ -1 +1 @@
+-no final newline
+\ No newline at end of file
++no final newline, secret
+\ No newline at end of file
+diff --git a/ren.txt b/ren2.txt
+similarity index 100%
+rename from ren.txt
+rename to ren2.txt
+diff --git a/renedit.txt b/renedit2.txt
+similarity index 81%
+rename from renedit.txt
+rename to renedit2.txt
+index 4157125..33901bc 100644
+--- a/renedit.txt
++++ b/renedit2.txt
+@@ -5,0 +6 @@ line five
++added secret

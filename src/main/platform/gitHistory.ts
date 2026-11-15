@@ -66,6 +66,7 @@ export const gitHistory: HistoryPort = {
   dirty: (folder, paths) => G.dirty(folder, paths),
   change: (repo, base, head) => G.change(repo, base, head),
   filesChanged: (repo, base, head) => G.filesChanged(repo, base, head),
+  addedDiff: (repo, base, head) => G.addedDiff(repo, base, head),
   candidateKey: (repo, base, head) => G.candidateKey(repo, base, head),
   sameChange: (repo, a, b) => G.sameChange(repo, a, b),
   contains: (repo, target, c, at) => G.contains(repo, target, c, at),

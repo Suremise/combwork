@@ -360,6 +360,8 @@
   "tips.mergeBranch.title": "Scal gałąź ręcznie",
   "tips.mergeFollowRemote.text": "Dzielisz main z innymi? Włącz „Gałąź docelowa podąża za zdalnym repozytorium” w Kontrola wersji → Przepływ pracy: kolejka scalania pobiera zmiany przed każdym scaleniem próbnym, testuje na najnowszym commicie zdalnym i wypycha tylko wtedy, gdy nikt w międzyczasie nie wypchnął zmian, a jeśli wypchnął, testuje ponownie.",
   "tips.mergeFollowRemote.title": "Scalaj względem zdalnego repozytorium zespołu",
+  "tips.mergeGuards.text": "Kontrola wersji → Przepływ pracy → Filtry scalania odrzuca scalenie, które dodaje wiersz pasujący do Twojego wzorca (starą nazwę, wywołanie debugowania), i odsyła kartę z Twoim komunikatem. Liczą się tylko dodane wiersze, więc sprzątanie tego, co już jest, pozostaje osobną pracą.",
+  "tips.mergeGuards.title": "Nie wpuszczaj niechcianych rzeczy do scaleń",
   "tips.mergeMessage.text": "Gdy scala Combwork, Kontrola wersji → Przepływ pracy ustala komunikat commita scalenia: komunikat Combwork nazywa kartę, a własny komunikat gałęzi trzyma klucze kart z dala od Twojej historii. Przy Squash każda karta trafia wtedy jako jeden commit z komunikatem jej wykonawcy.",
   "tips.mergeMessage.title": "Scalenia z własnymi komunikatami commitów",
   "tips.mergePush.text": "Gdy scala Combwork, Kontrola wersji → Przepływ pracy może wypychać gałąź docelową po każdym scaleniu, nigdy z wymuszeniem. Jeśli zdalne repozytorium odmówi, kolejka wstrzymuje się i mówi dlaczego: ściągnij zmiany i wznów albo wyłącz opcję i wznów.",

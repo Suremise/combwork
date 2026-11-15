@@ -24,7 +24,7 @@ import { agentText, linesOf, withValues, type Text } from '../../shared/advanced
 import { msg } from '../../shared/i18n/msg'
 import { tr } from '../../shared/i18n'
 import { MERGE_ANSWER, OPTION_TEXT, VALUE_TEXT } from '../../shared/workflow/optionTexts'
-import { allOff, BRANCH_OPTIONS, FOCUSED_PICK, FOCUSED_RUN, NAME_OPTIONS, PRESETS, preset, sameOptionValue, takesOption, type CommitMessage, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
+import { allOff, BRANCH_OPTIONS, FOCUSED_PICK, GUARD_OPTIONS, FOCUSED_RUN, NAME_OPTIONS, PRESETS, preset, sameOptionValue, takesOption, type CommitMessage, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
 import { setPresetAsked, writeWorkflow } from '../../shared/workflow/projectWorkflow'
 import { keptStageName, stagesOf } from '../../shared/workflow/stages'
 import { merges, type PlatformId } from '../../shared/platform/descriptors'
@@ -44,6 +44,7 @@ import { withFolderRepoLocks } from '../platform/repoPorts'
 import { exitBy } from '../exitLog'
 import { LEGACY_CONSUMED, legacyPreferences } from '../../shared/workflow/preferences'
 import { checkOffer } from './releaseOffer'
+import { changeGuards, refuseGuardsAtSave } from './guardsSave'
 
 const log = createLogger('workflow')
 
@@ -219,8 +220,8 @@ export function keptNames<T extends Partial<WorkflowOptions>>(options: T): T {
   return { ...options, stageNames: Object.fromEntries(Object.entries(names).map(([k, v]) => [k, typeof v === 'string' ? keptStageName(v) : v])) }
 }
 
-/** Whether a change of these options applies at once (#1417): only names (N5), or the branches lanes and cards may pick (HI-2556), changed, which aren't rules. */
-export const namesOnly = (changed: readonly (keyof WorkflowOptions)[]): boolean => changed.length > 0 && changed.every((k) => (NAME_OPTIONS as readonly string[]).includes(k) || (BRANCH_OPTIONS as readonly string[]).includes(k))
+/** Whether a change of these options applies at once (#1417): only names (N5), the branches lanes and cards may pick (HI-2556), or the merge guards (HI-3284) changed, which aren't rules. */
+export const namesOnly = (changed: readonly (keyof WorkflowOptions)[]): boolean => changed.length > 0 && changed.every((k) => (NAME_OPTIONS as readonly string[]).includes(k) || (BRANCH_OPTIONS as readonly string[]).includes(k) || (GUARD_OPTIONS as readonly string[]).includes(k))
 
 /** The options a save would set, their problems, and what changes from the options in force now. */
 function changeOf(ws: WorkspaceService, platform: PlatformId, current: Partial<WorkflowOptions>, change: WorkflowChange, folder: string) {
@@ -338,7 +339,9 @@ export class WorkflowRefused extends CombworkError {
  * recorded with an Override naming what changed (OP-38: the user only, per change, the cards listed first). `check`: the
  * caller's, run at the write itself, under its lock (its throw saves nothing). Returns the form as it is now.
  */
-export function setWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; check?: () => void; offer?: string } = {}): Promise<WorkflowForm> {
+export async function setWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; check?: () => void; offer?: string } = {}): Promise<WorkflowForm> {
+  // HI-3284: the merge guards' empty-match rule, in their worker, before the locks.
+  await refuseGuardsAtSave(changeGuards(raw))
   // Checked against the levels as they are now and written in the same turn of workflow writes (#1422), holding the
   // project's repository lock first (#1642 round 5): its target can't move while a clean-up checks a branch against it,
   // from this Combwork or another.

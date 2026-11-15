@@ -15,7 +15,7 @@ import { ADVANCE_GATES, ADVANCE_PREVIEW_GATE, ADVANCE_STOPPED_GATE, agentActor, 
 import { awaitsAgentMerge, baseRulesetId, compile, hasStage, mergeCommitOf, skipReviewOf, targetedOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
-import { FOCUSED_PICK, reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
+import { finishOnCandidate, FOCUSED_PICK, reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
 import { reviewsInProgress, submissionReviewers } from '../../shared/workflow/reviewerPool'
 import { ACCEPT_MAX, chosenTests, focusedCheckName, reviewProved, standingFocusedRun, validTestId, type FocusedChoice, type FocusedTest, type PathChange } from '../../shared/workflow/focused'
 import { pathChanges, pickAtRevision, type PickOutcome } from './focusedRun'
@@ -57,6 +57,8 @@ import { createLogger, userText } from '../logger'
 import { GatherDepth } from './gatherDepth'
 import { earlierWork, UNREAD, type EarlierLine } from './earlierWork'
 import { asCardCounts } from './containment'
+import { guardsOf, guardsRefuse, guardWarning } from '../../shared/workflow/mergeGuards'
+import { checkMergeGuards } from './mergeGuardsRun'
 
 const log = createLogger('workflow')
 
@@ -225,6 +227,8 @@ export interface WorkflowConfig {
   projectId?: () => string
   /** The project's resolved options (§16.6.6); a card in flight keeps its own ruleset. */
   options: () => WorkflowOptions
+  /** HI-3284: the merge guards' limits (Settings → Advanced), for submit's early warning; left out, 10 s and 200,000 lines. */
+  guardLimits?: () => { timeoutMs: number; maxLines: number }
   /** HI-3235: whether the project's finish is its platform's default, set at no level (the one-time note's condition). */
   finishInherited?: () => boolean
   /** Where cards' own folders go (the P2 spike's stand-in for slots, its unit tests only: the app lends slots, `slotFor`). */
@@ -2131,6 +2135,8 @@ export class Workflow {
       ;({ revision, base, key, files, commits, paths, platform } = plan)
       Object.assign(inputs, plan.inputs)
       warnings.push(...plan.warnings, ...(await this.pathNotices(card, o, !!args.paths, op)))
+      // HI-3284: the merge guards' early warning (never a refusal, never evidence): what the revision adds since its base.
+      if (!predicted && plan.base && plan.revision) warnings.push(...(await this.guardWarnings(o, plan.base, plan.revision)))
       // The adapter may have reconciled (a shared folder's attribution): the card and its state as they are now.
       if (!predicted) {
         card = { ...this.store.card(card.id), ...(setPaths ? { paths: setPaths } : {}) }
@@ -3574,6 +3580,19 @@ export class Workflow {
    * pre-fill's files the paths don't cover (paths set, none given), and the unclaimed changes. Never claimed: the
    * declared paths stay what the revision covers. Agent-facing English; empty elsewhere (Git, no-code).
    */
+  /**
+   * HI-3284: cw_submit's early warning from the merge guards (as the options are now, where the merge checks run): what
+   * `revision` adds since `base`, matched in their worker. A warning only: the merge's own check, on the merged result,
+   * decides. A read that failed or a cancel says nothing.
+   */
+  private async guardWarnings(o: WorkflowOptions, base: string, revision: string): Promise<string[]> {
+    const guards = guardsOf(this.cfg.options())
+    const adapter = this.platform(o)
+    if (!guards.length || !adapter.addedDiff || !(o.finish === 'combworkMerges' || finishOnCandidate(o.finish))) return []
+    const r = await checkMergeGuards(guards, () => adapter.addedDiff!(base, revision), this.cfg.guardLimits?.() ?? { timeoutMs: 10_000, maxLines: 200_000 })
+    return guardsRefuse(r) && !r.transient ? [guardWarning(r)] : []
+  }
+
   private async pathNotices(card: CardRecord, o: WorkflowOptions, given: boolean, signal?: AbortSignal): Promise<string[]> {
     if (!declaresPaths(o.platform) || card.kind !== 'code') return []
     const paths = card.paths ?? []

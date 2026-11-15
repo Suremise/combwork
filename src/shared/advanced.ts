@@ -133,6 +133,10 @@ export const QUEUE_NETWORK_CODES = 'cw.queue.networkCodes'
 
 /** The longest the merge queue's signed merge commit takes before its signer is ended (#1350): read by main's queueHost. */
 export const QUEUE_SIGN_SECONDS = 'cw.queue.signSeconds'
+/** HI-3284: the longest the merge guards' matching runs before the check ends incomplete (never a pass). */
+export const MERGE_GUARDS_SECONDS = 'cw.mergeGuards.seconds'
+/** HI-3284: the most lines a merge may add for its guards to check them (past it, incomplete, never a pass). */
+export const MERGE_GUARDS_LINES = 'cw.mergeGuards.maxLines'
 /** G20 (HI-1367): the parallel jobs the merge queue gives a project's focused-tests runner (CW_FOCUSED_JOBS). */
 export const QUEUE_FOCUSED_JOBS = 'cw.queue.focusedJobs'
 /** G20 (HI-1367): the longest a project's focused-tests picker runs, at a submit or at the merge. */
@@ -904,6 +908,32 @@ const SOURCES: readonly AdvancedSource[] = [
     min: 5,
     max: 3600,
     unit: 's',
+    applies: 'now'
+  },
+  // Merge guards (HI-3284): the matching's time limit and the lines a merge may add, past which the check ends incomplete,
+  // which refuses the merge like a match (never a pass on what was checked so far).
+  {
+    id: MERGE_GUARDS_SECONDS,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.mergeGuards.seconds.title', defaultMessage: 'Merge guards: longest the check takes', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds. Merge guards are patterns Combwork refuses in the lines a merge adds (HI-3284)." }),
+    desc: msg({ id: 'settings.advanced.cw.mergeGuards.seconds.desc', defaultMessage: 'How long matching the merge guards against a merge’s added lines may take. Past it the check ends unfinished, which sends the card back like a match, naming the guard that was running. Raise it for very large merges; a pattern that takes this long usually needs rewriting.', description: 'What the advanced setting "Merge guards: longest the check takes" does, and what goes wrong when it is wrong (Settings → Advanced, HI-3284).' }),
+    kind: 'number',
+    default: 10,
+    min: 1,
+    max: 300,
+    unit: 's',
+    applies: 'now'
+  },
+  {
+    id: MERGE_GUARDS_LINES,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.mergeGuards.maxLines.title', defaultMessage: 'Merge guards: most lines a merge adds', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by a number of lines. Merge guards are patterns Combwork refuses in the lines a merge adds (HI-3284)." }),
+    desc: msg({ id: 'settings.advanced.cw.mergeGuards.maxLines.desc', defaultMessage: 'The most lines a merge may add for its merge guards to check them (and at most 64 MB of them). A merge that adds more isn’t checked at all: it goes back like a match, never through on the part that was read.', description: 'What the advanced setting "Merge guards: most lines a merge adds" does, and what goes wrong when it is wrong (Settings → Advanced, HI-3284). MB is megabytes.' }),
+    kind: 'number',
+    default: 200_000,
+    min: 1_000,
+    max: 5_000_000,
+    unit: 'lines',
     applies: 'now'
   },
   // Merging into a branch checked out in a folder (#1351, OP-40, SPEC §16.9.2): its journaled update has one race it
@@ -1763,6 +1793,7 @@ const UNITS: Record<string, Msg> = {
   min: msg({ id: 'settings.advanced.unit.minutes', defaultMessage: '{n, number} min', description: 'An advanced setting\'s value in minutes, short: "10 min". {n} is the number.' }),
   days: msg({ id: 'settings.advanced.unit.days', defaultMessage: '{n, plural, one {# day} other {# days}}', description: 'An advanced setting\'s value in days: "14 days".' }),
   captures: msg({ id: 'settings.advanced.unit.captures', defaultMessage: '{n, plural, one {# capture} other {# captures}}', description: "An advanced setting's value: a number of the flight recorder's captures (saved recordings of the developer console)." }),
+  lines: msg({ id: 'settings.advanced.unit.lines', defaultMessage: '{n, plural, one {# line} other {# lines}}', description: "An advanced setting's value: a number of lines of text (HI-3284: the lines a merge adds)." }),
   characters: msg({ id: 'settings.advanced.unit.characters', defaultMessage: '{n, plural, one {# character} other {# characters}}', description: "An advanced setting's value: a number of characters (letters, spaces and the like) in a piece of text." })
 }
 
@@ -1775,6 +1806,7 @@ const UNIT_LABELS: Record<string, Msg> = {
   days: msg({ id: 'settings.advanced.unitLabel.days', defaultMessage: 'days', description: 'Beside the box of an advanced setting given in days (Settings → Advanced), as in "14 days".' }),
   bytes: msg({ id: 'settings.advanced.unitLabel.bytes', defaultMessage: 'bytes', description: 'Beside the box of an advanced setting that is a size in bytes (Settings → Advanced), as in "4096 bytes".' }),
   captures: msg({ id: 'settings.advanced.unitLabel.captures', defaultMessage: 'captures', description: "Beside the box of an advanced setting that is a number of the flight recorder's captures (saved recordings of the developer console; Settings → Advanced)." }),
+  lines: msg({ id: 'settings.advanced.unitLabel.lines', defaultMessage: 'lines', description: 'Beside the box of an advanced setting that is a number of lines of text (Settings → Advanced), as in "200000 lines" (HI-3284).' }),
   characters: msg({ id: 'settings.advanced.unitLabel.characters', defaultMessage: 'characters', description: 'Beside the box of an advanced setting that is a number of characters in a piece of text (Settings → Advanced), as in "80 characters".' })
 }
 

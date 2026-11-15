@@ -51,6 +51,8 @@ import type { RunCheck } from '../../shared/types'
 import type { QueueStep, QueueStuck } from '../../shared/workflow/queue'
 import { agentMsg, say } from '../../shared/agentText'
 import { asCardCounts } from './containment'
+import { guardReportLog, guardsKey, guardsOf, guardsRefuse, MERGE_GUARDS_CHECK, type GuardReport } from '../../shared/workflow/mergeGuards'
+import { checkMergeGuards } from './mergeGuardsRun'
 
 /** A focused-test run's results Combwork couldn't read, as its check's output (HI-2463: Combwork's name). */
 const RESULTS_UNREAD = agentMsg({ id: 'workflow.focused.resultsUnread', text: "Combwork couldn't take its results: {why}.", note: "A check's output: the focused tests' runner wrote results that couldn't be read. why: what was wrong with them." })
@@ -90,7 +92,7 @@ export interface CheckContext {
 /** What the merge checks of a test merge came to: green (every one passed and counted), red, or not proved. */
 /** A red outcome names the check (`install` for the install before them) and its log, when it holds its output (#1354). */
 /** G20 (HI-1367): `focused`, its focused tests stopped it (returned, with why); `skip`, some were skipped and wait for a decision. */
-type ChecksOutcome = { kind: 'green' } | { kind: 'red'; transient: boolean; cause?: TransientFailure; output: string; check: string; logPath?: string } | { kind: 'uncounted' } | { kind: 'focused'; focused: FocusedReturn } | { kind: 'skip'; skipped: FocusedResult[]; expected: string; tree: string }
+type ChecksOutcome = { kind: 'green' } | { kind: 'red'; transient: boolean; cause?: TransientFailure; output: string; check: string; logPath?: string; guards?: GuardReport } | { kind: 'uncounted' } | { kind: 'focused'; focused: FocusedReturn } | { kind: 'skip'; skipped: FocusedResult[]; expected: string; tree: string }
 
 export interface QueueConfig {
   /** The queue's own worktree (a merge slot, kept warm). */
@@ -107,6 +109,11 @@ export interface QueueConfig {
   mergeAsk?: () => Promise<boolean>
   /** HI-1697: brings the project's options in line with the board's recorded merge choice, when its write is pending. */
   settle?: () => Promise<void>
+  /**
+   * HI-3284: the merge guards' limits (Settings → Advanced, read at each check): the matching's time limit and the most
+   * lines a merge may add. Left out, 10 s and 200,000.
+   */
+  guardLimits?: () => { timeoutMs: number; maxLines: number }
   /** Runs a named merge check (its configured command) in a folder, on the test merge's result. */
   runCheck: (name: string, command: string, folder: string, ctx: CheckContext) => Promise<CheckResult>
   /** Installs dependencies there; `clean` from scratch (`npm ci`). `skipped`: there was nothing to install. */
@@ -1448,6 +1455,9 @@ export class MergeQueue {
       // HI-2660: the focused tests' review proof read again here, in the lock, on the facts as they are now: one that no
       // longer stands sends the entry round again, whose checks then return the card for its proof (`noProof`).
       if (focusedProofGone(s, r.options.commands, proofReviewers(this.wf.store.card(card.id).reviewer, s), entry, data.result).length) return 'proofGone' as const
+      // HI-3284: and the merge guards' result, read again against the options as they are now: changed since, it goes
+      // round again the same way (its evidence gone), checked under the guards now.
+      if (this.guardsStale(entry.id, data.result)) return 'proofGone' as const
       if (this.cfg.enforced && !this.cfg.enforced()) return 'rulesOff' as const
       if (this.wf.store.queuePause(entry.target) || this.cfg.teamPaused?.()) return 'held' as const
       // A checked-out target under Ask each time (OP-40): only with the user's Approve of this entry and test merge, as
@@ -1656,7 +1666,7 @@ export class MergeQueue {
           const p = checks.transient ? null : await pinned()
           if (p === 'again') continue
           if (p) return p
-          return this.returnCard(card, entry, revision, target, 'checks', checks.transient, undefined, checks.output, checks.cause, { check: checks.check, ...(checks.logPath ? { logPath: checks.logPath } : {}) }, undefined, undefined, checks.transient ? undefined : tested)
+          return this.returnCard(card, entry, revision, target, 'checks', checks.transient, undefined, checks.output, checks.cause, { check: checks.check, ...(checks.logPath ? { logPath: checks.logPath } : {}), ...(checks.guards ? { guards: checks.guards } : {}) }, undefined, undefined, checks.transient ? undefined : tested)
         }
         // Missing review proof or a missing runner isn't the work's fault: the same revision may go back (requeue.allowed).
         if (checks.kind === 'focused') return this.returnCard(card, entry, revision, target, 'focused', checks.focused.why === 'noProof' || checks.focused.why === 'noRunner', undefined, undefined, undefined, undefined, undefined, checks.focused)
@@ -1673,6 +1683,12 @@ export class MergeQueue {
       // The last check before the target moves: still approved (a decision since cancels the entry).
       const last = this.stillApproved(card, entry)
       if (!last.ok) return this.skip(card, entry, last.cancelled)
+      // HI-3284: the merge guards as the options are now aren't those this result was checked with (changed while it was
+      // queued or checked, or never checked here: an approved advance after a restart): round again, checked anew.
+      if (this.guardsStale(entry.id, result)) {
+        if (++retests > MAX_RETESTS) return this.pause(target, card, entry, 'targetMovesFast')
+        continue
+      }
       // HI-2660: a focused test's review proof gone since its checks: round again, whose checks return the card for it.
       if (focusedProofGone(last.s, this.wf.rulesetOf(card, last.s).options.commands, proofReviewers(this.wf.store.card(card.id).reviewer, last.s), entry, result).length) {
         if (++retests > MAX_RETESTS) return this.pause(target, card, entry, 'targetMovesFast')
@@ -1879,6 +1895,10 @@ export class MergeQueue {
    */
   private async mergeChecks(card: CardRecord, result: string, entry: QueueEntry, expected: string): Promise<ChecksOutcome> {
     const o = this.wf.rulesetOf(card).options
+    // HI-3284: the merge guards first (cheap, no install), as the options are now (not a rule), on what the result adds
+    // to the head it was made on.
+    const red = await this.guardsCheck(card, entry, result, expected)
+    if (red) return red
     // G20 runs with no G9 checks too (HI-1367), after the same install.
     const focused = o.focusedTests && o.finish === 'combworkMerges'
     if (!o.mergeChecks.length && !focused) return { kind: 'green' }
@@ -1928,6 +1948,44 @@ export class MergeQueue {
     }
     if (focused) return this.focusedTests(card, entry, expected, result, { ...ctx, ...(noInstall ? { noInstall } : {}) })
     return { kind: 'green' }
+  }
+
+  /** What each entry's result was checked with by the merge guards (HI-3284): their key, and the result. */
+  private readonly guardedRuns = new Map<string, { key: string; result: string }>()
+
+  /** Whether the guards now aren't those `result` was checked with for `entry` (no guards, never checked: not stale). */
+  private guardsStale(entry: string, result: string): boolean {
+    const now = guardsKey(guardsOf(this.wf.cfg.options()))
+    const was = this.guardedRuns.get(entry)
+    return was ? was.key !== now || was.result !== result : now !== ''
+  }
+
+  /**
+   * HI-3284: the merge guards over the lines `result` adds to `expected` (the history port's diff, matched in a worker),
+   * recorded as the check `merge guards` with the guards' key; a match, or a check that couldn't finish, is red. None:
+   * nothing runs, and the result stands for no guards.
+   */
+  private async guardsCheck(card: CardRecord, entry: QueueEntry, result: string, expected: string): Promise<ChecksOutcome | null> {
+    const guards = guardsOf(this.wf.cfg.options())
+    const key = guardsKey(guards)
+    this.guardedRuns.delete(entry.id)
+    if (!guards.length) {
+      this.guardedRuns.set(entry.id, { key, result })
+      return null
+    }
+    const t0 = Date.now()
+    const limits = this.cfg.guardLimits?.() ?? { timeoutMs: 10_000, maxLines: 200_000 }
+    const history = this.history(card)
+    const r = await checkMergeGuards(guards, () => history.addedDiff(this.project, expected, result), limits)
+    const refused = guardsRefuse(r)
+    const data: FactData['CheckRan'] = { name: MERGE_GUARDS_CHECK, command: MERGE_GUARDS_CHECK, revision: result, tested: result, result: refused ? 'failed' : 'passed', run: randomUUID(), durationMs: Math.max(0, Date.now() - t0), by: CW_RUNS, counted: !r.incomplete, entry: entry.id, guardsKey: key, base: expected }
+    await this.write(card, (w) => w.fact('CheckRan', data))
+    if (!refused) {
+      this.guardedRuns.set(entry.id, { key, result })
+      return null
+    }
+    const { transient, ...report } = r
+    return { kind: 'red', transient: !!transient, output: guardReportLog(report), check: MERGE_GUARDS_CHECK, guards: report }
   }
 
   /**
@@ -2331,7 +2389,7 @@ export class MergeQueue {
   }
 
   /** A conflict, red checks or a hook: `IntegrationFailed`, the card back to its builder with the output (§16.9.1 step 8). */
-  private async returnCard(card: CardRecord, entry: QueueEntry, revision: string, target: string, reason: FactData['IntegrationFailed']['reason'], transient: boolean, files?: string[], log?: string, cause?: TransientFailure, check?: { check: string; logPath?: string }, conflicts?: ConflictsRecord, focused?: FocusedReturn, tested?: Tested): Promise<QueueOutcome> {
+  private async returnCard(card: CardRecord, entry: QueueEntry, revision: string, target: string, reason: FactData['IntegrationFailed']['reason'], transient: boolean, files?: string[], log?: string, cause?: TransientFailure, check?: { check: string; logPath?: string; guards?: GuardReport }, conflicts?: ConflictsRecord, focused?: FocusedReturn, tested?: Tested): Promise<QueueOutcome> {
     // Removed from the queue (or cancelled by a decision) while its test merge or checks ran: its cancellation stands,
     // the card where that left it (Approved), and the late failure isn't written.
     const wrote = await this.write(card, (w) => {

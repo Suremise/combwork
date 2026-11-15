@@ -151,6 +151,7 @@
   "tasks.history.noDependencies": "Hängt nicht mehr von anderen Karten ab",
   "tasks.history.notified": "Dich benachrichtigt, {event, select, failed {dass das Review nicht bestanden wurde} blocked {dass die Karte blockiert ist} stalled {dass die Karte festgefahren ist} mergeDue {dass alle Karten der Lane {lane} das Review bestanden haben und der Merge ansteht} mergeStalled {dass der Merge der Lane {lane} festgefahren ist} other {dass die Karte dich braucht}}{hasWhy, select, yes {: {why}} other {}}",
   "tasks.history.placed": "Auf Platz {place, selectordinal, other {#}} in {column, select, hold {Geparkt} todo {Offen} doing {In Arbeit} review {Review} passed {Genehmigt} done {Erledigt} other {{column}}} gesetzt",
+  "tasks.history.queueGuarded": "{state, select, matched {Aus der Merge-Warteschlange zurückgegeben: Die Merge-Sperre „{guard}“ hat {count, plural, one {eine hinzugefügte Zeile} other {# hinzugefügte Zeilen}} getroffen, zuerst in {where}. {message}} other {Aus der Merge-Warteschlange zurückgegeben: Die Merge-Sperren konnten die hinzugefügten Zeilen nicht fertig prüfen, daher wurde sie nicht gemergt.}} Der Abschnitt „Arbeit“ der Karte zeigt den Lauf.",
   "tasks.history.renamed": "Umbenannt in „{title}“",
   "tasks.history.repaired": "Projekt: {from} → {to} (umbenannt oder verschoben)",
   "tasks.history.requestClosed": "{why, select, done {Eine Frage für dich geschlossen: die Karte ist in Erledigt} other {Eine Frage für dich geschlossen: der fragende Agent hat weitergemacht}}",

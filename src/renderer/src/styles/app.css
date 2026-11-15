@@ -15850,6 +15850,27 @@ button.progress-lane-retry {
 .workflow-check .input:first-child {
   flex: 0 0 35%;
 }
+.workflow-guard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.workflow-guard-head {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.workflow-guard-head .input {
+  flex: 1;
+  min-width: 0;
+}
+.workflow-guards > .flex {
+  gap: 6px;
+  flex-wrap: wrap;
+}
 .workflow-problems {
   color: var(--error);
   margin-block: 8px;

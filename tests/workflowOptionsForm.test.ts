@@ -261,6 +261,25 @@ describe('the Workflow section (#1278)', () => {
     expect((await w.projectConfig(repo)).workflow).toMatchObject({ options: { target: 'release' } })
   })
 
+  it('HI-3284: refuses merge guards a save can’t take (an invalid pattern, a bad glob, a pattern matching an empty line), saving nothing; takes good ones', async () => {
+    const { w, repo } = await workspace()
+    const { platform: _p, ...pair } = preset('git', 'pair')
+    const g = { name: 'No secrets', pattern: 'secret', message: 'Take it out.' }
+    expect(checkOptions('git', { project: { ...pair, mergeGuards: [{ ...g, pattern: '(' }] } }).problems).toMatchObject([{ kind: 'guard', guard: 0, field: 'pattern', why: 'invalid' }])
+    await expect(form.setWorkflowOptions(w, repo, { preset: null, options: { ...pair, mergeGuards: [g, { ...g, pattern: '(unclosed' }] } })).rejects.toThrow(/pattern of merge guard 2 isn’t a regular expression/)
+    await expect(form.setWorkflowOptions(w, repo, { preset: null, options: { ...pair, mergeGuards: [{ ...g, skip: ['../up'] }] } })).rejects.toThrow(/Merge guard 1 has a path it can’t use: “\.\.\/up”/)
+    await expect(form.setWorkflowOptions(w, repo, { preset: null, options: { ...pair, mergeGuards: [{ ...g, pattern: 'x*' }] } })).rejects.toThrow(/pattern of merge guard 1 matches an empty line/)
+    expect((await w.projectConfig(repo)).workflow).toBeUndefined()
+    const f = await form.setWorkflowOptions(w, repo, { preset: null, options: { ...pair, mergeGuards: [g] } })
+    expect(f.own.mergeGuards).toEqual([g])
+    // Not a rule (left out of a ruleset), never set by a preset nor making the options Custom.
+    const id = (o: Parameters<typeof compile>[0]): string | null => {
+      const r = compile(o)
+      return r.ok ? r.ruleset.id : null
+    }
+    expect(id({ ...preset('git', 'pair'), mergeGuards: [g] })).toBe(id(preset('git', 'pair')))
+  })
+
   it('refuses a contradiction whole, with its reason, and saves the options and the preset they started from', async () => {
     const { w, repo } = await workspace()
     await expect(form.setWorkflowOptions(w, repo, { preset: null, options: { finish: 'committed', folder: 'slots' } })).rejects.toThrow(/Committed is done” needs everyone in the project folder/)

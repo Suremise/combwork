@@ -169,6 +169,31 @@ interface CombworkMessageValues {
   'workflow.group.where': undefined
   'workflow.group.work': undefined
   'workflow.mergeChoice.answer': { styleTitle: string | number; style: string | number; messageTitle: string | number; message: string | number }
+  'workflow.mergeGuards.add': undefined
+  'workflow.mergeGuards.addName': undefined
+  'workflow.mergeGuards.down': undefined
+  'workflow.mergeGuards.example': undefined
+  'workflow.mergeGuards.ignoreCase': undefined
+  'workflow.mergeGuards.message': undefined
+  'workflow.mergeGuards.name': undefined
+  'workflow.mergeGuards.nameGuard': undefined
+  'workflow.mergeGuards.nameMessage': undefined
+  'workflow.mergeGuards.none': undefined
+  'workflow.mergeGuards.paths': undefined
+  'workflow.mergeGuards.pattern': undefined
+  'workflow.mergeGuards.problem.empty': { n: number; field: string }
+  'workflow.mergeGuards.problem.glob': { n: number; detail: string | number; braces: string | number }
+  'workflow.mergeGuards.problem.invalid': { n: number; detail: string | number }
+  'workflow.mergeGuards.problem.matchesEmpty': { n: number }
+  'workflow.mergeGuards.problem.notGuard': { n: number }
+  'workflow.mergeGuards.problem.notList': undefined
+  'workflow.mergeGuards.problem.timedOut': { n: number }
+  'workflow.mergeGuards.problem.tooLong': { field: string; n: number; max: number }
+  'workflow.mergeGuards.problem.tooMany': { max: number }
+  'workflow.mergeGuards.problem.tooManyGlobs': { n: number; max: number }
+  'workflow.mergeGuards.remove': undefined
+  'workflow.mergeGuards.skip': undefined
+  'workflow.mergeGuards.up': undefined
   'workflow.missing.create': undefined
   'workflow.missing.failed': { branch: string | number }
   'workflow.missing.from': { branch: string | number }
@@ -246,6 +271,10 @@ interface CombworkMessageValues {
   'workflow.option.mergeChecks.jjDesc': undefined
   'workflow.option.mergeChecks.jjTitle': undefined
   'workflow.option.mergeChecks.title': undefined
+  'workflow.option.mergeGuards.desc': undefined
+  'workflow.option.mergeGuards.jjDesc': undefined
+  'workflow.option.mergeGuards.jjTitle': undefined
+  'workflow.option.mergeGuards.title': undefined
   'workflow.option.mergeInstall.desc': undefined
   'workflow.option.mergeInstall.jjDesc': undefined
   'workflow.option.mergeInstall.jjTitle': undefined

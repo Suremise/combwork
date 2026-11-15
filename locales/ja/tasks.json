@@ -151,6 +151,7 @@
   "tasks.history.noDependencies": "他のカードへの依存を解除",
   "tasks.history.notified": "{event, select, failed {レビュー不合格} blocked {ブロックされている} stalled {停滞している} mergeDue {レーン{lane}のすべてのカードがレビューに合格し、マージできる状態である} mergeStalled {レーン{lane}のマージが停滞している} other {対応が必要である}}ことを通知しました{hasWhy, select, yes {：{why}} other {}}",
   "tasks.history.placed": "「{column, select, hold {保留} todo {未着手} doing {進行中} review {レビュー} passed {承認済み} done {完了} other {{column}}}」の{place, selectordinal, other {#番目}}に配置",
+  "tasks.history.queueGuarded": "{state, select, matched {マージキューから差し戻されました：マージガード「{guard}」が、追加される行のうち{count, plural, other {#行}}に一致しました（最初は{where}）。{message}} other {マージキューから差し戻されました：マージガードが追加される行のチェックを完了できなかったため、マージされませんでした。}}カードの「作業」セクションに実行が表示されます。",
   "tasks.history.renamed": "タイトルを「{title}」に変更",
   "tasks.history.repaired": "プロジェクト：{from} → {to}（名前の変更または移動）",
   "tasks.history.requestClosed": "{why, select, done {要対応の質問を閉じました：カードは完了にあります} other {要対応の質問を閉じました：質問したエージェントが作業を続けました}}",

@@ -32,6 +32,7 @@ import { emit } from './events'
 import { workspace } from './workspace'
 import { advanced, updateSettingsChecked } from './advanced'
 import { checkOffer } from './workflow/releaseOffer'
+import { refuseGuardsAtSave } from './workflow/guardsSave'
 
 /**
  * Combwork's settings for the Agent API and the Combwork Assistant's settings tools (#186): the catalog's entries with their
@@ -287,6 +288,10 @@ export async function applySetting(
   if (e.sensitive) throw new SettingRefused(403, settingReadOnly(e) ?? say(T.usersToChange, { path: settingPath(e) }))
   const value = await checkedValue(e, raw, e.scope === 'project' ? projectPath : null)
   if (e.scope === 'project' && e.key === PLATFORM_SETTING_KEY) return switchSetting(value, projectPath, guard)
+  // HI-3284: the merge guards' empty-match rule, in their worker, before the project's lock.
+  if (e.workflow === 'mergeGuards') await refuseGuardsAtSave(value).catch((err: unknown) => {
+    throw err instanceof CombworkError ? new SettingRefused(400, agentError(err)) : err
+  })
   const change = settingPatch(e, value)
   if ('project' in change) {
     if (!projectPath) throw new SettingRefused(400, say(T.projectSetting, { id: e.id }))

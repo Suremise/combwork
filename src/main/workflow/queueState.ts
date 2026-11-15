@@ -13,6 +13,7 @@ import { HISTORY, storedText } from '../../shared/taskHistory'
 import type { StoredText } from '../../shared/types'
 import { agentMsg, say } from '../../shared/agentText'
 import { inDefaultDialect } from '../../shared/agentText/asyncScope'
+import { guardFailureText } from '../../shared/workflow/mergeGuards'
 
 /** What agents are told of a card and the merge queue (dialects, HI-2435): card reads, a lane's next, wakes, the queue's comment. */
 const Q = {
@@ -366,6 +367,8 @@ function failureText(f: FactData['IntegrationFailed'], room: number, about?: Ret
       return f.files?.length ? say(Q.failureIn, { head, files: placedFiles(f, room - frame(Q.failureIn, { head }, 'files')) }) : head
     }
     case 'checks': {
+      // HI-3284: the merge guards' own words: which guard matched how many lines, or why the check couldn't finish.
+      if (f.guards) return guardFailureText(f.guards)
       const what = f.check === 'install' ? say(Q.checkInstall) : f.check ? say(Q.checkNamed, { check: f.check }) : say(Q.checkSome)
       return f.transient ? say(Q.checkEnv, { what, cause: f.cause ?? say(Q.temporary), code: f.code ? `: ${f.code}` : '' }) : say(Q.checkFailed, { what })
     }
@@ -527,6 +530,13 @@ export function returnedComment(key: string, f: FactData['IntegrationFailed'], f
   // Of its log, only the lines the comment quotes (lastLines reads the same from them): a comment stays small.
   const kept: FactData['IntegrationFailed'] = f.log ? { ...f, log: f.log.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(-COMMENT_LINES).join('\n') } : f
   const agent = { render: RETURNED_COMMENT, data: { key, failure: kept, ...(forward ? { forward: { from: forward.from, to: forward.to, ...(forward.resolution ? { resolution: forward.resolution } : {}), ...(forward.source ? { source: forward.source } : {}) } } : {}) } }
+  // HI-3284: a merge guard's return in the window: which guard, where, and its message (the user's own words).
+  const g = f.guards
+  if (g) {
+    const first = g.hits[0]
+    const shown = storedText(HISTORY.queueGuarded, { state: g.incomplete ? 'incomplete' : 'matched', guard: first?.guard ?? '', count: g.hits.length + g.more, where: first ? `${first.file}:${first.line}` : '', message: g.messages.find((m) => m.guard === first?.guard)?.message ?? '' })
+    return { text: inDefaultDialect(() => returnedCommentFrom(agent.data)!), shown: { ...shown, agent } }
+  }
   return { text: inDefaultDialect(() => returnedCommentFrom(agent.data)!), shown: { ...storedText(HISTORY.queueReturned, { reason, target: f.target, check: f.check ?? '', files }), agent } }
 }
 

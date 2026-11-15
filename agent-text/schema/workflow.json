@@ -270,6 +270,61 @@
   "workflow.jj.start.target": {
     "placeholders": {}
   },
+  "workflow.mergeGuards.problem.empty": {
+    "placeholders": {
+      "n": "number",
+      "field": "select"
+    }
+  },
+  "workflow.mergeGuards.problem.glob": {
+    "placeholders": {
+      "n": "number",
+      "detail": "plain",
+      "braces": "plain"
+    }
+  },
+  "workflow.mergeGuards.problem.invalid": {
+    "placeholders": {
+      "n": "number",
+      "detail": "plain"
+    }
+  },
+  "workflow.mergeGuards.problem.matchesEmpty": {
+    "placeholders": {
+      "n": "number"
+    }
+  },
+  "workflow.mergeGuards.problem.notGuard": {
+    "placeholders": {
+      "n": "number"
+    }
+  },
+  "workflow.mergeGuards.problem.notList": {
+    "placeholders": {}
+  },
+  "workflow.mergeGuards.problem.timedOut": {
+    "placeholders": {
+      "n": "number"
+    }
+  },
+  "workflow.mergeGuards.problem.tooLong": {
+    "placeholders": {
+      "field": "select",
+      "n": "number",
+      "max": "number"
+    }
+  },
+  "workflow.mergeGuards.problem.tooMany": {
+    "placeholders": {
+      "max": "number"
+    }
+  },
+  "workflow.mergeGuards.problem.tooManyGlobs": {
+    "placeholders": {
+      "n": "number",
+      "max": "number"
+    }
+  },
   "workflow.move.answer": {
     "placeholders": {}
   },
@@ -430,6 +485,18 @@
     "placeholders": {}
   },
   "workflow.option.mergeChecks.title": {
+    "placeholders": {}
+  },
+  "workflow.option.mergeGuards.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.mergeGuards.jjDesc": {
+    "placeholders": {}
+  },
+  "workflow.option.mergeGuards.jjTitle": {
+    "placeholders": {}
+  },
+  "workflow.option.mergeGuards.title": {
     "placeholders": {}
   },
   "workflow.option.mergeInstall.desc": {

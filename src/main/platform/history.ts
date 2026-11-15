@@ -11,7 +11,7 @@
 // RepoContext per read would add reads to each; contexts stay port 1's, for identity and locks).
 
 import type { FileChange } from '../../shared/workflow/facts'
-import type { Change, Containment, Maybe } from './types'
+import type { Change, Containment, DiffRead, Maybe } from './types'
 
 /** A commit as attribution reads it: its id, author email and `Combwork-Card` trailers. */
 export interface CommitInfo {
@@ -158,6 +158,11 @@ export interface HistoryPort {
   change(repo: string, base: string, head: string): Promise<Maybe<Change>>
   /** The files changed between two revisions. */
   filesChanged(repo: string, base: string, head: string): Promise<Maybe<FileChange[]>>
+  /**
+   * HI-3284: the lines `head` adds to `base`, as a unified diff with no context, its inputs pinned (no external diff,
+   * textconv, colour, prefix or path quoting the user's configuration sets), at most GUARD_DIFF_BYTES: the merge guards'.
+   */
+  addedDiff(repo: string, base: string, head: string): Promise<DiffRead>
   /** A change's candidate key (a first test only, never sameness on its own: R3.2), or null where it has none. */
   candidateKey(repo: string, base: string, head: string): Promise<Maybe<string | null>>
   /** Whether two changes are the same change (§16.3.2's replay; false for anything it can't settle: R3.2). */
