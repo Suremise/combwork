@@ -98,7 +98,9 @@ const projectJson = () => JSON.parse(fs.readFileSync(path.join(fx.alpha, '.combw
       return /merge guard “No secrets” matched a line it adds, first in src\.txt:2\. Take the secret out\./.test(t) ? t : null
     }, HUNG_MS)
     check('the card says which guard, where, and its message', !!said, comment ? JSON.stringify(comment.data) : await text(cardDialog))
-    await shoot(cardDialog, 'returned')
+    const said2 = cardDialog.locator('.task-comment').filter({ hasText: 'No secrets' }).last()
+    await said2.scrollIntoViewIfNeeded()
+    await shoot(said2, 'returned')
     await page.keyboard.press('Escape')
     await until(async () => (await cardDialog.count()) === 0, HUNG_MS)
 
