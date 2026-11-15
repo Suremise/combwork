@@ -245,6 +245,10 @@ const check = (name, ok, extra = '') => {
   check("no hand-over while agents can't use Combwork's tools", noTools.status === 409 && /Combwork's tools/.test(noTools.body?.error), JSON.stringify(noTools.body))
   await inv('settings:update', { agentApi: { enabled: true } })
   await lib.until(async () => (await api('GET', '/v1/status').catch(() => ({}))).status === 200, 10000)
+  // The user presses Enter in Builder's terminal (at its idle prompt, an empty line: nothing sent). Its run now is the new
+  // conversation above, and a run's start forgets the keys typed into an earlier one (HI-3261), so the Enter that
+  // answered its trust question no longer counts: this one does, here and for the lane below (the pause is 600 s).
+  await inv('pty:write', lib.ptyKey(alpha, builder), '\r')
   const typedIn = await api('POST', '/v1/projects/alpha/handover', { from: 'Builder', to: 'Fixer', handover: false })
   check('no hand-over from an agent the user just typed in', typedIn.status === 409 && /typed/.test(typedIn.body?.error), JSON.stringify(typedIn.body))
   await api('POST', '/v1/projects/alpha/agents', { name: 'Checker' })
