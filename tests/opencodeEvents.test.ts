@@ -256,26 +256,26 @@ describe("the question tool's form (HI-3317: 2.2.6 recorded, events/question-*.j
     const sid = sidOf(ev)
     const t = newTracker()
     const a = new Agent()
-    const asked: (Ask | null)[] = []
+    const seen: (Ask | null)[] = []
     for (const raw of ev) {
       const e = projectEvent(raw, sid)
       if (!e) continue
       a.take(applyEvent(t, 0, e))
-      if ((asked.length ? asked[asked.length - 1] : null) !== a.waitingOn) asked.push(a.waitingOn)
+      if ((seen.length ? seen[seen.length - 1] : null) !== a.waitingOn) seen.push(a.waitingOn)
     }
-    return { a, asked, ev }
+    return { a, seen, ev }
   }
 
   it('answered: the agent waits on you with its question, on its tool call, until the answer; then it works on and finishes', () => {
-    const { a, asked, ev } = waits('question-answered')
+    const { a, seen, ev } = waits('question-answered')
     const call = ev.find((e) => e.type === 'form.created')!.data.form.metadata.tool.id
-    expect(asked).toEqual([{ kind: 'question', blocking: true, message: 'Which file should I write?', call }, null])
+    expect(seen).toEqual([{ kind: 'question', blocking: true, message: 'Which file should I write?', call }, null])
     expect([a.prompts, a.status, a.waitingOn, a.running, a.stale]).toEqual([1, 'finished', null, false, []])
   })
 
   it('dismissed: the wait answered, the turn interrupted', () => {
-    const { a, asked } = waits('question-dismissed')
-    expect(asked.map((x) => x?.kind ?? null)).toEqual(['question', null])
+    const { a, seen } = waits('question-dismissed')
+    expect(seen.map((x) => x?.kind ?? null)).toEqual(['question', null])
     expect([a.prompts, a.status, a.waitingOn, a.running]).toEqual([1, 'ready', null, false])
   })
 

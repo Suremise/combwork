@@ -232,8 +232,8 @@ describe('fake opencode: its private server, as 2.2.6 served', () => {
       const form = created.data.form as { id: string }
       const listed = await s.api('GET', `/api/session/${sid}/form`)
       expect(listed).toEqual({ status: 200, body: { data: [form] } })
-      const rec = (wire['GET /api/session/{id}/form (a question pending)'].body as { data: Record<string, unknown>[] }).data[0]
-      expect(Object.keys(form).sort()).toEqual(Object.keys(rec).sort())
+      const pendingRec = (wire['GET /api/session/{id}/form (a question pending)'].body as { data: Record<string, unknown>[] }).data[0]
+      expect(Object.keys(form).sort()).toEqual(Object.keys(pendingRec).sort())
       if (dismiss) expect(await s.api('DELETE', `/api/session/${sid}/form/${form.id}`)).toEqual(wire['DELETE /api/session/{id}/form/{formID}'])
       else expect(await s.api('POST', `/api/session/${sid}/form/${form.id}/reply`, { answer: { q0: 'a.txt' } })).toEqual(wire['POST /api/session/{id}/form/{formID}/reply {answer: {q0}}'])
       await until(() => ended(s.events, sid), "the turn's end")

@@ -345,10 +345,10 @@ async function startServer(opts) {
      * dismisses (form.cancelled: the tool fails aborted, the step fails, the execution is interrupted). An interrupt while it
      * waits (not recorded) dismisses it the same way.
      */
-    const question = (text) =>
+    const question = (words) =>
       step(async (msgId) => {
         const callId = 'call_' + Math.random().toString(36).slice(2, 10)
-        const input = { questions: [{ header: 'Question', question: text, multiple: false, options: [{ label: 'Yes', description: 'Go on' }, { label: 'No', description: 'Stop here' }] }] }
+        const input = { questions: [{ header: 'Question', question: words, multiple: false, options: [{ label: 'Yes', description: 'Go on' }, { label: 'No', description: 'Stop here' }] }] }
         emit('session.tool.input.started', { sessionID: sid, assistantMessageID: msgId, id: callId, name: 'question' }, d)
         emit('session.tool.input.ended', { sessionID: sid, assistantMessageID: msgId, id: callId, text: JSON.stringify(input) }, d)
         emit('session.tool.called', { sessionID: sid, assistantMessageID: msgId, id: callId, input, executed: false }, d)
@@ -357,7 +357,7 @@ async function startServer(opts) {
         const part = (state) => setMessage(sid, msgId, (m) => (m.content = [{ type: 'tool', id: callId, name: 'question', executed: false, state, time: { created, ran: created, completed: Date.now() } }]))
         const form = { id: store.newId('frm'), sessionID: sid, title: 'Questions', metadata: { kind: 'question', tool: { messageID: msgId, id: callId } }, fields: input.questions.map((q, i) => ({ key: `q${i}`, title: q.header, description: q.question, type: 'string', options: q.options.map((o) => ({ value: o.label, label: o.label, description: o.description })), custom: true })) }
         emit('form.created', { form }, { location: l })
-        log({ kind: 'question', session: sid, text })
+        log({ kind: 'question', session: sid, text: words })
         const answer = await new Promise((resolve) => {
           forms.set(form.id, { form, resolve })
           ctl.wake = () => {
