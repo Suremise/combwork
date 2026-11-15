@@ -28,6 +28,12 @@ import { LOOP_ROUNDS, LOOP_WAIT_HOURS } from '../../shared/lanes'
 import { shellLine, type QueueCommand, type QueueFileSide, type QueuePauseLogged, type QueueStuck } from '../../shared/workflow/queue'
 import { pauseLogged, pauseLogKey, pauseLogOf } from './queueLogs'
 
+/** A card's stage as cardsInFlight and cardsOpen read it: its own, else its column's (Todo, Done). */
+const STAGE_OF = "coalesce(stage, CASE col WHEN 'todo' THEN 'todo' WHEN 'done' THEN 'done' END, '')"
+
+/** HI-3301: a `records` condition for only these numbers (none: no condition). */
+const amongOf = (among: readonly number[] | undefined): string => (among ? ` AND number IN (${among.map(() => '?').join(', ') || 'NULL'})` : '')
+
 /** What the runtime needs of a card: the board's card, with the columns the runtime keeps beside its document. */
 export interface CardRecord {
   /** The card's number (`#N`). */
@@ -475,17 +481,18 @@ export class FactStore {
   /**
    * This project's cards (not archived) past Todo and not Done, in number order (#1629): the only ones that can be in
    * flight, read without the rest of the board (a Done card's facts can't make it so: a `Moved` sets its stage too).
+   * HI-3301: `among`, only those of these numbers.
    */
-  cardsInFlight(): CardRecord[] {
-    return this.records("project = ? AND archived = 0 AND coalesce(stage, CASE col WHEN 'todo' THEN 'todo' WHEN 'done' THEN 'done' END, '') NOT IN ('todo', 'done')", [this.scope.project])
+  cardsInFlight(among?: readonly number[]): CardRecord[] {
+    return this.records(`project = ? AND archived = 0 AND ${STAGE_OF} NOT IN ('todo', 'done')${amongOf(among)}`, [this.scope.project, ...(among ?? [])])
   }
 
   /**
    * This project's cards (not archived) not Done, Todo included, in number order (HI-3000: a branch pair's open forward
-   * or resolution), read without the Done ones, as cardsInFlight is.
+   * or resolution), read without the Done ones, as cardsInFlight is. HI-3301: `among`, only those of these numbers.
    */
-  cardsOpen(): CardRecord[] {
-    return this.records("project = ? AND archived = 0 AND coalesce(stage, CASE col WHEN 'todo' THEN 'todo' WHEN 'done' THEN 'done' END, '') <> 'done'", [this.scope.project])
+  cardsOpen(among?: readonly number[]): CardRecord[] {
+    return this.records(`project = ? AND archived = 0 AND ${STAGE_OF} <> 'done'${amongOf(among)}`, [this.scope.project, ...(among ?? [])])
   }
 
   /**
