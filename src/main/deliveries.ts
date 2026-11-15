@@ -41,7 +41,8 @@ import { openTable, readStore, saveTable, storeValue } from './storeRows'
 import { measured } from './stallWork'
 import { boardLock, dbGenerationAt, onDbReplaced, upgradeWaiting, withLeasedDb, workspaceDb } from './boardStore'
 import { transaction } from './db'
-import { addDeliveriesFile, countDeliveries, readDeliveries as readDeliveryRows, readDeliveriesWithBases, saveDeliveryChanges, StaleDeliveries } from './schema/sessionDeliveryTables'
+import { addDeliveriesFile, countDeliveries, readDeliveries as readDeliveryRows, readDeliveriesWithBases, StaleDeliveries } from './schema/sessionDeliveryTables'
+import { saveDeliveryChanges } from './deliveryChanges'
 import { canTypeLine, lineBusy, typeLine, whyNoLine } from './lineWriter'
 import { createLogger, userText } from './logger'
 import { readyFor } from './readiness'
@@ -652,10 +653,40 @@ async function readFileOf(host: string): Promise<{ deliveries: unknown[]; next: 
 const fileText = (d: Pick<Draft, 'records' | 'next' | 'invalid'>): string => JSON.stringify({ version: 1, next: d.next, deliveries: d.records, ...(d.invalid.length ? { invalid: d.invalid } : {}) }, null, 2) + '\n'
 
 /**
+ * Each record's bytes in fileText, as an element of its deliveries list (indented two levels), kept while the record is
+ * (HI-3290: a save sized every record the host keeps, on main, several times a delivery). A record is never changed in
+ * place, but for the id its save gave it (forgotten here then).
+ */
+const recordBytes = new WeakMap<DeliveryRecord, number>()
+const bytesOf = (r: DeliveryRecord): number => {
+  let n = recordBytes.get(r)
+  if (n === undefined) {
+    const text = JSON.stringify(r, null, 2)
+    let lines = 0
+    for (let i = text.indexOf('\n'); i >= 0; i = text.indexOf('\n', i + 1)) lines++
+    // Each of its lines but the first indented four more; "    " before it, and ",\n" or "\n" after it.
+    n = Buffer.byteLength(text) + 4 * lines + 6
+    recordBytes.set(r, n)
+  }
+  return n
+}
+
+/** Buffer.byteLength(fileText(d)), from each record's bytes kept (bytesOf) rather than all of them written out again. */
+const fileBytes = (d: Pick<Draft, 'records' | 'next' | 'invalid'>): number => {
+  const empty = Buffer.byteLength(fileText({ records: [], next: d.next, invalid: d.invalid }))
+  if (!d.records.length) return empty
+  // "[]" becomes "[\n", its elements, then "\n  ]", less the last element's comma.
+  let n = empty + 2
+  for (const r of d.records) n += bytesOf(r)
+  return n
+}
+export const fileBytesForTests = (records: DeliveryRecord[], next: number, invalid: unknown[] = []): { bytes: number; text: number } => ({ bytes: fileBytes({ records, next, invalid }), text: Buffer.byteLength(fileText({ records, next, invalid })) })
+
+/**
  * Whether a draft fits the file's budget, with room for each live delivery to grow to its end (times, a reason): what
  * Combwork writes stays well under what it reads back (MAX_FILE_BYTES), so a file it wrote is never set aside as too big.
  */
-const fits = (d: Draft): boolean => Buffer.byteLength(fileText(d)) + d.records.filter(isLive).length * GROWTH_PER_LIVE <= fileBudget
+const fits = (d: Draft): boolean => fileBytes(d) + d.records.filter(isLive).length * GROWTH_PER_LIVE <= fileBudget
 
 /** Makes room in the budget by dropping the oldest ended deliveries (their history), if need be. False if it still doesn't fit. */
 function makeRoom(d: Draft): boolean {
@@ -691,12 +722,16 @@ async function save(store: Store, d: Draft): Promise<void> {
   }
   // What is written is what reads back (#649): one check, readDelivery's, for saving and restoring alike; a record it
   // wouldn't read back fails the save (nothing changes), never a delivery lost on the next start.
-  // Named in a stall it makes (HI-3293): every record of the host, round-tripped and serialised again.
+  // Only the records this transaction changed (HI-3290): the rest are those published, each checked as it was read or saved.
+  const was = new Map(store.records.map((r) => [r.id, r]))
+  const now = new Set(d.records.map((r) => r.id))
+  const changed = d.records.filter((r) => was.get(r.id) !== r)
+  // Named in a stall it makes (HI-3293).
   // agent-protocol: a stall's label, for combwork.log
   measured('deliveries save check', () => {
     // agent-protocol: a mistake in Combwork's code (a record it made that doesn't read back), for the log and its bug report
-    for (const r of d.records) if (!readDelivery(JSON.parse(JSON.stringify(r)))) throw new Error(`delivery ${r.id} isn't one Combwork could read back`)
-    if (Buffer.byteLength(fileText(d)) > MAX_FILE_BYTES) throw saidError(T.tooMany)
+    for (const r of changed) if (!readDelivery(JSON.parse(JSON.stringify(r)))) throw new Error(`delivery ${r.id} isn't one Combwork could read back`)
+    if (fileBytes(d) > MAX_FILE_BYTES) throw saidError(T.tooMany)
   })
   // Read from a database since replaced (the upgrade to 1.0, a restore): never saved over what the file has now.
   const guard = (): void => {
@@ -712,9 +747,6 @@ async function save(store: Store, d: Draft): Promise<void> {
   // transaction, against the rows as they are committed (#1266): a row another Combwork changed since this store read it
   // fails the save (StaleDeliveries: planned again on the rows as they are), its rows saved since are never touched, and
   // a new delivery whose id it took takes the next free one (made here, before it is published).
-  const was = new Map(store.records.map((r) => [r.id, r]))
-  const now = new Set(d.records.map((r) => r.id))
-  const changed = d.records.filter((r) => was.get(r.id) !== r) as unknown as Record<string, unknown>[]
   const removed = [...was.keys()].filter((id) => !now.has(id))
   let saved: ReturnType<typeof saveDeliveryChanges> = { written: new Map(), renamed: new Map() }
   const once = d.once
@@ -726,7 +758,7 @@ async function save(store: Store, d: Draft): Promise<void> {
       // Its receipt (HI-2618), read in this transaction against what is committed: one there means its delivery was made
       // (by another pass, another Combwork, or before a restart), and nothing of this plan is saved.
       if (once && storeValue(db, 'deliveries', store.place.scope, ONCE + once.key) !== null) throw new OnceTaken(once.key)
-      saved = saveDeliveryChanges(db, store.place.scope, { put: changed, removed, base: store.base })
+      saved = saveDeliveryChanges(db, store.place.scope, { put: changed as unknown as Record<string, unknown>[], removed, base: store.base })
       // Receipts past their keeping go (their producers no longer retry them).
       db.prepare("DELETE FROM store_meta WHERE store = 'deliveries' AND scope = ? AND substr(key, 1, 5) = ? AND json_extract(value, '$.at') < ?").run(store.place.scope, ONCE, new Date(Date.now() - ONCE_KEEP_MS).toISOString()) // agent-protocol: SQL
     },
@@ -736,8 +768,9 @@ async function save(store: Store, d: Draft): Promise<void> {
   for (const r of d.records) {
     const to = saved.renamed.get(r.id)
     if (!to) continue
-    // The same record (what the transaction returns is it): its id is the one saved.
+    // The same record (what the transaction returns is it): its id is the one saved, its size worked out again.
     Object.assign(r, to)
+    recordBytes.delete(r)
     d.next = Math.max(d.next, to.seq + 1)
   }
   // What this store now last wrote: the rows it saves next are changed only from these.
@@ -747,17 +780,30 @@ async function save(store: Store, d: Draft): Promise<void> {
   store.base = base
 }
 
+/** When an ended delivery ended, kept while the record is (HI-3290: prune parsed every ended one's time at each save). */
+const endedTimes = new WeakMap<DeliveryRecord, number>()
+const endedAt = (r: DeliveryRecord): number => {
+  let t = endedTimes.get(r)
+  if (t === undefined) endedTimes.set(r, (t = Date.parse(r.ended ?? r.acked ?? r.received ?? r.created)))
+  return t
+}
+
 /** Ended deliveries beyond what is kept (per agent, by age) go; received ones never acked expire after a week. */
 function prune(store: Store, d: Draft): void {
   const now = Date.now()
   for (const r of [...d.records]) if (r.state === 'received' && needsAck(r.kind) && now - Date.parse(r.received ?? r.created) > KEEP_RECEIVED_MS) set(store, d, r, 'expired', say(T.notAcked))
   const ended = new Map<string, DeliveryRecord[]>()
-  for (const r of d.records) if (!isLive(r)) ended.set(r.agentId, [...(ended.get(r.agentId) ?? []), r])
+  for (const r of d.records) {
+    if (isLive(r)) continue
+    const list = ended.get(r.agentId)
+    if (list) list.push(r)
+    else ended.set(r.agentId, [r])
+  }
   const drop = new Set<DeliveryRecord>()
   for (const list of ended.values()) {
     list.sort((a, b) => b.seq - a.seq)
     list.forEach((r, i) => {
-      if (i >= KEEP_ENDED || now - Date.parse(r.ended ?? r.acked ?? r.received ?? r.created) > KEEP_ENDED_MS) drop.add(r)
+      if (i >= KEEP_ENDED || now - endedAt(r) > KEEP_ENDED_MS) drop.add(r)
     })
   }
   if (drop.size) d.records = d.records.filter((r) => !drop.has(r))
@@ -1227,7 +1273,10 @@ function leftOnLease(host: string, place: HostPlace, nd: NewDelivery, meta: Deli
         const now = new Set(d.records.map((r) => r.id))
         const saved = saveDeliveryChanges(w, place.scope, { put: [rec as unknown as Record<string, unknown>], removed: read.records.filter((r) => !now.has(r.id)).map((r) => r.id), base: read.base })
         const to = saved.renamed.get(rec.id)
-        if (to) Object.assign(rec, to)
+        if (to) {
+          Object.assign(rec, to)
+          recordBytes.delete(rec)
+        }
         const value = w.prepare("INSERT INTO store_meta (store, scope, key, value) VALUES ('deliveries', ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET value = excluded.value") // agent-protocol: SQL
         value.run(place.scope, 'next', JSON.stringify(Math.max(d.next, rec.seq + 1)))
         log.info(`Delivery ${rec.id} (${rec.kind}) for ${userText(nd.agentName ?? nd.agentId)} left for when its workspace opens`)

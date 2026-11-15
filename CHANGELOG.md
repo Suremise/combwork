@@ -27,6 +27,7 @@
 
 ### Fixed
 
+- **Less typing lag while agents are woken** (HI-3290). Each change to a delivery (a wake, a card event, a message: about five saves each) checked, sized and read back every delivery the project keeps, a few MB with many agents, on the thread that carries your typing. A save now handles only the deliveries it changed: about 1.5 ms instead of 26 with 1,150 deliveries kept.
 - **Hovering a lane no longer slows typing** (HI-3294). Combwork worked out a lane's cost from scratch every time it was shown, on the main process every keystroke also goes through. It now keeps the cost until a session records more use, the board changes or prices change, and reads only the lane's own agents' sessions when it does work it out again.
 - **A stopped agent's usage no longer slows typing** (HI-3295). Showing the usage of an agent whose session had stopped read and priced every session of its project on the main process, each time the usage history changed. It now reads that one session only.
 - **Cards catch up with their merges again after a merge queue runs** (HI-3292). A board check Combwork started while a merge queue was working (a card moving to Done once its merge reached the target, a stale mark) could fail for every card once the queue had finished, logging "the merge queue for … is run by another Combwork now", and waited for a later check started elsewhere. These checks now always run on their own.
