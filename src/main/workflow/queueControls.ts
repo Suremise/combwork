@@ -163,14 +163,14 @@ function queueTables(db: DatabaseSync, project: string): string {
   const all = (sql: string, ...args: string[]): unknown[] => db.prepare(sql).all(...args)
   const prefix = `workflow:${project.toLowerCase()}:`
   return JSON.stringify([
-    all('SELECT * FROM workflow_queue_pauses WHERE project = ? ORDER BY target', project),
-    all('SELECT * FROM workflow_queue_pause_files WHERE project = ? ORDER BY target, ord', project),
-    all('SELECT * FROM workflow_queue_pause_commands WHERE project = ? ORDER BY target, ord', project),
-    all('SELECT * FROM workflow_queue_pause_command_args WHERE project = ? ORDER BY target, command, ord', project),
-    all('SELECT entry, seen_at FROM workflow_queue_seen WHERE project = ? ORDER BY entry', project),
-    all('SELECT target, lease, token, profile, pid, started, taken_at FROM queue_runners WHERE project = ? ORDER BY target', project),
+    all('SELECT * FROM workflow_queue_pauses WHERE project = ? ORDER BY target', project), // i18n-ignore: SQL
+    all('SELECT * FROM workflow_queue_pause_files WHERE project = ? ORDER BY target, ord', project), // i18n-ignore: SQL
+    all('SELECT * FROM workflow_queue_pause_commands WHERE project = ? ORDER BY target, ord', project), // i18n-ignore: SQL
+    all('SELECT * FROM workflow_queue_pause_command_args WHERE project = ? ORDER BY target, command, ord', project), // i18n-ignore: SQL
+    all('SELECT entry, seen_at FROM workflow_queue_seen WHERE project = ? ORDER BY entry', project), // i18n-ignore: SQL
+    all('SELECT target, lease, token, profile, pid, started, taken_at FROM queue_runners WHERE project = ? ORDER BY target', project), // i18n-ignore: SQL
     // board_meta's key is its primary key: a range of it (';' is the character after ':').
-    all('SELECT key, value FROM board_meta WHERE key >= ? AND key < ? ORDER BY key', prefix, `${prefix.slice(0, -1)};`)
+    all('SELECT key, value FROM board_meta WHERE key >= ? AND key < ? ORDER BY key', prefix, `${prefix.slice(0, -1)};`) // i18n-ignore: SQL
   ])
 }
 
