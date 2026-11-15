@@ -26,7 +26,7 @@ import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
 import { withFileLock } from '../fsutil'
 import { CW_DIR } from '../../shared/defaults'
-import { changedCardsIn, changeMarksIn, queueRevision, type ChangeMarks } from '../boardStore'
+import { changedCardsIn, changeMarksIn, queueRevision, upgradeWaiting, type ChangeMarks } from '../boardStore'
 import type { DatabaseSync } from 'node:sqlite'
 import { runCardIntent } from '../cardIntents'
 import { measured } from '../stallWork'
@@ -400,6 +400,9 @@ async function readGit(ws: WorkspaceService, wf: Workflow, projectPath: string, 
 
 /** A listing, and when the git part it was made from expires (HI-3301: a kept listing ends no later). */
 async function makeViews(ws: WorkspaceService, projectPath: string, target: string | undefined, window: boolean): Promise<{ views: QueueView[]; gitUntil: number }> {
+  // HI-3310: a board waiting for its upgrade to 1.0 has no queues, and lacks the tables and columns a listing reads: none,
+  // like the Assistant's changes (HI-1820). Never kept (it has no stamp), so the first listing after the upgrade reads them.
+  if (upgradeWaiting(ws.path!)) return { views: [], gitUntil: Infinity }
   const wf = await workflowFor(ws, projectPath)
   if (!wf) return { views: [], gitUntil: Infinity }
   // HI-3291: the board part on the stamp as it is now, after the await (a change meanwhile has a stamp of its own).
