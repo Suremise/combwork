@@ -169,5 +169,13 @@ describe("a project's queue revision (HI-3296)", () => {
     outside(ws, 'DELETE FROM cards WHERE number = ?', solo)
     now = revs(w)
     expect([now.p !== before.p, now.q !== before.q]).toEqual([true, true])
+    // Restored under its number (HR1's round 1: the link to it stayed): the dependent's project too, not only its own.
+    const back = await card(w, 'p', 'Restore source')
+    const row = store.workspaceDb(ws).reader.prepare('SELECT * FROM cards WHERE number = ?').get(back) as Record<string, unknown>
+    before = revs(w)
+    const cols = Object.keys(row)
+    outside(ws, `INSERT INTO cards (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`, ...cols.map((c) => (c === 'number' ? solo : c === 'project' ? 'q' : c === 'project_number' ? 900 : (row[c] as string | number))))
+    now = revs(w)
+    expect([now.p !== before.p, now.q !== before.q]).toEqual([true, true])
   })
 })

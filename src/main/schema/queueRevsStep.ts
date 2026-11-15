@@ -19,9 +19,10 @@ import type { FactKind } from '../../shared/workflow/facts'
  *   labels, links, context and decisions, any other column of its row, a card inserted, deleted or moved to another
  *   project (both projects).
  * - **A blocker's projects** (the bug HI-3291's revision had): a queued card shows what it waits for (queueWaitingOn: its
- *   blockers not Done), and a blocker may be another project's. A card whose row changes other than quietly, or that is
- *   deleted, raises the queue revision of every project with a card blocked by it; for a delete, before the delete, while
- *   the links naming it are still there to read.
+ *   blockers not Done), and a blocker may be another project's. A card whose row changes other than quietly, that is
+ *   deleted, or that is inserted (a link to a number not on the board stays, shown as waited for: a card coming back
+ *   under it, restored or written by another Combwork, ends that), raises the queue revision of every project with a card
+ *   blocked by it; for a delete, before the delete, while the links naming it are still there to read.
  *
  * Created only when missing (a board whose later steps are run again takes it again).
  */
@@ -85,7 +86,7 @@ const cardTriggers = (t: string): string[] => [
 export function addQueueRevs(db: DatabaseSync): void {
   db.exec('CREATE TABLE IF NOT EXISTS queue_revs (project TEXT NOT NULL COLLATE NOCASE PRIMARY KEY, q INTEGER NOT NULL) STRICT, WITHOUT ROWID;')
   const triggers = [
-    `CREATE TRIGGER IF NOT EXISTS cards_qrev_ai AFTER INSERT ON cards BEGIN ${raise('NEW.project')} END`,
+    `CREATE TRIGGER IF NOT EXISTS cards_qrev_ai AFTER INSERT ON cards BEGIN ${raise('NEW.project')} ${raiseDependents('NEW.number')} END`,
     // Not for the revision triggers' own raise of `rev` (CARD_REVS_STEP), nor a rewrite changing only quiet columns.
     `CREATE TRIGGER IF NOT EXISTS cards_qrev_au AFTER UPDATE ON cards WHEN NEW.rev = OLD.rev AND (${rowChanged}) BEGIN ${raise('OLD.project')} ${raise('NEW.project', 'NEW.project IS NOT OLD.project')} ${raiseDependents('NEW.number')} END`,
     // Before the delete: the links naming it are still there (another card's link to it has no foreign key, but its own
