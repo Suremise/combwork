@@ -1,0 +1,214 @@
+{
+ "status": 200,
+ "body": {
+  "data": [
+   {
+    "id": "msg_1e03f8e0b001z8tVBMrOFcAsfz",
+    "time": {
+     "created": 1794763623950,
+     "streamed": 1794763623959,
+     "completed": 1794763624059
+    },
+    "type": "assistant",
+    "agent": "build",
+    "model": {
+     "id": "probe-model",
+     "providerID": "probe",
+     "variant": "default"
+    },
+    "content": [
+     {
+      "type": "tool",
+      "id": "call_a6fc37ac",
+      "name": "question",
+      "executed": false,
+      "state": {
+       "status": "error",
+       "input": {
+        "questions": [
+         {
+          "header": "Next step",
+          "question": "Which file should I write?",
+          "multiple": false,
+          "options": [
+           {
+            "label": "a.txt",
+            "description": "The first"
+           },
+           {
+            "label": "b.txt",
+            "description": "The second"
+           }
+          ]
+         }
+        ]
+       },
+       "error": {
+        "type": "aborted",
+        "message": "The user dismissed this question"
+       }
+      },
+      "time": {
+       "created": 1794763623955,
+       "ran": 1794763623958,
+       "completed": 1794763624057
+      }
+     }
+    ],
+    "finish": "error",
+    "rawFinish": "tool_calls",
+    "cost": 0,
+    "tokens": {
+     "input": 10,
+     "output": 5,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "error": {
+     "type": "aborted",
+     "message": "Step interrupted"
+    }
+   },
+   {
+    "id": "msg_1e03f8e03001mpmKNhKj80ai2L",
+    "time": {
+     "created": 1794763623944
+    },
+    "text": "PROBE-QUESTION two: ask me again.",
+    "type": "user"
+   },
+   {
+    "id": "msg_1e03f8dff001sOHwmQv4S6qVbc",
+    "time": {
+     "created": 1794763623935
+    },
+    "type": "idle",
+    "outcome": "succeeded"
+   },
+   {
+    "id": "msg_1e03f8dee0012xi4NCyhRnx70d",
+    "time": {
+     "created": 1794763623922,
+     "streamed": 1794763623932,
+     "completed": 1794763623933
+    },
+    "type": "assistant",
+    "agent": "build",
+    "model": {
+     "id": "probe-model",
+     "providerID": "probe",
+     "variant": "default"
+    },
+    "content": [
+     {
+      "type": "text",
+      "text": "ok"
+     }
+    ],
+    "finish": "stop",
+    "rawFinish": "stop",
+    "cost": 0,
+    "tokens": {
+     "input": 10,
+     "output": 1,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    }
+   },
+   {
+    "id": "msg_1e03f8d8e00152qYBR2oSz5dw5",
+    "time": {
+     "created": 1794763623829,
+     "streamed": 1794763623846,
+     "completed": 1794763623911
+    },
+    "type": "assistant",
+    "agent": "build",
+    "model": {
+     "id": "probe-model",
+     "providerID": "probe",
+     "variant": "default"
+    },
+    "content": [
+     {
+      "type": "tool",
+      "id": "call_3ee7622a",
+      "name": "question",
+      "executed": false,
+      "state": {
+       "status": "completed",
+       "input": {
+        "questions": [
+         {
+          "header": "Next step",
+          "question": "Which file should I write?",
+          "multiple": false,
+          "options": [
+           {
+            "label": "a.txt",
+            "description": "The first"
+           },
+           {
+            "label": "b.txt",
+            "description": "The second"
+           }
+          ]
+         }
+        ]
+       },
+       "content": [
+        {
+         "type": "text",
+         "text": "User has answered your questions: \"Which file should I write?\"=\"a.txt\". You can now continue with the user's answers in mind."
+        }
+       ],
+       "metadata": {
+        "answers": [
+         [
+          "a.txt"
+         ]
+        ],
+        "truncated": false
+       }
+      },
+      "time": {
+       "created": 1794763623840,
+       "ran": 1794763623845,
+       "completed": 1794763623909
+      }
+     }
+    ],
+    "finish": "tool-calls",
+    "rawFinish": "tool_calls",
+    "cost": 0,
+    "tokens": {
+     "input": 10,
+     "output": 5,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    }
+   },
+   {
+    "id": "msg_1e03f8bbe001NFeqXeP20rsArS",
+    "time": {
+     "created": 1794763623808
+    },
+    "text": "PROBE-QUESTION one: ask me which file.",
+    "type": "user"
+   }
+  ],
+  "cursor": {
+   "previous": "eyJpZCI6Im1zZ18xZTAzZjhlMGIwMDF6OHRWQk1yT0ZjQXNmeiIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+   "next": "eyJpZCI6Im1zZ18xZTAzZjhiYmUwMDFORmVxWGVQMjByc0FyUyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+  }
+ }
+}

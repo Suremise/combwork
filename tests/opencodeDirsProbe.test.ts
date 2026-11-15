@@ -14,6 +14,8 @@ const probe = require('./e2e/opencodeDirsProbe.cjs') as {
   writeOf: (file: string) => (tools: Tool[]) => Tool | null
   turnTools: (read: () => object[], nonce: string, ready: (t: Tool[]) => unknown, until: (fn: () => unknown, ms: number) => Promise<unknown>, ms: number) => Promise<Tool[] | null>
   ending: (r: { failed: number; inconclusive: string[] }) => { line: string; code: number }
+  questionsAsked: (messages: object[]) => Set<string>
+  permissionAsks: (asks: { phase: string; message: string }[], phase: (p: string) => boolean, questions: Set<string>) => { phase: string; message: string }[]
 }
 
 // A bound for a hung poll (under the test's own timeout, so a wrong predicate fails on its assertion), never how long it takes.
@@ -33,6 +35,29 @@ const user = (text: string) => ({ type: 'user', text })
 const tool = (status: string, text = '', name = 'read', file = 'C:/copies/p/m.txt') => ({ type: 'assistant', content: [{ type: 'tool', name, state: { status, input: { path: file }, content: text ? [{ type: 'text', text }] : [] } }] })
 // The attempt's own file as the probe names it (backslashes, another case): the suite's own predicates.
 const FILE = String.raw`C:\Copies\p\M.txt`
+
+describe("opencodereal-dirs: the model's question is no permission asked (HI-3317)", () => {
+  it("rc.2's write turn: a wait with qwen3's question (its record's question tool) leaves the write unasked; a folder's permission still counts", () => {
+    // As the real tier's record had it on 1.6.0-rc.2: the write, then the question tool, its first question's words.
+    const record = [
+      user('Use your write tool to create the file C:/copies/p/written-1.txt containing exactly this one line: cw-written-1'),
+      { type: 'assistant', content: [{ type: 'tool', name: 'write', state: { status: 'completed', input: { path: 'C:/copies/p/written-1.txt' } } }] },
+      { type: 'assistant', content: [{ type: 'tool', name: 'question', state: { status: 'error', input: { questions: [{ header: 'What would you like to do with the file?', question: 'Please select your next action with the file', options: [] }] } } }] }
+    ]
+    const asks = [
+      { phase: 'reviewer (Build): write 1', message: 'Please select your next action with the file' },
+      { phase: 'builder (Build): write 1', message: 'external_directory: C:/copies/p/*' },
+      { phase: 'builder (Build): write 2', message: 'Questions' }
+    ]
+    const q = probe.questionsAsked(record)
+    expect(probe.permissionAsks(asks, (p) => p.startsWith('reviewer (Build): write'), q)).toEqual([])
+    expect(probe.permissionAsks(asks, (p) => p.startsWith('builder (Build): write'), q)).toEqual([asks[1]])
+    // With no question in the record, the same wait counts as asked; a long question is matched as Combwork cuts it.
+    expect(probe.permissionAsks(asks, (p) => p.startsWith('reviewer'), probe.questionsAsked([]))).toEqual([asks[0]])
+    const long = 'q'.repeat(700)
+    expect(probe.questionsAsked([{ type: 'assistant', content: [{ type: 'tool', name: 'question', state: { input: { questions: [{ question: long }] } } }] }]).has(long.slice(0, 500))).toBe(true)
+  })
+})
 
 describe("opencodereal-dirs: a run that proves nothing isn't a pass", () => {
   it('a step the model never tried ends the run SKIPPED, as the runner reads it; a failed check fails it; else it passed', () => {

@@ -1,0 +1,62 @@
+{
+ "GET /api/session/{id}/form (a question pending)": {
+  "status": 200,
+  "body": {
+   "data": [
+    {
+     "id": "frm_1e03f8dac001s9ZzV8p4A9oPhA",
+     "sessionID": "ses_abde6db583766ccdf4b67e53c6",
+     "title": "Questions",
+     "metadata": {
+      "kind": "question",
+      "tool": {
+       "messageID": "msg_1e03f8d8e00152qYBR2oSz5dw5",
+       "id": "call_3ee7622a"
+      }
+     },
+     "fields": [
+      {
+       "key": "q0",
+       "title": "Next step",
+       "description": "Which file should I write?",
+       "type": "string",
+       "options": [
+        {
+         "value": "a.txt",
+         "label": "a.txt",
+         "description": "The first"
+        },
+        {
+         "value": "b.txt",
+         "label": "b.txt",
+         "description": "The second"
+        }
+       ],
+       "custom": true
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "GET /api/session/{id}/permission (the same moment)": {
+  "status": 200,
+  "body": {
+   "data": []
+  }
+ },
+ "POST /api/session/{id}/form/{formID}/reply {answer: {q0}}": {
+  "status": 204,
+  "body": ""
+ },
+ "GET /api/session/{id}/form (answered)": {
+  "status": 200,
+  "body": {
+   "data": []
+  }
+ },
+ "DELETE /api/session/{id}/form/{formID}": {
+  "status": 204,
+  "body": ""
+ }
+}
