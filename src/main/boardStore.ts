@@ -20,6 +20,7 @@ import { JJ_PUBLISH_STEP } from './schema/jjPublishStep'
 import { REQUEST_RECEIPTS_STEP } from './schema/requestReceiptsStep'
 import { PROJECT_REVS_STEP } from './schema/projectRevsStep'
 import { QUEUE_REVS_STEP } from './schema/queueRevsStep'
+import { PROJECT_REVS_DROP_STEP } from './schema/projectRevsDropStep'
 import { addCommentArchive, allArchivedComments, archivedCommentCount, archivedCommentRows, archiveCommentRows, COMMENT_ARCHIVE_STEP, mayHaveLostCards, type Evicted } from './schema/commentArchive'
 import { backupsOf, beginTransaction, DbInUseError, fileSchemaVersion, groupBackupFamily, isIoError, openDb, OPENABLE_WAIT_MS, schemaVersion, soleCopy, untilOpenable, type Db, type Migration, type PendingGroup } from './db'
 import { checkpointsReleased, checkpointWhenIdle, timedCommit } from './walCheckpoint'
@@ -394,6 +395,14 @@ export const BOARD_MIGRATIONS: Migration[] = [
     name: QUEUE_REVS_STEP.name,
     group: UPGRADE_GROUP_ID,
     up: (db) => QUEUE_REVS_STEP.up(db)
+  },
+  {
+    // HI-3306: v31's project revisions dropped, unread since HI-3296's queue revisions; the facts' epoch kept, its raises
+    // in triggers of their own (schema/projectRevsDropStep.ts). In the 1.0 group.
+    version: 33,
+    name: PROJECT_REVS_DROP_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => PROJECT_REVS_DROP_STEP.up(db)
   }
 ]
 
@@ -950,19 +959,12 @@ export function boardReadToken(ws: WorkspaceService): string | null {
 }
 
 /**
- * HI-3291: a token for what is committed of one project's cards now: its rows, facts and the child tables a card is made
- * of (schema/projectRevsStep.ts's `project_revs`, raised by triggers for every connection's writes), and the database's
- * generation. With `also`, what else a cache is made from, read on the same snapshot. Null as boardReadToken is (inside a
- * write, or a read's snapshot that may be older), and on a board without the revisions (one waiting for its upgrade): a
- * cache keeps nothing then. Reading it changes nothing.
- */
-export function projectRevision(ws: WorkspaceService, project: string, also?: (db: Db['reader']) => string): string | null {
-  return revisionOf(ws, 'SELECT g AS r FROM project_revs WHERE project = ?', project, also) // i18n-ignore: SQL
-}
-
-/**
- * HI-3296: projectRevision for a project's queue listings: its queue revision (schema/queueRevsStep.ts's `queue_revs`: the
- * project's revision less the writes no listing reads, plus its cards' blockers changing), null as projectRevision is.
+ * HI-3296: a token for what is committed of one project's queue now, for its queue listings: its queue revision
+ * (schema/queueRevsStep.ts's `queue_revs`, raised by triggers for every connection's writes to the project's cards, less
+ * the writes no listing reads, plus its cards' blockers changing), and the database's generation. With `also`, what else a
+ * cache is made from, read on the same snapshot. Null as boardReadToken is (inside a write, or a read's snapshot that may
+ * be older), and on a board without the revisions (one waiting for its upgrade): a cache keeps nothing then. Reading it
+ * changes nothing. (HI-3306: HI-3291's project revision it was first made beside is gone, unread.)
  */
 export function queueRevision(ws: WorkspaceService, project: string, also?: (db: Db['reader']) => string): string | null {
   return revisionOf(ws, 'SELECT q AS r FROM queue_revs WHERE project = ?', project, also) // i18n-ignore: SQL
