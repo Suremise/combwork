@@ -257,15 +257,31 @@ export async function cardsInFlight(ws: WorkspaceService, project: { path: strin
  * lines and where, read in the guards' worker: the files its version control has (tracked, and new ones not ignored), or
  * a walk of the folder leaving out its excluded folders and node_modules.
  */
-export async function guardPreview(ws: WorkspaceService, projectPath: string, raw: unknown, slot?: unknown): Promise<GuardPreview> {
+/** How a guard preview reads the project: the files its version control has, and the folders it leaves out (tests hold them). */
+export interface PreviewReads {
+  files(project: { path: string; platform: PlatformId }): Promise<string[] | null>
+  excluded(project: { path: string; platform: PlatformId }): Promise<string[]>
+}
+
+export async function guardPreview(ws: WorkspaceService, projectPath: string, raw: unknown, slot?: unknown, reads?: PreviewReads): Promise<GuardPreview> {
   const project = projectOf(ws, projectPath)
   const guard = raw as MergeGuard
   if (!guard || typeof guard !== 'object' || !previewable(guard)) return { count: 0, hits: [], files: 0, incomplete: 'invalid' } // i18n-ignore: a reason's code
-  const files = (await historyOf(project.platform)?.workingFiles(project.path).catch(() => null)) ?? null
-  const cfg = await ws.projectConfig(project.path)
-  const excluded = resolvedOf(ws, project.path, project.platform, cfg).options.excluded
-  // In its turn (at most two read at once), a newer one from the same guard row cancelling this one.
-  return schedulePreview(typeof slot === 'string' && slot ? slot.slice(0, 64) : null, (signal) => previewMergeGuard(project.path, files, ['node_modules', ...excluded], guard, { signal }))
+  const r: PreviewReads = reads ?? {
+    files: async (p) => (await historyOf(p.platform)?.workingFiles(p.path).catch(() => null)) ?? null,
+    excluded: async (p) => resolvedOf(ws, p.path, p.platform, await ws.projectConfig(p.path)).options.excluded
+  }
+  const cancelled: GuardPreview = { count: 0, hits: [], files: 0, incomplete: 'cancelled' } // i18n-ignore: a reason's code
+  // Scheduled before anything is awaited (HR2's round 2): its slot is the row's from the first moment, so a newer request
+  // or the row closing cancels it even while it reads the project, and its reads count in its turn (two at once). Each
+  // read is followed by a look at its cancel: a preview cancelled meanwhile never scans.
+  return schedulePreview(typeof slot === 'string' && slot ? slot.slice(0, 64) : null, async (signal) => {
+    const files = await r.files(project)
+    if (signal.aborted) return cancelled
+    const excluded = await r.excluded(project)
+    if (signal.aborted) return cancelled
+    return previewMergeGuard(project.path, files, ['node_modules', ...excluded], guard, { signal })
+  })
 }
 
 /** What saving a change would do (§16.6.5's warning), before it is saved. */

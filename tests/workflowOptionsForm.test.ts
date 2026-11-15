@@ -264,6 +264,40 @@ describe('the Workflow section (#1278)', () => {
     expect((await w.projectConfig(repo)).workflow).toMatchObject({ options: { target: 'release' } })
   })
 
+  it('HI-3284: a guard preview is the row’s from its first moment: closed while it reads the project, it never scans; an older one finishing its reads later never cancels the newer (HR2’s round 2)', async () => {
+    const { w, repo } = await workspace()
+    writeFileSync(join(repo, 'a.txt'), 'my secret\n')
+    const { cancelPreview, guardWorkers, previewsNow } = await import('../src/main/workflow/mergeGuardsRun')
+    const g = { name: 'No secrets', pattern: 'secret', message: 'Take it out.' }
+    /** Reads that wait until let go, telling when they're asked. */
+    const held = () => {
+      let go!: () => void
+      const gate = new Promise<void>((r) => (go = r))
+      const asked = { files: false }
+      const reads = { files: async () => ((asked.files = true), await gate, ['a.txt']), excluded: async () => [] }
+      return { reads, go: () => go(), asked }
+    }
+    const now = { files: async () => ['a.txt'], excluded: async () => [] }
+    // Closed while it reads the project's files: no scan, no worker.
+    const a = held()
+    const closed = form.guardPreview(w, repo, g, 'row-1', a.reads)
+    await vi.waitFor(() => expect(a.asked.files).toBe(true), { timeout: HUNG_MS })
+    cancelPreview('row-1')
+    a.go()
+    expect(await closed).toMatchObject({ incomplete: 'cancelled' })
+    expect(guardWorkers.live).toBe(0)
+    // An older request still reading, a newer one from the same row: the newer answers; the older, finishing later, is cancelled.
+    const old = held()
+    const older = form.guardPreview(w, repo, g, 'row-2', old.reads)
+    await vi.waitFor(() => expect(old.asked.files).toBe(true), { timeout: HUNG_MS })
+    const newer = await form.guardPreview(w, repo, g, 'row-2', now)
+    expect(newer).toMatchObject({ count: 1, hits: [{ file: 'a.txt', line: 1 }] })
+    old.go()
+    expect(await older).toMatchObject({ incomplete: 'cancelled' })
+    expect(previewsNow()).toEqual({ running: 0, waiting: 0 })
+    expect(guardWorkers.live).toBe(0)
+  })
+
   it('HI-3284: refuses merge guards a save can’t take (an invalid pattern, a bad glob, a pattern matching an empty line), saving nothing; takes good ones', async () => {
     const { w, repo } = await workspace()
     const { platform: _p, ...pair } = preset('git', 'pair')

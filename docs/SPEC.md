@@ -7629,8 +7629,8 @@ workspace and project levels, none by default) are patterns a merge may not add.
   guards' worker: the files the version control has (Git: tracked, and new ones not ignored; otherwise a walk of the
   folder leaving out dot folders, `node_modules` and the excluded folders), binary files and files over 2 MB left out, at
   most 50,000 files, 64 MB and 10 s (past them it says it couldn't look). At most two previews read at once, in
-  Combwork; a newer one for the same guard row, or the row closing, cancels the one before (its worker ended, or never
-  started). It still saves whatever it matches: guards check
+  Combwork, their reads of the project's files and settings included; a newer one for the same guard row, or the row
+  closing, cancels the one before from the moment it was asked (its worker ended, or its scan never started). It still saves whatever it matches: guards check
   only the lines a merge adds. No list of common words: the user decides.
 - **Not secret scanning:** a guard catches what it names, in the lines a merge adds; the option's help says so.
 - **Existing "no new X" checks** (for reference; HI-3284's decision: nothing configured or migrated by this card, and
