@@ -993,8 +993,6 @@ describe("HI-3177: purging a past branch's merge queue history", () => {
 
   it('a confirmed branch made a target while the purge waits for the board refuses the whole list, nothing written (HR1’s round 1)', async () => {
     const { purgedKey, pauseLogKey } = await import('../src/main/workflow/queueLogs')
-    const { writesAt } = await import('../src/main/dbWrites')
-    const { placeKey } = await import('../src/main/fsutil')
     const { w, repo } = await pastTwo()
     const wf = (await workflowFor(w, repo))!
     // 1.2.0 gets a pause log, so "nothing written" covers its logs too.
@@ -1002,8 +1000,18 @@ describe("HI-3177: purging a past branch's merge queue history", () => {
     await inWorkspace(w, () => wf.locked(() => wf.store.setQueuePause('1.2.0', null)))
     const log = wf.store.meta(pauseLogKey('1.2.0'))
     expect(log).not.toBeNull()
-    // The board held; once the purge waits for it (a second write counted), 1.1.0 becomes one of the project's targets
-    // in the held write, which then lets go.
+    // The purge's own write, known as it asks for the board (counted and queued at once: boardWrite), never by how many
+    // writers wait (HI-3297: another one, a reconcile run or the actions worker, can wait for the board too).
+    let purgeWaits!: () => void
+    const waiting = new Promise<void>((r) => (purgeWaits = r))
+    const locked = wf.locked.bind(wf)
+    const spy = vi.spyOn(wf, 'locked').mockImplementation(((fn: () => unknown) => {
+      const out = locked(fn)
+      if (new Error().stack?.includes('purgeQueueHistory')) purgeWaits()
+      return out
+    }) as typeof wf.locked)
+    // The board held; once the purge waits for it, 1.1.0 becomes one of the project's targets in the held write, which
+    // then lets go. Another write waits beside it, as a background one may.
     let release!: () => void
     const gate = new Promise<void>((r) => (release = r))
     const held = inWorkspace(w, () =>
@@ -1012,10 +1020,16 @@ describe("HI-3177: purging a past branch's merge queue history", () => {
         await w.mutateProjectConfig(repo, (now) => ({ workflow: { ...now.workflow!, options: { ...now.workflow!.options, otherTargets: ['1.4.0', 'next', '1.1.0'] } } }))
       })
     )
+    const other = inWorkspace(w, () => store.boardWrite(w, async () => undefined))
     const purging = purge(w, repo, ['1.2.0', '1.1.0'])
-    await vi.waitFor(() => expect(writesAt(placeKey(dirname(repo)), dirname(repo))).toBe(2))
+    try {
+      // A purge that ended without asking for the board fails here, rather than at the test's time limit.
+      await Promise.race([waiting, purging.then(() => Promise.reject(new Error('the purge ended before it waited for the board')))])
+    } finally {
+      spy.mockRestore()
+    }
     release()
-    await held
+    await Promise.all([held, other])
     await expect(purging).rejects.toThrow('Nothing was purged: 1.1.0 is a branch work merges into now.')
     expect([wf.store.meta(purgedKey('1.1.0')), wf.store.meta(purgedKey('1.2.0')), wf.store.meta(pauseLogKey('1.2.0'))]).toEqual([null, null, log])
   })
