@@ -226,7 +226,7 @@ describe('the state view in a workspace', () => {
   const cards: Record<string, number> = {}
   const run = <T,>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
   const home = (): string => w.assistantHome
-  const write = (kind: string, summary: string, more: Record<string, unknown> = {}): number => journal.writeEntry(home(), service.journalSettingsOf(w), { kind, summary, ...more }, 'assistant')
+  const write = (kind: string, summary: string, more: Record<string, unknown> = {}): Promise<number> => journal.writeEntry(home(), service.journalSettingsOf(w), { kind, summary, ...more }, 'assistant')
   const backdate = (id: number, at: Date): void => {
     const db = new DatabaseSync(journal.journalFile(home()))
     db.prepare('UPDATE entries SET at = ? WHERE id = ?').run(at.toISOString(), id)
@@ -257,13 +257,13 @@ describe('the state view in a workspace', () => {
 
   it('gives the board, lanes, agents and the journal entries relevant now', async () => {
     const now = new Date()
-    const decision = write('decision', 'Sam: the greeting is "Welcome back!"', { importance: 2, links: [{ type: 'card', ref: String(cards.doing) }] })
+    const decision = await write('decision', 'Sam: the greeting is "Welcome back!"', { importance: 2, links: [{ type: 'card', ref: String(cards.doing) }] })
     backdate(decision, new Date(now.getTime() - 6 * DAY))
-    const old = write('decision', 'A decision from last month')
+    const old = await write('decision', 'A decision from last month')
     backdate(old, new Date(now.getTime() - 30 * DAY))
-    write('incident', 'The merge of #3 failed its lint')
-    const onCard = write('insight', 'Faster tests: the slow one is the e2e build', { links: [{ type: 'card', ref: String(cards.review) }] })
-    write('preference', 'Sam likes short replies')
+    await write('incident', 'The merge of #3 failed its lint')
+    const onCard = await write('insight', 'Faster tests: the slow one is the e2e build', { links: [{ type: 'card', ref: String(cards.review) }] })
+    await write('preference', 'Sam likes short replies')
     const v = (await run(() => assistantStartView(w, live, 'compact', now)))!
     expect(v).toMatch(/after a compaction/)
     expect(v).toContain(`- #${cards.blocked} (alpha, Todo) blocked: Which colour does Sam want?`)
@@ -296,16 +296,16 @@ describe('the state view in a workspace', () => {
   it('asks for a digest of last week when it had entries and none', async () => {
     const lastWeek = new Date(weekStart(new Date()).getTime() - 3 * DAY)
     const label = isoWeek(lastWeek)
-    backdate(write('event', 'Something last week'), lastWeek)
+    backdate(await write('event', 'Something last week'), lastWeek)
     expect(await run(() => assistantStartView(w, live, 'startup'))).toContain(`${label} has entries but no digest`)
-    write('digest', `The week ${label}`, { digestOf: label })
+    await write('digest', `The week ${label}`, { digestOf: label })
     expect(await run(() => assistantStartView(w, live, 'startup'))).not.toContain('has entries but no digest')
   })
 
   it('stays within its budget with a big board and a busy journal', async () => {
     const long = 'A long title that goes on '.repeat(7)
     for (let i = 0; i < 40; i++) await run(() => tasks.createTask({ title: `${long} ${i}`, project: 'alpha', column: 'doing', blocked: i % 2 ? long : undefined }, user))
-    for (let i = 0; i < 40; i++) write('decision', `${long} decision ${i}`)
+    for (let i = 0; i < 40; i++) await write('decision', `${long} decision ${i}`)
     const v = (await run(() => assistantStartView(w, live, 'startup')))!
     expect(utf8Bytes(v)).toBeLessThanOrEqual(START_VIEW_MAX_BYTES)
     expect(v).toMatch(/\(\d+ more: /)

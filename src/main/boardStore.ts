@@ -19,7 +19,7 @@ import { WORKSPACE_IDENTITY_STEP } from './schema/workspaceIdentityStep'
 import { JJ_PUBLISH_STEP } from './schema/jjPublishStep'
 import { REQUEST_RECEIPTS_STEP } from './schema/requestReceiptsStep'
 import { addCommentArchive, allArchivedComments, archivedCommentCount, archivedCommentRows, archiveCommentRows, COMMENT_ARCHIVE_STEP, mayHaveLostCards, type Evicted } from './schema/commentArchive'
-import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, isIoError, openDb, OPENABLE_WAIT_MS, schemaVersion, soleCopy, untilOpenable, type Db, type Migration, type PendingGroup } from './db'
+import { backupsOf, beginTransaction, DbInUseError, fileSchemaVersion, groupBackupFamily, isIoError, openDb, OPENABLE_WAIT_MS, schemaVersion, soleCopy, untilOpenable, type Db, type Migration, type PendingGroup } from './db'
 import { checkpointsReleased, checkpointWhenIdle, timedCommit } from './walCheckpoint'
 import { beginWrite, countedWrite } from './dbWrites'
 import { timedStep } from './stallWork'
@@ -539,7 +539,7 @@ function importFiles(b: Board, combwork: string, appVersion: string): void {
   const folder = `${TASKS}.imported-${stamp()}`
   const t0 = performance.now()
   const record: Imported = { at: new Date().toISOString(), cards: cards.length, damaged, appVersion, folder, pendingRename: names.length > 0 || existsSync(join(dir, 'board.json')) || existsSync(join(dir, 'archive-batches.json')) }
-  timedStep(`db begin ${DB_FILE}`, () => db.exec('BEGIN IMMEDIATE'))
+  timedStep(`db begin ${DB_FILE}`, () => beginTransaction(db))
   try {
     for (const c of cards) writeCardRows(db, decomposeCard(c.n, c.doc))
     // Cards from before 1.0 keep their number in their project (#1219: #1061 is HI-1061).
@@ -763,7 +763,9 @@ function openBoard(path: string, upgrade: boolean): Board {
         if (othersPresent(combwork, presenceId()).length) throw new OtherCombworkError()
       },
       whileGroupLocked: boardTestHooks.whileUpgrading ?? holdForTest,
-      checkpointer: checkpointWhenIdle,
+      // The WAL's first write after a checkpoint is made under the board's lock, which every writer of the file takes (HI-3289),
+      // counted (HI-1368) so the workspace's close waits for the worker's answer rather than closing while it holds the lock.
+      checkpointer: (file, writer) => checkpointWhenIdle(file, writer, { hold: (fn) => countedWrite(path, () => withFileLock(boardLock(path), fn)) }),
       onIoRetry: (e, ms) => log.warn(`opening the board of ${userText(path)}: ${userText(e.message)} (SQLite code ${(e as { errcode?: number }).errcode}), tried again in ${ms} ms`),
       // Each step's time (HI-1694: an upgrade that took a minute said only that it had finished).
       onSteps: (steps, copyMs) => {
@@ -1035,7 +1037,7 @@ function boardWriteLocked<T>(ws: WorkspaceService, path: string, key: string, fn
     const state: WriteState = { key, open: true, changed: false, after: [], checks: new Map(), undone: [], lost: null }
     const db = b.db.writer
     let committed = false
-    timedStep(`db begin ${DB_FILE}`, () => db.exec('BEGIN IMMEDIATE'))
+    timedStep(`db begin ${DB_FILE}`, () => beginTransaction(db))
     try {
       const out = await writing.run(state, fn)
       // HI-3194: what the change's callers need to still hold as it commits (a request's launch still current), with no

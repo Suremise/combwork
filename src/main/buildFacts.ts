@@ -25,13 +25,13 @@ export type BuildRecorded = { recorded: true } | { recorded: false; reason: stri
 const JOURNAL_OFF = "The journal is off, or its scope (Settings → Assistant → Journal) doesn't include events."
 
 /** Writes a build into the workspace's journal. */
-export function recordBuild(ws: WorkspaceService, f: BuildFact): BuildRecorded {
+export async function recordBuild(ws: WorkspaceService, f: BuildFact): Promise<BuildRecorded> {
   if (advanced.get(JOURNAL_BUILDS) === false) return { recorded: false, reason: 'Settings → Advanced → Record builds in the journal is off.' }
   const s = journalSettingsOf(ws)
   if (!s.enabled || !inScope(s, 'event')) return { recorded: false, reason: JOURNAL_OFF }
   // Once per build: a script whose reply was cut off leaves a marker too, and its time makes the detail the build's own.
   const commit = { type: 'commit', ref: f.commit } as const
-  const written = journalFact(
+  const written = await journalFact(
     ws,
     {
       summary: buildFactSummary(f),
@@ -96,7 +96,7 @@ export async function pickUpBuilds(ws: WorkspaceService): Promise<number> {
     try {
       const f = text === null ? null : buildFactOf(JSON.parse(text))
       if (!f || 'error' in f) log.warn(`a build marker that isn't one (${userText(name)}): ${f ? f.error.said : 'unreadable'}`)
-      else if (recordBuild(ws, f).recorded) recorded++
+      else if ((await recordBuild(ws, f)).recorded) recorded++
     } catch (e) {
       log.warn(`reading a build marker (${userText(name)})`, e)
     }

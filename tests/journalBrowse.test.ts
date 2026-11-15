@@ -42,20 +42,20 @@ function at(h: string, times: Record<number, string>): void {
 const summaries = (p: { rows: { summary: string }[] }): string[] => p.rows.map((r) => r.summary)
 
 /** Five entries over three days, of two projects and the workspace, by both writers. */
-function seeded(): string {
+async function seeded(): Promise<string> {
   const h = home()
-  const a = write(h, { summary: 'Orange theme chosen', project: 'alpha', links: [{ type: 'card', ref: '#12' }, { type: 'commit', ref: 'abc123' }] })
-  const b = write(h, { kind: 'plan', summary: 'Plan the orange markers', project: 'beta' })
-  const c = write(h, { kind: 'event', summary: '#12 is Done', project: 'alpha', links: [{ type: 'card', ref: '12' }] }, 'combwork')
-  const d = write(h, { kind: 'insight', summary: 'Themes need contrast', detail: 'Orange text on white fails AA.' })
-  const e = write(h, { kind: 'digest', summary: 'Week 42', digestOf: '2026-W42', importance: 2 })
+  const a = await write(h, { summary: 'Orange theme chosen', project: 'alpha', links: [{ type: 'card', ref: '#12' }, { type: 'commit', ref: 'abc123' }] })
+  const b = await write(h, { kind: 'plan', summary: 'Plan the orange markers', project: 'beta' })
+  const c = await write(h, { kind: 'event', summary: '#12 is Done', project: 'alpha', links: [{ type: 'card', ref: '12' }] }, 'combwork')
+  const d = await write(h, { kind: 'insight', summary: 'Themes need contrast', detail: 'Orange text on white fails AA.' })
+  const e = await write(h, { kind: 'digest', summary: 'Week 42', digestOf: '2026-W42', importance: 2 })
   at(h, { [a]: '2026-10-14T10:00:00.000Z', [b]: '2026-10-15T10:00:00.000Z', [c]: '2026-10-16T09:00:00.000Z', [d]: '2026-10-16T12:00:00.000Z', [e]: '2026-10-13T08:00:00.000Z' })
   return h
 }
 
 describe('the timeline', () => {
-  it('is newest first, with each row its links, and the total', () => {
-    const h = seeded()
+  it('is newest first, with each row its links, and the total', async () => {
+    const h = await seeded()
     const p = j.browseJournal(h, {})
     expect(summaries(p)).toEqual(['Themes need contrast', '#12 is Done', 'Plan the orange markers', 'Orange theme chosen', 'Week 42'])
     expect(p.total).toBe(5)
@@ -64,29 +64,29 @@ describe('the timeline', () => {
     expect(p.rows[1].source).toBe('combwork')
   })
 
-  it('comes in pages, the total all of them', () => {
-    const h = seeded()
+  it('comes in pages, the total all of them', async () => {
+    const h = await seeded()
     const first = j.browseJournal(h, {}, 0, 2)
     const next = j.browseJournal(h, {}, 2, 2)
     expect([...summaries(first), ...summaries(next)]).toEqual(['Themes need contrast', '#12 is Done', 'Plan the orange markers', 'Orange theme chosen'])
     expect(next.total).toBe(5)
   })
 
-  it('reads nothing, and makes no journal, where there is none', () => {
+  it('reads nothing, and makes no journal, where there is none', async () => {
     const h = home()
     expect(j.browseJournal(h, {})).toEqual({ rows: [], total: 0 })
     expect(j.journalProjects(h)).toEqual([])
     expect(j.browseEntry(h, 1)).toBeNull()
     const none = j.forgetPreview(h, { query: 'x' })
     expect(none.count).toBe(0)
-    expect(j.forgetJournal(h, { query: 'x' }, none.token)).toEqual({ gone: 0 })
+    expect(await j.forgetJournal(h, { query: 'x' }, none.token)).toEqual({ gone: 0 })
     expect(existsSync(j.journalFile(h))).toBe(false)
   })
 })
 
 describe('the filters', () => {
-  it('search: every word must be found, each as a prefix, in the summary, detail or why', () => {
-    const h = seeded()
+  it('search: every word must be found, each as a prefix, in the summary, detail or why', async () => {
+    const h = await seeded()
     expect(summaries(j.browseJournal(h, { query: 'orange' }))).toEqual(['Themes need contrast', 'Plan the orange markers', 'Orange theme chosen'])
     expect(summaries(j.browseJournal(h, { query: 'orange them' }))).toEqual(['Themes need contrast', 'Orange theme chosen'])
     expect(j.browseJournal(h, { query: 'orange zebra' }).total).toBe(0)
@@ -94,8 +94,8 @@ describe('the filters', () => {
     expect(summaries(j.browseJournal(h, { query: '"orange" (theme*' }))).toEqual(['Themes need contrast', 'Orange theme chosen'])
   })
 
-  it('kinds, project (or the workspace own), source and dates', () => {
-    const h = seeded()
+  it('kinds, project (or the workspace own), source and dates', async () => {
+    const h = await seeded()
     expect(summaries(j.browseJournal(h, { kinds: ['plan', 'insight'] }))).toEqual(['Themes need contrast', 'Plan the orange markers'])
     expect(summaries(j.browseJournal(h, { kinds: ['digest'] }))).toEqual(['Week 42'])
     expect(summaries(j.browseJournal(h, { project: 'ALPHA' }))).toEqual(['#12 is Done', 'Orange theme chosen'])
@@ -107,32 +107,32 @@ describe('the filters', () => {
     expect(j.journalProjects(h)).toEqual(['alpha', 'beta'])
   })
 
-  it('superseded entries are shown (the browser marks them)', () => {
-    const h = seeded()
-    const newer = write(h, { summary: 'Amber theme chosen instead' })
-    j.updateEntry(h, all, 1, { supersededBy: newer })
+  it('superseded entries are shown (the browser marks them)', async () => {
+    const h = await seeded()
+    const newer = await write(h, { summary: 'Amber theme chosen instead' })
+    await j.updateEntry(h, all, 1, { supersededBy: newer })
     expect(j.browseJournal(h, { query: 'orange theme' }).rows.find((r) => r.id === 1)?.supersededBy).toBe(newer)
   })
 })
 
 describe('editing', () => {
-  it("changes an entry's kind, within the scope", () => {
-    const h = seeded()
-    expect(j.updateEntry(h, all, 4, { kind: 'decision', summary: 'Themes need AA contrast' })).toBe(true)
+  it("changes an entry's kind, within the scope", async () => {
+    const h = await seeded()
+    expect(await j.updateEntry(h, all, 4, { kind: 'decision', summary: 'Themes need AA contrast' })).toBe(true)
     expect(j.readEntry(h, 4)).toMatchObject({ kind: 'decision', summary: 'Themes need AA contrast' })
-    expect(() => j.updateEntry(h, { ...all, scope: ['decision'] }, 4, { kind: 'moment' })).toThrow(/scope doesn't include moment/)
-    expect(() => j.updateEntry(h, all, 4, { kind: 'gossip' })).toThrow(/kind is one of/)
+    await expect(j.updateEntry(h, { ...all, scope: ['decision'] }, 4, { kind: 'moment' })).rejects.toThrow(/scope doesn't include moment/)
+    await expect(j.updateEntry(h, all, 4, { kind: 'gossip' })).rejects.toThrow(/kind is one of/)
     // A digest is always allowed.
-    expect(j.updateEntry(h, { ...all, scope: [] }, 4, { kind: 'digest' })).toBe(true)
+    expect(await j.updateEntry(h, { ...all, scope: [] }, 4, { kind: 'digest' })).toBe(true)
   })
 })
 
 describe('Forget everything about X', () => {
-  it('deletes exactly the set confirmed, with their links, tags and index rows', () => {
-    const h = seeded()
+  it('deletes exactly the set confirmed, with their links, tags and index rows', async () => {
+    const h = await seeded()
     const seen = j.forgetPreview(h, { query: 'orange' })
     expect(seen.count).toBe(3)
-    expect(j.forgetJournal(h, { query: 'orange' }, seen.token)).toEqual({ gone: 3 })
+    expect(await j.forgetJournal(h, { query: 'orange' }, seen.token)).toEqual({ gone: 3 })
     expect(summaries(j.browseJournal(h, {}))).toEqual(['#12 is Done', 'Week 42'])
     j.closeJournal(h)
     const db = new DatabaseSync(j.journalFile(h), { readOnly: true })
@@ -145,40 +145,40 @@ describe('Forget everything about X', () => {
     }
   })
 
-  it('with filters only', () => {
-    const h = seeded()
-    expect(j.forgetJournal(h, { source: 'combwork' }, j.forgetPreview(h, { source: 'combwork' }).token)).toEqual({ gone: 1 })
+  it('with filters only', async () => {
+    const h = await seeded()
+    expect(await j.forgetJournal(h, { source: 'combwork' }, j.forgetPreview(h, { source: 'combwork' }).token)).toEqual({ gone: 1 })
     expect(j.browseJournal(h, {}).total).toBe(4)
   })
 
   // HR6's round 1: an entry edited into the match while the question was open was deleted with the rest.
-  it('deletes nothing when an entry moved into the set meanwhile, saying what matches now', () => {
-    const h = seeded()
+  it('deletes nothing when an entry moved into the set meanwhile, saying what matches now', async () => {
+    const h = await seeded()
     const seen = j.forgetPreview(h, { query: 'orange' })
     // Entry 3 ("#12 is Done") is edited to match, as another window or the Assistant could.
-    j.updateEntry(h, all, 3, { summary: 'Orange unrelated newly edited entry' })
-    const r = j.forgetJournal(h, { query: 'orange' }, seen.token)
+    await j.updateEntry(h, all, 3, { summary: 'Orange unrelated newly edited entry' })
+    const r = await j.forgetJournal(h, { query: 'orange' }, seen.token)
     expect(r).toEqual({ changed: { count: 4, token: expect.any(String) } })
     expect(j.browseJournal(h, {}).total).toBe(5)
     // Asked again with the new set, it goes.
-    expect(j.forgetJournal(h, { query: 'orange' }, (r as { changed: { token: string } }).changed.token)).toEqual({ gone: 4 })
+    expect(await j.forgetJournal(h, { query: 'orange' }, (r as { changed: { token: string } }).changed.token)).toEqual({ gone: 4 })
   })
 
-  it('…or out of it, or one was written or deleted', () => {
-    const h = seeded()
+  it('…or out of it, or one was written or deleted', async () => {
+    const h = await seeded()
     const q = { query: 'orange' }
     let seen = j.forgetPreview(h, q)
-    j.updateEntry(h, all, 2, { summary: 'Plan the amber markers' })
-    expect(j.forgetJournal(h, q, seen.token)).toMatchObject({ changed: { count: 2 } })
+    await j.updateEntry(h, all, 2, { summary: 'Plan the amber markers' })
+    expect(await j.forgetJournal(h, q, seen.token)).toMatchObject({ changed: { count: 2 } })
     seen = j.forgetPreview(h, q)
-    write(h, { summary: 'Orange again, later' })
-    expect(j.forgetJournal(h, q, seen.token)).toMatchObject({ changed: { count: 3 } })
+    await write(h, { summary: 'Orange again, later' })
+    expect(await j.forgetJournal(h, q, seen.token)).toMatchObject({ changed: { count: 3 } })
     seen = j.forgetPreview(h, q)
-    j.deleteEntry(h, 1)
-    expect(j.forgetJournal(h, q, seen.token)).toMatchObject({ changed: { count: 2 } })
+    await j.deleteEntry(h, 1)
+    expect(await j.forgetJournal(h, q, seen.token)).toMatchObject({ changed: { count: 2 } })
     expect(j.browseJournal(h, {}).total).toBe(5)
     // A token from another search never deletes this one's.
-    expect(j.forgetJournal(h, q, j.forgetPreview(h, { source: 'combwork' }).token)).toMatchObject({ changed: { count: 2 } })
+    expect(await j.forgetJournal(h, q, j.forgetPreview(h, { source: 'combwork' }).token)).toMatchObject({ changed: { count: 2 } })
   })
 })
 
@@ -195,14 +195,14 @@ describe('the windows are told', () => {
     const told: string[] = []
     const off = j.onJournalChange((x) => told.push(x))
     try {
-      const id = write(h, { summary: 'One' })
-      write(h, { summary: 'Two' })
-      j.updateEntry(h, all, id, { importance: 2 })
-      j.deleteEntry(h, id)
-      j.forgetJournal(h, { query: 'two' }, j.forgetPreview(h, { query: 'two' }).token)
+      const id = await write(h, { summary: 'One' })
+      await write(h, { summary: 'Two' })
+      await j.updateEntry(h, all, id, { importance: 2 })
+      await j.deleteEntry(h, id)
+      await j.forgetJournal(h, { query: 'two' }, j.forgetPreview(h, { query: 'two' }).token)
       // Nothing changed: no word.
-      j.forgetJournal(h, { query: 'nothing' }, j.forgetPreview(h, { query: 'nothing' }).token)
-      j.forgetJournal(h, { query: 'one' }, 'stale')
+      await j.forgetJournal(h, { query: 'nothing' }, j.forgetPreview(h, { query: 'nothing' }).token)
+      await j.forgetJournal(h, { query: 'one' }, 'stale')
       await j.deleteJournal(h)
       expect(told).toEqual([h, h, h, h, h, h])
     } finally {

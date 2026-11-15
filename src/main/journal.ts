@@ -8,7 +8,7 @@ import { BROWSE_LIMITS, ENTRY_LIMITS, JOURNAL_KINDS, KEPT_IMPORTANCE, LINK_TYPES
 import { openDb, OPENABLE_WAIT_MS, transaction, untilOpenable, type Db, type Migration } from './db'
 import { realPath } from './fsutil'
 import { createLogger, userText } from './logger'
-import { checkpointWhenIdle, checkpointsReleased } from './walCheckpoint'
+import { checkpointWhenIdle, checkpointsReleased, walGate } from './walCheckpoint'
 import { assertPlaceAdmitted, isAdmitted, ownerOf, refusedOpen } from './openingFence'
 import { trash } from './trash'
 import type { StoredText } from '../shared/types'
@@ -253,6 +253,21 @@ function journalOf(home: string, at: Located = located(home)): Db {
 }
 
 /**
+ * The journal, once main may write to it (HI-3289): not while the checkpoints' worker makes its WAL's first write after a
+ * checkpoint, which holds the file's write lock (a write begun then would wait for that sync on main's thread). Its
+ * writes run synchronously from here, with no await between this and their last statement: the gate closes only when
+ * the worker's answer to a checkpoint comes, a task of its own.
+ */
+async function writableJournal(home: string): Promise<Db> {
+  for (;;) {
+    const db = journalOf(home)
+    const gate = walGate(db.writer)
+    if (!gate) return db
+    await gate
+  }
+}
+
+/**
  * Before a workspace's open lets its Assistant use the journal (HI-2200, as the board's HI-2199): while its file, as a
  * Combwork that ended without quitting left it, can't be opened yet (another process still maps its `-shm`), waits for that,
  * bounded (untilOpenable), instead of its first use failing. At once for a journal open already or a file closed
@@ -387,8 +402,8 @@ function checkTags(v: unknown): string[] {
  * Writes an entry; returns its id. The scope decides which kinds may be stored (the caller says why not). In one
  * transaction with its links and tags; the index follows by trigger.
  */
-export function writeEntry(home: string, settings: JournalSettings, input: EntryInput, source: JournalSource): number {
-  return writeEntryUnless(home, settings, input, source, null)!
+export async function writeEntry(home: string, settings: JournalSettings, input: EntryInput, source: JournalSource): Promise<number> {
+  return (await writeEntryUnless(home, settings, input, source, null))!
 }
 
 /**
@@ -396,13 +411,13 @@ export function writeEntry(home: string, settings: JournalSettings, input: Entry
  * and detail, linked to `link` (#1534: a build sent twice, its reply cut off and then its marker). Checked in the
  * write's own transaction, so two at once write one; found through the links index, however many entries share it.
  */
-export function writeEntryOnce(home: string, settings: JournalSettings, input: EntryInput, source: JournalSource, link: { type: LinkType; ref: string }): number | null {
+export function writeEntryOnce(home: string, settings: JournalSettings, input: EntryInput, source: JournalSource, link: { type: LinkType; ref: string }): Promise<number | null> {
   return writeEntryUnless(home, settings, input, source, link)
 }
 
-function writeEntryUnless(home: string, settings: JournalSettings, input: EntryInput, source: JournalSource, once: { type: LinkType; ref: string } | null): number | null {
+async function writeEntryUnless(home: string, settings: JournalSettings, input: EntryInput, source: JournalSource, once: { type: LinkType; ref: string } | null): Promise<number | null> {
   const e = entryOf(settings, input)
-  const id = insertEntry(journalOf(home).writer, e, source, once)
+  const id = insertEntry((await writableJournal(home)).writer, e, source, once)
   if (id === null) return null
   pruneSoon(home, settings)
   told(home)
@@ -415,7 +430,7 @@ function writeEntryUnless(home: string, settings: JournalSettings, input: EntryI
  * opened, written and closed here (a transient open), never kept nor made the journal's, so a window opening the
  * workspace meanwhile keeps its own (pruned and shown once it is opened). Refused while the journal is being deleted.
  */
-export function leaveEntry(home: string, settings: JournalSettings, input: EntryInput, source: JournalSource): number {
+export async function leaveEntry(home: string, settings: JournalSettings, input: EntryInput, source: JournalSource): Promise<number> {
   // Where it is, resolved once as it enters (#1456): admitted by it, and opened there.
   const at = located(home)
   if (at.owner !== null && isAdmitted(at.owner)) return writeEntry(home, settings, input, source)
@@ -608,7 +623,7 @@ export interface EntryPatch {
 }
 
 /** Changes an entry; false when there is none. Retention and the cap apply after it (a longer detail, a lower importance). */
-export function updateEntry(home: string, settings: JournalSettings, id: number, patch: EntryPatch): boolean {
+export async function updateEntry(home: string, settings: JournalSettings, id: number, patch: EntryPatch): Promise<boolean> {
   const sets: string[] = []
   const args: (string | number | Uint8Array | null)[] = []
   const set = (clause: string, value: string | number | null): void => {
@@ -640,7 +655,7 @@ export function updateEntry(home: string, settings: JournalSettings, id: number,
   const links = checkLinks(patch.addLinks)
   const tags = checkTags(patch.addTags)
   if (!sets.length && !links.length && !tags.length) fail('Nothing to change: give summary, kind, detail, why, importance, supersededBy, addLinks or addTags.')
-  const { writer: w } = journalOf(home)
+  const { writer: w } = await writableJournal(home)
   const changed = transaction(w, () => {
     if (!w.prepare('SELECT 1 FROM entries WHERE id = ?').get(id)) return false
     if (patch.supersededBy != null && !w.prepare('SELECT 1 FROM entries WHERE id = ?').get(patch.supersededBy)) fail(`There is no entry ${patch.supersededBy}.`)
@@ -652,15 +667,15 @@ export function updateEntry(home: string, settings: JournalSettings, id: number,
     return true
   })
   if (changed) {
-    pruneJournal(home, settings)
+    pruneJournalNow(home, settings)
     told(home)
   }
   return changed
 }
 
 /** Deletes an entry (its links and tags with it; entries it superseded are current again); false when there is none. */
-export function deleteEntry(home: string, id: number): boolean {
-  const { writer: w } = journalOf(home)
+export async function deleteEntry(home: string, id: number): Promise<boolean> {
+  const { writer: w } = await writableJournal(home)
   const gone = transaction(w, () => Number(w.prepare('DELETE FROM entries WHERE id = ?').run(id).changes) > 0)
   if (gone) {
     w.exec('PRAGMA incremental_vacuum')
@@ -706,7 +721,13 @@ export function digestDue(home: string, now = new Date()): string | null {
  * cap, the oldest everyday entries go first, one at a time, the size measured after each, until it fits or none is left (digests and important entries are never pruned). Space
  * freed is given back to the file. Returns how many went.
  */
-export function pruneJournal(home: string, settings: JournalSettings, now = new Date()): number {
+export async function pruneJournal(home: string, settings: JournalSettings, now = new Date()): Promise<number> {
+  await writableJournal(home)
+  return pruneJournalNow(home, settings, now)
+}
+
+/** pruneJournal's work, once the journal is writable (writableJournal, awaited by the caller with nothing after it). */
+function pruneJournalNow(home: string, settings: JournalSettings, now = new Date()): number {
   const { writer: w } = journalOf(home)
   const cutoff = new Date(now.getTime() - settings.retentionDays * 86_400_000).toISOString()
   const everyday = `importance < ${KEPT_IMPORTANCE} AND kind <> 'digest'`
@@ -745,7 +766,7 @@ function pruneSoon(home: string, settings: JournalSettings): void {
     const last = (w.prepare("SELECT value FROM journal_meta WHERE key = 'prunedAt'").get() as { value: string } | undefined)?.value
     const due = !last || Date.now() - Date.parse(last) > 3_600_000
     const over = settings.capMB !== null && (journalSize(home)?.bytes ?? 0) > settings.capMB * 1024 * 1024
-    if (due || over) pruneJournal(home, settings)
+    if (due || over) pruneJournalNow(home, settings)
   } catch (e) {
     log.warn('pruning the journal', e)
   }
@@ -873,9 +894,9 @@ export function forgetPreview(home: string, f: JournalFilter): JournalForgetPrev
  * exactly the one the user confirmed (`token`, from forgetPreview). Changed since (an entry written, edited into or out
  * of the match, deleted), nothing goes and the set as it is now is returned, to ask again.
  */
-export function forgetJournal(home: string, f: JournalFilter, token: string): JournalForgetResult {
+export async function forgetJournal(home: string, f: JournalFilter, token: string): Promise<JournalForgetResult> {
   if (!hasJournal(home)) return token === NONE.token ? { gone: 0 } : { changed: NONE }
-  const { writer: w } = journalOf(home)
+  const { writer: w } = await writableJournal(home)
   const { where, args } = filterSql(f)
   const r = transaction(w, (): JournalForgetResult => {
     const now = matchSet(w, f)

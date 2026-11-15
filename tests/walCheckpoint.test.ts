@@ -3,9 +3,12 @@
 // pause; checkpoints that can't copy the whole WAL give SQLite's own back until one can. Time is passed in: no waits.
 import { closeSync, openSync, readSync } from 'fs'
 import { join } from 'path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
+
+/** A bound for a hung run only: each wait polls for its condition (tests/README.md). */
+const HUNG_MS = 10_000
 
 const { openDb, transaction } = await import('../src/main/db')
 const wal = await import('../src/main/walCheckpoint')
@@ -197,5 +200,201 @@ describe('checkpoints out of the commits (#1633)', () => {
       checkpointHooks.fail = null
       db.close()
     }
+  })
+})
+
+// HI-3289: the first write after a whole checkpoint starts the WAL again and syncs its new header, on whichever thread
+// writes first; the checkpointer makes that write itself (the worker's runRestart, here in-process), under the
+// database's lock (`hold`) with its write gate closed meanwhile, so main's next commit is an ordinary one.
+describe("the WAL's first write after a checkpoint is the checkpointer's (HI-3289)", () => {
+  afterEach(() => {
+    checkpointHooks.inRestart = null
+    checkpointHooks.fail = null
+  })
+  /** A checkpoint due now (the idle trigger), for every database registered. */
+  const due = (): void => {
+    const t = performance.now()
+    wal.checkpointTick(t)
+    wal.checkpointTick(t + wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+  }
+  /** The board's kind of lock: an async queue (withFileLock), with what waits on it. */
+  function lock(): { hold: (fn: () => Promise<void>) => Promise<void>; held: () => boolean } {
+    let tail: Promise<unknown> = Promise.resolve()
+    let held = false
+    const hold = (fn: () => Promise<void>): Promise<void> => {
+      const run = tail.then(async () => {
+        held = true
+        try {
+          await fn()
+        } finally {
+          held = false
+        }
+      })
+      tail = run.catch(() => undefined)
+      return run
+    }
+    return { hold, held: () => held }
+  }
+
+  it("restarts the WAL as the checkpoint finishes: the writer's next commit doesn't, and its data is the same", () => {
+    const db = open(wal.checkpointWhenIdle)
+    try {
+      write(db.writer, 5)
+      const before = walRestarts(db.file)
+      const restarts = wal.checkpointStats.restarts
+      due()
+      expect(wal.checkpointStats.restarts).toBe(restarts + 1)
+      // The checkpointer's write started the WAL again, its header synced there.
+      const after = walRestarts(db.file)
+      expect(after).toBeGreaterThan(before)
+      write(db.writer, 3)
+      expect(walRestarts(db.file)).toBe(after)
+      expect((db.reader.prepare('SELECT count(*) AS c FROM t').get() as { c: number }).c).toBe(8)
+      expect((db.reader.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(0)
+    } finally {
+      db.close()
+    }
+  })
+
+  it('a write begun on main since the checkpoint restarts the WAL itself: the checkpointer makes none then', async () => {
+    const l = lock()
+    const db = open((f, w) => wal.checkpointWhenIdle(f, w, { hold: l.hold }))
+    try {
+      write(db.writer, 5)
+      // A change holds the lock as the checkpoint finishes: the restart waits for it, and its write goes first.
+      let release = (): void => undefined
+      const change = l.hold(() => new Promise<void>((r) => (release = r)))
+      await vi.waitFor(() => expect(l.held()).toBe(true), { timeout: HUNG_MS })
+      const restarts = wal.checkpointStats.restarts
+      const before = walRestarts(db.file)
+      due()
+      write(db.writer, 1)
+      expect(walRestarts(db.file)).toBeGreaterThan(before)
+      release()
+      await change
+      await vi.waitFor(() => expect(l.held()).toBe(false), { timeout: HUNG_MS })
+      expect(wal.checkpointStats.restarts).toBe(restarts)
+    } finally {
+      db.close()
+    }
+  })
+
+  it("runs under the database's lock with its write gate closed: writers wait for it without holding the thread, and a BEGIN past both is refused", async () => {
+    const l = lock()
+    const db = open((f, w) => wal.checkpointWhenIdle(f, w, { hold: l.hold }))
+    try {
+      write(db.writer, 5)
+      const order: string[] = []
+      let refused: unknown = null
+      let gated: Promise<void> | null = null
+      let queued: Promise<void> | null = null
+      checkpointHooks.inRestart = (file) => {
+        if (file !== db.file) return
+        order.push('restart')
+        expect(l.held()).toBe(true)
+        // A writer that awaits the gate (the journal's), and one that takes the lock (the board's): both wait.
+        gated = wal.walWritable(db.writer).then(() => {
+          order.push('gated')
+          transaction(db.writer, () => db.writer.prepare('INSERT INTO t (doc) VALUES (?)').run(Buffer.alloc(10)))
+        })
+        queued = l.hold(async () => {
+          order.push('locked')
+          transaction(db.writer, () => db.writer.prepare('INSERT INTO t (doc) VALUES (?)').run(Buffer.alloc(10)))
+        })
+        // One past both would wait for the restart's sync on main: refused, never begun.
+        try {
+          transaction(db.writer, () => db.writer.prepare('INSERT INTO t (doc) VALUES (?)').run(Buffer.alloc(10)))
+        } catch (e) {
+          refused = e
+        }
+        expect(db.writer.isTransaction).toBe(false)
+      }
+      due()
+      await vi.waitFor(() => expect(order).toContain('restart'), { timeout: HUNG_MS })
+      await gated
+      await queued
+      expect(order.slice(0, 1)).toEqual(['restart'])
+      expect(order).toEqual(expect.arrayContaining(['gated', 'locked']))
+      expect(String(refused)).toMatch(/began while the checkpoints' worker made its WAL's first write/)
+      expect(wal.walGate(db.writer)).toBeNull()
+      expect((db.reader.prepare('SELECT count(*) AS c FROM t').get() as { c: number }).c).toBe(7)
+    } finally {
+      db.close()
+    }
+  })
+
+  it("a close while the restart holds the write lock is told so (its optional PRAGMA optimize is skipped, never waited for); otherwise it isn't", () => {
+    let stop: (() => boolean) | null = null
+    const db = open((f, w) => (stop = wal.checkpointWhenIdle(f, w)))
+    write(db.writer, 5)
+    let during: boolean | null = null
+    checkpointHooks.inRestart = (file) => {
+      if (file === db.file) during = stop!()
+    }
+    due()
+    expect(during).toBe(true)
+    db.close()
+    const db2 = open((f, w) => (stop = wal.checkpointWhenIdle(f, w)))
+    expect(stop!()).toBe(false)
+    db2.close()
+  })
+
+  it('another connection holding the write lock: skipped, never waited for, and the gate opens', () => {
+    const db = open(wal.checkpointWhenIdle)
+    const other = new DatabaseSync(db.file)
+    try {
+      write(db.writer, 5)
+      // Taken as the checkpoint finishes, as another process's writer might.
+      checkpointHooks.inRestart = null
+      const skipped = wal.checkpointStats.restartsSkipped
+      const t = performance.now()
+      wal.checkpointTick(t)
+      other.exec('BEGIN IMMEDIATE')
+      wal.checkpointTick(t + wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+      other.exec('ROLLBACK')
+      expect(wal.checkpointStats.restartsSkipped).toBe(skipped + 1)
+      expect(wal.walGate(db.writer)).toBeNull()
+      // The writer's own commit restarts it then, as before.
+      const before = walRestarts(db.file)
+      write(db.writer, 1)
+      expect(walRestarts(db.file)).toBeGreaterThan(before)
+    } finally {
+      other.close()
+      db.close()
+    }
+  })
+
+  it('a restart that throws opens the gate and lets go of the lock; a database closed while it waits for the lock makes none', async () => {
+    const l = lock()
+    const db = open((f, w) => wal.checkpointWhenIdle(f, w, { hold: l.hold }))
+    try {
+      write(db.writer, 5)
+      checkpointHooks.inRestart = (file) => {
+        if (file === db.file) throw new Error('disk I/O error (test)')
+      }
+      due()
+      await vi.waitFor(() => expect(l.held()).toBe(false), { timeout: HUNG_MS })
+      expect(wal.walGate(db.writer)).toBeNull()
+      // The lock is free: a change takes it at once.
+      await l.hold(async () => void transaction(db.writer, () => db.writer.prepare('INSERT INTO t (doc) VALUES (?)').run(Buffer.alloc(10))))
+    } finally {
+      db.close()
+    }
+    const l2 = lock()
+    const db2 = open((f, w) => wal.checkpointWhenIdle(f, w, { hold: l2.hold }))
+    let release = (): void => undefined
+    const change = l2.hold(() => new Promise<void>((r) => (release = r)))
+    await vi.waitFor(() => expect(l2.held()).toBe(true), { timeout: HUNG_MS })
+    const restarts = wal.checkpointStats.restarts
+    try {
+      write(db2.writer, 5)
+      due()
+    } finally {
+      db2.close()
+    }
+    release()
+    await change
+    await vi.waitFor(() => expect(l2.held()).toBe(false), { timeout: HUNG_MS })
+    expect(wal.checkpointStats.restarts).toBe(restarts)
   })
 })

@@ -1020,6 +1020,8 @@ export const UNIT_SCANS = [
   // HI-2457: agentTextSchema() against the schema area files on disk; each glob user's source read (none imported but schema.ts).
   { test: 'tests/globCache.test.ts', paths: ['agent-text/schema/', 'src/main/installDir.ts', 'src/shared/i18n/catalogues.ts'] },
   { test: 'tests/agentText.test.ts', paths: ['src/'], lines: ['agentMsg\\('] },
+  // HI-3289: every write BEGIN in src/main goes through db.ts's beginTransaction, its source read for a raw one.
+  { test: 'tests/beginTransaction.test.ts', paths: ['src/main/'], lines: ['BEGIN'] },
   // HI-2440: the window's messages agents read, followed from the calls that read text (the catalogue's audience both).
   { test: 'tests/agentText.test.ts', paths: ['src/main/', 'src/shared/'], lines: ['msg\\(', 'agent-text:', 'CombworkError', 'englishText', 'agentText'] },
   { test: 'tests/agentTextBoth.test.ts', paths: ['agent-text/catalogue/', 'agent-text/schema/'] },

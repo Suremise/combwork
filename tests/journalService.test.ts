@@ -127,7 +127,7 @@ describe('the journal in a workspace', () => {
   })
 
   it('a tighter retention prunes at once; Delete Journal sends it to the Recycle Bin and tells the Assistant', async () => {
-    const id = journal.writeEntry(home(), service.journalSettingsOf(w), { kind: 'decision', summary: 'An old everyday decision' }, 'assistant')
+    const id = await journal.writeEntry(home(), service.journalSettingsOf(w), { kind: 'decision', summary: 'An old everyday decision' }, 'assistant')
     journal.closeJournal(home())
     const { DatabaseSync } = await import('node:sqlite')
     const db = new DatabaseSync(journal.journalFile(home()))

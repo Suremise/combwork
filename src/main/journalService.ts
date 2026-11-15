@@ -67,13 +67,13 @@ export async function setJournalSettings(ws: WorkspaceService, patch: Partial<Jo
   if (next.enabled && before.scope.join() !== next.scope.join()) said.push(`The journal's scope changed: store only ${next.scope.length ? next.scope.join(', ') : 'digests'} entries from now on.`)
   if (said.length) await tellAssistant(ws, said.join(' '))
   // A tighter retention or cap applies now.
-  if (next.enabled && (next.retentionDays < before.retentionDays || (next.capMB ?? Infinity) < (before.capMB ?? Infinity))) pruneNow(ws, next)
+  if (next.enabled && (next.retentionDays < before.retentionDays || (next.capMB ?? Infinity) < (before.capMB ?? Infinity))) void pruneNow(ws, next)
   return next
 }
 
-function pruneNow(ws: WorkspaceService, s: JournalSettings): void {
+async function pruneNow(ws: WorkspaceService, s: JournalSettings): Promise<void> {
   try {
-    if (existsSync(journalFile(ws.assistantHome))) pruneJournal(ws.assistantHome, s)
+    if (existsSync(journalFile(ws.assistantHome))) await pruneJournal(ws.assistantHome, s)
   } catch (e) {
     log.warn('pruning the journal after its settings changed', e)
   }
@@ -139,7 +139,7 @@ export async function journalFactAt(workspacePath: string, fact: Fact): Promise<
   const s = journalSettings(saved.journal)
   if (!s.enabled || !inScope(s, 'event')) return
   try {
-    leaveEntry(join(workspacePath, CW_DIR, ASSISTANT_DIR), s, { kind: 'event', ...fact, tags: ['combwork', ...(fact.tags ?? [])] }, 'combwork')
+    await leaveEntry(join(workspacePath, CW_DIR, ASSISTANT_DIR), s, { kind: 'event', ...fact, tags: ['combwork', ...(fact.tags ?? [])] }, 'combwork')
   } catch (e) {
     log.warn('recording a fact in the journal', e)
   }
@@ -150,14 +150,14 @@ export async function journalFactAt(workspacePath: string, fact: Fact): Promise<
  * (a fact that can't be written is logged). With `once`, a fact the journal already has (the same summary and detail,
  * linked to it) isn't written again, and counts as recorded.
  */
-export function journalFact(ws: WorkspaceService | null | undefined, fact: Fact, once?: { type: LinkType; ref: string }): boolean {
+export async function journalFact(ws: WorkspaceService | null | undefined, fact: Fact, once?: { type: LinkType; ref: string }): Promise<boolean> {
   if (!ws?.path) return false
   const s = journalSettingsOf(ws)
   if (!s.enabled || !inScope(s, 'event')) return false
   try {
     const input = { kind: 'event', ...fact, tags: ['combwork', ...(fact.tags ?? [])] }
-    if (once) writeEntryOnce(ws.assistantHome, s, input, 'combwork', once)
-    else writeEntry(ws.assistantHome, s, input, 'combwork')
+    if (once) await writeEntryOnce(ws.assistantHome, s, input, 'combwork', once)
+    else await writeEntry(ws.assistantHome, s, input, 'combwork')
     return true
   } catch (e) {
     log.warn('recording a fact in the journal', e)
@@ -176,15 +176,15 @@ export function journalEntry(ws: WorkspaceService, id: number): ReturnType<typeo
 }
 
 /** The user's edit; the scope still decides the kinds (Settings → Assistant → Journal). */
-export function editJournalEntry(ws: WorkspaceService, id: number, edit: JournalEdit): boolean {
+export async function editJournalEntry(ws: WorkspaceService, id: number, edit: JournalEdit): Promise<boolean> {
   const home = homeOf(ws)
   if (!home || !journalEntry(ws, id)) return false
   return updateEntry(home, journalSettingsOf(ws), id, edit)
 }
 
-export function deleteJournalEntry(ws: WorkspaceService, id: number): boolean {
+export async function deleteJournalEntry(ws: WorkspaceService, id: number): Promise<boolean> {
   const home = homeOf(ws)
-  return !!home && !!journalEntry(ws, id) && deleteEntry(home, id)
+  return !!home && !!journalEntry(ws, id) && (await deleteEntry(home, id))
 }
 
 /** What Forget would delete: how many, and a token for exactly that set. */
@@ -194,7 +194,7 @@ export function forgetJournalPreview(ws: WorkspaceService, filter: JournalFilter
 }
 
 /** Forget everything about X: exactly the set the user confirmed (its token), or nothing and the set as it is now. */
-export function forgetJournalEntries(ws: WorkspaceService, filter: JournalFilter, token: string): JournalForgetResult {
+export async function forgetJournalEntries(ws: WorkspaceService, filter: JournalFilter, token: string): Promise<JournalForgetResult> {
   const home = homeOf(ws)
   return home ? forgetJournal(home, filter ?? {}, String(token ?? '')) : { gone: 0 }
 }
