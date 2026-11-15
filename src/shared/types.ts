@@ -31,6 +31,7 @@ import type { Refusal } from './workflow/refusals'
 import type { ReviewerMode, WorkflowRole } from './workflow/roles'
 import type { NamedFolder, ResumeHold, ShownPlace } from './agentFolders'
 import type { StageNameProblem } from './workflow/stages'
+import type { GuardProblem } from './workflow/mergeGuards'
 import type { TemplateWorkflow, TemplateWorkflowOverlay } from './workflow/templateOptions'
 import type { StageId } from './workflow/facts'
 import type { StageDef } from './workflow/compile'
@@ -1669,7 +1670,7 @@ export type WorkflowProblem = OwnWorkflowProblem | { kind: 'inheritor'; project:
  * A problem of the options being saved themselves; an inheritor's (#1422): a project inheriting a level's change would
  * have that problem in its own options.
  */
-export type OwnWorkflowProblem = { kind: 'contradiction'; id: Contradiction } | ({ kind: 'stageName' } & StageNameProblem) | { kind: 'bad'; why: string }
+export type OwnWorkflowProblem = { kind: 'contradiction'; id: Contradiction } | ({ kind: 'stageName' } & StageNameProblem) | ({ kind: 'guard' } & GuardProblem) | { kind: 'bad'; why: string }
 
 /** The levels of workflow defaults the window edits (#1422): Combwork's (config) and the workspace's (workspace.json). */
 export type WorkflowLevel = 'global' | 'workspace'

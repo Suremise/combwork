@@ -96,6 +96,26 @@ export const HISTORY = {
     description:
       "A comment Combwork writes on a card when the merge queue sends it back to its builder instead of merging it (HI-2087). {reason} says why (select: translate each; keep the keys): a merge conflict with the target branch {target} (a branch name, such as main), a merge check {check} (the check's name, such as typecheck) that failed on the merged result or failed because of the machine or network rather than the code, the install before the checks, a git hook that refused the merge commit, the target branch moving while it was merged, the folder where the target branch is checked out being busy, the card's work not being up to date with the target, its focused tests, or (direction, HI-2892) a forward merge that would bring {target} up to date against the release path's direction (into an older version, or into main), made without the user's override, or (resolution, HI-2999) a card resolving such a merge by hand whose work doesn't contain the commit it resolves: it was cherry-picked or copied rather than merged. {files} lists the files concerned (file paths, keep them; none: leave that part out). \"Merge queue\" and \"Work section\" are Combwork's terms."
   }),
+  queueGuarded: msg({
+    id: 'tasks.history.queueGuarded',
+    defaultMessage: 'Came back from the merge queue: {count, plural, one {a merge guard matched lines it adds} other {# merge guards matched lines it adds}}. {guards}{others, plural, =0 {} one { One more guard matched too.} other { # more guards matched too.}} The card’s Work section shows the run.',
+    description: 'A comment Combwork writes on a card when the merge queue sends it back because merge guards matched (HI-3284: patterns the project refuses in the lines a merge adds). {count}: how many guards matched; {guards}: the first of them, each as tasks.history.queueGuardedOne, joined by tasks.history.queueGuardedJoin (already translated); {others}: how many more matched, not listed. "Merge queue" and "Work section" are Combwork’s terms.'
+  }),
+  queueGuardedOne: msg({
+    id: 'tasks.history.queueGuardedOne',
+    defaultMessage: '“{guard}” matched {count, plural, one {# line} other {# lines}}, first in {where}: {message}',
+    description: 'One matching merge guard in a returned card’s comment (HI-3284, inside tasks.history.queueGuarded): {guard} is its name and {message} its message, the user’s own words on what to do instead (any language: insert them as they are); {count}: the lines it matched; {where}: the first, a file path and line number such as src/a.ts:12 (keep it).'
+  }),
+  queueGuardedJoin: msg({
+    id: 'tasks.history.queueGuardedJoin',
+    defaultMessage: '{first} {rest}',
+    description: 'Two matching merge guards’ parts of a returned card’s comment, one after the other (HI-3284, tasks.history.queueGuardedOne each): keep both, separated as your language separates two sentences.'
+  }),
+  queueGuardedIncomplete: msg({
+    id: 'tasks.history.queueGuardedIncomplete',
+    defaultMessage: 'Came back from the merge queue: the merge guards couldn’t finish checking the lines it adds ({why, select, timedOut {guard “{guard}” ran past its time limit} tooLarge {the merge adds more than they check} unreadable {its changes couldn’t be read} malformed {its changes couldn’t be followed} matchesEmpty {guard “{guard}” matches an empty line} invalid {guard “{guard}” has an invalid pattern} cancelled {the check was stopped} other {their check ended}}), so it wasn’t merged. The card’s Work section shows the run.',
+    description: 'A comment Combwork writes on a card when the merge queue sends it back because its merge guards check could not finish (HI-3284), which never lets a merge through. {why} (select: translate each; keep the keys): a guard (its name, {guard}, the user’s own text) ran past the time limit; the merge adds more text or lines than the limits; the changes could not be read or parsed; a guard’s pattern matches the empty string or does not compile; the check was stopped; another failure. "Merge queue" and "Work section" are Combwork’s terms.'
+  }),
   forwardResolving: msg({
     id: 'tasks.history.forwardResolving',
     defaultMessage: 'Ended here, nothing merged: Resolve on a builder made {card} for a builder to merge {from} ({source}) into {to} and resolve the conflict there. Follow {card}.',

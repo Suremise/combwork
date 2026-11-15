@@ -351,6 +351,8 @@ export const AREAS = [
   { paths: ['tests/e2e/forwardremote.cjs', 'src/main/workflow/queueControls.ts', 'src/main/platform/gitHistory.ts', 'src/main/platform/gitTransport.ts', 'src/renderer/src/components/ProgressQueue.tsx'], suites: ['forwardremote'] },
   // Each card's focused tests (G20, HI-1367): chosen at submit, run by the merge queue; this repository's picker and runner.
   { paths: ['tests/e2e/queuefocused.cjs', 'scripts/focusedTests.mjs'], suites: ['queuefocused'] },
+  // Merge guards (HI-3284): the editor, their check in the merge queue, the returned card's words.
+  { paths: ['tests/e2e/queueguards.cjs', 'src/shared/workflow/mergeGuards.ts', 'src/main/workflow/mergeGuardsRun.ts', 'src/main/workflow/mergeGuardsWorker.ts', 'src/main/workflow/guardsSave.ts', 'src/main/workflow/mergeGuardLimits.ts', 'src/renderer/src/components/MergeGuardsEditor.tsx', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueState.ts', 'src/shared/taskHistory.ts'], suites: ['queueguards'] },
   // The queue's controls (#1353): its model, Pause/Resume, Remove from queue and Retry merge, cw_queue.
   { paths: ['src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueHost.ts', 'src/main/workflow/queueControls.ts', 'src/main/folderFence.ts', 'src/shared/workflow/facts.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/mergequeuefolder.cjs', 'tests/e2e/mergequeuecrash.cjs'], suites: ['mergequeuecrash', 'mergequeuefolder'] },
   { paths: ['src/main/workflow/mergeQueue.ts', 'src/shared/workflow/options.ts', 'src/shared/workflow/optionTexts.ts', 'src/renderer/src/components/WorkflowOptions.tsx', 'tests/e2e/queueFixture.cjs'], suites: ['p5lane', 'workflowoptions'] },

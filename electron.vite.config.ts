@@ -88,6 +88,8 @@ export default defineConfig({
           'repo-lock-worker': resolve(__dirname, 'src/main/repoLockWorker.ts'),
           // A None project's whole-project read (HI-2340).
           'none-baseline-worker': resolve(__dirname, 'src/main/noneBaselineWorker.ts'),
+          // The merge guards' worker thread (HI-3284): a user's patterns run here, never on main's thread.
+          'merge-guards-worker': resolve(__dirname, 'src/main/workflow/mergeGuardsWorker.ts'),
           // Git's worker thread, which starts its processes (HI-1783).
           'git-worker': resolve(__dirname, 'src/main/gitWorker.ts'),
           // jj's worker thread, which starts its processes (HI-2793), never Git's.

@@ -1277,6 +1277,18 @@
   "settings.advanced.cw.merge.lockWaitSeconds.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.mergeGuards.maxLines.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.mergeGuards.maxLines.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.mergeGuards.seconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.mergeGuards.seconds.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.none.baselineSeconds.desc": {
     "placeholders": {}
   },
@@ -2365,6 +2377,11 @@
   },
   "settings.agent.takes.mergeChecks": {
     "placeholders": {}
+  },
+  "settings.agent.takes.mergeGuards": {
+    "placeholders": {
+      "shape": "plain"
+    }
   },
   "settings.agent.takes.okBefore": {
     "placeholders": {

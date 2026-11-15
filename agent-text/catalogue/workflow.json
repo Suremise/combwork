@@ -237,6 +237,61 @@
     "text": "a jj project needs a target bookmark (Work merges into)",
     "note": "HI-2868: why a jj card could not start: no target bookmark is set. Work merges into is a name in the window."
   },
+  "workflow.mergeGuards.problem.empty": {
+    "text": "Merge guard {n, number} has no {field, select, name {name} pattern {pattern} other {message}}.",
+    "note": "Why workflow options cannot be saved (HI-3284): a merge guard’s name, pattern or message is empty (select: translate each; keep the keys). {n} is its position, from 1.",
+    "audience": "both"
+  },
+  "workflow.mergeGuards.problem.glob": {
+    "text": "Merge guard {n, number} has a path it can’t use: “{detail}”. Paths take *, **, ? and {braces} only, with / between folders, and no leading /, .. or [ ].",
+    "note": "Why workflow options cannot be saved (HI-3284): a merge guard’s path (a glob, such as docs/** or *.md) uses something unsupported. {n} is its position, from 1; {detail} is the path as written. {braces} stands for the text \"{a,b}\": keep it as it is.",
+    "audience": "both"
+  },
+  "workflow.mergeGuards.problem.invalid": {
+    "text": "The pattern of merge guard {n, number} isn’t a regular expression JavaScript takes: {detail}",
+    "note": "Why workflow options cannot be saved (HI-3284): a merge guard’s pattern does not compile. {n} is its position, from 1; {detail} is the JavaScript engine’s own message, in English.",
+    "audience": "both"
+  },
+  "workflow.mergeGuards.problem.matchesEmpty": {
+    "text": "The pattern of merge guard {n, number} matches an empty line, so it would refuse every line.",
+    "note": "Why workflow options cannot be saved (HI-3284): a merge guard’s pattern matches the empty string. {n} is its position, from 1.",
+    "audience": "both"
+  },
+  "workflow.mergeGuards.problem.notGuard": {
+    "text": "Merge guard {n, number} isn’t a guard: it needs a name, a pattern and a message.",
+    "note": "Why workflow options cannot be saved (HI-3284): an entry of the merge guards has the wrong shape. {n} is its position, from 1.",
+    "audience": "both"
+  },
+  "workflow.mergeGuards.problem.notList": {
+    "text": "The merge guards aren’t a list of guards.",
+    "note": "Why workflow options cannot be saved (HI-3284): the merge guards option is not a list. A merge guard is a pattern Combwork refuses in the lines a merge adds.",
+    "audience": "both"
+  },
+  "workflow.mergeGuards.problem.timedOut": {
+    "text": "The pattern of merge guard {n, number} took too long to check.",
+    "note": "Why workflow options cannot be saved (HI-3284): checking a merge guard’s pattern ran past its time limit (a pattern that backtracks a lot). {n} is its position, from 1.",
+    "audience": "both"
+  },
+  "workflow.mergeGuards.problem.tooLong": {
+    "text": "The {field, select, name {name} pattern {pattern} other {message}} of merge guard {n, number} is longer than {max, number} characters.",
+    "note": "Why workflow options cannot be saved (HI-3284): a merge guard’s name, pattern or message is too long (select: translate each; keep the keys). {n} is its position, from 1; {max} the most characters it takes.",
+    "audience": "both"
+  },
+  "workflow.mergeGuards.problem.tooMany": {
+    "text": "There are more than {max, number} merge guards.",
+    "note": "Why workflow options cannot be saved (HI-3284): too many merge guards. {max} is the most a project takes.",
+    "audience": "both"
+  },
+  "workflow.mergeGuards.problem.tooManyGlobs": {
+    "text": "Merge guard {n, number} has more than {max, number} paths in one list.",
+    "note": "Why workflow options cannot be saved (HI-3284): a merge guard lists too many paths it applies to or skips. {n} is its position, from 1; {max} the most.",
+    "audience": "both"
+  },
+  "workflow.mergeGuards.problem.unchecked": {
+    "text": "The pattern of merge guard {n, number} couldn’t be checked: Combwork couldn’t start the check.",
+    "note": "Why workflow options cannot be saved (HI-3284): the thread that checks merge guards’ patterns could not be started, so the pattern could not be checked. {n} is its position, from 1.",
+    "audience": "both"
+  },
   "workflow.move.answer": {
     "text": "Answer",
     "note": "A move on a card, named in a refused move: the user's answer to a For you request (Approve, Decline, a reply).",
@@ -505,6 +560,26 @@
   "workflow.option.mergeChecks.title": {
     "text": "Checks pass on the merged result",
     "note": "A workflow option (glossary 2.6, G9): named commands Combwork’s merge queue runs on a card’s work merged with the target branch.",
+    "audience": "both"
+  },
+  "workflow.option.mergeGuards.desc": {
+    "text": "Patterns a merge may not add, matched against only the lines it adds (never what the target already has, nor binary files): a match sends the card back to its builder with the guard’s message, and as a pattern catches only what you name, this isn’t secret scanning.",
+    "note": "What the workflow option “Merge guards” does (HI-3284): each guard is a regular expression checked against the text lines a merge adds; a match returns the card. Secret scanning: tools that look for passwords and keys; say plainly that this is not one.",
+    "audience": "both"
+  },
+  "workflow.option.mergeGuards.jjDesc": {
+    "text": "Patterns a candidate may not add, matched against only the lines it adds to the target bookmark (never what it already has, nor binary files): a match sends the card back to its builder with the guard’s message, and as a pattern catches only what you name, this isn’t secret scanning.",
+    "note": "What the workflow option “Merge guards” does for a project using jj (HI-3284). A candidate is the commit Combwork builds for the user to integrate; a bookmark is jj’s name for a branch: keep it as jj’s term. Secret scanning: tools that look for passwords and keys.",
+    "audience": "both"
+  },
+  "workflow.option.mergeGuards.jjTitle": {
+    "text": "Merge guards",
+    "note": "The workflow option “Merge guards” (HI-3284) for a project using jj: the same name.",
+    "audience": "both"
+  },
+  "workflow.option.mergeGuards.title": {
+    "text": "Merge guards",
+    "note": "A workflow option (HI-3284): patterns (regular expressions) Combwork refuses in the lines a merge adds. A guard here is a check that keeps something out, not a person.",
     "audience": "both"
   },
   "workflow.option.mergeInstall.desc": {

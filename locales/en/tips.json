@@ -1467,6 +1467,14 @@
     "defaultMessage": "Merge against your team’s remote",
     "description": "A tip's title (G21, HI-1183): the workflow option that has Combwork's merge queue fetch the target's remote branch before each test merge and publish there first."
   },
+  "tips.mergeGuards.text": {
+    "defaultMessage": "Version Control → Workflow → Merge guards refuses a merge that adds a line matching your pattern (an old name, a debugging call), sending the card back with your message. Only added lines count, so sweeping out what is already there stays separate work.",
+    "description": "A tip (HI-3284). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. A merge guard is a pattern (regular expression) Combwork refuses in the lines a merge adds."
+  },
+  "tips.mergeGuards.title": {
+    "defaultMessage": "Keep things out of what merges",
+    "description": "A tip's title (HI-3284): merge guards, patterns Combwork refuses in the lines a merge adds."
+  },
   "tips.mergeMessage.text": {
     "defaultMessage": "With Combwork merging, Version Control → Workflow sets the merge’s commit message: Combwork’s names the card, the branch’s own keeps card keys out of your history. With Squash, each card then lands as one commit with its builder’s message.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Squash is a merge style's name: use the word Combwork shows for it."

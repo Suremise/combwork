@@ -736,6 +736,33 @@
       "column": "select"
     }
   },
+  "tasks.history.queueGuarded": {
+    "placeholders": {
+      "count": "plural",
+      "guards": "plain",
+      "others": "plural"
+    }
+  },
+  "tasks.history.queueGuardedIncomplete": {
+    "placeholders": {
+      "why": "select",
+      "guard": "plain"
+    }
+  },
+  "tasks.history.queueGuardedJoin": {
+    "placeholders": {
+      "first": "plain",
+      "rest": "plain"
+    }
+  },
+  "tasks.history.queueGuardedOne": {
+    "placeholders": {
+      "guard": "plain",
+      "count": "plural",
+      "where": "plain",
+      "message": "plain"
+    }
+  },
   "tasks.history.queueReturned": {
     "placeholders": {
       "reason": "select",

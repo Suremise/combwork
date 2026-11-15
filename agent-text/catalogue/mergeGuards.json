@@ -1,0 +1,66 @@
+{
+  "mergeGuards.hit": {
+    "text": "{file}:{line}: {excerpt}",
+    "note": "HI-3284: one line a merge guard matched, in a returned card’s log: the file, the line number, and the line around the match (its own text)."
+  },
+  "mergeGuards.incomplete": {
+    "text": "the merge guards couldn't finish ({why}), so nothing was proved",
+    "note": "HI-3284: what came back: the merge guards check could not finish: never a pass and never a match. {why}: mergeGuards.why.*."
+  },
+  "mergeGuards.matched": {
+    "text": "merge guard \"{guard}\" matches {count, plural, one {a line} other {# lines}} it adds",
+    "note": "HI-3284: what came back from a merge (the failure, after \"came back:\"): a merge guard (a pattern the project refuses in the lines a merge adds) matched. {guard}: its name. {count}: lines matched."
+  },
+  "mergeGuards.matchedBy": {
+    "text": "\"{guard}\" {count, plural, one {# line} other {# lines}}",
+    "note": "HI-3284: one of several matching merge guards, in mergeGuards.matchedMany: its name and how many lines it matched."
+  },
+  "mergeGuards.matchedMany": {
+    "text": "merge guards match lines it adds: {guards}",
+    "note": "HI-3284: as mergeGuards.matched, several guards. {guards}: each guard and how many lines it matched (mergeGuards.matchedBy), comma-joined."
+  },
+  "mergeGuards.more": {
+    "text": "and {count, plural, one {# more line} other {# more lines}}",
+    "note": "HI-3284: past the lines listed, how many more a merge guard matched."
+  },
+  "mergeGuards.todo": {
+    "text": "\"{guard}\": {message}",
+    "note": "HI-3284: a matching merge guard and its message (the user’s own words: what to do instead), at the end of a returned card’s log."
+  },
+  "mergeGuards.warning": {
+    "text": "Merge guards: {failure} since its merge base ({where}). The merge will refuse it if it is still there when merged.",
+    "note": "HI-3284: cw_submit’s early warning (never a refusal): a merge guard matched what the submitted revision adds since its merge base with the target. {failure}: mergeGuards.matched or .matchedMany. {where}: the first file:line matched."
+  },
+  "mergeGuards.warningIncomplete": {
+    "text": "Merge guards: couldn't check this revision ({why}); the merge checks them.",
+    "note": "HI-3284: cw_submit’s early warning when the merge guards could not be checked at submit. {why}: mergeGuards.why.*."
+  },
+  "mergeGuards.why.failed": {
+    "text": "its worker ended",
+    "note": "HI-3284: why the merge guards check could not finish: the thread that matches the guards ended unexpectedly."
+  },
+  "mergeGuards.why.invalid": {
+    "text": "guard \"{guard}\" has an invalid pattern",
+    "note": "HI-3284: why the merge guards check could not finish: a guard’s pattern does not compile. {guard}: its name."
+  },
+  "mergeGuards.why.malformed": {
+    "text": "the merge's changes couldn't be followed",
+    "note": "HI-3284: why the merge guards check could not finish: the diff the version control gave could not be parsed whole."
+  },
+  "mergeGuards.why.matchesEmpty": {
+    "text": "guard \"{guard}\" matches an empty line",
+    "note": "HI-3284: why the merge guards check could not finish: a guard’s pattern matches the empty string (it would refuse every line). {guard}: its name."
+  },
+  "mergeGuards.why.timedOut": {
+    "text": "guard \"{guard}\" ran past its time limit",
+    "note": "HI-3284: why the merge guards check could not finish: a guard’s pattern ran past the time limit (Settings → Advanced). {guard}: its name."
+  },
+  "mergeGuards.why.tooLarge": {
+    "text": "the merge adds more than the guards check",
+    "note": "HI-3284: why the merge guards check could not finish: the merge adds more text or lines than the limits (Settings → Advanced)."
+  },
+  "mergeGuards.why.unreadable": {
+    "text": "the merge's changes couldn't be read",
+    "note": "HI-3284: why the merge guards check could not finish: the version control could not give the merge’s changes (a temporary failure)."
+  }
+}

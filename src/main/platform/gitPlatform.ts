@@ -29,6 +29,7 @@ import { destinationOf, fetchHeadOf, projectHost, REMOTE_PLACEHOLDER, upstreamRe
 import { CW_DIR } from '../../shared/defaults'
 import type { TargetChanges } from '../../shared/types'
 import { shellLine } from '../../shared/workflow/queue'
+import type { DiffRead } from './types'
 
 /** How long a slotted card's start waits on fetching the remote its target follows (HI-1183). */
 const SLOT_FETCH_MS = 60_000
@@ -733,6 +734,11 @@ export class GitPlatform implements PlatformAdapter {
     const lh = await G.lineHead(this.project, s.started.line)
     if (isUnknown(lh)) return { contained: lh }
     return { contained: lh ? await G.isAncestor(this.project, revision, lh) : false }
+  }
+
+  /** HI-3284: what `head` adds to `base`, for the merge guards (the history port's pinned diff). */
+  addedDiff(base: string, head: string): Promise<DiffRead> {
+    return this.history.addedDiff(this.project, base, head)
   }
 
   async headMoved(_card: CardRecord, s: CardState, o: WorkflowOptions, from: { base: string | null; revision: string; key?: string | null }): Promise<HeadMove | null> {

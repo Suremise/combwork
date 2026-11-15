@@ -12,7 +12,7 @@ import type { CardRecord } from '../workflow/factStore'
 import type { ReconcileHooks } from '../workflow/reconcile'
 import type { Write } from '../workflow/runtime'
 import type { Disposable, ObserveEvent } from './observe'
-import type { Containment, Maybe, Unknown } from './types'
+import type { Containment, DiffRead, Maybe, Unknown } from './types'
 import type { TargetChanges } from '../../shared/types'
 
 /** What a start records of the platform: the card's folder, line, base and target (None: its manifests). */
@@ -130,6 +130,11 @@ export interface PlatformAdapter {
   contains(target: string, change: { base: string; revision: string; key?: string | null }, at?: string): Promise<Maybe<Containment | null>>
   /** A target's head now, for a recorded integration's result. */
   targetHead(target: string): Promise<Maybe<string | null>>
+  /**
+   * HI-3284: the lines `head` adds to `base`, a unified diff with its inputs pinned, for the merge guards (submit's early
+   * warning). Absent: a platform with no revisions (None).
+   */
+  addedDiff?(base: string, head: string): Promise<DiffRead>
   /**
    * An agent's worktree between a lane's cards (§16.19.2, #1271; Git only): its line, its head, the target's head, whether
    * the head is in the target (an ancestor of it), and its uncommitted files.

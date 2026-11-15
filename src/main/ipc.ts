@@ -111,7 +111,7 @@ import { cleanTasks, cleanWhere } from '../shared/windowHealth'
 import { setTitleBarBackdrops, setTitleBarColors } from './titleBar'
 import { showWindow } from './tray'
 import { resetMetrics } from './metrics'
-import { beginWork, recentStalls } from './mainStalls'
+import { beginWork, measured, recentStalls } from './mainStalls'
 import { metricsExport, metricsReport } from './metricsUsage'
 import { cancelWatch, stampWatchProjects } from './watches'
 import { cancelMessages, deliverWaiting } from './agentMessages'
@@ -135,7 +135,7 @@ import { settleCommitMessageDefault } from './workflow/commitMessageStep'
 import { migrateSlots, releaseCarried } from './slotMigration'
 import { boardSlots, heldWriter, releaseHeldWriter } from './agentFolders'
 import { copyV09Templates, sayV09TemplatesOnce } from './templateUpgrade'
-import { checkWorkflowChange, chooseMerge, presetsNotice, settleMergeChoices, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
+import { checkWorkflowChange, chooseMerge, guardPreview, presetsNotice, settleMergeChoices, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
 import { checkPlatformSwitch, setPlatform } from './workflow/platformSwitch'
 import { SwitchRefusedError } from './workflow/storeSwitch'
 import { presetNotNow } from './workflow/presetStep'
@@ -166,6 +166,7 @@ import { withSkillDelivered } from '../shared/skillDelivery'
 import { pauseApp, resumeApp } from './teamPause'
 import { endParkedProcess, installIfParked, teamPauseState } from './teamParked'
 import { cliSnapshotForWindow, openClisFolder, reloadClis } from './clis'
+import { cancelPreview } from './workflow/mergeGuardsRun'
 
 /**
  * What the window is told when a call is refused (#845): thrown as CombworkErrors, so the window reads them in its language
@@ -1009,7 +1010,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       if (!ws.path) return []
       // Each project's ruleset now, for the old rules marks (#1421): read before the board, then the badges on one snapshot.
       const now = await rulesNow(ws)
-      return ws.path ? workBadges(ws, now.ids, now.at) : []
+      return ws.path ? measured('work badges', () => workBadges(ws, now.ids, now.at)) : [] // i18n-ignore: a stall label for combwork.log, in English
     },
     'project:setActive': async (p, active) => {
       p = workspace.assertProject(p)
@@ -1044,6 +1045,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
     'workflow:form': (p) => workflowForm(workspace, workspace.assertProject(p)),
     'workflow:check': (p, change) => checkWorkflowChange(workspace, workspace.assertProject(p), change),
+    'workflow:guardPreview': (p, guard, slot) => guardPreview(workspace, workspace.assertProject(p), guard, slot),
+    'workflow:guardPreviewCancel': (slot) => void (typeof slot === 'string' && cancelPreview(slot)),
     'workflow:retarget': (p, preview) => retargetApply(currentWorkspace(), workspace.assertProject(p), retargetArg(preview), { kind: 'user' }),
     'workflow:nextVersionPlan': (p) => nextVersionPlan(workspace, workspace.assertProject(p)),
     'workflow:nextVersionPreview': (p, from, to) => previewFor(workspace, workspace.assertProject(p), String(from ?? ''), String(to ?? '')),
@@ -2024,7 +2027,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       try {
         const block = take(blocking, channel)
         if (block?.ms) for (const until = Date.now() + block.ms; Date.now() < until; );
-        return await senderStore.run(e.sender, () => inWorkspace(w.ws, () => (fn as (...a: unknown[]) => unknown)(...args)))
+        // Its own code up to its first wait, named when it computed long enough to be felt (HI-3293).
+        return await senderStore.run(e.sender, () => inWorkspace(w.ws, () => measured(`ran ipc ${channel}`, () => (fn as (...a: unknown[]) => unknown)(...args)))) // i18n-ignore: a line of combwork.log, in English
       } catch (err) {
         // A failure that isn't one of Combwork's own refusals (a file that couldn't be written, HI-1749): the window shows it, and
         // combwork.log has it too, so every "Could not …" notification has its line.

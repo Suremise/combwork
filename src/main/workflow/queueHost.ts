@@ -50,6 +50,7 @@ import { FOCUSED_PICK_SECONDS, QUEUE_CHECKED_OUT_TARGET, QUEUE_FOCUSED_JOBS, QUE
 import { childEnv } from '../ptyHost'
 import { pausedFor } from '../teamPause'
 import { queueTransportStore } from '../queueTransportStore'
+import { guardLimits } from './mergeGuardLimits'
 
 const log = createLogger('queue')
 
@@ -340,6 +341,8 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
     // HI-2947: as git starts it (the check quotes its words), its first word given. HI-3208: with no console of its own.
     spawn: (file, args, o) => runner.run('testMerge', file, args, { cwd: o.cwd, env: o.env, timeoutMs: o.timeoutMs, ...(o.input !== undefined ? { input: o.input } : {}), ...(o.argv0 !== undefined ? { argv0: o.argv0 } : {}), ...(o.verbatim ? { windowsVerbatimArguments: true } : {}), ...(o.noConsole ? { noConsole: true } : {}) }),
     signTimeoutMs: Math.max(1, Number(advanced.get(QUEUE_SIGN_SECONDS)) || 60) * 1000,
+    // HI-3284: the merge guards' time limit and lines, as Settings → Advanced says at each check.
+    guardLimits: () => guardLimits(),
     lock: (fn) => withRepoLock(h.projectPath, fn, { quiet: true, project: h.projectPath }),
     enforced: () => workflowEnforced(),
     teamPaused: () => !!pausedFor(h.projectPath),

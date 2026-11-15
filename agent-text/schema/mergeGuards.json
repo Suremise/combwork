@@ -1,0 +1,80 @@
+{
+  "mergeGuards.hit": {
+    "placeholders": {
+      "file": "plain",
+      "line": "plain",
+      "excerpt": "plain"
+    }
+  },
+  "mergeGuards.incomplete": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "mergeGuards.matched": {
+    "placeholders": {
+      "guard": "plain",
+      "count": "plural"
+    }
+  },
+  "mergeGuards.matchedBy": {
+    "placeholders": {
+      "guard": "plain",
+      "count": "plural"
+    }
+  },
+  "mergeGuards.matchedMany": {
+    "placeholders": {
+      "guards": "plain"
+    }
+  },
+  "mergeGuards.more": {
+    "placeholders": {
+      "count": "plural"
+    }
+  },
+  "mergeGuards.todo": {
+    "placeholders": {
+      "guard": "plain",
+      "message": "plain"
+    }
+  },
+  "mergeGuards.warning": {
+    "placeholders": {
+      "failure": "plain",
+      "where": "plain"
+    }
+  },
+  "mergeGuards.warningIncomplete": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "mergeGuards.why.failed": {
+    "placeholders": {}
+  },
+  "mergeGuards.why.invalid": {
+    "placeholders": {
+      "guard": "plain"
+    }
+  },
+  "mergeGuards.why.malformed": {
+    "placeholders": {}
+  },
+  "mergeGuards.why.matchesEmpty": {
+    "placeholders": {
+      "guard": "plain"
+    }
+  },
+  "mergeGuards.why.timedOut": {
+    "placeholders": {
+      "guard": "plain"
+    }
+  },
+  "mergeGuards.why.tooLarge": {
+    "placeholders": {}
+  },
+  "mergeGuards.why.unreadable": {
+    "placeholders": {}
+  }
+}

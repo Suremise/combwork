@@ -38,6 +38,7 @@ import { config } from './config'
 import { onCombworkEvent } from './events'
 import { placeKey, readCapped, readJson, realPath, renameRetrying, withFileLock } from './fsutil'
 import { openTable, readStore, saveTable, storeValue } from './storeRows'
+import { measured } from './stallWork'
 import { boardLock, dbGenerationAt, onDbReplaced, upgradeWaiting, withLeasedDb, workspaceDb } from './boardStore'
 import { transaction } from './db'
 import { addDeliveriesFile, countDeliveries, readDeliveries as readDeliveryRows, readDeliveriesWithBases, StaleDeliveries } from './schema/sessionDeliveryTables'
@@ -428,7 +429,8 @@ function transactAfter<P, T>(store: Store, read: () => Promise<P>, plan: (d: Dra
     for (let tries = 1; ; tries++) {
       // From here to the save, nothing is awaited: the plan is made from `got` as `again` last judged it.
       const d: Draft = { records: [...store.records], next: store.next, invalid: [...store.invalid], dirty: false, after: [] }
-      const planned = plan(d, got)
+      // Named in a stall it makes (HI-3293): a plan rechecks every unread delivery of the host.
+      const planned = measured('deliveries plan', () => plan(d, got)) // agent-protocol: a stall's label, for combwork.log
       if (!d.dirty) return planned
       try {
         await save(store, d)
@@ -724,9 +726,13 @@ async function save(store: Store, d: Draft): Promise<void> {
   const was = new Map(store.records.map((r) => [r.id, r]))
   const now = new Set(d.records.map((r) => r.id))
   const changed = d.records.filter((r) => was.get(r.id) !== r)
-  // agent-protocol: a mistake in Combwork's code (a record it made that doesn't read back), for the log and its bug report
-  for (const r of changed) if (!readDelivery(JSON.parse(JSON.stringify(r)))) throw new Error(`delivery ${r.id} isn't one Combwork could read back`)
-  if (fileBytes(d) > MAX_FILE_BYTES) throw saidError(T.tooMany)
+  // Named in a stall it makes (HI-3293).
+  // agent-protocol: a stall's label, for combwork.log
+  measured('deliveries save check', () => {
+    // agent-protocol: a mistake in Combwork's code (a record it made that doesn't read back), for the log and its bug report
+    for (const r of changed) if (!readDelivery(JSON.parse(JSON.stringify(r)))) throw new Error(`delivery ${r.id} isn't one Combwork could read back`)
+    if (fileBytes(d) > MAX_FILE_BYTES) throw saidError(T.tooMany)
+  })
   // Read from a database since replaced (the upgrade to 1.0, a restore): never saved over what the file has now.
   const guard = (): void => {
     if (store.gen !== dbGenerationAt(store.place.key)) throw saidError(T.dbReplaced)

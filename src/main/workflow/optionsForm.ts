@@ -24,7 +24,7 @@ import { agentText, linesOf, withValues, type Text } from '../../shared/advanced
 import { msg } from '../../shared/i18n/msg'
 import { tr } from '../../shared/i18n'
 import { MERGE_ANSWER, OPTION_TEXT, VALUE_TEXT } from '../../shared/workflow/optionTexts'
-import { allOff, BRANCH_OPTIONS, FOCUSED_PICK, FOCUSED_RUN, NAME_OPTIONS, PRESETS, preset, sameOptionValue, takesOption, type CommitMessage, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
+import { allOff, BRANCH_OPTIONS, FOCUSED_PICK, GUARD_OPTIONS, FOCUSED_RUN, NAME_OPTIONS, PRESETS, preset, sameOptionValue, takesOption, type CommitMessage, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
 import { setPresetAsked, writeWorkflow } from '../../shared/workflow/projectWorkflow'
 import { keptStageName, stagesOf } from '../../shared/workflow/stages'
 import { merges, type PlatformId } from '../../shared/platform/descriptors'
@@ -44,6 +44,9 @@ import { withFolderRepoLocks } from '../platform/repoPorts'
 import { exitBy } from '../exitLog'
 import { LEGACY_CONSUMED, legacyPreferences } from '../../shared/workflow/preferences'
 import { checkOffer } from './releaseOffer'
+import { changeGuards, refuseGuardsAtSave } from './guardsSave'
+import { previewable, type GuardPreview, type MergeGuard } from '../../shared/workflow/mergeGuards'
+import { previewMergeGuard, schedulePreview } from './mergeGuardsRun'
 
 const log = createLogger('workflow')
 
@@ -219,8 +222,8 @@ export function keptNames<T extends Partial<WorkflowOptions>>(options: T): T {
   return { ...options, stageNames: Object.fromEntries(Object.entries(names).map(([k, v]) => [k, typeof v === 'string' ? keptStageName(v) : v])) }
 }
 
-/** Whether a change of these options applies at once (#1417): only names (N5), or the branches lanes and cards may pick (HI-2556), changed, which aren't rules. */
-export const namesOnly = (changed: readonly (keyof WorkflowOptions)[]): boolean => changed.length > 0 && changed.every((k) => (NAME_OPTIONS as readonly string[]).includes(k) || (BRANCH_OPTIONS as readonly string[]).includes(k))
+/** Whether a change of these options applies at once (#1417): only names (N5), the branches lanes and cards may pick (HI-2556), or the merge guards (HI-3284) changed, which aren't rules. */
+export const namesOnly = (changed: readonly (keyof WorkflowOptions)[]): boolean => changed.length > 0 && changed.every((k) => (NAME_OPTIONS as readonly string[]).includes(k) || (BRANCH_OPTIONS as readonly string[]).includes(k) || (GUARD_OPTIONS as readonly string[]).includes(k))
 
 /** The options a save would set, their problems, and what changes from the options in force now. */
 function changeOf(ws: WorkspaceService, platform: PlatformId, current: Partial<WorkflowOptions>, change: WorkflowChange, folder: string) {
@@ -247,6 +250,38 @@ export async function cardsInFlight(ws: WorkspaceService, project: { path: strin
   // too, whose numbers repeat (#1422, HR5's round 2).
   const keys = cardKeys(ws, cards.map((c) => c.id))
   return cards.map((c) => ({ number: c.id, key: cardLabel({ number: c.id, key: keys.get(c.id) }), title: c.title }))
+}
+
+/**
+ * HI-3284 (HI-3284's decision): what a merge guard being added or edited already matches in the project, how many
+ * lines and where, read in the guards' worker: the files its version control has (tracked, and new ones not ignored), or
+ * a walk of the folder leaving out its excluded folders and node_modules.
+ */
+/** How a guard preview reads the project: the files its version control has, and the folders it leaves out (tests hold them). */
+export interface PreviewReads {
+  files(project: { path: string; platform: PlatformId }): Promise<string[] | null>
+  excluded(project: { path: string; platform: PlatformId }): Promise<string[]>
+}
+
+export async function guardPreview(ws: WorkspaceService, projectPath: string, raw: unknown, slot?: unknown, reads?: PreviewReads): Promise<GuardPreview> {
+  const project = projectOf(ws, projectPath)
+  const guard = raw as MergeGuard
+  if (!guard || typeof guard !== 'object' || !previewable(guard)) return { count: 0, hits: [], files: 0, incomplete: 'invalid' } // i18n-ignore: a reason's code
+  const r: PreviewReads = reads ?? {
+    files: async (p) => (await historyOf(p.platform)?.workingFiles(p.path).catch(() => null)) ?? null,
+    excluded: async (p) => resolvedOf(ws, p.path, p.platform, await ws.projectConfig(p.path)).options.excluded
+  }
+  const cancelled: GuardPreview = { count: 0, hits: [], files: 0, incomplete: 'cancelled' } // i18n-ignore: a reason's code
+  // Scheduled before anything is awaited (HR2's round 2): its slot is the row's from the first moment, so a newer request
+  // or the row closing cancels it even while it reads the project, and its reads count in its turn (two at once). Each
+  // read is followed by a look at its cancel: a preview cancelled meanwhile never scans.
+  return schedulePreview(typeof slot === 'string' && slot ? slot.slice(0, 64) : null, async (signal) => {
+    const files = await r.files(project)
+    if (signal.aborted) return cancelled
+    const excluded = await r.excluded(project)
+    if (signal.aborted) return cancelled
+    return previewMergeGuard(project.path, files, ['node_modules', ...excluded], guard, { signal })
+  })
 }
 
 /** What saving a change would do (§16.6.5's warning), before it is saved. */
@@ -338,7 +373,9 @@ export class WorkflowRefused extends CombworkError {
  * recorded with an Override naming what changed (OP-38: the user only, per change, the cards listed first). `check`: the
  * caller's, run at the write itself, under its lock (its throw saves nothing). Returns the form as it is now.
  */
-export function setWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; check?: () => void; offer?: string } = {}): Promise<WorkflowForm> {
+export async function setWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; check?: () => void; offer?: string } = {}): Promise<WorkflowForm> {
+  // HI-3284: the merge guards' empty-match rule, in their worker, before the locks.
+  await refuseGuardsAtSave(changeGuards(raw))
   // Checked against the levels as they are now and written in the same turn of workflow writes (#1422), holding the
   // project's repository lock first (#1642 round 5): its target can't move while a clean-up checks a branch against it,
   // from this Combwork or another.

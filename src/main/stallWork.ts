@@ -44,6 +44,24 @@ export function noteStep(label: string, start: number): void {
   if (ended.length > ENDED_KEPT) ended.shift()
 }
 
+/** A computing step shorter than this isn't noted: too short to be felt, and noting every one would push out the rest. */
+export const MEASURED_MS = 10
+
+/**
+ * Runs code that computes (HI-3293: the JavaScript of a burst, a listing or a plan), noted as a step by its fixed name
+ * when it took MEASURED_MS or more, so a CPU-bound stall names the code that ran, not only the database's quick steps
+ * around it. Cheap enough for code that runs often: two clock reads, and nothing kept when it was quick. Of a function
+ * that returns a promise, only what it runs before its first wait is timed (what follows is another turn of the loop).
+ */
+export function measured<T>(label: string, fn: () => T): T {
+  const start = stallClock.mono()
+  try {
+    return fn()
+  } finally {
+    if (stallClock.mono() - start >= MEASURED_MS) noteStep(label, start)
+  }
+}
+
 /** Runs a synchronous step that can wait (the disk, a lock), marked as work by its fixed name (HI-1692). */
 export function timedStep<T>(label: string, fn: () => T): T {
   const done = beginWork(label, true)

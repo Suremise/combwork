@@ -7,9 +7,9 @@ import { ended, running, stallClock, type Work } from './stallWork'
 import { pausedAlongside, slowProbe, WATCHDOG_SLOTS } from './stallWatchdog'
 import { threadPoolSize } from './threadPool'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
-import { MAIN_STALLS_KEPT, type MainStall, type MainStalls, type MainStallWork } from '../shared/mainStalls'
+import { HITCH_MS, MAIN_DELAY_HOURS_KEPT, MAIN_STALLS_KEPT, type MainDelayHour, type MainStall, type MainStalls, type MainStallWork } from '../shared/mainStalls'
 
-export { beginWork, stallClock, timedStep } from './stallWork'
+export { beginWork, measured, stallClock, timedStep } from './stallWork'
 
 /**
  * Notes in combwork.log when the main process was busy long enough to be felt (every terminal's typing goes through it), at
@@ -25,6 +25,10 @@ export { beginWork, stallClock, timedStep } from './stallWork'
  * A pause of the whole process isn't a stall either (HI-1692): a watchdog thread ticks on its own (stallWatchdog.ts),
  * and a stall its ticks stopped for too is the PC or the process paused (a sleep powerMonitor didn't tell, the display
  * off, the process suspended): one info line, not counted as busy.
+ *
+ * Shorter delays are felt while typing too (HI-3293): those from 50 ms are counted by the hour (delayTally), with every
+ * stall's first-named work, in the Performance view and one combwork.log line an hour. Code that computes in bursts is
+ * named as it runs (`measured`, stallWork.ts), so a stall that used the CPU names it, not only the quick database steps.
  */
 
 const log = createLogger('main')
@@ -88,6 +92,12 @@ function overlapping(from: number, to: number, held: Work[] = []): Work[] {
   return [...new Set([...held, ...running, ...ended])].filter((w) => o(w) > 0 && !IDLE.has(labelOf(w))).sort((a, b) => Number(!!b.step) - Number(!!a.step) || o(b) - o(a) || b.start - a.start)
 }
 
+/** The label a stall names first (the step that held the thread, else the work that overlapped it most), or null: nothing marked. */
+export function topWork(from: number, to: number, held: Work[] = []): string | null {
+  const first = overlapping(from, to, held)[0]
+  return first ? labelOf(first) : null
+}
+
 /** The work that overlapped [from, to], the most overlap first: at most `max` described, and how many more. */
 export function workDuring(from: number, to: number, max = NAMED, held: Work[] = []): { work: string[]; more: number } {
   const now = stallClock.mono()
@@ -136,13 +146,91 @@ export function keepStall(s: MainStall): void {
 
 /** The Performance view's stalls (performance:stalls): newest first. */
 export function recentStalls(): MainStalls {
-  return { stalls: [...recent].reverse(), total: stallsSeen, since: watchingSince }
+  return { stalls: [...recent].reverse(), hours: tally?.hours() ?? [], total: stallsSeen, since: watchingSince }
 }
 
 export function resetStallsForTests(): void {
   recent.length = 0
   stallsSeen = 0
+  tally = null
 }
+
+const HOUR_MS = 3_600_000
+/** Labels kept per hour, at most (each a fixed name: a handful in practice). */
+const TOP_KEPT = 50
+/** How many an hour's line names (the rest are counted). */
+const TOP_NAMED = 8
+
+interface TallyHour extends Omit<MainDelayHour, 'top'> {
+  top: Map<string, number>
+}
+
+export interface DelayTally {
+  /** A delay that wasn't a stall (ms): counted when it is a hitch. */
+  hitch(ms: number): void
+  /** A busy stall, its first-named work (null: nothing marked) and whether combwork.log named it. */
+  stall(top: string | null, logged: boolean): void
+  /** Closes the hour once it has passed (its line logged): called every tick, so a quiet hour ends on time. */
+  tick(): void
+  /** The hours with something counted, newest first, the current one included. */
+  hours(): MainDelayHour[]
+}
+
+const counted = (h: TallyHour): boolean => h.d50 + h.d100 + h.stalls > 0
+
+/** An hour as the view and the log have it: its labels the most first. */
+function hourOf(h: TallyHour): MainDelayHour {
+  const top = [...h.top].map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+  return { ...h, top }
+}
+
+/** An hour's combwork.log line (English, as the log is), naming its stalls' causes the once-a-minute warning leaves out. */
+export function hourLine(h: MainDelayHour): string {
+  const named = h.top.slice(0, TOP_NAMED).map((t) => `${t.label} ×${t.count}`)
+  const rest = h.top.slice(TOP_NAMED).reduce((n, t) => n + t.count, 0)
+  const causes = [...named, ...(rest ? [`${rest} more`] : []), ...(h.unnamed ? [`nothing marked ×${h.unnamed}`] : [])]
+  return `Main's event loop in the past hour: held 50–100 ms in ${h.d50} half-second(s), 100–250 ms in ${h.d100}, and ${h.stalls} stall(s) over 250 ms (${h.unlogged} not logged)${causes.length ? `; the stalls' first-named work: ${causes.join(', ')}` : ''}`
+}
+
+/** Counts main's delays by the hour of `wall`'s clock (HI-3293); an hour that has passed with any is told to `line`. */
+export function delayTally(wall: () => number, line: (text: string) => void, kept = MAIN_DELAY_HOURS_KEPT): DelayTally {
+  const hours: TallyHour[] = []
+  const current = (): TallyHour => {
+    const at = Math.floor(wall() / HOUR_MS) * HOUR_MS
+    let h = hours.at(-1)
+    if (h?.at === at) return h
+    if (h && counted(h)) line(hourLine(hourOf(h)))
+    // Only hours with something counted are kept: a quiet one is replaced.
+    if (h && !counted(h)) hours.pop()
+    h = { at, d50: 0, d100: 0, stalls: 0, unlogged: 0, top: new Map(), unnamed: 0 }
+    hours.push(h)
+    if (hours.length > kept) hours.shift()
+    return h
+  }
+  return {
+    hitch(ms) {
+      if (ms < HITCH_MS[0]) return
+      const h = current()
+      if (ms < HITCH_MS[1]) h.d50++
+      else h.d100++
+    },
+    stall(top, logged) {
+      const h = current()
+      h.stalls++
+      if (!logged) h.unlogged++
+      if (top === null) h.unnamed++
+      else if (h.top.has(top) || h.top.size < TOP_KEPT) h.top.set(top, (h.top.get(top) ?? 0) + 1)
+      else h.unnamed++
+    },
+    tick() {
+      current()
+    },
+    hours: () => hours.filter(counted).reverse().map(hourOf)
+  }
+}
+
+/** The running app's tally (null until watchMainStalls starts it, and in unit tests). */
+let tally: DelayTally | null = null
 
 export interface StallDeps {
   now(): number
@@ -161,6 +249,8 @@ export interface StallDeps {
   pausedAlongside?(from: number, to: number): boolean
   /** Keeps a stall for the Performance view (HI-1135), `end` its end on `now`'s clock: every one, logged or not, but not a pause. */
   record?(stall: Omit<MainStall, 'at'>, end: number): void
+  /** Counts delays by the hour (HI-3293): every tick, each delay short of a stall, and each busy stall. */
+  tally?: DelayTally
 }
 
 export const STALL_TIMING = { every: 500, over: 250, settleMs: 3000, quietMs: 60_000 }
@@ -187,7 +277,8 @@ export function stallWatcher(d: StallDeps, t = STALL_TIMING): { tick(): void; po
       const since = last
       last = now
       cpuLast = cpu
-      if (delay <= t.over) return
+      d.tally?.tick()
+      if (delay <= t.over) return d.tally?.hitch(delay)
       const from = Math.min(since, now - delay)
       const span = [now - delay - t.every, now] as const
       const held = overlapping(...span).slice(0, HELD_PER_STALL)
@@ -200,7 +291,9 @@ export function stallWatcher(d: StallDeps, t = STALL_TIMING): { tick(): void; po
         const cpuMs = cpuUsed === null ? null : Math.round(Math.min(cpuUsed, delay + t.every))
         // Kept before the log's quiet minute: the view lists the stalls the log leaves out too.
         d.record?.(stallOf(...span, ms, cpuMs, held), now)
-        if (d.now() - logged < t.quietMs) {
+        const quiet = d.now() - logged < t.quietMs
+        d.tally?.stall(topWork(...span, held), !quiet)
+        if (quiet) {
           unlogged++
           return
         }
@@ -317,7 +410,8 @@ export function watchMainStalls(): void {
     warn: (line) => log.warn(line),
     info: (line) => log.info(line),
     pausedAlongside: (from, to) => (watchdog ? pausedAlongside(watchdog, performance.timeOrigin + from, performance.timeOrigin + to) : false),
-    record: (s, end) => keepStall({ at: Math.round(performance.timeOrigin + end), ...s })
+    record: (s, end) => keepStall({ at: Math.round(performance.timeOrigin + end), ...s }),
+    tally: (tally = delayTally(Date.now, (line) => log.info(line)))
   }, { ...STALL_TIMING, quietMs })
   powerMonitor.on('suspend', () => watch.power())
   powerMonitor.on('resume', () => watch.power(true))

@@ -28,6 +28,7 @@ import { withFileLock } from '../fsutil'
 import { CW_DIR } from '../../shared/defaults'
 import { boardRevision } from '../boardStore'
 import { runCardIntent } from '../cardIntents'
+import { measured } from '../stallWork'
 import { onCombworkEvent } from '../events'
 import type { TaskActor } from '../tasks'
 import type { FolderChangeAction, QueueChangesSettled, QueuePauseRef, TaskCard } from '../../shared/types'
@@ -153,7 +154,8 @@ async function makeViews(ws: WorkspaceService, projectPath: string, target: stri
   // reminder and its Bring up to date… button), and its queue is cw_queue's too.
   const targets = scope.current ? await existingTargets(ws, projectPath) : []
   const also = [...scope.inFlight.keys(), ...(scope.current ? [scope.current] : []), ...targets]
-  const views = (target ? [target] : queueTargets(wf, also)).map((t) => queueView(ws, wf, projectPath, t, scope, window))
+  // Named in a stall it makes (HI-3293): each queue's facts folded on main.
+  const views = measured('queue views', () => (target ? [target] : queueTargets(wf, also)).map((t) => queueView(ws, wf, projectPath, t, scope, window))) // i18n-ignore: a stall label for combwork.log, in English
   markPast(views, await projectTargets(ws, projectPath).catch(() => null))
   // HI-2885: from the sources allowed (the default branch too), so a project with one target still brings it up to date with main.
   // HI-2892: only those in the release path's direction into it: none offered, none counted, against it.
@@ -260,14 +262,14 @@ export async function commitsBehind(projectPath: string, from: string, to: strin
  * target its current options merge into.
  */
 async function queueScope(wf: Workflow, projectPath: string): Promise<QueueScope> {
-  const inFlight = cardsInFlightByTarget(wf)
+  const inFlight = measured('queue cards in flight', () => cardsInFlightByTarget(wf)) // i18n-ignore: a stall label for combwork.log, in English
   const o = wf.currentRuleset(false).options
   let current: string | null = null
   if (merges(o.platform) && o.finish === 'combworkMerges') {
     const def = o.target ? o.target : await lineHistory().defaultTarget(projectPath).catch(() => null)
     current = def && !isUnknown(def) ? def : null
   }
-  return { inFlight, current, open: new Map(wf.store.cardsOpen().map((c) => [c.id, c])) }
+  return { inFlight, current, open: measured('queue open cards', () => new Map(wf.store.cardsOpen().map((c) => [c.id, c]))) } // i18n-ignore: a stall label for combwork.log, in English
 }
 
 /** Per target, the cards in flight whose own ruleset has Combwork merge into it, in number order (QueueScope.inFlight). */

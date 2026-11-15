@@ -47,6 +47,9 @@ const { MERGE_CHOICE_KEY } = await import('../src/shared/workflow/facts')
 const HUNG_MS = 15_000
 const { settingEntry, checkSettingValue, settingPatch } = await import('../src/shared/settingsCatalog')
 const settingsTools = await import('../src/main/settingsTools')
+const { withGuardsWorker } = await import('./guardsWorker')
+// HI-3284: a save's empty-match rule runs in the guards' worker, never on main's thread: the real one, built here.
+withGuardsWorker()
 
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
@@ -259,6 +262,59 @@ describe('the Workflow section (#1278)', () => {
     await holder
     await saving
     expect((await w.projectConfig(repo)).workflow).toMatchObject({ options: { target: 'release' } })
+  })
+
+  it('HI-3284: a guard preview is the row’s from its first moment: closed while it reads the project, it never scans; an older one finishing its reads later never cancels the newer (HR2’s round 2)', async () => {
+    const { w, repo } = await workspace()
+    writeFileSync(join(repo, 'a.txt'), 'my secret\n')
+    const { cancelPreview, guardWorkers, previewsNow } = await import('../src/main/workflow/mergeGuardsRun')
+    const g = { name: 'No secrets', pattern: 'secret', message: 'Take it out.' }
+    /** Reads that wait until let go, telling when they're asked. */
+    const held = () => {
+      let go!: () => void
+      const gate = new Promise<void>((r) => (go = r))
+      const asked = { files: false }
+      const reads = { files: async () => ((asked.files = true), await gate, ['a.txt']), excluded: async () => [] }
+      return { reads, go: () => go(), asked }
+    }
+    const now = { files: async () => ['a.txt'], excluded: async () => [] }
+    // Closed while it reads the project's files: no scan, no worker.
+    const a = held()
+    const closed = form.guardPreview(w, repo, g, 'row-1', a.reads)
+    await vi.waitFor(() => expect(a.asked.files).toBe(true), { timeout: HUNG_MS })
+    cancelPreview('row-1')
+    a.go()
+    expect(await closed).toMatchObject({ incomplete: 'cancelled' })
+    expect(guardWorkers.live).toBe(0)
+    // An older request still reading, a newer one from the same row: the newer answers; the older, finishing later, is cancelled.
+    const old = held()
+    const older = form.guardPreview(w, repo, g, 'row-2', old.reads)
+    await vi.waitFor(() => expect(old.asked.files).toBe(true), { timeout: HUNG_MS })
+    const newer = await form.guardPreview(w, repo, g, 'row-2', now)
+    expect(newer).toMatchObject({ count: 1, hits: [{ file: 'a.txt', line: 1 }] })
+    old.go()
+    expect(await older).toMatchObject({ incomplete: 'cancelled' })
+    expect(previewsNow()).toEqual({ running: 0, waiting: 0 })
+    expect(guardWorkers.live).toBe(0)
+  })
+
+  it('HI-3284: refuses merge guards a save can’t take (an invalid pattern, a bad glob, a pattern matching an empty line), saving nothing; takes good ones', async () => {
+    const { w, repo } = await workspace()
+    const { platform: _p, ...pair } = preset('git', 'pair')
+    const g = { name: 'No secrets', pattern: 'secret', message: 'Take it out.' }
+    expect(checkOptions('git', { project: { ...pair, mergeGuards: [{ ...g, pattern: '(' }] } }).problems).toMatchObject([{ kind: 'guard', guard: 0, field: 'pattern', why: 'invalid' }])
+    await expect(form.setWorkflowOptions(w, repo, { preset: null, options: { ...pair, mergeGuards: [g, { ...g, pattern: '(unclosed' }] } })).rejects.toThrow(/pattern of merge guard 2 isn’t a regular expression/)
+    await expect(form.setWorkflowOptions(w, repo, { preset: null, options: { ...pair, mergeGuards: [{ ...g, skip: ['../up'] }] } })).rejects.toThrow(/Merge guard 1 has a path it can’t use: “\.\.\/up”/)
+    await expect(form.setWorkflowOptions(w, repo, { preset: null, options: { ...pair, mergeGuards: [{ ...g, pattern: 'x*' }] } })).rejects.toThrow(/pattern of merge guard 1 matches an empty line/)
+    expect((await w.projectConfig(repo)).workflow).toBeUndefined()
+    const f = await form.setWorkflowOptions(w, repo, { preset: null, options: { ...pair, mergeGuards: [g] } })
+    expect(f.own.mergeGuards).toEqual([g])
+    // Not a rule (left out of a ruleset), never set by a preset nor making the options Custom.
+    const id = (o: Parameters<typeof compile>[0]): string | null => {
+      const r = compile(o)
+      return r.ok ? r.ruleset.id : null
+    }
+    expect(id({ ...preset('git', 'pair'), mergeGuards: [g] })).toBe(id(preset('git', 'pair')))
   })
 
   it('refuses a contradiction whole, with its reason, and saves the options and the preset they started from', async () => {

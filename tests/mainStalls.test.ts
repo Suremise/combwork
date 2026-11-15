@@ -2,9 +2,9 @@
 // overlapped it (IPC calls, Agent API requests, hooks, and HI-1692's synchronous steps: a database's BEGIN or commit) and
 // the main thread's CPU time. A gap the watchdog thread had too is the whole process paused, not a stall (HI-1692).
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { apiLabel, beginWork, fileWaitWatcher, hookLabel, keepStall, recentStalls, resetStallsForTests, stallClock, stallWatcher, timedStep, workDuring, FILE_WAIT_TIMING, STALL_TIMING } from '../src/main/mainStalls'
+import { apiLabel, beginWork, delayTally, fileWaitWatcher, hookLabel, keepStall, measured, recentStalls, resetStallsForTests, stallClock, stallWatcher, timedStep, topWork, workDuring, FILE_WAIT_TIMING, STALL_TIMING, type DelayTally } from '../src/main/mainStalls'
 import { MAIN_STALLS_KEPT, mostlyWaiting, type MainStall } from '../src/shared/mainStalls'
-import { noteStep } from '../src/main/stallWork'
+import { MEASURED_MS, noteStep } from '../src/main/stallWork'
 import { pausedAlongside, probeEnded, slowProbe, watchdogTick, PROBE_SLOW_MS, WATCHDOG_SLOTS } from '../src/main/stallWatchdog'
 
 let now = 0
@@ -21,7 +21,7 @@ function ran(label: string, ms: number): void {
 }
 
 /** A watcher on a fake clock and loop delay: its deferred decisions run when settle() is called. */
-function watcher() {
+function watcher(tally?: DelayTally) {
   let delay = 0
   let cpu = 0
   const deferred: (() => void)[] = []
@@ -32,6 +32,7 @@ function watcher() {
   /** The stalls kept for the Performance view (HI-1135), with their end. */
   const recorded: { stall: Omit<MainStall, 'at'>; end: number }[] = []
   const w = stallWatcher({
+    tally,
     record: (stall, end) => recorded.push({ stall, end }),
     now: () => now,
     longestDelayMs: () => {
@@ -580,5 +581,94 @@ describe('slow file calls, timed on the watchdog thread (HI-1702)', () => {
     expect(slowProbe(ticks)).toEqual({ n: 2, start: 5000, ms: 400 })
     // Its gaps are untouched by it.
     expect(pausedAlongside(ticks, 2000, 2900)).toBe(false)
+  })
+})
+
+const HOUR = 3_600_000
+
+describe('naming the computing, and counting short delays (HI-3293)', () => {
+  it('notes a computing step only when it took long enough to be felt, and returns what it ran', () => {
+    expect(measured('quick', () => {
+      now += MEASURED_MS - 1
+      return 7
+    })).toBe(7)
+    const slowStart = now
+    expect(() =>
+      measured('deliveries plan', () => {
+        now += 120
+        throw new Error('refused')
+      })
+    ).toThrow('refused')
+    // The slow one names the stall over it, though it threw; the quick one is never kept.
+    expect(workDuring(slowStart, now)).toEqual({ work: ['deliveries plan (0.1 s)'], more: 0 })
+    expect(topWork(slowStart - MEASURED_MS, now)).toBe('deliveries plan')
+  })
+
+  it('a stall names the code that computed before the quick database steps around it', () => {
+    const s = watcher()
+    s.tick()
+    const start = now
+    timedStep('db begin combwork.db', () => undefined)
+    measured('queue views', () => (now += 400))
+    timedStep('db commit combwork.db', () => undefined)
+    now = start
+    s.stall(400)
+    s.settle()
+    expect(s.warnings[0]).toMatch(/; during it: queue views \(0\.4 s\)/)
+    expect(s.recorded[0].stall.steps[0]).toMatchObject({ label: 'queue views', count: 1, ms: 400 })
+  })
+
+  it("counts the hour's short delays and every stall with its first-named work, and logs the hour once it has passed", () => {
+    let wall = 5 * HOUR + 10
+    const lines: string[] = []
+    const tally = delayTally(() => wall, (l) => lines.push(l))
+    const s = watcher(tally)
+    s.tick()
+    s.stall(40)
+    s.stall(60)
+    s.stall(99)
+    s.stall(100)
+    s.stall(250)
+    measured('deliveries save check', () => (now += 300))
+    now -= 300
+    s.stall(300)
+    s.settle()
+    s.tick()
+    s.tick()
+    s.stall(500)
+    s.settle()
+    expect(tally.hours()).toEqual([{ at: 5 * HOUR, d50: 2, d100: 2, stalls: 2, unlogged: 1, top: [{ label: 'deliveries save check', count: 1 }], unnamed: 1 }])
+    expect(lines).toEqual([])
+    // The next hour's first tick logs the last one; a quiet hour is neither logged nor kept.
+    wall = 6 * HOUR + 1
+    s.tick()
+    expect(lines).toEqual(["Main's event loop in the past hour: held 50–100 ms in 2 half-second(s), 100–250 ms in 2, and 2 stall(s) over 250 ms (1 not logged); the stalls' first-named work: deliveries save check ×1, nothing marked ×1"])
+    wall = 8 * HOUR
+    s.tick()
+    s.stall(70)
+    expect(lines).toHaveLength(1)
+    expect(tally.hours().map((h) => h.at)).toEqual([8 * HOUR, 5 * HOUR])
+  })
+
+  it('keeps only the latest hours with something counted, and counts nothing for a pause', () => {
+    let wall = 0
+    const tally = delayTally(() => wall, () => undefined, 3)
+    for (let h = 0; h < 5; h++) {
+      wall = h * HOUR
+      tally.hitch(60)
+    }
+    expect(tally.hours().map((h) => h.at / HOUR)).toEqual([4, 3, 2])
+    const s = watcher(delayTally(() => 0, () => undefined))
+    s.tick()
+    s.w.power()
+    s.stall(5000)
+    s.w.power(true)
+    s.settle()
+    expect(s.recorded).toEqual([])
+  })
+
+  it("the Performance view reads the running app's hours: none before it starts", () => {
+    resetStallsForTests()
+    expect(recentStalls().hours).toEqual([])
   })
 })

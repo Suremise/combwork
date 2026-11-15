@@ -368,6 +368,8 @@ interface CombworkMessageValues {
   'tips.mergeBranch.title': undefined
   'tips.mergeFollowRemote.text': undefined
   'tips.mergeFollowRemote.title': undefined
+  'tips.mergeGuards.text': undefined
+  'tips.mergeGuards.title': undefined
   'tips.mergeMessage.text': undefined
   'tips.mergeMessage.title': undefined
   'tips.mergePush.text': undefined
