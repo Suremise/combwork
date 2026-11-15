@@ -166,6 +166,32 @@ describe.runIf(windows)("the launcher follows OpenCode's session: baseline first
     await l.exit
   }, 60000)
 
+  it("the question tool's form (HI-3317): projected as events.ts does, a question the agent waits on; read with the snapshot's forms; answered, the turn finishes", async () => {
+    const hook = await hookServer()
+    const r = setUp({ hookUrl: '' })
+    r.env.CW_OC_HOOK_URL = hook.url
+    const l = launch(r)
+    const first = await until(() => hook.bodies[0], 'the baseline')
+    expect(first.snapshot.forms).toEqual([])
+    await prompt(r, 'question: Which file should I write?')
+    const created = await until(() => hook.bodies.find((b) => b.event?.type === 'form.created'), 'the form')
+    expect(created.event).toEqual({ type: 'form.created', requestID: expect.stringMatching(/^frm_/), messageID: expect.stringMatching(/^msg_/), callID: expect.stringMatching(/^call_/), text: 'Which file should I write?' })
+    const t = newTracker()
+    const asks = hook.bodies.flatMap((b) => (b.hook_event_name === 'OpencodeSnapshot' ? applySnapshot(t, b.gen, b.snapshot) : applyEvent(t, b.gen, b.event))).filter((h) => h.event.kind === 'ask')
+    expect(asks.map((h) => h.event)).toEqual([{ kind: 'ask', ask: { kind: 'question', blocking: true, message: 'Which file should I write?', call: created.event.callID } }])
+    // The pending form as the server lists it, then answered through it, as the TUI would.
+    const info = infoOf(r)!
+    const auth = { authorization: 'Basic ' + Buffer.from(`opencode:${r.password}`).toString('base64'), 'content-type': 'application/json' }
+    const listed = await (await fetch(info.url + `/api/session/${info.sessionId}/form`, { headers: auth })).json()
+    expect(listed.data.map((f: { id: string }) => f.id)).toEqual([created.event.requestID])
+    await fetch(info.url + `/api/session/${info.sessionId}/form/${created.event.requestID}/reply`, { method: 'POST', headers: auth, body: JSON.stringify({ answer: { q0: 'a.txt' } }) })
+    await until(() => tracked(hook.bodies).ends.length === 1, 'the turn to end')
+    expect(hook.bodies.find((b) => b.event?.type === 'form.replied')?.event).toEqual({ type: 'form.replied', requestID: created.event.requestID })
+    expect(tracked(hook.bodies)).toEqual({ prompts: 1, ends: ['stop'], open: null })
+    l.child.kill()
+    await l.exit
+  }, 60000)
+
   it('the stream dropped mid-turn: the turn ends while disconnected, the settled snapshot after the reconnect ends it, the prompt counted once', async () => {
     const hook = await hookServer()
     const r = setUp({ hookUrl: '' })

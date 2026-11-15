@@ -41,6 +41,7 @@ async function startServer(opts) {
   const auth = 'Basic ' + Buffer.from(`opencode:${opts.password ?? ''}`).toString('base64')
   const clients = new Set()
   const pending = new Map() // permission id → { request, resolve }
+  const forms = new Map() // the question tool's pending form id → { form, resolve }
   const turns = new Map() // session id → { abort }
   const queues = new Map()
   /**
@@ -338,6 +339,49 @@ async function startServer(opts) {
       })
       return lastCall
     }
+    /**
+     * 2.2.6's question tool (HI-3317, events/question-answered.json, question-dismissed.json, wire/forms.json): its call,
+     * then a form (form.created, not durable) the user answers (form.replied: the tool's success, the turn going on) or
+     * dismisses (form.cancelled: the tool fails aborted, the step fails, the execution is interrupted). An interrupt while it
+     * waits (not recorded) dismisses it the same way.
+     */
+    const question = (words) =>
+      step(async (msgId) => {
+        const callId = 'call_' + Math.random().toString(36).slice(2, 10)
+        const input = { questions: [{ header: 'Question', question: words, multiple: false, options: [{ label: 'Yes', description: 'Go on' }, { label: 'No', description: 'Stop here' }] }] }
+        emit('session.tool.input.started', { sessionID: sid, assistantMessageID: msgId, id: callId, name: 'question' }, d)
+        emit('session.tool.input.ended', { sessionID: sid, assistantMessageID: msgId, id: callId, text: JSON.stringify(input) }, d)
+        emit('session.tool.called', { sessionID: sid, assistantMessageID: msgId, id: callId, input, executed: false }, d)
+        emit('session.step.streamed', { sessionID: sid, assistantMessageID: msgId }, d)
+        const created = Date.now()
+        const part = (state) => setMessage(sid, msgId, (m) => (m.content = [{ type: 'tool', id: callId, name: 'question', executed: false, state, time: { created, ran: created, completed: Date.now() } }]))
+        const form = { id: store.newId('frm'), sessionID: sid, title: 'Questions', metadata: { kind: 'question', tool: { messageID: msgId, id: callId } }, fields: input.questions.map((q, i) => ({ key: `q${i}`, title: q.header, description: q.question, type: 'string', options: q.options.map((o) => ({ value: o.label, label: o.label, description: o.description })), custom: true })) }
+        emit('form.created', { form }, { location: l })
+        log({ kind: 'question', session: sid, text: words })
+        const answer = await new Promise((resolve) => {
+          forms.set(form.id, { form, resolve })
+          ctl.wake = () => {
+            if (forms.delete(form.id)) emit('form.cancelled', { id: form.id, sessionID: sid }, { location: l })
+            resolve(null)
+          }
+        })
+        ctl.wake = null
+        if (!answer) {
+          const error = { type: 'aborted', message: 'The user dismissed this question' }
+          part({ status: 'error', input, error })
+          emit('session.tool.failed', { sessionID: sid, assistantMessageID: msgId, id: callId, error, executed: false }, { ...d, version: 2 })
+          failStep(msgId, { type: 'aborted', message: 'Step interrupted' })
+          ctl.aborted = true
+          ctl.reason = ctl.reason ?? 'shutdown'
+          return false
+        }
+        const answers = input.questions.map((_, i) => (answer[`q${i}`] === undefined ? [] : [String(answer[`q${i}`])]))
+        const reply = `User has answered your questions: ${input.questions.map((q, i) => `"${q.question}"="${answers[i].join(', ') || 'Unanswered'}"`).join(', ')}. You can now continue with the user's answers in mind.`
+        part({ status: 'completed', input, content: [{ type: 'text', text: reply }], metadata: { answers, truncated: false } })
+        emit('session.tool.success', { sessionID: sid, assistantMessageID: msgId, id: callId, content: [{ type: 'text', text: reply }], metadata: { answers, truncated: false }, executed: false }, d)
+        endStep(msgId, 'tool-calls', 'tool_calls')
+        return true
+      })
     const read = (file) => toolStep('read', { filePath: file }, async () => (fs.existsSync(file) ? { text: fs.readFileSync(file, 'utf8'), metadata: { truncated: false } } : { text: `File not found: ${file}`, isError: true }))
     /**
      * 2.2.6's external_directory, for an edit outside the session's folder (HI-2772, from the pinned opencode.exe:
@@ -452,6 +496,8 @@ async function startServer(opts) {
       if (sh) await shell(sh[1].trim())
       const sub = /\bsubagent:\s*(.+)$/i.exec(s)
       if (sub) await subagent(sub[1].trim())
+      const asks = /\bquestion:\s*(.+)$/i.exec(s)
+      if (asks) await question(asks[1].trim())
       // `read` on an image, as 2.2.6 returns one (HI-2774's R0, messages/read-image.json): its data embedded as a data: URI.
       const img = /\breadimage:\s*(\S+)/i.exec(s)
       if (img) await toolStep('read', { path: img[1] }, async () => {
@@ -811,6 +857,21 @@ async function startServer(opts) {
       return json(res, 200, { interrupted: !!ctl })
     }
     if ((m = /^\/api\/session\/([^/]+)\/permission$/.exec(p)) && req.method === 'GET') return json(res, 200, { data: [...pending.values()].map((x) => x.request).filter((r) => r.sessionID === m[1]) })
+    // The question tool's forms (HI-3317, wire/forms.json): pending ones listed, answered (204, form.replied) or dismissed
+    // (DELETE, 204, form.cancelled). An unknown form's reply wasn't recorded: a 404 here.
+    if ((m = /^\/api\/session\/([^/]+)\/form$/.exec(p)) && req.method === 'GET') return json(res, 200, { data: [...forms.values()].map((x) => x.form).filter((f) => f.sessionID === m[1]) })
+    if ((m = /^\/api\/session\/([^/]+)\/form\/([^/]+)(\/reply)?$/.exec(p)) && (req.method === 'DELETE' || (req.method === 'POST' && m[3]))) {
+      const body = req.method === 'POST' ? (await bodyOf(req)) || {} : {}
+      const it = forms.get(m[2])
+      if (!it || it.form.sessionID !== m[1]) return json(res, 404, { _tag: 'FormNotFoundError', formID: m[2], message: `Form not found: ${m[2]}` })
+      forms.delete(m[2])
+      if (req.method === 'POST') emit('form.replied', { id: m[2], sessionID: m[1], answer: body.answer ?? {} }, { location: loc(m[1]) })
+      else emit('form.cancelled', { id: m[2], sessionID: m[1] }, { location: loc(m[1]) })
+      log({ kind: req.method === 'POST' ? 'question-reply' : 'question-dismissed', session: m[1] })
+      it.resolve(req.method === 'POST' ? body.answer ?? {} : null)
+      res.writeHead(204)
+      return res.end()
+    }
     if ((m = /^\/api\/session\/([^/]+)\/permission\/([^/]+)\/reply$/.exec(p)) && req.method === 'POST') {
       const body = (await bodyOf(req)) || {}
       const it = pending.get(m[2])

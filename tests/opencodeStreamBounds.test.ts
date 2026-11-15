@@ -6,7 +6,7 @@
 //   whose messages are bounded out (a message over the size bound, the page limit) fails the launch, nothing posted.
 import { spawn } from 'child_process'
 import { createRequire } from 'module'
-import { writeFileSync } from 'fs'
+import { readFileSync, writeFileSync } from 'fs'
 import http from 'http'
 import type { AddressInfo } from 'net'
 import { join } from 'path'
@@ -28,7 +28,7 @@ afterAll(() => {
 type Msg = { id: string; type: string; [k: string]: unknown }
 
 /** OpenCode's server as the snapshot reads it (watermark 5, an idle session), its messages newest first, honouring limit and cursor; and the hook server. */
-async function standIn(messages: (limit: number, cursor: string | null) => { data: Msg[]; next: string | null }, session = '{"data":{"time":{"busy":1,"idle":2},"outcome":"succeeded"}}') {
+async function standIn(messages: (limit: number, cursor: string | null) => { data: Msg[]; next: string | null }, session = '{"data":{"time":{"busy":1,"idle":2},"outcome":"succeeded"}}', forms: string | null = '{"data":[]}') {
   const posts: Record<string, any>[] = []
   const server = http.createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://x')
@@ -44,6 +44,10 @@ async function standIn(messages: (limit: number, cursor: string | null) => { dat
     res.setHeader('content-type', 'application/json')
     if (url.pathname.endsWith('/log')) return void res.end('data: {"type":"log.synced","seq":5}\n\n')
     if (url.pathname.endsWith('/permission')) return void res.end('{"data":[]}')
+    if (url.pathname.endsWith('/form')) {
+      if (forms === null) res.statusCode = 500
+      return void res.end(forms ?? '{}')
+    }
     if (url.pathname.endsWith('/message')) {
       const page = messages(Number(url.searchParams.get('limit') ?? 50), url.searchParams.get('cursor'))
       return void res.end(JSON.stringify({ data: page.data, cursor: page.next ? { next: page.next } : {} }))
@@ -141,5 +145,23 @@ describe.runIf(windows)("the launcher's recovery at its bounds (its own C#, a st
     const t = newTracker()
     const hooks = applySnapshot(t, s.posts[0].gen, snap)
     expect([t.open, hooks.map((h) => h.event.kind)]).toEqual(['u2', ['prompt']])
+  }, 60000)
+
+  it("a question pending as 2.2.6 lists it (HI-3317, wire/forms.json): the snapshot carries it as events.ts has a form, and the tracker asks it", async () => {
+    const rec = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'opencode', 'real-2.2.6', 'wire', 'forms.json'), 'utf8'))['GET /api/session/{id}/form (a question pending)'].body.data[0]
+    const form = { ...rec, sessionID: 'ses_probe', metadata: { ...rec.metadata, tool: { ...rec.metadata.tool, messageID: 'a2' } } }
+    const s = await standIn(pageOf([{ id: 'a2', type: 'assistant' }, { id: 'u2', type: 'user', text: 'go on' }, { id: 'idle1', type: 'idle', outcome: 'succeeded' }]), '{"data":{"time":{"busy":3,"idle":2}}}', JSON.stringify({ data: [form] }))
+    await drive(s.url, 'resume', "State 'asking' (Settle $true $true)")
+    const snap = s.posts[0].snapshot
+    expect(snap.forms).toEqual([{ id: form.id, messageID: 'a2', callID: form.metadata.tool.id, text: 'Which file should I write?' }])
+    const hooks = applySnapshot(newTracker(), s.posts[0].gen, snap)
+    expect(hooks.map((h) => h.event)).toEqual([{ kind: 'prompt', text: 'go on' }, { kind: 'ask', ask: { kind: 'question', blocking: true, message: 'Which file should I write?', call: form.metadata.tool.id } }])
+  }, 60000)
+
+  it("the questions can't be read: the snapshot fails, saying so, nothing posted", async () => {
+    const s = await standIn(pageOf([]), undefined, null)
+    const out = await drive(s.url, 'new', "State 'unread' (Settle $true $true)")
+    expect(out[0]).toMatchObject({ ok: false, problem: expect.stringMatching(/the questions couldn't be read/) })
+    expect(s.posts).toEqual([])
   }, 60000)
 })

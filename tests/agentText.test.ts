@@ -31,7 +31,7 @@ import { restartingLine, resumeNote as restartResumeNote } from '../src/shared/r
 import { resumeNote as outageResumeNote } from '../src/main/outageCore'
 import { teamPauseLine } from '../src/shared/teamPause'
 // @ts-expect-error: a plain .mjs module without types
-import { extractAgentMessages, extractDrift, messageProblems, readCatalogue } from '../scripts/agentTextExtract.mjs'
+import { extractDrift, messageProblems, readCatalogue } from '../scripts/agentTextExtract.mjs'
 
 const ROOT = join(__dirname, '..')
 type Catalogue = Record<string, { text: string; note?: string }>
@@ -175,11 +175,12 @@ describe("cw-mcp.js and cw-progress.js's dialect file", () => {
 })
 
 describe('the catalogue', () => {
-  it("is up to date with the code, and its schema is each message's placeholders", () => {
-    expect(extractDrift(ROOT)).toEqual([])
-    const messages = extractAgentMessages(ROOT) as Catalogue
-    expect(messages).toEqual(catalogue)
-    for (const [id, m] of Object.entries(messages)) expect(schema(id.split('.')[0])[id].placeholders, id).toEqual(placeholdersOf(parseIcu(m.text)))
+  // Whether the catalogue is the code's is `node scripts/agentTextExtract.mjs --check` (check:repo, CI's `npm run
+  // agent-text:extract -- --check`): a scan of the whole source, following every file's bindings, that was also run here
+  // until HI-3318, the same scan twice (as the guard's, HI-2689), and past this test's 20 s on CI's runner.
+  it("makes its schema files, and its schema is each message's placeholders as say()'s formatter reads them", () => {
+    expect(extractDrift(ROOT, catalogue)).toEqual([])
+    for (const [id, m] of Object.entries(catalogue)) expect(schema(id.split('.')[0])[id].placeholders, id).toEqual(placeholdersOf(parseIcu(m.text)))
   })
 })
 

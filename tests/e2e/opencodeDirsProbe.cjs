@@ -42,6 +42,23 @@ const readOf = (file) => (tools) => tools.find((t) => t.name === 'read' && ended
 const writeOf = (file) => (tools) => tools.find((t) => /^(write|edit|patch)$/.test(t.name) && ended(t) && on(t, file)) ?? null
 
 /**
+ * What the model asked with its question tool in a record (HI-3317), as Combwork shows such a wait: each question's words
+ * (its description), its header, and the form's title. A wait that says one of them is the model's question, which asks
+ * no permission; Combwork cuts its message at 500 characters.
+ */
+function questionsAsked(messages) {
+  const out = new Set(['Questions'])
+  for (const m of messages) for (const c of m.content ?? []) {
+    if (c.type !== 'tool' || c.name !== 'question') continue
+    for (const q of c.state?.input?.questions ?? []) for (const s of [q?.question, q?.header]) if (typeof s === 'string' && s.trim()) out.add(s.slice(0, 500))
+  }
+  return out
+}
+
+/** The waits of `asks` (the suite's trace.asks) in phases `phase` picks that were permissions, not the model's questions. */
+const permissionAsks = (asks, phase, questions) => asks.filter((a) => phase(a.phase) && !questions.has(a.message))
+
+/**
  * The turn's tools once `ready(tools)` holds of what the record has for it, polled with `until(fn, ms)` (lib.until);
  * at the bound, what it had (null: not even the turn's user message), for the caller to call it not tried.
  */
@@ -64,4 +81,4 @@ function ending({ failed, inconclusive }) {
   return { line: 'all checks passed', code: 0 }
 }
 
-module.exports = { recordOf, toolsOfTurn, ended, samePath, readOf, writeOf, turnTools, ending }
+module.exports = { recordOf, toolsOfTurn, ended, samePath, readOf, writeOf, turnTools, ending, questionsAsked, permissionAsks }

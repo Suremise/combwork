@@ -249,6 +249,67 @@ describe('the tracker: settled snapshots (design s14 to s22)', () => {
   })
 })
 
+describe("the question tool's form (HI-3317: 2.2.6 recorded, events/question-*.json)", () => {
+  /** A recorded stream played, with the agent's wait after each event that changed it. */
+  const waits = (name: string) => {
+    const ev = recorded(name)
+    const sid = sidOf(ev)
+    const t = newTracker()
+    const a = new Agent()
+    const seen: (Ask | null)[] = []
+    for (const raw of ev) {
+      const e = projectEvent(raw, sid)
+      if (!e) continue
+      a.take(applyEvent(t, 0, e))
+      if ((seen.length ? seen[seen.length - 1] : null) !== a.waitingOn) seen.push(a.waitingOn)
+    }
+    return { a, seen, ev }
+  }
+
+  it('answered: the agent waits on you with its question, on its tool call, until the answer; then it works on and finishes', () => {
+    const { a, seen, ev } = waits('question-answered')
+    const call = ev.find((e) => e.type === 'form.created')!.data.form.metadata.tool.id
+    expect(seen).toEqual([{ kind: 'question', blocking: true, message: 'Which file should I write?', call }, null])
+    expect([a.prompts, a.status, a.waitingOn, a.running, a.stale]).toEqual([1, 'finished', null, false, []])
+  })
+
+  it('dismissed: the wait answered, the turn interrupted', () => {
+    const { a, seen } = waits('question-dismissed')
+    expect(seen.map((x) => x?.kind ?? null)).toEqual(['question', null])
+    expect([a.prompts, a.status, a.waitingOn, a.running]).toEqual([1, 'ready', null, false])
+  })
+
+  it("projection: a form's id, its tool's message and call, its first question cut; replied and dismissed by id; nothing of another session", () => {
+    const ev = [...recorded('question-answered'), ...recorded('question-dismissed')]
+    const sid = sidOf(ev)
+    const created = ev.find((e) => e.type === 'form.created')!
+    const f = created.data.form
+    expect(projectEvent(created, sid)).toEqual({ type: 'form.created', requestID: f.id, messageID: f.metadata.tool.messageID, callID: f.metadata.tool.id, text: 'Which file should I write?' })
+    expect(projectEvent(created, 'ses_other')).toBeNull()
+    for (const type of ['form.replied', 'form.cancelled']) {
+      const e = ev.find((x) => x.type === type)!
+      expect(projectEvent(e, sid)).toEqual({ type, requestID: e.data.id })
+      expect(projectEvent(e, 'ses_other')).toBeNull()
+    }
+    const long = projectEvent({ type: 'form.created', data: { form: { ...f, fields: [{ ...f.fields[0], description: 'q'.repeat(900) }] } } }, sid)!
+    expect(long.text!.length).toBe(500)
+    expect(projectEvent({ type: 'form.created', data: { form: { ...f, fields: [{ key: 'q0', type: 'string', title: ' ' }] } } }, sid)!.text).toBe('Questions')
+  })
+
+  it('a snapshot: a pending form raised as a question; one without its forms leaves the question; one with none pending answers it', () => {
+    const t = newTracker()
+    const a = new Agent()
+    live(t, a, 1, enq('m1', 1), step('a1', 2))
+    const messages = [{ id: 'm1', type: 'user' }, { id: 'a1', type: 'assistant' }]
+    a.take(applySnapshot(t, 2, snap({ w: 5, boundary: 'known', session: { busy: 9, idle: 1 }, messages, forms: [{ id: 'frm_1', messageID: 'a1', callID: 'call_q', text: 'Which one?' }, { id: 'frm_other', messageID: 'a_unknown', callID: 'c' }] })))
+    expect([a.status, a.waitingOn?.kind, a.waitingOn?.call, a.waitingOn?.message]).toEqual(['waiting', 'question', 'call_q', 'Which one?'])
+    a.take(applySnapshot(t, 3, snap({ w: 6, boundary: 'known', session: { busy: 9, idle: 1 }, messages })))
+    expect([a.status, a.waitingOn?.call]).toEqual(['waiting', 'call_q'])
+    a.take(applySnapshot(t, 4, snap({ w: 7, boundary: 'known', session: { busy: 9, idle: 1 }, messages, forms: [] })))
+    expect([a.status, a.waitingOn]).toEqual(['working', null])
+  })
+})
+
 describe("a compaction (HI-2762's 2.2.6 recording: its own execution, under its inbox item of type compaction)", () => {
   const compacting = (a: Agent) => a.status === 'working' && a.statusMessage === COMPACTING_MESSAGE
   /** The recording's messages as the launcher's snapshot has them: oldest first, projected (ProjectMessage). */

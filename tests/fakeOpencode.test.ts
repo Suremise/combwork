@@ -98,7 +98,7 @@ const ended = (events: Ev[], sid: string) => events.find((e) => /^session\.execu
 /** A session's event types in order, as a client sees them (reasoning isn't the fake model's: left out of both). */
 function typesOf(events: Ev[], sid: string) {
   const shells = new Set(events.filter((e) => e.type === 'shell.created' && (e.data.info as { metadata?: { sessionID?: string } })?.metadata?.sessionID === sid).map((e) => (e.data.info as { id: string }).id))
-  const mine = (e: Ev) => e.data.sessionID === sid || (e.type === 'shell.created' && shells.has((e.data.info as { id: string }).id)) || (e.type === 'shell.exited' && shells.has(e.data.id as string))
+  const mine = (e: Ev) => e.data.sessionID === sid || (e.data.form as { sessionID?: string } | undefined)?.sessionID === sid || (e.type === 'shell.created' && shells.has((e.data.info as { id: string }).id)) || (e.type === 'shell.exited' && shells.has(e.data.id as string))
   return events.filter((e) => mine(e) && !e.type.startsWith('session.reasoning.') && e.type !== 'session.created').map((e) => e.type)
 }
 const recordedTypes = (name: string) => {
@@ -216,6 +216,33 @@ describe('fake opencode: its private server, as 2.2.6 served', () => {
     const one = s.events.filter((e) => e.durable?.aggregateID === s.events.find((x) => x.type === 'session.created')!.data.sessionID).map((e) => e.durable!.seq)
     expect(one[0]).toBe(0)
     expect(one.every((q, i) => i === 0 || q > one[i - 1])).toBe(true)
+    await s.stop()
+  })
+
+  it("the question tool as 2.2.6 did (HI-3317): its form listed, answered, then one dismissed, with the recorded events and replies", async () => {
+    const r = root()
+    const s = await serve(r.env, r.project)
+    s.subscribe()
+    await until(() => s.events[0]?.type === 'server.connected', 'server.connected')
+    const wire = recJson('wire/forms.json') as Record<string, { status: number; body: unknown }>
+    const turn = async (dismiss: boolean) => {
+      const sid = (await s.api('POST', '/api/session', { location: { directory: r.project } })).body.data.id
+      await s.api('POST', `/api/session/${sid}/prompt`, { text: 'question: Which file should I write?' })
+      const created = await until(() => s.events.find((e) => e.type === 'form.created' && (e.data.form as { sessionID: string }).sessionID === sid), 'form.created')
+      const form = created.data.form as { id: string }
+      const listed = await s.api('GET', `/api/session/${sid}/form`)
+      expect(listed).toEqual({ status: 200, body: { data: [form] } })
+      const pendingRec = (wire['GET /api/session/{id}/form (a question pending)'].body as { data: Record<string, unknown>[] }).data[0]
+      expect(Object.keys(form).sort()).toEqual(Object.keys(pendingRec).sort())
+      if (dismiss) expect(await s.api('DELETE', `/api/session/${sid}/form/${form.id}`)).toEqual(wire['DELETE /api/session/{id}/form/{formID}'])
+      else expect(await s.api('POST', `/api/session/${sid}/form/${form.id}/reply`, { answer: { q0: 'a.txt' } })).toEqual(wire['POST /api/session/{id}/form/{formID}/reply {answer: {q0}}'])
+      await until(() => ended(s.events, sid), "the turn's end")
+      expect((await s.api('GET', `/api/session/${sid}/form`)).body).toEqual(wire['GET /api/session/{id}/form (answered)'].body)
+      return sid
+    }
+    const strip = (types: string[]) => types.filter((t) => !['session.instructions.updated', 'session.renamed', 'session.usage.updated'].includes(t))
+    expect(strip(typesOf(s.events, await turn(false)))).toEqual(strip(recordedTypes('question-answered')))
+    expect(strip(typesOf(s.events, await turn(true)))).toEqual(strip(recordedTypes('question-dismissed')))
     await s.stop()
   })
 

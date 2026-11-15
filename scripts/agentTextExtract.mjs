@@ -48,6 +48,8 @@ export function messagesIn(rel, code) {
   const ast = parse(code, { sourceType: 'module', plugins: ['typescript', ...(rel.endsWith('x') ? ['jsx'] : [])] })
   const out = []
   traverse(ast, {
+    // Nodes only, no bindings: scopes cost most of the walk (HI-3318).
+    noScope: true,
     CallExpression(p) {
       const arg = p.node.arguments[0]
       if (calleeName(p.node.callee) !== 'agentMsg' || arg?.type !== 'ObjectExpression') return
