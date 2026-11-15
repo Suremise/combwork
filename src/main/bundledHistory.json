@@ -433,6 +433,9 @@
     "copilot/cli": [
       "2a428b5ff9d211fc"
     ],
+    "muse/cli": [
+      "680e73bc76cd6e1e"
+    ],
     "opencode/cli": [
       "4473053fbe5a4980"
     ]

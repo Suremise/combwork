@@ -15,6 +15,8 @@
 // past its limit.
 // HI-3279: and, by name, the pins every provider must answer (cliOverrides.test.ts's list of override switches,
 // reviewCopies.test.ts's providers given review copies): a new provider broke both on 1.6.0 unseen. About 1.5 s.
+// HI-3286: and dialectsShipped.test.ts's CLI file for every provider (its folder list, and loading them): Muse reached
+// 1.6.0 without one. A few ms; its workspace test (2 s) stays out.
 import { existsSync, readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'

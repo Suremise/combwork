@@ -31,7 +31,8 @@ const SHIPPED: Record<string, { name: string; model?: string }> = {
   'codex/GPT-6.1 Sol': { name: 'GPT-6.1 Sol', model: 'gpt-6.1-sol' },
   'copilot/cli': { name: 'GitHub Copilot' },
   'antigravity/cli': { name: 'Antigravity' },
-  'opencode/cli': { name: 'OpenCode' }
+  'opencode/cli': { name: 'OpenCode' },
+  'muse/cli': { name: 'Muse Code' }
 }
 
 /** A CLI file for every provider, and the API's (HI-2720: a new provider's was missed): the folders Combwork ships. */
