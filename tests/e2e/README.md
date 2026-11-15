@@ -427,7 +427,8 @@ touches one of its inputs (code, a tsconfig, `package.json` or the lock, its own
 from before the rule holds only when audited by hand (`workspaceRule.audited.json`: its exact git tree, the rule's and
 the compiler's identity, each escape's proof along its whole flow; `--reaudit <commit>` carries a record to a new rule
 only when the census still finds exactly what was audited, and never covers code outside the program, a member
-reached without its name or an edited Proxy). The `workspace` instance itself stays every suite. So
+reached without its name or an edited Proxy). Any change to the rule's file (a comment too), the compiler or the node
+types changes that identity, so `workspaceRuleCheck.mjs` fails until each record is reaudited (HI-3307). The `workspace` instance itself stays every suite. So
 HI-2654's `setAdvanced` selects 50 of 387 suites (`advanced`, `assistantsettings`, `consoletext`, `p7settings` among them;
 its two trees are audited), HI-2652's seam 2 suites, and HI-2653's New Project 28 from `actions.ts` (37 with its
 `Overlays.tsx`) (`tests/affectedUnits.test.ts` checks all three, and the suites they need; `tests/workspaceRule.test.ts`
