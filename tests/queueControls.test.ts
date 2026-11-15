@@ -890,11 +890,13 @@ describe("a project's queue listings, worked out once per state (HI-1683)", () =
     const first = await a
     expect(first[0].queued.map((q) => q.card)).toEqual([card])
     expect(await list()).toBe(first)
-    // Made again after each: a board change here (a comment)...
+    // A comment (HI-3296: nothing a listing reads) keeps it. Made again after each: a board change here (a title)...
     await inWorkspace(w, () => tasks.commentTask(card, 'a note', user))
+    expect(await list()).toBe(first)
+    await inWorkspace(w, () => tasks.updateTask(card, { title: 'Work b.txt, renamed' }, user))
     const second = await list()
     expect(second).not.toBe(first)
-    expect(second).toEqual(first)
+    expect(second[0].queued.map((q) => q.title)).toEqual(['Work b.txt, renamed'])
     expect(await list()).toBe(second)
     // ...another process's commit to the board (read before Combwork's poll tells it): one of the project's own
     // (HI-3291: a value of its workflow), not one of nobody's, which keeps the listing...
@@ -955,5 +957,75 @@ describe("a project's queue listings, worked out once per state (HI-1683)", () =
     const third = await list()
     expect(third).not.toBe(second)
     expect(third[0].queued.map((q) => q.card)).toEqual([card])
+  })
+
+  it('HI-3296: each quiet write, to a merged, a returned and a queued card waiting on a blocker, keeps the listing, and what is kept equals a listing made fresh', async () => {
+    const { tellListeners } = await import('../src/main/events')
+    const { CW_RUNS } = await import('../src/main/progress')
+    const { w, wt, repo, ws } = await workspace()
+    const merged = await approved(w, wt, 'm.txt')
+    await drain(w, repo, true)
+    const returned = await approved(w, wt, 'r.txt')
+    await drainReturned(w, repo)
+    const queued = await approved(w, wt, 'q.txt')
+    await inWorkspace(w, () => tasks.updateTask(queued, { blockedBy: [merged] }, user))
+    const blocker = await inWorkspace(w, async () => (await tasks.createTask({ title: 'Blocker', project: 'p' }, user)).number)
+    await inWorkspace(w, () => tasks.updateTask(queued, { blockedBy: [blocker] }, user))
+    // Only the clock's date held (no timer): the listing's 5 s git window doesn't run out while the test runs.
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() })
+    try {
+      const list = () => inWorkspace(w, () => queueViews(w, repo, undefined, true))
+      /** A listing made fresh: its workflow written changes its stamp, so nothing kept is used. */
+      const fresh = async () => (tellListeners({ type: 'workflow-changed', workspacePath: ws, projectPath: repo }), list())
+      let kept = await fresh()
+      expect({ recent: kept[0].recent.map((r) => r.card), returns: kept[0].returns.map((r) => r.card), queued: kept[0].queued.map((q) => [q.card, q.waitingOn]) }).toMatchObject({ recent: [returned, merged], returns: [returned], queued: [[queued, [expect.stringMatching(/-\d+$/)]]] })
+      const fact = (c: number, kind: string, data: object) =>
+        store.boardWrite(w, async () => void store.boardWriteOp(w, (d) => d.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (?, (SELECT coalesce(max(seq), 0) + 1 FROM card_facts WHERE card = ?), ?, '2026-11-15T00:00:00.000Z', 'outside', 'observed', ?)").run(c, c, kind, JSON.stringify(data))))
+      const quiet: [string, (c: number) => Promise<unknown>][] = [
+        ['TargetMoved', (c) => fact(c, 'TargetMoved', { target: 'main', from: null, to: 'f'.repeat(40) })],
+        ['HeadMoved', (c) => fact(c, 'HeadMoved', { from: 'a', to: 'b' })],
+        ['LoopStep', (c) => fact(c, 'LoopStep', { step: 'design', design: 'x' })],
+        ["a builder's CheckRan", (c) => fact(c, 'CheckRan', { name: 'lint', result: 'fail', revision: 'abc', counted: true, by: 'Builder' })],
+        ['a comment', (c) => inWorkspace(w, () => tasks.commentTask(c, 'a note', user))],
+        ['an agent comment', (c) => inWorkspace(w, () => tasks.commentTask(c, 'a note', script))]
+      ]
+      for (const c of [merged, returned, queued, blocker]) {
+        for (const [what, write] of quiet) {
+          await write(c)
+          const now = await list()
+          expect({ what, c, kept: now === kept }).toEqual({ what, c, kept: true })
+          const made = await fresh()
+          expect({ what, c, views: kept }).toEqual({ what, c, views: made })
+          kept = made
+        }
+      }
+      // The merge queue's own check, on the merged card, isn't quiet (entryTook reads it): made again.
+      await fact(merged, 'CheckRan', { name: 'quick', result: 'pass', revision: 'abc', counted: true, by: CW_RUNS })
+      expect(await list()).not.toBe(kept)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("HI-3296: a queued card's blocker in another project going Done, renamed or deleted makes the listing again (HI-3291's revision missed it)", async () => {
+    const { writeCardOutside } = await import('./boardDb')
+    const { w, wt, repo, ws } = await workspace()
+    const queued = await approved(w, wt)
+    const doc = { number: 9101, title: 'Elsewhere', project: 'other', column: 'doing', order: 1, history: [], comments: [] }
+    writeCardOutside(ws, 9101, doc)
+    await inWorkspace(w, () => tasks.updateTask(queued, { blockedBy: [9101] }, user))
+    const list = () => inWorkspace(w, () => queueViews(w, repo, undefined, true))
+    const waiting = async () => (await list())[0].queued.map((q) => q.waitingOn ?? [])
+    const first = await waiting()
+    expect(first).toEqual([[expect.any(String)]])
+    // Done in its own project: no longer waited for.
+    writeCardOutside(ws, 9101, { ...doc, column: 'done' })
+    expect(await waiting()).toEqual([[]])
+    // Back, then deleted: a blocker that can't be read is waited for, by its number.
+    writeCardOutside(ws, 9101, { ...doc, column: 'doing' })
+    expect(await waiting()).toEqual(first)
+    const { removeCard } = await import('./boardDb')
+    await removeCard(w, 9101)
+    expect(await waiting()).toEqual([['#9101']])
   })
 })
