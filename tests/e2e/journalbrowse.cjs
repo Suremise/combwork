@@ -44,7 +44,7 @@ function seed(cards, secondKey) {
     const link = db.prepare('INSERT INTO links (entry_id, type, ref) VALUES (?, ?, ?)')
     const tag = db.prepare('INSERT INTO tags (entry_id, tag) VALUES (?, ?)')
     const rows = [
-      [today(0.6), 'decision', 'alpha', 'Ship the journal browser under the Assistant view', 'Darren chose a small browser of its own, under the Assistant in the activity bar.\n\n- search and filters\n- edit and delete', 'No need for an external SQLite tool', 2, null, [['card', String(cards[0])], ['commit', '9e52d43e']], ['journal', 'ui']],
+      [today(0.6), 'decision', 'alpha', 'Ship the journal browser under the Assistant view', 'Sam chose a small browser of its own, under the Assistant in the activity bar.\n\n- search and filters\n- edit and delete', 'No need for an external SQLite tool', 2, null, [['card', String(cards[0])], ['commit', '9e52d43e']], ['journal', 'ui']],
       [today(0.3), 'plan', 'alpha', 'Build the timeline first, then the entry pane', null, null, 1, null, [['card', secondKey]], []],
       [day(1, 17), 'incident', null, 'The orange tabby knocked the build over', 'A flaky e2e run while the machine was loaded.', 'Runs under load need conditions, not sleeps', 1, null, [], ['flake']],
       [day(1, 11), 'insight', 'beta', 'Orange markers read better than red in both themes', null, null, 0, null, [], []],

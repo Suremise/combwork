@@ -588,7 +588,7 @@ export function laneSummary(cards: CardSegment[]): { finished: number; total: nu
 }
 
 /**
- * How many lanes the Progress panel's lanes section shows before it scrolls (#569; HI-1673, Darren: as before #1309):
+ * How many lanes the Progress panel's lanes section shows before it scrolls (#569; HI-1673: as before #1309):
  * all of them up to six (Settings → Advanced → Progress panel: lanes shown, and a workspace's own: #367, the `fallback`
  * below), its floor: a drag never shows fewer lanes than there are up to it, nor fewer than it with more lanes (folding
  * the section makes it smaller). The user drags the section's top edge (or presses Up and Down on it) for up to

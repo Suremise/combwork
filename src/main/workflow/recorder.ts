@@ -231,7 +231,7 @@ const roundOf = (card: TaskCard): number => {
 /**
  * The facts of a card's change, written in its transaction (from saveCard, inside the change): what moved, what started
  * or was submitted, a review's start or verdict, blocked or unblocked, its decisions' changes. `before` is null for a new
- * card. A card from before 1.0 gets none until it starts, which makes it a 1.0 card (Darren, #1119 decision 4). Never
+ * card. A card from before 1.0 gets none until it starts, which makes it a 1.0 card (#1119 decision 4). Never
  * refuses for what it couldn't read (named unknown), but a failure to write fails the change whole (HR4's #1216 round 1:
  * a card and its facts never diverge).
  */

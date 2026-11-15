@@ -91,7 +91,7 @@ const M = {
   base: msg({ id: 'settings.accounts.connection.base', defaultMessage: 'First', description: "A mark on an account's first connection (HI-2107): the one a new agent on that account gets first. Keep it short." }),
   tagTip: msg({ id: 'settings.accounts.connection.tagTip', defaultMessage: "Its tag: a usage move puts agents on another account's connection with the same tag.", description: "The tooltip of a connection's tag on its row (Settings → Accounts & Connections, HI-2530). The tag is a free-text label of the user's (\"Builders\")." }),
   baseTip: msg({ id: 'settings.accounts.connection.baseTip', defaultMessage: 'The first of its account: what a new agent gets when this account is first in the order and on here.', description: 'The tooltip of "First" on a connection (HI-2107).' }),
-  // The tidied cards (HI-2528, Darren's approved mockup v2).
+  // The tidied cards (HI-2528, approved mockup v2).
   factSignedInAs: msg({ id: 'settings.accounts.fact.signedInAs', defaultMessage: 'Signed in as', description: "A field's label on an account's card (Settings → Accounts & Connections, HI-2528): the email (or, for GitHub Copilot, the user name) it is signed in as. Keep it short." }),
   factPlan: msg({ id: 'settings.accounts.fact.plan', defaultMessage: 'Plan', description: "A field's label on an account's card (HI-2528): its plan as the coding agent CLI names it (\"Max\"). Keep it short." }),
   factState: msg({ id: 'settings.accounts.fact.state', defaultMessage: 'State', description: "A field's label on an account's card (HI-2528): whether it is signed in and set up, and when its sign-in expires. Keep it short." }),
@@ -194,7 +194,7 @@ export function AccountsSettings() {
   // An account being dragged to another place in the one order (HI-2107), and the row it would drop on.
   const [dragging, setDragging] = useState<string | null>(null)
   const [dropAt, setDropAt] = useState<string | null>(null)
-  // The account whose Account Settings are open (HI-2528: its usage move, off the card at Darren's word, 21:40).
+  // The account whose Account Settings are open (HI-2528: its usage move, off the card).
   const [accountDialog, setAccountDialog] = useState<string | null>(null)
   const load = useCallback((check: boolean) => {
     call('connections:list', check)
@@ -290,7 +290,7 @@ export function AccountsSettings() {
   }
 
   /**
-   * An account's connections as a small table inside its card (HI-2528, Darren's 21:40 decision and approved mockup v2):
+   * An account's connections as a small table inside its card (HI-2528, and its approved mockup v2):
    * order, Connection (with First), Tag, Model, Effort, Context, Mode, Extra args, Used by, then Edit, Remove and ⋯
    * (Duplicate). Each value the CLI decides reads "CLI's own"; on a narrow card each row goes to two lines (CSS).
    */
@@ -556,7 +556,7 @@ export function AccountsSettings() {
           const o = a.observed
           const email = o?.email ?? a.accepted?.email
           const same = dups.get(a.id)
-          // Its usage move lives in its Account Settings (HI-2528, Darren 21:40): there when it could have one.
+          // Its usage move lives in its Account Settings (HI-2528): there when it could have one.
           const moveTargets = view.connections.filter((other) => other.id !== a.id && other.provider === a.provider && !other.leftover)
           const hasMove = !server && !a.leftover && (!!a.usageMove || moveTargets.length > 0)
           const expiry = !server && state === 'signedIn' ? o?.loginExpiresAt : undefined

@@ -396,7 +396,7 @@ export class JjPlatform implements PlatformAdapter {
   }
 
   /**
-   * HI-3129 (Darren's decision (a), 13 Nov: a card keeps the bookmark it started on): a start's target. No kept slot (a
+   * HI-3129 (decision (a): a card keeps the bookmark it started on): a start's target. No kept slot (a
    * fresh start): the card's own, else the project's (a lane's: its Merges into). A kept slot (its committed work from
    * before it was put back, HI-2995): the target its binding names, proved (the slot's identity read, its binding this
    * card's at that generation), never the project's; unproved (anything unknown, missing or another card's) refused

@@ -1,4 +1,4 @@
-// Combwork's own agent templates (#1436, OP-19; Darren's 19 Oct decision on #1123: templates from 0.9 are wiped and Combwork
+// Combwork's own agent templates (#1436, OP-19; decided on #1123: templates from 0.9 are wiped and Combwork
 // ships these instead). Read-only, listed under the Combwork scope; Duplicate… copies one into the workspace or a project to
 // change it. They suggest a CLI per role and never a connection or model (HI-2109, decision G): the user picks
 // connections when one is loaded. Names are patterns of the project's key

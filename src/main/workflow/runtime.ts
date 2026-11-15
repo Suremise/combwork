@@ -1161,7 +1161,7 @@ export class Workflow {
   }
 
   /**
-   * HI-2854 (Darren's B): an agent's own submit, in a ruleset that doesn't hold `submit.decisionsReceived` already (Solo,
+   * HI-2854 (B): an agent's own submit, in a ruleset that doesn't hold `submit.decisionsReceived` already (Solo,
    * All off: their compiled guards and ids unchanged, so the user's drags there still ask nothing), is refused all the
    * same while the agent hasn't seen a decision or a comment of the user's: work-on-card no longer reads the card again
    * before submitting. In the submit's write, under its lock; nothing with the rules off, or what an override leaves out.
@@ -1724,7 +1724,7 @@ export class Workflow {
         continue
       }
       // Done before 1.0, or never started under the rules (moved to Done by hand): nothing to look for in the target. An
-      // override's Done counts as accepted (HI-2014, Darren's option A): its dependents start without its work in the target.
+      // override's Done counts as accepted (HI-2014, option A): its dependents start without its work in the target.
       // HI-3233: another project's card, Done, counts: its work is in its own repository, never this card's target.
       if (d.accepted || dep.preWorkflow || !d.started || finishAccepts(d.finished) || !this.store.isOwn(id)) continue
       const revision = d.integrated?.revision ?? d.approved?.revision ?? d.latest?.revision
@@ -2391,7 +2391,7 @@ export class Workflow {
   }
 
   /**
-   * HI-3220 (HI-3191's design, Darren's decision of 14 Nov): the user's open line comments sent to the card's builder as one
+   * HI-3220 (HI-3191's design): the user's open line comments sent to the card's builder as one
    * fix round, from Review, Approved or queued. One write checks, refusing with nothing written: the stage; the card as the
    * preview saw it (`expect`: its latest submission, decision generation and open review); a builder; the batch not sent
    * before; every item open at the version shown; an agent's open review replaced only as confirmed (`replaces`, that very
@@ -2481,7 +2481,7 @@ export class Workflow {
   }
 
   /**
-   * The user answers a request (§16.8.5): only the user (Darren's point 7, #1269: never an agent or the Assistant). An
+   * The user answers a request (§16.8.5): only the user (point 7, #1269: never an agent or the Assistant). An
    * approval satisfies its gate; a decline of a gate's request is a round, the card back to its builder; a reply (`note`)
    * is relayed. At the round limit the answer is the user's `choice`, and a carry on adds `rounds`. A decision (`decided`:
    * a Decide answer, or an agent's question approved with a note, HI-2286) is the board's to record, beside this. The agent waiting on it is woken: whoever asked (an agent's own question), else the builder;
@@ -2595,7 +2595,7 @@ export class Workflow {
   }
 
   /**
-   * A decision the user made answers some of a card's open requests (HI-1932, Darren's decision): the questions it names,
+   * A decision the user made answers some of a card's open requests (HI-1932): the questions it names,
    * each answered by it, in one write. Each must still be open and one a decision may answer (`decisionAnswers`), checked
    * under the write: any that isn't refuses the whole of it, nothing written. Each request's asker (else the builder) is
    * woken once with the requests it answers; nothing moves. The caller adds the decision itself in the same write
@@ -3079,7 +3079,7 @@ export class Workflow {
       return null
     })
     if (out) return this.refuse(card, by, 'move', out)
-    // An override's Done (Darren's option A, HI-2014): the reply says which cards waiting on it start without its work.
+    // An override's Done (option A, HI-2014): the reply says which cards waiting on it start without its work.
     const waiting = to === 'done' && skipped.length ? this.store.cards().filter((c) => c.blockedBy.includes(card.id) && c.stage !== 'done').map((c) => c.key) : []
     return this.ok(card, from, to, undefined, waiting.length ? [say(W.doneByOverride, { cards: waiting.join(', '), card: card.key })] : undefined)
   }

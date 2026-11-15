@@ -55,7 +55,7 @@ describe('osc52', () => {
   })
 })
 
-// The policy (#1292, #966 row 27, Darren's choice: Allow as before, Ask each time, Block; reads never allowed).
+// The policy (#1292, #966 row 27: Allow as before, Ask each time, Block; reads never allowed).
 describe('osc52Decision (#1292)', () => {
   const write = osc52(`c;${b64('copied')}`, true)
   it('Allow (the default) writes, Ask asks first with the text, Block refuses', () => {

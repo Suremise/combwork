@@ -33,7 +33,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
     }
     const left = async (label) => becomes(async () => !(await settingsShown()) && (await active()) === label)
 
-    // Settings on Agent API, as in Darren's screenshot.
+    // Settings on Agent API, as in the user's screenshot.
     check('the gear opens Settings', await gear())
     await page.locator('.settings-nav .row[data-section="agentApi"]').click()
     check('…on Agent API', await becomes(async () => (await section()) === 'agentApi'))

@@ -1017,7 +1017,7 @@
   },
   "workflow.option.otherTargets.title": {
     "defaultMessage": "Other branches work can merge into",
-    "description": "A workflow option (HI-2556, G7b): branches besides “Work merges into” that a lane or a card can be set to merge into (its “Merges into”). Darren’s name for it."
+    "description": "A workflow option (HI-2556, G7b): branches besides “Work merges into” that a lane or a card can be set to merge into (its “Merges into”). The user’s name for it."
   },
   "workflow.option.preChecks.desc": {
     "defaultMessage": "A card goes to review only once each of these named commands has passed on its work.",

@@ -496,7 +496,7 @@ describe('the usage worker reading a transcript for main', () => {
     await t.close()
   })
 
-  it('free (HI-1772, Darren 27 Oct): only on servers on this PC, a known $0 whatever prices are set; a run anywhere else ends it for good', async () => {
+  it('free (HI-1772): only on servers on this PC, a known $0 whatever prices are set; a run anywhere else ends it for good', async () => {
     const t = await setup()
     // A local model, priced by the user (a price local-only sessions never use), and Claude Code's report beside it.
     const local = (i: number): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'qwen3:8b', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 100 } } }) + '\n'
@@ -555,7 +555,7 @@ describe('the usage worker reading a transcript for main', () => {
     await h.close()
   })
 
-  it("an Ollama cloud model (HI-1773, Darren 27 Oct): a conversation free while local only, then run on a connection with a cloud model: Combwork's price for that id, never the CLI's report", async () => {
+  it("an Ollama cloud model (HI-1773): a conversation free while local only, then run on a connection with a cloud model: Combwork's price for that id, never the CLI's report", async () => {
     const t = await setup()
     // Claude Code's own $5 for it, priced as a Claude model, beside the requests.
     const cloud = (i: number): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'glm-4.6:cloud', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 100 } } }) + '\n'

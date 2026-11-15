@@ -207,7 +207,7 @@ async function builderWhere(projectPath: string, builder: AgentDef, options: Wor
 }
 
 /**
- * A lane whose cards still to do are all no-code (HI-2338, Darren's decision): none of them changes anything, so the
+ * A lane whose cards still to do are all no-code (HI-2338): none of them changes anything, so the
  * lane takes no slot as it starts and its agents start where they are (the project folder by default). A code card
  * coming up later in it (added, or made code) is lent the lane's slot as it starts (slotCards' leaseForStart), as a lane
  * an agent registers is at its first card. False with no card to do, or on a board with no kinds (waiting for its 1.0
@@ -497,9 +497,9 @@ export interface RecordedLaneLaunch {
 /**
  * A new lane the Assistant or a script recorded (HI-1900, `POST /v1/lanes` naming its builder): its stopped agents
  * started as Start Lane… starts them, so a lane over stopped agents never sits active with nobody working it. A running
- * agent is left as it is (HI-1934, Darren's option (a)): never refused nor given a new conversation, the lane recorded
+ * agent is left as it is (HI-1934, option (a)): never refused nor given a new conversation, the lane recorded
  * for it as before HI-1900, and the caller told to tell it; except an idle builder outside slots, given the lane in a
- * new conversation as Start Lane… gives it (HI-2232, Darren's decision (a); owed if it isn't free at its launch). With its builder stopped, its slot is lent
+ * new conversation as Start Lane… gives it (HI-2232, decision (a); owed if it isn't free at its launch). With its builder stopped, its slot is lent
  * first where the builder works in slots (none free: the lane waits for one, shown so, and slotCards' pass starts its
  * stopped agents once one is); then each stopped agent starts with the lane's brief. Null when the lane isn't running,
  * or its builder is no agent of the project.
@@ -520,7 +520,7 @@ export async function launchRecordedLane(ws: WorkspaceService, projectPath: stri
   const where = await builderWhere(projectPath, builder, options, noCodeOnly(ws, lane.cards))
   // Running now: left out of this start whatever they do meanwhile (its slot is decided from it), and named to the caller.
   const left = [builder, reviewer].filter((a): a is AgentDef => !!a && !!sessions.liveFor(projectPath, a.id))
-  // An idle builder outside slots (HI-2232, Darren's decision (a)): given the lane in a new conversation, as Start Lane…
+  // An idle builder outside slots (HI-2232, decision (a)): given the lane in a new conversation, as Start Lane…
   // gives it (its last stays in the Sessions history); in slots its card's start gives it one there. Never one in a turn
   // or on a watch: left as it is. One restarting (its exit typed for a switch, HI-2739: a workflow change just restarted
   // it for its tools) has no turn to keep: owed its new conversation, given once it has resumed.

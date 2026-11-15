@@ -1,5 +1,5 @@
-// The old name's guard (HI-2617): the stopping rule for the rename (Darren, 5 Nov 2026: iterate "until we clean of the
-// rename"). Every tracked file's path and text (and a new one not ignored, so a planted hit fails before it is committed)
+// The old name's guard (HI-2617): the stopping rule for the rename (iterate until the tree is clean of the
+// old name). Every tracked file's path and text (and a new one not ignored, so a planted hit fails before it is committed)
 // is searched for the app's old name, and each hit fails unless an entry in tests/oldNamesAllow.json places it:
 //
 // - regions: { file, id, why }, a section of the file between two marker lines, `old-name: begin <id>` and
@@ -19,7 +19,7 @@
 // searched (its entries name the text they allow).
 //
 // `node tests/oldNames.mjs` (npm run check:names) prints what fails in the whole tree, by file: the inventory a sweep
-// works from; `--json` prints it as JSON. The merge checks run `--diff` (Darren's decision on HI-2617, 6 Nov): only the
+// works from; `--json` prints it as JSON. The merge checks run `--diff` (HI-2617): only the
 // lines and paths a change adds since its target, which the merge queue gives as CW_CHECK_BASE (`--base <ref>` locally;
 // with neither it says so and passes). checkDiffNames says what passes there.
 import { execFileSync } from 'child_process'
@@ -186,7 +186,7 @@ export function diffPath(header) {
 const LINE_MARKER = /old-name: (?!begin |end )\S/
 
 /**
- * The names check of a change (Darren's decision on HI-2617, 6 Nov): only the lines it adds since `base` (its merge base
+ * The names check of a change (HI-2617): only the lines it adds since `base` (its merge base
  * with HEAD; the working tree, so uncommitted lines count too, and files new and not ignored whole) and the paths it
  * adds. A hit there fails unless:
  * - its file is one of oldNamesAllow.json's `diffFiles`: the upgrade code that must name the old paths, and the

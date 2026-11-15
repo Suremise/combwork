@@ -5,12 +5,12 @@ import { boardRead, setBoardCommitHook, setBoardPartHooks } from './boardStore'
 import type { WorkspaceService } from './workspace'
 
 /**
- * HI-3195 (Darren's decision of 14 Nov, "ok (b)"; SPEC's Agent API, AGENT_API's request keys): a project agent's write sent with a request key
+ * HI-3195 (decision (b); SPEC's Agent API, AGENT_API's request keys): a project agent's write sent with a request key
  * (`X-Combwork-Request`, which cw-mcp makes for each write tool call and sends again on its own retry) is applied once.
  * The write's own board transaction saves a durable "applied" marker for (launch, key) just before it commits (the board's
  * commit hook): the write and its marker commit together, or neither. A retry with the same key then gets "already
  * applied" with what the write produced (a created card's key), never a second write: after a lost reply, a crash or a
- * restart alike. The original reply isn't replayed (Darren's (b)); while Combwork runs, a retry of a request still in
+ * restart alike. The original reply isn't replayed (decision (b)); while Combwork runs, a retry of a request still in
  * flight waits for it and gets its reply. A write of several steps counts as applied at its first board commit.
  *
  * A key is bound to its exact request (its fingerprint: method, route, card and body); reused for another, it is refused

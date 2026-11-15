@@ -80,7 +80,7 @@ const check = (name, ok, extra = '') => {
       await inv('settings:update', { appearance: { theme: 'dark' } })
     }
     await themed('tilesview-onepage')
-    // A smaller window (1100×650): 4 fit, so the tiles page, 6 to a page (the floor, Darren's decision: as Panes' largest
+    // A smaller window (1100×650): 4 fit, so the tiles page, 6 to a page (the floor, decided: as Panes' largest
     // page), the area scrolling; the pager on the toolbar. Back at 1500×900, one page again.
     await lib.fitWindow(app, page, { width: 1100, height: 650 })
     check('a smaller window: the tiles page, 6 to a page (the floor), the pager showing three pages', !!(await lib.until(async () => (await pager.count()) === 1 && (await tileNames()).join() === NAMES.slice(0, 6).join() && (await pageButtons()).startsWith('1* 2 3'), HUNG_MS)), JSON.stringify({ tiles: await tileNames(), pages: await pageButtons().catch(() => '') }))

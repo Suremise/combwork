@@ -1,4 +1,4 @@
-// Settings → Accounts & Connections' tidied cards (HI-2528, Darren's approved mockup v2): what each card and connection
+// Settings → Accounts & Connections' tidied cards (HI-2528, the approved mockup v2): what each card and connection
 // row shows, worked out apart from the components.
 import { afterEach, describe, expect, it } from 'vitest'
 import type { PlanLimit } from '../src/shared/types'

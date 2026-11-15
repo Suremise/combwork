@@ -1,4 +1,4 @@
-// Remotes in the Git view (#1385, Darren's backup remote on his NAS): a project with origin and a second remote, backup.
+// Remotes in the Git view (#1385, the user's backup remote on a NAS): a project with origin and a second remote, backup.
 // Push to… backup, all branches and tags: everything goes there, and what main tracks is unchanged (Push still goes to
 // origin). Track… main to backup/main: Push then goes to backup. Track… a branch to a remote branch not there yet: the
 // form says it pushes it there first, and does. Stop tracking clears it. Rename backup to nas: the branches tracking it

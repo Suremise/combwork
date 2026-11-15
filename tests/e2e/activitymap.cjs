@@ -215,7 +215,7 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     check("HB2's calls count on the shared map beside HB1's", !!(await lib.until(async () => /beta\/z\.ts/.test(await feed.innerText().catch(() => '')), HUNG_MS, 250)))
     check('…each agent its own colour in the feed', (await feed.locator('.activity-map-dot').count()) > 0)
     await shoot('3-shared-dark')
-    // HI-3180 (Darren's decision): a click on a ring shows that agent's map, the selection and the strip staying, so a
+    // HI-3180: a click on a ring shows that agent's map, the selection and the strip staying, so a
     // click switches to another; that one again, or Escape, shows them all.
     const pickText = () => head.locator('.activity-pick').first().innerText()
     const selection = await pickText()
@@ -263,7 +263,7 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     check('Hide finished on: the agent shown stays the tab, marked and shown alone', !!(await lib.until(async () => (await tabs.count()) === 1 && (await agree('hb2', 'HB2')) && (await shownAlone('HB2')), HUNG_MS, 250)), await both())
     await head.locator('.activity-hide input').uncheck()
     await lib.until(async () => (await tabs.count()) === 2, HUNG_MS, 250)
-    // An agent that isn't running (never started, as Darren's MR1): its tab shows a plain line in the graph's place, never
+    // An agent that isn't running (never started, as in MR1): its tab shows a plain line in the graph's place, never
     // another agent's graph, and the strip still lists the working agents, one click away.
     const hr1 = await lib.addAgent(inv, alpha, { location: 'project', name: 'HR1' })
     await lib.until(async () => (await tabs.count()) === 3, HUNG_MS, 250)
@@ -312,7 +312,7 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     check('the workspace view, Hide finished on and both agents idle: no map', !!(await lib.until(async () => (await wsMap.count()) === 0 && (await page.locator('.activity-workspace .pane-empty').count()) === 1, HUNG_MS, 250)))
     await wsHead.locator('.activity-hide input').uncheck()
     check('…Hide finished off: one shared map of the workspace, a ring per agent', !!(await lib.until(async () => (await wsMap.getAttribute('data-mode').catch(() => null)) === 'shared' && (await page.locator('.activity-workspace .activity-map-ring').count()) === 2, HUNG_MS, 250)))
-    // HI-3186 in the workspace view (Darren's screenshot): a ring's click marks its tab, a tab's click its ring and map.
+    // HI-3186 in the workspace view (the user's screenshot): a ring's click marks its tab, a tab's click its ring and map.
     const wsRings = page.locator('.activity-workspace .activity-map-ring')
     const wsTabOn = () => page.locator('.activity-workspace .activity-agent-tab[aria-selected="true"]').allInnerTexts()
     const wsMarked = () => wsRings.evaluateAll((els) => els.filter((e) => e.getAttribute('aria-current') === 'true').map((e) => e.textContent))
@@ -373,7 +373,7 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     check('light, context 75 %: amber, its ring a stroke and the centre its own face', !!(await lib.until(async () => (await level()) === 'amber', HUNG_MS, 250)) && (await ctx.locator('.fill').evaluate((e) => getComputedStyle(e).fill)) === 'none', String(await level()))
     await shoot('5a-single-amber-light')
 
-    // --- HI-3179: the long names of Darren's screenshot. Each hex's text stays inside its outline (a path by its file
+    // --- HI-3179: the long names of the user's screenshot. Each hex's text stays inside its outline (a path by its file
     // name, cut in its middle; the whole on hover); Last actions under the graph at full width; the split beside the
     // list dragged, kept and reset.
     await turn('hb1', 'tool Read lanequeue-shots/ended-today-long-narrowest.png then tool Edit installer/interrupted.ps1 then tool mcp__windows-sandbox__sandbox_screenshot')

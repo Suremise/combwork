@@ -428,7 +428,7 @@ export interface DialectModel {
 }
 
 /**
- * The model a dialect file claims for what was typed in its dialog (HI-2523; Darren's decision: free text first). Only
+ * The model a dialect file claims for what was typed in its dialog (HI-2523: free text first). Only
  * what the CLI recognises is normalised, by the matcher's rules: an alias its catalogue resolves becomes that ID, and an
  * ID its catalogue or its descriptor's models list (matched without case, a "[…]" suffix or a snapshot date) becomes
  * that entry's ID without the suffix or date. Anything else is kept exactly as typed, apart from surrounding

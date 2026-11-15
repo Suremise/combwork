@@ -889,7 +889,7 @@ export function splitArgs(input: string): string[] {
 }
 
 /**
- * Why extra arguments can't be used, or null: a bare "--" (#523, Darren's decision). Combwork passes an agent's first task
+ * Why extra arguments can't be used, or null: a bare "--" (#523). Combwork passes an agent's first task
  * after a "--" of its own, so one of the user's would either end the options early or be read as the task; Combwork doesn't
  * guess which it meant. An option whose value is "--" is written with "=".
  */

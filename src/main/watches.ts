@@ -1772,7 +1772,7 @@ interface LaneBoard {
 
 /**
  * A card's newest open request for the user (HI-1991), as a lane watch tells it; null for none. For the Assistant's watch
- * (`assistant`: isAssistantWatch, its host and id), never one the Assistant asked (HI-3211, Darren's decision (c): its echo, an exception of the
+ * (`assistant`: isAssistantWatch, its host and id), never one the Assistant asked (HI-3211, decision (c): its echo, an exception of the
  * Assistant's alone): left out before the newest is taken, so another agent's on the same card is still told, and the
  * left-out one never moves the card's mark.
  */
@@ -2261,7 +2261,7 @@ const settling = new Set<string>()
  * `decision`: hearsHandoffs, #1272); or one that has fired and tells the card. Its watches not loaded yet: false.
  */
 /**
- * Whether an agent's own card watch still follows a card (HI-3211, Darren's decision of 14 Nov): one on the card that
+ * Whether an agent's own card watch still follows a card (HI-3211): one on the card that
  * hasn't fired, read when a loop wake's line is made just before it is given, so the line says its watch is still on only
  * when it is (one ended or fired meanwhile says nothing).
  */

@@ -1232,7 +1232,7 @@ const IN_A_TURN: ReadonlySet<string> = new Set(['working', 'starting', 'waiting'
  * card in flight, or it stays first): the start's own edit applies the list. Else what it did, for the reply.
  */
 /**
- * A changed list applied now (HI-1995, `applyNow`; Darren's decision of 29 Oct: two steps Combwork already has): when the
+ * A changed list applied now (HI-1995, `applyNow`: two steps Combwork already has): when the
  * builder's own card in flight is no longer the new list's first own open card, it is put back first, as `cw_put_back`
  * does (the runtime's put back, through the card's intent path: to Todo, its line and work kept); the start's own edit
  * then applies the list, at once now that no card of the lane is in flight (bound to this lane: one ended or changed in
@@ -1488,7 +1488,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     leftOut = []
     kept = []
     // After a put back for a reorder applied now (HI-1995), only the lane it was for, as it was then: ended or changed in
-    // between, refused with why, nothing resumed or recreated (Darren's decision).
+    // between, refused with why, nothing resumed or recreated.
     const bound = put ? lanes.find((l) => l.id === put.lane) : undefined
     if (put && (!bound || !running(bound))) throw new LaneError(409, say(A.endedMeanwhile, { card: put.putBack }))
     if (put && bound && (!sameList(bound.cards, put.cards) || !sameList(bound.pending ?? [], put.pending ?? []))) throw new LaneError(409, say(A.changedMeanwhile, { card: put.putBack }))

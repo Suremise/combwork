@@ -1,4 +1,4 @@
-// New Model File, Duplicate with a model, and Set Model (HI-2523; design HI-2523/s13, Darren's decision: the model is
+// New Model File, Duplicate with a model, and Set Model (HI-2523; design HI-2523/s13: the model is
 // typed, free text first): a file's name (unique in its folder, safe on Windows), the model ID it claims (normalised
 // only where the CLI recognises it, else kept exactly), the claimed-model handover (all or nothing), and a later launch
 // with that exact ID matching the file, through the launch's own resolver (dialectModelId) and the chain.

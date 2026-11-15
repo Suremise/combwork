@@ -2,7 +2,7 @@ import { useLayoutEffect } from 'react'
 import { get, progressWanted, set } from './store'
 
 /**
- * Room for the work beside the side panels (HI-1737: Darren's decision, then the Assistant's rule for the rest). The
+ * Room for the work beside the side panels (HI-1737: the user's decision, then the Assistant's rule for the rest). The
  * work never goes below MAIN_MIN while anything beside it can still give way, and what is beside it gives way in order,
  * covering nothing:
  * 1. the Assistant's panel narrows to 240 px, then the Progress panel to its 240 (CSS: their flex-shrinks, 1000 and 10,

@@ -403,7 +403,7 @@ const nothingToArchive = (dialog) => {
     fs.writeFileSync(fx.go, 'go')
     await until(async () => (await h.card(second.n))?.column === 'done', HUNG_MS)
 
-    // --- Every column there on open, nothing moving after (HI-1682, Darren's decision): the board's columns come with its
+    // --- Every column there on open, nothing moving after (HI-1682): the board's columns come with its
     // cards (`board:stages`, in the board's read), and Approved's heading sits on its line in the gap above the columns,
     // so a grouped board's columns start where a board's with no group do. main's reads of the stages and of the
     // toolbar's workflow link are held, to see the board meanwhile; each layout the board takes is recorded as it is

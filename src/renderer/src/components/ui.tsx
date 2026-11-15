@@ -200,7 +200,7 @@ export function OneLineTitle({ text, className }: { text: string; className?: st
 }
 
 /**
- * A list row's description kept to one line (HI-2527, Darren: "They look good on one row"), cut with "…" and then given
+ * A list row's description kept to one line (HI-2527), cut with "…" and then given
  * in full on hover. The same size and look as the `.desc` it replaces. While cut, its text is also a stop for Tab (list
  * rows aren't), so the keyboard shows the same tooltip; one that fits is no stop.
  */

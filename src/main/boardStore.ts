@@ -582,7 +582,7 @@ function finishMove(b: Board, combwork: string, record: Imported): void {
   if (record.pendingRename) setMeta(b.db.writer, 'imported', JSON.stringify({ ...record, pendingRename: false }))
 }
 
-/** Where cards an older version saved in the stub are set aside, intact, for the user to review (Darren, 17 Oct). */
+/** Where cards an older version saved in the stub are set aside, intact, for the user to review. */
 export const SET_ASIDE = `${TASKS}.set-aside`
 
 /**

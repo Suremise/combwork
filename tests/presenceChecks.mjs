@@ -1,6 +1,6 @@
 // The presence-check rule (HI-2617, after HI-2612): in the one-way upgrade's code and the test area's, only an absence
 // answers "not there", and an I/O failure is never taken for a result. It catches honest mistakes in ordinary code
-// (Darren's decision, 6 Nov): a bare existsSync, a catch or promise handler added without thought. It doesn't try to
+// (as decided): a bare existsSync, a catch or promise handler added without thought. It doesn't try to
 // defeat code written to evade it, and doesn't judge whether a handler passes the failure on: that is proved by the
 // I/O-failure tests (tests/upgradeIoFailures.test.ts) and by review. It is closed: in SCOPE, each of these must be one
 // of three things, or it fails.

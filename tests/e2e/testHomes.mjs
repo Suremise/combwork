@@ -1,4 +1,4 @@
-// The CLI test homes start each run fresh, keeping only the sign-in (HI-2606; its design s17 with Darren's answers, 7 Nov).
+// The CLI test homes start each run fresh, keeping only the sign-in (HI-2606; its design s17 with the user's answers).
 // A real suite or a model trial runs a real CLI from a long-lived, signed-in home under %LOCALAPPDATA%\combwork-test;
 // what earlier runs left there (memory, transcripts, per-folder trust, a stray MCP server, history, skill use) could make
 // a test pass that a new user's CLI would fail. So, under the home's lease (testHomeLock.mjs), before each run:
@@ -269,7 +269,7 @@ export async function freshenHome(cli, home, deps = {}) {
   throw new HomeNotReady('unknown', `${name}'s sign-in status in ${real} couldn't be read after it was reset: the run stops`)
 }
 
-/** What a reset said, as a line for the run's report (unclassified entries named, as Darren asked). */
+/** What a reset said, as a line for the run's report (unclassified entries named, as the user asked). */
 export function freshenedLine(cli, r) {
   const parts = [`${HOME_NAMES[cli]}'s test home reset: ${r.cleared.length} cleared${r.rewrote.length ? `, ${r.rewrote.join(', ')} rewritten` : ''}`]
   if (r.finishedInterrupted) parts.push('an interrupted reset finished')

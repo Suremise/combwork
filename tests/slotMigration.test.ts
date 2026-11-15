@@ -179,16 +179,16 @@ describe("agents' worktrees become slots (#1441)", () => {
   })
 })
 
-// Darren's shape (#1123): six builders with worktrees (HB6's deleted since, HB4 with unmerged commits, HB5 idle and
+// The maintainer's shape (#1123): six builders with worktrees (HB6's deleted since, HB4 with unmerged commits, HB5 idle and
 // merged), six reviewers working in the project folder, a lane running on HB1 with cards in Doing, Review and Passed;
 // beside it a solo agent with a worktree and no cards, a solo agent without one, and a project without git.
-describe("Darren's workspace's shape, and solo agents (#1441)", () => {
-  const dPath = join(base, 'darren')
+describe("the maintainer's workspace's shape, and solo agents (#1441)", () => {
+  const dPath = join(base, 'sam')
   const demo = join(dPath, 'demo')
   const solo = join(dPath, 'solo')
   const bare = join(dPath, 'bare')
   const plain = join(dPath, 'plain')
-  const dTrees = join(base, 'darren.worktrees')
+  const dTrees = join(base, 'sam.worktrees')
   const dw = createWorkspaceService()
   const runD = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(dw, fn)
   const ids: Record<string, string> = {}

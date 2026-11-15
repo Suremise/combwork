@@ -740,8 +740,8 @@ class UsageHistory {
   private rolledUp = new Map<string, number>()
 
   /**
-   * Ended sessions' timelines merged into 1-hour steps once Settings → Advanced's days of full detail are past (HI-1648,
-   * Darren 27 Oct), in the worker, a batch at a time behind what is queued (each batch a job of its own, so a turn's
+   * Ended sessions' timelines merged into 1-hour steps once Settings → Advanced's days of full detail are past (HI-1648),
+   * in the worker, a batch at a time behind what is queued (each batch a job of its own, so a turn's
    * record never waits for them all), then the space they freed given back (on a file from before, its one whole
    * vacuum first). At a workspace's opening, then about daily. Logged when it merged any.
    */
@@ -812,7 +812,7 @@ class UsageHistory {
   }
 
   /**
-   * The one-time import of a workspace's sessions (Darren's decision 3): each record's transcript (or Combwork's backup of
+   * The one-time import of a workspace's sessions (decision 3): each record's transcript (or Combwork's backup of
    * it) read in the worker, newest first, so recent periods fill first; a record's kept usage (a backup can lag what was
    * kept: whichever counted more stays); each deleted session's kept usage. Nothing already counted is lost: what
    * keptUsage and deletedUsage held is imported, and stays where it was. Only when every session was imported is it

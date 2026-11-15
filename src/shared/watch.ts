@@ -716,7 +716,7 @@ export const ANSWER_MAX = 4000
 export const isReturnNote = (kind: LoopWakeKind, text?: string): boolean => kind === 'note' && !!text && text.replace(/\s+/g, ' ').includes(` ${CAME_BACK}: `)
 
 export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: string, next?: string, watchOn = false): string {
-  // HI-3211 (Darren, 14 Nov): a loop wake isn't the agent's card watch firing, whose filter may leave this out; said so,
+  // HI-3211: a loop wake isn't the agent's card watch firing, whose filter may leave this out; said so,
   // and that the watch is still on, when it is.
   const still = watchOn ? ` ${say(W.loopWatchOn)}` : ''
   const who =

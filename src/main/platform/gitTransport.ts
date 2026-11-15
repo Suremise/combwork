@@ -276,7 +276,7 @@ export function publishOf(h: CandidateHost, snap: TransportSnapshot, lease: stri
       if (/\[remote rejected\]/i.test(line!)) return { refused: words }
       if (/\[rejected\]|stale info|non-fast-forward|fetch first/i.test(line!)) return { stale: words }
     }
-    // HI-3091 (Darren's decision): no ref line, and git says plainly it never reached the remote (no repository there, no
+    // HI-3091: no ref line, and git says plainly it never reached the remote (no repository there, no
     // connection, no sign-in), with nothing of a transfer begun: failed, nothing sent. Anything else stays unknown.
     if (!line && !r.ok && neverConnected(r.err)) return { failed: words }
     return { unknown: words }

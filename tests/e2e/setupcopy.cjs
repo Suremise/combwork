@@ -1,4 +1,4 @@
-// A Copy button beside every command Provider Setup shows (#1204, Darren's Store PowerShell fix): Codex found, with the
+// A Copy button beside every command Provider Setup shows (#1204, the Store PowerShell fix): Codex found, with the
 // warning about the Microsoft Store's PowerShell 7 and its detail (the symptom's error text, and the uninstall command
 // before the winget one, #1512: each as code); Claude Code not installed, with its install note (the installer's command and folder). Each code span has
 // its own Copy button; it copies exactly that command (a fake clipboard in the page: the real one is never touched) and

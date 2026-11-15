@@ -749,7 +749,7 @@ describe("the window's merge queues and badges on a board shaped like a long-use
   it('list the cards in flight as reading every card did, and each read takes under 50 ms', { timeout: 120_000 }, async () => {
     const { w, wt, repo } = await workspace()
     const store_ = FactStore.forBoard(w, { project: 'p', key: 'p' })
-    // As Darren's board: 1,277 archived cards from before 1.0 and 140 live ones in Todo and Done.
+    // As the maintainer's board: 1,277 archived cards from before 1.0 and 140 live ones in Todo and Done.
     await store.boardWrite(w, async () => {
       for (let i = 0; i < 1417; i++) store_.createCard({ title: `Card ${i}`, kind: 'code', labels: [], blockedBy: [], preWorkflow: true, stage: i % 2 ? 'done' : 'todo' })
       store.workspaceDb(w.path!).writer.prepare('UPDATE cards SET archived = 1 WHERE number < (SELECT min(number) + 1277 FROM cards)').run()

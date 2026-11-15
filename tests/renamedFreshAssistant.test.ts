@@ -32,7 +32,7 @@ const live = { sessionId: OLD }
 const launches: { resumeId?: string; prompt?: string; keepWatch?: boolean }[] = []
 // oxlint-disable-next-line typescript/no-explicit-any -- the manager's private launch and record, used as a launch would
 const internals = sessions as any
-const user = { kind: 'user', name: 'Darren' } as const
+const user = { kind: 'user', name: 'Sam' } as const
 
 beforeAll(async () => {
   mkdirSync(wsPath, { recursive: true })

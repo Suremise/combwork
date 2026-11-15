@@ -1,4 +1,4 @@
-// The real OpenCode (the pinned 2.2.6) through Combwork (HI-2763), under Darren's HI-2758 option A: no account, key, sign-in
+// The real OpenCode (the pinned 2.2.6) through Combwork (HI-2763), under HI-2758's option A: no account, key, sign-in
 // or cloud call; model turns only to the PC's local Ollama qwen3:8b, through a logging proxy here, so every request the
 // model got is on record. The pinned build (opencode-windows-x64.zip of v2.2.6, its opencode.exe's SHA-256 checked) as
 // Combwork selects it, run in this test copy's own profile (its account's roots and launch config in the test data; the
@@ -141,7 +141,7 @@ function proxy() {
   }
   const models = await ollamaModels()
   if (!models?.includes(MODEL)) {
-    console.log(`SKIP environment: no local Ollama with ${MODEL} at ${OLLAMA.host}:${OLLAMA.port} (${models ? models.join(', ') || 'no models' : 'not answering'}): Darren pulls it by hand`)
+    console.log(`SKIP environment: no local Ollama with ${MODEL} at ${OLLAMA.host}:${OLLAMA.port} (${models ? models.join(', ') || 'no models' : 'not answering'}): the user pulls it by hand`)
     process.exit(0)
   }
   const before = snapshot()

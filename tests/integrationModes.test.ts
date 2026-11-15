@@ -1,4 +1,4 @@
-// HI-2840 (Darren's decision of 14 Nov: no jj in the app's code): a platform's integration modes are its descriptor's
+// HI-2840 (no jj in the app's code): a platform's integration modes are its descriptor's
 // `finishes` and `defaultFinish`, and the options form, a new project's options and the contradictions follow them, never a
 // platform's id. Here the descriptors are changed under the workflow's options (a stand-in list for each platform) and
 // every answer moves with them; the real descriptors' own data is pinned beside it. gitAudit.test.ts fails a second

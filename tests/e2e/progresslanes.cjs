@@ -293,7 +293,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
     check(`the drag ${what} is kept and drawn (${rows} shown)`, !!done, JSON.stringify({ was, dy, kept: await kept(), says: await edgeSays(), box: b, now: await edge.boundingBox() }))
   }
   const kept = () => page.evaluate((w) => window.combwork.invoke('ui:get').then((ui) => ui.panes?.[`progress-lanes-rows:${w.toLowerCase()}`] ?? null), ws)
-  // Its floor (HI-1673, Darren): with more lanes than six, a drag never shows fewer than six.
+  // Its floor (HI-1673): with more lanes than six, a drag never shows fewer than six.
   check('the splitter ranges from six (the floor) to the lanes there are', (await edgeMin()) === 6 && (await edgeSays()).max === '7', JSON.stringify({ min: await edgeMin(), says: await edgeSays() }))
   // Dragged up by just under one: seven, kept.
   await drag(-pitch * 0.9, 'up just under a lane')
@@ -515,7 +515,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   await mergeCard.getByRole('button', { name: 'Show the merge in full' }).click()
   check('…and opens again', !!(await until(async () => (await mergeCard.locator('.progress-merge-branch').count()) === 1, HUNG_MS)))
 
-  // --- A short window, zoomed in (1000×650 at 150%): the lanes take priority (HI-1673, Darren): they stay inside the
+  // --- A short window, zoomed in (1000×650 at 150%): the lanes take priority (HI-1673): they stay inside the
   // panel at its bottom, whole lanes, and the runs give way above them. Both themes.
   await lib.fitWindow(app, page, { width: 1000, height: 650 })
   const zoom = (f) => app.evaluate(({ webContents }, z) => webContents.getAllWebContents().filter((w) => w.getType() === 'window').forEach((w) => w.setZoomFactor(z)), f)

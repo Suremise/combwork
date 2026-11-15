@@ -101,7 +101,7 @@ describe('connections: the model (HI-2106)', () => {
   })
 
   it('an account off here: its agents go to the first account on, to the connection with the same tag, else name, else its first (HI-3213)', () => {
-    // Darren's 14 Nov switch: both accounts' connections tagged alike, Anthropic-1 turned off.
+    // The user's switch: both accounts' connections tagged alike, Anthropic-1 turned off.
     const accounts: Account[] = [account('a1', 'claude-code'), account('a2', 'claude-code'), account('a3', 'claude-code')]
     const connections: Connection[] = [
       { id: 'b1', account: 'a1', name: 'Anthropic-1', tag: 'Builders' },

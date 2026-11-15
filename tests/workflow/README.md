@@ -52,7 +52,7 @@ with that phase rather than left out.
 | S58 | A shared folder: own-commit revisions, exclusions, isolated check runs | — | `workflow/sharedFolder.test.ts` "S58: …" |
 | S61 | None, Pair: declared paths, a counted check on them, a path added or edited after the run uncounts it (its hooks-free framing superseded: below) | — | `workflow/scenarios.none.test.ts` "S61: …" (the declared paths, the counted check and its uncounting, at core level) |
 
-**Hooks-free mode is superseded, not deferred** (Darren's decision on #1285, 21 Oct: no hooks-free mode and no "Combwork's
+**Hooks-free mode is superseded, not deferred** (decided on #1285: no hooks-free mode and no "Combwork's
 hooks" switch; SPEC §16.15 row 10). S45's last sentence (a hooks-free session's card: an empty pre-fill, its paths
 declared at submit) and S61's "hooks-free session" are out of scope for every phase. What stays valid of them is
 covered as above: S45's path-based staleness and unclaimed changes, and S61's declared paths, a counted check and a
@@ -151,7 +151,7 @@ or a preset's Use, or the step's Choose); **inv**: through `workflow:setOptions`
 the rule acting but not the window setting it. N1–N3 share G1–G3's keys; N5 is `stageNames`, N6 `dependenciesDone`
 (G14). Every row also has `workflowOptionsForm.test.ts` "has a row for every option of §16.6.1 and §16.6.2, …", and
 `workflowoptions` checks each group's rows in the window. The preset values are asserted in `workflowOptionsForm.test.ts`
-("Pair is §16.6.3's …", "Team is Darren's …", "Pair (the agent merges) is §16.19.1's …", "Solo (Git) and None's Solo,
+("Pair is §16.6.3's …", "Team is #1361's …", "Pair (the agent merges) is §16.19.1's …", "Solo (Git) and None's Solo,
 Pair and Team are §16.6.3's (#1425)").
 
 | Option | Key | Solo / Pair / Team (Git; None where it differs) | §16.6.3 | Unit test | e2e: the window sets it | e2e: the rule acts in the app |

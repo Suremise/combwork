@@ -40,7 +40,7 @@ export function journalStatus(ws: WorkspaceService): { settings: JournalSettings
   return { settings, bytes: journalFileBytes(home), entries }
 }
 
-/** Changes the settings; the Assistant is told what changed (its tools follow a turn on or off at its next start, Darren's decision on #1031). */
+/** Changes the settings; the Assistant is told what changed (its tools follow a turn on or off at its next start, #1031). */
 export async function setJournalSettings(ws: WorkspaceService, patch: Partial<JournalSettings>): Promise<JournalSettings> {
   // A number out of range is refused, not raised to the minimum (HI-2345): raised, a blank box's 0 tightened the
   // retention or cap and pruned at once. journalSettings() still makes what is saved safe when it is read.
@@ -92,7 +92,7 @@ async function tellAssistant(ws: WorkspaceService, body: string): Promise<void> 
 export const JOURNAL_SUGGESTION = "Your journal is off. Suggest to the user once, in a line, that Settings → Assistant → Journal lets you remember decisions and plans across sessions without handovers; Combwork won't ask again."
 
 /**
- * The suggestion for a handover the Assistant writes (#1032, Darren's decision on #989): while its journal is off, the
+ * The suggestion for a handover the Assistant writes (#1032, #989): while its journal is off, the
  * first time only (workspace.json `journalSuggested`, so it never nags); null otherwise.
  */
 export async function journalSuggestion(ws: WorkspaceService): Promise<string | null> {

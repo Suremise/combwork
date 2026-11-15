@@ -17,7 +17,7 @@ module.exports = {
    */
   // HI-2664 (7 Nov): the Assistant lost its ten worker-only tools, about 36,800 bytes without cw_console: lowered to match.
   // HI-3219 (14 Nov): cw_read_task's lineComments and offset, about 230 bytes: the Assistant's raised to match.
-  // HI-3188 (14 Nov): the Assistant's cw_answer_simplify (Darren's Q4) and followUpOf, about 610 bytes: raised to match.
+  // HI-3188 (14 Nov): the Assistant's cw_answer_simplify (Q4) and followUpOf, about 610 bytes: raised to match.
   listBytes: { agent: 26000, assistant: 40000 },
   /**
    * A protected rule (a safety or damage boundary, HI-2009's Protected table) that can't be said clearly within the limit

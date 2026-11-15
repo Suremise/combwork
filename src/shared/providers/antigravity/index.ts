@@ -9,7 +9,7 @@ import { TIPS } from './tips'
 
 /**
  * Google's Antigravity CLI (`agy`), Combwork's fourth provider (HI-2544; the research HI-2448, the runtime facts HI-2543,
- * checked against 1.5.0). Integrated like GitHub Copilot (Darren, 5 Nov): one sign-in for the PC (its Credential Manager
+ * checked against 1.5.0). Integrated like GitHub Copilot: one sign-in for the PC (its Credential Manager
  * entry `gemini:antigravity`), shared by every workspace; connections choose model, effort and mode, never the account.
  * Each agent runs with a private agy profile (its own USERPROFILE: agy reads its home from USERPROFILE alone), which holds
  * Combwork's MCP servers and settings for it and its conversations. Used by both processes.

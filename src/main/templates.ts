@@ -421,8 +421,8 @@ export async function readImport(path: string): Promise<AgentTemplate> {
   } catch {
     throw refusal(msg({ id: 'content.templates.importNotJson', defaultMessage: "It isn't a Combwork agent template (not JSON).", description: "An error importing a template: the file isn't JSON." }))
   }
-  // A 1.0 export whose sections hold 1.0's values (its finish's old value): refused, never converted (HI-2611, Darren's
-  // decision): only a workspace's own templates are upgraded, once (nameUpgradeValues.ts).
+  // A 1.0 export whose sections hold 1.0's values (its finish's old value): refused, never converted (HI-2611):
+  // only a workspace's own templates are upgraded, once (nameUpgradeValues.ts).
   if (upgradedTemplate(raw)) throw refusal(msg({ id: 'content.templates.importFrom10', defaultMessage: "It is an agent template exported from version 1.0, whose workflow settings Combwork doesn't import. Make the template again in Combwork.", description: 'An error importing a template (HI-2611): the file was exported by version 1.0, from before the app was renamed Combwork, and holds workflow settings under their old names.' }))
   const t = readTemplate(raw)
   // agent-text: readTemplate

@@ -2,7 +2,7 @@ import type { InboxItem } from './inbox'
 import type { ForYouItem } from './workflow/workView'
 
 /**
- * What needs you, as one thing each (HI-1931; Darren: "how many things wait for me", one card one thing): each card with
+ * What needs you, as one thing each (HI-1931: how many things wait for the user, one card one thing): each card with
  * open requests once, its requests under it, and each agent stopped in its pane once. An agent stopped on a card already
  * counted (it asked one of the card's requests, or works on it or reviews it) is under that card, not counted again.
  * The status bar's count, the window title's and the taskbar badge's, and the For you popover's rows.

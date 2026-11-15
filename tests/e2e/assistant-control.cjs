@@ -301,7 +301,7 @@ const check = (name, ok, extra = '') => {
   const wasLive = await live(alpha, builderId)
   const unwatched = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'Builder', cards: [o1, o2] })
   check('a lane started with no watch following it: the reply says to watch the lanes', unwatched.status === 200 && /No watch of yours follows this lane/.test(unwatched.body?.note ?? ''), JSON.stringify(unwatched.body))
-  // HI-2232 (Darren's decision (a)): Builder, idle outside slots, is given the lane in a new conversation, as Start Lane… gives it;
+  // HI-2232 (decision (a)): Builder, idle outside slots, is given the lane in a new conversation, as Start Lane… gives it;
   // not free at its launch, it is owed one (HI-2034). Here it isn't free: the user pressed Enter in its terminal above, and the
   // suite's typing pause (600 s, enterEndsPause off) still holds, so its run is left for now and the reply says Combwork gives it the
   // lane once it is free, not to prompt it (HI-2029, HR1: a prompt would race Combwork's start). The reply comes once the lane's launch

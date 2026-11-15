@@ -35,7 +35,7 @@ export const GATE_TEXT: Record<Gate, { name: Msg; why: Msg }> = {
   },
   advance: {
     name: msg({ id: 'git.gate.advance.name', defaultMessage: 'Combwork merging', description: 'What Combwork doesn’t do with jj (HI-2799): merge reviewed work into the target itself (the merge queue’s last step).' }),
-    why: msg({ id: 'git.gate.advance.why', defaultMessage: 'jj can’t move a bookmark safely when others move it too, so you integrate reviewed work yourself.', description: 'Why Combwork doesn’t merge under jj (HI-2799, Darren’s decision A). Keep jj; a bookmark is jj’s named line.' })
+    why: msg({ id: 'git.gate.advance.why', defaultMessage: 'jj can’t move a bookmark safely when others move it too, so you integrate reviewed work yourself.', description: 'Why Combwork doesn’t merge under jj (HI-2799, decision A). Keep jj; a bookmark is jj’s named line.' })
   },
   publish: {
     name: msg({ id: 'git.gate.publish.name', defaultMessage: 'Pushing after a merge', description: 'What Combwork doesn’t do with jj (HI-2799): push the target after merging.' }),

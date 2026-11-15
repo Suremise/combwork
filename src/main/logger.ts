@@ -70,7 +70,7 @@ export const logLimits = { waitingBytes: 8 * 1024 * 1024 }
 
 /**
  * The log's writer thread (logWriter.ts, HI-1730): lines are queued here and written there, in order, so a disk that
- * holds writes up (a System Restore point freezing the profile's drive: 2–8 s in Darren's log) holds that thread, never
+ * holds writes up (a System Restore point freezing the profile's drive: 2–8 s in the maintainer's log) holds that thread, never
  * main. Written here instead, at once, as before: without the writer's script (unit tests), once it has gone, and from
  * the process's exit on, when what is still queued is written here too (flushLogs), so the last lines aren't lost.
  */

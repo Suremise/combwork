@@ -153,7 +153,7 @@ export const PLATFORMS: Record<PlatformId, PlatformDescriptor> = {
   // Initialise repository is on Git's page (HI-1905), gated by Git's operations.
   none: { id: 'none', name: 'None', ownedWorkspaces: false, detectionSteady: false, capabilities: ['revisions', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'accept', deliverables: 'paths', finishes: ['accept'], defaultFinish: 'accept', repository: false, defaultTarget: false, operations: [], revisionShort: short, gates: [] }, // i18n-ignore: a product name, the same in every language
   // jj (HI-2799, J6; SPEC §16.3.6): workspaces for isolation (J2), pinned history and attribution (J3). No merge queue:
-  // a passed card's candidate is integrated by the adapter's advance (HI-3235, Darren's decision of 14 Nov, its residual
+  // a passed card's candidate is integrated by the adapter's advance (HI-3235, its residual
   // races documented) or by the user, and no operation in the window (R5.2). Every other gate stays closed until its J
   // card's evidence opens it.
   // Its workspaces are its own commands' records (HI-2795, HI-2866), and its agents get the jj rule (HI-2800): `jj`, or

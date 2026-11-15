@@ -115,15 +115,15 @@ export const JOURNAL_TOOLS = ['cw_journal_write', 'cw_journal_recall', 'cw_journ
 export const AGENT_ONLY_TOOLS = ['cw_merge_slot', 'cw_start_card', 'cw_ask_assistant']
 
 /**
- * Worker-only tools (HI-2664, Darren's approval of s13): a builder's or reviewer's moves on a card it works on, which the
+ * Worker-only tools (HI-2664, s13 approved): a builder's or reviewer's moves on a card it works on, which the
  * Assistant (it coordinates cards, never builds, reviews or merges them) is never offered. Its own way to move a card
  * past its rules on the user's answer is cw_update_task, which stays; cw_ask_user, an intent it uses, stays too.
  */
 export const WORKER_ONLY_TOOLS: readonly string[] = [...INTENT_TOOLS.filter((t) => t !== 'cw_ask_user'), 'cw_focused_skip']
 
 /**
- * A project agent's tools by its side of the workflow (HI-2664, Darren 7 Nov: "Approve HI-2664 … role filtering in this
- * card"): a builder is never offered a reviewer's moves, nor a reviewer a builder's; an agent on both sides (`either`)
+ * A project agent's tools by its side of the workflow (HI-2664: role filtering): a builder is never offered a
+ * reviewer's moves, nor a reviewer a builder's; an agent on both sides (`either`)
  * or neither (a generalist, an Independent agent) gets both. The side is its saved role's alone (HR3's round 1: a lane
  * never narrows an either-role agent, nor gives a role the other side's tools; a lane's builder builds and its reviewer
  * reviews, as lanes.ts checks), fixed for the session: a role change restarts it (sessions.ts).
@@ -156,8 +156,8 @@ export interface WorkflowToolOptions {
 }
 
 /**
- * A project agent's tools its project's workflow makes unusable (HI-2694, Darren 7 Nov: launch-only, "agents shouldn't see
- * tools they can never use"): each with when it can be used, read off its handler's own refusals (runtime.ts), so a tool
+ * A project agent's tools its project's workflow makes unusable (HI-2694: launch-only, so agents
+ * never see tools they can never use): each with when it can be used, read off its handler's own refusals (runtime.ts), so a tool
  * is hidden only where every operation of it is refused. A tool not listed is never hidden for the workflow: one of its
  * operations works under any options (cw_queue's list, cw_loop_step with a lane's reviewer, cw_request_builder,
  * cw_declare_paths, cw_merge_slot, cw_lane, the builder's moves).
@@ -243,7 +243,7 @@ export function assistantTools(level: AssistantControlLevel | string | undefined
 }
 
 /**
- * The name agents see Combwork's own MCP server by (HI-2463, Darren's decision): `mcp__combwork__cw_inbox` in Claude
+ * The name agents see Combwork's own MCP server by (HI-2463): `mcp__combwork__cw_inbox` in Claude
  * Code, `combwork-cw_inbox` in Copilot, `[mcp_servers.combwork]` in Codex. Reserved: no workspace server may take it.
  */
 export const TOOLS_SERVER = 'combwork'

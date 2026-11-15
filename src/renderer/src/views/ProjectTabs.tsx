@@ -1492,7 +1492,7 @@ export function ProjectSkillsTab({ project }: { project: ProjectInfo }) {
   const shown = providers.find((p) => p.id === remembered) ?? providers.find((p) => p.id === fallback) ?? providers[0]
   const showProvider = (id: ProviderId): void => rememberProjectPref('skillsProvider', key, id)
   // Combwork skills (the workspace's, the same in every project) start open at the top; the provider's skills folded under
-  // the dropdown. Opening or folding either is remembered for the project (Darren, 5 Oct).
+  // the dropdown. Opening or folding either is remembered for the project.
   const fold = useStore((s) => s.skillsFold[key])
   const combworkOpen = fold?.combwork ?? true
   const providerOpen = fold?.provider ?? false

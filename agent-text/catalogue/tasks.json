@@ -396,7 +396,7 @@
   },
   "tasks.error.targetHasWork": {
     "text": "{unknown, select, yes {Combwork can’t tell whether {card} has work on its branch, so its Merges into stays as it is.} other {{card} has work on its branch made from {target}, so it keeps merging there. To move it, make a new card for it on the other branch and copy the change.}}",
-    "note": "HI-2556: an error changing a card’s Merges into once its branch has work of its own (Darren: no rebase of started work). {card} is the card’s key (HI-12), {target} the branch its work was made from. unknown yes: git couldn’t say. Keep the select keys.",
+    "note": "HI-2556: an error changing a card’s Merges into once its branch has work of its own (no rebase of started work). {card} is the card’s key (HI-12), {target} the branch its work was made from. unknown yes: git couldn’t say. Keep the select keys.",
     "audience": "both"
   },
   "tasks.error.targetLane": {

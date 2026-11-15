@@ -91,7 +91,7 @@ const heads = () => git(fx.alpha, 'for-each-ref', '--format=%(refname)', 'refs/h
     await doneByUser(B.n, 'Merged by hand')
     await doneByUser(E.n, 'Set aside')
     // Their slots, free now, keep each line checked out (so in use: a worktree's) until the pool lends them again; the
-    // next card's start moves each off it, as here (Darren's leftovers had no worktree left).
+    // next card's start moves each off it, as here (the user's leftovers had no worktree left).
     for (const x of [A, B, E]) git(x.folder, 'checkout', '-q', '--detach')
     q.mergeOn(fx, 'integration', git(fx.alpha, 'rev-parse', `refs/heads/${B.line}`), 'Merge B by hand')
     // A tag named as B's line (HR1's round 1: never `heads/…`).

@@ -1,8 +1,8 @@
 import { msg } from '../shared/i18n'
 
 /**
- * What a notification says once its buttons' action is done or no longer applies (HI-2320, Darren: "once the action is
- * done or no longer needed it goes, and the entry says what happened"): shown in place of its buttons, in its pop-up and
+ * What a notification says once its buttons' action is done or no longer applies (HI-2320: once the action is
+ * done or no longer needed it goes, and the entry says what happened): shown in place of its buttons, in its pop-up and
  * its row under the bell. Short, in the language Combwork shows.
  */
 export const OUTCOME = {

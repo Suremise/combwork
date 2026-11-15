@@ -84,13 +84,13 @@ describe('what an agent watch counts', () => {
 
   it("names the user in the Assistant's reply lines (#426): Settings → General → Your name, else User", () => {
     const reply = [{ agentName: 'B1', cards: [7], text: 'C, the demo cell' }]
-    expect(cardWakeLine([], reply, [], 'Darren').line).toBe('[CW] Darren replied to B1 on #7: "C, the demo cell". Your card watch has ended: carry on (cw_read_task for the card, cw_agent_activity for the agent).')
+    expect(cardWakeLine([], reply, [], 'Sam').line).toBe('[CW] Sam replied to B1 on #7: "C, the demo cell". Your card watch has ended: carry on (cw_read_task for the card, cw_agent_activity for the agent).')
     expect(cardWakeLine([], reply).line).toMatch(/^\[CW\] User replied to B1 on #7/)
     const now = nowOf()
-    expect(agentWakeLine([{ agent: { projectPath: 'C:/ws/demo', agentId: 'b1', name: 'B1', project: 'demo' }, event: null, now, reply: 'Ship it' }], 'Darren')).toBe('[CW] Darren replied to B1 (demo): "Ship it". Your agent watch has ended: carry on (cw_agent_activity for more).')
+    expect(agentWakeLine([{ agent: { projectPath: 'C:/ws/demo', agentId: 'b1', name: 'B1', project: 'demo' }, event: null, now, reply: 'Ship it' }], 'Sam')).toBe('[CW] Sam replied to B1 (demo): "Ship it". Your agent watch has ended: carry on (cw_agent_activity for more).')
     expect(agentWakeLine([{ agent: { projectPath: 'C:/ws/demo', agentId: 'b1', name: 'B1', project: 'demo' }, event: null, now, reply: 'Ship it' }])).toMatch(/^\[CW\] User replied to B1 \(demo\)/)
     // Whatever was typed in the setting: one line, a few words; empty or blank is User.
-    expect(userNameOf('  Darren  ')).toBe('Darren')
+    expect(userNameOf('  Sam  ')).toBe('Sam')
     expect(userNameOf('Dar\nren\t M')).toBe('Dar ren M')
     expect(userNameOf('')).toBe('User')
     expect(userNameOf('   ')).toBe('User')
@@ -487,14 +487,14 @@ describe('agent watches (main/watches.ts)', async () => {
     // The Assistant's agent watch on Reviewer (working) hears it too, naming the user as Settings → General → Your name says.
     assistant.status = 'watching'
     await watches.registerAgentWatch(w, home, 'assistant', { agents: [reviewer(alpha)], ignoreBackground: false })
-    config.settings.general.userName = 'Darren'
+    config.settings.general.userName = 'Sam'
     try {
       watches.noteUserReply(alpha, 'a2', 'Reviewer', 'Ship it')
       await vi.waitFor(() => expect(assistant.told).toHaveLength(3), { timeout: HUNG_MS })
     } finally {
       config.settings.general.userName = 'User'
     }
-    expect(assistant.told[2]).toBe('[CW] Darren replied to Reviewer (alpha): "Ship it". Your agent watch has ended: carry on (cw_agent_activity for more).')
+    expect(assistant.told[2]).toBe('[CW] Sam replied to Reviewer (alpha): "Ship it". Your agent watch has ended: carry on (cw_agent_activity for more).')
     // With the setting off, nothing is kept or told.
     assistant.status = 'watching'
     config.settings.assistant.tellReplies = false

@@ -1,6 +1,6 @@
 // HI-3235 (HI-2840/s30, s34; HI-3235/s10–s16): jj's target advance (src/main/platform/jjAdvance.ts) on the real jj
 // Combwork is tested with, through J0's runner: every base refusal, every detection after the move, the residual races
-// Darren accepted shown for what they are, the recovery of a crash at each step, and the undo with a crash after each of
+// the user accepted shown for what they are, the recovery of a crash at each step, and the undo with a crash after each of
 // its commands. Each race is deterministic: a racer runs from the advance's hook between two named steps (or between two
 // of the observation's reads), never by timing. Every case asserts the one safety claim: `advanced` only with T at R in
 // jj, jj's record of Git and Git. J1's probe cases (HI-2794) carried over, under the protocol's stricter lineage: any

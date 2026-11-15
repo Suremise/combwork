@@ -174,7 +174,7 @@ const check = (name, ok, extra = '') => {
   check('it waits on a long background task of its own', timer.status === 200 && !!timing, JSON.stringify(timer.body))
   const rang = doorbells().length
   const t1 = Date.now()
-  const left = await api('POST', '/v1/projects/alpha/agents/Tester/message', { text: 'Darren pushed the tag: carry on with the release.' })
+  const left = await api('POST', '/v1/projects/alpha/agents/Tester/message', { text: 'Sam pushed the tag: carry on with the release.' })
   const heard = await until(async () => doorbells().length > rang, HUNG_MS)
   const during = await live(alpha, id)
   check('a message rings its doorbell within seconds while the task runs', left.status === 200 && !!heard && Date.now() - t1 < 15000 && during?.backgroundTasks === 1, JSON.stringify({ left: left.body, ms: Date.now() - t1, tasks: during?.backgroundTasks }))

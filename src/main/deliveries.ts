@@ -75,7 +75,7 @@ import { saidError } from './combworkError'
  * before it was read, is uncertain: it may not have reached the agent, so it is offered once more, saying it may repeat,
  * and stays uncertain (shown) if that one isn't received either.
  *
- * **No inbox** (Darren's decision on #650): an agent that can't read an inbox (`readsInbox`: a project agent while the
+ * **No inbox** (#650): an agent that can't read an inbox (`readsInbox`: a project agent while the
  * Agent API or its combwork server is off) is given no delivery, and its bodies are never typed instead: each is refused with
  * the reason its sender sees (`noInbox`: made, NoInbox; one already waiting, refused when next looked at). Only the
  * user's own action, a task they give it from Combwork (Start), is typed as their input, as their typing in its pane is: no

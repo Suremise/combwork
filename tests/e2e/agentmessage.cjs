@@ -104,11 +104,11 @@ const check = (name, ok, extra = '') => {
   check('the reviewer watches the card', !!(await until(async () => (await live(alpha, reviewer.id))?.status === 'watching', 15000)))
   const prompted = tool('cw_prompt_agent', { project: 'alpha', agent: 'Reviewer', text: 'Review the card' })
   check('cw_prompt_agent refuses a watching agent and points to cw_message_agent', prompted.isError && /cw_message_agent/.test(prompted.text), prompted.text)
-  const sent = tool('cw_message_agent', { project: 'alpha', agent: 'Reviewer', text: `Darren answered #${c1}: review it when it returns.` })
+  const sent = tool('cw_message_agent', { project: 'alpha', agent: 'Reviewer', text: `Sam answered #${c1}: review it when it returns.` })
   check('a message to a watching agent is told at once, with its id', !sent.isError && sent.text === 'Told Reviewer now (m1): it reads it with cw_inbox; its watch carries on.', sent.text)
   // Its doorbell (#650): the id, never the text, and that its watch carries on; it reads the message with cw_inbox.
   check('…its doorbell names it and says its watch carries on', !!(await until(async () => bells('Reviewer').some((t) => t.startsWith(`[CW] New in your inbox: 1 message (m1). Call cw_inbox to read it, act on it, then ack it. (Your watch is still on, waiting for #${c1} → Review:`)), 15000)), JSON.stringify(bells('Reviewer')))
-  check('…and the reviewer reads it in its inbox', wakes('Reviewer').includes(`Darren answered #${c1}: review it when it returns.`) && !bells('Reviewer').some((t) => t.includes('Darren answered')), JSON.stringify(wakes('Reviewer')))
+  check('…and the reviewer reads it in its inbox', wakes('Reviewer').includes(`Sam answered #${c1}: review it when it returns.`) && !bells('Reviewer').some((t) => t.includes('Sam answered')), JSON.stringify(wakes('Reviewer')))
   check('…and is watching the card again after it', !!(await until(async () => (await live(alpha, reviewer.id))?.status === 'watching' && (await live(alpha, reviewer.id))?.watch?.cards?.[0] === c1, 15000)))
   await inv('tasks:update', c1, { column: 'review' })
   check('…so the card arriving in Review still wakes it', !!(await until(async () => wakes('Reviewer').some((t) => t.startsWith(`[CW] #${c1} (Builder's card) is in Review`)), 20000)), JSON.stringify(wakes('Reviewer')))

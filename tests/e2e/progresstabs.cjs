@@ -430,7 +430,7 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     await app.close().catch(() => undefined)
   }
 
-  // --- HI-1701: Today by card. A third launch with a busy Today kept, like Darren's (26 Oct): a heading per card, the
+  // --- HI-1701: Today by card. A third launch with a busy Today kept, like the user's: a heading per card, the
   // card with the newest run first and Other last; every card's runs shown, none folded (HI-1925: a line per run, only
   // its details folded); a line per run (who, what, how long), the card's key not repeated, review copies' names only in the
   // hover, retries folded with a failure-aware icon and the merge queue's checks in one line; the filters filter runs

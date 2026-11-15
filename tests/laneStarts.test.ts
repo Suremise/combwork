@@ -593,7 +593,7 @@ describe("Combwork starts a lane's next card (HI-1990)", () => {
       expect(await columnOf(x1)).toBe('doing')
     })
 
-    it("a lane ended, replaced or changed between the put back and the edit: the edit is refused, the newer decision kept, nothing resumed or recreated (Darren's decision)", async () => {
+    it("a lane ended, replaced or changed between the put back and the edit: the edit is refused, the newer decision kept, nothing resumed or recreated", async () => {
       // Ended (abandoned) in between: no lane runs for its builder afterwards; the put back stays, and says so.
       const { cards: [a1, a2], lane: ended } = await inFlight('d3', ['E one', 'E two'])
       const end = await afterPutBack(async () => {

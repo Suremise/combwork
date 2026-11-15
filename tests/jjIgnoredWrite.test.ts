@@ -160,7 +160,7 @@ describe.skipIf(!jjExe)('HI-3121: a jj builder’s check in its slot that writes
       ).toMatchObject({ whyNot: 'changed', why: decides })
       rmSync(join(root, 'src', '__pycache__'), { recursive: true })
       // HR2's round 2: a file named `out` (the rule is `out/`, folders only) made where out/ was, read as a file by the
-      // watch before it's deleted and out/ made again. (Gone before it's read: the residual, Darren's r36.)
+      // watch before it's deleted and out/ made again. (Gone before it's read: the residual, r36.)
       expect(
         await run(async (start) => {
           rmSync(join(root, 'out'), { recursive: true, force: true })

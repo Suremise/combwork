@@ -225,7 +225,7 @@ const check = (name, ok, extra = '') => {
     await shots('checking')
     fs.writeFileSync(trustGo, '')
     check('…then Set up by itself: the workspace folder’s trust covers it, no new answer', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
-    // A project with no agent on Claude Code doesn't count (HI-1871, Darren): no read for it, nothing pending.
+    // A project with no agent on Claude Code doesn't count (HI-1871): no read for it, nothing pending.
     fs.mkdirSync(path.join(ws1, 'delta'), { recursive: true })
     await inv('workspace:refresh')
     check('a project with no agent on this CLI isn’t counted', (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1 && JSON.stringify(await trustOf(inv, personal.id)) === JSON.stringify({ pending: [], unknown: false }))
@@ -340,7 +340,7 @@ const check = (name, ok, extra = '') => {
     await p2.waitForLoadState('domcontentloaded')
     await lib.appReady(p2)
     await lib.openWorkspace(invOn(p2), p2, ws2)
-    // A new workspace starts with none on (HI-2650, Darren 6 Nov: nothing is turned on by itself); turned on there by hand.
+    // A new workspace starts with none on (HI-2650: nothing is turned on by itself); turned on there by hand.
     check('a new workspace starts with none on (HI-2650)', wsJson(ws2) === undefined, JSON.stringify(wsJson(ws2)))
     await invOn(p2)('connections:setOn', personal.id, true)
     check('…Personal turned on there', !!(await lib.until(async () => JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [personal.id] } }), HUNG_MS)), JSON.stringify(wsJson(ws2)))

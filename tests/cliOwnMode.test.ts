@@ -1,4 +1,4 @@
-// "The CLI's own setting" (#1284, #966 row 1, Darren's decision on #1120 point 3): a permission choice every provider
+// "The CLI's own setting" (#1284, #966 row 1, the decision on #1120 point 3): a permission choice every provider
 // offers, where Combwork passes no mode flag. The session keeps saying so (never a mode guessed or read off the CLI), no mode
 // switches live to or from it, and the Combwork Assistant is never offered it.
 import { mkdirSync, rmSync, writeFileSync } from 'fs'

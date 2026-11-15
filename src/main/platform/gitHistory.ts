@@ -69,7 +69,7 @@ export const gitHistory: HistoryPort = {
   candidateKey: (repo, base, head) => G.candidateKey(repo, base, head),
   sameChange: (repo, a, b) => G.sameChange(repo, a, b),
   contains: (repo, target, c, at) => G.contains(repo, target, c, at),
-  // HI-3041 (Darren's 2b): follow mode's reconciler, telling a local target merely behind a published result from one
+  // HI-3041 (2b): follow mode's reconciler, telling a local target merely behind a published result from one
   // whose result the remote no longer has either.
   async remoteHas(repo, target, revision) {
     const head = await remoteHeadOf(repo, target)

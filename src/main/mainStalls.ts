@@ -77,8 +77,8 @@ const labelOf = (w: Work): string => (typeof w.label === 'string' ? w.label : w.
 
 /**
  * The work that overlapped [from, to] (with `held`, found earlier), the most overlap first, however long it has run (a
- * handler can wake from an await, block, and await again), but for the requests that wait by design (Darren's choice,
- * 20 Oct: the line is evidence to read, not a verdict). Synchronous steps come first (HR6's round 1 of HI-1692): one held
+ * handler can wake from an await, block, and await again), but for the requests that wait by design (the
+ * line is evidence to read, not a verdict). Synchronous steps come first (HR6's round 1 of HI-1692): one held
  * the thread itself, and the calls overlapping it, often many, may only have waited behind it, so it is never left among
  * the ones counted.
  */

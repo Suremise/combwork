@@ -165,7 +165,7 @@
   },
   "jj.integrate.noMerge": {
     "defaultMessage": "Combwork doesn’t merge under jj: integrate the reviewed work with jj yourself.",
-    "description": "A note under jj’s “Waiting for you to integrate” (HI-2799, Darren’s decision A). Keep jj."
+    "description": "A note under jj’s “Waiting for you to integrate” (HI-2799, decision A). Keep jj."
   },
   "jj.integrate.none": {
     "defaultMessage": "No card is waiting.",

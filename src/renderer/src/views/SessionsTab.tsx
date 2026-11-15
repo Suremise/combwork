@@ -1325,7 +1325,7 @@ const exitCodeText = (code: number): string => tr(msg({ id: 'sessions.tool.exitC
 const callKind = (c: TranscriptTool): string => (c.name.includes(' · ') ? `mcp:${c.name.split(' · ')[0]}` : c.name === 'Shell' ? 'command' : c.name === 'Edit' ? 'edit' : c.name === 'view_image' ? 'image' : 'other')
 
 /**
- * A Codex script's calls in a line (HI-2240, Darren's decision): how many of each kind, in the order they first came
+ * A Codex script's calls in a line (HI-2240): how many of each kind, in the order they first came
  * ("3 combwork calls, 1 command, 2 edits"), and how many failed.
  */
 function callsSummary(calls: TranscriptTool[]): string {

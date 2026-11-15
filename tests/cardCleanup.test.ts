@@ -1,11 +1,11 @@
-// Archived cards' attachments cleaned up (HI-1842, Darren's decisions of 27 Oct 2026), on the real board (a temp combwork.db):
+// Archived cards' attachments cleaned up (HI-1842), on the real board (a temp combwork.db):
 // only archived cards, the project's days after archiving (30 by default, Never keeps them); open and Done cards keep theirs,
 // as do cards brought back from the archive, or archived with their hidden or removed project. Round 2 (HR5's review): a
 // plan and an apply that checks it again in each card's change: only planned files
 // still the same on disk, in a folder of the project's own (never through a junction), of a card still archived in the
 // planned project and due under the project's setting now; a plan kept for Clean Up Now is used once, within its
 // workspace's lifetime; the plan's candidates leave out cards that can never be due; the automatic run waits for an idle PC.
-// Round 3 (no worker, Darren's decision): a project hidden or removed since the plan keeps its cards' files; one listener
+// Round 3 (no worker, as decided): a project hidden or removed since the plan keeps its cards' files; one listener
 // per workspace lifetime, however many previews and queueings.
 import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { getEventListeners } from 'events'

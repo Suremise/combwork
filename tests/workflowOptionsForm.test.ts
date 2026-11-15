@@ -109,7 +109,7 @@ describe("P4's and P5's presets (#1278, #1355, §16.19.1)", () => {
     expect(preset('git', 'pair')).toMatchObject({ preChecks: [], mergeChecks: [], commands: {} })
   })
 
-  it("Team is Darren's (#1361, point 1 on #1121): as Pair, with quick checks + unit tests before review and on the merged result, installed from scratch every time, your OK for ui and release", () => {
+  it("Team is #1361's (point 1 on #1121): as Pair, with quick checks + unit tests before review and on the merged result, installed from scratch every time, your OK for ui and release", () => {
     const inputs = { quick: ['typecheck', 'lint'], tests: ['test'], commands: { typecheck: 'npm run typecheck', lint: 'npm run lint', test: 'npm test' }, identity: { name: 'Pat', email: 'p@e' }, target: 'trunk' }
     const t = preset('git', 'team', inputs)
     const { platform: _p, ...pair } = preset('git', 'pair', inputs)

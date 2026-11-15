@@ -823,7 +823,7 @@ describe('more checks follow the 1.0 workflow (HI-2239): what the skills prescri
     expect(two([call('cw_report_merge', { card: 'AL-2' })], 'passed')).toBe(false)
   })
 
-  describe("coordinator-fact-before-asking: Combwork's recorded reads and an exact Read count; a shell lookup is neither credited nor blamed (Darren's decision)", () => {
+  describe("coordinator-fact-before-asking: Combwork's recorded reads and an exact Read count; a shell lookup is neither credited nor blamed", () => {
     const LOOKED = 'looked the card or its doc up (cw_read_task, cw_read_section or a detailed listing of alpha, or a Read of the doc)'
     const STARTED = 'started Coder on the card'
     const DOC = "# Deploying alpha\n\n## Staging\n\nRun `npm run deploy:staging`. The host is staging.example.com; the build needs `ALPHA_ENV=staging`."

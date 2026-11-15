@@ -744,7 +744,7 @@ export function ProjectView({ visible }: { visible: boolean }) {
 }
 
 /**
- * Asks for a connection (HI-1755, Darren's 1a): in a project whose agents' CLI has connections but none is on in its
+ * Asks for a connection (HI-1755, 1a): in a project whose agents' CLI has connections but none is on in its
  * workspace, nothing of that CLI starts (it never falls back to the CLI's own login): Add a Connection opens Settings →
  * Connections. Not asked for a test copy on its CLI test home.
  */
