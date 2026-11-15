@@ -1007,7 +1007,8 @@ describe("HI-3177: purging a past branch's merge queue history", () => {
     const locked = wf.locked.bind(wf)
     const spy = vi.spyOn(wf, 'locked').mockImplementation(((fn: () => unknown) => {
       const out = locked(fn)
-      if (new Error().stack?.includes('purgeQueueHistory')) purgeWaits()
+      // By the function's own name, so a rename keeps it (the purge, blocked behind the held write, would never end).
+      if (new Error().stack?.includes(controls.purgeQueueHistory.name)) purgeWaits()
       return out
     }) as typeof wf.locked)
     // The board held; once the purge waits for it, 1.1.0 becomes one of the project's targets in the held write, which
