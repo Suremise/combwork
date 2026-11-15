@@ -15,7 +15,7 @@ import { OPEN_WORKFLOW_OPTIONS } from '@shared/defaults'
 import { loadedMaxAgents } from '@shared/workflow/templateOptions'
 
 /**
- * The Load template dialog's plan with its agents' names to choose (#702, Darren's decision of 12 Oct; #1440): beside
+ * The Load template dialog's plan with its agents' names to choose (#702; #1440): beside
  * each of the template's names (made with this project's key, a reference never changed) a box for the name the agent
  * will get. A name another project's agent has, or one used twice, starts as a free one (`suggestTemplateAgentName`:
  * the other project's key swapped for this one's, else suggestAgentName's), so loading is one click; any name can be
@@ -77,7 +77,7 @@ export function TemplateLoadNames({ path, scope, file, from, initial, onChange, 
   // Its workflow applied, unless unticked (HI-1910).
   const [apply, setApply] = useState(true)
   useEffect(() => onWorkflow?.(apply), [apply, onWorkflow])
-  // Maximum agents (HI-2058, Darren's decisions): its workflow applied, the template's own is saved with its agents (main
+  // Maximum agents (HI-2058): its workflow applied, the template's own is saved with its agents (main
   // works it out again under the project's lock); without it, more agents than the project's maximum can't be loaded.
   const now = useAgentLimit(project)
   const section = apply ? (plan.workflow?.section ?? null) : null

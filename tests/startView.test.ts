@@ -41,19 +41,19 @@ describe('the state view as text', () => {
         source: 'compact',
         counts: [{ project: 'alpha', columns: { doing: 1, review: 1, todo: 4, done: 9 } }],
         active: [card(12, { title: 'Friendlier greeting' }), card(13, { column: 'review', agent: 'B2', reviewer: 'R1' })],
-        blocked: [card(14, { column: 'todo', agent: null, blocked: 'Which greeting does Darren want?' })],
+        blocked: [card(14, { column: 'todo', agent: null, blocked: 'Which greeting does Sam want?' })],
         lanes: [{ project: 'alpha', builder: 'B1', reviewer: 'R1', current: 12, state: 'active', pausedOn: null }],
         agents: [{ project: 'alpha', name: 'B1', status: 'working' }, { project: 'alpha', name: 'B3', status: 'waiting', asking: 'Allow Bash?' }],
-        journal: { decisions: [entry(5, { summary: 'Darren: "Welcome back!" is the greeting', importance: 2 })], incidents: [entry(6, { kind: 'incident', summary: 'Merge of #10 failed its lint' })], onCards: [entry(7, { kind: 'plan', summary: 'Start #15 once #12 is Done' })], digestDue: '2026-W41' }
+        journal: { decisions: [entry(5, { summary: 'Sam: "Welcome back!" is the greeting', importance: 2 })], incidents: [entry(6, { kind: 'incident', summary: 'Merge of #10 failed its lint' })], onCards: [entry(7, { kind: 'plan', summary: 'Start #15 once #12 is Done' })], digestDue: '2026-W41' }
       })
     )
     expect(v.split('\n')[0]).toMatch(/^\[CW\] Where things stand, after a compaction \(2026-10-18 12:00 UTC\).*Check the live state before acting on it\.$/)
-    expect(v).toContain('Waiting on the user:\n- #14 (alpha, Todo) blocked: Which greeting does Darren want?\n- B3 (alpha) waits for the user: Allow Bash?')
+    expect(v).toContain('Waiting on the user:\n- #14 (alpha, Todo) blocked: Which greeting does Sam want?\n- B3 (alpha) waits for the user: Allow Bash?')
     expect(v).toContain('Cards in Doing and Review:\n- #12 Doing · alpha · B1: Friendlier greeting\n- #13 Review · alpha · B2, reviewed by R1: Card 13')
     expect(v).toContain('Lanes running:\n- B1/R1 (alpha): on #12, active')
     expect(v).toContain('Agents running:\n- alpha: B1 working, B3 waiting')
     expect(v).toContain('Board:\n- alpha: 1 Doing, 1 Review, 4 Todo')
-    expect(v).toContain('Journal: recent decisions and plans:\n- #5 2026-10-15 decision (alpha) !: Darren: "Welcome back!" is the greeting')
+    expect(v).toContain('Journal: recent decisions and plans:\n- #5 2026-10-15 decision (alpha) !: Sam: "Welcome back!" is the greeting')
     expect(v).toContain('Journal: on the cards in hand:\n- #7 2026-10-15 plan (alpha): Start #15 once #12 is Done')
     expect(v).toContain('Journal: recent incidents:\n- #6 2026-10-15 incident (alpha): Merge of #10 failed its lint')
     expect(v).toContain('2026-W41 has entries but no digest: write one (kind digest, digestOf "2026-W41"; the journal skill).')
@@ -97,12 +97,12 @@ describe('the state view as text', () => {
         counts: [{ project: 'alpha', columns: { doing: 1, todo: 100 } }],
         active: [card(1, { title: 'The one in hand' })],
         blocked: Array.from({ length: 100 }, (_, i) => card(100 + i, { column: 'todo', agent: null, blocked: reason })),
-        journal: { decisions: [entry(5, { summary: 'Darren: "Welcome back!" is the greeting', importance: 2 })], incidents: [], onCards: [], digestDue: '2026-W41' }
+        journal: { decisions: [entry(5, { summary: 'Sam: "Welcome back!" is the greeting', importance: 2 })], incidents: [], onCards: [], digestDue: '2026-W41' }
       })
     )
     expect(utf8Bytes(v)).toBeLessThanOrEqual(START_VIEW_MAX_BYTES)
     expect(v).toContain('- #1 Doing · alpha · B1: The one in hand')
-    expect(v).toContain('Darren: "Welcome back!" is the greeting')
+    expect(v).toContain('Sam: "Welcome back!" is the greeting')
     expect(v).toContain('2026-W41 has entries but no digest')
     expect(v).toContain('Board:\n- alpha: 1 Doing, 100 Todo')
     // The crowded section still gets what is left, and says how many it left out.
@@ -145,8 +145,8 @@ describe('the state view as text', () => {
     const at = (day: number): string => `2026-10-${String(day).padStart(2, '0')}T09:00:00Z`
     const after = Array.from({ length: 55 }, (_, i) => card(100 + i, { column: 'hold', agent: null, blocked: 'After 0.9.0: needs the new board first', updatedAt: at(1 + (i % 17)) }))
     const decide = [
-      card(300, { column: 'hold', agent: null, blocked: 'Darren to decide the layout', updatedAt: at(3) }),
-      card(301, { column: 'hold', agent: null, blocked: 'Discuss with Darren before building', updatedAt: at(16) }),
+      card(300, { column: 'hold', agent: null, blocked: 'Sam to decide the layout', updatedAt: at(3) }),
+      card(301, { column: 'hold', agent: null, blocked: 'Discuss with Sam before building', updatedAt: at(16) }),
       card(302, { column: 'hold', agent: null, blocked: 'Which provider first?', updatedAt: at(10) }),
       card(303, { column: 'hold', agent: null, blocked: 'Waits for the user', labels: ['design'], updatedAt: at(12) })
     ]
@@ -166,10 +166,10 @@ describe('the state view as text', () => {
     expect(section.slice(0, 6)).toEqual([
       '- B3 (alpha) waits for the user: Allow Bash?',
       '- #400 (alpha, Review, B1) blocked: Last round failed: carry on?',
-      '- #301 (alpha, On hold) blocked: Discuss with Darren before building',
+      '- #301 (alpha, On hold) blocked: Discuss with Sam before building',
       '- #303 (alpha, On hold) blocked: Waits for the user',
       '- #302 (alpha, On hold) blocked: Which provider first?',
-      '- #300 (alpha, On hold) blocked: Darren to decide the layout'
+      '- #300 (alpha, On hold) blocked: Sam to decide the layout'
     ])
     expect(section.slice(6, 10).every((l) => l.includes('After 0.9.0'))).toBe(true)
     const shownDates = section.slice(6, 10).map((l) => after.find((c) => l.startsWith(`- #${c.number} `))!.updatedAt)
@@ -183,7 +183,7 @@ describe('the state view as text', () => {
   it('keeps a small list as it was, in its order, up to the cap (#1078 round 1)', () => {
     const blocked = [
       card(20, { column: 'hold', agent: null, blocked: 'After 0.9.0', updatedAt: '2026-10-01T00:00:00Z' }),
-      card(21, { column: 'hold', agent: null, blocked: 'Darren to decide', updatedAt: '2026-10-17T00:00:00Z' }),
+      card(21, { column: 'hold', agent: null, blocked: 'Sam to decide', updatedAt: '2026-10-17T00:00:00Z' }),
       ...Array.from({ length: 7 }, (_, i) => card(30 + i, { column: 'todo', agent: null, blocked: 'Which one?' }))
     ]
     const v = startView(empty({ blocked, agents: [{ project: 'alpha', name: 'B3', status: 'waiting', asking: 'Allow Bash?' }] }))
@@ -245,7 +245,7 @@ describe('the state view in a workspace', () => {
     cards.doing = (await run(() => tasks.createTask({ title: 'Friendlier greeting', project: 'alpha', column: 'doing', agent: 'B1' }, user))).number
     cards.review = (await run(() => tasks.createTask({ title: 'Faster tests', project: 'alpha' }, user))).number
     await run(() => tasks.updateTask(cards.review, { column: 'review' }, user))
-    cards.blocked = (await run(() => tasks.createTask({ title: 'Pick a colour', project: 'alpha', blocked: 'Which colour does Darren want?' }, user))).number
+    cards.blocked = (await run(() => tasks.createTask({ title: 'Pick a colour', project: 'alpha', blocked: 'Which colour does Sam want?' }, user))).number
     cards.done = (await run(() => tasks.createTask({ title: 'Old work', project: 'alpha' }, user))).number
     await run(() => tasks.updateTask(cards.done, { column: 'done' }, user))
     await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [cards.doing], by: 'B1' })
@@ -257,16 +257,16 @@ describe('the state view in a workspace', () => {
 
   it('gives the board, lanes, agents and the journal entries relevant now', async () => {
     const now = new Date()
-    const decision = write('decision', 'Darren: the greeting is "Welcome back!"', { importance: 2, links: [{ type: 'card', ref: String(cards.doing) }] })
+    const decision = write('decision', 'Sam: the greeting is "Welcome back!"', { importance: 2, links: [{ type: 'card', ref: String(cards.doing) }] })
     backdate(decision, new Date(now.getTime() - 6 * DAY))
     const old = write('decision', 'A decision from last month')
     backdate(old, new Date(now.getTime() - 30 * DAY))
     write('incident', 'The merge of #3 failed its lint')
     const onCard = write('insight', 'Faster tests: the slow one is the e2e build', { links: [{ type: 'card', ref: String(cards.review) }] })
-    write('preference', 'Darren likes short replies')
+    write('preference', 'Sam likes short replies')
     const v = (await run(() => assistantStartView(w, live, 'compact', now)))!
     expect(v).toMatch(/after a compaction/)
-    expect(v).toContain(`- #${cards.blocked} (alpha, Todo) blocked: Which colour does Darren want?`)
+    expect(v).toContain(`- #${cards.blocked} (alpha, Todo) blocked: Which colour does Sam want?`)
     expect(v).toContain('- R1 (alpha) waits for the user: Allow Bash?')
     expect(v).toContain(`- #${cards.doing} Doing · alpha · B1: Friendlier greeting`)
     expect(v).toContain(`- #${cards.review} Review · alpha: Faster tests`)
@@ -274,12 +274,12 @@ describe('the state view in a workspace', () => {
     expect(v).toMatch(new RegExp(`- B1/R1 \\(alpha\\): on #${cards.doing}, active`))
     expect(v).toContain('- alpha: B1 working, R1 waiting')
     expect(v).toContain(`#${decision} `)
-    expect(v).toContain('Darren: the greeting is "Welcome back!"')
+    expect(v).toContain('Sam: the greeting is "Welcome back!"')
     expect(v).not.toContain('A decision from last month')
     expect(v).toContain('The merge of #3 failed its lint')
     expect(v).toContain(`- #${onCard} `)
     // Preferences aren't among the kinds the view looks at.
-    expect(v).not.toContain('Darren likes short replies')
+    expect(v).not.toContain('Sam likes short replies')
     expect(utf8Bytes(v)).toBeLessThanOrEqual(START_VIEW_MAX_BYTES)
   })
 

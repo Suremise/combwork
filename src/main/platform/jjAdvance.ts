@@ -1,6 +1,6 @@
 // jj's target advance (HI-3235: HI-2840's stage 2; its approved design HI-2840/s30 with s34, the mapping HI-3235/s7,
 // s10, s13 and s16). J1's probe (HI-2794) promoted into the protocol Combwork runs when a jj project's finish is
-// Combwork's advance (`combworkAdvances`, the default since Darren's decision of 14 Nov): one attempt to move a target
+// Combwork's advance (`combworkAdvances`, the default since it was decided): one attempt to move a target
 // bookmark T from E to a card's candidate R, journaled before each step, refused at the base on anything unexpected,
 // stopped on any difference it detects afterwards, and never called integrated without its full lineage.
 //
@@ -10,7 +10,7 @@
 // - Detected after the move, and stopped: an operation between P0 and O or a foreign one after it, O's view differing
 //   from P0's in more than T, a second head, a failed or partial export, Git's T ≠ R, any other Git ref changed, a
 //   worktree's HEAD changed or a worktree added or removed.
-// - Not detected (the residual races Darren accepted, documented in SPEC §16.3.6, never called safe): (a) ABA on T
+// - Not detected (the residual races accepted, documented in SPEC §16.3.6, never called safe): (a) ABA on T
 //   between P0 and the move; (b′) a racer's move of T to an ancestor of R, absorbed; (d1) a worktree switched to T during
 //   the attempt, detached by the export; (d2) a ref made pending during the attempt, exported with ours. Detecting what
 //   d2 leaves (another ref changed) stops the attempt; it is never prevented or undone.

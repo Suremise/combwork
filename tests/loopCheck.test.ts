@@ -114,7 +114,7 @@ describe("what a loop agent with no watch owes, while Combwork's loop wakes reac
     // A request from before the card came back for review is that round's: answered or not, the verdict waits now.
     expect(owedCards([own({ column: 'review', agentName: 'B1', history: [...asked, h('Returned for review, round 2')] })], 'alpha', 'b1', [1], reach)).toEqual([])
   })
-  // HI-2080: HB5 asked Darren on HI-2068 and ended its turn; "isn't watching" fired over "waiting for the user".
+  // HI-2080: HB5 asked the user on HI-2068 and ended its turn; "isn't watching" fired over "waiting for the user".
   it('a card with an open For you request of its own (asked of the user) is the user\'s move: not owed, wherever it is; once closed, owed as before', () => {
     const asked = (n: number) => n === 1
     for (const c of [own({ column: 'doing' }), own({ column: 'review', history: [h('Moved to Review')] })]) {

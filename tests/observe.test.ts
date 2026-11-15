@@ -239,7 +239,7 @@ describe('the watcher on a Git repository', () => {
   it('a file named as an ignored folder, replaced by that folder, still counts (HI-3173)', async () => {
     const t0 = Date.now()
     writeFileSync(join(p, 'out'), 'an input, not ignored\n')
-    // Its event is read while it is a file (it lasts longer than a moment: Darren's decision on HI-3158).
+    // Its event is read while it is a file (it lasts longer than a moment: the decision on HI-3158).
     await o.settled(p)
     rmSync(join(p, 'out'))
     mkdirSync(join(p, 'out'))

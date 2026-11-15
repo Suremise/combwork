@@ -24,8 +24,8 @@ import { inWorkspace, openWorkspaces, workspaceOf, type WorkspaceService } from 
  * Usage moves (HI-2195, SPEC §11.2; the design is HI-2195's s7 as revised by s9, s11 and s13): an account's rule moves its
  * agents to another account's connections once one of its limits reaches a share.
  *
- * - It moves project agents and, by the same rule and only between its turns, the Assistant (HI-2530, Darren: "Assistant
- *   -> Assistant"; before, never: its connection was the user's own choice, Settings → Assistant).
+ * - It moves project agents and, by the same rule and only between its turns, the Assistant (HI-2530: Assistant
+ *   -> Assistant; before, never: its connection was the user's own choice, Settings → Assistant).
  * - Each goes to the target's connection with the same tag as the one it is on, else the same name, else the target's
  *   first (matchConnection), and the notice says which rule matched each.
  * - It fires once per limit and reset period (`config.usageMoves`, kept until the reset passes): agents it handled (moved,
@@ -242,7 +242,7 @@ async function fire(acc: Account, rule: UsageMoveRule, l: PlanLimit, now: number
   const target = accountById(rule.to)!
   const movedNames: string[] = []
   for (const ws of openWorkspaces()) {
-    // The Assistant too (HI-2530, Darren 4 Nov: "Assistant -> Assistant"), as an agent of its home: moved only between its
+    // The Assistant too (HI-2530: Assistant -> Assistant), as an agent of its home: moved only between its
     // turns (switchAtSafePoint), once per period, never back. Before HI-2530 it never moved.
     const hosts = [...(await ws.listProjectPaths().catch(() => [] as string[])), ...(ws.path ? [ws.assistantHome] : [])]
     for (const projectPath of hosts) {

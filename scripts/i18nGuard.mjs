@@ -70,7 +70,7 @@ export const EXCLUDED = [
   [/^src\/main\/schema\//, "combwork.db's 1.0 tables and the card JSON contract: SQL, no text (#1208)"],
   [/^src\/main\/trash\.ts$/, 'test-only'],
   [/^src\/shared\/consoleFixtures\.mts$/, 'test-only'],
-  // Developer views (the developer console, Performance) are translated too (Darren, 19 Oct, #1104).
+  // Developer views (the developer console, Performance) are translated too (#1104).
   [/\.test\.tsx?$/, 'test-only']
 ]
 export const isExcluded = (rel) => isAgentFile(rel) || EXCLUDED.some(([re]) => re.test(rel))

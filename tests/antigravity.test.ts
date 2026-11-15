@@ -410,7 +410,7 @@ describe('the PC-wide sign-in (like Copilot’s)', () => {
   })
 })
 
-describe("agy's first-run screens, done once in Set up (HI-2547, Darren's (a))", () => {
+describe("agy's first-run screens, done once in Set up (HI-2547, option (a))", () => {
   const marker = JSON.stringify({ consumerOnboardingComplete: true, enterpriseOnboardingComplete: false, onboardingComplete: true })
   const state = 'post_onboarding: {\n  completed_steps: POST_ONBOARDING_STEP_TYPE_MANAGER_WELCOME\n  completed_steps: POST_ONBOARDING_STEP_TYPE_USAGE_MODE\n}\ninstallation_uuid: "11111111-2222-3333-4444-555555555555"\nmigrations: {\n  key: 3\n  value: MIGRATION_STATUS_COMPLETED\n}\n'
   const cli = (profile: string) => join(profile, '.gemini', 'antigravity-cli')
@@ -527,7 +527,7 @@ describe('an Independent launch in a profile a role agent used (HI-2731)', () =>
   })
 })
 
-describe("a removed agent's profile (HI-2731, Darren's decision)", () => {
+describe("a removed agent's profile (HI-2731)", () => {
   it('goes to the Recycle Bin (a test copy’s trash folder), whole, and only its own', async () => {
     const was = process.env.CW_TEST_TRASH_DIR
     const bin = join(base, 'trash')

@@ -257,7 +257,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     const inView = () => olderGroup.evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight && el.closest('.scroll-page').scrollTop > 0 }).catch(() => false)
     check('…Show in Attachments: the filter back to All, the older card scrolled into view from below the fold, outlined', !!(await until(async () => (await selectedAttach()) === 'card' && (await page.locator('.attachment-filter', { hasText: 'All' }).getAttribute('aria-pressed')) === 'true' && (await inView()) && (await olderGroup.evaluate((el) => el.classList.contains('jumped')).catch(() => false)))), JSON.stringify([await selectedAttach(), await inView()]))
     // --- A click opens the attachment viewer (HI-1958), a card's attachment as a pane's: arrows through the card
-    // attachments shown, Open in Its App for an image or a PDF and Show in Folder for any other kind (Darren's decision:
+    // attachments shown, Open in Its App for an image or a PDF and Show in Folder for any other kind (decided:
     // #387, nothing attached is ever run), Remove from Card for a card's, Delete for a pane's, a file gone said in place.
     // Open in Its App is never clicked here: it would start Windows' own viewer.
     const viewer = page.locator('.dialog[role="dialog"]').filter({ has: page.locator('.image-viewer') })

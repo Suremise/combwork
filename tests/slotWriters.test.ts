@@ -705,7 +705,7 @@ describe("a gone Combwork's writer settled by itself after a restart (HI-1886)",
       expect(tracker.endedExactly).toEqual([])
     })
 
-    // HI-2309 (Darren's decision, 1 Nov ~23:25): a keeper's "live" is a snapshot, never proof, so a slot it lists only the
+    // HI-2309: a keeper's "live" is a snapshot, never proof, so a slot it lists only the
     // idle broker for stays held (HR1's round 2 repro: a writer joined after that receipt, its next sweep failing); the
     // user is told once, naming it, that releasing is safe, and Release Slot… says so. Nothing ended.
     it('"live" with only Windows Sandbox\'s idle broker: held at the sweep and at its own start, told once that releasing is safe; with anything else, held and not told', async () => {

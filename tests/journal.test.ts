@@ -89,7 +89,7 @@ describe("a summary's message", () => {
     const h = home()
     const text = { id: 'finish.journal.done', values: { card: 'AM-1', title: 'Fix it', how: 'queue', byUser: 'no', by: 'combwork' } }
     const fact = j.writeEntry(h, all, { kind: 'event', summary: 'AM-1 "Fix it" is Done', summaryText: text }, 'combwork')
-    const own = write(h, { summary: 'Darren chose the greeting' })
+    const own = write(h, { summary: 'Sam chose the greeting' })
     expect(JSON.parse(stored(h, fact)!)).toEqual(text)
     expect(stored(h, own)).toBeNull()
     j.updateEntry(h, all, fact, { importance: 3 })
@@ -124,10 +124,10 @@ describe('the scope', () => {
     const h = home()
     const work = journalSettings({})
     expect(work.scope).toEqual(['decision', 'plan', 'event', 'incident', 'insight'])
-    expect(() => write(h, { summary: 'Darren likes short replies', kind: 'preference' }, work)).toThrow(/scope doesn't include preference entries .*allows: decision, plan, event, incident, insight/)
+    expect(() => write(h, { summary: 'Sam likes short replies', kind: 'preference' }, work)).toThrow(/scope doesn't include preference entries .*allows: decision, plan, event, incident, insight/)
     expect(() => write(h, { summary: 'A good moment', kind: 'moment' }, work)).toThrow(/moment/)
     expect(write(h, { summary: 'Week 42', kind: 'digest' }, { ...work, scope: [] })).toBeGreaterThan(0)
-    expect(write(h, { summary: 'Darren likes short replies', kind: 'preference' })).toBeGreaterThan(0)
+    expect(write(h, { summary: 'Sam likes short replies', kind: 'preference' })).toBeGreaterThan(0)
   })
 
   it('settings as saved are made safe', () => {
@@ -141,7 +141,7 @@ describe('the full-text index, kept by triggers', () => {
   it('finds words in a summary, a why and a long detail kept compressed; follows a correction and a delete', () => {
     const h = home()
     const long = `${'Background. '.repeat(200)}The zebra crossing was the cause.`
-    const a = write(h, { summary: 'Merged the board work', why: 'Darren wanted the giraffe fixed' })
+    const a = write(h, { summary: 'Merged the board work', why: 'Sam wanted the giraffe fixed' })
     const b = write(h, { summary: 'A long incident', kind: 'incident', detail: long })
     // Kept compressed, read back whole.
     j.closeJournal(h)
@@ -156,7 +156,7 @@ describe('the full-text index, kept by triggers', () => {
     // A prefix finds it too.
     expect(j.recall(h, { query: 'giraf' }).map((r) => r.id)).toEqual([a])
     // Corrected: the old words go from the index, the new ones come.
-    j.updateEntry(h, all, a, { why: 'Darren wanted the okapi fixed' })
+    j.updateEntry(h, all, a, { why: 'Sam wanted the okapi fixed' })
     expect(j.recall(h, { query: 'giraffe' })).toEqual([])
     expect(j.recall(h, { query: 'okapi' }).map((r) => r.id)).toEqual([a])
     j.updateEntry(h, all, b, { detail: 'Short now: a lion' })

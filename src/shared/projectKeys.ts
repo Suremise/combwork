@@ -70,7 +70,7 @@ export function suggestKey(name: string, projectId: string, held: readonly KeyHe
 export const cardKey = (projectKey: string, projectNumber: number): string => `${projectKey}-${projectNumber}`
 
 /**
- * A card as everything names it (HI-1661, Darren 26 Oct: "reference cards only by key"): its key, `HI-1230`, never the
+ * A card as everything names it (HI-1661: cards are referenced only by key): its key, `HI-1230`, never the
  * workspace-wide number beside it; `#1240` only for a card with no key (a workspace card, a project with no key yet, a
  * number no card has). The one rule for agents' texts and the window alike.
  */

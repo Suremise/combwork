@@ -249,7 +249,7 @@ describe('what a lane watch counts (#531)', () => {
     )
     // Only what happened: a wait alone, or a card alone.
     expect(laneWakeLine([], { waits: [{ ...wait, card: null, what: null }] })).toMatch(/^\[CW\] HB6 \(alpha\) is waiting for the user\. Your lane watch has ended/)
-    expect(laneWakeLine([], { cards: [{ ...rel, changes: ['blocked'], blocked: 'Darren pushes the tag' }], watching: true })).toMatch(/^\[CW\] #720 \(HB6's card\) is in Review and blocked: "Darren pushes the tag" \(latest comment/)
+    expect(laneWakeLine([], { cards: [{ ...rel, changes: ['blocked'], blocked: 'Sam pushes the tag' }], watching: true })).toMatch(/^\[CW\] #720 \(HB6's card\) is in Review and blocked: "Sam pushes the tag" \(latest comment/)
     for (const n of [3, 10, 40]) {
       const many = laneWakeLine(
         Array.from({ length: n }, (_, i) => ({ ...lane, id: `lane-${i}`, label: `Builder${i} / Reviewer${i} (lane ${i})` })),
@@ -1534,7 +1534,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await disposeWorkspaceService(w)
   })
 
-  // HI-2522: Darren read WR1's "Waiting on lane lane-1d1c05" as a commit id; the lane is "combwork screenshots".
+  // HI-2522: the user read WR1's "Waiting on lane lane-1d1c05" as a commit id; the lane is "combwork screenshots".
   it("HI-2522: a watch on one lane is labelled by the lane's name (its builder's too when another lane has it, else its builder's lane), kept on disk; never its id", async () => {
     const { w, alpha, home } = await open()
     fake(alpha, home)
@@ -1635,7 +1635,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     st.status = 'working'
     await inWorkspace(w, () => tasks.updateTask(a, { column: 'review' }, agent('b1')))
     await fail(w, a, 'r1')
-    await inWorkspace(w, () => tasks.updateTask(rel, { blocked: 'Darren pushes the tag' }, agent('b2')))
+    await inWorkspace(w, () => tasks.updateTask(rel, { blocked: 'Sam pushes the tag' }, agent('b2')))
     await watches.evaluateWatches(w)
     await watches.settled()
     expect(st.typed).toHaveLength(1)
@@ -1644,7 +1644,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
     expect(st.told[1]).toContain(`Lane B1 / R1: #${a} failed review (R1 (alpha))`)
     expect(st.told[1]).toContain(`#${rel} `)
-    expect(st.told[1]).toContain('and blocked: "Darren pushes the tag"')
+    expect(st.told[1]).toContain('and blocked: "Sam pushes the tag"')
     // Told once: the next watch (cards kept) starts from what that line told.
     await watchWith(w, home, st)
     await watches.evaluateWatches(w)

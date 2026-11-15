@@ -101,7 +101,7 @@ export function gitBool(v: string | null): boolean | null {
 const gitFalse = (v: string | null): boolean => v !== null && /^(false|no|off|0|)$/i.test(v.trim())
 
 /**
- * Git for Windows' stock system settings (HI-2872, Darren's (b) on HI-2799): the values its installer writes to its own
+ * Git for Windows' stock system settings (HI-2872, (b) on HI-2799): the values its installer writes to its own
  * `etc/gitconfig`, which a plain install always has and nothing applies unless the repository asks (an LFS filter no
  * attribute names, a diff driver for Office files). An entry is stock only at system scope, from that file (Git's
  * `--show-origin`), with exactly this value; the same key anywhere else, or another value, still counts.

@@ -2535,7 +2535,7 @@ describe("a card's history read by its lines' messages, not their words (dialect
   })
 })
 
-describe("a loop wake beside the agent's own card watch (HI-3211, Darren's decision (b))", () => {
+describe("a loop wake beside the agent's own card watch (HI-3211, decision (b))", () => {
   it("says it is the loop's handoff and the watch is still on only when told so; otherwise as before", () => {
     const c = { ...cardChange(7, cardOf({ column: 'doing' }), ['comment']), about: { owner: null, verdict: null } }
     const plain = loopWakeLine(c, 'stepAnswer', 'OK for d1')

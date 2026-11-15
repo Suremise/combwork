@@ -1,10 +1,10 @@
-// What each CLI test home holds (HI-2606, its design s17 with Darren's answers): every entry its supported CLI version
+// What each CLI test home holds (HI-2606, its design s17 with the user's answers): every entry its supported CLI version
 // writes, classified. `keep` stays (the sign-in, the machine's setup, the CLI's own downloads, which add nothing to a
 // session's context); `clear` is state a run leaves behind (memory, transcripts, trust, history, caches a session
 // reads, the CLI's temp files), removed before each run (testHomes.mjs). The sign-in files are named apart and are never
 // opened, copied or written by a reset.
 //
-// An entry not listed here is unclassified: kept where it is and named in the run's report (Darren, 7 Nov: point 4), so a
+// An entry not listed here is unclassified: kept where it is and named in the run's report (point 4), so a
 // new CLI version's new file is noticed and classified here. Names are exact; a trailing `*` is a prefix, a leading one a suffix.
 // Checked against: Claude Code 2.1.319 and Codex 0.166.0 (the homes' listings, names only, in tests/fixtures/testHomes:
 // tests/testHomes.test.ts fails for a name there this doesn't classify). A new version: record its listing there too.
@@ -45,7 +45,7 @@ export const ENTRIES = {
 }
 
 /**
- * What a kept settings file keeps: Claude Code's `.claude.json` fields that are the account and its onboarding (Darren's
+ * What a kept settings file keeps: Claude Code's `.claude.json` fields that are the account and its onboarding (the user's
  * yes to s11's point 2: runs start signed in and onboarded), Codex's `config.toml` tables that are the PC's sandbox and
  * the onboarding flags. Everything else in them (projects and their trust, MCP servers, skill use, tips, caches) goes.
  */
@@ -81,7 +81,7 @@ export function classify(cli, name) {
 }
 
 /**
- * What a reset does with an unclassified entry (Darren, 7 Nov, point 4): kept where it is, never deleted, and named in
+ * What a reset does with an unclassified entry (point 4): kept where it is, never deleted, and named in
  * the run's report; the run carries on. The one place this is decided.
  */
 export const UNCLASSIFIED = 'keep-and-report'

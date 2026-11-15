@@ -430,7 +430,7 @@ export function inTargetNow(s: CardState): FactData['InTarget'] | null {
 }
 
 /**
- * HI-2924 (Darren's decision, 11 Nov): a jj card the user moved to Done themselves while its integration wasn't proved
+ * HI-2924: a jj card the user moved to Done themselves while its integration wasn't proved
  * (a hand-resolved conflict changes the change's diff, so J5's proofs don't hold). Their Done is their word that it's
  * integrated: shown as "Done by you, integration not proved", and its slot's binding may be released without
  * containment (jjWorkspacePort's reuse and detach). Only the user's own move into Done this cycle (never the Assistant's,

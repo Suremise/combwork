@@ -179,7 +179,7 @@ function movesWork(wf: Workflow): boolean {
 
 /**
  * HI-3152: the preview on a platform that can't move work between targets (jj), read through the platform, never Git's
- * history (Darren's decision (a), 13 Nov: a card keeps the bookmark it started on). Running lanes on `from` stay (`lane`;
+ * history (decision (a): a card keeps the bookmark it started on). Running lanes on `from` stay (`lane`;
  * with a card in flight, `started`), their cards in flight too; cards in flight started on `from` stay (`started`); a
  * waiting card whose work is kept (its kept slot, `keptWork`) stays when that work is on `from` or can't be proved (with
  * the slot named staying, `kept` or `cantCheck`); a waiting card set to `from` with no kept work can move. Nothing else

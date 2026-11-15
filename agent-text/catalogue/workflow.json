@@ -554,7 +554,7 @@
   },
   "workflow.option.otherTargets.title": {
     "text": "Other branches work can merge into",
-    "note": "A workflow option (HI-2556, G7b): branches besides “Work merges into” that a lane or a card can be set to merge into (its “Merges into”). Darren’s name for it.",
+    "note": "A workflow option (HI-2556, G7b): branches besides “Work merges into” that a lane or a card can be set to merge into (its “Merges into”). The user’s name for it.",
     "audience": "both"
   },
   "workflow.option.preChecks.desc": {

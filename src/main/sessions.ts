@@ -1867,8 +1867,8 @@ class SessionManager {
     // Its connection's launch policy (HI-2670): without Combwork's tools, no combwork server and none of Combwork's or the
     // workspace's skills; with its MCP isolation off too, none of the workspace's servers either (the CLI's own config
     // decides, as in a terminal). Part of the signature, so a change of it asks running agents for a restart.
-    // An agent whose role is Independent launches as if its connection's switches were all off (HI-2731, Darren's 7 Nov
-    // 22:15 decision: "Independent behaves as if connection level switches are off"): the "Launch as from a terminal"
+    // An agent whose role is Independent launches as if its connection's switches were all off (HI-2731:
+    // Independent behaves as if connection level switches are off): the "Launch as from a terminal"
     // preset, whatever its connection says. Its role is in the signature too, so a role change restarts it. Its own saved
     // role: an agent a tools-off connection makes Independent launches as that connection says (its other switches).
     const independent = !assistant && forAgent?.workflowRole === 'independent'
@@ -2644,7 +2644,7 @@ class SessionManager {
    */
   /**
    * A running agent whose tool list changed since it launched, restarted to load the new one, resuming its conversation,
-   * as a connection switch does: its role changed its side of the workflow (HI-2664, Darren's decision), or its project's
+   * as a connection switch does: its role changed its side of the workflow (HI-2664), or its project's
    * workflow settings changed the tools they make unusable (HI-2694, the same decision: either way, added or removed). Every
    * role change runs it (projectAgents.updateAgent: Agent Settings, the Agent API, the Assistant's cw_update_agent), and
    * every workflow settings change (workflowTools.ts, at any level, and the rules' switch):
@@ -3440,7 +3440,7 @@ class SessionManager {
       ...(state.signInHost ? { signInHost: state.signInHost } : {}),
       // On a server connection (HI-1772), kept once set: its CLI's cost reports are never counted for it.
       ...(state.launchedConnection?.server ? { serverRan: true as const } : {}),
-      // Free (HI-1772, Darren 27 Oct) only while every run of it was on a server on this PC: kept once set, each.
+      // Free (HI-1772) only while every run of it was on a server on this PC: kept once set, each.
       ...(state.launchedConnection?.server?.local ? { serverLocal: true as const } : { notLocal: true as const })
     }, { createdAt: state.sessionCreatedAt })
     // Its record says it ran on a server (HI-1772, now or in an earlier run): its reads leave the CLI's cost reports out
@@ -6200,7 +6200,7 @@ class SessionManager {
     const limitMB = transcriptWarnLimit(project?.config, Number(config.settings.sessions.transcriptWarnMB) || 0)
     if (!limitMB || bytes < limitMB * 1024 * 1024 || !st.sessionId || l.sizeWarned === st.sessionId) return
     const assistant = workspace.isAssistantHome(st.projectPath)
-    // In a turn, the notice waits for its end (HI-1695, Darren's option 1): a transcript grows only in a turn, so it is
+    // In a turn, the notice waits for its end (HI-1695, option 1): a transcript grows only in a turn, so it is
     // nearly always crossed then, and the notice made then had no Hand Over to…, never offered again. The look at the
     // turn's end (or the next one) makes it, once, with the button when the agent may hand over then.
     if (!assistant && (st.status === 'working' || st.status === 'starting' || st.status === 'waiting')) return
@@ -9042,7 +9042,7 @@ class SessionManager {
    * Backup retention (#1110, Settings → Sessions → Keep transcript backups; off by default): Combwork's copies of a host's
    * sessions last active more than that many days ago go to the Recycle Bin (trash()), only where the CLI still has the
    * session's transcript (it can still be opened and resumed from there), and only once the usage history has what it
-   * used. A session whose only copy is Combwork's is never touched (the Assistant for Darren, 20 Oct): deleting those stays
+   * used. A session whose only copy is Combwork's is never touched: deleting those stays
    * the user's (Delete, Clean Up). Running sessions and those whose files are moving are skipped; each is checked again
    * with its backups locked, just before they go. Returns how many sessions' copies went. `signal`: the workspace's
    * opening it runs in (background housekeeping), ending it when the workspace closes (#1379).

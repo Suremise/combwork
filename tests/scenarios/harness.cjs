@@ -1131,7 +1131,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     // Each change to the merge slots (JSON lines, as the MCP log): { at, slots: [{ project, branch, holder, waiting }] }.
     observed.slotLog = readMcpLog(slotLog)
     // Any Agent API token (the workspace's, or an agent's for this launch) in what the session printed or said.
-    // Every one this Combwork issued (its record, knownTokens), each launch's hook token among them (HI-2262, Darren's
+    // Every one this Combwork issued (its record, knownTokens), each launch's hook token among them (HI-2262, the user's
     // decision: CW_HOOK_TOKEN stays in the session's environment, so a listing of it would print that), those of
     // launches long ended too.
     const known = knownTokens(tokenLog, apiToken)

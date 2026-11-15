@@ -1,4 +1,4 @@
-// HI-2320 (Darren: "End Them must confirm the exact processes (PID and start time), never just the PID"; HR2's round 1):
+// HI-2320 (End Them must confirm the exact processes (PID and start time), never just the PID; HR2's round 1):
 // a notice's End Them / Keep Running, through the real handler (agentProcesses.ts settleOffer) with a fake job host. It
 // reads what runs now from the job itself, never the list kept since the last look; ends exactly the processes the
 // notice showed, never the whole job; ends nothing when what runs changed or couldn't all be listed; says what it really

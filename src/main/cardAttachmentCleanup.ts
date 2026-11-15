@@ -1,7 +1,7 @@
-// Card attachments' clean-up (HI-1842, Darren's decisions of 27 Oct 2026; shared/cardCleanup.ts has the rules): each
+// Card attachments' clean-up (HI-1842; shared/cardCleanup.ts has the rules): each
 // project's archived cards lose their attachments the days its Project Settings → Storage says after they were archived.
 //
-// Round 2's contract (HR5's review), on main since round 3 (Darren's decision "Simplify: no worker"): a plan, then an
+// Round 2's contract (HR5's review), on main since round 3 (decided: "Simplify: no worker"): a plan, then an
 // apply that checks the plan again.
 // - The plan (planBatch) reads a batch of a project's cards that can be due, from a cursor, bounded in the cards it
 //   examines and plans, a card at a time with a yield between, so each step is a few milliseconds: each due card's files

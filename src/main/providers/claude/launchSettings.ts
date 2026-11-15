@@ -76,7 +76,7 @@ export async function userSettings(args: readonly string[], cwd: string): Promis
   }
   if (!json || typeof json !== 'object' || Array.isArray(json)) throw combworkError(M.notObject, what)
   // It would turn off Combwork's hooks and status line with the user's (Claude Code 2.1.292): Combwork can't keep both. Refused,
-  // not launched without them (#1285, Darren's decision: no hooks-free mode): the hooks are how Combwork knows the agent.
+  // not launched without them (#1285: no hooks-free mode): the hooks are how Combwork knows the agent.
   if ((json as Record<string, unknown>).disableAllHooks === true) throw combworkError(M.hooksOff, what)
   // A list's entries are added to (mergeLaunchSettings); anything else in its place blocks Combwork's hooks (2.1.292).
   for (const key of HOOK_ALLOWLISTS) {

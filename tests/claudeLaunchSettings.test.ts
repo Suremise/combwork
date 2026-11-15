@@ -67,7 +67,7 @@ describe("a --settings in a Claude Code agent's arguments (#330)", () => {
   it("refuses settings that would turn Combwork's hooks off where a merge can't undo it (Claude Code 2.1.292)", async () => {
     // disableAllHooks turns off every hook and the status line, Combwork's with the user's.
     await expect(userSettings(['--settings', '{"disableAllHooks":true}'], base)).rejects.toThrow('The --settings in Extra arguments turns off all hooks (disableAllHooks)')
-    // Refused, never launched without them (#1285, Darren's decision): saying why, and what to change.
+    // Refused, never launched without them (#1285): saying why, and what to change.
     await expect(userSettings(['--settings', '{"disableAllHooks":true}'], base)).rejects.toThrow(/how it knows what the agent is doing.*Take disableAllHooks out of those settings, or remove the --settings from Extra arguments/)
     expect(await userSettings(['--settings', '{"disableAllHooks":false}'], base)).toEqual({ disableAllHooks: false })
     // An allowlist that isn't a list blocks Combwork's HTTP hooks.

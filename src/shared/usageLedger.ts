@@ -5,7 +5,7 @@ import { TOKENS_SPREAD, TOKENS_UNKNOWN, chargeShares, rowModel, type UsageRow, t
 import { emptyPart, holdsFromHistory, mergeSpans, sharedSpans, type CostPart, type Span } from './cardCosts'
 
 /**
- * Usage history (#1106, Darren's decisions of 19 Oct): what each session used, recorded once as it happens and only ever
+ * Usage history (#1106): what each session used, recorded once as it happens and only ever
  * added to, so the Overview and every usage view read it rather than the CLIs' transcripts. A session's **rows**, one per
  * local day, model and card it worked on (and its role on it): tokens by kind, requests, prompts, compactions, and the
  * part of the cost known as an amount (the provider's charges, split between the requests they cover) with the tokens it

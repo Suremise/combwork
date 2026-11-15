@@ -351,7 +351,7 @@ describe('For you on the board (#1269)', () => {
     const card = await create(w)
     await update(w, card, { column: 'doing', agent: 'a1' })
     const wf = (await workflowFor(w, join(w.path!, 'p')))!
-    // HB1's HI-1624: asked how to close it, then Darren moved it to Done himself, with a reason.
+    // HB1's HI-1624: asked how to close it, then the user moved it to Done themselves, with a reason.
     await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'Already done by #1277: how do I close it?' }))
     expect(forYou(w).count).toBe(1)
     await inWorkspace(w, () => tasks.moveTask(card, 'done', { confirm: true, reason: 'already done by #1277' }))
@@ -378,7 +378,7 @@ describe('For you on the board (#1269)', () => {
     const card = await create(w)
     await update(w, card, { column: 'doing', agent: 'a1' })
     const wf = (await workflowFor(w, join(w.path!, 'p')))!
-    // HB5's HI-1630: Darren answered "go" in its pane, and it went on.
+    // HB5's HI-1630: the user answered "go" in its pane, and it went on.
     await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'OK to build it this way?' }))
     await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a2', { kind: 'decide', text: 'Should the review cover the docs?' }))
     expect(forYou(w).count).toBe(2)
@@ -592,7 +592,7 @@ describe("an answer that needs someone other than the card's agent (HI-1734)", a
     await update(w, card, { review: 'start' }, r1)
     expect((await update(w, card, { review: 'passed', column: 'passed' }, r1, { comment: 'Round 1: PASSED.' })).column).toBe('passed')
     const wf = (await workflowFor(w, join(w.path!, 'p')))!
-    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'Darren agreed to move it to Done?' }))
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'Sam agreed to move it to Done?' }))
     const req = forYou(w).items.find((i) => i.asker === 'a1')!
     await answer(w, card, req.request, { outcome: 'answered', reply: 'Checks-only card, nothing to merge.' })
     expect(relayed(w).map((r) => r.body)).toEqual([expect.stringMatching(/^This needs you: .*Builder \(p\) can't move it to Done by itself/)])

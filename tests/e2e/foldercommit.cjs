@@ -1,6 +1,6 @@
 // A change left uncommitted where the target is checked out (HI-2944): a project set to "Combwork merges" into `main`,
 // checked out in the project folder, fake Claude Code agents acting by their own tokens (queueFixture's), the Assistant
-// off. Darren's case, end to end:
+// off. The user's case, end to end:
 // - Files → Exclude from Git on a folder, shared: .gitignore changed, left uncommitted; the menu says which choice needs a
 //   commit, and the notification offers Commit It.
 // - A lane started for a card that also changes .gitignore: the window is told before work starts (Commit, Set Aside,
@@ -70,7 +70,7 @@ const lastCommitFiles = () => git('show', '--no-renames', '--name-only', '--form
     const excluded = toast('Added /reference/ to .gitignore')
     check('…its notification offers Commit It, and says Commit It commits .gitignore as it is now', !!(await waitHung(async () => (await excluded.getByRole('button', { name: 'Commit It' }).count()) === 1)) && /as it is now/.test(await excluded.innerText()), await excluded.innerText().catch(() => ''))
     await f.themes(page, excluded, 'foldercommit-exclude-toast')
-    // Left uncommitted, as Darren's was: the notification closed.
+    // Left uncommitted, as the user's was: the notification closed.
     await excluded.locator('.popup-close').first().click().catch(() => undefined)
 
     // --- A lane for a card that also changes .gitignore: told before work starts.

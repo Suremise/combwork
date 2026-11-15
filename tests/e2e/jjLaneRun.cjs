@@ -457,7 +457,7 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     // The user's own route: Done by hand (an override), recorded apart from the automatic reconciliation above.
     const done5 = await inv('tasks:move', n5, 'done', { confirm: true, reason: 'Integrated by hand after resolving a conflict' }).catch((e) => ({ error: String(e) }))
     check('the user moves card 5 to Done themselves (an override, not a proof)', !!(await until(async () => (await column(n5)) === 'done', HUNG_MS)) && (await integrationOf(n5)) === null, JSON.stringify({ done5, column: await column(n5), integration: await integrationOf(n5) }))
-    // HI-2924 (Darren's decision): the user's own Done is their word that it's integrated. The Work section says so, and
+    // HI-2924: the user's own Done is their word that it's integrated. The Work section says so, and
     // the slot (holding exactly the submitted commits) goes back to the pool without a proof.
     const unproved = await until(async () => (await inv('tasks:work', n5))?.doneUnproved ?? null, HUNG_MS)
     check("card 5's Work section: Done by you, integration not proved", !!unproved?.at && (await integrationOf(n5)) === null, JSON.stringify({ doneUnproved: (await inv('tasks:work', n5))?.doneUnproved, integration: await integrationOf(n5) }))

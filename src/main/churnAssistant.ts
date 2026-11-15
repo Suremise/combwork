@@ -5,7 +5,7 @@ import { createLogger } from './logger'
 import { workspaceFor, type WorkspaceService } from './workspace'
 
 /**
- * HI-3188 (Darren's Q4, 14 Nov): a card's simplify check is told to the Assistant first, when it is set up and may act on
+ * HI-3188 (Q4): a card's simplify check is told to the Assistant first, when it is set up and may act on
  * cards (assistantCanAct): it may answer carry on or simplify itself (`cw_answer_simplify`), and leaves cutting scope to
  * the user. The question stays under For you meanwhile, and the first answer wins. A delivery (`churn-simplify`), one per
  * question (its ref), cancelled when it is given if the Assistant can't act by then; nothing more is needed when it ends

@@ -284,7 +284,7 @@ const check = (name, ok, extra = '') => {
   await treesWarn.getByRole('button', { name: 'Cancel' }).click()
   check('cancelled: nothing changed', JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["Builder","Reviewer"]' && lib.git(beta, ['branch', '--list']) === branchesBeforeTrees)
   fs.rmSync(path.join(ws, '.combwork', 'templates', 'trees.json'))
-  // #511: twelve agents, builders and reviewers (as Darren's 6Bx6R): one row each, in the template's order; the table
+  // #511: twelve agents, builders and reviewers (as the user's 6Bx6R): one row each, in the template's order; the table
   // scrolls down in its box and never sideways. Both themes. Cancelled.
   const twelve = ['HB1', 'HB2', 'HB3', 'HR1', 'HR2', 'HR3', 'HB4', 'HB5', 'HB6', 'HR4', 'HR5', 'HR6']
   fs.writeFileSync(path.join(ws, '.combwork', 'templates', 'twelve.json'), JSON.stringify({ version: 2, name: 'Twelve', savedAt: new Date().toISOString(), layout: 'grid', agents: twelve.map((name) => ({ name, role: name.startsWith('HB') ? 'builder' : 'reviewer', provider: 'claude-code' })) }))

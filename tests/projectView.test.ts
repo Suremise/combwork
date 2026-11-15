@@ -1,4 +1,4 @@
-// A project's view out of project.json (HI-1749, Darren's decision): the Session tab's Panes or Tiles, layout and pane
+// A project's view out of project.json (HI-1749): the Session tab's Panes or Tiles, layout and pane
 // placement are this user's UI state (config.ui.projectViews), so a view switch writes no project file, and another program
 // holding project.json can't make it fail; the config is still written at once. A replace that gives up on a held file is
 // in combwork.log, with the processes Windows says have it open, those lookups bounded; any IPC failure that isn't Combwork's own

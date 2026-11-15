@@ -12,7 +12,7 @@ import { Icon, Tooltip, useBusy } from './ui'
 // shown on its tile when it isn't the project's.
 
 const M = {
-  field: msg({ id: 'board.target.field', defaultMessage: 'Merges into', description: 'HI-2556: a field label in the card dialog: the branch the card’s work is made from and merges into (Darren’s name for it).' }),
+  field: msg({ id: 'board.target.field', defaultMessage: 'Merges into', description: 'HI-2556: a field label in the card dialog: the branch the card’s work is made from and merges into (the user’s name for it).' }),
   own: msg({ id: 'board.target.own', defaultMessage: '{branch} (the project’s)', description: 'HI-2556: the first choice of the card dialog’s Merges into: the project’s Work merges into, {branch} its name.' }),
   mark: msg({ id: 'board.target.mark', defaultMessage: 'Into {branch}', description: 'HI-2556: a mark on a card’s tile: its work merges into {branch} (a branch name), not the project’s Work merges into.' }),
   markTip: msg({ id: 'board.target.markTip', defaultMessage: 'This card’s work is made from {branch} and merges into it, not the project’s Work merges into.', description: 'HI-2556: tooltip and accessible name of a card tile’s Merges into mark. {branch} is a branch name.' }),

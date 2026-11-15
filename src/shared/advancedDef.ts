@@ -135,7 +135,7 @@ export const outagePatternId = (provider: ProviderId): string => `${provider}.ou
 export const rightClickToCliId = (provider: string): string => `${provider}.mouse.rightClickToCli`
 
 /**
- * The off switch for one of Combwork's overrides of a CLI's own behaviour (#966, #1167; Darren's principle on #737: every
+ * The off switch for one of Combwork's overrides of a CLI's own behaviour (#966, #1167; the principle on #737: every
  * one has a switch): `<provider>.override.<what>`, a boolean marked `override`, on by default (what Combwork does today).
  * Off, Combwork leaves that part to the CLI and the user's own config, which Combwork never writes either way. Its description
  * says what Combwork loses without the override, and its samples show the CLI documenting the flag or variable Combwork sets.

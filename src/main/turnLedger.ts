@@ -18,11 +18,11 @@ import type { HookEvent, HookIds } from './providers/types'
  *    PreCompact or SessionEnd of an earlier turn is stale); hooks naming none are launch-wide (SessionStart, a
  *    compaction's) or from a CLI whose hooks name none (Copilot), and are the latest turn's.
  *    Two starts the CLI makes by itself, under an id of their own with no prompt hook (Claude Code 2.1.296, verified):
- *    - **a compaction** (`/compact` while idle, or the CLI's own; Darren's decision, option B): its PreCompact, under an
+ *    - **a compaction** (`/compact` while idle, or the CLI's own; option B): its PreCompact, under an
  *      id never seen while no turn runs, opens that compaction, not a turn; only its own launch-wide news follows under
  *      that id (SessionStart, PostCompact, SessionEnd), until a turn begins. Once, like a turn: a start of it again (while
  *      it runs, or after its PostCompact) is stale, and so is its news once it is over, but for the launch's SessionEnd.
- *    - **a background task's wake** (Darren's decision, 12 Oct): it sends its prompt hook (a `<task-notification>`), so it
+ *    - **a background task's wake**: it sends its prompt hook (a `<task-notification>`), so it
  *      opens like any prompt. Should that hook be lost, a tool start whose call id the launch never saw opens the turn,
  *      only while the CLI's transcript says a task of it just ended (`woke`), never merely because a task runs.
  *    - **a turn the user's typing began** (HI-2673: Claude Code 2.1.319 runs the model on a `!` command's output, under

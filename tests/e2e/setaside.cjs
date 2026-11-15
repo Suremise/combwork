@@ -1,6 +1,6 @@
 // Cards an older version saved after the board moved to its database (#1017's downgrade), set aside by the names upgrade
 // as it retires the board's stub (HI-2594; no version writes the stub since 1.1, HI-2624), and their review
-// (#1044, Darren's decision on #1017: the only way they reach the board): the notice offers Review…, whose dialog lists
+// (#1044, decided on #1017: the only way they reach the board): the notice offers Review…, whose dialog lists
 // each card (its old number, whether it is free, who made it, a preview); Add to Board keeps a free old number, gives a
 // taken one the next free number, with a history line by Repair; Discard… asks, then sends the file to the trash. The
 // board's ⋯ menu offers Set-Aside Cards (n)… while any remain. Both themes. No agents. Dev build, throwaway profile and

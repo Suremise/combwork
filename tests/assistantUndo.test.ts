@@ -157,7 +157,7 @@ describe("the Assistant's changes, recorded and undone (#1282)", () => {
     expect(r.undone).toEqual(['waitingFor'])
     expect((await card(c.number)).waitingFor).toBeUndefined()
     // The user's own mark, changed by the Assistant and then cleared: each undone puts back the mark as it was, who and when.
-    await run(() => tasks.updateTask(c.number, { waitingFor: 'Darren holds it' }, user))
+    await run(() => tasks.updateTask(c.number, { waitingFor: 'Sam holds it' }, user))
     const mine = (await card(c.number)).waitingFor!
     group = newMessage()
     await asAssistant(`reword #${c.number}'s hold`, () => tasks.updateTask(c.number, { waitingFor: 'The Assistant holds it' }, assistant))

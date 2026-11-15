@@ -1,5 +1,5 @@
 // jj's merge-queue candidates (SPEC §16.3.6 port 4, HI-2797's J4; its design HI-2797/s11, s14 and s17). Under decision A
-// (HI-2794, Darren 9 Nov) Combwork never advances a jj target: the user integrates. What this builds is the candidate the
+// (HI-2794) Combwork never advances a jj target: the user integrates. What this builds is the candidate the
 // user integrates: the reviewed change rebased, squashed or merged onto the target's head as private new commits, its
 // conflict state read (never taken from an exit code: a conflicted `jj duplicate` or `jj new` exits 0, probed on
 // 0.47.1), its evidence kept, and the builder's change, workspace and bookmarks untouched. Unregistered, like J2's and

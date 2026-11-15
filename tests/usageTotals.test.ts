@@ -48,7 +48,7 @@ function session(days: Record<string, number>, provider: 'claude-code' | 'codex'
   }
 }
 
-describe('free sessions (HI-1772, Darren 27 Oct)', () => {
+describe('free sessions (HI-1772)', () => {
   /** A session run only on a server on this PC: a known $0, marked free. */
   const free = (days: Record<string, number>): SessionListItem => {
     const s = session(days)

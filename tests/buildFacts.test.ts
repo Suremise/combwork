@@ -74,7 +74,7 @@ describe('a build fact', () => {
     expect(parseBuildSummary(buildFactSummary(f))).toEqual({ by: 'dist', version: '1.0.0-rc.1', kind: 'baseline', commit: '1fef5341', branch: '1.0.0' })
     expect(parseBuildSummary(buildFactSummary({ ...f, kind: 'rc', branch: null, by: 'release' }))).toEqual({ by: 'release', version: '1.0.0-rc.1', kind: 'rc', commit: '1fef5341', branch: null })
     expect(parseBuildSummary('#12 "Ship it" is Done (merged), moved there by B1')).toBeNull()
-    // HI-2581, Darren's decision: a one-way rename. An old entry's line under the old name is history, shown as written.
+    // HI-2581: a one-way rename. An old entry's line under the old name is history, shown as written.
     // old-name: begin old-build-line
     expect(parseBuildSummary('Built Hive 1.0.0-rc.1 (baseline) from 1fef5341 on 1.0.0')).toBeNull()
     // old-name: end old-build-line
@@ -89,7 +89,7 @@ describe('a build fact', () => {
     const e = { source: 'combwork' as const, summary: buildFactSummary(f), detail: buildFactDetail(f) }
     // Stored in English as agents read it; the window says it in the user's language (here English: the same line).
     expect(journalSummary(e)).toBe(e.summary)
-    // An old entry's "Built Combwork …" (before HI-2581) is shown as written (Darren's decision: one name, no reading of two).
+    // An old entry's "Built Combwork …" (before HI-2581) is shown as written (decided: one name, no reading of two).
     // old-name: begin old-build-summary
     const old = e.summary.replace(' Combwork ', ' Hive ')
     // old-name: end old-build-summary

@@ -702,7 +702,7 @@ async function pool(h) {
 }
 
 /**
- * The gallery for Darren (#1448, on #1123): in both themes, in English and German (the long locale, switched as the
+ * The gallery for the user (#1448, on #1123): in both themes, in English and German (the long locale, switched as the
  * window takes a language change, p6lane's), the Slots and copies group, lane rows with their slots and a pool, an agent
  * pane "in slot-a", a refused resume, Resume All's list with a slot reused, and a template load's names table.
  */

@@ -1,4 +1,4 @@
-// A settled publish record keeps its evidence and is re-checked (HI-2873, Darren's B on HI-2798; design HI-2873/s7,
+// A settled publish record keeps its evidence and is re-checked (HI-2873, option B on HI-2798; design HI-2873/s7,
 // s11, s14): the flag's compare-and-set, and the re-check's bounded, fair sweep, on the memory store with a scripted
 // ancestry. The real jj's behaviour (a remote moved back, removed, raced at the final boundary) is jjIntegrationReal's.
 import { describe, expect, it } from 'vitest'

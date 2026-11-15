@@ -51,7 +51,7 @@ export const ADVANCED: readonly AdvancedSource[] = [
     samples: [{ from: `${FIX}/advanced/integrations-opencode-2.2.6.json`, version: '2.2.6', text: '"label": "AWS profile (SSO or named profile)"', shows: "One of OpenCode's sign-ins that reads what the PC already has, which Combwork denies" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
-    // HI-2769 (Darren's option a, after HI-2768's source research): side jobs set to another provider's model, and image
+    // HI-2769 (option a, after HI-2768's source research): side jobs set to another provider's model, and image
     // generation's fallback across providers, can't leave the connection's provider while this is on.
     id: overrideId('opencode', 'ownProviderOnly'),
     group: 'opencode',
@@ -68,7 +68,7 @@ export const ADVANCED: readonly AdvancedSource[] = [
     samples: [{ from: `${FIX}/advanced/models-opencode-2.2.6.txt`, version: '2.2.6', text: 'opencode/big-pickle', shows: "One of OpenCode's free cloud models it offers with no account, which this keeps a local connection from" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
-    // HI-2775 (Darren's decision after HI-2772): 2.2.6's agents reach any folder unasked; a launch's private config asks.
+    // HI-2775 (decided after HI-2772): 2.2.6's agents reach any folder unasked; a launch's private config asks.
     id: overrideId('opencode', 'askOutsideFolder'),
     group: 'opencode',
     title: msg({ id: 'settings.advanced.opencode.override.askOutsideFolder.title', defaultMessage: "Ask before reaching outside the agent's folder", description: "An advanced setting's title (Settings → Advanced, under OpenCode): one of Combwork's overrides of the CLI, on by default." }),

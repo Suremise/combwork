@@ -12,7 +12,7 @@ export type JournalKind = (typeof JOURNAL_KINDS)[number]
 export const SCOPE_KINDS = ['decision', 'plan', 'event', 'incident', 'insight', 'preference', 'moment'] as const satisfies readonly JournalKind[]
 export type ScopeKind = (typeof SCOPE_KINDS)[number]
 
-/** Work only, by default (Darren's decision on #989): preferences and moments are the user's to turn on. */
+/** Work only, by default (#989): preferences and moments are the user's to turn on. */
 export const DEFAULT_SCOPE: ScopeKind[] = ['decision', 'plan', 'event', 'incident', 'insight']
 
 /** What an entry links to. */

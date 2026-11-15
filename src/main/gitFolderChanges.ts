@@ -6,8 +6,8 @@
 // changed. Nothing Git would allow is refused otherwise. A failure loses nothing: a refused commit leaves the files and
 // the index as they were, and a stash git made before it failed is kept and named. Git does all the index work
 // (`commit --only`, `stash push`): a path whose removal from Git is staged while its file is still in the folder (Files'
-// Stop Tracking, `git rm --cached`), which either would put back, is refused by name before anything runs (HI-2982;
-// Darren, 11 Nov 2026). The commit or stash runs against a private copy of the index (HI-3021), so a hook, filter or
+// Stop Tracking, `git rm --cached`), which either would put back, is refused by name before anything runs (HI-2982).
+// The commit or stash runs against a private copy of the index (HI-3021), so a hook, filter or
 // signer past its bound never leaves the real index locked; once something is made, its entries for the paths are
 // taken into the real index in one short step.
 import { copyFile, lstat, open, readFile, readdir, rename, rm, writeFile } from 'original-fs/promises'
@@ -607,7 +607,7 @@ async function commitPaths(folder: string, files: string[], untracked: string[],
   return withPrivateIndex(folder, files, M.commitFailed, async (env, copy, take) => {
     const r = byIndex ? await commitByIndex(folder, env, files, message, byIndex) : await commitOnly(folder, env, copy, files, untracked, message)
     if (r.timedOut) {
-      // HI-3075 (Darren, 12 Nov): a commit ended at its bound is never credited, whatever HEAD is now: a hook's own git
+      // HI-3075: a commit ended at its bound is never credited, whatever HEAD is now: a hook's own git
       // (which inherits everything this one has) can move HEAD or commit too, and nothing proves which made it. HEAD
       // where it started: nothing was made. Moved (or unread): said so, where it is now, the index left as it was.
       const now = await headOf(folder)

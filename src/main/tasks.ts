@@ -911,7 +911,7 @@ export async function setAsideCards(ws: WorkspaceService = workspace): Promise<S
 }
 
 /**
- * Adds a set-aside card to the board (#1044, Darren's decision on #1017): under its old number if no card has it, else
+ * Adds a set-aside card to the board (#1044, #1017): under its old number if no card has it, else
  * the next free one, with everything it had (comments, decisions, links as they were: nothing else is rewritten), placed
  * last in its column and a line in its history by Repair saying where it came from. In one board change, the file read
  * again there; its content is recorded as added in the same transaction, so it is never added twice.
@@ -2333,7 +2333,7 @@ const WAITING_STAGES: readonly StageId[] = ['hold', 'todo']
 const TARGET = {
   agents: msg({ id: 'tasks.error.targetNotAgents', defaultMessage: 'Only the user or the Assistant sets which branch a card merges into.', description: 'HI-2556: an error, an agent tried to set a card’s Merges into (the branch its work merges into); only the user or the Combwork Assistant can.' }),
   notListed: msg({ id: 'tasks.error.targetNotListed', defaultMessage: '{hasTargets, select, yes {{target} isn’t a branch work can merge into here: name {default}{hasOthers, select, yes { or one of {others}} other {}}, or add it under Other branches work can merge into (Version Control → Workflow).} other {This project merges work into no branch Combwork can pick: a card’s Merges into is for Git projects.}}', description: 'HI-2556: an error setting a card’s or lane’s Merges into to a branch the project doesn’t list. {target} is the branch named, {default} the project’s Work merges into, {others} the others listed (a list). Other branches work can merge into and Version Control → Workflow are names in the window: as translated there. Keep the select keys.' }),
-  started: msg({ id: 'tasks.error.targetHasWork', defaultMessage: '{unknown, select, yes {Combwork can’t tell whether {card} has work on its branch, so its Merges into stays as it is.} other {{card} has work on its branch made from {target}, so it keeps merging there. To move it, make a new card for it on the other branch and copy the change.}}', description: 'HI-2556: an error changing a card’s Merges into once its branch has work of its own (Darren: no rebase of started work). {card} is the card’s key (HI-12), {target} the branch its work was made from. unknown yes: git couldn’t say. Keep the select keys.' }),
+  started: msg({ id: 'tasks.error.targetHasWork', defaultMessage: '{unknown, select, yes {Combwork can’t tell whether {card} has work on its branch, so its Merges into stays as it is.} other {{card} has work on its branch made from {target}, so it keeps merging there. To move it, make a new card for it on the other branch and copy the change.}}', description: 'HI-2556: an error changing a card’s Merges into once its branch has work of its own (no rebase of started work). {card} is the card’s key (HI-12), {target} the branch its work was made from. unknown yes: git couldn’t say. Keep the select keys.' }),
   missing: msg({ id: 'tasks.error.targetMissing', defaultMessage: '{unknown, select, yes {Combwork can’t tell whether the branch {target} exists, so nothing was changed.} other {There is no branch {target} in this repository: make it first, then pick it.}}', description: 'HI-2556: an error setting a card’s Merges into to a branch the project lists under Other branches work can merge into but which doesn’t exist (yet) in the repository. {target} is the branch name. unknown yes: git couldn’t say. Keep the select keys.' }),
   defaultMoved: msg({ id: 'tasks.error.targetDefaultMoved', defaultMessage: 'Work merges into changed again while {card} was being moved, so it stays as it is.', description: 'HI-2680: a card left out of a retarget: the project’s Work merges into (an option’s name: as translated there) changed again between the preview and the move. {card} is its key (HI-12).' }),
   changed: msg({ id: 'tasks.error.targetChanged', defaultMessage: '{card}’s Merges into changed since it was listed, so it stays as it is.', description: 'HI-2680: a card left out of a retarget: its Merges into changed between the preview and the move. {card} is its key (HI-12).' }),
@@ -2532,7 +2532,7 @@ export async function setTarget(n: number, raw: unknown, actor: TaskActor, o:{ c
   if (wf && def && IN_FLIGHT_STAGES.includes(wf.state(wf.store.card(n)).stage)) {
     const target = await targetPick(first.project, raw, actor, !!res)
     // HI-3129: a platform that can't move started work (jj: its bookmarks, no `retarget`) keeps a card in flight where
-    // it started (Darren's decision (a)): its target and its proof there. Refused as the card's work keeping it.
+    // it started (decision (a)): its target and its proof there. Refused as the card's work keeping it.
     const startedOn = wf.state(wf.store.card(n)).started?.target ?? def
     if ((await projectTargets(ws, projectPath).catch(() => null))?.fixedInFlight && (target ?? def) !== startedOn) throw new TaskConflictError(withValues(TARGET.started, { card: cardRef(n), target: startedOn, unknown: 'no' }))
     if (res && wf.state(wf.store.card(n)).started?.target === res.to) return first
@@ -2554,7 +2554,7 @@ export async function setTarget(n: number, raw: unknown, actor: TaskActor, o:{ c
       const s = wf ? wf.state(wf.store.card(n)) : null
       const waiting = !!s && WAITING_STAGES.includes(s.stage)
       // HI-3152: where work can't move between targets (its platform lacks `retarget`: jj), a waiting card's work is its
-      // kept slot (Darren's decision (a)), read through its platform, never Git's lines (`ownWork`, `dropEmptyLines`).
+      // kept slot (decision (a)), read through its platform, never Git's lines (`ownWork`, `dropEmptyLines`).
       const viaKept = !!wf && !!s && !platformMoves(wf, n, s)
       const kept = viaKept && waiting ? await keptWorkOf(wf!, n, s!) : null
       // No work of its own (HR2's round 1: its slot's changes not committed too), read here under the board's lock, where
@@ -2617,7 +2617,7 @@ async function doAskAction(n: number, kind: AskActionKind, reason: string | unde
 }
 
 /**
- * The user answers a card's request (IPC `tasks:answer`, #1269, SPEC §16.8.5): only the user (Darren's point 7: never
+ * The user answers a card's request (IPC `tasks:answer`, #1269, SPEC §16.8.5): only the user (point 7: never
  * an agent or the Assistant). On the intent path (`runIntent`), so the answer, what it moves and the card's 0.9 fields
  * are one transaction, checked there (the request still open, the card where it was asked, its generation current). A
  * decision (a Decide answer) is the card's, added with the answer's write: a new generation, its agents told (#1266). A
@@ -2697,7 +2697,7 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
 }
 
 /**
- * HI-3188 (Darren's Q4, 14 Nov): the Assistant's answer to a card's simplify check, told to it first: carry on or simplify,
+ * HI-3188 (Q4): the Assistant's answer to a card's simplify check, told to it first: carry on or simplify,
  * nothing else (cutting scope, and the hard stop's question, are the user's: `loop.usersChoice`). `why`, if given, is its
  * comment on the card. Through runIntent as the user's answer is, the runtime checking the request still open and the
  * choice in the write; `commit` is assistantChange's guard (its Control, its session), checked in that write.
@@ -2736,7 +2736,7 @@ export function checkDecisionAnswers(actor: TaskActor, answers: unknown, wrong: 
 }
 
 /**
- * A decision the user made answers some of a card's open requests (HI-1932, Darren's decision of 28 Oct: the Assistant
+ * A decision the user made answers some of a card's open requests (HI-1932: the Assistant
  * records it naming the requests it answers, and Combwork closes them). The user's or the Assistant's only, never an
  * agent's: no agent closes its own request. `answers`: 1 to DECISION_ANSWERS_MAX request ids (duplicates once), with a
  * non-empty decision and nothing else. Each must be an open request a decision may answer (`decisionAnswers`), checked

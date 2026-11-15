@@ -323,7 +323,7 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [mode, view.agents, view.cards, view.hideFinished, view.tab, input]
   )
-  // One agent of the selection shown alone (HI-3180, Darren's decision): the strip's click. The selection, its tabs and
+  // One agent of the selection shown alone (HI-3180): the strip's click. The selection, its tabs and
   // the strip stay; a click on another switches, on that one (or Escape) shows them all again. The agent shown alone is
   // always the current tab's (HI-3186): one shown agent, so the tab and the strip mark the same one.
   const [showAlone, setShowAlone] = useState(false)

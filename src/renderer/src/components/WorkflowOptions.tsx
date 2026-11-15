@@ -453,7 +453,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
     const check = await source.check(change)
     setProblems(check.problems)
     if (check.problems.length) return
-    // Each option that changes, its value now and its new one (the Assistant for Darren: a list, never one sentence).
+    // Each option that changes, its value now and its new one (the Assistant for the user: a list, never one sentence).
     const changes = check.changed.flatMap((k) => {
       const title = k === 'platform' ? null : (optionTitle(k, platform, effective.folder) ?? OPTION_TEXT[k]?.title)
       return title && k !== 'platform' ? [tr(T.changeLine, { option: tr(title), from: valueText(k, form.options[k]), to: valueText(k, effective[k]) })] : []
@@ -606,7 +606,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
     if (key === 'fileLocks') return <div className="s-desc" data-note="file-locks">{tr(T.fileLocksNote)}</div>
     if (key === 'loopRounds' || key === 'loopWaitHours') return <div className="s-desc" data-note="loop-read">{tr(T.loopsReadNote)}</div>
     if (key === 'loopStepWaitMinutes') return <div className="s-desc" data-note="step-wait">{tr(T.stepWaitNote)}</div>
-    // Wake the Assistant for (HI-3211): what the chosen level wakes it for, in full (Darren: each level clearly described).
+    // Wake the Assistant for (HI-3211): what the chosen level wakes it for, in full (each level clearly described).
     if (key === 'assistantWakes') return <div className="s-desc" data-note="assistant-wakes">{tr(WAKE_LEVEL_TEXT[(effective.assistantWakes ?? ASSISTANT_WAKES_DEFAULT).level])}</div>
     // Maximum agents (HI-2001): above the default, what more agents cost here; below the agents there are, that none go.
     if (key === 'maxAgents') {

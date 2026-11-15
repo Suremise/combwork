@@ -33,7 +33,7 @@ import { AGY_ALLOW, agyForwardCommand, agyHookEnv, agyHooks, agyLockReply, agyNo
 // because agy keeps its conversations there (brain\<id>), with HOME left the user's. Each launch rewrites the profile's
 // MCP servers (Combwork's, with the launch's token). A workspace folder's own MCP servers the agent wasn't given refuse the
 // launch (profileConfig: agy can't be kept from starting them). The user's own global agy customizations (~\.gemini) are
-// never read (Darren, 7 Nov: hidden for now).
+// never read (hidden for now).
 // Hooks are HI-2545's (hooks.ts). Transcripts and usage are HI-2546's (transcript.ts, conversations.ts).
 
 const NAME = ANTIGRAVITY_DESCRIPTOR.name
@@ -46,7 +46,7 @@ const NOTICE = {
   autoUnknown: msg({ id: 'providers.antigravity.notice.autoUnknown', defaultMessage: 'Auto runs commands inside Antigravity’s own sandbox, which needs Windows 11 24H2 or later with the August 2026 update or later. Combwork couldn’t read this PC’s Windows version, so it can’t tell whether Auto applies here: if Antigravity refuses Auto or asks before commands, choose another mode in Agent Settings, or update Windows.', description: "Part of a notice as an Antigravity CLI agent starts in Auto mode where Combwork couldn't read the Windows version, so it can't tell whether Antigravity's sandbox applies. Auto is a permission mode, Agent Settings a place in Combwork: keep them; Windows 11 24H2 is a version." })
 }
 
-/** Provider Setup's first-run step (HI-2547, Darren's (a)). */
+/** Provider Setup's first-run step (HI-2547, (a)). */
 const SETUP = {
   needed: msg({ id: 'providers.antigravity.setup.needed', defaultMessage: 'Antigravity needs a one-time setup: its first-run screens. Until then each new agent shows them in its pane.', description: "Provider Setup and Settings → Providers: Antigravity CLI's first-run screens (a colour scheme, its terms of service) aren't done yet." }),
   action: msg({ id: 'providers.antigravity.setup.action', defaultMessage: 'Set up', description: "Provider Setup's button: opens Antigravity CLI's first-run screens in a terminal." }),
@@ -356,7 +356,7 @@ export class AntigravityAdapter implements ProviderAdapter {
   }
 
   /**
-   * A removed agent's private profile goes to the Recycle Bin (HI-2731, Darren's decision of 7 Nov): its rules, MCP config
+   * A removed agent's private profile goes to the Recycle Bin (HI-2731): its rules, MCP config
    * and conversations are its alone, and no new agent has its id. Agents a template load replaced keep theirs, which the
    * load's undo gives back with their ids.
    */

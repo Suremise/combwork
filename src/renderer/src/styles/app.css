@@ -5007,7 +5007,7 @@ h2.section#unused-worktrees {
   border-bottom: 1px solid var(--border);
   border-radius: 6px 6px 0 0;
 }
-/* An account's card (HI-2528, Darren's approved mockup v2): the same fields in the same place on every card. */
+/* An account's card (HI-2528, approved mockup v2): the same fields in the same place on every card. */
 .account-facts {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -5102,7 +5102,7 @@ h2.section#unused-worktrees {
     margin-top: -2px;
   }
 }
-/* Its connections, a small table inside the card (HI-2528; Darren 21:40: kept where they are, broken up as a table). */
+/* Its connections, a small table inside the card (HI-2528: kept where they are, broken up as a table). */
 .connection-list {
   container: connection-list / inline-size;
   display: flex;
@@ -5302,7 +5302,7 @@ h2.section#unused-worktrees {
   color: var(--warning);
   margin-left: 4px;
 }
-/* More room under it than before (HI-2528, Darren 21:40). */
+/* More room under it than before (HI-2528). */
 .connection-add {
   align-self: flex-start;
   margin: 10px 0 2px;
@@ -8436,7 +8436,7 @@ button.agent-place:hover {
     border-left: 1px solid var(--border-subtle);
   }
 }
-/* The map (HI-3179, Darren's decision): the graph and its agents' strip, Last actions always under them at full width.
+/* The map (HI-3179): the graph and its agents' strip, Last actions always under them at full width.
    Under the list (a narrow view) it is as tall as its graph allows; beside it (a wide view) its width is the split's,
    dragged at its right edge and kept, and the graph fills what Last actions leaves. */
 .activity-map {
@@ -10629,7 +10629,7 @@ body.pane-resizing-v .monaco-editor {
   flex: 0 0 auto;
 }
 /* Its heading is a line over its columns in the 10 px gap above them, its name on the line as a fieldset's legend
-   (HI-1682, Darren's decision): it takes no row of its own, so every column's top is the same with a group or without
+   (HI-1682): it takes no row of its own, so every column's top is the same with a group or without
    one. The name, on the view's background, may reach a pixel into the columns' tops. */
 .board-category-head {
   position: absolute;

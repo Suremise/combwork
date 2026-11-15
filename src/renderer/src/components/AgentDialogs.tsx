@@ -665,7 +665,7 @@ export function AgentSettingsDialog() {
           confirmed.current
         )
         await actions.refreshWorkspace()
-        // A new role gives it another side's tools (HI-2664, Darren's decision): restarted to load them, at once if it is
+        // A new role gives it another side's tools (HI-2664): restarted to load them, at once if it is
         // idle; busy, asked first (restart when its turn is over, or later: it keeps its old tools until it restarts).
         if (f.workflowRole !== initial.workflowRole) {
           const r = await call('session:restartForTools', project.path, agent.id, 'ifIdle').catch(() => 'same' as const)
@@ -693,7 +693,7 @@ export function AgentSettingsDialog() {
  * or lane's. No connection (HI-2109: the user picks connections when loading it), but the CLI it suggests.
  */
 /**
- * Busy agents whose tools a workflow change changes (HI-2694, Darren's decision: as a role change, HI-2664): asked once
+ * Busy agents whose tools a workflow change changes (HI-2694: as a role change, HI-2664): asked once
  * whether to restart them when their turn is over, in the same conversation, or later (they keep their old tools until
  * they restart, and are given no work that needs the new ones meanwhile). Idle ones were restarted already.
  */

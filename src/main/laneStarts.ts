@@ -23,7 +23,7 @@ import { endOwnLaneWatch } from './watches'
 import { inWorkspace, openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
 
 /**
- * Combwork starts a lane's next card (HI-1990, Darren's decision of 29 Oct 2026: plumbing, not guidance). With workflow
+ * Combwork starts a lane's next card (HI-1990: plumbing, not guidance). With workflow
  * rules on, once the card before it is Done, a running lane's next card (its own, in Todo, not blocked, every card
  * before it Done or another lane's) is started on the lane's builder as the Assistant's Start gives one (`startTask`,
  * through the start's rules): its slot lent and the builder placed there, typed into it idle, or started with it when

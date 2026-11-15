@@ -13,7 +13,7 @@ export type LaneEvent = (typeof LANE_EVENTS)[number]
 export const LANE_DEFAULT_EVENTS: LaneEvent[] = ['failed', 'blocked', 'unblocked', 'reblocked', 'stalled', 'merge-due', 'ended', 'abandoned', 'waiting', 'paused-user']
 
 /**
- * Wake the Assistant for (HI-3211, Darren's decision of 14 Nov): a workflow option, Combwork's, a workspace's or a project's,
+ * Wake the Assistant for (HI-3211): a workflow option, Combwork's, a workspace's or a project's,
  * for what the Assistant's lane watch counts when it names no events. Standard is today's default list, so an Assistant
  * nobody tunes works as before; Custom is the events ticked.
  */

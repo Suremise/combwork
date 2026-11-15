@@ -12,7 +12,7 @@ const M = {
 }
 
 /**
- * Provider Setup's warning about the Store's PowerShell 7 (#585, Darren's decision: warn and name the symptom, never change the
+ * Provider Setup's warning about the Store's PowerShell 7 (#585: warn and name the symptom, never change the
  * shell): a short label (its badge, the window's banner), what goes wrong, the symptom and the fix under it (#1404).
  */
 export function storePwshIssue(): ReadinessIssue {

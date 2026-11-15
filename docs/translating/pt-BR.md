@@ -145,7 +145,7 @@ is kept in English, it is as Brazilian developers say it.
 | setup command (a worktree's) | comando de preparação | Not *configuração*, which is Settings. |
 | exclude from git (.git/info/exclude) | ignorar no git | Not *excluir*, which is Delete. |
 | role (an agent's) | função | An agent's own role, in its words. |
-| role in the workflow (builder, reviewer, either, generalist) | papel | „Papel no fluxo de trabalho” (Darren, HI-1928). |
+| role in the workflow (builder, reviewer, either, generalist) | papel | „Papel no fluxo de trabalho” (HI-1928). |
 | hand over (to) | passar o trabalho (para) | The command *Hand Over to…*: „Passar para…“. |
 | Reset / Reset to defaults | Redefinir / Restaurar padrões | |
 | chime | som | |

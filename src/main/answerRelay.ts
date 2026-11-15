@@ -13,8 +13,8 @@ import { noteOnCard } from './tasks'
 import { workspaceFor, type WorkspaceService } from './workspace'
 
 /**
- * The user's answer to an agent's question, given to the Assistant too (HI-1734): on 25 Oct Darren agreed to move
- * HI-1449 to Done in his answer to HB3's question, Combwork told HB3, which can't move a card to Done, and the card sat in
+ * The user's answer to an agent's question, given to the Assistant too (HI-1734): the user agreed to move
+ * HI-1449 to Done in their answer to HB3's question, Combwork told HB3, which can't move a card to Done, and the card sat in
  * Approved for two days. Every answer to an agent's own question that Combwork didn't carry out itself (no action clicked)
  * reaches the Assistant as well as the asker, so someone who can act on it has it; Combwork never reads consent into the
  * reply's text. Where the card shows something only the user or the Assistant can settle (`need`: an action the

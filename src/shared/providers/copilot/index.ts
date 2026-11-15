@@ -102,7 +102,7 @@ export const COPILOT_PERMISSION_MODES: ModeOption[] = [
       description: msg({ id: 'agents.copilot.autopilotDescription', defaultMessage: 'Allow all, and it carries on by itself until the task is done (up to 5 continuations) without handing back to you. Once it has run, the session approves every tool, path and web request, also after you switch out of it. Use only where unattended changes are acceptable.', description: "What GitHub Copilot's Autopilot mode does (the mode picker): a warning. Allow all is another mode's name." })
     }
   },
-  // Not behind the opt-in (Darren, #490): Copilot's one low-interaction mode; its description says plainly what it does.
+  // Not behind the opt-in (#490): Copilot's one low-interaction mode; its description says plainly what it does.
   {
     value: 'allow-all',
     get label() {
@@ -122,7 +122,7 @@ export const COPILOT_PERMISSION_MODES: ModeOption[] = [
  * Whether Copilot can approve edits in exactly this folder: not when its path has a parenthesis. Copilot refuses a
  * write(<glob>) rule with ( or ) in it, even escaped or in a class, and doesn't start ("Invalid rule format"), and a
  * stand-in (? or a class) also matches a look-alike folder beside it (Copilot 1.0.93). Accept edits there approves no
- * edits: Copilot asks before each, as in Ask (#468, Darren's decision).
+ * edits: Copilot asks before each, as in Ask (#468).
  */
 export function copilotCanApproveEdits(folder: string): boolean {
   return !/[()]/.test(folder)

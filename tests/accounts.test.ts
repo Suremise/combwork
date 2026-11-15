@@ -929,7 +929,7 @@ describe("a workspace's accounts", () => {
 
     it('turning one on saves it in workspace.json, as its default, and nowhere else (HI-2650)', async () => {
       const a = await accounts.addAccount('claude-code', 'Here')
-      // Added, it is on nowhere: nothing is turned on by itself (Darren, 6 Nov).
+      // Added, it is on nowhere: nothing is turned on by itself.
       expect(JSON.parse(readFileSync(join(wsPath, '.combwork', 'workspace.json'), 'utf8')).connections?.['claude-code']?.on ?? []).not.toContain(a.id)
       await run(() => accounts.setAccountOn(a.id, true))
       expect(JSON.parse(readFileSync(join(wsPath, '.combwork', 'workspace.json'), 'utf8')).connections).toEqual({ 'claude-code': { on: [a.id] } })
@@ -1012,7 +1012,7 @@ describe("a workspace's accounts", () => {
         await projectsNow(0)
       })
 
-      it("counts only the projects it would be used in (HI-1871, Darren): an agent on it, own or the first on in the order; not another CLI's, nor one pinned elsewhere", async () => {
+      it("counts only the projects it would be used in (HI-1871): an agent on it, own or the first on in the order; not another CLI's, nor one pinned elsewhere", async () => {
         const mine = () => held.filter((h) => h.home === folderOf(a))
         // Its first read (beforeEach): alpha, whose Claude Code agent has no connection of its own (the first on: this
         // one), and the Assistant's home (the Assistant on it too).

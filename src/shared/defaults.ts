@@ -202,7 +202,7 @@ const memoryText = (n: number): string => (n >= 1024 ** 3 ? formatGigabytes(n) :
 
 /**
  * The note under Maximum agents (Version Control → Workflow, HI-2001; before, Settings → Advanced's Agents per project)
- * once it goes over the default (Darren, 11 Oct): what more agents cost, in
+ * once it goes over the default: what more agents cost, in
  * the machine's own figures (the memory running agents take now, measured; the computer's), and the plans' limits.
  */
 export function manyAgentsNote(m: { running: { agents: number; bytes: number } | null; total: number; free: number }): string {
@@ -670,7 +670,7 @@ export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppCon
     // focused. Show nothing (version 6 on; before it, "Only when Combwork is in the background" moved everyone to Show in
     // Combwork) becomes *Only in the bell* for agents' pop-ups, which keeps the Windows notifications in the background;
     // a Windows notification while focused becomes a pop-up. The banners' old default place, top centre, moves to the
-    // pop-ups' corner, bottom right (Darren, 2 Nov); any other place chosen is kept.
+    // pop-ups' corner, bottom right; any other place chosen is kept.
     const was = (raw.version ?? 1) < 6 ? 'inApp' : notifications.whileFocused
     if (was === 'nothing') notifications.bannerScope = 'none'
     if (notifications.bannerPosition === 'top-center') notifications.bannerPosition = 'bottom-right'

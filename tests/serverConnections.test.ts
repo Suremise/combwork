@@ -617,7 +617,7 @@ describe("reading a server's models (when asked)", () => {
   }, HUNG_MS * 2)
 })
 
-describe('Ollama cloud models: on this PC, but not local (HI-1773, Darren 27 Oct)', () => {
+describe('Ollama cloud models: on this PC, but not local (HI-1773)', () => {
   let srv: Server
   let port = 0
   let tags: unknown = { models: [] }

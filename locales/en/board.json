@@ -2097,7 +2097,7 @@
   },
   "board.laneStart.target": {
     "defaultMessage": "Merges into",
-    "description": "HI-2556: a field label in the Start Lane dialog: the branch the lane’s cards are made from and merge into (Darren’s name for it)."
+    "description": "HI-2556: a field label in the Start Lane dialog: the branch the lane’s cards are made from and merge into (the user’s name for it)."
   },
   "board.laneStart.targetDefault": {
     "defaultMessage": "{branch} (the project’s)",
@@ -3941,7 +3941,7 @@
   },
   "board.target.field": {
     "defaultMessage": "Merges into",
-    "description": "HI-2556: a field label in the card dialog: the branch the card’s work is made from and merges into (Darren’s name for it)."
+    "description": "HI-2556: a field label in the card dialog: the branch the card’s work is made from and merges into (the user’s name for it)."
   },
   "board.target.kept": {
     "defaultMessage": "Its work is kept on {branch}: it starts there again, whatever this says.",

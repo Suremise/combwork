@@ -3,7 +3,7 @@ import type { TileOrder } from './types'
 
 /**
  * The Session tab's Tiles view (#976): a tile per agent, in the order Settings → Sessions → Tile order chooses, as many
- * to a page as fit its area (HI-1951, Darren's decision): all on one page when they fit, pages only when they don't, and
+ * to a page as fit its area (HI-1951): all on one page when they fit, pages only when they don't, and
  * never fewer than TILES_PER_PAGE_MIN, as Panes' largest page (a window too small for them scrolls). TILES_PER_PAGE is the
  * page while the area can't be measured (not laid out yet, hidden).
  */

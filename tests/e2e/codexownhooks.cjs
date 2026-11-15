@@ -1,4 +1,4 @@
-// Combwork's hooks run beside the user's own Codex hooks (#1285, #966 row 11, Darren's decision: no "Keep my Codex hooks"
+// Combwork's hooks run beside the user's own Codex hooks (#1285, #966 row 11, decided: no "Keep my Codex hooks"
 // switch, as there is nothing to keep). Asked of the installed Codex's own hook discovery (its app server's hooks/list),
 // so a Codex that starts letting Combwork's -c overrides displace the user's hooks, or drop their trust, fails here first:
 // - the user's Stop and PreToolUse hooks (their config.toml) and Combwork's of the same events (-c hooks.<event>, the session

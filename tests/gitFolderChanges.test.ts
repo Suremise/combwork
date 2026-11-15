@@ -651,7 +651,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     writeFileSync(join(proj, '.git', 'hooks', 'post-commit'), `#!/bin/sh\n: > "${fwd(marker)}"\n"${fwd(process.execPath)}" -e 'setTimeout(() => {}, 30000)'\n`)
   }
 
-  // HI-3075 (Darren, 12 Nov): a commit ended at its bound is never credited, even one made before its post-commit hook
+  // HI-3075: a commit ended at its bound is never credited, even one made before its post-commit hook
   // was ended: a hook's own git can move HEAD or commit too, and nothing proves which made it. HEAD moved: said so, with
   // where it is now; the index left as it was, for the user to settle.
   const moved = (sha: string): string => `The branch moved meanwhile, to ${sha.slice(0, 12)}, and Combwork can't tell that it is this commit, so it left the index as it was. Check git log and git status`
@@ -1255,8 +1255,8 @@ describe('a file in conflict, no operation under way (HI-3025)', () => {
 })
 
 // HI-2982: Files' Stop Tracking (`git rm --cached`) leaves the file's removal staged and the file in the folder. Commit
-// took each path from the folder (`commit --only`), so the file went back into Git with its local content. Darren's
-// decision (11 Nov 2026): git does all the index work; such a path is refused by name, nothing committed or changed.
+// took each path from the folder (`commit --only`), so the file went back into Git with its local content. The
+// decision: git does all the index work; such a path is refused by name, nothing committed or changed.
 describe('a file the user stopped tracking (its removal staged, the file kept)', () => {
   const stopTracking = (file: string, content: string, ignore: boolean): void => {
     commit(proj, { [file]: '{}\n' }, 'tracked')

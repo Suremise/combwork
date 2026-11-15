@@ -1,6 +1,6 @@
 /**
- * The clean-install check's search (HI-2592): Darren, 5 Nov 2026, "the app is clean when there is no reference to hive
- * anywhere on a clean install". Used inside the Sandbox by inside/clean-scan.cjs (this checkout's tests folder is mapped
+ * The clean-install check's search (HI-2592): the app is clean when there is no reference to hive
+ * anywhere on a clean install. Used inside the Sandbox by inside/clean-scan.cjs (this checkout's tests folder is mapped
  * there read-only) and on the host by report.cjs, and unit-tested in tests/sandboxClean.test.ts. Node built-ins only,
  * and the tests folder's own oldNameMatch.cjs.
  *
@@ -13,7 +13,7 @@
  * Diagnostics and the exported board. app.asar is the one exception: its hits are counted and reported, never failed
  * (the upgrade code that knows the 1.0 names lives in it).
  *
- * The bundled code's contents aren't searched (HI-2647: Darren, 6 Nov, "check the job, not the tree"). The code is the
+ * The bundled code's contents aren't searched (HI-2647: the job is checked, not the tree). The code is the
  * repository's source, compiled, and which source may name the old name (only the upgrade code) is the repository's
  * name guard's job (tests/oldNames.mjs, tests/oldNamesAllow.json). This check's job is what a clean install writes and
  * shows, so the bundled code's files are named and counted (isBundledCode), never read.

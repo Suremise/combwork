@@ -67,7 +67,7 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
     desc: msg({ id: 'workflow.option.target.desc', defaultMessage: 'The branch a card’s work is merged into: the repository’s default branch when left empty.', description: 'What the workflow option “Work merges into” does.' })
   },
   otherTargets: {
-    title: msg({ id: 'workflow.option.otherTargets.title', defaultMessage: 'Other branches work can merge into', description: 'A workflow option (HI-2556, G7b): branches besides “Work merges into” that a lane or a card can be set to merge into (its “Merges into”). Darren’s name for it.' }),
+    title: msg({ id: 'workflow.option.otherTargets.title', defaultMessage: 'Other branches work can merge into', description: 'A workflow option (HI-2556, G7b): branches besides “Work merges into” that a lane or a card can be set to merge into (its “Merges into”). The user’s name for it.' }),
     desc: msg({ id: 'workflow.option.otherTargets.desc', defaultMessage: 'Branches a lane or a card can merge into instead (its Merges into), each through its own merge queue with the same merge checks, separated by commas.', description: 'What the workflow option “Other branches work can merge into” does (HI-2556). Merges into is the lane’s and card’s field: as translated there.' })
   },
   mergeChecks: {

@@ -169,7 +169,7 @@ const until = lib.until
     await stop()
     await inv('advanced:set', 'claude-code.hooks.timeoutSeconds', 5)
 
-    // ---- 5. No managed settings at all (Darren's PC, HI-2850): a busy turn is never taken for hooks arriving twice.
+    // ---- 5. No managed settings at all (the maintainer's PC, HI-2850): a busy turn is never taken for hooks arriving twice.
     fs.rmSync(path.join(managedDir, 'managed-settings.json'), { force: true })
     // Ready before any turn: a fresh start.
     check('5: the agent starts', (await start()) && !!(await until(async () => (await live())?.status === 'ready', HUNG_MS)))

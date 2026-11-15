@@ -3941,7 +3941,7 @@
   },
   "settings.connections.add.from": {
     "defaultMessage": "Gets its model from",
-    "description": "Label of the choice in Add Connection (Settings → Accounts & Connections): where the connection gets its model, its sign-in or a server (Darren, 27 Oct)."
+    "description": "Label of the choice in Add Connection (Settings → Accounts & Connections): where the connection gets its model, its sign-in or a server."
   },
   "settings.connections.add.fromServer": {
     "defaultMessage": "A server",
@@ -4872,7 +4872,7 @@
     "description": "A setting's title (Settings → General)."
   },
   "settings.general.userName.desc": {
-    "defaultMessage": "How Combwork names you to the Assistant when it tells it you replied to an agent (\"Darren replied to B1 on #399\").",
+    "defaultMessage": "How Combwork names you to the Assistant when it tells it you replied to an agent (\"Sam replied to B1 on #399\").",
     "description": "What the setting \"Your name\" does, under its title (Settings → General)."
   },
   "settings.general.userName.placeholder": {
@@ -6653,7 +6653,7 @@
   },
   "settings.workflow.combworkDefaults.title": {
     "defaultMessage": "Combwork defaults",
-    "description": "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (Darren's words, HI-1768)."
+    "description": "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (HI-1768)."
   },
   "settings.workflow.tabs": {
     "defaultMessage": "Workflow defaults",

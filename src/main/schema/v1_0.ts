@@ -412,7 +412,7 @@ export const FACTS_STEP: SchemaStep = {
       UNIQUE (folder, sha)
     ) STRICT`,
     'CREATE INDEX folder_commits_seen ON folder_commits (folder, id)',
-    // What the runtime keeps of a card besides its document (#1215; the Assistant for Darren, 20 Oct: typed, never JSON).
+    // What the runtime keeps of a card besides its document (#1215: typed, never JSON).
     // Columns of the card's row outside its JSON document, as `stage`: the Agent API's card is unchanged, and tasks.ts'
     // saves of the document keep them. `kind` code or no-code (§16.4.2); `target` a per-card target (OP-12); `lane` the
     // runtime's lane whose ruleset the card uses and `lane_reviewer` its reviewer to wake (§16.11.1), until #1291's step
@@ -475,7 +475,7 @@ export const FACTS_STEP: SchemaStep = {
   ]
 }
 
-/** Project keys, per-project numbers and aliases (#704, SPEC §16.12; Darren, 20 Oct: existing cards keep their number in their own project). */
+/** Project keys, per-project numbers and aliases (#704, SPEC §16.12: existing cards keep their number in their own project). */
 const KEYS: SchemaStep = {
   name: 'project keys',
   ddl: [

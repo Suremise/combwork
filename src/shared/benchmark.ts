@@ -21,7 +21,7 @@ import { moneyLabel } from './usageTotals'
 export const BENCHMARK_SCHEMA = 'combwork-benchmark/1'
 export const METRICS_EXPORT_SCHEMA = 'combwork-metrics/1'
 /**
- * A Performance export's id as 1.0 wrote it: not imported (HI-2611, Darren's decision: no 1.0 export is kept), only
+ * A Performance export's id as 1.0 wrote it: not imported (HI-2611: no 1.0 export is kept), only
  * recognised, so the refusal says what it is.
  */
 // old-name: begin metrics-export-schema

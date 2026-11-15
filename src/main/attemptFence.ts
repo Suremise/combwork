@@ -63,7 +63,7 @@ export class AttemptGuard {
   /**
    * The refusal for a write on card `card` (`key`: its key, as refusals name it) whose attempt before the write is `pre`
    * (null: a card with no workflow record, whose launch alone is checked), or null. A request with no binding for the card
-   * is its launch's first contact with it (Darren's decision on HI-3194, 14 Nov: no read-first rule, no saved
+   * is its launch's first contact with it (HI-3194: no read-first rule, no saved
    * bindings): allowed, and bound to the attempt by its write.
    */
   check(card: number, key: string, pre: AttemptKey | null): Refusal | null {

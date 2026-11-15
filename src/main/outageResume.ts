@@ -23,7 +23,7 @@ import { pausedFor } from './teamPause'
  * for its CLI's API host to answer, checked with a request that never holds main's thread, backing off; once it
  * answers, its own conversation gets one note to rerun what was cut off. Its status and a Progress run say it waits.
  * It gives up after the wait's limit, or when a turn ends on a connection error again after three resumes in an hour:
- * the PC's own network may not have come back (Darren's 25 Oct case needed a restart), so the user is told the likely
+ * the PC's own network may not have come back (one case needed a restart), so the user is told the likely
  * fixes, and the Assistant too. Anything else that starts the agent's turn (the user, a wake) or ends its launch ends
  * the wait.
  */

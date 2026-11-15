@@ -152,7 +152,7 @@ describe('the rules (shared/usageMoves.ts)', () => {
     expect(U.ruleLimits({ limit: 'fiveHour' }, limits).map((l) => l.id)).toEqual(['five_hour'])
     expect(U.ruleLimits({ limit: 'any' }, limits).map((l) => l.id)).toEqual(['seven_day', 'five_hour'])
   })
-  it("never watches a limit of part of the plan (HI-3262, Darren's (a)): a Codex model's limit or a per-model quota, whatever its window", () => {
+  it("never watches a limit of part of the plan (HI-3262, option (a)): a Codex model's limit or a per-model quota, whatever its window", () => {
     const limits = [scoped(99), scoped(99, 10080), modelQuota(99), weekly(10), fiveHour(20)]
     for (const l of [scoped(99), scoped(99, 10080), modelQuota(99)]) expect(U.limitKind(l)).toBeNull()
     expect(U.ruleLimits({ limit: 'weekly' }, limits).map((l) => l.id)).toEqual(['seven_day'])

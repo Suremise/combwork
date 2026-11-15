@@ -4,7 +4,7 @@
 // - Typed prompts: line breaks at Alt+Enter, then at Ctrl+J: the prompt as written (blank lines, indentation, a CRLF;
 //   a tab as a space), in one prompt, nothing sent early;
 // - at Spaces (the default): on one line, as before.
-// One short turn each, at low effort. Darren's OK for this run: HI-1327/r10 (28 Oct).
+// One short turn each, at low effort. The user's OK for this run: HI-1327/r10.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')

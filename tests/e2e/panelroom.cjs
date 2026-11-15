@@ -1,4 +1,4 @@
-// Room for the work beside the Assistant's panel (HI-1737, Darren's decision, then the Assistant's rule): in a narrow or
+// Room for the work beside the Assistant's panel (HI-1737, the user's decision, then the Assistant's rule): in a narrow or
 // zoomed window what is beside the work gives way in order, covering nothing, and the work never goes below 280 px while
 // anything can still give way. At 900 px and 150% (600 CSS px) the sidebar and the panel had left the main pane 0 px.
 // The window at 900 px with the sidebar on Projects and the Assistant's panel open, at 100%, 125% and 150%: the main

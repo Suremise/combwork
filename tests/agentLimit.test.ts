@@ -1,7 +1,7 @@
 // Maximum agents (HI-2001; #562 before it, Settings → Advanced → Agents per project): a workflow option, the user's team
 // size, set by the presets (Solo 1, Pair 2, Team and All off 12), resolved Combwork's, the workspace's, then the project's.
 // The Assistant and the Agent API add agents only up to it, checked again under the project's lock, and are told where
-// the user raises it; the user too (HI-2058, Darren's decision), told it in the window's words. A template's load
+// the user raises it; the user too (HI-2058), told it in the window's words. A template's load
 // likewise: over it, the Assistant's is refused; the user's with its workflow saves the template's own maximum with its
 // agents (never under them), without it is refused, nothing changed. The old setting's values become Maximum agents. The note on what more agents cost, and
 // the agent watch's bound.
@@ -45,7 +45,7 @@ describe('the option', () => {
     expect(preferencesOf('git', { workspace: { git: { maxAgents: 4 } }, project: { maxAgents: 2 } })).toMatchObject({ values: { maxAgents: 2 }, origins: { maxAgents: 'project' } })
   })
 
-  it("each preset sets its team (Darren's decision: Solo 1, Pair 2, Team and All off 12), for Git and None", () => {
+  it("each preset sets its team (decided: Solo 1, Pair 2, Team and All off 12), for Git and None", () => {
     expect(PRESET_TEAM).toEqual({ solo: 1, pair: 2, pairAgent: 2, team: 12 })
     for (const platform of ['git', 'none'] as const) {
       expect(allOff(platform).maxAgents).toBe(12)

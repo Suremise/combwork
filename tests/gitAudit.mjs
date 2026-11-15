@@ -581,7 +581,7 @@ function finisherValues(root, over) {
 }
 
 /**
- * HI-2840 (Darren's decision of 14 Nov: the integration modes are a generic capability the platform declares): each place
+ * HI-2840 (the integration modes are a generic capability the platform declares): each place
  * outside the descriptors that declares a platform's modes, as `<file>:<line> <field>`: a property of that name (an
  * object's field, a class's) given a mode or a list holding one. That would be a second list the form, the
  * contradictions or the workflow could follow instead of the descriptor's; reading `PLATFORMS[p].finishes` is how they

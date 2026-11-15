@@ -37,8 +37,8 @@ export function closeCommandState(win: BrowserWindow): CloseCommandRun | null {
 
 /**
  * The panel's button while Combwork waits (closeCommand:dontWait): while its workspace is still closing and being written,
- * Skip the command (it won't run, nor When Combwork quits; the close itself finishes and the panel stays until it has, Darren's
- * decision of 28 Oct ~15:30); once the command runs, Don't wait (Combwork goes on, the command carries on).
+ * Skip the command (it won't run, nor When Combwork quits; the close itself finishes and the panel stays until it has);
+ * once the command runs, Don't wait (Combwork goes on, the command carries on).
  */
 export function dontWait(win: BrowserWindow, id: string): void {
   const s = shown.get(win.webContents.id)
@@ -330,7 +330,7 @@ async function closeFailed(panel: Panel): Promise<RunOutcome> {
 
 /**
  * A close of one open of a workspace (s11): joined by every later close of that open, and never cancelled or begun again
- * (Darren's decision of 28 Oct ~15:30): Combwork always finishes closing it, as it did before close commands. Its saving step
+ * Combwork always finishes closing it, as it did before close commands. Its saving step
  * (the close, then the drain) shows in its window's panel as "Waiting for <workspace> to finish saving…"; that step's
  * Skip the command (`skip`) means its command won't run, nor When Combwork quits, and ends the drain's wait, never the
  * close: the panel stays until the close has finished. A command, once started, and a failure's dismissal wait as long

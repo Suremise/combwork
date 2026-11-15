@@ -317,7 +317,7 @@
   },
   "git.gate.advance.why": {
     "defaultMessage": "jj can’t move a bookmark safely when others move it too, so you integrate reviewed work yourself.",
-    "description": "Why Combwork doesn’t merge under jj (HI-2799, Darren’s decision A). Keep jj; a bookmark is jj’s named line."
+    "description": "Why Combwork doesn’t merge under jj (HI-2799, decision A). Keep jj; a bookmark is jj’s named line."
   },
   "git.gate.attributes.name": {
     "defaultMessage": "Git attributes and filters",

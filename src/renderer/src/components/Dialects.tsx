@@ -1,5 +1,5 @@
 /**
- * The Dialects view (HI-2444; plans/2026-11-03-dialects-design.md, section 4; Darren's decisions on HI-2065): the
+ * The Dialects view (HI-2444; plans/2026-11-03-dialects-design.md, section 4; decisions on HI-2065): the
  * workspace's dialect files in the sidebar (the Workspace file, each CLI's folder, the API's), and the file shown in the
  * main area with every agent text, even when the file is empty. A text the file overrides shows as written; one it
  * doesn't is dimmed, with the layer it comes from; expanding one shows each layer's value. Save checks the schema only
@@ -913,7 +913,7 @@ type FileDialog = { kind: 'new'; folder: string } | { kind: 'duplicate'; view: D
 
 /**
  * New Model File, Duplicate and Set Model (HI-2523): a name (not for Set Model) and a model ID. The model is free text
- * first (Darren's decision): the models agents of the CLI have run, and those the folder's files claim, are suggestions
+ * first: the models agents of the CLI have run, and those the folder's files claim, are suggestions
  * only. What was typed is normalised only where the CLI recognises it (dialectModelOf), and the notes under it never
  * block: the ID it is saved as, the file that has the model now (it becomes a test copy), a model no agent has run, an
  * alias Combwork can't resolve. Main checks everything again under the folder's lock.

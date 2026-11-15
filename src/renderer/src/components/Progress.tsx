@@ -454,7 +454,7 @@ function RunsTab({ runs, lanes, now, detail, toggle, filter, setFilter }: { runs
 
 /** Where a workspace's finished runs' dock keeps its height (HI-1925), as the lanes' rows are kept. */
 const dockKey = (ws: string): string => `progress-runs-today:${ws.toLowerCase()}`
-/** The dock's height in lane rows (HI-1925, Darren: about 6–7 lanes, up to 10 as Pulse's): its default, its least and most. */
+/** The dock's height in lane rows (HI-1925: about 6–7 lanes, up to 10 as Pulse's): its default, its least and most. */
 const DOCK_ROWS = 6.5
 const DOCK_MIN_ROWS = 1
 const DOCK_MAX_ROWS = 10

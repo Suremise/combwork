@@ -7,7 +7,7 @@ import { cardKey, normalKey, suggestKey, type KeyHeld } from '../../shared/proje
  * "project keys" step); this module is every query on them, for the 1.0 step and for the board (boardStore.ts), all on a
  * connection the caller holds (inside its transaction).
  *
- * Darren, 20 Oct (#1119): an existing card keeps its number in its own project (#1061 is HI-1061), and each project's
+ * #1119: an existing card keeps its number in its own project (#1061 is HI-1061), and each project's
  * counter carries on from its highest. A card's global number stays its id (`#N`, what the tools take until P8) and a
  * permanent alias. A card moved to another project takes that project's next number there, its old one kept as an alias
  * (`card_aliases`); a key changed keeps the old one as an alias (`project_keys`, current 0).

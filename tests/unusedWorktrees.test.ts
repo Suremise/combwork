@@ -220,7 +220,7 @@ describe('listing', () => {
       await run(() => boardWrite(w, async () => store.takeQueueLease({ ...held, token: 't2', pid: Number(ended) }, 't1')))
       need = true
       expect(await find(t)).toBeUndefined()
-      // Released cleanly and kept warm for the next merge (Darren's case): still the queue's while it needs it.
+      // Released cleanly and kept warm for the next merge (the maintainer's case): still the queue's while it needs it.
       await run(() => boardWrite(w, async () => store.dropQueueLease(lease, 't2') && store.setQueueFolder({ folder: t, target: 'main', lease: null })))
       expect(await find(t)).toBeUndefined()
       await expect(run(() => removalPreview(proj, t))).rejects.toThrow(/Combwork doesn't remove it/)

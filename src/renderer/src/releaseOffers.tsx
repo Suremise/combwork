@@ -1,4 +1,4 @@
-// HI-3155 (Darren's 2A): the release offer, a project's own For you item. Read from main (`workflow:releaseOffers`) as a
+// HI-3155 (2A): the release offer, a project's own For you item. Read from main (`workflow:releaseOffers`) as a
 // workspace opens and again on each `release-offers` event; shown on the board's For you row, in the Inbox, and under
 // Work merges into. Move… and Remove… fill the change into Version Control → Workflow and open its Save… (the existing
 // preview and retarget); Start… opens Start the next version; Not now puts it off until it changes. Each is bound to the

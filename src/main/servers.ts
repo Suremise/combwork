@@ -539,7 +539,7 @@ export function assistantApiUrl(): string | null {
 /**
  * Environment passed to an agent's session so it (and its Combwork tools) can reach the API: the file holding the agent's
  * own token for this launch (agentTokens.ts), never the workspace's, so the API knows which project's agent is calling.
- * Never the token itself (HI-2262, Darren's decision): an agent listing its environment printed it (HI-2259).
+ * Never the token itself (HI-2262): an agent listing its environment printed it (HI-2259).
  */
 export function apiEnv(projectPath: string, agentId: string): Record<string, string> {
   const info = apiInfo()
