@@ -736,8 +736,9 @@ kbd {
   font-weight: 400;
   text-transform: none;
 }
+/* A header's count sits beside its title (HI-3287), as a skill group's does: the right edge is its buttons' (a margin
+   here split the free space with them, floating the count mid-row). */
 .section-header .count {
-  margin-left: auto;
   font-weight: 500;
   color: var(--fg-muted);
 }
