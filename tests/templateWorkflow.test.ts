@@ -39,6 +39,18 @@ describe('the split (HI-1910)', () => {
     expect(carriedFor('none')).toEqual(expect.arrayContaining(['review', 'preChecks', 'dependenciesDone', 'fileLocks', 'stageNames']))
     expect(carriedFor('git')).toEqual([...TEMPLATE_CARRIED])
   })
+
+  // HI-3305: the churn levels (HI-3188) are rules like the loops' rounds, carried for both version controls; merge guards
+  // (HI-3284) are the project's own (one may be the user's own name), never carried, saved, read or laid over.
+  it('carries the churn levels; never the merge guards', () => {
+    for (const p of ['none', 'git'] as const) expect(carriedFor(p)).toEqual(expect.arrayContaining(['simplifyAt', 'churnStopAt']))
+    expect(TEMPLATE_NOT_CARRIED).toContain('mergeGuards')
+    const guarded: WorkflowOptions = { ...projectA, simplifyAt: 6, churnStopAt: 12, mergeGuards: [{ name: 'Own name', pattern: 'A Person', message: 'Say "the user".' }] }
+    const s = templateWorkflowOf(guarded, 'team')
+    expect(s.options).toMatchObject({ simplifyAt: 6, churnStopAt: 12 })
+    expect(JSON.stringify(s)).not.toContain('A Person')
+    expect(readTemplateWorkflow({ ...s, options: { ...s.options, mergeGuards: guarded.mergeGuards } }, 'git')).toEqual(s)
+  })
 })
 
 describe("a section from a project's options", () => {
