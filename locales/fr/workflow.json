@@ -733,7 +733,7 @@
   "workflow.why.style": "Un commit de fusion garde les commits propres à chaque carte, comme Combwork a toujours fusionné.",
   "workflow.why.target": "Le travail terminé va dans la branche par défaut du dépôt ; en solo, dans la branche sur laquelle est le projet.",
   "workflow.contradiction.jjNeedsSlots": "Avec jj, chaque carte a besoin de son propre dossier : des agents partageant le dossier du projet ne sont pas encore pris en charge.",
-  "workflow.contradiction.jjYouIntegrate": "Avec jj, tu intègres toi-même le travail relu : Combwork ne le fusionne pas.",
+  "workflow.contradiction.jjYouIntegrate": "Ce choix est celui d’un autre gestionnaire de versions : avec jj, Combwork ou toi intégrez le travail en déplaçant le signet cible ; avec Git, il est fusionné.",
   "workflow.form.levelForJj": "Les valeurs par défaut des projets jj.",
   "workflow.form.levelJj": "jj",
   "workflow.refused.platform.changed.message": "{card} ne peut pas démarrer avec ces règles : son projet utilise maintenant {platform}.",

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ProjectInfo } from '@shared/types'
+import type { Finisher } from '@shared/workflow/options'
 import { integrateCommands, isJjViewUnknown, jjRevisionInput, type JjBookmarksView, type JjCompareView, type JjConflictsView, type JjHistoryView, type JjLeftover, type JjOpChange, type JjOperationPreview, type JjOperationRow, type JjOperationsView, type JjOpOverlap, type JjOpRefusal, type JjRepoView, type JjResolved, type JjRow, type JjToCheckRow, type JjView, type JjViewUnknown, type JjWaitingCard, type JjWaitingChecks } from '@shared/jjViews'
 import { revisionShort, PLATFORMS } from '@shared/platform/descriptors'
 import { GATE_TEXT } from '@shared/platform/gateTexts'
@@ -38,7 +39,7 @@ const M = {
   staleTip: msg({ id: 'jj.repo.staleTip', defaultMessage: 'Its files are behind its working-copy commit: another workspace rewrote it. jj workspace update-stale updates them, but edits jj hasn’t recorded can end up in a separate commit: look before you run it. Combwork doesn’t run it.', description: 'Tooltip of the stale badge on a jj workspace (HI-2800). Keep jj workspace update-stale (a command).' }),
   unsupported: msg({ id: 'jj.repo.unsupported', defaultMessage: 'Not supported with jj in Combwork', description: 'A heading of the jj Repository section (HI-2799): what Combwork doesn’t do or support with jj. Keep jj.' }),
   edits: msg({ id: 'jj.repo.edits', defaultMessage: 'jj has no uncommitted changes: edits are recorded in the working-copy commit when jj snapshots them.', description: 'A note in the jj Repository section (HI-2799), in place of Git’s Changes. Keep jj.' }),
-  integrate: msg({ id: 'jj.integrate.head', defaultMessage: 'Waiting for you to integrate', description: 'A heading of the jj Repository section (HI-2799, option A): cards that passed review, which the user brings into their target themselves.' }),
+  integrate: msg({ id: 'jj.integrate.head', defaultMessage: 'Waiting to be integrated', description: 'A heading of the jj Repository section (HI-2799, HI-3315): cards that passed review and aren’t in their target yet. Who brings them in (Combwork or the user) is the project’s Who integrates, said under it.' }),
   integrateNone: msg({ id: 'jj.integrate.none', defaultMessage: 'No card is waiting.', description: 'Under “Waiting for you to integrate” (HI-2799) when no card has passed.' }),
   integrateCard: msg({ id: 'jj.integrate.card', defaultMessage: '{card} {title}: commit {commit} into {target}', description: 'A passed card in jj’s “Waiting for you to integrate” (HI-2799). {commit} is its reviewed commit (short), {target} the bookmark it goes into.' }),
   integrateHow: msg({ id: 'jj.integrate.how', defaultMessage: 'For example, copy its commits onto {target}, then move {target} to the copy jj prints for the reviewed commit, with jj bookmark set. A copy leaves the card’s slot as it is; rebasing the commits would rewrite the slot’s working copy and leave it stale.', description: 'Above a jj command suggested to integrate a passed card (HI-2913, HI-3094): copy all of its commits onto its target with jj duplicate (it prints a copy for each), then move the target bookmark to the copy of the reviewed commit (the card’s last). Why a copy: a rebase would rewrite the commits the slot (a jj workspace) works on top of, so the slot goes stale. Keep jj bookmark set (a command).' }),
@@ -70,7 +71,9 @@ const M = {
   leftoverWhy: msg({ id: 'jj.leftovers.why', defaultMessage: '{why, select, unrecorded {a set-up that didn’t finish} lost {a set-up that was lost} notEmpty {not empty} unproved {not provably Combwork’s} other {kept}}{name, select, none {} other {, registered as {name}}}', description: 'Why a folder under “Left over from setting up jj slots” was kept (HI-2869), and the jj workspace name it’s registered under (none: keep that branch empty). Keep the select keys.' }),
   showFolder: msg({ id: 'jj.leftovers.show', defaultMessage: 'Show in folder', description: 'A button beside a leftover folder (HI-2869): opens it in the file manager.' }),
   leftoversMore: msg({ id: 'jj.leftovers.more', defaultMessage: '{n, plural, one {# more not shown} other {# more not shown}}', description: 'Under “Left over from setting up jj slots” (HI-2869): how many more there are than the list shows.' }),
-  noMerge: msg({ id: 'jj.integrate.noMerge', defaultMessage: 'Combwork doesn’t merge under jj: integrate the reviewed work with jj yourself.', description: 'A note under jj’s “Waiting for you to integrate” (HI-2799, decision A). Keep jj.' }),
+  noMerge: msg({ id: 'jj.integrate.noMerge', defaultMessage: 'You integrate the reviewed work yourself, with jj: Combwork doesn’t move the target bookmark (Who integrates, in Workflow).', description: 'A note under jj’s “Waiting to be integrated” while the project’s Who integrates is “You integrate it yourself” (HI-2799, HI-3315). Keep jj; a bookmark is jj’s name for a branch; Who integrates and Workflow are names in Combwork’s window.' }),
+  byCombwork: msg({ id: 'jj.integrate.byCombwork', defaultMessage: 'Combwork integrates each card itself once its merge checks pass, moving the target bookmark (Who integrates, in Workflow). A card it can’t move stays here, and the card says why.', description: 'A note under jj’s “Waiting to be integrated” while the project’s Who integrates is “Combwork integrates after the checks” (HI-3235, HI-3315), the default. Keep jj; a bookmark is jj’s name for a branch; Who integrates and Workflow are names in Combwork’s window.' }),
+  onClick: msg({ id: 'jj.integrate.onClick', defaultMessage: 'Once a card’s merge checks pass, For you shows what Combwork would move, and Combwork moves the target bookmark when you click Integrate (Who integrates, in Workflow).', description: 'A note under jj’s “Waiting to be integrated” while the project’s Who integrates is “Combwork integrates when you click” (HI-3236, HI-3315). Keep jj; a bookmark is jj’s name for a branch; For you, Integrate, Who integrates and Workflow are names in Combwork’s window.' }),
   // History.
   change: msg({ id: 'jj.row.change', defaultMessage: 'Change', description: 'A column of jj’s History (HI-2799): the change id (stable across rewrites).' }),
   commit: msg({ id: 'jj.row.commit', defaultMessage: 'Commit', description: 'A column of jj’s History (HI-2799): the commit id (this exact version).' }),
@@ -280,7 +283,7 @@ function RowLine({ row }: { row: JjRow }) {
 /** Option A (HI-2794): the project's passed cards, each with its reviewed commit, its target, a command to integrate it, and
  * its last containment observation for exactly that approval (HI-2869). */
 /** Repository's panels read again with each of its reads (`tick`: its Refresh, the window's focus) and on board changes. */
-function IntegratePanel({ project, tick }: { project: ProjectInfo; tick: number }) {
+function IntegratePanel({ project, tick, finish }: { project: ProjectInfo; tick: number; finish: Finisher | null }) {
   const tasks = useStore((s) => s.tasks)
   // Each read of the board (a tasks-changed: a containment observation written, a card moved).
   const reads = useStore((s) => s.boardReads)
@@ -295,7 +298,7 @@ function IntegratePanel({ project, tick }: { project: ProjectInfo; tick: number 
   return (
     <section className="jj-integrate" data-jj-integrate="">
       <h4>{tr(M.integrate)}</h4>
-      <p className="hint">{tr(M.noMerge)}</p>
+      {finish && <p className="hint" data-jj-integrate-who={finish}>{tr(finish === 'combworkAdvances' ? M.byCombwork : finish === 'previewAdvance' ? M.onClick : M.noMerge)}</p>}
       {rows.length === 0 ? (
         <p className="faint">{tr(M.integrateNone)}</p>
       ) : (
@@ -488,7 +491,8 @@ function LeftoversPanel({ project, tick }: { project: ProjectInfo; tick: number 
   )
 }
 
-export function JjRepoSection({ project }: { project: ProjectInfo }) {
+/** `finish`: the project's Who integrates (HI-3315: what its Waiting to be integrated says), null until its form is read. */
+export function JjRepoSection({ project, finish }: { project: ProjectInfo; finish: Finisher | null }) {
   const r = useJjRead<JjRepoView>(() => call('jj:repo', project.path), project.path)
   return (
     <Frame name="repo" r={r}>
@@ -517,7 +521,7 @@ export function JjRepoSection({ project }: { project: ProjectInfo }) {
               ))}
             </ul>
           )}
-          <IntegratePanel project={project} tick={r.stamp} />
+          <IntegratePanel project={project} tick={r.stamp} finish={finish} />
           <ToCheckPanel project={project} tick={r.stamp} />
           <LeftoversPanel project={project} tick={r.stamp} />
           <h4>{tr(M.unsupported)}</h4>

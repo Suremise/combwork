@@ -733,7 +733,7 @@
   "workflow.why.style": "Um commit de merge mantém os commits de cada cartão, como o Combwork sempre fez o merge.",
   "workflow.why.target": "O trabalho concluído vai para o branch padrão do repositório; trabalhando sozinho, para o branch em que o projeto está.",
   "workflow.contradiction.jjNeedsSlots": "Com o jj, cada cartão precisa da própria pasta: agentes compartilhando a pasta do projeto ainda não são suportados.",
-  "workflow.contradiction.jjYouIntegrate": "Com o jj, você mesmo integra o trabalho revisado: o Combwork não faz o merge.",
+  "workflow.contradiction.jjYouIntegrate": "Essa escolha é de outro controle de versão: com o jj, o Combwork ou você integra o trabalho movendo o bookmark de destino; com o Git, é feito o merge.",
   "workflow.form.levelForJj": "Os padrões dos projetos jj.",
   "workflow.form.levelJj": "jj",
   "workflow.refused.platform.changed.message": "O cartão {card} não pode começar com estas regras: o projeto agora usa {platform}.",

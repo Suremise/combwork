@@ -248,6 +248,12 @@ describe('both revisions, and audits bound to an exact tree', () => {
       AUDITED.pop()
     }
   })
+  // HI-3307: a comment edit to the rule's file left HI-2654's two records unmatched, and its git-history selection tests
+  // fell back to every suite; workspaceRuleCheck.mjs fails on this too, at the change.
+  it("every kept audit is under the rule's identity now (else: workspaceRuleCheck.mjs --reaudit <commit>)", () => {
+    const id = ruleIdentity()
+    for (const a of AUDITED) expect({ commit: a.commit, rule: a.rule, compiler: a.compiler, types: a.types }).toEqual({ commit: a.commit, ...id })
+  })
 })
 
 describe("the rule's inputs: a change to none of them can't change its result", () => {

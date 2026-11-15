@@ -35,6 +35,7 @@ const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { keyProjects } = await import('../src/main/projectKeys')
 const { changeGroups } = await import('../src/main/assistantChanges')
+const { queueViews } = await import('../src/main/workflow/queueControls')
 const { BACKUPS_KEPT, DbInUseError, fileSchemaVersion, openDb, schemaVersion } = await import('../src/main/db')
 const { PRESENCE_DIR, STALE_MS } = await import('../src/main/presence')
 
@@ -497,6 +498,19 @@ describe('while the upgrade waits, nothing needing combwork.db starts or writes 
     await inWorkspace(w, () => store.upgradeBoard(w))
     expect(store.boardReadOnly(w)).toBe(false)
     expect(inWorkspace(w, () => changeGroups(w))).toEqual([])
+    await close(w)
+  })
+
+  it("a project's queues, which the window lists as it opens, read as none while it waits (no \"no such table: workflow_queue_seen\"); listed once upgraded (HI-3310)", async () => {
+    const ws = await board09()
+    const w = await open(ws)
+    expect(store.boardReadOnly(w)).toBe(true)
+    const p = join(ws, 'p')
+    await expect(inWorkspace(w, () => queueViews(w, p))).resolves.toEqual([])
+    await expect(inWorkspace(w, () => queueViews(w, p, 'main', true))).resolves.toEqual([])
+    await inWorkspace(w, () => store.upgradeBoard(w))
+    expect(store.boardReadOnly(w)).toBe(false)
+    await expect(inWorkspace(w, () => queueViews(w, p))).resolves.toBeInstanceOf(Array)
     await close(w)
   })
 

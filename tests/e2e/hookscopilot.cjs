@@ -71,6 +71,8 @@ const jsonl = (file) => {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1200, height: 800 })
     await lib.appReady(page)
+    // Its output as it came: pty:buffer is a replay, redrawn without the sequences it wrote (HI-3312).
+    await lib.recordPtyOutput(page)
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     const info = await lib.until(async () => { const i = (await inv('provider:info')).copilot; return i && !i.checking ? i : null }, 60000, 500)
     check('Copilot found', !!info?.found, JSON.stringify(info && { found: info.found, path: info.path }))
@@ -112,7 +114,7 @@ const jsonl = (file) => {
     check("released, its events show the turn no hook came after: hooks missing by the transcript, naming that turn's interactionId", flagged?.after === 'transcript' && flagged?.turn === deaf && deaf !== healthy, JSON.stringify({ flagged, deaf, healthy }))
     // Its status from its terminal meanwhile (HI-2802): Copilot's OSC 7501 says the deaf turn finished, and a turn that
     // takes a while, its hooks still lost, shows working, then finished, labelled as from its terminal.
-    const raw = (await inv('pty:buffer', key).catch(() => '')) ?? ''
+    const raw = await lib.ptyOutput(page, key)
     const osc = [...raw.matchAll(/\x1b\]((?:7501|9;4);[^\x07\x1b]*)(?:\x07|\x1b\\)/g)].map((m) => m[1])
     check('Copilot writes its turn state to its terminal (OSC 7501: idle, working, done)', ['idle', 'working', 'done'].every((s) => osc.some((p) => p.startsWith(`7501;state=${s}`))), JSON.stringify(osc.slice(0, 12)))
     // Recording the fixture the advanced setting's samples come from (tests/fixtures/advanced/terminal-turn-copilot-<v>.json).

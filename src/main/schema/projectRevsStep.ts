@@ -16,7 +16,8 @@ const REV_TABLES = ['card_labels', 'card_links', 'card_context', 'card_comments'
  * - `facts_epoch`: raised whenever facts may have gone or changed hands (a fact deleted or rewritten, a card deleted or
  *   moved to another project), so a cache of facts read by rowid from a high-water mark (FactStore.factsOfKind) reads them
  *   all again: a fact appended above the mark is new only while the epoch is unchanged (a deleted top rowid can be reused).
- * Created only when missing (a board whose later steps are run again takes it again).
+ * Created only when missing (a board whose later steps are run again takes it again). `project_revs` and its triggers
+ * are dropped at v33 (projectRevsDropStep.ts, HI-3306), unread since HI-3296's queue revisions; `facts_epoch` stays.
  */
 export const PROJECT_REVS_STEP = { name: 'project revisions', up: addProjectRevs } as const
 

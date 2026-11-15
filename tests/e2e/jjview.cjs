@@ -6,7 +6,7 @@
 // - shop: a Git project in a jj repository colocated with Git (made by jj): the fact and the jjFound offer; Git's own
 //   sections first (Git's UI kept). The switch to jj refused while a card is in flight (the drain, listed, Check Again),
 //   then made: the group named, every gate clear, jj's limits listed. jj's sections: Repository (the unsupported list,
-//   Waiting for you to integrate), History (change id beside commit id, divergent, conflicted, working copy), Compare (a
+//   Waiting to be integrated), History (change id beside commit id, divergent, conflicted, working copy), Compare (a
 //   divergent change id lists both commits, one picked), Bookmarks (a conflicted one with its sides), Conflicts. The switch's
 //   warning says cards run in slots (J9e: a jj card's start is jjwindow's). Back to Git refused (conflicted bookmark and commit), then,
 //   once jj's state is fixed, made: Git's sections again.
@@ -166,20 +166,23 @@ function jjRepo(dir, o = {}) {
     await inv('tasks:move', card.number, 'done', { confirm: true, reason: 'jjview: done' })
     await drained.getByRole('button', { name: 'Check Again' }).click()
 
-    // --- The switch: the group, the gates, jj's limits.
+    // --- The switch: the group, the gates, jj's limits (4: Combwork merging is no limit since HI-3235, which advances the bookmark).
     const warn = dialog.filter({ has: page.locator('[data-vc-store="jj"]') })
-    check('the warning: shop alone in its group, every gate clear, jj’s limits listed', !!(await until(async () => (await warn.count()) === 1 && (await warn.locator('[data-vc-store-drain]').count()) === 0 && (await warn.locator('[data-gate-state="clear"]').count()) === 5 && (await warn.locator('[data-vc-store-unsupported] li').count()) === 5, HUNG_MS)), await text(dialog))
+    check('the warning: shop alone in its group, every gate clear, jj’s limits listed', !!(await until(async () => (await warn.count()) === 1 && (await warn.locator('[data-vc-store-drain]').count()) === 0 && (await warn.locator('[data-gate-state="clear"]').count()) === 5 && (await warn.locator('[data-vc-store-unsupported] li').count()) === 4, HUNG_MS)), await text(dialog))
     // J9e (HI-2874): cards run under jj, and the warning says how (no "not yet").
-    check('…it says cards run in slots of their own and you integrate', /Cards run in slots of their own, and you integrate the reviewed work yourself/.test(await text(warn)) && !/don.t run in a jj project yet/.test(await text(warn)), await text(warn))
+    // HI-3315: and that by default Combwork integrates (HI-3235), which Who integrates can leave to the user.
+    check('…it says cards run in slots of their own and Combwork integrates by default', /Cards run in slots of their own\. By default Combwork integrates each passed card itself/.test(await text(warn)) && /Who integrates, in Workflow, can leave that to you/.test(await text(warn)) && !/don.t run in a jj project yet/.test(await text(warn)), await text(warn))
     await shoot(warn, 'switch-to-jj')
     await warn.getByRole('button', { name: 'Switch', exact: true }).click()
     check('shop uses jj: header and project.json', !!(await until(async () => (await head.locator('[data-platform="jj"][aria-checked="true"]').count()) === 1, HUNG_MS)) && JSON.parse(fs.readFileSync(path.join(shop, '.combwork', 'project.json'), 'utf8')).platform === 'jj')
     check("jj's sections", !!(await until(async () => JSON.stringify(await sections()) === JSON.stringify(['workflow', 'jjRepo', 'jjHistory', 'jjCompare', 'jjBookmarks', 'jjConflicts', 'jjOperations']), HUNG_MS)), JSON.stringify(await sections()))
 
-    // --- Repository.
+    // --- Repository: the 5 repository gates and jj's 4 limits (HI-3235 took Combwork merging off them).
     const repo = await section('jjRepo')
-    check('Repository: the root, colocated, the unsupported list (every gate)', !!(await until(async () => (await text(repo)).includes(shop) && /Colocated with Git/.test(await text(repo)) && (await repo.locator('[data-jj-unsupported] li').count()) === 10, HUNG_MS)), await text(repo))
-    check('…and Waiting for you to integrate, no merge offered', (await repo.locator('[data-jj-integrate]').count()) === 1 && (await page.locator('[data-action*="merge" i]').count()) === 0)
+    check('Repository: the root, colocated, the unsupported list (every gate)', !!(await until(async () => (await text(repo)).includes(shop) && /Colocated with Git/.test(await text(repo)) && (await repo.locator('[data-jj-unsupported] li').count()) === 9, HUNG_MS)), await text(repo))
+    check('…and Waiting to be integrated, no merge offered', (await repo.locator('[data-jj-integrate]').count()) === 1 && (await page.locator('[data-action*="merge" i]').count()) === 0)
+    // HI-3315: shop chose no jj options, so Combwork's default holds: Combwork integrates after the checks, and the panel says so.
+    check('…saying Combwork integrates each card once its merge checks pass (jj’s default)', !!(await until(async () => (await repo.locator('[data-jj-integrate-who="combworkAdvances"]').count()) === 1 && /Combwork integrates each card itself once its merge checks pass/.test(await text(repo)), HUNG_MS)), await text(repo))
     await shoot(page.locator('.vc-view'), 'repository')
 
     // --- J9c (HI-2869): publish records to check and the set-up's leftovers, seeded in the workspace database.

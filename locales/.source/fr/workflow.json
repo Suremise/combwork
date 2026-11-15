@@ -4,7 +4,7 @@
   "workflow.contradiction.committedNeedsFolder": "“Committed is done” needs everyone in the project folder.",
   "workflow.contradiction.focusedNeedsRunner": "Each card’s focused tests need the command that runs them.",
   "workflow.contradiction.jjNeedsSlots": "With jj, each card needs its own folder: agents sharing the project folder aren’t supported yet.",
-  "workflow.contradiction.jjYouIntegrate": "With jj, you integrate the reviewed work yourself: Combwork doesn’t merge it.",
+  "workflow.contradiction.jjYouIntegrate": "That choice is for another version control: with jj, Combwork or you integrate the work by moving the target bookmark; with Git, it is merged.",
   "workflow.contradiction.mergeNeedsSlots": "When Combwork or the agent merges, each card needs its own folder.",
   "workflow.contradiction.noneHasNoSlots": "Without version control, everyone works in the project folder.",
   "workflow.contradiction.okWithReview": "Your OK before merging is already part of review by you.",

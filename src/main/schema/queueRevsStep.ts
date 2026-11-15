@@ -4,7 +4,8 @@ import type { FactKind } from '../../shared/workflow/facts'
 /**
  * HI-3296 (boardStore.ts BOARD_MIGRATIONS version 32): each project's queue revision, `queue_revs`, what a project's queue
  * listings are kept by (queueControls.ts viewsStamp). It is raised, in the writer's transaction, by every write that raises
- * the project's revision (PROJECT_REVS_STEP, HI-3291) except the writes proven unread by the listings, and by one more:
+ * the project's revision (PROJECT_REVS_STEP, HI-3291; that revision itself is dropped at v33, HI-3306, and these triggers
+ * stand on their own) except the writes proven unread by the listings, and by one more:
  *
  * - **Quiet** (left out, QUIET_FACT_KINDS, QUIET_TABLES, QUIET_CARD_COLUMNS): facts `TargetMoved`, `HeadMoved`, `LoopStep`
  *   and `UserComment` (the fold's commentGeneration, which a submit's guard reads), and `CheckRan` not run by the merge
