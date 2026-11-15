@@ -1,10 +1,9 @@
-// A project's revision and the facts' epoch (HI-3291, schema/projectRevsStep.ts): what caches of a project's board reads
-// (its queue listings, FactStore.factsOfKind and facts) are checked against. Raised by triggers for every connection's
-// writes: a write to one of a project's cards, its facts or the child rows a card is made of raises that project only,
-// even for a card already at the board's highest revision (whose `rev` stays as it is); a card moving between projects
-// raises both; reading changes nothing. Facts kept across commits equal a full read after appends, a card deleted and
-// another made (the card count unchanged), the highest facts deleted and their rowids reused, another connection's
-// writes, and a card with its history moving into and out of a project.
+// The facts' epoch (HI-3291, schema/projectRevsStep.ts), what FactStore's kept facts are checked against, and v33's drop
+// of the project revision beside it (HI-3306, schema/projectRevsDropStep.ts: unread since HI-3296's queue revision): a
+// new board and one upgraded from v32 keep the epoch, raised by triggers of its own for every connection's writes, and
+// have no project revision. Facts kept across commits equal a full read after appends, a card deleted and another made
+// (the card count unchanged), the highest facts deleted and their rowids reused, another connection's writes, and a card
+// with its history moving into and out of a project.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -21,6 +20,9 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { FactStore } = await import('../src/main/workflow/factStore')
+const { openDb } = await import('../src/main/db')
+const { PROJECT_REVS_STEP } = await import('../src/main/schema/projectRevsStep')
+const { dropProjectRevs } = await import('../src/main/schema/projectRevsDropStep')
 
 const user = { kind: 'user' } as const
 let n = 0
@@ -55,72 +57,94 @@ function outside(ws: string, sql: string, ...args: (string | number)[]): void {
   }
 }
 
-/** A raw write in a board change of this Combwork's. */
-const inside = (w: WS, sql: string, ...args: (string | number)[]) => store.boardWrite(w, async () => void store.boardWriteOp(w, (db) => db.prepare(sql).run(...args)))
 const card = (w: WS, project: string, title = 'Card') => inWorkspace(w, async () => (await tasks.createTask({ title, project }, user)).number)
-const atTop = (ws: string, c: number): boolean => {
-  const db = store.workspaceDb(ws).reader
-  return (db.prepare('SELECT rev FROM cards WHERE number = ?').get(c) as { rev: number }).rev === (db.prepare('SELECT g FROM board_rev').get() as { g: number }).g
-}
 const docOf = (w: WS, c: number): Record<string, unknown> => store.cardDoc(w, c)!
 
-describe("a project's revision (HI-3291)", () => {
-  it("a card's child-only writes at the board's highest revision each raise its project, never another; a read raises nothing", async () => {
-    const { ws, w } = await workspace()
-    const c = await card(w, 'p')
-    await card(w, 'q')
-    const c2 = await card(w, 'p', 'Last')
-    // The card written last is at the board's mark: its later writes leave its `rev` as it is (CARD_REVS_STEP).
-    expect(atTop(ws, c2)).toBe(true)
-    const p0 = store.projectRevision(w, 'p')
-    const q0 = store.projectRevision(w, 'q')
-    expect(p0).not.toBeNull()
-    // Read again with no write: the same, for both.
-    expect([store.projectRevision(w, 'p'), store.projectRevision(w, 'q')]).toEqual([p0, q0])
-    // Two child-only writes, each its own commit (a label here, then one from another connection), no fact, no row change.
-    await inside(w, "INSERT INTO card_labels (card, ord, label) VALUES (?, 0, 'one')", c2)
-    expect(atTop(ws, c2)).toBe(true)
-    const p1 = store.projectRevision(w, 'p')
-    expect(p1).not.toBe(p0)
-    expect(store.projectRevision(w, 'q')).toBe(q0)
-    outside(ws, "INSERT INTO card_labels (card, ord, label) VALUES (?, 1, 'two')", c2)
-    const p2 = store.projectRevision(w, 'p')
-    expect(p2).not.toBe(p1)
-    expect(store.projectRevision(w, 'q')).toBe(q0)
-    // An update and a delete of child rows, and a comment, raise it too.
-    outside(ws, "UPDATE card_labels SET label = 'three' WHERE card = ? AND ord = 0", c2)
-    expect(store.projectRevision(w, 'p')).not.toBe(p2)
-    const p3 = store.projectRevision(w, 'p')
-    await inWorkspace(w, () => tasks.commentTask(c, 'a note', user))
-    expect(store.projectRevision(w, 'p')).not.toBe(p3)
-    expect(store.projectRevision(w, 'q')).toBe(q0)
-  })
+describe("v33 drops the project revision, unread since HI-3296's queue revision (HI-3306)", () => {
+  /** v31's and v33's tables and triggers on a connection: name and SQL, by name. */
+  const owned = (db: DatabaseSync) =>
+    db.prepare("SELECT type, name, sql FROM sqlite_master WHERE name = 'project_revs' OR name = 'facts_epoch' OR name LIKE '%\\_prev\\_%' ESCAPE '\\' OR name LIKE '%\\_epoch\\_%' ESCAPE '\\' ORDER BY name").all() as { type: string; name: string; sql: string }[]
+  const names = (db: DatabaseSync) => owned(db).map((r) => r.name)
+  const epoch = (ws: string): number => (store.workspaceDb(ws).reader.prepare('SELECT g FROM facts_epoch').get() as { g: number }).g
+  const NEW_EPOCH = ['card_facts_epoch_ad', 'card_facts_epoch_au', 'cards_epoch_ad', 'cards_epoch_au', 'facts_epoch']
 
-  it('a fact raises its project; a card moved between projects raises both; a card deleted raises its own', async () => {
-    const { ws, w } = await workspace()
+  /** The epoch moves for a fact rewritten or deleted, a card moved or deleted (an undone write's raise undone too), never for a fact appended or a comment. */
+  async function epochHolds(ws: string, w: WS): Promise<void> {
     const c = await card(w, 'p')
     const d = await card(w, 'q')
-    const facts = FactStore.forBoard(w, { project: 'p', key: 'P' })
-    let [p, q] = [store.projectRevision(w, 'p'), store.projectRevision(w, 'q')]
-    await store.boardWrite(w, async () => facts.tx((tx) => void tx.append(c, { kind: 'IntegrationRequested', actor: 'combwork', source: 'recorded', data: { entry: 'e1', revision: 'f'.repeat(40), key: null, target: 'main', style: 'merge' } as never })))
-    expect(store.projectRevision(w, 'p')).not.toBe(p)
-    expect(store.projectRevision(w, 'q')).toBe(q)
-    ;[p, q] = [store.projectRevision(w, 'p'), store.projectRevision(w, 'q')]
+    const e = await card(w, 'p')
+    const fact = (k: number, seq: number) => outside(ws, "INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (?, ?, 'Unblocked', '2026-11-15T00:00:00.000Z', 'outside', 'observed', '{}')", k, seq)
+    let g = epoch(ws)
+    fact(c, 1)
+    fact(c, 2)
+    await inWorkspace(w, () => tasks.commentTask(c, 'a note', user))
+    expect(epoch(ws)).toBe(g)
+    outside(ws, "UPDATE card_facts SET data = '{\"x\":1}' WHERE card = ? AND seq = 1", c)
+    expect(epoch(ws)).toBe(++g)
+    outside(ws, 'DELETE FROM card_facts WHERE card = ? AND seq = 2', c)
+    expect(epoch(ws)).toBe(++g)
     writeCardOutside(ws, d, { ...docOf(w, d), project: 'p' })
-    expect(store.projectRevision(w, 'p')).not.toBe(p)
-    expect(store.projectRevision(w, 'q')).not.toBe(q)
-    ;[p, q] = [store.projectRevision(w, 'p'), store.projectRevision(w, 'q')]
-    outside(ws, 'DELETE FROM cards WHERE number = ?', c)
-    expect(store.projectRevision(w, 'p')).not.toBe(p)
-    expect(store.projectRevision(w, 'q')).toBe(q)
+    expect(epoch(ws)).toBeGreaterThan(g)
+    g = epoch(ws)
+    await expect(store.boardWrite(w, async () => {
+      store.boardWriteOp(w, (db) => db.prepare('DELETE FROM cards WHERE number = ?').run(e))
+      throw new Error('undone')
+    })).rejects.toThrow('undone')
+    expect(epoch(ws)).toBe(g)
+    outside(ws, 'DELETE FROM cards WHERE number = ?', e)
+    expect(epoch(ws)).toBeGreaterThan(g)
+  }
+
+  it('a new board has no project revision, keeps the epoch with triggers of its own, and its comment writes no revision row', async () => {
+    const { ws, w } = await workspace()
+    expect(names(store.workspaceDb(ws).reader)).toEqual(NEW_EPOCH)
+    await epochHolds(ws, w)
+    // Running the step again changes nothing.
+    const before = owned(store.workspaceDb(ws).reader)
+    await store.boardWrite(w, async () => void store.boardWriteOp(w, (db) => dropProjectRevs(db as DatabaseSync)))
+    expect(owned(store.workspaceDb(ws).reader)).toEqual(before)
   })
 
-  it('is null inside a write (a cache keeps nothing there)', async () => {
-    const { w } = await workspace()
-    await card(w, 'p')
-    let inWrite: string | null = 'unset'
-    await store.boardWrite(w, async () => void (inWrite = store.projectRevision(w, 'p')))
-    expect(inWrite).toBeNull()
+  it('a board at v32 (the RC, a dev build) upgrades: its cards, comments and facts kept, the epoch kept as it was, the revision and its triggers gone', async () => {
+    // The schema a board v32 made has, as v31 and v32 made it on a new file.
+    const fresh = join(base, `v32-${++n}.db`)
+    const v32 = openDb(fresh, { migrations: store.BOARD_MIGRATIONS.filter((m) => m.version <= 32), appVersion: '1.6.0-rc.1' })
+    const atV32 = owned(v32.writer)
+    v32.close()
+    expect(atV32.map((r) => r.name)).toContain('project_revs')
+
+    const { ws, w } = await workspace()
+    const c = await card(w, 'p')
+    await inWorkspace(w, () => tasks.commentTask(c, 'kept', user))
+    outside(ws, "INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (?, (SELECT max(seq) + 1 FROM card_facts WHERE card = ?), 'Unblocked', '2026-11-15T00:00:00.000Z', 'outside', 'observed', '{}')", c, c)
+    const doc = JSON.stringify(docOf(w, c))
+    await disposeWorkspaceService(w)
+    opened.splice(opened.indexOf(w), 1)
+    store.closeBoard(ws)
+    // The board put back as v32 left it: v31's table and triggers, without v33's, at v32, its epoch moved on.
+    const db = new DatabaseSync(store.boardFile(ws))
+    try {
+      db.exec('BEGIN')
+      for (const t of ['cards_epoch_ad', 'card_facts_epoch_au', 'card_facts_epoch_ad']) db.exec(`DROP TRIGGER ${t}`)
+      PROJECT_REVS_STEP.up(db)
+      db.exec('UPDATE facts_epoch SET g = 41')
+      db.exec('DELETE FROM schema_version WHERE version > 32')
+      db.exec('COMMIT')
+      expect(owned(db)).toEqual(atV32)
+    } finally {
+      db.close()
+    }
+
+    const w2 = createWorkspaceService()
+    await w2.open(ws)
+    opened.push(w2)
+    const reader = store.workspaceDb(ws).reader
+    expect((reader.prepare('SELECT max(version) AS v FROM schema_version').get() as { v: number }).v).toBe(33)
+    expect(names(reader)).toEqual(NEW_EPOCH)
+    expect(epoch(ws)).toBe(41)
+    expect(JSON.stringify(docOf(w2, c))).toBe(doc)
+    expect((reader.prepare('SELECT count(*) AS n FROM card_facts WHERE card = ?').get(c) as { n: number }).n).toBe(2)
+    await epochHolds(ws, w2)
   })
 })
 
