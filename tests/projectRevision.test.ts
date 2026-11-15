@@ -234,3 +234,45 @@ describe('facts kept across commits equal a full read (HI-3291)', () => {
     expect(kept.factsOfKind(KIND)).toEqual(full(w))
   })
 })
+
+describe('the cards changed since a snapshot (HI-3301, boardStore.changedCardsIn)', () => {
+  /** The marks now, and the cards changed since `since` (null: it can't say), each on one read's snapshot. */
+  const marks = (w: WS) => store.boardRead(w, (db) => store.changeMarksIn(w, db))
+  const since = (w: WS, m: ReturnType<typeof marks>, most = 50) => store.boardRead(w, (db) => store.changedCardsIn(w, db, m, most)?.map((c) => [c.number, c.project]).sort())
+
+  it("names a card written (its row, a child row, a fact), here or by another connection, with its project; the card at the mark too; nothing else", async () => {
+    const { ws, w } = await workspace()
+    const a = await card(w, 'p', 'A')
+    const b = await card(w, 'q', 'B')
+    const c = await card(w, 'p', 'C')
+    const m0 = marks(w)
+    // Only the card at the mark (written last: a card there keeps its revision when written again).
+    expect(since(w, m0)).toEqual([[c, 'p']])
+    outside(ws, "UPDATE cards SET title = 'A, renamed' WHERE number = ?", a)
+    expect(since(w, m0)).toEqual([[a, 'p'], [c, 'p']])
+    const m1 = marks(w)
+    outside(ws, "INSERT INTO card_labels (card, ord, label) VALUES (?, 0, 'x')", b)
+    expect(since(w, m1)).toEqual([[a, 'p'], [b, 'q']])
+    const m2 = marks(w)
+    outside(ws, "INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (?, 1, 'Unblocked', '2026-11-15T00:00:00.000Z', 'outside', 'observed', '{}')", c)
+    expect(since(w, m2)).toEqual([[b, 'q'], [c, 'p']])
+  })
+
+  it("can't say after a fact or a card deleted, nor past `most` cards", async () => {
+    const { ws, w } = await workspace()
+    const a = await card(w, 'p', 'A')
+    const b = await card(w, 'p', 'B')
+    outside(ws, "INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (?, 1, 'Unblocked', '2026-11-15T00:00:00.000Z', 'outside', 'observed', '{}')", a)
+    let m = marks(w)
+    outside(ws, 'DELETE FROM card_facts WHERE card = ?', a)
+    expect(since(w, m)).toBeUndefined()
+    m = marks(w)
+    outside(ws, 'DELETE FROM cards WHERE number = ?', b)
+    expect(since(w, m)).toBeUndefined()
+    m = marks(w)
+    for (const t of ['C', 'D', 'E']) await card(w, 'p', t)
+    expect(since(w, m, 2)).toBeUndefined()
+    // The three made (the card at the mark was the one deleted).
+    expect(since(w, m, 5)).toHaveLength(3)
+  })
+})

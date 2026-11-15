@@ -34,7 +34,7 @@ const { FactStore } = await import('../src/main/workflow/factStore')
 const { advanced } = await import('../src/main/advanced')
 const service = await import('../src/main/workflow/service')
 const { MergeQueue } = await import('../src/main/workflow/mergeQueue')
-const { markQueueSeen, pauseQueue, queueCardChange, queueViews, resumeQueue, settleQueueChanges } = await import('../src/main/workflow/queueControls')
+const { markQueueSeen, pauseQueue, queueCardChange, queueViews, queueViewsMade, resumeQueue, settleQueueChanges } = await import('../src/main/workflow/queueControls')
 const { gitRepoOps } = await import('../src/main/platform/gitRepoOps')
 const { forgetBadges, workBadges } = await import('../src/main/workflow/cardWork')
 const { keptLive, nextFold, queueKey, shownReturns, unseenReturns, withKept, RETURN_SEEN_SHOWN_MS } = await import('../src/shared/progressQueue')
@@ -854,7 +854,10 @@ describe("a queue listing's cost doesn't grow with the queue's history (HI-3169)
       const card = counted('card')
       const records = counted('records')
       try {
-        // The window's listing, made afresh (a board change between: none kept).
+        // The window's listing, made whole: its workflow written, so nothing is kept or carried (HI-3301: a few cards
+        // changed would carry the views they can't touch, reading those cards).
+        const { tellListeners } = await import('../src/main/events')
+        tellListeners({ type: 'workflow-changed', workspacePath: w.path!, projectPath: repo })
         return { view: (await inWorkspace(w, () => queueViews(w, repo, undefined, true))).find((v) => v.target === 'main')!, ...reads }
       } finally {
         card.mockRestore()
@@ -1042,5 +1045,181 @@ describe("a project's queue listings, worked out once per state (HI-1683)", () =
     expect(now[0].queued.map((q) => q.waitingOn ?? [])).toEqual([[first[0][0], expect.not.stringMatching(/^#/)]])
     tellListeners({ type: 'workflow-changed', workspacePath: ws, projectPath: repo })
     expect(await list()).toEqual(now)
+  })
+})
+
+describe("a project's queue views, each kept while nothing it is made from changed (HI-3301)", () => {
+  const REV = 'c'.repeat(40)
+  /** A setup with two queues, main (a card approved the real way) and release (cards given queue facts directly). */
+  async function twoQueues() {
+    const { tellListeners } = await import('../src/main/events')
+    const { w, wt, repo, ws } = await workspace()
+    const facts_ = FactStore.forBoard(w, { project: 'p', key: 'p' })
+    const append = (c: number, kind: string, data: object) => store.boardWrite(w, async () => facts_.tx((tx) => void tx.append(c, { kind, actor: 'combwork', source: 'recorded', data } as never)))
+    const made = (title: string) => inWorkspace(w, async () => (await tasks.createTask({ title, project: 'p' }, user)).number)
+    /** A card queued for release: an entry of its own. */
+    const queuedFor = async (title: string, target = 'release'): Promise<{ card: number; entry: string }> => {
+      const card = await made(title)
+      const entry = `p-${card}/e1`
+      await append(card, 'IntegrationRequested', { entry, revision: REV, key: null, target, style: 'merge' })
+      return { card, entry }
+    }
+    const list = () => inWorkspace(w, () => queueViews(w, repo, undefined, true))
+    /** A listing made whole: its workflow written changes its stamp's rest, so nothing is carried. */
+    const fresh = async () => (tellListeners({ type: 'workflow-changed', workspacePath: ws, projectPath: repo }), list())
+    return { w, wt, repo, ws, append, made, queuedFor, list, fresh }
+  }
+
+  it('through a sequence of queue changes on two targets, each listing carried from the one before equals a listing made whole', async () => {
+    const { writeCardOutside, removeCard } = await import('./boardDb')
+    const { w, wt, repo, ws, append, made, queuedFor, list, fresh } = await twoQueues()
+    // Only the clock's date held (no timer): the listing's 5 s git window and a seen return's 10 s don't run out meanwhile.
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() })
+    try {
+      await fresh()
+      const steps: [string, () => Promise<unknown>][] = []
+      const step = (what: string, fn: () => Promise<unknown>) => steps.push([what, fn])
+      let a = 0
+      let blocker = 0
+      let r1 = { card: 0, entry: '' }
+      let r2 = { card: 0, entry: '' }
+      let r3 = { card: 0, entry: '' }
+      const elsewhere = { number: 9301, title: 'Elsewhere', project: 'other', column: 'doing', order: 1, history: [], comments: [] }
+      step('a card approved, queued for main', async () => (a = await approved(w, wt)))
+      step('a card queued for release', async () => (r1 = await queuedFor('Release one')))
+      step('main drained: merged', () => drain(w, repo, true))
+      step('release testing (begun)', () => append(r1.card, 'IntegrationStarted', { entry: r1.entry, expected: REV, result: 'd'.repeat(40) }))
+      step('release paused', () => inWorkspace(w, () => pauseQueue(w, repo, 'release', 'user')))
+      step('release resumed', () => inWorkspace(w, () => resumeQueue(w, repo, 'release')))
+      step('release merged', () => append(r1.card, 'Integrated', { entry: r1.entry, revision: REV, target: 'release', result: 'd'.repeat(40), method: 'merge', by: 'combwork' }))
+      step('another queued for release, blocked by a card of the project', async () => {
+        r2 = await queuedFor('Release two')
+        blocker = await made('Blocker')
+        await inWorkspace(w, () => tasks.updateTask(r2.card, { blockedBy: [blocker] }, user))
+      })
+      step('its blocker Done', () => inWorkspace(w, () => tasks.updateTask(blocker, { column: 'done' }, user)))
+      step('its blocker back from Done', () => inWorkspace(w, () => tasks.updateTask(blocker, { column: 'doing' }, user)))
+      step('a blocker that is not on the board', () => store.boardWrite(w, async () => void store.boardWriteOp(w, (d) => d.prepare("INSERT INTO card_links (card, kind, ord, target) VALUES (?, 'blockedBy', 7, 9301)").run(r2.card))))
+      step('that blocker written, in another project', async () => writeCardOutside(ws, 9301, elsewhere))
+      step('that blocker Done', async () => writeCardOutside(ws, 9301, { ...elsewhere, column: 'done' }))
+      step('the queued card renamed', () => inWorkspace(w, () => tasks.updateTask(r2.card, { title: 'Release two, renamed' }, user)))
+      step('the queued card labelled', () => inWorkspace(w, () => tasks.updateTask(r2.card, { labels: ['x'] }, user)))
+      step('the queued card removed from the queue', () => append(r2.card, 'IntegrationCancelled', { entry: r2.entry, reason: 'removed' }))
+      step('a third returned', async () => {
+        r3 = await queuedFor('Release three')
+        await append(r3.card, 'IntegrationFailed', { entry: r3.entry, revision: REV, target: 'release', reason: 'checks', transient: false })
+      })
+      step('its return seen', () => inWorkspace(w, () => markQueueSeen(w, repo, 'release', [r3.entry])))
+      step('a card of neither queue renamed', async () => {
+        const unrelated = await made('Unrelated')
+        await inWorkspace(w, () => tasks.updateTask(unrelated, { title: 'Unrelated, renamed' }, user))
+      })
+      step('the blocker deleted', () => removeCard(w, blocker))
+      step('the returned card moved to another project', async () => writeCardOutside(ws, r3.card, { ...store.cardDoc(w, r3.card)!, project: 'other' }))
+      for (const [what, fn] of steps) {
+        await fn()
+        const kept = await list()
+        const whole = await fresh()
+        expect({ what, views: kept }).toEqual({ what, views: whole })
+      }
+      // The steps did what they say: both queues, with their outcomes.
+      const last = Object.fromEntries((await list()).map((v) => [v.target, v]))
+      expect({ main: last.main.recent.map((x) => x.card), release: last.release.recent.map((x) => [x.card, x.outcome]) }).toEqual({ main: [a], release: [[r2.card, 'cancelled'], [r1.card, 'merged']] })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("alternating reads of one target: a view not asked for while a change touched it is never used after (HR1's round 1), the window's and the API's alike", async () => {
+    const { tellListeners } = await import('../src/main/events')
+    const { w, wt, repo, ws, append, made, queuedFor } = await twoQueues()
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() })
+    try {
+      const a = await approved(w, wt)
+      const r = await queuedFor('Release one')
+      const other = await made('Neither')
+      for (const window of [true, false]) {
+        const one = async (t: string) => (await inWorkspace(w, () => queueViews(w, repo, t, window)))[0]
+        const whole = async (t: string) => (tellListeners({ type: 'workflow-changed', workspacePath: ws, projectPath: repo }), one(t))
+        await whole('main')
+        await one('release')
+        // A main card changes; only release is asked for: main's view isn't checked in that part.
+        await inWorkspace(w, () => tasks.updateTask(a, { title: `Main, renamed (${window})` }, user))
+        // Another card written last, so the main card isn't the one at the revision mark (counted as changed every time).
+        await inWorkspace(w, () => tasks.updateTask(other, { title: `Neither (${window})` }, user))
+        const release = await one('release')
+        // A release card changes; then only main is asked for: its view must show the earlier change.
+        if (window) await append(r.card, 'IntegrationStarted', { entry: r.entry, expected: REV, result: 'd'.repeat(40) })
+        else await inWorkspace(w, () => tasks.updateTask(r.card, { title: 'Release one, renamed' }, user))
+        const main = await one('main')
+        expect(main.queued.map((q) => q.title)).toEqual([`Main, renamed (${window})`])
+        expect({ window, main }).toEqual({ window, main: await whole('main') })
+        // And release, asked for again after the first change, as made whole then.
+        expect(release.target).toBe('release')
+        expect({ window, release: await one('release') }).toEqual({ window, release: await whole('release') })
+      }
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("a listing kept never outlives what it read from git (HR1's round 2): refreshed just before git's 5 s run out, the next after it reads git again", async () => {
+    const { lineHistory } = await import('../src/main/platform/historyPorts')
+    const { w, wt, fresh, list } = await twoQueues()
+    const a = await approved(w, wt)
+    // The default branch as git answers it (the options name no target: the queue merges into it).
+    let def = 'main'
+    const read = vi.spyOn(lineHistory(), 'defaultTarget').mockImplementation(async () => def)
+    const t0 = Date.now()
+    vi.useFakeTimers({ toFake: ['Date'], now: t0 })
+    try {
+      const merging = async () => (await list()).filter((v) => v.combworkMerges).map((v) => v.target)
+      await fresh()
+      expect(await merging()).toEqual(['main'])
+      // Just before git's part runs out: a board change, so a new listing, made from that git part.
+      vi.setSystemTime(t0 + 4900)
+      await inWorkspace(w, () => tasks.updateTask(a, { title: 'Main, renamed' }, user))
+      expect(await merging()).toEqual(['main'])
+      // The default branch moves; past the git part's 5 s, with no board write: git is read again.
+      def = 'other'
+      const calls = read.mock.calls.length
+      vi.setSystemTime(t0 + 5100)
+      expect(await merging()).toEqual(['other'])
+      expect(read.mock.calls.length).toBeGreaterThan(calls)
+    } finally {
+      vi.useRealTimers()
+      read.mockRestore()
+    }
+  })
+
+  it("a change touches only its own queue's view: the other is reused, not worked out again; a blocker's change, the queue it blocks in", async () => {
+    const { w, wt, append, made, queuedFor, list, fresh } = await twoQueues()
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() })
+    try {
+      const a = await approved(w, wt)
+      const r = await queuedFor('Release one')
+      const blocker = await made('Blocker')
+      await inWorkspace(w, () => tasks.updateTask(r.card, { blockedBy: [blocker] }, user))
+      const other = await made('Neither')
+      await fresh()
+      /** The targets whose views a change made the next listing work out again. */
+      const remade = async (change: () => Promise<unknown>): Promise<string[]> => {
+        await change()
+        const from = queueViewsMade.length
+        await list()
+        return [...new Set(queueViewsMade.slice(from))].sort()
+      }
+      expect(await remade(() => append(r.card, 'IntegrationStarted', { entry: r.entry, expected: REV, result: 'd'.repeat(40) }))).toEqual(['release'])
+      expect(await remade(() => inWorkspace(w, () => tasks.updateTask(a, { title: 'Main, renamed' }, user)))).toEqual(['main'])
+      // A card at the board's revision mark keeps its revision when written again (HI-1715), so the card written last always
+      // counts as changed: renaming another card once remakes main's view again (the main card was written last); twice, none.
+      expect(await remade(() => inWorkspace(w, () => tasks.updateTask(other, { title: 'Neither, renamed' }, user)))).toEqual(['main'])
+      expect(await remade(() => inWorkspace(w, () => tasks.updateTask(other, { title: 'Neither, renamed again' }, user)))).toEqual([])
+      expect(await remade(() => inWorkspace(w, () => tasks.updateTask(blocker, { column: 'done' }, user)))).toEqual(['release'])
+      // Nothing changed: nothing worked out again.
+      expect(await remade(async () => undefined)).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

@@ -999,6 +999,45 @@ export function factsHighIn(db: Db['reader']): number {
   return (db.prepare('SELECT max(rowid) AS m FROM card_facts').get() as { m: number | null }).m ?? 0 // i18n-ignore: SQL
 }
 
+/**
+ * HI-3301: where a read's snapshot stands, for a cache that later asks what changed since (changedCardsIn): the database's
+ * opening, the facts' epoch, the board's card revision mark and its highest fact rowid.
+ */
+export interface ChangeMarks {
+  db: string
+  epoch: number
+  rev: number
+  high: number
+}
+
+/** HI-3301: the change marks on a read's snapshot. */
+export function changeMarksIn(ws: WorkspaceService, db: Db['reader']): ChangeMarks {
+  const rev = (db.prepare('SELECT g FROM board_rev').get() as { g: number } | undefined)?.g ?? 0 // i18n-ignore: SQL
+  return { db: boardDatabase(ws), epoch: factsEpochIn(db), rev, high: factsHighIn(db) }
+}
+
+/**
+ * HI-3301: the cards changed between `since` and a read's snapshot, on that snapshot (board-wide, with each one's project):
+ * those whose revision is at `since`'s mark or above (a card at the mark keeps its revision when written again, so the
+ * card written last before `since` is always among them: one card too many at most, never one missed) and those with a
+ * fact above `since`'s highest. Null when it can't say: another database or facts epoch (a fact or card deleted, a
+ * card moved to another project), or more than `most` cards (a caller then starts again).
+ */
+export function changedCardsIn(ws: WorkspaceService, db: Db['reader'], since: ChangeMarks, most: number): { number: number; project: string }[] | null {
+  const now = changeMarksIn(ws, db)
+  if (now.db !== since.db || now.epoch !== since.epoch || now.rev < since.rev || now.high < since.high) return null
+  // Two reads, each by its index (cards_rev; the facts' rowid, then each card by number): one UNION scans every card.
+  const out = new Map<number, string>()
+  const add = (rows: { number: number; project: string | null }[]): boolean => {
+    for (const r of rows) out.set(r.number, r.project ?? '')
+    return out.size <= most
+  }
+  if (!add(db.prepare('SELECT number, project FROM cards WHERE rev >= ? LIMIT ?').all(since.rev, most + 1) as { number: number; project: string | null }[])) return null // i18n-ignore: SQL
+  const facts = db.prepare('SELECT c.number, c.project FROM card_facts f CROSS JOIN cards c ON c.number = f.card WHERE f.rowid > ? LIMIT ?').all(since.high, (most + 1) * 8) as { number: number; project: string | null }[] // i18n-ignore: SQL
+  if (facts.length > (most + 1) * 8 - 1 || !add(facts)) return null
+  return [...out].map(([number, project]) => ({ number, project }))
+}
+
 /** The lanes were saved (storeTables.ts, in this process): the board's revision moves on. */
 export function noteLanesSaved(path: string): void {
   const b = boards.get(keyOf(path))
