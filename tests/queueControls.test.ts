@@ -1165,7 +1165,7 @@ describe("a project's queue views, each kept while nothing it is made from chang
 
   it("a listing kept never outlives what it read from git (HR1's round 2): refreshed just before git's 5 s run out, the next after it reads git again", async () => {
     const { lineHistory } = await import('../src/main/platform/historyPorts')
-    const { w, wt, repo, fresh, list } = await twoQueues()
+    const { w, wt, fresh, list } = await twoQueues()
     const a = await approved(w, wt)
     // The default branch as git answers it (the options name no target: the queue merges into it).
     let def = 'main'
