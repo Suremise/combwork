@@ -171,9 +171,14 @@ interface CombworkMessageValues {
   'workflow.mergeChoice.answer': { styleTitle: string | number; style: string | number; messageTitle: string | number; message: string | number }
   'workflow.mergeGuards.add': undefined
   'workflow.mergeGuards.addName': undefined
+  'workflow.mergeGuards.checking': undefined
   'workflow.mergeGuards.down': undefined
   'workflow.mergeGuards.example': undefined
   'workflow.mergeGuards.ignoreCase': undefined
+  'workflow.mergeGuards.matches': { count: number }
+  'workflow.mergeGuards.matchesNone': undefined
+  'workflow.mergeGuards.matchesUnknown': { why: string }
+  'workflow.mergeGuards.matchesWhere': { where: string | number; more: string }
   'workflow.mergeGuards.message': undefined
   'workflow.mergeGuards.name': undefined
   'workflow.mergeGuards.nameGuard': undefined

@@ -163,6 +163,11 @@ export interface HistoryPort {
    * textconv, colour, prefix or path quoting the user's configuration sets), at most GUARD_DIFF_BYTES: the merge guards'.
    */
   addedDiff(repo: string, base: string, head: string): Promise<DiffRead>
+  /**
+   * HI-3284: the working folder's files the version control has (Git: tracked, and new ones not ignored), `/` between
+   * folders: a merge guard's preview. Null when they can't be read.
+   */
+  workingFiles(repo: string): Promise<string[] | null>
   /** A change's candidate key (a first test only, never sameness on its own: R3.2), or null where it has none. */
   candidateKey(repo: string, base: string, head: string): Promise<Maybe<string | null>>
   /** Whether two changes are the same change (§16.3.2's replay; false for anything it can't settle: R3.2). */

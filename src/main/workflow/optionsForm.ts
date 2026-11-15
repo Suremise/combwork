@@ -45,6 +45,8 @@ import { exitBy } from '../exitLog'
 import { LEGACY_CONSUMED, legacyPreferences } from '../../shared/workflow/preferences'
 import { checkOffer } from './releaseOffer'
 import { changeGuards, refuseGuardsAtSave } from './guardsSave'
+import { previewable, type GuardPreview, type MergeGuard } from '../../shared/workflow/mergeGuards'
+import { previewMergeGuard } from './mergeGuardsRun'
 
 const log = createLogger('workflow')
 
@@ -248,6 +250,21 @@ export async function cardsInFlight(ws: WorkspaceService, project: { path: strin
   // too, whose numbers repeat (#1422, HR5's round 2).
   const keys = cardKeys(ws, cards.map((c) => c.id))
   return cards.map((c) => ({ number: c.id, key: cardLabel({ number: c.id, key: keys.get(c.id) }), title: c.title }))
+}
+
+/**
+ * HI-3284 (Darren's decision, 15 Nov): what a merge guard being added or edited already matches in the project, how many
+ * lines and where, read in the guards' worker: the files its version control has (tracked, and new ones not ignored), or
+ * a walk of the folder leaving out its excluded folders and node_modules.
+ */
+export async function guardPreview(ws: WorkspaceService, projectPath: string, raw: unknown): Promise<GuardPreview> {
+  const project = projectOf(ws, projectPath)
+  const guard = raw as MergeGuard
+  if (!guard || typeof guard !== 'object' || !previewable(guard)) return { count: 0, hits: [], files: 0, incomplete: 'invalid' } // i18n-ignore: a reason's code
+  const files = (await historyOf(project.platform)?.workingFiles(project.path).catch(() => null)) ?? null
+  const cfg = await ws.projectConfig(project.path)
+  const excluded = resolvedOf(ws, project.path, project.platform, cfg).options.excluded
+  return previewMergeGuard(project.path, files, ['node_modules', ...excluded], guard)
 }
 
 /** What saving a change would do (§16.6.5's warning), before it is saved. */

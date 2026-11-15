@@ -497,6 +497,12 @@ export async function addedDiff(repo: string, base: string, headRev: string): Pr
   return { unreadable: r.err || `git diff exited ${r.code}` } // i18n-ignore: git's side, for the log
 }
 
+/** HI-3284: the files git has in a working folder (tracked, and new ones not ignored), for a merge guard's preview. */
+export async function workingFiles(repo: string): Promise<string[] | null> {
+  const r = await git(repo, ['-c', 'core.quotePath=false', 'ls-files', '-z', '-co', '--exclude-standard'], 64 * 1024 * 1024)
+  return r.ok ? [...new Set(r.out.split('\0').filter(Boolean))] : null
+}
+
 /**
  * HI-2864: what a path is at a commit (a gitlink with its commit, a file, a link, or nothing there), from its tree entry's
  * mode: `ls-tree -z` of that one literal path. Unknown when git can't say or its output isn't one entry or none.

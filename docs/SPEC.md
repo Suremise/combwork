@@ -7622,6 +7622,13 @@ workspace and project levels, none by default) are patterns a merge may not add.
   case-sensitive (escaped, its spaces any whitespace, between Unicode letter, number and underscore boundaries), skipping
   `LICENSE*`, `package.json`, `electron-builder.yml` and `CODE_OF_CONDUCT*`, with the message "Your name is in this change.
   Cite the card or decision instead, or skip this file if a name belongs here." No guard ships active.
+- **What it already matches** (Darren's decision, 15 Nov: "show how many lines it currently matches and where. Some
+  onus should be on the user to write good guards"): in a project's form, each guard a save would take shows, a moment
+  after it is typed, how many lines of the project it already matches and the first five (file and line), read in the
+  guards' worker: the files the version control has (Git: tracked, and new ones not ignored; otherwise a walk of the
+  folder leaving out dot folders, `node_modules` and the excluded folders), binary files and files over 2 MB left out, at
+  most 50,000 files, 64 MB and 10 s (past them it says it couldn't look). It still saves whatever it matches: guards check
+  only the lines a merge adds. No list of common words: the user decides.
 - **Not secret scanning:** a guard catches what it names, in the lines a merge adds; the option's help says so.
 - **Existing "no new X" checks** (for reference; Darren, 15 Nov: nothing configured or migrated by this card, and
   `tests/oldNames.mjs --diff` stays in `check:repo`): this repository's old-name check needs more than a pattern (letter

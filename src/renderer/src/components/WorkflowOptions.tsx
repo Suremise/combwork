@@ -761,7 +761,8 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
         return <DraftText value={(effective.otherTargets ?? []).join(', ')} placeholder={tr(T.otherTargets)} onCommit={(v) => { const b = [...new Set(list(v))]; if (b.length) set('otherTargets', b); else inheritKey('otherTargets') }} />
       case 'mergeGuards':
         // HI-3284: none left is a list of none (the level's own), not inherited: Inherit takes the level's above.
-        return <MergeGuardsEditor guards={effective.mergeGuards ?? []} onChange={(g) => set('mergeGuards', g)} />
+        // A project's form previews what each guard already matches there (a level has no project to look in).
+        return <MergeGuardsEditor guards={effective.mergeGuards ?? []} project={source.level ? null : (project?.path ?? null)} onChange={(g) => set('mergeGuards', g)} />
       case 'stageNames':
         return <StageNamesEditor options={effective} onChange={(names) => (Object.keys(names).length ? set('stageNames', names) : inheritKey('stageNames'))} />
       default:

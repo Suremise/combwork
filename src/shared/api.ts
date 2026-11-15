@@ -196,6 +196,7 @@ import type { ForYouAnswer, ForYouSummary, WorkBadge, WorkView } from './workflo
 import type { BranchQueueCard, QueueRecent, QueueResumed, QueueView } from './workflow/queue'
 import type { LongTask, WindowWhere } from './windowHealth'
 import type { MainStalls } from './mainStalls'
+import type { GuardPreview, MergeGuard } from './workflow/mergeGuards'
 
 type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }
 export type SettingsPatch = DeepPartial<AppSettings>
@@ -401,6 +402,8 @@ export interface CombworkRequests {
   'project:updateConfig': (projectPath: string, patch: Partial<ProjectConfig>) => ProjectConfig
   /** The project's workflow options as Project Settings → Workflow shows them (#1278): its own, what they inherit, the presets. */
   'workflow:form': (projectPath: string) => WorkflowForm
+  /** HI-3284: what a merge guard being edited already matches in the project (how many lines, the first few). */
+  'workflow:guardPreview': (projectPath: string, guard: MergeGuard) => GuardPreview
   /** What saving a change to the project's workflow options would do (§16.6.5's warning): its problems, what changes, what keeps the old rules. */
   'workflow:check': (projectPath: string, change: WorkflowChange) => WorkflowCheck
   /** Saves the project's workflow options, checked again (refused, with every reason); `applyTo`: cards in flight to work under them from now (OP-38). */

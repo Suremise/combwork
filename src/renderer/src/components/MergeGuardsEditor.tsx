@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { msg, tr } from '@shared/i18n'
-import { nameGuard, offersNameGuard, type MergeGuard } from '@shared/workflow/mergeGuards'
+import { nameGuard, offersNameGuard, previewable, type GuardPreview, type MergeGuard } from '@shared/workflow/mergeGuards'
+import { call } from '../api'
 import { useStore } from '../store'
 import { Icon, Tooltip } from './ui'
 
 // Version Control → Workflow → Merge guards (HI-3284): a row per guard (its name, pattern, case, the paths it applies to
 // and skips, and its message), added, removed and moved; and the example guard that keeps the user's name out of the
-// code (Darren's decision, 15 Nov), offered only when Settings → General gives a name, and filled in once.
+// code (Darren's decision, 15 Nov), offered only when Settings → General gives a name, and filled in once. In a project's
+// form, each guard shows what it already matches there, how many lines and the first few (Darren's decision, 15 Nov:
+// "some onus should be on the user to write good guards"), still saved whatever it matches.
 
 const T = {
   none: msg({ id: 'workflow.mergeGuards.none', defaultMessage: 'No merge guards.', description: 'Under “Merge guards” (Version Control → Workflow) when there are none (HI-3284).' }),
@@ -23,6 +26,11 @@ const T = {
   addName: msg({ id: 'workflow.mergeGuards.addName', defaultMessage: 'Add “Keep My Name Out of the Code”', description: 'A button under the merge guards (HI-3284, Darren’s decision): adds a ready-made guard refusing the user’s own name (Settings → General → Your name) in what a merge adds. The quoted part is the guard’s name, as workflow.mergeGuards.nameGuard.' }),
   nameGuard: msg({ id: 'workflow.mergeGuards.nameGuard', defaultMessage: 'Keep my name out of the code', description: 'The name the ready-made merge guard is given (HI-3284): it refuses the user’s own name in what a merge adds. The user can rename it.' }),
   nameMessage: msg({ id: 'workflow.mergeGuards.nameMessage', defaultMessage: 'Your name is in this change. Cite the card or decision instead, or skip this file if a name belongs here.', description: 'The message the ready-made merge guard is given (HI-3284, Darren’s wording): what the builder is told when the user’s name is in what a merge adds. Card: a task on Combwork’s board. The user can edit it.' }),
+  checking: msg({ id: 'workflow.mergeGuards.checking', defaultMessage: 'Looking for what it already matches in the project…', description: 'Under a merge guard being edited (HI-3284), while Combwork looks for the lines of the project its pattern already matches.' }),
+  matchesNone: msg({ id: 'workflow.mergeGuards.matchesNone', defaultMessage: 'It matches no line in the project now.', description: 'Under a merge guard being edited (HI-3284): its pattern matches no line of the project’s files as they are now.' }),
+  matches: msg({ id: 'workflow.mergeGuards.matches', defaultMessage: '{count, plural, one {It already matches # line in the project} other {It already matches # lines in the project}}, so check it isn’t too broad. It still saves: only the lines a merge adds are checked.', description: 'Under a merge guard being edited (HI-3284): how many lines of the project’s files its pattern already matches; the first few follow as file:line. Existing matches don’t block anything (only the lines a merge adds are checked), but many suggest the pattern is too broad.' }),
+  matchesWhere: msg({ id: 'workflow.mergeGuards.matchesWhere', defaultMessage: '{where}{more, select, yes {, …} other {}}', description: 'Under a merge guard being edited (HI-3284): where its pattern already matches, {where} a list of file:line places (paths: keep them); with more yes, there are more than those listed.' }),
+  matchesUnknown: msg({ id: 'workflow.mergeGuards.matchesUnknown', defaultMessage: '{why, select, tooLarge {The project is too large to look for what it already matches.} timedOut {Looking for what it already matches took too long.} other {Combwork couldn’t look for what it already matches.}}', description: 'Under a merge guard being edited (HI-3284): what its pattern already matches in the project could not be found out (select: translate each; keep the keys): too many files, the time limit, or another failure.' }),
   example: msg({ id: 'workflow.mergeGuards.example', defaultMessage: 'Fills in a guard once from your name in Settings → General; edit or remove it like any other.', description: 'The tooltip of the button adding the ready-made “Keep my name out of the code” merge guard (HI-3284).' })
 }
 
@@ -40,8 +48,46 @@ const guardOf = (r: Row): MergeGuard => {
   return { name: r.name.trim(), pattern: r.pattern, ...(r.ignoreCase ? { ignoreCase: true } : {}), ...(paths.length ? { paths } : {}), ...(skip.length ? { skip } : {}), message: r.message.trim() }
 }
 
+/** How long a guard stays unchanged before its preview is looked for (so typing doesn't start one per key). */
+const PREVIEW_QUIET_MS = 400
+
+/** What a guard already matches in the project, looked for once its pattern and paths are valid and stay unchanged a moment. */
+function GuardMatches({ project, guard }: { project: string; guard: MergeGuard }) {
+  const key = JSON.stringify([guard.pattern, !!guard.ignoreCase, guard.paths ?? [], guard.skip ?? []])
+  const valid = previewable(guard)
+  const [shown, setShown] = useState<{ key: string; preview: GuardPreview | null } | null>(null)
+  useEffect(() => {
+    if (!valid) return
+    let live = true
+    const t = setTimeout(() => {
+      setShown({ key, preview: null })
+      call('workflow:guardPreview', project, guard).then(
+        (preview) => live && setShown({ key, preview }),
+        () => live && setShown({ key, preview: { count: 0, hits: [], files: 0, incomplete: 'failed' } })
+      )
+    }, PREVIEW_QUIET_MS)
+    return () => {
+      live = false
+      clearTimeout(t)
+    }
+    // The guard's matching parts, by their key: its name and message change nothing it matches.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project, key, valid])
+  if (!valid || shown?.key !== key) return null
+  const p = shown.preview
+  if (!p) return <div className="s-desc workflow-guard-matches" data-matches="checking">{tr(T.checking)}</div>
+  if (p.incomplete) return <div className="s-desc workflow-guard-matches" data-matches="unknown">{tr(T.matchesUnknown, { why: p.incomplete })}</div>
+  if (!p.count) return <div className="s-desc workflow-guard-matches" data-matches="0">{tr(T.matchesNone)}</div>
+  return (
+    <div className="s-desc workflow-guard-matches warn" data-matches={p.count}>
+      <div>{tr(T.matches, { count: p.count })}</div>
+      <div className="mono">{tr(T.matchesWhere, { where: p.hits.map((h) => `${h.file}:${h.line}`).join(', '), more: p.count > p.hits.length ? 'yes' : 'no' })}</div>
+    </div>
+  )
+}
+
 /** The merge guards' rows: typed freely, taken as a field loses focus (as the checks' rows are). */
-export function MergeGuardsEditor({ guards, onChange }: { guards: MergeGuard[]; onChange: (guards: MergeGuard[]) => void }) {
+export function MergeGuardsEditor({ guards, project, onChange }: { guards: MergeGuard[]; project: string | null; onChange: (guards: MergeGuard[]) => void }) {
   const userName = useStore((s) => s.settings?.general.userName ?? '')
   const given = JSON.stringify(guards)
   const [rows, setRows] = useState<Row[]>(() => guards.map(rowOf))
@@ -97,6 +143,7 @@ export function MergeGuardsEditor({ guards, onChange }: { guards: MergeGuard[]; 
           <input className="input mono" value={r.paths} placeholder={tr(T.paths)} aria-label={tr(T.paths)} spellCheck={false} onChange={(e) => edit(i, 'paths', e.target.value)} onBlur={() => commit(rows)} />
           <input className="input mono" value={r.skip} placeholder={tr(T.skip)} aria-label={tr(T.skip)} spellCheck={false} onChange={(e) => edit(i, 'skip', e.target.value)} onBlur={() => commit(rows)} />
           <input className="input" value={r.message} placeholder={tr(T.message)} aria-label={tr(T.message)} onChange={(e) => edit(i, 'message', e.target.value)} onBlur={() => commit(rows)} />
+          {project && <GuardMatches project={project} guard={guardOf(r)} />}
         </div>
       ))}
       <div className="flex">

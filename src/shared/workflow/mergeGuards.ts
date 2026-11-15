@@ -410,6 +410,44 @@ export function matchGuards(files: readonly AddedFile[], guards: readonly MergeG
   return { hits, more, messages: guards.filter((g) => matched.has(g.name)).map((g) => ({ guard: g.name, message: g.message })) }
 }
 
+/**
+ * Darren's decision, 15 Nov ("show how many lines it currently matches and where"): what a guard already matches in the
+ * project, shown as it is added or edited, so a too-broad pattern is obvious before it's saved (still allowed: guards
+ * check only added lines). The lines matched, the first few of them, and the files read; incomplete when it couldn't
+ * read them all (its bounds, its time limit).
+ */
+/** Whether a guard's matching parts (its pattern and paths) are ones a save takes: what a preview needs, its name and message aside. */
+export const previewable = (g: MergeGuard): boolean => guardProblems([{ ...g, name: g.name?.trim() ? g.name : 'x', message: g.message?.trim() ? g.message : 'x' }]).length === 0
+
+export interface GuardPreview {
+  count: number
+  hits: { file: string; line: number; excerpt: string }[]
+  files: number
+  incomplete?: string
+}
+
+/** How many of a preview's matches are listed. */
+export const PREVIEW_HITS = 5
+
+/** One guard over files' text (path, text), every line whole, binary files left out: what it already matches. */
+export function previewGuard(files: Iterable<{ path: string; text: string }>, g: MergeGuard): GuardPreview {
+  const re = compileGuard(g)
+  const out: GuardPreview = { count: 0, hits: [], files: 0 }
+  for (const f of files) {
+    if (!guardApplies(g, f.path)) continue
+    out.files++
+    const lines = f.text.split('\n')
+    for (let i = 0; i < lines.length; i++) {
+      const text = lines[i].replace(/\r$/, '')
+      const m = re.exec(text)
+      if (!m) continue
+      out.count++
+      if (out.hits.length < PREVIEW_HITS) out.hits.push({ file: f.path, line: i + 1, excerpt: excerptOf(text, m.index, m[0].length) })
+    }
+  }
+  return out
+}
+
 /** Whether a report refuses the merge: a match, or a check that couldn't finish. */
 export const guardsRefuse = (r: GuardReport): boolean => !!r.incomplete || r.hits.length > 0
 

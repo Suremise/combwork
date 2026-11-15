@@ -1,6 +1,6 @@
 import { join } from 'path'
 import { Worker } from 'worker_threads'
-import type { GuardProblem, GuardReport, MergeGuard } from '../../shared/workflow/mergeGuards'
+import { previewable, type GuardPreview, type GuardProblem, type GuardReport, type MergeGuard } from '../../shared/workflow/mergeGuards'
 import type { DiffRead } from '../platform/types'
 import { bundledScriptExists, workerHere } from '../workerThreads'
 import type { GuardsReply, GuardsRequest } from './mergeGuardsWorker'
@@ -86,6 +86,21 @@ export async function checkMergeGuards(guards: readonly MergeGuard[], read: () =
   if ('report' in r) return r.report
   if ('ended' in r) return none(r.ended === 'timedOut' ? `timedOut:${r.running ?? ''}` : r.ended === 'cancelled' ? 'cancelled' : 'failed', r.ended === 'cancelled') // i18n-ignore: a reason's code
   return none('failed') // i18n-ignore: a reason's code
+}
+
+/** A preview's bounds: the files, the text and one file's size read, and its time limit. */
+export const PREVIEW_LIMITS = { maxFiles: 50_000, maxBytes: 64 * 1024 * 1024, maxFile: 2 * 1024 * 1024, timeoutMs: 10_000 }
+
+/**
+ * What one guard already matches in the project (Darren's decision, 15 Nov), in the worker: `files` its version
+ * control's (null: a walk of the folder leaving out `skipDirs`). A guard a save wouldn't take is incomplete, never run.
+ */
+export async function previewMergeGuard(root: string, files: string[] | null, skipDirs: string[], guard: MergeGuard, timeoutMs = PREVIEW_LIMITS.timeoutMs): Promise<GuardPreview> {
+  const none = (incomplete: string): GuardPreview => ({ count: 0, hits: [], files: 0, incomplete })
+  if (!previewable(guard)) return none('invalid') // i18n-ignore: a reason's code
+  const r = await inWorker({ type: 'preview', root, files, skipDirs, guard, maxFiles: PREVIEW_LIMITS.maxFiles, maxBytes: PREVIEW_LIMITS.maxBytes, maxFile: PREVIEW_LIMITS.maxFile }, timeoutMs)
+  if ('preview' in r) return r.preview
+  return none('ended' in r && r.ended === 'timedOut' ? 'timedOut' : 'failed') // i18n-ignore: a reason's code
 }
 
 /**

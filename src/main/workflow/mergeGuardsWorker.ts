@@ -1,5 +1,7 @@
+import { readdirSync, readFileSync, statSync } from 'original-fs'
+import { join } from 'path'
 import { parentPort } from 'worker_threads'
-import { compileGuard, matchGuards, parseAddedLines, type GuardProblem, type GuardReport, type MergeGuard } from '../../shared/workflow/mergeGuards'
+import { compileGuard, matchGuards, parseAddedLines, previewGuard, type GuardPreview, type GuardProblem, type GuardReport, type MergeGuard } from '../../shared/workflow/mergeGuards'
 
 /**
  * The merge guards' worker (HI-3284, design HI-3284/s16): a user's patterns are run only here, never on main's thread,
@@ -9,12 +11,69 @@ import { compileGuard, matchGuards, parseAddedLines, type GuardProblem, type Gua
  * worker can't load it).
  */
 
-export type GuardsRequest = { type: 'check'; diff: string; guards: MergeGuard[]; maxLines: number } | { type: 'empty'; guards: MergeGuard[] }
+/**
+ * A preview (Darren's decision, 15 Nov): one guard over the project's files as they are on disk, `files` the paths to
+ * read (its version control's, tracked and not ignored) or, with none, a walk of `root` leaving out `skipDirs` and every
+ * dot folder; at most `maxFiles` files and `maxBytes` of text, each file at most `maxFile` (a larger one is left out).
+ */
+export type PreviewRequest = { type: 'preview'; root: string; files: string[] | null; skipDirs: string[]; guard: MergeGuard; maxFiles: number; maxBytes: number; maxFile: number }
 
-export type GuardsReply = { running: string } | { report: GuardReport } | { problems: GuardProblem[] }
+export type GuardsRequest = { type: 'check'; diff: string; guards: MergeGuard[]; maxLines: number } | { type: 'empty'; guards: MergeGuard[] } | PreviewRequest
+
+export type GuardsReply = { running: string } | { report: GuardReport } | { problems: GuardProblem[] } | { preview: GuardPreview }
+
+/** The project's files a preview reads: the given ones, or a walk; `null` once past the bound. */
+function listFiles(m: PreviewRequest): string[] | null {
+  if (m.files) return m.files.length > m.maxFiles ? null : m.files
+  const out: string[] = []
+  const skip = new Set(m.skipDirs.map((d) => d.toLowerCase()))
+  const walk = (rel: string): boolean => {
+    for (const e of readdirSync(join(m.root, rel), { withFileTypes: true })) {
+      const p = rel ? `${rel}/${e.name}` : e.name
+      if (e.isDirectory()) {
+        if (e.name.startsWith('.') || skip.has(e.name.toLowerCase()) || skip.has(p.toLowerCase())) continue
+        if (!walk(p)) return false
+      } else if (e.isFile()) {
+        out.push(p)
+        if (out.length > m.maxFiles) return false
+      }
+    }
+    return true
+  }
+  return walk('') ? out : null
+}
+
+/** A preview: the files read one at a time (binary ones, and one past `maxFile`, left out), within the bounds. */
+function preview(m: PreviewRequest): GuardPreview {
+  const files = listFiles(m)
+  if (!files) return { count: 0, hits: [], files: 0, incomplete: 'tooLarge' } // i18n-ignore: a reason's code
+  let bytes = 0
+  let over = false
+  function* texts(): Generator<{ path: string; text: string }> {
+    for (const path of files!) {
+      let buf: Buffer
+      try {
+        if (statSync(join(m.root, path)).size > m.maxFile) continue
+        buf = readFileSync(join(m.root, path))
+      } catch {
+        continue
+      }
+      if (buf.subarray(0, 8192).includes(0)) continue
+      bytes += buf.length
+      if (bytes > m.maxBytes) {
+        over = true
+        return
+      }
+      yield { path, text: buf.toString('utf8') }
+    }
+  }
+  const r = previewGuard(texts(), m.guard)
+  return over ? { ...r, incomplete: 'tooLarge' } : r // i18n-ignore: a reason's code
+}
 
 /** Runs one request, telling `post` of each guard it starts on; returns its answer. */
 export function handleGuards(m: GuardsRequest, post: (r: GuardsReply) => void): GuardsReply {
+  if (m.type === 'preview') return { preview: preview(m) }
   if (m.type === 'empty') {
     const problems: GuardProblem[] = []
     m.guards.forEach((g, i) => {

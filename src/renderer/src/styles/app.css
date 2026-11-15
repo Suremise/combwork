@@ -15867,6 +15867,12 @@ button.progress-lane-retry {
   flex: 1;
   min-width: 0;
 }
+.workflow-guard-matches.warn {
+  color: var(--warning);
+}
+.workflow-guard-matches .mono {
+  overflow-wrap: anywhere;
+}
 .workflow-guards > .flex {
   gap: 6px;
   flex-wrap: wrap;

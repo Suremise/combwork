@@ -2,7 +2,7 @@
 // recorded Git and jj output (tests/fixtures/mergeGuards), the matching (added lines only, whole lines, flags, paths),
 // the report for agents, the example guard's pattern, and the worker: a runaway pattern ends at its time limit naming
 // the guard, the empty-match rule at a save, and a read that fails or is too large is incomplete, never a pass.
-import { readFileSync } from 'fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { build } from 'esbuild'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -23,11 +23,13 @@ import {
   nameGuard,
   offersNameGuard,
   parseAddedLines,
+  previewGuard,
+  PREVIEW_HITS,
   unquotePath,
   type AddedFile,
   type MergeGuard
 } from '../src/shared/workflow/mergeGuards'
-import { checkMergeGuards, emptyMatchProblems, inWorker, useGuardsWorker } from '../src/main/workflow/mergeGuardsRun'
+import { checkMergeGuards, emptyMatchProblems, inWorker, previewMergeGuard, useGuardsWorker } from '../src/main/workflow/mergeGuardsRun'
 import { takesOption } from '../src/shared/workflow/options'
 import { tempDir } from './tempDir'
 
@@ -184,6 +186,18 @@ describe('matching', () => {
   })
 })
 
+describe('a preview of what a guard already matches (Darren’s decision, 15 Nov)', () => {
+  it('counts every line it matches in the files it applies to, listing the first few', () => {
+    const files = [{ path: 'a.txt', text: 'secret\nno\nsecret\r\n' }, { path: 'LICENSE', text: 'secret' }, ...Array.from({ length: 6 }, (_x, i) => ({ path: `f${i}.txt`, text: 'a secret' }))]
+    const p = previewGuard(files, guard({ skip: ['LICENSE'] }))
+    expect(p.count).toBe(8)
+    expect(p.files).toBe(7)
+    expect(p.hits).toHaveLength(PREVIEW_HITS)
+    expect(p.hits.slice(0, 2)).toEqual([{ file: 'a.txt', line: 1, excerpt: 'secret' }, { file: 'a.txt', line: 3, excerpt: 'secret' }])
+    expect(previewGuard([{ path: 'a', text: 'none' }], guard())).toEqual({ count: 0, hits: [], files: 1 })
+  })
+})
+
 describe('the example guard (Darren’s decision, 15 Nov)', () => {
   const hits = (name: string, text: string): boolean => new RegExp(namePattern(name), 'u').test(text)
 
@@ -221,7 +235,7 @@ describe('the worker', () => {
   const HUNG_MS = 30_000
 
   beforeAll(async () => {
-    await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'workflow', 'mergeGuardsWorker.ts')], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent' })
+    await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'workflow', 'mergeGuardsWorker.ts')], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
     useGuardsWorker(bundle)
   }, 60_000)
   afterAll(() => useGuardsWorker(null))
@@ -264,6 +278,25 @@ describe('the worker', () => {
     // The worker named which guard it was on when its time ran out (here, a limit no worker can meet).
     expect(await emptyMatchProblems([guard(), guard({ pattern: 'y' })], 0)).toMatchObject([{ field: 'pattern', why: 'timedOut' }])
   })
+
+  it('previews what a guard already matches in a project: the files given, or a walk leaving out dot folders and the excluded', async () => {
+    const root = tempDir('cw-guard-preview-')
+    const put = (f: string, text: string | Buffer): void => {
+      mkdirSync(join(root, f, '..'), { recursive: true })
+      writeFileSync(join(root, f), text)
+    }
+    put('src/a.ts', 'ok\nmy secret\r\nsecret again\n')
+    put('LICENSE', 'a secret licence\n')
+    put('node_modules/x/i.js', 'secret\n')
+    put('.git/config', 'secret\n')
+    put('bin.dat', Buffer.from([0, 1, 2, 115, 101, 99, 114, 101, 116]))
+    const walked = await previewMergeGuard(root, null, ['node_modules'], guard({ skip: ['LICENSE'] }))
+    expect(walked).toEqual({ count: 2, files: 1, hits: [{ file: 'src/a.ts', line: 2, excerpt: 'my secret' }, { file: 'src/a.ts', line: 3, excerpt: 'secret again' }] })
+    const listed = await previewMergeGuard(root, ['LICENSE', 'gone.txt'], [], guard())
+    expect(listed).toMatchObject({ count: 1, hits: [{ file: 'LICENSE', line: 1 }] })
+    expect(await previewMergeGuard(root, null, [], guard({ pattern: '(' }))).toMatchObject({ incomplete: 'invalid' })
+    expect(await previewMergeGuard(root, null, [], guard(), 0)).toMatchObject({ incomplete: 'timedOut' })
+  }, HUNG_MS)
 
   it('answers a request and is ended after it', async () => {
     const r = await inWorker({ type: 'empty', guards: [guard()] }, HUNG_MS)
