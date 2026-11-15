@@ -91,8 +91,12 @@ describe("the grant of the project's copies folder (extraDirs)", () => {
     expect(copiesDirOf('D:\\Work\\ws.worktrees', 'D:\\Work\\ws\\proj')).toBe(join('D:\\Work\\ws.worktrees', 'proj', COPIES_DIR))
   })
 
-  it("every provider Combwork has can be given folders (OpenCode since HI-2772: 2.2.6's default rules reach the copies, no grant needed)", () => {
-    for (const p of PROVIDERS) expect(p.capabilities.session?.extraDirs, p.id).toBe(true)
+  // Muse Code (HI-3202): 1.4.20 has no option for a folder beside its own (`muse --help`, tests/fixtures/advanced/
+  // help-muse-1.4.20.txt; --workspace roots its tools at one folder instead of the session's), so its reviewers review the
+  // builder's folder read-only. A new provider must be decided on here, not left out by default (HI-3279).
+  const NO_EXTRA_DIRS = ['muse']
+  it("every provider Combwork has can be given folders but Muse Code, whose CLI has no option for one (OpenCode since HI-2772: 2.2.6's default rules reach the copies, no grant needed)", () => {
+    for (const p of PROVIDERS) expect(p.capabilities.session?.extraDirs, p.id).toBe(!NO_EXTRA_DIRS.includes(p.id))
   })
 
   it('Claude Code: --add-dir, always followed by an option (it takes several), never with none granted', () => {

@@ -69,6 +69,7 @@ describe('the override switches', () => {
       'claude-code.override.mcpIsolation', 'claude-code.override.preApproveCombworkTools', 'claude-code.override.promptSnapshotOff', 'claude-code.override.statusLine',
       'codex.override.mcpIsolation', 'codex.override.preApproveCombworkTools', 'codex.override.terminalTitle',
       'copilot.override.allMcpInstructions', 'copilot.override.mcpIsolation', 'copilot.override.noAutoUpdate', 'copilot.override.preApproveCombworkTools', 'copilot.override.stripGitHubTokens',
+      'muse.override.keepPersonalOut', 'muse.override.keepProjectConfigOut', 'muse.override.stripAccountVars',
       'opencode.override.askOutsideFolder', 'opencode.override.keepProjectConfigOut', 'opencode.override.noAutoUpdate', 'opencode.override.ownProviderOnly', 'opencode.override.stripCredentials'
     ])
     for (const d of switches) {
