@@ -1,7 +1,8 @@
 import { basename } from 'path'
 import { config } from './config'
 import { cardHolds, costCards } from './tasks'
-import { listLanes } from './lanes'
+import { laneTimes } from './lanes'
+import { boardRevision } from './boardStore'
 import { usageHistory } from './usageHistory'
 import { inWorkspace, type WorkspaceService } from './workspace'
 import { cardFacts } from './workflow/cardWork'
@@ -42,9 +43,10 @@ const ms = (iso: string | undefined | null, fallback: number): number => {
  * A project's sessions in the history, read once per request, by the project's folder name. `timelines: false`: only
  * whose they are (`list` empty, `hasSessions` all there is), for what doesn't split usage by time (HI-1748: every
  * session's timeline was most of cost per card's reply from the history). `only`: the timelines of these sessions alone
- * (HI-1906: a card's, from its ledger rows), `hasSessions` still over all of them.
+ * (HI-1906: a card's, from its ledger rows), `hasSessions` still over all of them. `agents`: the timelines of these
+ * agents' sessions alone (HI-3294: a lane's), `hasSessions` over those.
  */
-async function sessionReader(ws: WorkspaceService, o: { timelines?: boolean; only?: { scope: string; session: string }[] } = {}): Promise<(project: string) => Promise<HostSessions | null>> {
+async function sessionReader(ws: WorkspaceService, o: { timelines?: boolean; only?: { scope: string; session: string }[]; agents?: string[] } = {}): Promise<(project: string) => Promise<HostSessions | null>> {
   const paths = [...(await ws.listProjectPaths()), ...(await ws.listProjectPaths({ hidden: true }))]
   const cache = new Map<string, Promise<HostSessions | null>>()
   const settings = config.settings
@@ -58,7 +60,7 @@ async function sessionReader(ws: WorkspaceService, o: { timelines?: boolean; onl
         const host: HostSessions = { list: [], agents, hasSessions: () => false }
         if (o.timelines === false) host.hasSessions = sessionsOf(await usageHistory.sessionsWho(p), namedIn(host))
         else {
-          host.list = (await usageHistory.timelines(p, o.only)).map((s) => {
+          host.list = (await usageHistory.timelines(p, o.only, o.agents)).map((s) => {
             const usage = usageFromRows(s.summary, [], settings)
             return { agentId: s.agentId, agentName: s.agentName, slice: { usage, timeline: s.timeline, from: ms(s.firstActivity, 0), to: ms(s.lastActivity, 0) } }
           })
@@ -304,48 +306,85 @@ function usedIn(list: SessionSlice[], spans: Span[]): ReturnType<typeof emptyPar
  */
 export async function laneCosts(ws: WorkspaceService, ids?: string[]): Promise<LaneCost[]> {
   return inWorkspace(ws, async () => {
-    const now = Date.now()
-    const lanes = (await listLanes(ws, { all: !!ids })).filter((l) => !ids || ids.includes(l.id))
-    if (!lanes.length) return []
-    const cards = await usageHistory.boardHolds(ws)
+    // What a running session used up to now recorded first, then whether anything a lane's cost is made from changed
+    // since the last answer (HI-3294: worked out again at every read, about 100 ms of main's time on a large board).
     await usageHistory.freshen(ws)
-    const read = await sessionReader(ws)
-    // Each project's cards' holds, worked out once (HI-1748: from history, for every lane's agents, cost most of a call).
-    const byProject = new Map<string, TaskHold[]>()
-    const holdsIn = (project: string): TaskHold[] => {
-      const key = project.toLowerCase()
-      let holds = byProject.get(key)
-      if (!holds) byProject.set(key, (holds = cards.filter((c) => c.project.toLowerCase() === key).flatMap(holdsOfCard)))
-      return holds
-    }
-    const out: LaneCost[] = []
-    for (const l of lanes) {
-      const p = await read(l.project)
-      const window: Span[] = [[ms(l.startedAt, now), ms(l.endedAt, now)]]
-      const total = emptyPart()
-      const onCards = emptyPart()
-      const overhead = emptyPart()
-      for (const a of [l.builder, ...(l.reviewer ? [l.reviewer] : [])]) {
-        const list = p ? p.list.filter((s) => holdIsSessions({ agent: a.id, name: a.name }, s, namedIn(p))).map((s) => s.slice) : []
-        if (!list.length) {
-          addPart(total, unknownPart())
-          continue
-        }
-        // Every card this agent held (the lane's or not), within the lane's time.
-        const held = mergeSpans(
-          holdsIn(l.project)
-            .filter((h) => (h.agent ? h.agent === a.id : h.name.toLowerCase() === a.name.toLowerCase()))
-            .map((h) => holdSpan(h, now))
-        )
-        const inLane = subtractSpans(window, subtractSpans(window, held))
-        const free = subtractSpans(window, held)
-        addPart(total, usedIn(list, window))
-        addPart(onCards, usedIn(list, inLane))
-        addPart(overhead, usedIn(list, free))
-      }
-      const finished = l.cards.filter((c) => c.column === 'passed' || c.column === 'done').length
-      out.push({ id: l.id, total: roundPart(total), onCards: roundPart(onCards), overhead: roundPart(overhead), finished })
-    }
+    const stamp = laneCostsStamp(ws)
+    const asked = JSON.stringify(ids ?? null)
+    let kept = keptLaneCosts.get(ws)
+    if (!kept || kept.stamp !== stamp || Date.now() - kept.at > LANE_COSTS_KEEP_MS) keptLaneCosts.set(ws, (kept = { stamp, at: Date.now(), answers: new Map() }))
+    const had = stamp !== null ? kept.answers.get(asked) : undefined
+    if (had) return had
+    const out = await workLaneCosts(ws, ids)
+    if (stamp !== null) kept.answers.set(asked, out)
     return out
   })
+}
+
+/** How long a lane's cost is kept with nothing it is made from changed: a running lane's ends now, and the history's step may part a row. */
+const LANE_COSTS_KEEP_MS = 5 * 60_000
+
+/** Each workspace's lane costs as last worked out, by what was asked, while its stamp is the same (HI-3294). */
+const keptLaneCosts = new WeakMap<WorkspaceService, { stamp: string | null; at: number; answers: Map<string, LaneCost[]> }>()
+
+/**
+ * What a lane's cost is made from, as a stamp (HI-3294): the board's revision (its cards' holds and its lanes, any
+ * process's commits), the usage history's writes, the prices (Settings → Providers) and the projects (their names and
+ * Combwork's writes of their project.json: their agents). The same stamp twice: nothing of it changed between. Null when
+ * it can't be told (no board open): nothing is kept.
+ */
+function laneCostsStamp(ws: WorkspaceService): string | null {
+  try {
+    const projects = (ws.info()?.projects ?? []).map((p) => [p.path, ws.projectConfigWrites(p.path)])
+    return JSON.stringify([ws.path, boardRevision(ws), usageHistory.changes(ws), config.settings.providers, projects])
+  } catch {
+    return null
+  }
+}
+
+/** Each lane's cost, worked out from the history and the board. */
+async function workLaneCosts(ws: WorkspaceService, ids?: string[]): Promise<LaneCost[]> {
+  const now = Date.now()
+  const lanes = await laneTimes(ws, ids)
+  if (!lanes.length) return []
+  const cards = await usageHistory.boardHolds(ws)
+  // Only the lanes' agents' sessions are read, with their timelines (HI-3294: every session of their projects was).
+  const read = await sessionReader(ws, { agents: [...new Set(lanes.flatMap((l) => [l.builder.id, ...(l.reviewer ? [l.reviewer.id] : [])]))] })
+  // Each project's cards' holds, worked out once (HI-1748: from history, for every lane's agents, cost most of a call).
+  const byProject = new Map<string, TaskHold[]>()
+  const holdsIn = (project: string): TaskHold[] => {
+    const key = project.toLowerCase()
+    let holds = byProject.get(key)
+    if (!holds) byProject.set(key, (holds = cards.filter((c) => c.project.toLowerCase() === key).flatMap(holdsOfCard)))
+    return holds
+  }
+  const out: LaneCost[] = []
+  for (const l of lanes) {
+    const p = await read(l.project)
+    const window: Span[] = [[ms(l.startedAt, now), ms(l.endedAt, now)]]
+    const total = emptyPart()
+    const onCards = emptyPart()
+    const overhead = emptyPart()
+    for (const a of [l.builder, ...(l.reviewer ? [l.reviewer] : [])]) {
+      const list = p ? p.list.filter((s) => holdIsSessions({ agent: a.id, name: a.name }, s, namedIn(p))).map((s) => s.slice) : []
+      if (!list.length) {
+        addPart(total, unknownPart())
+        continue
+      }
+      // Every card this agent held (the lane's or not), within the lane's time.
+      const held = mergeSpans(
+        holdsIn(l.project)
+          .filter((h) => (h.agent ? h.agent === a.id : h.name.toLowerCase() === a.name.toLowerCase()))
+          .map((h) => holdSpan(h, now))
+      )
+      const inLane = subtractSpans(window, subtractSpans(window, held))
+      const free = subtractSpans(window, held)
+      addPart(total, usedIn(list, window))
+      addPart(onCards, usedIn(list, inLane))
+      addPart(overhead, usedIn(list, free))
+    }
+    const finished = l.cards.filter((c) => c.column === 'passed' || c.column === 'done').length
+    out.push({ id: l.id, total: roundPart(total), onCards: roundPart(onCards), overhead: roundPart(overhead), finished })
+  }
+  return out
 }

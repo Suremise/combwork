@@ -61,7 +61,7 @@ export type WorkerRequest = { id: number } & (
   | { type: 'kept'; file: string; job: KeptJob }
   | { type: 'sessions'; file: string; scopes: string[] | null }
   | { type: 'cards'; file: string; cards: number[] }
-  | { type: 'timelines'; file: string; scope: string; sessions?: string[] }
+  | { type: 'timelines'; file: string; scope: string; sessions?: string[]; agents?: string[] }
   | { type: 'ids'; file: string; scope: string }
   | { type: 'meta'; file: string; scope: string; key: string; value?: string }
   | { type: 'forgetStates'; file: string; before: string }
@@ -669,8 +669,12 @@ export async function handleRequest(m: WorkerRequest): Promise<unknown> {
       return storedSessions(dbOf(m.file).reader, m.scopes)
     case 'cards':
       return cardRows(dbOf(m.file).reader, m.cards)
-    case 'timelines':
-      return storedTimelines(dbOf(m.file).reader, m.scope, m.sessions)
+    case 'timelines': {
+      const db = dbOf(m.file).reader
+      // Only these agents' sessions (HI-3294: a lane's, not every session of its project), among `sessions` when both.
+      const sessions = m.agents ? sessionIds(db, m.scope).filter((s) => !!s.agentId && m.agents!.includes(s.agentId) && (!m.sessions || m.sessions.includes(s.session))).map((s) => s.session) : m.sessions
+      return storedTimelines(db, m.scope, sessions)
+    }
     case 'ids':
       return sessionIds(dbOf(m.file).reader, m.scope)
     case 'meta': {

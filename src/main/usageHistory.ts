@@ -94,6 +94,12 @@ const whoKey = (who: SessionWho): string => `${who.agentId ?? ''}\0${who.agentNa
 type Priority = 0 | 1 | 2
 type Body = WorkerRequest extends infer R ? (R extends { id: number } ? Omit<R, 'id'> : never) : never
 
+/** Requests that may change what is stored (HI-3294: changes() counts them): a use recorded, cards shared out, a roll-up. */
+const changesData = (b: Body): boolean => b.type === 'ingest' || b.type === 'kept' || b.type === 'attribute' || b.type === 'rollUp'
+
+/** A write's answer saying it stored nothing new (its file unchanged or gone, or the history busy); anything else, or a failure, counts. */
+const unchangedBy = (v: unknown): boolean => !!v && typeof v === 'object' && ['unchanged', 'missing', 'busy'].includes((v as { status?: unknown }).status as string)
+
 interface Queued {
   key: string
   priority: Priority
@@ -321,6 +327,14 @@ class UsageHistory {
       this.post(send, { type: 'config', ...(JSON.parse(cfg) as Omit<Extract<Body, { type: 'config' }>, 'type'>) }).catch((e) => log.warn('sending the usage worker its settings', e))
     }
     const answer = this.post(send, body) as Promise<T>
+    // A write counted as it settles, before its caller goes on (this handler is the answer's first): what is read from
+    // the history after it sees the new count.
+    if (spelt && changesData(body)) {
+      const count = (v?: unknown): void => {
+        if (!unchangedBy(v)) this.writes.set(wsKey(spelt), (this.writes.get(wsKey(spelt)) ?? 0) + 1)
+      }
+      void answer.then(count, () => count())
+    }
     const opens = body.type === 'read' ? (body.seed?.file ?? null) : file
     if (opens && place !== null) {
       const known = this.sent.get(place) ?? new Map<string, string>()
@@ -338,6 +352,18 @@ class UsageHistory {
    * closes: bounded by the windows open.
    */
   private sent = new Map<string, Map<string, string>>()
+
+  /** Each usage.db's writes answered (HI-3294), by its file as spelt: changes() reads them. */
+  private writes = new Map<string, number>()
+
+  /**
+   * A count of what has been written to a workspace's history in this process (HI-3294): a session's use recorded, its
+   * cards shared out again, old timelines rolled up. The same count twice: what was read from the history between is
+   * still current, so a reader may keep what it worked out from it. Only moves on.
+   */
+  changes(ws: WorkspaceService): number {
+    return ws.path ? (this.writes.get(wsKey(usageFile(ws.path))) ?? 0) : 0
+  }
 
   /** Closes the workspace at `place`'s usage.db as each file was sent (and `file`), after what was queued. */
   private closeAt(place: string, file?: string): void {
@@ -949,14 +975,15 @@ class UsageHistory {
 
   /**
    * A host's sessions with their timelines (a lane's cost); only `only`'s when given (HI-1906: a card's, from its ledger
-   * rows), each by its scope and session, so a session of another host with the same id is never taken.
+   * rows), each by its scope and session, so a session of another host with the same id is never taken. `agents`: only
+   * the sessions of the agents with these ids (HI-3294: a lane's two, picked in the worker).
    */
-  async timelines(projectPath: string, only?: { scope: string; session: string }[]): Promise<(SessionMeta & { summary: UsageSummary; timeline: import('../shared/usageTimeline').UsageTimeline | null; firstActivity: string | null; lastActivity: string | null })[]> {
+  async timelines(projectPath: string, only?: { scope: string; session: string }[], agents?: string[]): Promise<(SessionMeta & { summary: UsageSummary; timeline: import('../shared/usageTimeline').UsageTimeline | null; firstActivity: string | null; lastActivity: string | null })[]> {
     const ws = workspaceFor(projectPath)
     if (!ws?.path) return []
     const { workspace, scope } = await ws.sessionScope(projectPath)
     const ids = only ? [...new Set(only.filter((s) => s.scope === scope).map((s) => s.session))] : undefined
-    return this.call({ type: 'timelines', file: usageFile(workspace), scope, ...(ids ? { sessions: ids } : {}) })
+    return this.call({ type: 'timelines', file: usageFile(workspace), scope, ...(ids ? { sessions: ids } : {}), ...(agents ? { agents } : {}) })
   }
 }
 

@@ -1937,6 +1937,22 @@ export async function listLanes(ws: WorkspaceService, o: { project?: string | nu
   return views(ws, o.all ? [...lanes].sort((a, b) => a.startedAt.localeCompare(b.startedAt)) : listedLanes(lanes, Date.now()))
 }
 
+/**
+ * The lanes as a lane's cost reads them (HI-3294): whose and when, and their cards' columns, without the rest of a lane's
+ * view (its agents' names, facts, slots and waits, a read of every lane's facts on main). `ids`: only those, of every lane
+ * kept; else those listed.
+ */
+export async function laneTimes(ws: WorkspaceService, ids?: readonly string[]): Promise<Pick<LaneInfo, 'id' | 'project' | 'builder' | 'reviewer' | 'startedAt' | 'endedAt' | 'cards'>[]> {
+  if (!ws.path) return []
+  const all = await read(ws)
+  const lanes = ids ? [...all].sort((a, b) => a.startedAt.localeCompare(b.startedAt)).filter((l) => ids.includes(l.id)) : listedLanes(all, Date.now())
+  const cards = await cardsOf(ws, lanes)
+  return lanes.map((l) => {
+    const v = laneView(l, cards.get(l.id)!)
+    return { id: v.id, project: v.project, builder: v.builder, reviewer: v.reviewer, startedAt: v.startedAt, endedAt: v.endedAt, cards: v.cards }
+  })
+}
+
 /** The lanes that ended (or were abandoned) at or after `since` (ms), newest first (HI-2898: Progress → Lanes' Ended today). */
 export async function lanesEndedSince(ws: WorkspaceService, since: number): Promise<LaneInfo[]> {
   if (!ws.path) return []
