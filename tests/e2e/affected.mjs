@@ -351,6 +351,8 @@ export const AREAS = [
   { paths: ['tests/e2e/forwardremote.cjs', 'src/main/workflow/queueControls.ts', 'src/main/platform/gitHistory.ts', 'src/main/platform/gitTransport.ts', 'src/renderer/src/components/ProgressQueue.tsx'], suites: ['forwardremote'] },
   // Each card's focused tests (G20, HI-1367): chosen at submit, run by the merge queue; this repository's picker and runner.
   { paths: ['tests/e2e/queuefocused.cjs', 'scripts/focusedTests.mjs'], suites: ['queuefocused'] },
+  // Merge guards (HI-3284): the editor, their check in the merge queue, the returned card's words.
+  { paths: ['tests/e2e/queueguards.cjs', 'src/shared/workflow/mergeGuards.ts', 'src/main/workflow/mergeGuardsRun.ts', 'src/main/workflow/mergeGuardsWorker.ts', 'src/main/workflow/guardsSave.ts', 'src/main/workflow/mergeGuardLimits.ts', 'src/renderer/src/components/MergeGuardsEditor.tsx', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueState.ts', 'src/shared/taskHistory.ts'], suites: ['queueguards'] },
   // The queue's controls (#1353): its model, Pause/Resume, Remove from queue and Retry merge, cw_queue.
   { paths: ['src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueHost.ts', 'src/main/workflow/queueControls.ts', 'src/main/folderFence.ts', 'src/shared/workflow/facts.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/mergequeuefolder.cjs', 'tests/e2e/mergequeuecrash.cjs'], suites: ['mergequeuecrash', 'mergequeuefolder'] },
   { paths: ['src/main/workflow/mergeQueue.ts', 'src/shared/workflow/options.ts', 'src/shared/workflow/optionTexts.ts', 'src/renderer/src/components/WorkflowOptions.tsx', 'tests/e2e/queueFixture.cjs'], suites: ['p5lane', 'workflowoptions'] },
@@ -485,7 +487,7 @@ export const AREAS = [
   { paths: ['src/main/agentMessages.ts'], suites: ['agentmessage', 'deliveries', 'replysize'] },
   // Deliveries and cw_inbox (#647).
   // The delivery service, its writer and readiness (#647, #649): every way into an agent goes through them.
-  { paths: ['src/main/deliveries.ts', 'src/shared/deliveries.ts', 'src/main/schema/sessionDeliveryTables.ts', 'src/main/schema/sessionDeliveryCodec.ts', 'src/main/lineWriter.ts', 'src/main/readiness.ts'], suites: ['deliveries', 'idlequestion', 'agentmessage', 'viewer', 'replysize', 'loopwakes', 'agentwatch', 'wakeuntaken', 'wakepaste', 'cardloop', 'decisionwake', 'loopwatch', 'lanewatch', 'assistantmode', 'assistant-control', 'signin', 'watchrelease', 'inboxnotices', 'combworktools', 'carryingon', 'codexqueued', 'wakeputoff'] },
+  { paths: ['src/main/deliveries.ts', 'src/main/deliveryChanges.ts', 'src/shared/deliveries.ts', 'src/main/schema/sessionDeliveryTables.ts', 'src/main/schema/sessionDeliveryCodec.ts', 'src/main/lineWriter.ts', 'src/main/readiness.ts'], suites: ['deliveries', 'idlequestion', 'agentmessage', 'viewer', 'replysize', 'loopwakes', 'agentwatch', 'wakeuntaken', 'wakepaste', 'cardloop', 'decisionwake', 'loopwatch', 'lanewatch', 'assistantmode', 'assistant-control', 'signin', 'watchrelease', 'inboxnotices', 'combworktools', 'carryingon', 'codexqueued', 'wakeputoff'] },
   { paths: ['src/main/inboxNotices.ts', 'src/shared/doorbell.ts', 'tests/e2e/fake-claude/fake-claude.cjs'], suites: ['inboxnotices', 'deliveries', 'agentmessage', 'turnledger', 'carryingon'] },
   { paths: ['src/shared/inboxSwitches.ts'], suites: ['carryingon', 'inboxnotices'] },
   // A long conversation's Hand Over (#1057): the notice, the footer, the dialog and the hand-over's own checks.
@@ -1020,6 +1022,8 @@ export const UNIT_SCANS = [
   // HI-2457: agentTextSchema() against the schema area files on disk; each glob user's source read (none imported but schema.ts).
   { test: 'tests/globCache.test.ts', paths: ['agent-text/schema/', 'src/main/installDir.ts', 'src/shared/i18n/catalogues.ts'] },
   { test: 'tests/agentText.test.ts', paths: ['src/'], lines: ['agentMsg\\('] },
+  // HI-3289: every write BEGIN in src/main goes through db.ts's beginTransaction, its source read for a raw one.
+  { test: 'tests/beginTransaction.test.ts', paths: ['src/main/'], lines: ['BEGIN'] },
   // HI-2440: the window's messages agents read, followed from the calls that read text (the catalogue's audience both).
   { test: 'tests/agentText.test.ts', paths: ['src/main/', 'src/shared/'], lines: ['msg\\(', 'agent-text:', 'CombworkError', 'englishText', 'agentText'] },
   { test: 'tests/agentTextBoth.test.ts', paths: ['agent-text/catalogue/', 'agent-text/schema/'] },

@@ -20,6 +20,7 @@ import { closeStaleChurn, workflowEnforced } from './service'
 import { cardsInFlight, keptNames, problemEnglish, WorkflowRefused, WorkflowStale } from './optionsForm'
 import { workflowWrite } from './writes'
 import { hasRepository, withFolderRepoLocks } from '../platform/repoPorts'
+import { changeGuards, refuseGuardsAtSave } from './guardsSave'
 
 const log = createLogger('workflow')
 
@@ -129,7 +130,9 @@ export async function checkLevelChange(ws: WorkspaceService, rawLevel: unknown, 
  * contradict), or as changed meanwhile when the form's base is no longer the level's. Combwork's in config, the workspace's
  * in workspace.json (written in turn, kept with a backup). The inheriting projects' views read again. Returns the form.
  */
-export function setLevelOptions(ws: WorkspaceService, rawLevel: unknown, rawPlatform: unknown, raw: unknown): Promise<WorkflowForm> {
+export async function setLevelOptions(ws: WorkspaceService, rawLevel: unknown, rawPlatform: unknown, raw: unknown): Promise<WorkflowForm> {
+  // HI-3284: the merge guards' empty-match rule, in their worker, before the locks.
+  await refuseGuardsAtSave(changeGuards(raw))
   // The level and every project it reaches checked as they are now, and written in the same turn of workflow writes:
   // no project or level changes between the check and the write (HR5's round 1).
   // Every repository the level reaches locked first (#1642 round 5): a level's target is each inheriting Git project's.

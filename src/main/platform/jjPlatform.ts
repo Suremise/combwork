@@ -50,7 +50,10 @@ import { jjUnknown } from './jjReads'
 import { anyRetainedDue, dueRetained, markRetainedDue, publishTargets, recordIntegration, retainedVisited, sqlObligations, type SqlDb } from './jjObligations'
 import { folderIdentity, type PublishCommitAnswer, type PublishCommitRequest } from './jjPublishCommit'
 import { advanceStep, candidateFingerprint, candidateKey, candidateShown, checksAgain, clearEndedCycle, cycleOver, publishCandidateChecks, reconcileJj, type CandidateWords, type JjChecksUpdate, type JjProved } from '../workflow/reconcile'
-import { checksJournalKey, checksKeyOf, readChecksJournal, runCandidateChecks, writeChecksJournal, type CandidateChecksDeps, type ChecksJournal } from './jjCandidateChecks'
+import { candidateCheckNames, checksJournalKey, checksKeyOf, readChecksJournal, runCandidateChecks, writeChecksJournal, type CandidateChecksDeps, type ChecksJournal } from './jjCandidateChecks'
+import { GUARD_DIFF_BYTES, guardsKey, guardsOf } from '../../shared/workflow/mergeGuards'
+import type { DiffRead } from './types'
+import { checkMergeGuards } from '../workflow/mergeGuardsRun'
 import { jjCandidateEntry, jjReturnedComment, jjReturnedWake } from './jjCandidateReturn'
 import type { Spawn } from '../workflow/queueChecks'
 import type { CheckContext, CheckResult } from '../workflow/mergeQueue'
@@ -212,6 +215,8 @@ export interface JjChecksHost {
   runCheck(name: string, command: string, folder: string, ctx: CheckContext, spawn: Spawn): Promise<CheckResult>
   install(folder: string, ctx: CheckContext, spawn: Spawn): Promise<CheckResult & { skipped?: boolean }>
   stopped(run: string): boolean
+  /** HI-3284: the merge guards' limits (Settings → Advanced); left out, 10 s and 200,000 lines. */
+  guardLimits?(): { timeoutMs: number; maxLines: number }
   hook?: CandidateChecksDeps['hook']
   /** How often a running command's validity is read again (tests: shorter than the default). */
   watchMs?: number
@@ -1278,7 +1283,21 @@ export class JjPlatform implements PlatformAdapter {
     const host = this.deps?.candidateChecks
     if (!this.wf || !host) return { key: '', names: [] }
     const o = this.wf.rulesetOf(card, s).options
-    return o.mergeChecks.length ? { key: checksKeyOf(o, (await host.setup()).setup), names: [...o.mergeChecks] } : { key: '', names: [] }
+    // HI-3284: and the merge guards, as the project's options are now (not a rule).
+    const guards = guardsOf(this.wf.cfg.options())
+    const names = candidateCheckNames(o, guards)
+    return names.length ? { key: checksKeyOf(o, (await host.setup()).setup, guards), names } : { key: '', names: [] }
+  }
+
+  /**
+   * HI-3284: the lines `result` adds to `base`, read by jj in the project (`jj diff --git`, no context, its output pinned
+   * by the runner's prefix: no pager, no colour), at most GUARD_DIFF_BYTES: the merge guards'.
+   */
+  async addedDiff(base: string, result: string): Promise<DiffRead> {
+    const r = await this.runner().run(this.wf!.cfg.project, ['diff', '--git', '--context', '0', '--from', base, '--to', result], { maxOutput: GUARD_DIFF_BYTES })
+    if (r.ok) return { text: r.out }
+    if (r.notRun === 'maxOutput') return { tooLarge: true }
+    return { unreadable: r.err || `jj diff exited ${r.code}` } // i18n-ignore: jj's side, for the log
   }
 
   /** HI-2938: asks the project's checks runner to look (one per workflow; a look asked for mid-look runs after it). */
@@ -1348,7 +1367,10 @@ export class JjPlatform implements PlatformAdapter {
       const read = await host.setup()
       const setup = read.setup
       const o = wf.rulesetOf(card0, s).options
-      const key = checksKeyOf(o, setup)
+      // HI-3284: the merge guards as the options are now, in the key and first among the checks.
+      const guards = guardsOf(wf.cfg.options())
+      const names = candidateCheckNames(o, guards)
+      const key = checksKeyOf(o, setup, guards)
       // HI-3122 (HR3's round 2): a setup command read as unknown (project.json caught mid-save) never stands for itself:
       // nothing is made or published under it.
       const setupNow = (): boolean => host.knownStamp?.(read.stamp) !== false && host.setupStamp() === read.stamp
@@ -1358,7 +1380,7 @@ export class JjPlatform implements PlatformAdapter {
       let misses = shown.checks.misses ?? 0
       // Other checks, commands, install or setup since (finding 3): they start anew under the key now.
       if (key !== shown.checks.key) {
-        if (!o.mergeChecks.length || !(await publishCandidateChecks(wf, wf.store.card(card0.id), project, at, { restart: [...o.mergeChecks] }, await this.offerCurrent(fp.target, offer), JJ_CANDIDATE_WORDS))) continue
+        if (!names.length || !(await publishCandidateChecks(wf, wf.store.card(card0.id), project, at, { restart: [...names] }, await this.offerCurrent(fp.target, offer), JJ_CANDIDATE_WORDS))) continue
         misses = 0
       } else {
         // HI-2991: a waiting or failing set under the same key runs again only at its retry time (SPEC's 30 s doubling to
@@ -1376,7 +1398,7 @@ export class JjPlatform implements PlatformAdapter {
         const st = wf.state(c)
         // The offer's state read unknown (an operation during its read) isn't invalid (HI-2991): only a definite answer ends
         // a check; what it comes to is published only while the offer is read current.
-        return sameFingerprint(candidateFingerprint(wf, c, st), fp) && checksKeyOf(wf.rulesetOf(c, st).options, (await host.setup()).setup) === key && setupNow() && (await this.offerState(fp.target, offer)) !== 'not'
+        return sameFingerprint(candidateFingerprint(wf, c, st), fp) && checksKeyOf(wf.rulesetOf(c, st).options, (await host.setup()).setup, guardsOf(wf.cfg.options())) === key && setupNow() && (await this.offerState(fp.target, offer)) !== 'not'
       }
       let done = 0
       const out = await runCandidateChecks(
@@ -1391,8 +1413,11 @@ export class JjPlatform implements PlatformAdapter {
           install: (folder, ctx, spawn) => host.install(folder, ctx, spawn),
           bracket: (folder, revision) => this.copyBracket(folder, revision),
           valid,
+          // HI-3284: the guards this run checks are those its key was made with (a change since makes it invalid).
+          // HI-3284 (HR2's round 1, finding 3): its worker ends with the workspace (the checks' signal).
+          ...(guards.length ? { guards: async (expected: string, result: string) => ({ ...(await checkMergeGuards(guards, () => this.addedDiff(expected, result), { ...(host.guardLimits?.() ?? { timeoutMs: 10_000, maxLines: 200_000 }), ...(host.signal ? { signal: host.signal } : {}) })), key: guardsKey(guards) }) } : {}),
           checkRan: async (c) => {
-            const data: FactData['CheckRan'] = { name: c.name, command: c.command, revision: c.revision, tested: c.tested, result: c.ok ? 'passed' : 'failed', run: c.run || randomUUID(), durationMs: c.durationMs, by: CW_RUNS, counted: c.counted, ...(c.whyNot ? { whyNot: c.whyNot } : {}), entry: jjCandidateEntry(offer.attempt) }
+            const data: FactData['CheckRan'] = { name: c.name, command: c.command, revision: c.revision, tested: c.tested, result: c.ok ? 'passed' : 'failed', run: c.run || randomUUID(), durationMs: c.durationMs, by: CW_RUNS, counted: c.counted, ...(c.whyNot ? { whyNot: c.whyNot } : {}), entry: jjCandidateEntry(offer.attempt), ...(c.guardsKey !== undefined ? { guardsKey: c.guardsKey, base: c.base } : {}) }
             await wf.write(wf.store.card(card0.id), null, 'combwork', (w) => void w.fact('CheckRan', data))
             if (c.ok && c.counted) await publish({ progress: { done: ++done } })
           },
@@ -1404,7 +1429,7 @@ export class JjPlatform implements PlatformAdapter {
             await host.hook?.(p)
           }
         },
-        { card: { key: card0.key, number: card0.id }, fp, attempt: offer.attempt, result: offer.result, expected: offer.expected, checksKey: key, names: [...o.mergeChecks], commands: o.commands, installAlways: o.mergeInstall === 'always' }
+        { card: { key: card0.key, number: card0.id }, fp, attempt: offer.attempt, result: offer.result, expected: offer.expected, checksKey: key, names, commands: o.commands, installAlways: o.mergeInstall === 'always' }
       )
       if ('green' in out) {
         await publish({ passed: out.checks })

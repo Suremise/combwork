@@ -408,6 +408,17 @@ interface CombworkMessageValues {
   'performance.stalls.during': undefined
   'performance.stalls.empty': undefined
   'performance.stalls.heading': undefined
+  'performance.stalls.hours.causes': undefined
+  'performance.stalls.hours.d100': undefined
+  'performance.stalls.hours.d50': undefined
+  'performance.stalls.hours.empty': undefined
+  'performance.stalls.hours.heading': undefined
+  'performance.stalls.hours.hour': undefined
+  'performance.stalls.hours.stalls': undefined
+  'performance.stalls.hours.times': { n: number }
+  'performance.stalls.hours.tip': { kept: number }
+  'performance.stalls.hours.unlogged': { n: number }
+  'performance.stalls.hours.unnamed': undefined
   'performance.stalls.length': undefined
   'performance.stalls.loadTarget': undefined
   'performance.stalls.more': { n: number }

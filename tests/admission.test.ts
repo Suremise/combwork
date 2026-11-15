@@ -110,12 +110,12 @@ describe("the journal (#1395)", () => {
     const ws = workspace()
     await w.open(ws)
     const home = w.assistantHome
-    journal.writeEntry(home, settings, fact('before the close'), 'combwork')
+    await journal.writeEntry(home, settings, fact('before the close'), 'combwork')
     // Dismissed, its connection not closed yet (as between the close's first step and closeJournal).
     fence.dismiss(placeKey(ws))
     try {
       expect(() => journal.recall(home, {})).toThrow('The workspace was closed')
-      expect(() => journal.writeEntry(home, settings, fact('late'), 'combwork')).toThrow('The workspace was closed')
+      await expect(journal.writeEntry(home, settings, fact('late'), 'combwork')).rejects.toThrow('The workspace was closed')
     } finally {
       fence.admit(placeKey(ws))
     }
@@ -127,18 +127,18 @@ describe("the journal (#1395)", () => {
     const ws = workspace()
     const home = join(ws, '.combwork', 'assistant')
     mkdirSync(home, { recursive: true })
-    const id = journal.leaveEntry(home, settings, fact('Combwork closed unexpectedly'), 'combwork')
+    const id = await journal.leaveEntry(home, settings, fact('Combwork closed unexpectedly'), 'combwork')
     expect(id).toBeGreaterThan(0)
     expect(nothingOpen(ws)).toBe(true)
     expect(() => journal.recall(home, {})).toThrow('The workspace was closed')
     // A link to an entry there isn't: refused in its transaction, the connection closed all the same.
-    expect(() => journal.leaveEntry(home, settings, { ...fact('linked'), links: [{ type: 'entry', ref: '999' }] }, 'combwork')).toThrow(/no entry 999/)
+    await expect(journal.leaveEntry(home, settings, { ...fact('linked'), links: [{ type: 'entry', ref: '999' }] }, 'combwork')).rejects.toThrow(/no entry 999/)
     expect(nothingOpen(ws)).toBe(true)
     // Its window opens it: the entry is there, in the journal it keeps open.
     await w.open(ws)
     expect(journal.recall(w.assistantHome, { query: 'unexpectedly' }).map((r) => r.id)).toEqual([id])
     // Admitted, an entry left goes through the window's journal, which stays open.
-    journal.leaveEntry(w.assistantHome, settings, fact('while open'), 'combwork')
+    await journal.leaveEntry(w.assistantHome, settings, fact('while open'), 'combwork')
     expect(nothingOpen(ws)).toBe(false)
     await w.close()
     expect(nothingOpen(ws)).toBe(true)

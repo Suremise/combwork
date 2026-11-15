@@ -6,6 +6,7 @@
 // In the app since P3: combwork.db's `card_facts` (main/workflow/factStore.ts), folded wherever a card's state is read.
 
 import type { ConflictsRecord } from './conflicts'
+import type { GuardReport } from './mergeGuards'
 import type { FocusedChoice, FocusedTest } from './focused'
 import type { GitlinkSide } from '../gitlink'
 import type { StoredText, TransientCause } from '../types'
@@ -128,6 +129,9 @@ export interface CheckRanData {
   isolated?: boolean
   /** The merge queue's entry it ran for (a merge check or the focused tests, HI-1924): the queue history's time taken. */
   entry?: string
+  /** HI-3284: the merge guards' run: the guards it checked (their key) and the head the result's added lines are read from. */
+  guardsKey?: string
+  base?: string
 }
 
 /** The paths a `CheckRan` keeps of what stopped it counting (#1654). */
@@ -423,7 +427,7 @@ export interface FactData {
    * the repository at the card's tested pin (written before this fact); `remote`, that branch as `<remote>/<branch>`
    * (a name, never its address).
    */
-  IntegrationFailed: { entry: string; revision: string; target: string; reason: IntegrationFailReason; files?: string[]; log?: string; transient: boolean; cause?: TransientCause; code?: string; check?: string; logPath?: string; conflicts?: ConflictsRecord; focused?: FocusedReturn; onto?: string; remote?: string }
+  IntegrationFailed: { entry: string; revision: string; target: string; reason: IntegrationFailReason; files?: string[]; log?: string; transient: boolean; cause?: TransientCause; code?: string; check?: string; logPath?: string; conflicts?: ConflictsRecord; focused?: FocusedReturn; onto?: string; remote?: string; guards?: GuardReport }
   /**
    * G20 (HI-1367): the tests the merge queue picked at a test merge's result for the paths whose change isn't exactly the
    * submission's (`paths`), run with the approved selection there; `tests` empty when the pick needed none.

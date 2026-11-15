@@ -1823,9 +1823,9 @@ function journalHome(): { home: string; settings: JournalSettings } {
   return { home: ws.assistantHome, settings }
 }
 /** A journal call: the caller's mistakes are 400s, said plainly; one while the journal is being deleted, 409. */
-function journalCall<T>(fn: () => T): T {
+async function journalCall<T>(fn: () => T | Promise<T>): Promise<T> {
   try {
-    return fn()
+    return await fn()
   } catch (e) {
     if (e instanceof JournalBusy) throw httpFrom(409, e)
     if (e instanceof JournalError) throw httpFrom(400, e)
@@ -1858,16 +1858,16 @@ function withCardLinks<T>(ws: WorkspaceService, body: T, fields: string[]): T {
 route('POST', '/v1/journal', async ({ body }) => {
   const { home, settings } = journalHome()
   const input = withCardLinks(requireWorkspace(), body, ['links'])
-  return { id: journalCall(() => writeEntry(home, settings, input, 'assistant')) }
+  return { id: await journalCall(() => writeEntry(home, settings, input, 'assistant')) }
 })
 route('POST', '/v1/journal/recall', async ({ body }) => {
   const { home } = journalHome()
   const query = withCardLinks(requireWorkspace(), body, ['link'])
-  return { entries: journalCall(() => recall(home, query)) }
+  return { entries: await journalCall(() => recall(home, query)) }
 })
 route('GET', '/v1/journal/:id', async ({ params }) => {
   const { home } = journalHome()
-  const e = journalCall(() => readEntry(home, entryId(params[0])))
+  const e = await journalCall(() => readEntry(home, entryId(params[0])))
   if (!e) throw new HttpError(404, apiSaid(API.journal.noEntry, { entry: params[0] }))
   return e
 })
@@ -1875,13 +1875,13 @@ route('PATCH', '/v1/journal/:id', async ({ params, body }) => {
   const { home, settings } = journalHome()
   const id = entryId(params[0])
   const patch = withCardLinks(requireWorkspace(), body, ['addLinks'])
-  if (!journalCall(() => updateEntry(home, settings, id, patch))) throw new HttpError(404, apiSaid(API.journal.noEntry, { entry: String(id) }))
+  if (!(await journalCall(() => updateEntry(home, settings, id, patch)))) throw new HttpError(404, apiSaid(API.journal.noEntry, { entry: String(id) }))
   return { id, updated: true }
 })
 route('DELETE', '/v1/journal/:id', async ({ params }) => {
   const { home } = journalHome()
   const id = entryId(params[0])
-  if (!journalCall(() => deleteEntry(home, id))) throw new HttpError(404, apiSaid(API.journal.noEntry, { entry: String(id) }))
+  if (!(await journalCall(() => deleteEntry(home, id)))) throw new HttpError(404, apiSaid(API.journal.noEntry, { entry: String(id) }))
   return { id, deleted: true }
 })
 
@@ -1890,7 +1890,7 @@ route('DELETE', '/v1/journal/:id', async ({ params }) => {
 route('POST', '/v1/builds', async ({ body }) => {
   const f = buildFactOf(body)
   if ('error' in f) throw new HttpError(400, f.error)
-  return recordBuild(requireWorkspace(), f)
+  return await recordBuild(requireWorkspace(), f)
 })
 
 /** Who is calling cw_inbox: a project agent (its own), or the Assistant (its home's). */

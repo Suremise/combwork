@@ -14,7 +14,8 @@ import { plainRepo, refSync } from './repoRefs'
 import type { FileChange } from '../../shared/workflow/facts'
 import { gitlinkOf, parseRawRows, sideOf, type GitlinkSide } from '../../shared/gitlink'
 import { UNREADABLE as U } from '../../shared/workflow/texts'
-import { isUnknown, unknown, withDetail, type Change, type Containment, type Maybe } from './types'
+import { GUARD_DIFF_BYTES } from '../../shared/workflow/mergeGuards'
+import { isUnknown, unknown, withDetail, type Change, type Containment, type DiffRead, type Maybe } from './types'
 import type { CommitInfo, SubmoduleChange, SubmoduleState, WorktreeNow } from './history'
 
 // A commit as attribution reads it, and a worktree as worktreeNow reads it: port 3's types (history.ts, HI-2787).
@@ -527,6 +528,25 @@ export async function filesChanged(repo: string, base: string, headRev: string):
     const link = gitlinkOf(row)
     return { status: row.status, path: row.path, ...(link ? { gitlink: { from: link.from, to: link.to } } : {}) }
   })
+}
+
+/**
+ * HI-3284: the lines `headRev` adds to `base`, for the merge guards: a unified diff with no context, renames found (a
+ * pure rename adds nothing), its inputs pinned against the user's configuration (no external diff or textconv, no colour,
+ * the a/ and b/ prefixes, paths unquoted where git allows). Past GUARD_DIFF_BYTES, `tooLarge`; git failing, `unreadable`.
+ */
+export async function addedDiff(repo: string, base: string, headRev: string): Promise<DiffRead> {
+  const pinned = ['-c', 'core.quotePath=false', '-c', 'diff.noprefix=false', '-c', 'diff.mnemonicPrefix=false', '-c', 'diff.relative=false']
+  const r = await git(repo, [...pinned, 'diff', '-U0', '-M', '--no-color', '--no-ext-diff', '--no-textconv', '--src-prefix=a/', '--dst-prefix=b/', base, headRev, '--'], GUARD_DIFF_BYTES)
+  if (r.ok) return { text: r.out }
+  if (r.notRun === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') return { tooLarge: true }
+  return { unreadable: r.err || `git diff exited ${r.code}` } // i18n-ignore: git's side, for the log
+}
+
+/** HI-3284: the files git has in a working folder (tracked, and new ones not ignored), for a merge guard's preview. */
+export async function workingFiles(repo: string): Promise<string[] | null> {
+  const r = await git(repo, ['-c', 'core.quotePath=false', 'ls-files', '-z', '-co', '--exclude-standard'], 64 * 1024 * 1024)
+  return r.ok ? [...new Set(r.out.split('\0').filter(Boolean))] : null
 }
 
 /**

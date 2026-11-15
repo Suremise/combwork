@@ -25,11 +25,21 @@ import type { CheckWhyNot } from '../../shared/types'
 import { sameFingerprint, type JjCandidateFingerprint } from './jjCandidateStep'
 import type { Spawn } from '../workflow/queueChecks'
 import type { CheckContext, CheckResult } from '../workflow/mergeQueue'
+import { guardReportLog, guardsKey, guardsRefuse, MERGE_GUARDS_CHECK, type GuardReport, type MergeGuard } from '../../shared/workflow/mergeGuards'
+import type { GuardsOutcome } from '../workflow/mergeGuardsRun'
 
-/** What a candidate's check results are bound to besides the candidate (s11 §2): the checks, their commands, the install. */
-export function checksKeyOf(o: Pick<WorkflowOptions, 'mergeChecks' | 'commands' | 'mergeInstall'>, setup: string): string {
-  return stableHash(JSON.stringify({ names: o.mergeChecks, commands: o.mergeChecks.map((n) => o.commands[n] ?? n), install: o.mergeInstall, setup }))
+/**
+ * What a candidate's check results are bound to besides the candidate (s11 §2): the checks, their commands, the install;
+ * and (HI-3284) the merge guards as they are now, so a guard changed makes the checks, and the consent bound to their key,
+ * stale. With no guards the key is as it was before them.
+ */
+export function checksKeyOf(o: Pick<WorkflowOptions, 'mergeChecks' | 'commands' | 'mergeInstall'>, setup: string, guards: readonly MergeGuard[] = []): string {
+  const g = guardsKey(guards)
+  return stableHash(JSON.stringify({ names: o.mergeChecks, commands: o.mergeChecks.map((n) => o.commands[n] ?? n), install: o.mergeInstall, setup, ...(g ? { guards: g } : {}) }))
 }
+
+/** HI-3284: a candidate's checks by name: the merge guards first when there are any, then the merge checks. */
+export const candidateCheckNames = (o: Pick<WorkflowOptions, 'mergeChecks'>, guards: readonly MergeGuard[]): string[] => [...(guards.length ? [MERGE_GUARDS_CHECK] : []), ...o.mergeChecks]
 
 export interface JournalledCheck {
   name: string
@@ -77,7 +87,12 @@ export interface CandidateChecksDeps {
   /** jj's check bracket at the copy, for exactly `revision`. */
   bracket(folder: string, revision: string): Promise<{ end(): Promise<{ counted: boolean; tested: string; whyNot?: CheckWhyNot }> }>
   valid(): Promise<boolean>
-  checkRan(c: { name: string; command: string; revision: string; tested: string; ok: boolean; run: string; durationMs: number; counted: boolean; whyNot?: CheckWhyNot }): Promise<void>
+  checkRan(c: { name: string; command: string; revision: string; tested: string; ok: boolean; run: string; durationMs: number; counted: boolean; whyNot?: CheckWhyNot; guardsKey?: string; base?: string }): Promise<void>
+  /**
+   * HI-3284: the merge guards over the lines `result` adds to `expected` (jj's diff, matched in a worker), with the key of
+   * the guards checked. Left out: no guards (the check `merge guards` is never named then).
+   */
+  guards?(expected: string, result: string): Promise<GuardsOutcome & { key: string }>
   /** Whether Stop (the Progress panel) ended this run (taken once). */
   stopped(run: string): boolean
   hook?: (point: `beforeCheck:${string}` | `afterCheck:${string}` | 'leased' | 'afterInstall') => Promise<void> | void
@@ -107,7 +122,7 @@ export interface CandidateChecksInput {
 
 export type CandidateChecksOutcome =
   | { green: true; checks: string[] }
-  | { red: { check: string; output: string; logPath?: string } }
+  | { red: { check: string; output: string; logPath?: string; guards?: GuardReport } }
   | { transient: { check: string; why: string; cause?: TransientFailure } }
   | { stopped: { check: string } }
   | { invalid: true }
@@ -234,6 +249,24 @@ export async function runCandidateChecks(deps: CandidateChecksDeps, i: Candidate
       if (!(await step(() => deps.valid()))) {
         await give('invalid', true)
         return { invalid: true }
+      }
+      // HI-3284: the merge guards, matched in their own worker (nothing runs in the copy): journalled and recorded like a
+      // check; a match or a check that couldn't finish is red, a read that failed transient.
+      if (name === MERGE_GUARDS_CHECK && deps.guards) {
+        const entry: JournalledCheck = { name, command: name, phase: 'started' }
+        j.checks = [...j.checks.filter((c) => c.name !== name), entry]
+        await step(() => deps.journal.write(j))
+        const t0 = Date.now()
+        const g = await step(() => deps.guards!(i.expected, i.result))
+        if (invalidated) return { invalid: true }
+        const refused = guardsRefuse(g)
+        Object.assign(entry, { phase: 'ended', run: '', ok: !refused, counted: !g.incomplete, revision: i.result, ...(g.transient ? { transient: true } : {}) })
+        await deps.journal.write(j)
+        await deps.checkRan({ name, command: name, revision: i.result, tested: i.result, ok: !refused, run: '', durationMs: Math.max(0, Date.now() - t0), counted: !g.incomplete, guardsKey: g.key, base: i.expected })
+        if (!refused) continue
+        const { transient, key: _key, ...report } = g
+        if (transient) return { transient: { check: name, why: guardReportLog(report) } }
+        return { red: { check: name, output: guardReportLog(report), guards: report } }
       }
       const command = i.commands[name] ?? name
       const entry: JournalledCheck = { name, command, phase: 'started' }

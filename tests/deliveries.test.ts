@@ -242,6 +242,24 @@ describe('the delivery service (#647)', async () => {
     }
   })
 
+  it("a burst of transactions lets the event loop turn between them, in their order (HI-3298: a keystroke waits for one, never all)", async () => {
+    // A keystroke's stand-in, queued once the first is made: before HI-3298 it ran only once every transaction had.
+    const seen: string[] = []
+    const made = await Promise.all(
+      Array.from({ length: 5 }, (_, i) =>
+        make({ from: combwork, kind: 'card-event', card: i + 1, body: `[CW] #${i + 1} is in Review.`, ref: `r${i}` }).then((r) => {
+          seen.push(r.id)
+          if (r.id === 'm1') setImmediate(() => seen.push('turn'))
+          return r
+        })
+      )
+    )
+    expect(seen.indexOf('turn')).toBeGreaterThan(-1)
+    expect(seen.indexOf('turn')).toBeLessThan(seen.indexOf('m5'))
+    expect(seen.filter((s) => s !== 'turn')).toEqual(['m1', 'm2', 'm3', 'm4', 'm5'])
+    expect(made.map((r) => r.id)).toEqual(['m1', 'm2', 'm3', 'm4', 'm5'])
+  })
+
   it('saved as made, with short ids that go on across a restart', async () => {
     expect((await make()).id).toBe('m1')
     expect((await make({ body: 'Then #520.' })).id).toBe('m2')
@@ -1083,6 +1101,18 @@ describe('the delivery service (#647)', async () => {
     await deliveries.readInbox(alpha, 'b1')
     now.control = false
     expect(await deliveries.ackDeliveries(alpha, 'b1', ['m4'])).toEqual({ acked: ['m4'], unknown: [], unread: [] })
+  })
+
+  it("HI-3290: a save's size, from each record's bytes kept, is the whole text's to the byte", () => {
+    const sizes = (records: DeliveryRecord[], next: number, invalid: unknown[] = []) => deliveries.fileBytesForTests(records, next, invalid)
+    const one = rec({ body: 'Rebase first — then «#7»\nand 🐝.', meta: { queueReturn: true } })
+    const many = [one, rec({ id: 'm2', seq: 2, state: 'acked', received: at, acked: at, ended: at, from: combwork, kind: 'card-event', card: 7 }), rec({ id: 'm3', seq: 3, body: '' })]
+    for (const [records, next, invalid] of [[[], 1, []], [[], 4, [{ id: 'nope' }]], [[one], 2, []], [many, 4, []], [many, 12, [{ id: 'nope', x: [1, { y: 'é' }] }]]] as [DeliveryRecord[], number, unknown[]][]) {
+      const got = sizes(records, next, invalid)
+      expect(got.bytes).toBe(got.text)
+    }
+    // The same records again (their bytes kept): the same total.
+    expect(sizes(many, 4).bytes).toBe(sizes(many, 4).text)
   })
 
   it('within its byte budget: refused when full (history makes room first), and a file it wrote always reads back whole', async () => {

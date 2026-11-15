@@ -13,6 +13,7 @@ import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX } from '../agentLimits'
 import type { StageId } from './facts'
 import type { ReviewerMode } from './roles'
 import { takesAssistantWakes, type AssistantWakes } from '../laneEvents'
+import { takesGuards, type MergeGuard } from './mergeGuards'
 
 /** G1 / N1: who checks the work before it's done. */
 export type ReviewBy = 'none' | 'agent' | 'agentThenYou' | 'you'
@@ -108,6 +109,13 @@ export interface WorkflowOptions {
    */
   mergeInstall: MergeInstall
   /**
+   * Merge guards (HI-3284): patterns a merge refuses in the lines it adds (mergeGuards.ts), checked by the merge queue on
+   * the merged result and by jj's candidate checks on the candidate, a match returning the card like a failed merge check.
+   * Not a rule (`GUARD_OPTIONS`): read as the options are when they check, so a guard added applies to cards in flight;
+   * a result counts only for the guards it was checked with. Unset: none.
+   */
+  mergeGuards?: MergeGuard[]
+  /**
    * G20 (HI-1367): each card's focused tests, chosen when it is submitted by the project's picker (`focused.pick` in
    * `commands`) or named by its builder, and run by the merge queue at the merged result with its runner (`focused.run`).
    * Combwork merges only.
@@ -193,6 +201,12 @@ export const NAME_OPTIONS: readonly OptionKey[] = ['stageNames']
 export const BRANCH_OPTIONS: readonly OptionKey[] = ['otherTargets']
 
 /**
+ * Merge guards (HI-3284), not rules: left out of a ruleset (the merge queue and jj's candidate checks read them as the
+ * options are when they check), never set by a preset, never making the options Custom.
+ */
+export const GUARD_OPTIONS: readonly OptionKey[] = ['mergeGuards']
+
+/**
  * How agents work together, not rules (HI-1766): left out of every ruleset (so a change applies at once and marks
  * nothing "old rules"), never set by a preset or All off (but Maximum agents, `PRESET_PREFERENCES`), never making the
  * options Custom. A lane keeps the rounds and wait it registered with.
@@ -214,10 +228,10 @@ export const PRESET_PREFERENCES: readonly OptionKey[] = ['maxAgents', 'simplifyA
 const SOLO_CHURN = { simplifyAt: 0, churnStopAt: 0 } as const
 
 /** The options no preset sets (names and preferences): a choice of preset keeps a project's or level's own. */
-export const UNPRESET_OPTIONS: readonly OptionKey[] = [...NAME_OPTIONS, ...BRANCH_OPTIONS, ...PREFERENCE_OPTIONS.filter((k) => !PRESET_PREFERENCES.includes(k))]
+export const UNPRESET_OPTIONS: readonly OptionKey[] = [...NAME_OPTIONS, ...BRANCH_OPTIONS, ...GUARD_OPTIONS, ...PREFERENCE_OPTIONS.filter((k) => !PRESET_PREFERENCES.includes(k))]
 
 /** The options that never make a preset Custom: the names and every preference, Maximum agents too. */
-const NOT_CUSTOM: readonly OptionKey[] = [...NAME_OPTIONS, ...BRANCH_OPTIONS, ...PREFERENCE_OPTIONS]
+const NOT_CUSTOM: readonly OptionKey[] = [...NAME_OPTIONS, ...BRANCH_OPTIONS, ...GUARD_OPTIONS, ...PREFERENCE_OPTIONS]
 
 /** A preset's or All off's own options, with the draft's own names and preferences kept (HI-1766, #1417). */
 export function withUnpreset(chosen: Partial<WorkflowOptions>, own: Partial<WorkflowOptions>): Partial<WorkflowOptions> {
@@ -531,6 +545,7 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
   commitMessage: oneOf<CommitMessage>(['combwork', 'branch']),
   mergeChecks: strings,
   mergeInstall: oneOf<MergeInstall>(['onManifestChange', 'always']),
+  mergeGuards: takesGuards,
   focusedTests: bool,
   okBefore: (v) => isRecord(v) && oneOf<OkBefore['mode']>(['never', 'labels', 'every'])(v.mode) && strings(v.labels),
   folder: oneOf<FolderMode>(['slots', 'project']),
@@ -577,7 +592,7 @@ export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionK
   git: [
     { id: 'team', options: ['maxAgents'] },
     { id: 'review', options: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'] },
-    { id: 'checks', options: ['preChecks', 'mergeChecks', 'focusedTests', 'mergeInstall'] },
+    { id: 'checks', options: ['preChecks', 'mergeChecks', 'focusedTests', 'mergeInstall', 'mergeGuards'] },
     { id: 'merging', options: ['finish', 'style', 'target', 'otherTargets', 'strict', 'pushTarget', 'followRemote', 'commitMessage', 'dependenciesDone'] },
     { id: 'where', options: ['folder', 'slotsUpToDate', 'identity', 'stopOwnRuns', 'sharedFolderWarning', 'fileLocks'] },
     { id: 'loops', options: LOOP_OPTIONS },
@@ -596,7 +611,7 @@ export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionK
     { id: 'team', options: ['maxAgents'] },
     { id: 'review', options: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'] },
     // HI-2938: the merge checks (and their install) run on the candidate before it is offered.
-    { id: 'checks', options: ['preChecks', 'mergeChecks', 'mergeInstall'] },
+    { id: 'checks', options: ['preChecks', 'mergeChecks', 'mergeInstall', 'mergeGuards'] },
     // HI-2871: style and strict shape the candidate Combwork builds before the user integrates.
     { id: 'merging', options: ['finish', 'style', 'target', 'otherTargets', 'strict', 'dependenciesDone'] },
     { id: 'where', options: ['folder', 'identity', 'stopOwnRuns'] },
@@ -659,6 +674,8 @@ export function previewRows(options: WorkflowOptions, effective: WorkflowOptions
 export function formShows(key: OptionKey, o: WorkflowOptions): boolean {
   // HI-2938: G9 also where the user integrates (jj's candidate); G20 stays the merge queue's.
   if (key === 'mergeChecks') return o.finish === 'combworkMerges' || finishOnCandidate(o.finish)
+  // HI-3284: merge guards where the merge checks run (the merge queue, jj's candidate).
+  if (key === 'mergeGuards') return o.finish === 'combworkMerges' || finishOnCandidate(o.finish)
   if (key === 'focusedTests') return o.finish === 'combworkMerges'
   // The install comes before G9's checks and G20's run alike (HI-1367): focused tests alone install too.
   if (key === 'mergeInstall') return (o.finish === 'combworkMerges' && (o.mergeChecks.length > 0 || o.focusedTests)) || (finishOnCandidate(o.finish) && o.mergeChecks.length > 0)

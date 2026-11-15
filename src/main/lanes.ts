@@ -452,7 +452,8 @@ function laneFact(ws: WorkspaceService, l: LaneRecord): void {
   // Kept as its message too (HI-2438's summaryText), so a later reader can be told it in their own dialect.
   const values = { named: l.name ? 'yes' : 'no', name: l.name ?? '', state, commit: l.mergeCommit ?? '', who, cards }
   const summary = inDefaultDialect(() => say(A.journal, values))
-  journalFact(ws, {
+  // Written once the journal is writable (HI-3289); journalFact logs a failure itself.
+  void journalFact(ws, {
     summary,
     summaryText: { id: A.journal.id, values },
     project: l.project,
@@ -1935,6 +1936,22 @@ export async function listLanes(ws: WorkspaceService, o: { project?: string | nu
   if (!ws.path) return []
   const lanes = (await read(ws)).filter((l) => !o.project || same(l.project, o.project))
   return views(ws, o.all ? [...lanes].sort((a, b) => a.startedAt.localeCompare(b.startedAt)) : listedLanes(lanes, Date.now()))
+}
+
+/**
+ * The lanes as a lane's cost reads them (HI-3294): whose and when, and their cards' columns, without the rest of a lane's
+ * view (its agents' names, facts, slots and waits, a read of every lane's facts on main). `ids`: only those, of every lane
+ * kept; else those listed.
+ */
+export async function laneTimes(ws: WorkspaceService, ids?: readonly string[]): Promise<Pick<LaneInfo, 'id' | 'project' | 'builder' | 'reviewer' | 'startedAt' | 'endedAt' | 'cards'>[]> {
+  if (!ws.path) return []
+  const all = await read(ws)
+  const lanes = ids ? [...all].sort((a, b) => a.startedAt.localeCompare(b.startedAt)).filter((l) => ids.includes(l.id)) : listedLanes(all, Date.now())
+  const cards = await cardsOf(ws, lanes)
+  return lanes.map((l) => {
+    const v = laneView(l, cards.get(l.id)!)
+    return { id: v.id, project: v.project, builder: v.builder, reviewer: v.reviewer, startedAt: v.startedAt, endedAt: v.endedAt, cards: v.cards }
+  })
 }
 
 /** The lanes that ended (or were abandoned) at or after `since` (ms), newest first (HI-2898: Progress → Lanes' Ended today). */

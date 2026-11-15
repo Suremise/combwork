@@ -48,3 +48,6 @@ export interface Containment {
   /** The target commit that holds it, when one does (a squash). */
   commit?: string
 }
+
+/** HI-3284: what a merge's added lines came to as its version control read them (the merge guards'): the diff, or why there is none. */
+export type DiffRead = { text: string } | { tooLarge: true } | { unreadable: string }

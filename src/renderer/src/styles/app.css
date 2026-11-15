@@ -736,8 +736,9 @@ kbd {
   font-weight: 400;
   text-transform: none;
 }
+/* A header's count sits beside its title (HI-3287), as a skill group's does: the right edge is its buttons' (a margin
+   here split the free space with them, floating the count mid-row). */
 .section-header .count {
-  margin-left: auto;
   font-weight: 500;
   color: var(--fg-muted);
 }
@@ -15849,6 +15850,33 @@ button.progress-lane-retry {
 }
 .workflow-check .input:first-child {
   flex: 0 0 35%;
+}
+.workflow-guard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.workflow-guard-head {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.workflow-guard-head .input {
+  flex: 1;
+  min-width: 0;
+}
+.workflow-guard-matches.warn {
+  color: var(--warning);
+}
+.workflow-guard-matches .mono {
+  overflow-wrap: anywhere;
+}
+.workflow-guards > .flex {
+  gap: 6px;
+  flex-wrap: wrap;
 }
 .workflow-problems {
   color: var(--error);

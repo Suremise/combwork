@@ -204,7 +204,7 @@ describe('the canary dialect over the lanes service (main/lanes.ts)', () => {
   it("say cw_lane's refusals and notes through the catalogue; a lane's journal fact stays the Default", async () => {
     const facts: string[] = []
     const kept: Parameters<typeof journal.journalFact>[1][] = []
-    const spy = vi.spyOn(journal, 'journalFact').mockImplementation((_ws, f) => {
+    const spy = vi.spyOn(journal, 'journalFact').mockImplementation(async (_ws, f) => {
       facts.push(f.summary)
       kept.push(f)
       return true
@@ -286,7 +286,7 @@ describe('the canary dialect over the lanes service (main/lanes.ts)', () => {
       const h = join(base, 'journal-ws', '.combwork', 'assistant')
       const out = admitted(join(base, 'journal-ws'))
       try {
-        const id = journalStore.writeEntry(h, journalSettings({ enabled: true }), { kind: 'event', ...started, tags: ['combwork', ...(started.tags ?? [])] }, 'combwork')
+        const id = await journalStore.writeEntry(h, journalSettings({ enabled: true }), { kind: 'event', ...started, tags: ['combwork', ...(started.tags ?? [])] }, 'combwork')
         journalStore.closeJournal(h)
         const raw = new DatabaseSync(journalStore.journalFile(h), { readOnly: true })
         try {

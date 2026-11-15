@@ -6,10 +6,11 @@
 
 import { createLogger, userText } from '../logger'
 import { compile } from '../../shared/workflow/compile'
-import { allOff, BRANCH_OPTIONS, contradictions, CONTRADICTIONS, NAME_OPTIONS, ownsTarget, PREFERENCE_OPTIONS, takesOption, type Contradiction, type WorkflowOptions } from '../../shared/workflow/options'
+import { allOff, BRANCH_OPTIONS, contradictions, CONTRADICTIONS, GUARD_OPTIONS, NAME_OPTIONS, ownsTarget, PREFERENCE_OPTIONS, takesOption, type Contradiction, type WorkflowOptions } from '../../shared/workflow/options'
 import { PREFERENCE_DEFAULTS } from '../../shared/workflow/preferences'
 import { detect } from '../platform/registry'
 import { stageNameProblems, stageNameProblemText, type StageNameProblem } from '../../shared/workflow/stages'
+import { guardProblems, guardProblemText, type GuardProblem } from '../../shared/workflow/mergeGuards'
 import { agentText, type Text } from '../../shared/advanced'
 import { tr } from '../../shared/i18n'
 import { needsRepository, type PlatformId } from '../../shared/platform/descriptors'
@@ -44,7 +45,7 @@ const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v =
 const fits = (key: keyof WorkflowOptions, v: unknown): boolean => takesOption(key, v)
 
 /** Every option a level may set: the platform's (all-off's keys), and the names (N5) and preferences (HI-1766), which all-off leaves unset. */
-const optionKeys = (base: WorkflowOptions): string[] => [...new Set([...Object.keys(base).filter((k) => k !== 'platform'), ...NAME_OPTIONS, ...BRANCH_OPTIONS, ...PREFERENCE_OPTIONS])]
+const optionKeys = (base: WorkflowOptions): string[] => [...new Set([...Object.keys(base).filter((k) => k !== 'platform'), ...NAME_OPTIONS, ...BRANCH_OPTIONS, ...GUARD_OPTIONS, ...PREFERENCE_OPTIONS])]
 
 /** The options a level sets for a platform, or why they can't be read. */
 function levelOf(raw: unknown, platform: PlatformId, known: Set<string>): { set: Partial<WorkflowOptions> } | { bad: string } {
@@ -106,7 +107,7 @@ export function resolveOptions(platform: PlatformId, levels: OptionLevels): Reso
  * Why options can't be saved (#1278): a level that can't be read, a contradiction, or a stage's name (N5, #1417). Every
  * option is offered since P7 (#1445: G15 was the last).
  */
-export type OptionsProblem = { kind: 'bad'; why: string } | { kind: 'contradiction'; id: Contradiction } | ({ kind: 'stageName' } & StageNameProblem)
+export type OptionsProblem = { kind: 'bad'; why: string } | { kind: 'contradiction'; id: Contradiction } | ({ kind: 'stageName' } & StageNameProblem) | ({ kind: 'guard' } & GuardProblem)
 
 /**
  * Options as a save would leave them (the Workflow section, the Assistant's settings tool): resolved, and every reason
@@ -128,7 +129,9 @@ export function checkOptions(platform: PlatformId, levels: OptionLevels): { reso
   const problems: OptionsProblem[] = [
     ...contradictions(options, { subfolder }).map((id) => ({ kind: 'contradiction' as const, id })),
     // Each stage's name (N5) against every other's, in English and in the language Combwork shows.
-    ...stageNameProblems(options.stageNames, tr).map((p) => ({ kind: 'stageName' as const, ...p }))
+    ...stageNameProblems(options.stageNames, tr).map((p) => ({ kind: 'stageName' as const, ...p })),
+    // HI-3284: each merge guard's shape and bounds, its pattern compiled, never run (the empty-match rule: guardsAtSave).
+    ...guardProblems(options.mergeGuards).map((p) => ({ kind: 'guard' as const, ...p }))
   ]
   return { resolved: { options, origins, invalid: null }, problems }
 }
@@ -136,6 +139,7 @@ export function checkOptions(platform: PlatformId, levels: OptionLevels): { reso
 /** A problem as text for the window (its message, in the user's language), or its English reason. */
 export function problemShownOf(p: OptionsProblem): Text {
   if (p.kind === 'bad') return { shown: p.why, agent: p.why }
+  if (p.kind === 'guard') return guardProblemText(p)
   return p.kind === 'contradiction' ? CONTRADICTIONS[p.id] : stageNameProblemText(p)
 }
 

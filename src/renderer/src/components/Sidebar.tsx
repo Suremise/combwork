@@ -224,12 +224,12 @@ export function Section({ title, count, children, defaultOpen = true, tip, butto
       <div className="section-header" onClick={() => setOpen(!open)}>
         <Icon name={open ? 'chevron-down' : 'chevron-right'} />
         {title}
+        {count !== undefined && <span className="count">{count}</span>}
         {tip && (
           <span onClick={(e) => e.stopPropagation()}>
             <InfoTip text={tip} />
           </span>
         )}
-        {count !== undefined && <span className="count">{count}</span>}
         {buttons && (
           <span className="section-actions" onClick={(e) => e.stopPropagation()}>
             {buttons}

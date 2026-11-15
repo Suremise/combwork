@@ -63,8 +63,17 @@ const busyLines = () => lines().filter((l) => l.includes('[main] The main proces
     const shown = await lib.until(async () => ((await row.count()) >= 1 ? (await row.first().innerText()).replace(/\s+/g, ' ') : null), HUNG_MS)
     check('the Performance view lists it: its length and the IPC call during it', !!shown && /\b1\.\d s\b/.test(shown) && shown.includes('ipc app:info'), shown ?? (await page.locator('.performance-page:visible').innerText().catch(() => '')).slice(-600))
     check('…and how many there were since Combwork started', /stalls? since Combwork started/.test(await page.locator('[data-stalls-count]').innerText().catch(() => '')))
+    // HI-3293: the hour's counts, the stall among them with the work it named first (a step just before it can come first:
+    // not asserted), and the view's Delays by hour table.
+    const { hours } = await inv('performance:stalls')
+    check('performance:stalls counts the hour: the stall, with what it named first', hours?.[0]?.stalls >= 1 && hours[0].top.length + hours[0].unnamed >= 1, JSON.stringify(hours?.[0]))
+    const hourRow = page.locator('.performance-page:visible .table:has(th .th-sort:text-is("Named first")) tbody tr')
+    const hourShown = await lib.until(async () => ((await hourRow.count()) >= 1 ? (await hourRow.first().innerText()).replace(/\s+/g, ' ') : null), HUNG_MS)
+    check('the Performance view lists the hour under Delays by hour, with what its stalls named first', !!hourShown && /×\d/.test(hourShown), hourShown ?? '')
     await table.scrollIntoViewIfNeeded().catch(() => undefined)
     await page.screenshot({ path: path.join(lib.WORK, 'stalls-performance.png') })
+    await hourRow.first().scrollIntoViewIfNeeded().catch(() => undefined)
+    await page.screenshot({ path: path.join(lib.WORK, 'stalls-hours.png') })
 
     // Main's thread pool (HI-1702): wider than Node's 4, and a wait for it is noted. Each read of a pipe nobody writes to
     // holds one of the pool's threads, using no CPU, until the test writes to it.

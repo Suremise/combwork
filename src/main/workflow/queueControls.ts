@@ -29,6 +29,7 @@ import { CW_DIR } from '../../shared/defaults'
 import { projectRevision } from '../boardStore'
 import type { DatabaseSync } from 'node:sqlite'
 import { runCardIntent } from '../cardIntents'
+import { measured } from '../stallWork'
 import { onCombworkEvent } from '../events'
 import type { TaskActor } from '../tasks'
 import type { FolderChangeAction, QueueChangesSettled, QueuePauseRef, TaskCard } from '../../shared/types'
@@ -199,7 +200,14 @@ function boardPart(ws: WorkspaceService, wf: Workflow, projectPath: string, stam
   if (stamp !== null && had && had.stamp === stamp && had.until > now) return had
   // A return seen leaves RETURN_SEEN_SHOWN_MS after it was seen (recentOutcomes reads the clock): kept until the first does.
   const folds = [...wf.store.queueSeen().values()].map((at) => Date.parse(at) + RETURN_SEEN_SHOWN_MS).filter((t) => t > now)
-  const part: BoardPart = { stamp: stamp ?? '', until: stamp === null ? 0 : Math.min(Infinity, ...folds), inFlight: cardsInFlightByTarget(wf), open: new Map(wf.store.cardsOpen().map((c) => [c.id, c])), views: new Map() }
+  const part: BoardPart = {
+    stamp: stamp ?? '',
+    until: stamp === null ? 0 : Math.min(Infinity, ...folds),
+    // Named in a stall they make (HI-3293).
+    inFlight: measured('queue cards in flight', () => cardsInFlightByTarget(wf)), // i18n-ignore: a stall label for combwork.log, in English
+    open: measured('queue open cards', () => new Map(wf.store.cardsOpen().map((c) => [c.id, c]))), // i18n-ignore: a stall label for combwork.log, in English
+    views: new Map(),
+  }
   if (stamp === null) byProject.delete(key)
   else byProject.set(key, part)
   return part
@@ -224,7 +232,8 @@ async function makeViews(ws: WorkspaceService, projectPath: string, target: stri
     if (!v) part.views.set(k, (v = queueView(ws, wf, projectPath, t, scope, window)))
     return { ...v }
   }
-  const views = (target ? [target] : queueTargets(wf, also)).map(viewOf)
+  // Named in a stall it makes (HI-3293): each queue's facts folded on main.
+  const views = measured('queue views', () => (target ? [target] : queueTargets(wf, also)).map(viewOf)) // i18n-ignore: a stall label for combwork.log, in English
   markPast(views, await projectTargets(ws, projectPath).catch(() => null))
   // HI-2885: from the sources allowed (the default branch too), so a project with one target still brings it up to date with main.
   // HI-2892: only those in the release path's direction into it: none offered, none counted, against it.
@@ -331,14 +340,14 @@ export async function commitsBehind(projectPath: string, from: string, to: strin
  * target its current options merge into.
  */
 async function queueScope(wf: Workflow, projectPath: string, part?: BoardPart): Promise<QueueScope> {
-  const inFlight = part?.inFlight ?? cardsInFlightByTarget(wf)
+  const inFlight = part?.inFlight ?? measured('queue cards in flight', () => cardsInFlightByTarget(wf)) // i18n-ignore: a stall label for combwork.log, in English
   const o = wf.currentRuleset(false).options
   let current: string | null = null
   if (merges(o.platform) && o.finish === 'combworkMerges') {
     const def = o.target ? o.target : await lineHistory().defaultTarget(projectPath).catch(() => null)
     current = def && !isUnknown(def) ? def : null
   }
-  return { inFlight, current, open: part?.open ?? new Map(wf.store.cardsOpen().map((c) => [c.id, c])) }
+  return { inFlight, current, open: part?.open ?? measured('queue open cards', () => new Map(wf.store.cardsOpen().map((c) => [c.id, c]))) } // i18n-ignore: a stall label for combwork.log, in English
 }
 
 /** Per target, the cards in flight whose own ruleset has Combwork merge into it, in number order (QueueScope.inFlight). */

@@ -2,6 +2,7 @@ import type { BrowserWindow } from 'electron'
 import { randomUUID } from 'crypto'
 import type { CombworkEvent, ToastAction, ToastLevel, ToastMessage, ToastTarget } from '../shared/types'
 import { createLogger } from './logger'
+import { measured } from './stallWork'
 
 const log = createLogger('events')
 
@@ -33,17 +34,20 @@ function send(wins: BrowserWindow[], channel: string, ...args: unknown[]): void 
  * still get the event, and the code that emitted it carries on.
  */
 function tellEach(event: CombworkEvent): void {
-  for (const l of listeners)
-    try {
-      l(event)
-    } catch (e) {
-      log.error(`a listener of the ${event.type} event failed`, e)
-    }
+  // Named in a stall they make (HI-3293): a board change's listeners rebuild what they keep. By the event's type, a fixed name.
+  measured(`on event ${event.type}`, () => { // i18n-ignore: a stall label for combwork.log, in English
+    for (const l of listeners)
+      try {
+        l(event)
+      } catch (e) {
+        log.error(`a listener of the ${event.type} event failed`, e)
+      }
+  })
 }
 
 /** Sends an event to the window(s) it is for and to in-process listeners (e.g. the Agent API event stream). */
 export function emit(event: CombworkEvent): void {
-  send(router.forEvent(event), 'cw:event', event)
+  measured(`send event ${event.type}`, () => send(router.forEvent(event), 'cw:event', event)) // i18n-ignore: a stall label for combwork.log, in English
   tellEach(event)
 }
 

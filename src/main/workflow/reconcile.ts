@@ -32,6 +32,7 @@ import { sameFingerprint, type JjCandidateFingerprint, type JjCandidateOffer, ty
 import type { WorkflowOptions } from '../../shared/workflow/options'
 import type { StoredText } from '../../shared/types'
 import { asCardCounts } from './containment'
+import { guardsOf, type GuardReport, type MergeGuard } from '../../shared/workflow/mergeGuards'
 
 export interface ReconcileHooks {
   /** Called after the platform was read and before the write: where a test lets another observer act first. */
@@ -573,7 +574,7 @@ async function integratedOutside(wf: Workflow, H: HistoryPort, card: CardRecord,
  * returned card's builder and card are told.
  */
 export interface CandidateWords {
-  checksKey(options: WorkflowOptions, setup: string): string
+  checksKey(options: WorkflowOptions, setup: string, guards?: readonly MergeGuard[]): string
   entry(attempt: string): string
   wake(key: string, f: FactData['IntegrationFailed']): string
   comment(key: string, f: FactData['IntegrationFailed']): { text: string; shown: StoredText }
@@ -729,7 +730,7 @@ export type JjChecksUpdate =
   | { waiting: string; retryMs: number }
   | { stopped: string }
   | { failing: string; retryMs: number }
-  | { red: { check: string; output: string; logPath?: string; expected: string } }
+  | { red: { check: string; output: string; logPath?: string; expected: string; guards?: GuardReport } }
 
 /**
  * Publishes a candidate's checks' progress or outcome (HI-2938/s11 §2), only in a write that finds, in its own
@@ -746,7 +747,8 @@ export async function publishCandidateChecks(wf: Workflow, card: CardRecord, pro
     const now = wf.store.card(card.id)
     const st = w.state()
     if (!sameFingerprint(candidateFingerprint(wf, now, st), at.fp)) return
-    if (words.checksKey(wf.rulesetOf(now, st).options, at.setup) !== at.key) return
+    // HI-3284: with the merge guards as the options are now: a guard changed since makes the key another.
+    if (words.checksKey(wf.rulesetOf(now, st).options, at.setup, guardsOf(wf.cfg.options())) !== at.key) return
     // The setup command still the one the key was made with (finding 3): project.json unchanged since it was read.
     if (at.setupStill && !at.setupStill()) return
     let rec: JjCandidateShown | null = null
@@ -761,7 +763,7 @@ export async function publishCandidateChecks(wf: Workflow, card: CardRecord, pro
     const r = rec as JjCandidateShown | null
     if (!r || r.state !== 'ready' || r.offer?.attempt !== at.attempt || !r.checks || (!('restart' in u) && r.checks.key !== at.key)) return
     if ('red' in u) {
-      const failed: FactData['IntegrationFailed'] = { entry: words.entry(at.attempt), revision: at.fp.revision, target: at.fp.target, reason: 'checks', transient: false, check: u.red.check, ...(u.red.logPath ? { logPath: u.red.logPath } : {}), ...(u.red.output ? { log: u.red.output.slice(-4000) } : {}) } // i18n-ignore: a failure's code, not text
+      const failed: FactData['IntegrationFailed'] = { entry: words.entry(at.attempt), revision: at.fp.revision, target: at.fp.target, reason: 'checks', transient: false, check: u.red.check, ...(u.red.logPath ? { logPath: u.red.logPath } : {}), ...(u.red.output ? { log: u.red.output.slice(-4000) } : {}), ...(u.red.guards ? { guards: u.red.guards } : {}) } // i18n-ignore: a failure's code, not text
       w.fact('IntegrationFailed', failed)
       w.tx.sql((db) => void db.prepare('DELETE FROM board_meta WHERE key = ?').run(key)) // i18n-ignore: SQL
       wrote = true
