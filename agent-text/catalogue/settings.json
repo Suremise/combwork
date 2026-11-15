@@ -2089,6 +2089,26 @@
     "note": "An advanced setting's title (Settings → Advanced), listed under Combwork. Another Combwork: the installed Combwork and a dev or test Combwork on the same machine.",
     "audience": "both"
   },
+  "settings.advanced.cw.mergeGuards.maxLines.desc": {
+    "text": "The most lines a merge may add for its merge guards to check them (and at most 64 MB of them). A merge that adds more isn’t checked at all: it goes back like a match, never through on the part that was read.",
+    "note": "What the advanced setting \"Merge guards: most lines a merge adds\" does, and what goes wrong when it is wrong (Settings → Advanced, HI-3284). MB is megabytes.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.mergeGuards.maxLines.title": {
+    "text": "Merge guards: most lines a merge adds",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by a number of lines. Merge guards are patterns Combwork refuses in the lines a merge adds (HI-3284).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.mergeGuards.seconds.desc": {
+    "text": "How long matching the merge guards against a merge’s added lines may take. Past it the check ends unfinished, which sends the card back like a match, naming the guard that was running. Raise it for very large merges; a pattern that takes this long usually needs rewriting.",
+    "note": "What the advanced setting \"Merge guards: longest the check takes\" does, and what goes wrong when it is wrong (Settings → Advanced, HI-3284).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.mergeGuards.seconds.title": {
+    "text": "Merge guards: longest the check takes",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds. Merge guards are patterns Combwork refuses in the lines a merge adds (HI-3284).",
+    "audience": "both"
+  },
   "settings.advanced.cw.none.baselineSeconds.desc": {
     "text": "In a project without version control, Combwork reads the project's files in the background when a card starts, when it is submitted, and when a check of it starts and ends, to find what changed outside the card's files. A read that takes longer than this is stopped: the card starts or is submitted without that list, and the check doesn't count.",
     "note": "What the advanced setting \"No version control: longest read of the project\" does (Settings → Advanced, under Combwork).",
@@ -3534,6 +3554,10 @@
   "settings.agent.takes.mergeChecks": {
     "text": "a list of check names the merge queue runs on the merged result when Combwork merges, e.g. [\"typecheck\", \"lint\"] (each with its command in project.workflow.commands)",
     "note": "What the workflow option mergeChecks takes. The JSON and project.workflow.commands (a setting's id) are code: keep them."
+  },
+  "settings.agent.takes.mergeGuards": {
+    "text": "a list of guards, each {shape} (pattern: a JavaScript regular expression matched against each line a merge adds; paths and skip: globs such as \"docs/**\" or \"*.md\"; at most 50 guards). A guard is not secret scanning: it catches only what it names",
+    "note": "What the workflow option mergeGuards takes (HI-3284). {shape} is the object's JSON form; the JSON field names and the globs are code: keep them."
   },
   "settings.agent.takes.okBefore": {
     "text": "an object {shape}",

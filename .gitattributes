@@ -26,6 +26,9 @@
 *.ttf binary
 *.otf binary
 
+# Recorded tool output kept byte for byte (HI-3284: a git and a jj diff whose lines carry a file's own CRLF).
+tests/fixtures/mergeGuards/*.diff -text
+
 # Branches all add CHANGELOG entries at the top of Unreleased: keep both sides instead of a conflict.
 # Only for the CHANGELOG (union keeps both versions of a changed line without warning). See AGENTS.md.
 CHANGELOG.md merge=union

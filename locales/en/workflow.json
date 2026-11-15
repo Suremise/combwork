@@ -671,6 +671,130 @@
     "defaultMessage": "{styleTitle}: {style}. {messageTitle}: {message}.",
     "description": "The user's answer to the merge queue's question before an upgraded project's first merge, kept on the card as the user's own comment: the two workflow options they chose, each its name ({styleTitle}: Merge style; {messageTitle}: Commit message) and the value chosen ({style}: Squash, say; {message}: a value of Commit message). The names and values are the workflow options' own texts, already translated: arrange them as your language writes such a list."
   },
+  "workflow.mergeGuards.add": {
+    "defaultMessage": "Add Guard",
+    "description": "A button under the merge guards: adds an empty one (HI-3284)."
+  },
+  "workflow.mergeGuards.addName": {
+    "defaultMessage": "Add “Keep My Name Out of the Code”",
+    "description": "A button under the merge guards (HI-3284’s decision): adds a ready-made guard refusing the user’s own name (Settings → General → Your name) in what a merge adds. The quoted part is the guard’s name, as workflow.mergeGuards.nameGuard."
+  },
+  "workflow.mergeGuards.checking": {
+    "defaultMessage": "Looking for what it already matches in the project…",
+    "description": "Under a merge guard being edited (HI-3284), while Combwork looks for the lines of the project its pattern already matches."
+  },
+  "workflow.mergeGuards.down": {
+    "defaultMessage": "Move down",
+    "description": "The tooltip of the button moving a merge guard down the list (HI-3284)."
+  },
+  "workflow.mergeGuards.example": {
+    "defaultMessage": "Fills in a guard once from your name in Settings → General; edit or remove it like any other.",
+    "description": "The tooltip of the button adding the ready-made “Keep my name out of the code” merge guard (HI-3284)."
+  },
+  "workflow.mergeGuards.ignoreCase": {
+    "defaultMessage": "Ignore case",
+    "description": "A checkbox on a merge guard: its pattern matches capitals and small letters alike (HI-3284)."
+  },
+  "workflow.mergeGuards.matches": {
+    "defaultMessage": "{count, plural, one {It already matches # line in the project} other {It already matches # lines in the project}}, so check it isn’t too broad. It still saves: only the lines a merge adds are checked.",
+    "description": "Under a merge guard being edited (HI-3284): how many lines of the project’s files its pattern already matches; the first few follow as file:line. Existing matches don’t block anything (only the lines a merge adds are checked), but many suggest the pattern is too broad."
+  },
+  "workflow.mergeGuards.matchesNone": {
+    "defaultMessage": "It matches no line in the project now.",
+    "description": "Under a merge guard being edited (HI-3284): its pattern matches no line of the project’s files as they are now."
+  },
+  "workflow.mergeGuards.matchesUnknown": {
+    "defaultMessage": "{why, select, tooLarge {The project is too large to look for what it already matches.} timedOut {Looking for what it already matches took too long.} other {Combwork couldn’t look for what it already matches.}}",
+    "description": "Under a merge guard being edited (HI-3284): what its pattern already matches in the project could not be found out (select: translate each; keep the keys): too many files, the time limit, or another failure."
+  },
+  "workflow.mergeGuards.matchesWhere": {
+    "defaultMessage": "{where}{more, select, yes {, …} other {}}",
+    "description": "Under a merge guard being edited (HI-3284): where its pattern already matches, {where} a list of file:line places (paths: keep them); with more yes, there are more than those listed."
+  },
+  "workflow.mergeGuards.message": {
+    "defaultMessage": "What to do instead",
+    "description": "The placeholder and label of a merge guard’s message: what the builder is told to do instead when the guard matches (HI-3284)."
+  },
+  "workflow.mergeGuards.name": {
+    "defaultMessage": "Name",
+    "description": "The placeholder and label of a merge guard’s name field (HI-3284)."
+  },
+  "workflow.mergeGuards.nameGuard": {
+    "defaultMessage": "Keep my name out of the code",
+    "description": "The name the ready-made merge guard is given (HI-3284): it refuses the user’s own name in what a merge adds. The user can rename it."
+  },
+  "workflow.mergeGuards.nameMessage": {
+    "defaultMessage": "Your name is in this change. Cite the card or decision instead, or skip this file if a name belongs here.",
+    "description": "The message the ready-made merge guard is given (HI-3284’s wording): what the builder is told when the user’s name is in what a merge adds. Card: a task on Combwork’s board. The user can edit it."
+  },
+  "workflow.mergeGuards.none": {
+    "defaultMessage": "No merge guards.",
+    "description": "Under “Merge guards” (Version Control → Workflow) when there are none (HI-3284)."
+  },
+  "workflow.mergeGuards.paths": {
+    "defaultMessage": "Only these paths (e.g. src/**, *.ts)",
+    "description": "The placeholder and label of a merge guard’s field of paths it applies to, as globs separated by commas; empty means every file (HI-3284). Keep the examples as they are."
+  },
+  "workflow.mergeGuards.pattern": {
+    "defaultMessage": "Pattern (regular expression)",
+    "description": "The placeholder and label of a merge guard’s pattern field: a JavaScript regular expression (HI-3284)."
+  },
+  "workflow.mergeGuards.problem.empty": {
+    "defaultMessage": "Merge guard {n, number} has no {field, select, name {name} pattern {pattern} other {message}}.",
+    "description": "Why workflow options cannot be saved (HI-3284): a merge guard’s name, pattern or message is empty (select: translate each; keep the keys). {n} is its position, from 1."
+  },
+  "workflow.mergeGuards.problem.glob": {
+    "defaultMessage": "Merge guard {n, number} has a path it can’t use: “{detail}”. Paths take *, **, ? and {braces} only, with / between folders, and no leading /, .. or [ ].",
+    "description": "Why workflow options cannot be saved (HI-3284): a merge guard’s path (a glob, such as docs/** or *.md) uses something unsupported. {n} is its position, from 1; {detail} is the path as written. {braces} stands for the text \"{a,b}\": keep it as it is."
+  },
+  "workflow.mergeGuards.problem.invalid": {
+    "defaultMessage": "The pattern of merge guard {n, number} isn’t a regular expression JavaScript takes: {detail}",
+    "description": "Why workflow options cannot be saved (HI-3284): a merge guard’s pattern does not compile. {n} is its position, from 1; {detail} is the JavaScript engine’s own message, in English."
+  },
+  "workflow.mergeGuards.problem.matchesEmpty": {
+    "defaultMessage": "The pattern of merge guard {n, number} matches an empty line, so it would refuse every line.",
+    "description": "Why workflow options cannot be saved (HI-3284): a merge guard’s pattern matches the empty string. {n} is its position, from 1."
+  },
+  "workflow.mergeGuards.problem.notGuard": {
+    "defaultMessage": "Merge guard {n, number} isn’t a guard: it needs a name, a pattern and a message.",
+    "description": "Why workflow options cannot be saved (HI-3284): an entry of the merge guards has the wrong shape. {n} is its position, from 1."
+  },
+  "workflow.mergeGuards.problem.notList": {
+    "defaultMessage": "The merge guards aren’t a list of guards.",
+    "description": "Why workflow options cannot be saved (HI-3284): the merge guards option is not a list. A merge guard is a pattern Combwork refuses in the lines a merge adds."
+  },
+  "workflow.mergeGuards.problem.timedOut": {
+    "defaultMessage": "The pattern of merge guard {n, number} took too long to check.",
+    "description": "Why workflow options cannot be saved (HI-3284): checking a merge guard’s pattern ran past its time limit (a pattern that backtracks a lot). {n} is its position, from 1."
+  },
+  "workflow.mergeGuards.problem.tooLong": {
+    "defaultMessage": "The {field, select, name {name} pattern {pattern} other {message}} of merge guard {n, number} is longer than {max, number} characters.",
+    "description": "Why workflow options cannot be saved (HI-3284): a merge guard’s name, pattern or message is too long (select: translate each; keep the keys). {n} is its position, from 1; {max} the most characters it takes."
+  },
+  "workflow.mergeGuards.problem.tooMany": {
+    "defaultMessage": "There are more than {max, number} merge guards.",
+    "description": "Why workflow options cannot be saved (HI-3284): too many merge guards. {max} is the most a project takes."
+  },
+  "workflow.mergeGuards.problem.tooManyGlobs": {
+    "defaultMessage": "Merge guard {n, number} has more than {max, number} paths in one list.",
+    "description": "Why workflow options cannot be saved (HI-3284): a merge guard lists too many paths it applies to or skips. {n} is its position, from 1; {max} the most."
+  },
+  "workflow.mergeGuards.problem.unchecked": {
+    "defaultMessage": "The pattern of merge guard {n, number} couldn’t be checked: Combwork couldn’t start the check.",
+    "description": "Why workflow options cannot be saved (HI-3284): the thread that checks merge guards’ patterns could not be started, so the pattern could not be checked. {n} is its position, from 1."
+  },
+  "workflow.mergeGuards.remove": {
+    "defaultMessage": "Remove",
+    "description": "The tooltip of the button removing a merge guard (HI-3284)."
+  },
+  "workflow.mergeGuards.skip": {
+    "defaultMessage": "Skip these paths (e.g. LICENSE, docs/**)",
+    "description": "The placeholder and label of a merge guard’s field of paths it skips, as globs separated by commas (HI-3284). Keep the examples as they are."
+  },
+  "workflow.mergeGuards.up": {
+    "defaultMessage": "Move up",
+    "description": "The tooltip of the button moving a merge guard up the list (HI-3284)."
+  },
   "workflow.missing.create": {
     "defaultMessage": "Create",
     "description": "HI-2807: the button beside a missing branch: creates it from the branch picked, without switching to it."
@@ -978,6 +1102,22 @@
   "workflow.option.mergeChecks.title": {
     "defaultMessage": "Checks pass on the merged result",
     "description": "A workflow option (glossary 2.6, G9): named commands Combwork’s merge queue runs on a card’s work merged with the target branch."
+  },
+  "workflow.option.mergeGuards.desc": {
+    "defaultMessage": "Patterns a merge may not add, matched against only the lines it adds (never what the target already has, nor binary files): a match sends the card back to its builder with the guard’s message, and as a pattern catches only what you name, this isn’t secret scanning.",
+    "description": "What the workflow option “Merge guards” does (HI-3284): each guard is a regular expression checked against the text lines a merge adds; a match returns the card. Secret scanning: tools that look for passwords and keys; say plainly that this is not one."
+  },
+  "workflow.option.mergeGuards.jjDesc": {
+    "defaultMessage": "Patterns a candidate may not add, matched against only the lines it adds to the target bookmark (never what it already has, nor binary files): a match sends the card back to its builder with the guard’s message, and as a pattern catches only what you name, this isn’t secret scanning.",
+    "description": "What the workflow option “Merge guards” does for a project using jj (HI-3284). A candidate is the commit Combwork builds for the user to integrate; a bookmark is jj’s name for a branch: keep it as jj’s term. Secret scanning: tools that look for passwords and keys."
+  },
+  "workflow.option.mergeGuards.jjTitle": {
+    "defaultMessage": "Merge guards",
+    "description": "The workflow option “Merge guards” (HI-3284) for a project using jj: the same name."
+  },
+  "workflow.option.mergeGuards.title": {
+    "defaultMessage": "Merge guards",
+    "description": "A workflow option (HI-3284): patterns (regular expressions) Combwork refuses in the lines a merge adds. A guard here is a check that keeps something out, not a person."
   },
   "workflow.option.mergeInstall.desc": {
     "defaultMessage": "Before the checks on the merged result, the merge queue installs the dependencies afresh, and always does when the lock file or manifests changed.",

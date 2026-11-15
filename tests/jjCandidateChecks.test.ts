@@ -4,7 +4,8 @@
 // before the lease and before each check, the lease always given back, and each outcome: green (only counted passes),
 // red, transient, uncounted, stopped, invalid, waiting.
 import { describe, expect, it } from 'vitest'
-import { checksKeyOf, journalFor, runCandidateChecks, type CandidateChecksDeps, type CandidateChecksInput, type ChecksJournal } from '../src/main/workflow/jjCandidateChecks'
+import { candidateCheckNames, checksKeyOf, journalFor, runCandidateChecks, type CandidateChecksDeps, type CandidateChecksInput, type ChecksJournal } from '../src/main/workflow/jjCandidateChecks'
+import { MERGE_GUARDS_CHECK, type MergeGuard } from '../src/shared/workflow/mergeGuards'
 import type { JjCandidateFingerprint } from '../src/main/platform/jjCandidateStep'
 
 const C = (c: string): string => c.repeat(40)
@@ -250,5 +251,69 @@ describe("a jj candidate's merge checks (HI-2938)", () => {
     const k = checksKeyOf(o, 'npm ci')
     expect(checksKeyOf({ ...o }, 'npm ci')).toBe(k)
     for (const other of [checksKeyOf({ ...o, mergeChecks: ['b', 'a'] }, 'npm ci'), checksKeyOf({ ...o, commands: { a: 'x2', b: 'y' } }, 'npm ci'), checksKeyOf({ ...o, mergeInstall: 'always' }, 'npm ci'), checksKeyOf(o, 'npm install')]) expect(other).not.toBe(k)
+  })
+})
+
+// HI-3284: the merge guards as the candidate's first check: matched by the deps' guards (never a run in the copy),
+// journalled and recorded like a check; a match or an unfinished check red with its diagnostics, a failed read
+// transient; and in the checks key, so a guard changed makes the checks (and the consent bound to their key) stale.
+describe("a jj candidate's merge guards (HI-3284)", () => {
+  const g: MergeGuard = { name: 'No secrets', pattern: 'secret', message: 'Take it out.' }
+  const report = (over: Record<string, unknown> = {}) => ({ hits: [], more: 0, messages: [], key: 'gk', ...over })
+
+  it('are named first, only when there are any', () => {
+    expect(candidateCheckNames({ mergeChecks: ['lint'] }, [g])).toEqual([MERGE_GUARDS_CHECK, 'lint'])
+    expect(candidateCheckNames({ mergeChecks: ['lint'] }, [])).toEqual(['lint'])
+  })
+
+  it('green: matched with the candidate and the head it was built on, recorded with their key, then the checks', async () => {
+    const p = parts()
+    const asked: string[] = []
+    p.deps.guards = async (expected, result) => (asked.push(`${expected.slice(0, 1)}..${result.slice(0, 1)}`), report())
+    const ran: unknown[] = []
+    const checkRan = p.deps.checkRan
+    p.deps.checkRan = async (c) => (ran.push(c), checkRan(c))
+    expect(await runCandidateChecks(p.deps, input({ names: [MERGE_GUARDS_CHECK, 'lint'] }))).toEqual({ green: true, checks: [MERGE_GUARDS_CHECK, 'lint'] })
+    expect(asked).toEqual(['d..c'])
+    expect(p.log).toEqual(['lease L1', 'ran merge guards ok', 'run lint', 'ran lint ok', 'give L1 checksEnded'])
+    expect(ran[0]).toMatchObject({ name: MERGE_GUARDS_CHECK, ok: true, counted: true, guardsKey: 'gk', base: C('d'), revision: C('c') })
+  })
+
+  it('red on a match, with the guard’s diagnostics; red too when unfinished (never green); a failed read transient', async () => {
+    const hit = { guard: 'No secrets', file: 'a.txt', line: 2, excerpt: 'my secret' }
+    const p = parts()
+    p.deps.guards = async () => report({ hits: [hit], messages: [{ guard: 'No secrets', message: 'Take it out.' }] })
+    const red = await runCandidateChecks(p.deps, input({ names: [MERGE_GUARDS_CHECK, 'lint'] }))
+    expect(red).toEqual({ red: { check: MERGE_GUARDS_CHECK, output: 'a.txt:2: my secret\n"No secrets": Take it out.', guards: { hits: [hit], more: 0, messages: [{ guard: 'No secrets', message: 'Take it out.' }] } } })
+    expect(p.log).not.toContain('run lint')
+    const u = parts()
+    u.deps.guards = async () => report({ incomplete: 'tooLarge' })
+    expect(await runCandidateChecks(u.deps, input({ names: [MERGE_GUARDS_CHECK] }))).toMatchObject({ red: { check: MERGE_GUARDS_CHECK, guards: { incomplete: 'tooLarge' } } })
+    expect(u.log).toContain('ran merge guards fail uncounted')
+    const t = parts()
+    t.deps.guards = async () => report({ incomplete: 'unreadable', transient: true })
+    expect(await runCandidateChecks(t.deps, input({ names: [MERGE_GUARDS_CHECK] }))).toMatchObject({ transient: { check: MERGE_GUARDS_CHECK } })
+  })
+
+  it('a green that stands is not matched again; one under another key is', async () => {
+    const green: ChecksJournal = { fp, attempt: 'att0001', result: C('c'), expected: C('d'), checksKey: 'k1', checks: [{ name: MERGE_GUARDS_CHECK, command: MERGE_GUARDS_CHECK, phase: 'ended', ok: true, counted: true, revision: C('c') }] }
+    let n = 0
+    const p = parts({ journal: green })
+    p.deps.guards = async () => (n++, report())
+    expect(await runCandidateChecks(p.deps, input({ names: [MERGE_GUARDS_CHECK] }))).toEqual({ green: true, checks: [MERGE_GUARDS_CHECK] })
+    expect(n).toBe(0)
+    const q = parts({ journal: green })
+    q.deps.guards = async () => (n++, report())
+    await runCandidateChecks(q.deps, input({ names: [MERGE_GUARDS_CHECK], checksKey: 'k2' }))
+    expect(n).toBe(1)
+  })
+
+  it('the checks key follows the guards (none: as it was before them)', () => {
+    const o = { mergeChecks: ['a'], commands: { a: 'x' }, mergeInstall: 'onManifestChange' as const }
+    expect(checksKeyOf(o, '', [])).toBe(checksKeyOf(o, ''))
+    const k = checksKeyOf(o, '', [g])
+    expect(k).not.toBe(checksKeyOf(o, ''))
+    expect(checksKeyOf(o, '', [{ ...g, pattern: 'other' }])).not.toBe(k)
+    expect(checksKeyOf(o, '', [{ ...g }])).toBe(k)
   })
 })

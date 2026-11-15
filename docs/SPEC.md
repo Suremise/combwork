@@ -5193,6 +5193,7 @@ Done for None: an `Accepted` revision (§16.3.3); with no review, the builder's 
 | G17 | **Reviewers** | One per lane · A shared pool | §16.10.5 |
 | G18 | **Push the target branch after merging** | On / Off (default Off) | The merge queue (§16.9.1), Combwork merges only. Not a rule: in no ruleset, read as the options are when the queue pushes (#1179). |
 | G21 | **The target branch follows its remote** | On / Off (default Off) | The merge queue (§16.9.4), Combwork merges only, Git only. Fetches the branch the target tracks before each test merge, tests on its head, publishes there first (an exact compare-and-swap) and catches the local target up after; implies G18. Not a rule, as G18: in no ruleset, read as the options are when the queue runs (HI-1183). |
+| G22 | **Merge guards** | A list of guards (default none) | Patterns a merge may not add (HI-3284, §16.9.6): the merge queue checks them on the merged result, and jj's candidate checks on the candidate; Combwork merges or a candidate finish only. Not a rule: in no ruleset, read as the options are when they check, never set by a preset nor making the options Custom. |
 | G20 | **Each card's focused tests pass on the merged result** | On / Off, with the project's commands `focused.pick` (optional) and `focused.run` | `submit.focusedChosen`; the merge queue's step 5 (§16.9.1), Combwork merges only. Built [HI-1367]. |
 | G19 | **Commit message** | Combwork's: the card's key and title, with trailers · The branch's own, with no card key or trailers (default, HI-1997) | The message of the queue's merge commit or squash commit (§16.9.1 step 4); shown when Combwork merges with Merge commit or Squash (Rebase makes no commit of its own). The branch's own leaves out the `Combwork-` trailers its commits carry (HI-2588; an old-name one of a commit from before 1.1 is history, kept as written: HI-2594); the branch's commits keep theirs. Not a rule, as G18: in no ruleset, read as the options are when the queue merges (HI-1697). |
 | — | Card loops: wake reviewers and builders, rounds, wait (hours), design check wait (minutes) | On, 10, 6, 30 | Workflow options since HI-1766 (§16.6.7), for None and Git, a group of their own. |
@@ -7573,6 +7574,72 @@ unsigned commit; every failure stays one, with git's own nonzero exit.
 - **Not measured** (recorded as limitations, the user's machine left alone): Gpg4win's gpg (not installed where it was
   built; the same GnuPG options), and Windows' ssh-agent service with a detached signer (loading a key would change the
   user's machine-wide agent; a private Git for Windows agent was measured).
+
+#### 16.9.6 Merge guards <a id="spec-merge-guards"></a>
+
+**Built [HI-3284]** (design HI-3284/s16, HR2's OK: regular expressions as guards for merge, under Version Control). A
+project's **Merge guards** (G22, Version Control → Workflow, Combwork,
+workspace and project levels, none by default) are patterns a merge may not add.
+
+- **A guard:** a name, a JavaScript regular expression (compiled with `u`; *Ignore case* adds `i`), the paths it applies
+  to and the paths it skips (globs: `*`, `**`, `?`, `{a,b}`, `/` between folders; one without a `/` matches a name at any
+  depth, as .gitignore does; one matching a folder matches what's in it; matched ignoring case), and a message saying what
+  to do instead. At most 50 guards; a name up to 80 characters, a message up to 1,000, a pattern up to 500; up to 50 paths
+  in each list, each up to 260 characters. A save refuses a guard that breaks any of these, a pattern that doesn't compile
+  or a glob it can't use (`[ ]`, `\`, a leading `/`, `..`, an empty segment, nested or unbalanced braces), each by a
+  sentence naming the guard, without running a pattern on main's thread; and a pattern that matches an empty line (it
+  would refuse every line), checked in the guards' worker before the save takes its locks (1 s).
+- **What it checks: only the text lines the merge adds** (HI-2617's rule: "no new X" guards check the change;
+  sweeps clean what already exists): the diff from the target's head the merge was made on to the merged result (jj: to the
+  candidate), renames found (a pure rename adds nothing), never a path, never a binary file, never what the target already
+  has. The diff is read through the platform (Git: `git diff -U0 -M` with the user's diff configuration pinned off: no
+  external diff or textconv, no colour, the `a/` and `b/` prefixes, paths unquoted; jj: `jj diff --git --context 0`
+  under the runner's prefix). Each line is matched whole, in a worker thread of its own (never main's), ended when the check
+  settles.
+- **Never a silent pass:** a diff over 64 MB or **Merge guards: most lines a merge adds** (Settings → Advanced, 200,000),
+  the matching past **Merge guards: longest the check takes** (10 s; it names the guard that was running), a worker that
+  ends, a pattern that can't compile (a hand-edited file) or matches an empty line: the check is *incomplete*, which
+  refuses the merge as a match does and says why. A diff that couldn't be read is incomplete and transient (the same
+  revision may go back). Only the excerpts shown are cut (160 characters around the match); at most 50 hits are kept,
+  the rest counted.
+- **Where it runs:** the merge queue's checks (§16.9.1 step 5), first, before the install and the named checks; jj's
+  candidate checks, as their first check, `merge guards`, journalled like the others. A refusal goes the failed-check way:
+  `IntegrationFailed` reason `checks`, check `merge guards`, with its diagnostics (`guards`: the hits, each guard, file,
+  line and excerpt, the matching guards' messages, or why it was incomplete); the builder's wake and the card's comment
+  name the guard, the file and line and the message. Recorded as `CheckRan` `merge guards`, with the guards' key and the
+  head its lines were read from.
+- **Authority:** a result counts only for the merged result or candidate it checked, its base, and the guards it was
+  checked with (their key: the list as it applies, in order). The queue reads the guards again just before the advance and
+  in the advance's own write: changed since (while queued, while the check ran, or before an approved advance after a
+  restart), the entry is tested again, never advanced on the old green; and a red result is acted on only under the guards
+  it was checked with, read again in the return's own write: changed meanwhile, the entry is tested again under the guards
+  now, never returned for a guard removed or relaxed. A check's worker ends with the queue's (a lease lost, Combwork
+  closing). The queue keeps a result's key only while its entry is open. jj's checks key takes the guards' key, so a change
+  makes the candidate's checks, and the consent bound to that key, stale: they run again before anything is offered or
+  integrated.
+- **At submit:** `cw_submit` matches what the revision adds since its base and, on a match, adds a warning to its reply.
+  A warning only: it records nothing and authorises nothing; the merge's check, on the merged result, decides.
+- **The example guard** (HI-3284's decision): with Settings → General → Your name set, the editor offers **Add
+  "Keep My Name Out of the Code"**: one guard filled in once (no link to the setting), the name as a whole word,
+  case-sensitive (escaped, its spaces any whitespace, between Unicode letter, number and underscore boundaries), skipping
+  `LICENSE*`, `package.json`, `electron-builder.yml` and `CODE_OF_CONDUCT*`, with the message "Your name is in this change.
+  Cite the card or decision instead, or skip this file if a name belongs here." No guard ships active.
+- **What it already matches** (HI-3284's decision: the onus is on the user to write good guards, so show how many lines a
+  guard already matches and where): in a project's form, each guard whose pattern and paths a save would take shows, a
+  moment after it is typed, how many lines of the project it already matches and the first five (file and line), read in the
+  guards' worker: the files the version control has (Git: tracked, and new ones not ignored; otherwise a walk of the
+  folder leaving out dot folders, `node_modules` and the excluded folders), binary files and files over 2 MB left out, at
+  most 50,000 files, 64 MB and 10 s (past them it says it couldn't look). At most two previews read at once, in
+  Combwork, their reads of the project's files and settings included; a newer one for the same guard row, or the row
+  closing, cancels the one before from the moment it was asked (its worker ended, or its scan never started). It still saves whatever it matches: guards check
+  only the lines a merge adds. No list of common words: the user decides.
+- **Not secret scanning:** a guard catches what it names, in the lines a merge adds; the option's help says so.
+- **Existing "no new X" checks** (for reference; HI-3284's decision: nothing configured or migrated by this card, and
+  `tests/oldNames.mjs --diff` stays in `check:repo`): this repository's old-name check needs more than a pattern (letter
+  case decides its ordinary words, marker regions, a per-line marker, exact-string allowances, stale entries); mcp's
+  `test/names.test.js` is one (the old name not after `arc`, ignoring case, skipping `.gitignore`, the app's two folders of
+  copies and itself) but runs on the whole tree; cli's test-hook audit evaluates C# preprocessor state and runs in release
+  builds; this repository's sleep check, workspace rule, Git audit and the i18n and agent-text guards parse code.
 
 ### 16.10 Slots, review copies and sessions
 

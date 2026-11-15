@@ -11,6 +11,7 @@ import { boardRead } from './boardStore'
 import { boardConn, jjPort } from './slotsApp'
 import { CANDIDATE_MISSES, candidateShown, containedKey, type JjContained } from './workflow/reconcile'
 import { checksKeyOf } from './platform/jjCandidateChecks'
+import { guardsOf } from '../shared/workflow/mergeGuards'
 import { JjPlatform } from './platform/jjPlatform'
 import { workflowFor } from './workflow/service'
 import type { Workflow } from './workflow/runtime'
@@ -99,7 +100,8 @@ export function waitingOf(wf: Workflow, project: string, heads?: ReadonlyMap<str
     // HI-2871: its candidate, only as recorded for exactly its approval and rules now; an unknown only once repeated.
     const c0 = candidateShown(wf, card, s, project, heads?.get(target))
     // HI-2938: checks shown only under the checks key the card's options and the setup command give now (s11 §2).
-    const c = c0?.checks && (setup === undefined || c0.checks.key !== checksKeyOf(wf.rulesetOf(card, s).options, setup)) ? null : c0
+    // HI-3284: with the merge guards as the options are now (a guard changed since: not shown as passed).
+    const c = c0?.checks && (setup === undefined || c0.checks.key !== checksKeyOf(wf.rulesetOf(card, s).options, setup, guardsOf(wf.cfg.options()))) ? null : c0
     const candidate: JjWaitingCandidate | null = !c
       ? null
       : c.state === 'ready' && c.offer

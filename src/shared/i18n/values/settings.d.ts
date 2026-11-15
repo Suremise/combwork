@@ -532,6 +532,10 @@ interface CombworkMessageValues {
   'settings.advanced.cw.mcpCatalog.probeSeconds.title': undefined
   'settings.advanced.cw.merge.lockWaitSeconds.desc': undefined
   'settings.advanced.cw.merge.lockWaitSeconds.title': undefined
+  'settings.advanced.cw.mergeGuards.maxLines.desc': undefined
+  'settings.advanced.cw.mergeGuards.maxLines.title': undefined
+  'settings.advanced.cw.mergeGuards.seconds.desc': undefined
+  'settings.advanced.cw.mergeGuards.seconds.title': undefined
   'settings.advanced.cw.none.baselineSeconds.desc': undefined
   'settings.advanced.cw.none.baselineSeconds.title': undefined
   'settings.advanced.cw.notes.deliverWorkspaceNotes.desc': undefined
@@ -758,6 +762,7 @@ interface CombworkMessageValues {
   'settings.advanced.unit.characters': { n: number }
   'settings.advanced.unit.days': { n: number }
   'settings.advanced.unit.lanes': { n: number }
+  'settings.advanced.unit.lines': { n: number }
   'settings.advanced.unit.minutes': { n: number }
   'settings.advanced.unit.seconds': { n: number }
   'settings.advanced.unitLabel.agents': undefined
@@ -766,6 +771,7 @@ interface CombworkMessageValues {
   'settings.advanced.unitLabel.characters': undefined
   'settings.advanced.unitLabel.days': undefined
   'settings.advanced.unitLabel.lanes': undefined
+  'settings.advanced.unitLabel.lines': undefined
   'settings.advanced.unitLabel.minutes': undefined
   'settings.advanced.unitLabel.seconds': undefined
   'settings.advanced.values.desc': undefined
