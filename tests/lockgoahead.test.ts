@@ -30,6 +30,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const { sessions } = await import('../src/main/sessions')
 // The delivery service gives the go-ahead (#649): it sets itself into sessions as it loads.
 const deliveries = await import('../src/main/deliveries')
+const lineWriter = await import('../src/main/lineWriter')
 const { config } = await import('../src/main/config')
 const { codex } = await import('../src/main/providers/codex/adapter')
 
@@ -151,8 +152,19 @@ describe('Allow on an "Ask me" lock', () => {
     await w.open(wsPath)
   })
   afterAll(async () => {
+    // HI-3318: what the last tests set going finishes before the workspace closes, and what its close stops (a retry's
+    // timer, as the app's close does) is over before the file ends. A line's check that its CLI took it waits for a prompt
+    // these hand-made agents never take: with them gone it ends at once, as untaken, and the delivery it carried is followed
+    // in the open workspace. Left running, they logged as Vitest's worker closed: ten unhandled errors on CI's runner.
+    deliveries.followWorkspaceCloses()
+    const settled = async () => {
+      await lineWriter.settled()
+      await deliveries.settled()
+    }
     s.live.clear()
+    await settled()
     await disposeWorkspaceService(w)
+    await settled()
   })
   beforeEach(() => {
     pty.typed.length = 0
