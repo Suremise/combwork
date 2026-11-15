@@ -6,7 +6,7 @@
 
 import { AsyncLocalStorage } from 'async_hooks'
 import { closeSync, copyFileSync, existsSync, openSync, readFileSync, renameSync, statSync, unlinkSync } from 'original-fs'
-import { access, lstat, readFile } from 'original-fs/promises'
+import { access, lstat, readFile, stat } from 'original-fs/promises'
 import { isAbsolute, join, resolve as resolvePath } from 'path'
 import { branchOfRef, git, gitRouted } from '../git'
 import { gitExe } from '../gitTool'
@@ -273,6 +273,51 @@ function branchRefSync(common: string, line: string): string | null {
   return null
 }
 
+/** HI-3291: gitDirSync's answer, read asynchronously. */
+async function gitDirOf(folder: string): Promise<string | null> {
+  if (process.env.GIT_DIR || process.env.GIT_COMMON_DIR) return null
+  const dot = join(folder, '.git')
+  try {
+    if ((await stat(dot)).isDirectory()) return resolvePath(dot)
+    const m = /^gitdir: (.+)$/m.exec(await readFile(dot, 'utf8'))
+    return m ? resolvePath(folder, m[1].trim()) : null
+  } catch {
+    return null
+  }
+}
+
+/** HI-3291: commonDirSync's answer, read asynchronously. */
+async function commonDirOf(folder: string): Promise<string | null> {
+  const own = await gitDirOf(folder)
+  if (!own) return null
+  try {
+    return resolvePath(own, (await readFile(join(own, 'commondir'), 'utf8')).trim())
+  } catch {
+    return own
+  }
+}
+
+/** HI-3291: branchRefSync's answer, read asynchronously. */
+async function branchRef(common: string, line: string): Promise<string | null> {
+  const ref = `refs/heads/${line}`
+  try {
+    const v = (await readFile(join(common, ref), 'utf8')).trim()
+    return SHA.test(v) ? v : null
+  } catch (e) {
+    const code = (e as { code?: string }).code
+    if (code !== 'ENOENT' && code !== 'ENOTDIR') return null
+  }
+  try {
+    for (const l of (await readFile(join(common, 'packed-refs'), 'utf8')).split(/\r?\n/)) {
+      const [sha, name] = l.split(' ')
+      if (name === ref) return SHA.test(sha) ? sha : null
+    }
+  } catch {
+    // No packed refs.
+  }
+  return null
+}
+
 /**
  * A line's head (refs/heads/<line>), or null when the line doesn't exist. Read from the ref files with no git process
  * where they name a commit (#1491: a step reads its target's head four or five times, each a git), read again each time
@@ -280,8 +325,9 @@ function branchRefSync(common: string, line: string): string | null {
  * whose `.git` doesn't name its repository).
  */
 export async function lineHead(repo: string, line: string): Promise<Maybe<string | null>> {
-  const common = plainBranch(line) ? commonDirSync(repo) : null
-  const known = common ? branchRefSync(common, line) : null
+  // HI-3291: the ref files read asynchronously, off main's thread (a queue listing reads a dozen heads as it is made).
+  const common = plainBranch(line) ? await commonDirOf(repo) : null
+  const known = common ? await branchRef(common, line) : null
   if (known) return known
   const r = await git(repo, ['rev-parse', '--verify', '-q', `refs/heads/${line}`])
   if (r.ok) return r.out.trim()
