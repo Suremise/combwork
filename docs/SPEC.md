@@ -2740,7 +2740,7 @@ merges under jj.
   retired it (below, "jj card starts on"), and jj cards run in slots under J9a–J9f.
 - **Views** (`platform/jjViews.ts`; IPC `jj:repo`, `jj:history`, `jj:compare`, `jj:bookmarks`, `jj:conflicts`; the
   window's `views/JjSections.tsx`), every read through J3's `JjReads`, pinned at the single head: Repository (root,
-  colocation, tool, the head, workspaces, **Waiting for you to integrate**: each Passed card's reviewed commit, its target
+  colocation, tool, the head, workspaces, **Waiting to be integrated** (HI-3315: headed by who integrates, as the project's finish says): each Passed card's reviewed commit, its target
   and the commands to start from (HI-2913: `jj duplicate -r <base>..<commit> --onto <target>`, every commit of the card
   (HI-3094: `JjWaitingCard.base`, the approved base), then `jj bookmark set <target> -r <copy of the reviewed commit>`; a rebase would also rewrite the slot's working-copy commit, a descendant of the reviewed commit, leaving the
   slot stale and its lane's next card unprepared), and its last containment observation for exactly that
@@ -3742,7 +3742,7 @@ Merge checks on the candidate are HI-2938's (the answer to r17: two cards). Its 
 - **Options:** jj's Merging group shows `style` (*Candidate style*) and `strict` (*The candidate brings work up to date
   first*), each with its own words where the user integrates (`OptionText.integrates`, `optionTitle`, `optionDesc`: by the
   descriptor, never the platform's id).
-- **The window:** Waiting for you to integrate shows *Candidate ready* (commit, change id, style, the head built on; no
+- **The window:** Waiting to be integrated shows *Candidate ready* (commit, change id, style, the head built on; no
   conflicts, no merge checks) with `jj bookmark set <target> -r <candidate>` in place of the duplicate's commands; *No
   candidate* for a signing repository and *couldn't build a candidate* (after three tries) keep the manual commands.
 - **Tests:** `tests/jjCandidateRuntime.test.ts` (the real jj, both modes: built, shown, answered again, adopted and
@@ -3943,7 +3943,7 @@ only writes are an acknowledgement, the containment record and the leftovers' pr
   by a **generation** reserved from the project's `jj_contained_gen:<project>` counter in a board write before the proof
   starts, never by a clock: it's written only while the card is still that approval (checked in the write) and over no
   record or a lower generation's, so an older observation finishing later writes nothing. The Integrated transaction
-  deletes it. **Waiting for you to integrate** (`jj:waiting`, `jjWindow.ts`) shows a record only when all six of its
+  deletes it. **Waiting to be integrated** (`jj:waiting`, `jjWindow.ts`) shows a record only when all six of its
   identity fields equal the card's now; any other is *not checked yet*.
 - **Publish records to check** (`jj:toCheck`): the project's unresolved `checkThis` rows (§ J9b2's publish pass), 50 a
   page in (target, flag time, card, cycle, bundle) order, the cursor that whole key (rows flagged at the same moment page

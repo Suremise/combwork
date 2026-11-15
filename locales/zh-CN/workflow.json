@@ -733,7 +733,7 @@
   "workflow.why.style": "合并提交会保留每张卡片自己的提交，这也是 Combwork 一直以来的合并方式。",
   "workflow.why.target": "完成的工作进入仓库的默认分支；单人工作时，进入项目当前所在的分支。",
   "workflow.contradiction.jjNeedsSlots": "使用 jj 时，每张卡片都需要自己的文件夹：尚不支持智能体共用项目文件夹。",
-  "workflow.contradiction.jjYouIntegrate": "使用 jj 时，由你自己整合已评审的工作：Combwork 不会合并。",
+  "workflow.contradiction.jjYouIntegrate": "这个选择属于另一种版本控制：使用 jj 时，由 Combwork 或你移动目标书签来整合工作；使用 Git 时，则进行合并。",
   "workflow.form.levelForJj": "jj 项目的默认设置。",
   "workflow.form.levelJj": "jj",
   "workflow.refused.platform.changed.message": "{card} 无法按这些规则开始：其项目现在使用 {platform}。",
