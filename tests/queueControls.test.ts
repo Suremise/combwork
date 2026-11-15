@@ -1130,6 +1130,39 @@ describe("a project's queue views, each kept while nothing it is made from chang
     }
   })
 
+  it("alternating reads of one target: a view not asked for while a change touched it is never used after (HR1's round 1), the window's and the API's alike", async () => {
+    const { tellListeners } = await import('../src/main/events')
+    const { w, wt, repo, ws, append, made, queuedFor } = await twoQueues()
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() })
+    try {
+      const a = await approved(w, wt)
+      const r = await queuedFor('Release one')
+      const other = await made('Neither')
+      for (const window of [true, false]) {
+        const one = async (t: string) => (await inWorkspace(w, () => queueViews(w, repo, t, window)))[0]
+        const whole = async (t: string) => (tellListeners({ type: 'workflow-changed', workspacePath: ws, projectPath: repo }), one(t))
+        await whole('main')
+        await one('release')
+        // A main card changes; only release is asked for: main's view isn't checked in that part.
+        await inWorkspace(w, () => tasks.updateTask(a, { title: `Main, renamed (${window})` }, user))
+        // Another card written last, so the main card isn't the one at the revision mark (counted as changed every time).
+        await inWorkspace(w, () => tasks.updateTask(other, { title: `Neither (${window})` }, user))
+        const release = await one('release')
+        // A release card changes; then only main is asked for: its view must show the earlier change.
+        if (window) await append(r.card, 'IntegrationStarted', { entry: r.entry, expected: REV, result: 'd'.repeat(40) })
+        else await inWorkspace(w, () => tasks.updateTask(r.card, { title: 'Release one, renamed' }, user))
+        const main = await one('main')
+        expect(main.queued.map((q) => q.title)).toEqual([`Main, renamed (${window})`])
+        expect({ window, main }).toEqual({ window, main: await whole('main') })
+        // And release, asked for again after the first change, as made whole then.
+        expect(release.target).toBe('release')
+        expect({ window, release: await one('release') }).toEqual({ window, release: await whole('release') })
+      }
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it("a change touches only its own queue's view: the other is reused, not worked out again; a blocker's change, the queue it blocks in", async () => {
     const { w, wt, append, made, queuedFor, list, fresh } = await twoQueues()
     vi.useFakeTimers({ toFake: ['Date'], now: Date.now() })
