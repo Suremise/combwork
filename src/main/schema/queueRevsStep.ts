@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
+import type { FactKind } from '../../shared/workflow/facts'
 
 /**
  * HI-3296 (boardStore.ts BOARD_MIGRATIONS version 32): each project's queue revision, `queue_revs`, what a project's queue
@@ -27,7 +28,7 @@ import type { DatabaseSync } from 'node:sqlite'
 export const QUEUE_REVS_STEP = { name: 'queue revisions', up: addQueueRevs } as const
 
 /** The fact kinds no queue listing reads (a CheckRan only when not the merge queue's: QUEUE_CHECKS_BY). */
-export const QUIET_FACT_KINDS = ['TargetMoved', 'HeadMoved', 'LoopStep', 'UserComment'] as const
+export const QUIET_FACT_KINDS = ['TargetMoved', 'HeadMoved', 'LoopStep', 'UserComment'] as const satisfies readonly FactKind[]
 
 /** CheckRan's `by` for the merge queue's own checks (progress.ts CW_RUNS, which entryTook reads): those raise it. */
 export const QUEUE_CHECKS_BY = 'Combwork (merge queue)' // i18n-ignore: a run's stored name, never shown
