@@ -1016,16 +1016,14 @@ export const UNIT_SCANS = [
   // A real file and its allowlist (Board.tsx's); the whole source is the CLI's (check:repo, CI), not this test's (HI-2663).
   { test: 'tests/i18nGuard.test.ts', paths: ['src/renderer/src/components/Board.tsx', 'i18n/allow/'] },
   // Agent text (HI-2065): two real files and their lists; the whole source is the CLI's (check:repo, CI), not this
-  // test's (HI-2689). The catalogue and schema extracted from the agentMsg() descriptors, current.
+  // test's (HI-2689). The catalogue and schema: whether they are the code's is the CLI's too (agentTextExtract.mjs
+  // --check, HI-3318), so a source change selects nothing here; the schema against the catalogue is this test's.
   { test: 'tests/agentTextGuard.test.ts', paths: ['src/shared/combworkGuidance.ts', 'src/shared/toolReplies.ts', 'agent-text/allow/'] },
   { test: 'tests/agentText.test.ts', paths: ['agent-text/catalogue/', 'agent-text/schema/'] },
   // HI-2457: agentTextSchema() against the schema area files on disk; each glob user's source read (none imported but schema.ts).
   { test: 'tests/globCache.test.ts', paths: ['agent-text/schema/', 'src/main/installDir.ts', 'src/shared/i18n/catalogues.ts'] },
-  { test: 'tests/agentText.test.ts', paths: ['src/'], lines: ['agentMsg\\('] },
   // HI-3289: every write BEGIN in src/main goes through db.ts's beginTransaction, its source read for a raw one.
   { test: 'tests/beginTransaction.test.ts', paths: ['src/main/'], lines: ['BEGIN'] },
-  // HI-2440: the window's messages agents read, followed from the calls that read text (the catalogue's audience both).
-  { test: 'tests/agentText.test.ts', paths: ['src/main/', 'src/shared/'], lines: ['msg\\(', 'agent-text:', 'CombworkError', 'englishText', 'agentText'] },
   { test: 'tests/agentTextBoth.test.ts', paths: ['agent-text/catalogue/', 'agent-text/schema/'] },
   // The dialects service checks files against the schema it bundles (an import glob, which --changed doesn't follow).
   { test: 'tests/dialects.test.ts', paths: ['agent-text/schema/'] },
