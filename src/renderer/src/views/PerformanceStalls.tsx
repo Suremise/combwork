@@ -154,9 +154,9 @@ export function StallsTable({ refreshAt }: { refreshAt: number }) {
           <DataTable id="perf-stalls" rows={data.stalls} columns={columns} rowKey={(s) => `${s.at}-${s.ms}`} defaultSort={NEWEST} defaultPageSize={10} empty={tr(M.empty)} />
           {data.total > 0 && <p className="hint" data-stalls-count>{tr(M.count, { total: data.total, listed: data.total > data.stalls.length ? 'some' : 'all', kept: data.stalls.length })}</p>}
           {/* HI-3293: the short delays the table above leaves out, and every stall's cause, by the hour. */}
-          <h3 className="section" data-section="main-delay-hours">
+          <h2 className="section" data-section="main-delay-hours">
             {tr(M.hoursHeading)} <InfoTip text={tr(M.hoursTip, { kept: MAIN_DELAY_HOURS_KEPT })} />
-          </h3>
+          </h2>
           <DataTable id="perf-delay-hours" rows={data.hours ?? []} columns={hours} rowKey={(h) => String(h.at)} defaultSort={LATEST_HOUR} defaultPageSize={6} empty={tr(M.emptyHours)} />
         </>
       )}
