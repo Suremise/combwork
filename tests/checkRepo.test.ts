@@ -13,6 +13,8 @@
 // catalogue's. Three messages unseen by a canary and two area rules broken reached 1.6.0 on 14 Nov. Measured on their
 // own, about 14 s. They run last, on their own: in the first run's pool they slowed focusedPick's command-line test
 // past its limit.
+// HI-3279: and, by name, the pins every provider must answer (cliOverrides.test.ts's list of override switches,
+// reviewCopies.test.ts's providers given review copies): a new provider broke both on 1.6.0 unseen. About 1.5 s.
 import { existsSync, readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
