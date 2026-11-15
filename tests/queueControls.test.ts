@@ -1111,8 +1111,8 @@ describe("a project's queue views, each kept while nothing it is made from chang
       })
       step('its return seen', () => inWorkspace(w, () => markQueueSeen(w, repo, 'release', [r3.entry])))
       step('a card of neither queue renamed', async () => {
-        const n = await made('Unrelated')
-        await inWorkspace(w, () => tasks.updateTask(n, { title: 'Unrelated, renamed' }, user))
+        const unrelated = await made('Unrelated')
+        await inWorkspace(w, () => tasks.updateTask(unrelated, { title: 'Unrelated, renamed' }, user))
       })
       step('the blocker deleted', () => removeCard(w, blocker))
       step('the returned card moved to another project', async () => writeCardOutside(ws, r3.card, { ...store.cardDoc(w, r3.card)!, project: 'other' }))

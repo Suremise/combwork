@@ -261,7 +261,10 @@ function wholeSets(wf: Workflow): Pick<BoardPart, 'open' | 'flights'> {
 function carriedSets(wf: Workflow, had: BoardPart, own: readonly number[]): Pick<BoardPart, 'open' | 'flights'> {
   const open = new Map(had.open)
   const flights = new Map(had.flights)
-  for (const n of own) open.delete(n), flights.delete(n)
+  for (const n of own) {
+    open.delete(n)
+    flights.delete(n)
+  }
   for (const c of own.length ? wf.store.cardsOpen(own) : []) open.set(c.id, c)
   for (const [n, t] of own.length ? flightsOf(wf, wf.store.cardsInFlight(own)) : []) flights.set(n, t)
   // In number order, as read whole (openPairs takes the first by number).
