@@ -2076,14 +2076,23 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
     // cancels) is told by this one, never lost. Else after a wake, from when its line was made: a lane started or a card
     // added since then is told (round 2 finding); otherwise from now.
     // A wake recorded since that watch began is its own, received (`received` records it before the watch is taken off
-    // the list): from what it told, so nothing it told is told again.
-    const woke = store.wokeLanes.get(agentKey(projectPath, agentId))
-    const ownWake = !!woke && !!old && Date.parse(woke.at) >= Date.parse(old.since)
-    const told = old?.lanes && old.laneMarks && !ownWake ? { at: old.laneSince ?? old.since, marks: new Map(Object.entries(old.laneMarks)) } : woke
-    const laneSince = told?.at ?? since
-    const toldMarks = told ? Object.fromEntries(told.marks) : undefined
-    const nows = await lanesNow(store, { scope, lanes: cond, laneSince, ...(toldMarks ? { laneMarks: toldMarks } : {}) })
-    await testHooks.afterLanesRead?.()
+    // the list): from what it told, so nothing it told is told again. A wake received while the lanes are read (its receipt
+    // isn't under this lock: HR1's round 1) is read from again, a few times at most.
+    const wakeKey = agentKey(projectPath, agentId)
+    let woke = store.wokeLanes.get(wakeKey)
+    let told: { at: string; marks: Map<string, LaneMark> } | undefined
+    let laneSince = since
+    let nows: LaneNow[] = []
+    for (let attempt = 0; ; attempt++) {
+      woke = store.wokeLanes.get(wakeKey)
+      const ownWake = !!woke && !!old && Date.parse(woke.at) >= Date.parse(old.since)
+      told = old?.lanes && old.laneMarks && !ownWake ? { at: old.laneSince ?? old.since, marks: new Map(Object.entries(old.laneMarks)) } : woke
+      laneSince = told?.at ?? since
+      const toldMarks = told ? Object.fromEntries(told.marks) : undefined
+      nows = await lanesNow(store, { scope, lanes: cond, laneSince, ...(toldMarks ? { laneMarks: toldMarks } : {}) })
+      await testHooks.afterLanesRead?.()
+      if (store.wokeLanes.get(wakeKey) === woke || attempt >= 2) break
+    }
     // HI-2521: a lane it names that has ended or been abandoned is the answer at once, as an agent not working is for an
     // agent watch: no watch starts (it would start from the end, with nothing left to tell), and one it had ends.
     const over = cond.ids === 'all' ? [] : nows.flatMap((n) => laneOverPart(n) ?? [])

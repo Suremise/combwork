@@ -959,6 +959,46 @@ describe('lane watches (main/watches.ts, #531)', async () => {
           await disposeWorkspaceService(w)
         })
 
+      // HR1's round 1 doubt: the wake read while the new watch is being set up (its lanes read, before it is saved), its
+      // receipt recorded meanwhile. The new watch must start from what that wake told, never re-tell it.
+      it('read while the new watch is set up: the end is read once, and later events still come', async () => {
+        const { w, alpha, home } = await open()
+        const { st, read, readNow } = lazy(alpha, home)
+        const [a] = await newCards(w, 'b1', 1)
+        await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })
+        await watchAll(w, home, st)
+        await inWorkspace(w, () => tasks.updateTask(a, { column: 'done' }, user))
+        await lanes.refresh(w)
+        await watches.evaluateWatches(w)
+        await watches.settled()
+        const [b] = await newCards(w, 'b1', 1)
+        await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [b], by: 'B1 (alpha)' })
+        watches.testHooks.afterLanesRead = async () => {
+          watches.testHooks.afterLanesRead = undefined
+          await readNow()
+        }
+        try {
+          await watchAll(w, home, st)
+        } finally {
+          watches.testHooks.afterLanesRead = undefined
+        }
+        // The read during the set-up got the end: it was received then.
+        expect(count(read, ENDED)).toBe(1)
+        await watches.evaluateWatches(w)
+        await watches.settled()
+        await readNow()
+        expect(count(read, ENDED)).toBe(1)
+        // Later events still come, once.
+        st.status = 'watching'
+        await inWorkspace(w, () => tasks.updateTask(b, { blocked: 'After the set-up' }, agent('b1')))
+        await watches.evaluateWatches(w)
+        await watches.settled()
+        await readNow()
+        expect(count(read, /is blocked: "After the set-up"/g)).toBe(1)
+        expect(count(read, ENDED)).toBe(1)
+        await disposeWorkspaceService(w)
+      })
+
       it('read after the replacement: the new watch isn’t moved by it, and an event between the old wake and the new watch is read once too', async () => {
         const { w, alpha, home } = await open()
         const { st, read, readNow } = lazy(alpha, home)
