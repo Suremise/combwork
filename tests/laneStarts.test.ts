@@ -68,7 +68,7 @@ describe("Combwork starts a lane's next card (HI-1990)", () => {
   beforeAll(async () => {
     mkdirSync(join(wsPath, '.combwork'), { recursive: true })
     mkdirSync(join(p, '.combwork'), { recursive: true })
-    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'h1', 'h2', 'h3', 'h4', 'h5', 'i1', 'i2'].map((id) => ({ id, name: id.toUpperCase(), workflowRole: 'either' })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1', workflowRole: 'either' }] }))
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'h1', 'h2', 'h3', 'h4', 'h5', 'i1', 'i2', 'i3', 'i4', 'i5'].map((id) => ({ id, name: id.toUpperCase(), workflowRole: 'either' })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1', workflowRole: 'either' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -631,6 +631,66 @@ describe("Combwork starts a lane's next card (HI-1990)", () => {
         expect((await lanes.getLane(w, changed.id)).cards.map((c) => c.number)).toEqual([c3, c1, c2])
       } finally {
         change.restore()
+      }
+    })
+
+    it("HI-3300: held on a card waiting for the user, its builder watching that card: a reorder with or without applyNow starts the new first card on it, the watch ended; a watch on a card outside the lane is left", async () => {
+      const { workflowFor } = await import('../src/main/workflow/service')
+      const wf = (await workflowFor(w, p))!
+      const watches = await import('../src/main/watches')
+      // A watching status as SessionManager makes it: from the agent's watch (initWatches' wiring).
+      const wasWatchFor = sessions.watchFor
+      sessions.watchFor = watches.watchFor
+      try {
+        // CB1's lane (without applyNow) and CB3's (with it): the card before Done, the next one asked the user about, so
+        // the lane is paused and its builder watches that card, as `cw_lane next` ("waiting for the user on …") led it to.
+        for (const [b, applyNow] of [['i3', false], ['i4', true]] as const) {
+          pty.typed.length = 0
+          const done = await card(`Held done ${b}`, b)
+          const asked = await card(`Held asked ${b}`, b)
+          const lane = (await lanes.startLane(w, { project: 'alpha', builder: b, reviewer: 'r1', cards: [done, asked], by: `${b.toUpperCase()} (alpha)` })).lane
+          await run(() => tasks.updateTask(done, { column: 'done' }, user))
+          await wf.askTheUser(`#${asked}`, 'user', { kind: 'decide', text: 'Should this card go ahead?' })
+          expect((await lanes.getLane(w, lane.id)).state).toBe('paused')
+          const st = builder('ready', b)
+          await watches.registerWatch(w, p, b, { cards: [asked], changes: ['column', 'comment'] })
+          sessions.watchChanged(p, b)
+          expect(st.status).toBe('watching')
+          await checkLaneStarts(w)
+          expect(await columnOf(asked)).toBe('todo')
+          expect(rung()).toBe(false)
+          // The Assistant puts a new card ahead of the one waiting: the lane is active on it, and it starts on the builder.
+          const added = await card(`Held added ${b}`, b)
+          const r = await lanes.startLane(w, { project: 'alpha', builder: b, reviewer: 'r1', cards: [done, added, asked], by: 'the Assistant', ...(applyNow ? { applyNow } : {}) })
+          expect([r.lane.state, r.lane.queued, r.lane.cards.map((c) => c.number)]).toEqual(['active', null, [done, added, asked]])
+          await checkLaneStarts(w)
+          const started = await run(() => tasks.getTask(added, w))
+          expect([started.column, started.agent]).toEqual(['doing', b])
+          expect(watches.watchFor(p, b)).toBeNull()
+          expect(rung()).toBe(true)
+          expect(await columnOf(asked)).toBe('todo')
+          await lanes.endLane(w, lane.id, { abandoned: true })
+        }
+
+        // A watch on a card that isn't the lane's (the builder's own wait): left, the card to the lane-next stall.
+        pty.typed.length = 0
+        const y1 = await card('Held elsewhere one', 'i5')
+        const y2 = await card('Held elsewhere two', 'i5')
+        const other = await card('Held elsewhere watched', 'o1')
+        const lane = (await lanes.startLane(w, { project: 'alpha', builder: 'i5', reviewer: 'r1', cards: [y1, y2], by: 'I5 (alpha)' })).lane
+        await run(() => tasks.updateTask(y1, { column: 'done' }, user))
+        const st = builder('ready', 'i5')
+        await watches.registerWatch(w, p, 'i5', { cards: [other], changes: ['column'] })
+        sessions.watchChanged(p, 'i5')
+        expect(st.status).toBe('watching')
+        await checkLaneStarts(w)
+        expect(await columnOf(y2)).toBe('todo')
+        expect(watches.watchFor(p, 'i5')).not.toBeNull()
+        expect((await lanes.getLane(w, lane.id)).status).toMatchObject({ reason: 'startWait', card: y2, why: 'watching' })
+        expect(rung()).toBe(false)
+        await lanes.endLane(w, lane.id, { abandoned: true })
+      } finally {
+        sessions.watchFor = wasWatchFor
       }
     })
   })
