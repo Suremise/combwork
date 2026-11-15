@@ -97,6 +97,12 @@ if (args.includes('--diff') && base) {
     process.exit(0)
   }
 }
+// An audit binds a tree to the rule's identity (its text, the compiler, the node types): a change to any of them leaves
+// the record unmatched, and selection on that tree's real changes falls back to every suite (HI-3307: a comment edit to
+// this rule's file did so). Caught here, at the change, not by a release's full run.
+const id = ruleIdentity()
+const stale = AUDITED.filter((a) => a.rule !== id.rule || a.compiler !== id.compiler || a.types !== id.types)
+if (stale.length) fail(`${stale.map((a) => a.commit).join(', ')}: ${stale.length === 1 ? 'its audit was' : 'their audits were'} made under another identity of the rule (its text, the compiler or the node types): run node tests/e2e/workspaceRuleCheck.mjs --reaudit <commit> for each`)
 const c = census(gitRevision(cwd, null), cwd)
 if (c.all) fail(c.all)
 if (c.broken) fail(c.broken)
