@@ -8743,8 +8743,8 @@ repeating them (#533) [note §8].
   additive to v2. Every option is on one side (`TEMPLATE_CARRIED`, `TEMPLATE_NOT_CARRIED`; a unit test fails on one on
   neither): carried are review, reviewers, reviewerMode, noSelfReview, sameness, okBefore, preChecks and mergeChecks (names
   only), focusedTests (G20, HI-1949: its runner and picker are commands), mergeInstall, finish, style, strict, dependenciesDone, folder, slotsUpToDate, identity (**on/off only**, made from
-  the loading project's git identity), stopOwnRuns, sharedFolderWarning, fileLocks, the loops' four and stageNames; never
-  target, targetOwn, pushTarget, commands, commitMessage, excluded. A platform carries only its form's (`carriedFor`).
+  the loading project's git identity), stopOwnRuns, sharedFolderWarning, fileLocks, the loops' four, the churn levels simplifyAt and churnStopAt (HI-3188; HI-3305: rules like loopRounds) and stageNames; never
+  target, targetOwn, pushTarget, commands, commitMessage, excluded, mergeGuards (HI-3284; HI-3305: the project's own, one may be the user's own name). A platform carries only its form's (`carriedFor`).
   **Whitelisted at every boundary**: saving (`templateWorkflowOf`, from the options in force; none when they fell back to
   all off), reading a file, an import or an edit (`readTemplateWorkflow`: options it doesn't carry left out; a value its
   option doesn't take, an identity that isn't a boolean, a carried option the platform lacks, a preset it doesn't offer, a
