@@ -5,7 +5,7 @@
 // With the rules off, agents' moves keep P3's path. S1, S6, S15, S16, S17, S26, S29 and S40 through the board.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { as09, writeCard } from './boardDb'
@@ -26,6 +26,7 @@ const { adoptNow } = await import('../src/main/workflow/adoption')
 const { runCardIntent } = await import('../src/main/cardIntents')
 const { allOff } = await import('../src/shared/workflow/options')
 const { foldCard } = await import('../src/shared/workflow/facts')
+const { reconcileNow, reconcilePending } = await import('../src/main/workflow/reconciler')
 
 advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
@@ -100,6 +101,17 @@ async function started(w: WS, wt: string, file = 'b.txt'): Promise<number> {
   return card
 }
 
+/**
+ * The reconciliation a passing verdict asks for (service.ts's `moved`, 400 ms on) waited for and run now, before the test
+ * merges by hand: left to its timer, a loaded run's pass can find the merge first and move the card to Done before the
+ * builder's report of it (HI-3277). After it, nothing reconciles the project until the report's own move.
+ */
+async function verdictSettled(w: WS, repo: string): Promise<void> {
+  await vi.waitFor(() => expect(reconcilePending(repo), 'the pass the verdict asked for').toBe(true), { timeout: 10_000 })
+  await reconcileNow(w, repo)
+  expect(reconcilePending(repo)).toBe(false)
+}
+
 describe("an agent's old moves as intents (#1268)", () => {
   it("a whole round trip by today's moves: each the intent it stands for, its facts once, the reply naming the tool", async () => {
     const { w, repo, wt } = await workspace()
@@ -134,6 +146,7 @@ describe("an agent's old moves as intents (#1268)", () => {
     expect(passed.card).toMatchObject({ column: 'passed', agent: 'a1' })
     expect(passed.card.history.some((h) => h.what === 'Review passed')).toBe(true)
     expect(stage(w, card)).toBe('approved')
+    await verdictSettled(w, repo)
     // Done: report merge, its merge checked.
     sh(repo, 'merge', '-q', '--no-ff', '-m', 'merge card', 'card')
     const done = await update(w, card, builder, { column: 'done' }, 'Merged.')
@@ -162,6 +175,7 @@ describe("an agent's old moves as intents (#1268)", () => {
     const done = await started(w, wt)
     await update(w, done, builder, { column: 'review' }, 'Ready')
     await update(w, done, reviewer, { review: 'passed', column: 'passed' }, 'PASSED')
+    await verdictSettled(w, repo)
     sh(repo, 'merge', '-q', '--no-ff', '-m', 'merge card', 'card')
     await update(w, done, builder, { column: 'done' })
     await block(done, 'waiting for the design')
