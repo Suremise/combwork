@@ -137,3 +137,14 @@ describe('a changed workspace skill asks running agents for a restart (HI-2268)'
     await askedForRestart()
   })
 })
+
+describe("a launch's own token file asks for no restart (HI-3312)", () => {
+  it('its signature leaves out the token file its run was given, and keeps the rest of its tools server', async () => {
+    const eff = await run(() => sessions.effective(project, agent))
+    // Its settings are read before its token is made (no file yet), then again with the run's own.
+    const withTools = (env: Record<string, string>): typeof eff => ({ ...eff, mcpServers: { ...eff.mcpServers, combwork: { command: 'node', args: ['cw-mcp.js'], env } } })
+    const atLaunch = sessions.signature(withTools({ CW_API_TOKEN_FILE: '', CW_PROJECT: 'alpha' }))
+    expect(sessions.signature(withTools({ CW_API_TOKEN_FILE: 'C:/profile/launches/run-a1/agent-token.json', CW_PROJECT: 'alpha' }))).toBe(atLaunch)
+    expect(sessions.signature(withTools({ CW_API_TOKEN_FILE: '', CW_PROJECT: 'beta' }))).not.toBe(atLaunch)
+  })
+})

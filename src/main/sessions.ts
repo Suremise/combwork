@@ -1887,6 +1887,13 @@ class SessionManager {
   signature(e: EffectiveSettings): string {
     // The permission mode can be switched live (setPermissionMode), so it doesn't ask for a restart.
     const { chime: _c, skills: _s, permissionMode: _p, connectionName: _n, connectionId: _i, ...rest } = e
+    // Its tools' token file is the launch's own (HI-3195: its run's folder), made after its settings are read: a launch,
+    // not a setting, so it is left out, or every session would ask for a restart from its start (HI-3312).
+    const tools = rest.mcpServers[TOOLS_SERVER]
+    if (tools?.env && 'CW_API_TOKEN_FILE' in tools.env) {
+      const { CW_API_TOKEN_FILE: _t, ...env } = tools.env
+      rest.mcpServers = { ...rest.mcpServers, [TOOLS_SERVER]: { ...tools, env } }
+    }
     return hashText(JSON.stringify(rest))
   }
 
