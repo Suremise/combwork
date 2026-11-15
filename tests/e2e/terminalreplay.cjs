@@ -93,7 +93,9 @@ const check = (name, ok, extra = '') => {
     const buffer = await inv('pty:buffer', key)
     // The pseudoconsole's title at the launch (OSC 0) is in the raw output only: gone, the output has outgrown what is kept.
     check("the kept output no longer has the launch's start", !buffer.includes('\x1b]0;'), JSON.stringify(buffer.slice(0, 300)))
-    check('…and the replay has the header and the alternate screen from its snapshot', buffer.includes('FULLSCREEN HEADER') && buffer.includes('\x1b[?1049h'), JSON.stringify(buffer.slice(0, 300)))
+    // Its switch to the alternate screen: ?1047h since HI-3275 (the normal screen's saved cursor kept), ?1049h where xterm's
+    // buffers can't be read (HI-3313: the check had kept HI-3252's ?1049h alone).
+    check('…and the replay has the header and the alternate screen from its snapshot', buffer.includes('FULLSCREEN HEADER') && /\x1b\[\?104[79]h/.test(buffer),JSON.stringify(buffer.slice(0, 300)))
 
     /** The pane as it should be after the CLI's full-screen drawing. */
     const restored = async (when) => {
