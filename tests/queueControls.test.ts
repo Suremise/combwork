@@ -1163,6 +1163,35 @@ describe("a project's queue views, each kept while nothing it is made from chang
     }
   })
 
+  it("a listing kept never outlives what it read from git (HR1's round 2): refreshed just before git's 5 s run out, the next after it reads git again", async () => {
+    const { lineHistory } = await import('../src/main/platform/historyPorts')
+    const { w, wt, repo, fresh, list } = await twoQueues()
+    const a = await approved(w, wt)
+    // The default branch as git answers it (the options name no target: the queue merges into it).
+    let def = 'main'
+    const read = vi.spyOn(lineHistory(), 'defaultTarget').mockImplementation(async () => def)
+    const t0 = Date.now()
+    vi.useFakeTimers({ toFake: ['Date'], now: t0 })
+    try {
+      const merging = async () => (await list()).filter((v) => v.combworkMerges).map((v) => v.target)
+      await fresh()
+      expect(await merging()).toEqual(['main'])
+      // Just before git's part runs out: a board change, so a new listing, made from that git part.
+      vi.setSystemTime(t0 + 4900)
+      await inWorkspace(w, () => tasks.updateTask(a, { title: 'Main, renamed' }, user))
+      expect(await merging()).toEqual(['main'])
+      // The default branch moves; past the git part's 5 s, with no board write: git is read again.
+      def = 'other'
+      const calls = read.mock.calls.length
+      vi.setSystemTime(t0 + 5100)
+      expect(await merging()).toEqual(['other'])
+      expect(read.mock.calls.length).toBeGreaterThan(calls)
+    } finally {
+      vi.useRealTimers()
+      read.mockRestore()
+    }
+  })
+
   it("a change touches only its own queue's view: the other is reused, not worked out again; a blocker's change, the queue it blocks in", async () => {
     const { w, wt, append, made, queuedFor, list, fresh } = await twoQueues()
     vi.useFakeTimers({ toFake: ['Date'], now: Date.now() })

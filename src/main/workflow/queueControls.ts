@@ -95,17 +95,19 @@ interface QueueScope {
  */
 export function queueViews(ws: WorkspaceService, projectPath: string, target?: string, window = false): Promise<QueueView[]> {
   const stamp = viewsStamp(ws, projectPath)?.key ?? null
-  if (stamp === null) return makeViews(ws, projectPath, target, window)
+  if (stamp === null) return makeViews(ws, projectPath, target, window).then((m) => m.views)
   const key = [ws.path!.toLowerCase(), projectPath.toLowerCase(), target ?? '', window ? 'window' : ''].join('\n') // i18n-ignore: a key, never shown
   const now = Date.now()
   for (const [k, e] of viewsKept) if (e.until <= now) viewsKept.delete(k)
   const had = viewsKept.get(key)
   if (had && had.stamp === stamp) return had.views
-  const entry: KeptViews = { stamp, until: now + VIEWS_KEPT_MS, views: makeViews(ws, projectPath, target, window) }
+  const made = makeViews(ws, projectPath, target, window)
+  const entry: KeptViews = { stamp, until: now + VIEWS_KEPT_MS, views: made.then((m) => m.views) }
   viewsKept.set(key, entry)
-  entry.views.then(
+  made.then(
     // A return seen leaves the listing RETURN_SEEN_SHOWN_MS after it was seen (recentOutcomes): kept until the first does.
-    (views) => (entry.until = Math.min(entry.until, ...views.flatMap((v) => v.returns.flatMap((r) => (r.seen ? [Date.parse(r.seen) + RETURN_SEEN_SHOWN_MS] : []))))),
+    // HI-3301: and never past what it read from git (its GitPart's own expiry, HR1's round 2).
+    ({ views, gitUntil }) => (entry.until = Math.min(entry.until, gitUntil, ...views.flatMap((v) => v.returns.flatMap((r) => (r.seen ? [Date.parse(r.seen) + RETURN_SEEN_SHOWN_MS] : []))))),
     () => void (viewsKept.get(key) === entry && viewsKept.delete(key))
   )
   return entry.views
@@ -358,7 +360,8 @@ interface GitPart {
 }
 const gitParts = new WeakMap<WorkspaceService, Map<string, { key: string; until: number; part: Promise<GitPart> }>>()
 
-function gitPart(ws: WorkspaceService, wf: Workflow, projectPath: string, window: boolean): Promise<GitPart> {
+/** The git part as it is now, and when it expires (counted from its read's start: a listing made from it ends no later). */
+function gitPart(ws: WorkspaceService, wf: Workflow, projectPath: string, window: boolean): { part: Promise<GitPart>; until: number } {
   const now = Date.now()
   let byProject = gitParts.get(ws)
   if (!byProject) gitParts.set(ws, (byProject = new Map()))
@@ -366,11 +369,11 @@ function gitPart(ws: WorkspaceService, wf: Workflow, projectPath: string, window
   const key = [optionsWritten, workflowEnforced()].join('\n')
   for (const [k, e] of byProject) if (e.until <= now) byProject.delete(k)
   const had = byProject.get(at)
-  if (had && had.key === key) return had.part
+  if (had && had.key === key) return had
   const entry = { key, until: now + VIEWS_KEPT_MS, part: readGit(ws, wf, projectPath, window) }
   byProject.set(at, entry)
   entry.part.catch(() => void (byProject.get(at) === entry && byProject.delete(at)))
-  return entry.part
+  return entry
 }
 
 async function readGit(ws: WorkspaceService, wf: Workflow, projectPath: string, window: boolean): Promise<GitPart> {
@@ -395,13 +398,15 @@ async function readGit(ws: WorkspaceService, wf: Workflow, projectPath: string, 
   return { current, targets, named, sources, main, behind }
 }
 
-async function makeViews(ws: WorkspaceService, projectPath: string, target: string | undefined, window: boolean): Promise<QueueView[]> {
+/** A listing, and when the git part it was made from expires (HI-3301: a kept listing ends no later). */
+async function makeViews(ws: WorkspaceService, projectPath: string, target: string | undefined, window: boolean): Promise<{ views: QueueView[]; gitUntil: number }> {
   const wf = await workflowFor(ws, projectPath)
-  if (!wf) return []
+  if (!wf) return { views: [], gitUntil: Infinity }
   // HI-3291: the board part on the stamp as it is now, after the await (a change meanwhile has a stamp of its own).
   const part = boardPart(ws, wf, projectPath)
   // HI-3301: what the listing reads from git, kept for VIEWS_KEPT_MS whatever the board does (GitPart).
-  const git = await gitPart(ws, wf, projectPath, window)
+  const gitKept = gitPart(ws, wf, projectPath, window)
+  const git = await gitKept.part
   // HI-2994: read for every listing, the window's or the API's: a queue's cards in flight keep it from being a past
   // branch's (markPast, HI-2927), for agents as for the user.
   const scope: QueueScope = { inFlight: part.inFlight, current: git.current, open: part.open }
@@ -433,7 +438,7 @@ async function makeViews(ws: WorkspaceService, projectPath: string, target: stri
     const f = await forwardOfTarget(wf, open, git, v.target, sources.filter((b) => b !== v.target && forwardDirection(b, v.target, main).dir === 'forward'))
     if (f.others.length) v.forward = f
   }
-  return views
+  return { views, gitUntil: gitKept.until }
 }
 
 /**
