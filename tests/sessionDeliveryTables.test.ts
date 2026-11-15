@@ -348,15 +348,15 @@ describe("a host's records in the tables (storeTables.ts)", () => {
     }
     const cases: ((bases: Map<string, string>) => Change)[] = [
       // m2 received, m1 dropped, a new one whose id (m4) the other writer took: renamed.
-      (base) => ({ put: [fullDelivery('m2', 2, { state: 'received', received: at }), fullDelivery('m4', 4, { body: 'mine' })], removed: ['m1'], base }),
+      (bases) => ({ put: [fullDelivery('m2', 2, { state: 'received', received: at }), fullDelivery('m4', 4, { body: 'mine' })], removed: ['m1'], base: bases }),
       // m3 changed here too: stale, nothing written.
-      (base) => ({ put: [fullDelivery('m3', 3, { state: 'cancelled', ended: at })], removed: [], base }),
+      (bases) => ({ put: [fullDelivery('m3', 3, { state: 'cancelled', ended: at })], removed: [], base: bases }),
       // m3 dropped here, acked there: stale.
-      (base) => ({ put: [], removed: ['m3'], base }),
+      (bases) => ({ put: [], removed: ['m3'], base: bases }),
       // Gone already (never there): nothing to drop; a new one with a free id.
-      (base) => ({ put: [fullDelivery('m7', 7)], removed: ['m5'], base }),
+      (bases) => ({ put: [fullDelivery('m7', 7)], removed: ['m5'], base: bases }),
       // Nothing changed.
-      (base) => ({ put: [], removed: [], base })
+      (bases) => ({ put: [], removed: [], base: bases })
     ]
     for (const c of cases) expect(run(saveDeliveryChanges, c)).toEqual(run(saveDeliveryChanges1_0, c))
     expect(run(saveDeliveryChanges, cases[0]).out).toMatchObject({ renamed: [['m4', { id: 'm5', seq: 5 }]] })
