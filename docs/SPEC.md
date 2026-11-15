@@ -4979,7 +4979,9 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   **fresh start** (Todo or On Hold → Active, a reopened Done card, a put-back card started again) onto a released line
   is refused (`start.released`), naming the tag and where it went, and a line to start on instead only when it exists
   and is known not released (Work merges into, else the next version's: `unreleasedFor`); an unreadable one is refused
-  as `start.releaseUnknown`. Both before anything is written (no `Started`, lease or lane). What lets a start through
+  as `start.releaseUnknown`. A read that is unknown only because its `watch` (below) was unreadable or moved under it
+  (jj's operation head while an operation lands, Combwork's own included) is read again whole, at most three reads in
+  all (HI-3319, as jj's target head is read, HI-2916); a steady unknown is not. Both before anything is written (no `Started`, lease or lane). What lets a start through
   without the user's or the Assistant's word (the line not released, or its lane's grant) is bound to the write (HR2's
   round 1): the port's `watch` (Git: the exact tag refs, the line's and the main line's heads, read from the common dir;
   jj: the single operation head), taken before the read, and the lane's grant as stored, are read again synchronously in

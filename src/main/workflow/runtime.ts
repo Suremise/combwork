@@ -396,6 +396,8 @@ const REVIEW_MOVES: ReadonlySet<string> = new Set(['start review', 'verdict']) /
  */
 /** HI-2944: paths as a warning names them: three at most, then how many more (HI-2960: an agent's reply, kept short). */
 const FILES_NAMED = 3
+/** How many whole release reads a start makes at most while what they rest on moves under them (HI-3319). */
+export const RELEASE_READS = 3
 const filesNamed = (files: readonly string[]): string => (files.length <= FILES_NAMED ? files.join(', ') : say(W.moreFiles, { files: files.slice(0, FILES_NAMED).join(', '), more: files.length - FILES_NAMED }))
 
 /**
@@ -1385,9 +1387,20 @@ export class Workflow {
     const by = actor === 'user' || actor === 'assistant' ? actor : null
     // The user's or the Assistant's for exactly this line: theirs whatever the line is now, so nothing to bind.
     if (given && by && given.target === target) return { grant: { rules: ['start.released'], move: 'start', by, reason: given.reason, target } }
-    const check = await reads.watch(this.cfg.project, target).catch(() => null)
-    const first = check ? check() : null
-    const r = first === null ? unknown(UNREADABLE.line, { branch: target }) : await reads.released(this.cfg.project, target)
+    let check: (() => string | null) | null = null
+    let first: string | null = null
+    let r: Awaited<ReturnType<ReleaseReads['released']>>
+    for (let i = 1; ; i++) {
+      check = await reads.watch(this.cfg.project, target).catch(() => null)
+      first = check ? check() : null
+      r = first === null ? unknown(UNREADABLE.line, { branch: target }) : await reads.released(this.cfg.project, target)
+      // HI-3319: unknown only because what it rests on was unsettled or moved under the read (jj's operation head while
+      // an operation lands, Combwork's own beside it: a slot made or detached), it is read again whole, at most
+      // RELEASE_READS reads in all, as jjTargetHead is (HI-2916); nothing of a moved read is kept. A steady unknown (a
+      // conflicted tag, a failed read) is not read again.
+      if (!isUnknown(r) || !check || stillAsRead(check, first) || i >= RELEASE_READS) break
+      log.info(`#${card.id}'s release read again (${first === null ? 'unsettled' : 'moved'} under it), read ${i + 1} of ${RELEASE_READS}`) // i18n-ignore: a log line
+    }
     if (!isUnknown(r) && !r) return { grant: null, bound: () => stillAsRead(check, first) }
     const laneId = card.lane ?? null
     if (laneId && this.cfg.releaseGrant?.(laneId) === target) return { grant: null, bound: () => this.cfg.releaseGrant?.(laneId) === target && (this.store.card(card.id).lane ?? null) === laneId }
