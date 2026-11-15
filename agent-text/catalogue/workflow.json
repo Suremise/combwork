@@ -558,12 +558,12 @@
     "audience": "both"
   },
   "workflow.option.mergeGuards.desc": {
-    "text": "Patterns a merge may not add. Combwork matches each against the lines the merge adds (never what the target already has, and never binary files), and a match sends the card back to its builder with the guard’s message. This isn’t secret scanning: it catches only what you name.",
+    "text": "Patterns a merge may not add, matched against only the lines it adds (never what the target already has, nor binary files): a match sends the card back to its builder with the guard’s message, and as a pattern catches only what you name, this isn’t secret scanning.",
     "note": "What the workflow option “Merge guards” does (HI-3284): each guard is a regular expression checked against the text lines a merge adds; a match returns the card. Secret scanning: tools that look for passwords and keys; say plainly that this is not one.",
     "audience": "both"
   },
   "workflow.option.mergeGuards.jjDesc": {
-    "text": "Patterns a candidate may not add. Combwork matches each against the lines the candidate adds to the target bookmark (never what it already has, and never binary files), and a match sends the card back to its builder with the guard’s message. This isn’t secret scanning: it catches only what you name.",
+    "text": "Patterns a candidate may not add, matched against only the lines it adds to the target bookmark (never what it already has, nor binary files): a match sends the card back to its builder with the guard’s message, and as a pattern catches only what you name, this isn’t secret scanning.",
     "note": "What the workflow option “Merge guards” does for a project using jj (HI-3284). A candidate is the commit Combwork builds for the user to integrate; a bookmark is jj’s name for a branch: keep it as jj’s term. Secret scanning: tools that look for passwords and keys.",
     "audience": "both"
   },
