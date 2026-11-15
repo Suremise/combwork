@@ -1,6 +1,6 @@
 // OpenCode agents' status from their server's event stream (HI-2760), through Combwork with the fake opencode (HI-2763,
 // its 2.2.6 recordings): typed into the agent's pane, a prompt makes it working and its end finished; a permission asked
-// makes it need you until answered in the pane; a failed turn ends finished, failed; an interrupt (Esc) leaves it ready;
+// makes it need you until answered in the pane, and so does the model's question (its question tool, HI-3317); a failed turn ends finished, failed; an interrupt (Esc) leaves it ready;
 // a stream dropped mid-turn, the turn ending meanwhile, ends finished through the settled snapshot after the reconnect.
 // Each against what the fake's TUI shows in the pane. Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
@@ -95,6 +95,17 @@ const turnEnds = () => lines().filter((e) => e.kind === 'turn-end')
     await type('y')
     await lib.until(async () => turnEnds().length > ends, HUNG_MS)
     check('…answered in the pane, the turn goes on and ends finished', (await statusIs(['finished'])) === 'finished')
+
+    // --- The question tool's question (HI-3317): needs you, in its words, until answered in the pane; then finished.
+    ends = turnEnds().length
+    await type('question: Which file should I write?')
+    const questioned = await statusIs(['waiting'])
+    check("the model's question (OpenCode's question tool): the agent needs you", questioned === 'waiting', String(questioned))
+    const live2 = await live()
+    check('…saying its question', live2?.statusMessage === 'Which file should I write?', JSON.stringify({ message: live2?.statusMessage }))
+    await type('a.txt')
+    await lib.until(async () => turnEnds().length > ends, HUNG_MS)
+    check('…answered in the pane, the turn goes on and ends finished', (await statusIs(['finished'])) === 'finished' && lines().some((e) => e.kind === 'question-reply'), JSON.stringify(lines().filter((e) => /^question/.test(e.kind))))
 
     // --- A failed turn: finished, its failure said.
     ends = turnEnds().length
