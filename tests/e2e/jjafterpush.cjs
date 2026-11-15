@@ -144,14 +144,16 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
     // read moved under it) or `evidence.changed` (the operation head moved again in the start's one gather-again pass).
     const n2 = (await inv('tasks:create', { title: 'Card two', project: 'shop', agent: b2.id })).number
     const started2 = await inv('tasks:move', n2, 'doing', { confirm: true, reason: 'jjafterpush: start' }).catch((e) => ({ error: String(e) }))
-    check('card 2 starts at once after the push: not refused', !started2?.refused && !started2?.error, JSON.stringify({ started2, log: lib.combworkLogLines(userData).filter((l) => / not started: /.test(l)).slice(-5) }))
+    // HI-3319: nor asked (an `ask` leaves it in Todo: its release read, unsettled under Combwork's own jj operations, was
+    // taken for "can't tell whether main is released", so the drag asked to confirm a released line).
+    check('card 2 starts at once after the push: not refused, nothing asked', !started2?.refused && !started2?.error && !started2?.ask, JSON.stringify({ started2, log: lib.combworkLogLines(userData).filter((l) => / not started: /.test(l)).slice(-5) }))
     const t2 = Date.now()
     const w2 = await until(async () => {
       const v = await inv('tasks:work', n2)
       return v?.folder && v.workspace ? v : null
     }, HUNG_MS)
     // A slot of its own, or card 1's once that one is back in the pool: either is the pool's to pick.
-    check(`…in a slot within a minute (${Date.now() - t2} ms)`, !!w2, JSON.stringify({ w2, work: await inv('tasks:work', n2), slots: await inv('slots:list', shop), log: lib.combworkLogLines(userData).filter((l) => /\[slots\]|\[folders\]|lease|#2\b/.test(l)).slice(-40) }, null, 1))
+    check(`…in a slot within a minute (${Date.now() - t2} ms)`, !!w2, JSON.stringify({ w2, started2, column: (await card(n2))?.column, work: await inv('tasks:work', n2), slots: await inv('slots:list', shop), log: lib.combworkLogLines(userData).filter((l) => /\[slots\]|\[folders\]|lease|#2\b/.test(l)).slice(-40) }, null, 1))
 
     // --- HI-2919 (HI-2916's shapes 1 and 2), after HI-2912's fix: B1 stopped, and card 3 started for B1 at once.
     // Shape 2: card 3 gets a slot within a minute. Shape 1: card 1's slot, its builder gone, is back within jjwindow's
