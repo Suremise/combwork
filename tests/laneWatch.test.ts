@@ -1647,10 +1647,13 @@ describe('lane watches (main/watches.ts, #531)', async () => {
   it('HI-2521: a watch naming a lane that has ended or been abandoned replies at once and starts none, ending the one before; one naming lanes counts their end whatever its events', async () => {
     const { w, alpha, home } = await open()
     const st = fake(alpha, home)
-    const [a, b, c] = await newCards(w, 'b1', 3)
+    const [a, c] = await newCards(w, 'b1', 2)
+    // B2's lane on B2's card (HI-3299): on another agent's it could end by itself (HI-3117) before it is abandoned.
+    const [b] = await newCards(w, 'b2', 1)
     const ended = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)', name: 'screenshots' })).lane
     await lanes.endLane(w, ended.id, { mergeCommit: '47a3d54c0ffee1234567890abcdef1234567890a' })
     const abandoned = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r2', cards: [b], by: 'B2 (alpha)' })).lane
+    await lanes.refresh(w)
     await lanes.endLane(w, abandoned.id, { abandoned: true })
     // A watch it had before: ended by the answer, and said.
     await watches.registerWatch(w, home, 'assistant', { cards: [c], changes: ['comment'] })
@@ -1699,7 +1702,11 @@ describe('lane watches (main/watches.ts, #531)', async () => {
   it("HI-2522: a watch on one lane is labelled by the lane's name (its builder's too when another lane has it, else its builder's lane), kept on disk; never its id", async () => {
     const { w, alpha, home } = await open()
     fake(alpha, home)
-    const [a, b, c] = await newCards(w, 'b1', 3)
+    // Each lane's card is its builder's (HI-3299): a lane whose cards are all another agent's ends by itself at the
+    // lanes' next pass (HI-3117), which under load came before the watch and read back as "ended (merged)".
+    const [a] = await newCards(w, 'b1', 1)
+    const [b] = await newCards(w, 'b2', 1)
+    const [c] = await newCards(w, 'b3', 1)
     const named = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)', name: 'combwork screenshots' })).lane
     const label = async (id: string): Promise<string> => {
       const r = await watches.registerLaneWatch(w, home, 'assistant', { ids: [id], events: ['failed'] })
@@ -1712,9 +1719,12 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await vi.waitFor(() => expect(watches.watchFor(home, 'assistant')?.label).toBe('Waiting on lane combwork screenshots'), { timeout: HUNG_MS })
     // Another lane with the same name: its builder is named too.
     const twin = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r2', cards: [b], by: 'B2 (alpha)', name: 'Combwork screenshots' })).lane
+    // The lanes' pass run now, not left to the timing of a run: the lanes are still running after it.
+    await lanes.refresh(w)
     expect(await label(named.id)).toBe("Waiting on B1's lane combwork screenshots")
     // A lane with no name: its builder's lane.
     const plain = (await lanes.startLane(w, { project: 'alpha', builder: 'b3', reviewer: 'r1', cards: [c], by: 'B3 (alpha)' })).lane
+    await lanes.refresh(w)
     expect(await label(plain.id)).toBe("Waiting on B3's lane")
     for (const l of [named, twin, plain]) expect(watches.watchFor(home, 'assistant')!.label).not.toContain(l.id)
     // A wake line too long to tell in full names each lane by its name, never by its id.
