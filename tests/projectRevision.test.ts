@@ -169,6 +169,35 @@ describe('facts kept across commits equal a full read (HI-3291)', () => {
     expect(kept.facts(c)).toEqual(full(w, c))
   })
 
+  it("a kept card's or kind's facts untouched by the commits since are served unread, and a touched one reads what was appended", async () => {
+    const { ws, w } = await workspace()
+    const kept = FactStore.forBoard(w, scope)
+    const [a, b] = [await card(w, 'p'), await card(w, 'p')]
+    const append = (c: number, entry: string, kind: typeof KIND | 'IntegrationCancelled' = KIND) =>
+      store.boardWrite(w, async () => kept.tx((tx) => void tx.append(c, kind === KIND ? req(entry) : { kind, actor: 'combwork', source: 'recorded', data: { entry, reason: 'removed' } as never })))
+    await append(a, 'a1')
+    expect(entries(kept.facts(a))).toEqual(['a1'])
+    expect(entries(kept.factsOfKind(KIND))).toEqual(['a1'])
+    // b's fact of another kind: a's facts and the kind's list untouched, served as kept, and still what a full read gives.
+    await append(b, 'b1', 'IntegrationCancelled')
+    expect(kept.facts(a)).toEqual(full(w, a))
+    expect(kept.factsOfKind(KIND)).toEqual(full(w))
+    // Another connection's comment (no fact): the same.
+    outside(ws, "INSERT INTO card_labels (card, ord, label) VALUES (?, 0, 'x')", a)
+    expect(kept.facts(a)).toEqual(full(w, a))
+    // A fact on a, from another connection: read.
+    outside(ws, "INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (?, 2, ?, '2026-11-15T00:00:00.000Z', 'combwork', 'recorded', ?)", a, KIND, JSON.stringify({ entry: 'a2', revision: 'f'.repeat(40), key: null, target: 'main', style: 'merge' }))
+    expect(entries(kept.facts(a))).toEqual(['a1', 'a2'])
+    expect(entries(kept.factsOfKind(KIND))).toEqual(['a1', 'a2'])
+    // Several commits between reads (the marks' range spans them all).
+    await append(b, 'b2')
+    await append(a, 'a3')
+    await append(b, 'b3', 'IntegrationCancelled')
+    expect(entries(kept.facts(a))).toEqual(['a1', 'a2', 'a3'])
+    expect(kept.facts(b)).toEqual(full(w, b))
+    expect(entries(kept.factsOfKind(KIND))).toEqual(['a1', 'a2', 'b2', 'a3'])
+  })
+
   it('a card with its history moving into and out of the project', async () => {
     const { ws, w } = await workspace()
     const kept = FactStore.forBoard(w, scope)
