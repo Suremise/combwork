@@ -319,7 +319,7 @@ class CheckpointThread {
       checkpointThreadHooks.beforeDispatch?.(kind)
       w = this.worker ?? this.start()
     } catch (e) {
-      return answer({ error: `its worker couldn't be started: ${e instanceof Error ? e.message : String(e)}` }, '')
+      return answer({ error: `its worker couldn't be started: ${e instanceof Error ? e.message : String(e)}` }, '') // i18n-ignore: for the log
     }
     if (!w) {
       let res: CheckpointDone | RestartDone | { error: string } | null
