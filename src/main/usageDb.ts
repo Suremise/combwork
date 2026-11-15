@@ -552,15 +552,22 @@ function timelineOf(step: number | null, rows: Rec[], charges: number[]): UsageT
   return { step, rows: out, reports: charges, ...(models.length ? { models } : {}) }
 }
 
-/** The sessions of some scopes (all of them: null), with their rows. */
-export function storedSessions(db: DatabaseSync, scopes: string[] | null): StoredSession[] {
-  if (scopes && !scopes.length) return []
-  const where = { scopes }
+/**
+ * The sessions of some scopes (all of them: null), with their rows. `sessions`: only these of one scope (HI-3295: a
+ * stopped session's usage asks for its own, not every session of its project).
+ */
+export function storedSessions(db: DatabaseSync, scopes: string[] | null, sessions?: { scope: string; sessions: string[] }): StoredSession[] {
+  if ((scopes && !scopes.length) || (sessions && !sessions.sessions.length)) return []
+  const where = sessions ?? { scopes }
   const rows = grouped(db, 'usage_rows', where, 'day, model, card, role', rowOf)
   const compactions = grouped(db, 'usage_compactions', where, 'seq', compactionOf)
   const guards = grouped(db, 'usage_safeguards', where, 'kind, key', (r) => r)
-  const sql = scopes ? `WHERE scope IN (${placeholders(scopes.length)})` : '' // i18n-ignore: SQL
-  return (db.prepare(`SELECT * FROM usage_sessions ${sql}`).all(...(scopes ?? [])) as Rec[]).map((s) => { // i18n-ignore: SQL
+  const [sql, args] = sessions
+    ? [`WHERE scope = ? AND session IN (${placeholders(sessions.sessions.length)})`, [sessions.scope, ...sessions.sessions]] // i18n-ignore: SQL
+    : scopes
+      ? [`WHERE scope IN (${placeholders(scopes.length)})`, scopes] // i18n-ignore: SQL
+      : ['', []]
+  return (db.prepare(`SELECT * FROM usage_sessions ${sql}`).all(...args) as Rec[]).map((s) => { // i18n-ignore: SQL
     const k = keyOf(s)
     return { ...metaOf(s), source: s.source as string, path: (s.path as string | null) ?? null, size: s.size as number, mtime: s.mtime as number, summary: summaryOf(s, compactions.get(k) ?? [], guards.get(k) ?? []), rows: rows.get(k) ?? [] }
   })

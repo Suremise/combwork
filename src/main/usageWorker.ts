@@ -59,7 +59,7 @@ export type WorkerRequest = { id: number } & (
   | { type: 'config'; advanced: Record<string, unknown>; providers: AppSettings['providers']; appVersion: string; cacheSize?: number }
   | { type: 'ingest'; file: string; job: IngestJob }
   | { type: 'kept'; file: string; job: KeptJob }
-  | { type: 'sessions'; file: string; scopes: string[] | null }
+  | { type: 'sessions'; file: string; scopes: string[] | null; sessions?: { scope: string; sessions: string[] } }
   | { type: 'cards'; file: string; cards: number[] }
   | { type: 'timelines'; file: string; scope: string; sessions?: string[]; agents?: string[] }
   | { type: 'ids'; file: string; scope: string }
@@ -666,7 +666,7 @@ export async function handleRequest(m: WorkerRequest): Promise<unknown> {
       return run
     }
     case 'sessions':
-      return storedSessions(dbOf(m.file).reader, m.scopes)
+      return storedSessions(dbOf(m.file).reader, m.scopes, m.sessions)
     case 'cards':
       return cardRows(dbOf(m.file).reader, m.cards)
     case 'timelines': {

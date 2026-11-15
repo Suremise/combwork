@@ -116,6 +116,11 @@ export interface StoredUsage {
   usage: ReturnType<typeof usageFromRows>
 }
 
+/** A stored session priced with these settings. */
+function storedUsageOf(s: StoredSession, settings: Parameters<typeof usageFromRows>[2]): StoredUsage {
+  return { meta: s, source: s.source, read: { path: s.path, size: s.size, mtime: s.mtime }, usage: usageFromRows(s.summary, s.rows, settings) }
+}
+
 const wsKey = (p: string): string => p.toLowerCase()
 
 /** The opening of a workspace that work in the background was begun for: its path, and that opening's lifetime. */
@@ -957,7 +962,19 @@ class UsageHistory {
     if (!ws?.path) return new Map()
     const { workspace, scope } = await ws.sessionScope(projectPath)
     const settings = config.settings
-    return new Map((await this.storedSessions(workspace, [scope])).map((s) => [s.session, { meta: s, source: s.source, read: { path: s.path, size: s.size, mtime: s.mtime }, usage: usageFromRows(s.summary, s.rows, settings) }]))
+    return new Map((await this.storedSessions(workspace, [scope])).map((s) => [s.session, storedUsageOf(s, settings)]))
+  }
+
+  /**
+   * One session of a host in the history, priced now (HI-3295): the worker sends only its rows, so a stopped session's read
+   * neither copies every session of a large project onto main nor prices them all there. Null: the history hasn't it.
+   */
+  async storedSessionUsage(projectPath: string, sessionId: string): Promise<StoredUsage | null> {
+    const ws = workspaceFor(projectPath)
+    if (!ws?.path) return null
+    const { workspace, scope } = await ws.sessionScope(projectPath)
+    const [s] = await this.call<StoredSession[]>({ type: 'sessions', file: usageFile(workspace), scopes: [scope], sessions: { scope, sessions: [sessionId] } })
+    return s ? storedUsageOf(s, config.settings) : null
   }
 
   /** The rows on some cards, with whose session each is. */

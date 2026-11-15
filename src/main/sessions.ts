@@ -8651,7 +8651,8 @@ class SessionManager {
       if (p) usage = await this.usageFor(projectPath, p, sessionId, await this.sessionProvider(projectPath, sessionId, ctx), { reportsIgnored: !!rec?.serverRan, costFree: !!rec?.serverLocal && !rec?.notLocal })
     }
     if (!usage && (!running || ctx?.stored)) {
-      const stored = (ctx?.stored ?? (await usageHistory.storedUsage(projectPath).catch(() => null)))?.get(sessionId)
+      // Alone (no list): only this session from the history (HI-3295), never every session of the project.
+      const stored = ctx?.stored ? ctx.stored.get(sessionId) : await usageHistory.storedSessionUsage(projectPath, sessionId).catch(() => null)
       if (stored) usage = this.titled(stored.usage)
     }
     if (!usage && ctx?.stored) {
@@ -8693,7 +8694,7 @@ class SessionManager {
     if (!p) return { usage: await this.usage(projectPath, sessionId, undefined, { noWait: true }), known: true }
     const st = await stat(p).catch(() => null)
     if (!st) return { usage: null, known: false }
-    const stored = (await usageHistory.storedUsage(projectPath).catch(() => null))?.get(sessionId)
+    const stored = await usageHistory.storedSessionUsage(projectPath, sessionId).catch(() => null)
     if (stored && stored.read.path?.toLowerCase() === p.toLowerCase() && stored.read.size === st.size && stored.read.mtime === st.mtimeMs) return { usage: withScreenStopsIn(this.titled(stored.usage), rec?.screenStops), known: true }
     const provider = await this.sessionProvider(projectPath, sessionId)
     const o = { reportsIgnored: !!rec?.serverRan, costFree: !!rec?.serverLocal && !rec?.notLocal }
