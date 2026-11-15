@@ -452,7 +452,8 @@ function laneFact(ws: WorkspaceService, l: LaneRecord): void {
   // Kept as its message too (HI-2438's summaryText), so a later reader can be told it in their own dialect.
   const values = { named: l.name ? 'yes' : 'no', name: l.name ?? '', state, commit: l.mergeCommit ?? '', who, cards }
   const summary = inDefaultDialect(() => say(A.journal, values))
-  journalFact(ws, {
+  // Written once the journal is writable (HI-3289); journalFact logs a failure itself.
+  void journalFact(ws, {
     summary,
     summaryText: { id: A.journal.id, values },
     project: l.project,

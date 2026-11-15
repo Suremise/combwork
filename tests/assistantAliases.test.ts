@@ -55,7 +55,7 @@ function aliasOf(kind: 'junction' | '8.3', ws: string): { path: string; drop: ()
 const all: JournalSettings = { ...DEFAULT_JOURNAL, scope: ['decision', 'plan', 'event', 'incident', 'insight', 'preference', 'moment'] }
 const home = (ws: string): string => join(ws, '.combwork', 'assistant')
 /** The journal of the workspace at `ws` (by that spelling), opened by writing to it. */
-const useJournal = (ws: string): number => journal.writeEntry(home(ws), all, { kind: 'decision', summary: `Entry ${++n}` }, 'assistant')
+const useJournal = (ws: string): Promise<number> => journal.writeEntry(home(ws), all, { kind: 'decision', summary: `Entry ${++n}` }, 'assistant')
 const journalOpen = (ws: string): boolean => journal.journalOpen(home(ws))
 /** The usage history of the workspace at `ws` (by that spelling), opened by reading it. */
 const useUsage = (ws: string): Promise<unknown> => usageHistory.storedSessions(ws, null)
@@ -99,7 +99,7 @@ describe("the Assistant's journal and usage.db under another name for their work
       if (!alias) return skip('this volume makes no 8.3 names')
       try {
         const w = await open(ws)
-        useJournal(alias.path)
+        await useJournal(alias.path)
         await useUsage(alias.path)
         expect([journalOpen(alias.path), usageOpen(ws), usageByAlias(alias.path)]).toEqual([true, true, false])
         await w.close()
@@ -118,7 +118,7 @@ describe("the Assistant's journal and usage.db under another name for their work
       try {
         const w = await open(alias.path)
         for (const p of [alias.path, ws]) {
-          useJournal(p)
+          await useJournal(p)
           await useUsage(p)
         }
         expect([journalOpen(alias.path), journalOpen(ws), usageOpen(ws), usageByAlias(alias.path)]).toEqual([true, true, true, false])
@@ -136,9 +136,9 @@ describe("the Assistant's journal and usage.db under another name for their work
     const ws = workspace()
     const alias = aliasOf('junction', ws)!
     const w = await open(alias.path)
-    useJournal(alias.path)
+    await useJournal(alias.path)
     await useUsage(alias.path)
-    useJournal(ws)
+    await useJournal(ws)
     await useUsage(ws)
     alias.drop()
     await w.close()
@@ -152,12 +152,12 @@ describe("the Assistant's journal and usage.db under another name for their work
     const alias = aliasOf('junction', ws)!
     try {
       const w = await open(alias.path)
-      useJournal(alias.path)
+      await useJournal(alias.path)
       await useUsage(alias.path)
-      useJournal(ws)
+      await useJournal(ws)
       await useUsage(ws)
       const w2 = await open(other)
-      useJournal(other)
+      await useJournal(other)
       await useUsage(other)
       alias.drop()
       junction(other, alias.path)
@@ -166,7 +166,7 @@ describe("the Assistant's journal and usage.db under another name for their work
       await vi.waitFor(() => expect(usageOpen(ws)).toBe(false), { timeout: HUNG_MS })
       expect(usageOpen(other)).toBe(true)
       // The other window's still work.
-      expect(useJournal(other)).toBeGreaterThan(0)
+      expect(await useJournal(other)).toBeGreaterThan(0)
       await expect(useUsage(other)).resolves.toEqual([])
       await w2.close()
       expect(journalOpen(other)).toBe(false)
@@ -182,10 +182,10 @@ describe("the Assistant's journal and usage.db under another name for their work
     const alias = aliasOf('junction', ws)!
     try {
       const w = await open(ws)
-      useJournal(ws)
-      useJournal(alias.path)
+      await useJournal(ws)
+      await useJournal(alias.path)
       const deleting = journal.deleteJournal(home(ws))
-      expect(() => useJournal(alias.path)).toThrow(/being deleted/)
+      await expect(useJournal(alias.path)).rejects.toThrow(/being deleted/)
       await deleting
       expect([journalOpen(ws), journalOpen(alias.path)]).toEqual([false, false])
       expect(journal.hasJournal(home(alias.path))).toBe(false)
@@ -228,15 +228,15 @@ describe("the Assistant's journal and usage.db under another name for their work
       const wa = await open(a)
       const wb = await open(b)
       try {
-        useJournal(via.path)
-        useJournal(b)
+        await useJournal(via.path)
+        await useJournal(b)
         if (!bOpen) journal.closeJournal(home(b))
         via.drop()
         junction(b, via.path)
         await journal.deleteJournal(home(via.path))
         expect({ a: existsSync(journal.journalFile(home(a))), b: existsSync(journal.journalFile(home(b))) }).toEqual({ a: false, b: true })
         expect(journalOpen(b)).toBe(bOpen)
-        expect(useJournal(b)).toBeGreaterThan(0)
+        expect(await useJournal(b)).toBeGreaterThan(0)
         await wa.close()
         await wb.close()
       } finally {

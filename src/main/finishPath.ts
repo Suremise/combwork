@@ -103,7 +103,7 @@ export async function runFinish(ws: WorkspaceService, wf: Workflow, projectPath:
     if (!f || !current()) return
     const by = wf.store.facts(n).find((x) => x.seq === finish)?.actor ?? 'combwork'
     // agent-protocol: the detail names the finish by its number, the once-check's key (writeEntryOnce)
-    journalFact(ws, { summary: doneFact(cardRef(n), card.title, f.how, by), summaryText: doneFactText(cardRef(n), card.title, f.how, by), detail: `finish ${finish}`, project: basename(projectPath), links: [{ type: 'card', ref: String(n) }], tags: ['done'] }, { type: 'card', ref: String(n) }) // i18n-ignore: the journal's detail for agents, protocol (agent-protocol above)
+    await journalFact(ws, { summary: doneFact(cardRef(n), card.title, f.how, by), summaryText: doneFactText(cardRef(n), card.title, f.how, by), detail: `finish ${finish}`, project: basename(projectPath), links: [{ type: 'card', ref: String(n) }], tags: ['done'] }, { type: 'card', ref: String(n) }) // i18n-ignore: the journal's detail for agents, protocol (agent-protocol above)
   })
   await settleSlotCards(ws, projectPath).catch((e) => log.warn(`#${n}'s finish: its slot`, e))
 }

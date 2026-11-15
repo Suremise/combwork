@@ -6,7 +6,7 @@ import { onDbReplaced, upgradeWaiting, withLeasedDb, workspaceDb } from './board
 import { placeKey, readKeptJson, writeKeptJson } from './fsutil'
 import { createLogger, userText } from './logger'
 import { keepAsBackup, openTable, readStore, rowKeys, storeValue, withStoreLock, writeStore, type StoreData, type StoreRow } from './storeRows'
-import { transaction, type Db } from './db'
+import { beginTransaction, transaction, type Db } from './db'
 import { addSessionRecords, countSessions, readAgentSessionRecords, readCardSessionRecords, readDeleted, readDeletedUsage, readSessionRecord, readSessionRecords, removeSessionRecords, sessionTexts, writeSessionRecord, writeSessionRecords } from './schema/sessionDeliveryTables'
 import { withMode } from '../shared/defaults'
 import { timedStep } from './stallWork'
@@ -321,7 +321,7 @@ export async function exportSessions(place: SessionsPlace): Promise<number> {
     const count = await withStoreLock(place.workspace, 'sessions', place.scope, async (db) => {
       // One write transaction from the read to the delete, the file written inside it (review round 2): no writer, in this
       // process or another (another Combwork, a script on the database), commits between them; a failure undoes it all.
-      timedStep('db begin combwork.db', () => db.exec('BEGIN IMMEDIATE'))
+      timedStep('db begin combwork.db', () => beginTransaction(db))
       try {
         const f = fromTables(db, place.scope)
         const deleted = f.deleted
