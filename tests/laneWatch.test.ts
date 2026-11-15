@@ -961,7 +961,8 @@ describe('lane watches (main/watches.ts, #531)', async () => {
 
       // HR1's round 1 doubt: the wake read while the new watch is being set up (its lanes read, before it is saved), its
       // receipt recorded meanwhile. The new watch must start from what that wake told, never re-tell it.
-      it('read while the new watch is set up: the end is read once, and later events still come', async () => {
+      for (const hook of ['afterLanesRead', 'beforeLaneWatchSaved'] as const)
+      it(`read while the new watch is set up (${hook === 'afterLanesRead' ? 'its lanes read' : 'every read done, before it replaces the old one'}): the end is read once, and later events still come`, async () => {
         const { w, alpha, home } = await open()
         const { st, read, readNow } = lazy(alpha, home)
         const [a] = await newCards(w, 'b1', 1)
@@ -973,14 +974,14 @@ describe('lane watches (main/watches.ts, #531)', async () => {
         await watches.settled()
         const [b] = await newCards(w, 'b1', 1)
         await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [b], by: 'B1 (alpha)' })
-        watches.testHooks.afterLanesRead = async () => {
-          watches.testHooks.afterLanesRead = undefined
+        watches.testHooks[hook] = async () => {
+          watches.testHooks[hook] = undefined
           await readNow()
         }
         try {
           await watchAll(w, home, st)
         } finally {
-          watches.testHooks.afterLanesRead = undefined
+          watches.testHooks[hook] = undefined
         }
         // The read during the set-up got the end: it was received then.
         expect(count(read, ENDED)).toBe(1)
