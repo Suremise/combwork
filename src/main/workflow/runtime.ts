@@ -425,6 +425,9 @@ const W = {
   acceptTooMany: agentMsg({ id: 'runtime.verdict.acceptTooMany', text: 'accept: only the first {max} tests are taken', note: "HI-2660: more than ACCEPT_MAX tests in cw_verdict's accept. {max}: the limit." }),
   acceptNone: agentMsg({ id: 'runtime.verdict.acceptNone', text: "accept: {test} has no counted run at this revision (or its command changed since), so it isn't accepted", note: "HI-2660: no standing run of focused:<test> at the passed revision to accept. {test}: the test id." }),
   acceptFailed: agentMsg({ id: 'runtime.verdict.acceptFailed', text: "accept: {test}'s latest counted run at this revision failed, so it isn't accepted", note: "HI-2660: the standing run of focused:<test> at the passed revision didn't pass; an earlier pass never stands behind it. {test}: the test id." }),
+  mergeSeen: agentMsg({ id: 'runtime.reportMerge.mergeSeen', text: 'Done already: Combwork saw its merge into {target}; nothing more to report', note: "HI-3282: report merge's answer (an OK, nothing written), its reply's `already` value, on a card Combwork had already seen merged into its target this cycle (its reconciliation or merge queue, before the builder's report). Historical: no fresh check is made. {target}: the branch or bookmark." }),
+  mergeSeenMove: agentMsg({ id: 'runtime.reportMerge.mergeSeenMove', text: '{card} was already Done: Combwork saw its merge into {target}; nothing more to report.', note: "HI-3282: an agent's old move to Done (cw_update_task) on a card already Done whose merge Combwork saw this cycle: a line of its reply, as report merge answers. {target}: the branch or bookmark." }),
+  mergeSeenMoveNext: agentMsg({ id: 'runtime.reportMerge.mergeSeenMoveNext', text: 'As report merge: next time call {tool}', note: "HI-3282: the line after mergeSeenMove, as an old move translated into an intent says it (#1268). {tool}: cw_report_merge." }),
   questionDone: agentMsg({ id: 'runtime.wake.questionDone', text: '{card}: your question "{question}" no longer stands: the card is in Done.', note: "An asker's wake when the card reached Done with its question open. {question}: the question, quoted short (#1626)." }),
   boardDone: agentMsg({ id: 'runtime.repair.boardDone', text: 'the board had it in Done while its stage was {stage}', note: "A repair's reason, stored on the card's Moved fact: the board's column and the card's stage disagreed. {stage}: the stage id." }),
   laneStarted: agentMsg({ id: 'runtime.start.laneStarted', text: "Combwork started {card} for you, as your lane's next card: carry on with it.", note: "HI-2092: a lane's builder starting the card Combwork had already started for it: its start's warning." }),
@@ -470,7 +473,14 @@ const stored = (m: AgentMsg, values?: AgentValues): string => inDefaultDialect((
 const CHOICE_WORDS: Record<PauseChoice, AgentMsg> = { carryOn: W.choiceCarryOn, split: W.choiceSplit, accept: W.choiceAccept, takeOver: W.choiceTakeOver, simplify: W.choiceSimplify, cutScope: W.choiceCutScope }
 
 /** HI-3188: the moves a card's open churn question pauses (an agent's or the Assistant's: churnPending). */
-const CHURN_PAUSED: readonly MoveId[] = ['start', 'submit', 'requeue', 'startReview', 'verdict', 'reportMerge']
+/**
+ * HI-3282: a Done card whose current cycle Combwork saw integrated in its target (by the reconciler, the queue or a
+ * report): foldCard clears `integrated` at each Started and Adopted, so one recorded is this cycle's. A Done card with
+ * none (the user's override, an earlier cycle's Done) isn't.
+ */
+const mergeSeen = (s: CardState): boolean => s.stage === 'done' && !!s.integrated && !!s.started && s.integrated.target === (s.started.target ?? '')
+
+const CHURN_PAUSED: readonly MoveId[] =['start', 'submit', 'requeue', 'startReview', 'verdict', 'reportMerge']
 /** What the user did with an action a question offered (#1630), as its answer's wake says it. */
 const ACTION_WORDS: Record<AskActionKind, AgentMsg> = { done: W.actionDone, noCode: W.actionNoCode, unblock: W.actionUnblock, skipReview: W.actionSkipReview }
 
@@ -2650,6 +2660,8 @@ export class Workflow {
     const combwork = r.options.finish === 'combworkMerges'
     const queued = this.combworkMergesRefusal(card, s)
     if (queued) return this.refuse(card, actor, 'report merge', queued, null) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    // HI-3282: this cycle's merge already seen (the reconciler or the queue finished it first): OK, nothing written.
+    if (mergeSeen(s)) return this.mergeSeenReply(card, s)
     // Only where the builder merges (or nothing is checked); with workflow rules off, a card Combwork merges is reported as
     // before 1.0 too, approved or waiting in the queue, whose entry it drops (a merge outside the queue, as S7's).
     const from = s.stage === 'approved' || (combwork && s.stage === 'merging') || awaitsAgentMerge(r, s)
@@ -2671,7 +2683,15 @@ export class Workflow {
       }
     }
     if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.reportMerge(ref, actor, args))
+    let seen: CardState | null = null
     const out = await this.write(card, r, actor, (w) => {
+      // HI-3282: finished meanwhile by this cycle's merge (the reconciler between the reads and this write): read under the
+      // write's lock, nothing written (no Refused fact either).
+      const now = w.state()
+      if (mergeSeen(now)) {
+        seen = now
+        return null
+      }
       const bad = this.stillAt(w, s, 'report merge') ?? this.evidenceChanged(w, r.options, before) ?? this.check(w, 'reportMerge', { agent: agentOf(actor), contained, revision: rev, target }) ?? this.staleUnchecked(w, r, rev) ?? this.blockersNotDone(w) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       if (bad) return bad
       if (contained === true) w.fact('Integrated', { revision: rev!, target, result: args.result ?? (!isUnknown(th) && th ? th : rev!), method, by: 'agent' }) // i18n-ignore: a fact's kind and codes, not text
@@ -2683,8 +2703,26 @@ export class Workflow {
       w.move('done', 'intent')
       return null
     })
+    // Set in the write's callback (TypeScript can't see it there).
+    const seenNow = seen as CardState | null
+    if (seenNow) return this.mergeSeenReply(card, seenNow)
     if (out) return this.refuse(card, actor, 'report merge', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     return this.ok(card, s.stage, 'done')
+  }
+
+  /** HI-3282: report merge's OK on a card whose merge this cycle Combwork had seen already: Done to Done, `already` saying so. */
+  private mergeSeenReply(card: CardRecord, s: CardState): Moved {
+    return this.ok(card, 'done', 'done', { already: say(W.mergeSeen, { target: s.integrated?.target ?? '' }) })
+  }
+
+  /**
+   * HI-3282: what an agent's old move to Done says on a card already there (P3's path, which moves nothing and keeps its
+   * comment): report merge's answer when this cycle's merge was seen, and the tool to call next time; else nothing.
+   */
+  mergeSeenLines(n: number): string[] {
+    const card = this.store.card(n)
+    const s = this.state(card)
+    return mergeSeen(s) ? [say(W.mergeSeenMove, { card: card.key, target: s.integrated?.target ?? '' }), say(W.mergeSeenMoveNext, { tool: 'cw_report_merge' })] : []
   }
 
   /**
