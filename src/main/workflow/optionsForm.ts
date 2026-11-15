@@ -46,7 +46,7 @@ import { LEGACY_CONSUMED, legacyPreferences } from '../../shared/workflow/prefer
 import { checkOffer } from './releaseOffer'
 import { changeGuards, refuseGuardsAtSave } from './guardsSave'
 import { previewable, type GuardPreview, type MergeGuard } from '../../shared/workflow/mergeGuards'
-import { previewMergeGuard } from './mergeGuardsRun'
+import { previewMergeGuard, schedulePreview } from './mergeGuardsRun'
 
 const log = createLogger('workflow')
 
@@ -253,18 +253,19 @@ export async function cardsInFlight(ws: WorkspaceService, project: { path: strin
 }
 
 /**
- * HI-3284 (Darren's decision, 15 Nov): what a merge guard being added or edited already matches in the project, how many
+ * HI-3284 (HI-3284's decision): what a merge guard being added or edited already matches in the project, how many
  * lines and where, read in the guards' worker: the files its version control has (tracked, and new ones not ignored), or
  * a walk of the folder leaving out its excluded folders and node_modules.
  */
-export async function guardPreview(ws: WorkspaceService, projectPath: string, raw: unknown): Promise<GuardPreview> {
+export async function guardPreview(ws: WorkspaceService, projectPath: string, raw: unknown, slot?: unknown): Promise<GuardPreview> {
   const project = projectOf(ws, projectPath)
   const guard = raw as MergeGuard
   if (!guard || typeof guard !== 'object' || !previewable(guard)) return { count: 0, hits: [], files: 0, incomplete: 'invalid' } // i18n-ignore: a reason's code
   const files = (await historyOf(project.platform)?.workingFiles(project.path).catch(() => null)) ?? null
   const cfg = await ws.projectConfig(project.path)
   const excluded = resolvedOf(ws, project.path, project.platform, cfg).options.excluded
-  return previewMergeGuard(project.path, files, ['node_modules', ...excluded], guard)
+  // In its turn (at most two read at once), a newer one from the same guard row cancelling this one.
+  return schedulePreview(typeof slot === 'string' && slot ? slot.slice(0, 64) : null, (signal) => previewMergeGuard(project.path, files, ['node_modules', ...excluded], guard, { signal }))
 }
 
 /** What saving a change would do (§16.6.5's warning), before it is saved. */

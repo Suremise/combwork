@@ -12,7 +12,7 @@ import { compileGuard, matchGuards, parseAddedLines, previewGuard, type GuardPre
  */
 
 /**
- * A preview (Darren's decision, 15 Nov): one guard over the project's files as they are on disk, `files` the paths to
+ * A preview (HI-3284's decision): one guard over the project's files as they are on disk, `files` the paths to
  * read (its version control's, tracked and not ignored) or, with none, a walk of `root` leaving out `skipDirs` and every
  * dot folder; at most `maxFiles` files and `maxBytes` of text, each file at most `maxFile` (a larger one is left out).
  */

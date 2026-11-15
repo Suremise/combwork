@@ -47,6 +47,9 @@ const { MERGE_CHOICE_KEY } = await import('../src/shared/workflow/facts')
 const HUNG_MS = 15_000
 const { settingEntry, checkSettingValue, settingPatch } = await import('../src/shared/settingsCatalog')
 const settingsTools = await import('../src/main/settingsTools')
+const { withGuardsWorker } = await import('./guardsWorker')
+// HI-3284: a save's empty-match rule runs in the guards' worker, never on main's thread: the real one, built here.
+withGuardsWorker()
 
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []

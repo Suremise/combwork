@@ -190,6 +190,7 @@
   "workflow.mergeGuards.problem.tooLong": "{field, select, name {Le nom} pattern {Le motif} other {Le message}} du filtre de fusion {n, number} dépasse {max, number} caractères.",
   "workflow.mergeGuards.problem.tooMany": "Il y a plus de {max, number} filtres de fusion.",
   "workflow.mergeGuards.problem.tooManyGlobs": "Le filtre de fusion {n, number} a plus de {max, number} chemins dans une liste.",
+  "workflow.mergeGuards.problem.unchecked": "Le motif du filtre de fusion {n, number} n’a pas pu être vérifié : Combwork n’a pas pu lancer la vérification.",
   "workflow.mergeGuards.remove": "Retirer",
   "workflow.mergeGuards.skip": "Ignorer ces chemins (ex. LICENSE, docs/**)",
   "workflow.mergeGuards.up": "Monter",

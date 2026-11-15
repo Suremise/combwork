@@ -4,8 +4,7 @@
 // the guard, the empty-match rule at a save, and a read that fails or is too large is incomplete, never a pass.
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { build } from 'esbuild'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import {
   excerptOf,
   GUARD_EXCERPT,
@@ -25,11 +24,16 @@ import {
   parseAddedLines,
   previewGuard,
   PREVIEW_HITS,
+  splitGlobs,
   unquotePath,
   type AddedFile,
   type MergeGuard
 } from '../src/shared/workflow/mergeGuards'
-import { checkMergeGuards, emptyMatchProblems, inWorker, previewMergeGuard, useGuardsWorker } from '../src/main/workflow/mergeGuardsRun'
+import { cancelPreview, checkMergeGuards, emptyMatchProblems, guardWorkers, inWorker, previewMergeGuard, PREVIEWS_AT_ONCE, previewsNow, schedulePreview, useGuardsWorker } from '../src/main/workflow/mergeGuardsRun'
+import { withGuardsWorker } from './guardsWorker'
+import { guardedShown } from '../src/main/workflow/queueState'
+import { storedLineText } from '../src/shared/taskHistory'
+import { tr } from '../src/shared/i18n'
 import { takesOption } from '../src/shared/workflow/options'
 import { tempDir } from './tempDir'
 
@@ -140,7 +144,7 @@ describe('matching', () => {
     expect(r).toEqual({ hits: [], more: 0, messages: [] })
     const s = matchGuards(added, [guard()])
     expect(s.hits.map((h) => `${h.file}:${h.line}`)).toEqual(['a.txt:4', 'café x.txt:2', 'crlf.txt:3', 'new.txt:2', 'nonl.txt:1', 'renedit2.txt:6'])
-    expect(s.messages).toEqual([{ guard: 'No secrets', message: 'Take it out.' }])
+    expect(s.messages).toEqual([{ guard: 'No secrets', message: 'Take it out.', count: 6, file: 'a.txt', line: 4 }])
     // A match past the first 4,000 characters of a line is found (no prefix scanning, HR2's round 1).
     const long = matchGuards([{ path: 'min.js', lines: [{ n: 1, text: `${'x'.repeat(10_000)}secret` }] }], [guard()])
     expect(long.hits).toHaveLength(1)
@@ -186,7 +190,7 @@ describe('matching', () => {
   })
 })
 
-describe('a preview of what a guard already matches (Darren’s decision, 15 Nov)', () => {
+describe('a preview of what a guard already matches (HI-3284’s decision)', () => {
   it('counts every line it matches in the files it applies to, listing the first few', () => {
     const texts = [{ path: 'a.txt', text: 'secret\nno\nsecret\r\n' }, { path: 'LICENSE', text: 'secret' }, ...Array.from({ length: 6 }, (_x, i) => ({ path: `f${i}.txt`, text: 'a secret' }))]
     const p = previewGuard(texts, guard({ skip: ['LICENSE'] }))
@@ -198,7 +202,81 @@ describe('a preview of what a guard already matches (Darren’s decision, 15 Nov
   })
 })
 
-describe('the example guard (Darren’s decision, 15 Nov)', () => {
+describe('previews in their turn (HR2\'s round 1, finding 3)', () => {
+  /** A preview that runs until it is let go or cancelled, telling when it starts. */
+  function held() {
+    const started: string[] = []
+    const go = new Map<string, () => void>()
+    const run = (name: string) => (signal: AbortSignal) =>
+      new Promise<{ count: number; hits: []; files: number; incomplete?: string }>((resolve) => {
+        started.push(name)
+        go.set(name, () => resolve({ count: 0, hits: [], files: 0 }))
+        signal.addEventListener('abort', () => resolve({ count: 0, hits: [], files: 0, incomplete: 'cancelled' }), { once: true })
+      })
+    return { started, go, run }
+  }
+
+  it('reads at most two at once, the rest waiting in order; a newer one for a row cancels its earlier one, waiting or reading', async () => {
+    const h = held()
+    const a = schedulePreview('row-a', h.run('a1'))
+    const b = schedulePreview('row-b', h.run('b1'))
+    const c = schedulePreview('row-c', h.run('c1'))
+    await expect.poll(() => h.started).toEqual(['a1', 'b1'])
+    expect(previewsNow()).toEqual({ running: PREVIEWS_AT_ONCE, waiting: 1 })
+    // Row c changes while it waits: its first never starts.
+    const c2 = schedulePreview('row-c', h.run('c2'))
+    expect(await c).toMatchObject({ incomplete: 'cancelled' })
+    // Row a changes while it reads: its first ends now, and the next in turn starts.
+    const a2 = schedulePreview('row-a', h.run('a2'))
+    expect(await a).toMatchObject({ incomplete: 'cancelled' })
+    await expect.poll(() => h.started).toEqual(['a1', 'b1', 'c2'])
+    h.go.get('b1')!()
+    expect(await b).toEqual({ count: 0, hits: [], files: 0 })
+    await expect.poll(() => h.started).toEqual(['a1', 'b1', 'c2', 'a2'])
+    // Row c closes: cancelled.
+    cancelPreview('row-c')
+    expect(await c2).toMatchObject({ incomplete: 'cancelled' })
+    h.go.get('a2')!()
+    await a2
+    expect(previewsNow()).toEqual({ running: 0, waiting: 0 })
+  })
+})
+
+describe('globs typed in one field', () => {
+  it('split only at commas outside braces, round-tripping a brace glob', () => {
+    expect(splitGlobs('src/*.{ts,tsx}, docs/**')).toEqual(['src/*.{ts,tsx}', 'docs/**'])
+    expect(splitGlobs(' a ,, {b,c}/d ,')).toEqual(['a', '{b,c}/d'])
+    expect(splitGlobs(splitGlobs('src/*.{ts,tsx}, docs/**').join(', '))).toEqual(['src/*.{ts,tsx}', 'docs/**'])
+    expect(guardProblems([guard({ paths: splitGlobs('src/*.{ts,tsx}, docs/**') })])).toEqual([])
+  })
+})
+
+describe('what a returned card says of its guards (HR2\'s round 1, finding 5)', () => {
+  const window = (g: Parameters<typeof guardedShown>[0]): string | null => storedLineText(guardedShown(g), (m, values) => tr(m, values))
+  const twoGuards = matchGuards([{ path: 'a.txt', lines: [{ n: 3, text: 'one secret' }] }, { path: 'b.txt', lines: Array.from({ length: 10 }, (_x, i) => ({ n: i + 1, text: 'TODO now' })) }], [guard({ name: 'A', message: 'Take it out.' }), guard({ name: 'B', pattern: 'TODO', message: 'Card it.' })])
+
+  it('names each guard with its own count, first place and message', () => {
+    expect(twoGuards.messages).toEqual([{ guard: 'A', message: 'Take it out.', count: 1, file: 'a.txt', line: 3 }, { guard: 'B', message: 'Card it.', count: 10, file: 'b.txt', line: 1 }])
+    expect(window(twoGuards)).toBe('Came back from the merge queue: 2 merge guards matched lines it adds. “A” matched 1 line, first in a.txt:3: Take it out. “B” matched 10 lines, first in b.txt:1: Card it. The card’s Work section shows the run.')
+    expect(guardFailureText(twoGuards)).toBe('merge guards match lines it adds: "A" 1 line, "B" 10 lines')
+  })
+
+  it('names three and counts the rest', () => {
+    const many = matchGuards([{ path: 'a', lines: [{ n: 1, text: 'abcde' }] }], ['a', 'b', 'c', 'd', 'e'].map((x) => guard({ name: x.toUpperCase(), pattern: x, message: 'm' })))
+    const said = window(many)!
+    expect(said).toContain('5 merge guards matched')
+    expect(said).toContain('“C” matched 1 line')
+    expect(said).not.toContain('“D”')
+    expect(said).toContain('2 more guards matched too.')
+  })
+
+  it('says why a check couldn\'t finish, never as a match', () => {
+    expect(window({ hits: [], more: 0, messages: [], incomplete: 'timedOut:Slow' })).toBe('Came back from the merge queue: the merge guards couldn’t finish checking the lines it adds (guard “Slow” ran past its time limit), so it wasn’t merged. The card’s Work section shows the run.')
+    expect(window({ hits: [], more: 0, messages: [], incomplete: 'tooLarge' })).toContain('(the merge adds more than they check)')
+  })
+})
+
+describe('the example guard (HI-3284’s decision)', () => {
   const hits = (name: string, text: string): boolean => new RegExp(namePattern(name), 'u').test(text)
 
   it('matches the name as a whole word, case-sensitive, its spaces any whitespace', () => {
@@ -229,16 +307,9 @@ describe('the example guard (Darren’s decision, 15 Nov)', () => {
 })
 
 describe('the worker', () => {
-  const tmp = tempDir('cw-merge-guards-')
-  const bundle = join(tmp, 'merge-guards-worker.cjs')
+  const built = withGuardsWorker()
   // The longest a wait here waits: a bound for a hung run, never how long it should take (#570).
   const HUNG_MS = 30_000
-
-  beforeAll(async () => {
-    await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'workflow', 'mergeGuardsWorker.ts')], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
-    useGuardsWorker(bundle)
-  }, 60_000)
-  afterAll(() => useGuardsWorker(null))
 
   const limits = { timeoutMs: HUNG_MS, maxLines: 200_000 }
   const diff = fixture('git-2.56.0-added.diff')
@@ -295,7 +366,39 @@ describe('the worker', () => {
     const listed = await previewMergeGuard(root, ['LICENSE', 'gone.txt'], [], guard())
     expect(listed).toMatchObject({ count: 1, hits: [{ file: 'LICENSE', line: 1 }] })
     expect(await previewMergeGuard(root, null, [], guard({ pattern: '(' }))).toMatchObject({ incomplete: 'invalid' })
-    expect(await previewMergeGuard(root, null, [], guard(), 0)).toMatchObject({ incomplete: 'timedOut' })
+    expect(await previewMergeGuard(root, null, [], guard(), { timeoutMs: 0 })).toMatchObject({ incomplete: 'timedOut' })
+    const ac = new AbortController()
+    ac.abort()
+    expect(await previewMergeGuard(root, null, [], guard(), { signal: ac.signal })).toMatchObject({ incomplete: 'cancelled' })
+    // A preview needs only a valid pattern and paths: a guard still without its name or message is previewed.
+    expect(await previewMergeGuard(root, ['LICENSE'], [], guard({ name: '', message: '' }))).toMatchObject({ count: 1 })
+    expect(guardWorkers.live).toBe(0)
+  }, HUNG_MS)
+
+  it('never matches on main\'s thread: with no worker it answers that the check failed, and a save refuses its guards unchecked', async () => {
+    useGuardsWorker(join(tempDir('cw-no-worker-'), 'missing.cjs'))
+    try {
+      const runaway = [guard({ name: 'Runaway', pattern: '^(a+)+$' })]
+      const text = `diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -0,0 +1 @@\n+${'a'.repeat(40)}!\n`
+      expect(await checkMergeGuards(runaway, async () => ({ text }), limits)).toMatchObject({ hits: [], incomplete: 'failed' })
+      expect(await emptyMatchProblems([guard()])).toEqual([{ guard: 0, field: 'pattern', why: 'unchecked' }])
+      expect(await previewMergeGuard(tempDir('cw-no-worker-root-'), [], [], guard())).toMatchObject({ incomplete: 'failed' })
+    } finally {
+      useGuardsWorker(built.bundle)
+    }
+  })
+
+  it('leaves no worker behind: answered, timed out or cancelled while it runs', async () => {
+    const text = `diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -0,0 +1 @@\n+${'a'.repeat(40)}!\n`
+    const runaway = [guard({ name: 'Runaway', pattern: '^(a+)+$' })]
+    await checkMergeGuards([guard()], async () => ({ text: diff }), limits)
+    await checkMergeGuards(runaway, async () => ({ text }), { timeoutMs: 200, maxLines: 10 })
+    const ac = new AbortController()
+    const cancelled = checkMergeGuards(runaway, async () => ({ text }), { ...limits, signal: ac.signal })
+    await expect.poll(() => guardWorkers.live, { timeout: HUNG_MS }).toBe(1)
+    ac.abort()
+    expect(await cancelled).toMatchObject({ incomplete: 'cancelled', transient: true })
+    expect(guardWorkers.live).toBe(0)
   }, HUNG_MS)
 
   it('answers a request and is ended after it', async () => {

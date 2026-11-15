@@ -54,7 +54,7 @@ const projectJson = () => JSON.parse(fs.readFileSync(path.join(fx.alpha, '.combw
     await row.getByRole('button', { name: 'Add Guard', exact: true }).click()
     const g = row.locator('.workflow-guard').first()
     await g.getByLabel('Name', { exact: true }).fill('No secrets')
-    // What it already matches in the project (Darren's decision, 15 Nov): a.txt's first line, as it is typed.
+    // What it already matches in the project (HI-3284's decision): a.txt's first line, as it is typed.
     await g.getByLabel('Pattern (regular expression)').fill('^one$')
     const matches = g.locator('.workflow-guard-matches')
     check('a guard being typed shows what it already matches in the project: how many lines, and where', !!(await until(async () => (await matches.getAttribute('data-matches').catch(() => null)) === '1' && /already matches 1 line in the project/.test(await text(matches)) && /a\.txt:1/.test(await text(matches)), HUNG_MS)), await text(g))
@@ -65,20 +65,37 @@ const projectJson = () => JSON.parse(fs.readFileSync(path.join(fx.alpha, '.combw
     check('an invalid pattern shows as a problem before saving, naming the guard', !!(await until(async () => /pattern of merge guard 1 isn’t a regular expression/.test(await text(row)), HUNG_MS)), await text(row))
     await g.getByLabel('Pattern (regular expression)').fill('secret')
     await g.getByLabel('Pattern (regular expression)').press('Tab')
-    await g.getByLabel('Skip these paths (e.g. LICENSE, docs/**)').fill('LICENSE, *.md')
+    await g.getByLabel('Skip these paths (e.g. LICENSE, docs/**)').fill('LICENSE, *.{md,markdown}')
     await g.getByLabel('Skip these paths (e.g. LICENSE, docs/**)').press('Tab')
     check('…gone once it is one', !!(await until(async () => (await row.locator('[data-guard-problem]').count()) === 0, HUNG_MS)), await text(row))
     check('…which matches no line in the project now', !!(await until(async () => (await matches.getAttribute('data-matches').catch(() => null)) === '0', HUNG_MS)), await text(g))
     await shoot(row, 'editor')
-    await until(async () => form.locator('[data-action="save"]').isEnabled(), HUNG_MS)
-    await form.locator('[data-action="save"]').click()
     const dialog = page.locator('.dialog', { hasText: 'Save Workflow Options' })
-    if (await until(async () => (await dialog.count()) > 0 || projectJson().workflow?.options?.mergeGuards !== undefined, HUNG_MS) && (await dialog.count()) > 0) {
-      await dialog.getByRole('button', { name: 'Save', exact: true }).click()
-      await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
+    /** Saves the section, through its Save dialog when it asks; the guards as project.json then has them. */
+    const save = async (expected) => {
+      await until(async () => form.locator('[data-action="save"]').isEnabled(), HUNG_MS)
+      await form.locator('[data-action="save"]').click()
+      const want = JSON.stringify(expected)
+      if (await until(async () => (await dialog.count()) > 0 || JSON.stringify(projectJson().workflow?.options?.mergeGuards) === want, HUNG_MS) && (await dialog.count()) > 0) {
+        await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+        await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
+      }
+      return until(async () => (JSON.stringify(projectJson().workflow?.options?.mergeGuards) === want ? projectJson().workflow.options.mergeGuards : null), HUNG_MS)
     }
-    const saved = await until(async () => projectJson().workflow?.options?.mergeGuards ?? null, HUNG_MS)
-    check('saved as the project’s own: its name, pattern, skips and message', JSON.stringify(saved) === JSON.stringify([{ name: 'No secrets', pattern: 'secret', skip: ['LICENSE', '*.md'], message: 'Take the secret out.' }]), JSON.stringify(saved))
+    const first = [{ name: 'No secrets', pattern: 'secret', skip: ['LICENSE', '*.{md,markdown}'], message: 'Take the secret out.' }]
+    const saved = await save(first)
+    check('saved as the project’s own: its name, pattern, skips (a brace glob kept whole) and message', JSON.stringify(saved) === JSON.stringify(first), JSON.stringify(projectJson().workflow?.options?.mergeGuards))
+    // A brace glob round-trips through the editor (HR2's round 1, finding 2): shown back as typed, and kept whole when
+    // another field is edited and saved.
+    const skipBox = g.getByLabel('Skip these paths (e.g. LICENSE, docs/**)')
+    check('…the brace glob shown back whole', !!(await until(async () => (await skipBox.inputValue()) === 'LICENSE, *.{md,markdown}', HUNG_MS)), await skipBox.inputValue())
+    await g.getByLabel('Name', { exact: true }).fill('No secrets here')
+    await g.getByLabel('Name', { exact: true }).press('Tab')
+    const again = await save([{ ...first[0], name: 'No secrets here' }])
+    check('…another field edited and saved: the brace glob still whole', JSON.stringify(again) === JSON.stringify([{ ...first[0], name: 'No secrets here' }]), JSON.stringify(projectJson().workflow?.options?.mergeGuards))
+    await g.getByLabel('Name', { exact: true }).fill('No secrets')
+    await g.getByLabel('Name', { exact: true }).press('Tab')
+    await save(first)
 
     // --- A card adding a match comes back from the merge queue.
     const reviewer = await q.agent(fx, h, 'R1')
@@ -88,7 +105,7 @@ const projectJson = () => JSON.parse(fs.readFileSync(path.join(fx.alpha, '.combw
     check('a card is approved (start, submit, review, pass)', Object.values(red.steps).every((s) => s.status === 200), JSON.stringify(red.steps))
     const failure = await until(async () => (await h.facts(red.n)).find((f) => f.kind === 'IntegrationFailed') ?? null, HUNG_MS)
     const hits = failure?.data?.guards?.hits ?? []
-    check('it comes back as the check "merge guards", the guard, file and line named (*.md skipped)', failure?.data?.reason === 'checks' && failure.data.check === 'merge guards' && hits.length === 1 && hits[0].guard === 'No secrets' && hits[0].file === 'src.txt' && hits[0].line === 2, JSON.stringify(failure?.data))
+    check('it comes back as the check "merge guards", the guard, file and line named (*.{md,markdown} skipped)', failure?.data?.reason === 'checks' && failure.data.check === 'merge guards' && hits.length === 1 && hits[0].guard === 'No secrets' && hits[0].file === 'src.txt' && hits[0].line === 2, JSON.stringify(failure?.data))
     check('…back to its builder', !!(await until(async () => (await column(red.n)) === 'doing', HUNG_MS)), String(await column(red.n)))
     const before = q.head(fx)
     check('…the target unmoved', before === lib.git(fx.alpha, ['rev-parse', 'main']).trim())
@@ -101,7 +118,7 @@ const projectJson = () => JSON.parse(fs.readFileSync(path.join(fx.alpha, '.combw
     await until(async () => (await cardDialog.count()) === 1, HUNG_MS)
     const said = await until(async () => {
       const t = await text(cardDialog)
-      return /merge guard “No secrets” matched a line it adds, first in src\.txt:2\. Take the secret out\./.test(t) ? t : null
+      return /a merge guard matched lines it adds\. “No secrets” matched 1 line, first in src\.txt:2: Take the secret out\./.test(t) ? t : null
     }, HUNG_MS)
     check('the card says which guard, where, and its message', !!said, comment ? JSON.stringify(comment.data) : await text(cardDialog))
     const said2 = cardDialog.locator('.task-comment').filter({ hasText: 'No secrets' }).last()

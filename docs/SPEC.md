@@ -7576,8 +7576,8 @@ unsigned commit; every failure stays one, with git's own nonzero exit.
 
 #### 16.9.6 Merge guards <a id="spec-merge-guards"></a>
 
-**Built [HI-3284]** (design HI-3284/s16, HR2's OK; Darren, 15 Nov: "an option under version control where you can add
-regular expressions as guards for merge"). A project's **Merge guards** (G22, Version Control → Workflow, Combwork,
+**Built [HI-3284]** (design HI-3284/s16, HR2's OK: regular expressions as guards for merge, under Version Control). A
+project's **Merge guards** (G22, Version Control → Workflow, Combwork,
 workspace and project levels, none by default) are patterns a merge may not add.
 
 - **A guard:** a name, a JavaScript regular expression (compiled with `u`; *Ignore case* adds `i`), the paths it applies
@@ -7588,7 +7588,7 @@ workspace and project levels, none by default) are patterns a merge may not add.
   or a glob it can't use (`[ ]`, `\`, a leading `/`, `..`, an empty segment, nested or unbalanced braces), each by a
   sentence naming the guard, without running a pattern on main's thread; and a pattern that matches an empty line (it
   would refuse every line), checked in the guards' worker before the save takes its locks (1 s).
-- **What it checks: only the text lines the merge adds** (Darren's rule of 6 Nov: "no new X" guards check the change;
+- **What it checks: only the text lines the merge adds** (HI-2617's rule: "no new X" guards check the change;
   sweeps clean what already exists): the diff from the target's head the merge was made on to the merged result (jj: to the
   candidate), renames found (a pure rename adds nothing), never a path, never a binary file, never what the target already
   has. The diff is read through the platform (Git: `git diff -U0 -M` with the user's diff configuration pinned off: no
@@ -7610,25 +7610,30 @@ workspace and project levels, none by default) are patterns a merge may not add.
 - **Authority:** a result counts only for the merged result or candidate it checked, its base, and the guards it was
   checked with (their key: the list as it applies, in order). The queue reads the guards again just before the advance and
   in the advance's own write: changed since (while queued, while the check ran, or before an approved advance after a
-  restart), the entry is tested again, never advanced on the old green. jj's checks key takes the guards' key, so a change
+  restart), the entry is tested again, never advanced on the old green; and a red result is acted on only under the guards
+  it was checked with, read again in the return's own write: changed meanwhile, the entry is tested again under the guards
+  now, never returned for a guard removed or relaxed. A check's worker ends with the queue's (a lease lost, Combwork
+  closing). The queue keeps a result's key only while its entry is open. jj's checks key takes the guards' key, so a change
   makes the candidate's checks, and the consent bound to that key, stale: they run again before anything is offered or
   integrated.
 - **At submit:** `cw_submit` matches what the revision adds since its base and, on a match, adds a warning to its reply.
   A warning only: it records nothing and authorises nothing; the merge's check, on the merged result, decides.
-- **The example guard** (Darren's decision, 15 Nov): with Settings → General → Your name set, the editor offers **Add
+- **The example guard** (HI-3284's decision): with Settings → General → Your name set, the editor offers **Add
   "Keep My Name Out of the Code"**: one guard filled in once (no link to the setting), the name as a whole word,
   case-sensitive (escaped, its spaces any whitespace, between Unicode letter, number and underscore boundaries), skipping
   `LICENSE*`, `package.json`, `electron-builder.yml` and `CODE_OF_CONDUCT*`, with the message "Your name is in this change.
   Cite the card or decision instead, or skip this file if a name belongs here." No guard ships active.
-- **What it already matches** (Darren's decision, 15 Nov: "show how many lines it currently matches and where. Some
-  onus should be on the user to write good guards"): in a project's form, each guard a save would take shows, a moment
-  after it is typed, how many lines of the project it already matches and the first five (file and line), read in the
+- **What it already matches** (HI-3284's decision: the onus is on the user to write good guards, so show how many lines a
+  guard already matches and where): in a project's form, each guard whose pattern and paths a save would take shows, a
+  moment after it is typed, how many lines of the project it already matches and the first five (file and line), read in the
   guards' worker: the files the version control has (Git: tracked, and new ones not ignored; otherwise a walk of the
   folder leaving out dot folders, `node_modules` and the excluded folders), binary files and files over 2 MB left out, at
-  most 50,000 files, 64 MB and 10 s (past them it says it couldn't look). It still saves whatever it matches: guards check
+  most 50,000 files, 64 MB and 10 s (past them it says it couldn't look). At most two previews read at once, in
+  Combwork; a newer one for the same guard row, or the row closing, cancels the one before (its worker ended, or never
+  started). It still saves whatever it matches: guards check
   only the lines a merge adds. No list of common words: the user decides.
 - **Not secret scanning:** a guard catches what it names, in the lines a merge adds; the option's help says so.
-- **Existing "no new X" checks** (for reference; Darren, 15 Nov: nothing configured or migrated by this card, and
+- **Existing "no new X" checks** (for reference; HI-3284's decision: nothing configured or migrated by this card, and
   `tests/oldNames.mjs --diff` stays in `check:repo`): this repository's old-name check needs more than a pattern (letter
   case decides its ordinary words, marker regions, a per-line marker, exact-string allowances, stale entries); mcp's
   `test/names.test.js` is one (the old name not after `arc`, ignoring case, skipping `.gitignore`, the app's two folders of

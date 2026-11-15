@@ -190,6 +190,7 @@
   "workflow.mergeGuards.problem.tooLong": "{field, select, name {O nome} pattern {O padrão} other {A mensagem}} do filtro de merge {n, number} tem mais de {max, number} caracteres.",
   "workflow.mergeGuards.problem.tooMany": "Há mais de {max, number} filtros de merge.",
   "workflow.mergeGuards.problem.tooManyGlobs": "O filtro de merge {n, number} tem mais de {max, number} caminhos em uma lista.",
+  "workflow.mergeGuards.problem.unchecked": "O padrão do filtro de merge {n, number} não pôde ser verificado: o Combwork não conseguiu iniciar a verificação.",
   "workflow.mergeGuards.remove": "Remover",
   "workflow.mergeGuards.skip": "Ignorar estes caminhos (ex.: LICENSE, docs/**)",
   "workflow.mergeGuards.up": "Mover para cima",

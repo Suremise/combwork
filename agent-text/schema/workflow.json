@@ -325,6 +325,11 @@
       "max": "number"
     }
   },
+  "workflow.mergeGuards.problem.unchecked": {
+    "placeholders": {
+      "n": "number"
+    }
+  },
   "workflow.move.answer": {
     "placeholders": {}
   },

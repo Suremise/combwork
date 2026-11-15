@@ -11,9 +11,13 @@
     "text": "merge guard \"{guard}\" matches {count, plural, one {a line} other {# lines}} it adds",
     "note": "HI-3284: what came back from a merge (the failure, after \"came back:\"): a merge guard (a pattern the project refuses in the lines a merge adds) matched. {guard}: its name. {count}: lines matched."
   },
+  "mergeGuards.matchedBy": {
+    "text": "\"{guard}\" {count, plural, one {# line} other {# lines}}",
+    "note": "HI-3284: one of several matching merge guards, in mergeGuards.matchedMany: its name and how many lines it matched."
+  },
   "mergeGuards.matchedMany": {
-    "text": "merge guards {guards} match {count, plural, one {a line} other {# lines}} it adds",
-    "note": "HI-3284: as mergeGuards.matched, several guards. {guards}: their names, quoted and comma-joined. {count}: lines matched."
+    "text": "merge guards match lines it adds: {guards}",
+    "note": "HI-3284: as mergeGuards.matched, several guards. {guards}: each guard and how many lines it matched (mergeGuards.matchedBy), comma-joined."
   },
   "mergeGuards.more": {
     "text": "and {count, plural, one {# more line} other {# more lines}}",

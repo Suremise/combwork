@@ -190,6 +190,7 @@
   "workflow.mergeGuards.problem.tooLong": "合并守卫 {n, number} 的{field, select, name {名称} pattern {模式} other {消息}}超过 {max, number} 个字符。",
   "workflow.mergeGuards.problem.tooMany": "合并守卫超过 {max, number} 个。",
   "workflow.mergeGuards.problem.tooManyGlobs": "合并守卫 {n, number} 的一个列表中有超过 {max, number} 个路径。",
+  "workflow.mergeGuards.problem.unchecked": "无法检查合并守卫 {n, number} 的模式：Combwork 无法启动检查。",
   "workflow.mergeGuards.remove": "删除",
   "workflow.mergeGuards.skip": "跳过这些路径（例如 LICENSE, docs/**）",
   "workflow.mergeGuards.up": "上移",

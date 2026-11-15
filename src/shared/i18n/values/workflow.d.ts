@@ -196,6 +196,7 @@ interface CombworkMessageValues {
   'workflow.mergeGuards.problem.tooLong': { field: string; n: number; max: number }
   'workflow.mergeGuards.problem.tooMany': { max: number }
   'workflow.mergeGuards.problem.tooManyGlobs': { n: number; max: number }
+  'workflow.mergeGuards.problem.unchecked': { n: number }
   'workflow.mergeGuards.remove': undefined
   'workflow.mergeGuards.skip': undefined
   'workflow.mergeGuards.up': undefined

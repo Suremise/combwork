@@ -190,6 +190,7 @@
   "workflow.mergeGuards.problem.tooLong": "{field, select, name {El nombre} pattern {El patrón} other {El mensaje}} del filtro de fusión {n, number} tiene más de {max, number} caracteres.",
   "workflow.mergeGuards.problem.tooMany": "Hay más de {max, number} filtros de fusión.",
   "workflow.mergeGuards.problem.tooManyGlobs": "El filtro de fusión {n, number} tiene más de {max, number} rutas en una lista.",
+  "workflow.mergeGuards.problem.unchecked": "El patrón del filtro de fusión {n, number} no se pudo comprobar: Combwork no pudo iniciar la comprobación.",
   "workflow.mergeGuards.remove": "Quitar",
   "workflow.mergeGuards.skip": "Omitir estas rutas (p. ej., LICENSE, docs/**)",
   "workflow.mergeGuards.up": "Subir",

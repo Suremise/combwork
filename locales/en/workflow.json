@@ -677,7 +677,7 @@
   },
   "workflow.mergeGuards.addName": {
     "defaultMessage": "Add “Keep My Name Out of the Code”",
-    "description": "A button under the merge guards (HI-3284, Darren’s decision): adds a ready-made guard refusing the user’s own name (Settings → General → Your name) in what a merge adds. The quoted part is the guard’s name, as workflow.mergeGuards.nameGuard."
+    "description": "A button under the merge guards (HI-3284’s decision): adds a ready-made guard refusing the user’s own name (Settings → General → Your name) in what a merge adds. The quoted part is the guard’s name, as workflow.mergeGuards.nameGuard."
   },
   "workflow.mergeGuards.checking": {
     "defaultMessage": "Looking for what it already matches in the project…",
@@ -725,7 +725,7 @@
   },
   "workflow.mergeGuards.nameMessage": {
     "defaultMessage": "Your name is in this change. Cite the card or decision instead, or skip this file if a name belongs here.",
-    "description": "The message the ready-made merge guard is given (HI-3284, Darren’s wording): what the builder is told when the user’s name is in what a merge adds. Card: a task on Combwork’s board. The user can edit it."
+    "description": "The message the ready-made merge guard is given (HI-3284’s wording): what the builder is told when the user’s name is in what a merge adds. Card: a task on Combwork’s board. The user can edit it."
   },
   "workflow.mergeGuards.none": {
     "defaultMessage": "No merge guards.",
@@ -778,6 +778,10 @@
   "workflow.mergeGuards.problem.tooManyGlobs": {
     "defaultMessage": "Merge guard {n, number} has more than {max, number} paths in one list.",
     "description": "Why workflow options cannot be saved (HI-3284): a merge guard lists too many paths it applies to or skips. {n} is its position, from 1; {max} the most."
+  },
+  "workflow.mergeGuards.problem.unchecked": {
+    "defaultMessage": "The pattern of merge guard {n, number} couldn’t be checked: Combwork couldn’t start the check.",
+    "description": "Why workflow options cannot be saved (HI-3284): the thread that checks merge guards’ patterns could not be started, so the pattern could not be checked. {n} is its position, from 1."
   },
   "workflow.mergeGuards.remove": {
     "defaultMessage": "Remove",

@@ -190,6 +190,7 @@
   "workflow.mergeGuards.problem.tooLong": "{field, select, name {Der Name} pattern {Das Muster} other {Die Nachricht}} von Merge-Sperre {n, number} ist länger als {max, number} Zeichen.",
   "workflow.mergeGuards.problem.tooMany": "Es gibt mehr als {max, number} Merge-Sperren.",
   "workflow.mergeGuards.problem.tooManyGlobs": "Merge-Sperre {n, number} hat mehr als {max, number} Pfade in einer Liste.",
+  "workflow.mergeGuards.problem.unchecked": "Das Muster von Merge-Sperre {n, number} konnte nicht geprüft werden: Combwork konnte die Prüfung nicht starten.",
   "workflow.mergeGuards.remove": "Entfernen",
   "workflow.mergeGuards.skip": "Diese Pfade auslassen (z. B. LICENSE, docs/**)",
   "workflow.mergeGuards.up": "Nach oben",

@@ -32,6 +32,7 @@ import type { WorkflowOptions } from '../src/shared/workflow/options'
 import { APPLY_OPTIONS } from '../src/shared/workflow/workView'
 import { jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
+import { withGuardsWorker } from './guardsWorker'
 import { B1, R1, moved } from './workflow/harness'
 import { opts, started, world, type World } from './jjCardsWorld'
 
@@ -737,6 +738,8 @@ describe.skipIf(!jjExe)(`merge checks on a jj card's candidate (jj ${TESTED_JJ.v
 // diagnostics); none passes and is offered; a guard changed after it passed makes its key, and the offer's consent
 // bound to it, stale: the checks run again under the new guards before anything is offered.
 describe.skipIf(!jjExe)(`merge guards on a jj card's candidate (jj ${TESTED_JJ.version}), HI-3284`, { timeout: REAL_JJ_MS }, () => {
+  // A user's pattern runs only in the guards' worker: the real one, built for these tests.
+  withGuardsWorker()
   const refusing = { name: 'No work', pattern: '^work$', message: 'Name it something else.' }
   const passing = { name: 'Nothing', pattern: 'zzz-never', message: 'n/a' }
 

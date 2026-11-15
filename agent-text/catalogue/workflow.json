@@ -287,6 +287,11 @@
     "note": "Why workflow options cannot be saved (HI-3284): a merge guard lists too many paths it applies to or skips. {n} is its position, from 1; {max} the most.",
     "audience": "both"
   },
+  "workflow.mergeGuards.problem.unchecked": {
+    "text": "The pattern of merge guard {n, number} couldn’t be checked: Combwork couldn’t start the check.",
+    "note": "Why workflow options cannot be saved (HI-3284): the thread that checks merge guards’ patterns could not be started, so the pattern could not be checked. {n} is its position, from 1.",
+    "audience": "both"
+  },
   "workflow.move.answer": {
     "text": "Answer",
     "note": "A move on a card, named in a refused move: the user's answer to a For you request (Approve, Decline, a reply).",

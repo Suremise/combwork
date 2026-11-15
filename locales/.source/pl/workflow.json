@@ -194,6 +194,7 @@
   "workflow.mergeGuards.problem.tooLong": "The {field, select, name {name} pattern {pattern} other {message}} of merge guard {n, number} is longer than {max, number} characters.",
   "workflow.mergeGuards.problem.tooMany": "There are more than {max, number} merge guards.",
   "workflow.mergeGuards.problem.tooManyGlobs": "Merge guard {n, number} has more than {max, number} paths in one list.",
+  "workflow.mergeGuards.problem.unchecked": "The pattern of merge guard {n, number} couldn’t be checked: Combwork couldn’t start the check.",
   "workflow.mergeGuards.remove": "Remove",
   "workflow.mergeGuards.skip": "Skip these paths (e.g. LICENSE, docs/**)",
   "workflow.mergeGuards.up": "Move up",

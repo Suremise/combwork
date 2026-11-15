@@ -190,6 +190,7 @@
   "workflow.mergeGuards.problem.tooLong": "{field, select, name {Nazwa} pattern {Wzorzec} other {Komunikat}} filtra scalania {n, number} przekracza limit znaków ({max, number}).",
   "workflow.mergeGuards.problem.tooMany": "Filtrów scalania jest za dużo (najwyżej {max, number}).",
   "workflow.mergeGuards.problem.tooManyGlobs": "Filtr scalania {n, number} ma za dużo ścieżek na jednej liście (najwyżej {max, number}).",
+  "workflow.mergeGuards.problem.unchecked": "Nie udało się sprawdzić wzorca filtra scalania {n, number}: Combwork nie mógł uruchomić sprawdzania.",
   "workflow.mergeGuards.remove": "Usuń",
   "workflow.mergeGuards.skip": "Pomiń te ścieżki (np. LICENSE, docs/**)",
   "workflow.mergeGuards.up": "Przenieś w górę",

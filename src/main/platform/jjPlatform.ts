@@ -1414,7 +1414,8 @@ export class JjPlatform implements PlatformAdapter {
           bracket: (folder, revision) => this.copyBracket(folder, revision),
           valid,
           // HI-3284: the guards this run checks are those its key was made with (a change since makes it invalid).
-          ...(guards.length ? { guards: async (expected: string, result: string) => ({ ...(await checkMergeGuards(guards, () => this.addedDiff(expected, result), host.guardLimits?.() ?? { timeoutMs: 10_000, maxLines: 200_000 })), key: guardsKey(guards) }) } : {}),
+          // HI-3284 (HR2's round 1, finding 3): its worker ends with the workspace (the checks' signal).
+          ...(guards.length ? { guards: async (expected: string, result: string) => ({ ...(await checkMergeGuards(guards, () => this.addedDiff(expected, result), { ...(host.guardLimits?.() ?? { timeoutMs: 10_000, maxLines: 200_000 }), ...(host.signal ? { signal: host.signal } : {}) })), key: guardsKey(guards) }) } : {}),
           checkRan: async (c) => {
             const data: FactData['CheckRan'] = { name: c.name, command: c.command, revision: c.revision, tested: c.tested, result: c.ok ? 'passed' : 'failed', run: c.run || randomUUID(), durationMs: c.durationMs, by: CW_RUNS, counted: c.counted, ...(c.whyNot ? { whyNot: c.whyNot } : {}), entry: jjCandidateEntry(offer.attempt), ...(c.guardsKey !== undefined ? { guardsKey: c.guardsKey, base: c.base } : {}) }
             await wf.write(wf.store.card(card0.id), null, 'combwork', (w) => void w.fact('CheckRan', data))

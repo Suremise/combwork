@@ -17,10 +17,15 @@
       "count": "plural"
     }
   },
+  "mergeGuards.matchedBy": {
+    "placeholders": {
+      "guard": "plain",
+      "count": "plural"
+    }
+  },
   "mergeGuards.matchedMany": {
     "placeholders": {
-      "guards": "plain",
-      "count": "plural"
+      "guards": "plain"
     }
   },
   "mergeGuards.more": {

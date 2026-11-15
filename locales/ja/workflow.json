@@ -190,6 +190,7 @@
   "workflow.mergeGuards.problem.tooLong": "マージガード{n, number}の{field, select, name {名前} pattern {パターン} other {メッセージ}}が{max, number}文字を超えています。",
   "workflow.mergeGuards.problem.tooMany": "マージガードが{max, number}個を超えています。",
   "workflow.mergeGuards.problem.tooManyGlobs": "マージガード{n, number}の1つのリストに{max, number}個を超えるパスがあります。",
+  "workflow.mergeGuards.problem.unchecked": "マージガード{n, number}のパターンをチェックできませんでした：Combworkがチェックを開始できませんでした。",
   "workflow.mergeGuards.remove": "削除",
   "workflow.mergeGuards.skip": "これらのパスをスキップ（例：LICENSE, docs/**）",
   "workflow.mergeGuards.up": "上へ移動",

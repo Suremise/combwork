@@ -738,7 +738,25 @@
   },
   "tasks.history.queueGuarded": {
     "placeholders": {
-      "state": "select",
+      "count": "plural",
+      "guards": "plain",
+      "others": "plural"
+    }
+  },
+  "tasks.history.queueGuardedIncomplete": {
+    "placeholders": {
+      "why": "select",
+      "guard": "plain"
+    }
+  },
+  "tasks.history.queueGuardedJoin": {
+    "placeholders": {
+      "first": "plain",
+      "rest": "plain"
+    }
+  },
+  "tasks.history.queueGuardedOne": {
+    "placeholders": {
       "guard": "plain",
       "count": "plural",
       "where": "plain",

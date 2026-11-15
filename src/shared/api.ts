@@ -403,7 +403,9 @@ export interface CombworkRequests {
   /** The project's workflow options as Project Settings → Workflow shows them (#1278): its own, what they inherit, the presets. */
   'workflow:form': (projectPath: string) => WorkflowForm
   /** HI-3284: what a merge guard being edited already matches in the project (how many lines, the first few). */
-  'workflow:guardPreview': (projectPath: string, guard: MergeGuard) => GuardPreview
+  'workflow:guardPreview': (projectPath: string, guard: MergeGuard, slot?: string) => GuardPreview
+  /** HI-3284: a guard row closed or changed: its preview (by the slot it asked with) cancelled. */
+  'workflow:guardPreviewCancel': (slot: string) => void
   /** What saving a change to the project's workflow options would do (§16.6.5's warning): its problems, what changes, what keeps the old rules. */
   'workflow:check': (projectPath: string, change: WorkflowChange) => WorkflowCheck
   /** Saves the project's workflow options, checked again (refused, with every reason); `applyTo`: cards in flight to work under them from now (OP-38). */

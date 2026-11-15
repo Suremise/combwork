@@ -745,8 +745,23 @@
     "audience": "both"
   },
   "tasks.history.queueGuarded": {
-    "text": "{state, select, matched {Came back from the merge queue: the merge guard “{guard}” matched {count, plural, one {a line} other {# lines}} it adds, first in {where}. {message}} other {Came back from the merge queue: the merge guards couldn’t finish checking the lines it adds, so it wasn’t merged.}} The card’s Work section shows the run.",
-    "note": "A comment Combwork writes on a card when the merge queue sends it back because of a merge guard (HI-3284: a pattern the project refuses in the lines a merge adds). {state} (select: translate each; keep the keys): matched, the guard {guard} (its name, the user’s own text) matched {count} lines, the first in {where} (a file path and line number, such as src/a.ts:12: keep it); {message} is that guard’s message, the user’s own words on what to do instead (it may be in any language: insert it as it is); or the check could not finish (too much to check, or its time limit), which never lets a merge through. \"Merge queue\" and \"Work section\" are Combwork’s terms.",
+    "text": "Came back from the merge queue: {count, plural, one {a merge guard matched lines it adds} other {# merge guards matched lines it adds}}. {guards}{others, plural, =0 {} one { One more guard matched too.} other { # more guards matched too.}} The card’s Work section shows the run.",
+    "note": "A comment Combwork writes on a card when the merge queue sends it back because merge guards matched (HI-3284: patterns the project refuses in the lines a merge adds). {count}: how many guards matched; {guards}: the first of them, each as tasks.history.queueGuardedOne, joined by tasks.history.queueGuardedJoin (already translated); {others}: how many more matched, not listed. \"Merge queue\" and \"Work section\" are Combwork’s terms.",
+    "audience": "both"
+  },
+  "tasks.history.queueGuardedIncomplete": {
+    "text": "Came back from the merge queue: the merge guards couldn’t finish checking the lines it adds ({why, select, timedOut {guard “{guard}” ran past its time limit} tooLarge {the merge adds more than they check} unreadable {its changes couldn’t be read} malformed {its changes couldn’t be followed} matchesEmpty {guard “{guard}” matches an empty line} invalid {guard “{guard}” has an invalid pattern} cancelled {the check was stopped} other {their check ended}}), so it wasn’t merged. The card’s Work section shows the run.",
+    "note": "A comment Combwork writes on a card when the merge queue sends it back because its merge guards check could not finish (HI-3284), which never lets a merge through. {why} (select: translate each; keep the keys): a guard (its name, {guard}, the user’s own text) ran past the time limit; the merge adds more text or lines than the limits; the changes could not be read or parsed; a guard’s pattern matches the empty string or does not compile; the check was stopped; another failure. \"Merge queue\" and \"Work section\" are Combwork’s terms.",
+    "audience": "both"
+  },
+  "tasks.history.queueGuardedJoin": {
+    "text": "{first} {rest}",
+    "note": "Two matching merge guards’ parts of a returned card’s comment, one after the other (HI-3284, tasks.history.queueGuardedOne each): keep both, separated as your language separates two sentences.",
+    "audience": "both"
+  },
+  "tasks.history.queueGuardedOne": {
+    "text": "“{guard}” matched {count, plural, one {# line} other {# lines}}, first in {where}: {message}",
+    "note": "One matching merge guard in a returned card’s comment (HI-3284, inside tasks.history.queueGuarded): {guard} is its name and {message} its message, the user’s own words on what to do instead (any language: insert them as they are); {count}: the lines it matched; {where}: the first, a file path and line number such as src/a.ts:12 (keep it).",
     "audience": "both"
   },
   "tasks.history.queueReturned": {

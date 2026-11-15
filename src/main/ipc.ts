@@ -166,6 +166,7 @@ import { withSkillDelivered } from '../shared/skillDelivery'
 import { pauseApp, resumeApp } from './teamPause'
 import { endParkedProcess, installIfParked, teamPauseState } from './teamParked'
 import { cliSnapshotForWindow, openClisFolder, reloadClis } from './clis'
+import { cancelPreview } from './workflow/mergeGuardsRun'
 
 /**
  * What the window is told when a call is refused (#845): thrown as CombworkErrors, so the window reads them in its language
@@ -1044,7 +1045,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
     'workflow:form': (p) => workflowForm(workspace, workspace.assertProject(p)),
     'workflow:check': (p, change) => checkWorkflowChange(workspace, workspace.assertProject(p), change),
-    'workflow:guardPreview': (p, guard) => guardPreview(workspace, workspace.assertProject(p), guard),
+    'workflow:guardPreview': (p, guard, slot) => guardPreview(workspace, workspace.assertProject(p), guard, slot),
+    'workflow:guardPreviewCancel': (slot) => void (typeof slot === 'string' && cancelPreview(slot)),
     'workflow:retarget': (p, preview) => retargetApply(currentWorkspace(), workspace.assertProject(p), retargetArg(preview), { kind: 'user' }),
     'workflow:nextVersionPlan': (p) => nextVersionPlan(workspace, workspace.assertProject(p)),
     'workflow:nextVersionPreview': (p, from, to) => previewFor(workspace, workspace.assertProject(p), String(from ?? ''), String(to ?? '')),

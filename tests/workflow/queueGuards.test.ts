@@ -7,6 +7,10 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { commit, GIT_HEAVY_MS, moved, R1, B1, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { MERGE_GUARDS_CHECK, type MergeGuard } from '../../src/shared/workflow/mergeGuards'
+import { withGuardsWorker } from '../guardsWorker'
+
+// A user's pattern runs only in the guards' worker, never on main's thread: the real one, built for these tests.
+withGuardsWorker()
 
 let env: Env | null = null
 afterEach(() => {
@@ -108,6 +112,41 @@ describe('merge guards in the merge queue', () => {
     const [o] = await q.drain('main')
     expect(o).toMatchObject({ outcome: 'integrated', retests: 1 })
     expect(e.wf.state(card).checks.filter((c) => c.name === MERGE_GUARDS_CHECK).map((c) => c.result)).toEqual(['passed', 'passed'])
+  })
+
+  it('guards relaxed while the check runs: its red is for the old guards, so it is checked again, and merges (HR2’s round 1, finding 4)', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = team([secrets])
+    const card = await queued(e, { 'src/c.txt': 'my secret\n' })
+    let changed = false
+    const q = e.queue({
+      guardLimits: () => {
+        if (!changed) {
+          changed = true
+          e.options.mergeGuards = [{ name: 'Nothing', pattern: 'zzz-never', message: 'n/a' }]
+        }
+        return { timeoutMs: 30_000, maxLines: 200_000 }
+      }
+    })
+    const [o] = await q.drain('main')
+    expect(o).toMatchObject({ outcome: 'integrated' })
+    expect(e.wf.state(card).checks.filter((c) => c.name === MERGE_GUARDS_CHECK).map((c) => c.result)).toEqual(['failed', 'passed'])
+    expect(e.wf.state(card).entries.at(-1)?.failure).toBeUndefined()
+  })
+
+  it('keeps no entry’s guard result once its attempt ends: merged or returned (HR2’s round 1, finding 6)', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = team([secrets])
+    const q = e.queue()
+    const runs = (): number => (q as unknown as { guardedRuns: Map<string, unknown> }).guardedRuns.size
+    await queued(e, { 'src/a.txt': 'fine\n' })
+    expect((await q.drain('main'))[0]).toMatchObject({ outcome: 'integrated' })
+    expect(runs()).toBe(0)
+    await queued(e, { 'src/b.txt': 'my secret\n' })
+    expect((await q.drain('main'))[0]).toMatchObject({ outcome: 'returned' })
+    expect(runs()).toBe(0)
+    e.options.mergeGuards = []
+    await queued(e, { 'src/c.txt': 'fine\n' })
+    expect((await q.drain('main'))[0]).toMatchObject({ outcome: 'integrated' })
+    expect(runs()).toBe(0)
   })
 
   it('guards changed while the check runs: its green is for the old guards, so it is checked again under the new', { timeout: GIT_HEAVY_MS }, async () => {

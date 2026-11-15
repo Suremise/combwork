@@ -13,7 +13,7 @@ import { HISTORY, storedText } from '../../shared/taskHistory'
 import type { StoredText } from '../../shared/types'
 import { agentMsg, say } from '../../shared/agentText'
 import { inDefaultDialect } from '../../shared/agentText/asyncScope'
-import { guardFailureText } from '../../shared/workflow/mergeGuards'
+import { guardFailureText, type GuardReport } from '../../shared/workflow/mergeGuards'
 
 /** What agents are told of a card and the merge queue (dialects, HI-2435): card reads, a lane's next, wakes, the queue's comment. */
 const Q = {
@@ -532,12 +532,25 @@ export function returnedComment(key: string, f: FactData['IntegrationFailed'], f
   const agent = { render: RETURNED_COMMENT, data: { key, failure: kept, ...(forward ? { forward: { from: forward.from, to: forward.to, ...(forward.resolution ? { resolution: forward.resolution } : {}), ...(forward.source ? { source: forward.source } : {}) } } : {}) } }
   // HI-3284: a merge guard's return in the window: which guard, where, and its message (the user's own words).
   const g = f.guards
-  if (g) {
-    const first = g.hits[0]
-    const shown = storedText(HISTORY.queueGuarded, { state: g.incomplete ? 'incomplete' : 'matched', guard: first?.guard ?? '', count: g.hits.length + g.more, where: first ? `${first.file}:${first.line}` : '', message: g.messages.find((m) => m.guard === first?.guard)?.message ?? '' })
-    return { text: inDefaultDialect(() => returnedCommentFrom(agent.data)!), shown: { ...shown, agent } }
-  }
+  if (g) return { text: inDefaultDialect(() => returnedCommentFrom(agent.data)!), shown: { ...guardedShown(g), agent } }
   return { text: inDefaultDialect(() => returnedCommentFrom(agent.data)!), shown: { ...storedText(HISTORY.queueReturned, { reason, target: f.target, check: f.check ?? '', files }), agent } }
+}
+
+/** How many matching merge guards a returned card's comment names (the rest counted). */
+const GUARDS_NAMED = 3
+
+/**
+ * HI-3284 (HR2's round 1, finding 5): a merge guard's return in the window: each matching guard (up to GUARDS_NAMED) with
+ * its own count, first place and message, the rest counted; or why the check couldn't finish.
+ */
+export function guardedShown(g: GuardReport): StoredText {
+  if (g.incomplete) {
+    const [why, guard = ''] = g.incomplete.split(':')
+    return { id: HISTORY.queueGuardedIncomplete.id, values: { why, guard } }
+  }
+  const blocks: StoredText[] = g.messages.slice(0, GUARDS_NAMED).map((m) => ({ id: HISTORY.queueGuardedOne.id, values: { guard: m.guard, count: m.count, where: `${m.file}:${m.line}`, message: m.message } }))
+  const guards = blocks.reduceRight<StoredText | null>((rest, first) => (rest ? { id: HISTORY.queueGuardedJoin.id, values: { first, rest } } : first), null)
+  return { id: HISTORY.queueGuarded.id, values: { count: g.messages.length, guards: guards ?? '', others: Math.max(0, g.messages.length - GUARDS_NAMED) } }
 }
 
 /** The return comment's renderer, by the name its stored data keeps (HI-2440). */

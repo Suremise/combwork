@@ -1,7 +1,7 @@
 // Merge guards (HI-3284, design HI-3284/s16, HR2's OK): patterns a project's merge refuses in the lines it adds. Each
 // guard is a regular expression (with a case flag), the paths it applies to and skips (globs), and a message saying what
-// to do instead. Only added text lines are matched, never paths and never what the target already has (Darren's rule of
-// 6 Nov: "no new X" guards check the change; sweeps clean what exists). Not a rule (left out of every ruleset): the merge
+// to do instead. Only added text lines are matched, never paths and never what the target already has (HI-2617's
+// rule: "no new X" guards check the change; sweeps clean what exists). Not a rule (left out of every ruleset): the merge
 // queue and jj's candidate checks read the guards as the options are when they check, and a result counts only for the
 // guards it was checked with (`guardsKey`).
 //
@@ -52,7 +52,7 @@ export const GUARD_EXCERPT = 160
 export interface GuardProblem {
   guard: number
   field: 'list' | 'name' | 'pattern' | 'message' | 'paths' | 'skip'
-  why: 'notList' | 'tooMany' | 'notGuard' | 'empty' | 'tooLong' | 'invalid' | 'glob' | 'tooManyGlobs' | 'matchesEmpty' | 'timedOut' // i18n-ignore: a problem's code (GUARD_PROBLEMS has its message)
+  why: 'notList' | 'tooMany' | 'notGuard' | 'empty' | 'tooLong' | 'invalid' | 'glob' | 'tooManyGlobs' | 'matchesEmpty' | 'timedOut' | 'unchecked' // i18n-ignore: a problem's code (GUARD_PROBLEMS has its message)
   /** The engine's message for an invalid pattern, or the glob refused. */
   detail?: string
 }
@@ -152,6 +152,26 @@ export function globRegExp(glob: string): RegExp {
   return new RegExp(`${anchored ? '^' : '(?:^|/)'}${body}(?:/.*)?$`, 'i')
 }
 
+/**
+ * Globs typed in one field, separated by commas, as a list: only a comma outside braces separates (`src/*.{ts,tsx}` stays
+ * one glob, HR2's round 1), each trimmed, empty ones dropped.
+ */
+export function splitGlobs(text: string): string[] {
+  const out: string[] = []
+  let depth = 0
+  let cur = ''
+  for (const c of text) {
+    if (c === '{') depth++
+    else if (c === '}' && depth > 0) depth--
+    if (c === ',' && depth === 0) {
+      out.push(cur)
+      cur = ''
+    } else cur += c
+  }
+  out.push(cur)
+  return out.map((x) => x.trim()).filter(Boolean)
+}
+
 /** Whether a guard applies to a path (`/` between folders): one of its paths (or none given), and none of its skips. */
 export function guardApplies(g: Pick<MergeGuard, 'paths' | 'skip'>, path: string): boolean {
   const p = path.replace(/\\/g, '/')
@@ -225,6 +245,7 @@ export const GUARD_PROBLEMS = {
   glob: msg({ id: 'workflow.mergeGuards.problem.glob', defaultMessage: 'Merge guard {n, number} has a path it can’t use: “{detail}”. Paths take *, **, ? and {braces} only, with / between folders, and no leading /, .. or [ ].', description: 'Why workflow options cannot be saved (HI-3284): a merge guard’s path (a glob, such as docs/** or *.md) uses something unsupported. {n} is its position, from 1; {detail} is the path as written. {braces} stands for the text "{a,b}": keep it as it is.' }),
   tooManyGlobs: msg({ id: 'workflow.mergeGuards.problem.tooManyGlobs', defaultMessage: 'Merge guard {n, number} has more than {max, number} paths in one list.', description: 'Why workflow options cannot be saved (HI-3284): a merge guard lists too many paths it applies to or skips. {n} is its position, from 1; {max} the most.' }),
   matchesEmpty: msg({ id: 'workflow.mergeGuards.problem.matchesEmpty', defaultMessage: 'The pattern of merge guard {n, number} matches an empty line, so it would refuse every line.', description: 'Why workflow options cannot be saved (HI-3284): a merge guard’s pattern matches the empty string. {n} is its position, from 1.' }),
+  unchecked: msg({ id: 'workflow.mergeGuards.problem.unchecked', defaultMessage: 'The pattern of merge guard {n, number} couldn’t be checked: Combwork couldn’t start the check.', description: 'Why workflow options cannot be saved (HI-3284): the thread that checks merge guards’ patterns could not be started, so the pattern could not be checked. {n} is its position, from 1.' }),
   timedOut: msg({ id: 'workflow.mergeGuards.problem.timedOut', defaultMessage: 'The pattern of merge guard {n, number} took too long to check.', description: 'Why workflow options cannot be saved (HI-3284): checking a merge guard’s pattern ran past its time limit (a pattern that backtracks a lot). {n} is its position, from 1.' })
 } satisfies Record<GuardProblem['why'], Msg>
 
@@ -365,7 +386,8 @@ export interface GuardHit {
 export interface GuardReport {
   hits: GuardHit[]
   more: number
-  messages: { guard: string; message: string }[]
+  /** Each guard that matched, in the guards' order: its message, how many lines it matched, and where it first did. */
+  messages: { guard: string; message: string; count: number; file: string; line: number }[]
   incomplete?: string
 }
 
@@ -386,7 +408,7 @@ export function excerptOf(text: string, at: number, length: number): string {
 export function matchGuards(files: readonly AddedFile[], guards: readonly MergeGuard[], onGuard?: (name: string) => void): GuardReport {
   const hits: GuardHit[] = []
   let more = 0
-  const matched = new Set<string>()
+  const messages: GuardReport['messages'] = []
   for (const g of guards) {
     onGuard?.(g.name)
     let re: RegExp
@@ -396,22 +418,24 @@ export function matchGuards(files: readonly AddedFile[], guards: readonly MergeG
       return { hits: [], more: 0, messages: [], incomplete: `invalid:${g.name}:${e instanceof Error ? e.message : String(e)}` } // i18n-ignore: a reason's code and the engine's words
     }
     if (re.test('')) return { hits: [], more: 0, messages: [], incomplete: `matchesEmpty:${g.name}` } // i18n-ignore: a reason's code
+    let own: GuardReport['messages'][number] | null = null
     for (const f of files) {
       if (!guardApplies(g, f.path)) continue
       for (const l of f.lines) {
         const m = re.exec(l.text)
         if (!m) continue
-        matched.add(g.name)
+        if (own) own.count++
+        else messages.push((own = { guard: g.name, message: g.message, count: 1, file: f.path, line: l.n }))
         if (hits.length < GUARD_HITS_KEPT) hits.push({ guard: g.name, file: f.path, line: l.n, excerpt: excerptOf(l.text, m.index, m[0].length) })
         else more++
       }
     }
   }
-  return { hits, more, messages: guards.filter((g) => matched.has(g.name)).map((g) => ({ guard: g.name, message: g.message })) }
+  return { hits, more, messages }
 }
 
 /**
- * Darren's decision, 15 Nov ("show how many lines it currently matches and where"): what a guard already matches in the
+ * HI-3284's decision ("show how many lines it currently matches and where"): what a guard already matches in the
  * project, shown as it is added or edited, so a too-broad pattern is obvious before it's saved (still allowed: guards
  * check only added lines). The lines matched, the first few of them, and the files read; incomplete when it couldn't
  * read them all (its bounds, its time limit).
@@ -455,7 +479,8 @@ export const guardsRefuse = (r: GuardReport): boolean => !!r.incomplete || r.hit
 
 const G = {
   matched: agentMsg({ id: 'mergeGuards.matched', text: 'merge guard "{guard}" matches {count, plural, one {a line} other {# lines}} it adds', note: 'HI-3284: what came back from a merge (the failure, after "came back:"): a merge guard (a pattern the project refuses in the lines a merge adds) matched. {guard}: its name. {count}: lines matched.' }),
-  matchedMany: agentMsg({ id: 'mergeGuards.matchedMany', text: 'merge guards {guards} match {count, plural, one {a line} other {# lines}} it adds', note: 'HI-3284: as mergeGuards.matched, several guards. {guards}: their names, quoted and comma-joined. {count}: lines matched.' }),
+  matchedMany: agentMsg({ id: 'mergeGuards.matchedMany', text: 'merge guards match lines it adds: {guards}', note: 'HI-3284: as mergeGuards.matched, several guards. {guards}: each guard and how many lines it matched (mergeGuards.matchedBy), comma-joined.' }),
+  matchedBy: agentMsg({ id: 'mergeGuards.matchedBy', text: '"{guard}" {count, plural, one {# line} other {# lines}}', note: 'HI-3284: one of several matching merge guards, in mergeGuards.matchedMany: its name and how many lines it matched.' }),
   incomplete: agentMsg({ id: 'mergeGuards.incomplete', text: "the merge guards couldn't finish ({why}), so nothing was proved", note: 'HI-3284: what came back: the merge guards check could not finish: never a pass and never a match. {why}: mergeGuards.why.*.' }),
   hit: agentMsg({ id: 'mergeGuards.hit', text: '{file}:{line}: {excerpt}', note: 'HI-3284: one line a merge guard matched, in a returned card’s log: the file, the line number, and the line around the match (its own text).' }),
   more: agentMsg({ id: 'mergeGuards.more', text: 'and {count, plural, one {# more line} other {# more lines}}', note: 'HI-3284: past the lines listed, how many more a merge guard matched.' }),
@@ -484,9 +509,8 @@ export function incompleteText(reason: string): string {
 /** What came back, in a phrase (for "came back: …" and the submit warning). */
 export function guardFailureText(r: GuardReport): string {
   if (r.incomplete) return say(G.incomplete, { why: incompleteText(r.incomplete) })
-  const count = r.hits.length + r.more
-  const names = [...new Set(r.hits.map((h) => h.guard))]
-  return names.length === 1 ? say(G.matched, { guard: names[0], count }) : say(G.matchedMany, { guards: names.map((n) => `"${n}"`).join(', '), count })
+  if (r.messages.length === 1) return say(G.matched, { guard: r.messages[0].guard, count: r.messages[0].count })
+  return say(G.matchedMany, { guards: r.messages.map((m) => say(G.matchedBy, { guard: m.guard, count: m.count })).join(', ') })
 }
 
 /** The report's lines, as a returned card's log carries them: each hit, then each matching guard's message last. */
@@ -502,7 +526,7 @@ export function guardWarning(r: GuardReport): string {
   return say(G.warning, { failure: guardFailureText(r), where: first ? `${first.file}:${first.line}` : '' })
 }
 
-// ---- The example guard (Darren's decision, 15 Nov) ----
+// ---- The example guard (HI-3284's decision) ----
 
 /** The characters a regular expression with the `u` flag takes escaped (only these: `\-` is an error there). */
 const ESCAPED = /[\^$\\.*+?()[\]{}|/]/g
