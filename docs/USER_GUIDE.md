@@ -1240,12 +1240,14 @@ Every pane's typing goes through Combwork's main process, so when it is busy for
 
 - **When** it ended, and its **Length**;
 - **Main thread CPU**: how much of it the main process spent working. **mostly waiting** (under half its length) means it was waiting on the disk, a lock or another program rather than working. It's measured from half a second before, so it can be a little more than the length;
-- **Step**: the database or file step that held the main process, where Combwork knows one;
+- **Step**: the step that held the main process, where Combwork knows one: a database or file step, or Combwork's own code that ran long enough to be felt (10 ms or more), such as `queue views`, `deliveries plan` or `ran ipc …` (a window's call's own code);
 - **During it**: what else was under way, such as a window's call (`ipc …`), an Agent API request (`api …`) or a hook (`hook …`), with how long each took. Some of these may only have waited behind the stall rather than caused it.
 
 In **Step** and **During it**, work that happened several times shows once, with how many times and how long in all (`db transaction … ×52 · 81 ms`), the longest first.
 
 The names are Combwork's own for its work, never your text. Combwork's log (**Help → Open Logs Folder**, `combwork.log`) notes the same stalls, at most one line a minute. If Combwork feels slow, a screenshot of this table with **Help → Copy Diagnostics…** helps find why.
+
+**Delays by hour**, below the table, counts shorter hitches too: from 50 ms a pause can be felt while typing. For each hour with any (the last 24 since Combwork started, the current one included) it says how many half-seconds had a delay of **50–100 ms** and of **100–250 ms**, how many **Stalls** there were (every one, with how many the log didn't name), and **Named first**: the work each stall named first, with how many times, so the commonest causes show even when the log's one line a minute left most stalls out. The log notes each hour in one line too (*Main's event loop in the past hour: …*).
 
 ### Cost per card <a id="cost-per-card"></a>
 

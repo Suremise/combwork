@@ -1627,6 +1627,50 @@
     "defaultMessage": "Main process stalls",
     "description": "Heading of the Performance page's table of the times Combwork's main process was busy long enough to be felt."
   },
+  "performance.stalls.hours.causes": {
+    "defaultMessage": "Named first",
+    "description": "Column header of the Performance page's Delays by hour table: for the hour's stalls, the work each named first, with how many times."
+  },
+  "performance.stalls.hours.d100": {
+    "defaultMessage": "100–250 ms",
+    "description": "Column header of the Performance page's Delays by hour table: how many delays of 100 ms up to 250 ms. Keep the numbers."
+  },
+  "performance.stalls.hours.d50": {
+    "defaultMessage": "50–100 ms",
+    "description": "Column header of the Performance page's Delays by hour table: how many delays of 50 ms up to 100 ms. Keep the numbers."
+  },
+  "performance.stalls.hours.empty": {
+    "defaultMessage": "No delays of 50 ms or more since Combwork started.",
+    "description": "The Performance page's Delays by hour table when there were none."
+  },
+  "performance.stalls.hours.heading": {
+    "defaultMessage": "Delays by hour",
+    "description": "Heading of the Performance page's table counting, hour by hour, the times Combwork's main process was held up, short ones included."
+  },
+  "performance.stalls.hours.hour": {
+    "defaultMessage": "Hour",
+    "description": "Column header of the Performance page's Delays by hour table: the hour counted (its start, a date and time)."
+  },
+  "performance.stalls.hours.stalls": {
+    "defaultMessage": "Stalls",
+    "description": "Column header of the Performance page's Delays by hour table: how many stalls (over 250 ms) in the hour."
+  },
+  "performance.stalls.hours.times": {
+    "defaultMessage": "×{n, number}",
+    "description": "After a work's name, or after nothing marked, in the Performance page's Delays by hour table: how many stalls named it first."
+  },
+  "performance.stalls.hours.tip": {
+    "defaultMessage": "How often Combwork's main process was held up, by the hour, short delays included: from 50 ms they can be felt while typing. A short delay is counted once per half second, the longest in it. Stalls are those over 250 ms, every one, with the work each names first, where combwork.log names at most one a minute; it notes each hour in a line too. The last {kept, number} hours with any, since Combwork started, kept in memory only.",
+    "description": "Info tip beside the Delays by hour heading of the Performance page. combwork.log is a file name."
+  },
+  "performance.stalls.hours.unlogged": {
+    "defaultMessage": "{n, number} not logged",
+    "description": "Under an hour's stall count in the Performance page's Delays by hour table: how many of them combwork.log didn't name. Lower case."
+  },
+  "performance.stalls.hours.unnamed": {
+    "defaultMessage": "nothing marked",
+    "description": "A line of an hour's Named first cell in the Performance page's Delays by hour table: stalls with no work known to Combwork under way. Lower case."
+  },
   "performance.stalls.length": {
     "defaultMessage": "Length",
     "description": "Column header of the Performance page's Main process stalls table: how long the main process was busy."
