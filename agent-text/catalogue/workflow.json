@@ -28,8 +28,8 @@
     "audience": "both"
   },
   "workflow.contradiction.jjYouIntegrate": {
-    "text": "With jj, you integrate the reviewed work yourself: Combwork doesn’t merge it.",
-    "note": "Why workflow options cannot be saved (HI-2799): a project using jj (Jujutsu) had another finish chosen than “You integrate it”. Keep jj (the tool’s name).",
+    "text": "That choice is for another version control: with jj, Combwork or you integrate the work by moving the target bookmark; with Git, it is merged.",
+    "note": "Why workflow options cannot be saved (HI-2799, HI-3315: a jj project given one of Git’s finishes, or a Git project one of jj’s). Keep jj (the tool’s name) and Git; a bookmark is jj’s name for a branch.",
     "audience": "both"
   },
   "workflow.contradiction.mergeNeedsSlots": {
