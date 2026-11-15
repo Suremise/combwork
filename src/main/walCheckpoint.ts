@@ -175,7 +175,11 @@ function restart(r: Registered): void {
     const from = performance.now()
     const say = setInterval(() => log.warn(`main's writes to ${basename(r.file)} wait for its WAL's first write in the checkpoints' worker (${Math.round(performance.now() - from)} ms so far)`), closeLimits.warnMs)
     say.unref?.()
-    thread.run(r.file, 'restart', (res, where) => {
+    // Answered once, whichever way it ends: the worker's reply, its end, or a throw before the request was ever sent.
+    let answered = false
+    const answer: Answer = (res, where) => {
+      if (answered) return
+      answered = true
       clearInterval(say)
       r.gate = null
       open()
@@ -186,7 +190,12 @@ function restart(r: Registered): void {
       checkpointStats.restarts++
       if (dbs.get(r.writer) === r) r.restartDue = false
       if (res.ms >= SLOW_MS) log.info(`restarted ${basename(r.file)}'s WAL in ${Math.round(res.ms)} ms${where} (its first write after a whole checkpoint, off main's thread)`)
-    })
+    }
+    try {
+      thread.run(r.file, 'restart', answer)
+    } catch (e) {
+      answer({ error: e instanceof Error ? e.message : String(e) }, '')
+    }
   }
   const landed = (): void => {
     r.inFlight = false
@@ -299,8 +308,19 @@ class CheckpointThread {
   private flying = new Map<string, number>()
   private waiting = new Map<string, (() => void)[]>()
 
+  /**
+   * Runs a checkpoint or a restart of `file`, answered once. Never throws: a worker that can't be started, or a request
+   * that can't be sent, is answered at once with its error, nothing of it left in flight (HI-3289: a restart's gate
+   * opens only with its answer).
+   */
   run(file: string, kind: 'checkpoint' | 'restart', answer: Answer): void {
-    const w = this.worker ?? this.start()
+    let w: Worker | null
+    try {
+      checkpointThreadHooks.beforeDispatch?.(kind)
+      w = this.worker ?? this.start()
+    } catch (e) {
+      return answer({ error: `its worker couldn't be started: ${e instanceof Error ? e.message : String(e)}` }, '')
+    }
     if (!w) {
       let res: CheckpointDone | RestartDone | { error: string } | null
       try {
@@ -315,8 +335,16 @@ class CheckpointThread {
     const key = file.toLowerCase()
     this.calls.set(id, { key, answer })
     this.flying.set(key, (this.flying.get(key) ?? 0) + 1)
-    const m: CheckpointRequest = { id, file, closing: Atomics.load(this.state, CLOSING), kind }
-    w.postMessage(m)
+    try {
+      const m: CheckpointRequest = { id, file, closing: Atomics.load(this.state, CLOSING), kind }
+      checkpointThreadHooks.beforePost?.(kind)
+      w.postMessage(m)
+    } catch (e) {
+      // Not sent: nothing of it in flight (a reply can't come), answered here.
+      if (!this.calls.delete(id)) return
+      this.landed(key)
+      answer({ error: `it couldn't be sent to its worker: ${e instanceof Error ? e.message : String(e)}` }, ' in its worker') // i18n-ignore: for the log
+    }
   }
 
   /** A database is closing: checkpoints asked for before now are skipped (never waited for). */
@@ -382,6 +410,9 @@ class CheckpointThread {
     return w
   }
 }
+
+/** Tests: a throw where the worker is started (beforeDispatch) or a request is sent to it (beforePost). */
+export const checkpointThreadHooks: { beforeDispatch?: (kind: 'checkpoint' | 'restart') => void; beforePost?: (kind: 'checkpoint' | 'restart') => void } = {}
 
 /** How often something waiting for a database's file to be let go of by the worker says so in the log (tests change it). */
 export const closeLimits = { warnMs: 10_000 }

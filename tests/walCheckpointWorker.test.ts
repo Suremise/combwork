@@ -307,6 +307,53 @@ describe("the WAL's first write after a checkpoint, in the worker (HI-3289)", ()
     }
   })
 
+  it("a restart's request that can't be sent to the worker (HR1's error path): answered at once, so the gate opens, the lock and the warning's interval are let go, nothing is left in flight, and the next write and restart go through", async () => {
+    const l = lock()
+    const db = openDb(join(base, `db-${++n}.db`), { migrations: MIGRATIONS, appVersion: 'test', checkpointer: (f, w) => wal.checkpointWhenIdle(f, w, { hold: l.hold }) })
+    const WARN_MS = 987_654
+    const warnMs = wal.closeLimits.warnMs
+    wal.closeLimits.warnMs = WARN_MS
+    const set = vi.spyOn(globalThis, 'setInterval')
+    const cleared = vi.spyOn(globalThis, 'clearInterval')
+    let thrown = 0
+    try {
+      write(db.writer, 20)
+      wal.checkpointThreadHooks.beforePost = (kind) => {
+        if (kind !== 'restart') return
+        thrown++
+        throw new Error('DataCloneError (test)')
+      }
+      const restarts = wal.checkpointStats.restarts
+      due()
+      await vi.waitFor(() => expect(thrown).toBe(1), { timeout: HUNG_MS })
+      await vi.waitFor(() => expect(l.held()).toBe(false), { timeout: HUNG_MS })
+      expect(wal.walGate(db.writer)).toBeNull()
+      await wal.walWritable(db.writer)
+      // The restart's warning interval, cleared.
+      const warnings = set.mock.calls.flatMap((c, i) => (c[1] === WARN_MS ? [set.mock.results[i].value] : []))
+      expect(warnings).toHaveLength(1)
+      expect(cleared).toHaveBeenCalledWith(warnings[0])
+      // Nothing of it in flight: what needs the file free goes on at once.
+      await wal.checkpointsReleased(db.file)
+      expect(wal.checkpointStats.restarts).toBe(restarts)
+      wal.checkpointThreadHooks.beforePost = undefined
+      await l.hold(async () => insert(db.writer))
+      // Later than the first checkpoint's idle mark, which due() set ahead of now.
+      const later = performance.now() + 4 * (wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+      wal.checkpointTick(later)
+      wal.checkpointTick(later + wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+      await vi.waitFor(() => expect(wal.checkpointStats.restarts).toBe(restarts + 1), { timeout: HUNG_MS })
+      await vi.waitFor(() => expect(l.held()).toBe(false), { timeout: HUNG_MS })
+      expect((db.reader.prepare('SELECT count(*) AS c FROM t').get() as { c: number }).c).toBe(21)
+    } finally {
+      wal.checkpointThreadHooks.beforePost = undefined
+      wal.closeLimits.warnMs = warnMs
+      set.mockRestore()
+      cleared.mockRestore()
+      db.close()
+    }
+  })
+
   it('the restart itself: skipped once a close began, never made for a file gone; with another writer holding the lock, skipped at once', () => {
     const state = new Int32Array(new SharedArrayBuffer(4))
     const db = open()

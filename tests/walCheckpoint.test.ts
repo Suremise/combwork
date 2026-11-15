@@ -364,6 +364,57 @@ describe("the WAL's first write after a checkpoint is the checkpointer's (HI-328
     }
   })
 
+  it("a throw before the restart is answered (its worker can't be started: HR1's error path), with the lock or without: the gate opens, the lock and the warning's interval are let go, and the next write and restart go through", async () => {
+    const WARN_MS = 987_653
+    const warnMs = wal.closeLimits.warnMs
+    wal.closeLimits.warnMs = WARN_MS
+    const set = vi.spyOn(globalThis, 'setInterval')
+    const cleared = vi.spyOn(globalThis, 'clearInterval')
+    let thrown = 0
+    wal.checkpointThreadHooks.beforeDispatch = (kind) => {
+      if (kind !== 'restart') return
+      thrown++
+      throw new Error('worker creation failed (test)')
+    }
+    const l = lock()
+    const held = open((f, w) => wal.checkpointWhenIdle(f, w, { hold: l.hold }))
+    const bare = open(wal.checkpointWhenIdle)
+    try {
+      write(held.writer, 5)
+      write(bare.writer, 5)
+      const restarts = wal.checkpointStats.restarts
+      // The bare one's (no lock) runs in the tick: its throw doesn't escape it.
+      expect(() => due()).not.toThrow()
+      await vi.waitFor(() => expect(thrown).toBe(2), { timeout: HUNG_MS })
+      await vi.waitFor(() => expect(l.held()).toBe(false), { timeout: HUNG_MS })
+      for (const db of [held, bare]) {
+        expect(wal.walGate(db.writer)).toBeNull()
+        await wal.walWritable(db.writer)
+      }
+      const warnings = set.mock.calls.flatMap((c, i) => (c[1] === WARN_MS ? [set.mock.results[i].value] : []))
+      expect(warnings).toHaveLength(2)
+      for (const h of warnings) expect(cleared).toHaveBeenCalledWith(h)
+      expect(wal.checkpointStats.restarts).toBe(restarts)
+      // Nothing left in flight: the next write goes through, and the next checkpoint's restart is made.
+      wal.checkpointThreadHooks.beforeDispatch = undefined
+      await l.hold(async () => void transaction(held.writer, () => held.writer.prepare('INSERT INTO t (doc) VALUES (?)').run(Buffer.alloc(10))))
+      write(bare.writer, 1)
+      // Later than the first checkpoint's idle mark, which due() set ahead of now.
+      const later = performance.now() + 4 * (wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+      wal.checkpointTick(later)
+      wal.checkpointTick(later + wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+      await vi.waitFor(() => expect(wal.checkpointStats.restarts).toBe(restarts + 2), { timeout: HUNG_MS })
+      await vi.waitFor(() => expect(l.held()).toBe(false), { timeout: HUNG_MS })
+    } finally {
+      wal.checkpointThreadHooks.beforeDispatch = undefined
+      wal.closeLimits.warnMs = warnMs
+      set.mockRestore()
+      cleared.mockRestore()
+      held.close()
+      bare.close()
+    }
+  })
+
   it('a restart that throws opens the gate and lets go of the lock; a database closed while it waits for the lock makes none', async () => {
     const l = lock()
     const db = open((f, w) => wal.checkpointWhenIdle(f, w, { hold: l.hold }))
