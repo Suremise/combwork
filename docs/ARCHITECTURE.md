@@ -477,14 +477,16 @@ slot's cards (`ProgressMerge.tsx`), Pulse's lines and the polite live region. A 
 **How a listing is kept** (HI-1683, HI-3291, HI-3296, HI-3301, `queueControls.ts`): a project's listing is kept while its
 stamp (`viewsStamp`) is the same: its queue revision (`queue_revs`), its queue tables, this Combwork's hosts of its queues,
 its options written and the rules switch, read on one snapshot with the snapshot's change marks (`boardStore.changeMarksIn`:
-the database's opening, the facts' epoch, the cards' revision mark and the highest fact rowid). Its board part (open cards,
-cards in flight, each target's view) outlives the listing's 5 s git window. When only the queue revision moved, the next
-board part reads, on that same snapshot, the cards changed since the last one's marks (`changedCardsIn`: a revision at the
-mark or above, a fact above the highest; another epoch or database, or over 200 cards, can't say) and carries the views
-they can't touch: a view is made again when a changed card has a fact naming its target or started into it, when one of
-its open entries' cards' blockers (`deps`, Done or missing ones too) changed, or when its cards in flight or its options'
-target differ; the open cards and cards in flight are read again for the changed cards alone. Anything else (the rest of
-the stamp, a seen return folding, a card that can't be read) makes the part whole.
+the database's opening, the facts' epoch, the cards' revision mark and the highest fact rowid). What it reads from git
+(`GitPart`: its options' target, the targets that exist, the forward sources, how far behind) is kept 5 s from its read
+whatever the board does, and its board part (open cards, cards in flight, each target's view) while its stamp holds. When
+only the queue revision moved, the next board part reads, on that same snapshot, the cards changed since the last one's
+marks (`changedCardsIn`: a revision at the mark or above, a fact above the highest; another epoch or database, or over 200
+cards, can't say) and carries the kept views they can't touch, dropping the rest whether asked for or not (so a kept view
+saw every change up to the part's marks): a view is touched when a changed card has a fact naming its target or started
+into it, or one of its open entries' cards' blockers (`deps`, Done or missing ones too) changed; one whose cards in flight
+or options' target differ is made again when asked for. The open cards and cards in flight are read again for the changed
+cards alone. Anything else (the rest of the stamp, a seen return folding, a card that can't be read) makes the part whole.
 
 **The queue on the card, in the Git tab and in the Merge dialog** (#1357): the card dialog's Work section adds
 `CardQueue.tsx` (the work view's `queue`, with a return's details, beside its target's `queue:list` for the place, step,
