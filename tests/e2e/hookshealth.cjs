@@ -79,6 +79,8 @@ const hooksOff = (agent, off) => {
     const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })
     const reviewer = await lib.addAgent(inv, alpha, { name: 'Reviewer' })
     const live = async (a) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === a.id)
+    // Before the agents start, so their output is all recorded (raw, below).
+    await lib.recordPtyOutput(page)
     for (const a of [builder, reviewer]) await inv('session:start', alpha, { agentId: a.id })
     check('the agents start', !!(await until(async () => (await live(builder))?.status === 'ready' && (await live(reviewer))?.status === 'ready', 45000)))
 
@@ -91,7 +93,9 @@ const hooksOff = (agent, off) => {
         // The window is closing.
       }
     }, 100)
-    const raw = async (a) => (await inv('pty:buffer', lib.ptyKey(alpha, a.id)).catch(() => '')) ?? ''
+    // The output as it came (HI-3311, HI-3312's recorder): what came after a mark is past it. pty:buffer may be the screen
+    // drawn afresh (a resize in its queue), where a turn's lines land above the input box, before the mark.
+    const raw = (a) => lib.ptyOutput(page, lib.ptyKey(alpha, a.id))
     /** Types a prompt and waits until the fake shows it working on it (its screen: hooks may be off). */
     const say = async (a, text) => {
       const mark = (await raw(a)).length

@@ -92,6 +92,24 @@ describe("a running terminal's replay", () => {
     expect(await history.replay()).toBe(SEED + 'more')
   })
 
+  it("after a resize in the queue, a replay is the terminal drawn afresh, not its output: the output as it came (raw, as lib.recordPtyOutput records it) only grows (HI-3311)", async () => {
+    const history = new TerminalHistory(80, 24, 100_000)
+    // A CLI's input box at the screen's foot, its turns drawn above it (as Claude Code's): what comes later is drawn
+    // before the box, so in a screen drawn afresh it lands before where an earlier replay ended.
+    const box = '\x1b[20;1H────\r\n❯ \r\n────'
+    history.push(`> first prompt\r\n✻ Worked for 1s${box}`)
+    history.resized(100, 24)
+    const before = await history.replay()
+    const rawBefore = history.raw()
+    history.push(`\x1b[3;1H> second prompt\r\n✻ Worked for 2s${box}`)
+    const after = await history.replay()
+    expect(after).toContain('Worked for 2s')
+    expect(after.startsWith(before)).toBe(false)
+    expect(after.slice(before.length)).not.toContain('Worked for 2s')
+    expect(history.raw().startsWith(rawBefore)).toBe(true)
+    expect(history.raw().slice(rawBefore.length)).toContain('Worked for 2s')
+  })
+
   it('draws each part at the size the process drew it at', async () => {
     const live = new Terminal({ cols: 80, rows: 10, allowProposedApi: true })
     const history = new TerminalHistory(80, 10, 400)
