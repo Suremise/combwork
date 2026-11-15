@@ -733,7 +733,7 @@
   "workflow.why.style": "マージコミットなら各カードのコミットがそのまま残り、Combworkの従来のマージ方法と同じです。",
   "workflow.why.target": "完成した作業はリポジトリの既定のブランチに入り、ソロではプロジェクトが現在いるブランチに入ります。",
   "workflow.contradiction.jjNeedsSlots": "jjでは、カードごとに専用フォルダーが必要です。プロジェクトフォルダーを共有するエージェントにはまだ対応していません。",
-  "workflow.contradiction.jjYouIntegrate": "jjでは、レビュー済みの作業はご自身で統合します。Combworkはマージしません。",
+  "workflow.contradiction.jjYouIntegrate": "その選択は別のバージョン管理のものです。jjでは、Combworkかご自身が対象のブックマークを動かして作業を統合し、Gitではマージします。",
   "workflow.form.levelForJj": "jjプロジェクトの既定値です。",
   "workflow.form.levelJj": "jj",
   "workflow.refused.platform.changed.message": "{card}は、このルールでは開始できません。プロジェクトは現在{platform}を使っています。",

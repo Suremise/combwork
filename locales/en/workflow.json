@@ -20,8 +20,8 @@
     "description": "Why workflow options cannot be saved (HI-2799): a project using jj (Jujutsu) was set to have everyone work in the project folder. Keep jj (the tool’s name)."
   },
   "workflow.contradiction.jjYouIntegrate": {
-    "defaultMessage": "With jj, you integrate the reviewed work yourself: Combwork doesn’t merge it.",
-    "description": "Why workflow options cannot be saved (HI-2799): a project using jj (Jujutsu) had another finish chosen than “You integrate it”. Keep jj (the tool’s name)."
+    "defaultMessage": "That choice is for another version control: with jj, Combwork or you integrate the work by moving the target bookmark; with Git, it is merged.",
+    "description": "Why workflow options cannot be saved (HI-2799, HI-3315: a jj project given one of Git’s finishes, or a Git project one of jj’s). Keep jj (the tool’s name) and Git; a bookmark is jj’s name for a branch."
   },
   "workflow.contradiction.mergeNeedsSlots": {
     "defaultMessage": "When Combwork or the agent merges, each card needs its own folder.",

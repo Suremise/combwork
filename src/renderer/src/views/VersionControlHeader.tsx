@@ -246,7 +246,8 @@ export function presetState(f: WorkflowForm): { state: 'preset' | 'custom' | 'no
 
 /** The project's workflow form, read again when its saved options change (here, or by the Assistant's tool). */
 export function useWorkflowForm(project: ProjectInfo): WorkflowForm | null {
-  const saved = JSON.stringify(project.config.workflow ?? null)
+  // Read again when its options or its version control change (HI-3315: a switch to jj reads jj's options).
+  const saved = JSON.stringify([project.config.workflow ?? null, project.platform?.id ?? null])
   const [form, setForm] = useState<{ for: string; form: WorkflowForm } | null>(null)
   useEffect(() => {
     let live = true

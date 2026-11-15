@@ -27,6 +27,7 @@ interface CombworkMessageValues {
   'jj.conflicts.none': undefined
   'jj.history.capped': { n: number }
   'jj.ids.tip': { change: string | number; commit: string | number }
+  'jj.integrate.byCombwork': undefined
   'jj.integrate.candidate': { commit: string | number; change: string | number; style: string; target: string | number; expected: string | number }
   'jj.integrate.candidateBuilt': { commit: string | number; style: string; target: string | number; expected: string | number }
   'jj.integrate.candidateHow': { target: string | number }
@@ -46,6 +47,7 @@ interface CombworkMessageValues {
   'jj.integrate.none': undefined
   'jj.integrate.notChecked': { target: string | number }
   'jj.integrate.notYet': { target: string | number; when: string | number }
+  'jj.integrate.onClick': undefined
   'jj.integrate.unknown': { target: string | number; when: string | number; why: string }
   'jj.leftovers.head': undefined
   'jj.leftovers.hint': undefined
