@@ -417,7 +417,7 @@ export function matchGuards(files: readonly AddedFile[], guards: readonly MergeG
  * read them all (its bounds, its time limit).
  */
 /** Whether a guard's matching parts (its pattern and paths) are ones a save takes: what a preview needs, its name and message aside. */
-export const previewable = (g: MergeGuard): boolean => guardProblems([{ ...g, name: g.name?.trim() ? g.name : 'x', message: g.message?.trim() ? g.message : 'x' }]).length === 0
+export const previewable = (g: MergeGuard): boolean => guardProblems([{ ...g, name: g.name?.trim() ? g.name : 'x', message: g.message?.trim() ? g.message : 'x' }]).length === 0 // i18n-ignore: a stand-in name and message, only checked, never shown
 
 export interface GuardPreview {
   count: number
