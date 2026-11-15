@@ -392,12 +392,21 @@ export function waitingForRunNow(host: string, agentId: string, run: string, con
   return (stores.get(keyOf(host))?.records ?? []).filter((r) => r.agentId === agentId && (r.state === 'queued' || r.state === 'offered' || r.state === 'uncertain') && Date.parse(r.expires) > now && (!r.conversation || !conversation || r.conversation === conversation) && (!r.forRun || r.forRun === run))
 }
 
-/** Runs fn after the host's transactions before it (and before later ones). */
+/**
+ * Runs fn after the host's transactions before it (and before later ones), once the event loop has turned (HI-3298): the
+ * awaits in a transaction resolve without a turn (the board's lock is a chain of promises, its database synchronous), so
+ * a burst of them (a lane's wakes, each made and offered) was one task on main, keystrokes queued behind all of it. The
+ * turn is taken holding the host's lock, before fn reads anything: the order of its transactions is as it was, and
+ * nothing is awaited between a plan and its save.
+ */
 function locked<T>(store: Store, fn: () => Promise<T>): Promise<T> {
-  const run = store.lock.then(fn)
+  const run = store.lock.then(turn).then(fn)
   store.lock = run.catch(() => undefined)
   return run
 }
+
+/** Resolves on the event loop's next turn, after what is waiting for main (input, IPC, I/O) has had it. */
+const turn = (): Promise<void> => new Promise((r) => setImmediate(r))
 
 /**
  * A transaction (see the top): `plan` checks and changes a copy of what is published (synchronously, under the host's

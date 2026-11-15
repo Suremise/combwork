@@ -27,6 +27,7 @@
 
 ### Fixed
 
+- **Typing no longer waits for a burst of agent wakes** (HI-3298). When several agents were woken at once (a lane's cards moving), Combwork made and handed over each wake on the main process one after another without a break, so a key you pressed waited for all of them (about 60 ms for 20 wakes, longer on a busy machine). Your typing now gets its turn between each.
 - **Hovering a lane no longer slows typing** (HI-3294). Combwork worked out a lane's cost from scratch every time it was shown, on the main process every keystroke also goes through. It now keeps the cost until a session records more use, the board changes or prices change, and reads only the lane's own agents' sessions when it does work it out again.
 - **A stopped agent's usage no longer slows typing** (HI-3295). Showing the usage of an agent whose session had stopped read and priced every session of its project on the main process, each time the usage history changed. It now reads that one session only.
 - **Cards catch up with their merges again after a merge queue runs** (HI-3292). A board check Combwork started while a merge queue was working (a card moving to Done once its merge reached the target, a stale mark) could fail for every card once the queue had finished, logging "the merge queue for … is run by another Combwork now", and waited for a later check started elsewhere. These checks now always run on their own.

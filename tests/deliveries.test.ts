@@ -242,6 +242,24 @@ describe('the delivery service (#647)', async () => {
     }
   })
 
+  it("a burst of transactions lets the event loop turn between them, in their order (HI-3298: a keystroke waits for one, never all)", async () => {
+    // A keystroke's stand-in, queued once the first is made: before HI-3298 it ran only once every transaction had.
+    const seen: string[] = []
+    const made = await Promise.all(
+      Array.from({ length: 5 }, (_, i) =>
+        make({ from: combwork, kind: 'card-event', card: i + 1, body: `[CW] #${i + 1} is in Review.`, ref: `r${i}` }).then((r) => {
+          seen.push(r.id)
+          if (r.id === 'm1') setImmediate(() => seen.push('turn'))
+          return r
+        })
+      )
+    )
+    expect(seen.indexOf('turn')).toBeGreaterThan(-1)
+    expect(seen.indexOf('turn')).toBeLessThan(seen.indexOf('m5'))
+    expect(seen.filter((s) => s !== 'turn')).toEqual(['m1', 'm2', 'm3', 'm4', 'm5'])
+    expect(made.map((r) => r.id)).toEqual(['m1', 'm2', 'm3', 'm4', 'm5'])
+  })
+
   it('saved as made, with short ids that go on across a restart', async () => {
     expect((await make()).id).toBe('m1')
     expect((await make({ body: 'Then #520.' })).id).toBe('m2')
