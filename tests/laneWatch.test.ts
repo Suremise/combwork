@@ -879,6 +879,126 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     })
   }
 
+  // HI-3280 (reported 14 Nov): PEN-2's lane ended and its end woke the Assistant; a new lane started for PEN-3 with the same
+  // builder and reviewer, and the lane watch started then was woken at once by the old lane's end.
+  describe('a lane whose end a wake told, then a new lane with the same builder and reviewer (HI-3280)', () => {
+    for (const first of ['all', 'named'] as const)
+      for (const next of ['all', 'the new lane'] as const)
+        it(`the end told by ${first === 'all' ? 'an "all" watch' : 'a watch naming the lane'}: ${next === 'all' ? 'an "all" watch' : 'a watch naming the new lane'} after it isn't woken by it`, async () => {
+          const { w, alpha, home } = await open()
+          const st = fake(alpha, home)
+          const [a] = await newCards(w, 'b1', 1)
+          const old = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })).lane
+          st.status = 'watching'
+          if (first === 'all') await watchAll(w, home, st)
+          else await watches.registerLaneWatch(w, home, 'assistant', { ids: [old.id], events: [...LANE_DEFAULT_EVENTS] })
+          await inWorkspace(w, () => tasks.updateTask(a, { column: 'done' }, user))
+          await lanes.refresh(w)
+          await watches.evaluateWatches(w)
+          await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+          expect(st.told[0]).toMatch(/^\[CW\] Lane B1 \/ R1: ended \(merged\)\./)
+          // The next lane, the same pair, then a lane watch.
+          const [b] = await newCards(w, 'b1', 1)
+          const fresh = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [b], by: 'B1 (alpha)' })).lane
+          expect(fresh.id).not.toBe(old.id)
+          st.status = 'watching'
+          const r = next === 'all' ? await watchAll(w, home, st) : await watches.registerLaneWatch(w, home, 'assistant', { ids: [fresh.id], events: [...LANE_DEFAULT_EVENTS] })
+          expect('watching' in r).toBe(true)
+          await watches.evaluateWatches(w)
+          await watches.settled()
+          expect(st.typed).toHaveLength(1)
+          await disposeWorkspaceService(w)
+        })
+
+    // HR1's design check (s8): an end only announced by its doorbell (typed, taken, not read with cw_inbox, which alone is
+    // the receipt) isn't received. Replacing the watch then cancels that delivery, so the next watch must tell it: each event
+    // reaches the agent exactly once over everything it reads.
+    describe('…and the watch replaced before the wake is read: every event read once', () => {
+      /** The Assistant takes each doorbell typed but reads its inbox only when the test says (`read`). */
+      const lazy = (alpha: string, home: string) => {
+        const st = fake(alpha, home)
+        Object.assign(sessions, {
+          sendPrompt: async (_p: string, _id: string, text: string, guard?: () => void) => {
+            guard?.()
+            st.typed.push(text)
+            st.status = 'working'
+          }
+        })
+        const read: string[] = []
+        return { st, read, readNow: async () => read.push(await follow(home, 'assistant', '[CW] New in your inbox: ')) }
+      }
+      const count = (texts: string[], re: RegExp): number => texts.join('\n').split(re).length - 1
+      const ENDED = /Lane B1 \/ R1: ended \(merged\)/g
+
+      for (const when of ['taken', 'not typed yet'] as const)
+        it(`its doorbell ${when}: the new lane watch tells the old lane's end, and it is read once`, async () => {
+          const { w, alpha, home } = await open()
+          const { st, read, readNow } = lazy(alpha, home)
+          const [a] = await newCards(w, 'b1', 1)
+          await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })
+          await watchAll(w, home, st)
+          // Not typed yet: the Assistant is busy, so the wake waits for it.
+          if (when === 'not typed yet') st.status = 'working'
+          await inWorkspace(w, () => tasks.updateTask(a, { column: 'done' }, user))
+          await lanes.refresh(w)
+          await watches.evaluateWatches(w)
+          await watches.settled()
+          if (when === 'taken') await vi.waitFor(() => expect(st.typed).toHaveLength(1), { timeout: HUNG_MS })
+          else expect(st.typed).toHaveLength(0)
+          // The next lane, the same pair, and a lane watch, before the wake is read.
+          const [b] = await newCards(w, 'b1', 1)
+          await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [b], by: 'B1 (alpha)' })
+          await watchAll(w, home, st)
+          await watches.evaluateWatches(w)
+          await watches.settled()
+          await readNow()
+          await watches.evaluateWatches(w)
+          await watches.settled()
+          await readNow()
+          expect(count(read, ENDED)).toBe(1)
+          await disposeWorkspaceService(w)
+        })
+
+      it('read after the replacement: the new watch isn’t moved by it, and an event between the old wake and the new watch is read once too', async () => {
+        const { w, alpha, home } = await open()
+        const { st, read, readNow } = lazy(alpha, home)
+        const [a] = await newCards(w, 'b1', 1)
+        await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })
+        await watchAll(w, home, st)
+        await inWorkspace(w, () => tasks.updateTask(a, { column: 'done' }, user))
+        await lanes.refresh(w)
+        await watches.evaluateWatches(w)
+        await vi.waitFor(() => expect(st.typed).toHaveLength(1), { timeout: HUNG_MS })
+        // Between the old wake and the new watch: the next lane starts and its card is blocked.
+        const [b] = await newCards(w, 'b1', 1)
+        await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [b], by: 'B1 (alpha)' })
+        await inWorkspace(w, () => tasks.updateTask(b, { blocked: 'Between the two' }, agent('b1')))
+        await watchAll(w, home, st)
+        // The old wake's inbox read now, after the replacement.
+        await readNow()
+        await watches.evaluateWatches(w)
+        await watches.settled()
+        await readNow()
+        expect(count(read, ENDED)).toBe(1)
+        expect(count(read, /is blocked: "Between the two"/g)).toBe(1)
+        // The new watch goes on from there: a later event in the new lane is read once, nothing earlier again.
+        st.status = 'watching'
+        await watchAll(w, home, st)
+        await fail(w, b, 'r1').catch(async () => {
+          await inWorkspace(w, () => tasks.updateTask(b, { blocked: null, column: 'review' }, agent('b1')))
+          await fail(w, b, 'r1')
+        })
+        await watches.evaluateWatches(w)
+        await watches.settled()
+        await readNow()
+        expect(count(read, ENDED)).toBe(1)
+        expect(count(read, /is blocked: "Between the two"/g)).toBe(1)
+        expect(count(read, new RegExp(`#${b} failed review`, 'g'))).toBe(1)
+        await disposeWorkspaceService(w)
+      })
+    })
+  })
+
   describe('what is new between a wake and the watch after it (round 2 findings)', () => {
     /** B1's lane with one card, watched; its block wakes the Assistant. */
     const woken = async (events?: string[]) => {
