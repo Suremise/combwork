@@ -61,6 +61,8 @@ const check = (name, ok, extra = '') => {
   try {
     await lib.fitWindow(app, page, { width: 1200, height: 800 })
     await lib.appReady(page)
+    // Its output as it came, to count what Copilot printed: pty:buffer is a replay, redrawn (HI-3312).
+    await lib.recordPtyOutput(page)
     // The clipboard, stubbed: what was written, what a read gives (__clip) and how often it was read. The window's focus
     // too, as the test says, not as Windows allows (a quiet test window never takes the OS focus): window.__focused,
     // with its blur and focus events.
@@ -83,7 +85,7 @@ const check = (name, ok, extra = '') => {
     const key = lib.ptyKey(proj, a.id)
     const live = async () => (await inv('session:live')).find((l) => l.agentId === a.id)
     const status = async () => (await live())?.status
-    const screen = async () => lib.plainText(await inv('pty:buffer', key).catch(() => ''))
+    const screen = async () => lib.plainText(await lib.ptyOutput(page, key))
     // What the terminal shows now (the pty's history keeps text since rubbed out).
     const onScreen = async () => ((await page.evaluate((k) => window.__cwTerminalLines(k), key)) ?? []).join('\n')
     const textAt = (text) => page.evaluate(([k, t]) => window.__cwTerminalTextAt(k, t), [key, text])
