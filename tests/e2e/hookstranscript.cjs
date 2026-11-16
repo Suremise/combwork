@@ -78,7 +78,11 @@ const rollouts = (dir = path.join(codexHome, 'sessions')) => {
     await lib.waitForProvider(inv)
     await lib.waitForProvider(inv, 'codex')
     const live = async (a) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === a.id)
-    const raw = async (a) => (await inv('pty:buffer', lib.ptyKey(alpha, a.id)).catch(() => '')) ?? ''
+    // The output as it came (HI-3311, HI-3312's recorder), recorded before the agents start: what came after a mark is past it.
+    // pty:buffer may be the screen drawn afresh (a resize in its queue), where a turn's lines land above the input box, before
+    // the mark, so a turn's end could be missed and its prompt sent again.
+    await lib.recordPtyOutput(page)
+    const raw = (a) => lib.ptyOutput(page, lib.ptyKey(alpha, a.id))
 
     /**
      * One quick turn, with Combwork's checks held: typed, then over on its screen (this prompt's own end, after a mark) and
