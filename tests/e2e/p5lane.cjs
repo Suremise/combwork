@@ -564,9 +564,20 @@ const ancestor = (x, y) => {
     const hintText = await waitHung(async () => { const t = (await hint.innerText().catch(() => '')) ?? ''; return t.includes(`this list applies once ${k6} is Done`) ? t : null })
     check("Start Lane with Ten alone (Six left out): its hint is the ordinary one, no switch promised", !!hintText && !hintText.includes('waits on'), await startDialog.innerText().catch(() => ''))
     await page.screenshot({ path: path.join(fx.shots, '9-start-lane-ordinary-hint.png') })
+    // HI-3334: Combwork gives B1 Six's start as a task, a turn of B1's that s6c's start (B1's own, through the API) doesn't
+    // wait for. A start while B1 is in it is refused ("Agent B1 is working", the dialog's error) and nothing is queued; the
+    // window can still read B1 as Finished then. So the click waits for that task read, B1's turn over and its inbox quiet.
+    const b1Done = await waitHung(async () => {
+      const ds = (await api('GET', `/v1/projects/alpha/agents/${encodeURIComponent(b1.name)}/deliveries?limit=200`, undefined, tokens.b1)).body?.deliveries ?? []
+      const task6 = ds.filter((d) => d.kind === 'task' && String(d.text ?? '').includes(k6)).sort((a, b) => Number(String(b.id).slice(1)) - Number(String(a.id).slice(1)))[0]
+      const state = await live(b1.id)
+      return !!task6 && !['queued', 'offered', 'uncertain'].includes(task6.state) && state?.turn?.state === 'over' && (await lib.agentQuiet(PORT, 'alpha', state, tokens.b1)) && ds.every((d) => !['queued', 'offered', 'uncertain'].includes(d.state)) ? { task: task6.id, state: task6.state } : null
+    })
+    check("…B1 has taken Six's task, its turn over and nothing waiting for it", !!b1Done, JSON.stringify({ live: await live(b1.id) }))
     await startDialog.getByRole('button', { name: /^(Start Lane|Wait and Start)$/ }).click()
     const queuedTen = await waitHung(async () => { const l = await laneNow(lc.id); return l && JSON.stringify(l.queued) === JSON.stringify([c10]) ? l : null })
-    check('…the start it submits is an ordinary queued change: queued after Six, no switch, Six still in Doing', !!queuedTen && queuedTen.status?.first === undefined && !(await inv('lanes:list')).some((l) => l.status?.first !== undefined) && (await card(c6)).column === 'doing', JSON.stringify({ lane: queuedTen ?? (await laneNow(lc.id)), six: (await card(c6)).column, k10 }))
+    check('…the start it submits is an ordinary queued change: queued after Six, no switch, Six still in Doing', !!queuedTen && queuedTen.status?.first === undefined && !(await inv('lanes:list')).some((l) => l.status?.first !== undefined) && (await card(c6)).column === 'doing', JSON.stringify({ lane: queuedTen ?? (await laneNow(lc.id)), six: (await card(c6)).column, k10, dialog: queuedTen ? undefined : await startDialog.innerText({ timeout: 2000 }).catch(() => '(closed)'), lanes: queuedTen ? undefined : await inv('lanes:list') }))
+    if (!queuedTen) await page.screenshot({ path: path.join(fx.shots, '9b-start-lane-after-click.png') })
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {
