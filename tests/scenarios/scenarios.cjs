@@ -3513,6 +3513,9 @@ module.exports.SCENARIOS = [
     // card, and the lane called it stalled after 9 min, waking the Assistant. Here the job is a plain file (POOL_RUN_JS).
     files: { 'pool-run.js': POOL_RUN_JS, '.gitignore': 'pool/\n' },
     startedByCombwork: true,
+    // Its first turn, the job's 2.5 min and a watch up to its end, then the rest of the card: a fake's minute and a model's
+    // six aren't enough.
+    runMs: 10 * 60_000,
     async setup(c) {
       // The fixture's premise, by its own clock: running before POOL_RUN_MS, passed from then.
       const lib = require('../e2e/lib.cjs')
