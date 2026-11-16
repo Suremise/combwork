@@ -684,8 +684,16 @@ async function handOffCarried(ws: WorkspaceService, projectPath: string, pool: S
  */
 function writtenSlotOf(projectPath: string, pool: SlotPool, builder: string): Slot | null {
   const run = sessions.runNow(projectPath, builder)?.run
-  if (!run || sessions.stopAsked(projectPath, builder, run)) return null
+  if (!run || !runGoesOn(projectPath, builder, run)) return null
   return pool.slots().find((s) => s.writer?.agent === builder && s.writer.run === run && !pool.openLease(s.name)) || null
+}
+
+/**
+ * Whether run `run` is still the builder's now and its stop not asked (HI-3326), read synchronously: asked again after
+ * each await of a takeover (the dry start's look) and first in its write, so a Stop arriving meanwhile wins.
+ */
+function runGoesOn(projectPath: string, builder: string, run: string): boolean {
+  return sessions.runNow(projectPath, builder)?.run === run && !sessions.stopAsked(projectPath, builder, run)
 }
 
 /**
@@ -712,6 +720,8 @@ async function startOnWritten(ws: WorkspaceService, projectPath: string, pool: S
     if (kept && slot.name !== kept) return { wait: pool.keptElsewhere(kept, 'written', slot.name, agentName) }
     // The takeover's own conditions, read (HI-1787): a dry start never advertises what the real one would refuse.
     const busy = await pool.writtenNotTakeable(slot.name, builder, slot.writer!.run)
+    // Its stop asked (or the run gone) during that look (HI-3326): looked at again, never advertised or waited for.
+    if (!runGoesOn(projectPath, builder, slot.writer!.run)) continue
     if (busy) return waitFor(slot, busy)
     if (dry) return { dry: slot }
     const taken = await takeWritten(ws, projectPath, pool, builder, req, agentName)
@@ -728,10 +738,17 @@ async function takeWritten(ws: WorkspaceService, projectPath: string, pool: Slot
   const host = (await ws.sessionScope(projectPath)).scope
   const id = (await ws.projectConfig(projectPath)).id ?? basename(projectPath)
   const taken = await pool
-    .takeWrittenSlot(slot.name, req, run, (db, lease, was) => {
-      const bound = db.prepare('SELECT id FROM sessions WHERE host = ? AND lease = ?').all(host, was) as { id: string }[] // i18n-ignore: SQL
-      for (const b of bound) rebindSession(db, host, id, b.id, lease.id)
-    })
+    .takeWrittenSlot(
+      slot.name,
+      req,
+      run,
+      (db, lease, was) => {
+        const bound = db.prepare('SELECT id FROM sessions WHERE host = ? AND lease = ?').all(host, was) as { id: string }[] // i18n-ignore: SQL
+        for (const b of bound) rebindSession(db, host, id, b.id, lease.id)
+      },
+      // A Stop asked after the slot was chosen, during this function's awaits or the pool's (HI-3326), wins at the write.
+      () => runGoesOn(projectPath, builder, run)
+    )
     .catch((e) => (log.warn(`taking ${userText(agentName)}'s slot ${userText(slot.name)} over`, e), null))
   if (taken) log.info(`${userText(agentName)}'s own slot ${userText(slot.name)}, its run still there, taken over by ${req.lane ? `lane ${req.lane}` : `#${req.card}`} (lease ${taken.id})`)
   return taken
