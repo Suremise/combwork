@@ -158,14 +158,14 @@ describe('a lane on slots (#1438)', () => {
 
 describe('HI-3323: the card a new list makes its lane yield to (laneYieldFirst), one rule for the save and Start Lane', () => {
   const board = (over: Record<number, Partial<{ column: string; agent: string | null; blockedBy: number[]; waitingFor: { reason: string }; key: string; archived: boolean }>> = {}) => {
-    const base: Record<number, { column: string; agent: string | null; blockedBy: number[]; key: string; archived?: boolean; waitingFor?: { reason: string } }> = {
+    const cardsOf: Record<number, { column: string; agent: string | null; blockedBy: number[]; key: string; archived?: boolean; waitingFor?: { reason: string } }> = {
       5: { column: 'done', agent: 'b1', blockedBy: [], key: 'AL-5' },
       6: { column: 'doing', agent: 'b1', blockedBy: [8], key: 'AL-6' },
       8: { column: 'todo', agent: null, blockedBy: [], key: 'AL-8' },
       9: { column: 'todo', agent: null, blockedBy: [], key: 'AL-9' }
     }
-    for (const [n, v] of Object.entries(over)) base[Number(n)] = { ...base[Number(n)], ...v } as never
-    return (n: number) => base[n]
+    for (const [n, v] of Object.entries(over)) cardsOf[Number(n)] = { ...cardsOf[Number(n)], ...v } as never
+    return (n: number) => cardsOf[n]
   }
   it('yields only to a list that keeps the card in Doing and puts first a card in Todo it waits on', () => {
     expect(laneYieldFirst([5, 8, 6], 6, board(), 'b1')).toBe(8)
