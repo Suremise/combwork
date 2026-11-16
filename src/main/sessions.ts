@@ -2303,6 +2303,17 @@ class SessionManager {
   }
 
   /**
+   * Whether run `run` of an agent is ending on request (HI-3326): its stop asked (a lease's end, Stop, a quit typed) or its
+   * start cancelled, while runNow still gives it until it has exited. A run that isn't the agent's now: false.
+   */
+  stopAsked(projectPath: string, agentId: string, run: string): boolean {
+    const l = this.live.get(liveId(projectPath, agentId))
+    if (l) return l.state.runId === run && !!l.stopRequested
+    const p = this.starting.get(liveId(projectPath, agentId))
+    return !!p && p.runId === run && !!p.cancelled
+  }
+
+  /**
    * Whether an agent's conversation may resume now where it was made (#1434, agentFolders.ts): null when it may, else its
    * hold (startup's resume of the last run leaves and lists one). A conversation not recorded, or an agent gone: null
    * (its start says why).
