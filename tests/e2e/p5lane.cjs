@@ -516,24 +516,8 @@ const ancestor = (x, y) => {
     commit('six-more.txt')
     const c8 = (await inv('tasks:create', { title: 'Eight', project: 'alpha' })).number
     await inv('tasks:update', c6, { blockedBy: [c8] })
-    // Start Lane… for B1 with Eight alone in Todo: its hint says the switch (HR1's round 1: the wording seen on the build).
-    await page.getByRole('button', { name: 'Task Board' }).click()
-    await waitHung(async () => (await column('Todo').locator('.task-card').count()) === 1)
-    await column('Todo').locator('.board-column-header').click({ button: 'right' })
-    const startItem = page.locator('.menu[role="menu"] .menu-item', { hasText: 'Start Lane with These Cards…' })
-    await waitHung(async () => (await startItem.count()) === 1)
-    await startItem.click()
-    const startDialog = page.locator('.dialog', { hasText: 'Start Lane' })
-    await waitHung(async () => (await startDialog.count()) === 1)
-    await startDialog.locator('#lane-start-builder').selectOption(b1.id)
     const k6 = await keyOf(c6)
     const k8 = await keyOf(c8)
-    const hint = startDialog.locator('.lane-start-apply-now p')
-    const hintText = await waitHung(async () => { const t = (await hint.innerText().catch(() => '')) ?? ''; return t.includes(`${k6} waits on ${k8}`) ? t : null })
-    check("Start Lane's hint says Six waits on Eight and switches at B1's turn end", !!hintText && hintText.includes('ends its turn'), await startDialog.innerText().catch(() => ''))
-    await page.screenshot({ path: path.join(fx.shots, '9-start-lane-yield-hint.png') })
-    await startDialog.getByRole('button', { name: 'Cancel' }).click()
-    await waitHung(async () => (await startDialog.count()) === 0)
     // Six's folder not clean (an edit not committed): the switch waits, said once to B1, and the lane says what it waits for.
     fs.writeFileSync(path.join(wt, 'six-draft.txt'), 'draft\n')
     const lcNow = await laneNow(lc?.id)
@@ -560,6 +544,29 @@ const ancestor = (x, y) => {
     check('…then Combwork starts Six again', !!again6c && again6c.actor === 'combwork', JSON.stringify(again6c))
     const s6c = await start(c6)
     check('…on its own line, with its work', s6c.s.status === 200 && s6c.line === s6.line && ancestor(sixMore, git(wt, 'rev-parse', 'HEAD')), JSON.stringify(s6c))
+
+    // Start Lane… (HR1's round 2): its lists are Todo cards, so it never keeps the card in Doing, and a list putting first a
+    // card Six waits on is an ordinary list change: its hint says so (no switch promised), and the submitted start queues it.
+    const c10 = (await inv('tasks:create', { title: 'Ten', project: 'alpha' })).number
+    await inv('tasks:update', c6, { blockedBy: [c10] })
+    await page.getByRole('button', { name: 'Task Board' }).click()
+    await waitHung(async () => (await column('Todo').locator('.task-card').count()) === 1)
+    await column('Todo').locator('.board-column-header').click({ button: 'right' })
+    const startItem = page.locator('.menu[role="menu"] .menu-item', { hasText: 'Start Lane with These Cards…' })
+    await waitHung(async () => (await startItem.count()) === 1)
+    await startItem.click()
+    const startDialog = page.locator('.dialog', { hasText: 'Start Lane' })
+    await waitHung(async () => (await startDialog.count()) === 1)
+    await startDialog.locator('#lane-start-builder').selectOption(b1.id)
+    await startDialog.locator('#lane-start-reviewer').selectOption(r1.id)
+    const k10 = await keyOf(c10)
+    const hint = startDialog.locator('.lane-start-apply-now p')
+    const hintText = await waitHung(async () => { const t = (await hint.innerText().catch(() => '')) ?? ''; return t.includes(`this list applies once ${k6} is Done`) ? t : null })
+    check("Start Lane with Ten alone (Six left out): its hint is the ordinary one, no switch promised", !!hintText && !hintText.includes('waits on'), await startDialog.innerText().catch(() => ''))
+    await page.screenshot({ path: path.join(fx.shots, '9-start-lane-ordinary-hint.png') })
+    await startDialog.getByRole('button', { name: /^(Start Lane|Wait and Start)$/ }).click()
+    const queuedTen = await waitHung(async () => { const l = await laneNow(lc.id); return l && JSON.stringify(l.queued) === JSON.stringify([c10]) ? l : null })
+    check('…the start it submits is an ordinary queued change: queued after Six, no switch, Six still in Doing', !!queuedTen && queuedTen.status?.first === undefined && !(await inv('lanes:list')).some((l) => l.status?.first !== undefined) && (await card(c6)).column === 'doing', JSON.stringify({ lane: queuedTen ?? (await laneNow(lc.id)), six: (await card(c6)).column, k10 }))
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

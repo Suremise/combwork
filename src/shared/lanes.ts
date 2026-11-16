@@ -167,6 +167,35 @@ export function waitsOnCard(c: { blockedBy: readonly number[]; waitingFor?: { re
   return [key, `#${first}`].some((k) => !!k && new RegExp(`(^|[^A-Za-z0-9-])${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![A-Za-z0-9])`, 'i').test(reason))
 }
 
+/** What laneYieldFirst reads of a card (the board's, or the window's copy of it). */
+export interface YieldCard {
+  column: string
+  archived?: boolean
+  agent?: string | null
+  blockedBy: readonly number[]
+  waitingFor?: { reason: string } | null
+  key?: string | null
+}
+
+/**
+ * HI-3323: the card a new list (`list`) makes its lane yield to, or null: the list keeps the builder's card in flight
+ * `behind` (in Doing, its own or nobody's), and its first own open card (not Done or archived, the builder's or nobody's)
+ * is another, in Todo, that `behind` waits on (waitsOnCard). One rule for the lanes' save (yieldOf), a reorder applied now
+ * and Start Lane's hint, so what the window says is what a start does.
+ */
+export function laneYieldFirst(list: readonly number[], behind: number, cardOf: (n: number) => YieldCard | null | undefined, builder: string): number | null {
+  if (!list.includes(behind)) return null
+  const c = cardOf(behind)
+  if (!c || c.archived || c.column !== 'doing' || (c.agent && c.agent !== builder)) return null
+  const first = list.find((n) => {
+    const x = cardOf(n)
+    return !!x && !x.archived && x.column !== 'done' && (!x.agent || x.agent === builder)
+  })
+  if (first === undefined || first === behind) return null
+  const f = cardOf(first)
+  return f && f.column === 'todo' && waitsOnCard(c, first, f.key) ? first : null
+}
+
 /** A lane's due card's dependency wait (HI-2618, LaneRecord.depEpisode). */
 export interface DepEpisode {
   card: number

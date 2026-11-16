@@ -5,7 +5,7 @@ import { projectPreferences } from './workflow/preferences'
 import { existsSync } from 'original-fs'
 import { CW_DIR, projectAgents } from '../shared/defaults'
 import { agentWorkflowRole, buildsWork, inWorkflow, reviewsWork } from '../shared/workflow/roles'
-import { allDone, isFrozen, keptLanes, laneName, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, waitsOnCard, type LaneYield, type LaneAgent, type FreshStart, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneSlotHeld, type LaneStartWait, type WaitStamp } from '../shared/lanes'
+import { allDone, isFrozen, keptLanes, laneName, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, laneYieldFirst, type LaneYield, type LaneAgent, type FreshStart, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneSlotHeld, type LaneStartWait, type WaitStamp } from '../shared/lanes'
 import type { CombworkErrorKind, DueDeps, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
 import { columnSince } from '../shared/tasks'
 import { designReviewer, reviewingNow } from '../shared/workflow/reviewerPool'
@@ -980,16 +980,8 @@ export async function applyLaneList(ws: WorkspaceService, was: LaneRecord, cards
 export async function yieldOf(ws: WorkspaceService, was: LaneRecord, cards: readonly number[], behind: number, by: string): Promise<LaneYield | null> {
   if (!cards.includes(behind)) return null
   const board = await cardsNow(ws, [...new Set([...cards, behind])])
-  const c = board.get(behind)
-  if (!c || c.archived || c.column !== 'doing' || (c.agent && c.agent !== was.builder.id)) return null
-  // The new list's first own open card, as a reorder applied now reads it (putBackForReorder).
-  const first = cards.find((n) => {
-    const x = board.get(n)
-    return !!x && !x.archived && x.column !== 'done' && (!x.agent || x.agent === was.builder.id)
-  })
-  if (first === undefined || first === behind) return null
-  const f = board.get(first)!
-  if (f.column !== 'todo' || !waitsOnCard(c, first, f.key ?? '')) return null
+  const first = laneYieldFirst(cards, behind, (n) => board.get(n), was.builder.id)
+  if (first === null) return null
   const s = attemptOf(ws, was.project, behind)
   return s && s.stage === 'active' ? { id: newId(), card: behind, first, attempt: s.attempt, by } : null
 }
@@ -1302,9 +1294,7 @@ async function putBackForReorder(ws: WorkspaceService, s: StartLane, builder: La
   // HI-3323: the new first card is one the card in flight waits on: never put back here, idle builder or not. The start's
   // edit queues it as a yield, which runLaneYields runs in its one guarded board change (fenced at its commit on the
   // builder's run, turn, Stop, launch, the team's pause and its role), at once when the builder is free.
-  const fc = first !== undefined ? cards.get(first) : undefined
-  const fly = cards.get(flying.number)
-  if (fc && fly && fc.column === 'todo' && waitsOnCard(fly, first!, fc.key ?? '')) return null
+  if (laneYieldFirst(s.cards, flying.number, (n) => cards.get(n), builder.id) !== null) return null
   const { sessions } = await import('./sessions')
   const st = sessions.liveFor(projectPath, builder.id)
   if (st && IN_A_TURN.has(st.status)) throw new LaneError(409, say(A.inATurn, { agent: builder.name, status: st.status }))
@@ -1397,15 +1387,9 @@ async function cardFolderClean(folder: string | undefined): Promise<boolean> {
  */
 async function yieldCardsHold(ws: WorkspaceService, l: LaneRecord, y: LaneYield): Promise<boolean> {
   const pending = l.pending ?? []
+  if (!l.cards.includes(y.card)) return false
   const board = await cardsNow(ws, [...new Set([...pending, y.card])])
-  const c = board.get(y.card)
-  const f = board.get(y.first)
-  if (!c || !f || c.archived || f.archived || c.column !== 'doing' || f.column !== 'todo' || (c.agent && c.agent !== l.builder.id) || !l.cards.includes(y.card)) return false
-  const first = pending.find((n) => {
-    const x = board.get(n)
-    return !!x && !x.archived && x.column !== 'done' && (!x.agent || x.agent === l.builder.id)
-  })
-  return first === y.first && waitsOnCard(c, y.first, f.key ?? '')
+  return laneYieldFirst(pending, y.card, (n) => board.get(n), l.builder.id) === y.first
 }
 
 /** For tests (HI-3323): awaited after a yield's look without the locks (`looked`), and after its decision under the lanes' lock, before its board change (`decided`). */

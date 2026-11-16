@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { AgentInfo, LaneStartInfo, ProjectInfo } from '@shared/types'
 import { shownText, type Text } from '@shared/advanced'
 import { fmt, msg, tr } from '@shared/i18n'
-import { LANE_NAME_MAX, waitsOnCard } from '@shared/lanes'
+import { LANE_NAME_MAX, laneYieldFirst } from '@shared/lanes'
 import { cardLabel } from '@shared/projectKeys'
 import { agentWorkflowRole, buildsWork, reviewsWork } from '@shared/workflow/roles'
 import { call } from '../api'
@@ -187,10 +187,10 @@ export function LaneStartDialog() {
     return c ? cardLabel(c) : `#${n}`
   }
   const canApplyNow = !!flying && flying.column === 'doing' && cards[0] !== flying.number
-  // HI-3323: the new first card is one the card in Doing waits on: the list switches at the builder's turn end by itself.
-  const firstCard = canApplyNow ? tasks.find((x) => x.number === cards[0]) : undefined
-  const flyingCard = canApplyNow ? tasks.find((x) => x.number === flying!.number) : undefined
-  const yieldsTo = !!firstCard && !!flyingCard && firstCard.column === 'todo' && waitsOnCard(flyingCard, firstCard.number, firstCard.key) ? firstCard.number : null
+  // HI-3323: the list makes the lane yield (the start's own rule, laneYieldFirst): it keeps the card in Doing and puts first
+  // a card in Todo that card waits on, so the lane switches at the builder's turn end. A list without that card (this
+  // dialog's own lists are Todo cards) is an ordinary list change, and its hint says so.
+  const yieldsTo = canApplyNow ? laneYieldFirst(cards, flying!.number, (n) => tasks.find((x) => x.number === n), builder) : null
 
   const go = async (): Promise<void> => {
     // Only for the request still open: a dialog closed or opened again since starts nothing.

@@ -8,7 +8,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import * as electron from 'electron'
 import type { CombworkEvent, TaskCard } from '../src/shared/types'
 import { preferencesOf } from '../src/shared/workflow/preferences'
-import { allDone, keptLanes, laneCard, laneLine, laneNextText, laneView, listedLanes, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_NAME_MAX, LANE_KEEP_MS, MAX_LANES, type LaneRecord, type LaneSlotHeld } from '../src/shared/lanes'
+import { laneYieldFirst, waitsOnCard, allDone, keptLanes, laneCard, laneLine, laneNextText, laneView, listedLanes, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_NAME_MAX, LANE_KEEP_MS, MAX_LANES, type LaneRecord, type LaneSlotHeld } from '../src/shared/lanes'
 import { tempDir } from './tempDir'
 import { storeDocs } from './storeDocs'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
@@ -153,6 +153,36 @@ describe('a lane on slots (#1438)', () => {
     // Another card's fact isn't this one's; with none, the reply is as before.
     expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: true }, waits: null, unsubmitted: [{ ...u[0], card: 3 }] })).toBe('Carry on with #2 Card 2 in slot-b.')
     expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: true }, waits: null, unsubmitted: [] })).toBe('Carry on with #2 Card 2 in slot-b.')
+  })
+})
+
+describe('HI-3323: the card a new list makes its lane yield to (laneYieldFirst), one rule for the save and Start Lane', () => {
+  const board = (over: Record<number, Partial<{ column: string; agent: string | null; blockedBy: number[]; waitingFor: { reason: string }; key: string; archived: boolean }>> = {}) => {
+    const base: Record<number, { column: string; agent: string | null; blockedBy: number[]; key: string; archived?: boolean; waitingFor?: { reason: string } }> = {
+      5: { column: 'done', agent: 'b1', blockedBy: [], key: 'AL-5' },
+      6: { column: 'doing', agent: 'b1', blockedBy: [8], key: 'AL-6' },
+      8: { column: 'todo', agent: null, blockedBy: [], key: 'AL-8' },
+      9: { column: 'todo', agent: null, blockedBy: [], key: 'AL-9' }
+    }
+    for (const [n, v] of Object.entries(over)) base[Number(n)] = { ...base[Number(n)], ...v } as never
+    return (n: number) => base[n]
+  }
+  it('yields only to a list that keeps the card in Doing and puts first a card in Todo it waits on', () => {
+    expect(laneYieldFirst([5, 8, 6], 6, board(), 'b1')).toBe(8)
+    // HR1's round 2: Start Lane's list of Todo cards alone (the card in Doing left out) is an ordinary list change.
+    expect(laneYieldFirst([8], 6, board(), 'b1')).toBeNull()
+    // Its card in flight still first, or a first card it doesn't wait on: none.
+    expect(laneYieldFirst([6, 8], 6, board(), 'b1')).toBeNull()
+    expect(laneYieldFirst([9, 8, 6], 6, board(), 'b1')).toBeNull()
+    // The first own open card counts: one given to another agent is passed over; one not in Todo, or a card not in Doing, isn't one.
+    expect(laneYieldFirst([9, 8, 6], 6, board({ 9: { agent: 'b2' } }), 'b1')).toBe(8)
+    expect(laneYieldFirst([8, 6], 6, board({ 8: { column: 'hold' } }), 'b1')).toBeNull()
+    expect(laneYieldFirst([8, 6], 6, board({ 6: { column: 'review' } }), 'b1')).toBeNull()
+    expect(laneYieldFirst([8, 6], 6, board({ 6: { agent: 'b2' } }), 'b1')).toBeNull()
+    // Named by its waiting reason (key or #n, a whole word), in place of blockedBy.
+    expect(laneYieldFirst([8, 6], 6, board({ 6: { blockedBy: [], waitingFor: { reason: 'needs al-8 merged first' } } }), 'b1')).toBe(8)
+    expect(laneYieldFirst([8, 6], 6, board({ 6: { blockedBy: [], waitingFor: { reason: 'needs AL-88 first' } } }), 'b1')).toBeNull()
+    expect(waitsOnCard({ blockedBy: [], waitingFor: { reason: 'after #8 lands' } }, 8, null)).toBe(true)
   })
 })
 
