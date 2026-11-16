@@ -393,7 +393,8 @@ for (const [i, { sc, sample, name }] of trials.entries()) {
   }
   process.stdout.write(`${sc.id} (${provider}${repeats > 1 ? `, ${sample}/${repeats}` : ''})… `)
   // What the trial uses the home with, noted on its lease before it starts (HR2 on round 1): kept after a crash too.
-  const r = await runScenario(sc, provider, { model, effort, advanced, dialect, keep, workRoot, port: lane.first, evidence, signedOut, timeoutMs: fake ? 60000 : 360000, uses: consumerHooks([realHome?.lease]) })
+  // A scenario whose outcome comes after a wait of its own (`runMs`, HI-3324: a watch's end some minutes on) runs that long at least.
+  const r = await runScenario(sc, provider, { model, effort, advanced, dialect, keep, workRoot, port: lane.first, evidence, signedOut, timeoutMs: Math.max(fake ? 60000 : 360000, sc.runMs ?? 0), uses: consumerHooks([realHome?.lease]) })
   r.sample = sample
   if (r.environment) {
     // Not a result of the scenario: no checks, and no cost assumed.

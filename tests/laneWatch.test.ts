@@ -1337,6 +1337,37 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await disposeWorkspaceService(w)
   })
 
+  it("a lane's builder waiting on a job Combwork can't see, its card marked waiting, is neither stalled nor told to the Assistant; the mark cleared, the same watch is (HI-3324)", async () => {
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    const [a] = await newCards(w, 'b1', 1)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })
+    const since = new Date().toISOString()
+    // CB2's case (CL-234, 16 Nov): a 40-min test run in a pool VM, through an MCP server's tool, with no process of its own
+    // on the host and no cw-progress run. It marks its card waiting for the run, then ends its turn on a watch of the card.
+    await inWorkspace(w, () => tasks.updateTask(a, { waitingFor: 'Pool VM run 17: the tests, ending about 40 min from now' }, agent('b1')))
+    Object.assign(sessions, { liveStates: () => [{ projectPath: alpha, agentId: 'b1', agentName: 'B1', status: 'watching', watch: { cards: [a], changes: ['comment'], label: '', since, limitAt: '' } }] })
+    await watchAll(w, home, st)
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      // Past the idle watch's 5 min, the watch on the card alone: no stall, nothing told to the Assistant.
+      vi.setSystemTime(Date.parse(since) + IDLE_WATCH_STALL_MS + 60_000)
+      await watches.evaluateWatches(w)
+      await watches.settled()
+      expect(st.typed).toEqual([])
+      const marked = (await watches.lanesNowIn(w, {}, since)).flatMap((l) => l.cards).find((c) => c.number === a)
+      expect(marked?.stalled).toBeNull()
+      // The run over, it clears the mark: the same aged watch with nothing else changed is a stall, told to the Assistant.
+      await inWorkspace(w, () => tasks.updateTask(a, { waitingFor: '' }, agent('b1')))
+      await watches.evaluateWatches(w)
+      await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    } finally {
+      vi.useRealTimers()
+    }
+    expect(st.told[0]).toContain(`#${a} is stalled: "B1 only watches #${a} (6 min), and nothing waits on it: no question for the user, no design step, not submitted."`)
+    await disposeWorkspaceService(w)
+  })
+
   it("a card the merge queue returned, its builder only watching it for Done, is stalled once it has waited 15 min (HI-1721)", async () => {
     const { w, alpha, home } = await open()
     const st = fake(alpha, home)
