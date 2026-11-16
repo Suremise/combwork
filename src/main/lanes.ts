@@ -1499,6 +1499,8 @@ async function runYield(ws: WorkspaceService, id: string): Promise<YieldNow | nu
       return d
     }
   )
+  if (decided?.kind === 'stale') log.info(`Lane ${id}: its yield no longer applies (its card moved on, or no longer waits on the first): its list stays queued`)
+  if (decided?.kind === 'wait') log.info(`Lane ${id}: its yield waits for ${decided.why === 'turn' ? 'its builder to be out of a turn' : "its card's folder to read as clean"}`)
   if (after.told) await tellYield(ws, after.told.l, after.told.y)
   if (after.ran) {
     const { l, y, line } = after.ran
