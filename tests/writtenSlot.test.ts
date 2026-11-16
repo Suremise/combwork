@@ -229,6 +229,22 @@ describe("B1's next start takes over the slot its own run still writes in (HI-17
     expect(await t.lane('lane-next')).toEqual({ slot: b1.slot })
   })
 
+  it("B1's run already being stopped (HI-3326: the old lease's gentle end stopped it at its idle moment, and runNow still gives it until it exits): never taken over; the start is refused while its writer holds the slot, as an ended run's is", async () => {
+    const t = await setup('stopping')
+    const b1 = await t.laneEndedWithB1There()
+    const r2 = await t.start(await t.card('B2s', 'b2'), 'b2')
+    expect(r2 && 'lease' in r2 ? r2.slot : r2).not.toBe(b1.slot)
+    const stopAsked = vi.spyOn(sessions, 'stopAsked').mockImplementation((_p: string, agent: string, run: string) => agent === 'b1' && run === 'run-b1')
+    cleanups.push(() => stopAsked.mockRestore())
+    const next = await t.card('B1 next', 'b1')
+    // Neither the dry start nor the real one names B1's own slot as its to take; the real one is refused, nothing lent.
+    expect(await t.start(next, 'b1', true)).not.toMatchObject({ slot: b1.slot })
+    expect(await t.start(next, 'b1')).toMatchObject({ wait: expect.any(String) })
+    expect(t.leases('b1')).toEqual([])
+    expect(t.writerOf(b1.slot)).toMatchObject({ run: 'run-b1', lease: b1.old })
+    expect(stopAsked).toHaveBeenCalledWith(t.project, 'b1', 'run-b1')
+  })
+
   it("another agent's writer is not B1's: B1 is lent another slot; B1's own run held by another Combwork: it waits, never a second slot", async () => {
     const t = await setup('other')
     const first = await t.lane('lane-old')

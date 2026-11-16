@@ -675,10 +675,17 @@ async function handOffCarried(ws: WorkspaceService, projectPath: string, pool: S
   return handed
 }
 
-/** The slot a builder's run now writes in with no open lease (HI-1762), as the pool has it: none, null. */
+/**
+ * The slot a builder's run now writes in with no open lease (HI-1762), as the pool has it: none, null. A run whose stop
+ * was asked (HI-3326: the old lease's gentle end stopped it at its idle moment) is ending, never taken over: its slot is
+ * as an ended run's, which the lend refuses while that run's writer holds it, the start's status saying so (HI-2468).
+ * Taken over, its card went to Doing with its builder to be resumed once what the run left there had ended, its lane's
+ * status saying nothing meanwhile.
+ */
 function writtenSlotOf(projectPath: string, pool: SlotPool, builder: string): Slot | null {
   const run = sessions.runNow(projectPath, builder)?.run
-  return (run && pool.slots().find((s) => s.writer?.agent === builder && s.writer.run === run && !pool.openLease(s.name))) || null
+  if (!run || sessions.stopAsked(projectPath, builder, run)) return null
+  return pool.slots().find((s) => s.writer?.agent === builder && s.writer.run === run && !pool.openLease(s.name)) || null
 }
 
 /**

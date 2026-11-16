@@ -210,6 +210,8 @@ vi.mock('../src/main/sessions', async (orig) => {
     agentNow: () => (state.live ? { status: 'ready', pending: false, backgroundTasks: 0 } : null),
     // No run writes in a slot here (HI-1762's takeover of the slot an agent's own run still writes in finds none).
     runNow: () => state.run,
+    // Nothing here stops a run while a start looks (HI-3326's run being stopped is writtenSlot.test.ts').
+    stopAsked: () => false,
     quit: async (_p: string, _a: string, _r: string, o: { fenced: () => boolean; ready?: () => string | null }) => (state.quits++, state.quit ? state.quit(o) : 'gone'),
     combworkMcp: () => null,
     start: async (_p: string, o: { prompt?: string; resumeId?: string }) => {
