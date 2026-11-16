@@ -8130,7 +8130,11 @@ Whether a conversation may resume there is its **hold** (none: it may):
     that slot busy just then (an operation or job, not ready, its run held by another Combwork, or changed while taken)
     makes the start wait, looked at once more, never lent a second slot; the window's dry start says the same, asking
     the takeover's own conditions without writing (HI-1787). The same rule as a carried slot's
-    takeover (§16.10.8).
+    takeover (§16.10.8). A run whose stop was already asked (HI-3326: the old lease's end stopped it at its idle moment,
+    and it hasn't exited yet) is never taken over, a stop asked after the slot was chosen included (asked again in the
+    takeover's write, and after a dry start's look): its slot is as an ended run's, so the start is refused while its writer
+    holds the slot, the lane's status naming the slot and what holds it (HI-2468). Taken over, its card went to Doing
+    with its builder to be resumed once the slot was free, and the lane's row said nothing meanwhile.
   - **Off switch:** Settings → Advanced → **Lanes: let the builder finish when its lane ends** (`cw.lanes.gentleEnd`):
     off, it is stopped at its first idle moment, as before. A reviewer holds no lease, so a lane's end never stops it:
     it goes idle.

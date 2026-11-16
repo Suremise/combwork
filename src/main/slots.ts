@@ -816,12 +816,15 @@ export class SlotStore {
    * while the slot has no open lease, operation or job, is lent with no warm error, its writer is that agent's run `run`
    * held by this Combwork (`holder`), and the agent holds no other dispatch lease. The lease begins on the slot, the writer
    * moves to it (the old lease's end then no longer owns the run: it stops nothing), and `also` (the caller's rebinding of
-   * the run's conversations) runs in the same write. Null when it can't be now; nothing written.
+   * the run's conversations) runs in the same write. `still` (the caller's, HI-3326: the run still the agent's and its
+   * stop not asked) is asked first in that write, with nothing awaited after it, so a stop asked since the caller chose
+   * the slot wins. Null when it can't be now; nothing written.
    */
-  async takeWrittenSlot(slot: string, req: { card?: number; lane?: string; agent: string; startsCard?: number }, run: string, holder: { pid: number; started: number }, also?: (db: DatabaseSync, lease: SlotLease, was: string) => void): Promise<SlotLease | null> {
+  async takeWrittenSlot(slot: string, req: { card?: number; lane?: string; agent: string; startsCard?: number }, run: string, holder: { pid: number; started: number }, also?: (db: DatabaseSync, lease: SlotLease, was: string) => void, still?: () => boolean): Promise<SlotLease | null> {
     if ((req.card === undefined) === (req.lane === undefined)) throw new Error('a lease is for a card or a lane') // agent-protocol: a programming error (its caller's), never an agent's or the user's
     try {
       return await this.conn.write((db) => {
+        if (still && !still()) return null
         if (this.writtenNotTakeableIn(db, slot, req.agent, run, holder)) return null
         // The card it is for has a slot kept for it elsewhere (HI-3032): never placed here instead.
         if (this.keptElsewhereIn(db, req.card ?? req.startsCard, slot)) return null
@@ -2042,8 +2045,8 @@ export class SlotPool {
   }
 
   /** The slot an agent's own run still writes in, taken over by its next card or lane (HI-1762, SlotStore.takeWrittenSlot), held by this Combwork. */
-  async takeWrittenSlot(slot: string, req: { card?: number; lane?: string; agent: string; startsCard?: number }, run: string, also?: (db: DatabaseSync, lease: SlotLease, was: string) => void): Promise<SlotLease | null> {
-    return this.store.takeWrittenSlot(slot, req, run, await this.deps.holder.self(), also)
+  async takeWrittenSlot(slot: string, req: { card?: number; lane?: string; agent: string; startsCard?: number }, run: string, also?: (db: DatabaseSync, lease: SlotLease, was: string) => void, still?: () => boolean): Promise<SlotLease | null> {
+    return this.store.takeWrittenSlot(slot, req, run, await this.deps.holder.self(), also, still)
   }
 
   /** Why takeWrittenSlot wouldn't take it now (SlotStore.writtenNotTakeable), held by this Combwork; null: it would. */
