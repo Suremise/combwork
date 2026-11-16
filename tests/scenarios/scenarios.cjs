@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 137
+const FIXTURES_VERSION = 138
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -309,9 +309,10 @@ const CARD_LOOP_GREETING = 'Change greet.js so it returns "Hi, <name>" instead o
  * card-loop-outside-job's test pass on a pool VM (HI-3324): a job Combwork can't see, acted out by a plain file. `start`
  * notes the run's start in pool/run.json and returns at once; `status` says running until POOL_RUN_MS have passed, then
  * passed, and logs each check to pool/checks.log. Nothing runs in the background. `state` is its clock, given the time,
- * so the setup checks it without waiting.
+ * so the setup checks it without waiting. 40 min, as CB2's run: too long to wait out in a shell (the models at the base
+ * polled a 2.5-min one there). The scenario stands in for the time passing by moving the run's start back.
  */
-const POOL_RUN_MS = 150_000
+const POOL_RUN_MS = 40 * 60_000
 const POOL_RUN_JS = `// The test pass on the pool VM: queued here, run there. Nothing of it runs on this machine.
 const fs = require('fs')
 const path = require('path')
@@ -325,7 +326,7 @@ if (require.main === module) {
   if (cmd === 'start') {
     fs.mkdirSync(dir, { recursive: true })
     fs.writeFileSync(file, JSON.stringify({ run: 17, startedAt: Date.now() }))
-    console.log('Queued run 17 on the pool VM: the tests take about 3 minutes there. Check it with: node pool-run.js status')
+    console.log('Queued run 17 on the pool VM: the tests take about 40 minutes there. Check it with: node pool-run.js status')
   } else if (cmd === 'status') {
     if (!fs.existsSync(file)) {
       console.log('No run queued.')
@@ -335,7 +336,7 @@ if (require.main === module) {
     const now = Date.now()
     const s = state(run, now)
     fs.appendFileSync(path.join(dir, 'checks.log'), JSON.stringify({ at: now, state: s }) + '\\n')
-    console.log(s === 'passed' ? 'Run 17: passed, 214 tests.' : 'Run 17: running, about ' + Math.ceil((run.startedAt + RUN_MS - now) / 1000) + ' s left.')
+    console.log(s === 'passed' ? 'Run 17: passed, 214 tests.' : 'Run 17: running, about ' + Math.ceil((run.startedAt + RUN_MS - now) / 60000) + ' min left.')
   } else {
     console.log('Usage: node pool-run.js start | status')
     process.exit(1)
@@ -344,7 +345,7 @@ if (require.main === module) {
 `
 const POOL_CARD = 'Run the test pass on the pool VM: `node pool-run.js start` queues it there and returns at once, and `node pool-run.js status` says how it is going. Once it has passed, write its result line to RESULTS.md, commit it, and submit. Don\'t submit before the run has ended.'
 /** card-loop-outside-job's fake, woken by its watch's end: it checks the run, clears the mark, records the result and submits. */
-const poolWake = (c) => `shell: node pool-run.js status then cw cw_update_task ${JSON.stringify({ number: `#${c.cards.a}`, waitingFor: '' })} then shell: node -e "require('fs').writeFileSync('RESULTS.md', 'Run 17: passed, 214 tests.\\n')" then shell: git add -A then shell: git -c user.name=Coder -c user.email=coder@example.com commit -qm "Pool run 17 passed" then cw cw_submit ${JSON.stringify({ card: `#${c.cards.a}`, summary: 'Ready for review: pool run 17 passed (214 tests), in RESULTS.md.' })}`
+const poolWake = (c) => `cw cw_read_task {"number":${c.cards.a}} then shell: node pool-run.js status then cw cw_update_task ${JSON.stringify({ number: `#${c.cards.a}`, waitingFor: '' })} then shell: node -e "require('fs').writeFileSync('RESULTS.md', 'Run 17: passed, 214 tests.\\n')" then shell: git add -A then shell: git -c user.name=Coder -c user.email=coder@example.com commit -qm "Pool run 17 passed" then cw cw_submit ${JSON.stringify({ card: `#${c.cards.a}`, summary: 'Ready for review: pool run 17 passed (214 tests), in RESULTS.md.' })}`
 /**
  * The fake builder's work on greet.js, committed before its card goes to Review (#1486: a submit needs a change). A step
  * a command, since the fakes' shells differ: cmd (Claude Code's, Codex's) and PowerShell (Copilot's).
@@ -3513,7 +3514,7 @@ module.exports.SCENARIOS = [
     // card, and the lane called it stalled after 9 min, waking the Assistant. Here the job is a plain file (POOL_RUN_JS).
     files: { 'pool-run.js': POOL_RUN_JS, '.gitignore': 'pool/\n' },
     startedByCombwork: true,
-    // Its first turn, the job's 2.5 min and a watch up to its end, then the rest of the card: a fake's minute and a model's
+    // Its first turn, the wake that stands in for the job's end, then the rest of the card: a fake's minute and a model's
     // six aren't enough.
     runMs: 10 * 60_000,
     async setup(c) {
@@ -3527,22 +3528,27 @@ module.exports.SCENARIOS = [
       const a = await c.card('a', { title: 'Run the test pass on the pool VM', description: POOL_CARD, agent: 'coder' })
       await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a], rounds: 10, waitMinutes: 360 }, { keepRunning: true })
     },
-    // Its first turn's end with the card in Doing: the card's mark and its watch then. It runs on till its card leaves
-    // Doing, or 8 min after that end (the job takes 2.5 min; a watch up to its end wakes it by 4).
+    // Its first turn's end with the card in Doing: the card's mark and its watch then. Then the job's 40 min pass at once
+    // (its start moved back), and the user's comment on the card wakes it, as a watch's end would at the job's end (no
+    // test hook brings a watch's limit forward). It runs on till its card leaves Doing, or 8 min after that end.
     async during(c, status) {
       if (c.firstEnd || !['finished', 'ready', 'watching'].includes(status)) return
       const card = (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body
       if (card?.column !== 'doing' || !c.read('pool/run.json')) return
-      c.firstEnd = { at: Date.now(), status, waitingFor: card.waitingFor ?? null, watch: (await coderLive(c))?.watch ?? null }
+      const job = JSON.parse(c.read('pool/run.json'))
+      c.firstEnd = { at: Date.now(), status, waitingFor: card.waitingFor ?? null, watch: (await coderLive(c))?.watch ?? null, jobEnds: job.startedAt + POOL_RUN_MS }
       // The fake Claude Code's steps for its next wake, given only now: Combwork's start line is a wake too, and would take
       // them first. A fake only (it has logged a wake: that start line); a real CLI reads no script.
       const fs = require('fs')
       const path = require('path')
       if (fs.existsSync(path.join(c.fakeHome, 'fake-wakes.jsonl'))) fs.writeFileSync(path.join(c.fakeHome, `fake-wakes-${c.agents.coder.name.replace(/[^\w-]/g, '_')}.txt`), poolWake(c) + '\n')
+      fs.writeFileSync(path.join(c.alpha, 'pool', 'run.json'), JSON.stringify({ ...job, startedAt: Date.now() - POOL_RUN_MS - 1000 }))
+      await c.inv('tasks:comment', c.cards.a, 'Any news on this card?')
+      c.wokenAt = Date.now()
     },
     keepWaiting: async (c) => !!c.firstEnd && Date.now() - c.firstEnd.at < 8 * 60_000 && (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body?.column === 'doing',
     prompt: (c) => `You are the builder of card #${c.cards.a} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). Do the card and hand it to your reviewer as your loop says.`,
-    fake: (c) => `skill card-loop then skill work-on-card then shell: node pool-run.js start then cw cw_update_task ${JSON.stringify({ number: `#${c.cards.a}`, waitingFor: 'Pool VM run 17: the test pass, ending about 3 min from now' })} then cw cw_wait_for_tasks ${JSON.stringify({ cards: [`#${c.cards.a}`], changes: ['comment'], wake: true, limitMinutes: 3 })}`,
+    fake: (c) => `skill card-loop then skill work-on-card then shell: node pool-run.js start then cw cw_update_task ${JSON.stringify({ number: `#${c.cards.a}`, waitingFor: 'Pool VM run 17: the test pass, ending about 40 min from now' })} then cw cw_wait_for_tasks ${JSON.stringify({ cards: [`#${c.cards.a}`], changes: ['comment'], wake: true, limitMinutes: 45 })}`,
     expect: (o, c) => {
       const f = c.firstEnd
       const run = (() => {
@@ -3559,7 +3565,9 @@ module.exports.SCENARIOS = [
           return {}
         }
       })
-      const passedAt = checks.find((x) => x.state === 'passed' && f && x.at > f.at)?.at ?? 0
+      // Its check once woken (after the job's end was brought forward), and its first check that saw it passed, whenever.
+      const passedAt = checks.find((x) => x.state === 'passed' && c.wokenAt && x.at >= c.wokenAt)?.at ?? 0
+      const firstPassed = checks.find((x) => x.state === 'passed')?.at ?? 0
       const marks = ran(o, 'cw_update_task').filter((x) => cardIs(o, argsOf(x).number, c.cards.a) && String(argsOf(x).waitingFor ?? '').trim())
       const clears = ran(o, 'cw_update_task').filter((x) => cardIs(o, argsOf(x).number, c.cards.a) && 'waitingFor' in argsOf(x) && !String(argsOf(x).waitingFor ?? '').trim())
       const clearedAt = Math.max(0, ...clears.map((x) => Date.parse(x.at) || 0))
@@ -3570,13 +3578,13 @@ module.exports.SCENARIOS = [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ['started the job (pool/run.json)', !!run, c.read('pool/run.json')],
         // Not a wait in its shell: its turn ended while the job still ran.
-        ['ended its first turn while the job still ran, the card in Doing', !!f && !!run && f.at < run.startedAt + POOL_RUN_MS, JSON.stringify({ firstEnd: f?.at, jobEnds: run ? run.startedAt + POOL_RUN_MS : null })],
+        ['ended its first turn while the job still ran, the card in Doing', !!f && f.at < f.jobEnds, JSON.stringify({ firstEnd: f?.at ?? null, jobEnds: f?.jobEnds ?? null })],
         ['its card marked waiting then, the mark naming the job', !!f?.waitingFor && marks.length > 0 && /pool|VM|run|test/i.test(f.waitingFor.reason ?? ''), JSON.stringify(f?.waitingFor)],
-        ['that turn ended on a card watch up to the job\'s end (1–15 min), not the lane\'s 6 h', !!w?.cards?.includes(c.cards.a) && watchMin !== null && watchMin >= 1 && watchMin <= 15, JSON.stringify({ watch: w, minutes: watchMin })],
+        ['that turn ended on a card watch up to the job\'s end (1–90 min), not the lane\'s 6 h', !!w?.cards?.includes(c.cards.a) && watchMin !== null && watchMin >= 1 && watchMin <= 90, JSON.stringify({ watch: w, minutes: watchMin })],
         ['woken, it checked the job and saw it passed', passedAt > 0, JSON.stringify(checks)],
         ['cleared the mark once the job passed (itself, or by its submission, which leaves Doing)', passedAt > 0 && (clearedAt > passedAt || submitted > passedAt) && !o.cards.a?.waitingFor, JSON.stringify({ clearedAt, submitted, passedAt, left: o.cards.a?.waitingFor ?? null, by: clearedAt > passedAt ? 'its clear' : 'its submission' })],
         ['wrote the result to RESULTS.md', /214/.test(c.read('RESULTS.md') ?? ''), c.read('RESULTS.md')],
-        ['submitted only after the job passed (Review)', passedAt > 0 && submitted > passedAt && o.cards.a?.column === 'review', `${o.cards.a?.column}; ${history(o.cards.a).join(' | ')}`]
+        ['submitted only after the job passed (Review)', firstPassed > 0 && submitted > firstPassed && o.cards.a?.column === 'review', `${o.cards.a?.column}; ${history(o.cards.a).join(' | ')}`]
       ]
     }
   },
