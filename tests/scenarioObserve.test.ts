@@ -2009,6 +2009,14 @@ describe('a trial the environment stops (trialEnvironment)', () => {
       const limit = await notices([...relayed, synthetic("You've hit your usage limit · resets 5pm (Europe/London)")])
       expect(trialEnvironment({ status: 'finished', replies: limit.cli })).toMatch(/^usage or rate limit: /)
     })
+
+    it("so is Claude Code's weekly limit (HI-3325), not six FAILs", async () => {
+      // Claude Code 2.1.325's notice on a spent seven-day limit (apiError usage_limit_reached, 429, rateLimitType seven_day).
+      const WEEKLY = "You've hit your weekly limit · resets Nov 18, 9am (Europe/London)"
+      const weekly = await notices([...relayed, synthetic(WEEKLY)])
+      expect(weekly.cli).toEqual([WEEKLY])
+      expect(trialEnvironment({ status: 'finished', replies: weekly.cli })).toMatch(/^usage or rate limit: /)
+    })
   })
 })
 

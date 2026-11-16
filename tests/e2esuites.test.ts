@@ -510,7 +510,7 @@ describe('the real tier and environment failures (card #191)', () => {
   it("lib.cjs knows the CLIs' environment failures from their output, and nothing else", () => {
     const { environmentProblem } = createRequire(import.meta.url)('./e2e/lib.cjs') as { environmentProblem: (t: string) => string | null }
     const env = {
-      'usage or rate limit': ['\x1b[31m  ⎿  API Error: 429 {"type":"error","error":{"type":"rate_limit_error"}}', 'Claude usage limit reached. Your limit will reset at 3pm', "You've hit your limit · resets 5pm (Europe/London)", "■ You've hit your usage limit. Upgrade to Pro or try again in 2 hours."],
+      'usage or rate limit': ['\x1b[31m  ⎿  API Error: 429 {"type":"error","error":{"type":"rate_limit_error"}}', 'Claude usage limit reached. Your limit will reset at 3pm', "You've hit your limit · resets 5pm (Europe/London)", "■ You've hit your usage limit. Upgrade to Pro or try again in 2 hours.", "You've hit your weekly limit · resets Nov 18, 9am (Europe/London)", "You've hit your session limit · resets 2pm (Europe/London)", "You've hit your 5-hour limit · resets 2pm (Europe/London)"],
       'the API is overloaded': ['API Error: 529 {"type":"error","error":{"type":"overloaded_error"}}'],
       'not signed in': ['Invalid API key · Please run /login', 'Select login method:', 'OAuth token has expired. Please obtain a new token or refresh your existing token.', 'Sign in with ChatGPT'],
       network: ['API Error: Connection error.', 'Unable to connect to Anthropic API', 'stream error: stream disconnected before completion: error sending request for url (https://chatgpt.com/backend-api/codex/responses)', 'getaddrinfo ENOTFOUND api.anthropic.com']
