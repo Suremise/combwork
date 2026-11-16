@@ -267,6 +267,66 @@ describe.skipIf(!jjExe)(`preview and click for jj (jj ${TESTED_JJ.version}), HI-
       expect(facts(w, card, 'Integrated')).toHaveLength(1)
     })
 
+    // HI-3321 (rc.3's jjadvance under load): a reconcile that read the card before the click's attempt began, reaching its
+    // offer's check once the attempt has moved main in jj but not yet exported it, finds the offer not current. Withdrawn
+    // there, the attempt's lease (its plan) was gone at its export: an uncertain move, the card left Approved.
+    it("HI-3321: a reconcile that read the card before Integrate's attempt began doesn't withdraw its offer mid-attempt: the click integrates", async () => {
+      let atExport: () => Promise<void> = async () => undefined
+      const w = await world(colocated, { candidates: true, oneSlot: true, advance: 'preview', advanceHook: async (p) => (p === 'beforeExport' ? atExport() : undefined) })
+      const card = await approved(w)
+      await pass(w, card)
+      const [p] = previews(w, card)
+      await click(w, card, p.request, 'approved')
+      // The reconcile reads the card (no attempt yet), then waits at its offer's check until the attempt is at its export.
+      const plat = jjp(w, card) as unknown as { offerCurrent: (t: string, o: unknown) => Promise<boolean> }
+      const realOffer = plat.offerCurrent.bind(plat)
+      let reached!: () => void
+      const atOffer = new Promise<void>((r) => (reached = r))
+      let open!: () => void
+      const gate = new Promise<void>((r) => (open = r))
+      let decided = false
+      let first = true
+      plat.offerCurrent = async (t, o) => {
+        // Only the stale reconcile's check waits (the attempt reads the offer too, for its plan).
+        if (!first) return realOffer(t, o)
+        first = false
+        reached()
+        await gate
+        const v = await realOffer(t, o)
+        decided = true
+        return v
+      }
+      // The reconcile's next write after its offer's check (the withdrawal it would make), awaited by the attempt.
+      const realWrite = w.wf.write.bind(w.wf)
+      let wrote!: () => void
+      const written = new Promise<void>((r) => (wrote = r))
+      w.wf.write = (async (...a: Parameters<typeof realWrite>) => {
+        const watch = decided && a[2] === 'outside'
+        try {
+          return await realWrite(...a)
+        } finally {
+          if (watch) wrote()
+        }
+      }) as typeof realWrite
+      const stale = reconcileOnly(w, card)
+      await atOffer
+      atExport = async () => {
+        atExport = async () => undefined
+        open()
+        await written
+      }
+      try {
+        await w.wf.runActions()
+        await stale
+      } finally {
+        delete (plat as Partial<typeof plat>).offerCurrent
+        delete (w.wf as Partial<typeof w.wf>).write
+      }
+      expect(facts(w, card, 'AdvanceStopped')).toEqual([])
+      expect(facts(w, card, 'Integrated')).toHaveLength(1)
+      expect(w.wf.state(w.wf.store.card(card.id)).stage).toBe('done')
+    })
+
     it('Not for this plan: not previewed again for it; once the target moves, the new plan is previewed', async () => {
       const w = await world(colocated, { candidates: true, oneSlot: true, advance: 'preview' })
       const card = await approved(w)

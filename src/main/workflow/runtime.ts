@@ -823,8 +823,12 @@ export class Workflow {
    * One write for a card, in one transaction; then the actions run (unless left pending). `prepare`: what the write
    * decides on that lives outside the card's facts (a design's reviewer, #1382), read inside the same lock (in the app,
    * the same board change) just before the transaction, so nothing that change orders against comes between.
+   * `settled` (HI-3321): asked in the transaction before the intent's `before` (its attempt fence): true when the card
+   * already holds what the call asks for and `fn` answers from that, writing nothing (a merge report on a card whose
+   * merge Combwork saw this cycle, HI-3282). Such a write isn't fenced: it changes nothing a stale call could, and its
+   * answer is the one the same call gets when the card was already there at its read. Writing anything then throws.
    */
-  async write<T, P = undefined>(card: CardRecord, ruleset: Ruleset | null, actor: Actor, fn: (w: Write, prepared: P) => T, prepare?: () => Promise<P>, opts: { runActions?: boolean } = {}): Promise<T> {
+  async write<T, P = undefined>(card: CardRecord, ruleset: Ruleset | null, actor: Actor, fn: (w: Write, prepared: P) => T, prepare?: () => Promise<P>, opts: { runActions?: boolean; settled?: (w: Write) => boolean } = {}): Promise<T> {
     const scope = alongsideScope()
     let movedTo: { from: StageId; to: StageId } | null = null
     const asked: string[] = []
@@ -841,8 +845,10 @@ export class Workflow {
         const base = ruleset && this.skippedBases.get(ruleset.id)
         if (base) tx.saveRuleset(base)
         w = new Write(tx, tx.card(card.id), ruleset, actor, tx.card(card.id).stage)
-        also?.before?.(w)
+        const settled = opts.settled?.(w) === true
+        if (!settled) also?.before?.(w)
         const written = fn(w, prepared)
+        if (settled && w.written.length) throw new Error('a settled write wrote facts') // i18n-ignore: a programming error, for the log
         // HI-3195: facts the requesting agent recorded (not its refusal): the write applies what a keyed request asked.
         if (agentOf(w!.actor) && w!.written.some((f) => f.actor === w!.actor && f.source === 'recorded' && f.kind !== 'Refused')) appliesRequest()
         this.closeSettled(w)
@@ -2726,10 +2732,12 @@ export class Workflow {
       }
     }
     if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.reportMerge(ref, actor, args))
+    await this.cfg.hooks?.beforeWrite?.('report merge') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     let seen: CardState | null = null
     const out = await this.write(card, r, actor, (w) => {
       // HI-3282: finished meanwhile by this cycle's merge (the reconciler between the reads and this write): read under the
-      // write's lock, nothing written (no Refused fact either).
+      // write's lock, nothing written (no Refused fact either). HI-3321: settled, so the agent's attempt fence, which that
+      // Done moved on, doesn't refuse it first: the builder is told its merge was seen, as when the Done came before its read.
       const now = w.state()
       if (mergeSeen(now)) {
         seen = now
@@ -2745,7 +2753,7 @@ export class Workflow {
       // Its slot, lane and the rest follow its finish (HI-2014).
       w.move('done', 'intent')
       return null
-    })
+    }, undefined, { settled: (w) => mergeSeen(w.state()) })
     // Set in the write's callback (TypeScript can't see it there).
     const seenNow = seen as CardState | null
     if (seenNow) return this.mergeSeenReply(card, seenNow)

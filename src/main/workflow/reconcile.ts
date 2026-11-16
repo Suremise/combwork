@@ -815,7 +815,9 @@ async function candidateFor(wf: Workflow, card: CardRecord, s: CardState, ports:
   const fp = candidateFingerprint(wf, card, s)
   if (!fp || !ports.candidate) return
   const project = ports.projectId()
-  const stillIn = (c: CardRecord, st: CardState): boolean => sameFingerprint(candidateFingerprint(wf, c, st), fp)
+  // HI-3321: and no advance of Combwork's unsettled, read in each write's own transaction: reconcileJj's check reads the
+  // card as its pass began, and an attempt (its AdvanceAttempted committed before it moves anything) may start after it.
+  const stillIn = (c: CardRecord, st: CardState): boolean => sameFingerprint(candidateFingerprint(wf, c, st), fp) && !advanceUnresolved(st)
   const still = (): boolean => {
     const c = wf.store.card(card.id)
     return stillIn(c, wf.state(c))
@@ -842,6 +844,9 @@ async function candidateFor(wf: Workflow, card: CardRecord, s: CardState, ports:
   if (had?.state === 'ready' && had.offer && !(ports.offerCurrent && (await ports.offerCurrent(fp.target, had.offer)))) {
     const seen = had
     await wf.write(card, null, 'outside', (w) => {
+      // HI-3321: never under an attempt in flight: between its jj move and its export the offer reads as not current, and
+      // withdrawing it would take the attempt's lease (its plan) and leave a move it made uncertain.
+      if (advanceUnresolved(w.state())) return
       w.tx.sql((db) => {
         const now = prior(db)
         if (now && now.gen === seen.gen && now.offer?.attempt === seen.offer?.attempt) db.prepare('DELETE FROM board_meta WHERE key = ?').run(key) // i18n-ignore: SQL
@@ -1052,7 +1057,8 @@ export async function reconcileJj(wf: Workflow, card0: CardRecord, hooks: Reconc
         // Only while the card is still exactly the approval proved (its cycle, stage, approved submission and its
         // endpoints, its recorded jj ids and its target), and nothing it depends on is undone.
         const now = wf.store.card(card.id)
-        if (!sameCycle(w, s) || !sameApproval(snap, approvalOf(now, w.state())) || wf.closeWaitsFor(w).length) return
+        // HI-3321: nor over an advance of Combwork's that started after this pass read the card (only it and the user settle it).
+        if (!sameCycle(w, s) || !sameApproval(snap, approvalOf(now, w.state())) || advanceUnresolved(w.state()) || wf.closeWaitsFor(w).length) return
         const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision: snap.revision, target: snap.target, result: p.result, method: p.method, by: 'outside', platform: p.platform } }) // i18n-ignore: a fact's kind and codes, not text
         if (!f) return
         w.written.push(f as Fact)

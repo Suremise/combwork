@@ -4226,7 +4226,9 @@ with s34, its mapping HI-3235/s7, s10, s13 and s16. gate:advance is open.
 - **Durable records** (s34 §2). The journal file (`.combwork/jj-advance/<card>.<cycle>.<attempt>.json`, written whole
   and synced) comes first, with the whole plan; then `AdvanceAttempted { plan, attempt }`, read back; no jj write runs
   before both. `AdvanceStopped`, `AdvanceResolved { nothingMoved | undone | attested | startAgain }` and `Integrated`
-  settle it; until then the card takes no other advance (no outside proof either). A plan undone isn't advanced again
+  settle it; until then the card takes no other advance (no outside proof either, nor its offer withdrawn or its
+  candidate rebuilt, each checked in that write's own transaction, HI-3321: a reconcile that read the card before the
+  attempt began would otherwise take its lease between its jj move and its export). A plan undone isn't advanced again
   on its own. HI-3264: a journal settled for good (`nothingMoved`, `integrated`, `resolved`, `undone`: its outcome on
   the card) moves to `jj-advance/settled/`, written whole there before the live file goes, and is pruned 30 days on;
   recovery and a card's listing read only the live folder (unsettled, stopped or uncertain attempts), so their cost
@@ -6208,6 +6210,10 @@ moved on.
   ahead, a follow-up) are refused **`attempt.notAssignee`** for an agent that isn't the attempt's builder (the card's agent
   now, or its cycle's builder when it has none). A put-back by another agent stays allowed (anyone moves a card), fenced by
   launch and binding like any write. The fence runs before a write's own refusals, so a stale call is told it is stale.
+  A write that finds the card already holds what it asks, and writes nothing, is answered from that before the fence
+  (HI-3321): a merge report on a card whose merge Combwork saw this cycle (HI-3282) gets its "Done already" when
+  Combwork's own Done, which ended the attempt, landed between the report's reads and its write, as it does when that
+  Done came first.
   Reordering a column is fenced by nothing more than before (the order is the board's, not an attempt's).
 - **Never fenced**: the user, the Assistant, scripts on the workspace token and Combwork itself, its writes that an
   agent's call set off and that outlive it included (a reconciliation its move scheduled, a candidate's checks: the call's
