@@ -7,7 +7,6 @@ interface CombworkMessageValues {
   'mcp.add.title': { project: string | number }
   'mcp.add.titleAssistant': undefined
   'mcp.addFile.messageAdded': { file: string | number; files: number }
-  'mcp.addFile.replaceDetailAdded': undefined
   'mcp.catalog.allSources': undefined
   'mcp.catalog.badName': undefined
   'mcp.catalog.badgeInstalled': undefined
@@ -41,6 +40,7 @@ interface CombworkMessageValues {
   'mcp.catalog.installTitle': { name: string | number; version: string | number }
   'mcp.catalog.installed': { name: string | number }
   'mcp.catalog.installedAt': { version: string | number }
+  'mcp.catalog.installedKept': undefined
   'mcp.catalog.installedNext': undefined
   'mcp.catalog.loading': undefined
   'mcp.catalog.mismatch': { name: string | number }
@@ -83,6 +83,7 @@ interface CombworkMessageValues {
   'mcp.error.invalidName': undefined
   'mcp.error.noProject': { project: string | number }
   'mcp.error.noServerAdd': { name: string | number }
+  'mcp.error.placesChanged': { name: string | number }
   'mcp.import.added': { project: string | number }
   'mcp.import.changedAdded': { count: number; names: string | number }
   'mcp.import.confirmButtonAdded': undefined
@@ -109,6 +110,9 @@ interface CombworkMessageValues {
   'mcp.places.projectsLabel': undefined
   'mcp.places.removedFrom': { places: string | number }
   'mcp.places.title': { name: string | number }
+  'mcp.replace.detailKept': undefined
+  'mcp.replace.messageChanged': { name: string | number; where: string | number }
+  'mcp.replace.messageSame': { name: string | number; where: string | number }
   'mcp.tab.hintAdded': undefined
   'mcp.tab.projectDefinedAdded': undefined
   'mcp.view.addTo': undefined

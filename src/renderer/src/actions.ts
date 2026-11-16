@@ -1127,8 +1127,8 @@ const CATALOG_FAILED = msg({ id: 'mcp.catalog.failed', defaultMessage: 'Could no
 
 /**
  * Install (HI-545): the catalogue server downloaded and checked against its catalogue (size, sha256) first, then #550's
- * Add dialog: what it runs, and its name, another one when it is taken, or Replace only if the user says so. Installed,
- * it is added to no project yet (HI-2059): its view opens, for Add to….
+ * Add dialog: what it runs, and its name, another one when it is taken, or Replace only if the user says so (which keeps
+ * the old one's places, HI-3327). Otherwise installed, it is added to no project yet (HI-2059): its view opens, for Add to….
  */
 export async function installCatalogServer(row: Pick<McpCatalogRow, 'source' | 'name' | 'version'>): Promise<boolean> {
   const p = await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogPrepare', row.source, row.name))
@@ -1147,10 +1147,12 @@ export async function installCatalogServer(row: Pick<McpCatalogRow, 'source' | '
     void call('mcp:catalogDrop', p.id).catch(() => undefined)
     return false
   }
-  const done = await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogInstall', p.id, picked.name, picked.replace).then(() => true))
+  const done = await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogInstall', p.id, picked.name, picked.replace, picked.places).then(() => true))
   if (!done) return false
   set((s) => ({ skillsVersion: s.skillsVersion + 1, mcpCatalogVersion: s.mcpCatalogVersion + 1, mcpTab: 'installed', selectedMcp: picked.name }))
-  notify('success', tr(msg({ id: 'mcp.catalog.installed', defaultMessage: 'Installed {name}', description: "A notification's title (HI-545): a catalogue server was installed." }), { name: picked.name }), tr(msg({ id: 'mcp.catalog.installedNext', defaultMessage: 'It runs nowhere yet: Add to… in its view adds it to the projects (and the Assistant) that need it.', description: 'Under "Installed {name}" (HI-545): what to do next. Add to… is the button in the server\'s view in the MCP view.' })))
+  // A replace keeps the places the old one had (HI-3327): only one added nowhere needs Add to….
+  const kept = !!picked.places && (picked.places.projects.length > 0 || picked.places.assistant)
+  notify('success', tr(msg({ id: 'mcp.catalog.installed', defaultMessage: 'Installed {name}', description: "A notification's title (HI-545): a catalogue server was installed." }), { name: picked.name }), kept ? tr(msg({ id: 'mcp.catalog.installedKept', defaultMessage: 'It replaced the server of that name, and stays added where that one was.', description: 'Under "Installed {name}" (HI-3327): the catalogue server replaced one of the same name, and the projects (and the Assistant) that had it keep it.' })) : tr(msg({ id: 'mcp.catalog.installedNext', defaultMessage: 'It runs nowhere yet: Add to… in its view adds it to the projects (and the Assistant) that need it.', description: 'Under "Installed {name}" (HI-545): what to do next. Add to… is the button in the server\'s view in the MCP view.' })))
   await refreshWorkspace()
   return true
 }
@@ -1221,8 +1223,8 @@ export function mcpWhereText(server: Pick<McpServerInfo, 'def' | 'projects' | 'a
 
 /**
  * Add MCP Server from File (#550): a .json definition, or a .zip of a server folder. The dialog shows what it runs and
- * the name it gets (the file's, editable); a name in use asks to replace it or choose another. It is added to no project
- * (HI-2059): a project's MCP tab, the Assistant's view or Add to… adds it where it runs.
+ * the name it gets (the file's, editable); a name in use asks to replace it (its places keep it, HI-3327) or choose
+ * another. A new one is added to no project (HI-2059): a project's MCP tab, the Assistant's view or Add to… adds it.
  */
 export async function addMcpServerFromFile(): Promise<McpServerInfo | null> {
   const file = await attempt(tr(msg({ id: 'actions.mcp.openFailed', defaultMessage: 'Could not open the file', description: "An error's title: picking an MCP server's file failed." })), () => call('mcp:pickFile'))
@@ -1246,7 +1248,7 @@ export async function addMcpServerFromFile(): Promise<McpServerInfo | null> {
     confirmLabel: tr(msg({ id: 'actions.mcp.add', defaultMessage: 'Add', description: 'Button: adds the MCP server to the workspace.' }))
   })
   if (!picked) return null
-  const added = await attempt(addServerFailed(), () => call('mcp:addFromFile', file, picked.name, picked.replace))
+  const added = await attempt(addServerFailed(), () => call('mcp:addFromFile', file, picked.name, picked.replace, picked.places))
   if (!added) return null
   set((s) => ({ skillsVersion: s.skillsVersion + 1, selectedMcp: added.name }))
   await refreshWorkspace()
@@ -1258,7 +1260,7 @@ export async function addMcpServerFromFile(): Promise<McpServerInfo | null> {
  * name in use asks to Replace that server or choose another. `initialTaken`: whether the name offered is in use. Null
  * when cancelled.
  */
-async function chooseServerName(o: { title: string; message: string; list: string[]; detail?: string; initial: string; initialTaken: boolean; confirmLabel: string }): Promise<{ name: string; replace: boolean } | null> {
+async function chooseServerName(o: { title: string; message: string; list: string[]; detail?: string; initial: string; initialTaken: boolean; confirmLabel: string }): Promise<{ name: string; replace: boolean; places?: { projects: string[]; assistant: boolean } } | null> {
   let name = o.initial
   for (;;) {
     const picked = await prompt({
@@ -1273,12 +1275,23 @@ async function chooseServerName(o: { title: string; message: string; list: strin
     })
     if (!picked) return null
     name = picked.trim()
-    const taken = name === o.initial ? o.initialTaken : ((await attempt(tr(msg({ id: 'actions.mcp.listFailed', defaultMessage: 'Could not list the servers', description: "An error's title: reading the workspace's MCP servers failed." })), () => call('mcp:list'))) ?? []).some((m) => m.name.toLowerCase() === name.toLowerCase())
-    if (!taken) return { name, replace: false }
+    const servers = name === o.initial && !o.initialTaken ? [] : await attempt(tr(msg({ id: 'actions.mcp.listFailed', defaultMessage: 'Could not list the servers', description: "An error's title: reading the workspace's MCP servers failed." })), () => call('mcp:list'))
+    if (!servers) return null
+    const existing = servers.find((m) => m.name.toLowerCase() === name.toLowerCase())
+    if (!existing) return { name, replace: false }
+    name = existing.name
+    // An upgrade (HI-3327): the places it is added keep it, and what it runs is shown changed (− now, + after).
+    const where = mcpWhereText({ def: existing.def ?? {}, projects: existing.projects, assistant: existing.assistant }, get().workspace?.projects ?? [])
+    const now = new Set(existing.runs)
+    const next = new Set(o.list)
+    const changed = [...existing.runs.filter((l) => !next.has(l)).map((l) => `− ${l}`), ...o.list.filter((l) => !now.has(l)).map((l) => `+ ${l}`)]
     const choice = await choose({
       title: tr(msg({ id: 'actions.mcp.replaceTitle', defaultMessage: 'Replace {name}?', description: 'Title of the question when the workspace already has an MCP server of that name ({name}).' }), { name }),
-      message: tr(msg({ id: 'actions.mcp.replaceMessage', defaultMessage: 'The workspace has a server named {name}.', description: 'The question when the workspace already has an MCP server of that name ({name}).' }), { name }),
-      detail: tr(msg({ id: 'mcp.addFile.replaceDetailAdded', defaultMessage: 'Replace moves it (and the folder of one added from a .zip) to the Recycle Bin and adds this one to no project yet: projects and the Assistant that had the old one lose it. Or choose another name.', description: 'When a server of that name exists, under Replace or Choose Another Name (HI-2059).' })),
+      message: changed.length
+        ? tr(msg({ id: 'mcp.replace.messageChanged', defaultMessage: 'The workspace has a server named {name}. {where}: those places keep it. What it runs changes (− now, + after):', description: 'The question when the workspace already has an MCP server of that name (HI-3327), above the lines of what it runs that change. {where} says where it is added ("Added in demo", "Not added anywhere"): replacing it keeps it there.' }), { name, where })
+        : tr(msg({ id: 'mcp.replace.messageSame', defaultMessage: 'The workspace has a server named {name}. {where}: those places keep it. What it runs stays the same.', description: 'The question when the workspace already has an MCP server of that name (HI-3327) and the new one runs the same command. {where} says where it is added ("Added in demo", "Not added anywhere"): replacing it keeps it there.' }), { name, where }),
+      list: changed.length ? changed : undefined,
+      detail: tr(msg({ id: 'mcp.replace.detailKept', defaultMessage: 'Replace moves the old one (and the folder of one added from a .zip) to the Recycle Bin. Sessions running it get the new one when they restart. Or choose another name.', description: 'When a server of that name exists, under Replace or Choose Another Name (HI-3327): what Replace does with the old server; the places it is added keep it.' })),
       danger: true,
       choices: [
         { label: tr(msg({ id: 'actions.mcp.rename', defaultMessage: 'Choose Another Name', description: 'Button: goes back to choose another name for the MCP server.' })), value: 'rename' },
@@ -1287,7 +1300,7 @@ async function chooseServerName(o: { title: string; message: string; list: strin
     })
     if (!choice) return null
     if (choice === 'rename') continue
-    return { name, replace: true }
+    return { name, replace: true, places: { projects: existing.projects, assistant: existing.assistant } }
   }
 }
 

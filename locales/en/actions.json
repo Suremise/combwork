@@ -295,10 +295,6 @@
     "defaultMessage": "Replace",
     "description": "Button: replaces the MCP server of that name."
   },
-  "actions.mcp.replaceMessage": {
-    "defaultMessage": "The workspace has a server named {name}.",
-    "description": "The question when the workspace already has an MCP server of that name ({name})."
-  },
   "actions.mcp.replaceTitle": {
     "defaultMessage": "Replace {name}?",
     "description": "Title of the question when the workspace already has an MCP server of that name ({name})."

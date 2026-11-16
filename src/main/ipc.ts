@@ -365,6 +365,12 @@ async function openHere(path: string): ReturnType<WorkspaceService['open']> {
 
 const log = createLogger('ipc')
 
+/** Where an MCP server was shown added (a Replace's or an Update's question, HI-3327), as the window sent it. */
+function shownPlaces(p: unknown): { projects: string[]; assistant: boolean } {
+  const o = (p && typeof p === 'object' ? p : {}) as { projects?: unknown; assistant?: unknown }
+  return { projects: Array.isArray(o.projects) ? o.projects.filter((x): x is string => typeof x === 'string') : [], assistant: o.assistant === true }
+}
+
 /** Repair…'s choices as the window sent them, with anything else dropped (#146). */
 function moveOptions(o: unknown): MoveOptions {
   const v = (o ?? {}) as Record<string, unknown>
@@ -1572,8 +1578,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       return r.canceled || !r.filePaths[0] ? null : r.filePaths[0]
     },
     'mcp:previewFile': (file) => mcp.previewMcpFile(file),
-    'mcp:addFromFile': async (file, name, replace) => {
-      const m = await mcp.addMcpFromFile(file, name, replace)
+    'mcp:addFromFile': async (file, name, replace, places) => {
+      const m = await mcp.addMcpFromFile(file, name, replace, shownPlaces(places))
       emit({ type: 'skills-changed' })
       workspace.scheduleRefresh()
       return m
@@ -1582,13 +1588,13 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'mcp:catalogNoted': (url) => mcpCatalog.noteCatalogSource(String(url)),
     'mcp:catalogPrepare': (source, name) => mcpCatalog.prepareCatalogServer(String(source), String(name)),
     'mcp:catalogDrop': (id) => mcpCatalog.dropPrepared(String(id)),
-    'mcp:catalogInstall': async (id, name, replace) => {
-      await mcpCatalog.installCatalogServer(String(id), String(name), replace === true)
+    'mcp:catalogInstall': async (id, name, replace, places) => {
+      await mcpCatalog.installCatalogServer(String(id), String(name), replace === true, shownPlaces(places))
       emit({ type: 'skills-changed' })
       workspace.scheduleRefresh()
     },
     'mcp:catalogUpdate': async (id, shown, places) => {
-      const r = await mcpCatalog.updateCatalogServer(String(id), shown, { projects: Array.isArray(places?.projects) ? places.projects.filter((p): p is string => typeof p === 'string') : [], assistant: places?.assistant === true })
+      const r = await mcpCatalog.updateCatalogServer(String(id), shown, shownPlaces(places))
       emit({ type: 'skills-changed' })
       workspace.scheduleRefresh()
       return r

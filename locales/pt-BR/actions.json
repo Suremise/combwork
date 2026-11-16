@@ -73,7 +73,6 @@
   "actions.mcp.openFailed": "Não foi possível abrir o arquivo",
   "actions.mcp.rename": "Escolher outro nome",
   "actions.mcp.replace": "Substituir",
-  "actions.mcp.replaceMessage": "O espaço de trabalho já tem um servidor chamado {name}.",
   "actions.mcp.replaceTitle": "Substituir {name}?",
   "actions.mcp.updateFailedAdded": "Não foi possível atualizar o servidor",
   "actions.pane.edge": "{agent} não pode ir mais {dir, select, left {para a esquerda} right {para a direita} up {para cima} other {para baixo}}",

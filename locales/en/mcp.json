@@ -23,10 +23,6 @@
     "defaultMessage": "Adds {file} to the workspace (.combwork/mcp){files, plural, =0 {} one {, with its file in a folder of its own} other {, with its # files in a folder of its own}}, added to no project yet. Add it where it should run: a project’s MCP tab, the Assistant’s view, or Add to… here. It runs:",
     "description": "Add MCP Server from File (HI-2059), above the command the server runs. {file} is the file added; {files} how many files a .zip brings. Keep .combwork/mcp as it is; \"MCP tab\" and \"Add to…\" as Combwork shows them."
   },
-  "mcp.addFile.replaceDetailAdded": {
-    "defaultMessage": "Replace moves it (and the folder of one added from a .zip) to the Recycle Bin and adds this one to no project yet: projects and the Assistant that had the old one lose it. Or choose another name.",
-    "description": "When a server of that name exists, under Replace or Choose Another Name (HI-2059)."
-  },
   "mcp.catalog.allSources": {
     "defaultMessage": "All sources",
     "description": "The Catalogue's source picker (HI-545): every catalogue."
@@ -158,6 +154,10 @@
   "mcp.catalog.installedAt": {
     "defaultMessage": "Installed: {version}",
     "description": "A catalogue server's view (HI-545): the version installed."
+  },
+  "mcp.catalog.installedKept": {
+    "defaultMessage": "It replaced the server of that name, and stays added where that one was.",
+    "description": "Under \"Installed {name}\" (HI-3327): the catalogue server replaced one of the same name, and the projects (and the Assistant) that had it keep it."
   },
   "mcp.catalog.installedNext": {
     "defaultMessage": "It runs nowhere yet: Add to… in its view adds it to the projects (and the Assistant) that need it.",
@@ -327,6 +327,10 @@
     "defaultMessage": "The workspace has no MCP server named {name}.",
     "description": "An error adding a server to a project or the Combwork Assistant. {name} is its name."
   },
+  "mcp.error.placesChanged": {
+    "defaultMessage": "Where {name} is added changed while you were replacing it, so nothing was changed: look again.",
+    "description": "An error replacing an MCP server (HI-3327): a project (or the Combwork Assistant) gained or lost the server after the Replace question showed where it is added (those places keep it), so nothing was written. {name} is the server."
+  },
   "mcp.import.added": {
     "defaultMessage": "Added to {project} for new sessions.",
     "description": "After Copy to workspace (HI-2059): where the copied servers are added."
@@ -430,6 +434,18 @@
   "mcp.places.title": {
     "defaultMessage": "Add {name} to…",
     "description": "Title of the dialog in the MCP view (HI-2059) that chooses the projects, and the Combwork Assistant, an MCP server is added to. {name} is the server."
+  },
+  "mcp.replace.detailKept": {
+    "defaultMessage": "Replace moves the old one (and the folder of one added from a .zip) to the Recycle Bin. Sessions running it get the new one when they restart. Or choose another name.",
+    "description": "When a server of that name exists, under Replace or Choose Another Name (HI-3327): what Replace does with the old server; the places it is added keep it."
+  },
+  "mcp.replace.messageChanged": {
+    "defaultMessage": "The workspace has a server named {name}. {where}: those places keep it. What it runs changes (− now, + after):",
+    "description": "The question when the workspace already has an MCP server of that name (HI-3327), above the lines of what it runs that change. {where} says where it is added (\"Added in demo\", \"Not added anywhere\"): replacing it keeps it there."
+  },
+  "mcp.replace.messageSame": {
+    "defaultMessage": "The workspace has a server named {name}. {where}: those places keep it. What it runs stays the same.",
+    "description": "The question when the workspace already has an MCP server of that name (HI-3327) and the new one runs the same command. {where} says where it is added (\"Added in demo\", \"Not added anywhere\"): replacing it keeps it there."
   },
   "mcp.tab.hintAdded": {
     "defaultMessage": "The workspace's MCP servers this project's agents get. Add one from the workspace's servers; Remove takes it off this project only.",

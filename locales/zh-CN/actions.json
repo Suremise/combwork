@@ -73,7 +73,6 @@
   "actions.mcp.openFailed": "无法打开文件",
   "actions.mcp.rename": "换个名称",
   "actions.mcp.replace": "替换",
-  "actions.mcp.replaceMessage": "工作区中已有名为 {name} 的服务器。",
   "actions.mcp.replaceTitle": "替换 {name}？",
   "actions.mcp.updateFailedAdded": "无法更新服务器",
   "actions.pane.edge": "{agent} 无法再向{dir, select, left {左} right {右} up {上} other {下}}移动",

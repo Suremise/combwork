@@ -954,7 +954,7 @@ export interface CombworkRequests {
    * Adds it as `name`, off in the workspace and in every project (#1093); a name in use is refused unless `replace` (the
    * old one goes to the Recycle Bin).
    */
-  'mcp:addFromFile': (file: string, name: string, replace: boolean) => McpServerInfo
+  'mcp:addFromFile': (file: string, name: string, replace: boolean, places?: { projects: string[]; assistant: boolean }) => McpServerInfo
   /**
    * The MCP catalogues' pages (HI-545): each listed source's rows for a search and a filter. `refresh` reads the
    * catalogues and this PC again (the view opening, ↻); `source` and `offset`: that source's next page.
@@ -967,7 +967,7 @@ export interface CombworkRequests {
   /** Drops a prepared download the user cancelled. */
   'mcp:catalogDrop': (id: string) => void
   /** Installs a prepared catalogue server as `name` (added nowhere); `replace` over a server of the name. */
-  'mcp:catalogInstall': (id: string, name: string, replace: boolean) => void
+  'mcp:catalogInstall': (id: string, name: string, replace: boolean, places?: { projects: string[]; assistant: boolean }) => void
   /** Updates an installed catalogue server, refused if its definition or the places shown changed meanwhile (HI-545/s17). */
   'mcp:catalogUpdate': (id: string, shown: McpShown, places: { projects: string[]; assistant: boolean }) => { stale?: string }
   /** The catalogue sources (Settings → MCP Catalogues), and saving them. */
