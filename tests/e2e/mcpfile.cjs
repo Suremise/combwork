@@ -2,7 +2,7 @@
 // .zip of a server folder are added from the MCP view's button (the file picker stubbed), the dialog showing what each
 // runs; each is added nowhere, with no questions; a name in use asks to replace it or choose another. Add to… in a
 // server's view shows what it runs and ticks the projects it is added to: Save adds where ticked and removes where
-// unticked. The MCP view searches and filters. A project's MCP tab lists only its added servers, each with Remove, and
+// unticked. Replacing a server with a newer zip keeps it added where it was (HI-3327). The MCP view searches and filters. A project's MCP tab lists only its added servers, each with Remove, and
 // Add Server… picks one of the others (search, what it runs, Add); Copy to workspace adds a project's own server there.
 // A new session gets only the servers added to its project (the fake Claude Code's --mcp-config); deleting one asks,
 // saying where it is added. Screenshots in mcpfile-shots (the project tab and the picker in both themes). Throwaway
@@ -39,6 +39,9 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(path.join(dump, 'github.json'), JSON.stringify({ description: 'GitHub issues', command: 'npx', args: ['-y', '@modelcontextprotocol/server-github'], env: { GITHUB_TOKEN: '${GITHUB_TOKEN}' } }))
   const notes = { description: 'Notes', command: 'node', args: ['${CW_MCP_DIR}/notes/server.js'], env: { NOTES_DIR: 'C:\\notes' } }
   fs.writeFileSync(path.join(dump, 'notes.zip'), zipSync({ 'notes/combwork-mcp.json': strToU8(JSON.stringify(notes)), 'notes/server.js': strToU8('// notes server') }))
+  // Its newer version (HI-3327), the zip named after the release: the folder names the server.
+  const notes2 = { ...notes, args: ['${CW_MCP_DIR}/notes/server2.js'] }
+  fs.writeFileSync(path.join(dump, 'notes-v2.zip'), zipSync({ 'notes/combwork-mcp.json': strToU8(JSON.stringify(notes2)), 'notes/server2.js': strToU8('// notes server 2') }))
   const env = lib.fakeClaude(userData, home, [proj, other])
   const { app, page, inv } = await lib.launch({ userData, env })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -154,6 +157,21 @@ const check = (name, ok, extra = '') => {
   await box(again, 'demo').uncheck()
   await save(again)
   check('unticked in demo: removed there, kept in other', !!(await lib.until(async () => (await where('notes')) === 'Added in other', HUNG_MS)) && !(projectMcp(proj).enabled ?? []).includes('notes') && (projectMcp(other).enabled ?? []).includes('notes'), JSON.stringify([projectMcp(proj), projectMcp(other)]))
+
+  // --- An upgrade (HI-3327): a newer zip of notes, Replace: the question says where it is added (those places keep it)
+  // and what it runs changes; replaced, it is still added in other, running the new code.
+  await pick(path.join(dump, 'notes-v2.zip'))
+  await addButton.click()
+  await lib.until(async () => (await add.count()) === 1, HUNG_MS)
+  await add.getByRole('button', { name: 'Add' }).click()
+  check('the upgrade asks to replace notes', !!(await lib.until(async () => (await clash.count()) === 1, HUNG_MS)))
+  const upgradeSaid = await clash.innerText()
+  check('saying where it is added, and that those places keep it', upgradeSaid.includes('Added in other: those places keep it.'), upgradeSaid)
+  check('and what it runs changes', upgradeSaid.includes('− Runs: node ${CW_MCP_DIR}/notes/server.js') && upgradeSaid.includes('+ Runs: node ${CW_MCP_DIR}/notes/server2.js'), upgradeSaid)
+  await shot('4b-upgrade')
+  await clash.getByRole('button', { name: 'Replace', exact: true }).click()
+  check('replaced: running the new code', !!(await lib.until(async () => (await server('notes'))?.def?.args?.[0] === '${CW_MCP_DIR}/notes/server2.js', HUNG_MS)) && fs.existsSync(path.join(mcpDir, 'notes', 'server2.js')) && !fs.existsSync(path.join(mcpDir, 'notes', 'server.js')))
+  check('still added in other, and only there', !!(await lib.until(async () => (await where('notes')) === 'Added in other', HUNG_MS)) && (projectMcp(other).enabled ?? []).includes('notes') && !(projectMcp(proj).enabled ?? []).includes('notes'), JSON.stringify([projectMcp(proj), projectMcp(other)]))
 
   // --- Search and filter in the MCP view.
   const search = page.locator('.sidebar [data-mcp-search]')

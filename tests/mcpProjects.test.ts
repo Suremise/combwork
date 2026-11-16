@@ -1,11 +1,11 @@
 // Workspace MCP servers are available, and run only where they are added (HI-2059): a project's MCP tab adds and removes
 // them, Add showing what one runs (refused if its definition changed since); Add to… in the MCP view sets every project
-// at once, checked before its first write and honest about a write that fails midway. A name used before starts added
-// nowhere; a server copied from a project's own config is added there. Upgrading converts each project's list on its own,
+// at once, checked before its first write and honest about a write that fails midway. A replace keeps the places shown
+// (HI-3327); a name used before, its definition gone, starts added nowhere; a server copied from a project's own config is added there. Upgrading converts each project's list on its own,
 // keeping what ran (#1093's on in the workspace and on in the project) and dropping a choice the workspace had off: a
 // project not converted keeps its old meaning, so nothing that didn't run starts. Settings from before #1093 still move
 // through it. Each case has a workspace of its own.
-import { mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
@@ -309,12 +309,42 @@ describe('MCP servers per project (HI-2059)', () => {
     expect([projectMcp(ambrosia).enabled, projectMcp(apiary).enabled]).toEqual([['github'], ['notes']])
   })
 
+  it('a replace keeps the places and agents that had the server, and they get the new definition (HI-3327)', async () => {
+    await open()
+    await run(() => mcp.addMcpFromFile(file('godot.json', godot), 'godot'))
+    await add(ambrosia, 'godot')
+    await add(apiary, 'godot')
+    await run(async () => mcp.addMcpTo('assistant', 'godot', await shown('godot')))
+    // apiary's agent is given only godot (#537): the replace leaves that choice as it is.
+    await run(() => w.mutateProjectConfig(apiary, (c) => ({ agents: c.agents.map((a) => ({ ...a, mcpServers: ['godot'] })) })))
+    const places = { projects: [ambrosia, apiary], assistant: true }
+    await run(() => mcp.addMcpFromFile(file('godot.json', { ...godot, args: ['godot2.js'] }), 'godot', true, places))
+    expect(await listed('godot')).toMatchObject({ projects: [ambrosia, apiary].sort(), assistant: true, def: { args: ['godot2.js'] } })
+    expect(await onIn('godot')).toEqual(['ambrosia', 'apiary'])
+    expect(await gets(apiary)).toEqual(['godot'])
+    expect(await run(async () => (await sessions.effective(ambrosia, { id: 'a1', name: 'Builder', provider: 'claude-code' } as never)).mcpServers.godot?.args)).toEqual(['godot2.js'])
+  })
+
+  it('refuses a replace when the places changed since they were shown, writing nothing (HI-3327)', async () => {
+    await open()
+    await run(() => mcp.addMcpFromFile(file('godot.json', godot), 'godot'))
+    await add(ambrosia, 'godot')
+    // Shown added nowhere, but ambrosia has it now: nothing is written.
+    await expect(run(() => mcp.addMcpFromFile(file('godot.json', { ...godot, args: ['godot2.js'] }), 'godot', true, { projects: [], assistant: false }))).rejects.toThrow('Where godot is added changed while you were replacing it, so nothing was changed: look again.')
+    await expect(run(() => mcp.addMcpFromFile(file('godot.json', { ...godot, args: ['godot2.js'] }), 'godot', true))).rejects.toThrow('Where godot is added changed')
+    expect(await listed('godot')).toMatchObject({ projects: [ambrosia], def: { args: ['godot.js'] } })
+    // Shown where it is: replaced, and kept there (paths compared without case).
+    await run(() => mcp.addMcpFromFile(file('godot.json', { ...godot, args: ['godot2.js'] }), 'godot', true, { projects: [ambrosia.toUpperCase()], assistant: false }))
+    expect(await listed('godot')).toMatchObject({ projects: [ambrosia], def: { args: ['godot2.js'] } })
+  })
+
   it('starts a server added under a name used before added nowhere', async () => {
     await open()
     await run(() => mcp.addMcpFromFile(file('godot.json', godot), 'godot'))
     await add(ambrosia, 'godot')
     await add(apiary, 'godot')
-    // Replaced: the new definition is added nowhere, wherever the old one was.
+    // Its definition deleted by hand: one added under the name again is added nowhere, wherever the old one was.
+    rmSync(join(mcpDir(), 'godot.json'))
     await run(() => mcp.addMcpFromFile(file('godot.json', { ...godot, args: ['godot2.js'] }), 'godot', true))
     expect((await listed('godot')).projects).toEqual([])
     expect([projectMcp(ambrosia).enabled, projectMcp(apiary).enabled]).toEqual([['github'], ['notes']])

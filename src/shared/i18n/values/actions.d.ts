@@ -75,7 +75,6 @@ interface CombworkMessageValues {
   'actions.mcp.openFailed': undefined
   'actions.mcp.rename': undefined
   'actions.mcp.replace': undefined
-  'actions.mcp.replaceMessage': { name: string | number }
   'actions.mcp.replaceTitle': { name: string | number }
   'actions.mcp.updateFailedAdded': undefined
   'actions.pane.edge': { agent: string | number; dir: string }

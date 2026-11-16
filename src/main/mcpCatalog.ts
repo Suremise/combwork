@@ -19,7 +19,7 @@ import { advanced } from './advanced'
 import { config } from './config'
 import { combworkError } from './combworkError'
 import { findSecretWarnings } from './mcpSecrets'
-import { checkShown, inTurn, listMcp, mcpRuns, placesNow, retarget, serverFromZip, validMcpName, writeServerNow } from './mcp'
+import { checkShown, inTurn, listMcp, mcpRuns, placesNow, retarget, samePlaces, serverFromZip, validMcpName, writeServerNow, type McpPlaces } from './mcp'
 import { createLogger, userText } from './logger'
 import { currentWorkspace, inWorkspace, type WorkspaceService } from './workspace'
 
@@ -408,9 +408,10 @@ export function dropPrepared(id: string): void {
 
 /**
  * Installs a downloaded catalogue server as `name` (#550's Add: added nowhere, HI-2059), for the workspace that asked,
- * still open; `replace`: over a server of the name (refused as Replace is while a project can't be read).
+ * still open; `replace`: over a server of the name, keeping the places it is added, those shown (`places`: HI-3327,
+ * refused as Replace is while a project can't be read or the places changed).
  */
-export async function installCatalogServer(id: string, name: string, replace: boolean): Promise<void> {
+export async function installCatalogServer(id: string, name: string, replace: boolean, places?: McpPlaces): Promise<void> {
   const h = heldFor(id)
   if (!validMcpName(name)) throw combworkError(msg({ id: 'mcp.catalog.badName', defaultMessage: 'Server names may contain letters, numbers, "-" and "_" (max 64 characters). "combwork" is reserved.', description: 'An error installing a catalogue server (HI-545) under a name a server can\'t have. Keep combwork as it is (Combwork\'s own server).' }), undefined, { kind: 'invalid' })
   const p = h.prepared
@@ -418,7 +419,7 @@ export async function installCatalogServer(id: string, name: string, replace: bo
   await inTurn(() =>
     inWorkspace(h.ws, async () => {
       heldFor(id)
-      await writeServerNow(name, def, h.files, replace)
+      await writeServerNow(name, def, h.files, replace, places)
     })
   )
   held.delete(id)
@@ -446,7 +447,7 @@ function keepOwnValues(next: McpServerDef, was: McpServerDef | null): McpServerD
  * keeping it. A stale dialog (the definition or the places changed) answers `stale` with why, for the window to show
  * the Update dialog again from what is there now; nothing is written then.
  */
-export async function updateCatalogServer(id: string, shown: McpShown, places: { projects: string[]; assistant: boolean }): Promise<{ stale?: string }> {
+export async function updateCatalogServer(id: string, shown: McpShown, places: McpPlaces): Promise<{ stale?: string }> {
   const h = heldFor(id)
   const p = h.prepared
   // The name it was installed under (the user may have chosen another), found by its provenance.
@@ -463,9 +464,8 @@ export async function updateCatalogServer(id: string, shown: McpShown, places: {
       }
       // Read strictly (a project that can't be read refuses it, HI-2059), and compared with what was shown.
       const where = await placesNow(name)
-      const want = [...places.projects].map((x) => x.toLowerCase()).sort()
-      if (JSON.stringify(where.projects.map((x) => x.toLowerCase())) !== JSON.stringify(want) || where.assistant !== places.assistant) return tr(M.placesChanged, { name })
-      await writeServerNow(name, keepOwnValues(p.def, now.def), h.files, true, true)
+      if (!samePlaces(where, places)) return tr(M.placesChanged, { name })
+      await writeServerNow(name, keepOwnValues(p.def, now.def), h.files, true, where)
       return null
     })
   )
