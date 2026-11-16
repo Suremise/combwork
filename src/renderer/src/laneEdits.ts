@@ -20,6 +20,7 @@ let seq = 0
 const M = {
   done: msg({ id: 'board.laneEdit.done', defaultMessage: '{op, select, move {Moved {card} in {lane}} add {Added {card} to {lane}} remove {Took {card} off {lane}} transfer {Moved {card} to {lane}} cancel {Cancelled the queued change of {lane}} other {Undone}}', description: "HI-2898: a notification's title after the user changed a lane's cards in Progress → Lanes (a lane: a builder and a reviewer agent working through cards in turn): moved a card ({card}, its key) within it, added one, took one off (it goes back to the board), moved one here from another lane (transfer), cancelled its queued change, or undid the last change (other). {lane} is the lane's builder / reviewer (B1 / R1). Keep the select keys. It has an Undo button." }),
   queued: msg({ id: 'board.laneEdit.queued', defaultMessage: 'It applies once {card} is Done.', description: "HI-2898: under the title of the notification after changing a lane's cards in Progress → Lanes, when the change waits for the lane's card in progress ({card}, its key) to be Done first." }),
+  queuedYield: msg({ id: 'board.laneEdit.queuedYield', defaultMessage: '{card} waits on {first}: once its builder ends its turn with {card}’s work committed, {card} goes back to Todo (its work kept) and {first} starts.', description: "HI-3323: under the title of the notification after changing a lane's cards in Progress → Lanes, when the change puts first {first}, a card that the lane's card in progress ({card}) waits on (both keys). Combwork switches the lane to {first} once the builder's turn is over, putting {card} back in the Todo column with its work kept on its branch; the lane comes back to {card} after." }),
   leftOut: msg({ id: 'board.laneEdit.leftOut', defaultMessage: '{n, plural, one {{cards} stays where it is: it can’t come back to the lane now.} other {{cards} stay where they are: they can’t come back to the lane now.}}', description: "HI-3062: under the title of the notification after Cancel Change on a lane (Progress → Lanes: it drops a change of the lane's cards that was waiting for its card in progress to be Done): the cards that change had taken off and that can't be put back now (another lane or agent has them, they were started, or they keep work), which stay where they are. {cards}: their keys, listed (AL-4, AL-7); {n}: how many." }),
   undo: msg({ id: 'board.laneEdit.undo', defaultMessage: 'Undo', description: "HI-2898: the button on the notification after changing a lane's cards (Progress → Lanes): undoes that change." }),
   undoFailed: msg({ id: 'board.laneEdit.undoFailed', defaultMessage: 'Couldn’t undo the change of the lane', description: "HI-2898: a notification's title: undoing a change of a lane's cards (Progress → Lanes) was refused; the reason follows (the lane changed since, say)." }),
@@ -118,13 +119,14 @@ function said(r: LaneEditResult, names: EditNames): void {
   const card = r.card !== null ? cardLabelOf(get(), r.card) : ''
   const lane = r.op === 'transfer' ? (names.to ?? names.lane) : names.lane
   const after = r.lanes.find((x) => x.queuedAfter !== null)?.queuedAfter ?? null
+  const yielded = r.lanes.find((x) => x.queuedAfter !== null && x.first !== undefined)
   const id = `lane-edit-${++seq}`
   last = r.undo ? { id, undo: r.undo, workspace } : null
   pushToast({
     id,
     level: 'success',
     title: tr(M.done, { op: r.op, card, lane }),
-    ...(after !== null ? { message: tr(M.queued, { card: cardLabelOf(get(), after) }) } : r.leftOut?.length ? { message: tr(M.leftOut, { n: r.leftOut.length, cards: fmt.list(r.leftOut.map((n) => cardLabelOf(get(), n)), 'unit') }) } : {}),
+    ...(yielded ? { message: tr(M.queuedYield, { card: cardLabelOf(get(), yielded.queuedAfter!), first: cardLabelOf(get(), yielded.first!) }) } : after !== null ? { message: tr(M.queued, { card: cardLabelOf(get(), after) }) } : r.leftOut?.length ? { message: tr(M.leftOut, { n: r.leftOut.length, cards: fmt.list(r.leftOut.map((n) => cardLabelOf(get(), n)), 'unit') }) } : {}),
     ...(r.undo ? { actions: [{ label: tr(M.undo), command: 'lanes.undoEdit', args: [id, workspace] }] } : {}),
     timestamp: new Date().toISOString(),
     timeoutMs: 10_000

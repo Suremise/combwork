@@ -5,7 +5,7 @@ import { projectPreferences } from './workflow/preferences'
 import { existsSync } from 'original-fs'
 import { CW_DIR, projectAgents } from '../shared/defaults'
 import { agentWorkflowRole, buildsWork, inWorkflow, reviewsWork } from '../shared/workflow/roles'
-import { allDone, isFrozen, keptLanes, laneName, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, type LaneAgent, type FreshStart, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneSlotHeld, type LaneStartWait, type WaitStamp } from '../shared/lanes'
+import { allDone, isFrozen, keptLanes, laneName, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, waitsOnCard, type LaneYield, type LaneAgent, type FreshStart, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneSlotHeld, type LaneStartWait, type WaitStamp } from '../shared/lanes'
 import type { CombworkErrorKind, DueDeps, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
 import { columnSince } from '../shared/tasks'
 import { designReviewer, reviewingNow } from '../shared/workflow/reviewerPool'
@@ -17,7 +17,7 @@ import { onCombworkEvent } from './events'
 import { readFile } from 'original-fs/promises'
 import { placeKey, renameRetrying, withFileLock } from './fsutil'
 import { openTable, readTable, saveTable, saveTableInBoard } from './storeTables'
-import { boardOpen, boardRead, boardWrite, cardOwnersNow, cardPlacesNow, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
+import { beforeBoardCommit, boardOpen, boardRead, boardWrite, cardOwnersNow, cardPlacesNow, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
 import { FactStore } from './workflow/factStore'
 import { pickTarget, projectTargets, targetExists, type ProjectTargets } from './workflow/targets'
 import { otherThanOwn, targetedOf, targetOfRulesetId } from '../shared/workflow/compile'
@@ -111,6 +111,8 @@ const A = {
   listChanged: agentMsg({ id: 'lane.tell.listChanged', text: "Your lane's card list changed, as queued: its cards are now {cards}. cw_lane next names your next card.", note: "Delivered to a lane's builder once a queued change of its card list applies (#1270); {cards} is the list, in order." }),
   reordered: agentMsg({ id: 'lane.tell.reordered', text: 'Your lane was reordered now by {by}: {card} is back in Todo (its work stays on {line}): stop working on it. Its cards are now {cards}. cw_lane next names your next card.', note: "Delivered to a lane's builder after a reorder applied now (HI-1995) put its card in flight back; {by} is who reordered it, {line} its branch (or lane.reorder.itsBranch)." }),
   itsBranch: agentMsg({ id: 'lane.reorder.itsBranch', text: 'its branch', note: "In place of {line}: where a put-back card's work stays, when its branch's name isn't known." }),
+  yieldWhy: agentMsg({ id: 'lane.yield.putBackWhy', text: 'Put back so {first}, which it waits on, goes first (lane reorder by {by})', note: "HI-3323: the reason recorded on a lane's card in Doing put back at its builder's turn end because the lane's new list puts first {first}, a card it waits on; {by} is who reordered. Stored on the card's facts." }),
+  yieldTold: agentMsg({ id: 'lane.tell.yield', text: "Your lane's list was changed by {by} to put {first} first: {card} waits on it. Commit {card}'s work and end your turn: Combwork then puts {card} back in Todo (its work stays on its branch) and starts {first}; your lane comes back to {card} after. If {card}'s folder can't be read as clean (a jj slot, an error), Combwork waits and tries again at your next turn end.", note: "HI-3323: delivered once to a lane's builder when its lane's new list puts first {first}, a card that its card in Doing ({card}) waits on, and the builder is in a turn or the folder isn't clean yet; {by} is who changed the list." }),
   putBackWhy: agentMsg({ id: 'lane.reorder.putBackWhy', text: 'Put back by a lane reorder applied now ({by})', note: "The reason recorded on a card put back by a reorder applied now (HI-1995), stored on the card's facts; {by} is who reordered." }),
   independent: agentMsg({ id: 'lane.refused.independent', text: "{agent} is Independent: it takes no part in the workflow (its own role, or its connection launches it without Combwork's tools), so it is never a lane's builder or reviewer. Choose a builder, a reviewer or an either-role agent.", note: "cw_lane's refusal (HI-2670): an Independent agent is never a lane's builder or reviewer." }),
   wrongSide: agentMsg({ id: 'lane.refused.wrongSide', text: "{agent} is a {part, select, builder {reviewer} other {builder}} by its role, so it has no {part}'s tools: a lane's {part} is a {part} or an either-role agent. Choose another, or change {agent}'s role first.", note: "cw_lane's refusal (HI-2664): an agent's Combwork tools follow its workflow role, so a lane part only for a role that does it. {part} is builder or reviewer." }),
@@ -139,6 +141,7 @@ const A = {
   allDoneNoLane: agentMsg({ id: 'lane.refused.allDone', text: '{cards} {n, plural, one {is} other {are}} already Done: no lane started.', note: 'cw_lane start refused: every card of its list is already Done; {n} is how many.' }),
   keptChanging: agentMsg({ id: 'lane.refused.keptChanging', text: 'The lane kept changing: try again', note: "cw_lane start refused: the lane's cards kept moving between its read and its save." }),
   queued: agentMsg({ id: 'lane.start.queued', text: 'The list change is queued: it applies once {card} is Done, and you are told then.', note: "cw_lane start's note (#1270): a list change while a card is in flight waits for that card ({card}) to be Done." }),
+  queuedYield: agentMsg({ id: 'lane.start.queuedYield', text: "{card} waits on {first}: once {builder} ends its turn with {card}'s work committed, Combwork puts {card} back in Todo (its work stays on its branch), applies this list and starts {first}; the lane comes back to {card} after.", note: "cw_lane start's note (HI-3323): the new list puts first {first}, a card that the card in flight ({card}, in Doing) waits on; the switch happens at the builder's ({builder}) turn end, never under a turn." }),
   applied: agentMsg({ id: 'lane.start.applied', text: "Applied now: {card} is back in Todo (its work stays on {line}); the lane's cards are now in this order, and {builder} is told.", note: "cw_lane start's note for a reorder applied now (HI-1995); {line} is the card's branch (or lane.reorder.itsBranch)." }),
   leftOut: agentMsg({ id: 'lane.start.leftOut', text: '{cards} {n, plural, one {is} other {are}} already Done: left out.', note: "cw_lane start's note (HI-2097): cards already Done, left out of a new lane; {n} is how many." }),
   stays: agentMsg({ id: 'lane.start.stays', text: "{cards} {n, plural, one {stays} other {stay}} on the lane, after the cards you listed: a builder's own cw_lane start adds or reorders cards, never takes one off (the Assistant or the user does).", note: "cw_lane start's note (HI-2169): a builder's own start left cards of its lane out, and they are kept after its list; {n} is how many." }),
@@ -952,16 +955,54 @@ function listChange(v: LaneInfo, was: readonly number[], cards: readonly number[
  * checked as it saves (stillBetweenCards, pushed onto `checks`). With rules off, at once. Returns the card in flight it
  * was queued after, or null. The one place a lane's list changes for cw_lane start and the window's edits (HI-2898).
  */
-export async function applyLaneList(ws: WorkspaceService, was: LaneRecord, cards: readonly number[], on: boolean, checks: (() => void)[]): Promise<number | null> {
+export async function applyLaneList(ws: WorkspaceService, was: LaneRecord, cards: readonly number[], on: boolean, checks: (() => void)[], by?: string): Promise<number | null> {
   const change = on && !sameList(was.cards, cards) ? listChange((await views(ws, [was]))[0], was.cards, cards) : null
+  // Any list change ends a yield queued before it (HI-3323): one is made again below only for this list.
+  delete was.yieldFor
   if (change && change.behind !== null) {
     was.pending = [...cards]
+    const y = by !== undefined ? await yieldOf(ws, was, cards, change.behind, by) : null
+    if (y) was.yieldFor = y
     return change.behind
   }
   if (change) checks.push(stillBetweenCards(ws, was, change.check))
   was.cards = [...cards]
   delete was.pending
   return null
+}
+
+/**
+ * HI-3323: a queued list (`cards`) that puts first, before the builder's card in flight `behind` (in Doing, its own), a
+ * card in Todo that `behind` waits on (waitsOnCard): the yield to record with it (a new id, `behind`'s attempt now), so
+ * laneYields.ts switches the lane to that card at the builder's turn end. Null otherwise: the list waits for `behind` to
+ * be Done, as any queued change.
+ */
+export async function yieldOf(ws: WorkspaceService, was: LaneRecord, cards: readonly number[], behind: number, by: string): Promise<LaneYield | null> {
+  if (!cards.includes(behind)) return null
+  const board = await cardsNow(ws, [...new Set([...cards, behind])])
+  const c = board.get(behind)
+  if (!c || c.archived || c.column !== 'doing' || (c.agent && c.agent !== was.builder.id)) return null
+  // The new list's first own open card, as a reorder applied now reads it (putBackForReorder).
+  const first = cards.find((n) => {
+    const x = board.get(n)
+    return !!x && !x.archived && x.column !== 'done' && (!x.agent || x.agent === was.builder.id)
+  })
+  if (first === undefined || first === behind) return null
+  const f = board.get(first)!
+  if (f.column !== 'todo' || !waitsOnCard(c, first, f.key ?? '')) return null
+  const s = attemptOf(ws, was.project, behind)
+  return s && s.stage === 'active' ? { id: newId(), card: behind, first, attempt: s.attempt, by } : null
+}
+
+/** A card's stage and attempt (HI-3194) as its facts have them now, or null where they can't be read. */
+export function attemptOf(ws: WorkspaceService, project: string, n: number): { stage: string; attempt: { id: number; generation: number } } | null {
+  try {
+    const store = FactStore.forBoard(ws, { project, key: project })
+    const s = foldCard(store.facts(n), store.card(n).stage)
+    return { stage: s.stage, attempt: { id: s.attempt.id, generation: s.attempt.generation } }
+  } catch {
+    return null
+  }
 }
 
 const sameList = (a: readonly number[], b: readonly number[]): boolean => a.length === b.length && a.every((n, i) => n === b[i])
@@ -1258,18 +1299,24 @@ async function putBackForReorder(ws: WorkspaceService, s: StartLane, builder: La
   if (first === flying.number) return null
   const key = cards.get(flying.number)?.key ?? `#${flying.number}`
   if (flying.column !== 'doing') throw new LaneError(409, say(A.inReview, { card: key, where: flying.column === 'review' ? 'review' : 'other' }))
+  // HI-3323: the new first card is one the card in flight waits on: what would refuse it now (its builder in a turn, its
+  // folder not clean) queues it as a yield instead, run at the builder's turn end (laneYields.ts).
+  const fc = first !== undefined ? cards.get(first) : undefined
+  const fly = cards.get(flying.number)
+  const yields = !!fc && !!fly && fc.column === 'todo' && waitsOnCard(fly, first!, fc.key ?? '')
   const { sessions } = await import('./sessions')
   const st = sessions.liveFor(projectPath, builder.id)
-  if (st && IN_A_TURN.has(st.status)) throw new LaneError(409, say(A.inATurn, { agent: builder.name, status: st.status }))
+  if (st && IN_A_TURN.has(st.status)) {
+    if (yields) return null
+    throw new LaneError(409, say(A.inATurn, { agent: builder.name, status: st.status }))
+  }
   const wf = await (await service()).workflowFor(ws, projectPath).catch(() => null)
   if (!wf) return null
   const state = wf.state(wf.store.card(flying.number))
   const folder = state.started?.folder
-  if (folder && folder !== 'project') {
-    const { gitCantRead, slotWorkspaces } = await import('./platform/workspacePorts')
-    // A non-colocated jj slot (HI-2896): Git can't read it, and jj can't see unrecorded edits without a snapshot: kept.
-    const d = (await gitCantRead(folder)) ? null : await slotWorkspaces().dirty(folder)
-    if (!Array.isArray(d) || d.length) throw new LaneError(409, say(A.uncommitted, { card: key, agent: builder.name }))
+  if (!(await cardFolderClean(folder))) {
+    if (yields) return null
+    throw new LaneError(409, say(A.uncommitted, { card: key, agent: builder.name }))
   }
   const { runIntent, CW_LANE_START } = await import('./tasks')
   const { reply } = await runIntent(wf, flying.number, CW_LANE_START, (w) => w.putBack(`#${flying.number}`, 'combwork', { why: inDefaultDialect(() => say(A.putBackWhy, { by: s.by })) }), undefined, s.commit)
@@ -1292,6 +1339,186 @@ async function tellReordered(ws: WorkspaceService, l: LaneRecord, put: { putBack
     await offerNow(projectPath, l.builder.id)
   } catch (e) {
     log.warn(`telling lane ${l.id}'s builder of its reorder`, e)
+  }
+}
+
+/**
+ * HI-3323: a lane's queued yield (LaneRecord.yieldFor) as it stands now: `stale` when it no longer applies (its card in
+ * flight left Doing or moved to another attempt or agent, its first card isn't in Todo or first any more, or isn't waited
+ * on), `wait` while its builder is in a turn, stopped, being launched or waiting for a slot, or the card's folder isn't
+ * clean (or can't be read), else `run`, with the builder's run as seen (the commit's fence) and the card's line.
+ */
+type YieldNow =
+  | { kind: 'stale' }
+  | { kind: 'wait'; why: 'turn' | 'folder' }
+  | { kind: 'run'; runId: string | null; line: string | null }
+
+async function yieldNow(ws: WorkspaceService, l: LaneRecord, y: LaneYield): Promise<YieldNow> {
+  if (!ws.path || !l.pending) return { kind: 'stale' }
+  const projectPath = join(ws.path, l.project)
+  const fact = attemptOf(ws, l.project, y.card)
+  if (!fact || fact.stage !== 'active' || fact.attempt.id !== y.attempt.id || fact.attempt.generation !== y.attempt.generation) return { kind: 'stale' }
+  if (!(await yieldCardsHold(ws, l, y))) return { kind: 'stale' }
+  const { sessions } = await import('./sessions')
+  const st = sessions.liveFor(projectPath, l.builder.id)
+  if ((st && IN_A_TURN.has(st.status)) || sessions.stoppedOnPurposeAt(projectPath, l.builder.id) > 0 || laneStartHeld(ws, l.project, l.builder.id) || laneWaitsForSlot(ws, l.id)) return { kind: 'wait', why: 'turn' } // i18n-ignore: a wait's code, never shown
+  const wf = await (await service()).workflowFor(ws, projectPath).catch(() => null)
+  if (!wf) return { kind: 'wait', why: 'folder' } // i18n-ignore: a wait's code, never shown
+  const started = wf.state(wf.store.card(y.card)).started
+  // As a reorder applied now reads it: a non-colocated jj slot (HI-2896) or an unreadable one is a wait, never taken for clean.
+  if (!(await cardFolderClean(started?.folder))) return { kind: 'wait', why: 'folder' } // i18n-ignore: a wait's code, never shown
+  return { kind: 'run', runId: st?.runId ?? null, line: started?.line ?? null }
+}
+
+/**
+ * Whether a card's folder (its start's) has nothing uncommitted, for a put back that keeps its work on its line (HI-1995,
+ * HI-3323): the project folder, or none, is; a slot is when its changes read as none. A non-colocated jj slot (HI-2896:
+ * Git can't read it, and jj can't see unrecorded edits without a snapshot) or one that can't be read is not.
+ */
+async function cardFolderClean(folder: string | undefined): Promise<boolean> {
+  if (!folder || folder === 'project') return true
+  const { gitCantRead, slotWorkspaces } = await import('./platform/workspacePorts')
+  const d = (await gitCantRead(folder)) ? null : await slotWorkspaces().dirty(folder).catch(() => null)
+  return Array.isArray(d) && !d.length
+}
+
+/**
+ * HI-3323: the board still has a yield's cards as it was made: its card in flight in Doing, the lane builder's (or given
+ * to nobody), its first card in Todo and still the queued list's first own open card, and the card still waiting on it.
+ */
+async function yieldCardsHold(ws: WorkspaceService, l: LaneRecord, y: LaneYield): Promise<boolean> {
+  const pending = l.pending ?? []
+  const board = await cardsNow(ws, [...new Set([...pending, y.card])])
+  const c = board.get(y.card)
+  const f = board.get(y.first)
+  if (!c || !f || c.archived || f.archived || c.column !== 'doing' || f.column !== 'todo' || (c.agent && c.agent !== l.builder.id) || !l.cards.includes(y.card)) return false
+  const first = pending.find((n) => {
+    const x = board.get(n)
+    return !!x && !x.archived && x.column !== 'done' && (!x.agent || x.agent === l.builder.id)
+  })
+  return first === y.first && waitsOnCard(c, y.first, f.key ?? '')
+}
+
+/** For tests (HI-3323): awaited after a yield's look without the locks (`looked`), and after its decision under the lanes' lock, before its board change (`decided`). */
+export const laneYieldTestHooks: { looked: ((lane: string) => Promise<void>) | null; decided: ((lane: string) => Promise<void>) | null } = { looked: null, decided: null }
+
+/**
+ * HI-3323: runs each running lane's queued yield that can run now (laneStarts.ts' look, before its starts): the card in
+ * flight put back through its intent path and the queued list applied, in one board change under the lanes' lock (both
+ * or neither). Decided under that lock (yieldNow), then, in the board change, decided again on the board as it is there,
+ * and fenced at the commit on the builder's run and status. A stale yield is dropped (its list stays queued for the
+ * card's Done, as any); a waiting one is said once to the builder. Returns the lanes it switched (their first card is
+ * started by a later look, once the put back's slot release has run) and the builders whose yield still waits, by lane.
+ */
+export async function runLaneYields(ws: WorkspaceService): Promise<{ switched: string[]; waiting: { lane: string; project: string; builder: string; first: number }[] }> {
+  const out: { switched: string[]; waiting: { lane: string; project: string; builder: string; first: number }[] } = { switched: [], waiting: [] }
+  if (!ws.path || !(await enforced())) return out
+  for (const l0 of (await read(ws)).filter((l) => running(l) && !!l.yieldFor && !!l.pending)) {
+    // A look without the locks first: most looks find the builder still in its turn, and change nothing.
+    const first = await yieldNow(ws, l0, l0.yieldFor!)
+    await laneYieldTestHooks.looked?.(l0.id)
+    if (first.kind === 'wait' && l0.yieldFor!.told) {
+      out.waiting.push({ lane: l0.id, project: l0.project, builder: l0.builder.id, first: l0.yieldFor!.first })
+      continue
+    }
+    try {
+      const done = await runYield(ws, l0.id)
+      if (done?.kind === 'run') out.switched.push(l0.id)
+      else if (done?.kind === 'wait') out.waiting.push({ lane: l0.id, project: l0.project, builder: l0.builder.id, first: l0.yieldFor!.first })
+    } catch (e) {
+      // Refused or changed meanwhile (StaleLane, the put back refused): the next look decides again from what is there then.
+      log.info(`Lane ${l0.id}: its yield to #${l0.yieldFor!.first} not run now: ${userText(e instanceof Error ? e.message : String(e))}`)
+      out.waiting.push({ lane: l0.id, project: l0.project, builder: l0.builder.id, first: l0.yieldFor!.first })
+    }
+  }
+  return out
+}
+
+/** One lane's yield (runLaneYields): what was decided and done, or null when the lane no longer has one. */
+async function runYield(ws: WorkspaceService, id: string): Promise<YieldNow | null> {
+  const path = ws.path!
+  const after: { told: { l: LaneRecord; y: LaneYield } | null; ran: { l: LaneRecord; y: LaneYield; line: string | null } | null } = { told: null, ran: null }
+  const decided = await mutateInBoard(
+    ws,
+    async (lanes) => {
+      const l = lanes.find((x) => x.id === id)
+      if (!l || !running(l) || !l.yieldFor || !l.pending) return null
+      const d = await yieldNow(ws, l, l.yieldFor)
+      await laneYieldTestHooks.decided?.(id)
+      return { d, y: l.yieldFor, seen: readAs.get(lanes) }
+    },
+    async (lanes, got, checks) => {
+      after.told = null
+      after.ran = null
+      if (!got) return null
+      const l = lanes.find((x) => x.id === id)!
+      const { d, y } = got
+      // The lanes as the decision read them: changed since (the runtime writes them under the board's lock, which this
+      // change now holds), decided again from a fresh read (readAgain).
+      if (boardOpen(path) && JSON.stringify(readTable(path, 'lanes').docs) !== got.seen) throw new StaleRead('the lanes changed since the yield was decided') // i18n-ignore: internal, caught and retried (never shown)
+      if (d.kind === 'stale') {
+        delete l.yieldFor
+        l.updatedAt = now()
+        return d
+      }
+      if (d.kind === 'wait') {
+        if (!y.told) {
+          l.yieldFor = { ...y, told: true }
+          after.told = { l, y }
+        }
+        return d
+      }
+      // Decided again here, on the board as this change has it (no other board change can come between this and its
+      // commit): the card still in Doing at the same attempt, the builder's, its first card first and waited on.
+      const fact = attemptOf(ws, l.project, y.card)
+      if (!fact || fact.stage !== 'active' || fact.attempt.id !== y.attempt.id || fact.attempt.generation !== y.attempt.generation || !(await yieldCardsHold(ws, l, y))) throw new StaleLane('its card changed before the yield') // i18n-ignore: internal, for the log
+      const projectPath = join(path, l.project)
+      const wf = await (await service()).workflowFor(ws, projectPath)
+      if (!wf) throw new StaleLane('no workflow') // i18n-ignore: internal, for the log
+      const { runIntent, CW_LANE_START } = await import('./tasks')
+      const why = inDefaultDialect(() => withCardNames(ws, () => say(A.yieldWhy, { first: cardRef(y.first), by: y.by })))
+      const { reply } = await runIntent(wf, y.card, CW_LANE_START, (w) => w.putBack(`#${y.card}`, 'combwork', { why }))
+      const r = reply as { ok?: boolean; refused?: boolean; message?: string }
+      if (r.refused || !r.ok) throw new StaleLane(r.message ?? 'its put back was refused') // i18n-ignore: internal, for the log
+      // This change's own put back may write the lanes (the runtime's part): what the save compares with is read again here.
+      if (boardOpen(path)) readAs.set(lanes, JSON.stringify(readTable(path, 'lanes').docs))
+      l.cards = [...l.pending!]
+      delete l.pending
+      delete l.yieldFor
+      l.updatedAt = now()
+      after.ran = { l, y, line: d.line }
+      // The builder's run and status at the commit, after every await of this change: a turn begun, a new run, a Stop or
+      // a launch since the decision undoes all of it (the put back's facts too).
+      const { sessions } = await import('./sessions')
+      const fence = (): void => {
+        const st = sessions.liveFor(projectPath, l.builder.id)
+        if ((st?.runId ?? null) !== d.runId || (st && IN_A_TURN.has(st.status)) || sessions.stoppedOnPurposeAt(projectPath, l.builder.id) > 0 || laneStartHeld(ws, l.project, l.builder.id) || laneWaitsForSlot(ws, l.id)) throw new StaleLane('its builder began a turn before the yield committed') // i18n-ignore: internal, for the log
+      }
+      checks.push(fence)
+      beforeBoardCommit(ws, `lane-yield:${y.id}`, fence)
+      return d
+    }
+  )
+  if (after.told) await tellYield(ws, after.told.l, after.told.y)
+  if (after.ran) {
+    const { l, y, line } = after.ran
+    log.info(`Lane ${l.id}: #${y.card} put back so #${y.first}, which it waits on, goes first (${userText(y.by)})`)
+    await tellReordered(ws, l, { putBack: withCardNames(ws, () => cardRef(y.card)), line }, y.by)
+  }
+  return decided
+}
+
+/** A lane's builder told once of its queued yield (HI-3323): what goes first, and what it waits for. */
+async function tellYield(ws: WorkspaceService, l: LaneRecord, y: LaneYield): Promise<void> {
+  if (!ws.path) return
+  const projectPath = join(ws.path, l.project)
+  const body = inDialectOf({ projectPath, agentId: l.builder.id }, () => withCardNames(ws, () => say(A.yieldTold, { by: y.by, card: cardRef(y.card), first: cardRef(y.first) })))
+  try {
+    // agent-protocol: the sender's name, Combwork's own
+    await createDelivery(projectPath, { agentId: l.builder.id, agentName: l.builder.name, kind: 'rebrief', from: { kind: 'combwork', name: 'Combwork' }, body, source: 'lane', ref: l.id }) // i18n-ignore: the sender's name, Combwork's own
+    await offerNow(projectPath, l.builder.id)
+  } catch (e) {
+    log.warn(`telling lane ${l.id}'s builder of its yield`, e)
   }
 }
 
@@ -1520,7 +1747,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     if (was && (was.cards.some((n) => cards.includes(n)) || on)) {
       // Combwork owns the list (#1270, §16.11.1): a change while a card is in flight is queued for the next card boundary,
       // never refused; between cards it applies now. With rules off, at once, as before.
-      queuedAfter = await applyLaneList(ws, was, cards, on, checks)
+      queuedAfter = await applyLaneList(ws, was, cards, on, checks, s.by)
       Object.assign(was, {
         builder,
         ...(reviewer !== undefined ? { reviewer } : {}),
@@ -1611,8 +1838,9 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   if (r.replaced) laneFact(ws, r.replaced)
   if (r.did === 'started') laneFact(ws, r.rec)
   tellEnded(ws, ended)
-  const queued = queuedAfter !== null ? withCardNames(ws, () => say(A.queued, { card: cardRef(queuedAfter!) }), scope) : null
-  // The builder told of a reorder applied now, once its list is saved (HI-1995).
+  // HI-3323: queued as a yield to a card the card in flight waits on: it switches at the builder's turn end, not at Done.
+  const y = queuedAfter !== null && r.rec.yieldFor?.card === queuedAfter ? r.rec.yieldFor : null
+  const queued = y ? withCardNames(ws, () => say(A.queuedYield, { card: cardRef(y.card), first: cardRef(y.first), builder: builder.name }), scope) : queuedAfter !== null ? withCardNames(ws, () => say(A.queued, { card: cardRef(queuedAfter!) }), scope) : null  // The builder told of a reorder applied now, once its list is saved (HI-1995).
   if (put) await tellReordered(ws, r.rec, put, s.by)
   const applied = put ? say(A.applied, { card: put.putBack, line: put.line ?? say(A.itsBranch), builder: builder.name }) : null
   const carriedText = carriedNote(builder.name, carried, s.name != null)
@@ -1690,6 +1918,8 @@ export async function restoreLane(ws: WorkspaceService, id: string, back: readon
     for (const v of back) {
       if (v.field === 'cards') {
         const cards = v.old as number[]
+        // An undone list change never keeps a yield (HI-3323): it was for the list undone.
+        delete l.yieldFor
         if (sameList(l.cards, cards)) delete l.pending
         else {
           const change = on ? listChange((await views(ws, [l]))[0], l.cards, cards) : null
@@ -2071,6 +2301,7 @@ export async function refresh(ws: WorkspaceService): Promise<void> {
             // A lane keeps at least a card (lanes.ts keeps none without): a change to none leaves it as it was.
             if (l.pending.length) l.cards = l.pending
             delete l.pending
+            delete l.yieldFor
             l.updatedAt = now()
             applied.push(l)
           }

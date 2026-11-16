@@ -126,6 +126,24 @@ describe('editLanes (HI-2898)', () => {
     expect((await raw(l.id)).cards).toEqual([a, b, c])
   })
 
+  it('HI-3323: moves before the card in flight a card it waits on, queued as a yield (said so); any other card still keeps out; Cancel change drops the yield', async () => {
+    const [a, fix, c] = [await make('Trial'), await make('Fix'), await make('Other')]
+    const l = await start('b1', [a, fix, c])
+    await doing(a, 'b1')
+    await run(() => tasks.updateTask(a, { blockedBy: [fix] }, user))
+    const rev = (await lane(l.id)).listRev
+    // Not one it waits on: refused, as ever.
+    await expect(edit({ op: 'move', lane: l.id, rev, card: c, to: 0 })).rejects.toThrow(/keep their places/)
+    const r = await edit({ op: 'move', lane: l.id, rev, card: fix, to: 0 })
+    expect(r.lanes).toEqual([{ lane: l.id, queuedAfter: a, first: fix, rev: rev + 1 }])
+    const kept = await raw(l.id)
+    expect([kept.cards, kept.pending, kept.yieldFor?.card, kept.yieldFor?.first, kept.yieldFor?.by]).toEqual([[a, fix, c], [fix, a, c], a, fix, 'the user'])
+    expect((await lane(l.id)).status).toMatchObject({ reason: 'listChanges', card: a, first: fix })
+    await edit({ op: 'cancel', lane: l.id, rev: kept.listRev! })
+    const after = await raw(l.id)
+    expect([after.pending, after.yieldFor]).toEqual([undefined, undefined])
+  })
+
   it('queues an edit behind the card in flight; editing that queued list keeps it queued; Cancel change drops it', async () => {
     const [a, b, c, d] = [await make('A'), await make('B'), await make('C'), await make('D')]
     const l = await start('b1', [a, b])

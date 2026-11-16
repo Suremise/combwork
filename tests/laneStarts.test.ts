@@ -68,7 +68,7 @@ describe("Combwork starts a lane's next card (HI-1990)", () => {
   beforeAll(async () => {
     mkdirSync(join(wsPath, '.combwork'), { recursive: true })
     mkdirSync(join(p, '.combwork'), { recursive: true })
-    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'h1', 'h2', 'h3', 'h4', 'h5', 'i1', 'i2', 'i3', 'i4', 'i5'].map((id) => ({ id, name: id.toUpperCase(), workflowRole: 'either' })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1', workflowRole: 'either' }] }))
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'h1', 'h2', 'h3', 'h4', 'h5', 'i1', 'i2', 'i3', 'i4', 'i5', 'j1', 'j2', 'j3', 'j4', 'j5', 'j6', 'j7', 'j8', 'j9'].map((id) => ({ id, name: id.toUpperCase(), workflowRole: 'either' })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1', workflowRole: 'either' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -692,6 +692,161 @@ describe("Combwork starts a lane's next card (HI-1990)", () => {
       } finally {
         sessions.watchFor = wasWatchFor
       }
+    })
+
+    describe('HI-3323: a card in Doing waiting on a card put first (MC-1525)', () => {
+      const { laneYieldTestHooks, runLaneYields } = lanes
+      afterEach(() => {
+        laneYieldTestHooks.decided = null
+        laneYieldTestHooks.looked = null
+      })
+      /** A lane of `b` with its card in flight in Doing that waits on a new card `fix` (blockedBy), its builder working. */
+      async function waiting(b: string, how: 'blockedBy' | 'waitingFor' = 'blockedBy') {
+        const { cards: [trial], lane, st } = await inFlight(b, [`Trial ${b}`])
+        const fix = await card(`Fix ${b}`, b)
+        const key = (await run(() => tasks.getTask(fix, w))).key ?? `#${fix}`
+        await run(() => tasks.updateTask(trial, how === 'blockedBy' ? { blockedBy: [fix] } : { waitingFor: `needs ${key} merged first` }, user))
+        st.status = 'working'
+        return { trial, fix, lane, st }
+      }
+      /** Its CLI took every line Combwork typed into it (a prompt submitted), as the stand-in CLI never says. */
+      const tookLines = (id: string): void => {
+        const live = s.live.get(`${p.toLowerCase()}#${id}`) as { prompts?: number; confirming?: unknown; state: { untakenLine?: unknown } }
+        live.prompts = (live.prompts ?? 0) + 1
+        live.confirming = undefined
+        live.state.untakenLine = undefined
+      }
+      const listOf = async (id: string) => {
+        const l = await lanes.getLane(w, id)
+        return { cards: l.cards.map((c) => c.number), queued: l.queued }
+      }
+
+      it('queued while its builder works (the reply says so, nothing put back), switched at its turn end in one change, the new card started next with no manual start; the lane comes back to the card after', async () => {
+        const { trial, fix, lane, st } = await waiting('j1')
+        const r = await lanes.startLane(w, { project: 'alpha', builder: 'j1', reviewer: 'r1', cards: [fix, trial], by: 'the Assistant' })
+        expect(r.note).toMatch(/waits on .*once J1 ends its turn with .*'s work committed, Combwork puts .* back in Todo/)
+        expect(r.lane.queued).toEqual([fix, trial])
+        expect(r.lane.status).toMatchObject({ reason: 'listChanges', card: trial, first: fix, agent: 'J1' })
+        await checkLaneStarts(w)
+        expect([await columnOf(trial), await columnOf(fix)]).toEqual(['doing', 'todo'])
+        // Told once, in its inbox, what goes first and why.
+        const { deliveriesOf } = await import('../src/main/deliveries')
+        const told = async () => (await deliveriesOf(p, 'j1')).filter((d) => d.body.includes('to put') && d.body.includes('first'))
+        expect((await told()).length).toBe(1)
+        await checkLaneStarts(w)
+        expect((await told()).length).toBe(1)
+        // Its turn over: the card put back and the list applied together; its first card waits for the next look.
+        st.status = 'ready'
+        await checkLaneStarts(w)
+        expect(await columnOf(trial)).toBe('todo')
+        expect(await listOf(lane.id)).toEqual({ cards: [fix, trial], queued: null })
+        // It reads the reorder's message in a turn of its own (its CLI takes the line typed: a prompt); once that is over,
+        // Combwork starts its first card.
+        tookLines('j1')
+        st.status = 'working'
+        await checkLaneStarts(w)
+        expect(await columnOf(fix)).toBe('todo')
+        st.status = 'ready'
+        await checkLaneStarts(w)
+        const started = await run(() => tasks.getTask(fix, w))
+        expect([started.column, started.agent]).toEqual(['doing', 'j1'])
+        // Its first card Done: the lane comes back to the card it put back (its next card due, its line carried on).
+        await run(() => tasks.updateTask(fix, { column: 'done' }, user))
+        const { laneStartDue } = await import('../src/shared/lanes')
+        expect(laneStartDue(await lanes.getLane(w, lane.id))?.number).toBe(trial)
+        await lanes.endLane(w, lane.id, { abandoned: true })
+      })
+
+      it("named by the card's waitingFor too; a list change that puts first a card it doesn't wait on stays queued for its Done; applyNow on a yield while its builder works is queued, not refused", async () => {
+        const a = await waiting('j2', 'waitingFor')
+        const ra = await lanes.startLane(w, { project: 'alpha', builder: 'j2', reviewer: 'r1', cards: [a.fix, a.trial], by: 'the user' })
+        expect(ra.lane.status).toMatchObject({ reason: 'listChanges', card: a.trial, first: a.fix })
+        a.st.status = 'ready'
+        await checkLaneStarts(w)
+        expect(await columnOf(a.trial)).toBe('todo')
+        await lanes.endLane(w, a.lane.id, { abandoned: true })
+
+        const b = await waiting('j3')
+        const other = await card('Unrelated j3', 'j3')
+        const rb = await lanes.startLane(w, { project: 'alpha', builder: 'j3', reviewer: 'r1', cards: [other, b.trial, b.fix], by: 'the user' })
+        expect(rb.note).toContain('it applies once')
+        expect(rb.lane.status).toMatchObject({ reason: 'listChanges', card: b.trial })
+        expect(rb.lane.status?.first).toBeUndefined()
+        b.st.status = 'ready'
+        await checkLaneStarts(w)
+        expect(await columnOf(b.trial)).toBe('doing')
+        await lanes.endLane(w, b.lane.id, { abandoned: true })
+
+        const c = await waiting('j4')
+        const rc = await lanes.startLane(w, { project: 'alpha', builder: 'j4', reviewer: 'r1', cards: [c.fix, c.trial], by: 'the user', applyNow: true })
+        expect(rc.note).toMatch(/waits on/)
+        expect(await columnOf(c.trial)).toBe('doing')
+        c.st.status = 'ready'
+        await checkLaneStarts(w)
+        expect(await columnOf(c.trial)).toBe('todo')
+        await lanes.endLane(w, c.lane.id, { abandoned: true })
+      })
+
+      it('changed after it was looked at or decided (a turn begun, a new run, a Stop, the list replaced, the lane ended, the card moved on, its dependency dropped): nothing changed', async () => {
+        // The lanes' own changes wait for the lanes' lock, held from the decision to the commit: they land after the look
+        // without the locks. The board's and the builder's land after the decision, before the board change.
+        const cases: [string, 'looked' | 'decided', (x: Awaited<ReturnType<typeof waiting>>) => Promise<void>][] = [
+          ['turn', 'decided', async (x) => void (x.st.status = 'working')],
+          ['run', 'decided', async (x) => void ((x.st as unknown as { runId: string }).runId = 'run-another')],
+          ['stop', 'decided', async () => void (sessions as unknown as { stoppedOnPurpose: Map<string, number> }).stoppedOnPurpose.set(`${p.toLowerCase()}#j5`, Date.now())],
+          ['list', 'looked', async (x) => void (await lanes.startLane(w, { project: 'alpha', builder: 'j5', reviewer: 'r1', cards: [x.trial, x.fix], by: 'a newer change' }))],
+          ['ended', 'looked', async (x) => void (await lanes.endLane(w, x.lane.id, { abandoned: true }))],
+          ['moved', 'decided', async (x) => void (await run(() => tasks.updateTask(x.trial, { column: 'review' }, user)))],
+          ['dependency', 'decided', async (x) => void (await run(() => tasks.updateTask(x.trial, { blockedBy: [] }, user)))]
+        ]
+        for (const [what, at, change] of cases) {
+          const x = await waiting('j5')
+          await lanes.startLane(w, { project: 'alpha', builder: 'j5', reviewer: 'r1', cards: [x.fix, x.trial], by: 'the user' })
+          x.st.status = 'ready'
+          let ran = false
+          laneYieldTestHooks[at] = async () => {
+            if (ran) return
+            ran = true
+            await change(x)
+          }
+          await runLaneYields(w)
+          laneYieldTestHooks[at] = null
+          expect([what, ran]).toEqual([what, true])
+          expect([what, await columnOf(x.fix)]).toEqual([what, 'todo'])
+          if (what !== 'moved') expect([what, await columnOf(x.trial)]).toEqual([what, 'doing'])
+          if (what !== 'list' && what !== 'ended') expect([what, (await listOf(x.lane.id)).cards]).toEqual([what, [x.trial]])
+          ;(sessions as unknown as { stoppedOnPurpose: Map<string, number> }).stoppedOnPurpose.clear()
+          const l = await lanes.laneOf(w, 'alpha', 'j5')
+          if (l) await lanes.endLane(w, l.id, { abandoned: true })
+        }
+      })
+
+      it('two looks at once switch it once and tell its builder once; kept through a restart (the yield read back from storage)', async () => {
+        const x = await waiting('j6')
+        await lanes.startLane(w, { project: 'alpha', builder: 'j6', reviewer: 'r1', cards: [x.fix, x.trial], by: 'the user' })
+        const { Workflow } = await import('../src/main/workflow/runtime')
+        const putBack = vi.spyOn(Workflow.prototype, 'putBack')
+        try {
+          x.st.status = 'ready'
+          const [a, b] = await Promise.all([runLaneYields(w), runLaneYields(w)])
+          expect([...a.switched, ...b.switched]).toEqual([x.lane.id])
+          expect(putBack).toHaveBeenCalledTimes(1)
+        } finally {
+          putBack.mockRestore()
+        }
+        expect(await columnOf(x.trial)).toBe('todo')
+        await lanes.endLane(w, x.lane.id, { abandoned: true })
+
+        // Recorded while its builder works, then Combwork "restarts": nothing in memory, a new run of the builder.
+        const y = await waiting('j7')
+        await lanes.startLane(w, { project: 'alpha', builder: 'j7', reviewer: 'r1', cards: [y.fix, y.trial], by: 'the user' })
+        s.live.clear()
+        builder('ready', 'j7')
+        await checkLaneStarts(w)
+        expect(await columnOf(y.trial)).toBe('todo')
+        expect(await listOf(y.lane.id)).toEqual({ cards: [y.fix, y.trial], queued: null })
+        await lanes.endLane(w, y.lane.id, { abandoned: true })
+      })
     })
   })
   describe("a lane agent's new conversation owed (HI-2034)", () => {

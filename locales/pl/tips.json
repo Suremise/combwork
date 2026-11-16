@@ -147,6 +147,8 @@
   "tips.cardLoop.title": "Dwaj agenci na zmianę: praca i recenzja",
   "tips.cardLoopChurn.text": "Z agentem recenzentem Combwork liczy rundy uzgodnień każdej karty i przy 12 pyta, czy uprościć, a przy 30, jak dalej. Oba ustawisz w Pętle kart, w Kontrola wersji → Przepływ pracy.",
   "tips.cardLoopChurn.title": "Karta, która kręci się w kółko, zatrzymuje się",
+  "tips.cardLoopYield.text": "Karta w toku na torze potrzebuje najpierw innej karty? Zaznacz zależność i postaw tamtą kartę na torze jako pierwszą: gdy wykonawca skończy turę, tor przełączy się na nią, odłoży kartę w toku do Do zrobienia z zachowaną pracą i potem do niej wróci.",
+  "tips.cardLoopYield.title": "Potrzebna poprawka przed kartą w toku",
   "tips.cardMove.text": "Przeciągnij dowolne okno dialogowe za nagłówek (kartę, Dodaj agenta, Ustawienia agenta…), żeby zobaczyć, co jest pod nim; Escape w trakcie przeciągania odkłada je z powrotem.",
   "tips.cardMove.title": "Odsuń okno dialogowe",
   "tips.cardReadFirst.text": "W polu „Przeczytaj najpierw” karty wypisz potrzebne jej sekcje dokumentów, np. docs/PLAN.md#setup: prompt startowy agenta je wymienia, więc czyta te sekcje zamiast całego planu. Kliknij jedną, żeby ją przeczytać w Combwork.",

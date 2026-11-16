@@ -4611,9 +4611,10 @@ export interface LaneEditResult {
   card: number | null
   /**
    * Each lane it changed, with the card in flight its change was queued after (null: applied now), and the revision its
-   * list is at after this edit (HI-2932: the window names it in its next quick edit).
+   * list is at after this edit (HI-2932: the window names it in its next quick edit). `first` (HI-3323): queued as a yield
+   * to that card, which the card in flight waits on: it switches at its builder's turn end, not at its Done.
    */
-  lanes: { lane: string; queuedAfter: number | null; rev: number }[]
+  lanes: { lane: string; queuedAfter: number | null; rev: number; first?: number }[]
   undo: LaneEditUndo | null
   /** Cancel Change (HI-3062): the cards its queued change took off that couldn't come back now, left where they are. */
   leftOut?: number[]
@@ -4701,6 +4702,11 @@ export interface LaneStatus {
   why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies' | 'stopped'
   /** startWait `dependencies` (HI-2129): the card it depends on that isn't Done yet, by its key. */
   waitsFor?: string
+  /**
+   * listChanges (HI-3323): the queued list puts this card first, which `card` (in Doing) waits on: the lane switches to it
+   * once its builder (`agent`) is out of a turn with `card`'s work committed, `card` put back to Todo meanwhile.
+   */
+  first?: number
   /** startWait `dependencies` (HI-2618): every card it depends on that isn't Done yet, by key, in its `blockedBy` order. */
   waitingOn?: string[]
   /** startWait `fresh` (HI-2034): no more automatic tries, and why (the user retries it, or ends the lane); the reason a failure gave. */

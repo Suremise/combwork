@@ -122,6 +122,9 @@ const A = {
   })
 }
 
+/** Who a window's lane change is by, as the lane records it (HI-3323: a yield's `by`), in the Default. */
+export const laneByUser = (): string => inDefaultDialect(() => say(A.byUser))
+
 /** Builders whose lane is being started (a second Start meanwhile is refused). */
 const starting = new Set<string>()
 
