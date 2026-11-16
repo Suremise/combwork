@@ -144,6 +144,7 @@
   "workflow.form.retargetSlot": "{slot} : libre, vers la nouvelle branche",
   "workflow.form.retargetStays": "Ceux-ci restent sur {from} :",
   "workflow.form.save": "Enregistrer…",
+  "workflow.form.nothingToSave": "Aucune modification à enregistrer : les options affichées sont celles enregistrées.",
   "workflow.form.saveBlocked": "Règle d’abord ce que signalent les options.",
   "workflow.form.saved": "Options du flux de travail enregistrées",
   "workflow.form.stageName": "Nom de l’étape {stage}",

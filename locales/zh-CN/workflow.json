@@ -144,6 +144,7 @@
   "workflow.form.retargetSlot": "{slot}：空闲，移到新分支",
   "workflow.form.retargetStays": "以下保留在 {from}：",
   "workflow.form.save": "保存…",
+  "workflow.form.nothingToSave": "没有要保存的更改：显示的选项就是已保存的选项。",
   "workflow.form.saveBlocked": "请先解决选项中提示的问题。",
   "workflow.form.saved": "已保存工作流程选项",
   "workflow.form.stageName": "阶段“{stage}”的名称",

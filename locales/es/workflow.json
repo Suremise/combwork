@@ -144,6 +144,7 @@
   "workflow.form.retargetSlot": "{slot}: libre, a la rama nueva",
   "workflow.form.retargetStays": "Estos se quedan en {from}:",
   "workflow.form.save": "Guardar…",
+  "workflow.form.nothingToSave": "No hay cambios que guardar: las opciones que ves son las guardadas.",
   "workflow.form.saveBlocked": "Resuelve primero lo que indican las opciones.",
   "workflow.form.saved": "Opciones del flujo de trabajo guardadas",
   "workflow.form.stageName": "Nombre de la etapa {stage}",

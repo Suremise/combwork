@@ -467,6 +467,10 @@
     "defaultMessage": "Workflow rules aren’t enforced (Settings → Advanced). These options are saved, and apply once the rules are enforced again.",
     "description": "A note atop Project Settings → Workflow while the switch \"Workflow rules are enforced\" is off."
   },
+  "workflow.form.nothingToSave": {
+    "defaultMessage": "No changes to save: the options shown are those saved.",
+    "description": "HI-3333: the tooltip of the Save… button of the workflow options while it is off because nothing differs from the saved options."
+  },
   "workflow.form.off": {
     "defaultMessage": "Off",
     "description": "A workflow option’s value: off."

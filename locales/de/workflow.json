@@ -144,6 +144,7 @@
   "workflow.form.retargetSlot": "{slot}: frei, auf den neuen Branch",
   "workflow.form.retargetStays": "Diese bleiben auf {from}:",
   "workflow.form.save": "Speichern…",
+  "workflow.form.nothingToSave": "Keine Änderungen zu speichern: Die angezeigten Optionen sind die gespeicherten.",
   "workflow.form.saveBlocked": "Kläre zuerst, was die Optionen melden.",
   "workflow.form.saved": "Workflow-Optionen gespeichert",
   "workflow.form.stageName": "Name der Phase {stage}",

@@ -144,6 +144,7 @@
   "workflow.form.retargetSlot": "{slot}: wolny, na nową gałąź",
   "workflow.form.retargetStays": "Na {from} zostają:",
   "workflow.form.save": "Zapisz…",
+  "workflow.form.nothingToSave": "Brak zmian do zapisania: widoczne opcje to te zapisane.",
   "workflow.form.saveBlocked": "Najpierw rozwiąż to, co zgłaszają opcje.",
   "workflow.form.saved": "Zapisano opcje przepływu pracy",
   "workflow.form.stageName": "Nazwa etapu {stage}",

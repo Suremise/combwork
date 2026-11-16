@@ -5409,7 +5409,10 @@ An unreadable membership or fence refuses (`switching`). A never-switched projec
     isn't a row: the tab's header shows it (#1416).
   - **Contradictions as you choose** (`liveContradictions`, `CONTRADICTION_ROWS`): each contradiction's reason shows
     under every row it is about at once, and a stage name's problem under Stage names; Save… stays off until they're
-    resolved. The save is still checked under the lock, with the same reasons.
+    resolved. The save is still checked under the lock, with the same reasons. Save… off always says why in its
+    tooltip (HI-3333, `saveOff`): no changes to save first, then a contradiction, then a branch that doesn't exist. A
+    save's answer resets the draft to what was saved unless the draft was edited while the save ran (`afterSave`): that
+    edit stays, measured against the saved options.
   - **Presets documented**: Solo, Pair (the agent merges), Pair, Team (None: Solo, Pair, Team) and **All off**
     (§16.6.4), each with a sentence (`PRESET_SUMMARY`); choosing one previews each option it sets with its value and
     why (`OPTION_WHY`, §16.6.3's Why column), those it would change marked with their value now, before **Use** fills
