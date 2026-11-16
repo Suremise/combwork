@@ -28,5 +28,5 @@ Read one only when it applies. Each is in this skill's own folder, beside this S
 
 - [refused.md](refused.md): a refusal, an unasked commit, rules off, no workflow.
 - [inbox.md](inbox.md): your inbox has something.
-- [while-working.md](while-working.md): a question for the user, comments, decisions, tests, follow-ups, waits, order.
+- [while-working.md](while-working.md): a question for the user, comments, decisions, tests, follow-ups, waits (a long job too), order.
 - [after-review.md](after-review.md): your card passed, is Done, or is back.
