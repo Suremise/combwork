@@ -4,6 +4,7 @@
 // binding its request captured as it arrived against the card's attempt before the write, in that write's transaction:
 // a replaced launch, a moved attempt and a builder's move by an agent that no longer builds it are refused; a launch
 // with no binding is in first contact, allowed and bound. Readiness (every blocker Done) is written in the same write as the blocker's Done.
+import { AsyncResource } from 'async_hooks'
 import { execFileSync } from 'child_process'
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -24,6 +25,7 @@ const { advanced } = await import('../src/main/advanced')
 const service = await import('../src/main/workflow/service')
 const { ENFORCE } = service
 const { runCardIntent } = await import('../src/main/cardIntents')
+const { reconcile } = await import('../src/main/workflow/reconcile')
 const { allOff } = await import('../src/shared/workflow/options')
 const { foldCard } = await import('../src/shared/workflow/facts')
 const fence = await import('../src/main/attemptFence')
@@ -256,6 +258,55 @@ describe('the fence on an agent write (HI-3194)', () => {
     expect(await refused(update(w, card, old, { labels: ['y'] }))).toBe('attempt.moved')
     await read(w, l, card)
     expect(await refused(update(w, card, arrive(l), { labels: ['y'] }))).toBeNull()
+  })
+
+  it("HI-3321: a builder's merge report that Combwork's reconciler beat to Done (between its reads and its write) is told the merge was seen, not refused", async () => {
+    const { w, repo, wt } = await workspace()
+    const card = await create(w)
+    const l1 = await launch(repo, 'a1', 'r1')
+    const l2 = await launch(repo, 'a2', 'r2')
+    await act(w, card, arrive(l1), { kind: 'start' })
+    const wf = (await service.workflowFor(w, repo))!
+    const folder = wf.state(wf.store.card(card)).started!.folder
+    commit(folder, 'b.txt')
+    await act(w, card, arrive(l1), { kind: 'submit', summary: 'Ready' })
+    await act(w, card, arrive(l2), { kind: 'startReview' })
+    await act(w, card, arrive(l2), { kind: 'verdict', pass: true, comment: 'ok' })
+    expect(foldCard(facts(w, card)).stage).toBe('approved')
+    // The builder merges by hand; its report arrives (bound to the attempt it built), and while it gathers, the
+    // reconciler sees the merge and finishes the card: the attempt ends (its generation moves on) before the report's write.
+    git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', wf.state(wf.store.card(card)).latest!.revision!)
+    const bound = key(w, card)
+    const report = arrive(l1)
+    let raced = false
+    // Run in the test's own async context, as the watcher's reconcile runs: never inside the report's intent.
+    const outside = AsyncResource.bind(() => inWorkspace(w, () => reconcile(wf, wf.store.card(card))))
+    const hooks = wf.cfg.hooks
+    wf.cfg.hooks = {
+      ...hooks,
+      beforeWrite: async (move) => {
+        if (move !== 'report merge' || raced) return
+        raced = true
+        await outside()
+      }
+    }
+    const spy = vi.spyOn(service, 'workflowFor').mockImplementation(async () => wf)
+    let r: Awaited<ReturnType<typeof act>>
+    try {
+      r = await act(w, card, report, { kind: 'reportMerge' })
+    } finally {
+      spy.mockRestore()
+      wf.cfg.hooks = hooks
+    }
+    expect(raced).toBe(true)
+    expect(foldCard(facts(w, card)).stage).toBe('done')
+    expect(key(w, card)).toEqual({ id: bound.id, generation: bound.generation + 1 })
+    expect(r.done).toMatchObject({ to: 'done', data: { already: expect.stringContaining('Done already') } })
+    expect(facts(w, card).some((f) => f.kind === 'Refused')).toBe(false)
+    expect(facts(w, card).filter((f) => f.kind === 'Integrated')).toHaveLength(1)
+    // The fence still holds for what a stale call would change: the same request's comment on the finished attempt.
+    expect(await refused(comment(w, card, report))).toBe('attempt.moved')
+    commit(wt, 'c.txt')
   })
 
   it('HI-3263: a card resumed from On Hold is a new attempt key: a launch bound while it was held is refused until it reads the card', async () => {
