@@ -569,7 +569,7 @@ const ancestor = (x, y) => {
     // window can still read B1 as Finished then. So the click waits for that task read, B1's turn over and its inbox quiet.
     const b1Done = await waitHung(async () => {
       const ds = (await api('GET', `/v1/projects/alpha/agents/${encodeURIComponent(b1.name)}/deliveries?limit=200`, undefined, tokens.b1)).body?.deliveries ?? []
-      const task6 = ds.filter((d) => d.kind === 'task' && String(d.text ?? '').includes(k6)).sort((a, b) => Number(String(b.id).slice(1)) - Number(String(a.id).slice(1)))[0]
+      const task6 = ds.filter((d) => d.kind === 'task' && String(d.text ?? '').includes(k6)).sort((x, y) => Number(String(y.id).slice(1)) - Number(String(x.id).slice(1)))[0]
       const state = await live(b1.id)
       return !!task6 && !['queued', 'offered', 'uncertain'].includes(task6.state) && state?.turn?.state === 'over' && (await lib.agentQuiet(PORT, 'alpha', state, tokens.b1)) && ds.every((d) => !['queued', 'offered', 'uncertain'].includes(d.state)) ? { task: task6.id, state: task6.state } : null
     })
