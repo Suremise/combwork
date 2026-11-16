@@ -98,5 +98,10 @@
     "text": "The workspace has no MCP server named {name}.",
     "note": "An error adding a server to a project or the Combwork Assistant. {name} is its name.",
     "audience": "both"
+  },
+  "mcp.error.placesChanged": {
+    "text": "Where {name} is added changed while you were replacing it, so nothing was changed: look again.",
+    "note": "An error replacing an MCP server (HI-3327): a project (or the Combwork Assistant) gained or lost the server after the Replace question showed where it is added (those places keep it), so nothing was written. {name} is the server.",
+    "audience": "both"
   }
 }

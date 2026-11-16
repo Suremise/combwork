@@ -93,5 +93,10 @@
     "placeholders": {
       "name": "plain"
     }
+  },
+  "mcp.error.placesChanged": {
+    "placeholders": {
+      "name": "plain"
+    }
   }
 }
