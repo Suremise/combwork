@@ -234,7 +234,7 @@ describe('the tests a change needs (pickTests)', () => {
 })
 
 describe('the picker on the command line (focused.pick)', () => {
-  const run = (input: string, base = 'HEAD') => spawnSync(process.execPath, [join(root, 'tests', 'e2e', 'affected.mjs'), '--pick'], { cwd: root, input, encoding: 'utf8', env: { ...runContext.baseEnv(), CW_FOCUSED_BASE: base } })
+  const run = (input: string, base = 'HEAD', cwd = root) => spawnSync(process.execPath, [join(root, 'tests', 'e2e', 'affected.mjs'), '--pick'], { cwd, input, encoding: 'utf8', env: { ...runContext.baseEnv(), CW_FOCUSED_BASE: base } })
 
   it('prints {"every":true} alone for a shared file, nothing for no change, and fails for a base that is no commit', () => {
     const every = run('src/main/sessions.ts\r\n')
@@ -250,7 +250,18 @@ describe('the picker on the command line (focused.pick)', () => {
 
   it('reads a shared file it splits by its changed parts in the checkout (HI-2659): unchanged since the base, no suite', () => {
     // ipc.ts is the same in the checkout as at HEAD: none of its parts changed, so no suite (a file-level pick: every).
-    const r = run('src/main/ipc.ts\n')
+    // The checkout is a clean one holding this ipc.ts, as the merge queue's is (HI-3328): this repository's own tree has
+    // uncommitted work whenever check:repo runs before a commit, and that starts `vitest list --changed` (HI-3002), which
+    // took over 20 s under load.
+    const repo = tempDir('cw-focused-cli-')
+    const git = (...args: string[]): string => execFileSync('git', ['-c', 'core.autocrlf=false', '-c', 'user.name=Combwork Test', '-c', 'user.email=test@example.invalid', ...args], { cwd: repo, env: runContext.baseEnv(), encoding: 'utf8' })
+    git('init', '-q', '-b', 'main')
+    mkdirSync(join(repo, 'src', 'main'), { recursive: true })
+    writeFileSync(join(repo, 'src', 'main', 'ipc.ts'), readFileSync(join(root, 'src', 'main', 'ipc.ts')))
+    git('add', '.')
+    git('commit', '-q', '-m', 'base')
+    expect(unchangedSince(repo, 'HEAD')).toBe(true)
+    const r = run('src/main/ipc.ts\n', 'HEAD', repo)
     expect(r.status, r.stderr).toBe(0)
     expect(r.stdout).not.toContain('"every"')
     expect(r.stdout).not.toMatch(/"needs":\["(fake|real|packaged)"\]/)
