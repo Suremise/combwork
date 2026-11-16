@@ -1493,14 +1493,18 @@ describe('many changed files', () => {
     return out
   }
 
-  it('Commit of 1,000 untracked files (about 100,000 characters of paths), with a tracked edit: all committed, nothing else', async () => {
-    const files = many(1000)
+  // HI-3332: as many files as pass the command line and no more (each path is 79 characters, so about 410 do): git
+  // writes each one's blob before its hook runs, and 1,000 timed out at 60 s on a busy CI runner.
+  const PAST_THE_LINE = 500
+
+  it('Commit of 500 untracked files (about 40,000 characters of paths), with a tracked edit: all committed, nothing else', async () => {
+    const files = many(PAST_THE_LINE)
     expect(files.join(' ').length).toBeGreaterThan(32_767)
     writeFileSync(join(proj, 'a.txt'), 'edit\n')
     writeFileSync(join(proj, 'b.txt'), 'staged\n')
     sh(proj, 'add', 'b.txt')
     const done = await settle('commit', [...files, 'a.txt'])
-    expect(done.files).toHaveLength(1001)
+    expect(done.files).toHaveLength(PAST_THE_LINE + 1)
     expect(committed()).toEqual([...files, 'a.txt'].sort())
     expect(status()).toBe('M  b.txt')
   })
@@ -1552,15 +1556,18 @@ describe('many changed files', () => {
     expect(status()).toBe(before)
   })
 
-  it('a refusing hook with 1,000 untracked files: the intent-to-add entries taken out again, nothing lost', async () => {
-    const files = many(1000)
+  // HI-3332: since HI-3021 the intent-to-add entries go only into the private index, removed whole on a refusal, so the
+  // count only has to pass the command line.
+  it('a refusing hook with 500 untracked files: the intent-to-add entries never in the real index, nothing lost', async () => {
+    const files = many(PAST_THE_LINE)
+    expect(files.join(' ').length).toBeGreaterThan(32_767)
     mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
     writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nexit 1\n')
     const before = head()
     await expect(settle('commit', files)).rejects.toThrow(/Git did not commit/)
     expect(head()).toBe(before)
     expect(sh(proj, 'ls-files', '--stage')).not.toContain('generated')
-    expect(status().split('\n')).toHaveLength(1000)
+    expect(status().split('\n')).toHaveLength(PAST_THE_LINE)
   })
 })
 
