@@ -688,8 +688,9 @@ each `workflowFor` first syncs them with the watcher (`syncHashes`, one at a tim
 of that time isn't complete. `cardRunRevision` (`runChecks.ts`) takes its runtime from `workflowFor` too.
 
 **Gates at boardWrite (#1265).** `tasks.ts` `runIntent(wf, n, actor, call, zero9)` is the one intent path: it runs a
-runtime intent (`call`) under `alongside` (runtime.ts, an AsyncLocalStorage), and `Workflow.write` calls it back inside
-each write that changed the card, in the same transaction (its `locked` joins the board change): `updateTaskAs` with
+runtime intent (`call`) under `alongside` (runtime.ts, an AsyncLocalStorage, live only until the call returns: work it
+sets off that outlives it, such as a reconciliation, inherits the context but not the hooks, HI-3322), and
+`Workflow.write` calls it back inside each write that changed the card, in the same transaction (its `locked` joins the board change): `updateTaskAs` with
 `was` (the column before the runtime's `setStage`) writes the card's 0.9 fields (column, place, history, agent, review,
 loop events), inside `recordingByRuntime`, so the recorder writes no `Started`/`Moved`/`Submitted`/`ReviewStarted`/
 `Verdict` for it (one owner per fact) but still its `Blocked`, `Decision`s. The user's and the Assistant's column moves

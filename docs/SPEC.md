@@ -6209,7 +6209,9 @@ moved on.
   now, or its cycle's builder when it has none). A put-back by another agent stays allowed (anyone moves a card), fenced by
   launch and binding like any write. The fence runs before a write's own refusals, so a stale call is told it is stale.
   Reordering a column is fenced by nothing more than before (the order is the board's, not an attempt's).
-- **Never fenced**: the user, the Assistant, scripts on the workspace token and Combwork itself. A card with no workflow
+- **Never fenced**: the user, the Assistant, scripts on the workspace token and Combwork itself, its writes that an
+  agent's call set off and that outlive it included (a reconciliation its move scheduled, a candidate's checks: the call's
+  fence is checked in its own writes only, HI-3322). A card with no workflow
   record (a workspace card) has its launch checked only.
 - **Readiness is written with the Done.** The one write path's choke point for Done (`runtime.write`) writes, on each card
   that waits for the one moving into or out of Done, a `Readiness` fact (`ready`, `after`) whenever it changes, in the same
