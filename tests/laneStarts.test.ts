@@ -24,6 +24,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const lanes = await import('../src/main/lanes')
 const { checkLaneStarts, laneStartsSettled, laneStartsTestHooks } = await import('../src/main/laneStarts')
+const teamPause = await import('../src/main/teamPause')
 const { sessions } = await import('../src/main/sessions')
 const { claudeCode } = await import('../src/main/providers/claude/adapter')
 const { advanced } = await import('../src/main/advanced')
@@ -715,6 +716,12 @@ describe("Combwork starts a lane's next card (HI-1990)", () => {
         st.status = 'working'
         return { trial, fix, lane, st }
       }
+      /** An agent's workflow role, as Agent Settings saves it. */
+      const roleOf = async (id: string, role: string): Promise<void> => {
+        await run(() => w.mutateProjectConfig(p, (c) => ({ agents: c.agents.map((a) => (a.id === id ? { ...a, workflowRole: role } : a)) as never })))
+        // The workspace's projects as it holds them (what the lanes' pauses read), as its watcher refreshes them.
+        await w.refresh()
+      }
       /** Its CLI took every line Combwork typed into it (a prompt submitted), as the stand-in CLI never says. */
       const tookLines = (id: string): void => {
         const live = s.live.get(`${p.toLowerCase()}#${id}`) as { prompts?: number; confirming?: unknown; state: { untakenLine?: unknown } }
@@ -793,6 +800,30 @@ describe("Combwork starts a lane's next card (HI-1990)", () => {
         await lanes.endLane(w, c.lane.id, { abandoned: true })
       })
 
+      it("HR1's round 1: applyNow on a yield with its builder idle never puts the card back itself: queued, then run in the guarded change, which a turn begun meanwhile stops", async () => {
+        const x = await waiting('j8')
+        x.st.status = 'ready'
+        const r = await lanes.startLane(w, { project: 'alpha', builder: 'j8', reviewer: 'r1', cards: [x.fix, x.trial], by: 'the user', applyNow: true })
+        expect(r.note ?? '').not.toContain('Applied now')
+        expect(r.note).toMatch(/waits on/)
+        expect([await columnOf(x.trial), r.lane.queued]).toEqual(['doing', [x.fix, x.trial]])
+        // Its builder begins a turn after the yield is decided: nothing moves.
+        let ran = false
+        laneYieldTestHooks.decided = async () => {
+          if (ran) return
+          ran = true
+          x.st.status = 'working'
+        }
+        await runLaneYields(w)
+        laneYieldTestHooks.decided = null
+        expect([ran, await columnOf(x.trial), (await listOf(x.lane.id)).cards]).toEqual([true, 'doing', [x.trial]])
+        // Its turn over: run.
+        x.st.status = 'ready'
+        await look()
+        expect([await columnOf(x.trial), (await listOf(x.lane.id)).cards]).toEqual(['todo', [x.fix, x.trial]])
+        await lanes.endLane(w, x.lane.id, { abandoned: true })
+      })
+
       it('changed after it was looked at or decided (a turn begun, a new run, a Stop, the list replaced, the lane ended, the card moved on, its dependency dropped): nothing changed', async () => {
         // The lanes' own changes wait for the lanes' lock, held from the decision to the commit: they land after the look
         // without the locks. The board's and the builder's land after the decision, before the board change.
@@ -803,7 +834,12 @@ describe("Combwork starts a lane's next card (HI-1990)", () => {
           ['list', 'looked', async (x) => void (await lanes.startLane(w, { project: 'alpha', builder: 'j5', reviewer: 'r1', cards: [x.trial, x.fix], by: 'a newer change' }))],
           ['ended', 'looked', async (x) => void (await lanes.endLane(w, x.lane.id, { abandoned: true }))],
           ['moved', 'decided', async (x) => void (await run(() => tasks.updateTask(x.trial, { column: 'review' }, user)))],
-          ['dependency', 'decided', async (x) => void (await run(() => tasks.updateTask(x.trial, { blockedBy: [] }, user)))]
+          ['dependency', 'decided', async (x) => void (await run(() => tasks.updateTask(x.trial, { blockedBy: [] }, user)))],
+          // HR1's round 1: the lane's own pauses hold it too, as they hold its starts: the team paused, its builder Independent or
+          // by a role that doesn't build (work in flight stays where it is).
+          ['team', 'decided', async () => void (await teamPause.pauseTeam(w, 'user'))],
+          ['independent', 'decided', async () => void (await roleOf('j5', 'independent'))],
+          ['offSide', 'decided', async () => void (await roleOf('j5', 'reviewer'))]
         ]
         for (const [what, at, change] of cases) {
           const x = await waiting('j5')
@@ -823,6 +859,8 @@ describe("Combwork starts a lane's next card (HI-1990)", () => {
           if (what !== 'moved') expect([what, await columnOf(x.trial)]).toEqual([what, 'doing'])
           if (what !== 'list' && what !== 'ended') expect([what, (await listOf(x.lane.id)).cards]).toEqual([what, [x.trial]])
           ;(sessions as unknown as { stoppedOnPurpose: Map<string, number> }).stoppedOnPurpose.clear()
+          await teamPause.resumeTeam(w)
+          await roleOf('j5', 'either')
           const l = await lanes.laneOf(w, 'alpha', 'j5')
           if (l) await lanes.endLane(w, l.id, { abandoned: true })
         }

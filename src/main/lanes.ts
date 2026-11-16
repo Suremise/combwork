@@ -1299,25 +1299,20 @@ async function putBackForReorder(ws: WorkspaceService, s: StartLane, builder: La
   if (first === flying.number) return null
   const key = cards.get(flying.number)?.key ?? `#${flying.number}`
   if (flying.column !== 'doing') throw new LaneError(409, say(A.inReview, { card: key, where: flying.column === 'review' ? 'review' : 'other' }))
-  // HI-3323: the new first card is one the card in flight waits on: what would refuse it now (its builder in a turn, its
-  // folder not clean) queues it as a yield instead, run at the builder's turn end (laneYields.ts).
+  // HI-3323: the new first card is one the card in flight waits on: never put back here, idle builder or not. The start's
+  // edit queues it as a yield, which runLaneYields runs in its one guarded board change (fenced at its commit on the
+  // builder's run, turn, Stop, launch, the team's pause and its role), at once when the builder is free.
   const fc = first !== undefined ? cards.get(first) : undefined
   const fly = cards.get(flying.number)
-  const yields = !!fc && !!fly && fc.column === 'todo' && waitsOnCard(fly, first!, fc.key ?? '')
+  if (fc && fly && fc.column === 'todo' && waitsOnCard(fly, first!, fc.key ?? '')) return null
   const { sessions } = await import('./sessions')
   const st = sessions.liveFor(projectPath, builder.id)
-  if (st && IN_A_TURN.has(st.status)) {
-    if (yields) return null
-    throw new LaneError(409, say(A.inATurn, { agent: builder.name, status: st.status }))
-  }
+  if (st && IN_A_TURN.has(st.status)) throw new LaneError(409, say(A.inATurn, { agent: builder.name, status: st.status }))
   const wf = await (await service()).workflowFor(ws, projectPath).catch(() => null)
   if (!wf) return null
   const state = wf.state(wf.store.card(flying.number))
   const folder = state.started?.folder
-  if (!(await cardFolderClean(folder))) {
-    if (yields) return null
-    throw new LaneError(409, say(A.uncommitted, { card: key, agent: builder.name }))
-  }
+  if (!(await cardFolderClean(folder))) throw new LaneError(409, say(A.uncommitted, { card: key, agent: builder.name }))
   const { runIntent, CW_LANE_START } = await import('./tasks')
   const { reply } = await runIntent(wf, flying.number, CW_LANE_START, (w) => w.putBack(`#${flying.number}`, 'combwork', { why: inDefaultDialect(() => say(A.putBackWhy, { by: s.by })) }), undefined, s.commit)
   const r = reply as { ok?: boolean; refused?: boolean; message?: string }
@@ -1353,6 +1348,20 @@ type YieldNow =
   | { kind: 'wait'; why: 'turn' | 'folder' }
   | { kind: 'run'; runId: string | null; line: string | null }
 
+/**
+ * HI-3323: what holds a lane's yield now, read synchronously (its decision, and its commit's fence): its builder in a turn,
+ * stopped by someone, being launched by a lane start, or its lane waiting for a slot; the team paused (HI-2081); or its
+ * builder Independent (HI-2670) or by a role that doesn't build (HI-2664, offSide), as the lane's own pauses read them:
+ * work in flight stays where it is.
+ */
+function yieldHeld(ws: WorkspaceService, l: LaneRecord, sessions: typeof import('./sessions').sessions): boolean {
+  if (!ws.path) return true
+  const projectPath = join(ws.path, l.project)
+  const st = sessions.liveFor(projectPath, l.builder.id)
+  if ((st && IN_A_TURN.has(st.status)) || sessions.stoppedOnPurposeAt(projectPath, l.builder.id) > 0 || laneStartHeld(ws, l.project, l.builder.id) || laneWaitsForSlot(ws, l.id)) return true
+  return !!teamPauseOf(ws) || outOfWorkflow(ws, l).has(l.builder.id) || offSideOf(ws, l).get(l.builder.id) === 'builder'
+}
+
 async function yieldNow(ws: WorkspaceService, l: LaneRecord, y: LaneYield): Promise<YieldNow> {
   if (!ws.path || !l.pending) return { kind: 'stale' }
   const projectPath = join(ws.path, l.project)
@@ -1361,7 +1370,7 @@ async function yieldNow(ws: WorkspaceService, l: LaneRecord, y: LaneYield): Prom
   if (!(await yieldCardsHold(ws, l, y))) return { kind: 'stale' }
   const { sessions } = await import('./sessions')
   const st = sessions.liveFor(projectPath, l.builder.id)
-  if ((st && IN_A_TURN.has(st.status)) || sessions.stoppedOnPurposeAt(projectPath, l.builder.id) > 0 || laneStartHeld(ws, l.project, l.builder.id) || laneWaitsForSlot(ws, l.id)) return { kind: 'wait', why: 'turn' } // i18n-ignore: a wait's code, never shown
+  if (yieldHeld(ws, l, sessions)) return { kind: 'wait', why: 'turn' } // i18n-ignore: a wait's code, never shown
   const wf = await (await service()).workflowFor(ws, projectPath).catch(() => null)
   if (!wf) return { kind: 'wait', why: 'folder' } // i18n-ignore: a wait's code, never shown
   const started = wf.state(wf.store.card(y.card)).started
@@ -1418,13 +1427,17 @@ export async function runLaneYields(ws: WorkspaceService): Promise<{ switched: s
     const first = await yieldNow(ws, l0, l0.yieldFor!)
     await laneYieldTestHooks.looked?.(l0.id)
     if (first.kind === 'wait' && l0.yieldFor!.told) {
+      yieldWaitLogged(l0.id, l0.yieldFor!.id, first.why)
       out.waiting.push({ lane: l0.id, project: l0.project, builder: l0.builder.id, first: l0.yieldFor!.first })
       continue
     }
     try {
       const done = await runYield(ws, l0.id)
       if (done?.kind === 'run') out.switched.push(l0.id)
-      else if (done?.kind === 'wait') out.waiting.push({ lane: l0.id, project: l0.project, builder: l0.builder.id, first: l0.yieldFor!.first })
+      else if (done?.kind === 'wait') {
+        yieldWaitLogged(l0.id, l0.yieldFor!.id, done.why)
+        out.waiting.push({ lane: l0.id, project: l0.project, builder: l0.builder.id, first: l0.yieldFor!.first })
+      }
     } catch (e) {
       // Refused or changed meanwhile (StaleLane, the put back refused): the next look decides again from what is there then.
       log.info(`Lane ${l0.id}: its yield to #${l0.yieldFor!.first} not run now: ${userText(e instanceof Error ? e.message : String(e))}`)
@@ -1432,6 +1445,16 @@ export async function runLaneYields(ws: WorkspaceService): Promise<{ switched: s
     }
   }
   return out
+}
+
+/** Each waiting yield's reason last logged (HI-3323), by lane: logged once per yield and reason, not at every look. */
+const yieldWaits = new Map<string, string>()
+function yieldWaitLogged(lane: string, id: string, why: 'turn' | 'folder'): void {
+  const k = `${id}:${why}`
+  if (yieldWaits.get(lane) === k) return
+  yieldWaits.set(lane, k)
+  if (yieldWaits.size > 500) yieldWaits.delete(yieldWaits.keys().next().value!)
+  log.info(`Lane ${lane}: its yield waits for ${why === 'turn' ? 'its builder to be free (out of a turn, not stopped, launched or held by a pause or its role)' : "its card's folder to read as clean"}`)
 }
 
 /** One lane's yield (runLaneYields): what was decided and done, or null when the lane no longer has one. */
@@ -1492,7 +1515,7 @@ async function runYield(ws: WorkspaceService, id: string): Promise<YieldNow | nu
       const { sessions } = await import('./sessions')
       const fence = (): void => {
         const st = sessions.liveFor(projectPath, l.builder.id)
-        if ((st?.runId ?? null) !== d.runId || (st && IN_A_TURN.has(st.status)) || sessions.stoppedOnPurposeAt(projectPath, l.builder.id) > 0 || laneStartHeld(ws, l.project, l.builder.id) || laneWaitsForSlot(ws, l.id)) throw new StaleLane('its builder began a turn before the yield committed') // i18n-ignore: internal, for the log
+        if ((st?.runId ?? null) !== d.runId || yieldHeld(ws, l, sessions)) throw new StaleLane('its builder began a turn, or the lane was held, before the yield committed') // i18n-ignore: internal, for the log
       }
       checks.push(fence)
       beforeBoardCommit(ws, `lane-yield:${y.id}`, fence)
@@ -1500,7 +1523,6 @@ async function runYield(ws: WorkspaceService, id: string): Promise<YieldNow | nu
     }
   )
   if (decided?.kind === 'stale') log.info(`Lane ${id}: its yield no longer applies (its card moved on, or no longer waits on the first): its list stays queued`)
-  if (decided?.kind === 'wait') log.info(`Lane ${id}: its yield waits for ${decided.why === 'turn' ? 'its builder to be out of a turn' : "its card's folder to read as clean"}`)
   if (after.told) await tellYield(ws, after.told.l, after.told.y)
   if (after.ran) {
     const { l, y, line } = after.ran

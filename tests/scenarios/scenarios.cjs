@@ -4771,6 +4771,36 @@ module.exports.SCENARIOS = [
     observe: (o) => [['read the run-lanes or coordinate-agents skill', read(o, 'run-lanes') || read(o, 'coordinate-agents'), o.skillsRead.join(',')]]
   },
   {
+    id: 'assistant-lane-yield',
+    // HI-3323 (MC-1525, 16 Nov): a lane's card in Doing needs a new card merged first. Putting that card first is one
+    // cw_lane start; the lane switches to it by itself at its builder's turn end (here its builder is stopped, which holds
+    // the switch), so the Assistant neither starts the new card itself nor puts the card in flight back.
+    title: "The Assistant asked to put first a card the lane's card in flight waits on (HI-3323): one cw_lane start with it first, the lane queues the switch; no manual start, no put back, no new lane",
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      await reviewedPair(c)
+      const a = await c.card('a', { title: 'greet() says Hi in every locale', description: 'src/greet.js: greet(name, locale) returns the locale\'s greeting.', agent: 'coder', column: 'doing' })
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a], name: 'greetings' })
+      const fix = await c.card('fix', { title: 'Fix the locale table loader', description: 'src/locales.js: the loader drops the last entry; greet() needs it fixed first.' })
+      await c.inv('tasks:update', a, { blockedBy: [fix] })
+    },
+    prompt: (c) => `In alpha, Coder's lane is working on #${c.cards.a}, but it can't be finished until #${c.cards.fix} is merged (it depends on it). Put #${c.cards.fix} first in Coder's lane so it is done next.`,
+    fake: (c) => `skill run-lanes then cw cw_lane ${JSON.stringify({ action: 'start', project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [c.cards.fix, c.cards.a] })}`,
+    expect: (o, c) => {
+      const num = (n) => Number(String(n).replace(/\D/g, ''))
+      const starts = ran(o, 'cw_lane').map((x) => argsOf(x)).filter((x) => x.action === 'start')
+      const lane = (o.lanes ?? []).find((l) => l.builder?.name === 'Coder' && (l.state === 'active' || l.state === 'paused'))
+      const list = lane ? (lane.queued ?? (lane.cards ?? []).map((x) => x.number)) : []
+      return [
+        [`reordered the lane with cw_lane start, #${c.cards.fix} before #${c.cards.a}`, starts.some((x) => { const ns = (x.cards ?? []).map(num); return ns.includes(c.cards.fix) && ns.includes(c.cards.a) && ns.indexOf(c.cards.fix) < ns.indexOf(c.cards.a) }), JSON.stringify(starts)],
+        ['started, put back or moved no card itself, and abandoned or ended no lane', !o.combworkCalls.some((x) => /cw_(start_task|start_card|put_back)/.test(x.tool) || (x.tool === 'cw_lane' && argsOf(x).action === 'end')) && !ran(o, 'cw_update_task').some((x) => /column/.test(String(x.args ?? ''))), o.combworkCalls.map((x) => x.tool).join(',')],
+        [`the lane switches to #${c.cards.fix} (queued as a switch, or already switched)`, !!lane && list[0] === c.cards.fix && ((lane.status?.reason === 'listChanges' && lane.status?.first === c.cards.fix) || o.cards.a?.column === 'todo'), JSON.stringify(lane ? { queued: lane.queued, status: lane.status, a: o.cards.a?.column } : (o.lanes ?? []).map((l) => [l.builder?.name, l.state]))]
+      ]
+    },
+    observe: (o) => [['read the run-lanes or coordinate-agents skill', read(o, 'run-lanes') || read(o, 'coordinate-agents'), o.skillsRead.join(',')]]
+  },
+  {
     id: 'assistant-new-lane',
     // HI-2222: coordinate-agents' A new lane is cw_lane start, never a prompt to a builder Combwork gives the lane. Combwork gives
     // an idle running builder outside slots the lane in a new conversation (#437; HI-2232, decision (a)), its last
