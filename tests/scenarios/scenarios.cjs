@@ -343,6 +343,8 @@ if (require.main === module) {
 }
 `
 const POOL_CARD = 'Run the test pass on the pool VM: `node pool-run.js start` queues it there and returns at once, and `node pool-run.js status` says how it is going. Once it has passed, write its result line to RESULTS.md, commit it, and submit. Don\'t submit before the run has ended.'
+/** card-loop-outside-job's fake, woken by its watch's end: it checks the run, clears the mark, records the result and submits. */
+const poolWake = (c) => `shell: node pool-run.js status then cw cw_update_task ${JSON.stringify({ number: `#${c.cards.a}`, waitingFor: '' })} then shell: node -e "require('fs').writeFileSync('RESULTS.md', 'Run 17: passed, 214 tests.\\n')" then shell: git add -A then shell: git -c user.name=Coder -c user.email=coder@example.com commit -qm "Pool run 17 passed" then cw cw_submit ${JSON.stringify({ card: `#${c.cards.a}`, summary: 'Ready for review: pool run 17 passed (214 tests), in RESULTS.md.' })}`
 /**
  * The fake builder's work on greet.js, committed before its card goes to Review (#1486: a submit needs a change). A step
  * a command, since the fakes' shells differ: cmd (Claude Code's, Codex's) and PowerShell (Copilot's).
@@ -3529,12 +3531,15 @@ module.exports.SCENARIOS = [
       const card = (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body
       if (card?.column !== 'doing' || !c.read('pool/run.json')) return
       c.firstEnd = { at: Date.now(), status, waitingFor: card.waitingFor ?? null, watch: (await coderLive(c))?.watch ?? null }
+      // The fake Claude Code's steps for its next wake, given only now: Combwork's start line is a wake too, and would take
+      // them first. A fake only (it has logged a wake: that start line); a real CLI reads no script.
+      const fs = require('fs')
+      const path = require('path')
+      if (fs.existsSync(path.join(c.fakeHome, 'fake-wakes.jsonl'))) fs.writeFileSync(path.join(c.fakeHome, `fake-wakes-${c.agents.coder.name.replace(/[^\w-]/g, '_')}.txt`), poolWake(c) + '\n')
     },
     keepWaiting: async (c) => !!c.firstEnd && Date.now() - c.firstEnd.at < 8 * 60_000 && (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body?.column === 'doing',
     prompt: (c) => `You are the builder of card #${c.cards.a} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). Do the card and hand it to your reviewer as your loop says.`,
     fake: (c) => `skill card-loop then skill work-on-card then shell: node pool-run.js start then cw cw_update_task ${JSON.stringify({ number: `#${c.cards.a}`, waitingFor: 'Pool VM run 17: the test pass, ending about 3 min from now' })} then cw cw_wait_for_tasks ${JSON.stringify({ cards: [`#${c.cards.a}`], changes: ['comment'], wake: true, limitMinutes: 3 })}`,
-    // Its watch's end wakes it: it checks the run, clears the mark, records the result and submits.
-    fakeWakes: (c) => [`shell: node pool-run.js status then cw cw_update_task ${JSON.stringify({ number: `#${c.cards.a}`, waitingFor: '' })} then shell: node -e "require('fs').writeFileSync('RESULTS.md', 'Run 17: passed, 214 tests.\\n')" then shell: git add -A then shell: git -c user.name=Coder -c user.email=coder@example.com commit -qm "Pool run 17 passed" then cw cw_submit ${JSON.stringify({ card: `#${c.cards.a}`, summary: 'Ready for review: pool run 17 passed (214 tests), in RESULTS.md.' })}`],
     expect: (o, c) => {
       const f = c.firstEnd
       const run = (() => {
