@@ -272,6 +272,21 @@ describe('installing and updating (HI-545)', () => {
     expect(await row()).toMatchObject({ installed: '1.1.0', update: false })
   })
 
+  it('installs over a server of the name with Replace, keeping the places shown, refused when they changed (HI-3327)', async () => {
+    // demo added by hand (not from the catalogue, so no Update is offered), and added to ambrosia.
+    const dir = tempDir('cw-mcp-catalog-own-')
+    writeFileSync(join(dir, 'demo.json'), JSON.stringify({ command: 'node', args: ['own.js'] }))
+    await run(() => mcp.addMcpFromFile(join(dir, 'demo.json'), 'demo'))
+    await addTo(ambrosia)
+    const p = await run(() => catalog.prepareCatalogServer(source(), 'demo'))
+    expect(p).toMatchObject({ existing: null, nameTaken: true })
+    await expect(run(() => catalog.installCatalogServer(p.id, 'demo', true, { projects: [], assistant: false }))).rejects.toThrow('Where demo is added changed')
+    expect((await launched(ambrosia)).demo?.args).toEqual(['own.js'])
+    await run(() => catalog.installCatalogServer(p.id, 'demo', true, { projects: [ambrosia], assistant: false }))
+    expect((await launched(ambrosia)).demo?.args?.[0]).toMatch(/demo[\\/]server\.js$/)
+    expect(projectMcp(ambrosia).enabled).toEqual(['demo'])
+  })
+
   it("installs and runs a zip with Combwork's names, updating it from the same folder; a zip with only the old names has no definition (HI-2594)", async () => {
     await install()
     await addTo(ambrosia)

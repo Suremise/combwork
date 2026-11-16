@@ -73,7 +73,6 @@
   "actions.mcp.openFailed": "Datei konnte nicht geöffnet werden",
   "actions.mcp.rename": "Anderen Namen wählen",
   "actions.mcp.replace": "Ersetzen",
-  "actions.mcp.replaceMessage": "Der Arbeitsbereich hat bereits einen Server namens {name}.",
   "actions.mcp.replaceTitle": "{name} ersetzen?",
   "actions.mcp.updateFailedAdded": "Der Server konnte nicht aktualisiert werden",
   "actions.pane.edge": "{agent} kann nicht weiter {dir, select, left {nach links} right {nach rechts} up {nach oben} other {nach unten}}",

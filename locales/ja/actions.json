@@ -73,7 +73,6 @@
   "actions.mcp.openFailed": "ファイルを開けませんでした",
   "actions.mcp.rename": "別の名前にする",
   "actions.mcp.replace": "置き換え",
-  "actions.mcp.replaceMessage": "ワークスペースには{name}という名前のサーバーがすでにあります。",
   "actions.mcp.replaceTitle": "{name}を置き換えますか？",
   "actions.mcp.updateFailedAdded": "サーバーを更新できませんでした",
   "actions.pane.edge": "{agent}はこれ以上{dir, select, left {左} right {右} up {上} other {下}}へ移動できません",

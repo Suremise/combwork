@@ -73,7 +73,6 @@
   "actions.mcp.openFailed": "Impossible d’ouvrir le fichier",
   "actions.mcp.rename": "Choisir un autre nom",
   "actions.mcp.replace": "Remplacer",
-  "actions.mcp.replaceMessage": "L’espace de travail a déjà un serveur nommé {name}.",
   "actions.mcp.replaceTitle": "Remplacer {name} ?",
   "actions.mcp.updateFailedAdded": "Impossible de mettre à jour le serveur",
   "actions.pane.edge": "{agent} ne peut pas aller plus {dir, select, left {à gauche} right {à droite} up {haut} other {bas}}",
