@@ -79,8 +79,11 @@ beforeEach(async () => {
   w = createWorkspaceService()
   await w.open(path)
 })
-afterEach(() => {
-  disposeWorkspaceService(w)
+// Awaited (HI-3330): the close waits for the refresh opening scheduled (reading each project, its branch with git) and
+// closes the board. Left running, the last test's close outlived the file under load: its logs reached vitest after
+// teardown ("Closing rpc while onUserConsoleLog was pending") and its open files kept the temp folder (EPERM).
+afterEach(async () => {
+  await disposeWorkspaceService(w)
   setLanguage('en', {})
 })
 
