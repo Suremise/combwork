@@ -1,0 +1,30 @@
+{
+  "what": "Claude Code 2.1.325 refusing a turn on a spent seven-day limit (HI-3329): the API-error message it wrote to the transcript in a scenario's test home (no hook input was saved). Its text is the turn's last assistant message, which StopFailure's last_assistant_message carries as it did in stopfailure-connection-claude-2.1.312.json; the 429, \"rate_limit\" and usage_limit_reached are other fields, which the outage check never reads. Ids, request ids and folders replaced.",
+  "record": {
+    "parentUuid": "00000000-0000-0000-0000-000000000001",
+    "isSidechain": false,
+    "type": "assistant",
+    "uuid": "00000000-0000-0000-0000-000000000002",
+    "timestamp": "2026-11-16T03:48:16.620Z",
+    "message": {
+      "id": "00000000-0000-0000-0000-000000000003",
+      "model": "<synthetic>",
+      "role": "assistant",
+      "stop_reason": "stop_sequence",
+      "stop_sequence": "",
+      "type": "message",
+      "content": [{ "type": "text", "text": "You've hit your weekly limit · resets Nov 18, 9am (Europe/London)" }]
+    },
+    "requestId": "req_000000000000000000000000",
+    "apiError": "usage_limit_reached",
+    "apiErrorParams": { "rate_limit_info": { "status": "rejected", "resetsAt": 1794992400, "rateLimitType": "seven_day", "overageStatus": "rejected", "overageDisabledReason": "org_level_disabled", "isUsingOverage": false } },
+    "error": "rate_limit",
+    "isApiErrorMessage": true,
+    "apiErrorStatus": 429,
+    "apiErrorType": "rate_limit_error",
+    "failedResponseHadNoToolCall": true,
+    "sessionId": "00000000-0000-0000-0000-000000000000",
+    "cwd": "C:\\work\\alpha",
+    "version": "2.1.325"
+  }
+}

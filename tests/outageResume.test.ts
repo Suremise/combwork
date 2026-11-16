@@ -48,6 +48,21 @@ describe('a dropped connection, by what the CLI said (connectionDropped)', () =>
     for (const line of fixture('rate-limit-copilot-1.0.105.jsonl').split('\n').filter(Boolean)) expect(dropped('copilot', JSON.parse(line).data.message)).toBe(false)
   })
 
+  it("never takes Claude Code's weekly, session or 5-hour limit as a dropped connection, whatever else its line says (HI-3329)", () => {
+    // Claude Code 2.1.325's recorded line for a spent seven-day limit: the 429 and "rate_limit" are only in other fields.
+    const weekly: string = JSON.parse(fixture('weekly-limit-claude-2.1.325.json')).record.message.content[0].text
+    expect(weekly).toBe("You've hit your weekly limit · resets Nov 18, 9am (Europe/London)")
+    const never = pattern(OUTAGE_NOT_CONNECTION)
+    for (const line of [weekly, "You've hit your session limit · resets 3pm", "You've hit your 5-hour limit · resets 3pm", "You've hit your Opus limit", "You've hit your individual spend limit", "You've hit your limit · resets 3pm"]) {
+      expect(never.test(line), line).toBe(true)
+      // With a connection error beside it, as the 529 case has, still no resume.
+      expect(dropped('claude-code', `${line} · Connection error`), line).toBe(false)
+    }
+    expect(dropped('claude-code', weekly)).toBe(false)
+    // Words that only name a limit in passing aren't one.
+    expect(never.test('API Error: Connection refused (ECONNREFUSED) · hit your proxy at its limit')).toBe(false)
+  })
+
   it("keeps each CLI's words to its own pattern, and Combwork's exclusions win", () => {
     // Codex's dropped stream isn't how Claude Code says it, nor Copilot's.
     expect(dropped('claude-code', 'stream disconnected before completion: Transport error')).toBe(false)
@@ -189,6 +204,7 @@ describe('the wait (OutageResume)', () => {
   it.each([
     ['the switch is off', { on: false }, REFUSED],
     ['a usage limit', {}, "Claude AI usage limit reached. You've hit your limit"],
+    ["Claude Code's weekly limit beside a connection error (HI-3329)", {}, "You've hit your weekly limit · resets Nov 18, 9am (Europe/London) · Connection error"],
     ['an overloaded server', {}, 'API Error: 529 overloaded_error · Connection error'],
     ['a sign-in', {}, 'Not logged in · Please run /login']
   ] as const)('does nothing when %s', async (_what, opts, words) => {

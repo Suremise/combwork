@@ -716,7 +716,9 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.cw.outage.notConnection.title', defaultMessage: 'Resuming after a connection drops: errors that are never a dropped connection', description: "An advanced setting's title (Settings → Advanced), listed under Combwork." }),
     desc: msg({ id: 'settings.advanced.cw.outage.notConnection.desc', defaultMessage: "A failed turn whose error this regular expression finds is never resumed, whatever a CLI's connection error pattern finds: a usage or rate limit, a sign-in, an overloaded server. Resuming wouldn't help those, and could repeat.", description: 'What the advanced setting "Resuming after a connection drops: errors that are never a dropped connection" does (Settings → Advanced).' }),
     kind: 'pattern',
-    default: String.raw`usage limit|rate.?limit|hit your limit|quota|credit balance|billing|overloaded|\b(?:401|403|429|529)\b|too many requests|log ?in|sign.?in|authenticat|unauthori[sz]ed|forbidden|api key`,
+    // "hit your … limit" (HI-3329): Claude Code names the limit it hit ("You've hit your weekly limit · resets …",
+    // 2.1.325), and the line is all a StopFailure's message holds: the 429 is in other fields.
+    default: String.raw`usage limit|rate.?limit|hit your (?:[\w-]+ ){0,2}limit|quota|credit balance|billing|overloaded|\b(?:401|403|429|529)\b|too many requests|log ?in|sign.?in|authenticat|unauthori[sz]ed|forbidden|api key`,
     flags: 'i',
     applies: 'now'
   },
