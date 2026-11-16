@@ -105,6 +105,16 @@ const id = (cwd, rev, t = 'commit_id') => jj(cwd, '--ignore-working-copy', 'log'
   }
   const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
   const forYouOf = async (n, gate) => ((await inv('tasks:forYou')).items ?? []).find((i) => i.card === n && i.gate === gate) ?? null
+  /** What a failed advance check shows (HI-3321): main against where it was, the card's facts since its pass, its For you items. */
+  const advanceEvidence = async (n, was) => {
+    const facts = (await inv('tasks:facts', n).catch(() => [])) ?? []
+    const from = facts.findLastIndex((f) => f.kind === 'Moved' && f.data?.to === 'approved')
+    return {
+      mainMoved: id(shop, 'main') !== was,
+      facts: facts.slice(Math.max(0, from)).map((f) => `${f.seq}:${f.kind}:${JSON.stringify(f.data ?? {}).slice(0, 160)}`),
+      forYou: ((await inv('tasks:forYou')).items ?? []).filter((i) => i.card === n).map((i) => ({ gate: i.gate, request: i.request }))
+    }
+  }
   let b1 = null
   /** A card for B1 in a slot of its own, B1's commit there submitted, the user's pass: Approved (Passed on the board). */
   const passedCard = async (title, file) => {
@@ -167,7 +177,7 @@ const id = (cwd, rev, t = 'commit_id') => jj(cwd, '--ignore-working-copy', 'log'
     check('…its buttons: Integrate and Not for this plan', !!(await until(async () => (await actions.count()) === 1, HUNG_MS)) && (await text(actions)).includes('Integrate') && (await text(actions)).includes('Not for this plan'), await text(section))
     await shoot(section, 'preview')
     await actions.locator('button').first().click()
-    check('…Integrate: Done, main at the candidate', !!(await until(async () => (await card(a.n))?.column === 'done', HUNG_MS)) && id(shop, 'main') !== E, JSON.stringify({ column: (await card(a.n))?.column }))
+    check('…Integrate: Done, main at the candidate', !!(await until(async () => (await card(a.n))?.column === 'done', HUNG_MS)) && id(shop, 'main') !== E, JSON.stringify({ column: (await card(a.n))?.column, ...(await advanceEvidence(a.n, E)) }))
     await closeDialog()
 
     // --- (b) A stale preview: main moved by jj after it; the old Integrate runs nothing; a fresh preview integrates.
