@@ -396,6 +396,39 @@ async function theForm(page, app, inv) {
     await saveAll()
     check('saved: Team, in project.json', !!(await lib.until(async () => projectJson().workflow?.preset === 'team' && saved().okBefore?.mode === 'labels', HUNG_MS)), JSON.stringify(projectJson().workflow))
 
+    // --- HI-3333: Save… off says why. The report's steps: Pair previewed, not used; down to Save…; back up to Use Pair.
+    // Save… then saves, and once saved it is off saying there is nothing to save, after the window reloads too.
+    const saveTip = async () => {
+      await page.mouse.move(5, 5)
+      await save.hover()
+      const tip = page.locator('.tip', { hasText: 'No changes to save' })
+      return !!(await lib.until(async () => (await tip.count()) === 1, HUNG_MS))
+    }
+    check('HI-3333: Save… off with nothing changed says so in its tooltip', (await save.isDisabled()) && (await save.getAttribute('data-off')) === 'noChanges' && (await saveTip()))
+    await choice('pair').click()
+    await preview.waitFor({ timeout: HUNG_MS })
+    await save.scrollIntoViewIfNeeded()
+    check('…Pair only previewed: still nothing to save', (await save.getAttribute('data-off')) === 'noChanges')
+    const use = preview.locator('[data-action="use-choice"]')
+    await use.scrollIntoViewIfNeeded()
+    await use.click()
+    await save.scrollIntoViewIfNeeded()
+    check('…Use Pair after scrolling: Save… on', !!(await lib.until(async () => !(await save.isDisabled()) && (await save.getAttribute('data-off')) === null, HUNG_MS)), String(await save.getAttribute('data-off')))
+    await saveAll()
+    check('…it saves Pair, and Save… is off again, saying there is nothing to save', !!(await lib.until(async () => projectJson().workflow?.preset === 'pair' && (await save.getAttribute('data-off')) === 'noChanges', HUNG_MS)) && (await saveTip()), JSON.stringify(projectJson().workflow?.preset))
+    await page.reload()
+    await lib.appReady(page)
+    await page.getByText('web', { exact: true }).first().click()
+    await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
+    await page.locator('.git-sections [data-section="workflow"]').click()
+    await section.waitFor({ timeout: HUNG_MS })
+    check('…after the window reloads: Pair shown, nothing to save', !!(await lib.until(async () => (await section.locator('.workflow-preset-now').getAttribute('data-preset-now')) === 'pair' && (await save.getAttribute('data-off')) === 'noChanges', HUNG_MS)))
+    // Team back, as the rest of the suite has it.
+    await applyChoice('team')
+    check('…a change turns Save… on again', !!(await lib.until(async () => !(await save.isDisabled()), HUNG_MS)))
+    await saveAll()
+    check('…Team saved again', !!(await lib.until(async () => projectJson().workflow?.preset === 'team' && saved().okBefore?.mode === 'labels', HUNG_MS)), JSON.stringify(projectJson().workflow))
+
     // --- Stage names (N5): a rename alone applies now, never "old rules".
     const stageBox = (stage) => row('stageNames').locator(`input[aria-label="Name of the stage ${stage}"]`)
     check('Stage names: a box per stage these options produce, its default name as the placeholder', (await stageBox('Review').getAttribute('placeholder')) === 'Review' && (await stageBox('Merging').count()) === 1, await row('stageNames').innerText())

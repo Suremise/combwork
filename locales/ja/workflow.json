@@ -144,6 +144,7 @@
   "workflow.form.retargetSlot": "{slot}：空き、新しいブランチへ",
   "workflow.form.retargetStays": "{from}に残るもの：",
   "workflow.form.save": "保存…",
+  "workflow.form.nothingToSave": "保存する変更はありません。表示されているオプションは保存済みのものです。",
   "workflow.form.saveBlocked": "先にオプションに表示されている問題を解決してください。",
   "workflow.form.saved": "ワークフローのオプションを保存しました",
   "workflow.form.stageName": "ステージ「{stage}」の名前",
