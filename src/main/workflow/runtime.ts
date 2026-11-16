@@ -123,12 +123,32 @@ export interface Alongside {
    */
   before?: (w: Write) => void
 }
-const alongsideOf = new AsyncLocalStorage<Alongside>()
+const alongsideOf = new AsyncLocalStorage<{ a: Alongside; live: boolean }>()
 
-/** Runs `fn` (a runtime call) with `a` run inside each of its writes that change a card. */
-export function alongside<T>(a: Alongside, fn: () => Promise<T>): Promise<T> {
-  return alongsideOf.run(a, fn)
+/**
+ * Runs `fn` (a runtime call) with `a` run inside each of its writes that change a card, while the call runs. HI-3322: what
+ * the call sets off and outlives it (a reconciliation, a candidate's checks, a timer) inherits its async context, but
+ * never its hooks: a verdict's attempt fence would otherwise refuse Combwork's own later writes on the card once the
+ * reviewer's launch ended (attempt.staleLaunch), and its 0.9 fields would be saved in the agent's name.
+ */
+export async function alongside<T>(a: Alongside, fn: () => Promise<T>): Promise<T> {
+  const scope = { a, live: true }
+  try {
+    return await alongsideOf.run(scope, fn)
+  } finally {
+    scope.live = false
+  }
 }
+
+/**
+ * The scope of the intent running here (`alongside`), taken as a write begins; its hooks are asked for (`hooksOf`) inside
+ * the write's transaction, once its lock and prepare are behind it (HR1 on HI-3322): a write set off while the intent ran
+ * that gets the lock only after the intent returned is not the intent's.
+ */
+type AlongsideScope = { a: Alongside; live: boolean } | undefined
+const alongsideScope = (): AlongsideScope => alongsideOf.getStore()
+/** The scope's hooks while its intent still runs; none once it has returned. */
+const hooksOf = (s: AlongsideScope): Alongside | undefined => (s?.live ? s.a : undefined)
 
 export const isRefusal = (r: unknown): r is Refusal => !!r && typeof r === 'object' && (r as Refusal).refused === true
 
@@ -805,13 +825,16 @@ export class Workflow {
    * the same board change) just before the transaction, so nothing that change orders against comes between.
    */
   async write<T, P = undefined>(card: CardRecord, ruleset: Ruleset | null, actor: Actor, fn: (w: Write, prepared: P) => T, prepare?: () => Promise<P>, opts: { runActions?: boolean } = {}): Promise<T> {
-    const also = alongsideOf.getStore()
+    const scope = alongsideScope()
     let movedTo: { from: StageId; to: StageId } | null = null
     const asked: string[] = []
     const out = await this.locked(async () => {
       const prepared = (prepare ? await prepare() : undefined) as P
       let w: Write | null = null
+      // Whether this write is its intent's, decided once in its transaction (its `before` and `written` alike).
+      let also: Alongside | undefined
       const r = this.store.tx((tx) => {
+        also = hooksOf(scope)
         // The ruleset its facts name, stored with them.
         if (ruleset) tx.saveRuleset(ruleset)
         // Its base too (#1625): the rules it is found again by once its review skip is undone.
@@ -1006,11 +1029,12 @@ export class Workflow {
     const out = refusal(g.rule, g.values, override)
     if (card && actor !== 'user') {
       // Under the store's lock, as every write (in the app, a change of the board).
-      const also = alongsideOf.getStore()
+      const scope = alongsideScope()
       await this.locked(() =>
         this.store.tx((tx) => {
           // HI-3194: a stale agent request is refused for that first (its fence, as in every write), not for what it found.
-          also?.before?.(new Write(tx, tx.card(card.id), null, actor, tx.card(card.id).stage))
+          // Its intent's hooks only while that intent still runs, asked here past the lock (HI-3322).
+          hooksOf(scope)?.before?.(new Write(tx, tx.card(card.id), null, actor, tx.card(card.id).stage))
           // HI-3195: a refusal's record applies nothing a keyed request asked: its commit takes no applied marker.
           auditOnly()
           tx.append(card.id, { kind: 'Refused', actor, source: 'recorded', data: { move, rule: g.rule, message: out.message, next: out.next, values: g.values } }) // i18n-ignore: a fact's kind and codes, not text
