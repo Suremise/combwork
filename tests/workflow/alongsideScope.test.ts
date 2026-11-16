@@ -47,4 +47,47 @@ describe("an intent's alongside hooks (HI-3322)", () => {
     expect(seen).toEqual(['before'])
     expect(wf.state(wf.store.card(card.id)).stage).toBe('todo')
   })
+
+  it("aren't run by a write or refusal set off while it ran that gets the lock only after it returned (HR1)", async () => {
+    env = setup({ platform: 'none', review: 'none' })
+    const wf = env.wf
+    const card = wf.createCard({ title: 'work' })
+    moved(await wf.start(card.key, B1))
+    let ended = false
+    const seen: string[] = []
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    // The board's lock, held for whatever asks for it from inside the intent's own context after its first write.
+    let holding = false
+    wf.cfg.locked = async <T>(fn: () => T): Promise<T> => {
+      if (holding) await gate
+      return fn()
+    }
+    const hooks = {
+      before: () => {
+        if (ended) throw new Error('attempt.staleLaunch')
+        seen.push('before')
+      },
+      written: async () => void seen.push('written')
+    }
+    let later: Promise<unknown>[] = []
+    await alongside(hooks, async () => {
+      // The intent's own awaited write: its hooks run.
+      await wf.write(wf.store.card(card.id), null, B1, (w) => w.move('todo', 'derived'))
+      expect(seen).toEqual(['before', 'written'])
+      holding = true
+      later = [
+        // A derived write started while the intent runs, waiting in its async prepare, then for the lock.
+        wf.write(wf.store.card(card.id), null, 'outside', (w) => w.move('active', 'derived'), () => gate),
+        // A refusal recorded for someone set off the same way, waiting for the lock.
+        wf.refuse(wf.store.card(card.id), 'combwork', 'move', { rule: 'move.notFromHere', values: { card: card.key, stage: 'todo' } })
+      ]
+    })
+    ended = true
+    release()
+    await Promise.all(later)
+    expect(seen).toEqual(['before', 'written'])
+    expect(wf.state(wf.store.card(card.id)).stage).toBe('active')
+    expect(env.kinds(card.id)).toContain('Refused')
+  })
 })
