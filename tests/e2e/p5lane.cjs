@@ -15,6 +15,9 @@
 //   lane ends verified (S21's queue part: started and answered from the window, the Assistant off).
 // Lane B (G6 squash): Four and Five squash-merged by the queue; Five's line is made from main with Four's squash in, so
 // its change is only its own (no branch moved: LineMoved is a 0.9 worktree's, §16.19.2). The lane ends verified.
+// Lane C (HI-1995): reordered now with applyNow (Six put back, Seven first), Six started again after Seven; then
+// (HI-3323) Six waits on a new card, Eight, put before it from Progress → Lanes: Combwork switches the lane to Eight by
+// itself at B1's turn end and starts Six again once Eight is merged.
 // A screenshot of the lane and the Merges tab at each stage, once the window shows it. Dev build, throwaway profile,
 // workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -505,6 +508,65 @@ const ancestor = (x, y) => {
     check('…then Combwork starts Six again', !!again6 && again6.actor === 'combwork', JSON.stringify(again6))
     const s6b = await start(c6)
     check('…on its own line, with its work', s6b.s.status === 200 && s6b.line === s6.line && ancestor(six, git(wt, 'rev-parse', 'HEAD')), JSON.stringify(s6b))
+
+    // ===== Lane C, then (HI-3323, MC-1525's case): Six, in Doing again, turns out to need a new card, Eight, merged first. Its
+    // work committed and Eight marked as what it depends on, the user puts Eight before it in Progress → Lanes: the lane
+    // switches by itself (B1 out of a turn): Six back to Todo with its work, the list applied, and Combwork starts Eight
+    // with no manual start. Once Eight is merged, Combwork starts Six again, on its line with its work.
+    commit('six-more.txt')
+    const c8 = (await inv('tasks:create', { title: 'Eight', project: 'alpha' })).number
+    await inv('tasks:update', c6, { blockedBy: [c8] })
+    const k6 = await keyOf(c6)
+    const k8 = await keyOf(c8)
+    // Six's folder not clean (an edit not committed): the switch waits, said once to B1, and the lane says what it waits for.
+    fs.writeFileSync(path.join(wt, 'six-draft.txt'), 'draft\n')
+    const lcNow = await laneNow(lc?.id)
+    const at = lcNow.cards.findIndex((c) => c.number === c6)
+    const added = await inv('lanes:edit', { op: 'add', lane: lc.id, rev: lcNow.listRev, card: c8, at })
+    check('the user puts Eight before Six in the lane: queued as a switch to it, said so', JSON.stringify(added?.lanes?.map((x) => [x.queuedAfter, x.first])) === JSON.stringify([[c6, c8]]), JSON.stringify(added))
+    const appLog = () => { try { return fs.readFileSync(path.join(fx.userData, 'logs', 'combwork.log'), 'utf8') } catch { return '' } }
+    const heldOnFolder = await waitHung(() => appLog().includes(`Lane ${lc.id}: its yield waits for its card's folder to read as clean`))
+    const toldYield = async () => ((await api('GET', `/v1/projects/alpha/agents/${encodeURIComponent(b1.name)}/deliveries?limit=200`, undefined, tokens.b1)).body?.deliveries ?? []).filter((d) => /list was changed by .* to put \S+ first/.test(String(d.text ?? '')))
+    check("…Six's folder not clean: the switch waits (Six still in Doing, Eight in Todo), B1 told once", !!heldOnFolder && (await card(c6)).column === 'doing' && (await card(c8)).column === 'todo' && (await toldYield()).length === 1, JSON.stringify({ heldOnFolder, six: (await card(c6)).column, told: await toldYield() }))
+    await shoot('10-lane-yield-waits', 'lanes', async () => (await laneText(lc.id)).includes(`${k8} next, once B1 ends its turn with ${k6} committed`))
+    // Committed: the switch is made.
+    const sixMore = commit('six-draft.txt', 'draft\n')
+    const started8 = await waitHung(async () => (await factsOf(c8, 'Started')).at(-1) ?? null)
+    check('…B1 told only once in all', (await toldYield()).length === 1, JSON.stringify(await toldYield()))
+    check('…once B1 is out of a turn, Combwork starts Eight (no manual start)', !!started8 && started8.actor === 'combwork' && (await card(c8)).column === 'doing', JSON.stringify({ started8, eight: (await card(c8))?.column }))
+    check('…Six back in Todo, its line kept with its work', (await card(c6)).column === 'todo' && git(alpha, 'rev-parse', s6.line) === sixMore, JSON.stringify({ six: (await card(c6)).column }))
+    check("…the lane's list applied: Eight, then Six", JSON.stringify((await laneNow(lc.id)).cards.map((c) => c.number).filter((n) => n !== c7)) === JSON.stringify([c8, c6]) && !(await laneNow(lc.id)).queued, JSON.stringify(await laneNow(lc.id)))
+    const s8 = await start(c8)
+    check("Eight's line is its own, from main, without Six's work", s8.s.status === 200 && s8.line !== s6.line && !ancestor(sixMore, s8.base), JSON.stringify(s8))
+    await round(c8, 'eight.txt')
+    check('Eight merged: Done', await done(c8))
+    const again6c = await waitHung(async () => ((await factsOf(c6, 'Started')).length >= 3 ? (await factsOf(c6, 'Started')).at(-1) : null))
+    check('…then Combwork starts Six again', !!again6c && again6c.actor === 'combwork', JSON.stringify(again6c))
+    const s6c = await start(c6)
+    check('…on its own line, with its work', s6c.s.status === 200 && s6c.line === s6.line && ancestor(sixMore, git(wt, 'rev-parse', 'HEAD')), JSON.stringify(s6c))
+
+    // Start Lane… (HR1's round 2): its lists are Todo cards, so it never keeps the card in Doing, and a list putting first a
+    // card Six waits on is an ordinary list change: its hint says so (no switch promised), and the submitted start queues it.
+    const c10 = (await inv('tasks:create', { title: 'Ten', project: 'alpha' })).number
+    await inv('tasks:update', c6, { blockedBy: [c10] })
+    await page.getByRole('button', { name: 'Task Board' }).click()
+    await waitHung(async () => (await column('Todo').locator('.task-card').count()) === 1)
+    await column('Todo').locator('.board-column-header').click({ button: 'right' })
+    const startItem = page.locator('.menu[role="menu"] .menu-item', { hasText: 'Start Lane with These Cards…' })
+    await waitHung(async () => (await startItem.count()) === 1)
+    await startItem.click()
+    const startDialog = page.locator('.dialog', { hasText: 'Start Lane' })
+    await waitHung(async () => (await startDialog.count()) === 1)
+    await startDialog.locator('#lane-start-builder').selectOption(b1.id)
+    await startDialog.locator('#lane-start-reviewer').selectOption(r1.id)
+    const k10 = await keyOf(c10)
+    const hint = startDialog.locator('.lane-start-apply-now p')
+    const hintText = await waitHung(async () => { const t = (await hint.innerText().catch(() => '')) ?? ''; return t.includes(`this list applies once ${k6} is Done`) ? t : null })
+    check("Start Lane with Ten alone (Six left out): its hint is the ordinary one, no switch promised", !!hintText && !hintText.includes('waits on'), await startDialog.innerText().catch(() => ''))
+    await page.screenshot({ path: path.join(fx.shots, '9-start-lane-ordinary-hint.png') })
+    await startDialog.getByRole('button', { name: /^(Start Lane|Wait and Start)$/ }).click()
+    const queuedTen = await waitHung(async () => { const l = await laneNow(lc.id); return l && JSON.stringify(l.queued) === JSON.stringify([c10]) ? l : null })
+    check('…the start it submits is an ordinary queued change: queued after Six, no switch, Six still in Doing', !!queuedTen && queuedTen.status?.first === undefined && !(await inv('lanes:list')).some((l) => l.status?.first !== undefined) && (await card(c6)).column === 'doing', JSON.stringify({ lane: queuedTen ?? (await laneNow(lc.id)), six: (await card(c6)).column, k10 }))
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

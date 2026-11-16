@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { AgentInfo, LaneStartInfo, ProjectInfo } from '@shared/types'
 import { shownText, type Text } from '@shared/advanced'
 import { fmt, msg, tr } from '@shared/i18n'
-import { LANE_NAME_MAX } from '@shared/lanes'
+import { LANE_NAME_MAX, laneYieldFirst } from '@shared/lanes'
 import { cardLabel } from '@shared/projectKeys'
 import { agentWorkflowRole, buildsWork, reviewsWork } from '@shared/workflow/roles'
 import { call } from '../api'
@@ -81,6 +81,7 @@ const M = {
   notStarted: msg({ id: 'board.laneStart.notStarted', defaultMessage: "{agent} didn't start", description: "A toast's title: the lane was recorded, but one of its agents ({agent}) couldn't be started. The reason follows." }),
   notStartedText: msg({ id: 'board.laneStart.notStartedText', defaultMessage: '{why} The lane is recorded: start {agent} yourself, or end the lane from its row in the Progress panel.', description: "The text of the toast when a lane's agent ({agent}) didn't start: why ({why}, a sentence), and what the user can do." }),
   applyNow: msg({ id: 'board.laneStart.applyNow', defaultMessage: 'Apply now', description: "A checkbox of the Start Lane dialog (HI-1995), off by default, shown when the builder's running lane has a card being worked: the new list applies at once instead of after that card is Done." }),
+  yieldHint: msg({ id: 'board.laneStart.yieldHint', defaultMessage: '{card} waits on {first}: once {builder} ends its turn with {card}’s work committed, {card} goes back to Todo (its work stays on its branch), this list applies and {first} starts. The lane comes back to {card} after.', description: "HI-3323: under the Apply now checkbox of the Start Lane dialog, instead of the usual hint, when the new list puts first {first}, a card that the builder's card in progress {card} waits on (both keys). {builder} is an agent's name. Combwork makes the switch by itself at the builder's turn end, Apply now or not. Todo is a board column." }),
   applyNowHint: msg({ id: 'board.laneStart.applyNowHint', defaultMessage: "{builder}'s lane is working on {card}: this list applies once {card} is Done. Apply now puts {card} back in Todo first (its work stays on its branch), so the new order applies at once, and tells {builder}.", description: "Under the Apply now checkbox of the Start Lane dialog (HI-1995): {builder} (an agent's name) has a running lane whose card {card} (its key) is in progress. Todo is a board column." }),
   applyNowNot: msg({ id: 'board.laneStart.applyNowNot', defaultMessage: "{builder}'s lane is working on {card}, which is in {column, select, review {Review} other {Approved}}: this list applies once it is Done. It can't be put back now without losing its {column, select, review {review} other {approval and merge}}.", description: "In the Start Lane dialog (HI-1995), with Apply now unavailable: the builder's ({builder}) lane card {card} is already in the Review or Approved column (select; translate each)." }),
   releasedReason: msg({ id: 'board.laneStart.releasedReason', defaultMessage: 'Why start it there anyway (a hotfix, say)', description: 'HI-3148: a field label in the Start Lane dialog, shown when the branch the lane would merge into is already released (or Combwork couldn’t check): the user’s reason for starting on it anyway, recorded with the lane.' }),
@@ -186,6 +187,10 @@ export function LaneStartDialog() {
     return c ? cardLabel(c) : `#${n}`
   }
   const canApplyNow = !!flying && flying.column === 'doing' && cards[0] !== flying.number
+  // HI-3323: the list makes the lane yield (the start's own rule, laneYieldFirst): it keeps the card in Doing and puts first
+  // a card in Todo that card waits on, so the lane switches at the builder's turn end. A list without that card (this
+  // dialog's own lists are Todo cards) is an ordinary list change, and its hint says so.
+  const yieldsTo = canApplyNow ? laneYieldFirst(cards, flying!.number, (n) => tasks.find((x) => x.number === n), builder) : null
 
   const go = async (): Promise<void> => {
     // Only for the request still open: a dialog closed or opened again since starts nothing.
@@ -370,7 +375,7 @@ export function LaneStartDialog() {
                 <input type="checkbox" checked={applyNow} disabled={waiting} onChange={(e) => setApplyNow(e.target.checked)} /> {tr(M.applyNow)}
               </label>
             )}
-            <p className="faint">{canApplyNow ? tr(M.applyNowHint, { builder: agentOf(builder)?.name ?? builder, card: keyOf(flying.number) }) : tr(M.applyNowNot, { builder: agentOf(builder)?.name ?? builder, card: keyOf(flying.number), column: flying.column === 'review' ? 'review' : 'passed' })}</p>
+            <p className="faint">{yieldsTo !== null ? tr(M.yieldHint, { builder: agentOf(builder)?.name ?? builder, card: keyOf(flying.number), first: keyOf(yieldsTo) }) : canApplyNow ? tr(M.applyNowHint, { builder: agentOf(builder)?.name ?? builder, card: keyOf(flying.number) }) : tr(M.applyNowNot, { builder: agentOf(builder)?.name ?? builder, card: keyOf(flying.number), column: flying.column === 'review' ? 'review' : 'passed' })}</p>
           </div>
         )}
         {busyNow.length > 0 && <p className="lane-start-busy">{waiting ? tr(M.waiting, { agents: names }) : tr(M.busy, { agents: names, n: busyNow.length })}</p>}

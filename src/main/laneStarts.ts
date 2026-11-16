@@ -10,7 +10,7 @@ import { LANES_FRESH_START_WAIT_MINUTES, withValues } from '../shared/advanced'
 import { msg } from '../shared/i18n'
 import { advanced } from './advanced'
 import { launchFresh } from './laneStart'
-import { changeFreshStart, freshStartsNow, laneNow, lanesEnforced, laneStartHeld, laneViewsChanged, laneWaitsForSlot, listLanes, rawLanes, setLaneStartWaits } from './lanes'
+import { changeFreshStart, freshStartsNow, laneNow, lanesEnforced, laneStartHeld, laneViewsChanged, laneWaitsForSlot, listLanes, rawLanes, runLaneYields, setLaneStartWaits } from './lanes'
 import { createLogger, userText } from './logger'
 import { withCardNames } from './projectKeys'
 import { offerNow, onDeliveriesChanged, waitingForRun } from './deliveries'
@@ -203,7 +203,17 @@ export async function checkLaneStarts(ws: WorkspaceService): Promise<void> {
       await freshPass(ws, path)
       await laneStartsTestHooks.midPass?.()
       const enforced = await lanesEnforced()
-      if (enforced) await lookAt(ws, path, found, fence)
+      // HI-3323: a lane's queued yield to a card its card in flight waits on, run once its builder is out of a turn. A lane
+      // it switched gets its first card from the next look, once the put back's slot release has run; a builder whose
+      // yield still waits is looked at again as its status changes, as one whose next card waits.
+      let switched: ReadonlySet<string> = new Set()
+      if (enforced && fence.current()) {
+        const y = await runLaneYields(ws)
+        for (const w of y.waiting) found.waiting.set(builderKey(path, w.project, w.builder), w.first)
+        switched = new Set(y.switched)
+        if (y.switched.length) soon(ws)
+      }
+      if (enforced) await lookAt(ws, path, found, fence, switched)
       // Its due cards' dependency waits (HI-2618), the rules on or off: an episode each, and with the rules off one
       // readiness wake once the last of them lands.
       await (await import('./laneDeps')).settleDepEpisodes(ws, enforced, fence)
@@ -252,9 +262,10 @@ function publish(path: string, found: PassFound, ws: WorkspaceService): void {
 /** Whether a lane's builder is owed its new conversation (HI-2034), as kept now: its cards wait for it, never the old one. */
 const builderOwed = (ws: WorkspaceService, id: string): boolean => freshStartsNow(ws, id).some((f) => f.role === 'builder')
 
-async function lookAt(ws: WorkspaceService, path: string, found: PassFound, fence: PassFence): Promise<void> {
+async function lookAt(ws: WorkspaceService, path: string, found: PassFound, fence: PassFence, switched: ReadonlySet<string> = new Set()): Promise<void> {
   for (const lane of await listLanes(ws)) {
     if (!fence.current()) return
+    if (switched.has(lane.id)) continue
     const next = laneStartDue(lane)
     // A lane waiting for a slot (none was free as it started) has its stopped agents started once one is lent (slotCards'
     // pass), which keeps the wait until they are launched (HR1 on HI-2029: a `stoppedOnly` one too): its status says it

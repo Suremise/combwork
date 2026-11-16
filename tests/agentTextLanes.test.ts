@@ -72,6 +72,9 @@ function sharedTexts(): { name: string; text: string }[] {
     status({ reason: 'blocked', blocked: 'Asked the user' }),
     status({ reason: 'blocked', card: null }),
     ...(['hold', 'you', 'roundLimit', 'notMerged', 'merging', 'stale', 'reviewer', 'lineUpdate', 'listChanges', 'checkCopy', 'slot', 'teamPause'] as const).map((reason) => status({ reason })),
+    // HI-3323: a queued yield to a card the card in flight waits on.
+    status({ reason: 'listChanges', first: 3, agent: 'B1' }),
+    status({ reason: 'listChanges', first: 3 }),
     status({ reason: 'hooks', agent: 'R1' }),
     status({ reason: 'hooks' }),
     status({ reason: 'independent', agent: 'R1' }),
