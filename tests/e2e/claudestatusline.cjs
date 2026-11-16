@@ -45,6 +45,10 @@ const check = (name, ok, extra = '') => {
     const key = lib.ptyKey(proj, agent.id)
     const live = async () => (await inv('session:live')).find((l) => l.projectPath.toLowerCase() === proj.toLowerCase())
     const screen = async () => lib.plainText((await inv('pty:buffer', key).catch(() => '')) ?? '')
+    // The output as it came (HI-3311, HI-3312's recorder), recorded before the first start: the check for absence reads what
+    // came after a mark there, since pty:buffer may be the screen drawn afresh, where new lines can land before the mark.
+    await lib.recordPtyOutput(page)
+    const output = () => lib.ptyOutput(page, key)
     const launches = () => (fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8').match(/ spawn \W?session:/g) ?? []).length
     const start = async () => {
       const before = launches()
@@ -70,10 +74,10 @@ const check = (name, ok, extra = '') => {
 
     // ---- On (the default): Combwork's alone, showing nothing.
     await lib.setAgentLaunch(inv, proj, agent.id, {})
-    const mark = (await screen()).length
+    const mark = (await output()).length
     check('on: the real Claude Code is ready', await start())
     check('…Combwork reads the status', !!(await lib.until(async () => !!(await live())?.modelName, HUNG_MS)))
-    check("…and nothing of the user's status line shows", !(await screen()).slice(mark).includes('MYLINE'), (await screen()).slice(-400))
+    check("…and nothing of the user's status line shows", !lib.plainText((await output()).slice(mark)).includes('MYLINE'), lib.plainText((await output()).slice(mark)).slice(-400))
     await stop()
   } catch (e) {
     check('the suite ran to its end', false, e?.stack ?? String(e))

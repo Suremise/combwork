@@ -319,6 +319,10 @@
     "text": "The list change is queued: it applies once {card} is Done, and you are told then.",
     "note": "cw_lane start's note (#1270): a list change while a card is in flight waits for that card ({card}) to be Done."
   },
+  "lane.start.queuedYield": {
+    "text": "{card} waits on {first}: once {builder} ends its turn with {card}'s work committed, Combwork puts {card} back in Todo (its work stays on its branch), applies this list and starts {first}; the lane comes back to {card} after.",
+    "note": "cw_lane start's note (HI-3323): the new list puts first {first}, a card that the card in flight ({card}, in Doing) waits on; the switch happens at the builder's ({builder}) turn end, never under a turn."
+  },
   "lane.start.stays": {
     "text": "{cards} {n, plural, one {stays} other {stay}} on the lane, after the cards you listed: a builder's own cw_lane start adds or reorders cards, never takes one off (the Assistant or the user does).",
     "note": "cw_lane start's note (HI-2169): a builder's own start left cards of its lane out, and they are kept after its list; {n} is how many."
@@ -503,6 +507,10 @@
     "text": "paused: the team is pausing",
     "note": "The workspace's team is paused (before an update, HI-2081): nothing of a lane moves until it resumes."
   },
+  "lane.status.yieldNext": {
+    "text": "{first} next, once {agent} ends its turn with {card} committed: {card} waits on it, and goes back to Todo meanwhile",
+    "note": "HI-3323: a lane's queued list puts first {first}, a card its card in Doing ({card}) waits on; once its builder {agent} is out of a turn and {card}'s folder is clean, Combwork puts {card} back (its work kept) and starts {first}."
+  },
   "lane.status.you": {
     "text": "waiting for the user on {card}",
     "note": "A lane waits: a request on its card waits for the user (For you)."
@@ -522,6 +530,10 @@
   "lane.tell.reordered": {
     "text": "Your lane was reordered now by {by}: {card} is back in Todo (its work stays on {line}): stop working on it. Its cards are now {cards}. cw_lane next names your next card.",
     "note": "Delivered to a lane's builder after a reorder applied now (HI-1995) put its card in flight back; {by} is who reordered it, {line} its branch (or lane.reorder.itsBranch)."
+  },
+  "lane.tell.yield": {
+    "text": "Your lane's list was changed by {by} to put {first} first: {card} waits on it. Commit {card}'s work and end your turn: Combwork then puts {card} back in Todo (its work stays on its branch) and starts {first}; your lane comes back to {card} after. If {card}'s folder can't be read as clean (a jj slot, an error), Combwork waits and tries again at your next turn end.",
+    "note": "HI-3323: delivered once to a lane's builder when its lane's new list puts first {first}, a card that its card in Doing ({card}) waits on, and the builder is in a turn or the folder isn't clean yet; {by} is who changed the list."
   },
   "lane.wait.hours": {
     "text": "{n} h",
@@ -546,5 +558,9 @@
   "lane.warn.sharedItem": {
     "text": "{card} is also in {builder}'s lane ({lane})",
     "note": "One card of a start's list another builder's running lane lists too (HI-1821); {lane} is that lane's id. Joined with \"; \" into lane.warn.shared's {items}."
+  },
+  "lane.yield.putBackWhy": {
+    "text": "Put back so {first}, which it waits on, goes first (lane reorder by {by})",
+    "note": "HI-3323: the reason recorded on a lane's card in Doing put back at its builder's turn end because the lane's new list puts first {first}, a card it waits on; {by} is who reordered. Stored on the card's facts."
   }
 }

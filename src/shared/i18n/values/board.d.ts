@@ -485,6 +485,7 @@ interface CombworkMessageValues {
   'board.laneEdit.onOther': { builder: string | number }
   'board.laneEdit.otherWorkspace': undefined
   'board.laneEdit.queued': { card: string | number }
+  'board.laneEdit.queuedYield': { card: string | number; first: string | number }
   'board.laneEdit.remove': { card: string | number }
   'board.laneEdit.said': { card: string | number; at: string | number; n: number }
   'board.laneEdit.search': undefined
@@ -531,6 +532,7 @@ interface CombworkMessageValues {
   'board.laneStart.up': { card: string | number }
   'board.laneStart.waitAndStart': undefined
   'board.laneStart.waiting': { agents: string | number }
+  'board.laneStart.yieldHint': { card: string | number; first: string | number; builder: string | number }
   'board.lanes.abandon': undefined
   'board.lanes.abandonConfirm': undefined
   'board.lanes.abandonMessage': undefined
@@ -575,6 +577,7 @@ interface CombworkMessageValues {
   'board.lanes.queuedMoves': { n: number; cards: string | number; builder: string | number }
   'board.lanes.queuedOrder': { cards: string | number }
   'board.lanes.queuedRemoved': { n: number; cards: string | number }
+  'board.lanes.queuedYield': { builder: string | number; first: string | number; card: string | number; cards: string | number }
   'board.lanes.retryFresh': undefined
   'board.lanes.retryFreshFailed': { lane: string | number }
   'board.lanes.retryFreshShort': { agent: string | number }
@@ -609,6 +612,7 @@ interface CombworkMessageValues {
   'board.lanes.waitsSlotHeld': { slot: string | number; held: string; agent: string | number; broker: string | number; idle: string }
   'board.lanes.waitsStart': { card: string | number; why: string; agent: string | number }
   'board.lanes.waitsStartHeld': { card: string | number; slot: string | number; held: string; agent: string | number; program: string | number; more: number; broker: string | number; idle: string }
+  'board.lanes.waitsYield': { first: string | number; agent: string | number; card: string | number }
   'board.leftOut.detail': { hasPaths: string; paths: string | number; card: string | number }
   'board.leftOut.include': { n: number }
   'board.leftOut.leave': { n: number }

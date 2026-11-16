@@ -599,6 +599,14 @@
     "defaultMessage": "A card that goes round in circles stops",
     "description": "A tip's title (HI-3188)."
   },
+  "tips.cardLoopYield.text": {
+    "defaultMessage": "A lane’s card in progress needs another card first? Mark it as a dependency and put that card first in the lane: at the builder’s turn end the lane switches to it, puts the card in progress back in Todo with its work kept, and returns to it after.",
+    "description": "A tip (HI-3323). A lane is a builder and its reviewer working through cards in order. Depends on and waiting for are a card's fields as the board names them; Todo is a board column. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
+  },
+  "tips.cardLoopYield.title": {
+    "defaultMessage": "Put a needed fix ahead of the card being worked",
+    "description": "A tip's title (HI-3323)."
+  },
   "tips.cardMove.text": {
     "defaultMessage": "Drag any dialog by its header (a card, Add Agent, Agent Settings…) to see what's behind it; Escape while dragging puts it back.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

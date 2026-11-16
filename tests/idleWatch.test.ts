@@ -42,6 +42,9 @@ describe("the card watch's reply (HI-2285)", () => {
     expect(t).toMatch(/stalled after 5 min/)
     expect(t).not.toMatch(/End your turn now/)
   })
+  it("names waitingFor for a long job Combwork can't see (HI-3324: CB2's VM run showed CL-234 as stalled)", () => {
+    expect(idleWatchText({ number: 5 })).toMatch(/long job Combwork can't see \(not run through cw-progress: .*\), mark #5 waiting \(cw_update_task's waitingFor\)/)
+  })
   it('a legitimate watch (no idle card) replies as before', () => {
     expect(taskWaitText({ watching: 'Waiting for #5', limitAt: 'T' })).toBe('Waiting for #5. End your turn now: Combwork types a line into this session when it changes, or at T if nothing does. Nothing runs meanwhile.')
   })

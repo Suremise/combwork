@@ -384,6 +384,13 @@
       "card": "plain"
     }
   },
+  "lane.start.queuedYield": {
+    "placeholders": {
+      "card": "plain",
+      "first": "plain",
+      "builder": "plain"
+    }
+  },
   "lane.start.stays": {
     "placeholders": {
       "cards": "plain",
@@ -615,6 +622,13 @@
   "lane.status.teamPause": {
     "placeholders": {}
   },
+  "lane.status.yieldNext": {
+    "placeholders": {
+      "first": "plain",
+      "agent": "plain",
+      "card": "plain"
+    }
+  },
   "lane.status.you": {
     "placeholders": {
       "card": "plain"
@@ -641,6 +655,13 @@
       "card": "plain",
       "line": "plain",
       "cards": "plain"
+    }
+  },
+  "lane.tell.yield": {
+    "placeholders": {
+      "by": "plain",
+      "first": "plain",
+      "card": "plain"
     }
   },
   "lane.wait.hours": {
@@ -675,6 +696,12 @@
       "card": "plain",
       "builder": "plain",
       "lane": "plain"
+    }
+  },
+  "lane.yield.putBackWhy": {
+    "placeholders": {
+      "first": "plain",
+      "by": "plain"
     }
   }
 }

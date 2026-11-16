@@ -1935,6 +1935,10 @@
     "defaultMessage": "It applies once {card} is Done.",
     "description": "HI-2898: under the title of the notification after changing a lane's cards in Progress → Lanes, when the change waits for the lane's card in progress ({card}, its key) to be Done first."
   },
+  "board.laneEdit.queuedYield": {
+    "defaultMessage": "{card} waits on {first}: once its builder ends its turn with {card}’s work committed, {card} goes back to Todo (its work kept) and {first} starts.",
+    "description": "HI-3323: under the title of the notification after changing a lane's cards in Progress → Lanes, when the change puts first {first}, a card that the lane's card in progress ({card}) waits on (both keys). Combwork switches the lane to {first} once the builder's turn is over, putting {card} back in the Todo column with its work kept on its branch; the lane comes back to {card} after."
+  },
   "board.laneEdit.remove": {
     "defaultMessage": "Take {card} off the lane (it goes back to the board)",
     "description": "HI-2898: tooltip of the × on a card waiting its turn in a lane's cards (Progress → Lanes): takes it off the lane; the card stays on the board, in To do. {card} is its key."
@@ -2119,6 +2123,10 @@
     "defaultMessage": "Waiting for these agents to be idle: {agents}…",
     "description": "In the Start Lane dialog, after Wait and Start: it waits for the busy agents ({agents}: their names, joined) before starting the lane. Cancel stops waiting. The names follow a colon (glossary §1 rule 4)."
   },
+  "board.laneStart.yieldHint": {
+    "defaultMessage": "{card} waits on {first}: once {builder} ends its turn with {card}’s work committed, {card} goes back to Todo (its work stays on its branch), this list applies and {first} starts. The lane comes back to {card} after.",
+    "description": "HI-3323: under the Apply now checkbox of the Start Lane dialog, instead of the usual hint, when the new list puts first {first}, a card that the builder's card in progress {card} waits on (both keys). {builder} is an agent's name. Combwork makes the switch by itself at the builder's turn end, Apply now or not. Todo is a board column."
+  },
   "board.lanes.abandon": {
     "defaultMessage": "Abandon Lane…",
     "description": "A lane's context menu item in the Progress panel: gives the lane up unmerged, after asking. Glossary: lane."
@@ -2295,6 +2303,10 @@
     "defaultMessage": "{n, plural, one {{cards} taken off} other {{cards} taken off}}",
     "description": "Part of a lane's queued list change (Progress panel → Lanes, HI-2151): the cards {cards} (their keys, joined; {n} of them) are taken off the lane's list. Combwork joins the parts with commas."
   },
+  "board.lanes.queuedYield": {
+    "defaultMessage": "Next, once {builder} ends its turn: {first} first, as {card} waits on it ({card} goes back to Todo, its work kept). New order: {cards}",
+    "description": "A line under a lane's cards in the Progress panel's Lanes tab (HI-3323): the lane's list was changed to put first {first}, a card that the card being worked ({card}) waits on. Once the builder {builder} (an agent's name) ends its turn with {card}'s work committed, Combwork puts {card} back in Todo (its work stays on its branch) and starts {first}. {cards}: the whole new list in order (keys joined with commas). Glossary: lane, Todo."
+  },
   "board.lanes.retryFresh": {
     "defaultMessage": "Retry New Conversation",
     "description": "A button in a lane's header (Progress panel) and an item of its menu (HI-2034): one of the lane's agents was owed a new conversation, and Combwork stopped trying to start it (it wasn't free in time, Combwork closed while starting it, or its start failed); this tries again, once the agent is free. Glossary: lane, conversation."
@@ -2430,6 +2442,10 @@
   "board.lanes.waitsStartHeld": {
     "defaultMessage": "{card} waits to start: its start was refused for now, {slot} still in use ({held, select, session {{agent}’s session is still in it} left {{agent}’s last run left {program}{more, plural, =0 {} other { and # more}} running in it} lastRun {{agent}’s last run there isn’t known to have ended} broker {a process still has a file or folder in it open: Windows Sandbox’s broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}), and Combwork tries again",
     "description": "Why a lane waits, in its header in the Progress panel (HI-2468): its card {card} (its key, such as HI-12) is due to start, but Combwork's start of it was refused because its slot {slot} (a working folder Combwork lends to a lane, such as slot-a: keep it as it is) is still in use. held (select): session, the agent {agent} (an agent's name) still has a session running in it; left, the agent {agent}'s last run left programs running in it ({program}: the first one's process name, such as node: keep it as it is; {more}: how many more, a number); lastRun, that last run of {agent}'s there isn't known to have ended; broker, a process still has a file or folder in it open, and Windows Sandbox's broker ({broker}: its process name, WindowsSandboxServer: keep it as it is) is seen using the slot as its working folder; other, a process still has a file or folder in it open (often a program the last agent there started, still closing). idle (select, only with broker): yes, no Windows Sandbox is running; no, one is; other, not known (nothing said). Combwork tries the start again. Translate each. The lane isn't paused."
+  },
+  "board.lanes.waitsYield": {
+    "defaultMessage": "{first} next, once {agent} ends its turn with {card} committed ({card} waits on it, and goes back to Todo meanwhile)",
+    "description": "Why a lane waits, in its header in the Progress panel (HI-3323): its list was changed to put first {first} (a card's key, such as HI-12), a card that the card being worked, {card}, waits on. Once its builder {agent} (an agent's name) ends its turn with {card}'s work committed, Combwork puts {card} back in Todo (its work stays on its branch) and starts {first}; the lane comes back to {card} after. Glossary: lane, Todo. The lane isn't paused."
   },
   "board.leftOut.detail": {
     "defaultMessage": "{hasPaths, select, yes {Its paths: {paths}.} other {It has no paths yet.}} A file changed meanwhile may be another card's work or your own: include only what belongs to {card}.",

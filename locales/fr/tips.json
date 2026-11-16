@@ -147,6 +147,8 @@
   "tips.cardLoop.title": "Deux agents qui font et relisent à tour de rôle",
   "tips.cardLoopChurn.text": "Avec un agent relecteur, Combwork compte les allers-retours de chaque carte et vous demande s’il faut simplifier à 12, et comment continuer à 30. Réglez les deux sous Boucles de cartes, dans Gestion de versions → Flux de travail.",
   "tips.cardLoopChurn.title": "Une carte qui tourne en rond s’arrête",
+  "tips.cardLoopYield.text": "La carte en cours d’un couloir a d’abord besoin d’une autre carte ? Indique la dépendance et mets cette carte en premier : à la fin du tour du constructeur, le couloir passe à elle, remet la carte en cours dans À faire avec son travail, et y revient ensuite.",
+  "tips.cardLoopYield.title": "Faire passer un correctif nécessaire avant la carte en cours",
   "tips.cardMove.text": "Fais glisser n’importe quelle boîte de dialogue par son en-tête (une carte, Ajouter un agent, Paramètres de l’agent…) pour voir ce qu’il y a derrière ; Échap pendant le glissement la remet en place.",
   "tips.cardMove.title": "Écarter une boîte de dialogue",
   "tips.cardReadFirst.text": "Dans « À lire d’abord » d’une carte, liste les sections de documents dont elle a besoin, comme docs/PLAN.md#setup : le prompt de démarrage de l’agent les cite, donc il lit ces sections plutôt qu’un plan entier. Clique sur l’une d’elles pour la lire dans Combwork.",
