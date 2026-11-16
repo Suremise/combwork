@@ -147,6 +147,8 @@
   "tips.cardLoop.title": "Que dos agentes trabajen y revisen por turnos",
   "tips.cardLoopChurn.text": "Con un agente revisor, Combwork cuenta las idas y vueltas de cada tarjeta y te pregunta si simplificar a las 12, y cómo seguir a las 30. Ajusta ambos en Ciclos de tarjetas, en Control de versiones → Flujo de trabajo.",
   "tips.cardLoopChurn.title": "Una tarjeta que da vueltas en círculo se detiene",
+  "tips.cardLoopYield.text": "¿La tarjeta en curso de un carril necesita antes otra tarjeta? Márcala como dependencia y pon esa tarjeta primero en el carril: al terminar el turno del constructor, el carril pasa a ella, devuelve la tarjeta en curso a Pendiente con su trabajo y vuelve a ella después.",
+  "tips.cardLoopYield.title": "Pon una corrección necesaria por delante de la tarjeta en curso",
   "tips.cardMove.text": "Arrastra cualquier cuadro de diálogo por su encabezado (una tarjeta, Agregar agente…, Configuración del agente…) para ver lo que hay detrás; Escape mientras arrastras lo devuelve a su sitio.",
   "tips.cardMove.title": "Aparta un cuadro de diálogo",
   "tips.cardReadFirst.text": "En “Leer primero” de una tarjeta, enumera las secciones de documentos que necesita, como docs/PLAN.md#setup: el prompt de inicio del agente las incluye, así que lee esas secciones en lugar de un plan entero. Haz clic en una para leerla en Combwork.",

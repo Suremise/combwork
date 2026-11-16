@@ -147,6 +147,8 @@
   "tips.cardLoop.title": "Zwei Agenten abwechselnd bauen und reviewen lassen",
   "tips.cardLoopChurn.text": "Mit einem Reviewer-Agenten zählt Combwork die Abstimmungsrunden jeder Karte und fragt dich bei 12, ob vereinfacht werden soll, und bei 30, wie es weitergeht. Beides stellst du unter Kartenschleifen in Versionsverwaltung → Workflow ein.",
   "tips.cardLoopChurn.title": "Eine Karte, die sich im Kreis dreht, hält an",
+  "tips.cardLoopYield.text": "Die laufende Karte einer Lane braucht zuerst eine andere Karte? Vermerke die Abhängigkeit und stelle diese Karte in der Lane nach vorn: Am Zugende des Builders wechselt die Lane zu ihr, legt die laufende Karte mit ihrer Arbeit zurück nach „Offen“ und kehrt danach zu ihr zurück.",
+  "tips.cardLoopYield.title": "Eine nötige Korrektur vor die laufende Karte stellen",
   "tips.cardMove.text": "Zieh jeden Dialog an seinem Kopf (eine Karte, „Agent hinzufügen“, „Agent-Einstellungen“…), um zu sehen, was dahinter liegt; Escape während des Ziehens setzt ihn zurück.",
   "tips.cardMove.title": "Einen Dialog beiseiteschieben",
   "tips.cardReadFirst.text": "Liste unter „Zuerst lesen“ einer Karte die Dokumentabschnitte auf, die sie braucht, etwa docs/PLAN.md#setup: Der Startprompt des Agenten nennt sie, sodass er diese Abschnitte statt eines ganzen Plans liest. Klicke auf einen, um ihn in Combwork zu lesen.",

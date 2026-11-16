@@ -151,6 +151,8 @@ interface CombworkMessageValues {
   'tips.cardLoop.title': undefined
   'tips.cardLoopChurn.text': undefined
   'tips.cardLoopChurn.title': undefined
+  'tips.cardLoopYield.text': undefined
+  'tips.cardLoopYield.title': undefined
   'tips.cardMove.text': undefined
   'tips.cardMove.title': undefined
   'tips.cardReadFirst.text': undefined

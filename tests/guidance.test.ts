@@ -989,6 +989,8 @@ describe("RELEASING.md's release path", () => {
     expect(checks).toMatch(/### The coverage ledger/)
     expect(checks).toMatch(/\*\*A fix round reruns the invalidated slices and nothing else\.\*\*/)
     expect(checks).toMatch(/A path in no class invalidates everything, as for a first RC\./)
+    // HI-3320: CI config and check-only scripts have a class of their own; a script build, dist or release reaches stays a build input.
+    expect(checks).toMatch(/\*\*CI and check-only tooling\*\* \(HI-3320\)[^]*?A script reached that way is a build input, whatever its name or folder[^]*?what they invalidate: check:repo, CI on the next push, and the unit tests that run or test the changed files/)
     expect(checks).toMatch(/installer's \*\*SHA-256\*\*/)
     expect(checks).toMatch(/\*\*The installer the user installs, and the one `npm run release` uploads, always get rows of their own bytes:\*\*/)
     expect(checks).toMatch(/Without one, or where it is uncertain, the full affected set runs: that is the fallback/)
