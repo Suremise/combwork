@@ -597,7 +597,7 @@ function trustForCodex(folder, home = CODEX_HOME) {
  * clearly one of these stays a FAIL. Hook errors (127.0.0.1) are Combwork's, never the environment's.
  */
 const ENVIRONMENT = [
-  { why: 'usage or rate limit', re: /(?:usage|5-hour|weekly|session|opus|sonnet) limit reached|hit your (?:usage )?limit|rate_limit_error|rate limit(?:ed| exceeded)|too many requests|API Error: 429/i },
+  { why: 'usage or rate limit', re: /(?:usage|5-hour|weekly|session|opus|sonnet) limit reached|hit your (?:usage |5-hour |weekly |session |opus |sonnet )?limit|rate_limit_error|rate limit(?:ed| exceeded)|too many requests|API Error: 429/i },
   { why: 'the API is overloaded', re: /overloaded_error|API Error: 529/i },
   { why: 'not signed in', re: /select login method|please run \/login|not logged in|invalid api key|oauth token (?:has )?expired|oauth session expired|authentication_error|sign in with chatgpt|run `?codex login/i },
   { why: 'network', re: /API Error: (?:Connection error|Request timed out)|unable to connect to (?:the )?(?:Anthropic )?API|stream disconnected before completion|error sending request for url \(https:\/\/[\w.]*(?:openai|chatgpt)|ENOTFOUND [\w.]*(?:anthropic|openai|chatgpt)/i }
