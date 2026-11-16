@@ -31,6 +31,7 @@ import { overlayTemplateWorkflow } from '@shared/workflow/templateOptions'
 import { PLATFORM_NAME } from '@shared/platform/switching'
 import { isVersionBranch } from '@shared/nextVersion'
 import { MissingBranches, missingSaveText, newlyNamed, NextVersionButton, startNextVersion } from './NextVersion'
+import { afterSave, saveOff } from './workflowFormState'
 
 /**
  * The Version Control tab's Workflow section (#1418, SPEC §16.6; P4's plain form before it, #1278): the presets, each
@@ -108,6 +109,7 @@ const T = {
   notEnforced: msg({ id: 'workflow.form.notEnforced', defaultMessage: 'Workflow rules aren’t enforced (Settings → Advanced). These options are saved, and apply once the rules are enforced again.', description: 'A note atop Project Settings → Workflow while the switch "Workflow rules are enforced" is off.' }),
   invalid: msg({ id: 'workflow.form.invalid', defaultMessage: 'These options can’t be used, so every rule is off in this project:', description: 'A note atop Project Settings → Workflow: the saved options contradict each other or can’t be read; the reason follows.' }),
   save: msg({ id: 'workflow.form.save', defaultMessage: 'Save…', description: 'The button saving the workflow options (it shows what changes first).' }),
+  nothingToSave: msg({ id: 'workflow.form.nothingToSave', defaultMessage: 'No changes to save: the options shown are those saved.', description: 'HI-3333: the tooltip of the Save… button of the workflow options while it is off because nothing differs from the saved options.' }),
   saveBlocked: msg({ id: 'workflow.form.saveBlocked', defaultMessage: 'Resolve what the options say first.', description: 'The tooltip of Save… in the Workflow section while some options contradict each other (their reasons are shown under them).' }),
   discard: msg({ id: 'workflow.form.discard', defaultMessage: 'Discard Changes', description: 'The button dropping unsaved changes to the workflow options.' }),
   copy: msg({ id: 'workflow.form.copy', defaultMessage: 'Copy as JSON', description: 'The button copying the project’s workflow options as JSON, to paste into another project.' }),
@@ -291,11 +293,15 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
   const draft = loaded?.for === source.key ? loaded.draft : null
   const error = failed?.for === source.key ? failed.error : null
 
-  /** The form as read (or saved) for a project, its draft reset to it; any read still under way is outdated by it. */
-  const show = useCallback((path: string, f: WorkflowForm): void => {
+  /**
+   * The form as read (or saved) for a project, its draft reset to it; any read still under way is outdated by it. A save's
+   * answer (`editedSince`: the draft's edits when it began) keeps a draft edited meanwhile (HI-3333).
+   */
+  const show = useCallback((path: string, f: WorkflowForm, editedSince?: number): void => {
     reads.current++
     if (pathRef.current !== path) return
-    setLoaded({ for: path, form: f, draft: { preset: f.preset, options: { ...f.own } } })
+    const editedMeanwhile = editedSince !== undefined && edits.current !== editedSince
+    setLoaded((l) => afterSave(l, path, f, editedMeanwhile))
     setProblems([])
     setFailed(null)
   }, [])
@@ -431,6 +437,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
   const live = liveContradictions(effective)
   const stageProblems = stageNameProblems(effective.stageNames, tr)
   const blocked = contradictions(effective).length > 0 || stageProblems.length > 0
+  const off = saveOff({ dirty, settings: !!settings, blocked, missingBranches: missingNow?.names.length ?? 0 })
   const set = <K extends OptionKey>(key: K, value: WorkflowOptions[K]): void => setDraft({ ...draft, options: setOption(draft.options, effective, key, value) })
   const inheritKey = (key: OptionKey): void => {
     const { [key]: _gone, ...rest } = draft.options
@@ -452,6 +459,8 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
   const save = async (offer?: string): Promise<void> => {
     // What the form was read with: the save is refused if the project's options are no longer these (#1418).
     const change: WorkflowChange = { ...draft, base: { preset: form.preset, options: form.own } }
+    // HI-3333: an edit made from here until the save returns stays in the draft, not replaced by what was saved.
+    const editedSince = edits.current
     const check = await source.check(change)
     setProblems(check.problems)
     if (check.problems.length) return
@@ -474,7 +483,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
       run: async () => {
         const path = source.key
         try {
-          show(path, await source.save(change, [...picked], offer))
+          show(path, await source.save(change, [...picked], offer), editedSince)
           // Saved: then what follows the new target, as previewed, each item rechecked; said whatever came of it.
           if (retargets && retarget.has('on')) {
             const r = await call('workflow:retarget', path, retargets).catch((e: unknown) => {
@@ -852,8 +861,8 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
       {/* Discard Changes reads the form again too: a change elsewhere it skipped while the draft was unsaved (another level
           saved meanwhile, HI-1768) shows at once. */}
       <div className="workflow-actions">
-        <Tooltip content={blocked ? tr(T.saveBlocked) : missingNow?.names.length ? missingSaveText(missingNow.names) : null}>
-          <button className="btn primary" data-action="save" disabled={!dirty || !settings || blocked || !!missingNow?.names.length} onClick={() => void save().catch((e) => notify('error', errorMessage(e)))}>
+        <Tooltip content={off === 'noChanges' ? tr(T.nothingToSave) : off === 'blocked' ? tr(T.saveBlocked) : off === 'missingBranches' && missingNow ? missingSaveText(missingNow.names) : null}>
+          <button className="btn primary" data-action="save" data-off={off ?? undefined} disabled={!!off} onClick={() => void save().catch((e) => notify('error', errorMessage(e)))}>
             {tr(T.save)}
           </button>
         </Tooltip>

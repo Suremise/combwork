@@ -118,6 +118,7 @@ interface CombworkMessageValues {
   'workflow.form.noPreset': undefined
   'workflow.form.noneValue': undefined
   'workflow.form.notEnforced': undefined
+  'workflow.form.nothingToSave': undefined
   'workflow.form.off': undefined
   'workflow.form.offerStale': undefined
   'workflow.form.offerUnsaved': undefined
