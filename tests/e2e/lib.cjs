@@ -324,8 +324,31 @@ async function appReady(page, ms = 90000) {
   if (!ok) throw new Error("Combwork's window wasn't ready (rendered, providers found) within " + ms / 1000 + ' s')
 }
 
+/**
+ * HI-3342: Claude Code 2.1.326 and later asks about an --add-dir folder outside the folders it trusts at every start, so
+ * Combwork grants a reviewer the copies folder only once its home trusts the workspace's worktrees folder (HI-3337, read
+ * from .claude.json). The fake says a later version (2.1.999), so a fake home the suite gave launch (one with
+ * fake-trusted.json) trusts it as Set Up leaves it: recorded as Claude Code writes it (its real path, forward slashes;
+ * tests/fixtures/advanced/trust-entry-*), beside what the home's .claude.json has. Reviewcopies takes it away to test that.
+ */
+function trustFakeWorktrees(home, ws) {
+  if (!home || !fs.existsSync(path.join(home, 'fake-trusted.json'))) return
+  fs.mkdirSync(`${ws}.worktrees`, { recursive: true })
+  const key = fs.realpathSync.native(`${ws}.worktrees`).replace(/\\/g, '/')
+  const file = path.join(home, '.claude.json')
+  let json = {}
+  try {
+    json = JSON.parse(fs.readFileSync(file, 'utf8'))
+  } catch {
+    // none yet, or not JSON: written afresh
+  }
+  json.projects = { ...json.projects, [key]: { ...json.projects?.[key], hasTrustDialogAccepted: true } }
+  fs.writeFileSync(file, JSON.stringify(json))
+}
+
 /** Opens a workspace and waits until the window shows it (its name in the title), instead of a fixed wait. */
 async function openWorkspace(inv, page, ws, ms = 20000) {
+  trustFakeWorktrees(inv.claudeHome, ws)
   await inv('workspace:open', ws)
   const name = path.basename(ws)
   const ok = await until(() => page.evaluate((n) => document.title.includes(n), name).catch(() => false), ms)
@@ -359,6 +382,8 @@ async function launch({ userData, env = {}, viewport = { width: 1400, height: 85
     throw e
   }
   const inv = (ch, ...a) => page.evaluate(([c, args]) => window.combwork.invoke(c, ...args), [ch, a])
+  // Its Claude Code home, for openWorkspace (HI-3342).
+  inv.claudeHome = env.CLAUDE_CONFIG_DIR
   return { app, page, inv }
 }
 
