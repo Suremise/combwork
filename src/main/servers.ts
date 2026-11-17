@@ -2321,8 +2321,10 @@ route('GET', '/v1/lanes/next', async () =>
     // HI-3340: a card it says to start is issued to the calling launch at its attempt now, so the start it tells of is
     // accepted (a binding from an earlier attempt, before a put-back or a lane reorder's restart, would refuse it). A card
     // to carry on issues nothing: the agent's view of it may be from an attempt that has moved on, which the fence is for.
+    // Only while it is still in Todo, read with its attempt in one step (attemptToStart): laneNext awaits after taking its
+    // view, and a card started again meanwhile is in an attempt this reply never showed (HR2's round 1).
     if (r.next && !r.next.carryOn && a.runId) {
-      const at = tasks.attemptRead(requireWorkspace(), basename(a.projectPath), r.next.card)
+      const at = tasks.attemptToStart(requireWorkspace(), basename(a.projectPath), r.next.card)
       if (at) issueAttempt({ projectPath: a.projectPath, agentId: a.agentId, runId: a.runId }, r.next.card, at)
     }
     // Its passed cards Combwork merges, each with where it is in the merge queue (#1354): the next waits for them.

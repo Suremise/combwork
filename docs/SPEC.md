@@ -6192,8 +6192,9 @@ moved on.
   launch, gone with its token): its own start (the attempt it made), its read of the card (`cw_read_task` in any form,
   `GET /v1/tasks/{n}` and its newest comment alone, `/comments/latest` (HI-3340: a refused agent told to read the card
   again clears it with whichever read it makes): the attempt in the read's snapshot), `cw_lane next` naming the card to
-  start (`GET /v1/lanes/next`, HI-3340: its attempt then, so the start it tells of is accepted; a card to carry on issues
-  nothing), a delivery about the card (each is stamped with the card's attempt as it is made, `DeliveryRecord.attempt`;
+  start (`GET /v1/lanes/next`, HI-3340: its attempt then, read with its stage in one step and only while it is still in
+  Todo, so the start it tells of is accepted; a card started again since the lane view was read, or one to carry on,
+  issues nothing), a delivery about the card (each is stamped with the card's attempt as it is made, `DeliveryRecord.attempt`;
   receiving it issues that attempt, never a later one), a card it creates, and each accepted write of its own, a first
   contact's included. A binding only moves forward; a list read and a call's arrival issue nothing.
 - **Each request captures its launch's bindings as it arrives**, before anything is awaited, and keeps them for every write

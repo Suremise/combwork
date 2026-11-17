@@ -1944,6 +1944,22 @@ export function attemptRead(ws: WorkspaceService, project: string, n: number): A
 }
 
 /**
+ * HI-3340: card n's attempt for a start cw_lane next advises, read in one synchronous step with its stage: only while the
+ * card is in Todo (out of any attempt, so the only write the advice leads to is a start, which makes a new one), else
+ * null. A card started again since the lane view was read is in an attempt the caller never saw: nothing is issued.
+ */
+export function attemptToStart(ws: WorkspaceService, project: string, n: number): AttemptKey | null {
+  if (!project) return null
+  try {
+    const store = FactStore.forBoard(ws, { project, key: '' })
+    const s = foldCard(store.facts(n), store.card(n).stage)
+    return s.stage === 'todo' ? s.attempt : null
+  } catch {
+    return null
+  }
+}
+
+/**
  * HI-3194: refused unless the agent request's fence holds for card n at attempt `pre` (null: only its launch is checked).
  * Its launch is checked again as the board change commits (beforeBoardCommit), after every await the change makes (the
  * card's own save included): a launch replaced meanwhile undoes the whole change, its facts too, `attempt.staleLaunch`.

@@ -687,6 +687,28 @@ describe('reads that clear a stale attempt, through the real handlers (HI-3340)'
     expect(await start(w, l, card)).toBeNull()
   })
 
+  it('a card started again after cw_lane next took its view issues nothing: the unseen attempt stays fenced', async () => {
+    const { w, card, l } = await putBackLaneCard()
+    const was = fence.boundAttempt('r1', card)
+    const lanes = await import('../src/main/lanes')
+    const real = lanes.laneNext
+    // The view is taken (the card in Todo); then, before the reply is made, the user starts it again for the builder.
+    const spy = vi.spyOn(lanes, 'laneNext').mockImplementation(async (...args) => {
+      const r = await real(...args)
+      await update(w, card, user, { column: 'doing', agent: 'a1' })
+      return r
+    })
+    try {
+      const next = await call(w, l, 'GET', '/v1/lanes/next', card)
+      expect(spy).toHaveBeenCalled()
+      expect(next.next).toMatchObject({ card, carryOn: false })
+    } finally {
+      spy.mockRestore()
+    }
+    expect(fence.boundAttempt('r1', card)).toEqual(was)
+    expect(await refused(comment(w, card, arrive(l)))).toBe('attempt.moved')
+  })
+
   it('a card cw_lane next says to carry on with issues nothing: a write for its earlier attempt stays refused', async () => {
     const { w, card, l } = await putBackLaneCard()
     // Started again for the builder by the user: in flight, at an attempt the launch never saw.
