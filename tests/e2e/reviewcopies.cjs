@@ -221,14 +221,14 @@ const starts = () => lines(started)
     // The folder trusted again (as Set Up records it) and E1 restarted, the grant and a copy come back.
     await inv('advanced:set', 'cw.copies.review', null)
     const restartE1 = async () => {
-      const before = lines(path.join(claudeHome, 'fake-launches.jsonl')).length
+      const launchedBefore = lines(path.join(claudeHome, 'fake-launches.jsonl')).length
       await inv('session:stop', alpha, e1.id)
       const stopped = !!(await until(async () => !(await live(e1.id)), HUNG_MS))
       await inv('session:start', alpha, { agentId: e1.id })
       const up = !!(await ready(e1.id))
       const l = await until(async () => {
         const sessionId = (await live(e1.id))?.sessionId
-        return lines(path.join(claudeHome, 'fake-launches.jsonl')).slice(before).findLast((x) => x.sessionId === sessionId && x.opts['--mcp-config'])
+        return lines(path.join(claudeHome, 'fake-launches.jsonl')).slice(launchedBefore).findLast((x) => x.sessionId === sessionId && x.opts['--mcp-config'])
       }, HUNG_MS)
       return { ok: stopped && up && !!l, launch: l }
     }
