@@ -8495,8 +8495,8 @@ for a day go hourly (Remove idle slots after a day).
   folder only when its home (the connection's folder, or the CLI's own) trusts it, read from the CLI's files
   (`addedDirTrusted`, `addedDirAsks` in copies.ts: an ancestor's entry covers a plain folder; can't be told counts as not);
   otherwise the grant is withheld for that launch (`withheldDirs`, logged), so a reviewer never starts into the question,
-  and its start review says why in one line ("No review copy (your CLI doesn't trust <worktrees folder> on your connection
-  yet…): review the builder's work read-only"). **A:** the connection's trust targets (§ Connections, Set up) gain the
+  and its start review says why in one line ("No review copy (your CLI doesn't trust <worktrees folder> yet; ask the user to
+  trust it with Set Up…): review the builder's work read-only…", at most 300 characters). **A:** the connection's trust targets (§ Connections, Set up) gain the
   workspace's worktrees folder (`<Workspace>.worktrees`, plain, made if not there yet) while a reviewer of a project would
   launch on it with review copies on and a CLI that both asks and has `extraDirs`; untrusted, the row is **Needs set up**
   and names it as *review copies*, and Set Up asks there last ("It opens in this workspace's worktrees folder, …, where
