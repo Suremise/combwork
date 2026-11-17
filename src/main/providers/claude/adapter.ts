@@ -2,7 +2,7 @@ import { TOOLS_SERVER } from '../../../shared/assistantTools'
 import { homedir } from 'os'
 import { msg, tr } from '../../../shared/i18n'
 import { join, basename } from 'path'
-import { mkdir, open, readdir, readFile, stat, writeFile } from 'original-fs/promises'
+import { mkdir, open, readdir, readFile, realpath, stat, writeFile } from 'original-fs/promises'
 import { existsSync, readFileSync, realpathSync } from 'original-fs'
 import type { AgentInstallInfo, AutoCompactSetting, HookCause, McpServerDef, MemorySource, PathDataCopy, PlanLimit, PlanUsage, ReadinessIssue, RetryWait, SubSession } from '../../../shared/types'
 import { assertSessionId, isSessionId } from '../../../shared/defaults'
@@ -309,8 +309,10 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   /** If Combwork itself was started from inside a Claude Code session, don't leak that session's identity. User configuration such as CLAUDE_CODE_GIT_BASH_PATH is kept. */
   readonly envToStrip = ['CLAUDECODE', 'CLAUDE_PID', 'CLAUDE_AGENT_SDK_VERSION', 'CLAUDE_CODE_ENTRYPOINT', 'CLAUDE_CODE_CHILD_SESSION', 'CLAUDE_CODE_SESSION_ID', 'CLAUDE_CODE_SESSION_ATTENDED', 'CLAUDE_CODE_MESSAGING_SOCKET', 'CLAUDE_CODE_MESSAGING_TOKEN', 'CLAUDE_CODE_SSE_PORT', 'CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING', 'MCP_CONNECTION_NONBLOCKING']
   readonly compactFailure = /not enough messages to compact|error during compaction|compaction failed/i
-  // Before a folder's first session: "Is this a project you created or one you trust? … trust this folder" (#367: an
-  // advanced setting, so a changed question can be fixed without a release).
+  // Before a folder's first session: "Is this a project you created or one you trust? … trust this folder"; and from
+  // 2.1.326, before each session, for an --add-dir folder outside every repository it trusts: "Adding a new directory:"
+  // (HI-3335). Both are drawn before its SessionStart hook. #367: an advanced setting, so a changed question can be fixed
+  // without a release.
   get startupQuestion(): RegExp {
     return advanced.pattern('claude-code.trust.prompt')
   }
@@ -490,6 +492,18 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
         p = up
       }
     })
+  }
+
+  /**
+   * Its trust of a plain folder given with --add-dir (HI-3337): 2.1.326 asks about one outside every folder it trusts,
+   * before each session (HI-3335). Read as its folder trust is (an ancestor's entry covers a folder without Git), from
+   * the home's `.claude.json`; its own home's is beside `.claude` unless CLAUDE_CONFIG_DIR moves it.
+   */
+  async addedDirTrusted(home: string | null, folder: string): Promise<boolean | null> {
+    const at = home ?? (process.env.CLAUDE_CONFIG_DIR || homedir())
+    const real = await realpath(folder).catch(() => null)
+    const [r] = await this.connectionTrusts(at, [{ root: real, git: false, short: false }])
+    return r === true ? true : r === false ? false : null
   }
 
   accountSharedTarget(name: string): string {

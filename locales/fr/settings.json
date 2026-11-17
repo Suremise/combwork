@@ -86,6 +86,8 @@
   "settings.accounts.setUpChecking": "Vérification…",
   "settings.accounts.setUpDone": "Configurée",
   "settings.accounts.setUpIn": "Il s’ouvre dans le dossier de {project}, {folder} : réponds à la question de {cli} pour lui faire confiance.",
+  "settings.accounts.setUpInCopies": "Il s’ouvre dans le dossier des worktrees de cet espace de travail, {folder}, où se trouvent les copies de relecture des relecteurs : réponds à la question de {cli} pour lui faire confiance. D’ici là, les relecteurs de cette connexion relisent sans copie, car {cli} poserait la question à chaque démarrage.",
+  "settings.accounts.reviewCopies": "copies de relecture",
   "settings.accounts.setUpInWorkspace": "Il s’ouvre dans le dossier de cet espace de travail, {folder} : réponds à la question de {cli} pour lui faire confiance, et avec lui à chaque projet qu’il contient qui n’est pas un dépôt Git. Chaque dépôt Git est ensuite demandé dans son propre dossier.",
   "settings.accounts.setUpNeeded": "À configurer",
   "settings.accounts.signIn": "Se connecter",

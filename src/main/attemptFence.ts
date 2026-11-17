@@ -5,8 +5,8 @@ import { refusal, type Refusal } from '../shared/workflow/refusals'
 /**
  * HI-3194: each card attempt fenced against stale agents (SPEC §16.8.7). A card's attempt key (`CardState.attempt`) moves on
  * with every start, reassignment and end of an attempt. Combwork binds each agent launch to the attempt of each card it
- * was handed (issued: its own start, a full read of the card, a delivery stamped with its attempt, an accepted write of
- * its own), and every agent write on a card checks, in that write's own transaction, the binding its request captured as
+ * was handed (issued: its own start, a read of the card in any form (its latest comment's too, HI-3340), cw_lane next
+ * naming it to start, a delivery stamped with its attempt, an accepted write of its own), and every agent write on a card checks, in that write's own transaction, the binding its request captured as
  * it arrived (never the shared binding then, which a later read may have moved) against the card's attempt before the
  * write. A launch with no binding for the card is in first contact with it: allowed, and bound by its write (the
  * Assistant's call on HI-3194, 14 Nov). The agent passes nothing: the token says which launch calls.

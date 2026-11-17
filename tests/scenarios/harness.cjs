@@ -348,6 +348,8 @@ function relaunchTrust({ status, runId, launchRun, answered, screen = '', provid
   if (status !== 'waiting' || !runId || runId === launchRun || answered.has(runId)) return null
   if (/Do you trust the files in this folder/i.test(screen)) return 'enter'
   if (/trust this folder/i.test(screen)) return provider === 'codex' ? 'enter' : 'claude'
+  // An added folder's (Claude Code 2.1.326, HI-3335).
+  if (lib.CLAUDE_TRUST.test(screen) && provider !== 'codex') return 'claude'
   return null
 }
 
@@ -764,7 +766,7 @@ async function runScenario(sc, providerKey, opts = {}) {
         for (let t = Date.now(); Date.now() - t < 90000 && !['ready', 'finished', 'working'].includes((await up())?.status); ) {
           const screen = plain(await inv('pty:buffer', k).catch(() => ''))
           if (/Do you trust the files in this folder/i.test(screen)) await inv('pty:write', k, '\r')
-          else if (/trust this folder/i.test(screen)) {
+          else if (lib.CLAUDE_TRUST.test(screen)) {
             if (p.provider === 'codex') await inv('pty:write', k, '\r')
             else await lib.acceptClaudeTrust(inv, home, 'assistant', 3000)
           }
@@ -945,7 +947,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       if (/Do you trust the files in this folder/i.test(plain(await inv('pty:buffer', key).catch(() => '')))) {
         await inv('pty:write', key, '\r')
         await answered()
-      } else if (/trust this folder/i.test(plain(await inv('pty:buffer', key).catch(() => '')))) {
+      } else if (lib.CLAUDE_TRUST.test(plain(await inv('pty:buffer', key).catch(() => '')))) {
         // Claude Code's menu starts on "No, exit": lib's answer presses Enter only once "Yes" shows selected (#218).
         if (p.provider === 'codex') await inv('pty:write', key, '\r')
         else await lib.acceptClaudeTrust(inv, host, agentId)
@@ -1063,7 +1065,7 @@ async function runScenario(sc, providerKey, opts = {}) {
         if (/Do you trust the files in this folder/i.test(tail)) {
           await inv('pty:write', k, '\r')
           trustAnswered.add(a.id)
-        } else if (/trust this folder/i.test(tail)) {
+        } else if (lib.CLAUDE_TRUST.test(tail)) {
           if (p.provider === 'codex') await inv('pty:write', k, '\r')
           if (p.provider === 'codex' || (await lib.acceptClaudeTrust(inv, alpha, a.id, 3000))) trustAnswered.add(a.id)
         }

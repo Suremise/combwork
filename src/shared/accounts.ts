@@ -12,14 +12,17 @@ import { permissionLabel, providerDescriptor } from './providers'
  * (its main repository root) its CLI doesn't trust yet, where Set Up opens; `unknown`, some couldn't be told.
  */
 export interface ConnectionTrust {
-  /** The folders still to trust; `git`: a Git root, which a trusted folder above it never covers (HI-2520). */
-  pending: { project: string; folder: string; git: boolean }[]
+  /**
+   * The folders still to trust; `git`: a Git root, which a trusted folder above it never covers (HI-2520); `copies`: the
+   * workspace's worktrees folder, where its reviewers' review copies are (HI-3337), its `project` that folder's name.
+   */
+  pending: { project: string; folder: string; git: boolean; copies?: true }[]
   unknown: boolean
   /**
    * Where Set Up asks the trust question next (HI-1871): the workspace's folder (`workspace`), which covers the
    * projects without Git in it for a CLI whose trust is inherited, else the first pending project's main root.
    */
-  setUpIn?: { folder: string; project?: string; workspace?: true }
+  setUpIn?: { folder: string; project?: string; workspace?: true; copies?: true }
   /** Its answer for the workspace's current projects isn't in yet (HI-1870 round 3): shown as Checking…, never set up. */
   checking?: true
 }

@@ -462,23 +462,71 @@ const ptyKey = (proj, agentId) => `session:${proj.toLowerCase()}#${agentId}`
 const CLAUDE_AT_PROMPT = /for shortcuts|\? for|shift\+tab to cycle|\bmode on\b/i
 
 /**
- * Answers Claude Code's "trust this folder" question in an agent's terminal, if it asks: true when it answered, false
- * as soon as the session is past it (Claude Code's prompt on screen, or Combwork has the session ready: a trusted folder
- * asks nothing, #188), or at the timeout. Never answers anything else (a sign-in screen least of all).
+ * Claude Code's trust questions: its folder's ("trust this folder"), and from 2.1.326 an added folder's (HI-3335: an
+ * --add-dir nobody trusted, a slot's launch plugin or a reviewer's copy: "Adding a new directory:", "Yes, add it").
+ */
+const CLAUDE_TRUST = /trust this folder|Adding a new directory:/i
+
+/** Where a trust question's text starts: its title, or (an older Claude Code's, without one) its first words. */
+const TRUST_TITLE = /Accessing workspace:|Adding a new directory:/gi
+const TRUST_WORDS = /Quick safety check|Is this a project/gi
+/** Where its choices start. */
+const TRUST_CHOICES = /[>❯›]?\s*(?:\d\.\s*)?(?:No, exit|Yes, )/
+
+/**
+ * A terminal's screen as it shows now (drawnScreen.cjs: pty:buffer drawn at pty:size, a wrapped row joined to the one
+ * before). Never positions in pty:buffer itself: it is a replay, after a resize the screen redrawn, where an earlier
+ * read's length means nothing (HI-3311, HI-3312); and in the output as it came, a question's text stays after it is
+ * erased.
+ */
+async function screenNow(inv, key) {
+  const size = await inv('pty:size', key).catch(() => null)
+  return renderScreen(String((await inv('pty:buffer', key).catch(() => '')) ?? ''), size?.cols, size?.rows, { unwrap: true })
+}
+
+/**
+ * The trust question a screen shows (screenNow), read from that screen alone (HI-3335): { id, choice }, or null when it
+ * shows none (none drawn, or Claude Code's prompt drawn after it). id is its text up to its choices: which question (its
+ * folder's, or which added folder's), so its screen moving on to another is seen. choice is the one shown selected
+ * ('No, exit', 'Yes, …'), or null while its menu draws no pointer: 2.1.326's added folder's menu draws both choices
+ * dimmed (grey) and no pointer for its first 500 ms, while it takes no keys (its armAfterMs; recorded in
+ * trust-added-raw-claude-2.1.326.json), and draws "❯ No, exit" once it does.
+ */
+function trustQuestion(screen) {
+  const text = plainText(screen)
+  const asked = [...text.matchAll(new RegExp(CLAUDE_TRUST.source, 'gi'))].at(-1)
+  if (!asked || CLAUDE_AT_PROMPT.test(text.slice(asked.index))) return null
+  const before = (re) => [...text.matchAll(re)].filter((m) => m.index <= asked.index).at(-1)?.index
+  const block = text.slice(before(TRUST_TITLE) ?? before(TRUST_WORDS) ?? asked.index)
+  const choices = block.search(TRUST_CHOICES)
+  return { id: (choices > 0 ? block.slice(0, choices) : block.slice(0, 200)).trim(), choice: trustChoice(block) }
+}
+
+/**
+ * Answers Claude Code's trust questions (CLAUDE_TRUST) in an agent's terminal, each it asks (its folder's, then an added
+ * folder's, HI-3335), each read from its screen as it shows now (screenNow): true when it answered one, false as soon as
+ * the session is past them (Claude Code's prompt on screen, or Combwork has the session ready: a trusted folder asks
+ * nothing, #188), or at the timeout. Never answers anything else (a sign-in screen least of all).
  */
 async function acceptClaudeTrust(inv, proj, agentId, timeoutMs = 15000) {
   const key = ptyKey(proj, agentId)
   const t = Date.now()
+  const ready = async () => (await inv('session:live').catch(() => [])).find((s) => s.projectPath.toLowerCase() === proj.toLowerCase() && s.agentId === agentId)?.status === 'ready'
+  let answered = false
   while (Date.now() - t < timeoutMs) {
-    // Terminal UIs draw spaces as cursor moves: control sequences become spaces before matching.
-    const text = plainText(await inv('pty:buffer', key).catch(() => ''))
-    if (/trust this folder/i.test(text)) return chooseTrust(inv, key, Math.max(3000, timeoutMs - (Date.now() - t)))
-    if (CLAUDE_AT_PROMPT.test(text)) return false
-    const live = (await inv('session:live').catch(() => [])).find((s) => s.projectPath.toLowerCase() === proj.toLowerCase() && s.agentId === agentId)
-    if (live?.status === 'ready') return false
+    const screen = await screenNow(inv, key)
+    const q = trustQuestion(screen)
+    if (q) {
+      const r = await chooseTrust(inv, key, q.id, ready, Math.max(3000, timeoutMs - (Date.now() - t)))
+      if (r === null) return answered
+      answered ||= r
+      continue
+    }
+    if (CLAUDE_AT_PROMPT.test(plainText(screen))) return answered
+    if (await ready()) return answered
     await sleep(500)
   }
-  return false
+  return answered
 }
 
 /**
@@ -493,30 +541,41 @@ async function acceptRelaunchTrust(inv, proj, agentId, spawned, { spawnMs = 2000
 
 /** The trust question's choice the terminal shows selected last ('No, exit' or 'Yes, …'), or null. */
 function trustChoice(text) {
-  const marks = [...plainText(text).matchAll(/[>❯›]\s*(?:\d\.\s*)?(No, exit|Yes, I trust this folder)/g)]
+  const marks = [...plainText(text).matchAll(/[>❯›]\s*(?:\d\.\s*)?(No, exit|Yes, I trust this folder|Yes, add it)/g)]
   return marks.length ? marks.at(-1)[1] : null
 }
 
 /**
- * Says yes to Claude Code's trust question. Its menu starts on "No, exit", and Enter on that quits Claude Code (exit 1).
- * A key sent while it is still drawing the menu is dropped on a busy machine (#218: Down lost, Enter chose No), so
- * Enter is pressed only once the terminal shows "Yes" selected, Down sent again until it does; never on "No". true when
- * it answered yes.
+ * Says yes to the trust question `id` (trustQuestion) its screen shows. Its menu starts on "No, exit", and Enter on that
+ * quits Claude Code (exit 1). A key sent while it is still drawing the menu is dropped on a busy machine (#218: Down
+ * lost, Enter chose No), so Enter is pressed only while its screen shows "Yes" selected, Down sent (only while it shows
+ * "No") until it does; nothing while it shows no pointer (its menu takes no keys yet). Answered only once its screen
+ * moves on (another question, its prompt, or `ready()`): an Enter it didn't take (dropped) is pressed again, on "Yes"
+ * again. true when it answered; false when the question went without its Enter; null at the timeout.
  */
-async function chooseTrust(inv, key, timeoutMs = 20000) {
+async function chooseTrust(inv, key, id, ready, timeoutMs = 20000) {
   const t = Date.now()
-  const choice = async () => trustChoice(await inv('pty:buffer', key).catch(() => ''))
+  const now = async () => trustQuestion(await screenNow(inv, key))
+  const here = (q) => !!q && q.id === id
+  const onYes = (q) => here(q) && !!q.choice?.startsWith('Yes')
+  const gone = async () => !here(await now()) || (await ready())
+  let entered = false
   while (Date.now() - t < timeoutMs) {
+    const q = await now()
+    if (!here(q) || (await ready())) return entered
     // Still "Yes" a moment later: a Down still on its way would have moved it back by then.
-    if ((await choice()) === 'Yes, I trust this folder' && (await sleep(400), (await choice()) === 'Yes, I trust this folder')) {
+    if (onYes(q) && (await sleep(400), onYes(await now()))) {
       await inv('pty:write', key, '\r')
-      return true
+      entered = true
+      // A try's pace, not a bound: its screen not moved on within 3 s, the loop presses Enter again if "Yes" still shows.
+      if (await until(gone, 3000, 150)) return true
+      continue
     }
-    await inv('pty:write', key, '\x1b[B')
-    // A try's pace, not a bound: not on "Yes" within 2 s, Down is pressed again (timeoutMs bounds the whole).
-    await until(async () => (await choice()) === 'Yes, I trust this folder', 2000, 150)
+    if (q.choice && !onYes(q)) await inv('pty:write', key, '\x1b[B')
+    // A try's pace, not a bound: not on "Yes" (or no pointer yet) within 2 s, the loop looks again (timeoutMs bounds the whole).
+    await until(async () => { const n = await now(); return !here(n) || onYes(n) || (!q.choice && !!n?.choice) }, 2000, 150)
   }
-  return false
+  return null
 }
 
 /**
@@ -2137,4 +2196,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }
+module.exports = { PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, CLAUDE_TRUST, trustQuestion, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }

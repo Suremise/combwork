@@ -3,7 +3,7 @@ import { limitName } from '@shared/planLimits'
 import { connectionCells, currentLimits, planName, resetText, usageLevel, windowOf, type ConnectionCell } from './accountCard'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Account, PlanLimit, ProviderId } from '@shared/types'
-import { accountState, connectionReadiness, duplicateLogins, type AccountView, type ConnectionRow, type ConnectionsView, type ConnectionState } from '@shared/accounts'
+import { accountState, connectionReadiness, duplicateLogins, type AccountView, type ConnectionRow, type ConnectionsView, type ConnectionState, type ConnectionTrust } from '@shared/accounts'
 import { pcAccountId, pcWideSignIn } from '@shared/connectionDefaults'
 import { connectionOf } from '@shared/connectionLabel'
 import { isProviderEnabled, providerDescriptor } from '@shared/providers'
@@ -75,6 +75,8 @@ const M = {
   notTrusted: msg({ id: 'settings.accounts.notTrusted', defaultMessage: 'Not trusted yet in this workspace: {projects}', description: "Under a connection that needs set up (Settings → Accounts & Connections, HI-1870): the projects of the open workspace whose folders its coding agent CLI hasn't been told to trust yet ({projects}: their names, listed). Set Up asks the CLI's trust question for each in turn." }),
   moreProjects: msg({ id: 'settings.accounts.moreProjects', defaultMessage: '{n, plural, one {# more} other {# more}}', description: 'The last item of that list when it names only the first projects: how many more there are.' }),
   setUpIn: msg({ id: 'settings.accounts.setUpIn', defaultMessage: "It opens in {project}'s folder, {folder}: answer {cli}'s question to trust it.", description: "Above a connection's Set Up terminal when it opens in a project's folder its coding agent CLI ({cli}) doesn't trust yet (HI-1870): {project} is the project's name, {folder} the folder." }),
+  setUpInCopies: msg({ id: 'settings.accounts.setUpInCopies', defaultMessage: "It opens in this workspace's worktrees folder, {folder}, where reviewers' review copies are: answer {cli}'s question to trust it. Until then, reviewers on this connection review without a copy, since {cli} would ask about it at every start.", description: "Above a connection's Set Up terminal when it opens in the open workspace's worktrees folder (HI-3337): the coding agent CLI ({cli}) asks about the reviewers' review-copies folder at each start until it trusts this folder once. {folder} is the folder." }),
+  reviewCopies: msg({ id: 'settings.accounts.reviewCopies', defaultMessage: 'review copies', description: "In the list after \"Not trusted yet in this workspace:\" (settings.accounts.notTrusted), beside project names (HI-3337): the workspace's worktrees folder, where reviewers' review copies are, which the coding agent CLI doesn't trust yet. Lower case, a list item." }),
   setUpInWorkspace: msg({ id: 'settings.accounts.setUpInWorkspace', defaultMessage: "It opens in this workspace's folder, {folder}: answer {cli}'s question to trust it, and with it every project in it that isn't a Git repository. A Git repository is asked in its own folder next.", description: "Above a connection's Set Up terminal when it opens in the open workspace's folder (HI-1871): the coding agent CLI ({cli}) asks once whether to trust that folder; trusting it covers the projects inside it that aren't Git repositories, and Set Up then asks in each Git repository's own folder (HI-2520). {folder} is the folder." }),
   setUpChecking: msg({ id: 'settings.accounts.setUpChecking', defaultMessage: 'Checking…', description: "A connection's state (Settings → Accounts & Connections, HI-1870): Combwork is still reading whether its coding agent CLI trusts the open workspace's project folders, so it doesn't say yet whether it is set up." }),
   setUpNeeded: msg({ id: 'settings.accounts.setUpNeeded', defaultMessage: 'Needs set up', description: "A connection's state (Settings → Accounts & Connections, HI-1870): its CLI's one-time first-run setup (Set Up, a button beside it) hasn't been done in its folder yet." }),
@@ -172,7 +174,7 @@ function Fact({ label, children, data }: { label: string; children: React.ReactN
   )
 }
 
-type Terminal = { id: string; key: string; ended: boolean; provider: ProviderId; setUp?: boolean; in?: { folder: string; project?: string; workspace?: true } }
+type Terminal = { id: string; key: string; ended: boolean; provider: ProviderId; setUp?: boolean; in?: ConnectionTrust['setUpIn'] }
 
 export function AccountsSettings() {
   const changed = useStore((s) => s.connectionsChanged)
@@ -496,7 +498,7 @@ export function AccountsSettings() {
         <p className="hint">{t.setUp ? setUpHint(t.provider) : tr(M.signingIn)}</p>
         {t.in && (
           <p className="hint" data-set-up-in>
-            {t.in.workspace ? tr(M.setUpInWorkspace, { folder: t.in.folder, cli: providerDescriptor(t.provider).name }) : tr(M.setUpIn, { project: t.in.project ?? '', folder: t.in.folder, cli: providerDescriptor(t.provider).name })}
+            {t.in.workspace ? tr(M.setUpInWorkspace, { folder: t.in.folder, cli: providerDescriptor(t.provider).name }) : t.in.copies ? tr(M.setUpInCopies, { folder: t.in.folder, cli: providerDescriptor(t.provider).name }) : tr(M.setUpIn, { project: t.in.project ?? '', folder: t.in.folder, cli: providerDescriptor(t.provider).name })}
           </p>
         )}
         <div className="task-terminal">
@@ -627,7 +629,7 @@ export function AccountsSettings() {
                   )}
                   {/* Said once: above its Set Up terminal while that is open (the Assistant, HI-1871). */}
                   {needsSetUp && !(terminal?.setUp && terminal.id === a.id) && <div className="account-setup-note hint" data-set-up-note>{setUpHint(a.provider)}</div>}
-                  {needsSetUp && pending.length > 0 && <div className="account-setup-note hint" data-not-trusted>{tr(M.notTrusted, { projects: fmt.list([...pending.slice(0, 3).map((p) => p.project), ...(pending.length > 3 ? [tr(M.moreProjects, { n: pending.length - 3 })] : [])]) })}</div>}
+                  {needsSetUp && pending.length > 0 && <div className="account-setup-note hint" data-not-trusted>{tr(M.notTrusted, { projects: fmt.list([...pending.slice(0, 3).map((p) => (p.copies ? tr(M.reviewCopies) : p.project)), ...(pending.length > 3 ? [tr(M.moreProjects, { n: pending.length - 3 })] : [])]) })}</div>}
                   {state === 'changed' && a.accepted && o?.email && <div className="account-warning" data-warning="changed"><Icon name="warning" /> {tr(M.changedTo, { now: o.email, was: a.accepted.email })}</div>}
                   {same && <div className="account-warning" data-warning="duplicate"><Icon name="warning" /> {tr(M.sameLogin, { names: fmt.list(same.map(nameOf)) })}</div>}
                   {a.leftover && <div className="account-warning" data-warning="leftover"><Icon name="warning" /> {tr(M.leftover, { what: a.leftover })}</div>}

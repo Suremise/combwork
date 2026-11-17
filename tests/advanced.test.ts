@@ -93,6 +93,11 @@ describe('advanced defaults', () => {
     const re = (id: string): RegExp => new RegExp(def(id).default as string, def(id).flags ?? '')
     expect(re('claude-code.trust.prompt').test(screen('advanced/trust-claude-2.1.296.txt'))).toBe(true)
     expect(re('claude-code.trust.prompt').test(screen('screen-claude-2.1.296-idle.txt'))).toBe(false)
+    // HI-3335: 2.1.326's question about a folder given with --add-dir, outside a repository and inside one; its folder
+    // question still reads as 2.1.312's.
+    expect(re('claude-code.trust.prompt').test(screen('advanced/trust-added-claude-2.1.326.txt'))).toBe(true)
+    expect(re('claude-code.trust.prompt').test(screen('advanced/trust-added-repo-claude-2.1.326.txt'))).toBe(true)
+    expect(re('claude-code.trust.prompt').test(screen('advanced/trust-term-claude-2.1.312.txt'))).toBe(true)
     expect(re('codex.trust.prompt').test(screen('advanced/trust-codex-0.162.1.txt'))).toBe(true)
     expect(re('codex.trust.prompt').test(screen('screen-codex-0.162.1-idle.txt'))).toBe(false)
     expect(re('copilot.trust.prompt').test(screen('advanced/trust-copilot-1.0.95.txt'))).toBe(true)
@@ -231,7 +236,7 @@ describe('an override', () => {
     // A value a workspace can't take is its own nowhere.
     expect(advancedRow(def('cw.mcp.replySeconds'), state({}, { 'cw.mcp.replySeconds': 900 })).value).toBe(300)
     const trust = def('claude-code.trust.prompt')
-    expect(advancedRow(trust, state({ 'claude-code.trust.prompt': '(' })).value).toBe('trust this folder')
+    expect(advancedRow(trust, state({ 'claude-code.trust.prompt': '(' })).value).toBe('trust this folder|Adding a new directory:')
   })
 
   it('is flagged once another CLI version is installed than the one it was made for', () => {

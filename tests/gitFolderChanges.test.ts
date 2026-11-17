@@ -534,11 +534,12 @@ describe('a commit or stash past its bound (HI-3021)', () => {
    * `pids` and running 30 s (past any bound here): a hook's node, npm or gpg. With `msys` (HI-3047), first a Git Bash
    * `sleep 30` of its own, started in the background by a subshell that then exits: outside Windows' process tree (MSYS's
    * exec leaves its Windows parent gone, and its shell is gone too), found by the timed git's marker. Its winpid is
-   * written once it is sleep (until MSYS's exec, `$!` names the forked sh.exe).
+   * written once it is sleep (until MSYS's exec, `$!` names the forked sh.exe). `started`: a file the script makes before
+   * anything else, the moment git has run it.
    */
-  const slowScript = (pids: string, msys = false): string => {
+  const slowScript = (pids: string, msys = false, started?: string): string => {
     const node = `"${fwd(process.execPath)}" -e 'require("fs").appendFileSync(process.argv[1], process.pid + "\\n"); setTimeout(() => {}, 30000)' "${fwd(pids)}"`
-    return `#!/bin/sh\n${msys ? `( ${sleeper(pids)} )\n` : ''}${node} &\n${node}\n`
+    return `#!/bin/sh\n${started ? `: > "${fwd(started)}"\n` : ''}${msys ? `( ${sleeper(pids)} )\n` : ''}${node} &\n${node}\n`
   }
   /** Git Bash: a background `sleep 30`, its winpid added to `pids` once it is sleep. */
   const sleeper = (pids: string): string => `sleep 30 & while :; do read -r e < /proc/$!/exename; case "$e" in */sleep*) break;; esac; done; read -r w < /proc/$!/winpid; echo "$w" >> "${fwd(pids)}"`
@@ -600,19 +601,31 @@ describe('a commit or stash past its bound (HI-3021)', () => {
 
   it('Set Aside held up past the bound in a step that holds the index (a slow smudge filter as the files are put back): ended, the stash named, the real index never locked, nothing left', async () => {
     const pids = join(tempDir('cw-folderchanges-pids-'), 'pids')
-    const filter = join(tempDir('cw-folderchanges-filter-'), 'slow.sh')
-    writeFileSync(filter, slowScript(pids))
+    const dir = tempDir('cw-folderchanges-filter-')
+    const filter = join(dir, 'slow.sh')
+    const started = join(dir, 'started')
+    writeFileSync(filter, slowScript(pids, false, started))
     sh(proj, 'config', 'filter.slow.clean', 'cat')
-    sh(proj, 'config', 'filter.slow.smudge', `sh "${fwd(filter)}"`)
+    sh(proj, 'config', 'filter.slow.smudge', 'cat')
     writeFileSync(join(proj, '.git', 'info', 'attributes'), 'a.txt filter=slow\n')
     writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    // The bound fits this machine as it is now (HI-3338): the same Set Aside with a filter that holds nothing, timed, and
+    // the bound well past it. A fixed 3 s was ended before git reached the filter on a loaded runner, and nothing held.
+    const t0 = performance.now()
+    await settle('setAside', ['a.txt'])
+    const took = performance.now() - t0
+    sh(proj, 'stash', 'pop', '-q')
+    expect(read('a.txt')).toBe('edit\n')
+    const seconds = Math.min(20, Math.max(3, Math.ceil((3 * took) / 1000)))
+    changes.folderChangesBounds.actMs = seconds * 1000
+    sh(proj, 'config', 'filter.slow.smudge', `sh "${fwd(filter)}"`)
     const done = settle('setAside', ['a.txt']).catch((e: Error) => e)
-    // While git checks a.txt out again (its index lock held), the real index is free.
-    await vi.waitFor(() => expect(pidsIn(pids).length).toBeGreaterThan(0), { timeout: 20_000 })
+    // While git checks a.txt out again (its index lock held), the real index is free. Reached, by the filter's own word.
+    await vi.waitFor(() => expect(existsSync(started)).toBe(true), { timeout: 20_000 })
     expect(existsSync(lockPath())).toBe(false)
     sh(proj, 'add', 'b.txt')
     const err = await done
-    expect(String(err)).toMatch(/didn't finish setting the changes aside in 3 seconds/)
+    expect(String(err)).toMatch(new RegExp(`didn't finish setting the changes aside in ${seconds} seconds`))
     const made = sh(proj, 'rev-parse', 'refs/stash')
     expect(String(err)).toContain(made.slice(0, 12))
     expect(sh(proj, 'show', 'refs/stash:a.txt')).toBe('edit')

@@ -122,7 +122,7 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
       // The slot's trust question, answered once, when it shows (the session starts with the card, after the slot is made):
       // answering again would press Down again and could move the choice back to No.
       const screen = async () => lib.plainText(await inv('pty:buffer', key).catch(() => '')).slice(-1500)
-      if (await until(async () => /trust this folder/i.test(await screen()) || lib.combworkToolsConnected(userData, b1.id, launchMark), 90000)) await lib.acceptClaudeTrust(inv, shop, b1.id, 30000)
+      if (await until(async () => lib.CLAUDE_TRUST.test(await screen()) || lib.combworkToolsConnected(userData, b1.id, launchMark), 90000)) await lib.acceptClaudeTrust(inv, shop, b1.id, 30000)
       const trusted = await until(() => lib.combworkToolsConnected(userData, b1.id, launchMark), 90000)
       check('Claude Code starts in the slot, its Combwork tools connected', !!trusted, await screen())
       check('B1 ran jj there, as its card asks (its Bash tool, in the slot)', !!(await until(() => fs.existsSync(marker), 180000)), await screen())

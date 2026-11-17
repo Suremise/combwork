@@ -28,14 +28,19 @@ export const ADVANCED: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.claude-code.trust.prompt.title', defaultMessage: 'Trust question', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.trust.prompt.desc', defaultMessage: "Claude Code's question before a folder's first session. Combwork shows the agent as waiting for you while it is on screen.", description: 'What the advanced setting "Trust question" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
-    default: 'trust this folder', // i18n-ignore: a CLI's recorded text (#367)
+    // HI-3335: 2.1.326 also asks, before its session starts, about each folder it is given with --add-dir (a slot's
+    // launch plugin, a reviewer's copies) outside every repository it trusts ("Adding a new directory:"); the answer holds
+    // for that session only, so it asks at each launch. Its folder question reads as before.
+    default: 'trust this folder|Adding a new directory:', // i18n-ignore: a CLI's recorded text (#367)
     flags: 'i',
     applies: 'now',
     samples: [
       { from: `${FIX}/advanced/trust-claude-2.1.296.txt`, version: '2.1.296', text: 'Yes, I trust this folder' }, // i18n-ignore: a CLI's recorded text (#367)
       // HI-2004: with TERM=xterm-256color (no WT_SESSION) its pointer is ❯; with neither, >. The question reads the same.
       { from: `${FIX}/advanced/trust-term-claude-2.1.312.txt`, version: '2.1.312', text: '❯ No, exit\n   Yes, I trust this folder' }, // i18n-ignore: a CLI's recorded text (#367)
-      { from: `${FIX}/advanced/trust-noterm-claude-2.1.312.txt`, version: '2.1.312', text: '> No, exit\n   Yes, I trust this folder' } // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/trust-noterm-claude-2.1.312.txt`, version: '2.1.312', text: '> No, exit\n   Yes, I trust this folder' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/trust-added-claude-2.1.326.txt`, version: '2.1.326', text: 'Adding a new directory:' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/trust-added-repo-claude-2.1.326.txt`, version: '2.1.326', text: 'Adding a new directory:' } // i18n-ignore: a CLI's recorded text (#367)
     ] // i18n-ignore: a CLI's recorded text (#367)
   },
   {

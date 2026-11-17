@@ -1475,13 +1475,13 @@ describe("a project agent's board", () => {
 
   it('reads only the latest comment, as far as it may read the card', async () => {
     const l = (await run(() => tasks.createTask({ title: 'Long', description: 'x'.repeat(5000), project: 'alpha' }, user))).number
-    expect(await run(() => tasks.latestComment(l, alphaAgent))).toEqual({ number: l, comment: null, commentId: null, sources: [] })
+    expect(await run(() => tasks.latestComment(l, alphaAgent))).toMatchObject({ number: l, comment: null, commentId: null, sources: [] })
     await run(() => tasks.commentTask(l, 'first', user))
     await run(() => tasks.commentTask(l, 'second', assistant))
     await run(() => tasks.commentTask(l, 'third, '.repeat(400), alphaAgent))
     const got = await run(() => tasks.latestComment(l, alphaAgent))
     // Its id and the card's comments' authors and times (HI-2402: where its attachments came), never their words.
-    expect(Object.keys(got)).toEqual(['number', 'comment', 'commentId', 'sources'])
+    expect(Object.keys(got)).toEqual(['number', 'comment', 'commentId', 'sources', 'attempt'])
     expect(got.sources).toHaveLength(3)
     expect(got.sources.every((x) => Object.keys(x).join() === 'id,by,at' && !!x.id)).toBe(true)
     expect(got.sources.at(-1)?.by).toBe('Agent 1 (alpha)')

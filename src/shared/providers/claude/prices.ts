@@ -6,12 +6,15 @@ import { baseModel } from './modelIds'
 const claude = (input: number, output: number, cachedInput = input / 10): ModelPrice => ({ input, output, cachedInput, cacheWrite: input * 1.25 })
 
 /** Claude Code's aliases, and the dated ids its transcripts show, map to the table's ids. */
-const CLAUDE_ALIASES: Record<string, string> = { fable: 'claude-fable-5-1', opus: 'claude-opus-5-5', sonnet: 'claude-sonnet-5-5', haiku: 'claude-haiku-5-5' }
+const CLAUDE_ALIASES: Record<string, string> = { fable: 'claude-fable-5-2', opus: 'claude-opus-5-5', sonnet: 'claude-sonnet-5-5', haiku: 'claude-haiku-5-5' }
 
 /** Claude Code's shipped API prices (prices.ts says how they are used), checked against Anthropic's model table. */
 export const CLAUDE_PRICES: ProviderPrices = {
-  checked: '2026-09-30',
+  checked: '2026-11-16',
   shipped: {
+    // Fable 5.2 (HI-3335): $8 in, $40 out, cache reads $0.20, Anthropic's model table, checked 16 Nov 2026. Claude Code
+    // 2.1.326 agrees (its tier_8_40_cache_read_0_20 table) and maps its fable alias to it.
+    'claude-fable-5-2': claude(8, 40, 0.2),
     'claude-fable-5-1': claude(10, 50, 0.25),
     'claude-fable-5': claude(10, 50),
     'claude-opus-5-5': claude(4, 20, 0.2),

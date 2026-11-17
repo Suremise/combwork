@@ -86,6 +86,8 @@
   "settings.accounts.setUpChecking": "Verificando…",
   "settings.accounts.setUpDone": "Configurada",
   "settings.accounts.setUpIn": "Ele abre na pasta de {project}, {folder}: responda à pergunta do {cli} para confiar nela.",
+  "settings.accounts.setUpInCopies": "Ele abre na pasta de worktrees deste espaço de trabalho, {folder}, onde ficam as cópias de revisão dos revisores: responda à pergunta do {cli} para confiar nela. Até lá, os revisores nesta conexão revisam sem cópia, pois o {cli} perguntaria sobre ela a cada início.",
+  "settings.accounts.reviewCopies": "cópias de revisão",
   "settings.accounts.setUpInWorkspace": "Ele abre na pasta deste espaço de trabalho, {folder}: responda à pergunta do {cli} para confiar nela e, com ela, em cada projeto dentro dela que não seja um repositório Git. Depois, cada repositório Git é perguntado na própria pasta.",
   "settings.accounts.setUpNeeded": "Precisa ser configurada",
   "settings.accounts.signIn": "Entrar",

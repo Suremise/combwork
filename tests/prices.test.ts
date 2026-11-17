@@ -39,6 +39,15 @@ describe('estimated cost', () => {
     expect(modelPrice('claude-code', 'claude-haiku-4-5')?.input).toBe(1)
     expect(modelPrice('claude-code', 'claude-unknown-9')).toBeNull()
   })
+  it('prices Fable 5.2, the fable alias in Claude Code 2.1.326, at $8 in, $40 out, $0.20 cache reads (HI-3335)', () => {
+    const fable52 = { input: 8, output: 40, cachedInput: 0.2, cacheWrite: 10 }
+    expect(modelPrice('claude-code', 'claude-fable-5-2')).toEqual(fable52)
+    expect(modelPrice('claude-code', 'claude-fable-5-2[1m]')).toEqual(fable52)
+    expect(modelPrice('claude-code', 'fable')).toEqual(fable52)
+    expect(unpricedModel('claude-code', 'claude-fable-5-2')).toBeNull()
+    // Fable 5.1, still served, keeps its own.
+    expect(modelPrice('claude-code', 'claude-fable-5-1')).toEqual({ input: 10, output: 50, cachedInput: 0.25, cacheWrite: 12.5 })
+  })
   it("prices Sonnet 5.5's cache reads at Anthropic's $0.10, 0.05× input (#435)", () => {
     // Anthropic's pricing page (platform.claude.com/docs/en/about-claude/pricing, 8 Oct 2026): $2 input, $2.50 five-minute
     // cache writes, $0.10 cache hits, $10 output per million.

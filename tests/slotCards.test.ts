@@ -858,11 +858,15 @@ describe("a builder's placement in its slot (#1438, HR1's round 2)", { timeout: 
   })
 
   describe("HI-2191: its builder unable to take a line: no delivery made or called off, said once; given once it can, woken by what ends each reason", () => {
-    /** A placement waiting for B1, which can't take a line for `why`: the pass that waits, and how often it said so. */
-    async function waiting(why: string) {
+    /**
+     * A placement waiting for B1, which can't take a line for `why`: the pass that waits, and how often it said so.
+     * `beforePlace`: run once the card is prepared, just before the placement starts.
+     */
+    async function waiting(why: string, beforePlace?: () => void) {
       const { e, n, slot, cycle, ws } = await prepared()
       state.live = { cwd: slot, sessionId: 's1' }
       state.busy = why
+      beforePlace?.()
       const placing = place(ws, e.project, e.wf, n, cycle, lease)
       const said = (): number => state.logged.filter((m) => /waits for its builder ⁨?B1⁩?, which can't take a line now/.test(m)).length
       await vi.waitFor(() => expect(said()).toBe(1), { timeout: HUNG_MS })
@@ -925,14 +929,25 @@ describe("a builder's placement in its slot (#1438, HR1's round 2)", { timeout: 
     })
 
     it('the user typing in its pane: woken once, at the end of the pause after they typed, with no status change', async () => {
-      state.quietAt = Date.now() + 1500
-      const { e, n, placing, said } = await waiting('the user has just typed in its terminal and may still be writing there')
-      await nothingYet(e, n, said)
-      // The pause ends: nothing else happens, and its own timer looks again.
-      const busyUntil = state.quietAt
-      state.busy = null
-      expect(Date.now()).toBeLessThan(busyUntil)
-      await givenOnce(e, n, placing)
+      // The pause's end is the test's to say (HI-3338): its timer is a fake one, from just before the placement starts
+      // (the card's preparation waits as it does). A real one raced the test's own setup, which on a slow runner outlasted
+      // the pause. Long enough that vi.waitFor's own advance of fake timers (its interval at each check) can't reach it.
+      const PAUSE_MS = 20_000
+      try {
+        const { e, n, placing, said } = await waiting('the user has just typed in its terminal and may still be writing there', () => {
+          vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+          state.quietAt = Date.now() + PAUSE_MS
+        })
+        await nothingYet(e, n, said)
+        // Free before the pause ends, which nothing tells: still not given, until its own timer looks again.
+        state.busy = null
+        await new Promise((r) => setImmediate(r))
+        expect(state.calls).toEqual([])
+        vi.advanceTimersByTime(PAUSE_MS + 100)
+        await givenOnce(e, n, placing)
+      } finally {
+        vi.useRealTimers()
+      }
     })
   })
 

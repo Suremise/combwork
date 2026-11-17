@@ -38,6 +38,8 @@ import { slotWorkspaces, workspacePortOf } from './platform/workspacePorts'
 import { isUnknown } from './platform/types'
 import type { WorkspaceFence, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort } from './platform/workspacePort'
 import { isPlatformId } from '../shared/platform/descriptors'
+import { signInConnections } from '../shared/providers'
+import type { ProviderAdapter } from './providers/types'
 
 const log = createLogger('copies')
 
@@ -182,6 +184,18 @@ export const copiesDirOf = (worktreesRoot: string, projectPath: string): string 
  */
 export function grantsCopies(g: { capable: boolean; on: boolean; reviews: boolean; inProjectFolder: boolean; assistant: boolean }): boolean {
   return g.capable && g.on && g.reviews && g.inProjectFolder && !g.assistant
+}
+
+/**
+ * Whether a CLI would ask about a folder given on its command line before it starts (HI-3337): its descriptor says it asks
+ * about one outside the folders it trusts (Claude Code 2.1.326), and its home (a connection's folder; null, the CLI's
+ * own) doesn't say it trusts this one. Can't be told counts as asking: a launch is never started into the question.
+ */
+export async function addedDirAsks(cli: Pick<ProviderAdapter, 'descriptor' | 'accounts'>, home: string | null, folder: string): Promise<boolean> {
+  if (!signInConnections(cli.descriptor)?.asksAddedDirs) return false
+  const read = cli.accounts?.addedDirTrusted?.bind(cli.accounts)
+  if (!read) return false
+  return (await read(home, folder).catch(() => null)) !== true
 }
 
 type Row = Record<string, string | number | null>
