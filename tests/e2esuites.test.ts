@@ -1563,8 +1563,8 @@ describe("answering Claude Code's trust question (lib.acceptClaudeTrust, #188)",
     const inv = async (ch: string, ...a: unknown[]) => {
       if (ch === 'pty:buffer') return typeof screen === 'function' ? screen(writes) : screen
       if (ch === 'session:live') return [{ projectPath: 'C:\\P', agentId: 'a1', status: writes.includes('\r') ? 'ready' : status }]
-      writes.push(String(a[1]))
-      return undefined
+      if (ch === 'pty:write') writes.push(String(a[1]))
+      return null
     }
     return { writes, run: async () => { const t = Date.now(); const r = await acceptClaudeTrust(inv, 'c:\\p', 'a1', 4000); return { r, ms: Date.now() - t } } }
   }
@@ -1605,7 +1605,7 @@ describe("answering Claude Code's trust question (lib.acceptClaudeTrust, #188)",
     expect(s.writes).toEqual(['\x1b[B', '\r'])
   })
 
-  it("answers each question a start asks (a worktree's folder, then its added plugin's), reading only what came after the last answer", async () => {
+  it("answers each question a start asks (its folder's, then an added folder's), in output that only grows", async () => {
     const writes: string[] = []
     // The terminal's output only grows: the folder's menu, once answered the added folder's, once answered the prompt.
     const buffer = () => {
@@ -1619,12 +1619,89 @@ describe("answering Claude Code's trust question (lib.acceptClaudeTrust, #188)",
     const inv = async (ch: string, ...a: unknown[]) => {
       if (ch === 'pty:buffer') return buffer()
       if (ch === 'session:live') return [{ projectPath: 'C:\\P', agentId: 'a1', status: 'starting' }]
-      writes.push(String(a[1]))
-      return undefined
+      if (ch === 'pty:write') writes.push(String(a[1]))
+      return null
     }
     expect(await acceptClaudeTrust(inv, 'c:\\p', 'a1', 4500)).toBe(true)
     // Each answered once: no Enter on the first menu's old "Yes" after it was taken, none on "No, exit".
     expect(writes).toEqual(['\x1b[B', '\r', '\x1b[B', '\r'])
+  })
+
+  it("reads each question from its screen as it shows now (HI-3335): a replay redrawn after a resize, a menu that takes no keys at first, an Enter it drops", async () => {
+    const { TerminalHistory } = await import('../src/main/terminalHistory')
+    // 2.1.326's added folder's menu as it wrote it: no pointer and its choices grey while it takes no keys, then
+    // "❯ No, exit", then after a Down "❯ Yes, add it" (a probe in its own test home).
+    const added = JSON.parse(readFileSync(join('tests', 'fixtures', 'advanced', 'trust-added-raw-claude-2.1.326.json'), 'utf8')) as { unarmed: string; armed: string; down: string }
+    // Its folder's question as Combwork's real replay keeps it (TerminalHistory, what pty:buffer returns).
+    const history = new TerminalHistory(120, 40, 100_000)
+    let size = { cols: 120, rows: 40 }
+    const folder = (on: 'No' | 'Yes') => `\x1b[2J\x1b[H\r\n──────\x1b[3;2HAccessing workspace:\x1b[5;2HC:\\work\\alpha\x1b[7;2HQuick safety check: Is this a project you created or one you trust?\x1b[16;2H${on === 'No' ? '❯' : ' '} No, exit\x1b[17;2H${on === 'Yes' ? '❯' : ' '} Yes, I trust this folder\x1b[19;2HEnter to confirm · Esc to cancel`
+    let state: 'folder' | 'added' | 'done' = 'folder'
+    let on: 'No' | 'Yes' = 'No'
+    let armed = false
+    let dropped = 0
+    const notOnYes: string[] = []
+    const writes: string[] = []
+    const replays: string[] = []
+    history.push(folder('No'))
+    // Claude Code: each key as its menu takes it (none before it is armed); the first Enter on "Yes, add it" is lost.
+    const key = (k: string) => {
+      writes.push(k)
+      if (state === 'done') return
+      if (k === '\r' && (on !== 'Yes' || (state === 'added' && !armed))) notOnYes.push(`${state} ${on} armed=${armed}`)
+      if (state === 'folder' && k === '\x1b[B') history.push(folder((on = 'Yes')))
+      else if (state === 'folder' && k === '\r' && on === 'Yes') {
+        // Answered: the window is resized as the next question comes, so the replay is the screen rebuilt, not the output.
+        state = 'added'
+        on = 'No'
+        size = { cols: 132, rows: 40 }
+        history.resized(size.cols, size.rows)
+        history.push(added.unarmed)
+        setTimeout(() => {
+          armed = true
+          history.push(added.armed)
+        }, 500)
+      } else if (state === 'added' && armed && k === '\x1b[B') history.push(((on = 'Yes'), added.down))
+      else if (state === 'added' && armed && k === '\r' && on === 'Yes' && dropped++ > 0) {
+        state = 'done'
+        history.push('\x1b[2J\x1b[H\x1b[2;2HClaude Code v2.1.326\x1b[20;1H❯ \x1b[22;3H⏸ manual mode on · ? for shortcuts')
+      }
+    }
+    const inv = async (ch: string, ...a: unknown[]) => {
+      if (ch === 'pty:buffer') {
+        const r = await history.replay()
+        replays.push(r)
+        return r
+      }
+      if (ch === 'pty:size') return size
+      if (ch === 'session:live') return [{ projectPath: 'C:\\P', agentId: 'a1', status: 'waiting' }]
+      if (ch === 'pty:write') key(String(a[1]))
+      return null
+    }
+    try {
+      expect(await acceptClaudeTrust(inv, 'c:\\p', 'a1', 20000)).toBe(true)
+    } finally {
+      history.dispose()
+    }
+    expect(state).toBe('done')
+    // Down and Enter for its folder; for the added folder nothing until it took keys, then Down, Enter (lost) and Enter.
+    expect(writes).toEqual(['\x1b[B', '\r', '\x1b[B', '\r', '\r'])
+    expect(notOnYes).toEqual([])
+    // The replay was rebuilt: a later one isn't the earlier one with more after it (what offsets into it relied on).
+    expect(replays.some((r, i) => i > 0 && !r.startsWith(replays[i - 1]))).toBe(true)
+  }, 30000)
+
+  it("trustQuestion reads 2.1.326's recorded added-folder menu: no choice while it takes no keys, then No, then Yes", async () => {
+    const { trustQuestion } = createRequire(import.meta.url)('./e2e/lib.cjs') as { trustQuestion: (screen: string) => { id: string; choice: string | null } | null }
+    const { renderScreen } = createRequire(import.meta.url)('./e2e/drawnScreen.cjs') as { renderScreen: (raw: string, cols: number, rows: number, o?: { unwrap?: boolean }) => Promise<string> }
+    const added = JSON.parse(readFileSync(join('tests', 'fixtures', 'advanced', 'trust-added-raw-claude-2.1.326.json'), 'utf8')) as { unarmed: string; armed: string; down: string }
+    const read = async (raw: string) => trustQuestion(await renderScreen(raw, 120, 40, { unwrap: true }))
+    const id = 'Adding a new directory: C:\\work\\beta This session hasn\'t worked here before. Is this a directory you created or one you trust? Claude Code\'ll be able to read, edit, and execute files here. Its skills, commands, and agents load and can run commands, and so can the git settings of its repository. Your answer holds for this session. Starting Claude Code in this directory and trusting it there lasts, and covers its whole repository or everything below it. Security guide'
+    expect(await read(added.unarmed)).toEqual({ id, choice: null })
+    expect(await read(added.unarmed + added.armed)).toEqual({ id, choice: 'No, exit' })
+    expect(await read(added.unarmed + added.armed + added.down)).toEqual({ id, choice: 'Yes, add it' })
+    // Its prompt drawn after it: no question.
+    expect(await read(`${added.unarmed}${added.armed}\x1b[2J\x1b[H❯ \x1b[3;3H⏸ manual mode on`)).toBeNull()
   })
 
   it("in a trusted folder it returns at once: Claude Code 2.1.289's mode footer, the old one, or Combwork's ready status", async () => {
@@ -1658,10 +1735,11 @@ describe("a restart's trust question (lib.acceptRelaunchTrust, #341)", () => {
     const writes: string[] = []
     const inv = async (ch: string, ...a: unknown[]) => {
       calls.push(ch)
-      if (ch === 'pty:buffer') return `Is this a project you trust? ${writes.length ? ' ' : '>'} No, exit ${writes.length ? '>' : ' '} Yes, I trust this folder`
+      // Once Enter is taken, its prompt (the question's answer is seen by its screen moving on, HI-3335).
+      if (ch === 'pty:buffer') return writes.includes('\r') ? '> ? for shortcuts' : `Is this a project you trust? ${writes.length ? ' ' : '>'} No, exit ${writes.length ? '>' : ' '} Yes, I trust this folder`
       if (ch === 'session:live') return []
-      writes.push(String(a[1]))
-      return undefined
+      if (ch === 'pty:write') writes.push(String(a[1]))
+      return null
     }
     return { calls, writes, inv }
   }
