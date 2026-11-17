@@ -11,7 +11,7 @@ import type { AdminSnippetFacts } from './hooks'
 import type { AgentLeftovers } from './agentProcesses'
 import type { FreshRow, FreshWhy } from './freshStarts'
 import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestionReply } from './antivirus'
-import type { ConnectionPatch, ConnectionsView } from './accounts'
+import type { ConnectionPatch, ConnectionsView, ConnectionTrust } from './accounts'
 import type { LaunchImpact } from './launchPolicy'
 import type { ServerModelsRead } from './serverConnection'
 import type { ContextCheck, LastCheck, ToolTest } from './serverDiagnostics'
@@ -1269,7 +1269,7 @@ export interface CombworkRequests {
   'connections:setModelOutput': (id: string, model: string, tokens: number | null) => void
   /** Opens the CLI on a connection (a server one, or a sign-in one: HI-1826), for its first-run screens; returns the terminal's key. */
   /** Its terminal's key, and where it opened (HI-1871: a workspace folder or a project's; absent, its own folder). */
-  'connections:setUp': (id: string) => { key: string; in?: { folder: string; project?: string; workspace?: true } }
+  'connections:setUp': (id: string) => { key: string; in?: ConnectionTrust['setUpIn'] }
   /** Reset Masking Data (the user confirmed it): fingerprints made again from the keys saved now; masking strict for good after. */
   'connections:resetMasking': () => void
   /** Takes on the login an account is now signed in as (its change answered). */

@@ -3,11 +3,13 @@
 // while one runs, the watches, and a workspace's choice of accounts. All in this file's temp folders: the CLI is never
 // run (its status is faked), nothing signs in, and no real home or accounts folder is touched.
 import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'fs'
-import { join, resolve } from 'path'
+import { basename, join, resolve } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { accountState, baseConnection, connectionReadiness, duplicateLogins, movedConnection, switchedOn, topOfOrder, workspaceAccounts } from '../src/shared/accounts'
 import type { Account } from '../src/shared/types'
+import { COPIES_REVIEW } from '../src/shared/advanced'
+import type { TrustTarget } from '../src/main/providers/types'
 import { tempDir } from './tempDir'
 
 /**
@@ -591,6 +593,32 @@ describe("whether a connection trusts a workspace's folders (HI-1870)", () => {
     }
   })
 
+  it("Claude Code: an --add-dir folder (HI-3337): review copies under a trusted worktrees folder are trusted, else not; no home, its own (CLAUDE_CONFIG_DIR)", async () => {
+    const claude = provider('claude-code').accounts!
+    const root = join(base, 'trust-added', 'ws.worktrees')
+    const copies = join(root, 'alpha', 'copies')
+    mkdirSync(copies, { recursive: true })
+    const entry = (folder: string) => ({ projects: { [realpathSync.native(folder).replace(/\\/g, '/')]: { hasTrustDialogAccepted: true } } })
+    expect(await claude.addedDirTrusted!(trustHome('added-root', JSON.stringify(entry(root))), copies)).toBe(true)
+    expect(await claude.addedDirTrusted!(trustHome('added-none', JSON.stringify({ projects: {} })), copies)).toBe(false)
+    expect(await claude.addedDirTrusted!(trustHome('added-broken', '{'), copies)).toBeNull()
+    // A folder that isn't there can't be told (never trusted on a guess).
+    expect(await claude.addedDirTrusted!(trustHome('added-gone', JSON.stringify(entry(root))), join(root, 'gone'))).toBeNull()
+    const own = trustHome('added-own', JSON.stringify(entry(root)))
+    vi.stubEnv('CLAUDE_CONFIG_DIR', own)
+    try {
+      expect(await claude.addedDirTrusted!(null, copies)).toBe(true)
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('the worktrees folder as a target for review copies (HI-3337): plain, made if not there yet, its name the project', async () => {
+    const root = join(base, 'trust-copies', 'ws.worktrees')
+    const [got] = await accounts.trustTargets([{ name: 'ws.worktrees', path: root, copies: true }])
+    expect(got).toMatchObject({ project: 'ws.worktrees', root: realpathSync.native(root), git: false, copies: true })
+  })
+
   it("finds each project's folder as the CLIs look it up: a worktree project's main repository root, which covers its slots", async () => {
     const { execFileSync } = await import('child_process')
     const g = (cwd: string, ...a: string[]): void => void execFileSync('git', a, { cwd })
@@ -660,6 +688,14 @@ describe("where Set Up asks a CLI's trust question (HI-1871)", () => {
     // Mixed: the workspace folder first, for the plain one; once it's trusted, the Git roots left, one at a time.
     expect(accounts.chooseSetUpTarget(true, ws, [cli, alpha, apiary])).toEqual({ folder: ws, workspace: true })
     expect(accounts.chooseSetUpTarget(true, ws, [cli, apiary])).toEqual({ folder: cli.folder, project: 'cli' })
+  })
+
+  it("the worktrees folder for review copies (HI-3337): asked last, at its own folder, said as the copies'", () => {
+    const copies = { project: 'ws.worktrees', folder: 'C:\\work\\ws.worktrees', git: false, copies: true as const }
+    // A plain project still pending: the workspace folder first (the worktrees folder is beside it, not inside).
+    expect(accounts.chooseSetUpTarget(true, ws, [alpha, copies])).toEqual({ folder: ws, workspace: true })
+    expect(accounts.chooseSetUpTarget(true, ws, [cli, copies])).toEqual({ folder: cli.folder, project: 'cli' })
+    expect(accounts.chooseSetUpTarget(true, ws, [copies])).toEqual({ folder: copies.folder, project: 'ws.worktrees', copies: true })
   })
 
   it("a CLI whose trust isn't inherited (Codex): each pending root in turn, Git or not; nothing pending: none", () => {
@@ -965,14 +1001,14 @@ describe("a workspace's accounts", () => {
       const names = ['alpha', 'beta', 'gamma']
       const folders = names.map((n) => join(wsPath, n))
       // Each trust read held until the test answers it: how many projects it was asked about, and its answer.
-      let held: { home: string; projects: number; answer: (v: (boolean | null | { at: string })[]) => void }[] = []
+      let held: { home: string; projects: number; targets: readonly TrustTarget[]; answer: (v: (boolean | null | { at: string })[]) => void }[] = []
       let spy: ReturnType<typeof vi.spyOn>
       let a: Account
       const row = () => run(() => accounts.accountsView()).connections.find((c) => c.id === a.id)!
       // A project's config with one agent, and an id of its own: one written without is given its id by Combwork whenever it
       // next reads the ids, in temp files and a .bak beside it, and a folder removed while that lands is found not empty
       // (HI-2060).
-      const writeProject = (i: number, agent: { provider: string; connection?: string }): void => {
+      const writeProject = (i: number, agent: { provider: string; connection?: string; workflowRole?: string }): void => {
         mkdirSync(join(folders[i], '.combwork'), { recursive: true })
         writeFileSync(join(folders[i], '.combwork', 'project.json'), JSON.stringify({ version: 2, id: `p-2060000000${i}`, agents: [{ id: `a-${i}`, name: `Agent ${i}`, ...agent }] }))
       }
@@ -997,7 +1033,7 @@ describe("a workspace's accounts", () => {
       const alphaConnection = (info: Awaited<ReturnType<typeof w.refresh>>) => info.projects.find((p) => p.name === 'alpha')?.agents[0]?.connection
       beforeEach(async () => {
         held = []
-        spy = vi.spyOn(provider('claude-code').accounts!, 'connectionTrusts').mockImplementation((dir, targets) => new Promise((answer) => held.push({ home: dir, projects: targets.length, answer })))
+        spy = vi.spyOn(provider('claude-code').accounts!, 'connectionTrusts').mockImplementation((dir, targets) => new Promise((answer) => held.push({ home: dir, projects: targets.length, targets, answer })))
         a = await accounts.addAccount('claude-code', 'Trusting')
         writeFileSync(join(folderOf(a), '.claude.json'), JSON.stringify({ hasCompletedOnboarding: true }))
         await projectsNow(1)
@@ -1033,6 +1069,32 @@ describe("a workspace's accounts", () => {
         await vi.waitFor(() => expect(held.filter((h) => h.home === folderOf(other)).map((h) => h.projects)).toEqual([1]), { timeout: HUNG_MS })
         for (const h of held.filter((x) => x.home === folderOf(other))) h.answer([true])
         await run(() => accounts.setAccountOn(other.id, false))
+      })
+
+      it('a reviewer on it adds the worktrees folder, for its review copies (HI-3337): named as the copies, Set Up asked there', async () => {
+        const mine = () => held.filter((h) => h.home === folderOf(a))
+        mine()[0].answer([true, true])
+        await vi.waitFor(() => expect(row().trust?.checking).toBeUndefined(), { timeout: HUNG_MS })
+        writeProject(0, { provider: 'claude-code', workflowRole: 'reviewer' })
+        await refreshedTo((info) => info.projects.find((p) => p.name === 'alpha')?.agents[0]?.workflowRole === 'reviewer')
+        row()
+        await vi.waitFor(() => expect(mine().at(-1)!.projects).toBe(3), { timeout: HUNG_MS })
+        const last = mine().at(-1)!
+        expect(last.targets[2]).toMatchObject({ root: realpathSync.native(w.worktreesRoot), git: false, copies: true })
+        last.answer([true, true, false])
+        await vi.waitFor(() => expect(row().trust?.pending).toEqual([{ project: basename(w.worktreesRoot), folder: realpathSync.native(w.worktreesRoot), git: false, copies: true }]), { timeout: HUNG_MS })
+        expect(row().trust?.setUpIn).toEqual({ folder: realpathSync.native(w.worktreesRoot), project: basename(w.worktreesRoot), copies: true })
+        // Review copies off (Settings → Advanced): no folder to trust for them.
+        await advanced.set(COPIES_REVIEW, false)
+        try {
+          row()
+          await vi.waitFor(() => expect(mine().at(-1)!.projects).toBe(2), { timeout: HUNG_MS })
+        } finally {
+          await advanced.set(COPIES_REVIEW, null)
+        }
+        for (const h of held) h.answer([true, true, true])
+        writeProject(0, { provider: 'claude-code' })
+        await refreshedTo((info) => info.projects.find((p) => p.name === 'alpha')?.agents[0]?.workflowRole === undefined)
       })
 
       it("follows the connection a project's agent would launch on now: reassigned, the project moves to the other's count; the order changed, the same (HR3, HI-1871)", async () => {

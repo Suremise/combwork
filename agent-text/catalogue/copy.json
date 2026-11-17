@@ -175,6 +175,10 @@
     "text": "{card}'s review by {agent} has waited {minutes} min for a review copy: {why}.",
     "note": "Why a card in Review is stalled (HI-1764), in a lane watch and the Agent API's stalled: its reviewer is kept from reviewing. {minutes} is whole minutes."
   },
+  "copy.review.untrusted": {
+    "text": "your CLI doesn't trust {folder} yet; ask the user to trust it with Set Up in Settings → Accounts & Connections",
+    "note": "Why a reviewer gets no review copy (HI-3337): its CLI (Claude Code 2.1.326) asks about the review-copies folder at each start until its connection trusts the workspace's worktrees folder ({folder}), so Combwork withheld it. The end of copy.review.none."
+  },
   "copy.review.waiting": {
     "text": "Waiting for a review copy ({why}): Combwork tells you when one is ready, with its folder. Meanwhile git can show the submission from where you are.",
     "note": "Start review's reply while no review copy is free yet. {why} is why (copy.inUse.*, copy.refusal.*)."

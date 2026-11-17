@@ -5,7 +5,7 @@
 // leasing one again, a resubmission's new revision, and a review waiting while every copy is in use, then told once it
 // has one. A real CopyPool on a real combwork.db and git repository; conditions, never time.
 import { spawn as nodeSpawn } from 'child_process'
-import { mkdirSync, readFileSync } from 'fs'
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -35,7 +35,7 @@ const { claudeCode } = await import('../src/main/providers/claude/adapter')
 const { codex } = await import('../src/main/providers/codex/adapter')
 const { copilot } = await import('../src/main/providers/copilot/adapter')
 const { boardFile, closeBoard, workspaceDb } = await import('../src/main/boardStore')
-const { COPIES_DIR, CopyPool, CopyStore, copiesDirOf, grantsCopies } = await import('../src/main/copies')
+const { COPIES_DIR, CopyPool, CopyStore, addedDirAsks, copiesDirOf, grantsCopies } = await import('../src/main/copies')
 const { fileSlotConn } = await import('../src/main/slots')
 const { BoundedLog, execCommand, FILE_IO } = await import('../src/main/workflow/queueChecks')
 const { COPY_WAIT_STALL_MS, copiesInUseText, copyWaitStall, ReviewCopies, reviewCopyText, tellReviewer } = await import('../src/main/reviewCopies')
@@ -85,6 +85,31 @@ describe("the grant of the project's copies folder (extraDirs)", () => {
     expect(grant('reviewer', { assistant: true })).toBe(false)
     expect(grant('reviewer', { capable: false })).toBe(false)
     expect(grant('reviewer', { on: false })).toBe(false)
+  })
+
+  // HI-3337: Claude Code 2.1.326 asks about an --add-dir folder outside every folder it trusts at each start, for that
+  // session only (tests/fixtures/advanced/trust-added-claude-2.1.326.txt): withheld until its home trusts it, never
+  // started into the question; the other CLIs never ask, so they are always given it.
+  it("is withheld where the CLI would ask about it (HI-3337): Claude Code until its home trusts the worktrees folder; never Codex's or Copilot's", async () => {
+    const root = join(base, 'asks', 'ws.worktrees')
+    const copies = join(root, 'proj', COPIES_DIR)
+    mkdirSync(copies, { recursive: true })
+    const home = (name: string, trusted: string[]): string => {
+      const dir = join(base, 'asks', name)
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(join(dir, '.claude.json'), JSON.stringify({ projects: Object.fromEntries(trusted.map((f) => [realpathSync.native(f).replace(/\\/g, '/'), { hasTrustDialogAccepted: true }])) }))
+      return dir
+    }
+    expect(await addedDirAsks(claudeCode, home('none', []), copies)).toBe(true)
+    expect(await addedDirAsks(claudeCode, home('root', [root]), copies)).toBe(false)
+    expect(await addedDirAsks(claudeCode, home('copies', [copies]), copies)).toBe(false)
+    // A sibling folder trusted covers nothing here; an unreadable home counts as asking.
+    expect(await addedDirAsks(claudeCode, home('other', [join(base, 'asks', 'none')]), copies)).toBe(true)
+    const broken = join(base, 'asks', 'broken')
+    mkdirSync(broken, { recursive: true })
+    writeFileSync(join(broken, '.claude.json'), '{')
+    expect(await addedDirAsks(claudeCode, broken, copies)).toBe(true)
+    for (const cli of [codex, copilot]) expect(await addedDirAsks(cli, home('none', []), copies), cli.id).toBe(false)
   })
 
   it('is one fixed folder per project, beside its slots', () => {

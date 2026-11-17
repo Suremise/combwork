@@ -84,10 +84,12 @@ interface CombworkMessageValues {
   'settings.accounts.renameTitle': { name: string | number }
   'settings.accounts.resetsAt': { time: string | number }
   'settings.accounts.resetsOn': { when: string | number }
+  'settings.accounts.reviewCopies': undefined
   'settings.accounts.sameLoginAccount': { names: string | number }
   'settings.accounts.setUpChecking': undefined
   'settings.accounts.setUpDone': undefined
   'settings.accounts.setUpIn': { project: string | number; folder: string | number; cli: string | number }
+  'settings.accounts.setUpInCopies': { folder: string | number; cli: string | number }
   'settings.accounts.setUpInWorkspace': { folder: string | number; cli: string | number }
   'settings.accounts.setUpNeeded': undefined
   'settings.accounts.signIn': undefined

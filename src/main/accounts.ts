@@ -15,6 +15,8 @@ import { localProfileInUse } from './profileFolders'
 import { agentProvider, extraArgsProblem, isProviderEnabled, modeOption, providerDescriptor, PROVIDERS, signInConnections } from '../shared/providers'
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
 import { advanced } from './advanced'
+import { COPIES_REVIEW } from '../shared/advanced'
+import { agentWorkflowRole, reviewsWork } from '../shared/workflow/roles'
 import { localLimitsTest } from './localLimitsTest'
 import { config } from './config'
 import { emit, onCombworkEvent } from './events'
@@ -1046,6 +1048,8 @@ const GIT_TRUST_MS = 10_000
 /** A project's folder for the trust check (HI-1870): its name, where Set Up opens, and how the CLIs look it up. */
 interface ProjectTarget extends TrustTarget {
   project: string
+  /** The workspace's worktrees folder, for its reviewers' review copies (HI-3337): a plain folder, never Git. */
+  copies?: true
 }
 
 /**
@@ -1054,7 +1058,7 @@ interface ProjectTarget extends TrustTarget {
  * made from it (probed: Claude Code 2.1.311, Codex 0.164.0; a worktree's own entry covers only itself), or a project
  * without Git's own real path. Read off main's thread (git's worker, async file calls).
  */
-export function trustTargets(projects: readonly { name: string; path: string }[]): Promise<ProjectTarget[]> {
+export function trustTargets(projects: Projects): Promise<ProjectTarget[]> {
   // One resolution per project set at a time, shared by every connection and window asking for it.
   const sig = JSON.stringify(projects)
   const under = targetsInFlight.get(sig)
@@ -1083,7 +1087,12 @@ async function targetSlot<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 /** One project's folder for the trust check (trustTargets). */
-async function resolveTarget(p: { name: string; path: string }): Promise<ProjectTarget> {
+async function resolveTarget(p: Projects[number]): Promise<ProjectTarget> {
+  // The worktrees folder (HI-3337): a plain folder Set Up opens in, so made if there isn't one yet (Combwork's own).
+  if (p.copies) {
+    const real = await mkdir(p.path, { recursive: true }).then(() => realpath(p.path)).catch(() => null)
+    return { project: p.name, root: real, git: false, short: false, folder: real, copies: true }
+  }
   const real = await realpath(p.path).catch(() => null)
   // An 8.3 path (a `~N` part its long form doesn't have): Claude Code doesn't expand it.
   const short = /~\d/.test(p.path) && !!real && real.toLowerCase() !== resolve(p.path).toLowerCase()
@@ -1101,9 +1110,10 @@ async function resolveTarget(p: { name: string; path: string }): Promise<Project
 const trustKey = (id: string, ws: string): string => `${id}|${ws.toLowerCase()}`
 
 /** A folder still to trust: its project, where it is asked, and whether it's a Git root (HI-2520: no inherited trust then). */
-type PendingTrust = { project: string; folder: string; git: boolean }
+type PendingTrust = { project: string; folder: string; git: boolean; copies?: true }
 type TrustAnswer = { pending: PendingTrust[]; unknown: boolean }
-type Projects = { name: string; path: string }[]
+/** The folders a connection would be used in; `copies`: the worktrees folder its reviewers' review copies are in (HI-3337). */
+type Projects = { name: string; path: string; copies?: true }[]
 
 /**
  * A connection's trust of one workspace's projects (HI-1870 round 3), per `<id>|<workspace>`. At most one read runs; a
@@ -1199,7 +1209,7 @@ async function readTrustOnce(id: string, projects: Projects): Promise<TrustAnswe
   const askAt = (t: ProjectTarget, r: TrustReading): string | null => (r === false ? t.root : r && typeof r === 'object' ? r.at : null)
   return { pending: targets.flatMap((t, i) => {
     const at = askAt(t, got[i])
-    return at ? [{ project: t.project, folder: at, git: t.git }] : []
+    return at ? [{ project: t.project, folder: at, git: t.git, ...(t.copies ? { copies: true as const } : {}) }] : []
   }), unknown: got.some((x) => x === null) }
 }
 
@@ -1278,7 +1288,7 @@ export function chooseSetUpTarget(inherits: boolean, ws: string | null | undefin
   const inside = (folder: string): boolean => !!ws && (folder + sep).toLowerCase().startsWith((resolve(ws) + sep).toLowerCase())
   // Only a pending folder without Git: the workspace's trust covers no repository, so asking there again would loop.
   if (ws && inherits && pending.some((p) => !p.git && inside(p.folder))) return { folder: resolve(ws), workspace: true }
-  return { folder: pending[0].folder, project: pending[0].project }
+  return { folder: pending[0].folder, project: pending[0].project, ...(pending[0].copies ? { copies: true as const } : {}) }
 }
 
 /** Whether a connection is on in this window's workspace: its trust of the workspace's folders counts then. */
@@ -1290,7 +1300,7 @@ const onHere = (a: Account): boolean => !!workspace.path && !!workspaceAccounts(
  * that's on), is this one, and the Assistant's home when the Assistant's is. "Needs set up" counts only these.
  * Resolved as sessions.ts launches (HI-2162): an agent names a connection (HI-2108), whose account is the one counted.
  */
-const projectsFor = (a: Account): { name: string; path: string }[] => {
+const projectsFor = (a: Account): Projects => {
   const info = workspace.info()
   const cfg = workspace.config
   const accounts = allAccounts()
@@ -1302,11 +1312,21 @@ const projectsFor = (a: Account): { name: string; path: string }[] => {
       const r = resolveAgentConnection(cfg, cli, ag.connection, accounts, connections)
       return r.ok && r.account.id === a.id
     })
-  const projects = (info?.projects ?? []).filter((p) => usedBy(p, (ag) => agentProvider(ag, config.settings))).map((p) => ({ name: p.name, path: p.path }))
+  const used = (info?.projects ?? []).filter((p) => usedBy(p, (ag) => agentProvider(ag, config.settings)))
+  const projects: Projects = used.map((p) => ({ name: p.name, path: p.path }))
   const home = info?.assistant
   // An Assistant that names no CLI yet: the first usable account's, as its launch (decision A).
   const assistantCli = (ag: AgentInfo): ProviderId => launchCli(ag, cfg, true)
-  return home && usedBy(home, assistantCli) ? [...projects, { name: home.name, path: home.path }] : projects
+  const all = home && usedBy(home, assistantCli) ? [...projects, { name: home.name, path: home.path }] : projects
+  // HI-3337: a CLI that asks about an added folder at every start needs the review copies' folder trusted where it
+  // would be granted (a reviewer of a project, on this connection): one answer at the worktrees folder covers them all.
+  const onThis = (ag: AgentInfo): boolean => {
+    const r = resolveAgentConnection(cfg, a.provider, ag.connection, accounts, connections)
+    return r.ok && r.account.id === a.id
+  }
+  const reviewers = used.some((p) => p.agents.some((ag) => agentProvider(ag, config.settings) === a.provider && reviewsWork(agentWorkflowRole(ag)) && onThis(ag)))
+  const asks = !!signInConnections(providerDescriptor(a.provider))?.asksAddedDirs && !!providerDescriptor(a.provider).capabilities.session?.extraDirs
+  return asks && reviewers && advanced.get(COPIES_REVIEW) !== false && workspace.path ? [...all, { name: basename(workspace.worktreesRoot), path: workspace.worktreesRoot, copies: true }] : all
 }
 
 /** Reads a connection's set-up state again, telling the windows when it changed. */

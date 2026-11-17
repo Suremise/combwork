@@ -295,6 +295,13 @@ export interface SignInConnections {
    * main root).
    */
   trustInherits?: true
+  /**
+   * HI-3337: before each session the CLI asks about every folder on its command line (`extraDirs`) outside the folders it
+   * trusts, the answer lasting that session only (Claude Code 2.1.326, HI-3335). A reviewer's review-copies folder is then
+   * a folder to trust: Set Up asks for it at the workspace's worktrees folder, and until it is trusted a launch isn't
+   * granted it (never started into the question).
+   */
+  asksAddedDirs?: true
   server?: ServerCaps
 }
 

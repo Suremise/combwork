@@ -86,6 +86,8 @@
   "settings.accounts.setUpChecking": "正在检查…",
   "settings.accounts.setUpDone": "已完成初始设置",
   "settings.accounts.setUpIn": "它会在 {project} 的文件夹 {folder} 中打开：回答 {cli} 的问题以信任它。",
+  "settings.accounts.setUpInCopies": "它会在此工作区的 worktree 文件夹 {folder} 中打开，评审者的评审副本就在这里：回答 {cli} 的问题以信任它。在此之前，此连接上的评审者将不使用副本进行评审，因为 {cli} 每次启动都会询问。",
+  "settings.accounts.reviewCopies": "评审副本",
   "settings.accounts.setUpInWorkspace": "它会在此工作区的文件夹 {folder} 中打开：回答 {cli} 的问题以信任它，其中不是 Git 仓库的项目也会一并受信任。之后会在每个 Git 仓库自己的文件夹中再询问。",
   "settings.accounts.setUpNeeded": "需要初始设置",
   "settings.accounts.signIn": "登录",

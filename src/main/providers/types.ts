@@ -913,6 +913,12 @@ export interface ProviderAccountsPart {
    * read, a folder Combwork couldn't resolve). Absent: the CLI keeps no trust to tell.
    */
   connectionTrusts?(home: string, targets: readonly TrustTarget[]): Promise<TrustReading[]>
+  /**
+   * Whether the CLI on a home (a connection's folder; null, the CLI's own) trusts a plain folder it would be given on its
+   * command line (HI-3337, `capabilities.connections.asksAddedDirs`), as its own files say, read only: true, false, or
+   * null when it can't be told. Absent: the CLI never asks about such a folder.
+   */
+  addedDirTrusted?(home: string | null, folder: string): Promise<boolean | null>
   /** Where a shared folder of an account (capabilities.connections.shared) links to: that folder of the CLI's own home. */
   accountSharedTarget(name: string): string
   /** Whether a file in an account's folder is one that changes when the CLI signs in or out there: watched, never read. */
