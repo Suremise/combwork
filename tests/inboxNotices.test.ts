@@ -116,11 +116,31 @@ describe('notices in the hook replies (#650)', () => {
     s.notify = () => {}
     s.setInbox = () => {}
     initInboxNotices()
+    // Each session record write followed, to be awaited (HI-3338): a Stop's turn end writes its record unawaited (so a
+    // prompt meanwhile isn't overwritten), and under load the last test's landed after the file had closed the workspace
+    // and its temp folder had gone: on a lease, opening a new board there, its logs reached vitest after teardown
+    // ("Closing rpc while onUserConsoleLog was pending"), as HI-3330's did.
+    const upsert = bound(w, w.upsertSession)
+    vi.spyOn(w, 'upsertSession').mockImplementation((...a) => {
+      const write = upsert(...a)
+      writes.add(write)
+      void write.catch(() => undefined).finally(() => writes.delete(write))
+      return write
+    })
   })
-  afterEach(() => deliveries.settledForTests())
+  const writes = new Set<Promise<unknown>>()
+  /** The session record writes started so far have ended, those they lead to too. */
+  const recordsWritten = async (): Promise<void> => {
+    while (writes.size) await Promise.allSettled([...writes])
+  }
+  afterEach(async () => {
+    await recordsWritten()
+    await deliveries.settledForTests()
+  })
   afterAll(async () => {
     sessions.inboxNotice = null
     s.live.clear()
+    await recordsWritten()
     await disposeWorkspaceService(w)
   })
 
