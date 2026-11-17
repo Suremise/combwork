@@ -1094,16 +1094,16 @@ describe("a workspace's accounts", () => {
         }
         // A Claude Code before 2.1.326 never asks about the folder (HI-3342): none to trust for them either; 2.1.326 does.
         // Each read answered first, so the next is a read of its own rather than joining it.
-        const info = providerService.info
+        const cliInfo = providerService.info
         try {
-          for (const [version, projects] of [['2.1.326', 3], ['2.1.325', 2], ['2.1.326', 3]] as const) {
+          for (const [version, count] of [['2.1.326', 3], ['2.1.325', 2], ['2.1.326', 3]] as const) {
             mine().at(-1)!.answer(Array(mine().at(-1)!.projects).fill(true))
-            providerService.info = ((id: string) => ({ ...info(id as never), version })) as never
+            providerService.info = ((id: string) => ({ ...cliInfo(id as never), version })) as never
             row()
-            await vi.waitFor(() => expect(mine().at(-1)!.projects).toBe(projects), { timeout: HUNG_MS })
+            await vi.waitFor(() => expect(mine().at(-1)!.projects).toBe(count), { timeout: HUNG_MS })
           }
         } finally {
-          providerService.info = info
+          providerService.info = cliInfo
         }
         for (const h of held) h.answer([true, true, true])
         writeProject(0, { provider: 'claude-code' })
