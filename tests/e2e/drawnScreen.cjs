@@ -3,14 +3,21 @@
 // plain text ("Your card wa ch has ended"), though its input holds the whole prompt (HI-3210).
 const { Terminal } = require('@xterm/headless')
 
-/** The visible lines of `raw` (a pty's output, pty:buffer) drawn at cols × rows, top to bottom, without trailing blanks. */
-async function renderScreen(raw, cols, rows) {
+/**
+ * The visible lines of `raw` (a pty's output, pty:buffer) drawn at cols × rows, top to bottom, without trailing blanks.
+ * `unwrap`: a row the terminal wrapped onto (a long line's next row) joins the row before it, so its words stay whole.
+ */
+async function renderScreen(raw, cols, rows, { unwrap = false } = {}) {
   const term = new Terminal({ cols: Math.max(2, Math.floor(cols) || 120), rows: Math.max(2, Math.floor(rows) || 30), scrollback: 1, allowProposedApi: true })
   try {
     await new Promise((resolve) => term.write(String(raw ?? ''), resolve))
     const buf = term.buffer.active
     const lines = []
-    for (let i = 0; i < term.rows; i++) lines.push(buf.getLine(buf.viewportY + i)?.translateToString(true) ?? '')
+    for (let i = 0; i < term.rows; i++) {
+      const line = buf.getLine(buf.viewportY + i)
+      if (unwrap && line?.isWrapped && lines.length) lines[lines.length - 1] += line.translateToString(true)
+      else lines.push(line?.translateToString(true) ?? '')
+    }
     return lines.join('\n')
   } finally {
     term.dispose()

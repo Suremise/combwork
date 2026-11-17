@@ -5586,7 +5586,7 @@ async function combworkStartedLaneCard(c, key, n) {
       if (/Do you trust the files in this folder/i.test(tail) || (/trust this folder/i.test(tail) && c.provider === 'codex')) {
         await c.inv('pty:write', ptyKey, '\r')
         trusted.add(live.runId)
-      } else if (/trust this folder/i.test(tail) && (await lib.acceptClaudeTrust(c.inv, c.alpha, agent.id, 10000))) trusted.add(live.runId)
+      } else if (lib.CLAUDE_TRUST.test(tail) && (await lib.acceptClaudeTrust(c.inv, c.alpha, agent.id, 10000))) trusted.add(live.runId)
     }
     return laneStartLanded({ column: (await c.api('GET', `/v1/tasks/${n}`)).body?.column, live, deliveries: await c.deliveries(key), shown }, n)
   }

@@ -756,4 +756,18 @@ describe("a CLI's start, read from its screen (#679)", () => {
     expect(startupScreen(state('ready'), trust, claude)).toBeNull()
     expect(startupWatched(state('starting'), {})).toBe(false)
   })
+
+  it("Claude Code 2.1.326's question about an added folder makes its start wait, after its folder question too (HI-3335)", async () => {
+    const { startupScreen } = await import('../src/main/hookStatus')
+    const { advancedDef } = await import('../src/shared/advanced')
+    const { readFileSync } = await import('fs')
+    const d = advancedDef('claude-code.trust.prompt')!
+    const real = { readyOutput: null, startupQuestion: new RegExp(d.default as string, d.flags) }
+    const screen = (name: string) => readFileSync(`tests/fixtures/advanced/${name}`, 'utf8').replace(/\r\n/g, '\n')
+    // Both were drawn before its SessionStart hook (probes in 2.1.326's own test homes): it is still starting.
+    for (const f of ['trust-added-claude-2.1.326.txt', 'trust-added-repo-claude-2.1.326.txt']) expect(startupScreen(state('starting'), screen(f), real), f).toEqual({ asked: 'Adding a new directory:' })
+    expect(startupScreen(state('starting'), screen('trust-term-claude-2.1.312.txt'), real)).toEqual({ asked: 'trust this folder' })
+    // In a folder it doesn't trust it asks that first, then about the added one: still waiting (asked), never ready.
+    expect(startupScreen(state('waiting', { askedAtStart: true }), screen('trust-added-claude-2.1.326.txt'), real)).toBeNull()
+  })
 })
