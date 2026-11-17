@@ -335,18 +335,22 @@ const CLAUDE_HOMES = new WeakMap()
  * tests/fixtures/advanced/trust-entry-*), beside what the home's .claude.json has. Reviewcopies takes it away to test that.
  */
 function trustFakeWorktrees(home, ws) {
-  if (!home || !fs.existsSync(path.join(home, 'fake-trusted.json'))) return
+  if (home && fs.existsSync(path.join(home, 'fake-trusted.json'))) trustWorktrees(home, ws)
+}
+
+/**
+ * Records in a Claude Code home (its .claude.json) that it trusts the workspace's worktrees folder, as Set Up leaves it
+ * (HI-3337, HI-3342): its real path with forward slashes, the rest of the file kept. A file that isn't JSON throws rather
+ * than be written afresh (a real home's holds its sign-in and onboarding). Returns the folder's key.
+ */
+function trustWorktrees(home, ws) {
   fs.mkdirSync(`${ws}.worktrees`, { recursive: true })
   const key = fs.realpathSync.native(`${ws}.worktrees`).replace(/\\/g, '/')
   const file = path.join(home, '.claude.json')
-  let json = {}
-  try {
-    json = JSON.parse(fs.readFileSync(file, 'utf8'))
-  } catch {
-    // none yet, or not JSON: written afresh
-  }
+  const json = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {}
   json.projects = { ...json.projects, [key]: { ...json.projects?.[key], hasTrustDialogAccepted: true } }
-  fs.writeFileSync(file, JSON.stringify(json))
+  fs.writeFileSync(file, JSON.stringify(json, null, 2))
+  return key
 }
 
 /** Opens a workspace and waits until the window shows it (its name in the title), instead of a fixed wait. */
@@ -2224,4 +2228,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, CLAUDE_TRUST, trustQuestion, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }
+module.exports = { PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, trustWorktrees, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, CLAUDE_TRUST, trustQuestion, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }
