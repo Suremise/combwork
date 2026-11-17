@@ -56,11 +56,11 @@ describe('a Start whose card changes while its references are checked', () => {
       return { runId: `run-${launched.length}` } as never
     })
   })
-  afterEach(() => {
+  afterEach(async () => {
     release()
     gate.active = false
     vi.restoreAllMocks()
-    disposeWorkspaceService(w)
+    await disposeWorkspaceService(w)
   })
 
   /** Starts the card, changes it with `change` while its references are being checked, and lets the check go on. */
