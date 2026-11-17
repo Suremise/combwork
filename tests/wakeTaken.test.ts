@@ -129,14 +129,25 @@ describe("a wake's Enter again (#430)", () => {
     let tries = 0
     let enters = 0
     vi.spyOn(sessions, 'submitAgain').mockImplementation(() => (++tries > 3 ? (enters++, true) : false))
-    expect(await writer.confirmTaken(project, id, before, 'WAKE')).toBe(false)
-    expect(enters).toBe(1)
-    expect(marks).toEqual([{ line: 'WAKE', retried: true }])
-    // Never safe within the wait: no Enter again, and the mark says so.
-    marks.length = 0
-    vi.spyOn(sessions, 'submitAgain').mockReturnValue(false)
-    expect(await writer.confirmTaken(project, id, before, 'WAKE 2')).toBe(false)
-    expect(marks).toEqual([{ line: 'WAKE 2', retried: false }])
+    // The wait's clock is the test's (HI-3349): each look comes after a 250 ms pause, within a wait of 6 × 200 ms, and a
+    // real clock let a stalled runner spend the wait before the fourth look. Advanced well past the wait.
+    vi.useFakeTimers()
+    try {
+      const first = writer.confirmTaken(project, id, before, 'WAKE')
+      await vi.advanceTimersByTimeAsync(5_000)
+      expect(await first).toBe(false)
+      expect(enters).toBe(1)
+      expect(marks).toEqual([{ line: 'WAKE', retried: true }])
+      // Never safe within the wait: no Enter again, and the mark says so.
+      marks.length = 0
+      vi.spyOn(sessions, 'submitAgain').mockReturnValue(false)
+      const second = writer.confirmTaken(project, id, before, 'WAKE 2')
+      await vi.advanceTimersByTimeAsync(5_000)
+      expect(await second).toBe(false)
+      expect(marks).toEqual([{ line: 'WAKE 2', retried: false }])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('taken late, while it waited to press Enter again: nothing more', async () => {

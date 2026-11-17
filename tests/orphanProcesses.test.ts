@@ -154,7 +154,8 @@ describe('a look as the timer makes it', () => {
     host.processes = () => new Promise((r) => (release = r))
     const second = lookForTests()
     // Its names are being read: nothing told yet, however often the agent's hooks ask.
-    await vi.waitFor(() => expect(release).not.toBe(null))
+    // Bounded for a hung run (HI-3349), not Vitest's 1 s, which a loaded runner outlasts.
+    await vi.waitFor(() => expect(release).not.toBe(null), { timeout: 20_000 })
     expect(orphanLinesFor(launch.projectPath, 'a1')).toBe('')
     release!([proc(20, created)])
     await second

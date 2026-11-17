@@ -294,6 +294,7 @@ describe("a carried lease's end never stops an agent with work elsewhere (HI-173
     busy = false
     status()
     // Asked again just before (an await), then stopped.
-    await vi.waitFor(() => expect(stopped).toEqual(['b1:run-1']))
+    // Bounded for a hung run (HI-3349), not Vitest's 1 s, which a loaded runner outlasts.
+    await vi.waitFor(() => expect(stopped).toEqual(['b1:run-1']), { timeout: 20_000 })
   })
 })
