@@ -6,9 +6,13 @@
 // scripts/gitInventory.mjs prints the audit.
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 // @ts-expect-error: a plain .mjs module without types, shared with scripts/gitInventory.mjs
 import { audit, EDGES, JJ_EDGES, JJ_HOMES, modeDeclarations, NOT_PLATFORM, platformIdsIn, SEAMS, SWITCHES } from './gitAudit.mjs'
+
+// A bound for a hung test (HI-3349): each audit reads the whole source tree, and a full unit run on a loaded machine
+// took one 14.5 s of Vitest's 20 s default.
+vi.setConfig({ testTimeout: 60_000 })
 
 type Edge = { file: string; module: string; class: string; names?: string[]; op?: string; card?: string; why: string }
 type Audit = { found: unknown[]; unlisted: string[]; stale: string[]; extraNames: string[]; seams: string[]; switches: string[]; compat: string[]; jj: string[] }

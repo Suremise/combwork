@@ -36,6 +36,9 @@ import { ProgressStore } from '../src/main/progress'
 import { tempDir } from './tempDir'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 10000
+// A bound for a hung test (HI-3349): the typing cases retry on real timers, and a full unit run on a loaded machine took
+// one 13.3 s of Vitest's 20 s default. Those that state their own keep it.
+vi.setConfig({ testTimeout: 60_000 })
 
 type Suite = { name: string; needs?: string[]; serial?: string; noCombwork?: string }
 type Area = { paths: string[]; suites: string[] }

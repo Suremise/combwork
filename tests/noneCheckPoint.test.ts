@@ -157,13 +157,16 @@ describe("a None check's points, off main's thread (HI-2358)", () => {
     expect(x.snapshot).toContain('doc.md:')
     expect(y.snapshot).toContain('src/deep/b.ts:')
     const bounded = useBaselineWorker(bundle, { timeoutMs: 150 })
+    // The held one is sent with its 150 ms bound; the next, sent to a new worker once it times out, has room under load.
+    // Each read's bound is read as it is sent, so the first send gets 150 ms and every later one HUNG_MS (HI-3349): the
+    // bound raised by the test once both were queued raced the held one's 150 ms on a slow runner, and the next went with
+    // 150 ms too.
+    let sends = 0
+    Object.defineProperty(bounded, 'timeoutMs', { configurable: true, get: () => (sends++ === 0 ? 150 : HUNG_MS) })
     try {
       bounded.hold()
       const late = checkStart(forNone(p), logOf([]))
       const next = checkStart(forNone(q, ['src']), logOf([]))
-      // The held one is sent with its 150 ms bound; the next, sent to a new worker once it times out, has room under load.
-      await until(() => bounded.pending === 2)
-      bounded.timeoutMs = HUNG_MS
       expect((await late).revision).toBeNull()
       // The next check's point went to a new worker: its own answer, q's.
       expect((await next).revision).toBe(y.revision)

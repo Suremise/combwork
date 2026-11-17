@@ -27,7 +27,8 @@ import { boardFile } from '../src/main/boardStore'
 
 if (!jjExe) console.warn(`jjAdvancePreview.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
-const REAL_JJ_MS = 90_000
+// A hung test's bound: each runs many real jj and git commands, and a full unit run on a loaded machine took one 49 s (HI-3349).
+const REAL_JJ_MS = 150_000
 
 async function approved(w: World, title = 'jj work', file = 'work.txt') {
   const a = w.slots['slot-a']

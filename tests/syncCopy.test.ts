@@ -153,7 +153,9 @@ describe('syncCopy', () => {
 })
 
 describe('syncCopyNow (Windows ending the session)', () => {
-  const soon = (): number => Date.now() + 2000
+  // A deadline these copies of a few lines never need (HI-3349): 2 s was one a loaded runner could outlast, failing a
+  // copy that isn't timed here. The tests of a copy past its deadline give their own.
+  const soon = (): number => Date.now() + 20_000
   const temps = async (d: string): Promise<string[]> => (await readdir(d)).filter((f) => f.endsWith('.tmp'))
 
   it('copies a new file, appends what the source gained, and copies a rewritten one whole', async () => {

@@ -66,6 +66,8 @@ const trashed = (): string[] => {
   }
 }
 const inside = (dir: string): string[] => (existsSync(dir) ? readdirSync(dir) : [])
+/** Bounds a wait for a hung run (HI-3349): the Recycle Bin's move ends after the commit, in the background, and Vitest's default 1 s is a budget a loaded runner outlasts. */
+const HUNG_MS = 20_000
 
 describe('keeping files with a card (HI-1700)', () => {
   it("copies a file into the card's folder, named by its number, with a row; the same bytes again give the one kept", async () => {
@@ -134,10 +136,10 @@ describe('keeping files with a card (HI-1700)', () => {
     const [a] = (await inWorkspace(w, () => att.attachToCard(w, c, [{ data: new TextEncoder().encode('bye'), name: 'bye.txt' }], 'You'))).attachments
     await inWorkspace(w, () => att.removeCardAttachment(w, c, a.id))
     expect(rows(w, c)).toEqual([])
-    await expect.poll(() => trashed().some((t) => t.endsWith(a.file))).toBe(true)
+    await expect.poll(() => trashed().some((t) => t.endsWith(a.file)), { timeout: HUNG_MS }).toBe(true)
     // The removal's own folder goes after its file is in the Recycle Bin (finishTrash, after the commit): awaited, not
     // looked at once (HI-2362: under load the look came between the two).
-    await expect.poll(() => inside(join(root, 'p', '.combwork', 'attachments', 'cards', '.trash')), { timeout: 20_000 }).toEqual([])
+    await expect.poll(() => inside(join(root, 'p', '.combwork', 'attachments', 'cards', '.trash')), { timeout: HUNG_MS }).toEqual([])
   })
 })
 
@@ -281,7 +283,7 @@ describe('moving and deleting a card with attachments (HI-1700)', () => {
     // Through the board's move: the files follow the card.
     await inWorkspace(w, () => tasks.updateTask(c, { project: 'q' }, user))
     expect(readFileSync(to, 'utf8')).toBe('moving')
-    await expect.poll(() => existsSync(a.path)).toBe(false)
+    await expect.poll(() => existsSync(a.path), { timeout: HUNG_MS }).toBe(false)
     expect((await att.cardAttachments(w, c))[0].path).toBe(to)
   })
 
@@ -292,7 +294,7 @@ describe('moving and deleting a card with attachments (HI-1700)', () => {
     await inWorkspace(w, () => tasks.archiveTask(c, true))
     expect(existsSync(a.path)).toBe(true)
     await inWorkspace(w, () => tasks.deleteTask(c))
-    await expect.poll(() => existsSync(a.path)).toBe(false)
+    await expect.poll(() => existsSync(a.path), { timeout: HUNG_MS }).toBe(false)
     expect(trashed().some((t) => t.endsWith(`${sep}${c}`) || t.includes(`${sep}files`))).toBe(true)
   })
 })

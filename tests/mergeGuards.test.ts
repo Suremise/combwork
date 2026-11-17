@@ -45,6 +45,10 @@ const files = (d: string): AddedFile[] => {
   return r.files
 }
 
+// The longest a wait here waits: a bound for a hung run, never how long it should take (#570). Vitest's default 1 s is a
+// budget a loaded runner outlasts (HI-3349).
+const HUNG_MS = 30_000
+
 describe('the diff parser (recorded git 2.56.0 and jj 0.47.1 output)', () => {
   // The same change both tools describe: an added line, a deleted file, a binary change, a non-ASCII name with a space,
   // a CRLF file, a new file, a line without its final newline, a pure rename and an edited one.
@@ -221,7 +225,7 @@ describe('previews in their turn (HR2\'s round 1, finding 3)', () => {
     const a = schedulePreview('row-a', h.run('a1'))
     const b = schedulePreview('row-b', h.run('b1'))
     const c = schedulePreview('row-c', h.run('c1'))
-    await expect.poll(() => h.started).toEqual(['a1', 'b1'])
+    await expect.poll(() => h.started, { timeout: HUNG_MS }).toEqual(['a1', 'b1'])
     expect(previewsNow()).toEqual({ running: PREVIEWS_AT_ONCE, waiting: 1 })
     // Row c changes while it waits: its first never starts.
     const c2 = schedulePreview('row-c', h.run('c2'))
@@ -229,10 +233,10 @@ describe('previews in their turn (HR2\'s round 1, finding 3)', () => {
     // Row a changes while it reads: its first ends now, and the next in turn starts.
     const a2 = schedulePreview('row-a', h.run('a2'))
     expect(await a).toMatchObject({ incomplete: 'cancelled' })
-    await expect.poll(() => h.started).toEqual(['a1', 'b1', 'c2'])
+    await expect.poll(() => h.started, { timeout: HUNG_MS }).toEqual(['a1', 'b1', 'c2'])
     h.go.get('b1')!()
     expect(await b).toEqual({ count: 0, hits: [], files: 0 })
-    await expect.poll(() => h.started).toEqual(['a1', 'b1', 'c2', 'a2'])
+    await expect.poll(() => h.started, { timeout: HUNG_MS }).toEqual(['a1', 'b1', 'c2', 'a2'])
     // Row c closes: cancelled.
     cancelPreview('row-c')
     expect(await c2).toMatchObject({ incomplete: 'cancelled' })
@@ -308,8 +312,6 @@ describe('the example guard (HI-3284’s decision)', () => {
 
 describe('the worker', () => {
   const built = withGuardsWorker()
-  // The longest a wait here waits: a bound for a hung run, never how long it should take (#570).
-  const HUNG_MS = 30_000
 
   const limits = { timeoutMs: HUNG_MS, maxLines: 200_000 }
   const diff = fixture('git-2.56.0-added.diff')

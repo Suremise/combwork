@@ -75,8 +75,11 @@ function reapply(w: World, card: { id: number }, o: Partial<WorkflowOptions>): v
   w.store.tx((tx) => tx.append(card.id, { kind: 'Override', actor: 'user', source: 'recorded', ruleset: r.id, data: { rules: Object.keys(o).map((k) => `option.${k}`), move: APPLY_OPTIONS, by: 'user', reason: '' } } as never))
 }
 
-/** A hung test's bound, as jjCandidatesReal's (HI-2921): each runs many real jj and git commands, slow on a busy machine. */
-const REAL_JJ_MS = 60_000
+/**
+ * A hung test's bound, as jjCandidatesReal's (HI-2921): each runs many real jj and git commands, slow on a busy machine.
+ * Alone the slowest took 36 s, and a full unit run on a loaded machine took one past 60 s (HI-3349).
+ */
+const REAL_JJ_MS = 180_000
 
 describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_JJ.version}), HI-2871`, { timeout: REAL_JJ_MS }, () => {
   describe.each([true, false] as const)('colocated: %s', (colocated) => {
