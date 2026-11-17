@@ -90,7 +90,7 @@ describe('saving pane placements', () => {
     await inWorkspace(w, () => placePanes(alpha, 'grid6', [null, null, 'Two', null, 'One']))
     const before = (await view()).placement!
     expect(before.grid6).toEqual([null, null, 'Two', null, 'One'])
-    disposeWorkspaceService(w)
+    await disposeWorkspaceService(w)
     w = createWorkspaceService()
     await w.open(wsPath)
     expect((await w.projectConfig(alpha)).placement).toEqual(before)

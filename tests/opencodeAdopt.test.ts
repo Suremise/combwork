@@ -57,7 +57,7 @@ describe("adopting an OpenCode session Combwork didn't make (HI-2774)", () => {
   afterAll(async () => {
     sessions.writeAdopted = realWrite
     await history.historyWorkerForTests(null)
-    disposeWorkspaceService(w)
+    await disposeWorkspaceService(w)
   })
 
   it('takes it over: a record of its own, and the mark in its account that lets it resume', async () => {
