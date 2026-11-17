@@ -282,12 +282,14 @@ const check = (name, ok, extra = '') => {
     // Set Up opens there with its own hint, and once the fake records the answer it is set up again.
     const reviewer = await inv('agents:update', path.join(ws1, 'alpha'), 'a-one', { workflowRole: 'reviewer' })
     const worktreesReal = fs.realpathSync.native(path.dirname(ws1)) + path.sep + `${path.basename(ws1)}.worktrees`
+    // HI-3341: the open window reads it again on the role change alone: the row is read before anything else lists the
+    // connections (the trustOf poll below would ask main for them).
+    check('a reviewer on it: its row, read alone, names the review copies as not trusted', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="needed"]').count()) === 1 && /Not trusted yet in this workspace: review copies/.test(await row('Personal').locator('[data-not-trusted]').innerText().catch(() => '')), HUNG_MS)))
     const copiesTrust = await lib.until(async () => {
       const t = await trustOf(inv, personal.id)
       return t && !t.checking && t.pending.length ? t : null
     }, HUNG_MS)
     check('a reviewer on it: it needs set up for the worktrees folder, its review copies', !!copiesTrust && JSON.stringify(copiesTrust.pending) === JSON.stringify([{ project: path.basename(worktreesReal), folder: worktreesReal, git: false, copies: true }]), JSON.stringify({ role: reviewer?.workflowRole, trust: copiesTrust ?? (await trustOf(inv, personal.id)) }))
-    check('…its row names them as review copies', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="needed"]').count()) === 1 && /Not trusted yet in this workspace: review copies/.test(await row('Personal').locator('[data-not-trusted]').innerText().catch(() => '')), HUNG_MS)))
     await shots('copies-not-trusted')
     const copiesLaunches = fs.readFileSync(launches, 'utf8').split('\n').filter(Boolean).length
     await row('Personal').locator('[data-set-up]').click()

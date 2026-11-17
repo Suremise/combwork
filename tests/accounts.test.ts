@@ -6,7 +6,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSyn
 import { basename, join, resolve } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { accountState, baseConnection, connectionReadiness, duplicateLogins, movedConnection, switchedOn, topOfOrder, workspaceAccounts } from '../src/shared/accounts'
+import { accountState, baseConnection, connectionReadiness, duplicateLogins, movedConnection, switchedOn, topOfOrder, trustInputsKey, workspaceAccounts } from '../src/shared/accounts'
 import type { Account } from '../src/shared/types'
 import { COPIES_REVIEW } from '../src/shared/advanced'
 import type { TrustTarget } from '../src/main/providers/types'
@@ -1325,5 +1325,27 @@ describe("a workspace's accounts", () => {
       expect((await accounts.confirmAccount(a.id)).fresh).toBe(false)
       await run(() => accounts.setAccountOn(a.id, false))
     })
+  })
+})
+
+describe("what the window's trust read keys on (trustInputsKey, HI-3341)", () => {
+  const agent = { id: 'a-one', name: 'Agent', provider: 'claude' as const, connection: 'c1' }
+  const key = (over: Partial<typeof agent> & { workflowRole?: 'builder' | 'reviewer' } = {}, copies = true, version = '2.1.326'): string =>
+    trustInputsKey([{ path: 'D:/ws/alpha', agents: [{ ...agent, ...over }] }], [], null, copies, { claude: { version } })
+
+  it('changes when an agent becomes a reviewer, and back', () => {
+    expect(key({ workflowRole: 'reviewer' })).not.toBe(key({ workflowRole: 'builder' }))
+    expect(key({ workflowRole: 'builder' })).toBe(key())
+  })
+  it('changes with a name or note that makes it a reviewer', () => {
+    expect(key({ name: 'Reviewer' })).not.toBe(key())
+  })
+  it('changes with its connection, review copies turned off, and the CLI version', () => {
+    expect(key({ connection: 'c2' })).not.toBe(key())
+    expect(key({}, false)).not.toBe(key())
+    expect(key({}, true, '2.1.325')).not.toBe(key())
+  })
+  it('stays the same for what the folders do not depend on', () => {
+    expect(key({ name: 'Builder two' })).toBe(key())
   })
 })
