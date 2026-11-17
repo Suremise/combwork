@@ -324,6 +324,9 @@ async function appReady(page, ms = 90000) {
   if (!ok) throw new Error("Combwork's window wasn't ready (rendered, providers found) within " + ms / 1000 + ' s')
 }
 
+/** Each window's Claude Code home, as launch was given it (HI-3342). */
+const CLAUDE_HOMES = new WeakMap()
+
 /**
  * HI-3342: Claude Code 2.1.326 and later asks about an --add-dir folder outside the folders it trusts at every start, so
  * Combwork grants a reviewer the copies folder only once its home trusts the workspace's worktrees folder (HI-3337, read
@@ -348,7 +351,7 @@ function trustFakeWorktrees(home, ws) {
 
 /** Opens a workspace and waits until the window shows it (its name in the title), instead of a fixed wait. */
 async function openWorkspace(inv, page, ws, ms = 20000) {
-  trustFakeWorktrees(inv.claudeHome, ws)
+  trustFakeWorktrees(CLAUDE_HOMES.get(page), ws)
   await inv('workspace:open', ws)
   const name = path.basename(ws)
   const ok = await until(() => page.evaluate((n) => document.title.includes(n), name).catch(() => false), ms)
@@ -382,8 +385,8 @@ async function launch({ userData, env = {}, viewport = { width: 1400, height: 85
     throw e
   }
   const inv = (ch, ...a) => page.evaluate(([c, args]) => window.combwork.invoke(c, ...args), [ch, a])
-  // Its Claude Code home, for openWorkspace (HI-3342).
-  inv.claudeHome = env.CLAUDE_CONFIG_DIR
+  // Its Claude Code home, for openWorkspace (HI-3342): by its window, as suites wrap inv.
+  if (env.CLAUDE_CONFIG_DIR) CLAUDE_HOMES.set(page, env.CLAUDE_CONFIG_DIR)
   return { app, page, inv }
 }
 
