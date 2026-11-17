@@ -644,3 +644,55 @@ describe('issuance never moves a binding back (HI-3194)', () => {
     expect(await refused(act(w, card, arrive(l), { kind: 'submit', summary: 'Read' }))).toBeNull()
   })
 })
+
+describe('reads that clear a stale attempt, through the real handlers (HI-3340)', () => {
+  type Launch = { projectPath: string; agentId: string; runId: string }
+  /** A request of launch `l` to a route of the Agent API, as handleApi makes it (its fence captured as it arrives). */
+  const call = async (w: WS, l: Launch, method: string, template: string, card: number, query = ''): Promise<any> => {
+    const { apiTextTestHooks: hooks } = await import('../src/main/servers')
+    const ref = (await inWorkspace(w, () => tasks.getTask(card))).key ?? `#${card}`
+    return inWorkspace(w, () => hooks.asLaunch(join(l.projectPath, '..'), l, () => hooks.routeHandler(method, template)!({ params: [ref],query: new URLSearchParams(query), body: {}, signal: new AbortController().signal })))
+  }
+  const start = (w: WS, l: Launch, card: number) => refused(call(w, l, 'POST', '/v1/tasks/:n/start', card))
+  /** A lane card the builder started and then lost to a put-back, as a lane reorder's applyNow puts it back (MC-1542's case). */
+  async function putBackLaneCard(): Promise<{ w: WS; card: number; l: Launch }> {
+    const { w, repo } = await workspace()
+    const card = await create(w)
+    const lanes = await import('../src/main/lanes')
+    await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a2', cards: [card], by: 'the Assistant' })
+    const l = await launch(repo, 'a1', 'r1')
+    expect(await start(w, l, card)).toBeNull()
+    await act(w, card, user, { kind: 'putBack', why: 'Another card first' })
+    return { w, card, l }
+  }
+
+  it("cw_lane next, a latest-comment read and cw_start_card: the start goes through on the first try", async () => {
+    const { w, card, l } = await putBackLaneCard()
+    const next = await call(w, l, 'GET', '/v1/lanes/next', card)
+    expect(next.next).toMatchObject({ card, carryOn: false })
+    // Its "Start it" is what the start accepts: the attempt it names is the launch's now.
+    expect(fence.boundAttempt('r1', card)).toEqual(key(w, card))
+    await call(w, l, 'GET', '/v1/tasks/:n/comments/latest', card)
+    expect(await start(w, l, card)).toBeNull()
+  })
+
+  it('a refused start is cleared by a latest-comment read, as the refusal says (any cw_read_task)', async () => {
+    const { w, card, l } = await putBackLaneCard()
+    const e = await call(w, l, 'POST', '/v1/tasks/:n/start', card).then(() => null, (x: unknown) => x as { refusal?: { rule: string } })
+    expect(e?.refusal?.rule).toBe('attempt.moved')
+    const { apiErrorReply } = await import('../src/main/servers')
+    expect(JSON.stringify(apiErrorReply(e).body)).toContain(`Read #${card} again (cw_read_task)`)
+    const got = await call(w, l, 'GET', '/v1/tasks/:n/comments/latest', card)
+    expect(got).not.toHaveProperty('attempt')
+    expect(await start(w, l, card)).toBeNull()
+  })
+
+  it('a card cw_lane next says to carry on with issues nothing: a write for its earlier attempt stays refused', async () => {
+    const { w, card, l } = await putBackLaneCard()
+    // Started again for the builder by the user: in flight, at an attempt the launch never saw.
+    await update(w, card, user, { column: 'doing', agent: 'a1' })
+    const next = await call(w, l, 'GET', '/v1/lanes/next', card)
+    expect(next.next).toMatchObject({ card, carryOn: true })
+    expect(await refused(comment(w, card, arrive(l)))).toBe('attempt.moved')
+  })
+})

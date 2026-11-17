@@ -2318,6 +2318,13 @@ route('GET', '/v1/lanes/next', async () =>
     const a = agentCaller()
     if (!a) throw new HttpError(400, apiSaid(API.lane.nextIsAgents))
     const r = await lanes.laneNext(requireWorkspace(), basename(a.projectPath), a.agentId)
+    // HI-3340: a card it says to start is issued to the calling launch at its attempt now, so the start it tells of is
+    // accepted (a binding from an earlier attempt, before a put-back or a lane reorder's restart, would refuse it). A card
+    // to carry on issues nothing: the agent's view of it may be from an attempt that has moved on, which the fence is for.
+    if (r.next && !r.next.carryOn && a.runId) {
+      const at = tasks.attemptRead(requireWorkspace(), basename(a.projectPath), r.next.card)
+      if (at) issueAttempt({ projectPath: a.projectPath, agentId: a.agentId, runId: a.runId }, r.next.card, at)
+    }
     // Its passed cards Combwork merges, each with where it is in the merge queue (#1354): the next waits for them.
     const queue: { card: number; line: string }[] = []
     for (const c of r.lane.cards.filter((x) => x.column === 'passed')) {
@@ -3393,8 +3400,8 @@ route('GET', '/v1/tasks/:n', async ({ params, query }) => {
   const me = agentCaller()
   if (me) {
     noteCardRead(me, view.number)
-    // HI-3194: the card as it is now (its place, agent and description, in every form of this read; never the latest
-    // comment alone): the attempt this read shows is issued to the reading launch (attemptFence.ts).
+    // HI-3194: the attempt this read shows is issued to the reading launch (attemptFence.ts), in every form of this read
+    // (and of the latest comment's, HI-3340).
     if (me.runId && seen.attempt) issueAttempt({ projectPath: me.projectPath, agentId: me.agentId, runId: me.runId }, view.number, seen.attempt)
     // What it has received of the card's decisions, as a fact (#1216), in the background: the generation read with this
     // reply's decisions, never one written since.
@@ -3790,6 +3797,10 @@ route('GET', '/v1/tasks/:n/attachments/:name', async ({ params, query }) => {
 route('GET', '/v1/tasks/:n/comments/latest', async ({ params, query }) => {
   requireWorkspace()
   const r = await tasks.latestComment(taskNumber(params[0]), await taskActor())
+  // HI-3340: every form of cw_read_task of the card, its latest comment alone included, issues the attempt its snapshot
+  // shows (a refused agent told to read the card again clears the refusal with whichever read it makes).
+  const me = agentCaller()
+  if (me?.runId && r.attempt) issueAttempt({ projectPath: me.projectPath, agentId: me.agentId, runId: me.runId }, r.number, r.attempt)
   // summary=true (#532): its first line, with its whole length when there is more.
   const summary = query.get('summary') === 'true'
   // Its open requests first (HI-1992): "check the latest comment" is where an Assistant looks for a question, and an
@@ -5387,4 +5398,7 @@ onWatchPlacing(watchWhilePlaced)
 const routeHandler = (method: string, template: string): Handler | undefined => routes.find((r) => r.method === method && r.template === template)?.handler
 /** Runs fn as a project agent's request (HI-2691: tests run its routes' real errors), as serveApi's caller scope does. */
 const asAgent = <T>(workspacePath: string, projectPath: string, agentId: string, fn: () => T): T => callerStore.run({ kind: 'agent', runId: 'test', workspace: workspacePath, projectPath, agentId }, () => inRequestScope({ projectPath, agentId }, fn))
-export const apiTextTestHooks = { notifyTarget, isolatedFor, lanePlacement, readUsageWatch, streamLines, routeHandler, asAgent, httpFrom }
+/** Runs fn as a request of an agent's launch (HI-3340: its token's run, with the fence it captured as it arrived), as handleApi does. */
+const asLaunch = <T>(workspacePath: string, launch: { projectPath: string; agentId: string; runId: string }, fn: () => T): T =>
+  callerStore.run({ kind: 'agent', workspace: workspacePath, ...launch, fence: captureFence(launch) }, () => inRequestScope({ projectPath: launch.projectPath, agentId: launch.agentId }, fn))
+export const apiTextTestHooks = { notifyTarget, isolatedFor, lanePlacement, readUsageWatch, streamLines, routeHandler, asAgent, asLaunch, httpFrom }
