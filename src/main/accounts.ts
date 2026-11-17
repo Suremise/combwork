@@ -12,7 +12,7 @@ import { ASSISTANT_NAME } from '../shared/assistant'
 import { launchesWithoutTools } from '../shared/launchPolicy'
 import { profileFolder } from '../shared/appName'
 import { localProfileInUse } from './profileFolders'
-import { agentProvider, extraArgsProblem, isProviderEnabled, modeOption, providerDescriptor, PROVIDERS, signInConnections } from '../shared/providers'
+import { agentProvider, asksAddedDirs, extraArgsProblem, isProviderEnabled, modeOption, providerDescriptor, PROVIDERS, signInConnections } from '../shared/providers'
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
 import { advanced } from './advanced'
 import { COPIES_REVIEW } from '../shared/advanced'
@@ -1325,7 +1325,8 @@ const projectsFor = (a: Account): Projects => {
     return r.ok && r.account.id === a.id
   }
   const reviewers = used.some((p) => p.agents.some((ag) => agentProvider(ag, config.settings) === a.provider && reviewsWork(agentWorkflowRole(ag)) && onThis(ag)))
-  const asks = !!signInConnections(providerDescriptor(a.provider))?.asksAddedDirs && !!providerDescriptor(a.provider).capabilities.session?.extraDirs
+  // Only a version that asks (HI-3342): before 2.1.326 Claude Code never does, so its connection needs nothing for them.
+  const asks = asksAddedDirs(providerDescriptor(a.provider), providerService.info(a.provider).version) && !!providerDescriptor(a.provider).capabilities.session?.extraDirs
   return asks && reviewers && advanced.get(COPIES_REVIEW) !== false && workspace.path ? [...all, { name: basename(workspace.worktreesRoot), path: workspace.worktreesRoot, copies: true }] : all
 }
 
