@@ -282,8 +282,8 @@ an options or level save and when the rules toggle. A simplify check is told to 
 (`CardState.attempt`, `shared/workflow/facts.ts`): `Started`/`Adopted` start one, `AttemptBound` (written by `tasks.ts`
 `attemptReassigned` in the board change that gives an attempt's card to another agent) and a `Moved` out of
 `ATTEMPT_STAGES` move its generation on. `main/attemptFence.ts` keeps each launch's bindings (in memory, by run id, dropped
-by `onAgentTokenEnded`): `issueAttempt` moves one forward only, and is called by the card read (`GET /v1/tasks/:n`, from
-`readTaskSeen`'s snapshot), an inbox read (`readInbox`'s `receivedAbout`, each delivery's `attempt` stamp, which
+by `onAgentTokenEnded`): `issueAttempt` moves one forward only, and is called by the card reads (`GET /v1/tasks/:n` and
+`/comments/latest`, from `readTaskSeen`'s snapshot), `GET /v1/lanes/next` for a card it names to start (HI-3340), an inbox read (`readInbox`'s `receivedAbout`, each delivery's `attempt` stamp, which
 `deliveries.ts` `checkedNew` takes through `setAttemptStamp` as it makes the delivery), an agent's card creation, and
 `AttemptGuard.accepted` after an accepted write. `servers.ts` captures a request's fence (`captureFence`) as it identifies
 the caller, before anything is awaited, and `taskActor()` gives the actor an `AttemptGuard` over it. The guard is asked
