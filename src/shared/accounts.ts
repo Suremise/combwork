@@ -1,5 +1,6 @@
-import type { Account, Connection, ConnectionDefaults, LaunchValues, ProviderId, WorkspaceConnections, WorkspaceConfig } from './types'
-import { permissionLabel, providerDescriptor } from './providers'
+import type { Account, AppSettings, Connection, ConnectionDefaults, LaunchValues, ProviderId, WorkspaceConnections, WorkspaceConfig } from './types'
+import { agentProvider, permissionLabel, providerDescriptor } from './providers'
+import { agentWorkflowRole, reviewsWork, type WorkflowRole } from './workflow/roles'
 
 /**
  * Combwork's accounts (HI-980) and connections (HI-2106): what an account's state is from its two identities, which accounts
@@ -25,6 +26,28 @@ export interface ConnectionTrust {
   setUpIn?: { folder: string; project?: string; workspace?: true; copies?: true }
   /** Its answer for the workspace's current projects isn't in yet (HI-1870 round 3): shown as Checking…, never set up. */
   checking?: true
+}
+
+/** An agent as trustInputsKey reads it: what decides its CLI, its connection and whether it reviews. */
+type TrustAgent = { id?: string; name: string; role?: string; workflowRole?: WorkflowRole; provider?: ProviderId; connection?: string }
+
+/**
+ * What the folders each connection's trust is read for depend on (main's projectsFor), as one key: the window reads
+ * the connections again when it changes (HI-1870, HI-1871). Each agent's CLI as its launch resolves it, its connection,
+ * and whether it reviews (HI-3341: a reviewer's connection also needs the review copies' folder, HI-3337); whether
+ * review copies are on, and each CLI's version (HI-3342: only a version that asks needs that folder).
+ */
+export function trustInputsKey(
+  projects: readonly { path: string; agents: readonly TrustAgent[] }[],
+  assistant: readonly TrustAgent[],
+  settings: Pick<AppSettings, 'providers'> | null | undefined,
+  copiesReview: boolean,
+  versions: Partial<Record<ProviderId, { version: string | null } | undefined>>
+): string {
+  const agent = (a: TrustAgent): string => `${a.id ?? ''}=${agentProvider(a, settings)}/${a.connection ?? ''}${reviewsWork(agentWorkflowRole(a)) ? '/r' : ''}`
+  const each = projects.map((p) => `${p.path}:${p.agents.map(agent).join(',')}`).join('|')
+  const cli = Object.entries(versions).map(([p, v]) => `${p}@${v?.version ?? ''}`).join(',')
+  return `${each}#${assistant.map(agent).join(',')}#${copiesReview ? 1 : 0}#${cli}`
 }
 
 /**
