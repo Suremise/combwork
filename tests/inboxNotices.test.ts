@@ -123,15 +123,15 @@ describe('notices in the hook replies (#650)', () => {
     const upsert = bound(w, w.upsertSession)
     vi.spyOn(w, 'upsertSession').mockImplementation((...a) => {
       const write = upsert(...a)
-      writes.add(write)
-      void write.catch(() => undefined).finally(() => writes.delete(write))
+      recordWrites.add(write)
+      void write.catch(() => undefined).finally(() => recordWrites.delete(write))
       return write
     })
   })
-  const writes = new Set<Promise<unknown>>()
+  const recordWrites = new Set<Promise<unknown>>()
   /** The session record writes started so far have ended, those they lead to too. */
   const recordsWritten = async (): Promise<void> => {
-    while (writes.size) await Promise.allSettled([...writes])
+    while (recordWrites.size) await Promise.allSettled([...recordWrites])
   }
   afterEach(async () => {
     await recordsWritten()
