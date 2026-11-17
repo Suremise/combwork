@@ -309,8 +309,10 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   /** If Combwork itself was started from inside a Claude Code session, don't leak that session's identity. User configuration such as CLAUDE_CODE_GIT_BASH_PATH is kept. */
   readonly envToStrip = ['CLAUDECODE', 'CLAUDE_PID', 'CLAUDE_AGENT_SDK_VERSION', 'CLAUDE_CODE_ENTRYPOINT', 'CLAUDE_CODE_CHILD_SESSION', 'CLAUDE_CODE_SESSION_ID', 'CLAUDE_CODE_SESSION_ATTENDED', 'CLAUDE_CODE_MESSAGING_SOCKET', 'CLAUDE_CODE_MESSAGING_TOKEN', 'CLAUDE_CODE_SSE_PORT', 'CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING', 'MCP_CONNECTION_NONBLOCKING']
   readonly compactFailure = /not enough messages to compact|error during compaction|compaction failed/i
-  // Before a folder's first session: "Is this a project you created or one you trust? … trust this folder" (#367: an
-  // advanced setting, so a changed question can be fixed without a release).
+  // Before a folder's first session: "Is this a project you created or one you trust? … trust this folder"; and from
+  // 2.1.326, before each session, for an --add-dir folder outside every repository it trusts: "Adding a new directory:"
+  // (HI-3335). Both are drawn before its SessionStart hook. #367: an advanced setting, so a changed question can be fixed
+  // without a release.
   get startupQuestion(): RegExp {
     return advanced.pattern('claude-code.trust.prompt')
   }

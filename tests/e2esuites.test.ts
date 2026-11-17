@@ -1556,13 +1556,13 @@ describe("answering Claude Code's trust question (lib.acceptClaudeTrust, #188)",
   const { acceptClaudeTrust } = createRequire(import.meta.url)('./e2e/lib.cjs') as { acceptClaudeTrust: Accept }
   /**
    * A session whose terminal shows `screen` (or what screen(writes so far) gives: a menu that redraws as keys arrive)
-   * and whose Combwork status is `status`.
+   * and whose Combwork status is `status`, ready once Enter was pressed (an answer taken, its start goes on).
    */
   const session = (screen: string | ((writes: string[]) => string), status = 'starting') => {
     const writes: string[] = []
     const inv = async (ch: string, ...a: unknown[]) => {
       if (ch === 'pty:buffer') return typeof screen === 'function' ? screen(writes) : screen
-      if (ch === 'session:live') return [{ projectPath: 'C:\\P', agentId: 'a1', status }]
+      if (ch === 'session:live') return [{ projectPath: 'C:\\P', agentId: 'a1', status: writes.includes('\r') ? 'ready' : status }]
       writes.push(String(a[1]))
       return undefined
     }
@@ -1594,6 +1594,37 @@ describe("answering Claude Code's trust question (lib.acceptClaudeTrust, #188)",
     expect((await stuck.run()).r).toBe(false)
     expect(stuck.writes.length).toBeGreaterThan(0)
     expect(stuck.writes.includes('\r')).toBe(false)
+  })
+
+  /** Claude Code 2.1.326's added folder's question (HI-3335): "No, exit" first, then "Yes, add it". */
+  const addedMenu = (on: 'No' | 'Yes') => ` Adding a new directory: C:\\work\\alpha\\.combwork\\launch-a\\plugin This session hasn't worked here before. ${on === 'No' ? '❯' : ' '} No, exit ${on === 'Yes' ? '❯' : ' '} Yes, add it Esc to exit `
+
+  it("answers an added folder's question (2.1.326, HI-3335): Down to \"Yes, add it\", then Enter", async () => {
+    const s = session((writes) => addedMenu(writes.includes('\x1b[B') ? 'Yes' : 'No'))
+    expect((await s.run()).r).toBe(true)
+    expect(s.writes).toEqual(['\x1b[B', '\r'])
+  })
+
+  it("answers each question a start asks (a worktree's folder, then its added plugin's), reading only what came after the last answer", async () => {
+    const writes: string[] = []
+    // The terminal's output only grows: the folder's menu, once answered the added folder's, once answered the prompt.
+    const buffer = () => {
+      const enters = writes.filter((w) => w === '\r').length
+      const downs = writes.filter((w) => w === '\x1b[B').length
+      let out = trustMenu(() => Math.min(downs, 1))([])
+      if (enters >= 1) out += addedMenu(downs >= 2 ? 'Yes' : 'No')
+      if (enters >= 2) out += ' > ? for shortcuts'
+      return out
+    }
+    const inv = async (ch: string, ...a: unknown[]) => {
+      if (ch === 'pty:buffer') return buffer()
+      if (ch === 'session:live') return [{ projectPath: 'C:\\P', agentId: 'a1', status: 'starting' }]
+      writes.push(String(a[1]))
+      return undefined
+    }
+    expect(await acceptClaudeTrust(inv, 'c:\\p', 'a1', 4500)).toBe(true)
+    // Each answered once: no Enter on the first menu's old "Yes" after it was taken, none on "No, exit".
+    expect(writes).toEqual(['\x1b[B', '\r', '\x1b[B', '\r'])
   })
 
   it("in a trusted folder it returns at once: Claude Code 2.1.289's mode footer, the old one, or Combwork's ready status", async () => {

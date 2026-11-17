@@ -462,23 +462,40 @@ const ptyKey = (proj, agentId) => `session:${proj.toLowerCase()}#${agentId}`
 const CLAUDE_AT_PROMPT = /for shortcuts|\? for|shift\+tab to cycle|\bmode on\b/i
 
 /**
- * Answers Claude Code's "trust this folder" question in an agent's terminal, if it asks: true when it answered, false
- * as soon as the session is past it (Claude Code's prompt on screen, or Combwork has the session ready: a trusted folder
- * asks nothing, #188), or at the timeout. Never answers anything else (a sign-in screen least of all).
+ * Claude Code's trust questions: its folder's ("trust this folder"), and from 2.1.326 an added folder's (HI-3335: an
+ * --add-dir nobody trusted, a slot's launch plugin or a reviewer's copy: "Adding a new directory:", "Yes, add it").
+ */
+const CLAUDE_TRUST = /trust this folder|Adding a new directory:/i
+
+/**
+ * Answers Claude Code's trust questions (CLAUDE_TRUST) in an agent's terminal, each it asks (a worktree's folder, then
+ * its added launch plugin's, HI-3335), reading only what was drawn after the last answer: true when it answered one,
+ * false as soon as the session is past them (Claude Code's prompt on screen, or Combwork has the session ready: a trusted
+ * folder asks nothing, #188), or at the timeout. Never answers anything else (a sign-in screen least of all).
  */
 async function acceptClaudeTrust(inv, proj, agentId, timeoutMs = 15000) {
   const key = ptyKey(proj, agentId)
   const t = Date.now()
+  const buffer = async () => String((await inv('pty:buffer', key).catch(() => '')) ?? '')
+  let from = 0
+  let answered = false
   while (Date.now() - t < timeoutMs) {
     // Terminal UIs draw spaces as cursor moves: control sequences become spaces before matching.
-    const text = plainText(await inv('pty:buffer', key).catch(() => ''))
-    if (/trust this folder/i.test(text)) return chooseTrust(inv, key, Math.max(3000, timeoutMs - (Date.now() - t)))
-    if (CLAUDE_AT_PROMPT.test(text)) return false
+    const text = plainText((await buffer()).slice(from))
+    if (CLAUDE_TRUST.test(text)) {
+      // Where the terminal's output was as Enter went: what comes after is the next screen, a next question too.
+      const at = await chooseTrust(inv, key, Math.max(3000, timeoutMs - (Date.now() - t)), from)
+      if (at === null) return answered
+      answered = true
+      from = at
+      continue
+    }
+    if (CLAUDE_AT_PROMPT.test(text)) return answered
     const live = (await inv('session:live').catch(() => [])).find((s) => s.projectPath.toLowerCase() === proj.toLowerCase() && s.agentId === agentId)
-    if (live?.status === 'ready') return false
+    if (live?.status === 'ready') return answered
     await sleep(500)
   }
-  return false
+  return answered
 }
 
 /**
@@ -493,30 +510,35 @@ async function acceptRelaunchTrust(inv, proj, agentId, spawned, { spawnMs = 2000
 
 /** The trust question's choice the terminal shows selected last ('No, exit' or 'Yes, …'), or null. */
 function trustChoice(text) {
-  const marks = [...plainText(text).matchAll(/[>❯›]\s*(?:\d\.\s*)?(No, exit|Yes, I trust this folder)/g)]
+  const marks = [...plainText(text).matchAll(/[>❯›]\s*(?:\d\.\s*)?(No, exit|Yes, I trust this folder|Yes, add it)/g)]
   return marks.length ? marks.at(-1)[1] : null
 }
 
 /**
  * Says yes to Claude Code's trust question. Its menu starts on "No, exit", and Enter on that quits Claude Code (exit 1).
  * A key sent while it is still drawing the menu is dropped on a busy machine (#218: Down lost, Enter chose No), so
- * Enter is pressed only once the terminal shows "Yes" selected, Down sent again until it does; never on "No". true when
- * it answered yes.
+ * Enter is pressed only once the terminal shows "Yes" selected, Down sent again until it does; never on "No". Reads the
+ * terminal's output from `from` on. When it answered yes, the output's length as Enter went; else null. An added folder's
+ * question (2.1.326, HI-3335) ignores Enter for its first 500 ms: "Yes" is held 700 ms before Enter, which comes after the
+ * Down that selected it, so after the question was drawn.
  */
-async function chooseTrust(inv, key, timeoutMs = 20000) {
+async function chooseTrust(inv, key, timeoutMs = 20000, from = 0) {
   const t = Date.now()
-  const choice = async () => trustChoice(await inv('pty:buffer', key).catch(() => ''))
+  const output = async () => String((await inv('pty:buffer', key).catch(() => '')) ?? '')
+  const choice = async () => trustChoice((await output()).slice(from))
+  const yes = (c) => !!c && c.startsWith('Yes')
   while (Date.now() - t < timeoutMs) {
     // Still "Yes" a moment later: a Down still on its way would have moved it back by then.
-    if ((await choice()) === 'Yes, I trust this folder' && (await sleep(400), (await choice()) === 'Yes, I trust this folder')) {
+    if (yes(await choice()) && (await sleep(700), yes(await choice()))) {
+      const at = (await output()).length
       await inv('pty:write', key, '\r')
-      return true
+      return at
     }
     await inv('pty:write', key, '\x1b[B')
     // A try's pace, not a bound: not on "Yes" within 2 s, Down is pressed again (timeoutMs bounds the whole).
-    await until(async () => (await choice()) === 'Yes, I trust this folder', 2000, 150)
+    await until(async () => yes(await choice()), 2000, 150)
   }
-  return false
+  return null
 }
 
 /**
@@ -2137,4 +2159,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }
+module.exports = { PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, CLAUDE_TRUST, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }

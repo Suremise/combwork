@@ -100,7 +100,7 @@ const check = (name, ok, extra = '') => {
     const relaunched = !!(await lib.until(
       async () => {
         if ((await restart.count()) === 0 && (await live(proj, agent.id))?.status === 'ready') return true
-        if (!trusted && /trust this folder/i.test(lib.plainText(await inv('pty:buffer', key).catch(() => '')))) {
+        if (!trusted && lib.CLAUDE_TRUST.test(lib.plainText(await inv('pty:buffer', key).catch(() => '')))) {
           trusted = await lib.acceptClaudeTrust(inv, proj, agent.id, 30000)
           if (trusted) console.log('(the relaunch asked to trust the folder again: answered yes)')
         }
