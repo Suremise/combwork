@@ -41,7 +41,7 @@ export interface ClaudeInput {
   /** Reads `writes` (its new entries) before each look at the screen. */
   from(writes: () => readonly string[]): void
   /** A session's `screen`, as SessionManager reads it. */
-  screen: { text(): string; textWithoutDim(): string; bracketedPaste(): boolean }
+  screen: { text(): string; textWithoutDim(): string; textToCursor(): string; bracketedPaste(): boolean }
 }
 
 export function claudeInput(opts: { draft?: string; viewport?: number; lagMs?: number; shows?: string; paste?: boolean; ascii?: boolean } = {}): ClaudeInput {
@@ -84,6 +84,13 @@ export function claudeInput(opts: { draft?: string; viewport?: number; lagMs?: n
     if (Date.now() - changedAt >= (opts.lagMs ?? 0)) shown = draw()
     return shown
   }
+  // What shows up to its cursor (HI-3345's drawnLine reads it): the cursor stands after the input's text, so the drawing up
+  // to the box's bottom rule (all of it, for a `shows` without one).
+  const textToCursor = (): string => {
+    const now = look()
+    const bottom = now.lastIndexOf(`\n${RULE}\n`)
+    return bottom < 0 ? now : now.slice(0, bottom)
+  }
   return {
     input,
     feed,
@@ -91,6 +98,6 @@ export function claudeInput(opts: { draft?: string; viewport?: number; lagMs?: n
       source = writes
       read = writes().length
     },
-    screen: { text: look, textWithoutDim: look, bracketedPaste: () => opts.paste ?? true }
+    screen: { text: look, textWithoutDim: look, textToCursor, bracketedPaste: () => opts.paste ?? true }
   }
 }
