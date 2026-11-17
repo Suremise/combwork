@@ -42,7 +42,11 @@ const QUIET: WriteLog = { settled: async () => undefined, changedBetween: async 
 let tokens = 0
 const token = (): string => `c${Date.now().toString(36)}${(++tokens).toString(36)}`
 
-describe.skipIf(!jjExe)(`jj's component chain on the real jj (${TESTED_JJ.version}), HI-2801`, () => {
+// Each test runs dozens of real jj and git commands, nothing it could wait on instead: alone the longest took 9 s, and a
+// full run on a loaded machine took it past the 20 s default (HI-3349). Its own bound, for a hung run.
+const REAL_JJ_MS = 120_000
+
+describe.skipIf(!jjExe)(`jj's component chain on the real jj (${TESTED_JJ.version}), HI-2801`, { timeout: REAL_JJ_MS }, () => {
   const h = harness()
   const env = { ...h.env, GIT_TERMINAL_PROMPT: '0' }
   const gitOn =
