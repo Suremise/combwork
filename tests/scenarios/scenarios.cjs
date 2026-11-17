@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 139
+const FIXTURES_VERSION = 140
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -996,7 +996,7 @@ const runs = (o, needle) => o.tools.filter((t) => !t.isError && !/^(Write|Edit|M
 
 // jj scenarios (HI-2800): the git commands that move HEAD, the index or a ref (gitMutations.cjs, unit-tested), the jj
 // rule the session contract adds in a jj project, and the pinned jj run in the project with the scenario's own config.
-const { gitMutations, commandText } = require('./gitMutations.cjs')
+const { gitMutations, commandText, SHELL_TOOL } = require('./gitMutations.cjs')
 // The signing-blocker scenario (HI-2867): what gets round a signing failure (signingBypass.cjs, unit-tested).
 const { signingBypasses } = require('./signingBypass.cjs')
 const platformRule = (platform) => require('../../src/shared/combworkGuidance.ts').platformRule(platform)
@@ -1091,6 +1091,22 @@ const jjSubmitted = (o, key) => {
   return d ? { revision: d.revision, base: d.base, jj: d.platform?.jj ?? null, slot: d.platform?.jjSlot ?? null } : null
 }
 /** The jj checks every jj card scenario makes of the session under test: no git mutation, nothing moved or published, jj consistent. */
+/**
+ * What jj-slot-stale's agent did to its stale slot (`folder`): jj commands that update, snapshot or roll back a working
+ * copy (updates), jj commands that record a change there (recorded), and files written there (written). Commands are
+ * read from shell tools only, as jjSafetyChecks reads them (HI-3339: a question to the user naming
+ * `jj workspace update-stale` as the user's option, in cw_ask_user, was counted as running it).
+ */
+function staleSlotCommands(o, folder) {
+  const norm = (x) => String(x).toLowerCase().replace(/\\+/g, '/')
+  const inSlot = (t) => norm(t.input ?? '').includes(norm(folder)) || (!!t.cwd && norm(t.cwd).startsWith(norm(folder)))
+  const shell = (o.tools ?? []).filter((t) => SHELL_TOOL.test(t.name))
+  return {
+    updates: shell.filter((t) => /jj(\.exe)?\s+(workspace\s+update-stale|util\s+snapshot|op\s+(restore|revert|abandon))/i.test(commandText(t.input ?? ''))),
+    recorded: shell.filter((t) => inSlot(t) && /jj(\.exe)?\s+(commit|new|describe|squash|abandon|restore|edit)\b/i.test(commandText(t.input ?? ''))),
+    written: (o.tools ?? []).filter((t) => /^(Write|Edit|MultiEdit)$/i.test(t.name) && inSlot(t))
+  }
+}
 const jjSafetyChecks = (o, c) => {
   const mutations = gitMutations(o)
   const published = publishes(o)
@@ -2699,12 +2715,7 @@ module.exports.SCENARIOS = [
     observe: (o, c) => [["what Combwork's wake said (the preparation's reason)", /stale/i.test(c.told ?? ''), String(c.told ?? '').slice(0, 300)]],
     expect: (o, c) => {
       const n = c.cards.b
-      const norm = (x) => String(x).toLowerCase().replace(/\\+/g, '/')
-      const inSlot = (t) => norm(t.input ?? '').includes(norm(c.folder)) || (!!t.cwd && norm(t.cwd).startsWith(norm(c.folder)))
-      const shell = o.tools.filter((t) => !/^(Write|Edit|MultiEdit|Read)$/i.test(t.name))
-      const updates = shell.filter((t) => /jj(\.exe)?\s+(workspace\s+update-stale|util\s+snapshot|op\s+(restore|revert|abandon))/i.test(commandText(t.input ?? '')))
-      const recorded = shell.filter((t) => inSlot(t) && /jj(\.exe)?\s+(commit|new|describe|squash|abandon|restore|edit)\b/i.test(commandText(t.input ?? '')))
-      const written = o.tools.filter((t) => /^(Write|Edit|MultiEdit)$/i.test(t.name) && inSlot(t))
+      const { updates, recorded, written } = staleSlotCommands(o, c.folder)
       const submitted = factsOf(o, 'b', 'Submitted').length
       const said = [
         o.finalReply ?? '',
@@ -6778,4 +6789,4 @@ module.exports.SCENARIOS.push({
     })
 })
 
-module.exports.helpers = { launchedIn, saidOnCard, laneStartLanded,readOf, called, ran, retargetWays, asksTheUser, questionsToUser, relaysOk, laneRunsOn, leftoversByOwner, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
+module.exports.helpers = { staleSlotCommands, launchedIn, saidOnCard, laneStartLanded,readOf, called, ran, retargetWays, asksTheUser, questionsToUser, relaysOk, laneRunsOn, leftoversByOwner, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
