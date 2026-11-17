@@ -1040,13 +1040,13 @@ export function withoutInvisible(line: string): string {
 
 /**
  * Whether a line Combwork is typing has been drawn on an agent's screen (#600): its end (spaces left out, as a CLI wraps
- * it) shows more often than when this was called, before it was typed (a doorbell's end is in its earlier ones too).
+ * it) is what the screen shows just before the CLI's cursor, which stands after what its input holds (HI-3345). Never a
+ * count of the ends on the screen: an earlier doorbell's shows there too, and a line wrapping in a narrow pane scrolls
+ * the screen, so an earlier one's leaves it as this one's is drawn and the count stays as it was.
  */
-export function drawnLine(screen: Pick<TerminalScreen, 'text'>, line: string): () => boolean {
+export function drawnLine(screen: Pick<TerminalScreen, 'textToCursor'>, line: string): () => boolean {
   const end = line.replace(/\s+/g, '').slice(-40)
-  const count = (): number => (end ? screen.text().replace(/\s+/g, '').split(end).length - 1 : 0)
-  const before = count()
-  return () => count() > before
+  return () => !!end && screen.textToCursor(line.length).replace(/\s+/g, '').endsWith(end)
 }
 
 /**

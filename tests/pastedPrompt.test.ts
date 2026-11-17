@@ -200,26 +200,30 @@ describe('a prompt Combwork puts into a CLI (#597)', () => {
 
       /**
        * A stand-in for Codex 0.164's input box (HR6's round 1): Alt+Enter a new line, Ctrl+U deletes to the line's start
-       * (at a line's start, the line break before it), Enter sends; what it sends is recorded. Drawn on `screen` too.
+       * (at a line's start, the line break before it), Enter sends; what it sends is recorded. Drawn on `screen` too, as
+       * the box shows, its cursor after what it holds (HI-3345: Combwork reads the line drawn before the cursor).
        */
       const composer = (screen: InstanceType<typeof TerminalScreen>) => {
         const box = { lines: [''], sent: [] as string[] }
         echo.to = {
           write: (d: string) => {
-            screen.write(d)
-            if (d === ALT_ENTER) box.lines.push('')
-            else
-              for (const ch of d) {
-                const last = box.lines.length - 1
-                if (ch === '\x15') {
-                  if (box.lines[last] === '' && last > 0) box.lines.pop()
-                  else box.lines[last] = ''
-                } else if (ch === '\r') {
-                  box.sent.push(box.lines.join('\n'))
-                  box.lines = ['']
-                } else if (ch >= ' ') box.lines[last] += ch
-              }
+            onKeys(d)
+            screen.write(`\x1b[H\x1b[2J${box.lines.join('\r\n')}`)
           }
+        }
+        const onKeys = (d: string): void => {
+          if (d === ALT_ENTER) box.lines.push('')
+          else
+            for (const ch of d) {
+              const last = box.lines.length - 1
+              if (ch === '\x15') {
+                if (box.lines[last] === '' && last > 0) box.lines.pop()
+                else box.lines[last] = ''
+              } else if (ch === '\r') {
+                box.sent.push(box.lines.join('\n'))
+                box.lines = ['']
+              } else if (ch >= ' ') box.lines[last] += ch
+            }
         }
         return box
       }
@@ -582,6 +586,35 @@ describe('a prompt Combwork puts into a CLI (#597)', () => {
       await vi.advanceTimersByTimeAsync(100)
       await sent
       expect(writes.at(-1)).toBe('\r')
+    })
+
+    it("drawn in a narrow pane whose screen scrolls an earlier doorbell's first row off as it wraps (HI-3345): Enter follows", async () => {
+      // 60 × 20: an earlier doorbell in the conversation's top two rows, the input on the last. The line wraps onto a
+      // second row, so the screen scrolls one row: the earlier doorbell's end no longer shows whole, and the count of ends
+      // on the screen is what it was before.
+      const filler = Array.from({ length: 17 }, (_, i) => `• row ${i}`).join('\r\n')
+      const screen = await running(codex, `› [CW] New in your inbox: 1 message (m3). Call cw_inbox to read it, act on it, then ack it.\r\n${filler}\r\n› `)
+      vi.useFakeTimers()
+      const sent = sessions.sendPrompt(p, id, line)
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(writes).not.toContain('\r')
+      screen.write(line)
+      await vi.advanceTimersByTimeAsync(100)
+      expect(writes.at(-1)).toBe('\r')
+      await sent
+    })
+
+    it("a doorbell whose end shows only in the conversation, its input empty, isn't drawn (HI-3345)", async () => {
+      const screen = await running(codex, '› ')
+      vi.useFakeTimers()
+      const sent = sessions.sendPrompt(p, id, line)
+      await vi.advanceTimersByTimeAsync(1000)
+      // The CLI inserts the doorbell into its conversation above an input left empty: the end shows, not before the cursor.
+      screen.write(`\r\x1b[K› ${line}\r\n\r\n› `)
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(writes).not.toContain('\r')
+      await vi.advanceTimersByTimeAsync(3000)
+      await sent
     })
 
     it('not drawn within 5 s, Enter anyway (as before #600)', async () => {
