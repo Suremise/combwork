@@ -962,7 +962,9 @@ describe("a project's queue listings, worked out once per state (HI-1683)", () =
     expect(third[0].queued.map((q) => q.card)).toEqual([card])
   })
 
-  it('HI-3296: each quiet write, to a merged, a returned and a queued card waiting on a blocker, keeps the listing, and what is kept equals a listing made fresh', async () => {
+  // 24 writes, each with a listing kept and one made fresh, after real merges: 6 s alone, and a full unit run on a loaded
+  // machine took it past the 20 s default (HI-3349). Its own bound, for a hung run.
+  it('HI-3296: each quiet write, to a merged, a returned and a queued card waiting on a blocker, keeps the listing, and what is kept equals a listing made fresh', { timeout: 60_000 }, async () => {
     const { tellListeners } = await import('../src/main/events')
     const { CW_RUNS } = await import('../src/main/progress')
     const { w, wt, repo, ws } = await workspace()
