@@ -643,13 +643,34 @@ describe('a commit or stash past its bound (HI-3021)', () => {
 
   it('Set Aside held up in a clean filter, before any stash: ended, no stash, the real index and the files as they were', async () => {
     const pids = join(tempDir('cw-folderchanges-pids-'), 'pids')
-    const filter = join(tempDir('cw-folderchanges-filter-'), 'slow.sh')
-    writeFileSync(filter, slowScript(pids))
-    sh(proj, 'config', 'filter.slow.clean', `sh "${fwd(filter)}"`)
+    const dir = tempDir('cw-folderchanges-filter-')
+    const filter = join(dir, 'slow.sh')
+    const started = join(dir, 'started')
+    writeFileSync(filter, slowScript(pids, false, started))
+    // HI-3346: the bound ends git's tree leaves first, so the filter goes before git; a filter not required that fails
+    // is passed over (the file taken unfiltered), and on a slow runner git went on to make the stash before it was ended
+    // itself. Required, a filter ended fails git's stash there, before any stash, whatever the order of the end.
+    sh(proj, 'config', 'filter.slow.required', 'true')
+    sh(proj, 'config', 'filter.slow.clean', 'cat')
+    sh(proj, 'config', 'filter.slow.smudge', 'cat')
     writeFileSync(join(proj, '.git', 'info', 'attributes'), 'new.txt filter=slow\n')
     writeFileSync(join(proj, 'new.txt'), 'new\n')
-    const err = await settle('setAside', ['new.txt']).catch((e: Error) => e)
-    expect(String(err)).toMatch(/didn't finish setting the changes aside in 3 seconds/)
+    // The bound fits this machine as it is now (HI-3338): the same Set Aside with a filter that holds nothing, timed, and
+    // the bound well past it, so git reaches the filter before it.
+    const t0 = performance.now()
+    await settle('setAside', ['new.txt'])
+    const took = performance.now() - t0
+    sh(proj, 'stash', 'pop', '-q')
+    expect(read('new.txt')).toBe('new\n')
+    expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
+    const seconds = Math.min(20, Math.max(3, Math.ceil((3 * took) / 1000)))
+    changes.folderChangesBounds.actMs = seconds * 1000
+    sh(proj, 'config', 'filter.slow.clean', `sh "${fwd(filter)}"`)
+    const done = settle('setAside', ['new.txt']).catch((e: Error) => e)
+    // Held at the filter, by its own word, and kept there (30 s) until the bound ends it.
+    await vi.waitFor(() => expect(existsSync(started)).toBe(true), { timeout: 20_000 })
+    const err = await done
+    expect(String(err)).toMatch(new RegExp(`didn't finish setting the changes aside in ${seconds} seconds`))
     expect(String(err)).not.toMatch(/in a stash/)
     expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
     await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: 10_000 })
