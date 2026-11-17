@@ -114,7 +114,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     lib.git(fx.alpha, ['add', 'staged.txt'])
     const four = await q.approveBy(fx, h, builder, reviewer, 'Four', { 'four.txt': 'four\n' })
     const p4 = await paused('staged')
-    check('S34c: something staged pauses the queue, naming it; the index untouched', JSON.stringify(p4?.files) === '["staged.txt"]' && lib.git(fx.alpha, ['diff', '--cached', '--name-only']).trim() === 'staged.txt', JSON.stringify(p4))
+    check('S34c: something staged pauses the queue, naming it; the index untouched', JSON.stringify(p4?.files) === '["staged.txt"]' && lib.git(fx.alpha, ['diff', '--cached', '--name-only']).trim() === 'staged.txt', `${JSON.stringify(p4)} ${JSON.stringify(four.steps)}`)
     lib.git(fx.alpha, ['reset', '-q'])
     fs.rmSync(path.join(fx.alpha, 'staged.txt'))
     check('…unstaged, Resume: merged', (await h.inv('queue:resume', fx.alpha, 'main')).resumed === true && (await done(four.n)))
@@ -122,7 +122,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     // --- S34b: the folder on another branch: main checked out nowhere, merged by compare-and-swap; the folder untouched.
     lib.git(fx.alpha, ['checkout', '-q', '-b', 'elsewhere'])
     const five = await q.approveBy(fx, h, builder, reviewer, 'Five', { 'five.txt': 'five\n' })
-    check('S34b: the folder on another branch: merged into main all the same', await done(five.n))
+    check('S34b: the folder on another branch: merged into main all the same', await done(five.n), JSON.stringify(five.steps))
     check('…by compare-and-swap: the folder still on its branch, its files untouched', lib.git(fx.alpha, ['branch', '--show-current']).trim() === 'elsewhere' && f.text('five.txt') === null && f.status() === '' && !(await h.facts(five.n)).find((x) => x.kind === 'IntegrationStarted')?.data?.checkedOut)
     lib.git(fx.alpha, ['checkout', '-q', 'main'])
   } catch (e) {
