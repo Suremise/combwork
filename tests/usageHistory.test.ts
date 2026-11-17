@@ -432,7 +432,8 @@ describe('the usage history of a workspace', () => {
     // The queue held by a job before it; the roll-up queued behind it, then the session resumed while it waits.
     let open!: () => void
     const gate = usageHistory['enqueue']('gate', 0, () => new Promise<null>((r) => (open = () => r(null))))
-    await vi.waitFor(() => expect(open).toBeTypeOf('function'))
+    // Bounded for a hung run (HI-3349), not Vitest's 1 s, which a loaded runner outlasts.
+    await vi.waitFor(() => expect(open).toBeTypeOf('function'), { timeout: 20_000 })
     usageHistory['rolledUp'].clear()
     const rolled = run(() => usageHistory['rollUp'](w, { path: w.path!, signal: w.lifetime }))
     live.set(`${p.toLowerCase()}#resumed`, { state: { sessionId: resumed, projectPath: p, provider: 'claude-code' } })

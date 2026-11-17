@@ -129,7 +129,8 @@ describe("cleaning up archived cards' attachments (HI-1842)", () => {
     expect(r.bytes).toBeGreaterThan(0)
     expect(rows(w, archived.n)).toBe(0)
     expect(archived.paths.every((f) => !existsSync(f))).toBe(true)
-    await expect.poll(() => archived.paths.every((f) => trashed().some((t) => t.endsWith(f.split(/[\\/]/).pop()!)))).toBe(true)
+    // The Recycle Bin's move ends after the commit, in the background (HI-3349): bounded for a hung run, not Vitest's 1 s.
+    await expect.poll(() => archived.paths.every((f) => trashed().some((t) => t.endsWith(f.split(/[\\/]/).pop()!))), { timeout: 20_000 }).toBe(true)
     const after = await inWorkspace(w, () => tasks.getTask(archived.n))
     expect(after.archived).toBe(true)
     const said = after.comments.at(-1)!

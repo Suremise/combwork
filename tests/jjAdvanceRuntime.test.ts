@@ -34,8 +34,11 @@ import { started, world, type World } from './jjCardsWorld'
 
 if (!jjExe) console.warn(`jjAdvanceRuntime.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
-/** A hung test's bound (jjCandidateRuntime's, raised: two cards in some): each runs many real jj and git commands. */
-const REAL_JJ_MS = 90_000
+/**
+ * A hung test's bound (jjCandidateRuntime's, raised: two cards in some): each runs many real jj and git commands. A full
+ * unit run on a loaded machine took one 61 s (HI-3349).
+ */
+const REAL_JJ_MS = 200_000
 
 class Crash extends Error {}
 

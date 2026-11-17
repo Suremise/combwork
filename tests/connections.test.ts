@@ -51,6 +51,9 @@ const { fileLockDepth, withFileLock } = await import('../src/main/fsutil')
 const { listSkills, invalidateSkillCache, machineSkillCacheSize } = await import('../src/main/skills')
 const { encodeProjectPath } = await import('../src/main/providers/claude/usage')
 
+// A bound for a hung test (HI-3349): a full unit run on a loaded machine took one 10.9 s of Vitest's 20 s default.
+vi.setConfig({ testTimeout: 60_000 })
+
 const status = new Map<string, () => Promise<{ ok: true; loggedIn: boolean; email?: string; orgId?: string } | { ok: false; error: string }>>()
 const signedIn = (email: string) => async () => ({ ok: true as const, loggedIn: true, email, orgId: 'org-1' })
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.

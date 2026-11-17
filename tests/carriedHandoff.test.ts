@@ -313,7 +313,8 @@ describe("a carried lease ending before the new lease exists (HI-1731, HR4's int
       busy = false
       status()
       status()
-      await vi.waitFor(() => expect(runNow).toHaveBeenCalled())
+      // Bounded for a hung run (HI-3349), not Vitest's 1 s, which a loaded runner outlasts.
+      await vi.waitFor(() => expect(runNow).toHaveBeenCalled(), { timeout: 20_000 })
       expect(stops).toEqual([])
     } finally {
       setAgentBusy(null)
