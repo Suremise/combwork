@@ -2,26 +2,26 @@
   "codex": {
     "version": "0.169.0",
     "testedAt": "2026-11-17",
-    "record": "282f92b2c9df"
+    "record": "31d7f8eef111"
   },
   "claude-code": {
     "version": "2.1.326",
     "testedAt": "2026-11-17",
-    "record": "282f92b2c9df"
+    "record": "31d7f8eef111"
   },
   "copilot": {
     "version": "1.0.112",
     "testedAt": "2026-11-17",
-    "record": "282f92b2c9df"
+    "record": "31d7f8eef111"
   },
   "antigravity": {
     "version": "1.5.5",
     "testedAt": "2026-11-17",
-    "record": "282f92b2c9df"
+    "record": "31d7f8eef111"
   },
   "opencode": {
     "version": "2.2.6",
     "testedAt": "2026-11-17",
-    "record": "282f92b2c9df"
+    "record": "31d7f8eef111"
   }
 }
