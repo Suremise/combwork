@@ -5,6 +5,7 @@ import type { TypedNewline } from '../terminalInput'
 import { msg, type Msg } from '../i18n/msg'
 import type { Tr } from '../tasks'
 import { BUILT_IN_PROVIDERS, PROVIDER_MODULES } from './registry'
+import { compareVersions } from '../updates'
 import { setCliAdvancedDefs, type AdvancedDef } from '../advancedDef'
 import type { ProviderModule } from './parts'
 
@@ -299,9 +300,10 @@ export interface SignInConnections {
    * HI-3337: before each session the CLI asks about every folder on its command line (`extraDirs`) outside the folders it
    * trusts, the answer lasting that session only (Claude Code 2.1.326, HI-3335). A reviewer's review-copies folder is then
    * a folder to trust: Set Up asks for it at the workspace's worktrees folder, and until it is trusted a launch isn't
-   * granted it (never started into the question).
+   * granted it (never started into the question). The version it began asking at (HI-3342): an older one never asks, so
+   * its reviewers keep their copies and Set Up asks nothing for them.
    */
-  asksAddedDirs?: true
+  asksAddedDirsSince?: string
   server?: ServerCaps
 }
 
@@ -318,6 +320,17 @@ export interface ServerOnlyConnections {
 export function signInConnections(d: Pick<ProviderDescriptor, 'capabilities'>): SignInConnections | undefined {
   const c = d.capabilities.connections
   return c && c.signIn !== false ? c : undefined
+}
+
+/**
+ * Whether this version of a CLI asks about a folder on its command line that it doesn't trust (HI-3337, HI-3342): its
+ * descriptor names the version it began at, and this one is that or later. A version that can't be told counts as asking.
+ */
+export function asksAddedDirs(d: Pick<ProviderDescriptor, 'capabilities'>, version: string | null | undefined): boolean {
+  const since = signInConnections(d)?.asksAddedDirsSince
+  if (!since) return false
+  const c = version ? compareVersions(version, since) : null
+  return c === null || c >= 0
 }
 
 /**

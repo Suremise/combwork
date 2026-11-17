@@ -3100,9 +3100,9 @@ class SessionManager {
     const copies = copiesDirOf(workspaceOf(projectPath).worktreesRoot, projectPath)
     const granted = grantsCopies({ capable: adapter.descriptor.capabilities.session?.extraDirs ?? false, on: advanced.get(COPIES_REVIEW) !== false, reviews: policy.tools && reviewsWork(agentWorkflowRole(agent)), inProjectFolder: !l.slotEnv && samePlace(cwd, projectPath), assistant: workspace.isAssistantHome(projectPath) })
     const made = granted && (await mkdir(copies, { recursive: true }).then(() => true, () => false))
-    // HI-3337: a CLI that asks about such a folder at every start (Claude Code 2.1.326) isn't given it until its home
-    // trusts it (Set Up, at the worktrees folder): a reviewer never starts into a question nobody may answer.
-    const untrusted = made && (await addedDirAsks(adapter, conn?.homeEnv && conn.folder ? conn.folder : null, copies))
+    // HI-3337: a CLI that asks about such a folder at every start (Claude Code 2.1.326 and later, HI-3342) isn't given it
+    // until its home trusts it (Set Up, at the worktrees folder): a reviewer never starts into a question nobody may answer.
+    const untrusted = made && (await addedDirAsks(adapter, info.version, conn?.homeEnv && conn.folder ? conn.folder : null, copies))
     if (untrusted) log.info(`${userText(this.label(state))}: no review copies this launch: ${adapter.descriptor.name} doesn't trust ${userText(copies)} on its connection yet (Set Up)`)
     const extraDirs = made && !untrusted ? [copies] : []
     l.extraDirs = extraDirs

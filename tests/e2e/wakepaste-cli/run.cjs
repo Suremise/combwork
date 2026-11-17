@@ -199,7 +199,8 @@ module.exports = async function run(provider) {
       fs.rmSync(hold, { force: true })
       await inv('advanced:set', 'cw.inbox.idleWakes', null)
       const outcome = await lib.until(() => wakeLines().slice(lines).find((l) => /was taken after \d+ ms|wasn't taken/.test(l)), HUNG_MS, 300)
-      check('put off: idle wakes on again, the next doorbell is typed and taken', !!outcome && /was taken after/.test(outcome), wakeLines().slice(lines).join(' | '))
+      // Not typed: what held it (HI-3343: the detail was empty), the agent as Combwork has it and Combwork's log since.
+      check('put off: idle wakes on again, the next doorbell is typed and taken', !!outcome && /was taken after/.test(outcome), outcome ? wakeLines().slice(lines).join(' | ') : `${JSON.stringify(await live())} || ${combworkLog().split('\n').slice(logLines).join(' | ')} || ${await screen(key)}`)
       const r = await left
       const read = await lib.until(async () => {
         const inbox = (await callApi('GET', '/v1/projects/alpha/agents/Tester/activity')).body?.inbox

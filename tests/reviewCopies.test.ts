@@ -100,16 +100,21 @@ describe("the grant of the project's copies folder (extraDirs)", () => {
       writeFileSync(join(dir, '.claude.json'), JSON.stringify({ projects: Object.fromEntries(trusted.map((f) => [realpathSync.native(f).replace(/\\/g, '/'), { hasTrustDialogAccepted: true }])) }))
       return dir
     }
-    expect(await addedDirAsks(claudeCode, home('none', []), copies)).toBe(true)
-    expect(await addedDirAsks(claudeCode, home('root', [root]), copies)).toBe(false)
-    expect(await addedDirAsks(claudeCode, home('copies', [copies]), copies)).toBe(false)
+    expect(await addedDirAsks(claudeCode, '2.1.326', home('none', []), copies)).toBe(true)
+    expect(await addedDirAsks(claudeCode, '2.1.326', home('root', [root]), copies)).toBe(false)
+    expect(await addedDirAsks(claudeCode, '2.1.326', home('copies', [copies]), copies)).toBe(false)
     // A sibling folder trusted covers nothing here; an unreadable home counts as asking.
-    expect(await addedDirAsks(claudeCode, home('other', [join(base, 'asks', 'none')]), copies)).toBe(true)
+    expect(await addedDirAsks(claudeCode, '2.1.326', home('other', [join(base, 'asks', 'none')]), copies)).toBe(true)
     const broken = join(base, 'asks', 'broken')
     mkdirSync(broken, { recursive: true })
     writeFileSync(join(broken, '.claude.json'), '{')
-    expect(await addedDirAsks(claudeCode, broken, copies)).toBe(true)
-    for (const cli of [codex, copilot]) expect(await addedDirAsks(cli, home('none', []), copies), cli.id).toBe(false)
+    expect(await addedDirAsks(claudeCode, '2.1.326', broken, copies)).toBe(true)
+    for (const cli of [codex, copilot]) expect(await addedDirAsks(cli, '2.1.326', home('none', []), copies), cli.id).toBe(false)
+    // HI-3342: a Claude Code before 2.1.326 never asks, so it is given the folder untrusted; a later one asks, and one whose
+    // version can't be told counts as asking.
+    expect(await addedDirAsks(claudeCode, '2.1.325', home('none', []), copies)).toBe(false)
+    expect(await addedDirAsks(claudeCode, '2.1.400', home('none', []), copies)).toBe(true)
+    for (const unknown of [null, undefined, 'not a version']) expect(await addedDirAsks(claudeCode, unknown, home('none', []), copies), String(unknown)).toBe(true)
   })
 
   it('is one fixed folder per project, beside its slots', () => {
