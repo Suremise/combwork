@@ -277,6 +277,27 @@ const check = (name, ok, extra = '') => {
     await inv('workspace:refresh')
     check('…removed, it is set up again', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
 
+    // --- A reviewer's review copies (HI-3337): Claude Code 2.1.326 asks about the copies folder at every start until it
+    // trusts the workspace's worktrees folder, so a reviewer on the connection adds that folder: named as review copies,
+    // Set Up opens there with its own hint, and once the fake records the answer it is set up again.
+    await inv('agents:update', path.join(ws1, 'alpha'), 'a-one', { workflowRole: 'reviewer' })
+    check('a reviewer on it: it needs set up, naming its review copies', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="needed"]').count()) === 1 && /Not trusted yet in this workspace: review copies/.test(await row('Personal').locator('[data-not-trusted]').innerText().catch(() => '')), HUNG_MS)))
+    await shots('copies-not-trusted')
+    const copiesLaunches = fs.readFileSync(launches, 'utf8').split('\n').filter(Boolean).length
+    await row('Personal').locator('[data-set-up]').click()
+    check('…its Set Up opens in the worktrees folder, saying it is where review copies are', !!(await lib.until(async () => /worktrees folder.*review copies/.test(await page.locator('.account-signin [data-set-up-in]').innerText().catch(() => '')), HUNG_MS)))
+    await shots('set-up-copies')
+    const copiesRun = await lib.until(async () => {
+      const all = fs.readFileSync(launches, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
+      return all.length > copiesLaunches ? all.at(-1) : null
+    }, HUNG_MS)
+    const worktreesReal = fs.realpathSync.native(`${ws1}.worktrees`)
+    check('…the CLI run in the workspace’s worktrees folder, on the connection', !!copiesRun && path.resolve(copiesRun.cwd).toLowerCase() === worktreesReal.toLowerCase(), JSON.stringify(copiesRun))
+    await lib.until(async () => JSON.parse(fs.readFileSync(path.join(folder, '.claude.json'), 'utf8')).projects?.[worktreesReal.replace(/\\/g, '/')]?.hasTrustDialogAccepted === true, HUNG_MS)
+    await closeRunning(true)
+    check('…answered once, it is set up again', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
+    await inv('agents:update', path.join(ws1, 'alpha'), 'a-one', { workflowRole: 'builder' })
+
     // --- Rename: the name only.
     await menuOf('Personal', 'Rename…')
     await fillPrompt('Combwork overnight')
