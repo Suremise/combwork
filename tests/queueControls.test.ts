@@ -43,6 +43,10 @@ const { allOff } = await import('../src/shared/workflow/options')
 const control = await import('../src/main/assistantControl')
 const { config } = await import('../src/main/config')
 
+// A bound for a hung test (HI-3349): each makes real merges, and a full unit run on a loaded machine took one 10.2 s of
+// Vitest's 20 s default. Those that state their own keep it.
+vi.setConfig({ testTimeout: 60_000 })
+
 advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []

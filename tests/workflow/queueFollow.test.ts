@@ -147,7 +147,8 @@ describe('the target follows its remote (G21, HI-1183)', () => {
     expect(existsSync(join(e.project, 'theirs.txt')) || sh(e.project, 'ls-tree', '--name-only', 'main').includes('theirs.txt')).toBe(true)
   })
 
-  it('a remote that keeps moving pauses the queue (the three-retests limit), nothing published', { timeout: GIT_HEAVY_MS }, async () => {
+  // Three retests, each a fetch, merge and checks: a full unit run on a loaded machine took it 31 s of GIT_HEAVY_MS (HI-3349).
+  it('a remote that keeps moving pauses the queue (the three-retests limit), nothing published', { timeout: 2 * GIT_HEAVY_MS }, async () => {
     const { e, bare, queue } = following()
     const a = await queued(e, 'A', 'a.txt')
     let n = 0

@@ -41,8 +41,11 @@ const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.Proce
 
 if (!jjExe) console.warn(`jjCandidateChecksRuntime.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
-/** A hung test's bound, as jjCandidatesReal's (HI-2921): many real jj and git commands, and real check runs. */
-const REAL_JJ_MS = 120_000
+/**
+ * A hung test's bound, as jjCandidatesReal's (HI-2921): many real jj and git commands, and real check runs. A full unit
+ * run on a loaded machine took one 62 s (HI-3349).
+ */
+const REAL_JJ_MS = 200_000
 const NODE = `"${process.execPath}"`
 const PASS = `${NODE} -e "process.exit(0)"`
 const FAIL = `${NODE} -e "console.log('lint: 1 problem');process.exit(1)"`
