@@ -280,8 +280,14 @@ const check = (name, ok, extra = '') => {
     // --- A reviewer's review copies (HI-3337): Claude Code 2.1.326 asks about the copies folder at every start until it
     // trusts the workspace's worktrees folder, so a reviewer on the connection adds that folder: named as review copies,
     // Set Up opens there with its own hint, and once the fake records the answer it is set up again.
-    await inv('agents:update', path.join(ws1, 'alpha'), 'a-one', { workflowRole: 'reviewer' })
-    check('a reviewer on it: it needs set up, naming its review copies', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="needed"]').count()) === 1 && /Not trusted yet in this workspace: review copies/.test(await row('Personal').locator('[data-not-trusted]').innerText().catch(() => '')), HUNG_MS)))
+    const reviewer = await inv('agents:update', path.join(ws1, 'alpha'), 'a-one', { workflowRole: 'reviewer' })
+    const worktreesReal = fs.realpathSync.native(path.dirname(ws1)) + path.sep + `${path.basename(ws1)}.worktrees`
+    const copiesTrust = await lib.until(async () => {
+      const t = await trustOf(inv, personal.id)
+      return t && !t.checking && t.pending.length ? t : null
+    }, HUNG_MS)
+    check('a reviewer on it: it needs set up for the worktrees folder, its review copies', !!copiesTrust && JSON.stringify(copiesTrust.pending) === JSON.stringify([{ project: path.basename(worktreesReal), folder: worktreesReal, git: false, copies: true }]), JSON.stringify({ role: reviewer?.workflowRole, trust: copiesTrust ?? (await trustOf(inv, personal.id)) }))
+    check('…its row names them as review copies', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="needed"]').count()) === 1 && /Not trusted yet in this workspace: review copies/.test(await row('Personal').locator('[data-not-trusted]').innerText().catch(() => '')), HUNG_MS)))
     await shots('copies-not-trusted')
     const copiesLaunches = fs.readFileSync(launches, 'utf8').split('\n').filter(Boolean).length
     await row('Personal').locator('[data-set-up]').click()
@@ -291,7 +297,6 @@ const check = (name, ok, extra = '') => {
       const all = fs.readFileSync(launches, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
       return all.length > copiesLaunches ? all.at(-1) : null
     }, HUNG_MS)
-    const worktreesReal = fs.realpathSync.native(`${ws1}.worktrees`)
     check('…the CLI run in the workspace’s worktrees folder, on the connection', !!copiesRun && path.resolve(copiesRun.cwd).toLowerCase() === worktreesReal.toLowerCase(), JSON.stringify(copiesRun))
     await lib.until(async () => JSON.parse(fs.readFileSync(path.join(folder, '.claude.json'), 'utf8')).projects?.[worktreesReal.replace(/\\/g, '/')]?.hasTrustDialogAccepted === true, HUNG_MS)
     await closeRunning(true)
