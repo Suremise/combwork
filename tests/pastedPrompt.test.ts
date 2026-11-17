@@ -604,6 +604,22 @@ describe('a prompt Combwork puts into a CLI (#597)', () => {
       await sent
     })
 
+    it("a busy Codex still showing an earlier doorbell in its input, the clear not drawn yet: no Enter until it draws this line (HR1's round 1 of HI-3345)", async () => {
+      // Its input holds an earlier doorbell, its cursor after it: the same 40 characters at its end as this one.
+      const screen = await running(codex, '› [CW] New in your inbox: 1 message (m3). Call cw_inbox to read it, act on it, then ack it.')
+      vi.useFakeTimers()
+      const sent = sessions.sendPrompt(p, id, line)
+      // Busy: it draws neither the clear nor what is typed.
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(writes.slice(1).join('')).toBe(line)
+      expect(writes).not.toContain('\r')
+      // It reads its input again and draws this line in place of the earlier one: Enter follows.
+      screen.write(`\x1b[2J\x1b[H› ${line}`)
+      await vi.advanceTimersByTimeAsync(100)
+      expect(writes.at(-1)).toBe('\r')
+      await sent
+    })
+
     it("a doorbell whose end shows only in the conversation, its input empty, isn't drawn (HI-3345)", async () => {
       const screen = await running(codex, '› ')
       vi.useFakeTimers()

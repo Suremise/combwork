@@ -1042,11 +1042,19 @@ export function withoutInvisible(line: string): string {
  * Whether a line Combwork is typing has been drawn on an agent's screen (#600): its end (spaces left out, as a CLI wraps
  * it) is what the screen shows just before the CLI's cursor, which stands after what its input holds (HI-3345). Never a
  * count of the ends on the screen: an earlier doorbell's shows there too, and a line wrapping in a narrow pane scrolls
- * the screen, so an earlier one's leaves it as this one's is drawn and the count stays as it was.
+ * the screen, so an earlier one's leaves it as this one's is drawn and the count stays as it was. And never what showed
+ * there when this was called, after the input's clear and before the line was typed: a busy CLI that hasn't drawn the
+ * clear yet still shows an earlier doorbell before its cursor, ending the same, and an Enter then would go with the line
+ * it hasn't read (HR1's round 1). The same line left there, the wait runs out and Enter goes anyway.
  */
 export function drawnLine(screen: Pick<TerminalScreen, 'textToCursor'>, line: string): () => boolean {
   const end = line.replace(/\s+/g, '').slice(-40)
-  return () => !!end && screen.textToCursor(line.length).replace(/\s+/g, '').endsWith(end)
+  const toCursor = (): string => screen.textToCursor(line.length).replace(/\s+/g, '')
+  const before = toCursor()
+  return () => {
+    const now = toCursor()
+    return !!end && now !== before && now.endsWith(end)
+  }
 }
 
 /**
