@@ -28,8 +28,9 @@ async function renderScreen(raw, cols, rows, { unwrap = false } = {}) {
 const PASTE_MARK = /\[Pasted (?:text|Content)\b/g
 
 /**
- * How often a screen shows a prompt's end (spaces left out, as a CLI wraps it), as Combwork's drawnLine counts it (#600),
- * plus the paste marks on it: a count that rises after the prompt is written says the CLI has drawn it.
+ * How often a screen shows a prompt's end (spaces left out, as a CLI wraps it), as Combwork's drawnLine counted it (#600;
+ * since HI-3345 it reads the end before the CLI's cursor instead), plus the paste marks on it: a count that rises after the
+ * prompt is written says the CLI has drawn it.
  */
 function drawnCount(screen, text) {
   const s = String(screen ?? '')
