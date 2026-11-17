@@ -3,7 +3,9 @@ import { limitName } from '@shared/planLimits'
 import { connectionCells, currentLimits, planName, resetText, usageLevel, windowOf, type ConnectionCell } from './accountCard'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Account, PlanLimit, ProviderId } from '@shared/types'
-import { accountState, connectionReadiness, duplicateLogins, type AccountView, type ConnectionRow, type ConnectionsView, type ConnectionState, type ConnectionTrust } from '@shared/accounts'
+import { COPIES_REVIEW } from '@shared/advanced'
+import { useAdvancedValue } from '../advanced'
+import { accountState, connectionReadiness, duplicateLogins, trustInputsKey, type AccountView, type ConnectionRow, type ConnectionsView, type ConnectionState, type ConnectionTrust } from '@shared/accounts'
 import { pcAccountId, pcWideSignIn } from '@shared/connectionDefaults'
 import { connectionOf } from '@shared/connectionLabel'
 import { isProviderEnabled, providerDescriptor } from '@shared/providers'
@@ -206,11 +208,13 @@ export function AccountsSettings() {
   // Each account checked again as the section is shown; read again whenever main says they changed.
   useEffect(() => load(true), [load, wsPath])
   useEffect(() => load(false), [load, changed])
-  // The workspace's projects changed (one added, moved), or which agent runs on which connection: the projects each
-  // account would be used in, and so its trust of them, are read again (HI-1870; HI-1871), and who uses each connection.
-  const projectsKey = (projects ?? []).map((p) => `${p.path}:${p.agents.map((a) => `${a.id}=${a.provider ?? ''}/${a.connection ?? ''}`).join(',')}`).join('|')
-  const assistantKey = useStore((s) => (s.workspace?.assistant?.agents ?? []).map((a) => `${a.provider ?? ''}/${a.connection ?? ''}`).join(','))
-  useEffect(() => load(false), [load, projectsKey, assistantKey])
+  // The workspace's projects changed (one added, moved), which agent runs on which connection, or anything else the
+  // folders each connection is used in depend on (an agent made a reviewer: HI-3341): the projects each account would
+  // be used in, and so its trust of them, are read again (HI-1870; HI-1871), and who uses each connection.
+  const assistantAgents = useStore((s) => s.workspace?.assistant?.agents)
+  const copiesReview = useAdvancedValue<boolean>(COPIES_REVIEW) !== false
+  const trustKey = trustInputsKey(projects ?? [], assistantAgents ?? [], settings, copiesReview, providerInfo)
+  useEffect(() => load(false), [load, trustKey])
 
   if (!view) return <div className="faint">{tr(M.loading)}</div>
   // Agents running on a connection other than the one chosen for them now (HI-1755), not yet waiting to switch: by
