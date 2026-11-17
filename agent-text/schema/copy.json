@@ -193,6 +193,11 @@
       "why": "plain"
     }
   },
+  "copy.review.untrusted": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
   "copy.review.waiting": {
     "placeholders": {
       "why": "plain"

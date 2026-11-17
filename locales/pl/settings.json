@@ -86,6 +86,8 @@
   "settings.accounts.setUpChecking": "Sprawdzanie…",
   "settings.accounts.setUpDone": "Skonfigurowane",
   "settings.accounts.setUpIn": "Otwiera się w folderze projektu {project}, {folder}: odpowiedz na pytanie {cli}, aby mu zaufać.",
+  "settings.accounts.setUpInCopies": "Otwiera się w folderze worktree tego obszaru roboczego, {folder}, w którym są kopie do recenzji recenzentów: odpowiedz na pytanie {cli}, aby mu zaufać. Do tego czasu recenzenci na tym połączeniu recenzują bez kopii, bo {cli} pytałby o nią przy każdym starcie.",
+  "settings.accounts.reviewCopies": "kopie do recenzji",
   "settings.accounts.setUpInWorkspace": "Otwiera się w folderze tego obszaru roboczego, {folder}: odpowiedz na pytanie {cli}, aby mu zaufać, a wraz z nim każdemu projektowi w nim, który nie jest repozytorium Git. O każde repozytorium Git pytanie pada potem w jego własnym folderze.",
   "settings.accounts.setUpNeeded": "Wymaga konfiguracji",
   "settings.accounts.signIn": "Zaloguj",

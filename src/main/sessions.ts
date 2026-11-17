@@ -32,7 +32,7 @@ import { coalesced, joined } from '../shared/coalesce'
 import { atMost, whenAll } from '../shared/atMost'
 import { agentPlace, bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, heldSlots, releaseWriter, settleWriter, slotHeldWords } from './agentFolders'
 import { slotEnv } from './slots'
-import { copiesDirOf, grantsCopies } from './copies'
+import { addedDirAsks, copiesDirOf, grantsCopies } from './copies'
 import { agentWorkflowRole, inWorkflow, launchWorkflow, reviewsWork, type LaunchWorkflow } from '../shared/workflow/roles'
 import { agentLaunchSettings, agentProvider, autoProviderPending, canSwitchModeLive, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake, providerSwitchOn } from '../shared/providers'
 import { isCliOwnMode, modeInEffect } from '../shared/cliOwnMode'
@@ -504,6 +504,8 @@ interface LiveSession {
   slotEnv?: Record<string, string>
   /** The folders its launch was granted outside its own (#1439: its project's review copies). */
   extraDirs?: string[]
+  /** Folders it would have been granted that its CLI doesn't trust yet (HI-3337): its review copies, withheld. */
+  withheldDirs?: string[]
   /**
    * The CLI's version as this run was launched (HI-1327): what a version gate goes by while it runs, not the CLI
    * installed now (updated or switched since, it isn't this process). Null: not known.
@@ -1757,6 +1759,11 @@ class SessionManager {
   /** The folders a running agent's launch was granted outside its own (#1439: its project's review copies); none if not running. */
   grantedDirs(projectPath: string, agentId: string): readonly string[] {
     return this.live.get(liveId(projectPath, agentId))?.extraDirs ?? []
+  }
+
+  /** The folders a running agent's launch would have been granted but its CLI doesn't trust yet (HI-3337); none if not running. */
+  withheldDirs(projectPath: string, agentId: string): readonly string[] {
+    return this.live.get(liveId(projectPath, agentId))?.withheldDirs ?? []
   }
 
   projectStates(projectPath: string): LiveSessionState[] {
@@ -3092,8 +3099,14 @@ class SessionManager {
     // between submissions. Never in a slot (either building there) nor with review copies off.
     const copies = copiesDirOf(workspaceOf(projectPath).worktreesRoot, projectPath)
     const granted = grantsCopies({ capable: adapter.descriptor.capabilities.session?.extraDirs ?? false, on: advanced.get(COPIES_REVIEW) !== false, reviews: policy.tools && reviewsWork(agentWorkflowRole(agent)), inProjectFolder: !l.slotEnv && samePlace(cwd, projectPath), assistant: workspace.isAssistantHome(projectPath) })
-    const extraDirs = granted && (await mkdir(copies, { recursive: true }).then(() => true, () => false)) ? [copies] : []
+    const made = granted && (await mkdir(copies, { recursive: true }).then(() => true, () => false))
+    // HI-3337: a CLI that asks about such a folder at every start (Claude Code 2.1.326) isn't given it until its home
+    // trusts it (Set Up, at the worktrees folder): a reviewer never starts into a question nobody may answer.
+    const untrusted = made && (await addedDirAsks(adapter, conn?.homeEnv && conn.folder ? conn.folder : null, copies))
+    if (untrusted) log.info(`${userText(this.label(state))}: no review copies this launch: ${adapter.descriptor.name} doesn't trust ${userText(copies)} on its connection yet (Set Up)`)
+    const extraDirs = made && !untrusted ? [copies] : []
     l.extraDirs = extraDirs
+    l.withheldDirs = untrusted ? [copies] : []
     l.cliVersion = info.version ?? null
     // Its side of the workflow for its metrics (HI-2049), once: its part in the running lanes now, else its own role.
     l.workflow = workspace.isAssistantHome(projectPath) ? 'none' : launchWorkflow(agentWorkflowRole(agent), await this.laneParts(projectPath, agent.id).catch(() => []))

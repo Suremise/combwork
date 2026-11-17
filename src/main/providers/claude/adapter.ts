@@ -2,7 +2,7 @@ import { TOOLS_SERVER } from '../../../shared/assistantTools'
 import { homedir } from 'os'
 import { msg, tr } from '../../../shared/i18n'
 import { join, basename } from 'path'
-import { mkdir, open, readdir, readFile, stat, writeFile } from 'original-fs/promises'
+import { mkdir, open, readdir, readFile, realpath, stat, writeFile } from 'original-fs/promises'
 import { existsSync, readFileSync, realpathSync } from 'original-fs'
 import type { AgentInstallInfo, AutoCompactSetting, HookCause, McpServerDef, MemorySource, PathDataCopy, PlanLimit, PlanUsage, ReadinessIssue, RetryWait, SubSession } from '../../../shared/types'
 import { assertSessionId, isSessionId } from '../../../shared/defaults'
@@ -490,6 +490,18 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
         p = up
       }
     })
+  }
+
+  /**
+   * Its trust of a plain folder given with --add-dir (HI-3337): 2.1.326 asks about one outside every folder it trusts,
+   * before each session (HI-3335). Read as its folder trust is (an ancestor's entry covers a folder without Git), from
+   * the home's `.claude.json`; its own home's is beside `.claude` unless CLAUDE_CONFIG_DIR moves it.
+   */
+  async addedDirTrusted(home: string | null, folder: string): Promise<boolean | null> {
+    const at = home ?? (process.env.CLAUDE_CONFIG_DIR || homedir())
+    const real = await realpath(folder).catch(() => null)
+    const [r] = await this.connectionTrusts(at, [{ root: real, git: false, short: false }])
+    return r === true ? true : r === false ? false : null
   }
 
   accountSharedTarget(name: string): string {

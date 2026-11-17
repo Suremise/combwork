@@ -331,6 +331,10 @@
     "defaultMessage": "resets {when}",
     "description": "Beside a plan-usage bar (HI-2528): the limit resets another day; {when} is a weekday and time (\"Thu 09:00\") or a date and time further out. Lower case, after the bar's percentage."
   },
+  "settings.accounts.reviewCopies": {
+    "defaultMessage": "review copies",
+    "description": "In the list after \"Not trusted yet in this workspace:\" (settings.accounts.notTrusted), beside project names (HI-3337): the workspace's worktrees folder, where reviewers' review copies are, which the coding agent CLI doesn't trust yet. Lower case, a list item."
+  },
   "settings.accounts.sameLoginAccount": {
     "defaultMessage": "Signed in to the same login as another account: {names}",
     "description": "A warning on an account (Settings → Accounts & Connections, HI-2107): other accounts are signed in as the same login. {names} is their names, listed."
@@ -346,6 +350,10 @@
   "settings.accounts.setUpIn": {
     "defaultMessage": "It opens in {project}'s folder, {folder}: answer {cli}'s question to trust it.",
     "description": "Above a connection's Set Up terminal when it opens in a project's folder its coding agent CLI ({cli}) doesn't trust yet (HI-1870): {project} is the project's name, {folder} the folder."
+  },
+  "settings.accounts.setUpInCopies": {
+    "defaultMessage": "It opens in this workspace's worktrees folder, {folder}, where reviewers' review copies are: answer {cli}'s question to trust it. Until then, reviewers on this connection review without a copy, since {cli} would ask about it at every start.",
+    "description": "Above a connection's Set Up terminal when it opens in the open workspace's worktrees folder (HI-3337): the coding agent CLI ({cli}) asks about the reviewers' review-copies folder at each start until it trusts this folder once. {folder} is the folder."
   },
   "settings.accounts.setUpInWorkspace": {
     "defaultMessage": "It opens in this workspace's folder, {folder}: answer {cli}'s question to trust it, and with it every project in it that isn't a Git repository. A Git repository is asked in its own folder next.",

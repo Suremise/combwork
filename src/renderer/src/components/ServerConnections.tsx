@@ -6,6 +6,7 @@ import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { serverModelLabel } from '@shared/models'
 import { defaultOutput, outputFits, tightFit } from '@shared/localModelLimits'
 import { CONTEXT_MAX } from '@shared/serverDiagnostics'
+import type { ConnectionTrust } from '@shared/accounts'
 import { call, errorMessage } from '../api'
 import { confirm, notify } from '../store'
 import { Icon, Modal } from './ui'
@@ -583,7 +584,7 @@ export function MaskingBanner({ masking }: { masking?: { state: string; gap: boo
  * Opens a connection's Set Up terminal (a server one's, or a sign-in one's: HI-1826): its key and where it opened
  * (HI-1871), or null when it couldn't be opened (said).
  */
-export async function setUpConnection(id: string): Promise<{ key: string; in?: { folder: string; project?: string; workspace?: true } } | null> {
+export async function setUpConnection(id: string): Promise<{ key: string; in?: ConnectionTrust['setUpIn'] } | null> {
   try {
     return await call('connections:setUp', id)
   } catch (e) {

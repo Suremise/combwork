@@ -86,6 +86,8 @@
   "settings.accounts.setUpChecking": "Wird geprüft…",
   "settings.accounts.setUpDone": "Eingerichtet",
   "settings.accounts.setUpIn": "Es öffnet sich im Ordner von {project}, {folder}: Beantworte die Frage von {cli}, um ihm zu vertrauen.",
+  "settings.accounts.setUpInCopies": "Es öffnet sich im Worktree-Ordner dieses Arbeitsbereichs, {folder}, in dem die Review-Kopien der Reviewer liegen: Beantworte die Frage von {cli}, um ihm zu vertrauen. Bis dahin prüfen Reviewer mit dieser Verbindung ohne Kopie, da {cli} bei jedem Start danach fragen würde.",
+  "settings.accounts.reviewCopies": "Review-Kopien",
   "settings.accounts.setUpInWorkspace": "Es öffnet sich im Ordner dieses Arbeitsbereichs, {folder}: Beantworte die Frage von {cli}, um ihm zu vertrauen, und damit jedem Projekt darin, das kein Git-Repository ist. Ein Git-Repository wird danach in seinem eigenen Ordner gefragt.",
   "settings.accounts.setUpNeeded": "Einrichtung nötig",
   "settings.accounts.signIn": "Anmelden",
