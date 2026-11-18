@@ -1,5 +1,5 @@
 // HI-3378: the types of tests/timing.cjs, for the unit tests and vitest.config.ts.
-export type TimingKind = 'hang' | 'budget' | 'quiet' | 'pace' | 'interval' | 'seam'
+export type TimingKind = 'hang' | 'budget' | 'quiet' | 'pace' | 'interval' | 'seam' | 'lock'
 export interface Timing {
   kind: TimingKind
   ms: number
@@ -14,3 +14,5 @@ export function resolve(env?: Record<string, string | undefined>, defaults?: Rec
 /** tests/timing.json's entries, checked. */
 export function readDefaults(file?: string): Record<string, Timing>
 export const KINDS: readonly TimingKind[]
+/** The most a Node timer takes (2^31 - 1 ms): every value in force is from 1 to this. */
+export const MAX_MS: number

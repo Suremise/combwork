@@ -8,8 +8,9 @@
 //                                  bound (lists only, exits 0)
 //   --base <ref>                   compare with another ref than main
 //   npm run test:waits -- --literals   HI-3378: no number written in place for a wait or timeout anywhere in tests/**
-//                                  (scripts/timingLiterals.mjs; check:repo runs it): fails on one outside the allow list
-//                                  (tests/timingAllow.json, the backlog), or on a listed file with none left
+//                                  (scripts/timingLiterals.mjs; check:repo runs it): fails on one its baseline (tests/
+//                                  timingAllow.json, the backlog by occurrence) doesn't cover, or on a stale entry
+//   with --shrink too              drops the baseline's stale entries (never adds one)
 //   with --all too                 also prints the backlog, per file
 // It exits 2 when it can't compare (no such ref, git fails): nothing was checked. What it can't see: a single read
 // with no sleep before it, a sleep more than three lines before its check, and a wait under another helper's name.
@@ -19,7 +20,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { reportReadyWaits } from './readyWaits.mjs'
-import { checkTree } from './timingLiterals.mjs'
+import { checkTree, writeBaseline } from './timingLiterals.mjs'
 
 const ROOT = join(import.meta.dirname, '..')
 /** A fake's sleep is a slow CLI, and fixtures aren't tests. */
@@ -303,20 +304,26 @@ function allFiles(dir) {
 if (process.argv[1] && import.meta.filename === process.argv[1]) {
   const args = process.argv.slice(2)
   const all = args.includes('--all')
-  // HI-3378: the whole tree's literal waits against the allow list; nothing else of this script runs then.
+  // HI-3378: the whole tree's literal waits against the baseline (tests/timingAllow.json); nothing else of this script runs then.
   if (args.includes('--literals')) {
     const r = checkTree()
+    if (args.includes('--shrink')) {
+      // Drops the entries with no literal left, and never adds one: a literal the baseline doesn't cover still fails.
+      writeBaseline(r.shrunk)
+      console.log(`tests/timingAllow.json: ${r.stale.length} entr${r.stale.length === 1 ? 'y' : 'ies'} with no literal left dropped.`)
+      r.stale.length = 0
+    }
     for (const f of r.found) console.log(`${f.file}:${f.line}  ${f.what}: ${f.text}`)
     if (r.found.length) console.log(`
-${r.found.length} wait(s) or timeout(s) with a number written in place: use a name from tests/timing.json (timing(name); tests/README.md, Timing), or say "timing-ok: <why>" on the line if it is no wait.`)
-    for (const f of r.cleared) console.log(`${f}: on tests/timingAllow.json with no literal wait left: take it off the list.`)
+${r.found.length} wait(s) or timeout(s) with a number written in place, added or changed: use a name from tests/timing.json (timing(name); tests/README.md, Timing), or say "timing-ok: <why>" on the line if it is no wait.`)
+    for (const s of r.stale) console.log(`${s.file}: its baseline entry "${s.key}" has no literal left (migrated?): node scripts/testWaits.mjs --literals --shrink drops it.`)
     if (all) {
       for (const entry of [...r.backlog].sort((x, y) => y.count - x.count)) console.log(`${entry.file}  ${entry.count}`)
       console.log(`
-The backlog: ${r.backlog.reduce((n, b) => n + b.count, 0)} literal wait(s) in ${r.backlog.length} file(s) still on tests/timingAllow.json (HI-3381, HI-3382).`)
+The backlog: ${r.backlog.reduce((n, b) => n + b.count, 0)} literal wait(s) in ${r.backlog.length} file(s) on tests/timingAllow.json (HI-3381, HI-3382).`)
     }
-    if (!r.found.length && !r.cleared.length) console.log('No literal wait outside the allow list, and every file on it still has one.')
-    process.exit(r.found.length || r.cleared.length ? 1 : 0)
+    if (!r.found.length && !r.stale.length) console.log('No literal wait the baseline (tests/timingAllow.json) does not cover, and none of its entries stale.')
+    process.exit(r.found.length || r.stale.length ? 1 : 0)
   }
   const base = args.includes('--base') ? args[args.indexOf('--base') + 1] : 'main'
   let found = 0

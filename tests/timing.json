@@ -1,5 +1,5 @@
 {
-  "$comment": "HI-3378: every test wait and timeout, by name, in one place. Read with timing(name) from tests/timing.cjs. kind: hang (generous: only bounds a hung run; CW_TEST_TIMING_SCALE multiplies these), budget (narrow on purpose: a performance check), quiet (a window where nothing happening is the point), pace (a sleep that is the point of a test), interval (how often a wait looks), seam (a value given to Combwork's own CW_TEST_* seams). To check a narrow result, lower a value here, or in a file named by CW_TEST_TIMING (merged over these by name). tests/README.md, Timing.",
+  "$comment": "HI-3378: every test wait and timeout, by name, in one place. Read with timing(name) from tests/timing.cjs. kind: hang (generous: only bounds a hung run; CW_TEST_TIMING_SCALE multiplies these), lock (when one run may take another's lock: never scaled), budget (narrow on purpose: a performance check), quiet (a window where nothing happening is the point), pace (a sleep that is the point of a test), interval (how often a wait looks), seam (a value given to Combwork's own CW_TEST_* seams). To check a narrow result, lower a value here, or in a file named by CW_TEST_TIMING (merged over these by name). tests/README.md, Timing.",
   "test.hang": { "kind": "hang", "ms": 120000, "note": "a unit test's own limit (vitest.config.ts testTimeout)" },
   "test.hangReal": { "kind": "hang", "ms": 300000, "note": "a unit test doing real git or real processes at length" },
   "test.hangRealJj": { "kind": "hang", "ms": 600000, "note": "a unit test driving the real jj" },
@@ -26,7 +26,7 @@
   "queue.stepMs": { "kind": "hang", "ms": 120000, "note": "a merge queue step" },
   "slot.readyMs": { "kind": "hang", "ms": 120000, "note": "a slot being prepared" },
   "git.lockRetryMs": { "kind": "hang", "ms": 60000, "note": "an e2e git command retried while git's index lock is held" },
-  "runner.lockStaleMs": { "kind": "hang", "ms": 60000, "note": "the e2e runner's lane claims lock counted stale" },
+  "runner.lockStaleMs": { "kind": "lock", "ms": 60000, "note": "the e2e runner's lane claims lock counted stale, when another run may take it: an ownership threshold on a shared machine, never scaled" },
   "suite.limitMs": { "kind": "hang", "ms": 1200000, "note": "an e2e suite's whole run" },
   "scenario.fakeTurnMs": { "kind": "hang", "ms": 180000, "note": "a scenario's whole turn on a fake provider" },
   "scenario.modelTurnMs": { "kind": "hang", "ms": 600000, "note": "a scenario's whole turn in a model trial" },

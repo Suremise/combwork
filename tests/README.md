@@ -151,6 +151,8 @@ can't become a default. Each entry says its kind:
 - **`budget`**: narrow on purpose: a performance check, its number the point.
 - **`quiet`** and **`pace`**: a window where nothing happening is the point, a sleep that paces input.
 - **`interval`**: how often a wait looks. **`seam`**: a value given to one of Combwork's `CW_TEST_*` seams.
+- **`lock`**: an ownership threshold (`runner.lockStaleMs`: when one run may take another's claims lock on this
+  shared machine), never scaled.
 
 **To check a narrow result**, change the value in one place, without touching a test:
 
@@ -158,7 +160,10 @@ can't become a default. Each entry says its kind:
   defaults by name; a name it gives that the file doesn't have is an error). CI commits `tests/timing.ci.json` and
   sets it once in its workflow;
 - **`CW_TEST_TIMING_SCALE=<n>`**: multiplies the `hang` values alone (a slow machine), never a budget, a quiet window, a
-  pace or an interval.
+  pace, an interval or a lock's age.
+
+Every value in force is a whole number of ms from 1 to a Node timer's most (2^31 − 1), after an override and a scale, or
+loading fails; names are own properties only (`constructor` is no timing).
 
 Both are passed from the e2e runner to its suites (`PASS_ENV` in `tests/e2e/runContext.cjs`). A new kind of wait gets
 a new name in `tests/timing.json`, with its kind and a note.
@@ -168,8 +173,12 @@ a test's or hook's timeout, `vi.setConfig`'s limits, a `timeout:` value, `until`
 Promise around `setTimeout`, a `Date.now() - t < N` loop, a `*_MS` constant, or `toBeLessThan(N)` on a clock reading,
 anywhere in `tests/**` (fakes, fixtures and the timing files apart; simulated time is none). A number that is no wait
 (a value under test, a child's own lifetime) says `timing-ok: <why>` on its line or the line above.
-`tests/timingAllow.json` lists the files not migrated yet (HI-3381 for unit tests, HI-3382 for e2e and scenarios): the
-list only shrinks, as a listed file with none left fails too. `-- --literals --all` prints that backlog, per file.
+The calls are read across lines (comments and strings blanked, parentheses matched), so a test's timeout or a Promise's
+`setTimeout` written over several lines counts. `tests/timingAllow.json` is the backlog not migrated yet (HI-3381 for
+unit tests, HI-3382 for e2e and scenarios), **by occurrence**: each existing literal's kind and line text. A literal it
+doesn't cover fails, in a backlog file too (one added, or one changed); an entry with no literal left fails until
+`node scripts/testWaits.mjs --literals --shrink` drops it, which never adds one. `-- --literals --all` prints the backlog,
+per file.
 
 A test that flakes anyway is investigated with the `investigate-flake` skill (`.claude/skills`, `.agents/skills`).
 
