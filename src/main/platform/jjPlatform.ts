@@ -966,7 +966,7 @@ export class JjPlatform implements PlatformAdapter {
     const cycle = wf.state(card).cycle
     // HI-3367: its live journals of earlier cycles (a card put back and restarted) retired first, read again here under
     // its locks: none is ever answered again. Until each is, no attempt or preview of this cycle runs (false: busy).
-    if (!(await this.retireOthers(journals, card.key, card, cycle, cycle, host))) return false
+    if (!(await this.retireOthers(journals, card.key, card, cycle, cycle, host, integ.view.store))) return false
     const recovery = this.advanceDeps(integ, journals, () => true)
     const listed = await journals.list(card.key, cycle)
     for (const { attempt, journal } of listed) {
@@ -1260,8 +1260,14 @@ export class JjPlatform implements PlatformAdapter {
    * lock and the repository lock (its caller's). Each is marked superseded on the card first, in one write with its comment
    * when it may have moved its target (attemptPreMutation), then archived whole. Kept live where that write wasn't
    * committed, or the archive failed (the next pass archives it, its marker saying it was told). False: one is still live.
+   * HR1's round 2: only what this adapter's locks fence is retired. The card is read again as this project's here (moved
+   * to another project while the locks were waited for: false, nothing touched), and a journal only when its plan names
+   * `store`, the repository whose lock is held. One of another repository (a card moved here from another project) is
+   * that repository's writer's: left live, untouched, and not waited for (its move wasn't in this repository). One that
+   * can't be read can't be fenced: its notice is given once (its marker), and it is left live, not waited for again.
    */
-  private async retireOthers(journals: AdvanceJournals, fileKey: string, card: CardRecord, keep: number | null, cycleNow: number, host: AdvanceHost): Promise<boolean> {
+  private async retireOthers(journals: AdvanceJournals, fileKey: string, card: CardRecord, keep: number | null, cycleNow: number, host: AdvanceHost, store: string): Promise<boolean> {
+    const wf = this.wf!
     let ok = true
     let listed: Awaited<ReturnType<AdvanceJournals['others']>>
     try {
@@ -1271,12 +1277,22 @@ export class JjPlatform implements PlatformAdapter {
       checksLog.warn(`listing ${userText(card.key)}'s advance journals`, e) // i18n-ignore: a log line, English
       return false
     }
+    if (!listed.length) return true
+    try {
+      const owner = wf.store.ownerOfKey(fileKey)
+      if (!wf.store.isOwn(card.id) || owner === 'unknown' || !owner || !owner.own || owner.id !== card.id) return false
+    } catch (e) {
+      checksLog.warn(`reading ${userText(card.key)}'s project`, e) // i18n-ignore: a log line, English
+      return false
+    }
     for (const o of listed) {
-      const warn = attemptPreMutation(o.journal) ? null : { target: o.journal !== 'unreadable' ? o.journal.plan.target : (this.wf!.state(card).started?.target ?? '-') }
+      if (o.journal !== 'unreadable' && !samePath(o.journal.plan.store, store)) continue
+      const warn = attemptPreMutation(o.journal) ? null : { target: o.journal !== 'unreadable' ? o.journal.plan.target : (wf.state(card).started?.target ?? '-') }
       if ((await host.superseded(card, { cycle: o.cycle, attempt: o.attempt }, warn)) === 'failed') {
         ok = false
         continue
       }
+      if (o.journal === 'unreadable') continue
       try {
         await journals.supersede(o.name, o.journal, cycleNow)
       } catch (e) {
@@ -1312,9 +1328,10 @@ export class JjPlatform implements PlatformAdapter {
       if (!wf.store.isArchived(id)) return
       await this.withCardLock(id, () =>
         underLock(integ.view.store, integ.lock, async () => {
+          // Read again under the locks (HR1's round 2): still archived, and still this project's (retireOthers).
           if (!wf.store.isArchived(id)) return
           const now = wf.store.card(id)
-          await this.retireOthers(journals, fileKey, now, null, wf.state(now).cycle, host)
+          await this.retireOthers(journals, fileKey, now, null, wf.state(now).cycle, host, integ.view.store)
         })
       )
       return

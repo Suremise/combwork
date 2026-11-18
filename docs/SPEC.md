@@ -4277,7 +4277,12 @@ with s34, its mapping HI-3235/s7, s10, s13 and s16. gate:advance is open.
   repository lock (an attempt holds it from its first journal to its outcome), the card read again as gone there,
   only those whose plan names this repository's store, with nothing said; one that can't be read stays, as does
   everything when a board read fails. A folder that can't be listed (anything but missing) is never taken as empty:
-  the card stays busy.
+  the card stays busy. Only what this adapter's locks fence is retired (HR1's round 2): under the locks the card is read
+  again as this project's (moved away meanwhile: nothing touched, busy), and a journal only when its plan names the
+  store whose lock is held. One of another repository (a card moved here) stays live, untouched and not waited for (its
+  move wasn't in this repository); one that can't be read can't be fenced, so its notice is given once (its marker)
+  and it stays live, not waited for. Recovery's listing passes over a file it can't parse: the card's next settling
+  finds it.
 - **Preview and click** (HI-3236; its mapping HI-3236/s7, s10, s13). A finish that previews (`finishPreviews`) asks the
   adapter's optional `advancePreview` port, never `advance`: once the plan is ready (as an automatic attempt's would be,
   not dismissed), For you previews it (gate `advancePreview`, bound to the plan id: the move E → R, the candidate's style,

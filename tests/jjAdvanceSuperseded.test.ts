@@ -18,7 +18,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { boardFile } from '../src/main/boardStore'
 import { FactStore } from '../src/main/workflow/factStore'
 import type { AdvanceHost } from '../src/main/platform/adapter'
-import { AdvanceJournals, attemptPreMutation, type AdvanceJournal, type AdvancePoint } from '../src/main/platform/jjAdvance'
+import { AdvanceJournals, attemptPreMutation, planIdOf, type AdvanceJournal, type AdvancePoint } from '../src/main/platform/jjAdvance'
 import { advanceHostOf, supersededKey } from '../src/main/workflow/advanceHost'
 import { reconcile } from '../src/main/workflow/reconcile'
 import { ADVANCE_UNCERTAIN_GATE, type FactData } from '../src/shared/workflow/facts'
@@ -103,6 +103,16 @@ const superseded = (w: World, card: Card): AdvanceJournal[] => {
     .map((n) => JSON.parse(readFileSync(join(dir, n), 'utf8')) as AdvanceJournal)
     .filter((j) => j.settled === 'superseded')
 }
+
+/** Another repository's backing store (a path no repository of this project has). */
+const otherStore = (w: World): string => join(w.home, 'elsewhere', '.jj', 'repo', 'store', 'git')
+/** A journal with its plan changed, its planId recomputed (AdvanceJournals.read checks it): a valid journal, not an unreadable one. */
+const withPlan = (j: AdvanceJournal, plan: Partial<AdvanceJournal['plan']>, attempt = j.attempt): AdvanceJournal => {
+  const p = { ...j.plan, ...plan }
+  return { ...j, attempt, plan: p, planId: planIdOf(p) }
+}
+const journalFile = (w: World, card: Card, cycle: number, attempt: string): string => join(journals(w).dir, `${card.key}.${cycle}.${attempt}.json`)
+const readJournal = (w: World, card: Card, cycle: number, attempt: string): AdvanceJournal => JSON.parse(readFileSync(journalFile(w, card, cycle, attempt), 'utf8')) as AdvanceJournal
 
 /** A card Approved whose advance crashed at `point` (its journal left live, unsettled); `ask`: a pass after, asking its question. */
 async function crashedAt(point: AdvancePoint, o: { ask?: boolean } = {}) {
@@ -309,12 +319,15 @@ describe.skipIf(!jjExe)(`a superseded jj advance journal retired (jj ${TESTED_JJ
     b.close()
     const foreign = (key: string): string => {
       const name = `${key}.7.x1.json`
-      const text = JSON.stringify({ ...mine, attempt: 'x1', plan: { ...mine.plan, card: key, cycle: 7, store: join(w.home, 'elsewhere', '.jj', 'repo', 'store', 'git') } })
+      const j = withPlan(mine, { card: key, cycle: 7, store: otherStore(w) }, 'x1')
+      const text = JSON.stringify(j)
       writeFileSync(join(journals(w).dir, name), text)
+      // A valid journal (its planId matches), so it is the ownership and the store that keep it, not unreadability.
       return text
     }
     const theirsText = foreign(theirs.key)
     const unknownText = foreign('ZZ-9')
+    expect(await journals(w).read(theirs.key, 7, 'x1')).toMatchObject({ planId: planIdOf(withPlan(mine, { card: theirs.key, cycle: 7, store: otherStore(w) }).plan) })
     // This project's own journal settled so it isn't what the pass is about: restart this card and let it retire.
     await restart(w, card)
     await recover(w, card)
@@ -354,6 +367,81 @@ describe.skipIf(!jjExe)(`a superseded jj advance journal retired (jj ${TESTED_JJ
     await advanceWith(w, card, advanceHostOf(w.wf))
     expect(marked(w, card, cycle1, attempt)).toBe(true)
     expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(before + 1)
+    expect(notices(w, card)).toEqual(['done'])
+  })
+
+  it('HR1’s round 2: ownership read again under the locks: an archived card moved to another project while they were waited for keeps its journal; an active card no longer this project’s is busy, nothing touched', async () => {
+    const { w, card, cycle1, attempt } = await crashedAt('crash:afterIntegrate')
+    const text = readFileSync(journalFile(w, card, cycle1, attempt), 'utf8')
+    db(w, (d) => d.prepare('UPDATE cards SET archived = 1 WHERE number = ?').run(card.id))
+    const store = w.wf.store
+    const ownerOfKey = store.ownerOfKey.bind(store)
+    let reads = 0
+    // The first read (before the locks) finds it this project's; every read after (under them), another project's.
+    store.ownerOfKey = (key: string) => (key === card.key && ++reads > 1 ? { id: card.id, own: false } : ownerOfKey(key))
+    try {
+      await recover(w, card)
+    } finally {
+      store.ownerOfKey = ownerOfKey
+    }
+    expect(reads).toBeGreaterThan(1)
+    expect(readFileSync(journalFile(w, card, cycle1, attempt), 'utf8')).toBe(text)
+    expect(marked(w, card, cycle1, attempt)).toBe(false)
+    // Active again, restarted, then moved away (isOwn false) as its advance takes the locks: busy, its journal kept.
+    db(w, (d) => d.prepare('UPDATE cards SET archived = 0 WHERE number = ?').run(card.id))
+    await restart(w, card)
+    await approve(w, card, 'again.txt', { pins: false })
+    await jjp(w, card).reconcile(w.wf.store.card(card.id), {})
+    const isOwn = store.isOwn.bind(store)
+    store.isOwn = (id: number) => (id === card.id ? false : isOwn(id))
+    try {
+      expect(await advanceWith(w, card, advanceHostOf(w.wf))).toBe('busy')
+    } finally {
+      store.isOwn = isOwn
+    }
+    expect(readFileSync(journalFile(w, card, cycle1, attempt), 'utf8')).toBe(text)
+    expect(marked(w, card, cycle1, attempt)).toBe(false)
+  })
+
+  it('HR1’s round 2: a valid journal of another repository on this project’s card (moved here) is never retired, on the active (earlier cycle) and the archived paths, and doesn’t hold the new cycle', async () => {
+    const { w, card, cycle1, attempt } = await crashedAt('crash:afterIntegrate')
+    // Its plan names another repository's store: written by that repository's writer, under that repository's lock.
+    writeFileSync(journalFile(w, card, cycle1, attempt), JSON.stringify(withPlan(readJournal(w, card, cycle1, attempt), { store: otherStore(w) })))
+    const text = readFileSync(journalFile(w, card, cycle1, attempt), 'utf8')
+    expect(await journals(w).read(card.key, cycle1, attempt)).not.toBe('unreadable')
+    // Archived in the same cycle: kept.
+    db(w, (d) => d.prepare('UPDATE cards SET archived = 1 WHERE number = ?').run(card.id))
+    await recover(w, card)
+    expect(readFileSync(journalFile(w, card, cycle1, attempt), 'utf8')).toBe(text)
+    expect(marked(w, card, cycle1, attempt)).toBe(false)
+    // Active, restarted: an earlier cycle's journal of another store, kept; the new cycle attempted all the same.
+    db(w, (d) => d.prepare('UPDATE cards SET archived = 0 WHERE number = ?').run(card.id))
+    await restart(w, card)
+    await approve(w, card, 'again.txt', { pins: false })
+    await jjp(w, card).reconcile(w.wf.store.card(card.id), {})
+    const before = facts(w, card, 'AdvanceAttempted').length
+    await advanceWith(w, card, advanceHostOf(w.wf))
+    expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(before + 1)
+    expect(readFileSync(journalFile(w, card, cycle1, attempt), 'utf8')).toBe(text)
+    expect(marked(w, card, cycle1, attempt)).toBe(false)
+    expect(notices(w, card)).toEqual([])
+  })
+
+  it('an earlier journal that can’t be read (its store unknown): its notice given once, the file left live, the new cycle not held', async () => {
+    const { w, card, cycle1, attempt } = await crashedAt('crash:afterIntegrate')
+    writeFileSync(journalFile(w, card, cycle1, attempt), '{ not json')
+    await restart(w, card)
+    // Recovery's listing passes over a file it can't parse (no lock taken for it); the card's next settling finds it.
+    await approve(w, card, 'again.txt', { pins: false })
+    await jjp(w, card).reconcile(w.wf.store.card(card.id), {})
+    const before = facts(w, card, 'AdvanceAttempted').length
+    await advanceWith(w, card, advanceHostOf(w.wf))
+    expect(marked(w, card, cycle1, attempt)).toBe(true)
+    expect(notices(w, card)).toEqual(['done'])
+    expect(existsSync(journalFile(w, card, cycle1, attempt))).toBe(true)
+    expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(before + 1)
+    await recover(w, card)
+    await pass(w, card)
     expect(notices(w, card)).toEqual(['done'])
   })
 })
