@@ -1145,12 +1145,12 @@ async function runScenario(sc, providerKey, opts = {}) {
     const traceFrom = Date.now()
     const onLook = (look, r) => {
       if (look.values.stop && look.values.stop !== UNKNOWN) envStop = look.values.stop
-      const key = `${r.state.phase}: ${String(r.why).replace(/\d+/g, '#')}`
-      if (trace.length < 40 && trace[trace.length - 1]?.key !== key) trace.push({ key, ms: look.now - traceFrom, status: look.status, turn: look.turn, why: r.why })
+      const decision = `${r.state.phase}: ${String(r.why).replace(/\d+/g, '#')}`
+      if (trace.length < 40 && trace[trace.length - 1]?.decision !== decision) trace.push({ decision, ms: look.now - traceFrom, status: look.status, turn: look.turn, why: r.why })
     }
     const ended = await waitTurnEnd({ reads, act, onLook, deadline: limit, floors: { quietMs: timing('scenario.quietMs'), waitingQuietMs: timing('scenario.waitingQuietMs') }, readMs: timing('scenario.readMs'), lookMs: timing('scenario.lookMs'), sleep })
     if (ended.outcome === 'environment') return skipFor(envStop)
-    result.turnEnd = { outcome: ended.outcome, why: ended.why, trace: trace.map(({ key, ...t }) => t), statuses: (await ctx.statesSeen(statesFrom).catch(() => [])).map((x) => x.status) }
+    result.turnEnd = { outcome: ended.outcome, why: ended.why, trace: trace.map(({ decision: _decision, ...t }) => t), statuses: (await ctx.statesSeen(statesFrom).catch(() => [])).map((x) => x.status) }
     const s = await live()
     if (endedAtLaunch) result.error = endedAtLaunch.error
     else if (notTaken) result.error = notTaken
