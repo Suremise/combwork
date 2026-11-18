@@ -110,7 +110,7 @@ const lastCommitFiles = () => git('show', '--no-renames', '--name-only', '--form
     // the hook are ended, the notice says so (nothing committed), and the paused merge's buttons are back.
     const hold = path.join(lib.probeDir('foldercommit-hold'), 'started')
     const pidFile = `${hold}.pid`
-    const fwd = (p) => p.replace(/\\/g, '/')
+    const fwd = (file) => file.replace(/\\/g, '/')
     fs.mkdirSync(path.join(fx.alpha, '.git', 'hooks'), { recursive: true })
     fs.writeFileSync(path.join(fx.alpha, '.git', 'hooks', 'pre-commit'), `#!/bin/sh\n: > "${fwd(hold)}"\n"${fwd(process.execPath)}" -e 'require("fs").writeFileSync(process.argv[1], String(process.pid)); setTimeout(() => {}, 120000)' "${fwd(pidFile)}"\n`)
     await commitBtn.click()
