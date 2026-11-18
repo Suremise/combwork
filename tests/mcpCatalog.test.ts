@@ -287,6 +287,19 @@ describe('installing and updating (HI-545)', () => {
     expect(projectMcp(ambrosia).enabled).toEqual(['demo'])
   })
 
+  it('HI-3371: a folder left without its definition takes the name though no server is listed; Install with Replace, added nowhere, goes in its place', async () => {
+    mkdirSync(join(mcpDir(), 'demo'), { recursive: true })
+    writeFileSync(join(mcpDir(), 'demo', 'old.js'), '// left behind')
+    expect((await run(() => mcp.listMcp())).some((m) => m.name === 'demo')).toBe(false)
+    const p = await run(() => catalog.prepareCatalogServer(source(), 'demo'))
+    expect(p).toMatchObject({ existing: null, nameTaken: true })
+    await expect(run(() => catalog.installCatalogServer(p.id, 'demo', false))).rejects.toThrow('already exists')
+    const again = await run(() => catalog.prepareCatalogServer(source(), 'demo'))
+    await run(() => catalog.installCatalogServer(again.id, 'demo', true, { projects: [], assistant: false }))
+    expect(readdirSync(join(mcpDir(), 'demo'))).toEqual(['server.js'])
+    expect((await run(() => mcp.listMcp())).find((m) => m.name === 'demo')).toMatchObject({ projects: [], assistant: false })
+  })
+
   it("installs and runs a zip with Combwork's names, updating it from the same folder; a zip with only the old names has no definition (HI-2594)", async () => {
     await install()
     await addTo(ambrosia)

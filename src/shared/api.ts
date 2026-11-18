@@ -955,6 +955,8 @@ export interface CombworkRequests {
   'mcp:pickFile': () => string | null
   /** What adding the file would add: its name, what it runs, whether the name is taken. Adds nothing. */
   'mcp:previewFile': (file: string) => McpFileServer
+  /** HI-3371: whether `name` is taken for a server being added (`folder`: one that brings a folder, a .zip), as the add would refuse it. */
+  'mcp:nameTaken': (name: string, folder: boolean) => boolean
   /**
    * Adds it as `name`, off in the workspace and in every project (#1093); a name in use is refused unless `replace` (the
    * old one goes to the Recycle Bin).
