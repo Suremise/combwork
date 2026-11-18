@@ -24,6 +24,7 @@ lib.gitProject(proj)
 
 const IDLE = '33600000-0000-4000-8000-000000000001' // Worker's (Claude Code), last active three days ago, 60K tokens
 const CODEX = '33600000-0000-4000-8000-000000000002' // Coder's (Codex), last active three days ago, no transcript
+const OLD = '33600000-0000-4000-8000-000000000003' // Worker's, from before the rename (no names: HI-2540), idle four days
 const threeDaysAgo = new Date(Date.now() - 3 * 86_400_000 - 3_600_000).toISOString()
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -58,7 +59,8 @@ function backup(id, at) {
   const worker = await lib.addAgent(inv, proj, { name: 'Worker' })
   const coder = await lib.addAgent(inv, proj, { name: 'Coder', provider: 'codex' })
   const rec = (id, agent, agentId, name, extra) => ({ id, agent, agentId, cwd: proj, name, createdAt: threeDaysAgo, lastActiveAt: threeDaysAgo, archived: false, names: 2, ...extra })
-  putSessions(proj, { version: 1, sessions: [rec(IDLE, 'claude-code', worker.id, 'Idle work'), rec(CODEX, 'codex', coder.id, 'Idle Codex work')] })
+  const fourDaysAgo = new Date(Date.now() - 4 * 86_400_000).toISOString()
+  putSessions(proj, { version: 1, sessions: [rec(IDLE, 'claude-code', worker.id, 'Idle work'), rec(CODEX, 'codex', coder.id, 'Idle Codex work'), rec(OLD, 'claude-code', worker.id, 'Before the rename', { names: undefined, createdAt: fourDaysAgo, lastActiveAt: fourDaysAgo })] })
   backup(IDLE, threeDaysAgo)
 
   // The Assistant's token (only it starts agents through the Agent API): its session on the fake Claude Code.
@@ -100,7 +102,14 @@ function backup(id, at) {
   const codex = await api('POST', '/v1/projects/demo/agents/Coder/start', { resume: CODEX })
   const codexSaid = String(codex.body?.error ?? codex.body?.message ?? JSON.stringify(codex.body))
   check("a Codex agent's long-idle conversation is refused too, with no size claimed", codex.status === 409 && /last active/.test(codexSaid) && !/tokens of context/.test(codexSaid), `${codex.status} ${codexSaid}`)
-  const anyway = await api('POST', '/v1/projects/demo/agents/Worker/start', { resume: true, resumeIdle: true })
+  // HR3's round 1: one that can't continue (HI-2540), idle as long, is never refused as cold: its start begins a new one.
+  const old = await api('POST', '/v1/projects/demo/agents/Worker/start', { resume: OLD })
+  const startedFresh = old.body?.result?.startedFresh ?? old.body?.startedFresh
+  check("one from before the rename, idle as long, isn't refused as cold: it starts a new conversation, said so", old.status === 200 && startedFresh === 'renamed', `${old.status} ${JSON.stringify(old.body)}`)
+  const fresh = await lib.until(async () => ((await live(worker.id))?.sessionId ? await live(worker.id) : null), HUNG_MS)
+  check('…a new one, not the old one', !!fresh && fresh.sessionId !== OLD && fresh.sessionId !== IDLE, fresh?.sessionId)
+  check('stopped again', await stop(worker.id))
+  const anyway = await api('POST', '/v1/projects/demo/agents/Worker/start', { resume: IDLE, resumeIdle: true })
   check('resumeIdle: true resumes it', anyway.status === 200, `${anyway.status} ${JSON.stringify(anyway.body)}`)
   const resumed = await lib.until(async () => ((await live(worker.id))?.sessionId ? await live(worker.id) : null), HUNG_MS)
   check('…in that same conversation', resumed?.sessionId === IDLE, resumed?.sessionId)

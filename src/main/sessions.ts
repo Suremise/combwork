@@ -8799,11 +8799,13 @@ class SessionManager {
 
   /**
    * HI-3360: whether resuming conversation `id` counts as cold (idle past Settings → Advanced's minutes, and not small),
-   * as its listing says it; null when it doesn't, the rule is off, or it isn't listed (nothing to tell it by).
+   * as its listing says it; null when it doesn't, the rule is off, or it isn't listed (nothing to tell it by). One that
+   * can't continue (HI-2540's `fresh`) never resumes, so it never counts: the start gives it a new conversation, as before.
    */
   async idleOf(projectPath: string, id: string): Promise<IdleResume | null> {
     if (resumeIdleMinutes() === null) return null
-    return (await this.list(projectPath)).find((i) => i.id === id)?.idle ?? null
+    const item = (await this.list(projectPath)).find((i) => i.id === id)
+    return item && !item.fresh ? (item.idle ?? null) : null
   }
 
   private ownListing(key: string, projectPath: string): Promise<SessionListItem[]> {
