@@ -4372,8 +4372,10 @@ module.exports.SCENARIOS = [
       if (posted.status !== 200) throw new Error(`follow-up: ${JSON.stringify(posted.body)}`)
       c.followUp = posted.body.data.design
     },
-    // HI-2225: as card-loop-design-check, the follow-up's wake waits for the prompt's turn.
-    promptAtLaunch: true,
+    // HI-3408: Combwork-started (HI-2664), so it has no prompt of its own to give at launch (HI-2225's promptAtLaunch, which
+    // this had, did nothing since): Combwork's line is its first input, and the follow-up's wake (left above) rings as that
+    // line's turn ends. A model takes both as Combwork types them; a fake is typed its steps once both turns are over and
+    // Combwork is quiet (harness.cjs), so its watch has seen the follow-up already and its answer comes in the same turn.
     prompt: (c) => `You are the reviewer in Implementer's card loop (the card-loop skill). On card #${c.cards.f}, in Review, the user asked for a change for you to check, and Implementer has posted it as a follow-up: check it and answer as your loop says.`,
     fake: (c) =>
       `skill card-loop then cw cw_read_task {"number":${c.cards.f},"latestComment":true} then cw cw_wait_for_tasks {"cards":[${c.cards.f}],"changes":["comment","column"],"wake":true} then cw cw_loop_step ${JSON.stringify({ card: `#${c.cards.f}`, step: 'gaps', text: '1. Add a test for the trimmed name.', design: c.followUp })}`,

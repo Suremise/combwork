@@ -14,7 +14,7 @@ const { timing } = require('../timing.cjs')
 const path = require('path')
 const { execFileSync } = require('child_process')
 const lib = require('../e2e/lib.cjs')
-const { waitTurnEnd, UNKNOWN } = require('./turnEnd.cjs')
+const { waitTurnEnd, UNKNOWN, lineReads, combworkLineAt } = require('./turnEnd.cjs')
 const { processes, leftoverIdentities } = require('../e2e/folderProcesses.cjs')
 const { measuresOf, metricsTotals } = require('./benchmark.cjs')
 const { readWhole, withScriptCalls } = require('./codexScripts.cjs')
@@ -887,7 +887,9 @@ async function runScenario(sc, providerKey, opts = {}) {
     // for it (Combwork types nothing into a launch whose CLI hasn't taken its task yet, #712, and a wake waits for the turn
     // after), so a wake can't come first and do the prompt's work without it. Never with beforePrompt, which waits for
     // that wake's turn.
-    const atLaunch = !byCombwork && !!sc.promptAtLaunch
+    // HI-3408: Combwork's line is a Combwork-started session's first input, so a prompt at launch never applies to one.
+    if (byCombwork && sc.promptAtLaunch) throw new Error(`${sc.id}: startedByCombwork and promptAtLaunch don't go together (Combwork's line is its first input)`)
+    const atLaunch = !!sc.promptAtLaunch
     if (atLaunch && sc.beforePrompt) throw new Error(`${sc.id}: promptAtLaunch and beforePrompt don't go together`)
     const launchPrompt = !atLaunch ? null : p.fake ? (typeof sc.fake === 'function' ? sc.fake(ctx) : sc.fake) : typeof sc.prompt === 'function' ? sc.prompt(ctx) : sc.prompt
     // The run the session under test launched as (HI-2225), known before any prompt can have Combwork relaunch it (a card
@@ -1011,12 +1013,33 @@ async function runScenario(sc, providerKey, opts = {}) {
     if (sc.beforePrompt && !endedAtLaunch) await sc.beforePrompt(ctx)
     const prompt = typeof sc.prompt === 'function' ? sc.prompt(ctx) : sc.prompt
     const fakePrompt = typeof sc.fake === 'function' ? sc.fake(ctx) : sc.fake
+    /** Combwork types nothing into the session under test now or next: its composer free and (in a project) nothing queued to be offered. */
+    const combworkQuiet = async (s) => {
+      if (!s || s.runtime?.composer !== 'free') return false
+      if (host.toLowerCase() !== alpha.toLowerCase()) return true
+      const token = s.runId ? lib.launchToken(userData, s.runId) : null
+      return !!token && (await lib.inboxQuiet(port, 'alpha', s.agentName, token))
+    }
     // Started by Combwork: its line, once the conversation has it. A model works on it, typed nothing more; a fake (which
-    // does nothing on a line it has no script for) is typed its steps once that turn is over.
+    // does nothing on a line it has no script for) is typed its steps once that turn is over (HI-3408, turnEnd.cjs's
+    // lineReads): the line taken and its turn ended, then Combwork quiet for scenario.quietMs, so what else its inbox had
+    // (rung as the line's turn ends) has had its turn too. Idle alone was taken before: a status from before the line's
+    // turn, or between it and that ring, had the steps typed into a turn that dropped them.
     let combworkLine = null
     if (byCombwork && !endedAtLaunch) {
-      const lineOf = async () => (await conversation()).find((x) => x.kind === 'user' && String(x.text ?? '').startsWith('[CW]'))?.text ?? null
-      await lib.until(async () => !!(combworkLine = await lineOf()) && (!p.fake || ['ready', 'finished'].includes((await live())?.status)), timing('hang.step'))
+      const lineOf = async () => {
+        const items = await conversation()
+        return items[combworkLineAt(items)]?.text ?? null
+      }
+      if (!p.fake) await lib.until(async () => !!(combworkLine = await lineOf()), timing('hang.step'))
+      else {
+        const lineEnd = await waitTurnEnd({ reads: lineReads({ live, conversation, quiet: combworkQuiet }), deadline: Date.now() + timing('hang.step'), floors: { quietMs: timing('scenario.quietMs'), waitingQuietMs: timing('scenario.waitingQuietMs') }, readMs: timing('scenario.readMs'), lookMs: timing('scenario.lookMs'), sleep })
+        combworkLine = await lineOf()
+        if (combworkLine && lineEnd.outcome !== 'over') {
+          result.error = `Combwork's line's turn didn't end quietly (${lineEnd.outcome}: ${lineEnd.why})`
+          return result
+        }
+      }
       if (!combworkLine) {
         result.error = "Combwork's line never reached the session under test"
         return result
@@ -1105,12 +1128,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       // A person asked (Combwork's runtime facts): not a trust question on its screen, nor a sign-in.
       asks: async ({ live: s }) => s?.runtime?.attention === 'waiting' && s.runtime.lifecycle === 'running' && !/Do you trust the files in this folder|trust this folder/i.test(await screenOf(key)) && !lib.CLAUDE_TRUST.test(await screenOf(key)),
       // Combwork types nothing into it now or next: its composer free and (in a project) nothing queued to be offered.
-      quiet: async ({ live: s }) => {
-        if (!s || s.runtime?.composer !== 'free') return false
-        if (host.toLowerCase() !== alpha.toLowerCase()) return true
-        const token = s.runId ? lib.launchToken(userData, s.runId) : null
-        return !!token && (await lib.inboxQuiet(port, 'alpha', s.agentName, token))
-      },
+      quiet: async ({ live: s }) => combworkQuiet(s),
       trust: async ({ live: s }) => !!(await trustKind(s)),
       // A dispatched agent's work is part of the outcome: wait while one is still working, or at a question (#498).
       dispatchedBusy: sc.waitForAgents ? async () => (await otherAgents()).some((x) => x.agentId !== agentId && ['working', 'starting', 'background', 'waiting'].includes(x.status)) : undefined,

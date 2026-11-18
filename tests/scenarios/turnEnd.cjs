@@ -176,4 +176,33 @@ async function waitTurnEnd({ reads, act, deadline, floors, readMs, lookMs, sleep
   return { state, done: false, outcome: 'timed out', why: last?.why ?? 'no look within the limit' }
 }
 
-module.exports = { turnStep, start, gatherLook, waitTurnEnd, bounded, UNKNOWN, WORKING, IDLE_ENDS }
+/** The index of Combwork's own line (a user item starting "[CW]") in a conversation's items, or -1. */
+const combworkLineAt = (items) => (items ?? []).findIndex((x) => x.kind === 'user' && String(x.text ?? '').startsWith('[CW]'))
+
+/**
+ * HI-3408: the reads for the turn of Combwork's own line in a session Combwork started (startedByCombwork), for
+ * waitTurnEnd, so a fake is typed its steps only once that turn is over and Combwork is quiet. Idle alone isn't over:
+ * the session can be ready before the line's turn starts (its UserPromptSubmit not yet handled), and once it ends
+ * Combwork rings what else waits in its inbox (card-loop-follow-up-check's follow-up), whose turn drops a line typed
+ * meanwhile (fake-dropped.jsonl). `live()`: its live state, or null when gone; `conversation()`: its items;
+ * `quiet(s)`: Combwork types nothing into it now or next (its composer free, nothing waiting to be offered).
+ * - work: the conversation has the line (its turn began);
+ * - end: a reply after the line, or Combwork's turn ledger has a turn over (the line was its first input: the fake
+ *   Codex's rollout has no replies);
+ * - quiet: as `quiet` says. Turns after the line's (that ring's) show as work and hold the floor until they end.
+ */
+function lineReads({ live, conversation, quiet }) {
+  const state = (s) => (s && typeof s === 'object' ? s : null)
+  return {
+    live: async () => (await live()) ?? null,
+    workSeen: async () => combworkLineAt(await conversation()) >= 0,
+    endSeen: async ({ live: s }) => {
+      const items = await conversation()
+      const at = combworkLineAt(items)
+      return at >= 0 && (items.slice(at + 1).some((x) => x.kind === 'assistant') || state(s)?.turn?.state === 'over')
+    },
+    quiet: async ({ live: s }) => !!state(s) && (await quiet(state(s))) === true
+  }
+}
+
+module.exports = { turnStep, start, gatherLook, waitTurnEnd, bounded, UNKNOWN, WORKING, IDLE_ENDS, lineReads, combworkLineAt }
