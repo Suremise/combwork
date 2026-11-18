@@ -53,7 +53,6 @@ const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${
   // Provider Setup
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
   await page.locator('.activitybar .activity, .activity-bar .activity').first().click().catch(() => undefined)
-  await lib.until(async () => (await page.locator('.settings-nav').count()) === 0, HUNG_MS)
   await page.evaluate(() => (window).__cwRun?.('help.agentSetup'))
   // Open Provider Setup through the command palette.
   await fromPalette('Provider Setup')

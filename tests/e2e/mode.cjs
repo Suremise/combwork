@@ -56,6 +56,8 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   check('no restart banner for mode changes', (await page.locator('.banner', { hasText: 'Restart the session' }).count()) === 0)
 
   // Badge menu → Auto
+  // The window's badge has the mode main has (its live state comes a moment after), so the menu marks it.
+  await lib.until(async () => /Accept edits/.test(await page.locator('.pane-footer-bar .mode-badge').innerText().catch(() => '')), HUNG_MS)
   await page.locator('.pane-footer-bar .mode-badge').click()
   await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, HUNG_MS)
   const items = await page.locator('.menu .menu-item').allTextContents()
