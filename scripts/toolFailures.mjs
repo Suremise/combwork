@@ -28,18 +28,23 @@ export const PROVIDER = 'claude-code'
  * rest are counted for the rate only. Correct refusals keep their own class, so a rate never falls by renaming them.
  */
 export const CLASSES = [
+  // Classes 1–4 are Combwork's tools' own failures only (call.cw): another tool's output quoting a refusal (a test run's,
+  // another server's) is not one.
   // 2. A lane's next card started before the one before it is Done.
-  { id: 'laneOneAtATime', card: 2, test: (t) => /\(lane\.oneAtATime\)/.test(t) },
+  { id: 'laneOneAtATime', card: 2, test: (t, call) => call.cw && /\(lane\.oneAtATime\)/.test(t) },
   // 3. The stale-read fence.
-  { id: 'staleRead', card: 3, test: (t) => /after you last read it/.test(t) },
+  { id: 'staleRead', card: 3, test: (t, call) => call.cw && /after you last read it/.test(t) },
   // 4. A lane reorder refused while its builder works, or work refused to an agent on a card watch.
-  { id: 'laneReorderBusy', card: 4, test: (t) => /a reorder applied now never puts|putting it back would lose its review/.test(t) },
-  { id: 'watchBusy', card: 4, test: (t) => /\(a card watch\)/.test(t) },
-  // 1. A deferred tool called with arguments that don't fit it (its schema not loaded): Claude Code's own validation, or
-  // Combwork's argument error, which names what the tool takes and what was missing or not one of its arguments. Claude
-  // Code adds "input schema was not in your prompt" to any error of a tool not loaded, so that alone isn't this class.
-  { id: 'schemaNotLoaded', card: 1, test: (t) => /InputValidationError/.test(t) || /\btakes [^\n]*?; (missing|not): /.test(t) || t.startsWith('Combwork error: "undefined" is not a card number') },
+  { id: 'laneReorderBusy', card: 4, test: (t, call) => call.cw && /a reorder applied now never puts|putting it back would lose its review/.test(t) },
+  { id: 'watchBusy', card: 4, test: (t, call) => call.cw && /\(a card watch\)/.test(t) },
+  // 1. A deferred Combwork tool called with arguments that don't fit it (its schema not loaded): Claude Code's own
+  // validation, or Combwork's argument error, which names what the tool takes and what was missing or not one of its
+  // arguments. Claude Code adds "input schema was not in your prompt" to any error of a tool not loaded, so that alone
+  // isn't this class.
+  { id: 'schemaNotLoaded', card: 1, test: (t, call) => call.cw && (/InputValidationError/.test(t) || /\btakes [^\n]*?; (missing|not): /.test(t) || t.startsWith('Combwork error: "undefined" is not a card number')) },
   { id: 'otherCombwork', test: (t, call) => call.cw },
+  // Another tool's arguments that don't fit it (Claude Code's own tools', another server's): counted apart, not Combwork's.
+  { id: 'otherSchema', test: (t) => /InputValidationError/.test(t) },
   { id: 'other', test: () => true }
 ]
 
@@ -92,11 +97,13 @@ const textOf = (content) => (typeof content === 'string' ? content : Array.isArr
 
 /**
  * A transcript's lines (JSONL): each answered call once by its id in `seen` (results from `since` on), with its day
- * (YYYY-MM-DD of the result), tool, and for a failure its class; the calls left unanswered; and the session's role.
+ * (YYYY-MM-DD of the result), tool, and for a failure its class; and the session's role. `book` is the whole corpus's
+ * record of calls by id, shared by every transcript read: `answered` (a result seen anywhere, any time) and `pending`
+ * (a call in the window with no result seen yet). A call is pending until a result for its id turns up in any copy, so
+ * the unanswered count is `book.pending.size` once every transcript is read: each id once, whatever copies and order.
  */
-export function readTranscript(lines, seen, since = 0) {
+export function readTranscript(lines, seen, since = 0, book = { answered: new Set(), pending: new Set() }) {
   const uses = new Map()
-  const answered = new Set()
   const results = []
   for (const line of lines) {
     if (!line.trim()) continue
@@ -109,9 +116,14 @@ export function readTranscript(lines, seen, since = 0) {
     const content = e?.message?.content
     if (!Array.isArray(content)) continue
     for (const b of content) {
-      if (b?.type === 'tool_use' && b.id) uses.set(b.id, { name: b.name, input: b.input, at: Date.parse(e.timestamp ?? '') })
+      if (b?.type === 'tool_use' && b.id) {
+        const at = Date.parse(e.timestamp ?? '')
+        uses.set(b.id, { name: b.name, input: b.input, at })
+        if (!book.answered.has(b.id) && (!Number.isFinite(at) || at >= since)) book.pending.add(b.id)
+      }
       if (b?.type !== 'tool_result' || !b.tool_use_id) continue
-      answered.add(b.tool_use_id)
+      book.answered.add(b.tool_use_id)
+      book.pending.delete(b.tool_use_id)
       if (seen.has(b.tool_use_id)) continue
       const at = Date.parse(e.timestamp ?? '')
       if (!Number.isFinite(at) || at < since) continue
@@ -127,10 +139,9 @@ export function readTranscript(lines, seen, since = 0) {
       }
     }
   }
-  const unanswered = [...uses].filter(([id, u]) => !answered.has(id) && !seen.has(id) && (!Number.isFinite(u.at) || u.at >= since)).length
   const role = [...uses.values()].some((u) => ASSISTANT_ONLY_SEEN.includes(toolOf(u.name).name)) ? 'assistant' : 'unknown'
   for (const r of results) r.role = role
-  return { results, unanswered, role }
+  return { results, role, book }
 }
 
 /** Rows of counts, one per key (a day or a role): calls, Combwork's calls, failed, and each class, numerators and denominators. */
@@ -200,14 +211,15 @@ function main() {
   const since = o.dir && o.since === null ? 0 : Number.isFinite(o.since) ? o.since : Date.now() - o.days * 864e5
   const seen = new Set()
   const all = []
-  let unanswered = 0
+  const book = { answered: new Set(), pending: new Set() }
   const sessions = { assistant: 0, unknown: 0 }
   for (const file of transcripts(o, since)) {
-    const t = readTranscript(readFileSync(file, 'utf8').split('\n'), seen, since)
+    const t = readTranscript(readFileSync(file, 'utf8').split('\n'), seen, since, book)
     all.push(...t.results)
-    unanswered += t.unanswered
     if (t.results.length) sessions[t.role]++
   }
+  // Calls still without a result in any transcript read: each id once.
+  const unanswered = book.pending.size
   const rows = countBy(all, o.by === 'role' ? (r) => r.role : (r) => r.day)
   const ids = CLASSES.map((c) => c.id)
   if (o.json) {

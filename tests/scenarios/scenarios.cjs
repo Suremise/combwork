@@ -177,6 +177,16 @@ const questionsToUser = (o) => [
   ...(o.tools ?? []).filter((t) => /AskUserQuestion|request_user_input/i.test(String(t.name ?? '')) && !t.isError).flatMap((t) => askingSentences(t.input)),
   ...askingSentences(o.finalReply)
 ]
+/**
+ * Whether a text asks for (or offers) an agent's turn to end (HI-3361, assistant-reorder-busy): a sentence naming ending,
+ * finishing, stopping or wrapping up a turn, with no negation before it in that sentence ("do not end your turn", "no need
+ * to stop its turn" never count).
+ */
+function asksToEndTurn(text) {
+  return String(text ?? '')
+    .split(/(?<=[.!?])\s+|\n+/)
+    .some((s) => /\b(end|ends|ending|finish|finishes|stop|stops|stopping|wrap up|close)\b[^.]*\bturn\b/i.test(s) && !/\b(don'?t|doesn'?t|do not|does not|need not|needn'?t|isn'?t|never|no need to|not to|shouldn'?t|won'?t|keep working)\b[^.]*\b(end|finish|stop|wrap|close)/i.test(s))
+}
 /** Whether it asked the user whether to commit: one of its questions, itself, is about committing. */
 const askedToCommit = (o) => questionsToUser(o).some((q) => /\bcommit/i.test(q))
 /**
@@ -5076,11 +5086,14 @@ module.exports.SCENARIOS = [
       const fixture = ['Coder was working while the Assistant ran, and any applyNow was refused for its turn', (c.coderStatuses ?? []).includes('working') && now.every((x) => x.ok === false) && turnRefused.length === now.length, `${(c.coderStatuses ?? []).join(',')} / ${now.map((x) => String(x.error ?? 'ok').slice(0, 80)).join(' | ')}`]
       const order = (x) => JSON.stringify((argsOf(x).cards ?? []).map((n) => Number(String(n).replace(/\D/g, ''))))
       const queued = starts.some((x) => x.ok && argsOf(x).applyNow !== true && order(x) === JSON.stringify([c.cards.b, c.cards.a]))
-      const asked = called(o, 'cw_message_agent').some((x) => x.ok && /coder/i.test(String(argsOf(x).agent)))
+      // A message that went to this fixture's Coder (by its name or id, in alpha) asking it to end its turn, not the
+      // opposite (HR2's round 1: "Keep working … Do not end your turn" counted).
+      const toCoder = (x) => [c.agents.coder.id, 'coder'].includes(String(argsOf(x).agent ?? '').toLowerCase()) && [undefined, 'alpha'].includes(argsOf(x).project)
+      const asked = called(o, 'cw_message_agent').some((x) => x.ok && toCoder(x) && asksToEndTurn(argsOf(x).text ?? argsOf(x).message))
       // The user said "now, not after it is finished", so the queued change alone doesn't do what was asked: asking the user
       // to choose, naming both ways the refusal gives (Coder's turn ended first, or the order after #a's Done), is right too.
       const reply = String(o.finalReply ?? '')
-      const offered = /\b(end|stop|finish)\w*\b[^.]*\bturn\b/i.test(reply) && (/\b(after|once)\b[^.]*\b(done|finish\w*|#\d+|[A-Z]{2}-\d+)/i.test(reply) || /\bqueue/i.test(reply))
+      const offered = asksToEndTurn(reply) && (/\b(after|once)\b[^.]*\b(done|finish\w*|#\d+|[A-Z]{2}-\d+)/i.test(reply) || /\bqueue/i.test(reply))
       return [
         fixture,
         ['queued the new order (cw_lane start without applyNow), asked Coder to end its turn, or asked the user naming both ways', queued || asked || offered, starts.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ')],
@@ -6898,4 +6911,4 @@ module.exports.SCENARIOS.push({
     })
 })
 
-module.exports.helpers = { staleSlotCommands, launchedIn, saidOnCard, laneStartLanded,readOf, called, ran, retargetWays, asksTheUser, questionsToUser, relaysOk, laneRunsOn, leftoversByOwner, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
+module.exports.helpers = { asksToEndTurn, staleSlotCommands, launchedIn, saidOnCard, laneStartLanded,readOf, called, ran, retargetWays, asksTheUser, questionsToUser, relaysOk, laneRunsOn, leftoversByOwner, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }

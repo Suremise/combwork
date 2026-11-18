@@ -17,7 +17,7 @@ describe('the classifier (HI-3361)', () => {
 
   it('a real argument error is class 1: Combwork naming what the tool takes, Claude Code\'s validation, an undefined card', () => {
     expect(classify(`Combwork error: text is required cw_message_agent takes project (required), agent (required), text, card, cancel; not: message.${SUFFIX}`, cw)).toBe('schemaNotLoaded')
-    expect(classify('<tool_use_error>InputValidationError: Monitor failed due to the following issue: The required parameter `description` is missing</tool_use_error>', { cw: false })).toBe('schemaNotLoaded')
+    expect(classify('<tool_use_error>InputValidationError: cw_lane failed due to the following issue: The required parameter `action` is missing</tool_use_error>', cw)).toBe('schemaNotLoaded')
     expect(classify('Combwork error: "undefined" is not a card number or key (12, #12 or HI-12) cw_submit takes card (required), summary (required)', cw)).toBe('schemaNotLoaded')
   })
 
@@ -26,6 +26,20 @@ describe('the classifier (HI-3361)', () => {
     expect(classify('Combwork error: XB1 is working: a reorder applied now never puts its card back under it.', cw)).toBe('laneReorderBusy')
     expect(classify('Combwork error: AB-4 is in Review: putting it back would lose its review or merge.', cw)).toBe('laneReorderBusy')
     expect(classify('Combwork error: XB1 is waiting on cards (a card watch): it takes no other work until it is woken.', cw)).toBe('watchBusy')
+  })
+
+  it("another tool's output quoting a Combwork refusal is never one of classes 1–4 (a test run's, another server's)", () => {
+    const shell = { cw: false }
+    for (const t of [
+      'test failed: expected refusal (lane.oneAtATime)',
+      'AB-3 was restarted, put back, finished or given to another agent after you last read it',
+      'XB1 is working: a reorder applied now never puts its card back under it.',
+      'XB1 is waiting on cards (a card watch): it takes no other work',
+      'cw_read_task takes number (required); missing: number; not: key.'
+    ])
+      expect(classify(t, shell)).toBe('other')
+    // Claude Code's own validation of a tool that isn't Combwork's: counted apart, never class 1.
+    expect(classify('<tool_use_error>InputValidationError: Monitor failed due to the following issue: The required parameter `description` is missing</tool_use_error>', shell)).toBe('otherSchema')
   })
 
   it("anything else: Combwork's other refusals, and other tools' failures", () => {
@@ -66,7 +80,7 @@ describe('reading transcripts (HI-3361)', () => {
   it('a call with no result is unanswered, not a failure; results before the window are left out', () => {
     const t = readTranscript([call('a', 'Bash', { command: 'x' }), call('b', 'Read', {}, '2026-11-01T00:00:00.000Z'), result('b', 'old', true, '2026-11-01T00:00:01.000Z')], new Set(), Date.parse('2026-11-10'))
     expect(t.results).toHaveLength(0)
-    expect(t.unanswered).toBe(1)
+    expect([...t.book.pending]).toEqual(['a'])
   })
 
   it("the role is the Assistant's only when it called a tool only the Assistant has; otherwise unknown, never assumed an agent's", () => {
@@ -117,5 +131,33 @@ describe("a schema failure of Combwork's own naming (argNaming, HI-3361): the br
     const t = readTranscript([call('n', 'mcp__combwork__cw_start_card', { number: 'AB-12' }), result('n', startCard, true), call('g', 'mcp__combwork__cw_lane', {}), result('g', 'Combwork error: action must be start, join, next, end or list cw_lane takes action (required), cards; missing: action.', true)], new Set())
     expect(t.results.map((r: { cls: string; naming: boolean }) => [r.cls, r.naming])).toEqual([['schemaNotLoaded', true], ['schemaNotLoaded', false]])
     expect(countBy(t.results, () => 'all')[0]).toMatchObject({ calls: 2, failed: 2, schemaNotLoaded: 2, argNaming: 1 })
+  })
+})
+
+describe('unanswered calls across copies of a session (HR2, HI-3361 round 1)', () => {
+  const partial = [call('p', 'mcp__combwork__cw_inbox', {})]
+  const full = [call('p', 'mcp__combwork__cw_inbox', {}), result('p', 'ok', false)]
+  const read = (copies: string[][]) => {
+    const seen = new Set<string>()
+    const book = { answered: new Set<string>(), pending: new Set<string>() }
+    const results = copies.flatMap((lines) => readTranscript(lines, seen, 0, book).results)
+    return { answered: results.length, unanswered: book.pending.size }
+  }
+
+  it('two partial copies of one call are one unanswered call', () => {
+    expect(read([partial, partial])).toEqual({ answered: 0, unanswered: 1 })
+  })
+
+  it('a partial copy and the completed one, in either order: one answered call, none unanswered', () => {
+    expect(read([partial, partial, full])).toEqual({ answered: 1, unanswered: 0 })
+    expect(read([full, partial, partial])).toEqual({ answered: 1, unanswered: 0 })
+  })
+})
+
+describe("a refusal quoted by another tool, read from a transcript (HR2, HI-3361 round 1)", () => {
+  it('a Bash test run and another server quoting lane.oneAtATime: no Combwork call, no class 2', () => {
+    const quote = "Combwork error: AB-2 can't start yet: AB-1, before it in its lane, isn't Done. (lane.oneAtATime)"
+    const t = readTranscript([call('b', 'Bash', { command: 'npm test' }), result('b', `test failed: expected refusal ${quote}`, true), call('o', 'mcp__other__cw_start_card', { card: 'AB-2' }), result('o', quote, true)], new Set())
+    expect(countBy(t.results, () => 'all')[0]).toMatchObject({ calls: 2, cwCalls: 0, failed: 2, laneOneAtATime: 0, other: 2 })
   })
 })
