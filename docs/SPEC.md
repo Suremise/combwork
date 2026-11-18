@@ -7635,8 +7635,9 @@ workspace and project levels, none by default) are patterns a merge may not add.
   sweeps clean what already exists): the diff from the target's head the merge was made on to the merged result (jj: to the
   candidate), renames found (a pure rename adds nothing), never a path, never a binary file, never what the target already
   has. The diff is read through the platform (Git: `git diff -U0 -M` with the user's diff configuration pinned off: no
-  external diff or textconv, no colour, the `a/` and `b/` prefixes, paths unquoted; jj: `jj diff --git --context 0`
-  under the runner's prefix). Each line is matched whole, in a worker thread of its own (never main's), ended when the check
+  external diff or textconv, no colour, the `a/` and `b/` prefixes, paths unquoted, a submodule as its `Subproject commit`
+  lines whatever `diff.submodule` says, no context between hunks and no blank context line without its space, HI-3364;
+  jj: `jj diff --git --context 0` under the runner's prefix). Each line is matched whole, in a worker thread of its own (never main's), ended when the check
   settles.
 - **Never a silent pass:** a diff over 64 MB or **Merge guards: most lines a merge adds** (Settings → Advanced, 200,000),
   the matching past **Merge guards: longest the check takes** (10 s; it names the guard that was running), a worker that

@@ -36,6 +36,8 @@ import { storedLineText } from '../src/shared/taskHistory'
 import { tr } from '../src/shared/i18n'
 import { takesOption } from '../src/shared/workflow/options'
 import { tempDir } from './tempDir'
+import { freshGitRepo, sh } from './workflow/harness'
+import { addedDiff } from '../src/main/platform/git'
 
 const fixture = (name: string): string => readFileSync(join(__dirname, 'fixtures', 'mergeGuards', name), 'utf8')
 const guard = (over: Partial<MergeGuard> = {}): MergeGuard => ({ name: 'No secrets', pattern: 'secret', message: 'Take it out.', ...over })
@@ -307,6 +309,39 @@ describe('the example guard (HI-3284’s decision)', () => {
     expect(offersNameGuard('User')).toBe(false)
     expect(offersNameGuard('  ')).toBe(false)
     expect(offersNameGuard(undefined)).toBe(false)
+  })
+})
+
+// HI-3364: the user's git configuration can change the diff's form; addedDiff pins each setting the parser depends on.
+describe('the merge’s diff read with real git, whatever the repository’s diff settings', () => {
+  it('a submodule moved and hunks near each other, under diff.submodule=log, interHunkContext and suppressBlankEmpty: read, never malformed', { timeout: HUNG_MS }, async () => {
+    const repo = freshGitRepo(join(tempDir('guards-diff-'), 'repo'))
+    sh(repo, 'update-index', '--add', '--cacheinfo', `160000,${'1'.repeat(40)},sub`)
+    // Only what is staged: `add -A` would take the gitlink, which has no folder, for a deletion.
+    const only = (content: string, message: string): string => {
+      writeFileSync(join(repo, 'blank.txt'), content)
+      sh(repo, 'add', '--', 'blank.txt')
+      sh(repo, 'commit', '-q', '-m', message)
+      return sh(repo, 'rev-parse', 'HEAD')
+    }
+    const base = only('a\n\nb\n', 'base')
+    sh(repo, 'update-index', '--cacheinfo', `160000,${'2'.repeat(40)},sub`)
+    const head = only('A\n\nB\n', 'head')
+    for (const [k, v] of [['diff.submodule', 'log'], ['diff.interHunkContext', '3'], ['diff.suppressBlankEmpty', 'true'], ['diff.noprefix', 'true'], ['diff.mnemonicPrefix', 'true'], ['color.ui', 'always']]) sh(repo, 'config', k, v)
+    // The settings do change what a plain `git diff` prints: the reasons the pins exist.
+    const plain = sh(repo, 'diff', '-U0', base, head)
+    expect(plain).toContain(`Submodule sub ${'1'.repeat(7)}...${'2'.repeat(7)}`)
+    expect(parseAddedLines(plain)).toEqual({ incomplete: 'malformed' })
+    const read = await addedDiff(repo, base, head)
+    if (!('text' in read)) throw new Error(JSON.stringify(read))
+    // A gitlink reads as git's default form says it (its `Subproject commit` line), as without the setting.
+    expect(parseAddedLines(read.text)).toEqual({
+      files: [
+        { path: 'blank.txt', lines: [{ n: 1, text: 'A' }, { n: 3, text: 'B' }] },
+        { path: 'sub', lines: [{ n: 1, text: `Subproject commit ${'2'.repeat(40)}` }] }
+      ],
+      lines: 3
+    })
   })
 })
 
