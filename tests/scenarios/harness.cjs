@@ -383,6 +383,15 @@ const logLines = (file) => {
 /** Whether Combwork's log says this agent's terminal exited (its process ended). */
 const ptyExitedIn = (file, agentId) => logLines(file).some((l) => /\[pty\] exit /.test(l) && l.includes(`#${agentId}⁩`))
 /**
+ * HI-3392: whether this agent's terminal has ended since line `since` of Combwork's log (its launch), and its exit code:
+ * the last spawn or exit naming it is an exit (a spawn after it is a new run, still going). Null while it runs.
+ */
+function terminalEnded(file, agentId, since = 0) {
+  const last = logLines(file).slice(since).filter((l) => /\[pty\] (spawn|exit) /.test(l) && l.includes(`#${agentId}⁩`)).pop() ?? ''
+  if (!/\[pty\] exit /.test(last)) return null
+  return { code: /⁩: (-?\d+|undefined)/.exec(last)?.[1] ?? null }
+}
+/**
  * Why Combwork says a CLI exited before its session started (sessions.ts failedStart), or '': the latest such line, which
  * names the agent by its label, not its id (a scenario's session under test starts first).
  */
@@ -426,7 +435,7 @@ const FAILURE_WORDS = /\b(?:error|errors|failed|failure|invalid|cannot|can't|unk
  * its error and exits at once, often before a poll sees the screen); otherwise an error, at once rather than after the
  * trial's limits.
  */
-function launchEnded({ screen = '', reason = '', auth = null } = {}) {
+function launchEnded({ screen = '', reason = '', auth = null, code = null } = {}) {
   const env = trialEnvironment({ screen: [screen, reason].join('\n') })
   if (env) return { environment: env }
   // Its auth status only stands in for a failure nobody saw: a concrete one, in Combwork's reason or on its screen (an
@@ -435,7 +444,8 @@ function launchEnded({ screen = '', reason = '', auth = null } = {}) {
   const failure = reason.trim() || (FAILURE_WORDS.exec(screen)?.[0] ?? '').slice(0, 200).trim()
   if (!failure && auth?.loggedIn === false) return { environment: "not signed in: its auth status says it isn't logged in" }
   const said = failure || screen.slice(-200).trim()
-  return { error: `the session ended at launch${said ? `: ${said}` : ''}` }
+  const exit = code !== null && code !== 'undefined' ? ` (exit code ${code})` : ''
+  return { error: `the session ended at launch${exit}${said ? `: ${said}` : ''}` }
 }
 /**
  * The CLI's own notices in a transcript's items (#342): not a background task's summary or a command's output (a
@@ -484,7 +494,8 @@ function forgetClaudeMemory(home, root) {
 /**
  * Runs `sc` with `providerKey` (fake, claude-code or codex). `opts`: { model, effort, timeoutMs, port, keep, workRoot,
  * signedOut (a fake only: it acts out an expired sign-in, for checking the environment skip; 'launch': one that stops it
- * at launch; 'late': one shown only once the prompt is sent, #1321) }.
+ * at launch; 'late': one shown only once the prompt is sent, #1321), exitsAtLaunch (a fake only: it exits once its
+ * session has started, before drawing its prompt, HI-3392) }.
  * Returns { scenario, provider, model, cliVersion, guidance, observed, checks, usage, seconds, error }.
  */
 async function runScenario(sc, providerKey, opts = {}) {
@@ -548,6 +559,7 @@ async function runScenario(sc, providerKey, opts = {}) {
   // The fake trusts these folders; the real Claude Code asks (answered below); Codex reads its test home's trust list.
   fs.writeFileSync(path.join(fakeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase(), ws.toLowerCase()]))
   // A fake that acts out an expired sign-in: each prompt's turn ends with "Login expired · Please run /login".
+  if (opts.exitsAtLaunch && p.fake) fs.writeFileSync(path.join(fakeHome, 'fake-launch-exit.json'), JSON.stringify({ code: 1 }))
   if (opts.signedOut && p.fake) fs.writeFileSync(path.join(fakeHome, 'fake-signin.json'), JSON.stringify({ expired: true, ...(opts.signedOut === 'launch' ? { atLaunch: true } : opts.signedOut === 'late' ? { late: true } : {}) }))
   if (providerKey === 'codex') {
     lib.trustForCodex(alpha)
@@ -934,9 +946,12 @@ async function runScenario(sc, providerKey, opts = {}) {
       if (screen) lastScreen = screen
       // Exited before its session started (an OAuth session it couldn't refresh, #577): no prompt can reach it.
       const combworkLog = path.join(userData, 'logs', 'combwork.log')
-      if (s) seen = true
-      else if (seen || ptyExitedIn(combworkLog, agentId)) {
-        endedAtLaunch = launchEnded({ screen: lastScreen, reason: startFailureIn(combworkLog), auth: p.provider === 'claude-code' ? claudeAuthStatus(combworkLog, agentId, env) : null })
+      // HI-3392: or stopped, its entry kept: Combwork keeps a session that ended as `stopped`, which the check before
+      // (only a session gone) waited out for 90 s, then typed a prompt into a terminal with no process ("never taken").
+      const ended = s?.status === 'stopped' ? terminalEnded(combworkLog, agentId, launchMark) : null
+      if (s && !ended) seen = true
+      else if (ended || seen || ptyExitedIn(combworkLog, agentId)) {
+        endedAtLaunch = launchEnded({ screen: lastScreen, reason: startFailureIn(combworkLog), auth: p.provider === 'claude-code' ? claudeAuthStatus(combworkLog, agentId, env) : null, code: ended?.code ?? terminalEnded(combworkLog, agentId, launchMark)?.code ?? null })
         if (endedAtLaunch.environment) return skipFor(endedAtLaunch.environment)
         break
       }
@@ -1006,13 +1021,32 @@ async function runScenario(sc, providerKey, opts = {}) {
       turnBefore.set(text, (await live())?.turn?.id ?? null)
       const mark = String((await inv('pty:buffer', key).catch(() => '')) ?? '').length
       // Real Claude Code: its first prompt waits for its Combwork tools, as Combwork's own first line does (HI-1148).
-      const ready = p.provider === 'claude-code' ? () => lib.combworkToolsConnected(userData, agentId, launchMark) : null
-      if (!(await lib.sendPrompt(inv, key, text, { submitted, ready, waitMs: 20000 }))) {
-        // Never taken: a sign-in or a limit the CLI shows only once something is typed is the environment (#1321).
+      // HI-3392: a CLI can end after its session started (ready, so the loop above went on) and before its prompt was
+      // taken: its terminal's end in Combwork's log says so, and nothing is typed into it, nor waited for.
+      const combworkLog = path.join(userData, 'logs', 'combwork.log')
+      const endedNow = () => terminalEnded(combworkLog, agentId, launchMark)
+      const ready = p.provider === 'claude-code' ? () => lib.combworkToolsConnected(userData, agentId, launchMark) || !!endedNow() : null
+      // Waited for here (as sendPrompt would), so that its end is seen too.
+      if (ready && !(await lib.until(ready, 20000, 250))) console.log('INFO sendPrompt: not ready within 20 s, typed anyway')
+      if (endedNow() || !(await lib.sendPrompt(inv, key, text, { submitted }))) {
         const drawn = String((await inv('pty:buffer', key).catch(() => '')) ?? '').slice(mark)
-        const refused = promptRefused({ prompt: text, screen: drawn, auth: p.provider === 'claude-code' ? claudeAuthStatus(path.join(userData, 'logs', 'combwork.log'), agentId, env) : null })
+        const auth = p.provider === 'claude-code' ? claudeAuthStatus(combworkLog, agentId, env) : null
+        const gone = endedNow()
+        if (gone) {
+          endedAtLaunch = launchEnded({ screen: lib.plainText(drawn) || lastScreen, reason: startFailureIn(combworkLog), auth, code: gone.code })
+          if (endedAtLaunch.environment) return skipFor(endedAtLaunch.environment)
+        }
+        // Never taken: a sign-in or a limit the CLI shows only once something is typed is the environment (#1321).
+        const refused = gone ? null : promptRefused({ prompt: text, screen: drawn, auth })
         if (refused) return skipFor(refused)
-        notTaken = promptNotTaken({ taken: await submitted(), screen: drawn })
+        notTaken = gone ? null : promptNotTaken({ taken: await submitted(), screen: drawn })
+        // HI-3392: what the session showed and what Combwork logged of it, for a prompt never taken: its whole screen (not
+        // only what came after the prompt was typed) and the log's lines naming it.
+        if (notTaken) {
+          const whole = lib.plainText(String((await inv('pty:buffer', key).catch(() => '')) ?? ''))
+          const named = logLines(path.join(userData, 'logs', 'combwork.log')).filter((l) => l.includes(agentId)).slice(-40)
+          result.notTakenDiag = { screen: whole.trim().slice(-1500), screenChars: whole.length, live: (await live().catch(() => null)) ?? null, log: named }
+        }
       }
     }
     const sentAt = Date.now()
@@ -1256,4 +1290,4 @@ async function runScenario(sc, providerKey, opts = {}) {
   return result
 }
 
-module.exports = { runScenario, scenarioFolder, PROVIDER_TAGS, dialectForRun, dialectRecord,forgetClaudeMemory, observeTranscript, tokenSightings, knownTokens, maskTokens, retainedObserved, skillRefsOf, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, relaunchTrust, keptReply, REPLY_KEPT, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }
+module.exports = { runScenario, scenarioFolder, PROVIDER_TAGS, dialectForRun, dialectRecord,forgetClaudeMemory, observeTranscript, tokenSightings, knownTokens, maskTokens, retainedObserved, skillRefsOf, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, relaunchTrust, keptReply, REPLY_KEPT, cliNotices, launchEnded, startFailureIn, terminalEnded, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }

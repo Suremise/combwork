@@ -1916,7 +1916,7 @@ describe('a trial the environment stops (trialEnvironment)', () => {
   // #577: Claude Code 2.1.296 with an OAuth session it couldn't refresh printed this and exited with 1 at launch.
   describe('a CLI that exits at launch (launchEnded)', () => {
     const { launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus } = require('./scenarios/harness.cjs') as {
-      launchEnded: (o: { screen?: string; reason?: string; auth?: { loggedIn?: boolean } | null }) => { environment?: string; error?: string }
+      launchEnded: (o: { screen?: string; reason?: string; auth?: { loggedIn?: boolean } | null; code?: string | null }) => { environment?: string; error?: string }
       startFailureIn: (file: string) => string
       claudeAuthStatus: (file: string, agentId: string, env: { CLAUDE_CONFIG_DIR?: string }) => { loggedIn?: boolean } | null
       parseAuthStatus: (out: string) => { loggedIn?: boolean } | null
@@ -1962,6 +1962,26 @@ describe('a trial the environment stops (trialEnvironment)', () => {
       expect(claudeAuthStatus(log, 'a-1', { CLAUDE_CONFIG_DIR: home })).toMatchObject({ loggedIn: false })
       expect(claudeAuthStatus(log, 'a-2', { CLAUDE_CONFIG_DIR: home })).toBeNull()
     }, 30000)
+
+    // HI-3392: a session Combwork keeps as stopped, its terminal ended: ended at launch, never typed into for 90 s.
+    it("whether its terminal ended since its launch, by Combwork's log: its last spawn or exit, and its code", () => {
+      const { terminalEnded } = require('./scenarios/harness.cjs') as { terminalEnded: (file: string, agentId: string, since?: number) => { code: string | null } | null }
+      const log = join(tempDir('cw-terminal-ended-'), 'combwork.log')
+      const spawn = '2026-11-18T10:07:30.000Z [INFO] [pty] spawn \u2068session:c:\\x\\a#assistant\u2069: claude.exe ["--session-id","x"]'
+      const exit = (code: string) => `2026-11-18T10:07:31.000Z [INFO] [pty] exit \u2068session:c:\\x\\a#assistant\u2069: ${code}`
+      writeFileSync(log, [spawn, exit('1'), ''].join('\n'))
+      expect(terminalEnded(log, 'assistant')).toEqual({ code: '1' })
+      expect(terminalEnded(log, 'a-2')).toBeNull()
+      // An exit before its launch (a run before) doesn't count; a spawn after an exit is a new run, still going.
+      expect(terminalEnded(log, 'assistant', 2)).toBeNull()
+      writeFileSync(log, [spawn, exit('1'), spawn, ''].join('\n'))
+      expect(terminalEnded(log, 'assistant')).toBeNull()
+      writeFileSync(log, [spawn, exit('undefined (process 12 gone, not killed by Combwork)'), ''].join('\n'))
+      expect(terminalEnded(log, 'assistant')).toEqual({ code: 'undefined' })
+      expect(launchEnded({ code: '1' })).toEqual({ error: 'the session ended at launch (exit code 1)' })
+      expect(launchEnded({ code: 'undefined' })).toEqual({ error: 'the session ended at launch' })
+      expect(launchEnded({ code: '1', auth: { loggedIn: false } }).environment).toMatch(/^not signed in: /)
+    })
 
     it('anything else is an error at once, saying what it showed', () => {
       expect(launchEnded({ reason: "error: option '--model <model>' argument 'x' is invalid.", auth: { loggedIn: true } })).toEqual({ error: "the session ended at launch: error: option '--model <model>' argument 'x' is invalid." })
