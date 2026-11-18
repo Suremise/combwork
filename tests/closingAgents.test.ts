@@ -44,11 +44,12 @@ function start(pending: { running: number; starting: number; writers: number }, 
 }
 
 describe('the deadline from the CLIs\' exit graces (HI-3376)', () => {
-  it('the default grace (30 s) gives 65 s before "still closing"; a saved 300 s grace gives 335 s; none, the writers\' 30 s', () => {
+  it("the default grace (30 s) gives 65 s before \"still closing\"; a saved 300 s grace gives 335 s; a CLI killed at once (no grace), its kill's 5 s and the writers' 30 s", () => {
     expect(KILL_EXIT_MS).toBe(5000)
-    expect(stopWaitMs(0, [30_000]) + CLOSE_WRITERS_MS).toBe(65_000)
-    expect(stopWaitMs(0, [30_000, 300_000]) + CLOSE_WRITERS_MS).toBe(335_000)
-    expect(stopWaitMs(0, []) + CLOSE_WRITERS_MS).toBe(30_000)
+    expect(stopWaitMs(KILL_EXIT_MS, [30_000]) + CLOSE_WRITERS_MS).toBe(65_000)
+    expect(stopWaitMs(KILL_EXIT_MS, [30_000, 300_000]) + CLOSE_WRITERS_MS).toBe(335_000)
+    // HI-3374: never 0 for runs: a CLI with no grace still takes its kill's time to exit.
+    expect(stopWaitMs(KILL_EXIT_MS, [0]) + CLOSE_WRITERS_MS).toBe(35_000)
   })
 })
 

@@ -489,6 +489,18 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
+    id: 'cw.db.busySeconds',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.db.busySeconds.title', defaultMessage: "Databases: wait for another program's lock", description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"15 s\")." }),
+    desc: msg({ id: 'settings.advanced.cw.db.busySeconds.desc', defaultMessage: "How long a write to the board, the Assistant's journal or the usage history waits while another program (another Combwork on this workspace, a script) holds its database's lock, before the write is refused. It bounds a wait, not a speed: a write to the board waits on Combwork's main thread, so the window doesn't respond while it waits. Takes effect after Combwork restarts.", description: 'What the advanced setting "Databases: wait for another program\'s lock" does (Settings → Advanced, HI-3374). The window not responding while it waits is a real warning: keep it.' }),
+    kind: 'number',
+    default: 15,
+    min: 1,
+    max: 120,
+    unit: 's',
+    applies: 'restart'
+  },
+  {
     id: 'cw.recorder.minutes',
     group: 'cw',
     title: msg({ id: 'settings.advanced.cw.recorder.minutes.title', defaultMessage: 'Flight recorder: one capture per trigger and agent every', description: "An advanced setting's title (Settings → Advanced), followed by its value in minutes (\"10 min\")." }),

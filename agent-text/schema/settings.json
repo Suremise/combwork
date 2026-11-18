@@ -1163,6 +1163,12 @@
   "settings.advanced.cw.copies.review.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.db.busySeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.db.busySeconds.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.disableHardwareAcceleration.desc": {
     "placeholders": {}
   },

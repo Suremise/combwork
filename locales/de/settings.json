@@ -459,6 +459,8 @@
   "settings.advanced.copilot.turnFailed.errorType.title": "Durchgang fehlgeschlagen: Fehlertyp",
   "settings.advanced.copilotFooter.desc": "Die Fußzeile von Copilot im Modus {mode} („{footer}“){shared, select, yes {, die sich Fragen und Änderungen annehmen teilen (Combwork unterscheidet sie am Modus, mit dem die Sitzung begann)} other {}}. Combwork liest den Modus eines Agenten aus seiner Fußzeile (der zuletzt auf dem Bildschirm gefundene Modus) und wechselt Modi, indem es Shift+Tab drückt, bis die Fußzeile den gewünschten zeigt; ist sie falsch, erkennt Combwork den Agenten nicht in diesem Modus und kann ohne Neustart nicht dorthin wechseln.",
   "settings.advanced.copilotFooter.title": "Fußzeile: {mode}",
+  "settings.advanced.cw.db.busySeconds.desc": "Wie lange ein Schreibvorgang in das Board, das Journal des Assistenten oder den Nutzungsverlauf wartet, während ein anderes Programm (ein anderes Combwork in diesem Arbeitsbereich, ein Skript) die Sperre seiner Datenbank hält, bevor er abgelehnt wird. Es begrenzt eine Wartezeit, keine Geschwindigkeit: Ein Schreibvorgang in das Board wartet im Hauptthread von Combwork, sodass das Fenster während des Wartens nicht reagiert. Wirkt nach einem Neustart von Combwork.",
+  "settings.advanced.cw.db.busySeconds.title": "Datenbanken: auf die Sperre eines anderen Programms warten",
   "settings.advanced.data.desc": "Combwork speichert seine Einstellungen in %APPDATA%\\Combwork\\config.json.",
   "settings.advanced.data.tip": "Projekteinstellungen liegen im .combwork-Ordner jedes Projekts, Einstellungen des Arbeitsbereichs im .combwork-Ordner des Arbeitsbereichs.",
   "settings.advanced.data.title": "Einstellungsdatei",

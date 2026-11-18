@@ -1,4 +1,5 @@
 import { randomBytes } from 'crypto'
+import { RENAME_RETRY } from './retryBounds'
 import { rename, writeFile } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
 import { CW_DIR, projectAgents } from '../shared/defaults'
@@ -547,7 +548,7 @@ async function readFileOf(path: string, open: () => boolean): Promise<Saved | nu
   const aside = async (why: string): Promise<Saved> => {
     const to = `${file}.${why}-${Date.now()}`
     try {
-      await renameRetrying(file, to, 20, () => {
+      await renameRetrying(file, to, RENAME_RETRY, () => {
         if (!open()) throw closedError()
       }, renameOnce)
     } catch (e) {

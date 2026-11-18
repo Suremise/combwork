@@ -1,5 +1,6 @@
 // First: the thread pool's size is set before anything uses it (HI-1702).
 import './threadPool'
+import { setDbBusyMs } from './db'
 import { initWatches, onWatchedCardsMoved, watchKeepsQuitWaiting } from './watches'
 import { initLoopWakes } from './loopWakes'
 import { migrateAgentsPerProject } from './workflow/preferences'
@@ -1074,6 +1075,8 @@ app.whenReady().then(async () => {
   await startI18n(config.settings)
   // Advanced settings (#367): advanced.json's overrides, followed as it changes.
   advanced.load()
+  // HI-3374: the databases' wait for another program's lock, before any of them opens (it applies from here on).
+  setDbBusyMs(advanced.get<number>('cw.db.busySeconds') * 1000)
   // The user's own CLIs (HI-3196): their descriptions read and registered before anything looks for a provider.
   await startClis()
   // Connections' launch settings (HI-2670): the app-wide switches they replaced copied onto them once, and agents on a

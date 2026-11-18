@@ -71,6 +71,10 @@
     "text": "git worktree add: {error}",
     "note": "A copy's setup error: `git worktree add` failed. {error} is git's first line, else failed."
   },
+  "copy.held.aside": {
+    "text": "its folder left renamed aside at {aside}, which Combwork can't tell is safe to put back; put it back by hand, then look again",
+    "note": "What holds a copy back (HI-3374): a check that renames its folder aside and back left it at {aside} (a path), and Combwork can't tell it is safe to put it back (why is in Combwork's log): the user does, then looks again."
+  },
   "copy.held.job": {
     "text": "its run's processes ({job})",
     "note": "What holds a returned copy back from being freed: processes of the run that had it. {job} is their job's id. The end of copy.refusal.stillInUse and of \"held back by …\"."

@@ -11,6 +11,7 @@
 // signer past its bound never leaves the real index locked; once something is made, its entries for the paths are
 // taken into the real index in one short step.
 import { copyFile, lstat, open, readFile, readdir, rename, rm, writeFile } from 'original-fs/promises'
+import { heldError, INDEX_BUSY as INDEX_BOUNDS, RENAME_RETRY, untilBound } from './retryBounds'
 import { randomBytes } from 'crypto'
 import { basename, dirname, join, resolve } from 'path'
 import type { FolderChangeAction, FolderChangesDone } from '../shared/types'
@@ -101,7 +102,7 @@ let privateIndexes = 0
  * from outside never removes its lock), git leaves only the copy's lock, Combwork's own by its name, removed with the
  * copy. What git did to the shown paths' entries is then taken into the real index in one short step (takeEntries).
  */
-async function withPrivateIndex<T>(folder: string, files: string[], m: (typeof M)['commitFailed'] | (typeof M)['stashFailed'], fn: (env: NodeJS.ProcessEnv, copy: string, take: (made?: Made) => Promise<Taken>) => Promise<T>): Promise<T> {
+async function withPrivateIndex<T>(folder: string, files: string[], m: (typeof M)['commitFailed'] | (typeof M)['stashFailed'], fn: (env: NodeJS.ProcessEnv, copy: string, take: (made?: Made) => Promise<Taken>) => Promise<T>, guard?: () => void): Promise<T> {
   const where = await git(folder, ['rev-parse', '--path-format=absolute', '--git-path', 'index'])
   if (!where.ok || !where.out.trim()) throw failed(m, where.err || "git didn't say where its index is") // i18n-ignore: stands in for git's own (English) words
   const index = resolve(where.out.trim())
@@ -116,7 +117,7 @@ async function withPrivateIndex<T>(folder: string, files: string[], m: (typeof M
     // a commit's hook can change paths beyond `files`). With their flags (HI-3125), as takeEntries compares them.
     const was = await entriesIn(folder, null, copy, true)
     if (!was.ok) throw failed(m, was.why)
-    return await fn({ ...quietEnv(), GIT_INDEX_FILE: copy }, copy, (made) => takeEntries(folder, index, copy, made?.paths ?? files, was.entries, made?.entries))
+    return await fn({ ...quietEnv(), GIT_INDEX_FILE: copy }, copy, (made) => takeEntries(folder, index, copy, made?.paths ?? files, was.entries, made?.entries, guard))
   } finally {
     await removePrivateIndex(copy)
   }
@@ -134,25 +135,22 @@ async function removePrivateIndex(copy: string): Promise<void> {
   for (const name of names.filter((n) => n === own || n.startsWith(`${own}.`))) await removeOwn(join(dir, name))
 }
 
-/** One of the private index's files removed, tried again briefly while a process just ended still holds it. False: it is still there. */
+/**
+ * One of the private index's files removed, tried again while a process just ended still holds it (HI-3374: for
+ * RENAME_RETRY's bound, as a held rename is). False: it is still there.
+ */
 async function removeOwn(file: string): Promise<boolean> {
-  for (let t = 1; ; t++) {
-    const e = await rm(file, { force: true }).then(
-      () => null,
-      (err: NodeJS.ErrnoException) => err
-    )
-    if (!e) return true
-    if (t >= TAKE_TRIES || (e.code !== 'EBUSY' && e.code !== 'EPERM')) {
-      log.warn(`A private index's file wasn't removed (${userText(basename(file))}): ${userText(e.message)}`)
-      return false
-    }
-    await new Promise((res) => setTimeout(res, TAKE_RETRY_MS))
-  }
+  const e = await untilBound(() => rm(file, { force: true }), { bound: RENAME_RETRY, transient: heldError }).then(
+    () => null,
+    (err: NodeJS.ErrnoException) => err
+  )
+  if (!e) return true
+  log.warn(`A private index's file wasn't removed (${userText(basename(file))}): ${userText(e.message)}`)
+  return false
 }
 
-/** How many times the real index is tried while another git holds it, and how long between (INDEX_BUSY). */
-const TAKE_TRIES = 10
-const TAKE_RETRY_MS = 100
+// HI-3374: the real index tried while another git holds it, for INDEX_BOUNDS.take's bound (30 s, waits doubling to 1.6 s;
+// it was 10 tries 100 ms apart): an agent's `git add` on a large repository holds index.lock for seconds.
 /** HI-3056: how many times the new index is made again while another git keeps writing the real one. */
 const PREPARE_TRIES = 3
 
@@ -199,7 +197,12 @@ export function changedPaths(files: readonly string[], was: readonly string[], n
  * Combwork's own file steps while the lock is held. Another git wrote the index meanwhile: made again from its new bytes,
  * a few times; still moving, the entries are made under the lock unrefreshed (git's own work alone, no filter).
  */
-async function takeEntries(folder: string, index: string, copy: string, files: string[], was: readonly string[], made?: readonly string[]): Promise<Taken> {
+/**
+ * HI-3374: `guard` (settleChanges' owner: the workspace still open, the work still its) runs before each try at the real
+ * index's lock and immediately before the index is published (each rename over it): refused, nothing more is written,
+ * and the lock taken here is removed.
+ */
+async function takeEntries(folder: string, index: string, copy: string, files: string[], was: readonly string[], made?: readonly string[], guard?: () => void): Promise<Taken> {
   const from = made ? { ok: true as const, entries: [...made] } : await entriesIn(folder, files, copy)
   if (!from.ok) return from
   const fmt = await git(folder, ['rev-parse', '--show-object-format'])
@@ -249,34 +252,24 @@ async function takeEntries(folder: string, index: string, copy: string, files: s
 
   /** `fn` under the real index's lock: only one made here (`wx`), and only that one removed, unless it became the index. */
   const locked = async <T>(fn: (publish: () => Promise<void>) => Promise<T>): Promise<T | { ok: false; why: string }> => {
-    for (let t = 1; ; t++) {
-      const e = await open(lock, 'wx').then(
-        async (h) => {
-          await h.close()
-          return null
-        },
-        (err: NodeJS.ErrnoException) => err
-      )
-      if (!e) break
-      if (e.code !== 'EEXIST' || t >= TAKE_TRIES) return { ok: false, why: e.code === 'EEXIST' ? `Unable to create '${lock}': File exists` : e.message } // i18n-ignore: git's own (English) words for a held lock
-      await new Promise((res) => setTimeout(res, TAKE_RETRY_MS))
-    }
+    const taken = await untilBound(
+      async () => {
+        const h = await open(lock, 'wx')
+        await h.close()
+      },
+      { bound: INDEX_BOUNDS.take, transient: (err) => (err as NodeJS.ErrnoException).code === 'EEXIST', guard }
+    ).then(
+      () => null,
+      (err: NodeJS.ErrnoException) => err
+    )
+    if (taken) return { ok: false, why: taken.code === 'EEXIST' ? `Unable to create '${lock}': File exists` : taken.message } // i18n-ignore: git's own (English) words for a held lock
     let renamed = false
     const publish = async (): Promise<void> => {
       await rename(scratch, lock)
-      // A git reading the index can hold it open a moment (Windows refuses the rename then): tried again briefly.
-      for (let t = 1; ; t++) {
-        const e = await rename(lock, index).then(
-          () => null,
-          (err: NodeJS.ErrnoException) => err
-        )
-        if (!e) {
-          renamed = true
-          return
-        }
-        if (t >= TAKE_TRIES || (e.code !== 'EBUSY' && e.code !== 'EPERM' && e.code !== 'EACCES')) throw e
-        await new Promise((res) => setTimeout(res, TAKE_RETRY_MS))
-      }
+      // A git reading the index can hold it open a moment (Windows refuses the rename then): tried again, as long as
+      // the take may wait (INDEX_BUSY.take).
+      await untilBound(() => rename(lock, index), { bound: INDEX_BOUNDS.take, transient: heldError, guard })
+      renamed = true
     }
     try {
       return await fn(publish)
@@ -600,7 +593,7 @@ async function assertQuiet(projectPath: string, folder: string, branch: string |
  * A refused commit leaves the real index as it was, intent-to-add entries never in it. Never given a path whose removal
  * is staged while its file is still in the folder (settleChanges and commitIgnore refuse it first, keptDeleted).
  */
-async function commitPaths(folder: string, files: string[], untracked: string[], message: string, byIndex?: { removed: string[]; staged: string[] }): Promise<MadeWith> {
+async function commitPaths(folder: string, files: string[], untracked: string[], message: string, byIndex?: { removed: string[]; staged: string[] }, guard?: () => void): Promise<MadeWith> {
   // What the branch was, to tell whether a commit ended at its bound moved it; unreadable, nothing runs.
   const before = await headOf(folder)
   if (before === undefined) throw failed(M.commitFailed, "git couldn't read HEAD") // i18n-ignore: stands in for git's own (English) words
@@ -629,7 +622,7 @@ async function commitPaths(folder: string, files: string[], untracked: string[],
     // HI-3059: from here the commit is made, whatever its index step gives: said with it, never as a failure.
     const took = entries.ok ? await take(entries) : entries
     return { made, warning: indexWarning('commit', made, took) }
-  })
+  }, guard)
 }
 
 /**
@@ -807,7 +800,7 @@ async function ownStash(folder: string, before: ReadonlySet<string>, message: st
  * private copy of the index (withPrivateIndex, HI-3021): once a stash is made, the real index's entries for `files`
  * become what git left them (takeEntries), however far it got; with none made, the real index is as it was.
  */
-async function setAsidePaths(folder: string, files: string[], message: string, renamedFrom: string[] = [], ita: string[] = []): Promise<MadeWith> {
+async function setAsidePaths(folder: string, files: string[], message: string, renamedFrom: string[] = [], ita: string[] = [], guard?: () => void): Promise<MadeWith> {
   // HI-3081: git's stash on a branch with no commit yet fails, saying why only without --quiet: said here instead.
   if ((await headOf(folder)) === null) throw failed(M.stashFailed, "the branch has no commit yet, and git can't set changes aside before its first one") // i18n-ignore: stands in for git's own (English) words
   // HI-3125: the stashes there as it starts, so its own is told by its message among the new ones.
@@ -844,7 +837,7 @@ async function setAsidePaths(folder: string, files: string[], message: string, r
     // what is said below).
     const said = stash ? indexWarning('setAside', stash, await take()) : undefined
     return { r: pushed, made: stash, warning: said }
-  })
+  }, guard)
   if (!r.ok && r.timedOut) {
     // HI-3021: ended at its bound, part way: the stash it made by then named, kept.
     if (made) log.warn(`A stash was made in ${userText(folder)} before git was ended at its bound: ${made}`)
@@ -945,7 +938,7 @@ export async function settleChanges(projectPath: string, target: string, shownFo
         // HI-3024: git's partial commit can't take a case-only rename ("will not add file alias") nor a removal whose path is
         // now a folder ("does not have a commit checked out"): those are built in the private index (byIndex).
         const byIndex = [...removed.values()].some((k) => k === 'alias' || k === 'folder') ? { removed: [...removed.keys()], staged: [...now].filter(([p, c]) => (c.staged || c.unmerged) && !files.includes(p)).map(([p]) => p) } : undefined
-        const { made, warning } = action === 'commit' ? await commitPaths(folder, files, files.filter((p) => now.get(p)?.untracked && !now.get(p)?.deleted), message, byIndex) : await setAsidePaths(folder, files, message, [...removed.keys()].filter((p) => [...now.values()].some((c) => c.from === p)), files.filter((p) => now.get(p)?.ita))
+        const { made, warning } = action === 'commit' ? await commitPaths(folder, files, files.filter((p) => now.get(p)?.untracked && !now.get(p)?.deleted), message, byIndex, guard) : await setAsidePaths(folder, files, message, [...removed.keys()].filter((p) => [...now.values()].some((c) => c.from === p)), files.filter((p) => now.get(p)?.ita), guard)
         log.info(`${action === 'commit' ? 'Committed' : 'Set aside'} ${files.length} paths in ${userText(folder)} on ${userText(branch)}`)
         return { action, folder, branch, files, message, made, ...(warning ? { warning } : {}) }
       }),

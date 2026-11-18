@@ -395,6 +395,9 @@ export const AREAS = [
   { paths: ['tests/e2e/p5scenarios.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueChecks.ts', 'src/main/workflow/queueChecksApp.ts', 'src/shared/progressQueue.ts'], suites: ['p5scenarios'] },
   { paths: ['tests/e2e/queuelease.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/workflow/queueRunner.ts', 'src/main/workflow/queueJobs.ts', 'src/main/workflow/queueHost.ts'], suites: ['queuelease'] },
   { paths: ['tests/e2e/reviewcopies.cjs', 'src/main/reviewCopies.ts', 'src/main/copies.ts', 'src/main/copiesApp.ts'], suites: ['reviewcopies'] },
+  // HI-3374: the quiet check's claims (copies' folders renamed aside and back), and the retries' time bounds (saves, a busy index, jj's journal, OpenCode's mirror).
+  { paths: ['src/main/quietClaims.ts'], suites: ['reviewcopies', 'isolatedcheck'] },
+  { paths: ['src/main/retryBounds.ts'], suites: ['changes', 'gitview', 'setaside', 'jjadvance', 'opencode', 'isolatedcheck'] },
   { paths: ['tests/e2e/reviewcopiesreal.cjs'], suites: ['reviewcopiesreal'] },
   { paths: ['tests/e2e/followupsubmit.cjs'], suites: ['followupsubmit'] },
   { paths: ['tests/e2e/reviewerpool.cjs', 'src/main/reviewerPool.ts', 'src/shared/workflow/reviewerPool.ts', 'src/main/laneStart.ts', 'src/shared/laneBrief.ts', 'src/renderer/src/components/LaneStartDialog.tsx', 'src/main/loopReviewer.ts'], suites: ['reviewerpool'] },

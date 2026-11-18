@@ -2386,8 +2386,10 @@ class SessionManager {
    * that (CLOSE_WRITERS_MS). With the defaults: 30 + 5 + 30 s. A threshold for saying so, never taken as their end.
    */
   closeDeadlineMs(which?: (projectPath: string) => boolean): number {
-    const graces = [...this.live.values()].filter((l) => !which || which(l.state.projectPath)).map((l) => l.adapter.launch.exitKeys?.graceMs)
-    return stopWaitMs(0, graces) + CLOSE_WRITERS_MS
+    // A CLI without an exit of its own (killed at once: Claude Code) still takes its kill's time to exit (HI-3374: it
+    // counted as 0, so a quit with no window went on at once, before the runs' exit work).
+    const graces = [...this.live.values()].filter((l) => !which || which(l.state.projectPath)).map((l) => l.adapter.launch.exitKeys?.graceMs ?? 0)
+    return stopWaitMs(KILL_EXIT_MS, graces) + CLOSE_WRITERS_MS
   }
 
   /**

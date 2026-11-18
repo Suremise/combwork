@@ -459,6 +459,8 @@
   "settings.advanced.copilot.turnFailed.errorType.title": "Turno fallido: tipo de error",
   "settings.advanced.copilotFooter.desc": "El pie de Copilot en el modo {mode} (“{footer}”){shared, select, yes {, que comparten Preguntar y Aceptar ediciones (Combwork los distingue por el modo en que se inició la sesión)} other {}}. Combwork lee el modo de un agente en su pie (el último modo que aparece en pantalla) y cambia de modo presionando Shift+Tab hasta que el pie muestra el deseado; si es incorrecto, Combwork no ve al agente en ese modo y no puede cambiar a él sin reiniciar.",
   "settings.advanced.copilotFooter.title": "Pie: {mode}",
+  "settings.advanced.cw.db.busySeconds.desc": "Cuánto espera una escritura en el tablero, el diario del Asistente o el historial de uso mientras otro programa (otro Combwork en este espacio de trabajo, un script) mantiene el bloqueo de su base de datos, antes de que la escritura se rechace. Limita una espera, no una velocidad: una escritura en el tablero espera en el hilo principal de Combwork, así que la ventana no responde mientras espera. Se aplica después de reiniciar Combwork.",
+  "settings.advanced.cw.db.busySeconds.title": "Bases de datos: esperar el bloqueo de otro programa",
   "settings.advanced.data.desc": "Combwork guarda su configuración en %APPDATA%\\Combwork\\config.json.",
   "settings.advanced.data.tip": "La configuración de cada proyecto está en su carpeta .combwork; la del espacio de trabajo, en la carpeta .combwork del espacio de trabajo.",
   "settings.advanced.data.title": "Archivo de configuración",

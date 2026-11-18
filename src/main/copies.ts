@@ -33,7 +33,8 @@ import { basename, join, resolve } from 'path'
 import { placeMatcher, samePlace } from './fsutil'
 import { agentMsg, inDefaultDialect, say, sayWithId, type AgentMsg, type AgentValues, type Said } from '../shared/agentText'
 import { createLogger, userText } from './logger'
-import { deletingIn, folderThere, IDLE_MS, lockHash, OpLost, quiet, releaseDeleteIn, type Holder, type OpHolder, type SlotConn, type SlotOptionsNow, type SlotRun, type SlotRunner, type SlotRunEnd } from './slots'
+import type { QuietTarget } from './quietClaims'
+import { deletingIn, folderThere, IDLE_MS, lockHash, OpLost, quiet, quietNeeds, releaseDeleteIn, type Holder, type OpHolder, type SlotConn, type SlotOptionsNow, type SlotRun, type SlotRunner, type SlotRunEnd } from './slots'
 import { slotWorkspaces, workspacePortOf } from './platform/workspacePorts'
 import { isUnknown } from './platform/types'
 import type { WorkspaceFence, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort } from './platform/workspacePort'
@@ -78,6 +79,7 @@ export const COPY_TEXT = {
   setupExit: agentMsg({ id: 'copy.error.setupExit', text: 'its setup exited with code {code}', note: "A copy's setup error: its setup command failed. {code} is its exit code." }),
   heldJob: agentMsg({ id: 'copy.held.job', text: "its run's processes ({job})", note: 'What holds a returned copy back from being freed: processes of the run that had it. {job} is their job\'s id. The end of copy.refusal.stillInUse and of "held back by …".' }),
   heldProcess: agentMsg({ id: 'copy.held.process', text: 'a process with a file or folder open in it', note: 'What holds a copy back from being freed or removed: a process has something open in its folder.' }),
+  heldAside: agentMsg({ id: 'copy.held.aside', text: "its folder left renamed aside at {aside}, which Combwork can't tell is safe to put back; put it back by hand, then look again", note: "What holds a copy back (HI-3374): a check that renames its folder aside and back left it at {aside} (a path), and Combwork can't tell it is safe to put it back (why is in Combwork's log): the user does, then looks again." }),
   notLeased: agentMsg({ id: 'copy.isolated.notLeased', text: 'no check copy could be leased: {error}', note: "cw-progress --isolated's refusal: leasing its check copy failed. {error} is why." }),
   waitCopy: agentMsg({ id: 'copy.isolated.waitCopy', text: 'a check copy', note: 'What cw-progress --isolated waits for ("waiting for a check copy"): none is free yet.' }),
   waitSetup: agentMsg({ id: 'copy.isolated.waitSetup', text: 'a check copy to be set up', note: 'What cw-progress --isolated waits for: its check copy is being set up.' })
@@ -529,6 +531,17 @@ export class CopyPool {
     this.store = deps.store
   }
 
+  /** HI-3374: what a quiet check of copy `name` claims its folder through: this pool's store, in the board's database. */
+  private claimTarget(name: string): QuietTarget {
+    return { conn: this.store.conn, project: this.store.project, kind: 'copy', name }
+  }
+
+  /** What holds a copy whose quiet check said no: its folder left aside by a claim that needs the user, or a process. */
+  private heldBy(folder: string): string {
+    const needs = quietNeeds(folder)
+    return needs ? sayStored(T.heldAside, { aside: needs.aside }) : sayStored(T.heldProcess)
+  }
+
   private now(): number {
     return this.deps.now?.() ?? Date.now()
   }
@@ -708,7 +721,7 @@ export class CopyPool {
       const opts = await this.deps.options()
       // HI-1182: with the setting on, Combwork's checkouts here leave LFS files for the step below.
       const filesOn = opts.gitFiles !== false && !!this.port.files
-      let made = fresh || copy.state === 'gone' || !(await folderThere(copy.folder))
+      let made = fresh || copy.state === 'gone' || !(await folderThere(copy.folder, this.claimTarget(copy.name)))
       const listed = made ? true : await this.listed(copy.folder)
       // Git can't list the worktrees (HI-2810): passed over as it was, its lease dropped, looked at again next time.
       if (listed === null) {
@@ -727,7 +740,7 @@ export class CopyPool {
       }
       // Free since it was freed, not since now: a run or a process may have come into it since. Passed over (it stays as it
       // was, its lease dropped) while anything is in it; never reset under it.
-      if (!made && (this.deps.runIn(copy.folder) || !(await quiet(copy.folder)))) {
+      if (!made && (this.deps.runIn(copy.folder) || !(await quiet(copy.folder, this.claimTarget(copy.name))))) {
         await this.store.fenced(name, token, (db) => {
           this.store.dropIn(db, lease.id, 'busy')
           this.store.setIn(db, name, copy.state, {}, { op: null })
@@ -859,7 +872,7 @@ export class CopyPool {
       await this.op(token, async () => {
         if (!(await this.store.startOp(c.name, 'lease', 'free', token, await this.deps.holder.self()))) return
         try {
-          if (this.deps.runIn(c.folder) || !(await quiet(c.folder))) {
+          if (this.deps.runIn(c.folder) || !(await quiet(c.folder, this.claimTarget(c.name)))) {
             await this.store.fenced(c.name, token, (db) => this.store.setIn(db, c.name, 'free', {}, { op: null }))
             return
           }
@@ -932,7 +945,7 @@ export class CopyPool {
       const busy = this.deps.holderBusy(l.agent)
       if (busy) return hold({ why: 'holder', by: busy })
     }
-    if ((await folderThere(c.folder)) && !(await quiet(c.folder))) return hold({ why: 'process', by: sayStored(T.heldProcess) })
+    if ((await folderThere(c.folder, this.claimTarget(c.name))) && !(await quiet(c.folder, this.claimTarget(c.name)))) return hold({ why: 'process', by: this.heldBy(c.folder) })
     const port = this.portOf(c)
     if (port.copyIntact) {
       // HI-2795/s21 §3: every consumer ended, its result taken against the files now, under a verification operation; the
@@ -978,7 +991,7 @@ export class CopyPool {
     for (const c of this.store.copies()) {
       // HI-2936: one whose platform has no port here is kept as it is until it has one.
       if (c.state === 'returning' && this.hasPort(c)) await this.tryFree(c.name)
-      else if (c.state === 'free' && !(await folderThere(c.folder))) await this.store.markGone(c.name)
+      else if (c.state === 'free' && !(await folderThere(c.folder, this.claimTarget(c.name)))) await this.store.markGone(c.name)
     }
   }
 
@@ -1020,7 +1033,7 @@ export class CopyPool {
           })
           return
         }
-        const to: CopyState = (await folderThere(c.folder)) ? 'free' : 'gone'
+        const to: CopyState = (await folderThere(c.folder, this.claimTarget(c.name))) ? 'free' : 'gone'
         await this.store.fenced(c.name, token, (db) => this.store.setIn(db, c.name, to, {}, { op: null, ...job }))
       } catch (e) {
         if (!(e instanceof OpLost)) throw e
@@ -1046,8 +1059,8 @@ export class CopyPool {
       try {
         const run = this.deps.runIn(c.folder)
         if (run) return await keep({ why: 'run' as const, by: run })
-        if (await folderThere(c.folder)) {
-          if (!(await quiet(c.folder))) return await keep({ why: 'process' as const, by: sayStored(T.heldProcess) })
+        if (await folderThere(c.folder, this.claimTarget(c.name))) {
+          if (!(await quiet(c.folder, this.claimTarget(c.name)))) return await keep({ why: 'process' as const, by: this.heldBy(c.folder) })
           await this.store.fenced(name, token, () => undefined)
           // A copy holds nobody's work (detached at a revision): its build outputs go with it. A jj copy (HI-2795): forgotten
           // and trashed, journalled; a removal part done keeps the copy out of the pool, never lent, until it's finished.

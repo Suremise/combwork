@@ -1,4 +1,5 @@
 import { app, BrowserWindow } from 'electron'
+import { RENAME_RETRY } from './retryBounds'
 import { randomUUID } from 'crypto'
 import { existsSync, readFileSync, renameSync, rmSync, statSync } from 'original-fs'
 import { rm, writeFile } from 'original-fs/promises'
@@ -179,7 +180,7 @@ export async function writeMarkerFile(file: string, marker: RunMarker, wanted: (
     const guard = (): void => {
       if (!wanted()) throw new NotWanted()
     }
-    await renameRetrying(tmp, file, 20, guard, renameOnce)
+    await renameRetrying(tmp, file, RENAME_RETRY, guard, renameOnce)
     return true
   } catch (e) {
     if (e instanceof NotWanted) {

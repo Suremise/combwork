@@ -496,6 +496,8 @@ interface CombworkMessageValues {
   'settings.advanced.cw.copies.quietWaitMinutes.title': undefined
   'settings.advanced.cw.copies.review.desc': undefined
   'settings.advanced.cw.copies.review.title': undefined
+  'settings.advanced.cw.db.busySeconds.desc': undefined
+  'settings.advanced.cw.db.busySeconds.title': undefined
   'settings.advanced.cw.disableHardwareAcceleration.desc': undefined
   'settings.advanced.cw.disableHardwareAcceleration.title': undefined
   'settings.advanced.cw.focused.pickSeconds.desc': undefined

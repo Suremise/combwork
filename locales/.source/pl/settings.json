@@ -494,6 +494,8 @@
   "settings.advanced.cw.copies.quietWaitMinutes.title": "Copies: wait for one to be free",
   "settings.advanced.cw.copies.review.desc": "A reviewer reads a card's work, and runs its commands, in a review copy: a folder at exactly the revision under review, which nothing else writes, so what it checks is what was submitted. Turned off, reviewers read the builder's folder as before. Isolated checks (cw-progress --check with --isolated) use the same copies either way.",
   "settings.advanced.cw.copies.review.title": "Reviewers review in review copies",
+  "settings.advanced.cw.db.busySeconds.desc": "How long a write to the board, the Assistant's journal or the usage history waits while another program (another Combwork on this workspace, a script) holds its database's lock, before the write is refused. It bounds a wait, not a speed: a write to the board waits on Combwork's main thread, so the window doesn't respond while it waits. Takes effect after Combwork restarts.",
+  "settings.advanced.cw.db.busySeconds.title": "Databases: wait for another program's lock",
   "settings.advanced.cw.disableHardwareAcceleration.desc": "Draw Combwork without the graphics card, for a graphics driver that leaves Combwork's window blank, flickering or crashing. Terminals then draw without WebGL. Takes effect when Combwork restarts; to start once without it, run Combwork with --disable-gpu.",
   "settings.advanced.cw.disableHardwareAcceleration.title": "Disable hardware acceleration",
   "settings.advanced.cw.focused.pickSeconds.desc": "How long the project’s command that chooses a card’s focused tests may run, when it is submitted and at its merge. Past it, the command is ended and no tests count as chosen: the builder then names them itself.",
