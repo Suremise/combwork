@@ -206,10 +206,10 @@ const check = (name, ok, extra = '') => {
   // The filter cleared: the tree is back.
   await lib.until(async () => (await row('src').count()) === 1, HUNG_MS)
 
-  await row('src/app.ts').click().catch(() => undefined)
-  await row('src').click().catch(() => undefined)
+  // src/app.ts's details: its folder open (a click on src toggles it), then the file selected.
+  if (!(await row('src/app.ts').count())) await row('src').click()
   await lib.until(async () => (await row('src/app.ts').count()) === 1, HUNG_MS)
-  await row('src/app.ts').click().catch(() => undefined)
+  await row('src/app.ts').click()
   await lib.until(() => selected('src/app.ts'), HUNG_MS)
   await lib.settled(page)
   await page.screenshot({ path: path.join(shots, '3-details.png') })
