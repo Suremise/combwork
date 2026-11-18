@@ -9,7 +9,9 @@ module.exports = {
   /** A role's descriptions and parameter descriptions together, every tool it is offered (the Assistant: all of its own). */
   // HI-3219 (14 Nov): cw_read_task's lineComments and offset (a card's line comments, a page at a time): agent raised to match.
   // HI-3188 (14 Nov): cw_create_task's followUpOf (a continuation keeps the card's count): agent raised to match.
-  total: { agent: 11200, assistant: 19000 },
+  // HI-3360 (18 Nov): cw_start_agent's long-idle refusal and resumeIdle, about 90 characters, the Assistant's alone; left
+  // over its total until HI-3395 raised it to match.
+  total: { agent: 11200, assistant: 19100 },
   /**
    * A role's whole tool list as the CLI gets it (HI-2553): the tools array's JSON, UTF-8 bytes (names, descriptions,
    * schemas), every tool it is offered but cw_console. Set 7 Nov 2026 at about 6% over the list then (agent 24,571 bytes,
