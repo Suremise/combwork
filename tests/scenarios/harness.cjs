@@ -1067,7 +1067,9 @@ async function runScenario(sc, providerKey, opts = {}) {
       // taken: its terminal's end in Combwork's log says so, and nothing is typed into it, nor waited for.
       const combworkLog = path.join(userData, 'logs', 'combwork.log')
       const endedNow = () => terminalEnded(combworkLog, agentId, launchMark)
-      const ready = p.provider === 'claude-code' ? () => lib.combworkToolsConnected(userData, agentId, launchMark) || !!endedNow() : null
+      // HI-3408: not after Combwork's line, which waited for them itself (its turn is over by now), and was often typed
+      // before launchMark, so the wait ran out its 20 s.
+      const ready = p.provider === 'claude-code' && !combworkLine ? () => lib.combworkToolsConnected(userData, agentId, launchMark) || !!endedNow() : null
       // Waited for here (as sendPrompt would), so that its end is seen too.
       if (ready && !(await lib.until(ready, 20000, 250))) console.log('INFO sendPrompt: not ready within 20 s, typed anyway') // timing-ok: sendPrompt's own readiness allowance (its waitMs, 20 s), moved here: past it the prompt is typed anyway, never a hang
       if (endedNow() || !(await lib.sendPrompt(inv, key, text, { submitted }))) {
