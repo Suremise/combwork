@@ -43,8 +43,8 @@ const ws = createWorkspaceService()
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(ws, fn)
 
 /** One of B1's conversations: its provider, when it was last active, and the lease it is bound to. */
-async function record(id: string, o: { lease: string | null; at: string; provider?: string; agentId?: string }): Promise<void> {
-  await run(() => ws.upsertSession(project, { id, agent: (o.provider ?? 'claude-code') as never, agentId: o.agentId ?? 'b1', cwd: join(base, 'slot-a'), name: id, lastActiveAt: o.at }))
+async function record(id: string, o: { lease: string | null; at: string; provider?: string; agentId?: string; names?: number }): Promise<void> {
+  await run(() => ws.upsertSession(project, { id, agent: (o.provider ?? 'claude-code') as never, agentId: o.agentId ?? 'b1', cwd: join(base, 'slot-a'), name: id, lastActiveAt: o.at, ...(o.names ? { names: o.names } : {}) } as never))
   const host = (await ws.sessionScope(project)).scope
   await boardWrite(ws, async () => boardWriteOp(ws, (db) => db.prepare('UPDATE sessions SET lease = ? WHERE host = ? AND id = ?').run(o.lease, host, id)))
 }
@@ -190,5 +190,43 @@ describe("Resume All joining a start of that same conversation (HI-1746)", () =>
     } finally {
       clear()
     }
+  })
+})
+
+// HI-3360: whether resuming one of these counts as cold, as its listing says (sessions.idleOf), which the Agent API's start
+// and a placement read. Their last activity is the record's (no usage read for them), weeks before now.
+describe('a long-idle conversation (HI-3360)', () => {
+  // Launched since HI-2463 (names 2), so they resume: bound to no lease, weeks before now.
+  const current = async (): Promise<void> => {
+    await record('c-idle', { lease: null, at: '2026-10-20T02:00:00.000Z', names: 2 })
+    await record('c-idle-codex', { lease: null, at: '2026-10-20T04:00:00.000Z', provider: 'codex', names: 2 })
+  }
+
+  it("idle past the threshold: its age, and no size where none is known; a Codex one (no prompt-cache TTL) too", async () => {
+    await current()
+    const idle = await run(() => sessions.idleOf(project, 'c-idle'))
+    expect(idle).toMatchObject({ since: '2026-10-20T02:00:00.000Z', tokens: null })
+    expect(idle!.idleMs).toBeGreaterThan(60 * 60_000)
+    expect(await run(() => sessions.idleOf(project, 'c-idle-codex'))).toMatchObject({ since: '2026-10-20T04:00:00.000Z' })
+  })
+
+  it("one that can't continue (HI-2540: launched before the rename), idle as long: never counted, as its start begins a new one (HR3's round 1)", async () => {
+    await current()
+    const listed = (await run(() => sessions.list(project))).find((i) => i.id === 'c-new')
+    expect(listed).toMatchObject({ fresh: 'renamed' })
+    expect(await run(() => sessions.idleOf(project, 'c-new'))).toBeNull()
+  })
+
+  it('the rule off: not cold; one not listed: nothing to tell it by', async () => {
+    await current()
+    const { advanced } = await import('../src/main/advanced')
+    const { RESUME_IDLE_ASK } = await import('../src/shared/advanced')
+    await advanced.set(RESUME_IDLE_ASK, false)
+    try {
+      expect(await run(() => sessions.idleOf(project, 'c-idle'))).toBeNull()
+    } finally {
+      await advanced.set(RESUME_IDLE_ASK, null)
+    }
+    expect(await run(() => sessions.idleOf(project, 'no-such'))).toBeNull()
   })
 })

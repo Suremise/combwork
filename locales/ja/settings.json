@@ -1693,5 +1693,9 @@
   "settings.advanced.cw.activity.mapMotion.off": "オフ",
   "settings.advanced.cw.activity.mapMotion.on": "オン",
   "settings.advanced.cw.activity.mapMotion.system": "Windowsに従う",
-  "settings.advanced.cw.activity.mapMotion.title": "アクティビティマップの動くパルス"
+  "settings.advanced.cw.activity.mapMotion.title": "アクティビティマップの動くパルス",
+  "settings.advanced.cw.resume.idleAsk.title": "再開：長くアイドル状態の会話を開く前に確認する",
+  "settings.advanced.cw.resume.idleAsk.desc": "下の時間より長くアイドル状態の会話は、CLIのプロンプトキャッシュをおそらく失っているため、再開するとコンテキスト全体が再び処理される可能性があります。「再開」はまず確認し、新しく始めることを提案して、アイドルの長さとサイズを示します。アシスタントにも同じことが伝えられ、アシスタントが選びます。レーンやカードの開始では、代わりにビルダーに新しい会話を与え、カードをそのプロンプトにします。再起動、アップデート、終了の後にCombworkが再開するエージェントは、これまでどおり再開します。オフにすると、すべての再開がこれまでどおり行われ、Claude Codeのセッションにあった期限切れキャッシュの確認だけが残ります。",
+  "settings.advanced.cw.resume.idleMinutes.title": "再開：会話を長くアイドル状態とみなすまでの時間",
+  "settings.advanced.cw.resume.idleMinutes.desc": "会話の最後のアクティビティ（トランスクリプトの最後のエントリ、なければCombworkが最後に確認した時刻）からこの時間を過ぎると、再開の前に確認します。既定値は、CLIが保持するプロンプトキャッシュの最長時間である1時間です。"
 }

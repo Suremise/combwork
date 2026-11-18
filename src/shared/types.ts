@@ -10,6 +10,7 @@ import type { IgnoreRule, IgnoreTarget } from './gitIgnoreRules'
 import type { GitlinkChange } from './gitlink'
 import type { AgentProcess } from './agentProcesses'
 import type { StartFailure } from './startFailure'
+import type { IdleResume } from './sessionFresh'
 import type { FreshReason } from './sessionFresh'
 import type { TipsState } from './tips'
 import type { GithubHostSettings } from './githubHost'
@@ -3709,6 +3710,8 @@ export interface SessionListItem extends Partial<SessionRecord> {
   deleted?: boolean
   usage: SessionUsage | null
   recache: RecacheEstimate | null
+  /** HI-3360: idle so long its resume counts as cold (Settings → Advanced), with its age and size; absent: it doesn't, or the rule is off. */
+  idle?: IdleResume
   /** The usage history doesn't have it yet (#1106): its figures follow once the worker has read it (the window is told). */
   pending?: boolean
   /** The slot it ran in (#1434), if it ran in one of the project's. */

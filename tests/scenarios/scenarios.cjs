@@ -6332,6 +6332,24 @@ const restartedNothing = (o) => !ran(o, 'cw_prompt_agent').some((x) => argsOf(x)
  * The cards' work, committed (greet.js with its test, the README's Usage), so git backs the board when the Assistant
  * checks a merge (run-lanes, Verify): a board saying merged over an empty repository is a problem, not a natural break.
  */
+/**
+ * HI-3360: `agent`'s last conversation, idle two days: its record in the workspace's database and Combwork's backup of
+ * its transcript (one exchange, a 60K-token context), as the window and the Agent API read them.
+ */
+function idleConversation(c, agent) {
+  const fs = require('fs')
+  const path = require('path')
+  const id = '33600000-0000-4000-8000-00000000c0de'
+  const at = new Date(Date.now() - 2 * 86_400_000).toISOString()
+  require('../e2e/storeDocs.cjs').putSessions(c.alpha, { version: 1, sessions: [{ id, agent: 'claude-code', agentId: agent.id, cwd: c.alpha, name: 'Greeting work', createdAt: at, lastActiveAt: at, archived: false, names: 2 }] })
+  const file = path.join(c.alpha, '.combwork', 'sessions', `${id}.jsonl`)
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  const lines = [
+    { type: 'user', sessionId: id, timestamp: at, message: { role: 'user', content: 'Make greet() trim the name' } },
+    { type: 'assistant', sessionId: id, requestId: `${id}-1`, timestamp: at, message: { model: 'claude-opus-5-5', content: [{ type: 'text', text: 'Done: greet() trims the name.' }], usage: { input_tokens: 5, cache_read_input_tokens: 60000, cache_creation_input_tokens: 100, output_tokens: 50 } } }
+  ]
+  fs.writeFileSync(file, lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
+}
 function landWork(c, readme = true) {
   c.git('config', 'user.email', 'agent@example.com')
   c.git('config', 'user.name', 'Agent')
@@ -6447,6 +6465,27 @@ module.exports.SCENARIOS.push(
     prompt: (c) => `[CW] #${c.cards.a} (Coder's card) is in Done; latest comment by Coder: "Done: greet() returns "Hi, <name>", with a test. Committed." Your card watch has ended: carry on (cw_read_task with latestComment for the comment in full).`,
     fake: (c) => `skill coordinate-agents then cw cw_read_task {"number":${c.cards.a},"latestComment":true}`,
     expect: (o) => [['restarted and stopped nothing itself', restartedNothing(o), o.combworkCalls.map((x) => x.tool).join(',')]]
+  },
+  {
+    id: 'assistant-idle-resume',
+    title: "The Assistant asked to resume Coder's last conversation, idle two days (HI-3360): the resume is refused with its age and size, and the Assistant chooses informed: a new conversation, or resuming it anyway (resumeIdle) with the user told its age and cost",
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      landWork(c)
+      idleConversation(c, c.agents.coder)
+    },
+    prompt: () => "Resume Coder's last conversation so it carries on with greet(): it should add a test for an empty name.",
+    fake: () => 'cw cw_start_agent {"project":"alpha","agent":"Coder","resume":true}',
+    expect: (o) => {
+      const tries = called(o, 'cw_start_agent')
+      return [
+        ['asked to resume it, and was told it is long idle (its age)', tries.some((x) => argsOf(x).resume && /last active/.test(String(x.error ?? ''))), tries.map((x) => `${JSON.stringify(argsOf(x))} -> ${x.ok ? 'ok' : String(x.error ?? '').slice(0, 120)}`).join(' | ')],
+        // The user asked for the resume: resuming anyway is the Assistant's informed choice (the design: it is told and
+        // chooses), so long as the user hears what it costs; never a silent cold resume.
+        ['resumed it anyway only with the user told its age or cost', !ran(o, 'cw_start_agent').some((x) => argsOf(x).resumeIdle === true) || /last active|idle|ago|cache|tokens/i.test(String(o.finalReply ?? '')), `${tries.map((x) => JSON.stringify(argsOf(x))).join(' | ')} :: ${String(o.finalReply ?? '').slice(0, 200)}`]
+      ]
+    }
   },
   {
     id: 'fresh-start-saves-first',

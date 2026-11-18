@@ -1693,5 +1693,9 @@
   "settings.advanced.cw.activity.mapMotion.off": "Desactivado",
   "settings.advanced.cw.activity.mapMotion.on": "Activado",
   "settings.advanced.cw.activity.mapMotion.system": "Como diga Windows",
-  "settings.advanced.cw.activity.mapMotion.title": "Pulsos en movimiento del mapa de actividad"
+  "settings.advanced.cw.activity.mapMotion.title": "Pulsos en movimiento del mapa de actividad",
+  "settings.advanced.cw.resume.idleAsk.title": "Reanudar: preguntar antes de reabrir una conversación inactiva desde hace mucho",
+  "settings.advanced.cw.resume.idleAsk.desc": "Una conversación inactiva durante más tiempo que el indicado abajo probablemente ha perdido la caché de prompts de la CLI, así que al reanudarla puede volver a procesarse todo su contexto. Reanudar pregunta primero, ofrece empezar de nuevo y dice cuánto tiempo lleva inactiva y qué tamaño tiene; al Asistente se le dice lo mismo y elige. El inicio de un carril o de una tarjeta da a su autor una conversación nueva en su lugar, con la tarjeta como prompt. Los agentes que Combwork reanuda tras un reinicio, una actualización o un cierre se reanudan como antes. Desactivado, cada reanudación sigue como antes, solo con la pregunta de la caché caducada que tenían las sesiones de Claude Code.",
+  "settings.advanced.cw.resume.idleMinutes.title": "Reanudar: una conversación cuenta como inactiva desde hace mucho tras",
+  "settings.advanced.cw.resume.idleMinutes.desc": "Cuánto tiempo desde la última actividad de una conversación (la última entrada de su transcripción o, si no, cuándo la vio Combwork por última vez) antes de que reanudarla pregunte primero. El valor predeterminado es la caché de prompts más larga que guardan las CLI: una hora."
 }

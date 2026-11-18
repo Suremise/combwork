@@ -636,5 +636,7 @@
   "tips.versionControlJj.text": "在 jj 仓库中，可在“版本控制”标签页顶部选择 jj：其历史会并排显示每个变更 ID 和提交 ID，比较、书签和冲突会读取仓库而不更改它。已评审的工作由 Combwork 整合，或由你来做。",
   "tips.versionControlJj.title": "查看 jj 仓库",
   "tips.activityMap.text": "“活动”把智能体画成蜂巢：每次工具调用都会去往它的站点（读取、编辑、命令行、智能体、工具、你），每个智能体都有一个上下文环。在“智能体 ▾”中选一个智能体即可看到它自己的地图；“显示”可关闭地图、动态和环。",
-  "tips.activityMap.title": "智能体在做什么的地图"
+  "tips.activityMap.title": "智能体在做什么的地图",
+  "tips.resumeLongIdle.title": "长时间空闲的对话在恢复前会先询问",
+  "tips.resumeLongIdle.text": "空闲超过一小时的对话很可能已失去提示词缓存，因此恢复它可能花费大量 Token。“恢复”会说明它已空闲多久、有多大，并提供“归档并新建会话”作为替代。"
 }

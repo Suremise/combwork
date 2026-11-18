@@ -187,6 +187,7 @@ export const SUITES = [
   { name: 'i18nshots' },
   { name: 'icons' },
   { name: 'idlequestion' },
+  { name: 'idleresume' },
   { name: 'idlestatus' },
   { name: 'image' },
   { name: 'inbox', serial: 'window focus' },
