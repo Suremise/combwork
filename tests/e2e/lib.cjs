@@ -178,21 +178,35 @@ async function hoverTip(page, locator, want, ms = timing('hang.ui')) {
 }
 
 /**
- * HI-3387: the window drawn in `theme`: its data-theme set (by the app from a setting, or by a suite itself) and no CSS
- * transition still running (a background fading to the new colours), so a screenshot shows the theme, not a moment
- * between. document.getAnimations() brings styles up to date first, so a transition the change starts is seen.
+ * HI-3387: waits for the window drawn in `theme`: its data-theme set (by the app from a setting, or by a suite itself)
+ * and no CSS transition still running (a background fading to the new colours), so a screenshot shows the theme, not a
+ * moment between. document.getAnimations() brings styles up to date first, so a transition the change starts is seen.
+ * Not drawn within ms, it throws, saying what it saw: what follows (a screenshot) never runs on an unready window.
  */
 async function themeShown(page, theme, ms = timing('hang.ui')) {
-  const drawn = () => page.evaluate((t) => document.documentElement.dataset.theme === t && !document.getAnimations().some((a) => a instanceof CSSTransition && a.playState === 'running'), theme).catch(() => false)
-  return until(drawn, ms)
+  let seen = null
+  const drawn = async () => {
+    seen = await page.evaluate(() => ({ theme: document.documentElement.dataset.theme ?? null, fading: document.getAnimations().filter((a) => a instanceof CSSTransition && a.playState === 'running').map((a) => a.transitionProperty) })).catch((e) => ({ error: e.message }))
+    return seen.theme === theme && seen.fading.length === 0
+  }
+  if (!(await until(drawn, ms))) throw new Error(`The window wasn't drawn in the ${theme} theme within ${ms} ms: ${JSON.stringify(seen)}`)
+  return true
 }
 
 /**
- * HI-3387: `locator`'s element with no CSS animation or transition running on it or inside it (sliding in, fading), so
- * where it is now is where it stays: read its box after this.
+ * HI-3387: waits for `locator`'s element with no CSS animation or transition running on it or inside it (sliding in,
+ * fading), so where it is now is where it stays: read its box after this. Each look finds the element within the bound
+ * too (never Playwright's longer default). Still moving, or not there, within ms, it throws, saying what ran.
  */
 async function animationsDone(locator, ms = timing('hang.ui')) {
-  return until(() => locator.evaluate((el) => el.getAnimations({ subtree: true }).every((a) => a.playState !== 'running')).catch(() => false), ms)
+  const look = Math.min(ms, timing('poll.readMs'))
+  let seen = null
+  const settled = async () => {
+    seen = await locator.evaluate((el) => el.getAnimations({ subtree: true }).filter((a) => a.playState === 'running').map((a) => a.animationName || a.transitionProperty || 'an animation'), undefined, { timeout: look }).catch((e) => ({ error: e.message }))
+    return Array.isArray(seen) && seen.length === 0
+  }
+  if (!(await until(settled, ms))) throw new Error(`${locator} still animating, or not there, after ${ms} ms: ${JSON.stringify(seen)}`)
+  return true
 }
 
 let quitWatches = 0
