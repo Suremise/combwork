@@ -2619,6 +2619,14 @@
     "defaultMessage": "A CLI putting text on the clipboard",
     "description": "An advanced setting's title (Settings → Advanced), listed under Combwork: what Combwork does when an agent's CLI asks to set the clipboard (OSC 52)."
   },
+  "settings.advanced.cw.typed.takeSeconds.desc": {
+    "defaultMessage": "How long an agent's CLI has to take a line Combwork typed into it (start working on it) before Combwork presses Enter again, once, as soon as that is safe (within six times this). Not taken in this time again, Combwork tells you the line may be waiting in its prompt and types nothing more into that agent until it is taken. Raise it if a slow or busy machine shows that notice for lines that were taken.",
+    "description": "What the advanced setting \"Typed line: wait to be taken\" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-3373)."
+  },
+  "settings.advanced.cw.typed.takeSeconds.title": {
+    "defaultMessage": "Typed line: wait to be taken",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A line: a message Combwork typed into an agent's terminal; taken: the agent's CLI started working on it."
+  },
   "settings.advanced.cw.usage.timelineDetailDays.desc": {
     "defaultMessage": "How long the usage history keeps when each request happened, to the second, after a session ends. Past it, a session's use over time is kept in 1-hour steps, so the history stays small. Totals, tokens and costs stay exact; only where a card's or lane's share began or ended inside an hour is less exact, for sessions that old.",
     "description": "What the advanced setting \"Usage history: keep full detail for\" does, and what is lost past it (Settings → Advanced, under Combwork). A lane is a card loop: a builder and a reviewer taking cards in turn."

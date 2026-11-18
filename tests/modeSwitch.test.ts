@@ -213,13 +213,16 @@ describe("switching a running Codex agent's preset through its menu (#363)", () 
       }
       return a
     }
-    // By default (2 s) the preset is taken as switched before the warning comes.
+    // Set to 2 s, the preset is taken as switched before the warning comes.
+    await advanced.set('codex.fullAccess.warningAfterSeconds', 2)
     const early = late()
     const r1 = early.switchTo('full-access')
     await vi.advanceTimersByTimeAsync(5000)
     expect(await r1).toEqual({ ok: true })
-    // Given 5 s, the switch sees the warning and waits for the answer; cancelled, not switched.
-    await advanced.set('codex.fullAccess.warningAfterSeconds', 5)
+    // By default (HI-3373: 10 s, the setting's own default), the switch sees the warning and waits for the answer;
+    // cancelled, not switched.
+    await advanced.set('codex.fullAccess.warningAfterSeconds', null)
+    expect(advanced.number('codex.fullAccess.warningAfterSeconds')).toBe(10)
     const a = late()
     const r2 = a.switchTo('full-access')
     await vi.advanceTimersByTimeAsync(6000)
