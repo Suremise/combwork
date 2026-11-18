@@ -6830,7 +6830,11 @@ touched:
   **Bounded** (HI-3021): a commit or stash still running after two
   minutes (a slow hook, a signer waiting for an answer) has git's whole process tree ended (git.ts's time limit: every
   timed git command, not git.exe alone, which on Windows never removes the `index.lock` it holds and leaves the hook
-  running). **Git Bash's own programs too** (HI-3047): one a hook's shell starts (`sleep`, `cat`, `perl`) has a Windows
+  running). **Started after the listing too** (HI-3358): the tree is listed once, so after its end the processes are
+  listed again and what an ended process started since is ended, counted only by identity (its parent id names an ended
+  process, it started no earlier than that process and before the end had run, and no other process holding that pid
+  now started before it), until a listing finds none, at most three more ends (still finding some then is logged). The
+  outcome comes after all of it, and none of it runs on main's thread. **Git Bash's own programs too** (HI-3047): one a hook's shell starts (`sleep`, `cat`, `perl`) has a Windows
   parent already gone (MSYS's exec), so no tree walk finds it. Each timed git runs with a fresh random
   `COMBWORK_RUN=<marker>` in its environment, which what it starts inherits; at its end, that Git's own `sh.exe` is
   asked, with a script of builtins only (it starts nothing; 3 s and 1 MB, then ended), which MSYS programs have exactly

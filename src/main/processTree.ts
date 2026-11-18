@@ -225,6 +225,55 @@ export function treesToEnd(list: ListedProcess[], root: number | null, extra: Li
   return out
 }
 
+/** HI-3358: at most this many more ends after the first, for what the ended processes started after their listing. */
+export const LATE_ROUNDS = 3
+
+/** What a teardown tells its caller, for the log. */
+export interface TeardownNotes {
+  /** HI-3358: the last listing still found processes the ended ones had started, after LATE_ROUNDS more ends: they were left running. */
+  onLateLeft?: () => void
+}
+
+/**
+ * HI-3358: the processes of `list` (read after an end) that the processes `previous` ended had started since they were
+ * listed, each with what it started in turn (treeToEnd), children before their parents, none of `done` again. A
+ * parent id is only a number once its process has ended, so a process counts only when its parent id names one of
+ * `previous` (that pid, listed with a start time), it started no earlier than that process, and no later than
+ * `endedBy` (when the end that ended it had run: a process ended can start nothing after). And when that pid now names
+ * another process, started no later than this one, this one may be that process's child, and is left.
+ */
+export function lateStarted(list: ListedProcess[], previous: ListedProcess[], done: ListedProcess[], endedBy: number): ListedProcess[] {
+  const same = (a: ListedProcess, b: ListedProcess): boolean => a.pid === b.pid && Math.abs(a.started - b.started) <= 1
+  const late: ListedProcess[] = []
+  for (const k of list) {
+    if (done.some((d) => same(d, k))) continue
+    const parent = previous.find((p) => p.pid === k.parent)
+    if (!parent || k.started < parent.started || k.started > endedBy) continue
+    const holder = list.find((p) => p.pid === k.parent)
+    if (holder && !same(holder, parent) && holder.started <= k.started) continue
+    late.push(k)
+  }
+  return treesToEnd(list, null, late).filter((p) => !done.some((d) => same(d, p)))
+}
+
+/**
+ * HI-3358: after `first` was ended (its end run over at `endedBy`), lists again and ends what those processes started
+ * since (lateStarted), until a listing finds none or LATE_ROUNDS more ends have run; still finding some then, says so.
+ */
+async function endLate(first: ListedProcess[], endedBy: number, notes: TeardownNotes): Promise<void> {
+  const done = [...first]
+  let previous = first
+  for (let round = 1; ; round++) {
+    const late = lateStarted(parseProcessList(await powershell(LIST_PS)), previous, done, endedBy)
+    if (!late.length) return
+    if (round > LATE_ROUNDS) return notes.onLateLeft?.()
+    await powershell(endListedPs(late))
+    endedBy = Date.now()
+    done.push(...late)
+    previous = late
+  }
+}
+
 /**
  * endTree without blocking the caller's thread (HI-1185: Electron's main thread carries every keystroke): the same
  * listing, identity check and order, through PowerShell runs it awaits rather than spawnSync. With `msys` (HI-3047), the
@@ -237,8 +286,13 @@ export function treesToEnd(list: ListedProcess[], root: number | null, extra: Li
  * already name another process, so no tree is walked from that number. Its marked MSYS programs, found by their marker,
  * not their parent, are still ended with what they started; native programs it started, whose parent is then only a
  * number, are left, as when it exits before any teardown.
+ *
+ * HI-3358: the listing is one moment, and a process the tree starts after it, before the end, wasn't in it. After the
+ * end, the processes are listed again and what the ended ones started since is ended (endLate, by identity), so a
+ * command still starting processes as its bound fires leaves none of them running (notes.onLateLeft when the rounds run
+ * out). The promise settles once those rounds are over.
  */
-export async function endTreeAsync(child: ChildProcess, platform = process.platform, msys?: MsysMark): Promise<void> {
+export async function endTreeAsync(child: ChildProcess, platform = process.platform, msys?: MsysMark, notes: TeardownNotes = {}): Promise<void> {
   const exited = (): boolean => child.exitCode !== null || child.signalCode !== null
   if (exited()) return
   if (platform === 'win32' && child.pid) {
@@ -255,6 +309,7 @@ export async function endTreeAsync(child: ChildProcess, platform = process.platf
     }
     const tree = treesToEnd(list, root, extra)
     const ended = tree.length ? pidsOf(await powershell(endListedPs(tree))) : []
+    if (tree.length) await endLate(tree, Date.now(), notes)
     if (root === null || ended.includes(root)) return
   }
   try {
@@ -279,11 +334,11 @@ export interface TreeEnding {
  * spawnSync (about 2.4 s of the thread for PowerShell's listing and ending), and whatever waited on the tree having ended
  * (an outcome, a time-out's grace) waits on the teardown instead. Never rejects.
  */
-export function treeEnding(platform = process.platform, msys?: MsysMark): TreeEnding {
+export function treeEnding(platform = process.platform, msys?: MsysMark, notes: TeardownNotes = {}): TreeEnding {
   let teardown: Promise<void> | null = null
   return {
     end: (child) => {
-      if (child && !teardown) teardown = endTreeAsync(child, platform, msys).catch(() => undefined)
+      if (child && !teardown) teardown = endTreeAsync(child, platform, msys, notes).catch(() => undefined)
     },
     after: (fn) => {
       if (teardown) void teardown.then(fn)

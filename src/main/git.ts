@@ -12,6 +12,7 @@ import { msg } from '../shared/i18n'
 import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { runGit, type GitOutcome, type GitReply, type GitRequest, type RefsRequest } from './gitWorker'
+import { LATE_ROUNDS } from './processTree'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 import { readRepoRefs, type RepoRefs } from './platform/repoRefs'
 import type { RunResult } from './platform/repoContext'
@@ -220,6 +221,7 @@ async function gitAs(use: GitExe, cwd: string, args: string[], maxBuffer: number
   if (!scope?.active) gitTestHooks.ended?.(cwd, args)
   if (o.held) log.warn(`git ${args[0]}'s output stayed open after it exited, held by another process (HI-1854): taken as read`)
   if (o.msysIncomplete) log.warn(`git ${args[0]} was ended at its time limit, but its Git Bash programs couldn't be looked for (${userText(o.msysIncomplete)}): only its process tree was ended (HI-3047)`)
+  if (o.lateLeft) log.warn(`git ${args[0]} was ended at its time limit, but its processes were still starting others after ${LATE_ROUNDS} more ends: those were left running (HI-3358)`)
   const buf = Buffer.from(o.stdout.buffer, o.stdout.byteOffset, o.stdout.byteLength)
   const err = o.error
   const errCode = err?.code

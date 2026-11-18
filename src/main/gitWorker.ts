@@ -53,6 +53,8 @@ export interface GitOutcome {
   held?: boolean
   /** Ended at its time limit, but its Git Bash programs couldn't be looked for, and why (HI-3047): its process tree alone was ended. */
   msysIncomplete?: string
+  /** Ended at its time limit, but it was still starting processes after LATE_ROUNDS more ends, and those were left running (HI-3358). */
+  lateLeft?: boolean
 }
 
 const msysBins = new Map<string, string | null>()
@@ -127,9 +129,10 @@ export function runGit(m: Omit<GitRequest, 'id'>, quietMs = EXITED_QUIET_MS): Pr
     let timedOut = false
     let bound: ReturnType<typeof setTimeout> | undefined
     let msysIncomplete: string | undefined
+    let lateLeft = false
     const bin = m.timeout && process.platform === 'win32' ? msysBinFor(m) : null
     const msys: MsysMark | undefined = bin ? { mark: randomBytes(16).toString('hex'), bin, onIncomplete: (why) => (msysIncomplete = why) } : undefined
-    const ending = treeEnding(process.platform, msys)
+    const ending = treeEnding(process.platform, msys, { onLateLeft: () => (lateLeft = true) })
     const given = m.launcherEnv ? withLauncherEnv(m.env ?? process.env, m.launcherEnv) : m.env
     const env = msys ? { ...(given ?? process.env), [RUN_MARK_VAR]: msys.mark } : given
     const child = execFile(m.exe ?? 'git', m.args, { cwd: m.cwd, windowsHide: true, maxBuffer: m.maxBuffer, encoding: 'buffer', ...(env ? { env } : {}) }, (err, stdout, stderr) => {
@@ -145,7 +148,8 @@ export function runGit(m: Omit<GitRequest, 'id'>, quietMs = EXITED_QUIET_MS): Pr
           // Only asked when git didn't start: a folder that isn't there makes Node say ENOENT too.
           cwdExists: e && typeof e.code === 'string' ? existsSync(m.cwd) : true,
           ...(held ? { held } : {}),
-          ...(msysIncomplete ? { msysIncomplete } : {})
+          ...(msysIncomplete ? { msysIncomplete } : {}),
+          ...(lateLeft ? { lateLeft } : {})
         })
       )
     })

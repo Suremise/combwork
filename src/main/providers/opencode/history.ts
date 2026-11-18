@@ -12,7 +12,7 @@ import { placeholderMirror } from './mirror'
 import { serverInfoPath } from './launcher'
 
 const log = createLogger('opencodeHistory')
-/** The longest a shutdown's reply is waited for before its worker is ended: its exports' trees ended (endTreeAsync's two bounded runs). */
+/** The longest a shutdown's reply is waited for before its worker is ended: its exports' trees ended (endTreeAsync's bounded runs: a listing and an end, then a listing for what started meanwhile, HI-3358, about a second each). */
 const SHUTDOWN_MS = 25_000
 
 // The OpenCode history's main side (HI-2762, design s7/s10/s13). Main never reads a session itself: it tells the worker
