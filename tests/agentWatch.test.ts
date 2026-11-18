@@ -1118,7 +1118,10 @@ describe('agent watches (main/watches.ts)', async () => {
     expect(st.told[0]).toBe(`[CW] #${c1} is in Done (your watch on it ended). ${done}`)
     await vi.waitFor(() => expect(watches.watchFor(alpha, 'a1')).toBeNull(), { timeout: HUNG_MS })
     await vi.waitFor(async () => expect(await history(c1)).toContain("Ended Builder (alpha)'s watch on it: the card is in Done"), { timeout: HUNG_MS })
-    await vi.waitFor(async () => expect((await lanes.getLane(w, l1.id)).state).toBe('ended'), { timeout: HUNG_MS })
+    // The lane ends as the Done's finish reads the lanes again (finishPath.ts's lane step), which isn't running here:
+    // that read, as it makes it. Its own start's settle timer may have read them before the Done (HI-3354).
+    await lanes.refresh(w)
+    expect((await lanes.getLane(w, l1.id)).state).toBe('ended')
     // A lane abandoned with its card still in Todo: no card changes, and the watch ends all the same.
     st.status = 'watching'
     const c2 = await card('Abandoned', 'todo')
