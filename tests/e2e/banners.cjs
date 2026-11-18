@@ -83,6 +83,17 @@ const check = (name, ok, extra = '') => {
     await lib.until(async () => (await page.locator('.project-header h1').innerText().catch(() => '')).includes(name), lib.timing('hang.ui'))
   }
 
+  // --- Opened without the focus (HI-3404): the window knows it from the start, before any focus or blur event, so a pop-up
+  // sent to it (as main sends one, "waits in its window") holds its clock rather than closing unseen after its seconds.
+  check('a test copy opens without the focus', !(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isFocused())))
+  const early = { id: 'unfocused-1', kind: 'finished', level: 'success', title: 'Opened unfocused', message: 'Done.', target: { kind: 'project', projectPath: alpha, project: 'alpha' }, timestamp: new Date().toISOString() }
+  await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'toast', toast: early })
+  await lib.until(async () => (await banners().count()) === 1, lib.timing('hang.ui'))
+  await lib.sleep(lib.timing('quiet.bannerStaysMs')) // The window is the point: past a banner's 2 s, it doesn't close while the window is unfocused.
+  check('…and a pop-up in it stays past its seconds while unfocused', (await banners().count()) === 1, JSON.stringify(await bannerTitles()))
+  await setFocus(true)
+  check('…then closes after its seconds once the window is focused', !!(await lib.until(async () => (await banners().count()) === 0, lib.timing('hang.ui'))))
+
   // --- Focused: a finished agent is a pop-up at the bottom right, not a Windows notification.
   await setFocus(true)
   await showProject('beta')

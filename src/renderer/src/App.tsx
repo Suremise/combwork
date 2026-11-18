@@ -451,9 +451,11 @@ export function App() {
       set({ settings: s, sidebarWidth: ui.sidebarWidth, sidebarVisible: ui.sidebarVisible, sidebarCompact: !!ui.sidebarCompact, panes: ui.panes ?? {}, skillsProvider: ui.skillsProvider ?? {}, skillsFold: ui.skillsFold ?? {}, sessionsTree: ui.sessionsTree ?? {}, combworkVcsNotice: ui.combworkVcsNotice ?? {}, assistantFold: ui.assistantFold ?? {}, boardFold: ui.boardFold ?? {}, progressFilter: ui.progressFilter ?? {}, tabs: ui.tabs ?? {}, laneOrder: ui.laneOrder ?? {}, tips: tipsState(ui.tips), workspace: ws, recent, providers: ag, api, appInfo: info })
       early.settle()
       set({ assistantOpen: assistantWasOpen(ws?.path) })
-      // A window restored on top (its workspace was left pinned) shows its pin lit from the start.
-      void call('window:getAlwaysOnTop').then((on) => {
-        if (early.active()) set({ alwaysOnTop: on })
+      // The window's state from the start (HI-3404): main sends it only when it changes, so a window opened without the
+      // focus would think it had it (and run its pop-ups' clocks) until first focused or blurred, and one restored on top
+      // (its workspace was left pinned) shows its pin lit.
+      void call('window:state').then((st) => {
+        if (early.active()) set({ maximized: st.maximized, windowFocused: st.focused, alwaysOnTop: st.alwaysOnTop })
       }).catch(() => undefined)
       if (ws) set({ selectedProject: (ws.projects.find((p) => p.active) ?? ws.projects[0])?.path ?? null })
       for (const l of live) applyLiveState(l)

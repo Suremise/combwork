@@ -646,6 +646,10 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       return now
     },
     'window:getAlwaysOnTop': () => win().isAlwaysOnTop(),
+    'window:state': () => {
+      const w = win()
+      return { maximized: w.isMaximized(), focused: w.isFocused(), alwaysOnTop: w.isAlwaysOnTop() }
+    },
     'window:showing': (projectPath) => {
       const e = combworkWindows().find((x) => x.win === win())
       if (e) e.showing = projectPath
