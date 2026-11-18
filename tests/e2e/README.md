@@ -367,9 +367,8 @@ same code while every required check still runs:
   runs only the unit tests.
 - **The full set runs at checkpoints**: `npm run e2e -- --all --build --record` **on the integration branch when the
   lanes go quiet** (a phase's end, overnight with the load capped, before a long pause; a failure is carded at once and
-  bisected over the merge commits since the last full run), **twice during a version, as its full passes** (with the
-  full unit run and the real tier: RELEASING.md, The release path, stage 1, says when, and that their failures are
-  carded into the version at once), **once for a version's first RC** (RELEASING.md, What a
+  bisected over the merge commits since the last full run), **twice during a version, as its full passes**
+  (RELEASING.md, The release path, stage 1), **once for a version's first RC** (RELEASING.md, What a
   release checks; the real tier then runs on its own, `--all --only-real` with Copilot's suites named, RELEASING Step 4; an RC
   fix round and the release rerun only the slices a change invalidates, by the release's coverage ledger), and **on request** (the user, or a card that asks for it). Run the real tier on its own
   (`--all --only-real`) **after updating Claude Code or Codex**. `--affected` (below) stays a tool for picking the
