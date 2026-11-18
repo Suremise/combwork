@@ -1386,7 +1386,7 @@ const USER_REPLY_MS = 15_000
  * HI-3373: 120 s (it was 30): a CLI starting several MCP servers can be ready long before it takes its first task, and
  * pending ends at that first prompt anyway.
  */
-const PENDING_MS = 120_000
+export const PENDING_MS = 120_000
 
 /** The longest a Shift+Tab press waits for the footer to show the mode it moved to (HI-3373: 4 s gave up on a busy machine). */
 const MODE_PRESS_MS = 30_000

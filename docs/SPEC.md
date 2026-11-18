@@ -5987,7 +5987,10 @@ The `review` parameter of `cw_update_task` maps onto the intents for one release
   On a no-code card (HI-3409: one the user made no-code while its code submission waited in Review, MC-1559, whose
   follow-ups were refused as duplicates naming no revision, so its reviewer had to fail it) a follow-up records a new
   submission with no revision, its summary the evidence (a commit named there is supporting evidence, never a recorded
-  revision), and is otherwise the same; any other submit while one waits stays `submit.notDuplicate`.
+  revision), and is otherwise the same; any other submit while one waits stays `submit.notDuplicate`. While its own line
+  holds commits its target lacks (MC-1559's 5045b46 among them), the follow-up is refused `done.noCodeUnmerged` first, as
+  any no-code submission is (HI-3410, HI-3412): a no-code submission would leave them unmerged, so the user says whether
+  they merge (the card made code again) or are dropped.
   The loop step's `followUp` stays for Approved and for a change with no commit (a screenshot's). On 26 Oct HR4 OK'd HB4's
   follow-up commit and passed the submitted one: the pass went stale at once and HI-1737 sat in Approved, nobody told.
   **A pass that goes stale afterwards is never silent:** its builder's wake names what was passed, where the line is and
