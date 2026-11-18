@@ -5,6 +5,7 @@
 // page and photographed there; the install-folder message, drawn by Combwork itself to a picture (CW_TEST_DIALOG_SNAPSHOT)
 // by a start of its own in the language, is shown the same way.
 const fs = require('fs')
+const { timing } = require('../../timing.cjs')
 const path = require('path')
 const { spawn, spawnSync } = require('child_process')
 
@@ -72,7 +73,7 @@ async function corruptFile(ctx) {
 
 async function closeToasts(ctx) {
   const { page, lib } = ctx
-  const dismiss = () => page.locator('.toasts .toast .icon-btn').first().click({ timeout: 2000 }).then(() => false, () => false)
+  const dismiss = () => page.locator('.toasts .toast .icon-btn').first().click({ timeout: timing('poll.clickMs') }).then(() => false, () => false)
   if (!(await lib.until(async () => (await page.locator('.toasts .toast').count()) === 0 || (await dismiss()), ctx.hungMs))) throw new Error("the notices didn't close")
 }
 
@@ -162,7 +163,7 @@ async function installFolder(ctx) {
   const child = spawn(lib.ELECTRON, [lib.ROOT], { cwd: lib.ROOT, env, stdio: 'ignore' })
   let code = null
   child.on('exit', (c) => (code = c ?? -1))
-  const ended = await lib.until(async () => code !== null, 60_000)
+  const ended = await lib.until(async () => code !== null, lib.timing('hang.step'))
   if (!ended) child.kill()
   fs.rmSync(locked, { recursive: true, force: true })
   if (!ended) throw new Error('the start from the locked folder did not quit')

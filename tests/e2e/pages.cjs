@@ -35,7 +35,7 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('crowd', { exact: true }).first().click()
-  await lib.sleep(500)
+  await lib.readyWithin('its project shown', async () => (await page.locator('.project-row.selected', { hasText: 'crowd' }).count()) === 1, lib.timing('hang.ui'))
   // Panes on screen, and the agents in them (an empty pane has no header).
   const panes = () => page.locator('.agent-pane').count()
   const shown = async () => (await page.locator('.pane-header-bar .agent-name').allInnerTexts()).map((t) => t.trim()).join(',')
@@ -44,13 +44,14 @@ const check = (name, ok, extra = '') => {
   const add = async (n) => {
     for (let i = 0; i < n; i++) await inv('agents:add', proj, { location: 'project', provider: 'claude-code' })
     await inv('workspace:refresh')
-    await lib.sleep(600)
+    // HI-3396: what main told the window of them drawn.
+    await lib.answersDrawn(inv, page)
   }
   const cfg = async () => (await inv('workspace:refresh')).projects[0].config
   const choose = async (label) => {
     await page.locator(`.layout-switch button[aria-label="${label}"]`).click()
     await lib.until(async () => (await page.locator(`.layout-switch button.active[aria-label="${label}"]`).count()) === 1, lib.timing('hang.ui'))
-    await lib.sleep(300)
+    await lib.framesDrawn(page)
   }
   const go = async (n) => {
     await page.locator(`.page-switch button[aria-label="Agent page ${n}"]`).click()
@@ -80,7 +81,7 @@ const check = (name, ok, extra = '') => {
   // A fresh hover (the tooltip hides on the click that went to page 2).
   await page.mouse.move(0, 0)
   await page.locator('.page-switch button[aria-label="Agent page 2"]').hover()
-  const tipText = async () => (await page.locator('.tip').first().textContent({ timeout: 500 }).catch(() => '')) ?? ''
+  const tipText = async () => (await page.locator('.tip').first().textContent({ timeout: lib.timing('poll.readMs') }).catch(() => '')) ?? ''
   check('the page button names its agents', !!(await lib.until(async () => (await tipText()).startsWith('Page 2: Agent 5 and Agent 6'), HUNG_MS)), await tipText())
   await page.mouse.move(0, 0)
   // One at a time: no page buttons, the focused agent shown; choosing an agent in the summary chip's list shows it (#975).
@@ -138,7 +139,7 @@ const check = (name, ok, extra = '') => {
   const left = (await inv('workspace:refresh')).projects[0].agents
   for (const a of left.slice(7)) await inv('agents:remove', proj, a.id, { deleteWorktree: false })
   await inv('workspace:refresh')
-  await lib.sleep(600)
+  await lib.answersDrawn(inv, page)
   await remove('Agent 7')
   check('removing the only agent on page 2 goes to page 1', (await page.locator('.page-switch').count()) === 0 && (await panes()) >= 1)
 

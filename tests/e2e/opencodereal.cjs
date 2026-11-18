@@ -20,7 +20,7 @@ const { processes } = require('./folderProcesses.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = lib.timing('hang.step')
 // A real model turn on a local model: bounded, never how long it should take.
-const TURN_MS = 240000
+const TURN_MS = lib.timing('turn.realMs')
 
 const PINNED = path.join(process.env.LOCALAPPDATA || '', 'combwork-test', 'opencode-2.2.6', 'opencode.exe')
 const PINNED_SHA256 = '98cb0aa854c7c015cf6febafa7afb872c359bfe5a823a526f3b4fd347a9e9677'
@@ -73,7 +73,7 @@ const portOpen = (port) => new Promise((resolve) => {
 })
 /** The local Ollama's models, or null when it doesn't answer. */
 const ollamaModels = () => new Promise((resolve) => {
-  const req = http.get({ ...OLLAMA, path: '/api/tags', timeout: 5000 }, (res) => {
+  const req = http.get({ ...OLLAMA, path: '/api/tags', timeout: lib.timing('hang.ui') }, (res) => {
     let b = ''
     res.on('data', (d) => (b += d))
     res.on('end', () => {

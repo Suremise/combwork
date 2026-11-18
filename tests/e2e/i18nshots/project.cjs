@@ -7,6 +7,7 @@
 // and structural hooks (data-action, data-section, data-stat, classes, icons), never English text. See
 // tests/e2e/i18nshots.cjs for ctx.
 const fs = require('fs')
+const { timing } = require('../../timing.cjs')
 const path = require('path')
 const { execFileSync } = require('child_process')
 
@@ -24,7 +25,7 @@ async function gone(ctx, locator, what) {
 /** Closes the dialog on top with its Cancel (the first subtle button, whatever its words). */
 async function cancelDialog(ctx) {
   const { page, lib } = ctx
-  const cancel = () => page.locator('.dialog').last().locator('button.subtle').first().click({ timeout: 2000 }).then(() => false, () => false)
+  const cancel = () => page.locator('.dialog').last().locator('button.subtle').first().click({ timeout: timing('poll.clickMs') }).then(() => false, () => false)
   if (!(await lib.until(async () => (await page.locator('.dialog').count()) === 0 || (await cancel()), ctx.hungMs))) throw new Error("the dialog didn't close")
 }
 

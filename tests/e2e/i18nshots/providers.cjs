@@ -4,6 +4,7 @@
 // are looked for with the test copy's empty homes (lib.cjs gives every test Combwork its own), so Provider Setup shows their
 // readiness (not installed, or not signed in, or the sandbox to set up), whatever this machine has.
 const fs = require('fs')
+const { timing } = require('../../timing.cjs')
 const path = require('path')
 
 const WINDOW = { width: 1400, height: 860 }
@@ -50,7 +51,7 @@ async function shown(ctx, locator, what) {
 
 async function closeToasts(ctx) {
   const { page, lib } = ctx
-  const dismiss = () => page.locator('.toasts .toast .icon-btn').first().click({ timeout: 2000 }).then(() => false, () => false)
+  const dismiss = () => page.locator('.toasts .toast .icon-btn').first().click({ timeout: timing('poll.clickMs') }).then(() => false, () => false)
   if (!(await lib.until(async () => (await page.locator('.toasts .toast').count()) === 0 || (await dismiss()), ctx.hungMs))) throw new Error("the notices didn't close")
 }
 
