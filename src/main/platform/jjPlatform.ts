@@ -195,6 +195,9 @@ class SamenessUnread extends Error {}
 
 const checksLog = createLogger('jj')
 
+/** HI-3390: how many times a preview's click is read again when its reason to run nothing changed during its write. */
+const PREVIEW_REREADS = 3
+
 /** HI-2938: what the app gives the candidate checks (jjCards.ts). */
 export interface JjChecksHost {
   /**
@@ -1151,16 +1154,24 @@ export class JjPlatform implements PlatformAdapter {
     }
     // HI-3367: the card's earlier attempts settled first (an earlier cycle's retired), as before any attempt.
     if (!(await this.settleAdvances(h, integ, journals, c, host))) return false
-    const c2 = wf.store.card(card.id)
-    const s2 = wf.state(c2)
-    if (s2.cycle !== ans.cycle || c2.stage !== 'approved' || s2.integrated || advanceUnresolved(s2)) return false
     // HI-3390: a click whose consent went since its preview was asked (the finish changed, a blocker added) runs nothing,
-    // and the card says why (once for the request), never dropped silently.
-    const waits = host.waitsFor(c2)
-    const finishGone = !finishPreviews(wf.rulesetOf(c2, s2).options.finish)
-    if (finishGone || waits.length) {
-      await host.previewClosed(c2, s2.cycle, finishGone ? 'finish' : 'blocked', waits, ans.request)
-      return false
+    // and the card says why (once for the request), never dropped silently. The reason is read again in that write: gone
+    // there ('changed', HR1's round 1), the click is read again here (a few times: each a change of the board between two
+    // reads), and runs if its consent holds now. Not said ('failed', or still changing): the action fails, never done
+    // without its explanation (the preview comes back by the next reconcile where the finish still previews).
+    let c2 = wf.store.card(card.id)
+    let s2 = wf.state(c2)
+    for (let tries = 0; ; tries++) {
+      c2 = wf.store.card(card.id)
+      s2 = wf.state(c2)
+      if (s2.cycle !== ans.cycle || c2.stage !== 'approved' || s2.integrated || advanceUnresolved(s2)) return false
+      const waits = host.waitsFor(c2)
+      const finishGone = !finishPreviews(wf.rulesetOf(c2, s2).options.finish)
+      if (!finishGone && !waits.length) break
+      const said = await host.previewClosed(c2, s2.cycle, finishGone ? 'finish' : 'blocked', waits, ans.request)
+      if (said === 'recorded' || said === 'already') return false
+      if (said === 'failed') throw new Error("advance preview: why its Integrate ran nothing couldn't be recorded") // i18n-ignore: an action's failure, for the log
+      if (tries >= PREVIEW_REREADS) throw new Error("advance preview: its Integrate's conditions kept changing") // i18n-ignore: an action's failure, for the log
     }
     if (!this.consentHolds(c2, s2, 'preview')) return false
     const ready = await this.readyPlan(h, integ, journals, c2, s2, host)

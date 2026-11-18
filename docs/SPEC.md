@@ -4297,7 +4297,10 @@ with s34, its mapping HI-3235/s7, s10, s13 and s16. gate:advance is open.
   saying why (`previewClosed`, the reason read again in that write): the finish no longer previews (changed to
   automatic, which then advances, or to the user's own integration), or the card waits for blockers (previewed again
   once they are Done). An Integrate that raced such a change runs nothing and the card says why, once for its request
-  (project meta), never dropped silently.
+  (project meta), never dropped silently. The reason is read again in the explanation's write: gone there (the blocker
+  Done, the finish back to preview), the click is read again and runs if its consent holds now (up to three reads);
+  an explanation that can't be written, or conditions that keep changing, fail the answer's action, never done
+  without it.
 - **For you** (the user's alone: an agent's or the Assistant's answer is refused). The window names each answer: the
   preview's Integrate / Not for this plan, a stop's Undo Combwork's move / Leave it to me, an uncertain attempt's It's
   integrated / Not integrated, start again (an attested card shows *Done by you, integration not proved*). A stop whose undo conditions hold

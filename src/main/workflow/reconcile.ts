@@ -295,7 +295,7 @@ export async function advanceStep(wf: Workflow, card0: CardRecord): Promise<void
   if (s.requests.some((q) => q.gate === ADVANCE_PREVIEW_GATE)) {
     const waits = wf.queueWaitingOn(card.id)
     const why = !finishPreviews(r.options.finish) ? 'finish' : waits.length ? 'blocked' : null
-    if (why && (await advanceHostOf(wf).previewClosed(card, s.cycle, why, waits, null)) && wf.cfg.autoRun !== false) await wf.runActions()
+    if (why && (await advanceHostOf(wf).previewClosed(card, s.cycle, why, waits, null)) === 'recorded' && wf.cfg.autoRun !== false) await wf.runActions()
   }
   // HI-3236: a finish that previews asks the adapter for its preview (never an attempt: only the user's Integrate starts one).
   if (!advances && !(finishPreviews(r.options.finish) && p.advancePreview)) return

@@ -286,39 +286,43 @@ export function advanceHostOf(wf: Workflow): AdvanceHost {
         )
       }),
     previewDeclined: (card, cycle, plan) => !!wf.store.meta(previewDeclinedKey(card.key, cycle, plan)),
-    previewClosed: (card, cycle, why, waits, clicked) =>
-      guarded('previewClosed', card, async () => {
-        const key = clicked ? previewIgnoredKey(card.key, cycle, clicked) : null
-        if (key && wf.store.meta(key)) return false
+    previewClosed: async (card, cycle, why, waits, clicked) => {
+      const key = clicked ? previewIgnoredKey(card.key, cycle, clicked) : null
+      try {
+        if (key && wf.store.meta(key)) return 'already'
         const s = wf.state(wf.store.card(card.id))
-        return wf.write(
+        return await wf.write(
           card,
           wf.rulesetOf(card, s),
           'combwork',
-          (w) => {
+          (w): 'recorded' | 'already' | 'changed' => {
             const now = w.state()
-            if (now.cycle !== cycle) return false
-            // The reason read again in this write: a finish that previews again, or blockers Done since, close nothing.
+            if (now.cycle !== cycle) return 'changed'
+            if (key && w.tx.meta(key)) return 'already'
+            // The reason read again in this write: a finish that previews again, or blockers Done since, say nothing
+            // ('changed': the caller reads the card again, HR1's round 1).
             const blockers = wf.queueWaitingOn(card.id, w.tx)
             const holds = why === 'finish' ? !finishPreviews(wf.rulesetOf(card, now).options.finish) : blockers.length > 0
-            if (!holds) return false
-            if (key) {
-              if (w.tx.meta(key)) return false
-              w.tx.setMeta(key, new Date().toISOString())
-            } else {
+            if (!holds) return 'changed'
+            if (key) w.tx.setMeta(key, new Date().toISOString())
+            else {
               const open = now.requests.filter((r) => r.gate === ADVANCE_PREVIEW_GATE)
-              if (!open.length) return false
+              if (!open.length) return 'changed'
               for (const r of open) w.fact('RequestClosed', { request: r.request, why: 'advance' }) // i18n-ignore: a fact's kind and codes, not text
             }
             const values = { card: card.key, clicked: key ? 'yes' : 'no', why, cards: (why === 'blocked' ? blockers : waits).join(', ') || '—' }
             // Agents read the card's comments: its English is the agent message, the window's the stored message.
             w.action('comment', { text: inDefaultDialect(() => say(A.previewClosed, values)), shown: workflowText(FOR_YOU.advancePreviewClosed, values) })
-            return true
+            return 'recorded'
           },
           undefined,
           quiet
         )
-      }),
+      } catch (e) {
+        log.warn(`advance previewClosed for ${card.key} not recorded: ${userText((e as Error).message)}`) // i18n-ignore: the log (English)
+        return 'failed'
+      }
+    },
     superseded: async (card, ref, warn) => {
       const key = supersededKey(card.key, ref.cycle, ref.attempt)
       try {

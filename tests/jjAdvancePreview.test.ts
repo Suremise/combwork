@@ -11,7 +11,7 @@
 import { writeFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
-import type { AdvanceAnswer } from '../src/main/platform/adapter'
+import type { AdvanceAnswer, AdvanceHost } from '../src/main/platform/adapter'
 import { advanceHostOf } from '../src/main/workflow/advanceHost'
 import { reconcile } from '../src/main/workflow/reconcile'
 import { ADVANCE_PREVIEW_GATE, type FactData } from '../src/shared/workflow/facts'
@@ -421,6 +421,94 @@ describe.skipIf(!jjExe)(`preview and click for jj (jj ${TESTED_JJ.version}), HI-
       await jjp(w, card).advanceAnswer!(w.wf.store.card(card.id), payloadOf(w, card, p.request, 'approved'), advanceHostOf(w.wf))
       await w.wf.runActions()
       expect(previewNotes(w, card)).toHaveLength(1)
+    })
+
+    // HR1's round 1: the click's reason to run nothing, gone by the time its explanation is written, never leaves it silent.
+    /** The real host, with `before` run once just before its first previewClosed write (between the click's read and its write). */
+    const racing = (w: World, before: () => Promise<void> | void): { host: AdvanceHost; calls: string[] } => {
+      const real = advanceHostOf(w.wf)
+      const calls: string[] = []
+      let first = true
+      return {
+        calls,
+        host: {
+          ...real,
+          previewClosed: async (...a) => {
+            if (first) {
+              first = false
+              await before()
+            }
+            const r = await real.previewClosed(...a)
+            calls.push(r)
+            return r
+          }
+        }
+      }
+    }
+    /** The click's action taken out of the worker's queue (the test delivers it itself, with its own host). */
+    const takeAnswer = (w: World, card: { id: number }): void => {
+      for (const a of w.store.pendingActions().filter((x) => x.card === card.id && x.kind === 'advanceAnswer')) w.store.markAction(a.id, 'done')
+    }
+
+    it('HR1’s round 1: a blocker Done between the click’s read and its explanation’s write: the click is read again and integrates; a replay does nothing more', async () => {
+      const w = await world(colocated, { candidates: true, oneSlot: true, advance: 'preview' })
+      const card = await approved(w)
+      await pass(w, card)
+      const [p] = previews(w, card)
+      const blocker = w.wf.createCard({ title: 'blocker' })
+      block(w, card, [blocker])
+      await click(w, card, p.request, 'approved')
+      takeAnswer(w, card)
+      const { host, calls } = racing(w, async () => void moved(await w.wf.move(blocker.key, 'done', 'user', { confirm: true, reason: 'not needed' })))
+      await jjp(w, card).advanceAnswer!(w.wf.store.card(card.id), payloadOf(w, card, p.request, 'approved'), host)
+      await w.wf.runActions()
+      expect(calls).toEqual(['changed'])
+      expect(facts(w, card, 'Integrated')).toHaveLength(1)
+      expect(previewNotes(w, card)).toEqual([])
+      const n = w.store.facts(card.id).length
+      await jjp(w, card).advanceAnswer!(w.wf.store.card(card.id), payloadOf(w, card, p.request, 'approved'), advanceHostOf(w.wf))
+      expect(w.store.facts(card.id).length).toBe(n)
+    })
+
+    it('HR1’s round 1: the finish back to preview between the click’s read and its write: read again, it integrates; a replay does nothing more', async () => {
+      const w = await world(colocated, { candidates: true, oneSlot: true, advance: 'preview' })
+      const card = await approved(w)
+      await pass(w, card)
+      const [p] = previews(w, card)
+      reapply(w, card, { finish: 'userIntegrates' })
+      await click(w, card, p.request, 'approved')
+      takeAnswer(w, card)
+      const { host, calls } = racing(w, () => reapply(w, card, { finish: 'previewAdvance' }))
+      await jjp(w, card).advanceAnswer!(w.wf.store.card(card.id), payloadOf(w, card, p.request, 'approved'), host)
+      await w.wf.runActions()
+      expect(calls).toEqual(['changed'])
+      expect(facts(w, card, 'Integrated')).toHaveLength(1)
+      expect(previewNotes(w, card)).toEqual([])
+      const n = w.store.facts(card.id).length
+      await jjp(w, card).advanceAnswer!(w.wf.store.card(card.id), payloadOf(w, card, p.request, 'approved'), advanceHostOf(w.wf))
+      expect(w.store.facts(card.id).length).toBe(n)
+    })
+
+    it('HR1’s round 1: an explanation that can’t be written fails the click’s handling (never done without it); nothing runs; delivered again, it is said once', async () => {
+      const w = await world(colocated, { candidates: true, oneSlot: true, advance: 'preview' })
+      const card = await approved(w)
+      const head = w.main()
+      await pass(w, card)
+      const [p] = previews(w, card)
+      reapply(w, card, { finish: 'userIntegrates' })
+      await click(w, card, p.request, 'approved')
+      takeAnswer(w, card)
+      const failing: AdvanceHost = { ...advanceHostOf(w.wf), previewClosed: async () => 'failed' }
+      await expect(jjp(w, card).advanceAnswer!(w.wf.store.card(card.id), payloadOf(w, card, p.request, 'approved'), failing)).rejects.toThrow(/couldn't be recorded/)
+      expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(0)
+      expect(w.main()).toBe(head)
+      expect(previewNotes(w, card)).toEqual([])
+      for (let i = 0; i < 2; i++) {
+        await jjp(w, card).advanceAnswer!(w.wf.store.card(card.id), payloadOf(w, card, p.request, 'approved'), advanceHostOf(w.wf))
+        await w.wf.runActions()
+      }
+      expect(previewNotes(w, card)).toHaveLength(1)
+      expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(0)
     })
   })
 })
