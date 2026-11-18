@@ -1581,6 +1581,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       return r.canceled || !r.filePaths[0] ? null : r.filePaths[0]
     },
     'mcp:previewFile': (file) => mcp.previewMcpFile(file),
+    'mcp:nameTaken': (name, folder) => mcp.mcpNameTaken(String(name), folder === true),
     'mcp:addFromFile': async (file, name, replace, places) => {
       const m = await mcp.addMcpFromFile(file, name, replace, shownPlaces(places))
       emit({ type: 'skills-changed' })

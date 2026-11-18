@@ -1225,6 +1225,7 @@ export async function installCatalogServer(row: Pick<McpCatalogRow, 'source' | '
     detail: p.secretWarnings.join('\n') || undefined,
     initial: p.server.name,
     initialTaken: p.nameTaken,
+    folder: true,
     confirmLabel: tr(msg({ id: 'mcp.catalog.installButton', defaultMessage: 'Install', description: 'Button (HI-545): installs the catalogue server.' }))
   })
   if (!picked) {
@@ -1329,6 +1330,7 @@ export async function addMcpServerFromFile(): Promise<McpServerInfo | null> {
     detail: server.secretWarnings.length ? server.secretWarnings.join('\n') : undefined,
     initial: server.name,
     initialTaken: server.exists,
+    folder: server.files > 0,
     confirmLabel: tr(msg({ id: 'actions.mcp.add', defaultMessage: 'Add', description: 'Button: adds the MCP server to the workspace.' }))
   })
   if (!picked) return null
@@ -1344,7 +1346,7 @@ export async function addMcpServerFromFile(): Promise<McpServerInfo | null> {
  * name in use asks to Replace that server or choose another. `initialTaken`: whether the name offered is in use. Null
  * when cancelled.
  */
-async function chooseServerName(o: { title: string; message: string; list: string[]; detail?: string; initial: string; initialTaken: boolean; confirmLabel: string }): Promise<{ name: string; replace: boolean; places?: { projects: string[]; assistant: boolean } } | null> {
+async function chooseServerName(o: { title: string; message: string; list: string[]; detail?: string; initial: string; initialTaken: boolean; folder: boolean; confirmLabel: string }): Promise<{ name: string; replace: boolean; places?: { projects: string[]; assistant: boolean } } | null> {
   let name = o.initial
   for (;;) {
     const picked = await prompt({
@@ -1362,10 +1364,14 @@ async function chooseServerName(o: { title: string; message: string; list: strin
     const servers = name === o.initial && !o.initialTaken ? [] : await attempt(tr(msg({ id: 'actions.mcp.listFailed', defaultMessage: 'Could not list the servers', description: "An error's title: reading the workspace's MCP servers failed." })), () => call('mcp:list'))
     if (!servers) return null
     const listed = servers.find((m) => m.name.toLowerCase() === name.toLowerCase())
-    // HI-3371: the name offered taken but no server listed under it: a folder left without its definition (a .zip's, kept
-    // when a plain .json replaced it, or a definition deleted by hand). Main refuses it unless replaced, so Replace is
-    // asked for as for any server, one added nowhere and running nothing (1.5.0 asked it here too).
-    if (!listed && !(name.toLowerCase() === o.initial.toLowerCase() && o.initialTaken)) return { name, replace: false }
+    // HI-3371: a name taken though no server is listed under it: a folder left without its definition (a .zip's, kept when
+    // a plain .json replaced it, or a definition deleted by hand), which takes the name for a server bringing a folder.
+    // Main refuses it unless replaced, so Replace is asked for as for any server, one added nowhere and running nothing
+    // (1.5.0 asked it for the name offered). The name offered: as its preview said; another typed: main says, as its add
+    // would decide (mcp:nameTaken). Main's own check at the add stays the one that decides.
+    const taken = listed ? true : name.toLowerCase() === o.initial.toLowerCase() ? o.initialTaken : await attempt(tr(msg({ id: 'actions.mcp.listFailed', defaultMessage: 'Could not list the servers', description: "An error's title: reading the workspace's MCP servers failed." })), () => call('mcp:nameTaken', name, o.folder))
+    if (taken === null) return null
+    if (!listed && !taken) return { name, replace: false }
     const existing = listed ?? { name, def: undefined, runs: [] as string[], projects: [] as string[], assistant: false }
     name = existing.name
     // An upgrade (HI-3327): the places it is added keep it, and what it runs is shown changed (− now, + after).

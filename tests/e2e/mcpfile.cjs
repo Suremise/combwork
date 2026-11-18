@@ -263,6 +263,21 @@ const check = (name, ok, extra = '') => {
   await shot('8-leftover-replace')
   await leftover.getByRole('button', { name: 'Replace', exact: true }).click()
   check('Replace adds it in the folder’s place, added nowhere', !!(await lib.until(async () => (await server('leftover'))?.def?.args?.[0] === '${CW_MCP_DIR}/leftover/server.js', HUNG_MS)) && fs.existsSync(path.join(mcpDir, 'leftover', 'server.js')) && !fs.existsSync(path.join(mcpDir, 'leftover', 'old.js')) && JSON.stringify((await server('leftover'))?.projects) === '[]', JSON.stringify(await server('leftover')))
+  // HR1's round 1: the same with a name typed in the dialog (another .zip, renamed to a leftover folder's name): main
+  // says the typed name is taken, and Replace is asked there too.
+  fs.mkdirSync(path.join(mcpDir, 'leftover-2'), { recursive: true })
+  fs.writeFileSync(path.join(mcpDir, 'leftover-2', 'old.js'), '// left behind')
+  fs.writeFileSync(path.join(dump, 'fresh.zip'), zipSync({ 'fresh/combwork-mcp.json': strToU8(JSON.stringify({ command: 'node', args: ['${CW_MCP_DIR}/fresh/server.js'] })), 'fresh/server.js': strToU8('// fresh server') }))
+  await pick(path.join(dump, 'fresh.zip'))
+  await addButton.click()
+  await lib.until(async () => (await add.count()) === 1, HUNG_MS)
+  check('the other .zip offers its own name', (await add.locator('input').inputValue()) === 'fresh')
+  await add.locator('input').fill('leftover-2')
+  await add.getByRole('button', { name: 'Add' }).click()
+  const typed = dialog('Replace leftover-2?')
+  check('a typed name that only a leftover folder has asks Replace', !!(await lib.until(async () => (await typed.count()) === 1, HUNG_MS)), JSON.stringify(await page.getByRole('dialog').allInnerTexts()))
+  await typed.getByRole('button', { name: 'Replace', exact: true }).click()
+  check('…and Replace adds it there under that name, running its own folder', !!(await lib.until(async () => (await server('leftover-2'))?.def?.args?.[0] === '${CW_MCP_DIR}/leftover-2/server.js', HUNG_MS)) && fs.existsSync(path.join(mcpDir, 'leftover-2', 'server.js')) && !fs.existsSync(path.join(mcpDir, 'leftover-2', 'old.js')), JSON.stringify(await server('leftover-2')))
 
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'All checks passed')

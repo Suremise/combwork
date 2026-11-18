@@ -587,6 +587,15 @@ export async function previewMcpFile(file: string): Promise<McpFileServer> {
   return { name: r.name, def, runs: mcpRuns(def), secretWarnings: findSecretWarnings(def), files: r.files?.size ?? 0, exists: serverExists(r.name, !!r.files) }
 }
 
+/**
+ * HI-3371: whether a name chosen for a server being added is taken, as an add would refuse it (writeServerNow): by a
+ * definition, or for one that brings a folder (a .zip) by a folder of that name, even one left without its definition
+ * (which lists no server). A name that isn't a server's name takes nothing.
+ */
+export function mcpNameTaken(name: string, folder: boolean): boolean {
+  return validMcpName(name) && serverExists(name, folder)
+}
+
 /** A server named so: its definition, or (for a .zip) its folder. */
 function serverExists(name: string, folder: boolean): boolean {
   return existsSync(join(workspace.mcpDir, `${name}.json`)) || (folder && existsSync(join(workspace.mcpDir, name)))

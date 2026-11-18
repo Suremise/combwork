@@ -240,6 +240,11 @@ describe('Add MCP Server from File', () => {
     const f = file('ollama-v3.zip', zipSync({ 'ollama/combwork-mcp.json': json(OLLAMA), 'ollama/server.js': strToU8('// v3') }))
     // What the window reads to ask Replace: the name taken (exists), though no server is listed under it.
     expect((await run(() => mcp.previewMcpFile(f))).exists).toBe(true)
+    // A name typed in the dialog (HR1's round 1): taken by the folder for a server bringing one (a .zip), not for a plain
+    // .json (which may keep a folder there); a definition takes it either way; a name that isn't a server's takes nothing.
+    expect(await run(() => [mcp.mcpNameTaken('ollama', true), mcp.mcpNameTaken('ollama', false), mcp.mcpNameTaken('nothing-here', true), mcp.mcpNameTaken('../ollama', true)])).toEqual([true, false, false, false])
+    await addGithub()
+    expect(await run(() => [mcp.mcpNameTaken('github', true), mcp.mcpNameTaken('github', false)])).toEqual([true, true])
     await expect(run(() => mcp.addMcpFromFile(f, 'ollama'))).rejects.toThrow('already exists')
     const added = await run(() => mcp.addMcpFromFile(f, 'ollama', true, { projects: [], assistant: false }))
     expect(added.name).toBe('ollama')
