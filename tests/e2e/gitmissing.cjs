@@ -48,7 +48,7 @@ function pathWithoutGit() {
   const shot = (name) => page.screenshot({ path: path.join(lib.WORK, `gitmissing-${name}.png`) })
   const theme = async (t) => {
     await inv('settings:update', { appearance: { theme: t } })
-    await lib.sleep(300)
+    await lib.themeSettled(page, t)
   }
 
   // --- Git itself.

@@ -47,7 +47,6 @@ fs.writeFileSync(
 )
 fs.writeFileSync(path.join(scratch, 'from explorer.txt'), 'dropped')
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const exists = (rel) => fs.existsSync(path.join(proj, rel))
 // The longest a check waits for its condition: a bound for a hung run, never how long the step should take.
 const HUNG_MS = lib.timing('hang.ui')
@@ -66,15 +65,15 @@ const check = (name, ok, extra = '') => {
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('demo', { exact: true }).first().click()
   await page.locator('.tab', { hasText: 'Files' }).click()
-  await sleep(800)
+  await lib.until(async () => (await page.locator('.file-row').count()) > 0, lib.timing('hang.ui'))
   const row = (rel) => page.locator(`.file-row[data-rel="${rel}"]`)
   const selected = async (rel) => (await page.locator(`.file-row.selected[data-rel="${rel}"]`).count()) === 1
 
   await row('src').click()
-  await sleep(500)
+  // Playwright's click waits for the folder's row to show.
   await row('src/app.ts').click()
   // A row's classes, '' while it isn't there (git's status arrives after the tree).
-  const cls = (loc) => loc.getAttribute('class', { timeout: 1000 }).catch(() => '').then((c) => c ?? '')
+  const cls = (loc) => loc.getAttribute('class', { timeout: lib.timing('poll.readMs') }).catch(() => '').then((c) => c ?? '')
   const classed = async (loc, c) => !!(await lib.until(async () => (await cls(loc)).includes(c), HUNG_MS))
   check('git modified colour on src/app.ts', await classed(row('src/app.ts').locator('.label'), 'git-M'))
   check('untracked colour on src/new.ts', await classed(row('src/new.ts').locator('.label'), 'git-U'))
@@ -144,7 +143,7 @@ const check = (name, ok, extra = '') => {
 
   // Internal drag: move src/new.ts onto dist.
   if (!(await row('src/new.ts').count())) await row('src').click()
-  await sleep(400)
+  await lib.until(async () => (await row('src/new.ts').count()) === 1, HUNG_MS)
   await page.evaluate(() => {
     const dt = new DataTransfer()
     const src = document.querySelector('.file-row[data-rel="src/new.ts"]')
@@ -204,13 +203,15 @@ const check = (name, ok, extra = '') => {
   check('filter finds src/util.ts', !!(await lib.until(async () => (await row('src/util.ts').count()) === 1 && (await row('src/app.ts').count()) === 0, HUNG_MS)))
   await page.screenshot({ path: path.join(shots, '2-filter.png') })
   await page.locator('.files-filter input').fill('')
-  await sleep(400)
+  // The filter cleared: the tree is back.
+  await lib.until(async () => (await row('src').count()) === 1, HUNG_MS)
 
   await row('src/app.ts').click().catch(() => undefined)
   await row('src').click().catch(() => undefined)
-  await sleep(300)
+  await lib.until(async () => (await row('src/app.ts').count()) === 1, HUNG_MS)
   await row('src/app.ts').click().catch(() => undefined)
-  await sleep(300)
+  await lib.until(() => selected('src/app.ts'), HUNG_MS)
+  await lib.settled(page)
   await page.screenshot({ path: path.join(shots, '3-details.png') })
 
   // The Git menu (HI-2743): Exclude from Git, Include Again, Why Is This Ignored? and Stop Tracking, on the project folder.
@@ -273,9 +274,9 @@ const check = (name, ok, extra = '') => {
   check('why (this PC): offered with Include Again', (await gitMenu('made-outside.txt')) && (await shown(menuItem('Why Is This Ignored?'))) && (await menuItem('Include Again').count()) === 1)
   await menuItem('Why Is This Ignored?').click()
   const ruleAt = page.locator('.ignore-rule-at')
-  check('why (this PC): the viewer names the file, line and rule', !!(await lib.until(async () => (await ruleAt.innerText({ timeout: 1000 }).catch(() => '')) === `Line ${ruleLine} of .git/info/exclude: \`/made-outside.txt\``, HUNG_MS)), await ruleAt.innerText().catch(() => ''))
+  check('why (this PC): the viewer names the file, line and rule', !!(await lib.until(async () => (await ruleAt.innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')) === `Line ${ruleLine} of .git/info/exclude: \`/made-outside.txt\``, HUNG_MS)), await ruleAt.innerText().catch(() => ''))
   // Monaco puts the cursor on the rule's line: its line number is the current one.
-  check('why (this PC): the editor is at the rule\'s line', !!(await lib.until(async () => (await page.locator('.ignore-rule-file .line-numbers.active-line-number').innerText({ timeout: 1000 }).catch(() => '')).trim() === String(ruleLine), HUNG_MS)))
+  check('why (this PC): the editor is at the rule\'s line', !!(await lib.until(async () => (await page.locator('.ignore-rule-file .line-numbers.active-line-number').innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')).trim() === String(ruleLine), HUNG_MS)))
   await page.screenshot({ path: path.join(shots, '7-git-why-viewer.png') })
   await page.locator('.dialog-footer').getByRole('button', { name: 'Close' }).click()
   await lib.until(async () => (await ruleAt.count()) === 0, HUNG_MS)
@@ -318,12 +319,12 @@ const check = (name, ok, extra = '') => {
     return a.width > 0 && a.height > 0 && a.left >= b.left - 1 && a.top >= b.top - 1 && a.right <= b.right + 1 && a.bottom <= b.bottom + 1
   }, sel)
   await page.locator('.thumb[data-kind="text"]').first().click()
-  check('viewer: a log shows its text', !!(await lib.until(async () => /line one/.test(await page.locator('.attachment-text').innerText({ timeout: 1000 }).catch(() => '')), HUNG_MS)))
+  check('viewer: a log shows its text', !!(await lib.until(async () => /line one/.test(await page.locator('.attachment-text').innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')), HUNG_MS)))
   await page.screenshot({ path: path.join(shots, '5-viewer-text.png') })
   await page.keyboard.press('ArrowLeft')
   check('viewer: the PDF shows in the PDF viewer, inside the frame', !!(await lib.until(async () => (await inFrame('.pdf-preview')) === true, HUNG_MS)))
   // One key at a time: each waits for the viewer to show the next.
-  const title = () => page.locator('.dialog-header h2').innerText({ timeout: 1000 }).catch(() => '')
+  const title = () => page.locator('.dialog-header h2').innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')
   await page.keyboard.press('ArrowRight')
   await lib.until(async () => (await title()).endsWith('build.log'), HUNG_MS)
   await page.keyboard.press('ArrowRight')
@@ -338,14 +339,14 @@ const check = (name, ok, extra = '') => {
   await lib.until(async () => (await page.locator('.image-viewer img').count()) === 1, HUNG_MS)
   await page.screenshot({ path: path.join(shots, '5-viewer.png') })
   await page.keyboard.press('ArrowRight')
-  check('viewer navigates', !!(await lib.until(async () => (await page.locator('.dialog-header h2').innerText({ timeout: 1000 }).catch(() => '')).includes('10-00-00'), HUNG_MS)))
+  check('viewer navigates', !!(await lib.until(async () => (await page.locator('.dialog-header h2').innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')).includes('10-00-00'), HUNG_MS)))
   await page.keyboard.press('Escape')
 
   // Light theme check of the Files tab.
   await page.locator('.tab', { hasText: 'Files' }).click()
-  await sleep(300)
+  await lib.until(async () => (await page.locator('.tab.active', { hasText: 'Files' }).count()) === 1, HUNG_MS)
   await inv('settings:update', { appearance: { theme: 'light' } })
-  await sleep(800)
+  await lib.themeSettled(page, 'light')
   await page.screenshot({ path: path.join(shots, '6-light.png') })
   check('git menu (light): opens', await gitMenu('made-outside.txt'))
   await page.screenshot({ path: path.join(shots, '7-git-menu-light.png') })

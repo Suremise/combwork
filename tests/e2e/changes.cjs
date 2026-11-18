@@ -35,7 +35,7 @@ const check = (name, ok, extra = '') => {
   const until = async (fn, ms) => {
     const t = Date.now()
     let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(150)
+    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
     return v
   }
 
@@ -53,7 +53,7 @@ const check = (name, ok, extra = '') => {
   await row('b.ts').click()
   const shown = () => page.locator('.split-main .editor-toolbar strong').innerText().catch(() => '')
   check("the selected file's diff shows", !!(await until(async () => (await shown()) === 'b.ts', lib.timing('hang.ui'))), await shown())
-  await lib.sleep(3500) // A fixed wait on purpose: the slowed answer for the old choice arrives later, and this checks it doesn't replace the new one.
+  await lib.sleep(lib.timing('quiet.lateAnswerMs')) // The window is the point: the slowed answer for the old choice arrives within it, and doesn't replace the new one.
   check("a late answer for another file doesn't replace it", (await shown()) === 'b.ts' && (await row('b.ts').getAttribute('class')).includes('selected'), await shown())
   await page.screenshot({ path: path.join(lib.WORK, 'changes-2-diff.png') })
   await row('a.ts').click()

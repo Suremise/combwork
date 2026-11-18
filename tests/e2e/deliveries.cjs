@@ -17,7 +17,7 @@ const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = lib.timing('hang.ui')
 // Overdue this long after it was made (instead of 30 minutes), so the suite sees one become overdue.
-const OVERDUE_MS = 8000
+const OVERDUE_MS = lib.timing('seam.deliveryOverdueMs')
 
 const userData = path.join(lib.WORK, 'deliveries-profile')
 const ws = path.join(lib.WORK, 'deliveries-ws')
