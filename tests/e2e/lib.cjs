@@ -157,6 +157,56 @@ async function until(fn, ms, interval = timing('poll.intervalMs')) {
   return v
 }
 
+/**
+ * Whether `promise` settles within ms (HI-3384): true once it has, false when ms passes first, never taken as done. A
+ * call that can hang outside a polling wait (a page.evaluate for a frame, an IPC round trip: Playwright bounds neither)
+ * is raced against its deadline; a rejection is thrown. The promise left behind is not cancelled, only no longer awaited.
+ */
+async function within(promise, ms) {
+  if (typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0) throw new Error(`within needs its deadline, a name from tests/timing.json: got ${ms}`)
+  let timer
+  const late = new Promise((done) => {
+    timer = setTimeout(() => done(false), ms)
+  })
+  try {
+    return await Promise.race([Promise.resolve(promise).then(() => true), late])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/**
+ * Waits until read() gives the same value (JSON) twice a look apart (HI-3384): what it reads has stopped changing (a
+ * layout after a resize, a column after its scrolling). Whether it did within ms; false when it kept changing, or when a
+ * read is still unanswered at the deadline (HR1's round 2: a Playwright read can hang, and the whole wait, each read and
+ * each pause included, has the one deadline). Past it, no further read starts; the one left unanswered is only no longer
+ * awaited. A read's failure is thrown.
+ */
+async function steady(read, ms, interval = timing('poll.intervalMs')) {
+  if (typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0) throw new Error(`steady needs its deadline, a name from tests/timing.json: got ${ms}`)
+  const LATE = Symbol('late')
+  let timer
+  const late = new Promise((done) => {
+    timer = setTimeout(() => done(LATE), ms)
+  })
+  const inTime = (p) => Promise.race([p, late])
+  try {
+    let last
+    let looked = false
+    for (;;) {
+      const value = await inTime(Promise.resolve().then(read))
+      if (value === LATE) return false
+      const now = JSON.stringify(value)
+      if (looked && now === last) return true
+      last = now
+      looked = true
+      if ((await inTime(sleep(interval))) === LATE) return false
+    }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 /** The suite's line a wait was called from: the first frame outside lib.cjs, repo-relative. */
 function waitCaller(stack) {
   const frames = (stack ?? '').split('\n').slice(1).map((l) => /\(?([A-Za-z]:[^():]+|\/[^():]+):(\d+):\d+\)?$/.exec(l.trim())).filter(Boolean)
@@ -170,11 +220,13 @@ function waitCaller(stack) {
  * with the text, never for the delay. The mouse first leaves for the window's corner, so an earlier tip has gone.
  */
 /**
- * HI-3385: whether the window shows `theme` fully, waited for up to ms: its root says so and no CSS transition is still
- * running (a background's fade), so a screenshot or a colour read then shows the theme's colours, not a blend.
+ * HI-3385, HI-3399: the window shows `theme` fully, within ms: its root says so and the page has settled (no finite
+ * animation or transition running, a background's fade among them), so a screenshot or a colour read shows the theme's
+ * colours, not a blend. It is themeSettled: each page read bounded (readyWithin), and a throw when not so, never a
+ * false a bare await would ignore.
  */
 async function themeShown(page, theme, ms = timing('hang.ui')) {
-  return !!(await until(() => page.evaluate((t) => document.documentElement.dataset.theme === t && !document.getAnimations().some((a) => a instanceof CSSTransition && a.playState === 'running'), theme), ms))
+  return themeSettled(page, theme, ms)
 }
 
 /**
@@ -645,6 +697,21 @@ const TRUST_CHOICES = /[>❯›]?\s*(?:\d\.\s*)?(?:No, exit|Yes, )/
 async function screenNow(inv, key) {
   const size = await inv('pty:size', key).catch(() => null)
   return renderScreen(String((await inv('pty:buffer', key).catch(() => '')) ?? ''), size?.cols, size?.rows, { unwrap: true })
+}
+
+/**
+ * Types `text` into a CLI's terminal (pty key) at its prompt and presses Enter once its input line shows it (HI-3384), as
+ * Combwork waits before its Enter (#600): read in one go with the text, the Enter is taken as part of a paste (the fake
+ * Claude Code drops it, #597). Its input line, never the whole screen (inputOf): the same text sent before shows above.
+ * Whether it was drawn within ms; Enter goes either way, and the caller's wait for the turn is the check.
+ */
+async function typeThenEnter(inv, key, text, ms = timing('hang.ui')) {
+  await inv('pty:write', key, text)
+  // Claude Code's box marks its input with `❯` and a no-break space (2.1.312, as the fake draws it): read as a space.
+  const drawn = !!(await until(async () => drawnCount(inputOf((await screenNow(inv, key)).replace(/ /g, ' ')), text) > 0, ms))
+  if (!drawn) console.log(`INFO typeThenEnter: ${JSON.stringify(text.slice(0, 40))} not drawn on its input line within ${ms / 1000} s: Enter anyway`)
+  await inv('pty:write', key, '\r')
+  return drawn
 }
 
 /**
@@ -2359,4 +2426,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { timing, PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, settled, themeSettled, noDialog, hoverTip, quitWatch, appReady, openWorkspace, trustWorktrees, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, themeShown, CLAUDE_TRUST, CLAUDE_AT_PROMPT, trustQuestion, screenNow, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip, zoomTo, viewportIs, framesDrawn, ipcSettled, ipcAnswered, answersDrawn, readyWithin, projectShown, sizesGiven }
+module.exports = { timing, PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, within, steady, settled, themeSettled, noDialog, hoverTip, quitWatch, appReady, openWorkspace, trustWorktrees, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, themeShown, CLAUDE_TRUST, CLAUDE_AT_PROMPT, trustQuestion, screenNow, typeThenEnter, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip, zoomTo, viewportIs, framesDrawn, ipcSettled, ipcAnswered, answersDrawn, readyWithin, projectShown, sizesGiven }

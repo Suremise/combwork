@@ -215,3 +215,28 @@ describe('lib.ipcAnswered (a delayed save: the check waits for the last answer)'
     }
   })
 })
+
+// HI-3399: themeShown (HI-3385's, used by progresslanes and removeall) is themeSettled: bounded reads, a throw on expiry.
+describe('lib.themeShown', () => {
+  const shown = createRequire(import.meta.url)('./e2e/lib.cjs') as { themeShown: (page: FakePage, theme: string, ms?: number) => Promise<boolean> }
+  it('passes once the theme shows and the page settles', async () => {
+    let n = 0
+    expect(await shown.themeShown(page(async () => (++n === 1 ? 'dark' : true)), 'dark', BOUND)).toBe(true)
+  })
+  it('throws within its bound when the page never answers, or the theme never shows; the check after never runs', async () => {
+    for (const evaluate of [never, async () => 'light']) {
+      const r = await thenCheck(shown.themeShown(page(evaluate), 'dark', BOUND))
+      expect(r.ok).toBe(false)
+      expect(!r.ok && r.e.message).toMatch(/dark theme/)
+      expect(r.checked).toBe(false)
+      expect(r.ms).toBeLessThan(WITHIN)
+    }
+  })
+  it('throws when the theme shows but the page never settles (a frame that never comes)', async () => {
+    let n = 0
+    const r = await thenCheck(shown.themeShown(page(() => (++n === 1 ? Promise.resolve('dark') : never())), 'dark', BOUND))
+    expect(r.ok).toBe(false)
+    expect(r.checked).toBe(false)
+    expect(r.ms).toBeLessThan(WITHIN)
+  })
+})

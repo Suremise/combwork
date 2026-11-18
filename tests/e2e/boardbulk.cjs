@@ -66,7 +66,6 @@ const check = (name, ok, extra = '') => {
   const shot = async (name) => {
     await page.screenshot({ path: path.join(lib.WORK, `boardbulk-${name}-dark.png`) })
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
-    await lib.sleep(200)
     await page.screenshot({ path: path.join(lib.WORK, `boardbulk-${name}-light.png`) })
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
   }
@@ -186,23 +185,22 @@ const check = (name, ok, extra = '') => {
   await page.locator('.board-toolbar label', { hasText: 'Archived (' }).click()
   const race = await make('Taken meanwhile', 'todo')
   await until(async () => (await page.locator(`.task-card[data-task="${race}"]`).count()) === 1, lib.timing('hang.ui'))
-  await app.evaluate(() => {
-    process.env.CW_TEST_SLOW_IPC = 'tasks:archiveBatch=2500*1'
-  })
+  // The archive is held in main (CW_TEST_HOLD_IPC) from the click until the agent has taken the card, so the race is
+  // the suite's, not a delay's (HI-2652).
+  const holdArchive = (on) => app.evaluate((_e, v) => void (v ? (process.env.CW_TEST_HOLD_IPC = 'tasks:archiveBatch') : delete process.env.CW_TEST_HOLD_IPC), on)
+  await holdArchive(true)
   const todoCount = (await order('todo')).length
   await openColumnMenu('todo', 'Todo')
   await item(`Archive All in Todo (${todoCount})…`).click()
   await until(async () => (await dialog.count()) === 1, lib.timing('hang.ui'))
   check('the card is idle when the dialog opens', !(await dialog.innerText()).includes('Taken meanwhile'))
   await dialog.getByRole('button', { name: `Archive ${todoCount} cards` }).click()
-  await lib.sleep(300)
+  check('…the archive is on its way (held in main)', !!(await until(async () => (await app.evaluate(() => globalThis.__cwHeldIpc?.['tasks:archiveBatch'] ?? 0)) >= 1, lib.timing('hang.ui'))))
   await inv('tasks:update', race, { column: 'doing', agent: b4.id })
+  await holdArchive(false)
   const raced = page.locator('.toast', { hasText: `Archived ${todoCount - 1} card` }).last()
   check('the card an agent took meanwhile stays on the board', !!(await until(async () => (await order('todo')).length === 0, lib.timing('hang.ui'))) && (await archivedNow(race)) === false)
   check('…and the toast says why', !!(await until(async () => (await raced.count()) === 1, lib.timing('hang.ui'))) && (await raced.innerText()).includes(`One card was left on the board: ${await lib.cardLabel(inv, race)} moved to Active`), await raced.innerText().catch(() => ''))
-  await app.evaluate(() => {
-    delete process.env.CW_TEST_SLOW_IPC
-  })
 
   // 8. Every card it would archive leaves while the dialog is open (#1463): it says none is left, with Archive
   // disabled and no box to tick, never that agents are on them.

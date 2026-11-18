@@ -21,12 +21,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms) => {
-  const t = Date.now()
-  let v
-  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-  return v
-}
+const until = lib.until
 
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
@@ -80,11 +75,7 @@ const until = async (fn, ms) => {
   await inv('session:start', beta, { agentId: two.id })
   // before any turn (HI-2688): its start, restart or resume
   check('the agents start', !!(await until(async () => (await live(alpha, one))?.status === 'ready' && (await live(beta, two))?.status === 'ready', lib.timing('hang.step'))))
-  const send = async (p, a, text) => {
-    await inv('pty:write', lib.ptyKey(p, a.id), text)
-    await lib.sleep(100)
-    await inv('pty:write', lib.ptyKey(p, a.id), '\r')
-  }
+  const send = (p, a, text) => lib.typeThenEnter(inv, lib.ptyKey(p, a.id), text)
   check('no count while nothing needs you', !/^\(\d/.test(await title()))
 
   // --- Beta's agent finishes while alpha is shown: told quietly in the status bar, never counted (#1632).
@@ -121,12 +112,16 @@ const until = async (fn, ms) => {
   check('turning the flash off stops it', !!(await until(async () => (await flashes()).at(-1) === false, HUNG_MS)), JSON.stringify(await flashes()))
   clearFlashes()
   await page.getByText('alpha', { exact: true }).first().click()
-  await send(beta, two, 'ask go')
-  await until(async () => (await live(beta, two))?.status === 'finished', lib.timing('hang.step'))
-  await lib.sleep(800)
+  // Its question held open (it goes on once the suite makes taskbar-off), so what the settings turned off is looked for
+  // while it would show: the agent waiting, then a quiet window for the window to count it, then neither count nor flash.
+  await send(beta, two, 'ask waitfile taskbar-off')
+  await until(async () => (await live(beta, two))?.status === 'waiting', lib.timing('hang.step'))
+  await lib.sleep(lib.timing('quiet.attentionOffMs')) // A quiet window on purpose: this checks that no count, badge or flash comes.
   check('with the settings off: no count in the title', !/^\(\d/.test(await title()), await title())
   check('no badge', (await overlay())?.png == null)
   check('and no flash', (await flashes()).length === 0, JSON.stringify(await flashes()))
+  fs.writeFileSync(path.join(claudeHome, 'taskbar-off'), '')
+  await until(async () => (await live(beta, two))?.status === 'finished', lib.timing('hang.step'))
 
   for (const [p, a] of [[alpha, one], [beta, two]]) await inv('session:stop', p, a.id).catch(() => undefined)
   await app.close()

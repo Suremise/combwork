@@ -51,12 +51,7 @@ const check = (name, ok, extra = '') => {
   // The board's own moves, as before 1.0's rules (#1275): its project has every rule off, where Review isn't a stage, so
   // with the rules enforced the board refuses it (boardgates covers that); turned off, every column is a plain move.
   await inv('advanced:set', 'cw.workflow.enforce', false)
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)
-    return v
-  }
+  const until = lib.until
   const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
   const api = async (method, p, body) => {
     const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
@@ -193,7 +188,8 @@ const check = (name, ok, extra = '') => {
   const edit = lib.cardDialog(page, await lib.cardLabel(inv, c3))
   await edit.waitFor({ timeout: lib.timing('hang.ui') })
   await api('PATCH', `/v1/tasks/${c3}`, { column: 'review' })
-  await lib.sleep(500)
+  // The window has the agent's change (drawn in Review behind the dialog) before the dialog is saved.
+  await until(async () => (await drawnIn('Review', c3).count()) === 1, lib.timing('hang.ui'))
   await edit.locator('.task-title-input').fill('New title')
   await edit.getByRole('button', { name: 'Save', exact: true }).click()
   const c3b = await until(async () => {
@@ -397,12 +393,10 @@ const check = (name, ok, extra = '') => {
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1.25))
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    await lib.sleep(400)
-    await page.mouse.move(5, 5)
+    await until(() => themeIs(theme), lib.timing('hang.ui'))
     await tile(long.number).locator('.task-blocked').scrollIntoViewIfNeeded()
-    await tile(long.number).locator('.task-blocked').hover()
-    await lib.sleep(900)
-    const t = await page.locator('.tip').last().evaluate((el) => {
+    await lib.hoverTip(page, tile(long.number).locator('.task-blocked'), (t) => t.startsWith('Blocked:'))
+    const t = await page.locator('.tip:visible').last().evaluate((el) => {
       const r = el.getBoundingClientRect()
       return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, vw: window.innerWidth, vh: window.innerHeight, whole: el.scrollHeight <= el.clientHeight + 1, text: el.textContent }
     })

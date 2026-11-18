@@ -44,12 +44,7 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const home = (await inv('workspace:refresh')).assistant.path
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-    return v
-  }
+  const until = lib.until
   const live = async (proj, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === proj.toLowerCase() && s.agentId === id)
   const textAt = (key, text) => page.evaluate(([k, t]) => window.__cwTerminalTextAt(k, t), [key, text])
   const hostTitle = () => page.evaluate(() => [...document.querySelectorAll('.terminal-host[title]')].map((h) => h.getAttribute('title')).join('|'))
@@ -81,7 +76,8 @@ const check = (name, ok, extra = '') => {
     if (!found) return null
     const at = { x: found.x + skip * (await cellWidth(key)), y: found.y }
     await page.mouse.move(at.x - 40, at.y - 40)
-    await lib.sleep(150)
+    // Off the last link first: its title gone, so the one read next is this hover's.
+    await until(async () => (await hostTitle()) === '', HUNG_MS)
     await page.mouse.move(at.x + 4, at.y)
     await until(async () => (await hostTitle()) !== '', HUNG_MS)
     return { at, title: await hostTitle() }
@@ -116,7 +112,7 @@ const check = (name, ok, extra = '') => {
   const h1 = await hover(key, `${A})`)
   check('a card number is linked, its title and column on hover', !!h1 && h1.title === `${K} Attention inbox · Review · Ctrl+click to open`, h1?.title)
   await page.mouse.click(h1.at.x + 4, h1.at.y)
-  await lib.sleep(600)
+  await lib.sleep(lib.timing('quiet.plainClickMs')) // A quiet window on purpose: this checks that the click opens nothing.
   check("a plain click doesn't open it", (await dialog.count()) === 0)
   await ctrlClick({ x: h1.at.x + 4, y: h1.at.y })
   check('Ctrl+click opens the card', !!(await until(async () => (await dialog.count()) === 1 && (await dialogTitle()) === 'Attention inbox', lib.timing('hang.ui'))), await dialogTitle())
@@ -159,9 +155,8 @@ const check = (name, ok, extra = '') => {
   // --- The hover in both themes (the underline and pointer; the title is the system's tooltip).
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    await lib.sleep(500)
+    await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
     await hover(key, `${A})`)
-    await lib.sleep(300)
     await page.screenshot({ path: path.join(lib.WORK, `cardlinks-hover-${theme}.png`) })
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })
