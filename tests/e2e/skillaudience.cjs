@@ -10,7 +10,7 @@ const path = require('path')
 const userData = path.join(lib.WORK, 'skillaudience-profile')
 const ws = path.join(lib.WORK, 'skillaudience-ws')
 const proj = path.join(ws, 'demo')
-const sleep = lib.sleep
+const HUNG_MS = lib.timing('hang.ui')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -26,6 +26,8 @@ const skill = (dir, name, audience) => {
 const bundledDir = path.join(lib.ROOT, 'resources', 'skills')
 const bundledForAssistant = fs.readdirSync(bundledDir).filter((n) => /^\s*audience:\s*assistant\s*$/m.test(fs.readFileSync(path.join(bundledDir, n, 'SKILL.md'), 'utf8')))
 const assistantOnly = bundledForAssistant.length + 1
+/** The skill a Skills page shows, by its name in the visible editor's toolbar (a project's Skills tab stays mounted, hidden). */
+const shownSkill = (page) => page.locator('.editor-toolbar:visible .path strong').first().innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')
 
 ;(async () => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
@@ -49,9 +51,9 @@ const assistantOnly = bundledForAssistant.length + 1
   skill(skillsDir, 'misspelt', 'assitant')
   // A bundled skill for the Assistant, deleted: it's listed (for Restore) with its audience. Bundled skills are added
   // just after the workspace opens, so it's deleted once it's there.
-  if (!(await lib.until(() => fs.existsSync(path.join(skillsDir, 'coordinate-agents', 'SKILL.md')), 20000))) throw new Error('The bundled coordinate-agents skill was never added')
+  if (!(await lib.until(() => fs.existsSync(path.join(skillsDir, 'coordinate-agents', 'SKILL.md')), HUNG_MS))) throw new Error('The bundled coordinate-agents skill was never added')
   await inv('skills:delete', path.join(skillsDir, 'coordinate-agents'))
-  await sleep(800)
+  await lib.until(async () => (await inv('skills:workspace')).find((s) => s.name === 'coordinate-agents')?.bundled === 'missing', HUNG_MS)
 
   // What launches select, from the same metadata.
   const list = await inv('skills:workspace')
@@ -59,7 +61,8 @@ const assistantOnly = bundledForAssistant.length + 1
   check('audiences as launches read them', aud['weekly-report'] === 'assistant' && aud['both-ways'] === 'all' && aud.plain === 'agents' && aud['coordinate-agents'] === 'assistant' && aud['work-on-card'] === 'agents', JSON.stringify(aud))
 
   await page.keyboard.press('Control+Shift+K')
-  await lib.until(async () => (await page.locator('.skill-row').count()) > 0, lib.timing('hang.ui'))
+  // Every skill this suite wrote is listed, and the deleted bundled one as deleted.
+  await lib.until(async () => (await page.locator('.skill-row.missing', { hasText: 'coordinate-agents' }).count()) === 1 && (await page.locator('.skill-row', { hasText: 'misspelt' }).count()) > 0, HUNG_MS)
   const rowBadge = async (name) => {
     const b = page.locator('.skill-row', { hasText: name }).first().locator('.badge[data-audience]')
     return (await b.count()) ? (await b.innerText()).trim() : null
@@ -79,14 +82,11 @@ const assistantOnly = bundledForAssistant.length + 1
   // A skill's page: its audience as a badge, with what it means.
   const pageBadge = async (name) => {
     await page.locator('.skill-row', { hasText: name }).first().click()
-    await sleep(700)
+    await lib.until(async () => (await shownSkill(page)).trim() === name, HUNG_MS)
     const b = page.locator('.editor-toolbar .badge[data-audience]')
     const text = (await b.innerText()).trim()
-    await b.hover()
-    await sleep(500)
-    const tip = await page.locator('.tip').innerText().catch(() => '')
+    const tip = await lib.hoverTip(page, b, (t) => t.length > 0)
     await page.mouse.move(5, 5)
-    await sleep(200)
     return { text, tip }
   }
   const plain = await pageBadge('plain')
@@ -104,10 +104,10 @@ const assistantOnly = bundledForAssistant.length + 1
     const row = page.locator('.skill-row', { hasText: name }).first()
     await row.hover()
     await row.locator('button[aria-label="Delete skill"]').click()
-    await sleep(500)
+    await lib.until(async () => (await page.locator('.dialog').count()) === 1, HUNG_MS)
     const text = await page.locator('.dialog').innerText()
     await page.locator('.dialog .btn', { hasText: 'Cancel' }).click()
-    await sleep(300)
+    await lib.until(async () => (await page.locator('.dialog').count()) === 0, HUNG_MS)
     return text
   }
   const delWeekly = await deleteDetail('weekly-report')
@@ -122,11 +122,10 @@ const assistantOnly = bundledForAssistant.length + 1
 
   // The project's Skills tab: what its agents get. The Assistant's skills are left out, and counted.
   await inv('skills:restoreBundled', 'coordinate-agents')
-  await sleep(800)
+  await lib.until(async () => (await inv('skills:workspace')).find((s) => s.name === 'coordinate-agents')?.bundled === 'same', HUNG_MS)
   await page.keyboard.press('Control+Shift+E')
-  await sleep(500)
   await page.getByText('demo', { exact: true }).first().click()
-  await sleep(600)
+  await lib.until(async () => (await page.locator('.project-header h1').innerText().catch(() => '')).includes('demo'), HUNG_MS)
   await lib.openMoreTab(page, 'Skills')
   await lib.until(async () => (await page.locator('.split-list .skill-row').count()) > 0, lib.timing('hang.ui'))
   const tabRows = await page.locator('.split-list .skill-row').allInnerTexts()
@@ -143,10 +142,8 @@ const assistantOnly = bundledForAssistant.length + 1
   if ((await providerToggle.getAttribute('aria-expanded').catch(() => 'true')) === 'false') await providerToggle.click()
   const copyAndRead = async (name) => {
     await page.locator('.skill-row', { hasText: name }).first().click()
-    await sleep(700)
-    await page.locator('.editor-toolbar .btn', { hasText: 'Copy to workspace' }).hover()
-    await sleep(500)
-    const tip = await page.locator('.tip').innerText().catch(() => '')
+    await lib.until(async () => (await shownSkill(page)).trim() === name, HUNG_MS)
+    const tip = await lib.hoverTip(page, page.locator('.editor-toolbar .btn', { hasText: 'Copy to workspace' }), (t) => t.length > 0)
     await page.locator('.editor-toolbar .btn', { hasText: 'Copy to workspace' }).click()
     await lib.until(async () => (await page.locator('.toast', { hasText: `Copied "${name}"` }).count()) > 0, lib.timing('hang.ui'))
     const toast = await page.locator('.toast', { hasText: `Copied "${name}"` }).innerText().catch(() => '')
@@ -165,11 +162,12 @@ const assistantOnly = bundledForAssistant.length + 1
 
   // A narrow window: the badges stay inside their rows and the toolbar.
   await lib.fitWindow(app, page, { width: 760, height: 640 })
-  await sleep(600)
+  await lib.until(async () => (await page.evaluate(() => window.innerWidth)) === 760, HUNG_MS)
   await page.keyboard.press('Control+Shift+K')
-  await sleep(800)
-  await page.locator('.skill-row', { hasText: 'both-ways' }).first().click()
-  await sleep(800)
+  const bothRow = page.locator('.skill-row:visible', { hasText: 'both-ways' }).first()
+  await lib.until(async () => (await bothRow.count()) === 1, HUNG_MS)
+  await bothRow.click()
+  await lib.until(async () => (await shownSkill(page)).trim() === 'both-ways', HUNG_MS)
   const inside = await page.evaluate(() => {
     const out = []
     // Visible ones: a project's Skills tab stays mounted, hidden, behind the Skills view.
@@ -186,7 +184,7 @@ const assistantOnly = bundledForAssistant.length + 1
   check('narrow window: no horizontal page scroll', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
   await page.screenshot({ path: path.join(lib.WORK, 'skillaudience-narrow.png') })
   await page.keyboard.press('Control+Shift+E')
-  await sleep(500)
+  await lib.until(async () => (await page.locator('.tabs .tab-more:visible').count()) === 1, HUNG_MS)
   await lib.openMoreTab(page, 'Skills')
   await lib.until(async () => (await page.locator('.split-list .skill-row').count()) > 0, lib.timing('hang.ui'))
   await page.screenshot({ path: path.join(lib.WORK, 'skillaudience-narrow-project.png') })

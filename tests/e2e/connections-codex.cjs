@@ -145,7 +145,6 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
 
     // --- A conversation carried over: Two's first turn on Home, then resumed on Work, through the shared rollouts.
     await inv('pty:write', lib.ptyKey(alpha, 'a-two'), 'hello')
-    await lib.sleep(300) // on purpose: the fake takes a typed line before its Enter, as Codex does
     await inv('pty:write', lib.ptyKey(alpha, 'a-two'), '\r')
     const first = await lib.until(async () => (await live('a-two'))?.sessionId || null, HUNG_MS)
     check("Two's conversation has begun on Home", !!first)
@@ -161,7 +160,6 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
     // rollout's rate limits kept as Work's, and the status bar's Work item shows them.
     await lib.until(async () => (await live('a-two'))?.status === 'ready', HUNG_MS)
     await inv('pty:write', lib.ptyKey(alpha, 'a-two'), 'planusage 12 57')
-    await lib.sleep(300) // on purpose: the fake takes a typed line before its Enter, as Codex does
     await inv('pty:write', lib.ptyKey(alpha, 'a-two'), '\r')
     const keptWork = await lib.until(async () => (await inv('app:connectionPlanUsage'))[work.id] ?? null, HUNG_MS)
     check("Two's rollout's rate limits are kept as Work's", keptWork?.limits?.map((l) => l.usedPercent).join(',') === '12,57' && !(await inv('app:planUsage')).codex, JSON.stringify({ kept: keptWork, cli: (await inv('app:planUsage')).codex ?? null }))
@@ -170,7 +168,6 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
     check('…and the status bar shows Work’s: 5h 12% · Week 57%', !!(await lib.until(async () => /Work.*5h 12%.*Week 57%/.test(await workText()), HUNG_MS)), await workText())
     // A second of Codex's limits, of the same windows (HI-1125): its own item beside Codex's, by its name, never mixed in.
     await inv('pty:write', lib.ptyKey(alpha, 'a-two'), 'planusage 70 20 id=codex_bengalfox name=gpt-5.2-codex-sonic')
-    await lib.sleep(300) // on purpose: the fake takes a typed line before its Enter, as Codex does
     await inv('pty:write', lib.ptyKey(alpha, 'a-two'), '\r')
     check("…a second Codex limit (another limit_id) shows by its name, Codex's own figures unchanged", !!(await lib.until(async () => /5h 12%.*Week 57%/.test(await workText()) && /gpt-5\.2-codex-sonic 5h 70%/.test(await workText()) && /gpt-5\.2-codex-sonic wk 20%/.test(await workText()), HUNG_MS)), await workText())
 

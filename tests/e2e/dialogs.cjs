@@ -106,7 +106,7 @@ const check = (name, ok, extra = '') => {
   // Both themes, moved.
   await page.screenshot({ path: path.join(lib.WORK, 'dialogs-settings-moved.png') })
   await inv('settings:update', { appearance: { theme: 'light' } })
-  await lib.sleep(300)
+  await lib.themeShown(page, 'light')
   await page.screenshot({ path: path.join(lib.WORK, 'dialogs-settings-moved-light.png') })
   await inv('settings:update', { appearance: { theme: 'dark' } })
   await page.keyboard.press('Escape')
