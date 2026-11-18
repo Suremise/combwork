@@ -360,7 +360,7 @@
   "workflow.refused.lane.lineBehind.next": "{reader, select, you {Deixe como está: o Combwork atualiza {line} com {target} quando o agente estiver ocioso, ou pergunta a você antes, e avisa o agente quando {card} puder começar.} other {Deixe como está: o Combwork atualiza {line} com {target} quando você estiver ocioso, ou pergunta ao usuário, e avisa quando {card} puder começar.}}",
   "workflow.refused.lane.oneAtATime.change": "Uma raia sempre pega um cartão por vez; desativar Configurações → Avançado → As regras do fluxo de trabalho são aplicadas desativa todas as regras.",
   "workflow.refused.lane.oneAtATime.message": "{card} ainda não pode começar: {earlier}, antes dele na raia, não está concluído.",
-  "workflow.refused.lane.oneAtATime.next": "Termine {earlier} primeiro: quando estiver concluído, a raia segue para {card}.",
+  "workflow.refused.lane.oneAtATime.next": "Espere {earlier} ser concluído: encerre seu turno, e o Combwork inicia {card} para você assim que isso acontecer e nada mais o segurar. Pegar {card} antes de {earlier} muda a ordem da raia, o que cabe ao usuário ou ao Assistente.",
   "workflow.refused.loop.churnPending.message": "O cartão {card} aguarda resposta à pergunta {request} sobre suas idas e vindas: o ciclo dele fica pausado até lá.",
   "workflow.refused.loop.churnPending.next": "Aguarde a resposta (o Combwork acorda você): você ainda pode ler o cartão, comentar ou perguntar ao Assistente.",
   "workflow.refused.loop.followUpChecked.message": "Cartão {card}: um acompanhamento espera a verificação do revisor, e não dá para seguir sem ela.",

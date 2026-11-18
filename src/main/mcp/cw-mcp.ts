@@ -33,7 +33,7 @@ import { INBOX_SWITCHES, type InboxSwitch } from '../../shared/inboxSwitches'
 import { ENTRY_LIMITS, JOURNAL_KINDS, LINK_TYPES } from '../../shared/journal'
 import { cardName, cardRef, namedBy, namesFrom } from '../../shared/projectKeys'
 import { toolListSize } from '../../shared/toolListSize'
-import { ALWAYS_LOAD_META, alwaysLoaded, argumentHint } from '../../shared/combworkToolLoad'
+import { ALWAYS_LOAD_META, alwaysLoaded, argumentHint, withAliases } from '../../shared/combworkToolLoad'
 import { agentMsg, say } from '../../shared/agentText'
 import { ACCEPT_MAX } from '../../shared/workflow/focused'
 
@@ -1819,7 +1819,10 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
     case 'tools/call': {
       const tool = offered.find((t) => t.name === params?.name)
       if (!tool) return replyError(id, -32602, say(T['call.error.unknownTool'], { name: String(params?.name) }))
-      const args = (params?.arguments ?? {}) as Record<string, unknown>
+      // HI-3361: an argument Combwork's own tools name two ways (a card's `number` or `card`…) taken as this tool's name for
+      // it, before its handler and every check (withAliases): its schema stays the one it lists.
+      const props = (tool.inputSchema as { properties?: Record<string, unknown> }).properties ?? {}
+      const args = withAliases(tool.name, (n) => Object.prototype.hasOwnProperty.call(props, n), (params?.arguments ?? {}) as Record<string, unknown>)
       const started = performance.now()
       calling++
       let text: string

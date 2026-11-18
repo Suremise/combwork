@@ -360,7 +360,7 @@
   "workflow.refused.lane.lineBehind.next": "{reader, select, you {そのままにしてください：エージェントがアイドルになったらCombworkが{line}を{target}に合わせて最新にするか、先に確認を求めます。{card}を開始できるようになったらエージェントに知らせます。} other {そのままにしてください：アイドルになったらCombworkが{line}を{target}に合わせて最新にするか、ユーザーに確認します。{card}を開始できるようになったらお知らせします。}}",
   "workflow.refused.lane.oneAtATime.change": "レーンは常に1件ずつカードを扱います。「設定」→「詳細」→「ワークフローのルールを適用する」をオフにすると、すべてのルールがオフになります。",
   "workflow.refused.lane.oneAtATime.message": "{card}はまだ開始できません：レーンでその前にある{earlier}が完了していません。",
-  "workflow.refused.lane.oneAtATime.next": "先に{earlier}を仕上げてください。完了するとレーンは{card}に進みます。",
+  "workflow.refused.lane.oneAtATime.next": "{earlier}が完了するまで待ってください。ターンを終えると、完了して他に妨げがなければ Combwork が{card}を開始します。{earlier}より先に{card}に取りかかるのはレーンの順序の変更で、ユーザーかアシスタントが決めることです。",
   "workflow.refused.loop.churnPending.message": "{card}はやり取りの回数に関する質問{request}への回答を待っています。それまでループは一時停止しています。",
   "workflow.refused.loop.churnPending.next": "回答を待ってください（Combworkが起こします）。その間もカードを読む、コメントする、アシスタントに質問することはできます。",
   "workflow.refused.loop.followUpChecked.message": "{card}：フォローアップはレビュアーの確認を待っており、確認なしには進めません。",

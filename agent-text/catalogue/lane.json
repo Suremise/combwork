@@ -180,8 +180,8 @@
     "note": "A reorder applied now (HI-1995): its card was put back, then the lane ended before its list was saved."
   },
   "lane.refused.applyNow.inATurn": {
-    "text": "{agent} {status, select, working {is working} starting {is starting} waiting {is waiting for the user} other {has background tasks running}}: a reorder applied now never puts its card back under it. Ask it to finish and end its turn, then reorder again.",
-    "note": "A reorder applied now (HI-1995) refused: the builder is in a turn of its own ({status}: working, starting, waiting for the user, or background tasks running)."
+    "text": "{agent} {status, select, working {is working} starting {is starting} waiting {is waiting for the user} other {has background tasks running}}: a reorder applied now never puts its card back under it. Change the order without applyNow (it applies once {card} is Done), or ask {agent} to end its turn, then reorder again with applyNow.",
+    "note": "A reorder applied now (HI-1995) refused: the builder is in a turn of its own ({status}: working, starting, waiting for the user, or background tasks running). {card}: its card in flight. HI-3361: both ways on, the queued change first, as lane.refused.applyNow.inReview says it."
   },
   "lane.refused.applyNow.inReview": {
     "text": "{card} is in {where, select, review {Review} other {Approved or merging}}: putting it back would lose its review or merge. Change the order without applyNow (it applies once {card} is Done), or wait.",

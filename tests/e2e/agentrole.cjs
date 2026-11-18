@@ -215,11 +215,14 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await gSettings.getByRole('button', { name: 'Cancel' }).click()
     const agentTools = mcp('tools/list', {}, 'agent').tools
     check('a project agent has neither cw_update_agent nor cw_add_agent', agentTools.length > 0 && !agentTools.some((t) => t.name === 'cw_update_agent' || t.name === 'cw_add_agent'), JSON.stringify(agentTools.map((t) => t.name)))
-    // HI-2229: each role's most used tools are marked to be sent in full where a CLI defers tools; the rest aren't.
-    const full = (list) => list.filter((t) => t._meta?.['anthropic/alwaysLoad'] === true).map((t) => t.name).sort().join(',')
-    check("a project agent's cw_inbox, cw_list_tasks and cw_read_task are marked to load in full, no other", full(agentTools) === 'cw_inbox,cw_list_tasks,cw_read_task', full(agentTools))
+    // HI-3361 (the user's decision): no tool is marked to load in full where a CLI defers tools (HI-2229 marked a few).
+    const full = (list) => list.filter((t) => t._meta?.['anthropic/alwaysLoad'] !== undefined).map((t) => t.name).sort().join(',')
+    check("no project agent's tool is marked to load in full", full(agentTools) === '', full(agentTools))
     const assistantTools = mcp('tools/list', {}, 'assistant').tools
-    check("…the Assistant's, and its cw_agent_activity and cw_project_status", full(assistantTools) === 'cw_agent_activity,cw_inbox,cw_list_tasks,cw_project_status,cw_read_task', full(assistantTools))
+    check("…nor any of the Assistant's", assistantTools.length > 0 && full(assistantTools) === '', full(assistantTools))
+    // HI-3361: a card given as `card` to a tool that names it `number` is taken as meant, at the bridge's tools/call.
+    const aliased = tool('cw_read_task', { card: 'AL-1' }, 'agent')
+    check("cw_read_task given `card` (the intents' name) for its `number` reads the card", !aliased.isError && aliased.text.includes('AL-1'), aliased.text.slice(0, 200))
     const guessed = tool('cw_read_task', { key: 'AL-1' }, 'agent')
     check('a call with a guessed argument is refused as before, and told what the tool takes, naming no value', guessed.isError && /is not a card number/.test(guessed.text) && /cw_read_task takes number \(required\).*; missing: number; not: key\./.test(guessed.text) && !guessed.text.includes('AL-1'), guessed.text)
     const noProject = tool('cw_project_status', {})

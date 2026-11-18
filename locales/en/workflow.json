@@ -1484,8 +1484,8 @@
     "description": "A refused start (glossary 2.4): a lane takes one card at a time, so a card starts only once the cards before it in its lane are Done. {card} and {earlier} are card keys like AM-12."
   },
   "workflow.refused.lane.oneAtATime.next": {
-    "defaultMessage": "Finish {earlier} first: once it is Done, the lane goes on to {card}.",
-    "description": "The next step after a start refused because an earlier card of the lane is not Done. {card} and {earlier} are card keys like AM-12."
+    "defaultMessage": "Wait for {earlier} to be Done: end your turn, and Combwork starts {card} on you once it is and nothing else holds it. Taking {card} before {earlier} is a change of the lane’s order, the user’s or the Assistant’s.",
+    "description": "The next step after a start refused because an earlier card of the lane is not Done (HI-3361: the agent waits; Combwork starts the next card itself once the earlier is Done). {card} and {earlier} are card keys like AM-12. The Assistant: Combwork’s assistant (glossary)."
   },
   "workflow.refused.loop.churnPending.message": {
     "defaultMessage": "{card} waits for an answer to its question {request} about how much back-and-forth it has had: its loop is paused until then.",

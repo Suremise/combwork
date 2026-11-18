@@ -370,7 +370,7 @@
   "workflow.refused.lane.lineBehind.next": "{reader, select, you {Leave it as it is: Combwork brings {line} up to date with {target} once the agent is idle, or asks you first, and tells the agent when {card} can start.} other {Leave it as it is: Combwork brings {line} up to date with {target} once you are idle, or asks the user, and tells you when {card} can start.}}",
   "workflow.refused.lane.oneAtATime.change": "A lane always takes one card at a time; turning off Settings → Advanced → Workflow rules are enforced turns every rule off.",
   "workflow.refused.lane.oneAtATime.message": "{card} can't start yet: {earlier}, before it in its lane, isn't Done.",
-  "workflow.refused.lane.oneAtATime.next": "Finish {earlier} first: once it is Done, the lane goes on to {card}.",
+  "workflow.refused.lane.oneAtATime.next": "Wait for {earlier} to be Done: end your turn, and Combwork starts {card} on you once it is and nothing else holds it. Taking {card} before {earlier} is a change of the lane’s order, the user’s or the Assistant’s.",
   "workflow.refused.loop.churnPending.message": "{card} waits for an answer to its question {request} about how much back-and-forth it has had: its loop is paused until then.",
   "workflow.refused.loop.churnPending.next": "Wait for its answer (Combwork wakes you): you may still read the card, comment, or ask the Assistant.",
   "workflow.refused.loop.followUpChecked.message": "{card}: a follow-up waits for its reviewer's check, with no going ahead without it.",

@@ -360,7 +360,7 @@
   "workflow.refused.lane.lineBehind.next": "{reader, select, you {Zostaw to tak, jak jest: Combwork zaktualizuje gałąź {line} do {target}, gdy agent będzie bezczynny, albo najpierw zapyta Ciebie, i powie agentowi, kiedy karta {card} może wystartować.} other {Zostaw to tak, jak jest: Combwork zaktualizuje gałąź {line} do {target}, gdy będziesz bezczynny, albo zapyta użytkownika, i powie Ci, kiedy karta {card} może wystartować.}}",
   "workflow.refused.lane.oneAtATime.change": "Tor zawsze bierze jedną kartę naraz; wyłączenie Ustawienia → Zaawansowane → Reguły przepływu pracy są egzekwowane wyłącza wszystkie reguły.",
   "workflow.refused.lane.oneAtATime.message": "Karta {card} nie może jeszcze wystartować: karta {earlier}, wcześniejsza w jej torze, nie jest gotowa.",
-  "workflow.refused.lane.oneAtATime.next": "Najpierw dokończ kartę {earlier}: gdy będzie gotowa, tor przejdzie do karty {card}.",
+  "workflow.refused.lane.oneAtATime.next": "Poczekaj, aż karta {earlier} będzie gotowa: zakończ swoją turę, a Combwork uruchomi kartę {card}, gdy tak się stanie i nic innego jej nie wstrzyma. Wzięcie karty {card} przed {earlier} to zmiana kolejności toru, o której decyduje użytkownik lub Assistant.",
   "workflow.refused.loop.churnPending.message": "Karta {card} czeka na odpowiedź na swoje pytanie {request} o jej rundy uzgodnień: do tego czasu jej pętla jest wstrzymana.",
   "workflow.refused.loop.churnPending.next": "Poczekaj na odpowiedź (Combwork Cię wybudzi): nadal możesz czytać kartę, komentować lub zapytać Asystenta.",
   "workflow.refused.loop.followUpChecked.message": "Karta {card}: poprawki czekają na sprawdzenie przez recenzenta i bez niego nie można kontynuować.",
