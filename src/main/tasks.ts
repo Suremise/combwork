@@ -1945,6 +1945,21 @@ export function attemptRead(ws: WorkspaceService, project: string, n: number): A
 }
 
 /**
+ * HI-3361: the earlier card of its lane a start of card n waits for (`lane.oneAtATime`), or null: the runtime's own test
+ * (Workflow.laneStartWaits, the one its start's refusal reads), for `cw_lane next` to say so rather than "Start it".
+ */
+export async function laneStartWaitsFor(ws: WorkspaceService, projectPath: string, n: number): Promise<number | null> {
+  const { workflowFor } = await import('./workflow/service')
+  const wf = await workflowFor(ws, projectPath).catch(() => null)
+  if (!wf) return null
+  try {
+    return wf.laneStartWaits(wf.store.card(n))?.id ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
  * HI-3340: card n's attempt for a start cw_lane next advises, read in one synchronous step with its stage: only while the
  * card is in Todo (out of any attempt, so the only write the advice leads to is a start, which makes a new one), else
  * null. A card started again since the lane view was read is in an attempt the caller never saw: nothing is issued.

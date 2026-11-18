@@ -127,6 +127,10 @@
     "text": "No lanes running or recently ended.",
     "note": "cw_lane list: no lane is running or ended recently (an ended lane stays listed an hour)."
   },
+  "lane.next.after": {
+    "text": "Next: {card}, once {earlier} is Done{also}. Start nothing meanwhile: end your turn with no watch, and Combwork starts {card} on you once {earlier} is Done and nothing else holds it.",
+    "note": "cw_lane next (HI-3361): the next card can't start yet, an earlier card of the lane isn't Done (lane.oneAtATime, the start's own test). {card} is its key and title; {earlier} the earlier card's key; {also} as in lane.next.carryOn. Combwork starts a lane's next card on its idle builder once the cards before it are Done (HI-1990)."
+  },
   "lane.next.afterQueue": {
     "text": "Next: {card}, once {n, plural, one {it is} other {they are}} Done.",
     "note": "cw_lane next, after its passed cards' places in the merge queue (#1354): the next card waits for them to be Done (one card at a time); {n} is how many."
@@ -180,8 +184,8 @@
     "note": "A reorder applied now (HI-1995): its card was put back, then the lane ended before its list was saved."
   },
   "lane.refused.applyNow.inATurn": {
-    "text": "{agent} {status, select, working {is working} starting {is starting} waiting {is waiting for the user} other {has background tasks running}}: a reorder applied now never puts its card back under it. Ask it to finish and end its turn, then reorder again.",
-    "note": "A reorder applied now (HI-1995) refused: the builder is in a turn of its own ({status}: working, starting, waiting for the user, or background tasks running)."
+    "text": "{agent} {status, select, working {is working} starting {is starting} waiting {is waiting for the user} other {has background tasks running}}: a reorder applied now never puts its card back under it. Change the order without applyNow (it applies once {card} is Done), or ask {agent} to end its turn, then reorder again with applyNow.",
+    "note": "A reorder applied now (HI-1995) refused: the builder is in a turn of its own ({status}: working, starting, waiting for the user, or background tasks running). {card}: its card in flight. HI-3361: both ways on, the queued change first, as lane.refused.applyNow.inReview says it."
   },
   "lane.refused.applyNow.inReview": {
     "text": "{card} is in {where, select, review {Review} other {Approved or merging}}: putting it back would lose its review or merge. Change the order without applyNow (it applies once {card} is Done), or wait.",

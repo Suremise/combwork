@@ -1291,7 +1291,7 @@ export class Workflow {
     const from: CardState = reopening ? { ...s, stage: 'todo' } : s
     // One card at a time (#1270, §16.11.2): a lane's card starts only once the cards before it in the lane are Done. The
     // user's own drag is theirs to make.
-    const lane = this.enforced() && !opts.drag ? this.laneRefusal(card) : null
+    const lane = !opts.drag ? this.laneRefusal(card) : null
     if (lane) return this.refuse(card, actor, 'start', lane)
     // Its builder's worktree still has an earlier card's squashed work (§16.19.2, #1271): it waits for Combwork (or the user)
     // to bring the branch up to date, so its change is only its own.
@@ -1362,7 +1362,7 @@ export class Workflow {
             return undone({ rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal)
           }
         }
-        const waits = (this.enforced() && !opts.drag ? this.laneRefusal(this.store.card(card.id)) : null) ?? moving()
+        const waits = (!opts.drag ? this.laneRefusal(this.store.card(card.id)) : null) ?? moving()
         if (waits) return undone(waits)
         // HI-3148: what let it through onto its line still holds here (no tag made, no lane's grant ended): else decided again.
         if ('bound' in rel && rel.bound && !rel.bound()) {
@@ -3795,9 +3795,18 @@ export class Workflow {
     if (builder) this.wake(w, builder, stored(W.laneListChanged, { cards: now.cards.map((c) => this.store.card(c).key).join(', ') }))
   }
 
-  /** A start refused for a card that waits in its lane (laneWaits), or null. */
+  /**
+   * The earlier card of its lane a start of `card` waits for (`lane.oneAtATime`), or null: laneWaits while the rules are
+   * enforced. The one test both the start's refusal and `cw_lane next` read (HI-3361: next said "Start it" for a card the
+   * start then refused, an earlier card in Passed that Combwork doesn't merge).
+   */
+  laneStartWaits(card: CardRecord): CardRecord | null {
+    return this.enforced() ? this.laneWaits(card) : null
+  }
+
+  /** A start refused for a card that waits in its lane (laneStartWaits), or null. */
   private laneRefusal(card: CardRecord): GuardRefusal | null {
-    const earlier = this.laneWaits(card)
+    const earlier = this.laneStartWaits(card)
     return earlier ? { rule: 'lane.oneAtATime', values: { card: card.key, earlier: earlier.key } } : null
   }
 

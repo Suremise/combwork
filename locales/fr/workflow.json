@@ -360,7 +360,7 @@
   "workflow.refused.lane.lineBehind.next": "{reader, select, you {Laisse-la telle quelle : Combwork met {line} à jour avec {target} dès que l’agent est inactif, ou te demande d’abord, et dit à l’agent quand {card} peut démarrer.} other {Laisse-la telle quelle : Combwork met {line} à jour avec {target} dès que tu es inactif, ou demande à l’utilisateur, et te dit quand {card} peut démarrer.}}",
   "workflow.refused.lane.oneAtATime.change": "Un couloir prend toujours une carte à la fois ; désactiver Paramètres → Avancé → Les règles du flux de travail sont appliquées désactive toutes les règles.",
   "workflow.refused.lane.oneAtATime.message": "{card} ne peut pas encore démarrer : {earlier}, avant elle dans son couloir, n’est pas terminée.",
-  "workflow.refused.lane.oneAtATime.next": "Termine d’abord {earlier} : une fois terminée, le couloir passe à {card}.",
+  "workflow.refused.lane.oneAtATime.next": "Attends que {earlier} soit terminée : termine ton tour, et Combwork démarre {card} pour toi dès qu’elle l’est et que rien d’autre ne la retient. Prendre {card} avant {earlier} change l’ordre du couloir, ce qui revient à l’utilisateur ou à l’Assistant.",
   "workflow.refused.loop.churnPending.message": "La carte {card} attend une réponse à sa question {request} sur ses allers-retours : sa boucle est en pause d’ici là.",
   "workflow.refused.loop.churnPending.next": "Attends la réponse (Combwork te réveille) : tu peux toujours lire la carte, commenter ou demander à l’Assistant.",
   "workflow.refused.loop.followUpChecked.message": "Carte {card} : un suivi attend la vérification de son relecteur, et on ne continue pas sans elle.",

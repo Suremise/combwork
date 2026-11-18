@@ -173,7 +173,7 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   ),
   'lane.oneAtATime': r(
     msg({ id: 'workflow.refused.lane.oneAtATime.message', defaultMessage: "{card} can't start yet: {earlier}, before it in its lane, isn't Done.", description: 'A refused start (glossary 2.4): a lane takes one card at a time, so a card starts only once the cards before it in its lane are Done. {card} and {earlier} are card keys like AM-12.' }),
-    msg({ id: 'workflow.refused.lane.oneAtATime.next', defaultMessage: 'Finish {earlier} first: once it is Done, the lane goes on to {card}.', description: 'The next step after a start refused because an earlier card of the lane is not Done. {card} and {earlier} are card keys like AM-12.' }),
+    msg({ id: 'workflow.refused.lane.oneAtATime.next', defaultMessage: 'Wait for {earlier} to be Done: end your turn, and Combwork starts {card} on you once it is and nothing else holds it. Taking {card} before {earlier} is a change of the lane’s order, the user’s or the Assistant’s.', description: 'The next step after a start refused because an earlier card of the lane is not Done (HI-3361: the agent waits; Combwork starts the next card itself once the earlier is Done). {card} and {earlier} are card keys like AM-12. The Assistant: Combwork’s assistant (glossary).' }),
     msg({ id: 'workflow.refused.lane.oneAtATime.change', defaultMessage: 'A lane always takes one card at a time; turning off Settings → Advanced → Workflow rules are enforced turns every rule off.', description: 'Where the rule that a lane takes one card at a time is changed: it has no option of its own; the switch that turns every workflow rule off (a setting name: use it as Combwork shows it).' })
   ),
   'card.plainNumber': r(

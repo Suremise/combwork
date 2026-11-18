@@ -360,7 +360,7 @@
   "workflow.refused.lane.lineBehind.next": "{reader, select, you {保持原样即可：智能体空闲后，Combwork 会让 {line} 与 {target} 同步，或先询问你，并在 {card} 可以开始时告诉智能体。} other {保持原样即可：你空闲后，Combwork 会让 {line} 与 {target} 同步，或询问用户，并在 {card} 可以开始时告诉你。}}",
   "workflow.refused.lane.oneAtATime.change": "通道始终一次只处理一张卡片；关闭“设置”→“高级”→“强制执行工作流程规则”会关闭所有规则。",
   "workflow.refused.lane.oneAtATime.message": "{card} 还不能开始：其通道中排在它之前的 {earlier} 尚未完成。",
-  "workflow.refused.lane.oneAtATime.next": "请先完成 {earlier}：完成后通道会继续处理 {card}。",
+  "workflow.refused.lane.oneAtATime.next": "请等 {earlier} 完成：结束你的回合，一旦它完成且没有其他阻碍，Combwork 就会为你启动 {card}。在 {earlier} 之前处理 {card} 是更改通道顺序，这由用户或助手决定。",
   "workflow.refused.loop.churnPending.message": "{card} 正在等待其关于来回轮数的问题 {request} 的回答：在此之前，它的循环已暂停。",
   "workflow.refused.loop.churnPending.next": "请等待回答（Combwork 会唤醒你）：期间你仍可以阅读卡片、发表评论或询问助手。",
   "workflow.refused.loop.followUpChecked.message": "{card}：后续修改在等评审者检查，没有检查就不能继续。",

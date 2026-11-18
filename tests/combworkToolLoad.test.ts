@@ -10,6 +10,13 @@ describe('the tools sent in full (HI-2229)', () => {
     expect(alwaysLoaded(false)).toEqual(AGENT_ALWAYS_LOAD)
     expect(alwaysLoaded(true)).toEqual(ASSISTANT_ALWAYS_LOAD)
     expect(ASSISTANT_ALWAYS_LOAD.length).toBeLessThanOrEqual(6)
+    expect(AGENT_ALWAYS_LOAD.length).toBeLessThanOrEqual(6)
+  })
+
+  it("HI-3361: an agent's include the tools most of its sessions load anyway; the Assistant's stay as measured for it", () => {
+    for (const t of ['cw_submit', 'cw_lane', 'cw_wait_for_tasks']) expect(AGENT_ALWAYS_LOAD).toContain(t)
+    for (const t of ['cw_start_card', 'cw_ask_assistant']) expect(AGENT_ALWAYS_LOAD).not.toContain(t)
+    expect(ASSISTANT_ALWAYS_LOAD).toEqual(['cw_inbox', 'cw_read_task', 'cw_list_tasks', 'cw_project_status', 'cw_agent_activity'])
   })
 
   it("a project agent's are tools every agent is offered", () => {

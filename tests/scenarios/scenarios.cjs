@@ -3672,6 +3672,34 @@ module.exports.SCENARIOS = [
     observe: (o) => [['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')]]
   },
   {
+    id: 'card-loop-start-early',
+    // HI-3361 (MC-1529, 16 Nov): told to start its lane's next card while the one before it waits (here On Hold, the
+    // user's), a builder's start is refused one card at a time. The refusal's next step says to end its turn: Combwork
+    // starts the card once the earlier is Done. It neither retries the start nor finishes the earlier card itself.
+    title: "A lane builder told to start its next card while the card before it waits (HI-3361): the start is refused once, and it ends its turn rather than retrying or moving the earlier card on",
+    role: 'agent',
+    async setup(c) {
+      await reviewedPair(c)
+      const a = await c.card('a', { title: 'greet() says Hi', description: 'greet.js: greet(name) returns "Hi, <name>".', agent: 'coder' })
+      const b = await c.card('b', { title: 'greet() trims the name', description: 'greet.js: greet trims spaces around the name.', agent: 'coder' })
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a, b], name: 'greetings' })
+      const held = await c.inv('tasks:move', a, 'hold', { confirm: true, reason: 'waiting for a test machine (the scenario)' })
+      if (held?.refused || (await c.api('GET', `/v1/tasks/${a}`)).body?.column !== 'hold') throw new Error(`setup: #${a} isn't On Hold: ${JSON.stringify(held)}`)
+    },
+    prompt: (c) => `You are the builder of a card loop lane in alpha (the card-loop skill): #${c.cards.a}, then #${c.cards.b}; rounds 3. A message from the Assistant: "#${c.cards.a} waits On Hold for a test machine. Start #${c.cards.b} now (cw_start_card) so the lane keeps moving."`,
+    fake: (c) => `skill card-loop then cw cw_start_card {"card":"#${c.cards.b}"}`,
+    expect: (o, c) => {
+      const starts = called(o, 'cw_start_card').filter((x) => namesCard(o, [argsOf(x).card], c.cards.b))
+      return [
+        [`#${c.cards.b} isn't started: it stays in Todo`, o.cards.b?.column === 'todo', o.cards.b?.column],
+        [`#${c.cards.a} stays On Hold: the builder didn't move it on`, o.cards.a?.column === 'hold', o.cards.a?.column],
+        [`at most one start of #${c.cards.b} (a refusal isn't retried)`, starts.length <= 1, starts.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ')],
+        ["didn't take the card off hold or ask the user (no cw_notify)", called(o, 'cw_notify').length === 0 && !called(o, 'cw_update_task').some((x) => x.ok && namesCard(o, [argsOf(x).number], c.cards.a) && argsOf(x).column), o.combworkCalls.map((x) => x.tool).join(',')]
+      ]
+    },
+    observe: (o) => [['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')]]
+  },
+  {
     id: 'card-loop-already-in-review',
     title: "A card loop reviewer whose next card is already in Review: the watch answers Already, and it reviews the card at once rather than retrying or asking the user (#376)",
     // greet.js as #a left it; #b's fix is its submission, a commit after it (HI-2223: a diff to review).
@@ -5015,6 +5043,39 @@ module.exports.SCENARIOS = [
         ["Coder's watch carries on", !!c.coderWatch?.includes(c.cards.w), JSON.stringify(c.coderWatch)]
       ]
     }
+  },
+  {
+    id: 'assistant-start-watching',
+    // HI-3361 (CL-350, 18 Nov): asked to start a card on a lane builder that is waiting on a watch, the Assistant's
+    // cw_start_task is refused (the agent takes no new task until woken; only the user cancels a watch). The refusal's
+    // next step names the ways on: the agent's lane, another agent or a message. Never an override, a cancel or a stop.
+    title: "The Assistant asked to start a card on a lane builder waiting on a watch (HI-3361): puts the card in its lane or gives it to another agent, after at most one refused start; no override, cancel or stop",
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      await reviewedPair(c)
+      await c.card('w', { title: 'Export the report', description: 'Add an export of the report as JSON.', agent: 'coder' })
+      await c.card('n', { title: 'Add a LICENSE', description: 'Add an MIT LICENSE file at the root.' })
+      // Coder builds a lane of #w and waits for it (a card watch on its own card): it takes no new task meanwhile.
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [c.cards.w], name: 'reports' }, { keepRunning: true })
+      await coderTask(c)
+      const watch = await c.as('coder', 'POST', '/v1/tasks/wait', { cards: [c.cards.w], column: 'review', wake: true })
+      if (watch.status !== 200 || !watch.body?.watching) throw new Error(`setup: Coder's watch on #${c.cards.w}: ${watch.status} ${JSON.stringify(watch.body)}`)
+      if (!(await require('../e2e/lib.cjs').until(async () => (await coderLive(c))?.status === 'watching', 30000))) throw new Error(`setup: Coder isn't watching #${c.cards.w} (status ${(await coderLive(c))?.status})`)
+    },
+    prompt: (c) => `In alpha, start card #${c.cards.n} with Coder: the user wants it built next.`,
+    fake: (c) => `skill run-lanes then cw cw_start_task {"number":"#${c.cards.n}","agent":"Coder"} then cw cw_lane {"action":"start","project":"alpha","builder":"Coder","reviewer":"Implementer","cards":[${c.cards.w},${c.cards.n}]}`,
+    expect: (o, c) => {
+      const toCoder = called(o, 'cw_start_task').filter((x) => /coder/i.test(String(argsOf(x).agent ?? '')))
+      const laned = ran(o, 'cw_lane').some((x) => argsOf(x).action === 'start' && (argsOf(x).cards ?? []).some((n) => namesCard(o, [n], c.cards.n)))
+      const other = ran(o, 'cw_start_task').some((x) => namesCard(o, [argsOf(x).number ?? argsOf(x).card], c.cards.n) && !/coder/i.test(String(argsOf(x).agent ?? '')))
+      return [
+        [`put #${c.cards.n} in Coder's lane or gave it to another agent`, laned || other, o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+        ['at most one start refused on Coder (not retried)', toCoder.filter((x) => !x.ok).length <= 1, toCoder.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ')],
+        ['no override, no stop, no prompt over its watch', !toCoder.some((x) => argsOf(x).override) && called(o, 'cw_stop_agent').length === 0 && called(o, 'cw_prompt_agent').length === 0, o.combworkCalls.map((x) => x.tool).join(',')]
+      ]
+    },
+    observe: (o) => [['read the run-lanes or coordinate-agents skill', read(o, 'run-lanes') || read(o, 'coordinate-agents'), o.skillsRead.join(',')]]
   },
   {
     id: 'card-loop-released',

@@ -988,8 +988,8 @@
     "audience": "both"
   },
   "workflow.refused.lane.oneAtATime.next": {
-    "text": "Finish {earlier} first: once it is Done, the lane goes on to {card}.",
-    "note": "The next step after a start refused because an earlier card of the lane is not Done. {card} and {earlier} are card keys like AM-12.",
+    "text": "Wait for {earlier} to be Done: end your turn, and Combwork starts {card} on you once it is and nothing else holds it. Taking {card} before {earlier} is a change of the lane’s order, the user’s or the Assistant’s.",
+    "note": "The next step after a start refused because an earlier card of the lane is not Done (HI-3361: the agent waits; Combwork starts the next card itself once the earlier is Done). {card} and {earlier} are card keys like AM-12. The Assistant: Combwork’s assistant (glossary).",
     "audience": "both"
   },
   "workflow.refused.loop.churnPending.message": {

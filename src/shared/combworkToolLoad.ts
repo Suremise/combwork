@@ -13,11 +13,17 @@
 /** The `_meta` key Claude Code reads (2.1.316: a tool listed with it true is never deferred behind its tool search). */
 export const ALWAYS_LOAD_META = 'anthropic/alwaysLoad'
 
-/** The tools a project agent gets in full: those most agents call (HI-2190's Haiku trials: 31 to 72% of agent trials). */
-export const AGENT_ALWAYS_LOAD: readonly string[] = ['cw_inbox', 'cw_read_task', 'cw_list_tasks']
+/**
+ * The tools a project agent gets in full: those most agents call (HI-2190's Haiku trials: 31 to 72% of agent trials), and
+ * (HI-3361) each tool at least ⅔ of agent sessions call, where a session nearly always loads its schema anyway, so marking
+ * it costs about nothing and saves that load and a guessed call: cw_submit 96%, cw_lane 78%, cw_wait_for_tasks 71% of 195
+ * sessions in a week (cw_start_card 42% and cw_ask_assistant 29% stay deferred). Only those a session is offered are marked.
+ */
+export const AGENT_ALWAYS_LOAD: readonly string[] = ['cw_inbox', 'cw_read_task', 'cw_list_tasks', 'cw_submit', 'cw_lane', 'cw_wait_for_tasks']
 
-/** The Assistant's: an agent's, and the two it calls most of its own (54% and 37% of its trials). */
-export const ASSISTANT_ALWAYS_LOAD: readonly string[] = [...AGENT_ALWAYS_LOAD, 'cw_project_status', 'cw_agent_activity']
+/** The Assistant's: HI-2190's three an agent gets, and the two it calls most of its own (54% and 37% of its trials). */
+// HI-3361: written out, not an agent's list and more: the Assistant's sessions are too few to measure an agent's rule on.
+export const ASSISTANT_ALWAYS_LOAD: readonly string[] = ['cw_inbox', 'cw_read_task', 'cw_list_tasks', 'cw_project_status', 'cw_agent_activity']
 
 /** The tools a session's role gets in full. */
 export const alwaysLoaded = (assistant: boolean): readonly string[] => (assistant ? ASSISTANT_ALWAYS_LOAD : AGENT_ALWAYS_LOAD)

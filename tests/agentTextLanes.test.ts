@@ -143,6 +143,8 @@ function sharedTexts(): { name: string; text: string }[] {
       out.push({ name: `next start ${slot} ${!!waits}`, text: laneNextText({ lane, next: { ...next, carryOn: false }, waits }) })
     }
   out.push({ name: 'next after one', text: laneNextText({ lane: view, next: { ...next, carryOn: false }, waits: null, queue }) })
+  // HI-3361: a card the start's own test holds back, named with the earlier card.
+  out.push({ name: 'next once earlier is Done', text: laneNextText({ lane: view, next: { ...next, carryOn: false, after: 1 }, waits: null }) })
   out.push({ name: 'next after two', text: laneNextText({ lane: view, next: { ...next, carryOn: false }, waits: null, queue: [...queue, { card: 3, line: 'merging next' }] }) })
 
   // A check's refusal is said with its id (HI-2704): its text.

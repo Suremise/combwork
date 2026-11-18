@@ -607,6 +607,7 @@ const L = {
   afterQueue: agentMsg({ id: 'lane.next.afterQueue', text: 'Next: {card}, once {n, plural, one {it is} other {they are}} Done.', note: "cw_lane next, after its passed cards' places in the merge queue (#1354): the next card waits for them to be Done (one card at a time); {n} is how many." }),
   reviewNext: agentMsg({ id: 'lane.next.reviewNext', text: '{card} waits for your review (lane {lane}): review it.', note: "cw_lane next (HI-3118), for an agent that reviews a running lane and builds none: the first card of its lanes in Review. {card} is its key and title." }),
   reviewNone: agentMsg({ id: 'lane.next.reviewNone', text: 'No card of your lanes waits for your review now: end your turn; Combwork wakes you when one is submitted.', note: 'cw_lane next (HI-3118), for an agent that reviews a running lane and builds none, with no card of its lanes in Review.' }),
+  after: agentMsg({ id: 'lane.next.after', text: 'Next: {card}, once {earlier} is Done{also}. Start nothing meanwhile: end your turn with no watch, and Combwork starts {card} on you once {earlier} is Done and nothing else holds it.', note: "cw_lane next (HI-3361): the next card can't start yet, an earlier card of the lane isn't Done (lane.oneAtATime, the start's own test). {card} is its key and title; {earlier} the earlier card's key; {also} as in lane.next.carryOn. Combwork starts a lane's next card on its idle builder once the cards before it are Done (HI-1990)." }),
   start: agentMsg({ id: 'lane.next.start', text: 'Next: {card}. Start it.', note: 'cw_lane next: the card to start next; {card} is its key and title.' }),
   startIn: agentMsg({ id: 'lane.next.startIn', text: 'Next: {card}. Start it: it is built in {slot}, on a new branch Combwork makes there.', note: "cw_lane next: the card to start next, built in the lane's slot (#1438), where Combwork makes its line as it starts." }),
   cardsNone: agentMsg({ id: 'lane.args.cardsNone', text: 'cards must be the card numbers, in order (at least one)', note: "cw_lane start's refusal of its cards argument: none given, or not a list." }),
@@ -866,7 +867,7 @@ export function laneEndText(l: LaneInfo & { note?: string }): string {
  * `queue`: the lane's passed cards Combwork merges, each with where it is in the merge queue (#1354): the lane takes one card
  * at a time, so the next waits for them to be Done.
  */
-export function laneNextText(r: { lane: LaneInfo; next: { card: number; title: string; carryOn: boolean } | null; waits: LaneStatus | null; queue?: { card: number; line: string }[]; unsubmitted?: UnsubmittedCard[]; review?: { card: number; title: string } | null }): string {
+export function laneNextText(r: { lane: LaneInfo; next: { card: number; title: string; carryOn: boolean; after?: number } | null; waits: LaneStatus | null; queue?: { card: number; line: string }[]; unsubmitted?: UnsubmittedCard[]; review?: { card: number; title: string } | null }): string {
   // An agent that only reviews (HI-3118): a reviewer's answer, never a card to start.
   if (r.review !== undefined) return r.review ? say(L.reviewNext, { card: `${cardRef(r.review.card)} ${r.review.title}`, lane: r.lane.id }) : say(L.reviewNone)
   if (r.lane.state === 'paused' && r.waits) return say(L.nextWaits, { why: laneStatusText(r.waits) })
@@ -881,5 +882,8 @@ export function laneNextText(r: { lane: LaneInfo; next: { card: number; title: s
   const first = r.next.carryOn ? unsubmittedText(r.unsubmitted?.filter((u) => u.card === r.next!.card), undefined, true) : null
   if (r.next.carryOn) return `${slot ? say(L.carryOnIn, { card, slot, also }) : say(L.carryOn, { card, also })}${first ? ` ${first}` : ''}`
   if (queued) return `${queued} ${say(L.afterQueue, { card, n: r.queue!.length })}`
+  // HI-3361: an earlier card of the lane isn't Done (the start's own test, laneStartWaits): never "Start it" for a start
+  // the rule would refuse.
+  if (r.next.after !== undefined) return say(L.after, { card, earlier: cardRef(r.next.after), also })
   return slot ? say(L.startIn, { card, slot }) : say(L.start, { card })
 }
