@@ -205,6 +205,10 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     // hidden: wait (10 s here) has passed; then B1 waits for the user, the lane watch told once more, and nothing is typed
     // or handed off. The user's Esc draws its box again, which frees it by itself: what waited is typed, card 3 placed once.
     await until(async () => (await idle(alpha, b1.id)) && b1Reads(freeAt).some((r) => r.data.includes(`(${c2Key})`)))
+    // Its lane watch ended with its wake: the Assistant watches the lanes again, as its wake tells it to.
+    await until(() => idle(aHome, 'assistant'))
+    await lib.typeLine(inv, lib.ptyKey(aHome, 'assistant'), home, null, 'cw cw_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}', { live: () => liveIn(aHome, 'assistant') })
+    check('the Assistant watches the lanes again', !!(await until(async () => (await liveIn(aHome, 'assistant'))?.status === 'watching')))
     await lib.typeLine(inv, b1Key, home, 'B1', 'swallowhide', { ready: async () => lib.agentQuiet(PORT, 'alpha', await live(b1.id), tb1), strict: true, live: () => live(b1.id), hungMs: HUNG_MS })
     check("B1 ends its turn with the dialog in its input box's place", !!(await until(async () => (await idle(alpha, b1.id)) && (await inv('pty:buffer', b1Key)).slice(-800).includes(SWALLOW))))
     const placed3 = placements(c3)
@@ -215,7 +219,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     })
     const blockedAt = new Date().toISOString()
     check('past the wait, B1 waits for the user: something on its screen takes its keys', !!hidden && /taking its keys/.test(String(hidden.statusMessage)), JSON.stringify(hidden && { status: hidden.status, message: hidden.statusMessage }))
-    check("…the log says its box was off the screen, naming its screen's last rows", /its input box hasn't been on the screen for \d+ s \(its screen's last rows: [^)]*Choose how long replies are kept/.test(combworkLog()))
+    check("…the log says its box was off the screen, naming its screen's last rows", /its input box hasn't been on the screen for \d+ s \(its screen's last rows: "[^"]*Don't show again \| Enter to select/.test(combworkLog()))
     check("the Assistant's lane watch is told once more", !!(await until(() => waitLine().length >= 2)) && waitLine().length === 2, JSON.stringify(waitLine()))
     const cancelledHidden = await cancelled()
     // Hand-offs tried before the block (each refused, the report's loop) are bounded by the wait; none since.
