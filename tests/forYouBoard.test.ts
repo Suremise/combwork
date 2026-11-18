@@ -906,4 +906,29 @@ describe("an option answer is recorded with what it chose (HI-3356)", () => {
     expect(two.decisions?.at(-1)?.text).toBe('B')
     expect(forYou(w).count).toBe(0)
   })
+
+  it('past the 4000-character cap: the chosen option or the question is kept whole on every path; a raw decision past it is still refused, nothing written', async () => {
+    const tail = ' and never drop this last condition.'
+    const longOption = 'A: ' + 'x'.repeat(4500) + tail
+    const longQuestion = `Which way?\n${longOption}\nB: the other way.`
+    const plain = 'Go on? ' + 'y'.repeat(4500) + tail
+    const { w, card, ids } = await asking('decide', longQuestion, plain, longQuestion, 'Which database?')
+    const decide = await answer(w, card, ids[0], { outcome: 'answered', decision: 'A' })
+    expect(decide.decisions?.at(-1)?.text).toBe(`${longOption} (${ids[0]})`)
+    const quoted = await answer(w, card, ids[1], { outcome: 'answered', decision: 'a' })
+    expect(quoted.decisions?.at(-1)?.text).toBe(`a (${ids[1]}: “${plain}”)`)
+    const byAssistant = await update(w, card, { decision: 'A', answers: [ids[2]] }, assistant)
+    expect(byAssistant.decisions?.at(-1)?.text).toBe(`${longOption} (${ids[2]})`)
+    // A raw decision past the cap is refused as before: no decision, the question still open.
+    await expect(answer(w, card, ids[3], { outcome: 'answered', decision: 'z'.repeat(4001) })).rejects.toThrow(/too long/)
+    await expect(update(w, card, { decision: 'z'.repeat(4001), answers: [ids[3]] }, assistant)).rejects.toThrow(/too long/)
+    await expect(update(w, card, { decision: 'z'.repeat(4001) })).rejects.toThrow(/too long/)
+    expect((await inWorkspace(w, () => tasks.getTask(card))).decisions).toHaveLength(3)
+    expect(forYou(w).items.map((i) => i.request)).toEqual([ids[3]])
+    // An agent's Approve question approved with the note 'A' (HI-2286): whole too.
+    const approve = await asking('approve', longQuestion)
+    const approved = await answer(approve.w, approve.card, approve.ids[0], { outcome: 'approved', reply: 'A' })
+    expect(approved.decisions?.map((d) => d.text)).toEqual([`${longOption} (${approve.ids[0]})`])
+    expect(approved.comments.at(-1)?.text).toBe('A')
+  })
 })
