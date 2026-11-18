@@ -40,6 +40,7 @@ const os = require('os')
 const path = require('path')
 const crypto = require('crypto')
 const { execFileSync } = require('child_process')
+const { timing } = require('../timing.cjs')
 const { server } = require('./client.cjs')
 const { stopConfirmed, list, hostProblem, SAC_QUERY, sacState } = require('./wsb.cjs')
 const { evaluate, markdown, verdict, KINDS } = require('./report.cjs')
@@ -69,7 +70,7 @@ const INSIDE = 'C:\\tools\\combwork-tests\\sandbox\\inside'
 function mainCheckout(dir) {
   let common
   try {
-    common = execFileSync('git', ['-C', dir, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8', windowsHide: true, timeout: 10_000, stdio: ['ignore', 'pipe', 'ignore'], env: baseEnv() }).trim()
+    common = execFileSync('git', ['-C', dir, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8', windowsHide: true, timeout: timing('spawn.hang'), stdio: ['ignore', 'pipe', 'ignore'], env: baseEnv() }).trim()
   } catch { return dir }
   return common && path.basename(common).toLowerCase() === '.git' ? path.dirname(path.resolve(common)) : dir
 }
@@ -127,7 +128,7 @@ function gitRoot(opt) {
   const ok = d => !!d && fs.existsSync(path.join(d, 'cmd', 'git.exe'))
   if (opt) return ok(path.resolve(opt)) ? path.resolve(opt) : null
   let found = ''
-  try { found = execFileSync('where.exe', ['git'], { encoding: 'utf8', windowsHide: true, timeout: 10_000 }).split(/\r?\n/)[0].trim() } catch { /* none */ }
+  try { found = execFileSync('where.exe', ['git'], { encoding: 'utf8', windowsHide: true, timeout: timing('spawn.hang') }).split(/\r?\n/)[0].trim() } catch { /* none */ }
   // git.exe is in <root>\cmd (or <root>\bin, <root>\mingw64\bin): the root is the folder above it holding cmd\git.exe.
   if (!found) return null
   for (let d = path.dirname(found); d !== path.dirname(d); d = path.dirname(d)) if (ok(d)) return d
@@ -356,9 +357,9 @@ function steps(srv, ctx) {
 }
 
 const SCENARIO_OF = { fresh: 1, upgrade: 4, manual: 7, edges: 8, clean: 9, 'upgrade-rc': 10, 'profile-move': 11 }
-// How long Settings gets to open inside the Sandbox before its screenshot (nothing there to wait on from the host); the
-// unit tests, whose fake server shows nothing, set it to 0.
-const SETTINGS_OPEN_MS = Number(process.env.CW_SANDBOX_TEST_SETTINGS_MS ?? 6000)
+// How long Settings gets to open inside the Sandbox before its screenshot (nothing there to wait on from the host:
+// the timing file's sandbox.settingsOpenMs, a pace); the unit tests, whose fake server shows nothing, set it to 0.
+const SETTINGS_OPEN_MS = Number(process.env.CW_SANDBOX_TEST_SETTINGS_MS ?? timing('sandbox.settingsOpenMs'))
 
 async function main(argv) {
   const t0 = Date.now()
@@ -376,7 +377,7 @@ async function main(argv) {
     if (!ids.length) break
     if (Date.now() - t0w >= p.waitMin * 60_000) { log(`NOT RUN: another Sandbox is running (${ids.join(', ')}), not ours`); return 2 }
     log('waiting for another Sandbox to finish:', ids.join(', '))
-    await new Promise(r => setTimeout(r, 30_000))
+    await new Promise(r => setTimeout(r, timing('sandbox.otherPollMs')))
   }
   // The server's environment: the run context's allowlist (nothing else of this shell's: tests/e2e/runContext.cjs) and
   // its settings. WSB_STUB and WSB_STUB_STATE only ever come from the unit tests (tests/sandboxChecks.test.ts).

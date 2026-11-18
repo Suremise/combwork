@@ -171,7 +171,10 @@ can't become a default. Each entry says its kind:
 Every value in force is a whole number of ms from 1 to a Node timer's most (2^31 − 1), after an override and a scale, or
 loading fails; names are own properties only (`constructor` is no timing).
 
-Both are passed from the e2e runner to its suites (`PASS_ENV` in `tests/e2e/runContext.cjs`). A new kind of wait gets
+Both are passed from the e2e runner to its suites (`PASS_ENV` in `tests/e2e/runContext.cjs`). The Sandbox checks' scripts
+(`tests/sandbox`, HI-3393) read the same file. The tests folder is mapped whole into the Sandbox, so the scripts inside
+it read the defaults: the host's `CW_TEST_TIMING` doesn't reach them. `muse-real/stage.mjs` copies `timing.json` beside
+the bundle it stages. A new kind of wait gets
 a new name in `tests/timing.json`, with its kind and a note.
 
 **`check:repo` fails a number written in place** (`npm run test:waits -- --literals`, `scripts/timingLiterals.mjs`):
