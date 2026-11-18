@@ -1,5 +1,11 @@
 # Release Notes
 
+## Unreleased
+
+### Fixed
+
+- **A jj card waiting for a card in another project goes on as soon as that card is Done** (HI-3366). A jj card held for a card it depends on in another project wasn't integrated, and its lane didn't go on, until something else made Combwork look at its own project again (a jj operation there, or focusing a window). Now the other card's Done is enough.
+
 ## 1.6.0 — 2026-11-17
 
 ### Added

@@ -302,7 +302,19 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
       // The reconciler imports this module: loaded when needed. It follows the service holding the project (workspaceOf),
       // never a window's proxy of it, which this workflow may have been made from.
       // HI-2950: and one put back or Done, so an ended cycle's candidate is cleaned up soon (JjPlatform's sweep).
-      if ((to === 'approved' || to === 'todo' || to === 'done') && alive()) void Promise.all([import('./reconciler'), import('../workspace')]).then(([m, w]) => m.reconcileCard(w.workspaceOf(project.path), card.id, project.name)).catch(() => undefined)
+      // HI-3366: a card into Done reconciles each project it blocks a card of, too: a jj card held for it (HI-3265) has no
+      // merge-queue entry for kickDependents to run again, and nothing else reconciles its project when it is another one.
+      if ((to === 'approved' || to === 'todo' || to === 'done') && alive()) {
+        const elsewhere = to === 'done' ? store.dependents(card.id).flatMap((dep) => {
+          const p = store.projectOf(dep)
+          return p && p.toLowerCase() !== project.name.toLowerCase() ? [{ dep, p }] : []
+        }) : []
+        void Promise.all([import('./reconciler'), import('../workspace')]).then(([m, w]) => {
+          const at = w.workspaceOf(project.path)
+          m.reconcileCard(at, card.id, project.name)
+          for (const { dep, p } of elsewhere) m.reconcileCard(at, dep, p)
+        }).catch(() => undefined)
+      }
     },
     // HI-3188: the churn's levels as the project's preferences say now, and a simplify check told to the Assistant first.
     // The resolved options (read afresh by each workflowFor) carry the preferences, the defaults filled in.

@@ -4245,8 +4245,10 @@ with s34, its mapping HI-3235/s7, s10, s13 and s16. gate:advance is open.
   between the archive and the live file's removal leaves the previous live version, which recovery settles again.
 - **Blockers** (HI-3265, §16.9.1's HI-2709 rule): a card blocked by one that isn't Done (or can't be read) gets no
   attempt and no preview, and an Integrate click on an earlier preview runs nothing; it is tried again once they are
-  Done. The authority is `AdvanceAttempted`'s write, which reads `closeWaitsFor` as the Git queue's `IntegrationStarted`
-  does: one waited for there writes no fact, so the journal is abandoned and nothing moves. A dependency added while an
+  Done: a card's move into Done asks for a reconciliation of each project it blocks a card of, its own and others
+  (HI-3366), since a jj card has no queue entry for HI-2709's kick to run again. The authority is
+  `AdvanceAttempted`'s write, which reads `closeWaitsFor` as the Git queue's `IntegrationStarted` does: one waited for
+  there writes no fact, so the journal is abandoned and nothing moves. A dependency added while an
   attempt is unsettled is refused ("being merged into main now").
 - **Recovery**, under the card's lock and the repository lock (so never an active writer's half), at each advance and
   in each reconciler run: a journal with no fact at `requested` (or abandoned for a fact not confirmed) is nothing
