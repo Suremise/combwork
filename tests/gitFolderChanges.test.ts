@@ -53,8 +53,8 @@ vi.mock('original-fs', async (original) => {
 })
 /** HI-3022: a file written just before the next `checkout-index` (a rename's old side put back) runs. */
 let beforeRestore: { file: string; text: string } | null = null
-/** HI-3021: each git command and its bound, while a test collects them (null: none). */
-let gitCalls: { args: string[]; timeout?: number }[] | null = null
+/** HI-3021: each git command, its bound and when it was started (Date.now()), while a test collects them (null: none). */
+let gitCalls: { args: string[]; timeout?: number; at: number }[] | null = null
 /** HI-3021: the next `rev-parse --verify HEAD` fails as an unreadable HEAD does (not an unborn branch's exit 1). */
 let failHeadOnce = false
 /** HI-3053: run with the folder once the next commit or `stash push` is made, before Combwork takes its entries in. */
@@ -72,7 +72,7 @@ vi.mock('../src/main/git', async (original) => {
   return {
     ...real,
     git: async (cwd: string, args: string[], max?: number, input?: string, opts?: Parameters<typeof real.git>[4]): Promise<GitResult> => {
-      gitCalls?.push({ args, timeout: opts?.timeout })
+      gitCalls?.push({ args, timeout: opts?.timeout, at: Date.now() })
       if (failHeadOnce && args[0] === 'rev-parse' && args.includes('--verify') && args.includes('HEAD')) {
         // HI-3021 (HR2's round 2): HEAD unreadable for a moment, as git fails reading it.
         failHeadOnce = false
@@ -984,21 +984,74 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     })
 
   it("the refresh of what was taken in runs no hook, is bounded and never holds the real index (HR3's round 1): the user's git add while its clean filter runs works and is kept; the filter ended at its bound, the commit said made", async () => {
-    const pids = join(tempDir('cw-folderchanges-pids-'), 'pids')
-    const filter = join(tempDir('cw-folderchanges-filter-'), 'slow.sh')
-    // Slow only for the real index's refresh (the scratch): the private commit's own clean runs at once.
-    writeFileSync(filter, `#!/bin/sh\ncase "$GIT_INDEX_FILE" in\n*.take)\n${slowScript(pids).split('\n').slice(1).join('\n')}\n;;\nesac\ncat\n`)
-    sh(proj, 'config', 'filter.slow.clean', `sh "${fwd(filter)}"`)
+    const regs = join(tempDir('cw-folderchanges-pids-'), 'pids')
+    const dir = tempDir('cw-folderchanges-filter-')
+    const filter = join(dir, 'slow.sh')
+    const fast = join(dir, 'fast.sh')
+    // HI-3355: each slow filter run's two nodes register themselves, a line each: the run's own id, the node's pid and a
+    // moment it was running (Date.now()). Slow only for the real index's refresh (the scratch): the private commit's own
+    // clean runs at once. Each refresh is held by a run of its own, so each is established on its own.
+    const node = `"${fwd(process.execPath)}" -e 'require("fs").appendFileSync(process.argv[1], process.argv[2] + " " + process.pid + " " + Date.now() + "\\n"); setTimeout(() => {}, 30000)' "${fwd(regs)}" "$run"`
+    writeFileSync(filter, `#!/bin/sh\ncase "$GIT_INDEX_FILE" in\n*.take)\nrun="$$-$RANDOM"\n${node} &\n${node}\n;;\nesac\ncat\n`)
+    writeFileSync(fast, '#!/bin/sh\ncat\n')
+    type Reg = { pid: number; at: number }
+    /** The filter runs whose two nodes have both registered, in the order they did. */
+    const established = (): Reg[][] => {
+      const runs = new Map<string, Reg[]>()
+      for (const [run, pid, at] of (existsSync(regs) ? readFileSync(regs, 'utf8') : '').split(/\r?\n/).map((l) => l.trim().split(' ')))
+        if (run && Number(pid) > 0 && Number(at) > 0) runs.set(run, [...(runs.get(run) ?? []), { pid: Number(pid), at: Number(at) }])
+      return [...runs.values()].filter((r) => r.length === 2)
+    }
+    // Each node by its identity (pid and start time), never its pid alone: a pid ended may name another process by the
+    // time it is looked at. Taken while the run is known to hold (both registered, its bound not reached), and only a
+    // process started by the moment it registered is that node (a reused pid's process starts after the node has gone).
+    const exact = process.platform === 'win32'
+    const identities = (run: Reg[]): Ids => identify(run.map((r) => r.pid)).filter((id) => id.started <= run.find((r) => r.pid === id.pid)!.at)
+    const ids: Ids = []
+    onTestFinished(() => void endExactly(ids))
     writeFileSync(join(proj, '.git', 'info', 'attributes'), 'a.txt filter=slow\n')
+    // The bound fits this machine as it is now (HI-3338): the same Commit with a filter that holds nothing, timed, and
+    // the bound well past it and past taking each run's identities, so both nodes have started and are identified before
+    // it. Headroom only: each run is checked below to have been established before its bound, and fails saying so.
+    sh(proj, 'config', 'filter.slow.clean', `sh "${fwd(fast)}"`)
+    writeFileSync(join(proj, 'a.txt'), 'calibrate\n')
+    const t0 = performance.now()
+    await settle('commit', ['a.txt'])
+    const took = performance.now() - t0
+    const t1 = performance.now()
+    identify([process.pid])
+    const looking = performance.now() - t1
+    changes.folderChangesBounds.actMs = Math.min(20, Math.max(3, Math.ceil((3 * took + 2 * looking) / 1000))) * 1000
+    sh(proj, 'config', 'filter.slow.clean', `sh "${fwd(filter)}"`)
     writeFileSync(join(proj, 'a.txt'), 'edit\n')
     writeFileSync(join(proj, 'b.txt'), 'staged by the user meanwhile\n')
     gitCalls = []
     const settling = settle('commit', ['a.txt'])
-    // While the refresh's filter runs, the real index is free: the user's own git add works (no index.lock).
-    await vi.waitFor(() => expect(pidsIn(pids).length).toBeGreaterThan(0), { timeout: 20_000 })
+    // While the first refresh's filter holds (both its nodes running), the real index is free: the user's own git add
+    // works (no index.lock).
+    const first = await vi.waitFor(
+      () => {
+        const run = established()[0]
+        if (!run) throw new Error("the first refresh's filter has not started both its processes")
+        return run
+      },
+      { timeout: 20_000 }
+    )
+    ids.push(...identities(first))
     expect(existsSync(lockPath())).toBe(false)
     sh(proj, 'add', 'b.txt')
+    // The refresh made again from the index the user's add wrote: its own run, established while it holds too.
+    const second = vi.waitFor(
+      () => {
+        const run = established()[1]
+        if (!run) throw new Error("the second refresh's filter has not started both its processes")
+        ids.push(...identities(run))
+        return run
+      },
+      { timeout: changes.folderChangesBounds.actMs + 20_000 }
+    )
     const done = await settling
+    const runs = [first, await second]
     expect(done.made).toBe(head())
     expect(sh(proj, 'show', 'HEAD:a.txt')).toBe('edit')
     const refresh = gitCalls.filter((c) => c.args.includes('add') && c.args.includes('--refresh'))
@@ -1009,14 +1062,26 @@ describe('a commit or stash past its bound (HI-3021)', () => {
       expect(r.timeout).toBe(changes.folderChangesBounds.actMs)
       expect(r.args).toContain('core.fsmonitor=false')
     }
-    await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: 10_000 })
+    // Each run's nodes registered after its refresh started and before its bound, and were identified then: what the
+    // bound ended was an established tree. Else the headroom above was too little on this machine, said as such.
+    runs.forEach((run, i) => {
+      for (const r of run) {
+        expect(r.at, `refresh ${i + 1}: a node registered before its git started`).toBeGreaterThanOrEqual(refresh[i].at)
+        expect(r.at, `refresh ${i + 1}: a node registered only after its bound (${changes.folderChangesBounds.actMs} ms): too little headroom here`).toBeLessThan(refresh[i].at + changes.folderChangesBounds.actMs)
+      }
+    })
+    if (exact) expect(ids, 'each node identified while its refresh held').toHaveLength(4)
+    // The refresh's outcome comes once its teardown is over (treeEnding): each node already gone. The bound here is for a
+    // hung run only.
+    await vi.waitFor(() => expect(exact ? stillSame(ids) : runs.flat().map((r) => r.pid).filter(alive)).toEqual([]), { timeout: 10_000 })
     sh(proj, 'config', '--unset', 'filter.slow.clean')
     // The user's staging kept; a.txt taken in.
     expect(sh(proj, 'show', ':b.txt')).toBe('staged by the user meanwhile')
     expect(lines()).toEqual(['M  b.txt'])
     expect(existsSync(lockPath())).toBe(false)
     expect(leftovers()).toEqual([])
-  })
+    // A calibrated Commit and two bounds of up to 20 s each.
+  }, 120_000)
 
   it("another git writing the real index during every refresh (HR3's round 1): made again a few times, then taken in under the lock unrefreshed; each of its writes kept, the commit made", async () => {
     writeFileSync(join(proj, 'a.txt'), 'edit\n')
