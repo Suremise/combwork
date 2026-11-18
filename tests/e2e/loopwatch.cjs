@@ -280,11 +280,15 @@ const check = (name, ok, extra = '') => {
   // Its start's line taken and its turn over before the watch (a prompt after the stop would be a turn since). The lane
   // gives the builder a new conversation whose first turn is its brief, and types #6's start after that turn: idle after
   // the brief alone, a line typed then meets the start's, which leaves it to the user and tries again later (HI-3403). So:
-  // the start's prompt taken (it names the card's title), its turn over, and nothing more of Combwork's to type.
+  // the start's turn done (the fake's "Done:" line names the card's title), its turn over, its composer free and nothing of
+  // Combwork's waiting to be typed (the start's own delivery stays received, unacked: not lib.agentQuiet, which waits for
+  // that too).
   const startTaken = async () => {
     const s = await live(builder.id)
-    const items = s?.sessionId ? ((await inv('transcript:read', alpha, s.sessionId).catch(() => null))?.items ?? []) : []
-    return items.some((x) => x.kind === 'user' && String(x.text ?? '').includes('Stopped by the filter')) && s.turn?.state === 'over' && (await lib.agentQuiet(PORT, 'alpha', s, apiToken))
+    if (!s || !['ready', 'finished'].includes(s.status) || s.turn?.state !== 'over' || s.runtime?.composer !== 'free') return false
+    if (!/Done: Work on task[\s\S]{0,300}?Stopped by the filter/.test(lib.plainText(await inv('pty:buffer', lib.ptyKey(alpha, builder.id)).catch(() => '')))) return false
+    const rows = await lib.inboxPending(PORT, 'alpha', s.agentName, apiToken)
+    return !!rows && rows.every((d) => d.state !== 'queued' && d.state !== 'uncertain')
   }
   check("…its start taken and its turn over", !!(await until(startTaken, HUNG_MS)), await why(builder.id))
   script('Builder', ['safeguard'])
