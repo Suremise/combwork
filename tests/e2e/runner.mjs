@@ -4,8 +4,11 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
 import { createRequire } from 'module'
 import { join, posix } from 'path'
+import { availableParallelism } from 'os'
 
 const { exitText } = createRequire(import.meta.url)('./windowsExits.cjs')
+// HI-3378: the tests' one timing file, by name.
+const { timing } = createRequire(import.meta.url)('../timing.cjs')
 
 const VALUE_FLAGS = ['--jobs', '--affected', '--repeat', '--clear-dir', '--lang']
 const PLAIN_FLAGS = ['--all', '--real', '--only-real', '--record', '--fingerprint', '--build', '--packaged', '--no-progress', '--no-wait', '--pre-merge', '--keep-files', '--warm-homes']
@@ -18,10 +21,15 @@ export const LANG_SUITE = 'i18nshots'
  */
 export const keepLimits = (name, lang = []) => (name === LANG_SUITE && lang.length ? { maxFiles: 100 + 450 * lang.length, maxTotal: (20 + 60 * lang.length) * 1024 * 1024 } : {})
 /**
- * How long a suite may run before the runner stops it: 10 minutes, but 6 a language for a --lang run of more than one
- * (HI-2159: a language takes about 3 minutes, so a seven-language run reached four in 10).
+ * How long a suite may run before the runner stops it: the timing file's suite.limitMs (HI-3378: 20 minutes, a bound for a
+ * hung suite), but 6 minutes a language for a --lang run of more than that (HI-2159: a language takes about 3 minutes).
  */
-export const suiteLimitMs = (name, lang = []) => Math.max(10, name === LANG_SUITE ? 6 * lang.length : 0) * 60_000
+export const suiteLimitMs = (name, lang = []) => Math.max(timing('suite.limitMs'), (name === LANG_SUITE ? 6 * lang.length : 0) * 60_000)
+/**
+ * How many suites run at once by default (HI-3378): a quarter of this machine's cores, from one to four, so a run never
+ * loads more than its share of a shared machine (AGENTS.md) and a 4-core runner runs one at a time; --jobs says otherwise.
+ */
+export const defaultJobs = (cores = availableParallelism()) => Math.max(1, Math.min(4, Math.floor(cores / 4)))
 /** A language tag as --lang takes it (pl, pt-BR, en-XA); whether Combwork has the language, the suite checks by starting it. */
 const LANG_TAG = /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i
 
@@ -34,7 +42,7 @@ export const isRealCli = (s) => (s.needs ?? []).some((n) => n === 'claude' || n 
  * or in PACKAGED_SEAMS.
  */
 export const DEV_SEAMS = [
-  'CW_TEST_ADVANCE_STOP', 'CW_TEST_ANTIVIRUS', 'CW_TEST_ANTIVIRUS_LOG', 'CW_TEST_BLOCK_IPC', 'CW_TEST_BOARD_UPGRADE', 'CW_TEST_CLAUDE_MANAGED_DIR', 'CW_TEST_CLI_HOME_CONNECTION', 'CW_TEST_CLI_LOG', 'CW_TEST_DAY_MS', 'CW_TEST_DECISION_SETTLE_MS',
+  'CW_TEST_ADVANCE_STOP', 'CW_TEST_ANTIVIRUS', 'CW_TEST_CATALOG_HOLD', 'CW_TEST_ANTIVIRUS_LOG', 'CW_TEST_BLOCK_IPC', 'CW_TEST_BOARD_UPGRADE', 'CW_TEST_CLAUDE_MANAGED_DIR', 'CW_TEST_CLI_HOME_CONNECTION', 'CW_TEST_CLI_LOG', 'CW_TEST_DAY_MS', 'CW_TEST_DECISION_SETTLE_MS',
   'CW_TEST_DELIVERY_OVERDUE_MS', 'CW_TEST_DETECT_WAIT_MS', 'CW_TEST_DROP_HOOKS', 'CW_TEST_FAIL_IPC', 'CW_TEST_FLIGHT_AFTER_MS',
   'CW_TEST_HOLD_AGENT_TEMP', 'CW_TEST_HOLD_DRAIN', 'CW_TEST_HOLD_IPC', 'CW_TEST_HOLD_LAUNCH', 'CW_TEST_HOLD_MERGE_RECOVERY', 'CW_TEST_HOLD_TRUST', 'CW_TEST_HOLD_TYPED','CW_TEST_HOOKS_HOLD', 'CW_TEST_IDLE', 'CW_TEST_INSTALL_DIR', 'CW_TEST_JOB_KILL_FAILS', 'CW_TEST_LOG_DIRECT', 'CW_TEST_LOOP_GRACE_MS',
   'CW_TEST_MCP_LOG', 'CW_TEST_MERGE_CHOICE_CRASH', 'CW_TEST_MERGE_HOLD_MS', 'CW_TEST_MERGE_SLOT_LOG', 'CW_TEST_OPENCODE_PROVIDER', 'CW_TEST_ORPHAN_MS', 'CW_TEST_ORPHAN_POLL_MS', 'CW_TEST_PROCESS_TRACKER', 'CW_TEST_PROFILE_CHOOSE', 'CW_TEST_QUEUE_CRASH',
@@ -163,7 +171,7 @@ export function noCombworkProblems(suites, dir) {
  * plus what changed since main). Every suite name given is kept.
  */
 export function parseArgs(argv, suiteNames) {
-  const o = { jobs: 4, repeat: 1, all: false, affected: null, named: [], tier: 'fake', record: false, fingerprint: false, build: false, packaged: false, noWait: false, preMerge: false, keepFiles: false, warmHomes: false, clearDir: null, lang: [] }
+  const o = { jobs: defaultJobs(), repeat: 1, all: false, affected: null, named: [], tier: 'fake', record: false, fingerprint: false, build: false, packaged: false, noWait: false, preMerge: false, keepFiles: false, warmHomes: false, clearDir: null, lang: [] }
   const tiers = new Set()
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]

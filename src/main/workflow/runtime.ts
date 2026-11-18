@@ -22,7 +22,7 @@ import { pathChanges, pickAtRevision, type PickOutcome } from './focusedRun'
 import type { GuardId, MoveId } from '../../shared/workflow/pieces'
 import { refusal, type Refusal, type RuleId } from '../../shared/workflow/refusals'
 import { FOR_YOU, UNREADABLE, workflowEnglish, workflowText } from '../../shared/workflow/texts'
-import { englishText } from '../../shared/advanced'
+import { englishText, FOCUSED_PICK_DEFAULT_S } from '../../shared/advanced'
 import type { StoredText, TargetChanges } from '../../shared/types'
 import { parseCardRef } from '../../shared/workflow/cardRefs'
 import type { ForwardOverride } from '../../shared/workflow/forwardOrder'
@@ -57,7 +57,7 @@ import { createLogger, userText } from '../logger'
 import { GatherDepth } from './gatherDepth'
 import { earlierWork, UNREAD, type EarlierLine } from './earlierWork'
 import { asCardCounts } from './containment'
-import { guardsOf, guardsRefuse, guardWarning } from '../../shared/workflow/mergeGuards'
+import { GUARD_CHECK_DEFAULTS, guardsOf, guardsRefuse, guardWarning } from '../../shared/workflow/mergeGuards'
 import { checkMergeGuards } from './mergeGuardsRun'
 
 const log = createLogger('workflow')
@@ -2238,7 +2238,7 @@ export class Workflow {
   private async pickFor(o: WorkflowOptions, folder: string, revision: string, base: string, tests: FocusedTest[] | undefined, signal: AbortSignal): Promise<FocusedChoice> {
     const change = await pathChanges(folder, base, revision)
     const command = o.commands[FOCUSED_PICK]?.trim()
-    const deps = { env: this.cfg.focused?.env ?? (() => ({})), timeoutMs: this.cfg.focused?.timeoutMs() ?? 60_000, signal }
+    const deps = { env: this.cfg.focused?.env ?? (() => ({})), timeoutMs: this.cfg.focused?.timeoutMs() ?? FOCUSED_PICK_DEFAULT_S * 1000, signal }
     let p: PickOutcome
     if (!change) p = { state: 'unknown', tests: [], why: 'noChange' } // i18n-ignore: codes (a why, a check name), never shown as text
     else if (!command) p = { state: 'unknown', tests: [], why: 'noPicker' } // i18n-ignore: codes (a why, a check name), never shown as text
@@ -2568,11 +2568,21 @@ export class Workflow {
     if (!answerFits(req, { outcome: answer, reply: !!note, decision: !!opts.decided, choice, rounds: opts.rounds, action }, LANE_MAX_ROUNDS)) throw new Error(`an answer (${answer}${choice ? `, ${choice}` : ''}) that doesn't fit request ${request} (${req.kind}, ${req.gate})`) // i18n-ignore: a programming error (tasks.ts checks first, in the user's words)
     const rounds = choice === 'carryOn' ? opts.rounds : undefined
     await this.cfg.hooks?.beforeWrite?.('answer')
-    if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.answer(ref, request, answer, opts))
+    // HI-3391: as a verdict's (HI-3216): gathered again while only its fingerprint moved, or can't be read at that instant,
+    // as often as its platform allows. jj's head moves with any jj operation in the repository (another lane's commit, a
+    // review copy's checkout), which changes nothing the answer decides on; a change by content still refuses at once.
+    const gathers = this.platform(r.options).gathers ?? 1
+    if (await this.revalidate(card, s, r.options, before, gathers, 'answer')) return this.regather(card, () => this.answer(ref, request, answer, opts))
+    let evidenceMoved = false
     const out = await this.write(card, r, by, (w) => {
       // Under the transaction: the request still open (a newer submission retires the old one's), the card where it was.
-      const changed = this.stillAt(w, s, 'answer') ?? this.evidenceChanged(w, r.options, before)
-      if (changed) return changed
+      const stale = this.stillAt(w, s, 'answer')
+      if (stale) return stale
+      const changed = this.evidenceChanged(w, r.options, before)
+      if (changed) {
+        evidenceMoved = true
+        return changed
+      }
       const st = w.state()
       if (!st.requests.some((x) => x.request === request)) return { rule: 'move.notFromHere', values: { card: card.key, stage: st.stage, move: 'answer', moves: '' } } as GuardRefusal
       w.fact('Approval', { request, answer, ...(note ? { note } : {}), generation: st.generation, ...(req.submission !== undefined ? { submission: req.submission } : {}), ...(choice ? { choice } : {}), ...(rounds ? { rounds } : {}), ...(action ? { action } : {}) }) // i18n-ignore: a fact's kind and codes, not text
@@ -2649,6 +2659,16 @@ export class Workflow {
       if (!w.woken.includes(builder ?? '')) this.wake(w, builder, said)
       return null
     })
+    // HI-3391: its fingerprint moved again between the last gather and the write, its answer by content the same, or
+    // unreadable at that instant (a verdict's rule): gathered again from the top while its platform allows more passes.
+    if (out && evidenceMoved) {
+      const again = gathers > 1 && this.gathering.depth(card.id) < gathers ? await this.gatherAgain(card, s, r.options, before) : null
+      if (again) {
+        this.passLog(card, 'answer', 'write', again, gathers)
+        return this.regather(card, () => this.answer(ref, request, answer, opts))
+      }
+      log.info(`#${card.id}'s answer refused: evidence.changed at its write, pass ${this.gathering.depth(card.id) + 1} of ${gathers} (${this.noPassWhy(card, gathers)})`)
+    }
     if (out) return this.refuse(card, by, 'answer', out)
     return this.ok(card, from, this.state(card).stage)
   }
@@ -3672,7 +3692,9 @@ export class Workflow {
     const guards = guardsOf(this.cfg.options())
     const adapter = this.platform(o)
     if (!guards.length || !adapter.addedDiff || !(o.finish === 'combworkMerges' || finishOnCandidate(o.finish))) return []
-    const r = await checkMergeGuards(guards, () => adapter.addedDiff!(base, revision), this.cfg.guardLimits?.() ?? { timeoutMs: 10_000, maxLines: 200_000 })
+    // A warning only, which says nothing when it can't finish: never a submit held for the merge's own limit (HI-3377).
+    const limits = this.cfg.guardLimits?.() ?? GUARD_CHECK_DEFAULTS
+    const r = await checkMergeGuards(guards, () => adapter.addedDiff!(base, revision), { ...limits, timeoutMs: Math.min(limits.timeoutMs, SUBMIT_GUARDS_MS) })
     return guardsRefuse(r) && !r.transient ? [guardWarning(r)] : []
   }
 
@@ -4010,3 +4032,6 @@ export class Workflow {
 }
 
 export type { RuleId }
+
+/** HI-3377: the longest cw_submit's early merge-guards warning matches (the merge's own check takes the setting's time). */
+const SUBMIT_GUARDS_MS = 10_000

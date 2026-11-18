@@ -26,7 +26,7 @@ import type { CardRecord } from '../workflow/factStore'
 import type { ReconcileHooks } from '../workflow/reconcile'
 import type { Workflow } from '../workflow/runtime'
 import type { AdvanceAnswer, AdvanceHost, AdvanceRef, AdvanceStep, AdvanceWords, PreviewWords, CheckBracket, FinishInputs, HeadMove, KeptWork, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
-import { AdvanceJournals, baseRefusalNow, classifyUndoNow, commitsAdded, fingerprintHash, journalAbandoned, journalNewUndo, journalRequested, journalSettled, journalUndoAs, planIdOf, recoverAdvance, resultContained, runAdvance, runUndo, underLock, undoOfferedNow, undoPreMutation, type AdvanceJournal, type AdvanceOutcome, type Held, type JjAdvanceDeps, type JjAdvancePlan } from './jjAdvance'
+import { AdvanceJournals, attemptPreMutation, baseRefusalNow, classifyUndoNow, commitsAdded, fingerprintHash, journalAbandoned, journalNewUndo, journalRequested, journalSettled, journalUndoAs, planIdOf, recoverAdvance, resultContained, runAdvance, runUndo, underLock, undoOfferedNow, undoPreMutation, type AdvanceJournal, type AdvanceOutcome, type Held, type JjAdvanceDeps, type JjAdvancePlan } from './jjAdvance'
 import { ADVANCE_GATES, ADVANCE_PREVIEW_GATE, ADVANCE_UNCERTAIN_GATE, advanceUnresolved, approvedByUser } from '../../shared/workflow/facts'
 import { finishAdvances, finishPreviews } from '../../shared/workflow/options'
 
@@ -59,7 +59,7 @@ import { anyRetainedDue, dueRetained, markRetainedDue, publishTargets, recordInt
 import { folderIdentity, type PublishCommitAnswer, type PublishCommitRequest } from './jjPublishCommit'
 import { advanceStep, candidateFingerprint, candidateKey, candidateShown, checksAgain, clearEndedCycle, cycleOver, publishCandidateChecks, reconcileJj, type CandidateWords, type JjChecksUpdate, type JjProved } from '../workflow/reconcile'
 import { candidateCheckNames, checksJournalKey, checksKeyOf, readChecksJournal, runCandidateChecks, writeChecksJournal, type CandidateChecksDeps, type ChecksJournal } from './jjCandidateChecks'
-import { GUARD_DIFF_BYTES, guardsKey, guardsOf } from '../../shared/workflow/mergeGuards'
+import { GUARD_CHECK_DEFAULTS, GUARD_DIFF_BYTES, guardsKey, guardsOf } from '../../shared/workflow/mergeGuards'
 import type { DiffRead } from './types'
 import { checkMergeGuards } from '../workflow/mergeGuardsRun'
 import { jjCandidateEntry, jjReturnedComment, jjReturnedWake } from './jjCandidateReturn'
@@ -202,6 +202,9 @@ const oneLine = (m: string): string => m.split(/\r?\n/)[0].trim()
 class SamenessUnread extends Error {}
 
 const checksLog = createLogger('jj')
+
+/** HI-3390: how many times a preview's click is read again when its reason to run nothing changed during its write. */
+const PREVIEW_REREADS = 3
 
 /** HI-2938: what the app gives the candidate checks (jjCards.ts). */
 export interface JjChecksHost {
@@ -999,6 +1002,9 @@ export class JjPlatform implements PlatformAdapter {
     const wf = this.wf!
     const card = wf.store.card(card0.id)
     const cycle = wf.state(card).cycle
+    // HI-3367: its live journals of earlier cycles (a card put back and restarted) retired first, read again here under
+    // its locks: none is ever answered again. Until each is, no attempt or preview of this cycle runs (false: busy).
+    if (!(await this.retireOthers(journals, card.key, card, cycle, cycle, host, integ.view.store))) return false
     const recovery = this.advanceDeps(integ, journals, () => true)
     const listed = await journals.list(card.key, cycle)
     for (const { attempt, journal } of listed) {
@@ -1183,10 +1189,31 @@ export class JjPlatform implements PlatformAdapter {
       await host.declinePreview(c, s.cycle, ans.plan)
       return false
     }
-    if (c.stage !== 'approved' || s.integrated || advanceUnresolved(s) || !this.consentHolds(c, s, 'preview') || host.waitsFor(c).length) return false
-    const ready = await this.readyPlan(h, integ, journals, c, s, host, 'preview')
+    // HI-3367: the card's earlier attempts settled first (an earlier cycle's retired), as before any attempt.
+    if (!(await this.settleAdvances(h, integ, journals, c, host))) return false
+    // HI-3390: a click whose consent went since its preview was asked (the finish changed, a blocker added) runs nothing,
+    // and the card says why (once for the request), never dropped silently. The reason is read again in that write: gone
+    // there ('changed', HR1's round 1), the click is read again here (a few times: each a change of the board between two
+    // reads), and runs if its consent holds now. Not said ('failed', or still changing): the action fails, never done
+    // without its explanation (the preview comes back by the next reconcile where the finish still previews).
+    let c2 = wf.store.card(card.id)
+    let s2 = wf.state(c2)
+    for (let tries = 0; ; tries++) {
+      c2 = wf.store.card(card.id)
+      s2 = wf.state(c2)
+      if (s2.cycle !== ans.cycle || c2.stage !== 'approved' || s2.integrated || advanceUnresolved(s2)) return false
+      const waits = host.waitsFor(c2)
+      const finishGone = !finishPreviews(wf.rulesetOf(c2, s2).options.finish)
+      if (!finishGone && !waits.length) break
+      const said = await host.previewClosed(c2, s2.cycle, finishGone ? 'finish' : 'blocked', waits, ans.request)
+      if (said === 'recorded' || said === 'already') return false
+      if (said === 'failed') throw new Error("advance preview: why its Integrate ran nothing couldn't be recorded") // i18n-ignore: an action's failure, for the log
+      if (tries >= PREVIEW_REREADS) throw new Error("advance preview: its Integrate's conditions kept changing") // i18n-ignore: an action's failure, for the log
+    }
+    if (!this.consentHolds(c2, s2, 'preview')) return false
+    const ready = await this.readyPlan(h, integ, journals, c2, s2, host, 'preview')
     if (!ready || ready.planId !== ans.plan) return false
-    return (await this.attemptUnder(h, integ, journals, c, s, ready.plan, ready.planId, host, 'preview')).integrated
+    return (await this.attemptUnder(h, integ, journals, c2, s2, ready.plan, ready.planId, host, 'preview')).integrated
   }
 
   /**
@@ -1285,6 +1312,108 @@ export class JjPlatform implements PlatformAdapter {
     }
   }
 
+  /**
+   * HI-3367: a card's live journals in cycles other than `keep` (null: all, an archived card's) retired, under its card
+   * lock and the repository lock (its caller's). Each is marked superseded on the card first, in one write with its comment
+   * when it may have moved its target (attemptPreMutation), then archived whole. Kept live where that write wasn't
+   * committed, or the archive failed (the next pass archives it, its marker saying it was told). False: one is still live.
+   * HR1's round 2: only what this adapter's locks fence is retired. The card is read again as this project's here (moved
+   * to another project while the locks were waited for: false, nothing touched), and a journal only when its plan names
+   * `store`, the repository whose lock is held. One of another repository (a card moved here from another project) is
+   * that repository's writer's: left live, untouched, and not waited for (its move wasn't in this repository). One that
+   * can't be read can't be fenced: its notice is given once (its marker), and it is left live, not waited for again.
+   */
+  private async retireOthers(journals: AdvanceJournals, fileKey: string, card: CardRecord, keep: number | null, cycleNow: number, host: AdvanceHost, store: string): Promise<boolean> {
+    const wf = this.wf!
+    let ok = true
+    let listed: Awaited<ReturnType<AdvanceJournals['others']>>
+    try {
+      listed = await journals.others(fileKey, keep)
+    } catch (e) {
+      // HI-3367 (HR1's round 1, finding 2): the folder can't be listed: what it holds is unknown, so not settled (busy).
+      checksLog.warn(`listing ${userText(card.key)}'s advance journals`, e) // i18n-ignore: a log line, English
+      return false
+    }
+    if (!listed.length) return true
+    try {
+      const owner = wf.store.ownerOfKey(fileKey)
+      if (!wf.store.isOwn(card.id) || owner === 'unknown' || !owner || !owner.own || owner.id !== card.id) return false
+    } catch (e) {
+      checksLog.warn(`reading ${userText(card.key)}'s project`, e) // i18n-ignore: a log line, English
+      return false
+    }
+    for (const o of listed) {
+      if (o.journal !== 'unreadable' && !samePath(o.journal.plan.store, store)) continue
+      const warn = attemptPreMutation(o.journal) ? null : { target: o.journal !== 'unreadable' ? o.journal.plan.target : (wf.state(card).started?.target ?? '-') }
+      if ((await host.superseded(card, { cycle: o.cycle, attempt: o.attempt }, warn)) === 'failed') {
+        ok = false
+        continue
+      }
+      if (o.journal === 'unreadable') continue
+      try {
+        await journals.supersede(o.name, o.journal, cycleNow)
+      } catch (e) {
+        ok = false
+        checksLog.warn(`archiving ${userText(card.key)}'s superseded advance journal`, e) // i18n-ignore: a log line, English
+      }
+    }
+    return ok
+  }
+
+  /**
+   * HI-3367: live journals whose card isn't one of the project's active cards. The folder is the workspace's, shared by its
+   * projects (HR1's round 1, finding 1), so the journal's key is looked up across the whole board (ownerOfKey): another
+   * project's card, or a key not known here, is never this adapter's to touch; a read that fails keeps them too. This
+   * project's archived card has its journals retired whole (every cycle) under its card lock and the repository lock,
+   * rechecked there: unarchived meanwhile, they stay for its own settling. A key held here whose card is gone has no card
+   * lock: the repository lock is the fence (an attempt holds it from its first journal to its outcome), the card rechecked
+   * gone under it, and only a journal whose plan names this repository's store is archived, with nothing said (no card to
+   * say it on); one that can't be read, or of another store, stays.
+   */
+  private async retireStray(integ: JjIntegrationDeps, journals: AdvanceJournals, fileKey: string, host: AdvanceHost): Promise<void> {
+    const wf = this.wf!
+    let owner: ReturnType<typeof wf.store.ownerOfKey>
+    try {
+      owner = wf.store.ownerOfKey(fileKey)
+    } catch (e) {
+      checksLog.warn(`reading the card of advance journals ${userText(fileKey)}`, e) // i18n-ignore: a log line, English
+      return
+    }
+    if (owner === 'unknown' || (owner && !owner.own)) return
+    if (owner) {
+      const id = owner.id
+      if (!wf.store.isArchived(id)) return
+      await this.withCardLock(id, () =>
+        underLock(integ.view.store, integ.lock, async () => {
+          // Read again under the locks (HR1's round 2): still archived, and still this project's (retireOthers).
+          if (!wf.store.isArchived(id)) return
+          const now = wf.store.card(id)
+          await this.retireOthers(journals, fileKey, now, null, wf.state(now).cycle, host, integ.view.store)
+        })
+      )
+      return
+    }
+    await underLock(integ.view.store, integ.lock, async () => {
+      let listed: Awaited<ReturnType<AdvanceJournals['others']>>
+      try {
+        if (wf.store.ownerOfKey(fileKey) !== null) return
+        listed = await journals.others(fileKey, null)
+      } catch (e) {
+        checksLog.warn(`advance journals ${userText(fileKey)} of a gone card kept`, e) // i18n-ignore: a log line, English
+        return
+      }
+      for (const o of listed) {
+        if (o.journal === 'unreadable' || !samePath(o.journal.plan.store, integ.view.store)) continue
+        try {
+          await journals.supersede(o.name, o.journal, null)
+          checksLog.info(`advance journal ${userText(o.name)} retired: its card is gone`) // i18n-ignore: a log line, English
+        } catch (e) {
+          checksLog.warn(`archiving advance journal ${userText(o.name)} of a gone card`, e) // i18n-ignore: a log line, English
+        }
+      }
+    })
+  }
+
   /** HI-3235: the project's journaled advances settled (a crash, a card no reconcile reached), card by card under its locks. */
   async recoverAdvances(host: AdvanceHost): Promise<void> {
     const d = this.deps
@@ -1292,8 +1421,19 @@ export class JjPlatform implements PlatformAdapter {
     const journals = this.advanceJournals()
     if (!wf || !d?.records || !journals) return
     const keys = new Set((await journals.all()).filter((j) => !j.settled || j.settled === 'stopped' || j.settled === 'uncertain').map((j) => j.plan.card.toLowerCase()))
-    const cards = wf.store.cards().filter((c) => keys.has(c.key.toLowerCase()) || advanceUnresolved(wf.state(c)))
-    if (!cards.length) return
+    const active = wf.store.cards()
+    const cards = active.filter((c) => keys.has(c.key.toLowerCase()) || advanceUnresolved(wf.state(c)))
+    // HI-3367: and journals of cards that aren't active (archived, or gone), which no card's settling reaches.
+    const own = new Set(active.map((c) => c.key.toLowerCase()))
+    let named = new Set<string>()
+    try {
+      named = await journals.cardsNamed()
+    } catch (e) {
+      // Unlistable: no stray is retired this pass (what the folder holds is unknown).
+      checksLog.warn('listing the advance journals', e) // i18n-ignore: a log line, English
+    }
+    const strays = [...named].filter((k) => !own.has(k.toLowerCase()))
+    if (!cards.length && !strays.length) return
     const integ = await d.integration()
     if (!integ) {
       // jj unreadable now: nothing classified, but an unsettled attempt keeps a question (its journal read only for its words).
@@ -1301,6 +1441,7 @@ export class JjPlatform implements PlatformAdapter {
       return
     }
     for (const c of cards) await this.withCardLock(c.id, () => underLock(integ.view.store, integ.lock, (h) => this.settleAdvances(h, integ, journals, c, host)))
+    for (const k of strays) await this.retireStray(integ, journals, k, host)
   }
 
   /** Whether a target's head is still `expected` (J5's read): false when it moved or can't be read. */
@@ -1452,7 +1593,7 @@ export class JjPlatform implements PlatformAdapter {
           valid,
           // HI-3284: the guards this run checks are those its key was made with (a change since makes it invalid).
           // HI-3284 (HR2's round 1, finding 3): its worker ends with the workspace (the checks' signal).
-          ...(guards.length ? { guards: async (expected: string, result: string) => ({ ...(await checkMergeGuards(guards, () => this.addedDiff(expected, result), { ...(host.guardLimits?.() ?? { timeoutMs: 10_000, maxLines: 200_000 }), ...(host.signal ? { signal: host.signal } : {}) })), key: guardsKey(guards) }) } : {}),
+          ...(guards.length ? { guards: async (expected: string, result: string) => ({ ...(await checkMergeGuards(guards, () => this.addedDiff(expected, result), { ...(host.guardLimits?.() ?? GUARD_CHECK_DEFAULTS), ...(host.signal ? { signal: host.signal } : {}) })), key: guardsKey(guards) }) } : {}),
           checkRan: async (c) => {
             const data: FactData['CheckRan'] = { name: c.name, command: c.command, revision: c.revision, tested: c.tested, result: c.ok ? 'passed' : 'failed', run: c.run || randomUUID(), durationMs: c.durationMs, by: CW_RUNS, counted: c.counted, ...(c.whyNot ? { whyNot: c.whyNot } : {}), entry: jjCandidateEntry(offer.attempt), ...(c.guardsKey !== undefined ? { guardsKey: c.guardsKey, base: c.base } : {}) }
             await wf.write(wf.store.card(card0.id), null, 'combwork', (w) => void w.fact('CheckRan', data))

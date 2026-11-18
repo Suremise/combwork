@@ -139,6 +139,14 @@ export const QUEUE_NETWORK_CODES = 'cw.queue.networkCodes'
 
 /** The longest the merge queue's signed merge commit takes before its signer is ended (#1350): read by main's queueHost. */
 export const QUEUE_SIGN_SECONDS = 'cw.queue.signSeconds'
+/** HI-3372: the last resort for a Commit or Set aside of a folder's changes (the user can cancel it from the window). */
+export const GIT_COMMIT_MINUTES = 'cw.git.commitMinutes'
+/** HI-3372: the last resort for the user's Fetch, Pull and Push (cancellable from the window). */
+export const GIT_NETWORK_MINUTES = 'cw.git.networkMinutes'
+/** HI-3372: the merge queue's own fetches and pushes. */
+export const QUEUE_NETWORK_MINUTES = 'cw.queue.networkMinutes'
+/** HI-3372: one jj command's bound (its `--version` keeps its own). */
+export const JJ_COMMAND_SECONDS = 'cw.jj.commandSeconds'
 /** HI-3284: the longest the merge guards' matching runs before the check ends incomplete (never a pass). */
 export const MERGE_GUARDS_SECONDS = 'cw.mergeGuards.seconds'
 /** HI-3284: the most lines a merge may add for its guards to check them (past it, incomplete, never a pass). */
@@ -147,6 +155,8 @@ export const MERGE_GUARDS_LINES = 'cw.mergeGuards.maxLines'
 export const QUEUE_FOCUSED_JOBS = 'cw.queue.focusedJobs'
 /** G20 (HI-1367): the longest a project's focused-tests picker runs, at a submit or at the merge. */
 export const FOCUSED_PICK_SECONDS = 'cw.focused.pickSeconds'
+/** Its default, and the bound where the setting can't be read (HI-3377: the code's own 60 s was shorter than the setting's). */
+export const FOCUSED_PICK_DEFAULT_S = 180
 
 /** Whether the merge queue asks before updating a target checked out in a folder (#1351, OP-40): read by main's queueHost. */
 export const QUEUE_CHECKED_OUT_TARGET = 'cw.queue.checkedOutTarget'
@@ -487,6 +497,18 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
+    id: 'cw.db.busySeconds',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.db.busySeconds.title', defaultMessage: "Databases: wait for another program's lock", description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"15 s\")." }),
+    desc: msg({ id: 'settings.advanced.cw.db.busySeconds.desc', defaultMessage: "How long a write to the board, the Assistant's journal or the usage history waits while another program (another Combwork on this workspace, a script) holds its database's lock, before the write is refused. It bounds a wait, not a speed: a write to the board waits on Combwork's main thread, so the window doesn't respond while it waits. Takes effect after Combwork restarts.", description: 'What the advanced setting "Databases: wait for another program\'s lock" does (Settings → Advanced, HI-3374). The window not responding while it waits is a real warning: keep it.' }),
+    kind: 'number',
+    default: 15,
+    min: 1,
+    max: 120,
+    unit: 's',
+    applies: 'restart'
+  },
+  {
     id: 'cw.recorder.minutes',
     group: 'cw',
     title: msg({ id: 'settings.advanced.cw.recorder.minutes.title', defaultMessage: 'Flight recorder: one capture per trigger and agent every', description: "An advanced setting's title (Settings → Advanced), followed by its value in minutes (\"10 min\")." }),
@@ -556,11 +578,11 @@ const SOURCES: readonly AdvancedSource[] = [
     id: 'cw.progress.replySeconds',
     group: 'cw',
     title: msg({ id: 'settings.advanced.cw.progress.replySeconds.title', defaultMessage: "cw-progress: Combwork's reply time", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. cw-progress is the command agents run long commands and checks through: keep it as it is." }),
-    desc: msg({ id: 'settings.advanced.cw.progress.replySeconds.desc', defaultMessage: "How long cw-progress waits for Combwork to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks once more, then runs nothing and says Combwork is slow. Raise it when a busy Combwork makes checks fail with \"Combwork is slow to answer\" (HI-1892). Kept at 2 minutes at most.", description: "What the advanced setting \"cw-progress: Combwork's reply time\" is for, and what goes wrong when it is wrong (Settings → Advanced)." }),
+    desc: msg({ id: 'settings.advanced.cw.progress.replySeconds.desc', defaultMessage: "How long cw-progress waits for Combwork to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks again (after 5 s, then 15 s), then runs nothing and says Combwork is slow. Raise it when a busy Combwork makes checks fail with \"Combwork is slow to answer\" (HI-1892). Kept at 10 minutes at most.", description: "What the advanced setting \"cw-progress: Combwork's reply time\" is for, and what goes wrong when it is wrong (Settings → Advanced)." }),
     kind: 'number',
-    default: 15,
+    default: 60,
     min: 1,
-    max: 120,
+    max: 600,
     unit: 's',
     applies: 'sessions'
   },
@@ -592,7 +614,7 @@ const SOURCES: readonly AdvancedSource[] = [
     id: 'cw.mcpCatalog.downloadSeconds',
     group: 'cw',
     title: msg({ id: 'settings.advanced.cw.mcpCatalog.downloadSeconds.title', defaultMessage: 'MCP catalogues: downloading a server', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (HI-545)." }),
-    desc: msg({ id: 'settings.advanced.cw.mcpCatalog.downloadSeconds.desc', defaultMessage: "How long Install and Update wait for a catalogue server's zip, redirects included, before they stop with nothing installed. Raise it on a slow connection.", description: 'What the advanced setting "MCP catalogues: downloading a server" is for (Settings → Advanced, HI-545).' }),
+    desc: msg({ id: 'settings.advanced.cw.mcpCatalog.downloadSeconds.desc', defaultMessage: "How long Install and Update wait with nothing arriving while they download a catalogue server's zip, before they stop with nothing installed. A slow download that keeps arriving is never stopped; Cancel download stops one. Raise it on a connection that pauses for long.", description: 'What the advanced setting "MCP catalogues: downloading a server" is for (Settings → Advanced, HI-545). HI-3377: the time with no data arriving, not the whole download’s time.' }),
     kind: 'number',
     default: 60,
     min: 10,
@@ -656,7 +678,7 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.cw.hooks.missingSeconds.title', defaultMessage: 'Hooks missing: wait', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Hooks: the calls an agent's coding agent makes to Combwork as it works." }),
     desc: msg({ id: 'settings.advanced.cw.hooks.missingSeconds.desc', defaultMessage: "How long an agent's CLI may go without a hook, from its start (a CLI that sends one then) or from a prompt it went to work on, before Combwork says its hooks aren't arriving and shows its status as unknown (#1336). A long think after a prompt's hook never counts. Raise it if a slow machine shows that notice for agents that are fine.", description: 'What the advanced setting "Hooks missing: wait" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
-    default: 60,
+    default: 180,
     min: 1,
     max: 600,
     unit: 's',
@@ -668,9 +690,21 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.cw.lostLine.steadySeconds.title', defaultMessage: 'Lost line: wait', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A line: a message Combwork typed into an agent's terminal." }),
     desc: msg({ id: 'settings.advanced.cw.lostLine.steadySeconds.desc', defaultMessage: "A line Combwork typed into an agent that its CLI didn't take, gone from its input since (a screen of the CLI's took it): how long its input must stay empty, at its prompt, with nothing taken, before Combwork types it again or, with nothing to type again, tells you. Raise it if a slow machine has a line typed twice.", description: 'What the advanced setting "Lost line: wait" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1959).' }),
     kind: 'number',
-    default: 2,
+    default: 5,
     min: 1,
     max: 30,
+    unit: 's',
+    applies: 'now'
+  },
+  {
+    id: 'cw.typed.takeSeconds',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.typed.takeSeconds.title', defaultMessage: 'Typed line: wait to be taken', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A line: a message Combwork typed into an agent's terminal; taken: the agent's CLI started working on it." }),
+    desc: msg({ id: 'settings.advanced.cw.typed.takeSeconds.desc', defaultMessage: "How long an agent's CLI has to take a line Combwork typed into it (start working on it) before Combwork presses Enter again, once, as soon as that is safe (within six times this). Not taken in this time again, Combwork tells you the line may be waiting in its prompt and types nothing more into that agent until it is taken. Raise it if a slow or busy machine shows that notice for lines that were taken.", description: 'What the advanced setting "Typed line: wait to be taken" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-3373).' }),
+    kind: 'number',
+    default: 30,
+    min: 5,
+    max: 300,
     unit: 's',
     applies: 'now'
   },
@@ -935,7 +969,7 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.cw.focused.pickSeconds.title', defaultMessage: 'Focused tests: longest the choice of tests runs', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds: how long the project's command that chooses a card's focused tests may run, when the card is submitted and at its merge." }),
     desc: msg({ id: 'settings.advanced.cw.focused.pickSeconds.desc', defaultMessage: 'How long the project’s command that chooses a card’s focused tests may run, when it is submitted and at its merge. Past it, the command is ended and no tests count as chosen: the builder then names them itself.', description: 'What the advanced setting "Focused tests: longest the choice of tests runs" does (Settings → Advanced).' }),
     kind: 'number',
-    default: 180,
+    default: FOCUSED_PICK_DEFAULT_S,
     min: 10,
     max: 1800,
     unit: 's',
@@ -962,6 +996,56 @@ const SOURCES: readonly AdvancedSource[] = [
       { from: `${FIX}/advanced/network-node-24.19.0-econnrefused.txt`, version: '24.19.0', text: 'Error: connect ECONNREFUSED' } // i18n-ignore: Node's recorded output (#367)
     ]
   },
+  // HI-3372: the user's own git work and Combwork's network steps, bounded only as a last resort (a commit or a fetch, pull
+  // or push can be cancelled from the window), and jj's commands, whose first snapshot of a large working copy passed a minute.
+  {
+    id: GIT_COMMIT_MINUTES,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.git.commitMinutes.title', defaultMessage: 'Git: longest a commit or set aside takes', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes. Commit and Set aside are the buttons that commit or stash a folder's uncommitted changes (HI-3372)." }),
+    desc: msg({ id: 'settings.advanced.cw.git.commitMinutes.desc', defaultMessage: "How long Commit and Set aside of a folder's changes may run, the repository's pre-commit hook, filters and signer included, before Combwork ends git as stuck. You can cancel one from the window at any time: this is a last resort for one nobody is watching. Raise it if a hook really runs longer.", description: 'What the advanced setting "Git: longest a commit or set aside takes" does, and when to change it (Settings → Advanced, HI-3372).' }),
+    kind: 'number',
+    default: 30,
+    min: 1,
+    max: 240,
+    unit: 'min',
+    applies: 'now'
+  },
+  {
+    id: GIT_NETWORK_MINUTES,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.git.networkMinutes.title', defaultMessage: 'Git: longest a fetch, pull or push takes', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes: the Fetch, Pull and Push actions in Version Control (HI-3372)." }),
+    desc: msg({ id: 'settings.advanced.cw.git.networkMinutes.desc', defaultMessage: 'How long Fetch, Pull and Push in Version Control (and Push to…, pushing a tag, deleting remote branches) may run, a sign-in window included, before Combwork ends git as stuck. You can cancel one from the window at any time; raise it for a large first fetch or push on a slow connection.', description: 'What the advanced setting "Git: longest a fetch, pull or push takes" does, and when to change it (Settings → Advanced, HI-3372). Push to… is an action\'s name.' }),
+    kind: 'number',
+    default: 30,
+    min: 1,
+    max: 240,
+    unit: 'min',
+    applies: 'now'
+  },
+  {
+    id: QUEUE_NETWORK_MINUTES,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.queue.networkMinutes.title', defaultMessage: 'Merge queue: longest a fetch or push takes', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes: the merge queue's own fetches and pushes (HI-3372)." }),
+    desc: msg({ id: 'settings.advanced.cw.queue.networkMinutes.desc', defaultMessage: "How long the merge queue's own fetches and pushes may take: pushing a merged target, a target that follows its remote (its fetch and push), reading the remote's head as a card starts, and Bring up to date. Past it git is ended and the merge waits or pauses. Raise it for a slow connection or a large repository.", description: 'What the advanced setting "Merge queue: longest a fetch or push takes" does, and when to change it (Settings → Advanced, HI-3372). Bring up to date is an action\'s name.' }),
+    kind: 'number',
+    default: 30,
+    min: 1,
+    max: 240,
+    unit: 'min',
+    applies: 'now'
+  },
+  {
+    id: JJ_COMMAND_SECONDS,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.jj.commandSeconds.title', defaultMessage: 'jj: longest a command takes', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds. jj is the Jujutsu version control tool: keep its name (HI-3372)." }),
+    desc: msg({ id: 'settings.advanced.cw.jj.commandSeconds.desc', defaultMessage: "How long one jj command Combwork runs may take, a snapshot of a large working copy included, before Combwork ends it: a read then counts as unknown, and a change made during a merge is left for you to settle. Raise it for a very large repository or a slow disk.", description: 'What the advanced setting "jj: longest a command takes" does, and when to change it (Settings → Advanced, HI-3372). jj is the Jujutsu version control tool.' }),
+    kind: 'number',
+    default: 300,
+    min: 30,
+    max: 3600,
+    unit: 's',
+    applies: 'now'
+  },
   // How long the merge queue's own commit may take when the repository signs its commits (#1350, SPEC §16.9.1 step 4):
   // past it, the signer is taken to be waiting for a passphrase, ended, and the queue pauses.
   {
@@ -974,23 +1058,26 @@ const SOURCES: readonly AdvancedSource[] = [
       description: 'What the advanced setting "Merge queue: longest a signed merge commit takes" does, and what goes wrong when it is wrong (Settings → Advanced). “signing waits for you” is how the queue’s pause reads.'
     }),
     kind: 'number',
-    default: 60,
+    // HI-3372: it bounds the repository's commit hooks too, which 60 s cut short.
+    default: 300,
     min: 5,
     max: 3600,
     unit: 's',
     applies: 'now'
   },
   // Merge guards (HI-3284): the matching's time limit and the lines a merge may add, past which the check ends incomplete,
-  // which refuses the merge like a match (never a pass on what was checked so far).
+  // which refuses the merge (never a pass on what was checked so far). HI-3377: the time limit runs from the worker's
+  // ready, and running past it is "not checked" (the same revision may go back), never a match; 60 s, as
+  // GUARD_CHECK_DEFAULTS.
   {
     id: MERGE_GUARDS_SECONDS,
     group: 'cw',
     title: msg({ id: 'settings.advanced.cw.mergeGuards.seconds.title', defaultMessage: 'Merge guards: longest the check takes', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds. Merge guards are patterns Combwork refuses in the lines a merge adds (HI-3284)." }),
-    desc: msg({ id: 'settings.advanced.cw.mergeGuards.seconds.desc', defaultMessage: 'How long matching the merge guards against a merge’s added lines may take. Past it the check ends unfinished, which sends the card back like a match, naming the guard that was running. Raise it for very large merges; a pattern that takes this long usually needs rewriting.', description: 'What the advanced setting "Merge guards: longest the check takes" does, and what goes wrong when it is wrong (Settings → Advanced, HI-3284).' }),
+    desc: msg({ id: 'settings.advanced.cw.mergeGuards.seconds.desc', defaultMessage: 'How long matching the merge guards against a merge’s added lines may take, once their check has started. Past it the merge isn’t checked: nothing merges, and the card comes back to be submitted again unchanged, naming the guard that was running (not as a match). Raise it for very large merges; a pattern that takes this long usually needs rewriting.', description: 'What the advanced setting "Merge guards: longest the check takes" does, and what goes wrong when it is wrong (Settings → Advanced, HI-3284, HI-3377).' }),
     kind: 'number',
-    default: 10,
+    default: 60,
     min: 1,
-    max: 300,
+    max: 1800,
     unit: 's',
     applies: 'now'
   },
@@ -1232,7 +1319,8 @@ const SOURCES: readonly AdvancedSource[] = [
       description: 'What the advanced setting "No version control: longest read of the project" does (Settings → Advanced, under Combwork).'
     }),
     kind: 'number',
-    default: 120,
+    // HI-3377: a read grows with the project, so 120 s stopped large projects' reads on a busy machine.
+    default: 600,
     min: 10,
     max: 3600,
     unit: 's',

@@ -317,7 +317,9 @@ describe("agy's hooks through sessions (s56)", () => {
         await drain(st)
         expect(l.idleGrace, JSON.stringify(reports)).toBeUndefined()
         // A fresh idle period just before the old one would have ended: it gets its full grace.
-        await vi.advanceTimersByTimeAsync(2900)
+        // The grace is Settings → Advanced's (antigravity.statusLine.idleGraceSeconds; HI-3373: 10 s by default).
+        const grace = advanced.number('antigravity.statusLine.idleGraceSeconds') * 1000
+        await vi.advanceTimersByTimeAsync(grace - 100)
         await report(st, IDLE)
         await drain(st)
         await vi.advanceTimersByTimeAsync(101)
@@ -328,7 +330,7 @@ describe("agy's hooks through sessions (s56)", () => {
         await hook(other.st, 'PreInvocation', zero(MAIN, 1))
         expect(((await hook(other.st, 'PreToolUse', edit)) as Record<string, unknown> | null)?.decision).toBe('deny')
         // Its own grace, once it has run its full time: interrupted.
-        await vi.advanceTimersByTimeAsync(3000)
+        await vi.advanceTimersByTimeAsync(grace)
         await drain(st)
         expect(st.status, JSON.stringify(reports)).toBe('ready')
       }
@@ -399,7 +401,8 @@ describe("agy's hooks through sessions (s56)", () => {
       const settle = () => run(async () => {
         for (let i = 0; i < 5; i++) await Promise.resolve()
       })
-      const grace = 3000
+      // Settings → Advanced's (antigravity.statusLine.idleGraceSeconds; HI-3373: 10 s by default).
+      const grace = advanced.number('antigravity.statusLine.idleGraceSeconds') * 1000
       // Idle, nothing else: interrupted once, its claims gone.
       const a = agent(MAIN, { [MAIN]: fixture('run-tools-continue-1.5.0.jsonl') })
       await hook(a.st, 'PreInvocation', zero(MAIN, 1))

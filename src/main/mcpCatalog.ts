@@ -5,12 +5,13 @@
  * used only if its size and sha256 match its catalogue. Install is #550's Add (added nowhere, HI-2059); Update keeps
  * the places it is added only while they are the ones the user was shown (HI-545/s17).
  */
+import { app } from 'electron'
 import { createHash, randomUUID } from 'crypto'
 import { execFile } from 'child_process'
 import { fileURLToPath } from 'url'
 import { join } from 'path'
-import { existsSync } from 'original-fs'
-import { readFile, stat } from 'original-fs/promises'
+import { createReadStream, existsSync } from 'original-fs'
+import { stat } from 'original-fs/promises'
 import { msg } from '../shared/i18n/msg'
 import { tr } from '../shared/i18n'
 import { OUR_CATALOG_URL, catalogRowShown, isOurCatalogUrl, sameCatalogSource, catalogUrlAllowed, checkRequirements, compareVersions, editionOf, readCatalog, type PcFacts, type ReadCatalog } from '../shared/mcpCatalog'
@@ -54,6 +55,7 @@ const M = {
   redirects: msg({ id: 'mcp.catalog.redirects', defaultMessage: 'Too many redirects downloading {url}.', description: 'An error downloading from an MCP catalogue (HI-545): more than 5 redirects. {url} is the address asked for.' }),
   tooLarge: msg({ id: 'mcp.catalog.tooLarge', defaultMessage: '{url} is larger than its catalogue says ({max, number} bytes at most): not used.', description: 'An error downloading from an MCP catalogue (HI-545): the download went past the size its catalogue gives, or the limit. {url} is the address.' }),
   http: msg({ id: 'mcp.catalog.http', defaultMessage: '{url} answered {status}.', description: 'An error downloading from an MCP catalogue (HI-545): the server answered with an HTTP error {status} (a number such as 404).' }),
+  stalled: msg({ id: 'mcp.catalog.stalled', defaultMessage: '{url} stopped sending (nothing received for {seconds, number} s).', description: 'An error downloading a server from an MCP catalogue (HI-545, HI-3377): no data arrived for the time Settings → Advanced allows; a slow download that keeps receiving is never stopped.' }),
   timeout: msg({ id: 'mcp.catalog.timeout', defaultMessage: '{url} took too long (over {seconds, number} s).', description: 'An error downloading from an MCP catalogue (HI-545): no complete answer within the time limit (Settings → Advanced).' }),
   mismatch: msg({ id: 'mcp.catalog.mismatch', defaultMessage: "{name}'s download doesn't match its catalogue (its size or checksum differ): not installed.", description: 'An error installing a server from an MCP catalogue (HI-545): the zip downloaded is not the one the catalogue describes, so Combwork used none of it. {name} is the server.' }),
   folder: msg({ id: 'mcp.catalog.folder', defaultMessage: "{name}'s zip doesn't hold a folder named {name}: not installed.", description: 'An error installing a server from an MCP catalogue (HI-545): the zip is not laid out as catalogues require (one top folder named after the server).' }),
@@ -123,66 +125,122 @@ type Policy = 'https' | 'file'
 const policyOf = (sourceUrl: string): Policy => (/^file:/i.test(sourceUrl) ? 'file' : 'https')
 
 /** For tests: what fetch and the PC probes are. */
-export const testHooks: { fetch?: typeof fetch; probe?: (cmd: string, args: string[]) => Promise<string>; facts?: PcFacts; stat?: (path: string) => Promise<{ size: number }> } = {}
+export const testHooks: { fetch?: typeof fetch; probe?: (cmd: string, args: string[]) => Promise<string>; facts?: PcFacts; stat?: (path: string) => Promise<{ size: number }>; read?: (path: string, signal: AbortSignal) => AsyncIterable<Uint8Array> } = {}
+
+/** A file's bytes as they are read, ended by `signal` (its stream destroyed: no read goes on after). */
+function readChunks(path: string, signal: AbortSignal): AsyncIterable<Uint8Array> {
+  return createReadStream(path, { signal })
+}
 
 /**
  * Bytes from `url` within one budget: `ms` for the whole download, every redirect included, and `max` bytes, counted
  * as they come. Each hop's address must be allowed by the policy (https; a file:// one only for a file:// source).
- * `etag`: a 304 answers null (the cache is up to date). `signal` ends it early (the workspace closed).
+ * `etag`: a 304 answers null (the cache is up to date). `signal` ends it early (the workspace closed, the user's Cancel).
+ * `idle` (HI-3377, a server's zip): `ms` is instead the longest it goes without receiving bytes, so a slow connection that
+ * is progressing finishes. Its clock starts before the first request and only bytes received start it again: a redirect
+ * or headers alone never do. Its timer ends with the download, whatever ends it.
  */
-export async function download(url: string, policy: Policy, max: number, ms: number, signal?: AbortSignal, etag?: string): Promise<{ bytes: Buffer; etag?: string } | null> {
-  const timeout = AbortSignal.timeout(ms)
-  const stop = signal ? AbortSignal.any([signal, timeout]) : timeout
-  const timedOut = (): Error => combworkError(M.timeout, { url, seconds: Math.round(ms / 1000) })
-  if (/^file:/i.test(url)) {
-    if (policy !== 'file') throw combworkError(M.scheme, { url })
-    // The same budget and the same end as a download: a share that stalls, or a workspace closed, stops it.
-    const ended = (): Error => (timeout.aborted ? timedOut() : (signal?.reason instanceof Error ? signal.reason : new Error('aborted'))) // i18n-ignore: an abort's cause, for the log
-    if (stop.aborted) throw ended()
-    const path = fileURLToPath(url)
-    const size = await Promise.race([(testHooks.stat ?? stat)(path).then((s) => s.size), new Promise<never>((_, reject) => stop.addEventListener('abort', () => reject(ended()), { once: true }))])
-    if (size > max) throw combworkError(M.tooLarge, { url, max })
-    const bytes = await readFile(path, { signal: stop }).catch((e) => {
-      throw stop.aborted ? ended() : e
-    })
-    if (bytes.length > max) throw combworkError(M.tooLarge, { url, max })
-    return { bytes }
+export async function download(url: string, policy: Policy, max: number, ms: number, signal?: AbortSignal, etag?: string, opts: { idle?: boolean } = {}): Promise<{ bytes: Buffer; etag?: string } | null> {
+  const idle = opts.idle ? new AbortController() : null
+  let idleTimer: ReturnType<typeof setTimeout> | undefined
+  const arm = (): void => {
+    if (!idle) return
+    clearTimeout(idleTimer)
+    idleTimer = setTimeout(() => idle.abort(), ms)
   }
-  let at = url
-  for (let hop = 0; ; hop++) {
-    if (!/^https:\/\//i.test(at)) throw combworkError(M.scheme, { url: at })
-    if (hop > MAX_REDIRECTS) throw combworkError(M.redirects, { url })
-    let res: Response
-    try {
-      res = await (testHooks.fetch ?? fetch)(at, { redirect: 'manual', signal: stop, headers: etag && hop === 0 ? { 'If-None-Match': etag } : {} })
-    } catch (e) {
-      if (timeout.aborted) throw timedOut()
-      throw e
-    }
-    if (res.status >= 300 && res.status < 400 && res.status !== 304) {
-      const next = res.headers.get('location')
-      await res.body?.cancel().catch(() => undefined)
-      if (!next) throw combworkError(M.http, { url: at, status: res.status })
-      at = new URL(next, at).href
-      continue
-    }
-    if (res.status === 304) return null
-    if (!res.ok) throw combworkError(M.http, { url: at, status: res.status })
-    const declared = Number(res.headers.get('content-length') ?? 0)
-    if (declared > max) throw combworkError(M.tooLarge, { url, max })
-    const chunks: Buffer[] = []
-    let got = 0
-    try {
-      for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
-        got += chunk.length
-        if (got > max) throw combworkError(M.tooLarge, { url, max })
-        chunks.push(Buffer.from(chunk))
+  const timeout = idle ? idle.signal : AbortSignal.timeout(ms)
+  const stop = signal ? AbortSignal.any([signal, timeout]) : timeout
+  const timedOut = (): Error => combworkError(idle ? M.stalled : M.timeout, { url, seconds: Math.round(ms / 1000) })
+  arm()
+  try {
+    return await fetched()
+  } finally {
+    clearTimeout(idleTimer)
+  }
+
+  async function fetched(): Promise<{ bytes: Buffer; etag?: string } | null> {
+    if (/^file:/i.test(url)) {
+      if (policy !== 'file') throw combworkError(M.scheme, { url })
+      // The same budget and the same end as a download: a share that stalls, or a workspace closed, stops it.
+      const ended = (): Error => (timeout.aborted ? timedOut() : (signal?.reason instanceof Error ? signal.reason : new Error('aborted'))) // i18n-ignore: an abort's cause, for the log
+      if (stop.aborted) throw ended()
+      await testHold(stop)
+      if (stop.aborted) throw ended()
+      const path = fileURLToPath(url)
+      const size = await Promise.race([(testHooks.stat ?? stat)(path).then((s) => s.size), new Promise<never>((_, reject) => stop.addEventListener('abort', () => reject(ended()), { once: true }))])
+      if (size > max) throw combworkError(M.tooLarge, { url, max })
+      // Read as it comes (HI-3377): each chunk counted against `max` and, for a server's zip, starting the idle clock
+      // again, so a slow share that keeps reading finishes; the stream ends with the read, whatever ends it.
+      const chunks: Buffer[] = []
+      let got = 0
+      try {
+        for await (const chunk of (testHooks.read ?? readChunks)(path, stop)) {
+          arm()
+          got += chunk.length
+          if (got > max) throw combworkError(M.tooLarge, { url, max })
+          chunks.push(Buffer.from(chunk))
+        }
+      } catch (e) {
+        throw stop.aborted ? ended() : e
       }
-    } catch (e) {
-      if (timeout.aborted) throw timedOut()
-      throw e
+      return { bytes: Buffer.concat(chunks) }
     }
-    return { bytes: Buffer.concat(chunks), etag: res.headers.get('etag') ?? undefined }
+    let at = url
+    for (let hop = 0; ; hop++) {
+      if (!/^https:\/\//i.test(at)) throw combworkError(M.scheme, { url: at })
+      if (hop > MAX_REDIRECTS) throw combworkError(M.redirects, { url })
+      let res: Response
+      try {
+        res = await (testHooks.fetch ?? fetch)(at, { redirect: 'manual', signal: stop, headers: etag && hop === 0 ? { 'If-None-Match': etag } : {} })
+      } catch (e) {
+        if (timeout.aborted) throw timedOut()
+        throw e
+      }
+      if (res.status >= 300 && res.status < 400 && res.status !== 304) {
+        const next = res.headers.get('location')
+        await res.body?.cancel().catch(() => undefined)
+        if (!next) throw combworkError(M.http, { url: at, status: res.status })
+        at = new URL(next, at).href
+        continue
+      }
+      if (res.status === 304) return null
+      if (!res.ok) throw combworkError(M.http, { url: at, status: res.status })
+      const declared = Number(res.headers.get('content-length') ?? 0)
+      if (declared > max) throw combworkError(M.tooLarge, { url, max })
+      const chunks: Buffer[] = []
+      let got = 0
+      try {
+        for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
+          // Bytes received: the idle clock starts again (HI-3377).
+          arm()
+          got += chunk.length
+          if (got > max) throw combworkError(M.tooLarge, { url, max })
+          chunks.push(Buffer.from(chunk))
+        }
+      } catch (e) {
+        if (timeout.aborted) throw timedOut()
+        throw e
+      }
+      return { bytes: Buffer.concat(chunks), etag: res.headers.get('etag') ?? undefined }
+    }
+  }
+}
+
+/**
+ * The mcpcatalog e2e suite's hold (HI-3377), in unpackaged builds only: while the file CW_TEST_CATALOG_HOLD names exists, a
+ * file:// download waits (or until it is ended), so the suite can press Cancel download while one runs. Never in an
+ * installed Combwork.
+ */
+async function testHold(stop: AbortSignal): Promise<void> {
+  const file = process.env.CW_TEST_CATALOG_HOLD
+  if (!file || unpackaged() === false) return
+  while (existsSync(file) && !stop.aborted) await new Promise((r) => setTimeout(r, 100))
+}
+const unpackaged = (): boolean => {
+  try {
+    return !app.isPackaged
+  } catch {
+    return true
   }
 }
 
@@ -350,11 +408,40 @@ function listed(source: string, name: string): McpCatalogServer {
  * Downloads a catalogue server and checks it (its size and sha256 against the catalogue, its zip as #550 unpacks one,
  * one top folder named after it), for the Install or Update dialog to show what it would run. Refused before any
  * download when this PC doesn't meet a requirement Combwork checked. Bound to the workspace that asked: held until the user
- * answers, at most 10 minutes, a few at a time.
+ * answers, at most 10 minutes, a few at a time. `op` (HI-3377): the window's id for this one preparation, which its Cancel
+ * names (cancelCatalogPrepare): cancelled, it answers null once its download has ended, nothing held.
  */
-export async function prepareCatalogServer(source: string, name: string): Promise<McpCatalogPrepared> {
-  // The open that asked, before any await: a close, or a close and reopen of the same folder, ends what it started.
+export async function prepareCatalogServer(source: string, name: string): Promise<McpCatalogPrepared>
+export async function prepareCatalogServer(source: string, name: string, op: string | undefined): Promise<McpCatalogPrepared | null>
+export async function prepareCatalogServer(source: string, name: string, op?: string): Promise<McpCatalogPrepared | null> {
   const ws = currentWorkspace()
+  const ctl = new AbortController()
+  if (op) preparing.set(op, { ctl, ws })
+  try {
+    const p = await prepareFor(ws, source, name, ctl.signal)
+    return ctl.signal.aborted ? null : p
+  } catch (e) {
+    if (ctl.signal.aborted) return null
+    throw e
+  } finally {
+    if (op && preparing.get(op)?.ctl === ctl) preparing.delete(op)
+  }
+}
+
+/** HI-3377: the catalogue servers being prepared now, by the window's id for each: a Cancel ends only its own. */
+const preparing = new Map<string, { ctl: AbortController; ws: WorkspaceService }>()
+
+/**
+ * The user's Cancel of one preparation (`op`, as the window named it): its download ended. Only the workspace that started it
+ * can: another window's, or an id no longer preparing (a stale click), changes nothing.
+ */
+export function cancelCatalogPrepare(op: string): void {
+  const p = preparing.get(op)
+  if (p && p.ws === currentWorkspace()) p.ctl.abort()
+}
+
+async function prepareFor(ws: WorkspaceService, source: string, name: string, cancel: AbortSignal): Promise<McpCatalogPrepared | null> {
+  // The open that asked, before any await: a close, or a close and reopen of the same folder, ends what it started.
   const path = ws.path
   const life = ws.lifetime
   if (!path || life.aborted) throw combworkError(M.workspaceGone, { name })
@@ -363,20 +450,25 @@ export async function prepareCatalogServer(source: string, name: string): Promis
   const server = listed(source, name)
   const unmet = checksOf(server, await (facts ?? (facts = probeFacts()))).filter((c) => c.state === 'no')
   if (unmet.length) throw combworkError(M.needs, { name, needs: { list: unmet.map((c) => c.label), type: 'conjunction' } }, { kind: 'conflict' })
-  const got = await download(server.zip.url, policyOf(source), Math.min(server.zip.size, ZIP_MAX_BYTES), seconds(DOWNLOAD_SECONDS, 60) * 1000, life)
+  // HI-3377: the setting is the longest it goes without data, not the whole download's time; the user's Cancel ends it too.
+  const got = await download(server.zip.url, policyOf(source), Math.min(server.zip.size, ZIP_MAX_BYTES), seconds(DOWNLOAD_SECONDS, 60) * 1000, AbortSignal.any([life, cancel]), undefined, { idle: true })
+  if (cancel.aborted) return null
   if (life.aborted) throw combworkError(M.workspaceGone, { name })
   const bytes = got!.bytes
   if (bytes.length !== server.zip.size || createHash('sha256').update(bytes).digest('hex') !== server.zip.sha256) throw combworkError(M.mismatch, { name })
   const z = serverFromZip(bytes)
   if (z.folder !== name) throw combworkError(M.folder, { name })
   const def: McpServerDef = { ...retarget(z.def, z.folder, name), catalog: { source, name, version: server.version, sha256: server.zip.sha256 } }
-  // Installed from this entry already (under any name: an update's), and whether its own name is taken.
+  // Installed from this entry already (under any name: an update's), and whether its own name is taken: by a server, or
+  // by its folder alone (HI-3371: a zip's left without its definition, which the install's write refuses unless replaced).
   const { existing, nameTaken } = await inWorkspace(ws, async () => {
     const all = await listMcp(true)
     const m = all.find((x) => fromEntry(x.def, source, name))
-    return { existing: m ? { name: m.name, version: m.def!.catalog!.version, def: m.def, revision: m.revision, runs: m.runs, projects: m.projects, assistant: m.assistant } : null, nameTaken: all.some((x) => x.name === name) }
+    return { existing: m ? { name: m.name, version: m.def!.catalog!.version, def: m.def, revision: m.revision, runs: m.runs, projects: m.projects, assistant: m.assistant } : null, nameTaken: all.some((x) => x.name === name) || existsSync(join(ws.mcpDir, name)) }
   })
   if (life.aborted) throw combworkError(M.workspaceGone, { name })
+  // Cancelled meanwhile: nothing held.
+  if (cancel.aborted) return null
   // An update of one installed under another name: shown, and written, under that name's folder.
   const shown = existing && existing.name !== name ? retarget(def, name, existing.name) : def
   const prepared: McpCatalogPrepared = { id: randomUUID(), source, server, def: shown, runs: mcpRuns(shown), secretWarnings: findSecretWarnings(shown), files: z.files.size, existing, nameTaken }

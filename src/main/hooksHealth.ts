@@ -261,8 +261,17 @@ export interface HooksEvidence {
 export function hooksMissing(w: HooksWatch, ev: HooksEvidence, now: number, boundMs: number): 'start' | 'prompt' | 'transcript' | null {
   if (ev.startWaits) w.startFrom = now
   if (w.startHook && w.hooks === 0 && !ev.startWaits && now - w.startFrom >= boundMs) return 'start'
+  // Work seen on its screen for the prompt watched, noted before the transcript's turns are weighed (HI-3383).
+  if (w.submit && ev.screen === 'working') w.workAt ??= now
+  // HI-3383: the turn of the prompt Combwork watches, its screen seen working on it: the first turn the transcript shows
+  // begun since that submit (by the turn's own time, within the clocks' skew; HR1's round 1: never by when Combwork read
+  // it, which can be late for an older turn). The prompt's check names that one (its grace included), never the
+  // transcript first because it is weighed first. Any other turn, older or after it, is the transcript's to name, as is
+  // that one where its screen never showed it working.
+  const own = w.submit && w.workAt !== null ? ownTurn(w, w.submit.at) : null
   for (const [id, u] of w.unheard) {
     if (now - u.foundAt < boundMs) continue
+    if (id === own) continue
     w.flagged = id
     w.flaggedSeq = u.seq
     return 'transcript'
@@ -277,6 +286,13 @@ export function hooksMissing(w: HooksWatch, ev: HooksEvidence, now: number, boun
     return null
   }
   return w.workAt !== null && now - s.at >= boundMs && now - w.workAt >= grace ? 'prompt' : null
+}
+
+/** HI-3383: the unheard turn a prompt submitted at `at` began, if the transcript shows it: the first (in its order) begun since then. */
+function ownTurn(w: HooksWatch, at: number): string | null {
+  let best: { id: string; seq: number } | null = null
+  for (const [id, u] of w.unheard) if (u.at >= at - HOOKS_SKEW_MS && (!best || u.seq < best.seq)) best = { id, seq: u.seq }
+  return best?.id ?? null
 }
 
 const keyOf = (projectPath: string, agentId: string): string => `${projectPath.toLowerCase()}#${agentId}`

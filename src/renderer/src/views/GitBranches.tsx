@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { CopyView, ProjectInfo, SlotView } from '@shared/types'
 import { fmt, msg, tr } from '@shared/i18n'
 import {
@@ -23,6 +23,7 @@ import { samePath } from '@shared/movePaths'
 import { call } from '../api'
 import { offered, offeredCleanup, repoOp } from '../repoOps'
 import { attempt, releaseHeldSlot } from '../actions'
+import { cancelGitRun, cancelLabel, gitRun, startGitRun } from '../gitRuns'
 import { SLOT_HELD_TEXT } from '../components/SlotsAndCopies'
 import { bumpGit, cardLabelOf, choose, confirm, notify, prompt, set, showVersionControl, UNUSED_ROOT, useStore } from '../store'
 import { agentCard, branchCards, type BranchCard } from '@shared/branchCards'
@@ -50,6 +51,7 @@ import { GitSigning } from '../components/GitSigning'
 const ab = (c: React.ReactNode[]): React.ReactNode => <span data-git-ab="">{c}</span>
 
 const M = {
+  deletingOn: msg({ id: 'git.branches.deletingOn', defaultMessage: 'Deleting branches on {remote}…', description: "HI-3372: a notification while Clean up deletes the ticked branches on the remote {remote}, with a Cancel button." }),
   enterName: GIT_TEXT.enterName,
   cancel: GIT_TEXT.cancel,
   branchesLoad: msg({ id: 'git.branches.loadTarget', defaultMessage: 'the branches and remotes', description: 'What could not be read in Git → Branches & remotes: shown in "Could not load {what}: {error}" and "Could not refresh {what}; last updated …".' }),
@@ -243,6 +245,23 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
   }, [project.path, read.loading])
 
   const act = (name: string, title: string, fn: () => Promise<string>): void => void run(name, () => gitAction(project, title, fn))
+  // HI-3372: the network action running now, for the Cancel beside its button.
+  const [netOp, setNetOp] = useState<string | null>(null)
+  /** A Fetch, Pull or Push, cancellable beside its button while it runs (`op`: its run's id, for main). */
+  const netAct = (name: string, title: string, fn: (op: string) => Promise<string>): void =>
+    void run(name, async () => {
+      const done = await gitRun(project.path, title, fn, { onOp: setNetOp })
+      bumpGit(project.path)
+      if (done !== undefined) notify('success', done)
+      return done !== undefined
+    })
+  /** The Cancel beside `name`'s busy button while it runs. */
+  const cancelNet = (name: string): ReactNode =>
+    busy === name && netOp ? (
+      <button className="btn small subtle" data-action="cancel-git-run" onClick={() => cancelGitRun(netOp)}>
+        <Icon name="close" /> {cancelLabel()}
+      </button>
+    ) : null
 
   /** A branch, after a confirm that names the agents whose session runs in the folder (idle now: they find it on their next turn). */
   const switchTo = async (target: string, current: string | null): Promise<void> => {
@@ -282,7 +301,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
   }
 
   const pushNow = async (s: GitRepoSummary): Promise<void> => {
-    if (s.upstream?.remote && !s.upstream.gone) return act('push', tr(M.pushFailed, { branch: s.branch ?? '' }), () => repoOp('git:push', project.path))
+    if (s.upstream?.remote && !s.upstream.gone) return netAct('push', tr(M.pushFailed, { branch: s.branch ?? '' }), (op) => repoOp('git:push', project.path, undefined, op))
     let remote = s.remotes.includes('origin') ? 'origin' : s.remotes[0]
     const go = await choose({
       title: tr(M.pushTitle, { branch: s.branch ?? '' }),
@@ -293,7 +312,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
         { label: tr(M.push), value: 'push' }
       ]
     })
-    if (go === 'push') act('push', tr(M.pushFailed, { branch: s.branch ?? '' }), () => repoOp('git:push', project.path, remote))
+    if (go === 'push') netAct('push', tr(M.pushFailed, { branch: s.branch ?? '' }), (op) => repoOp('git:push', project.path, remote, op))
   }
 
   const renameRemote = async (name: string, remotes: string[]): Promise<void> => {
@@ -366,7 +385,13 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
           }
           for (const name of [...new Set(remote.map((r) => r.remote))]) {
             const mine = remote.filter((r) => r.remote === name)
-            notify('success', await repoOp('git:deleteRemoteBranches', project.path, name, mine.map(asked)))
+            // HI-3372: reaching the remote, cancellable from a notification while it runs (the dialog shows what came of it).
+            const going = startGitRun(project.path, tr(M.deletingOn, { remote: name }))
+            try {
+              notify('success', await repoOp('git:deleteRemoteBranches', project.path, name, mine.map(asked), going.op))
+            } finally {
+              going.end()
+            }
             for (const r of mine) done.add(`remote:${r.name}`)
           }
         } finally {
@@ -478,23 +503,25 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                   {fetched ? tr(M.fetchedAt, { when: fetched }) : tr(M.neverFetched)}
                   {offered('git:fetch') && (
                     <Tooltip content={tr(M.fetchTip)}>
-                      <button className="btn small subtle" disabled={off} aria-label={tr(M.fetch)} data-action="fetch" onClick={() => act('fetch', tr(M.fetchFailed), () => repoOp('git:fetch', project.path))}>
+                      <button className="btn small subtle" disabled={off} aria-label={tr(M.fetch)} data-action="fetch" onClick={() => netAct('fetch', tr(M.fetchFailed), (op) => repoOp('git:fetch', project.path, op))}>
                         <Icon name={busy === 'fetch' ? 'loading' : 'refresh'} spin={busy === 'fetch'} /> {tr(M.fetch)}
                       </button>
                     </Tooltip>
                   )}
+                  {cancelNet('fetch')}
                 </div>
               )}
               <div className="git-actions">
                 {offered('git:pull') && (
                   <Tooltip content={pullBlocked ?? tr(M.pullTip, { upstream: s.upstream?.name ?? '', branch: s.branch ?? '' })}>
                     <span>
-                      <BusyButton className="small" busy={busy === 'pull'} busyLabel={tr(M.pulling)} disabled={!!pullBlocked || off} onClick={() => act('pull', tr(M.pullFailed), () => repoOp('git:pull', project.path))}>
+                      <BusyButton className="small" busy={busy === 'pull'} busyLabel={tr(M.pulling)} disabled={!!pullBlocked || off} onClick={() => netAct('pull', tr(M.pullFailed), (op) => repoOp('git:pull', project.path, op))}>
                         <Icon name="repo-pull" /> {tr(M.pull)}
                       </BusyButton>
                     </span>
                   </Tooltip>
                 )}
+                {cancelNet('pull')}
                 {offered('git:push') && (
                   <Tooltip content={pushBlocked ?? (s.upstream?.remote && !s.upstream.gone ? tr(M.pushTo, { branch: s.branch ?? '', upstream: s.upstream.name }) : tr(M.pushTrack, { branch: s.branch ?? '' }))}>
                     <span>
@@ -504,6 +531,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                     </span>
                   </Tooltip>
                 )}
+                {cancelNet('push')}
                 {s.remotes.length > 0 && offered('git:pushTo') && (
                   <Tooltip content={ro ?? (!s.head ? tr(M.pushNoCommits) : tr(M.pushToTip, { branch: s.branch ?? '' }))}>
                     <span>
@@ -978,8 +1006,10 @@ function pushToForm(project: ProjectInfo, s: GitRepoSummary): FormSpec {
     confirm: tr(M.push),
     busyLabel: tr(M.pushing),
     validate: (v) => (v.remote ? null : tr(M.pushNoRemote)),
+    // HI-3372: cancellable from the dialog while it pushes.
+    cancellable: true,
     // The branch the form names, as it named it when opened: never whichever is checked out when Push runs.
-    submit: (v) => repoOp('git:pushTo', project.path, v.remote, v.scope === 'all' ? 'all' : 'branch', v.scope === 'all' ? undefined : (s.branch ?? undefined))
+    submit: (v, op) => repoOp('git:pushTo', project.path, v.remote, v.scope === 'all' ? 'all' : 'branch', v.scope === 'all' ? undefined : (s.branch ?? undefined), op)
   }
 }
 
@@ -1002,7 +1032,9 @@ function trackForm(project: ProjectInfo, info: GitRepoInfo, b: GitBranchRow): Fo
     busyLabel: tr(M.saving),
     validate: (v) => (!v.branch.trim() ? tr(M.enterName) : /\s/.test(v.branch.trim()) ? tr(M.branchNoSpaces) : null),
     note: (v) => (known(v) ? null : tr(M.trackPushFirst, { remote: v.remote, branch: v.branch.trim(), local: b.name })),
-    submit: (v) => repoOp('git:setUpstream', project.path, b.name, v.remote, v.branch.trim(), !known(v))
+    // HI-3372: its push first, when it pushes, cancellable from the dialog.
+    cancellable: true,
+    submit: (v, op) => repoOp('git:setUpstream', project.path, b.name, v.remote, v.branch.trim(), !known(v), op)
   }
 }
 

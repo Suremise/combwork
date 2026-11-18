@@ -54,6 +54,8 @@ export interface RunResult {
   notRun?: string
   /** Stopped at its `timeout` (RunOptions). */
   timedOut?: boolean
+  /** HI-3372: stopped by its `signal` (the user's Cancel) before it exited: its tree ended, never the tool's answer. */
+  cancelled?: boolean
 }
 
 /** A command's bounds and inputs. Unset, each is the platform runner's own default (Git: git()'s). */

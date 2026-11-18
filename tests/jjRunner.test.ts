@@ -10,6 +10,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { compareJjVersions, jjRunnable, jjSupported, jjToolOf, parseJjVersion, TESTED_JJ } from '../src/shared/jjTool'
 import { createJjRunner, JJ_NO_EDITOR, JJ_PREFIX, JJ_READ, jjOnPath, storeGatedHistory, storeGitGated, storeKeyOf, workspaceGateKeys } from '../src/main/platform/jjRunner'
 import { jjFileGate } from '../src/main/platform/jjFileGate'
+import { platformLimits } from '../src/main/platform/limits'
 import { runJj } from '../src/main/platform/jjProcess'
 import testedVcs from '../resources/tested-vcs.json'
 import { tempDir } from './tempDir'
@@ -186,6 +187,21 @@ describe("jj's runner", () => {
     const pid = join(tempDir('jj-runner-pid-'), 'pid')
     const res = await runner({ FAKE_JJ_MODE: 'hang', FAKE_JJ_PID: pid }).run(dir, ['log'], { timeout: 500 })
     expect(res).toMatchObject({ ok: false, code: -1, notRun: 'timedOut', timedOut: true })
+    expect(alive(Number(readFileSync(pid, 'utf8')))).toBe(false)
+  })
+
+  // HI-3372: with no time limit of its own, a command's is cw.jj.commandSeconds as main sets it (300 s by default).
+  it('a command given no time limit takes cw.jj.commandSeconds: past it, ended as timed out', async () => {
+    expect(platformLimits.jjCommandMs()).toBe(300_000)
+    const pid = join(tempDir('jj-runner-pid-'), 'pid')
+    const was = platformLimits.jjCommandMs
+    platformLimits.jjCommandMs = () => 500
+    try {
+      const res = await runner({ FAKE_JJ_MODE: 'hang', FAKE_JJ_PID: pid }).run(dir, ['log'])
+      expect(res).toMatchObject({ ok: false, code: -1, notRun: 'timedOut', timedOut: true })
+    } finally {
+      platformLimits.jjCommandMs = was
+    }
     expect(alive(Number(readFileSync(pid, 'utf8')))).toBe(false)
   })
 

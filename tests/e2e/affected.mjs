@@ -281,6 +281,10 @@ export const AREAS = [
   { paths: ['src/main/filesGit.ts', 'src/shared/gitIgnoreRules.ts', 'src/renderer/src/components/FilesGitMenu.ts', 'src/main/platform/gitRepoOps.ts', 'src/main/platform/repoOpsPorts.ts', 'src/main/repoOpsIpc.ts', 'src/renderer/src/repoOps.ts', 'src/renderer/src/repoOffers.ts'], suites: ['files', 'foldercommit'] },
   // HI-2944: Commit and Set aside of a target folder's changes, a start's warning of them, Files' Commit it.
   { paths: ['src/main/gitFolderChanges.ts', 'src/main/targetChangesNotice.ts', 'src/renderer/src/folderChanges.ts', 'src/renderer/src/components/FolderChangeButtons.tsx', 'tests/e2e/foldercommit.cjs'], suites: ['foldercommit', 'mergequeuefolder'] },
+  // HI-3372: the user's Cancel of a commit, set aside, fetch, pull or push: its owner and run ids, and the window's side.
+  { paths: ['src/main/gitCancel.ts', 'src/renderer/src/gitRuns.ts'], suites: ['foldercommit', 'gitremotes', 'gitview'] },
+  // HI-3372: the version-control ports' bounds, from Settings → Advanced.
+  { paths: ['src/main/limitsApp.ts', 'src/main/platform/limits.ts'], suites: ['advanced', 'gitremotes'] },
   { paths: ['src/main/attachmentsFolder.ts', 'src/shared/attachments.ts', 'src/renderer/src/attach.ts', 'src/renderer/src/components/AttachmentChips.tsx'], suites: ['image', 'files', 'assistantimages', 'storage', 'storageclose', 'dialogs', 'asarfiles', 'codex-extra'] },
   { paths: ['src/main/heldLine.ts', 'tests/e2e/idlequestion.cjs'], suites: ['idlequestion', 'wakeuntaken'] },
   // Codex's offer of a cheaper model (HI-2609): read on its screen, hidden per launch, and a model switch marked.
@@ -334,7 +338,7 @@ export const AREAS = [
   { paths: ['src/main/laneBriefs.ts', 'tests/e2e/lanebrief.cjs'], suites: ['lanebrief', 'slotrecovery'] },
   // The shared list's other user: the Assistant's "Done by the Assistant" (#312).
   { paths: ['src/renderer/src/components/ShowAllList.tsx'], suites: ['assistantpanel', 'assistantundo'] },
-  { paths: ['src/main/progressReporters/'], suites: ['progressreport', 'progressstates', 'packaged-progress'] },
+  { paths: ['src/main/progressReporters/', 'src/shared/checkReply.ts'], suites: ['progressreport', 'progressstates', 'packaged-progress'] },
   // Agents' signer (HI-2867): the launcher and cw-sign.js, built outside the asar (packaged-sign runs them as installed).
   { paths: ['src/main/platform/cw-sign.ts', 'src/main/platform/signerRules.ts', 'src/main/platform/signerPick.ts', 'resources/cw-sign/', 'scripts/buildSignLauncher.mjs'], suites: ['packaged-sign'] },
   { paths: ['src/main/projectAgents.ts'], suites: ['agents', 'agents-ui', 'agents24', 'reorder', 'pages', 'unmerged', 'removeall', 'mergeslot', 'placement', 'swap', 'repolock', 'maxagents'] },
@@ -395,6 +399,9 @@ export const AREAS = [
   { paths: ['tests/e2e/p5scenarios.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueChecks.ts', 'src/main/workflow/queueChecksApp.ts', 'src/shared/progressQueue.ts'], suites: ['p5scenarios'] },
   { paths: ['tests/e2e/queuelease.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/workflow/queueRunner.ts', 'src/main/workflow/queueJobs.ts', 'src/main/workflow/queueHost.ts'], suites: ['queuelease'] },
   { paths: ['tests/e2e/reviewcopies.cjs', 'src/main/reviewCopies.ts', 'src/main/copies.ts', 'src/main/copiesApp.ts'], suites: ['reviewcopies'] },
+  // HI-3374: the quiet check's claims (copies' folders renamed aside and back), and the retries' time bounds (saves, a busy index, jj's journal, OpenCode's mirror).
+  { paths: ['src/main/quietClaims.ts'], suites: ['reviewcopies', 'isolatedcheck'] },
+  { paths: ['src/main/retryBounds.ts'], suites: ['changes', 'gitview', 'setaside', 'jjadvance', 'opencode', 'isolatedcheck'] },
   { paths: ['tests/e2e/reviewcopiesreal.cjs'], suites: ['reviewcopiesreal'] },
   { paths: ['tests/e2e/followupsubmit.cjs'], suites: ['followupsubmit'] },
   { paths: ['tests/e2e/reviewerpool.cjs', 'src/main/reviewerPool.ts', 'src/shared/workflow/reviewerPool.ts', 'src/main/laneStart.ts', 'src/shared/laneBrief.ts', 'src/renderer/src/components/LaneStartDialog.tsx', 'src/main/loopReviewer.ts'], suites: ['reviewerpool'] },

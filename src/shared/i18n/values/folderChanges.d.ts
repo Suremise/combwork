@@ -4,10 +4,13 @@ interface CombworkMessageValues {
   'folderChanges.commitFailed': undefined
   'folderChanges.committed': { count: number; branch: string | number }
   'folderChanges.committedWarning': { count: number; branch: string | number }
+  'folderChanges.committing': { branch: string | number }
+  'folderChanges.committingIgnore': undefined
   'folderChanges.resumed': undefined
   'folderChanges.setAside': { count: number; branch: string | number }
   'folderChanges.setAsideDetail': { name: string | number }
   'folderChanges.setAsideFailed': undefined
   'folderChanges.setAsideWarning': { count: number; branch: string | number }
+  'folderChanges.settingAside': { branch: string | number }
   'folderChanges.stillPaused': undefined
 }

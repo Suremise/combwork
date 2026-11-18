@@ -56,6 +56,7 @@
   "shell.command.files.commitIgnore": "Zrób commit .gitignore",
   "shell.command.folderChanges.settle": "Zrób commit lub odłóż zmiany",
   "shell.command.folderChanges.show": "Pokaż zmiany bez commita",
+  "shell.command.git.cancelRun": "Anuluj czynność Git",
   "shell.command.help.about": "{app} – informacje",
   "shell.command.help.agentSetup": "Konfiguracja dostawców…",
   "shell.command.help.api": "Dokumentacja Agent API",

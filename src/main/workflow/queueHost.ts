@@ -46,7 +46,7 @@ import { defaultProbe, type ProcessProbe } from './queueProcs'
 import { workflowEnforced, workflowFor } from './service'
 import type { Workflow } from './runtime'
 import { openEntry, type FactData } from '../../shared/workflow/facts'
-import { FOCUSED_PICK_SECONDS, QUEUE_CHECKED_OUT_TARGET, QUEUE_FOCUSED_JOBS, QUEUE_SIGN_SECONDS } from '../../shared/advanced'
+import { FOCUSED_PICK_DEFAULT_S, FOCUSED_PICK_SECONDS, QUEUE_CHECKED_OUT_TARGET, QUEUE_FOCUSED_JOBS, QUEUE_SIGN_SECONDS } from '../../shared/advanced'
 import { childEnv } from '../ptyHost'
 import { pausedFor } from '../teamPause'
 import { queueTransportStore } from '../queueTransportStore'
@@ -340,7 +340,7 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
     // HI-1185: the signing check's signer, in the lease's job as the test merge's commands are.
     // HI-2947: as git starts it (the check quotes its words), its first word given. HI-3208: with no console of its own.
     spawn: (file, args, o) => runner.run('testMerge', file, args, { cwd: o.cwd, env: o.env, timeoutMs: o.timeoutMs, ...(o.input !== undefined ? { input: o.input } : {}), ...(o.argv0 !== undefined ? { argv0: o.argv0 } : {}), ...(o.verbatim ? { windowsVerbatimArguments: true } : {}), ...(o.noConsole ? { noConsole: true } : {}) }),
-    signTimeoutMs: Math.max(1, Number(advanced.get(QUEUE_SIGN_SECONDS)) || 60) * 1000,
+    signTimeoutMs: Math.max(1, Number(advanced.get(QUEUE_SIGN_SECONDS)) || 300) * 1000,
     // HI-3284: the merge guards' time limit and lines, as Settings → Advanced says at each check.
     guardLimits: () => guardLimits(),
     lock: (fn) => withRepoLock(h.projectPath, fn, { quiet: true, project: h.projectPath }),
@@ -359,7 +359,7 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
     // G20 (HI-1367): the pick at the result runs as a check does; its tests and results files in Combwork's own folder.
     focused: {
       env: () => childEnv(),
-      pickTimeoutMs: () => Math.max(10, Number(advanced.get(FOCUSED_PICK_SECONDS)) || 180) * 1000,
+      pickTimeoutMs: () => Math.max(10, Number(advanced.get(FOCUSED_PICK_SECONDS)) || FOCUSED_PICK_DEFAULT_S) * 1000,
       jobs: () => Math.max(1, Number(advanced.get(QUEUE_FOCUSED_JOBS)) || 2),
       dir: join(app.getPath('userData'), 'merge-queue', 'focused')
     },

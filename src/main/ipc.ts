@@ -154,6 +154,7 @@ import { jjOperationPreview, jjOperations } from './platform/jjOperations'
 import { checkRepoTools } from './platform/repoPorts'
 import { gitCantRead, slotWorkspaces } from './platform/workspacePorts'
 import { opsAt, refuseUnoffered, repoOpHandlers } from './repoOpsIpc'
+import { cancelGitRun, cancellableGit, cancelOwnerOf, withGitCancel, type CancelOwner } from './gitCancel'
 import { nextVersionPlan, previewFor, startNextVersion } from './workflow/nextVersion'
 import { checkOffer, dismissOffer, releaseOffers } from './workflow/releaseOffer'
 import { branchStartArg } from '../shared/nextVersion'
@@ -237,6 +238,14 @@ const advancedState = (): AdvancedState => advanced.state(workspace.path ? (work
 
 /** The window an IPC call came from, for calls that keep something per window (the developer console's subscription). */
 const senderStore = new AsyncLocalStorage<WebContents>()
+
+/** HI-3372: who may cancel a run started now: this window, this open of its workspace, the project (gitCancel.ts). */
+const cancelOwner = (projectPath: string): CancelOwner => cancelOwnerOf(senderStore.getStore(), currentWorkspace(), projectPath)
+
+/** A Commit or Set aside, Fetch, Pull or Push the user can cancel (`op`: the window's id for it). */
+const cancellableRun = <T>(p: string, op: unknown, fn: () => T | Promise<T>): Promise<T> => withGitCancel(op, cancelOwner(workspace.assertProject(p)), async (signal) => (signal ? cancellableGit(signal, async () => fn()) : fn()))
+const netRun = cancellableRun
+const actRun = cancellableRun
 
 /**
  * The Combwork window whose IPC request is being served now (HI-2355), or null outside one (a timer, a hook, the Agent API):
@@ -528,6 +537,17 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
   const impl: Impl = {
     // The repository mutations (HI-2788): each through the operations port, gated by its operation.
     ...repoOpHandlers,
+    // HI-3372: the user's network actions and Commit it, each under the window's id for it (`op`), which its Cancel names.
+    'git:fetch': (p, op) => netRun(p, op, () => repoOpHandlers['git:fetch'](p)),
+    'git:pull': (p, op) => netRun(p, op, () => repoOpHandlers['git:pull'](p)),
+    'git:push': (p, remote, op) => netRun(p, op, () => repoOpHandlers['git:push'](p, remote)),
+    'git:pushTo': (p, remote, scope, branch, op) => netRun(p, op, () => repoOpHandlers['git:pushTo'](p, remote, scope, branch)),
+    'git:setUpstream': (p, branch, remote, remoteBranch, pushFirst, op) => netRun(p, op, () => repoOpHandlers['git:setUpstream'](p, branch, remote, remoteBranch, pushFirst)),
+    'git:createTag': (p, name, message, pushTo, op) => netRun(p, op, () => repoOpHandlers['git:createTag'](p, name, message, pushTo)),
+    'git:deleteRemoteBranches': (p, remote, items, op) => netRun(p, op, () => repoOpHandlers['git:deleteRemoteBranches'](p, remote, items)),
+    'files:gitCommitIgnore': (p, op) => actRun(p, op, () => repoOpHandlers['files:gitCommitIgnore'](p)),
+    // The owner's Cancel of its run `op` (the project it recorded with it): another window's, workspace's or project's changes nothing.
+    'git:cancel': (op, p) => cancelGitRun(op, cancelOwner(String(p ?? ''))),
     'app:info': () => getAppInfo(),
     'app:planUsage': () => config.get().planUsage,
     'app:connectionPlanUsage': () => config.get().connectionPlanUsage ?? {},
@@ -1128,7 +1148,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
     'queue:resume': (p, target) => resumeQueue(workspace, workspace.assertProject(p), queueTarget(target)),
     // HI-2944: the port refuses it first where the project's version control doesn't offer it.
-    'queue:settleChanges': (p, target, action, shown, pause, folder) => settleQueueChanges(workspace, workspace.assertProject(p), queueTarget(target), action === 'setAside' ? 'setAside' : 'commit', shown, pauseRef(pause), typeof folder === 'string' && folder ? folder : null, opsAt('queue:settleChanges')),
+    'queue:settleChanges': (p, target, action, shown, pause, folder, op) => actRun(p, op, () => settleQueueChanges(workspace, workspace.assertProject(p), queueTarget(target), action === 'setAside' ? 'setAside' : 'commit', shown, pauseRef(pause), typeof folder === 'string' && folder ? folder : null, opsAt('queue:settleChanges'))),
     'queue:remove': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'removeFromQueue', typeof reason === 'string' ? reason : '')).card,
     'queue:retry': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'retryMerge', typeof reason === 'string' ? reason : '')).card,
     // HI-2959: Resolve on a builder, on a forward merge the queue returned: the card made for a builder.
@@ -1581,6 +1601,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       return r.canceled || !r.filePaths[0] ? null : r.filePaths[0]
     },
     'mcp:previewFile': (file) => mcp.previewMcpFile(file),
+    'mcp:nameTaken': (name, folder) => mcp.mcpNameTaken(String(name), folder === true),
     'mcp:addFromFile': async (file, name, replace, places) => {
       const m = await mcp.addMcpFromFile(file, name, replace, shownPlaces(places))
       emit({ type: 'skills-changed' })
@@ -1589,7 +1610,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
     'mcp:catalog': (opts) => mcpCatalog.catalogPages(opts && typeof opts === 'object' ? opts : {}),
     'mcp:catalogNoted': (url) => mcpCatalog.noteCatalogSource(String(url)),
-    'mcp:catalogPrepare': (source, name) => mcpCatalog.prepareCatalogServer(String(source), String(name)),
+    'mcp:catalogPrepare': (source, name, op) => mcpCatalog.prepareCatalogServer(String(source), String(name), typeof op === 'string' ? op : undefined),
+    'mcp:catalogCancel': (op) => mcpCatalog.cancelCatalogPrepare(String(op)),
     'mcp:catalogDrop': (id) => mcpCatalog.dropPrepared(String(id)),
     'mcp:catalogInstall': async (id, name, replace, places) => {
       await mcpCatalog.installCatalogServer(String(id), String(name), replace === true, shownPlaces(places))

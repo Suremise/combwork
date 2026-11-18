@@ -281,6 +281,51 @@ describe("a turn its transcript shows (#1371)", () => {
     expect(w.flagged).toBe('E')
   })
 
+  // HI-3383: the prompt Combwork watches, its turn shown by the transcript too. Its screen first seen working late (a
+  // loaded machine) used to leave both signs due at one look, and the transcript's, checked first, named it: the prompt's
+  // check decides a prompt it saw working; the transcript stays the sign where its screen never showed it working.
+  it('a prompt watched and seen working, its turn in the transcript found since: the prompt names it, never the transcript', () => {
+    const w = idWatch()
+    promptSent(w, 10_000, true)
+    transcriptTurns(w, [turn('E', 10_100)], 10_500, since)
+    const working = { ...quiet, screen: 'working' as const }
+    // Its screen first read working only once both bounds have passed: the prompt's grace still runs.
+    expect(hooksMissing(w, working, 10_500 + BOUND, BOUND)).toBeNull()
+    expect(hooksMissing(w, working, 10_500 + BOUND + Math.min(HOOKS_GRACE_MS, BOUND) - 1, BOUND)).toBeNull()
+    expect(hooksMissing(w, working, 10_500 + BOUND + Math.min(HOOKS_GRACE_MS, BOUND), BOUND)).toBe('prompt')
+    expect(w.flagged).toBeNull()
+  })
+
+  // HR1's round 1: which turn is the prompt's is told by the turn's own time, never by when Combwork read it.
+  it('an older turn read late, while a prompt is watched and seen working: the transcript names that turn, as before', () => {
+    const w = idWatch()
+    promptSent(w, 10_000, true)
+    const working = { ...quiet, screen: 'working' as const }
+    expect(hooksMissing(w, working, 10_200, BOUND)).toBeNull()
+    // Begun at 1.5 s (before the prompt), found only at 10.5 s.
+    transcriptTurns(w, [turn('OLD', 1_500)], 10_500, since)
+    expect(hooksMissing(w, working, 10_500 + BOUND, BOUND)).toBe('transcript')
+    expect(w.flagged).toBe('OLD')
+  })
+
+  it('two turns begun since the prompt: the first is the prompt’s, the next the transcript names', () => {
+    const w = idWatch()
+    promptSent(w, 10_000, true)
+    const working = { ...quiet, screen: 'working' as const }
+    expect(hooksMissing(w, working, 10_200, BOUND)).toBeNull()
+    transcriptTurns(w, [turn('MINE', 10_100), turn('NEXT', 10_400)], 10_500, since)
+    expect(hooksMissing(w, working, 10_500 + BOUND, BOUND)).toBe('transcript')
+    expect(w.flagged).toBe('NEXT')
+  })
+
+  it('a prompt watched whose screen never shows it working: its turn in the transcript names it', () => {
+    const w = idWatch()
+    promptSent(w, 10_000, true)
+    transcriptTurns(w, [turn('E', 10_100)], 10_500, since)
+    expect(hooksMissing(w, quiet, 10_500 + BOUND, BOUND)).toBe('transcript')
+    expect(w.flagged).toBe('E')
+  })
+
   it('its hook came first (a Stop before the transcript was written): never', () => {
     const w = idWatch()
     hookTurn(w, 5_000, 'E')

@@ -190,8 +190,8 @@ describe('trash (src/main/trash.ts)', () => {
     const fd = openSync(file, 'r')
     try {
       await expect(trash(folder)).rejects.toMatchObject({ code: 'EPERM' })
-      // The first try and five more, then no more.
-      expect(hooks.refused.filter((f) => f === folder)).toHaveLength(6)
+      // The first try and seven more (HI-3374: waits of 50 ms doubling to 3.2 s), then no more.
+      expect(hooks.refused.filter((f) => f === folder)).toHaveLength(8)
       expect(readFileSync(file, 'utf8')).toBe('a')
       expect(readdirSync(dir)).toEqual([])
     } finally {

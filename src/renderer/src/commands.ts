@@ -22,6 +22,7 @@ import type { VcSection } from '@shared/gitRepo'
 import { agentPage, assistantOnLeft, closeTile, showTilePage, tileFocusOf, tilePage, tilesPageSize, focusedAgentId, get, isAssistantPath, setAssistantSide, notify, openInSessionsTab, openProjectSettings, openVersionControl, revealAgent, set, setActivity, setAssistantOpen, setProgressOpen, progressIsOpen, showAssistantView, showView, showUnusedWorktrees, setProjectTab, showAgent, showPage, panePageCount, shownLayout, toggleCompactSidebar, type ProjectTab } from './store'
 import { STRIP_TABS } from '@shared/projectTabs'
 import { commitIgnore, settleFolderChanges, showFolderChanges } from './folderChanges'
+import { cancelGitRun } from './gitRuns'
 import { workspacePaused } from './teamPause'
 import { pauseTheTeam, resumeTheTeam } from './components/TeamPause'
 
@@ -593,6 +594,13 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'project',
     internal: true,
     run: (projectPath?: unknown) => (typeof projectPath === 'string' ? commitIgnore(projectPath) : undefined)
+  },
+  {
+    id: 'git.cancelRun',
+    name: msg({ id: 'shell.command.git.cancelRun', defaultMessage: 'Cancel Git Action', description: "HI-3372: a command, in the Project category. It isn't in the menus or the palette: a commit's, set aside's, fetch's, pull's or push's notification runs it from its Cancel button while that action runs." }),
+    category: 'project',
+    internal: true,
+    run: (op?: unknown) => cancelGitRun(op)
   },
   {
     id: 'agent.show',

@@ -9,6 +9,8 @@ import { assignIsolated, estimateFor, ProgressRun, progressTarget, recordTiming,
 import { startLauncher } from '../workflow/launcher'
 import { agentMsg, inDefaultDialect, say, type AgentMsg } from '../../shared/agentText'
 import { hasCapability, isPlatformId } from '../../shared/platform/descriptors'
+// How long a check's finish waits for Combwork to say how it counted (Combwork answers within CHECK_REPLY_MS; HI-3377).
+import { CHECK_FINISH_WAIT_MS } from '../../shared/checkReply'
 
 /**
  * What cw-progress says (agent text, HI-2065): its usage, refusals and run lines. It runs as the session's own process,
@@ -337,6 +339,9 @@ export function spawnSpec(command: string[], env: Record<string, string | undefi
   return { file: env.ComSpec ?? env.COMSPEC ?? 'cmd.exe', args: ['/d', '/s', '/c', `"${line}"`], verbatim: true }
 }
 
+/** HI-3377: git's bound resolving a revision for a check (10 s, a loaded machine's git start included, refused checks). */
+const REV_PARSE_MS = 60_000
+
 /** A revision as git takes one, never an option: a commit id, a branch or tag, HEAD~1 (as Combwork checks it). */
 const REVISION = /^[\w./@^~{}-]{1,100}$/
 
@@ -349,7 +354,7 @@ export function revisionProblem(cwd: string, revision: string, env: Record<strin
   if (!named || named.startsWith('-') || !REVISION.test(named)) return say(A.revisionForm)
   const parse = (rev: string): string | null => {
     try {
-      const r = spawnSync('git', ['rev-parse', '--verify', '--quiet', rev], { cwd, env, encoding: 'utf8', windowsHide: true, timeout: 10_000 })
+      const r = spawnSync('git', ['rev-parse', '--verify', '--quiet', rev], { cwd, env, encoding: 'utf8', windowsHide: true, timeout: REV_PARSE_MS })
       return r.status === 0 ? String(r.stdout).trim() || null : null
     } catch {
       return null
@@ -394,8 +399,8 @@ export interface WrapperIo {
    * it hands sessions as CW_PROGRESS_REPLY_SECONDS; `replyTimeoutMs`).
    */
   resolveTimeoutMs?: number
-  /** How long it waits before asking Combwork again, once, when a check's ask or finish got no reply (default 1 s, HI-1892). */
-  retryMs?: number
+  /** The waits before asking Combwork again when a check's ask or finish got no reply (default RETRY_MS, HI-1892, HI-3377). */
+  retryMs?: readonly number[]
   /** How long a check's finish waits for Combwork's reply (default CHECK_FINISH_WAIT_MS); tests shorten it. */
   checkFinishWaitMs?: number
   /** How long the run waits for a step line with the total before it is reported without (default 2 s). */
@@ -411,17 +416,21 @@ export interface WrapperIo {
 /**
  * How long cw-progress waits for Combwork's reply (HI-1892: a fixed 5 s gave up on a Combwork whose main was slow): Settings →
  * Advanced, "cw-progress: Combwork's reply time" (cw.progress.replySeconds), handed to sessions as
- * CW_PROGRESS_REPLY_SECONDS; without it, 15 s. Kept within 1 s to 2 minutes whatever is set, so a hung Combwork never holds
- * a command for long.
+ * CW_PROGRESS_REPLY_SECONDS; without it, 60 s (HI-3377: 15 s gave up on a Combwork busy for a moment on a loaded machine).
+ * Kept within 1 s to 10 minutes whatever is set, so a hung Combwork never holds a command for long.
  */
-export const REPLY_DEFAULT_S = 15
-export const REPLY_MAX_S = 120
+export const REPLY_DEFAULT_S = 60
+export const REPLY_MAX_S = 600
 export function replyTimeoutMs(env: Record<string, string | undefined>): number {
   const s = Number(env.CW_PROGRESS_REPLY_SECONDS)
   return Math.round(Math.min(REPLY_MAX_S, Math.max(1, Number.isFinite(s) && s > 0 ? s : REPLY_DEFAULT_S)) * 1000)
 }
-/** How long it waits before asking again, once (a check's ask or finish that got no reply). */
-const RETRY_MS = 1000
+/**
+ * The waits before asking again (a check's ask or finish that got no reply): HI-3377, backing off, so a Combwork stalled for
+ * a moment isn't asked again into the same stall (one retry after 1 s was). A check's ask takes them all; its finish only
+ * the first: it is sent twice at most, as A.noReply says ("asked twice").
+ */
+export const RETRY_MS: readonly number[] = [5000, 15_000]
 
 /**
  * Why Combwork gave no answer to a run that needed one, and that nothing was run (HI-1892). `check`: the check whose command
@@ -552,8 +561,8 @@ class WrappedRun {
     this.run.update({ ...(late !== undefined ? { total: late, step: this.step ?? 0 } : {}), ...(u.step !== undefined ? { step: this.step } : {}), ...(u.name !== undefined ? { stepName: u.name } : {}) })
   }
 
-  /** Combwork's answer to the finish (null: none in `waitMs`); `retry`: sent once more after that many ms when it got no reply. */
-  finish(ok: boolean, summary: string | undefined, exitCode: number, stopped = false, waitMs?: number, retry?: number): Promise<unknown> {
+  /** Combwork's answer to the finish (null: none in `waitMs`); `retry`: sent again after each of these waits while it got no reply. */
+  finish(ok: boolean, summary: string | undefined, exitCode: number, stopped = false, waitMs?: number, retry?: readonly number[]): Promise<unknown> {
     this.begin()
     return this.run!.finish(ok, summary, waitMs, { exitCode, ...(this.log ? { logPath: this.log } : {}), ...(stopped ? { stopped: true } : {}) }, retry)
   }
@@ -564,8 +573,6 @@ class WrappedRun {
   }
 }
 
-/** How long a check's finish waits for Combwork to say how it counted (Combwork answers within 8 s: servers.ts CHECK_REPLY_MS). */
-const CHECK_FINISH_WAIT_MS = 9000
 
 /** What's said for each reason a check run didn't count (#1654): what happened, then what to do. */
 const UNCOUNTED: Record<string, AgentMsg> = { notCheck: A.notCheck, notContained: A.notContained, dirty: A.dirty, moved: A.moved, changed: A.changed, revisionChanged: A.revisionChanged }
@@ -676,7 +683,7 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
     }
     if ('link' in r) link = r.link
     else if (parsed.isolated || parsed.check !== undefined) {
-      io.stderr.write(`cw-progress: ${unansweredLine(r, parsed.isolated ? null : (parsed.check ?? ''), replyMs, target.url, retry !== undefined && r.why !== 'refused' ? 2 : 1)}\n`)
+      io.stderr.write(`cw-progress: ${unansweredLine(r, parsed.isolated ? null : (parsed.check ?? ''), replyMs, target.url, retry !== undefined && r.why !== 'refused' ? retry.length + 1 : 1)}\n`)
       return 2
     }
   }
@@ -747,7 +754,7 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
   if (passed && timings) recordTiming(timings, key, Math.max(0, Date.now() - started - report.waitedMs()))
   // A check's result is what a submit needs: its finish is sent once more if it got no reply (HI-1892).
   // A failed run's detail is stored with it, for any reader: the Default's words (HI-2065).
-  const answer = await report.finish(passed, passed ? undefined : stopped ? 'interrupted' : inDefaultDialect(() => say(A.exitCode, { code: String(code) })), code, stopped, link?.check ? (io.checkFinishWaitMs ?? CHECK_FINISH_WAIT_MS) : undefined, link?.check ? (io.retryMs ?? RETRY_MS) : undefined)
+  const answer = await report.finish(passed, passed ? undefined : stopped ? 'interrupted' : inDefaultDialect(() => say(A.exitCode, { code: String(code) })), code, stopped, link?.check ? (io.checkFinishWaitMs ?? CHECK_FINISH_WAIT_MS) : undefined, link?.check ? (io.retryMs ?? RETRY_MS).slice(0, 1) : undefined)
   // A check that didn't count says why (#1654), or that it may not be recorded; its exit code is the command's all the same.
   const uncounted = link?.check ? (uncountedLine(answer, !!link.isolated) ?? unrecordedLine(report.finishedAs(), link.check.name)) : null
   if (uncounted) io.stderr.write(`cw-progress: ${uncounted}\n`)

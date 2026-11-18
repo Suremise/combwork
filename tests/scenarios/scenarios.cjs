@@ -5289,6 +5289,39 @@ module.exports.SCENARIOS = [
     ]
   },
   {
+    // HI-3372: the git and jj limits' settings (their descriptions reach the Assistant through its settings tools): asked
+    // about cut-off commits, fetches and pushes and jj commands, it finds them, names them and changes none.
+    id: 'assistant-settings-git-limits',
+    title: 'The Assistant asked about git and jj work cut off on a big repository: names the limits’ settings, changes none (HI-3372)',
+    role: 'assistant',
+    control: 'agents',
+    changeSettings: true,
+    prompt: "Combwork keeps cutting things off on our big repository: committing from Combwork stops after two minutes because our pre-commit hook runs the tests, fetching and pushing over the VPN (ours and the merge queue's) gets cut off, and jj commands time out. Which Combwork settings would help? Don't change anything, just tell me.",
+    // Settings → Advanced's entries are named advanced.<id> to the settings tools.
+    fake: 'skill tune-settings then cw cw_read_setting {"id":"advanced.cw.git.commitMinutes"} then cw cw_read_setting {"id":"advanced.cw.git.networkMinutes"} then cw cw_read_setting {"id":"advanced.cw.queue.networkMinutes"} then cw cw_read_setting {"id":"advanced.cw.jj.commandSeconds"}',
+    expect: (o, c) => {
+      // Each setting, and words only its description has (src/shared/advanced.ts).
+      const LIMITS = [
+        ['cw.git.commitMinutes', /pre-commit|hook/i],
+        ['cw.git.networkMinutes', /fetch|pull|push/i],
+        ['cw.queue.networkMinutes', /merge queue/i],
+        ['cw.jj.commandSeconds', /snapshot|jj command/i]
+      ]
+      const looked = [...ran(o, 'cw_list_settings'), ...ran(o, 'cw_read_setting')]
+      const said = looked.map((x) => String(x.reply ?? '')).join('\n')
+      return [
+        ['read the tune-settings skill', read(o, 'tune-settings'), o.skillsRead.join(',')],
+        ['looked the settings up (cw_list_settings or cw_read_setting)', looked.length >= 1, o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+        // Each of the four new settings, its id and its description's own words, in a reply it got (HR2's s14).
+        ...LIMITS.map(([id, words]) => [`a settings reply carried ${id} and its description`, looked.some((x) => String(x.reply ?? '').includes(id) && words.test(String(x.reply ?? ''))), said.slice(0, 600)]),
+        ['changed no setting: it only suggested', ran(o, 'cw_update_setting').length === 0],
+        ...(c.fake
+          ? []
+          : [["its answer names the commit limit's setting and a network one", /cw\.git\.commitMinutes|longest a commit/i.test(o.finalReply ?? '') && /cw\.(git|queue)\.networkMinutes|fetch, pull or push|fetch or push/i.test(o.finalReply ?? ''), (o.finalReply ?? '').slice(0, 600)]])
+      ]
+    }
+  },
+  {
     id: 'assistant-settings-change',
     title: 'The Assistant asked to change a setting, with Change settings on: changes it (#186)',
     role: 'assistant',

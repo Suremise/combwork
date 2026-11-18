@@ -55,6 +55,10 @@
     "defaultMessage": "Copy revision {revision}",
     "description": "Tooltip of the button beside a branch's revision under review: copies the whole commit id. {revision} is its short form (a3f2c1d)."
   },
+  "git.branches.deletingOn": {
+    "defaultMessage": "Deleting branches on {remote}…",
+    "description": "HI-3372: a notification while Clean up deletes the ticked branches on the remote {remote}, with a Cancel button."
+  },
   "git.branches.earlierCards": {
     "defaultMessage": "{n, plural, one {+# earlier card} other {+# earlier cards}}",
     "description": "Beside a branch's card (Version Control → Branches & remotes): how many earlier cards worked on the same branch ({n}); its tooltip lists them."
