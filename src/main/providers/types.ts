@@ -1011,7 +1011,7 @@ export interface ProviderBackgroundPart {
    * HI-3376: the CLI's background jobs running now, each with its own process id when the CLI gives one; null when they
    * couldn't be listed (the command failed, timed out, or printed what isn't a list): not the same as none running.
    */
-  runningBackgroundJobs?(executable: string): Promise<{ id: string; pid: number | null }[] | null>
+  runningBackgroundJobs?(executable: string, timeoutMs?: number): Promise<{ id: string; pid: number | null }[] | null>
 }
 
 /**

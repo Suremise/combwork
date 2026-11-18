@@ -86,7 +86,7 @@ import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcript
 import { usesOwnPrices } from '../shared/prices'
 import { priceUsage, withCostFree } from '../shared/usageDays'
 import { summaryOf, usageFromRows, type LedgerRow } from '../shared/usageLedger'
-import { listProcesses, type ListedProcess } from './processTree'
+import { listProcesses, TREE_END_BOUNDS, type ListedProcess } from './processTree'
 import type { ClosingPending } from './closingAgents'
 import type { AdoptionHandle, Ask, BackgroundTaskType, ExternalSession, HookEvent, HookOccurrence, LaunchContext, LaunchHooks, LaunchSkill, LiveDetails, NormalizedHook, ProviderAdapter, SkillDelivery } from './providers/types'
 import { HOOK_FIRED_MAX, HOOK_SHORT_MAX, clip, type ActivityHookBlock, type HookFired, type SessionHooks } from '../shared/hooks'
@@ -342,39 +342,54 @@ export const BACKGROUND_END_MS = 30_000
 const BACKGROUND_LOOK_MS = 1000
 
 /** Tests: the process listing backgroundJobEnded uses (null: processTree's). */
-export const backgroundTestHooks: { list?: () => Promise<ListedProcess[] | null> } = {}
-const listAll = (): Promise<ListedProcess[] | null> => (backgroundTestHooks.list ?? listProcesses)()
+export const backgroundTestHooks: { list?: (timeoutMs: number) => Promise<ListedProcess[] | null> } = {}
+const listAll = (timeoutMs: number): Promise<ListedProcess[] | null> => (backgroundTestHooks.list ?? listProcesses)(timeoutMs)
 
 /**
- * HI-3376: a running background job's own process (its pid, as the CLI lists the job, and that process's start, as
- * Windows lists it), so its end is seen by identity, never by a pid number alone; null when the CLI can't list its jobs,
- * doesn't list this one, or gives no process for it.
+ * HI-3376: what is known of a background job before it is told to stop (HR1's round 1: never one null for all of it):
+ * its own process (`process`: its pid as the CLI lists the job, and that process's start as a complete listing of
+ * Windows' has it); not running (`notRunning`: a parsed listing of the CLI's that doesn't name it); its process already
+ * gone (`gone`: named with a pid that a complete listing doesn't have); or `unknown` (a listing failed, or the CLI names
+ * it without a process: Settings → Advanced's fields wrong, or a CLI that gives none).
  */
-async function jobProcess(adapter: ProviderAdapter, exe: string, jobId: string): Promise<ListedProcess | null> {
-  const jobs = await adapter.background?.runningBackgroundJobs?.(exe).catch(() => null)
-  const pid = jobs?.find((j) => j.id === jobId)?.pid
-  if (!pid) return null
-  return (await listAll().catch(() => null))?.find((p) => p.pid === pid) ?? null
+export type JobBefore = { kind: 'process'; proc: ListedProcess } | { kind: 'notRunning' } | { kind: 'gone' } | { kind: 'unknown' }
+
+async function jobProcess(adapter: ProviderAdapter, exe: string, jobId: string): Promise<JobBefore> {
+  const jobs = adapter.background?.runningBackgroundJobs ? await adapter.background.runningBackgroundJobs(exe).catch(() => null) : null
+  if (jobs === null) return { kind: 'unknown' }
+  const job = jobs.find((j) => j.id === jobId)
+  if (!job) return { kind: 'notRunning' }
+  if (!job.pid) return { kind: 'unknown' }
+  const list = await listAll(TREE_END_BOUNDS.listMs).catch(() => null)
+  if (list === null) return { kind: 'unknown' }
+  const proc = list.find((p) => p.pid === job.pid)
+  return proc ? { kind: 'process', proc } : { kind: 'gone' }
 }
 
 /**
- * HI-3376: whether a background job told to stop has ended, looked at until it has or BACKGROUND_END_MS passes:
- * `ended` once the CLI's listing of running jobs (parsed: a listing that failed is no answer) doesn't name it and its
- * own process (`before`, by pid and start) isn't running; `running` while either still holds; `unknown` when the CLI
- * can't list its jobs (or has no way to) at the last look.
+ * HI-3376: whether a background job told to stop has ended, looked at until it has or BACKGROUND_END_MS passes, each look
+ * bounded by the time left: `ended` once a parsed listing of the CLI's running jobs doesn't name it and, when its own
+ * process was known (`before`), a complete listing of Windows' no longer has that process (by pid and start); `running`
+ * while either still holds; `unknown` when what was known before the stop is unknown, or a listing fails at the last look.
  */
-export async function backgroundJobEnded(adapter: ProviderAdapter, exe: string, jobId: string, before: ListedProcess | null, now = Date.now): Promise<'ended' | 'running' | 'unknown'> {
+export async function backgroundJobEnded(adapter: ProviderAdapter, exe: string, jobId: string, before: JobBefore, now = Date.now): Promise<'ended' | 'running' | 'unknown'> {
+  // Not known before the stop: nothing seen after it can show its end (HR1's round 1).
+  if (before.kind === 'unknown' || !adapter.background?.runningBackgroundJobs) return 'unknown'
   const deadline = now() + BACKGROUND_END_MS
-  for (;;) {
-    const jobs = adapter.background?.runningBackgroundJobs ? await adapter.background.runningBackgroundJobs(exe).catch(() => null) : null
-    let state: 'ended' | 'running' | 'unknown' = jobs === null ? 'unknown' : jobs.some((j) => j.id === jobId) ? 'running' : 'ended'
-    if (state === 'ended' && before) {
-      const list = await listAll().catch(() => null)
-      state = list === null ? 'unknown' : list.some((p) => p.pid === before.pid && p.started === before.started) ? 'running' : 'ended'
+  const left = (): number => deadline - now()
+  // What the last look saw; a look begun with no time left isn't made.
+  let state: 'ended' | 'running' | 'unknown' = 'unknown'
+  while (left() > 0) {
+    const jobs = await adapter.background.runningBackgroundJobs(exe, left()).catch(() => null)
+    state = jobs === null ? 'unknown' : jobs.some((j) => j.id === jobId) ? 'running' : 'ended'
+    if (state === 'ended' && before.kind === 'process') {
+      const list = left() > 0 ? await listAll(Math.min(TREE_END_BOUNDS.listMs, left())).catch(() => null) : null
+      state = list === null ? 'unknown' : list.some((p) => p.pid === before.proc.pid && p.started === before.proc.started) ? 'running' : 'ended'
     }
-    if (state === 'ended' || now() >= deadline) return state
-    await new Promise((r) => setTimeout(r, BACKGROUND_LOOK_MS))
+    if (state === 'ended') return state
+    if (left() > 0) await new Promise((r) => setTimeout(r, Math.min(BACKGROUND_LOOK_MS, left())))
   }
+  return state
 }
 
 /** After a kill, how long a CLI's console takes to be gone (its processes listed and ended, then its exit). HI-3376: 5 s, a listing on a busy machine taking seconds itself. */
@@ -2337,8 +2352,10 @@ class SessionManager {
    */
   closingPending(which?: (projectPath: string) => boolean): ClosingPending {
     const mine = (p: string): boolean => !which || which(p)
+    // A run counts from its launch until its exit work is over (`exiting`), not only while it is in `live`.
+    const runs = new Set([...[...this.live.values()].filter((l) => mine(l.state.projectPath)).map((l) => l.state.runId), ...[...this.exiting].filter(([, p]) => mine(p)).map(([r]) => r)])
     return {
-      running: [...this.live.values()].filter((l) => mine(l.state.projectPath)).length,
+      running: runs.size,
       starting: [...this.starting.values()].filter((p) => mine(p.projectPath)).length,
       writers: which ? [...this.writerSettlingOf.values()].filter((e) => which(e.projectPath)).length : this.writersSettling.size
     }
@@ -5482,7 +5499,24 @@ class SessionManager {
     return this.liveStates().filter((s) => s.status === 'working' || s.status === 'waiting' || s.status === 'background' || s.status === 'watching')
   }
 
+  /**
+   * HI-3376 (HR1's round 1): each run whose exit work is under way (onExit, from its first line to its last, errors
+   * included), by run, with its project: it leaves `live` part way through, before its transcript's check and its
+   * session list's write, which a close still waits for (closingPending).
+   */
+  private readonly exiting = new Map<string, string>()
+
   private async onExit(projectPath: string, agentId: string, runId: string, code: number, output = ''): Promise<void> {
+    this.exiting.set(runId, projectPath)
+    try {
+      await this.exitWork(projectPath, agentId, runId, code, output)
+    } finally {
+      this.exiting.delete(runId)
+    }
+  }
+
+  /** What a run's exit does (onExit's). */
+  private async exitWork(projectPath: string, agentId: string, runId: string, code: number, output: string): Promise<void> {
     // What notices offered about this run no longer applies (HI-2320): its conversation ended here.
     resolveOffers((o) => o.startsWith(`transcript:${liveId(projectPath, agentId)}#`), tr(OUTCOME.conversationEnded))
     this.modeOfferGone(liveId(projectPath, agentId))

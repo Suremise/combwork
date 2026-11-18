@@ -67,15 +67,22 @@ const pidsOf = (out: string): number[] => out.split(/\r?\n/).map(Number).filter(
 
 /** A PowerShell command's output, run without blocking (bounded; '' when it couldn't run). */
 function powershell(command: string, timeoutMs: number): Promise<string> {
+  return powershellRun(command, timeoutMs).then((r) => r.out)
+}
+
+/** A PowerShell command's output, and whether it exited by itself with 0 (not ended at its bound, nor failed to run). */
+function powershellRun(command: string, timeoutMs: number): Promise<{ out: string; ok: boolean }> {
   return new Promise((res) => {
     let c: ChildProcess
     try {
       c = spawn(POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', command], { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] })
     } catch {
-      return res('')
+      return res({ out: '', ok: false })
     }
     const out: Buffer[] = []
+    let ended = false
     const t = setTimeout(() => {
+      ended = true
       try {
         c.kill()
       } catch {
@@ -85,19 +92,34 @@ function powershell(command: string, timeoutMs: number): Promise<string> {
     c.stdout?.on('data', (d: Buffer) => out.push(d))
     c.once('error', () => {
       clearTimeout(t)
-      res('')
+      res({ out: '', ok: false })
     })
-    c.once('close', () => {
+    c.once('close', (code: number | null) => {
       clearTimeout(t)
-      res(Buffer.concat(out).toString('utf8'))
+      res({ out: Buffer.concat(out).toString('utf8'), ok: !ended && code === 0 })
     })
   })
 }
 
-/** HI-3376: every process, listed without blocking (bounded: TREE_END_BOUNDS.listMs); null when the listing gave nothing. */
-export async function listProcesses(): Promise<ListedProcess[] | null> {
-  const list = parseProcessList(await powershell(LIST_PS, TREE_END_BOUNDS.listMs))
-  return list.length ? list : null
+/**
+ * HI-3376 (HR1's round 1): every process, listed without blocking, or null unless the listing is known complete: its
+ * PowerShell exited by itself with 0 within `timeoutMs`, every line it printed is a process's, and its last is `end`
+ * (printed after the whole listing). A listing cut short (ended at its bound, or failing part way) is no answer, never a
+ * list missing what it didn't get to.
+ */
+export async function listProcesses(timeoutMs = TREE_END_BOUNDS.listMs): Promise<ListedProcess[] | null> {
+  const r = await powershellRun(`${LIST_PS}; 'end'`, timeoutMs)
+  return completeProcessList(r.out, r.ok)
+}
+
+/** listProcesses' reading of a listing's output (`ok`: its PowerShell exited by itself with 0): the processes, or null. */
+export function completeProcessList(out: string, ok: boolean): ListedProcess[] | null {
+  if (!ok) return null
+  const lines = out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+  if (lines.at(-1) !== 'end') return null
+  const rows = lines.slice(0, -1)
+  const list = parseProcessList(rows.join('\n'))
+  return rows.length && list.length === rows.length ? list : null
 }
 
 /**

@@ -140,6 +140,88 @@ describe('waiting for agents to close (HI-3376)', () => {
     expect(rb.how()).toBe('settled')
   })
 
+  describe("two waits in one window (HR1's round 1: a workspace's close still pending as a quit begins)", () => {
+    /** Two waits on one window, the first begun a second before the second; each one's panel states recorded. */
+    async function overlap() {
+      const w = fakeWindow()
+      const p1 = { running: 1, starting: 0, writers: 0 }
+      const p2 = { running: 0, starting: 0, writers: 1 }
+      const r1 = start(p1, 65_000, () => [w])
+      await vi.advanceTimersByTimeAsync(2000)
+      const r2 = start(p2, 65_000, () => [w])
+      await vi.advanceTimersByTimeAsync(2000)
+      const id1 = r1.sent.find((x) => x.state)!.state!.id
+      const id2 = r2.sent.find((x) => x.state)!.state!.id
+      return { w, p1, p2, r1, r2, id1, id2 }
+    }
+
+    it('the newer is shown; the older settling first leaves the newer shown and never clears it', async () => {
+      const o = await overlap()
+      expect(closingAgentsState(o.w)?.id).toBe(o.id2)
+      const before = o.r1.sent.length
+      o.p1.running = 0
+      await vi.advanceTimersByTimeAsync(closingLimits.lookMs)
+      expect(o.r1.how()).toBe('settled')
+      // Nothing sent for it: the window didn't show it.
+      expect(o.r1.sent.length).toBe(before)
+      expect(closingAgentsState(o.w)?.id).toBe(o.id2)
+      // The last state sent to the window is still the newer wait's (never cleared by the older's end).
+      expect(o.r2.sent.at(-1)?.state?.id).toBe(o.id2)
+      o.p2.writers = 0
+      await vi.advanceTimersByTimeAsync(closingLimits.lookMs)
+      expect(o.r2.how()).toBe('settled')
+      expect(o.r2.sent.at(-1)?.state).toBeNull()
+      expect(closingAgentsState(o.w)).toBeNull()
+      expect(o.w.listeners.size).toBe(0)
+    })
+
+    it('the newer settling first shows the older again, with its latest counts', async () => {
+      const o = await overlap()
+      o.p1.running = 2
+      await vi.advanceTimersByTimeAsync(closingLimits.lookMs)
+      o.p2.writers = 0
+      await vi.advanceTimersByTimeAsync(closingLimits.lookMs)
+      expect(o.r2.how()).toBe('settled')
+      expect(o.r2.sent.at(-1)?.state).toMatchObject({ id: o.id1, running: 2 })
+      expect(closingAgentsState(o.w)?.id).toBe(o.id1)
+      expect(o.r1.how()).toBeNull()
+      o.p1.running = 0
+      await vi.advanceTimersByTimeAsync(closingLimits.lookMs)
+      expect(o.r1.how()).toBe('settled')
+      expect(closingAgentsState(o.w)).toBeNull()
+    })
+
+    it("Don't wait on the shown (newer) one ends only it, and shows the older; then the older's own Don't wait", async () => {
+      const o = await overlap()
+      closingAgentsDontWait(o.w, o.id2)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(o.r2.how()).toBe('skipped')
+      expect(o.r1.how()).toBeNull()
+      expect(closingAgentsState(o.w)?.id).toBe(o.id1)
+      expect(o.r2.sent.at(-1)?.state?.id).toBe(o.id1)
+      closingAgentsDontWait(o.w, o.id1)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(o.r1.how()).toBe('skipped')
+      expect(o.r1.sent.at(-1)?.state).toBeNull()
+      expect(closingAgentsState(o.w)).toBeNull()
+    })
+
+    it("Don't wait on the older one (not shown) ends only it: the newer stays shown and untouched", async () => {
+      const o = await overlap()
+      const before = o.r1.sent.length
+      closingAgentsDontWait(o.w, o.id1)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(o.r1.how()).toBe('skipped')
+      expect(o.r1.sent.length).toBe(before)
+      expect(closingAgentsState(o.w)?.id).toBe(o.id2)
+      expect(o.r2.how()).toBeNull()
+      o.p2.writers = 0
+      await vi.advanceTimersByTimeAsync(closingLimits.lookMs)
+      expect(o.r2.how()).toBe('settled')
+      expect(closingAgentsState(o.w)).toBeNull()
+    })
+  })
+
   it('a hidden window (closed to the tray) is shown, without the focus, so the wait can be seen', async () => {
     const w = fakeWindow(false)
     start({ running: 1, starting: 0, writers: 0 }, 65_000, () => [w])

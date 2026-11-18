@@ -28,16 +28,44 @@ export const closingLimits = {
   lookMs: 200
 }
 
-/** The panel shown in each window (by its webContents' id): its state, and its Don't wait. */
-const shown = new Map<number, { state: ClosingAgentsState; skip: () => void }>()
+/**
+ * The waits each window shows (by its webContents' id), oldest first (HR1's round 1: two waits can share a window, a
+ * workspace's close still pending as a quit begins): the newest is the one its panel shows; each wait changes only its
+ * own entry, and when it ends the window shows the one before it again, or none.
+ */
+const shown = new Map<number, { state: ClosingAgentsState; skip: () => void }[]>()
 
-/** A window's closing-agents state, for a window that reloads while its panel is up. */
-export const closingAgentsState = (win: ClosingWindow): ClosingAgentsState | null => shown.get(win.webContents.id)?.state ?? null
+const topOf = (wid: number): { state: ClosingAgentsState; skip: () => void } | undefined => shown.get(wid)?.at(-1)
 
-/** The panel's Don't wait (closingAgents:dontWait): only the wait it is shown for. */
+/** A window's closing-agents state (the newest wait it shows), for a window that reloads while its panel is up. */
+export const closingAgentsState = (win: ClosingWindow): ClosingAgentsState | null => topOf(win.webContents.id)?.state ?? null
+
+/** The panel's Don't wait (closingAgents:dontWait): only the wait it names, among this window's. */
 export function closingAgentsDontWait(win: ClosingWindow, id: string): void {
-  const s = shown.get(win.webContents.id)
-  if (s && s.state.id === id) s.skip()
+  shown.get(win.webContents.id)?.find((e) => e.state.id === id)?.skip()
+}
+
+/** Puts wait `id`'s state in window `wid`'s list (new, at the end); true when the window now shows something else. */
+function put(wid: number, state: ClosingAgentsState, skip: () => void): boolean {
+  const list = shown.get(wid) ?? []
+  const at = list.findIndex((e) => e.state.id === state.id)
+  const was = list.at(-1)?.state
+  if (at >= 0) list[at] = { state, skip }
+  else list.push({ state, skip })
+  shown.set(wid, list)
+  const now = list.at(-1)!.state
+  return !was || was.id !== now.id || was.running !== now.running || was.starting !== now.starting || was.writers !== now.writers || was.late !== now.late
+}
+
+/** Takes wait `id` out of window `wid`'s list: what the window shows now when that changed (null: nothing), else undefined. */
+function take(wid: number, id: string): ClosingAgentsState | null | undefined {
+  const list = shown.get(wid)
+  if (!list) return undefined
+  const top = list.at(-1)?.state.id === id
+  const rest = list.filter((e) => e.state.id !== id)
+  if (rest.length) shown.set(wid, rest)
+  else shown.delete(wid)
+  return top ? (rest.at(-1)?.state ?? null) : undefined
 }
 
 let waits = 0
@@ -69,10 +97,11 @@ export function waitForAgentsClosed(o: {
       over = true
       if (look) clearInterval(look)
       for (const [wid, m] of mine) {
-        if (shown.get(wid)?.state.id === id) shown.delete(wid)
+        const now = take(wid, id)
         if (!m.win.isDestroyed()) {
           m.win.removeListener('closed', m.gone)
-          o.send(m.win, null)
+          // Only when it showed this wait: the one before it again, or none.
+          if (now !== undefined) o.send(m.win, now)
         }
       }
       mine.clear()
@@ -93,17 +122,14 @@ export function waitForAgentsClosed(o: {
           if (!mine.has(wid)) {
             const gone = (): void => {
               mine.delete(wid)
-              if (shown.get(wid)?.state.id === id) shown.delete(wid)
+              take(wid, id)
             }
             mine.set(wid, { win, gone })
             win.once('closed', gone)
             if (!win.isVisible() && !o.quiet) win.showInactive()
           }
-          const was = shown.get(wid)?.state
-          if (!was || was.id !== id || was.running !== state.running || was.starting !== state.starting || was.writers !== state.writers || was.late !== state.late) {
-            shown.set(wid, { state, skip: () => finish('skipped') })
-            o.send(win, state)
-          }
+          // Its own entry only; the window's panel changes when what it shows (its newest wait's) does.
+          if (put(wid, state, () => finish('skipped'))) o.send(win, topOf(wid)!.state)
         }
       }
       if (late && !mine.size) finish('unattended')

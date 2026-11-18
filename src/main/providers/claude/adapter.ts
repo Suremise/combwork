@@ -935,10 +935,10 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
    * no `id`). A stopped job is gone from it at once (it stays in `--all`, without a pid). Run without
    * CLAUDE_CODE_DISABLE_AGENT_VIEW, which turns the command off (Combwork sets it only in its agents' sessions).
    */
-  async runningBackgroundJobs(executable: string): Promise<{ id: string; pid: number | null }[] | null> {
+  async runningBackgroundJobs(executable: string, timeoutMs = 20000): Promise<{ id: string; pid: number | null }[] | null> {
     const env = { ...process.env }
     delete env.CLAUDE_CODE_DISABLE_AGENT_VIEW
-    const r = await run(executable, ['agents', '--json'], 20000, env)
+    const r = await run(executable, ['agents', '--json'], timeoutMs, env)
     if (r.code !== 0 || r.timedOut || r.ended) return null
     return runningJobsIn(r.stdout)
   }
