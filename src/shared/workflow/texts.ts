@@ -184,7 +184,8 @@ export const RULE_NAMES: Record<string, Msg> = {
   'integrate.approved': msg({ id: 'workflow.rule.integrate.approved', defaultMessage: "Work is reviewed before it's merged", description: 'A rule of the workflow, named where a move skips or can\'t check it (glossary 2.6: G1).' }),
   'integrate.upToDate': msg({ id: 'workflow.rule.integrate.upToDate', defaultMessage: 'Work is up to date before it merges', description: 'A rule of the workflow, named where a move skips or can\'t check it (glossary 2.6: G8, without the branch name).' }),
   'integrate.checksPassed': msg({ id: 'workflow.rule.integrate.checksPassed', defaultMessage: 'Checks pass on the merged result', description: 'A rule of the workflow, named where a move skips or can\'t check it (glossary 2.6: G9).' }),
-  'done.contained': msg({ id: 'workflow.rule.done.contained', defaultMessage: 'Combwork checks the merge', description: 'A rule of the workflow, named where a move skips or can\'t check it: a card is done only when its work is in its target (glossary 2.6: G5).' })
+  'done.contained': msg({ id: 'workflow.rule.done.contained', defaultMessage: 'Combwork checks the merge', description: 'A rule of the workflow, named where a move skips or can\'t check it: a card is done only when its work is in its target (glossary 2.6: G5).' }),
+  'done.noCodeUnmerged': msg({ id: 'workflow.rule.done.noCodeUnmerged', defaultMessage: 'A no-code card leaves no commits unmerged', description: "A rule of the workflow, named where a move can't check it (HI-3410): a no-code card (nothing of it is merged) isn't finished while its own branch has commits its target branch lacks." })
 }
 
 /** A card's slot notices, shown on the card as its notify action's text (HI-1796: a preparation that failed; HI-1746: a placement waiting or giving up). */

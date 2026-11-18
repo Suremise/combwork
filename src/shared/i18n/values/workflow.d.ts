@@ -353,6 +353,8 @@ interface CombworkMessageValues {
   'workflow.refused.done.contained.change': undefined
   'workflow.refused.done.contained.message': { card: string | number; revision: string | number; target: string | number }
   'workflow.refused.done.contained.next': { revision: string | number; target: string | number }
+  'workflow.refused.done.noCodeUnmerged.message': { card: string | number; line: string | number; count: number; target: string | number; commits: string | number; more: number }
+  'workflow.refused.done.noCodeUnmerged.next': { reader: string }
   'workflow.refused.evidence.changed.message': { card: string | number }
   'workflow.refused.evidence.changed.next': undefined
   'workflow.refused.forward.notAgents.message': { card: string | number }
@@ -541,6 +543,7 @@ interface CombworkMessageValues {
   'workflow.rule.approval.given': undefined
   'workflow.rule.card.kind': undefined
   'workflow.rule.done.contained': undefined
+  'workflow.rule.done.noCodeUnmerged': undefined
   'workflow.rule.forward.resolutionSource': undefined
   'workflow.rule.integrate.approved': undefined
   'workflow.rule.integrate.checksPassed': undefined

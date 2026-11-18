@@ -571,6 +571,65 @@ describe('workflow scenarios, Git', () => {
     expect(s.latest!.revision).toBeNull()
   })
 
+  // HI-3410: MC-1559 was started as code (its own line), its work committed and submitted, then made no-code; its pass
+  // finished it with nothing merged, and the commits stayed on its line alone.
+  it('HI-3410: a no-code card whose own line has commits its target lacks is refused its pass and submit, naming them, until they merge or the user drops them', async () => {
+    const e = pair()
+    const { card, folder } = await started(e, 'Live proof')
+    moved(await e.wf.submit(card.key, B1, { summary: 'the driver' }))
+    e.store.updateCard(card.id, { kind: 'no-code' })
+    const { line, target } = e.wf.state(card).started!
+    const sha = sh(folder, 'rev-parse', '--short=7', 'HEAD')
+    moved(await e.wf.startReview(card.key, R1))
+    const pass = refusedBy(await e.wf.verdict(card.key, R1, { pass: true, comment: 'proved' }), 'done.noCodeUnmerged')
+    expect(pass.message).toBe(`${card.key} is no-code, so nothing of it is merged, but its branch ${line} has 1 commit that ${target} doesn't: ${sha} ${card.key}: Live proof.`)
+    expect(pass.next).toBe("Ask the user which (cw_ask_user): to merge them, the user (or the Assistant, with the user's reason) makes the card code again, and its branch is submitted for review as code; to drop them, the user moves the card to Done.")
+    expect(e.wf.state(card)).toMatchObject({ stage: 'review', accepted: null })
+    // Its no-code submission is refused alike, more commits counted past the first few named.
+    moved(await e.wf.verdict(card.key, R1, { pass: false, comment: 'say what ran' }))
+    for (let i = 1; i <= 5; i++) commit(folder, { [`p${i}.txt`]: `${i}\n` }, `part ${i}`)
+    const submit = refusedBy(await e.wf.submit(card.key, B1, { summary: 'ran it' }), 'done.noCodeUnmerged')
+    expect(submit.message).toMatch(new RegExp(`has 6 commits that ${target} doesn't: ${sha} ${card.key}: Live proof; [0-9a-f]{7} part 1; .*; [0-9a-f]{7} part 4 and 1 more\\.$`))
+    expect(e.wf.state(card).stage).toBe('active')
+    // Merged into its target, nothing is left behind: submitted, passed, Done.
+    sh(e.project, 'merge', '-q', '--no-ff', '-m', `merge ${card.key}`, line!)
+    moved(await e.wf.submit(card.key, B1, { summary: 'ran it' }))
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'proved' }))
+    expect(e.wf.state(card).stage).toBe('done')
+    // Dropped on purpose: the user's own move to Done takes it there, the branch kept as it is.
+    const { card: other, folder: f2 } = await started(e, 'Another proof', { 'proof.txt': 'driver\n' })
+    moved(await e.wf.submit(other.key, B1, { summary: 'the driver' }))
+    e.store.updateCard(other.id, { kind: 'no-code' })
+    const kept = sh(f2, 'rev-parse', 'HEAD')
+    moved(await e.wf.move(other.key, 'done', 'user', { confirm: true, reason: 'not wanted' }))
+    expect(e.wf.state(other).stage).toBe('done')
+    expect(sh(e.project, 'rev-parse', e.wf.state(other).started!.line!)).toBe(kept)
+  })
+
+  it("HI-3410: the user's approval of such a card's review is refused alike", async () => {
+    const e = pair({}, { review: 'you', noSelfReview: false })
+    const { card } = await started(e, 'Live proof')
+    moved(await e.wf.submit(card.key, B1, { summary: 'the driver' }))
+    e.store.updateCard(card.id, { kind: 'no-code' })
+    const req = e.wf.state(card).requests[0]
+    const r = refusedBy(await e.wf.answer(card.key, req.request, 'approved'), 'done.noCodeUnmerged')
+    expect(r.message).toContain(`its branch ${e.wf.state(card).started!.line} has 1 commit`)
+    expect(e.wf.state(card)).toMatchObject({ stage: 'review', accepted: null })
+  })
+
+  it('HI-3410: a no-code card whose own line has nothing its target lacks goes Done as before', async () => {
+    const e = pair()
+    const card = e.wf.createCard({ title: 'Started as code' })
+    moved(await e.wf.start(card.key, B1))
+    expect(e.wf.state(card).started!.line).toMatch(/^cw\//)
+    e.store.updateCard(card.id, { kind: 'no-code' })
+    moved(await e.wf.submit(card.key, B1, { summary: 'nothing to change' }))
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'agreed' }))
+    expect(e.wf.state(card)).toMatchObject({ stage: 'done', integrated: null })
+  })
+
   it('S26: a failing pre-review check refuses submit; the failing run says it blocks review', async () => {
     const e = pair({}, { preChecks: ['lint'], commands: { lint: 'npm run lint' } })
     const { card } = await started(e)

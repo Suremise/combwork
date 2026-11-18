@@ -5788,6 +5788,17 @@ needs `override.reason`; either records one `Override` (`card.kind`); agents nev
 card shows **No code** on its tile and in its dialog's **Kind** (with **Make It Code…** / **Make It No Code…**); the
 Agent API's card adds `kind` and, while one is open, `kindProposed` after its document's fields, just before `stage`.
 
+**Commits left on a no-code card's own line (HI-3410).** A no-code card finishes with nothing merged, so it doesn't
+while its own line (`cw/<project>/<key>…`, made by a start while it was code) has commits its target lacks: MC-1559 was
+started as code, its work committed, then made no-code (its agent's proposal, confirmed in Review), and its pass took
+it to Done with four commits that never merged. Its no-code submission, a reviewer's pass and the user's approval of its
+review are each refused `done.noCodeUnmerged`, naming the line, the target, how many commits and the first five (id and
+subject); a line Combwork can't read refuses `platform.unknown`, never taken for none. Refusing, not offering the merge,
+because a no-code card has no revision to review or merge: what to do is the user's. To merge them, the card is made code
+again (the user, or the Assistant with the user's reason) and its line submitted for review as code; to drop them, the
+user moves the card to Done (an override), which keeps the line. A no-code card with no such line, or whose line is
+all in its target, finishes as before. Git only: jj and None read no such line.
+
 **Review: Skip (#1625).** Any card, code or no code, can skip its review, decided when it is made or
 before it is submitted: not a project option, and Pair and Team still review everything else. Set, the card runs under
 its rules with no review (`skipReviewOf`: its ruleset compiled with `review: none`, its id the base's with
