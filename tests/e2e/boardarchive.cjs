@@ -60,7 +60,6 @@ const check = (name, ok, extra = '') => {
   check('the pages say where they are', /1–20 of 35/.test(await table.locator('.table-range').innerText()) && /Page 1 of 2/.test(await table.locator('.table-page').innerText()))
   await page.screenshot({ path: path.join(lib.WORK, 'boardarchive-dark.png') })
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
-  await lib.sleep(200)
   await page.screenshot({ path: path.join(lib.WORK, 'boardarchive-light.png') })
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
 
