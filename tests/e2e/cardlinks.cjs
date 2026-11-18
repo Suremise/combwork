@@ -70,11 +70,24 @@ const check = (name, ok, extra = '') => {
   }
   /** A terminal's cell width in pixels. */
   const cellWidth = (key) => page.evaluate((k) => window.__cwTerminalState(k).cols && document.querySelector(`.terminal-host[data-pty="${CSS.escape(k)}"] .xterm-screen`).getBoundingClientRect().width / window.__cwTerminalState(k).cols, key)
-  /** Hovers `text` in a terminal (`skip` characters into it); the terminal's title once a link answers (empty if none). */
-  const hover = async (key, text, skip = 0) => {
+  /**
+   * Hovers `text` in a terminal (`skip` characters into it); the terminal's title once a link answers (empty if none).
+   * `from`: text that must not be a link is hovered from `from`, a link on the same line (HI-3398): its title shows once
+   * every link provider has answered for the line, and xterm then decides the next cell on that line from what they
+   * answered, in the same mouse move that leaves `from`. So the title going is the sign the hover was handled: a link
+   * there would have set its own title in that move, and no wait runs out for a text that isn't one.
+   */
+  const hover = async (key, text, skip = 0, from = null) => {
     const found = await textAt(key, text)
     if (!found) return null
     const at = { x: found.x + skip * (await cellWidth(key)), y: found.y }
+    if (from) {
+      const start = await hover(key, from)
+      if (!start?.title || start.at.y !== at.y) return null
+      await page.mouse.move(at.x + 4, at.y)
+      await until(async () => (await hostTitle()) === '', HUNG_MS)
+      return { at, title: await hostTitle() }
+    }
     await page.mouse.move(at.x - 40, at.y - 40)
     // Off the last link first: its title gone, so the one read next is this hover's.
     await until(async () => (await hostTitle()) === '', HUNG_MS)
@@ -103,8 +116,9 @@ const check = (name, ok, extra = '') => {
   check('the card numbers are printed', !!(await until(() => textAt(key, '#9999'), lib.timing('hang.ui'))))
 
   // --- Not linked: an unknown number, hex, a URL's fragment.
+  // Each hovered from the card number on its line, so its hover's end is seen (HI-3398).
   for (const [t, skip] of [['#9999', 0], ['#fff', 0], [`/a${A}`, 2]]) {
-    const h = await hover(key, t, skip)
+    const h = await hover(key, t, skip, `${A})`)
     check(`"${t}" isn't linked`, !!h && h.title === '', h?.title)
   }
 
