@@ -119,6 +119,9 @@ const SAMPLE: RefusalValues = {
   into: 'main',
   suggest: '1.5.0',
   alias: '#1061',
+  // done.noCodeUnmerged (HI-3410): the first commits its line has that its target lacks, and how many more.
+  commits: 'a1b2c3d The driver; e4f5a6b Its tests',
+  more: 1,
   what: workflowText(UNREADABLE.head, { where: 'D:\\work\\am' }),
   rule: 'submit.checksPassed',
   cause: 'passes',
