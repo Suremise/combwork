@@ -1943,6 +1943,18 @@ export class Workflow {
     w.action('enqueue', { target })
   }
 
+  /**
+   * HI-3410: a no-code card finishes with nothing merged, so it doesn't while its own line holds commits its target lacks
+   * (`FinishInputs.unmerged`, MC-1559's four): refused naming them, for the user to say whether they merge (the card made
+   * code again) or are dropped (the user moves it to Done). Refused too when the line can't be read, never taken for none.
+   */
+  private unmergedRefusal(card: CardRecord, fin: FinishInputs | Record<string, never>): GuardRefusal | null {
+    const u = (fin as FinishInputs).unmerged
+    if (!u) return null
+    if (isUnknown(u)) return { rule: 'platform.unknown', values: { card: card.key, what: u.whatText ?? u.what, rule: 'done.noCodeUnmerged' } }
+    return { rule: 'done.noCodeUnmerged', values: { card: card.key, line: u.line, target: u.target, count: u.count, commits: u.commits.join('; '), more: u.count - u.commits.length } }
+  }
+
   /** Finish (§16.7.2): after review, or straight after submit with no review. */
   finish(w: Write, fin: FinishInputs): void {
     const r = w.ruleset!
@@ -2222,7 +2234,10 @@ export class Workflow {
       inputs.focused = await this.pickFor(o, this.folderOf(s), revision, base, args.tests, focusedOp)
     }
     const earlier = card.kind === 'code' && s.submissions.some((x) => x.revision === revision)
-    const fin = o.review === 'none' ? await this.finishInputs(card, s, r, revision) : {}
+    // HI-3410: a no-code card's own line is read at its submission too, so its builder hears of unmerged commits first.
+    const fin = o.review === 'none' || card.kind === 'no-code' ? await this.finishInputs(card, s, r, revision) : {}
+    const unmerged = card.kind === 'no-code' ? this.unmergedRefusal(card, fin) : null
+    if (unmerged) return unmerged
     const only = card.kind === 'no-code' ? (id: GuardId) => NO_CODE_GUARDS.includes(id) : undefined
     return { r, o, card, s, from, agent, runner, setPaths, revision, base, key, files, ...(commits ? { commits } : {}), ...(paths ? { paths } : {}), ...(platform ? { platform } : {}), inputs, warnings, earlier, fin, before, ...(only ? { only } : {}), ...(focusedOp ? { focusedOp } : {}) }
   }
@@ -2370,6 +2385,8 @@ export class Workflow {
     // builder submits the new revision, which runs its checks, the user's gates and a review copy as any submission does.
     if (args.pass && moved && !moved.same) return this.refuse(card, actor, 'verdict', { rule: 'review.headMoved', values: { card: card.key, submitted: (sub?.revision ?? '').slice(0, 7), head: moved.to.slice(0, 7) } } as GuardRefusal)
     const fin = args.pass ? await this.finishInputs(card, s, r, moved?.same ? moved.to : sub?.revision) : {}
+    const unmerged = args.pass && card.kind === 'no-code' ? this.unmergedRefusal(card, fin) : null
+    if (unmerged) return this.refuse(card, actor, 'verdict', unmerged)
     // HI-1734: a code card passing with nothing to merge (its change already in its target: HI-1449's checks only, which
     // others' merges had superseded) is proposed no code. Read before the write; unknown is no proposal.
     const merged = args.pass && card.kind === 'code' && sub?.revision && sub.base && s.started?.target && !this.store.facts(card.id).some((f) => f.kind === 'KindProposed' || f.kind === 'KindDecided') ? asCardCounts(s, await this.platform(r.options).contains(s.started.target, { base: sub.base, revision: sub.revision, key: sub.key })) : null
@@ -2568,6 +2585,9 @@ export class Workflow {
     // What the answer may be follows its request (HR3's #1269 round 1 finding 2): checked before anything is written.
     if (!answerFits(req, { outcome: answer, reply: !!note, decision: !!opts.decided, choice, rounds: opts.rounds, action }, LANE_MAX_ROUNDS)) throw new Error(`an answer (${answer}${choice ? `, ${choice}` : ''}) that doesn't fit request ${request} (${req.kind}, ${req.gate})`) // i18n-ignore: a programming error (tasks.ts checks first, in the user's words)
     const rounds = choice === 'carryOn' ? opts.rounds : undefined
+    // HI-3410: the user's approval of a no-code card's review finishes it: not while its own line holds unmerged commits.
+    const unmerged = req.gate === 'review' && answer === 'approved' && card.kind === 'no-code' ? this.unmergedRefusal(card, fin) : null
+    if (unmerged) return this.refuse(card, by, 'answer', unmerged)
     await this.cfg.hooks?.beforeWrite?.('answer')
     // HI-3391: as a verdict's (HI-3216): gathered again while only its fingerprint moved, or can't be read at that instant,
     // as often as its platform allows. jj's head moves with any jj operation in the repository (another lane's commit, a

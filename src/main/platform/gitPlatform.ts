@@ -16,7 +16,7 @@ import { attributeFolder, reconcileHistory, sharesFolder, type ReconcileHooks } 
 import { snapshot } from '../workflow/checks'
 import { lineName, type Workflow } from '../workflow/runtime'
 import { keptLineTarget } from '../workflow/keptLine'
-import type { CheckBracket, FinishInputs, HeadMove, LineNow, PlatformAdapter, RunRevision, StartPlan, SubmitPlan, Unsubmitted } from './adapter'
+import type { CheckBracket, FinishInputs, HeadMove, LineNow, PlatformAdapter, RunRevision, StartPlan, SubmitPlan, Unmerged, Unsubmitted } from './adapter'
 import * as G from './git'
 import { listWorktreesOrNull } from '../worktrees'
 import type { Disposable, ObserveEvent } from './history'
@@ -46,6 +46,9 @@ function statLine(p: string): string {
 
 /** The most commits an unsubmitted read counts (HI-2245): past it, a lower bound. */
 export const UNSUBMITTED_MAX = 100
+
+/** The most commits a no-code card's unmerged line names (HI-3410): the rest are counted. */
+const UNMERGED_SHOWN = 5
 
 const unknownRefusal =(card: CardRecord, what: Unknown, rule: string): GuardRefusal => ({ rule: 'platform.unknown', values: { card: card.key, what: what.whatText ?? what.what, rule } })
 
@@ -730,10 +733,41 @@ export class GitPlatform implements PlatformAdapter {
   }
 
   async finishInputs(card: CardRecord, s: CardState, o: WorkflowOptions, revision: string | null | undefined): Promise<FinishInputs> {
-    if (card.kind === 'no-code' || !revision || o.finish !== 'committed' || !s.started?.line) return {}
+    if (card.kind === 'no-code') return { unmerged: await this.unmergedLine(card, s) }
+    if (!revision || o.finish !== 'committed' || !s.started?.line) return {}
     const lh = await G.lineHead(this.project, s.started.line)
     if (isUnknown(lh)) return { contained: lh }
     return { contained: lh ? await G.isAncestor(this.project, revision, lh) : false }
+  }
+
+  /**
+   * HI-3410: a no-code card's own line (`cw/<project>/<its key>…`, made by a start of it while it was code, as MC-1559's
+   * was before its kind changed) with commits its target lacks. A no-code card finishes with nothing merged, so those
+   * would stay on the line alone. Null when it has no such line, the line is gone, or all of it is in the target; unknown
+   * when a head or the commits can't be read (never taken for none).
+   */
+  private async unmergedLine(card: CardRecord, s: CardState): Promise<Maybe<Unmerged | null>> {
+    const target = s.started?.target
+    if (!target) return null
+    const own = `cw/${this.wf.cfg.projectKey}/${card.key}`
+    let th: string | null = null
+    for (const line of new Set([s.started?.line, ...[...s.lines].reverse()])) {
+      if (!line || (line !== own && !line.startsWith(`${own}-`))) continue
+      const h = await G.lineHead(this.project, line)
+      if (isUnknown(h)) return h
+      if (!h) continue
+      if (th === null) {
+        const t = await G.lineHead(this.project, target)
+        if (isUnknown(t)) return t
+        if (!t) return unknown(UNREADABLE.head, { where: target })
+        th = t
+      }
+      if (h === th) continue
+      const list = await G.commits(this.project, `${th}..${h}`)
+      if (isUnknown(list)) return list
+      if (list.length) return { line, target, count: list.length, commits: list.slice(0, UNMERGED_SHOWN).map((c) => `${c.commit.slice(0, 7)} ${c.subject}`) }
+    }
+    return null
   }
 
   /** HI-3284: what `head` adds to `base`, for the merge guards (the history port's pinned diff). */
