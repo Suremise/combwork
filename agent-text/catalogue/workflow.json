@@ -900,6 +900,16 @@
     "note": "The next step after a refused report of a merge.",
     "audience": "both"
   },
+  "workflow.refused.done.noCodeUnmerged.message": {
+    "text": "{card} is no-code, so nothing of it is merged, but its branch {line} has {count, plural, one {# commit} other {# commits}} that {target} doesn't: {commits}{more, plural, =0 {} other { and # more}}.",
+    "note": "HI-3410: a refused submit, pass or approval of a no-code card (a card whose work is not code: nothing of it is merged when it is done): its own branch {line} has commits its target branch {target} doesn't have, which would stay on the branch alone. {card} is a card key like AM-12; {count} how many commits; {commits} the first few, each a short commit id and its subject, separated by semicolons (keep them as they are); {more} how many more there are (0: none, and nothing is added).",
+    "audience": "both"
+  },
+  "workflow.refused.done.noCodeUnmerged.next": {
+    "text": "{reader, select, you {If they're to be merged, make the card code again (its kind), and submit its branch for review as code. If they're to be dropped, move the card to Done yourself.} other {Ask the user which (cw_ask_user): to merge them, the user (or the Assistant, with the user's reason) makes the card code again, and its branch is submitted for review as code; to drop them, the user moves the card to Done.}}",
+    "note": "HI-3410: the next step after that refusal: the commits are merged (the card's kind changed back to code, then its branch submitted for review as a code card) or dropped on purpose (the user moves the card to Done, which keeps the branch and merges nothing). {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences. cw_ask_user is a tool name: keep it as it is. Done is a column name: use it as Combwork shows it.",
+    "audience": "both"
+  },
   "workflow.refused.evidence.changed.message": {
     "text": "What Combwork read for {card} changed while it decided.",
     "note": "A refused intent: a branch head, a file or another card the rule depends on changed between Combwork's reading it and recording the move. {card} is a card key.",
@@ -1748,6 +1758,11 @@
   "workflow.rule.done.contained": {
     "text": "Combwork checks the merge",
     "note": "A rule of the workflow, named where a move skips or can't check it: a card is done only when its work is in its target (glossary 2.6: G5).",
+    "audience": "both"
+  },
+  "workflow.rule.done.noCodeUnmerged": {
+    "text": "A no-code card leaves no commits unmerged",
+    "note": "A rule of the workflow, named where a move can't check it (HI-3410): a no-code card (nothing of it is merged) isn't finished while its own branch has commits its target branch lacks.",
     "audience": "both"
   },
   "workflow.rule.forward.resolutionSource": {
