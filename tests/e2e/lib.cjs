@@ -177,18 +177,34 @@ async function within(promise, ms) {
 
 /**
  * Waits until read() gives the same value (JSON) twice a look apart (HI-3384): what it reads has stopped changing (a
- * layout after a resize, a column after its scrolling). Whether it did within ms; false when it kept changing.
+ * layout after a resize, a column after its scrolling). Whether it did within ms; false when it kept changing, or when a
+ * read is still unanswered at the deadline (HR1's round 2: a Playwright read can hang, and the whole wait, each read and
+ * each pause included, has the one deadline). Past it, no further read starts; the one left unanswered is only no longer
+ * awaited. A read's failure is thrown.
  */
-async function steady(read, ms) {
-  let last
-  let looked = false
-  return !!(await until(async () => {
-    const now = JSON.stringify(await read())
-    const same = looked && now === last
-    last = now
-    looked = true
-    return same
-  }, ms))
+async function steady(read, ms, interval = timing('poll.intervalMs')) {
+  if (typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0) throw new Error(`steady needs its deadline, a name from tests/timing.json: got ${ms}`)
+  const LATE = Symbol('late')
+  let timer
+  const late = new Promise((done) => {
+    timer = setTimeout(() => done(LATE), ms)
+  })
+  const inTime = (p) => Promise.race([p, late])
+  try {
+    let last
+    let looked = false
+    for (;;) {
+      const value = await inTime(Promise.resolve().then(read))
+      if (value === LATE) return false
+      const now = JSON.stringify(value)
+      if (looked && now === last) return true
+      last = now
+      looked = true
+      if ((await inTime(sleep(interval))) === LATE) return false
+    }
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /** The suite's line a wait was called from: the first frame outside lib.cjs, repo-relative. */

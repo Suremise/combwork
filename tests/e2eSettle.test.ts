@@ -60,6 +60,32 @@ describe("lib.cjs's bounded settling (HI-3384)", () => {
     expect(n).toBeGreaterThanOrEqual(6)
   })
 
+  it('steady: a first read that never answers is false at its deadline, not before (HR1, round 2)', async () => {
+    let settled: boolean | null = null
+    void steady(() => new Promise(() => undefined), DEADLINE).then((v) => (settled = v))
+    await vi.advanceTimersByTimeAsync(DEADLINE - 1)
+    expect(settled).toBe(null)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(settled).toBe(false)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('steady: a read that stalls after a first answer is false at its deadline, and no read starts after it (HR1, round 2)', async () => {
+    let reads = 0
+    let settled: boolean | null = null
+    void steady(() => (++reads === 1 ? Promise.resolve([900, 600]) : new Promise(() => undefined)), DEADLINE).then((v) => (settled = v))
+    await vi.advanceTimersByTimeAsync(DEADLINE)
+    expect(settled).toBe(false)
+    expect(reads).toBe(2)
+    await vi.advanceTimersByTimeAsync(DEADLINE)
+    expect(reads).toBe(2)
+  })
+
+  it("steady: a read's failure is thrown, the deadline's timer cleared", async () => {
+    await expect(steady(() => Promise.reject(new Error('page closed')), DEADLINE)).rejects.toThrow('page closed')
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
   it('steady: geometry that never stabilises is false at its deadline, not taken as settled', async () => {
     let n = 0
     let settled: boolean | null = null
@@ -68,5 +94,9 @@ describe("lib.cjs's bounded settling (HI-3384)", () => {
     expect(settled).toBe(null)
     await vi.advanceTimersByTimeAsync(timing('poll.intervalMs') * 2)
     expect(settled).toBe(false)
+    // Past its deadline, no further read.
+    const at = n
+    await vi.advanceTimersByTimeAsync(DEADLINE)
+    expect(n).toBe(at)
   })
 })
