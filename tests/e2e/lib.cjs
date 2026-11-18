@@ -176,6 +176,22 @@ async function within(promise, ms) {
 }
 
 /**
+ * HI-3397: a test copy's exit, awaited within ms (`exited`: a promise of its process's exit, made before what quits it).
+ * Exited in time: it returns. Not: that exact process is ended by its handle (`proc`, the copy's own ChildProcess, never a
+ * name), its exit given ms again, and it throws naming `what`, so nothing goes on as if it had quit (HR1's round 1).
+ */
+async function exitWithin(proc, exited, ms, what) {
+  if (await within(exited, ms)) return
+  try {
+    proc.kill()
+  } catch {
+    // Gone meanwhile: nothing to end.
+  }
+  await within(exited, ms)
+  throw new Error(`${what}: the app didn't exit within ${ms / 1000} s (ended by its own handle)`)
+}
+
+/**
  * Waits until read() gives the same value (JSON) twice a look apart (HI-3384): what it reads has stopped changing (a
  * layout after a resize, a column after its scrolling). Whether it did within ms; false when it kept changing, or when a
  * read is still unanswered at the deadline (HR1's round 2: a Playwright read can hang, and the whole wait, each read and
@@ -2409,4 +2425,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { timing, PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, within, steady, settled, themeSettled, noDialog, hoverTip, quitWatch, appReady, openWorkspace, trustWorktrees, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, themeShown, CLAUDE_TRUST, CLAUDE_AT_PROMPT, trustQuestion, screenNow, typeThenEnter, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip, zoomTo, viewportIs, framesDrawn, ipcSettled, ipcAnswered, answersDrawn, readyWithin }
+module.exports = { timing, PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, within, exitWithin, steady, settled, themeSettled, noDialog, hoverTip, quitWatch, appReady, openWorkspace, trustWorktrees, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, themeShown, CLAUDE_TRUST, CLAUDE_AT_PROMPT, trustQuestion, screenNow, typeThenEnter, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip, zoomTo, viewportIs, framesDrawn, ipcSettled, ipcAnswered, answersDrawn, readyWithin }

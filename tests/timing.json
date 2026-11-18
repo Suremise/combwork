@@ -90,7 +90,6 @@
   "budget.replyToldMs": { "kind": "budget", "ms": 15000, "note": "a user's reply to an agent told to the Assistant within this, with no watch of its own (replytell.cjs, #1099)" },
   "lock.startSlackMs": { "kind": "lock", "ms": 2000, "note": "a test home lock's holder counts as the same process while its start, as listed now, is within this of the one it recorded (testHomeLock.mjs): an ownership tolerance, never scaled" },
   "pace.folderRenameAgainMs": { "kind": "pace", "ms": 250, "note": "a project folder rename refused while something still has it open, tried again after this, 40 tries at most (projectrename.cjs)" },
-  "quiet.writeToldMs": { "kind": "quiet", "ms": 2000, "note": "a card's own write told to the window and read within this, so only a project rename can then bring a new name (projectrename.cjs, #508)" },
   "quiet.removeOpensNothingMs": { "kind": "quiet", "ms": 500, "note": "a recent workspace's ✕ removes it and opens nothing within this (recent.cjs)" },
   "quiet.reloadNoteMs": { "kind": "quiet", "ms": 2500, "note": "after Reload on an unresponsive window: no crash note and no second question within this (rendercrash.cjs)" },
   "quiet.noTellMs": { "kind": "quiet", "ms": 2500, "note": "nothing told to the Assistant within this (keystrokes without Enter, Combwork's own line, a second line, the setting off, a task's turn: replytell.cjs)" },

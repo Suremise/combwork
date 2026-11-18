@@ -131,7 +131,9 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   // Restart and Update goes through the quit flow; test mode quits without installing.
   const closed = new Promise((r) => app.process().once('exit', r))
   await inv('update:install')
-  await lib.within(closed, lib.timing('app.closeMs'))
+  // It quits within the close bound, or the suite stops here: that copy ended by its own handle, never a next launch
+  // beside it, nor a pass on the log line alone (HR1's round 1).
+  await lib.exitWithin(app.process(), closed, lib.timing('app.closeMs'), 'Restart and Update')
   // HI-3167: asks nothing more (no agent working), and the installer would be shown, never silent.
   check('Restart and Update quits (test mode: no install), the installer shown', /Test mode: would install 9.1.1 \(Restart and Update\), the installer shown/.test(log('upd-a')))
 

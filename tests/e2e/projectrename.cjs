@@ -152,14 +152,43 @@ const oldCard = (n, proj, agent) =>
   await page.locator('.board-toolbar label', { hasText: 'Archived (' }).click()
 
   // --- Renamed while Combwork runs: the card follows it.
+  // The card's own write is told and read before the rename, and the rename is told by an event of its own after it, so
+  // only the rename can bring the new name to the board (#508 round 1: a late write's notice had hidden that it didn't;
+  // HR1's round 1 of HI-3397: proved by what was read and told, never by a time).
+  // Workspace events, as the window gets them (the Agent API's stream, the workspace token's).
+  const events = { text: '' }
+  const stream = new AbortController()
+  fetch(`http://127.0.0.1:${env.CW_API_PORT}/v1/events`, { headers: { Authorization: `Bearer ${apiToken}` }, signal: stream.signal })
+    .then(async (res) => {
+      const reader = res.body.getReader()
+      for (;;) {
+        const { value, done } = await reader.read()
+        if (done) break
+        events.text += Buffer.from(value).toString('utf8')
+      }
+    })
+    .catch(() => undefined)
+  check('the event stream is open', !!(await lib.until(() => events.text.includes(': connected'), lib.timing('hang.ui'))))
+  const boardTold = () => (events.text.match(/"type":"(?:tasks|workspace)-changed"/g) ?? []).length
+  // The window's reads of the board (main's answers to them; the suite reads none meanwhile).
+  const boardReads = async () => (await lib.ipcSettled(r.app, 'tasks:changes')) + (await lib.ipcSettled(r.app, 'tasks:list'))
+  // The card write's refresh is slowed past the 2 s the suite used to wait (CW_TEST_SLOW_IPC, its first read): the rename
+  // still begins only once that read has been answered and drawn.
+  await r.app.evaluate(() => void (process.env.CW_TEST_SLOW_IPC = 'tasks:changes=3000*1,tasks:list=3000*1'))
+  const readsBefore = await boardReads()
   const live = await inv('tasks:create', { title: 'Beta card', project: 'beta' })
-  // Shown on the board, then a pause on purpose: the card's own write has been told and read before the rename, so only
-  // the rename can bring the new name to the board (#508 round 1: a late write's notice had hidden that it didn't).
   check('the board shows the card under beta', !!(await lib.until(async () => /beta/.test(await page.locator(`.task-card[data-task="${live.number}"]`).innerText().catch(() => '')), lib.timing('hang.ui'))))
-  await lib.sleep(lib.timing('quiet.writeToldMs')) // A quiet window on purpose: the card write above is told and read first, so only the rename can rename it
+  // Its notice consumed: a board read answered since the write (the one that drew it), then all main has sent drawn.
+  await lib.until(async () => (await boardReads()) > readsBefore, lib.timing('hang.ui'))
+  await lib.answersDrawn(inv, page)
+  await r.app.evaluate(() => void delete process.env.CW_TEST_SLOW_IPC)
+  check("the card write's refresh, slowed past 2 s, was read before the rename began", (await boardReads()) > readsBefore, `${readsBefore} → ${await boardReads()}`)
+  const toldBefore = boardTold()
   await rename(beta, delta)
   check('a project renamed while Combwork runs keeps its cards', !!(await lib.until(async () => (await cards()).find((c) => c.number === live.number)?.project === 'delta', lib.timing('hang.ui'))), JSON.stringify((await cards()).find((c) => c.number === live.number)?.project))
+  check('…the rename told to the window by an event of its own, after it', !!(await lib.until(() => boardTold() > toldBefore, lib.timing('hang.ui'))), events.text.slice(-300))
   check('…and the board lists it under the new name', !!(await lib.until(async () => /delta/.test(await page.locator(`.task-card[data-task="${live.number}"]`).innerText().catch(() => '')), lib.timing('hang.ui'))))
+  stream.abort()
   const sidebar = async () => (await inv('workspace:get'))?.projects?.map((p) => p.name) ?? []
   check('…and the project list says delta, not beta', !!(await lib.until(async () => {
     const names = await sidebar()
