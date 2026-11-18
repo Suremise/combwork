@@ -7,6 +7,7 @@ import { advancedDef, CLI_PROBE_SECONDS, RESTART_READY_SECONDS, SERVER_CHECK_INF
 import { REQUEST_MAX_AGE_MS } from '../src/shared/restartResume'
 import { JJ_DEFAULTS } from '../src/main/platform/jjRunner'
 import { WHERE_MS } from '../src/main/providers/common'
+import { LAUNCHER_SOURCE } from '../src/main/providers/opencode/launcher'
 
 describe('the timing margins of finding tools and starting agents (HI-3375)', () => {
   it('two new settings: the CLIs’ version probe (row 1) and Check Server’s test request (row 17)', () => {
@@ -22,6 +23,14 @@ describe('the timing margins of finding tools and starting agents (HI-3375)', ()
     expect(advancedDef('claude-code.accounts.statusSeconds')).toMatchObject({ default: 30, min: 3, max: 120 })
     expect(advancedDef('codex.accounts.statusSeconds')).toMatchObject({ default: 30, min: 5, max: 120 })
     expect(advancedDef('cw.mcpCatalog.probeSeconds')).toMatchObject({ default: 15, min: 1, max: 60 })
+  })
+
+  // HR1's round 1: the launcher's own fallback (CW_OC_READY_MS missing or bad) follows the setting's default, never drifts
+  // from it; its post to Combwork waits past the start step's 20 s (row 8).
+  it("OpenCode's launcher: its ready fallback is the setting's default (row 5), its post 30 s (row 8)", () => {
+    const fallback = /readyMs < 1000\) readyMs = (\d+);/.exec(LAUNCHER_SOURCE)?.[1]
+    expect(Number(fallback)).toBe(Number(advancedDef('opencode.server.readySeconds')!.default) * 1000)
+    expect(LAUNCHER_SOURCE).toContain('r.Timeout = 30000; r.ReadWriteTimeout = 30000;')
   })
 
   it('the constants: where.exe 20 s (row 2), jj --version 30 s (row 4), an installer’s restart request 10 min (row 11)', () => {

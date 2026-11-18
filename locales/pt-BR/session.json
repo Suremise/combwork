@@ -233,5 +233,5 @@
   "session.tracker.unavailable": "O rastreador de processos não está disponível",
   "session.tracker.windowsOnly": "Rastrear processos exige o Windows",
   "session.notice.startContextTitle": "{agent} iniciou sem o contexto de início do Combwork",
-  "session.notice.startContextBody": "O Combwork não conseguiu {why, select, slow {prepará-lo a tempo} other {colocá-lo na sessão}}, então {agent} trabalha por enquanto sem a visão do quadro do Combwork e sem as orientações dele. Pare e inicie de novo para tentar outra vez."
+  "session.notice.startContextBody": "O Combwork não conseguiu {why, select, slow {prepará-lo a tempo} failed {prepará-lo} other {colocá-lo na sessão}}, então {agent} trabalha por enquanto sem a visão do quadro do Combwork e sem as orientações dele. Pare e inicie de novo para tentar outra vez."
 }

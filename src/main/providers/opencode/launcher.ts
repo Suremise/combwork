@@ -668,7 +668,7 @@ public static class CwOpencode {
     if (rulesAgent == "") rulesAgent = "build";
     int slash = model.IndexOf('/');
     string modelProvider = slash > 0 ? model.Substring(0, slash) : "", modelId = slash > 0 ? model.Substring(slash + 1) : "";
-    int readyMs; if (!int.TryParse(E("CW_OC_READY_MS"), out readyMs) || readyMs < 1000) readyMs = 30000;
+    int readyMs; if (!int.TryParse(E("CW_OC_READY_MS"), out readyMs) || readyMs < 1000) readyMs = 120000;
     long logMax; if (!long.TryParse(E("CW_OC_LOG_MAX"), out logMax) || logMax < 4096) logMax = 1048576;
     exe0 = exe; sayLog = log == "" ? null : log;
     foreach (string a in E("CW_OC_PREFIX").Split('\u001f')) if (a.Length > 0) prefix.Add(a);

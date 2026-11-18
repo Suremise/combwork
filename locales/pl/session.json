@@ -233,5 +233,5 @@
   "session.tracker.unavailable": "Moduł śledzenia procesów jest niedostępny",
   "session.tracker.windowsOnly": "Śledzenie procesów wymaga systemu Windows",
   "session.notice.startContextTitle": "Agent {agent} wystartował bez kontekstu startowego od Combwork",
-  "session.notice.startContextBody": "Combwork nie zdołał {why, select, slow {przygotować go na czas} other {umieścić go w sesji}}, więc agent {agent} na razie pracuje bez widoku tablicy od Combwork i jego wskazówek. Zatrzymaj go i uruchom ponownie, aby spróbować jeszcze raz."
+  "session.notice.startContextBody": "Combwork nie zdołał {why, select, slow {przygotować go na czas} failed {przygotować go} other {umieścić go w sesji}}, więc agent {agent} na razie pracuje bez widoku tablicy od Combwork i jego wskazówek. Zatrzymaj go i uruchom ponownie, aby spróbować jeszcze raz."
 }
