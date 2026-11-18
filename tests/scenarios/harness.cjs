@@ -1040,7 +1040,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       const endedNow = () => terminalEnded(combworkLog, agentId, launchMark)
       const ready = p.provider === 'claude-code' ? () => lib.combworkToolsConnected(userData, agentId, launchMark) || !!endedNow() : null
       // Waited for here (as sendPrompt would), so that its end is seen too.
-      if (ready && !(await lib.until(ready, 20000, 250))) console.log('INFO sendPrompt: not ready within 20 s, typed anyway')
+      if (ready && !(await lib.until(ready, 20000, 250))) console.log('INFO sendPrompt: not ready within 20 s, typed anyway') // timing-ok: sendPrompt's own readiness allowance (its waitMs, 20 s), moved here: past it the prompt is typed anyway, never a hang
       if (endedNow() || !(await lib.sendPrompt(inv, key, text, { submitted }))) {
         const drawn = String((await inv('pty:buffer', key).catch(() => '')) ?? '').slice(mark)
         const auth = p.provider === 'claude-code' ? claudeAuthStatus(combworkLog, agentId, env) : null
