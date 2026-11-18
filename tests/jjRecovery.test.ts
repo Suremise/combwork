@@ -75,7 +75,11 @@ async function stale(colocated: boolean, o: { destEdit?: (repo: string) => void;
 const run = (s: Stale, deps: RecoveryDeps, key = 'rec'): Promise<RecoveryResult> => recoverStale(deps, { repo: s.repo, folder: s.slot, identity: s.id, journal: s.h.journals.of(key), fence: yes, quiet })
 const divergentCount = (s: Stale): number => s.visible().filter((l) => l.endsWith(' true')).length
 
-describe.skipIf(!jjExe)(`a stale jj workspace's recovery (jj ${TESTED_JJ.version})`, () => {
+// A hung test's bound (HI-3350), not a time budget: each test runs real jj and Git processes, and alone, one file at a time,
+// the longest took 8.3 s, over a third of Vitest's 20 s default; a loaded full run needs at least 3 times that.
+const REAL_JJ_MS = 30_000
+
+describe.skipIf(!jjExe)(`a stale jj workspace's recovery (jj ${TESTED_JJ.version})`, { timeout: REAL_JJ_MS }, () => {
   for (const colocated of [true, false]) {
     describe(colocated ? 'colocated' : 'non-colocated', () => {
       it("HI-2781's case: the unrecorded edit is back in the checkout, the earlier recorded file untouched, no divergent revision left", async () => {
