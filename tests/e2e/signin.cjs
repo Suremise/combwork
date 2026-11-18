@@ -84,8 +84,12 @@ const until = lib.until
   check('Resume (n) counts the three', (await page.locator('.project-header button.act-resume', { hasText: 'Resume (3)' }).count()) === 1)
   await page.screenshot({ path: path.join(shots, 'signin-1-needs-sign-in.png') })
   // Another turn refused in the same expiry is shown, never told again.
+  // Its refusal seen (one more "Please run /login" in its terminal, never the moment it works, which a refused turn
+  // passes through faster than a look), then its status back at sign-in.
+  const refusals = async () => lib.plainText(String(await inv('pty:buffer', lib.ptyKey(alpha, agents[0].id)))).split('Please run /login').length - 1
+  const refusedBefore = await refusals()
   await send(agents[0], 'try once more')
-  await until(async () => (await live(agents[0]))?.status === 'working', HUNG_MS)
+  await until(async () => (await refusals()) > refusedBefore, HUNG_MS)
   await until(async () => (await live(agents[0]))?.status === 'signin', lib.timing('hang.ui'))
   await lib.sleep(lib.timing('quiet.signInGatherMs')) // A quiet window on purpose: a second notification would arrive within the gathering window.
   check('a later refusal in the same expiry is not told again', signInNotes().length === 1, JSON.stringify(signInNotes()))
