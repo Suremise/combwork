@@ -80,6 +80,10 @@ function idle(projectPath: string, agentId: string): boolean {
   if (!sessions.sideAllows(projectPath, agentId, 'reviewer')) return false
   if (BUSY.has(now.status) || agentBusy(projectPath, agentId) || now.backgroundTasks !== 0 || agentRunsGoing(projectPath, agentId).length !== 0) return false
   const st = sessions.liveFor(projectPath, agentId)
+  // HI-3402: a run in a slot (an either agent's, its lane's lease just ended and its exit still to come) is never told a
+  // review: typed there, it reviewed in the slot without its review copy (#1439's grant is a project-folder launch's).
+  // Free once it has stopped: then started for review in the project folder (#1434's purpose).
+  if (st?.slot) return false
   return !st || readyFor(st, 'idle')
 }
 
