@@ -231,5 +231,7 @@
   "session.tracker.stopped": "Combwork 的进程跟踪器已停止（{why}）",
   "session.tracker.title": "Combwork 无法跟踪智能体的进程",
   "session.tracker.unavailable": "进程跟踪器不可用",
-  "session.tracker.windowsOnly": "跟踪进程需要 Windows"
+  "session.tracker.windowsOnly": "跟踪进程需要 Windows",
+  "session.notice.startContextTitle": "{agent} 在没有 Combwork 启动上下文的情况下启动了",
+  "session.notice.startContextBody": "Combwork 未能{why, select, slow {及时生成它} failed {生成它} other {把它放进会话}}，因此 {agent} 暂时在没有 Combwork 的看板视图和指引的情况下工作。停止并重新启动它即可再试一次。"
 }

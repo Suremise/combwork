@@ -150,6 +150,37 @@ describe("a wake's Enter again (#430)", () => {
     }
   })
 
+  it("HI-3373: with no test's own time, the wait is Settings → Advanced's (cw.typed.takeSeconds, 30 s by default): Enter again after it, the mark after it again", async () => {
+    const { advanced } = await import('../src/main/advanced')
+    const { advancedDef } = await import('../src/shared/advanced')
+    expect(advancedDef(writer.TAKE_SECONDS)).toMatchObject({ default: 30, min: 5, max: 300 })
+    writer.testHooks.takeMs = undefined
+    await advanced.set(writer.TAKE_SECONDS, 5)
+    const before = { runId: 'run1', count: 0 }
+    vi.spyOn(sessions, 'promptsTaken').mockReturnValue(before)
+    const marks: string[] = []
+    vi.spyOn(sessions, 'lineNotTaken').mockImplementation((_p, _a, _r, line) => void marks.push(line))
+    let enters = 0
+    vi.spyOn(sessions, 'submitAgain').mockImplementation(() => (enters++, true))
+    vi.useFakeTimers()
+    try {
+      const done = writer.confirmTaken(project, id, before, 'WAKE')
+      await vi.advanceTimersByTimeAsync(4_000)
+      expect(enters).toBe(0)
+      await vi.advanceTimersByTimeAsync(2_000)
+      expect(enters).toBe(1)
+      // Not taken in the setting's time again: told as maybe waiting in its prompt, not before.
+      await vi.advanceTimersByTimeAsync(3_000)
+      expect(marks).toEqual([])
+      await vi.advanceTimersByTimeAsync(3_000)
+      expect(await done).toBe(false)
+      expect(marks).toEqual(['WAKE'])
+    } finally {
+      vi.useRealTimers()
+      await advanced.set(writer.TAKE_SECONDS, null)
+    }
+  })
+
   it('taken late, while it waited to press Enter again: nothing more', async () => {
     writer.testHooks.takeMs = 50
     let count = 0

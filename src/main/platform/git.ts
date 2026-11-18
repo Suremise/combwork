@@ -534,11 +534,13 @@ export async function filesChanged(repo: string, base: string, headRev: string):
 /**
  * HI-3284: the lines `headRev` adds to `base`, for the merge guards: a unified diff with no context, renames found (a
  * pure rename adds nothing), its inputs pinned against the user's configuration (no external diff or textconv, no colour,
- * the a/ and b/ prefixes, paths unquoted where git allows). Past GUARD_DIFF_BYTES, `tooLarge`; git failing, `unreadable`.
+ * the a/ and b/ prefixes, paths unquoted where git allows; HI-3364: a submodule as its `Subproject commit` lines, never
+ * `diff.submodule`'s log or diff form, and no context between hunks, nor a blank context line without its space, which
+ * the parser would take as malformed). Past GUARD_DIFF_BYTES, `tooLarge`; git failing, `unreadable`.
  */
 export async function addedDiff(repo: string, base: string, headRev: string): Promise<DiffRead> {
-  const pinned = ['-c', 'core.quotePath=false', '-c', 'diff.noprefix=false', '-c', 'diff.mnemonicPrefix=false', '-c', 'diff.relative=false']
-  const r = await git(repo, [...pinned, 'diff', '-U0', '-M', '--no-color', '--no-ext-diff', '--no-textconv', '--src-prefix=a/', '--dst-prefix=b/', base, headRev, '--'], GUARD_DIFF_BYTES)
+  const pinned = ['-c', 'core.quotePath=false', '-c', 'diff.noprefix=false', '-c', 'diff.mnemonicPrefix=false', '-c', 'diff.relative=false', '-c', 'diff.suppressBlankEmpty=false']
+  const r = await git(repo, [...pinned, 'diff', '-U0', '--inter-hunk-context=0', '--submodule=short', '-M', '--no-color', '--no-ext-diff', '--no-textconv', '--src-prefix=a/', '--dst-prefix=b/', base, headRev, '--'], GUARD_DIFF_BYTES)
   if (r.ok) return { text: r.out }
   if (r.notRun === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') return { tooLarge: true }
   return { unreadable: r.err || `git diff exited ${r.code}` } // i18n-ignore: git's side, for the log

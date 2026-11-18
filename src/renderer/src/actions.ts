@@ -24,7 +24,7 @@ import { IDLE_RESUME_FLOOR_TOKENS, idleResume, type IdleResume } from '@shared/s
 import { durationText } from '@shared/tasks'
 import { formatBytes } from '@shared/units'
 import { HAND_OVER_TEXT } from '@shared/handOver'
-import type { McpCatalogRow, McpServerInfo, ProjectInfo, ProviderId, SessionLayout, SessionListItem, SessionView, TemplateLoadPlan, ToastAction } from '@shared/types'
+import type { McpCatalogPrepared, McpCatalogRow, McpServerInfo, ProjectInfo, ProviderId, SessionLayout, SessionListItem, SessionView, TemplateLoadPlan, ToastAction } from '@shared/types'
 import type { TemplateWorkflow } from '@shared/workflow/templateOptions'
 import { TEMPLATE_NAME_MAX, namesFollowKey, templateAgentNames, usesKey, type TemplateEntry, type TemplateScope } from '@shared/templates'
 import { PLATFORM_NAME } from '@shared/platform/switching'
@@ -1214,8 +1214,31 @@ const CATALOG_FAILED = msg({ id: 'mcp.catalog.failed', defaultMessage: 'Could no
  * Add dialog: what it runs, and its name, another one when it is taken, or Replace only if the user says so (which keeps
  * the old one's places, HI-3327). Otherwise installed, it is added to no project yet (HI-2059): its view opens, for Add to….
  */
+/**
+ * HI-3377: a catalogue server downloaded and checked for Install or Update, cancellable meanwhile (Cancel download): its
+ * own id, so a Cancel ends only this one. One at a time in the window (HR1's round 1): while one runs, the others' Install
+ * and Update are off and their views name it, with its Cancel, so none loses its Cancel and none opens a dialog behind
+ * another's. Cancelled, or another running: null, and nothing is said; failed: undefined, said.
+ */
+async function prepareCatalog(row: Pick<McpCatalogRow, 'source' | 'name'>): Promise<McpCatalogPrepared | null | undefined> {
+  if (get().catalogPreparing) return null
+  const op = crypto.randomUUID()
+  set({ catalogPreparing: { source: row.source, name: row.name, op } })
+  try {
+    return await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogPrepare', row.source, row.name, op))
+  } finally {
+    set((s) => (s.catalogPreparing?.op === op ? { catalogPreparing: null } : {}))
+  }
+}
+
+/** HI-3377: the row's Cancel download: ends the preparation running now (its download stops; nothing is installed). */
+export function cancelCatalogPrepare(): void {
+  const p = get().catalogPreparing
+  if (p) void call('mcp:catalogCancel', p.op).catch(() => undefined)
+}
+
 export async function installCatalogServer(row: Pick<McpCatalogRow, 'source' | 'name' | 'version'>): Promise<boolean> {
-  const p = await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogPrepare', row.source, row.name))
+  const p = await prepareCatalog(row)
   if (!p) return false
   // #550's Add: what it runs, the name (another if it is taken, or Replace).
   const picked = await chooseServerName({
@@ -1225,6 +1248,7 @@ export async function installCatalogServer(row: Pick<McpCatalogRow, 'source' | '
     detail: p.secretWarnings.join('\n') || undefined,
     initial: p.server.name,
     initialTaken: p.nameTaken,
+    folder: true,
     confirmLabel: tr(msg({ id: 'mcp.catalog.installButton', defaultMessage: 'Install', description: 'Button (HI-545): installs the catalogue server.' }))
   })
   if (!picked) {
@@ -1247,7 +1271,7 @@ export async function installCatalogServer(row: Pick<McpCatalogRow, 'source' | '
  * change before it is applied, Combwork writes nothing and the dialog opens again from what is there now.
  */
 export async function updateCatalogServer(row: Pick<McpCatalogRow, 'source' | 'name' | 'version'>, again = 0): Promise<boolean> {
-  const p = await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogPrepare', row.source, row.name))
+  const p = await prepareCatalog(row)
   if (!p) return false
   const ex = p.existing
   if (!ex) {
@@ -1329,6 +1353,7 @@ export async function addMcpServerFromFile(): Promise<McpServerInfo | null> {
     detail: server.secretWarnings.length ? server.secretWarnings.join('\n') : undefined,
     initial: server.name,
     initialTaken: server.exists,
+    folder: server.files > 0,
     confirmLabel: tr(msg({ id: 'actions.mcp.add', defaultMessage: 'Add', description: 'Button: adds the MCP server to the workspace.' }))
   })
   if (!picked) return null
@@ -1344,7 +1369,7 @@ export async function addMcpServerFromFile(): Promise<McpServerInfo | null> {
  * name in use asks to Replace that server or choose another. `initialTaken`: whether the name offered is in use. Null
  * when cancelled.
  */
-async function chooseServerName(o: { title: string; message: string; list: string[]; detail?: string; initial: string; initialTaken: boolean; confirmLabel: string }): Promise<{ name: string; replace: boolean; places?: { projects: string[]; assistant: boolean } } | null> {
+async function chooseServerName(o: { title: string; message: string; list: string[]; detail?: string; initial: string; initialTaken: boolean; folder: boolean; confirmLabel: string }): Promise<{ name: string; replace: boolean; places?: { projects: string[]; assistant: boolean } } | null> {
   let name = o.initial
   for (;;) {
     const picked = await prompt({
@@ -1361,8 +1386,16 @@ async function chooseServerName(o: { title: string; message: string; list: strin
     name = picked.trim()
     const servers = name === o.initial && !o.initialTaken ? [] : await attempt(tr(msg({ id: 'actions.mcp.listFailed', defaultMessage: 'Could not list the servers', description: "An error's title: reading the workspace's MCP servers failed." })), () => call('mcp:list'))
     if (!servers) return null
-    const existing = servers.find((m) => m.name.toLowerCase() === name.toLowerCase())
-    if (!existing) return { name, replace: false }
+    const listed = servers.find((m) => m.name.toLowerCase() === name.toLowerCase())
+    // HI-3371: a name taken though no server is listed under it: a folder left without its definition (a .zip's, kept when
+    // a plain .json replaced it, or a definition deleted by hand), which takes the name for a server bringing a folder.
+    // Main refuses it unless replaced, so Replace is asked for as for any server, one added nowhere and running nothing
+    // (1.5.0 asked it for the name offered). The name offered: as its preview said; another typed: main says, as its add
+    // would decide (mcp:nameTaken). Main's own check at the add stays the one that decides.
+    const taken = listed ? true : name.toLowerCase() === o.initial.toLowerCase() ? o.initialTaken : await attempt(tr(msg({ id: 'actions.mcp.listFailed', defaultMessage: 'Could not list the servers', description: "An error's title: reading the workspace's MCP servers failed." })), () => call('mcp:nameTaken', name, o.folder))
+    if (taken === null) return null
+    if (!listed && !taken) return { name, replace: false }
+    const existing = listed ?? { name, def: undefined, runs: [] as string[], projects: [] as string[], assistant: false }
     name = existing.name
     // An upgrade (HI-3327): the places it is added keep it, and what it runs is shown changed (− now, + after).
     const where = mcpWhereText({ def: existing.def ?? {}, projects: existing.projects, assistant: existing.assistant }, get().workspace?.projects ?? [])

@@ -955,6 +955,8 @@ export interface CombworkRequests {
   'mcp:pickFile': () => string | null
   /** What adding the file would add: its name, what it runs, whether the name is taken. Adds nothing. */
   'mcp:previewFile': (file: string) => McpFileServer
+  /** HI-3371: whether `name` is taken for a server being added (`folder`: one that brings a folder, a .zip), as the add would refuse it. */
+  'mcp:nameTaken': (name: string, folder: boolean) => boolean
   /**
    * Adds it as `name`, off in the workspace and in every project (#1093); a name in use is refused unless `replace` (the
    * old one goes to the Recycle Bin).
@@ -968,7 +970,9 @@ export interface CombworkRequests {
   /** The one-time note for a source Combwork doesn't check was shown (HI-545). */
   'mcp:catalogNoted': (url: string) => void
   /** Downloads and checks a catalogue server for Install or Update (HI-545): what it would run, held for the answer. */
-  'mcp:catalogPrepare': (source: string, name: string) => McpCatalogPrepared
+  /** `op`: the window's id for this preparation, which `mcp:catalogCancel` names (HI-3377); cancelled, null. */
+  'mcp:catalogPrepare': (source: string, name: string, op?: string) => McpCatalogPrepared | null
+  'mcp:catalogCancel': (op: string) => void
   /** Drops a prepared download the user cancelled. */
   'mcp:catalogDrop': (id: string) => void
   /** Installs a prepared catalogue server as `name` (added nowhere); `replace` over a server of the name. */

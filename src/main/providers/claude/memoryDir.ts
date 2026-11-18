@@ -16,7 +16,7 @@ import { encodeProjectPath } from './usage'
 const KEY_LIMIT = 200
 
 /** The longest git may take to find the repository's main folder: no setting past it. */
-const GIT_MS = 5_000
+const GIT_MS = 30_000
 
 /**
  * Variables that give Claude Code its memory folder, or the folder's name, some other way (2.1.312; the last is

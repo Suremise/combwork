@@ -402,6 +402,94 @@ const commit = (dir, file, text, message) => {
   check('cancelling the draft keeps the edit too', !!(await lib.until(async () => (await ktDraft.count()) === 0, HUNG_MS)) && (await editKept()))
   await closeDialogs()
 
+  // --- HI-3369: a draft being typed survives choosing another file of the revision and coming back, and closing the
+  // card and opening it again (each remakes the file's comment layer).
+  const tf = (await inv('tasks:create', { title: 'Two files', project: 'alpha', agent: builder.id, column: 'todo' })).number
+  await say(alpha, builder.id, `boardmove ${tf} doing`)
+  await lib.until(async () => (await card(tf))?.column === 'doing', HUNG_MS)
+  commit(alpha, 'first.ts', 'export const first = 1\n', 'First file')
+  commit(alpha, 'second.ts', 'export const second = 2\n', 'Second file')
+  await say(alpha, builder.id, `boardmove ${tf} review`)
+  await lib.until(async () => (await card(tf))?.column === 'review', HUNG_MS)
+  const tfChanges = async () => {
+    const tfr = (await openCard(tf)).locator('.card-work[data-work="recorded"] .card-work-rev').first()
+    if (!(await tfr.locator('[data-revision-file]').count())) await tfr.getByRole('button', { name: 'Changes' }).click()
+    return tfr
+  }
+  let tfRev = await tfChanges()
+  const fileButton = (name) => tfRev.locator(`[data-revision-file="${name}"]`)
+  await lib.until(async () => (await fileButton('first.ts').count()) === 1, HUNG_MS)
+  await fileButton('first.ts').click()
+  await lib.until(async () => (await tfRev.locator('[data-revision-diff="first.ts"] .editor.modified .view-line', { hasText: 'first' }).count()) === 1, HUNG_MS)
+  await tfRev.locator('[data-revision-diff="first.ts"] .editor.modified .view-line', { hasText: 'first' }).hover()
+  const tfPlus = tfRev.locator('[data-revision-diff="first.ts"] .editor.modified .cw-comment-add')
+  await lib.until(async () => (await tfPlus.count()) === 1, HUNG_MS)
+  await tfPlus.click()
+  const tfDraftBox = () => tfRev.locator('[data-revision-diff="first.ts"] [data-draft="new:1-1"] textarea')
+  await lib.until(async () => (await tfDraftBox().count()) === 1, HUNG_MS)
+  await tfDraftBox().fill('Typed on first.ts')
+  await fileButton('second.ts').click()
+  await lib.until(async () => (await tfRev.locator('[data-revision-diff="second.ts"]').count()) === 1, HUNG_MS)
+  await fileButton('first.ts').click()
+  check('a draft typed on a file is still there, with its text, after choosing another file and coming back', !!(await lib.until(async () => (await tfDraftBox().inputValue().catch(() => '')) === 'Typed on first.ts', HUNG_MS)), await tfRev.innerText().catch(() => ''))
+  await closeDialogs()
+  tfRev = await tfChanges()
+  await lib.until(async () => (await fileButton('first.ts').count()) === 1, HUNG_MS)
+  await fileButton('first.ts').click()
+  check('…and after closing the card and opening its changes again', !!(await lib.until(async () => (await tfDraftBox().inputValue().catch(() => '')) === 'Typed on first.ts', HUNG_MS)), await tfRev.innerText().catch(() => ''))
+  // HR1's round 1: a save under way when the file changes. Main holds the add (CW_TEST_HOLD_IPC, as above) while the user
+  // chooses another file, then lets it go.
+  const tfDraft = () => tfRev.locator('[data-revision-diff="first.ts"] [data-draft="new:1-1"]')
+  const tfSaved = async () => (await inv('tasks:work', tf)).lineComments.filter((x) => x.path === 'first.ts').map((x) => x.body)
+  const away = async () => {
+    await fileButton('second.ts').click()
+    await lib.until(async () => (await tfRev.locator('[data-revision-diff="second.ts"]').count()) === 1, HUNG_MS)
+  }
+  const back = async () => {
+    await fileButton('first.ts').click()
+    await lib.until(async () => (await tfRev.locator('[data-revision-diff="first.ts"] .editor.modified .view-line').count()) > 0, HUNG_MS)
+  }
+  const draftAgain = async (words) => {
+    await tfRev.locator('[data-revision-diff="first.ts"] .editor.modified .view-line', { hasText: 'first' }).hover()
+    await lib.until(async () => (await tfPlus.count()) === 1, HUNG_MS)
+    await tfPlus.click()
+    await lib.until(async () => (await tfDraftBox().count()) === 1, HUNG_MS)
+    await tfDraftBox().fill(words)
+  }
+  await holdAdd(true)
+  await tfDraft().getByRole('button', { name: 'Save' }).click()
+  await lib.until(async () => (await addsHeld()) === 1, HUNG_MS)
+  await away()
+  await holdAdd(false)
+  await lib.until(async () => (await addsHeld()) === 0, HUNG_MS)
+  await back()
+  check('a save that ends while another file is shown: back on the file, the draft is gone and the comment is saved once', !!(await lib.until(async () => (await tfDraft().count()) === 0 && JSON.stringify(await tfSaved()) === '["Typed on first.ts"]', HUNG_MS)), `${await tfRev.innerText().catch(() => '')} | ${JSON.stringify(await tfSaved())}`)
+  // The file chosen again while the save is still held: the layer showing it loses the draft when the save ends.
+  await draftAgain('Second on first.ts')
+  await holdAdd(true)
+  await tfDraft().getByRole('button', { name: 'Save' }).click()
+  await lib.until(async () => (await addsHeld()) === 1, HUNG_MS)
+  await away()
+  await back()
+  check('…chosen again while it is still being saved: the draft shows, still with its text', !!(await lib.until(async () => (await tfDraftBox().inputValue().catch(() => '')) === 'Second on first.ts', HUNG_MS)), await tfRev.innerText().catch(() => ''))
+  await holdAdd(false)
+  check('…and leaves that layer once the save ends, saved once', !!(await lib.until(async () => (await tfDraft().count()) === 0 && JSON.stringify((await tfSaved()).sort()) === JSON.stringify(['Second on first.ts', 'Typed on first.ts']), HUNG_MS)), `${await tfRev.innerText().catch(() => '')} | ${JSON.stringify(await tfSaved())}`)
+  // A save that fails while another file is shown: back on the file, its text and the failure, and Save again works.
+  await draftAgain('Third on first.ts')
+  await app.evaluate(() => { process.env.CW_TEST_FAIL_IPC = 'tasks:lineCommentAdd*1' })
+  await holdAdd(true)
+  await tfDraft().getByRole('button', { name: 'Save' }).click()
+  await lib.until(async () => (await addsHeld()) === 1, HUNG_MS)
+  await away()
+  await holdAdd(false)
+  await lib.until(async () => (await addsHeld()) === 0, HUNG_MS)
+  await app.evaluate(() => { delete process.env.CW_TEST_FAIL_IPC })
+  await back()
+  check('a save that fails while another file is shown: back on the file, the draft has its text and says it failed; nothing saved', !!(await lib.until(async () => (await tfDraftBox().inputValue().catch(() => '')) === 'Third on first.ts' && /failed \(CW_TEST_FAIL_IPC\)/.test(await tfDraft().innerText().catch(() => '')), HUNG_MS)) && (await tfSaved()).length === 2, `${await tfDraft().innerText().catch(() => '')} | ${JSON.stringify(await tfSaved())}`)
+  await tfDraft().getByRole('button', { name: 'Save' }).click()
+  check('…and Save again saves it, once', !!(await lib.until(async () => (await tfDraft().count()) === 0 && (await tfSaved()).filter((b) => b === 'Third on first.ts').length === 1, HUNG_MS)), JSON.stringify(await tfSaved()))
+  await closeDialogs()
+
   // --- A submission whose repository couldn't be read (#1224 round 1, finding 2): its revision and files say they
   // weren't read, and why, never "no files changed". HEAD is unreadable while it is submitted, then put back.
   const u = (await inv('tasks:create', { title: 'Read failure', project: 'alpha', agent: builder.id, column: 'todo' })).number

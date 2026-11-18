@@ -13,6 +13,7 @@ import { strToU8, zipSync } from 'fflate'
 import * as electron from 'electron'
 import { OUR_CATALOG_URL, catalogRowShown, isOurCatalogUrl, sameCatalogSource, checkRequirements, compareVersions, editionOf, readCatalog, type PcFacts } from '../src/shared/mcpCatalog'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-mcp-catalog-')
 const profile = join(base, 'profile')
@@ -85,6 +86,9 @@ describe('catalog.json v1 (HI-545)', () => {
   })
 })
 
+// The longest a wait here waits: a bound for a hung run, never how long it should take (#570; HI-3378's timing file).
+const HUNG_MS = timing('wait.hang')
+
 describe('downloads (HI-545/s17)', () => {
   afterEach(() => {
     catalog.testHooks.fetch = undefined
@@ -117,6 +121,67 @@ describe('downloads (HI-545/s17)', () => {
     await expect(catalog.download('https://a.com/slow', 'https', 100, 200)).rejects.toThrow('took too long')
   })
 
+  // HI-3377: a server's zip is bounded by the time with nothing arriving, not the whole download's: a body that keeps
+  // arriving finishes however long it takes; no first byte, a stall mid-body, or redirects alone (headers never give it
+  // time) stop it. A fetch of the test's own sends its body in timed chunks and, as fetch does, ends it on an abort.
+  describe('idle time (HI-3377)', () => {
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
+    /** A body of `chunks` bytes each `every` ms apart, then the end (or a hang from `stallAfter` chunks on). */
+    const trickle = (chunks: number, every: number, stallAfter = Infinity): typeof fetch =>
+      (async (_url: string, init?: RequestInit) => {
+        let sent = 0
+        const body = new ReadableStream<Uint8Array>({
+          start(c) {
+            init?.signal?.addEventListener('abort', () => c.error(new DOMException('aborted', 'AbortError')), { once: true })
+          },
+          async pull(c) {
+            if (sent >= stallAfter) return new Promise<void>(() => {})
+            await wait(every)
+            if (sent++ >= chunks) return c.close()
+            c.enqueue(new Uint8Array([120]))
+          }
+        })
+        return new Response(body, { status: 200 })
+      }) as never
+
+    it('a body arriving slowly, past the whole time once over, finishes', async () => {
+      catalog.testHooks.fetch = trickle(8, 100)
+      const got = await catalog.download('https://a.com/zip', 'https', 100, 300, undefined, undefined, { idle: true })
+      expect(got!.bytes.length).toBe(8)
+    }, HUNG_MS)
+
+    it('no first byte, or a stall mid-body: stopped, saying nothing arrived', async () => {
+      catalog.testHooks.fetch = routes({ 'https://a.com/slow': { hang: true } })
+      await expect(catalog.download('https://a.com/slow', 'https', 100, 300, undefined, undefined, { idle: true })).rejects.toThrow('stopped sending (nothing received for')
+      catalog.testHooks.fetch = trickle(8, 50, 2)
+      await expect(catalog.download('https://a.com/zip', 'https', 100, 300, undefined, undefined, { idle: true })).rejects.toThrow('stopped sending')
+    }, HUNG_MS)
+
+    it('redirects with no body give it no more time: a chain slower than the idle time stops', async () => {
+      const hops = ['https://a.com/0', 'https://a.com/1', 'https://a.com/2', 'https://a.com/3']
+      catalog.testHooks.fetch = (async (url: string, init?: RequestInit) => {
+        await new Promise<void>((r, reject) => {
+          const t = setTimeout(r, 150) // timing-ok: the fake server's delay before each redirect, the premise of the test
+          init?.signal?.addEventListener('abort', () => (clearTimeout(t), reject(new DOMException('aborted', 'AbortError'))), { once: true })
+        })
+        const i = hops.indexOf(url)
+        return new Response(null, { status: 302, headers: { location: hops[i + 1] ?? 'https://a.com/end' } })
+      }) as never
+      await expect(catalog.download(hops[0], 'https', 100, 400, undefined, undefined, { idle: true })).rejects.toThrow('stopped sending')
+    }, HUNG_MS)
+
+    it('cancelled mid-body: ended at once, not at the idle time', async () => {
+      catalog.testHooks.fetch = trickle(1000, 50)
+      const cancel = new AbortController()
+      const going = catalog.download('https://a.com/zip', 'https', 10_000, 60_000, cancel.signal, undefined, { idle: true })
+      await wait(200)
+      const from = Date.now()
+      cancel.abort()
+      await expect(going).rejects.toThrow()
+      expect(Date.now() - from).toBeLessThan(HUNG_MS)
+    }, HUNG_MS)
+  })
+
   it("ends a download when its workspace's lifetime ends", async () => {
     catalog.testHooks.fetch = routes({ 'https://a.com/slow': { hang: true } })
     const life = new AbortController()
@@ -147,6 +212,52 @@ describe('downloads (HI-545/s17)', () => {
       catalog.testHooks.stat = undefined
     }
   })
+
+  // HI-3377 (HR1's round 1, finding 2): a file:// zip is read as it comes, so the idle time holds for a share as for https:
+  // a read that keeps arriving finishes past the idle time in all; one that stops arriving stops; a cancel ends the read.
+  it('a file:// zip under the idle time: a slow share that keeps reading finishes; a stall stops; a cancel ends the read', async () => {
+    const d = tempDir('cw-mcp-catalog-share-')
+    writeFileSync(join(d, 'demo.zip'), 'x'.repeat(8))
+    const url = pathToFileURL(join(d, 'demo.zip')).href
+    const wait = (ms: number, signal: AbortSignal) =>
+      new Promise<void>((r, reject) => {
+        const t = setTimeout(r, ms)
+        signal.addEventListener('abort', () => (clearTimeout(t), reject(new DOMException('aborted', 'AbortError'))), { once: true })
+      })
+    let reading = 0
+    /** One byte each `every` ms, `chunks` of them (a hang from `stallAfter` on); counts the reads going on. */
+    const share = (chunks: number, every: number, stallAfter = Infinity) =>
+      async function* (_path: string, signal: AbortSignal): AsyncIterable<Uint8Array> {
+        reading++
+        try {
+          for (let i = 0; i < chunks; i++) {
+            if (i >= stallAfter) await wait(3_600_000, signal)
+            await wait(every, signal)
+            yield new Uint8Array([120])
+          }
+        } finally {
+          reading--
+        }
+      }
+    try {
+      catalog.testHooks.read = share(8, 100)
+      expect((await catalog.download(url, 'file', 100, 300, undefined, undefined, { idle: true }))!.bytes.length).toBe(8)
+      catalog.testHooks.read = share(8, 50, 2)
+      await expect(catalog.download(url, 'file', 100, 300, undefined, undefined, { idle: true })).rejects.toThrow('stopped sending')
+      // Still held to the catalogue's size as it reads.
+      catalog.testHooks.read = share(8, 10)
+      await expect(catalog.download(url, 'file', 4, 300, undefined, undefined, { idle: true })).rejects.toThrow('is larger than its catalogue says')
+      catalog.testHooks.read = share(1000, 50)
+      const cancel = new AbortController()
+      const going = catalog.download(url, 'file', 10_000, 60_000, cancel.signal, undefined, { idle: true })
+      await expect.poll(() => reading, { timeout: HUNG_MS }).toBe(1)
+      cancel.abort()
+      await expect(going).rejects.toThrow()
+      expect(reading).toBe(0)
+    } finally {
+      catalog.testHooks.read = undefined
+    }
+  }, HUNG_MS)
 })
 
 describe('installing and updating (HI-545)', () => {
@@ -243,6 +354,33 @@ describe('installing and updating (HI-545)', () => {
     expect('catalog' in (def ?? {})).toBe(false)
   })
 
+  // HI-3377: the window's Cancel download names its own preparation: only that one ends (its download stopped, nothing held,
+  // answered null), and only from the workspace that started it; an id no longer preparing changes nothing.
+  it('Cancel ends only its own preparation, from its own workspace: null, nothing held', async () => {
+    await pages()
+    // The download held open: a share whose file never answers.
+    catalog.testHooks.stat = () => new Promise(() => {})
+    const other = createWorkspaceService()
+    await other.open(tempDir('cw-mcp-catalog-other-'))
+    try {
+      let settled = false
+      const going = run(() => catalog.prepareCatalogServer(source(), 'demo', 'op-1'))
+      void going.then(() => (settled = true), () => (settled = true))
+      await run(() => catalog.cancelCatalogPrepare('op-stale'))
+      await inWorkspace(other, async () => catalog.cancelCatalogPrepare('op-1'))
+      await new Promise((r) => setImmediate(r))
+      expect(settled).toBe(false)
+      await run(() => catalog.cancelCatalogPrepare('op-1'))
+      expect(await going).toBeNull()
+      expect((await run(() => mcp.listMcp())).map((m) => m.name)).toEqual([])
+    } finally {
+      catalog.testHooks.stat = undefined
+      await disposeWorkspaceService(other)
+    }
+    // Not cancelled: prepared as before.
+    expect(await run(() => catalog.prepareCatalogServer(source(), 'demo', 'op-2'))).toMatchObject({ server: { name: 'demo' } })
+  }, HUNG_MS)
+
   it("refuses a download that doesn't match its catalogue, a zip laid out wrong, or a server this PC can't run, writing nothing", async () => {
     publish('1.0.0', 'server.js', undefined, { sha: 'b'.repeat(64) })
     await pages()
@@ -285,6 +423,19 @@ describe('installing and updating (HI-545)', () => {
     await run(() => catalog.installCatalogServer(p.id, 'demo', true, { projects: [ambrosia], assistant: false }))
     expect((await launched(ambrosia)).demo?.args?.[0]).toMatch(/demo[\\/]server\.js$/)
     expect(projectMcp(ambrosia).enabled).toEqual(['demo'])
+  })
+
+  it('HI-3371: a folder left without its definition takes the name though no server is listed; Install with Replace, added nowhere, goes in its place', async () => {
+    mkdirSync(join(mcpDir(), 'demo'), { recursive: true })
+    writeFileSync(join(mcpDir(), 'demo', 'old.js'), '// left behind')
+    expect((await run(() => mcp.listMcp())).some((m) => m.name === 'demo')).toBe(false)
+    const p = await run(() => catalog.prepareCatalogServer(source(), 'demo'))
+    expect(p).toMatchObject({ existing: null, nameTaken: true })
+    await expect(run(() => catalog.installCatalogServer(p.id, 'demo', false))).rejects.toThrow('already exists')
+    const again = await run(() => catalog.prepareCatalogServer(source(), 'demo'))
+    await run(() => catalog.installCatalogServer(again.id, 'demo', true, { projects: [], assistant: false }))
+    expect(readdirSync(join(mcpDir(), 'demo'))).toEqual(['server.js'])
+    expect((await run(() => mcp.listMcp())).find((m) => m.name === 'demo')).toMatchObject({ projects: [], assistant: false })
   })
 
   it("installs and runs a zip with Combwork's names, updating it from the same folder; a zip with only the old names has no definition (HI-2594)", async () => {

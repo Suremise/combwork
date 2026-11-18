@@ -274,8 +274,10 @@ describe('Copilot launch', () => {
     const h = copilotHooks('http://127.0.0.1:5000/hook?run=r1', 'tok') as { version: number; hooks: Record<string, { type: string; url: string; headers: Record<string, string>; timeoutSec: number }[]> }
     expect(h.version).toBe(1)
     expect(Object.keys(h.hooks)).toEqual(['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'Notification', 'Stop', 'ErrorOccurred', 'PreCompact', 'SessionEnd'])
-    expect(h.hooks.PreToolUse).toEqual([{ type: 'http', url: 'http://127.0.0.1:5000/hook?run=r1', headers: { Authorization: 'Bearer tok' }, timeoutSec: 10 }])
-    expect(h.hooks.Stop[0].timeoutSec).toBe(5)
+    // Each hook's timeout is Settings → Advanced's (HI-3373: 30 s each by default).
+    expect(h.hooks.PreToolUse).toEqual([{ type: 'http', url: 'http://127.0.0.1:5000/hook?run=r1', headers: { Authorization: 'Bearer tok' }, timeoutSec: advanced.number('copilot.hooks.preToolUseTimeoutSeconds') }])
+    expect(h.hooks.Stop[0].timeoutSec).toBe(advanced.number('copilot.hooks.timeoutSeconds'))
+    expect([h.hooks.PreToolUse[0].timeoutSec, h.hooks.Stop[0].timeoutSec]).toEqual([30, 30])
   })
 
   it('converts workspace MCP servers to Copilot’s format', () => {

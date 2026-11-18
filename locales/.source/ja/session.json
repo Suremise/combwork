@@ -124,6 +124,8 @@
   "session.notice.question": "{agent} has a question for you",
   "session.notice.questionBody": "It carries on working meanwhile.",
   "session.notice.safeguardSwitch": "{agent} now runs on {model}",
+  "session.notice.startContextBody": "Combwork couldn't {why, select, slow {make it in time} failed {make it} other {put it into the session}}, so {agent} works without Combwork's view of the board and its guidance for now. Stop it and start it again to try again.",
+  "session.notice.startContextTitle": "{agent} started without Combwork's start context",
   "session.notice.tasksEnded": "Its background tasks have ended.",
   "session.notice.untaken": "Combwork typed it, but couldn't press Enter again (the agent was busy, or you were typing there). Show it, click its terminal and press Enter.",
   "session.notice.untakenRetried": "Combwork typed it and pressed Enter twice, but its CLI wasn't reading its input. Show it, click its terminal and press Enter.",

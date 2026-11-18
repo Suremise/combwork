@@ -133,7 +133,7 @@ A CLI Combwork has no provider for can still run your agents, from a **descripti
 
 This one runs Ollama's chat with a model on your PC (tested with Ollama 0.40.15 and `qwen3:8b`): its connection names the model. Ollama keeps no session Combwork can resume, so it has no `session`.
 
-- **What a description says.** `id` (lower-case letters, digits and dashes, no other provider's) and `name`. `binary`: its names on PATH, `paths` where it may be otherwise (a file, or a folder holding one of its names), and how to read its version. `launch`: its `args`, how the first prompt goes in (`"typed"` once its prompt is ready, or `{ "arg": [...] }` naming `{prompt}`), its permission `modes` (each a `value`, a `label` and the `args` that give it) and `env` (never Combwork's `CW_` variables). `session`: the arguments that start a session under Combwork's id and resume it (`{ "new": ["--session-id", "{id}"], "resume": ["--resume", "{id}"] }`); without it, its sessions can't be resumed. `status`: regular expressions for its screen (`ready`, its prompt's line, whether or not something is typed after it; and if it has them `working`, `asks` for a question or permission, `titleAsks` for its window title: the one found lowest on its screen says what it is doing), `osc7501` if it writes its turn's state that way, and `exit`, the line that ends it. Arguments may name `{model}`, `{cwd}`, `{prompt}` and `{id}`.
+- **What a description says.** `id` (lower-case letters, digits and dashes, no other provider's) and `name`. `binary`: its names on PATH, `paths` where it may be otherwise (a file, or a folder holding one of its names), and how to read its version. `launch`: its `args`, how the first prompt goes in (`"typed"` once its prompt is ready, or `{ "arg": [...] }` naming `{prompt}`), its permission `modes` (each a `value`, a `label` and the `args` that give it) and `env` (never Combwork's `CW_` variables). `session`: the arguments that start a session under Combwork's id and resume it (`{ "new": ["--session-id", "{id}"], "resume": ["--resume", "{id}"] }`); without it, its sessions can't be resumed. `status`: regular expressions for its screen (`ready`, its prompt's line, whether or not something is typed after it; and if it has them `working`, `asks` for a question or permission, `titleAsks` for its window title: the one found lowest on its screen says what it is doing), `osc7501` if it writes its turn's state that way, and `exit`, the line that ends it, with `exitGraceSeconds` how long it then gets to exit by itself before Combwork ends it (3 to 300, 30 when it doesn't say). Arguments may name `{model}`, `{cwd}`, `{prompt}` and `{id}`.
 - **A file Combwork can't use** is listed under Your own CLIs with each reason (a field missing or of the wrong kind, a pattern that isn't valid, an id that's taken), and isn't used. If a file that worked breaks, its last good version stays in use until you fix it or restart. A copy of the CLI inside an editor's extensions (VS Code, Cursor and the like) is never used, even if the description or the CLI path names it: Provider Setup says it was ignored.
 - **What such a CLI lacks.** It gets none of Combwork's tools, skills or guidance (no board or inbox), no hooks (no file locks or notices), no transcript (no conversation view, usage or context), no cost, and no live mode switch (a restart changes its mode); without `session`, no resume. Provider Setup and Agent Settings list what it lacks. Combwork doesn't install, update or sign it in: do that as its own instructions say. A task the Assistant or a script starts it on is typed as its first prompt; while it runs, it can't be sent tasks or messages, so type to it in its pane.
 - **Its status** comes from its screen: **working** while its `working` pattern (or its OSC 7501 state) says so, **waiting for you** while it asks something (answer in its pane; nothing is typed over it), and **finished** when its prompt is back after work. **Settings → Advanced** has each CLI's patterns, if one needs changing.
@@ -684,8 +684,8 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand JABQAHIAbwBnAHIAZQBzAHMAUAByAGUAZgBlAHIAZQBuAGMAZQA9ACcAUwBpAGwAZQBuAHQAbAB5AEMAbwBuAHQAaQBuAHUAZQAnAAoAJAB1AD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBVAFIATAA7ACAAJABhAD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBBAFUAVABIAF8ARgBJAEwARQAKAGkAZgAgACgALQBuAG8AdAAgACQAdQAgAC0AbwByACAALQBuAG8AdAAgACQAYQApACAAewAgAGUAeABpAHQAIAAwACAAfQAKAFMAZQB0AC0ATABvAGMAYQB0AGkAbwBuACAALQBMAGkAdABlAHIAYQBsAFAAYQB0AGgAIAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAtAEwAaQB0AGUAcgBhAGwAUABhAHQAaAAgACQAYQApAAoAYwB1AHIAbAAuAGUAeABlACAALQBzACAALQBtACAANQAgAC0AWAAgAFAATwBTAFQAIAAtAEgAIAAiAEAAJAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAkAGEAIAAtAEwAZQBhAGYAKQAiACAALQBIACAAIgBDAG8AbgB0AGUAbgB0AC0AVAB5AHAAZQA6ACAAYQBwAHAAbABpAGMAYQB0AGkAbwBuAC8AagBzAG8AbgAiACAALQAtAGQAYQB0AGEALQBiAGkAbgBhAHIAeQAgACIAQAAtACIAIAAiACQAKAAkAHUAKQAiAAoAZQB4AGkAdAAgADAA",
-            "timeout": 5
+            "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand JABQAHIAbwBnAHIAZQBzAHMAUAByAGUAZgBlAHIAZQBuAGMAZQA9ACcAUwBpAGwAZQBuAHQAbAB5AEMAbwBuAHQAaQBuAHUAZQAnAAoAJAB1AD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBVAFIATAA7ACAAJABhAD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBBAFUAVABIAF8ARgBJAEwARQAKAGkAZgAgACgALQBuAG8AdAAgACQAdQAgAC0AbwByACAALQBuAG8AdAAgACQAYQApACAAewAgAGUAeABpAHQAIAAwACAAfQAKAFMAZQB0AC0ATABvAGMAYQB0AGkAbwBuACAALQBMAGkAdABlAHIAYQBsAFAAYQB0AGgAIAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAtAEwAaQB0AGUAcgBhAGwAUABhAHQAaAAgACQAYQApAAoAYwB1AHIAbAAuAGUAeABlACAALQBzACAALQBtACAAMwAwACAALQBYACAAUABPAFMAVAAgAC0ASAAgACIAQAAkACgAUwBwAGwAaQB0AC0AUABhAHQAaAAgACQAYQAgAC0ATABlAGEAZgApACIAIAAtAEgAIAAiAEMAbwBuAHQAZQBuAHQALQBUAHkAcABlADoAIABhAHAAcABsAGkAYwBhAHQAaQBvAG4ALwBqAHMAbwBuACIAIAAtAC0AZABhAHQAYQAtAGIAaQBuAGEAcgB5ACAAIgBAAC0AIgAgACIAJAAoACQAdQApACIACgBlAHgAaQB0ACAAMAA=",
+            "timeout": 30
           }
         ]
       }
@@ -696,7 +696,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -714,7 +714,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 10,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -732,7 +732,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -749,7 +749,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -766,7 +766,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -783,7 +783,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -800,7 +800,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -817,7 +817,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -834,7 +834,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -848,7 +848,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
   },
   "statusLine": {
     "type": "command",
-    "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand JABQAHIAbwBnAHIAZQBzAHMAUAByAGUAZgBlAHIAZQBuAGMAZQA9ACcAUwBpAGwAZQBuAHQAbAB5AEMAbwBuAHQAaQBuAHUAZQAnAAoAJAB1AD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBVAFIATAA7ACAAJABhAD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBBAFUAVABIAF8ARgBJAEwARQAKAGkAZgAgACgALQBuAG8AdAAgACQAdQAgAC0AbwByACAALQBuAG8AdAAgACQAYQApACAAewAgAGUAeABpAHQAIAAwACAAfQAKAFMAZQB0AC0ATABvAGMAYQB0AGkAbwBuACAALQBMAGkAdABlAHIAYQBsAFAAYQB0AGgAIAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAtAEwAaQB0AGUAcgBhAGwAUABhAHQAaAAgACQAYQApAAoAYwB1AHIAbAAuAGUAeABlACAALQBzACAALQBtACAANQAgAC0AWAAgAFAATwBTAFQAIAAtAEgAIAAiAEAAJAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAkAGEAIAAtAEwAZQBhAGYAKQAiACAALQBIACAAIgBDAG8AbgB0AGUAbgB0AC0AVAB5AHAAZQA6ACAAYQBwAHAAbABpAGMAYQB0AGkAbwBuAC8AagBzAG8AbgAiACAALQAtAGQAYQB0AGEALQBiAGkAbgBhAHIAeQAgACIAQAAtACIAIAAiACQAKAAkAHUAKQA/AHMAdABhAHQAdQBzAGwAaQBuAGUAIgAKAGUAeABpAHQAIAAwAA==",
+    "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand JABQAHIAbwBnAHIAZQBzAHMAUAByAGUAZgBlAHIAZQBuAGMAZQA9ACcAUwBpAGwAZQBuAHQAbAB5AEMAbwBuAHQAaQBuAHUAZQAnAAoAJAB1AD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBVAFIATAA7ACAAJABhAD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBBAFUAVABIAF8ARgBJAEwARQAKAGkAZgAgACgALQBuAG8AdAAgACQAdQAgAC0AbwByACAALQBuAG8AdAAgACQAYQApACAAewAgAGUAeABpAHQAIAAwACAAfQAKAFMAZQB0AC0ATABvAGMAYQB0AGkAbwBuACAALQBMAGkAdABlAHIAYQBsAFAAYQB0AGgAIAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAtAEwAaQB0AGUAcgBhAGwAUABhAHQAaAAgACQAYQApAAoAYwB1AHIAbAAuAGUAeABlACAALQBzACAALQBtACAAMwAwACAALQBYACAAUABPAFMAVAAgAC0ASAAgACIAQAAkACgAUwBwAGwAaQB0AC0AUABhAHQAaAAgACQAYQAgAC0ATABlAGEAZgApACIAIAAtAEgAIAAiAEMAbwBuAHQAZQBuAHQALQBUAHkAcABlADoAIABhAHAAcABsAGkAYwBhAHQAaQBvAG4ALwBqAHMAbwBuACIAIAAtAC0AZABhAHQAYQAtAGIAaQBuAGEAcgB5ACAAIgBAAC0AIgAgACIAJAAoACQAdQApAD8AcwB0AGEAdAB1AHMAbABpAG4AZQAiAAoAZQB4AGkAdAAgADAA",
     "padding": 0
   }
 }
@@ -861,7 +861,7 @@ $ProgressPreference='SilentlyContinue'
 $u=$env:CW_HOOK_URL; $a=$env:CW_HOOK_AUTH_FILE
 if (-not $u -or -not $a) { exit 0 }
 Set-Location -LiteralPath (Split-Path -LiteralPath $a)
-curl.exe -s -m 5 -X POST -H "@$(Split-Path $a -Leaf)" -H "Content-Type: application/json" --data-binary "@-" "$($u)"
+curl.exe -s -m 30 -X POST -H "@$(Split-Path $a -Leaf)" -H "Content-Type: application/json" --data-binary "@-" "$($u)"
 exit 0
 ```
 
@@ -1438,7 +1438,7 @@ Stopping a `cw-progress` command (Ctrl+C where it gets one) gives it 5 seconds t
 
 **A check that doesn't count says why.** When a `cw-progress --check` run passes but doesn't count for its card, it says so in one line as it ends, with the reason and what to do: for example *not counted as check typecheck: files changed in the folder while it ran (src/a.ts). Run it again with nothing else writing in the folder, or with --isolated*. The exit code stays the command's. A submit refused because that check hasn't passed gives the same reason, so an agent isn't left running the same command again.
 
-**A check when Combwork is slow.** `cw-progress --check` asks Combwork for the check's command before running it, and waits up to 15 seconds for the answer (**Settings → Advanced → cw-progress: Combwork's reply time**, for sessions started afterwards, up to 2 minutes). With no answer it asks once more, then runs nothing and says *Combwork is slow to answer* (try again, or give it longer); a refused connection says *Combwork couldn't be reached* at once, adding that a sandbox blocking local network access, as Claude Code's Bash sandbox does, has the same effect. If Combwork doesn't confirm the check's result as it ends, cw-progress sends it once more, and says when the check may not have been recorded, so an agent runs it again rather than finding out at submit.
+**A check when Combwork is slow.** `cw-progress --check` asks Combwork for the check's command before running it, and waits up to a minute for the answer (**Settings → Advanced → cw-progress: Combwork's reply time**, for sessions started afterwards, up to 10 minutes). With no answer it asks again, after 5 and then 15 seconds, then runs nothing and says *Combwork is slow to answer* (try again, or give it longer); a refused connection says *Combwork couldn't be reached* at once, adding that a sandbox blocking local network access, as Claude Code's Bash sandbox does, has the same effect. If Combwork doesn't confirm the check's result as it ends, cw-progress sends it once more, and says when the check may not have been recorded, so an agent runs it again rather than finding out at submit.
 
 **A check in a copy of its own.** In a folder several agents share, another agent's edit while a check runs makes it not count (its details say files changed while it ran). Run it isolated instead: `cw-progress --check typecheck --isolated` runs the project's command for that check in a **check copy**, a folder Combwork keeps at exactly the card's revision (`<workspace>.worktrees/<project>/copies/copy-1`), which nothing else writes, so it counts whatever happens in the shared folder. Its run's details name the copy. When every copy is in use, it says *waiting for a check copy* and runs once one is free (it asks every 2 seconds, less often after a minute, up to every 10 seconds; Performance counts these asks as waits, not failures); a copy is used again only once nothing is left running in it. **Stop** (the square on its row in the Progress panel) ends the check and everything it started, also processes it left running in the background, and the run shows as stopped. A project keeps the larger of two copies and its reviewers plus one; **Settings → Advanced → Copies: wait for one to be free** (10 minutes) is how long a check waits before it says which copy is still in use, and by what. Copies set themselves up with your setup command, shown as **Combwork (copy copy-1)** runs. A project with no version control has no check copies: run the check again once nobody is changing the card's files.
 
@@ -1491,7 +1491,7 @@ It isn't **Blocked**: a blocked card can't go on and shows in red for someone to
 From Combwork 1.0, a card records its **work** as it goes: what its builder submitted for review, the verdicts and checks on it, and how it was merged. Open a card to see it in its **Work** section, below the decisions:
 
 - **Where it works:** its **Branch** (in a Git project), the **Base** revision it started from, its **Folder** (the project folder, or a folder of its own) and its **Target** (where it goes once approved, such as main).
-- **Revisions, newest first:** each revision submitted for review, with its round, the agent who submitted it and when. Click a revision to copy it whole; **1 file changed** lists its files, and a click on one opens it in the project's Files tab. **Changes** shows the revision's own diff: its files, and the one you choose side by side (or inline) from where the work started to that revision, read from the commits, so it is what was submitted even after the folder has moved on. A binary file or one too large to compare says so. **Comment on lines** there: hover a line and press the **+** beside it (on either side), or select lines first and press the **+** beside one of them; write in Markdown and press **Ctrl+Enter**. You can have several boxes open at once: a **+** on another line opens another beside the one you are writing (an empty one gives way), and what you type stays while you switch the diff to inline, where the original side's boxes and comments are listed above it. A comment shows under its lines with **Edit**, **Resolve** (or **Reopen**) and **Delete**. Comments stay on the card, each on the revision it was made on: the Work section counts the open ones, on the card and on each revision, and the revision's files list marks the files that have some. When a newer revision comes, open the older one to check each comment and resolve it. Agents read them too (`cw_read_task` with `lineComments`). **Send N comments to <builder>** (beside the count, while the card is in Review or Approved) gives every open comment to the card's builder as **one fix round**: a preview lists them (marking those sent before, and those edited since), and **Send** fails the review in your name with the comments as its findings, so the card goes back to Doing, the round counts toward its limit, and the builder is told through its inbox. A queued card is taken out of the queue first; while its merge is under way, or once it's merged, Send is refused. If a reviewer agent is reviewing the card, tick **Replace its review** first. A comment you leave open goes again with the next send; a comment once sent can be resolved but no longer deleted. Combwork refuses a send if the card or a comment changed since the preview opened, and a second click sends nothing more. A file opens in the folder the work was done in; if no agent has that folder any more, its files are listed as text, saying so. What Combwork couldn't read when the work was submitted (its revision, its files) says so, with why: never *No files changed*. Under it, each reviewer's verdict (*passed* or *failed*, and *no longer counts* once a newer revision or decision came since) and each check run on it (*not counted* when it doesn't count for that revision: hover it for why).
+- **Revisions, newest first:** each revision submitted for review, with its round, the agent who submitted it and when. Click a revision to copy it whole; **1 file changed** lists its files, and a click on one opens it in the project's Files tab. **Changes** shows the revision's own diff: its files, and the one you choose side by side (or inline) from where the work started to that revision, read from the commits, so it is what was submitted even after the folder has moved on. A binary file or one too large to compare says so. **Comment on lines** there: hover a line and press the **+** beside it (on either side), or select lines first and press the **+** beside one of them; write in Markdown and press **Ctrl+Enter**. You can have several boxes open at once: a **+** on another line opens another beside the one you are writing (an empty one gives way), and what you type stays while you switch the diff to inline, where the original side's boxes and comments are listed above it, and while you look at another file or close the card: it's there when you come back, until you save or cancel it (while Combwork is open). A comment shows under its lines with **Edit**, **Resolve** (or **Reopen**) and **Delete**. Comments stay on the card, each on the revision it was made on: the Work section counts the open ones, on the card and on each revision, and the revision's files list marks the files that have some. When a newer revision comes, open the older one to check each comment and resolve it. Agents read them too (`cw_read_task` with `lineComments`). **Send N comments to <builder>** (beside the count, while the card is in Review or Approved) gives every open comment to the card's builder as **one fix round**: a preview lists them (marking those sent before, and those edited since), and **Send** fails the review in your name with the comments as its findings, so the card goes back to Doing, the round counts toward its limit, and the builder is told through its inbox. A queued card is taken out of the queue first; while its merge is under way, or once it's merged, Send is refused. If a reviewer agent is reviewing the card, tick **Replace its review** first. A comment you leave open goes again with the next send; a comment once sent can be resolved but no longer deleted. Combwork refuses a send if the card or a comment changed since the preview opened, and a second click sends nothing more. A file opens in the folder the work was done in; if no agent has that folder any more, its files are listed as text, saying so. What Combwork couldn't read when the work was submitted (its revision, its files) says so, with why: never *No files changed*. Under it, each reviewer's verdict (*passed* or *failed*, and *no longer counts* once a newer revision or decision came since) and each check run on it (*not counted* when it doesn't count for that revision: hover it for why).
 - **A card worked in the project folder** (no slots) shares its branch with the folder's other cards, so its work is the commits made on that branch for it: those whose message names it (`Combwork-Card: HI-12`), and, while it is the folder's only unfinished card, those that name no card. A branch merged into the folder's branch keeps its commits with their own cards; only the merge commit is noted, by the same rule.
 - **Marks:** **Stale** when the pass was for an earlier revision that isn't the same change as the card's now, or a decision came after it; a pass that **carries over** to a later revision with the same changes; **merged outside the rules**, **already in** its target (a card in Review), **merged in part**, **no longer in** its target, or moved on by an override.
 - **How it was merged:** merged, squashed or already in its target, with the target's revision; *merged outside Combwork* when that happened in a terminal or another tool. A new commit on the target is looked at straight away; a change only to git's config or `.gitattributes` (a merge driver, say), with the same commits, can take up to 30 seconds to change whether the card's work counts as in its target, there and for deleting its branch or freeing its slot. A project without version control shows when its work was accepted.
@@ -1739,7 +1739,7 @@ The merge queue runs the list after the merge checks, once, and moves the target
 - **Only these paths** and **Skip these paths** (optional): globs separated by commas, such as `src/**`, `*.ts` or `LICENSE`. One without a `/` matches a file or folder name anywhere; a folder covers everything in it;
 - a **message**: what the builder should do instead.
 
-Combwork matches only the lines the merge adds, never what the target branch already has: a file that already holds a match can still be changed, and sweeping old matches out is separate work. Binary files are skipped. A match sends the card back to its builder like a failed merge check, naming the guard, the file and line, and your message; the card's Work section shows the run. If the check can't finish (a merge adding more than **Merge guards: most lines a merge adds**, or the matching taking longer than **Merge guards: longest the check takes**, both in Settings → Advanced), the card goes back too: a guard never lets a merge through on what it didn't check. When a builder submits a card whose work adds a match, its submit reply warns it first.
+Combwork matches only the lines the merge adds, never what the target branch already has: a file that already holds a match can still be changed, and sweeping old matches out is separate work. Binary files are skipped. A match sends the card back to its builder like a failed merge check, naming the guard, the file and line, and your message; the card's Work section shows the run. If the merge adds more than **Merge guards: most lines a merge adds** (Settings → Advanced), the card goes back too: a guard never lets a merge through on what it didn't check. If the matching runs out of time (**Merge guards: longest the check takes**, a minute by default), nothing merges either, but the card comes back to be submitted again unchanged, naming the guard that was running: that is a busy machine or a slow pattern, not a match. When a builder submits a card whose work adds a match, its submit reply warns it first.
 
 As you type a guard in a project's Workflow section, Combwork shows how many lines of the project it already matches, and the first few (file and line). Many matches usually mean the pattern is too broad: it still saves, since only the lines a merge adds are checked, but every card touching such lines would trip it once it adds one.
 
@@ -2126,7 +2126,7 @@ The MCP view's **Catalogue** tab lists servers you can install from **catalogues
 
 - **Each catalogue is its own category.** Search finds servers by name, description and tags. The filter shows **Not installed**, **Installed**, **Updates available** or **Runs on this PC**, and the source picker narrows the list to one catalogue. A long catalogue loads a page at a time (**Show more**).
 - **A server's requirements** are checked on this PC: its system, its Windows edition and build, Node.js and Docker. Combwork can't check every Windows feature without administrator rights; Windows Sandbox it can. A requirement Combwork can't check says so. A server this PC can't run shows **Can't run here**, and its **Install** is greyed out.
-- **Install…** downloads the server's zip and checks its size and checksum against the catalogue. Anything that doesn't match is refused and nothing is written. Combwork then shows what the server runs, as **Add MCP Server from File** does. Installed, it is in the workspace and added nowhere: use **Add to…** in its view, or **Add Server…** in a project's **MCP** tab, to add it where it should run. Installed with **Replace** over a server of the same name, it keeps that server's places instead.
+- **Install…** downloads the server's zip and checks its size and checksum against the catalogue. While it downloads, **Cancel download** stops it (one server downloads at a time: another server's view says which, with the same Cancel); a slow download that keeps arriving is never given up on, only one where nothing arrives for a minute (**Settings → Advanced → MCP catalogues: downloading a server**). Anything that doesn't match is refused and nothing is written. Combwork then shows what the server runs, as **Add MCP Server from File** does. Installed, it is in the workspace and added nowhere: use **Add to…** in its view, or **Add Server…** in a project's **MCP** tab, to add it where it should run. Installed with **Replace** over a server of the same name, it keeps that server's places instead.
 - **Updates are never automatic.** When a catalogue has a newer version of a server you installed from it, the server shows **Update to x.y.z**. **Update…** downloads and checks the new version, says where the server is added (those places keep it), keeps your own values for its environment variables and headers, and shows which lines of what it runs change. If where it is added changes while the dialog is open, Combwork writes nothing and shows the dialog again.
 - **Combwork reads catalogues only when the Catalogue opens or you refresh it** (↻), never in the background. A catalogue Combwork can't read shows why in its category.
 - **A catalogue you add isn't checked by Combwork.** The first time its servers are listed, a note says so. Look at what a server runs before you install it.

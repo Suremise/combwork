@@ -16,14 +16,26 @@ import type { GuardsReply, GuardsRequest } from './mergeGuardsWorker'
 
 export type { DiffRead }
 
-/** How long the empty-match rule may take at a save (design §4): past it the save is refused, naming the guard. */
-export const EMPTY_CHECK_MS = 1_000
+/**
+ * How long the empty-match rule may take at a save (design §4), from the worker's ready (HI-3377: 1 s, the thread's start
+ * included, refused saves on a busy machine): past it the save is refused, naming the guard.
+ */
+export const EMPTY_CHECK_MS = 10_000
+
+/**
+ * HI-3377: how long a worker may take to be ready (its thread started and its module loaded) before its request's own time
+ * limit starts. Past it the request has no answer (`failed`, `starting`): no pattern ran, so none is blamed.
+ */
+export const WORKER_START_MS = 30_000
 
 /** A check's outcome: its report, and whether an incomplete one was the environment's (a read that failed: tried again). */
 export type GuardsOutcome = GuardReport & { transient?: boolean }
 
-/** Why a worker gave no answer: its time limit (with the guard it was on), a cancel, or it failed or couldn't start. */
-export type WorkerEnded = { ended: 'timedOut' | 'cancelled' | 'failed'; running?: string }
+/**
+ * Why a worker gave no answer: its time limit (with the guard it was on), a cancel, or it failed or couldn't start
+ * (`starting`: it ended, or was not ready within WORKER_START_MS, before its request was sent: nothing ran).
+ */
+export type WorkerEnded = { ended: 'timedOut' | 'cancelled' | 'failed'; running?: string; starting?: true }
 
 let scriptForTests: string | null = null
 /** Tests: the worker's bundled script (built by the test, as the app's build makes merge-guards-worker.js). */
@@ -37,9 +49,10 @@ export const guardWorkers = { live: 0 }
 
 /**
  * One request in a worker of its own, ended once it settles: its answer, or why there is none (`timedOut` with the guard
- * it was on, `cancelled`, `failed`: it ended, or its script isn't there).
+ * it was on, `cancelled`, `failed`: it ended, or its script isn't there; `starting` when that was before it was ready). HI-3377: the
+ * request is sent, and `timeoutMs` starts, only once the worker says it is ready; `startMs` bounds that start.
  */
-export async function inWorker(m: GuardsRequest, timeoutMs: number, signal?: AbortSignal): Promise<GuardsReply | WorkerEnded> {
+export async function inWorker(m: GuardsRequest, timeoutMs: number, signal?: AbortSignal, startMs = WORKER_START_MS): Promise<GuardsReply | WorkerEnded> {
   if (signal?.aborted) return { ended: 'cancelled' }
   const script = guardsScript()
   if (!bundledScriptExists(script)) {
@@ -55,7 +68,9 @@ export async function inWorker(m: GuardsRequest, timeoutMs: number, signal?: Abo
   guardWorkers.live++
   workerStarted('merge guards', w) // i18n-ignore: a worker's name, for Copy Diagnostics' report (English)
   let running: string | undefined
+  let ready = false
   let timer: ReturnType<typeof setTimeout> | undefined
+  let starting: ReturnType<typeof setTimeout> | undefined
   let onAbort: (() => void) | undefined
   try {
     return await new Promise<GuardsReply | WorkerEnded>((done) => {
@@ -66,19 +81,27 @@ export async function inWorker(m: GuardsRequest, timeoutMs: number, signal?: Abo
         settled = true
         done(r)
       }
-      timer = setTimeout(() => settle({ ended: 'timedOut', ...(running !== undefined ? { running } : {}) }), timeoutMs)
+      // Cancellable from the start, before the worker is ready as after.
       onAbort = (): void => settle({ ended: 'cancelled' })
       signal?.addEventListener('abort', onAbort, { once: true })
+      starting = setTimeout(() => settle({ ended: 'failed', starting: true }), startMs)
       w.on('message', (r: GuardsReply) => {
-        if ('running' in r) running = r.running
+        if ('ready' in r) {
+          if (ready) return
+          ready = true
+          clearTimeout(starting)
+          // Its own time from here: the request's, never the thread's start (HI-3377).
+          timer = setTimeout(() => settle({ ended: 'timedOut', ...(running !== undefined ? { running } : {}) }), timeoutMs)
+          // A worker's port takes a transfer list where a window's postMessage takes an origin: none to transfer.
+          w.postMessage(m, [])
+        } else if ('running' in r) running = r.running
         else settle(r)
       })
-      w.on('error', () => settle({ ended: 'failed' }))
-      w.on('exit', () => settle({ ended: 'failed' }))
-      // A worker's port takes a transfer list where a window's postMessage takes an origin: none to transfer.
-      w.postMessage(m, [])
+      w.on('error', () => settle({ ended: 'failed', ...(ready ? {} : { starting: true as const }) }))
+      w.on('exit', () => settle({ ended: 'failed', ...(ready ? {} : { starting: true as const }) }))
     })
   } finally {
+    clearTimeout(starting)
     clearTimeout(timer)
     if (onAbort) signal?.removeEventListener('abort', onAbort)
     // Ended whatever settled it: a runaway pattern stops here (terminate ends the thread mid-match), waited for so no
@@ -94,7 +117,7 @@ export async function inWorker(m: GuardsRequest, timeoutMs: number, signal?: Abo
  * nothing read and an empty report. `signal`: the check's life (the queue's lease, the workspace): once aborted, its
  * worker ends and the check is incomplete.
  */
-export async function checkMergeGuards(guards: readonly MergeGuard[], read: () => Promise<DiffRead>, opts: { timeoutMs: number; maxLines: number; signal?: AbortSignal }): Promise<GuardsOutcome> {
+export async function checkMergeGuards(guards: readonly MergeGuard[], read: () => Promise<DiffRead>, opts: { timeoutMs: number; maxLines: number; signal?: AbortSignal; startMs?: number }): Promise<GuardsOutcome> {
   const none = (incomplete: string, transient = false): GuardsOutcome => ({ hits: [], more: 0, messages: [], incomplete, ...(transient ? { transient } : {}) })
   if (!guards.length) return { hits: [], more: 0, messages: [] }
   let d: DiffRead
@@ -105,14 +128,17 @@ export async function checkMergeGuards(guards: readonly MergeGuard[], read: () =
   }
   if ('tooLarge' in d) return none('tooLarge') // i18n-ignore: a reason's code
   if ('unreadable' in d) return none('unreadable', true) // i18n-ignore: a reason's code
-  const r = await inWorker({ type: 'check', diff: d.text, guards: [...guards], maxLines: opts.maxLines }, opts.timeoutMs, opts.signal)
+  const r = await inWorker({ type: 'check', diff: d.text, guards: [...guards], maxLines: opts.maxLines }, opts.timeoutMs, opts.signal, opts.startMs)
   if ('report' in r) return r.report
-  if ('ended' in r) return none(r.ended === 'timedOut' ? `timedOut:${r.running ?? ''}` : r.ended === 'cancelled' ? 'cancelled' : 'failed', r.ended === 'cancelled') // i18n-ignore: a reason's code
-  return none('failed') // i18n-ignore: a reason's code
+  // HI-3377: a time limit, a worker that ended or never got ready, and a cancel are the environment's (transient: the same
+  // revision may go back, still unchecked until a check finishes); a match, or a merge past the limits, is the work's.
+  // A worker never ready is recorded as `failed:notReady` (no pattern ran: the record tells it from a time limit).
+  if ('ended' in r) return none(r.ended === 'timedOut' ? `timedOut:${r.running ?? ''}` : r.ended === 'cancelled' ? 'cancelled' : r.starting ? 'failed:notReady' : 'failed', true) // i18n-ignore: a reason's code
+  return none('failed', true) // i18n-ignore: a reason's code
 }
 
 /** A preview's bounds: the files, the text and one file's size read, and its time limit. */
-export const PREVIEW_LIMITS = { maxFiles: 50_000, maxBytes: 64 * 1024 * 1024, maxFile: 2 * 1024 * 1024, timeoutMs: 10_000 }
+export const PREVIEW_LIMITS = { maxFiles: 50_000, maxBytes: 64 * 1024 * 1024, maxFile: 2 * 1024 * 1024, timeoutMs: 30_000 }
 
 /**
  * What one guard already matches in the project (HI-3284's decision), in the worker: `files` its version control's
@@ -193,7 +219,8 @@ export async function emptyMatchProblems(guards: readonly MergeGuard[] | undefin
   if (!guards?.length) return []
   const r = await inWorker({ type: 'empty', guards: [...guards] }, timeoutMs)
   if ('problems' in r) return r.problems
-  const ended = 'ended' in r ? r : { ended: 'failed' as const, running: undefined }
+  const ended: WorkerEnded = 'ended' in r ? r : { ended: 'failed' }
   const at = ended.running !== undefined ? Number(ended.running) : 0
+  // A worker never ready ran no pattern: unchecked, never a pattern's time (HI-3377).
   return [{ guard: Number.isFinite(at) ? at : 0, field: 'pattern', why: ended.ended === 'timedOut' ? 'timedOut' : 'unchecked' }] // i18n-ignore: problems' codes (GUARD_PROBLEMS has their messages)
 }

@@ -1371,8 +1371,15 @@ export async function deliveredSkillSizes(adapter: ProviderAdapter, ctx: LaunchC
 /** How soon after the user's Enter in an agent's pane its CLI must take a prompt for it to count as theirs (#418). */
 const USER_REPLY_MS = 15_000
 
-/** How long a prompt Combwork typed counts as pending (the agent just given a task) while its CLI hasn't taken it (#416). */
-const PENDING_MS = 30_000
+/**
+ * How long a prompt Combwork typed counts as pending (the agent just given a task) while its CLI hasn't taken it (#416).
+ * HI-3373: 120 s (it was 30): a CLI starting several MCP servers can be ready long before it takes its first task, and
+ * pending ends at that first prompt anyway.
+ */
+const PENDING_MS = 120_000
+
+/** The longest a Shift+Tab press waits for the footer to show the mode it moved to (HI-3373: 4 s gave up on a busy machine). */
+const MODE_PRESS_MS = 30_000
 
 /** How often a connection switch waiting for its safe point looks again with no event (HI-3213: as a lane's end does). */
 const SWITCH_RECHECK_MS = 5000
@@ -4398,8 +4405,10 @@ class SessionManager {
       if (before) seen.add(before)
       writePty(key, '\x1b[Z')
       const t = Date.now()
-      // The footer redraw that shows the new mode can take a few seconds on a busy machine or just after the start.
-      while (Date.now() - t < 4000 && st.permissionMode === before) await new Promise((r) => setTimeout(r, 50))
+      // Each press waits for the footer to show its effect before the next (HI-3373): the redraw can take seconds on a busy
+      // machine or just after the start, and a press before it would cycle past the mode. MODE_PRESS_MS bounds a redraw
+      // that never comes (nothing changed: the mode isn't offered), never how long one should take.
+      while (Date.now() - t < MODE_PRESS_MS && st.permissionMode === before) await new Promise((r) => setTimeout(r, 50))
       if (st.permissionMode === mode) {
         log.info(`${userText(this.label(st))}: switched to ${mode}`)
         this.refreshSizeSoon(l)
@@ -7382,8 +7391,12 @@ class SessionManager {
     return null
   }
 
-  /** The whole start step's budget (HI-2771): building the view and putting it, well inside the launcher's 5 s wait. */
-  static readonly SESSION_CONTEXT_MS = 2500
+  /**
+   * The whole start step's budget (HI-2771): building the view and putting it, inside the launcher's own wait for its
+   * post (30 s, launcher.ts' Post). HI-3375: 20 s, a bound for a hung step, not a performance budget: main stalls of 2–4 s
+   * happen, and a start context skipped is told to the user (startContextSkipped), never only logged.
+   */
+  static readonly SESSION_CONTEXT_MS = 20_000
   /** Each launch's start context in its session (HI-2771): its start step taken, compactions refreshed, its queue, its generation. */
   private sessionContexts = new WeakMap<LiveSession, { started: boolean; compactions: Set<string>; chain: Promise<void>; gen: number }>()
   /** The post that was its launch's start (its first baseline): its own expanded hooks are history the start's view covers. */
@@ -7439,17 +7452,41 @@ class SessionManager {
     const barred = (): boolean => l.policy?.guidance === false || !!this.keepsOut(l.state.projectPath, l.state.agentId)
     const run = s.chain.then(async () => {
       const ac = new AbortController()
-      const timer = setTimeout(() => ac.abort(), SessionManager.SESSION_CONTEXT_MS)
+      // Test copies only (unpackaged): CW_TEST_START_CONTEXT_MS shortens the deadline, so a check can see a skipped start
+      // context told (HI-3375, its notice) through the real path.
+      const testMs = !app.isPackaged ? Number(process.env.CW_TEST_START_CONTEXT_MS) : NaN
+      const timer = setTimeout(() => ac.abort(), Number.isFinite(testMs) && testMs > 0 ? testMs : SessionManager.SESSION_CONTEXT_MS)
       try {
         // Only a CLI that takes a start context in its session (its hooks part's deliverStartContext) is sent one.
         const deliver = l.adapter.hooks?.deliverStartContext?.bind(l.adapter.hooks)
         if (!current(ac.signal) || !sessionId || !deliver) return
-        const built = !barred() && this.startContext ? this.startContext(l.state, source).catch(() => null) : Promise.resolve(null)
+        const wanted = !barred() && !!this.startContext
+        // HI-3375 (HR1's round 1): a build that failed is told apart from one that made nothing on purpose (null: an
+        // ordinary agent, the Assistant's journal or guidance off), which is no skip.
+        let failed = false
+        const built = wanted ? this.startContext!(l.state, source).catch((e) => ((failed = true), log.warn('start context: building it', e), null)) : Promise.resolve(null)
         const text = await Promise.race([built, new Promise<null>((done) => ac.signal.addEventListener('abort', () => done(null), { once: true }))])
+        // Still this launch's latest delivery, its agent's running launch, its session the same: what may be told of it
+        // (never a warning against a replacement, or of a delivery a newer one superseded).
+        const still = (): boolean => gen === s.gen && this.live.get(liveId(l.state.projectPath, l.state.agentId)) === l && l.state.sessionId === sessionId
         // Asked again once it is made (as startContextFor): out of time, superseded, or barred meanwhile, nothing is sent.
-        if (!current(ac.signal)) return
+        // HI-3375: out of time (the deadline, its launch still this agent's), it is told: the agent works without it.
+        if (!current(ac.signal)) {
+          if (wanted && ac.signal.aborted && still()) this.startContextSkipped(l, 'slow')
+          return
+        }
+        // Wanted and its build failed: nothing to put (its old entry removed as before), and told.
+        if (failed && wanted && !barred()) {
+          const outcome = await deliver(l.state.runId, sessionId, null, ac.signal)
+          log.info(`start context into ${l.state.agentId}'s session (${source}): build failed, ${outcome}`)
+          if (still()) this.startContextSkipped(l, 'failed')
+          return
+        }
         const outcome = await deliver(l.state.runId, sessionId, text && !barred() ? text : null, ac.signal)
         log.info(`start context into ${l.state.agentId}'s session (${source}): ${outcome}`)
+        // HI-3375: one made and not put (refused, too large, not sent, or cut off at the deadline): told, never only logged,
+        // and only while that launch is still its agent's (a stop or a newer delivery meanwhile says nothing).
+        if (text && !barred() && outcome !== 'put' && outcome !== 'removed' && still()) this.startContextSkipped(l, 'notSent')
       } catch (e) {
         log.warn('start context into a session', e)
       } finally {
@@ -7458,6 +7495,24 @@ class SessionManager {
     })
     s.chain = run.catch(() => undefined)
     return run.then(() => null, () => null)
+  }
+
+  /**
+   * HI-3375: a launch's start context (Combwork's view of the board, its guidance and state) that couldn't be made in time
+   * (`slow`), couldn't be made at all (`failed`: its build threw), or couldn't be put into its session (`notSent`): the user is told, as the agent then works without it until its next
+   * compaction or start. A notice, never a chime.
+   */
+  private startContextSkipped(l: LiveSession, why: 'slow' | 'failed' | 'notSent'): void {
+    log.warn(`start context into ${l.state.agentId}'s session skipped (${why})`)
+    const agent = this.label(l.state)
+    this.notify(
+      l.state.projectPath,
+      withValues(msg({ id: 'session.notice.startContextTitle', defaultMessage: "{agent} started without Combwork's start context", description: "A notification's title (HI-3375): an agent ({agent}, its name) started, or went on after compacting its conversation, without the start context Combwork puts into its session (Combwork's view of the board, its guidance and its state)." }), { agent }),
+      withValues(msg({ id: 'session.notice.startContextBody', defaultMessage: "Combwork couldn't {why, select, slow {make it in time} failed {make it} other {put it into the session}}, so {agent} works without Combwork's view of the board and its guidance for now. Stop it and start it again to try again.", description: "The notification that an agent ({agent}) started without Combwork's start context (HI-3375). why: slow, it took too long to make (this PC was busy); failed, making it failed; other, it couldn't be put into the agent's session. Stop and start are the agent's buttons." }), { agent, why }), // i18n-ignore: select keys, never shown
+      'notice',
+      undefined,
+      l.state.agentId
+    )
   }
 
   /** The start context for a launch, in its CLI's reply form, or null (none, or it couldn't be made). */

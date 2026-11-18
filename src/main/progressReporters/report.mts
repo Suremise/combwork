@@ -240,9 +240,10 @@ export class ProgressRun {
    * log or record file. Inside cw-progress the log goes to the wrapper as a line (it reports the finish). Never rejects.
    * Resolves with Combwork's answer (a check run's says how it counted, #1654), or null when there is none in time;
    * `finishedAs` then says how it went. With `retry` (a check's run, HI-1892: its result is what a submit needs), a
-   * finish that got no reply is sent once more after `retry` ms: a 409 then says the first one arrived.
+   * finish that got no reply is sent again after each of `retry`'s delays in turn (HI-3377: backing off, the same run's
+   * finish each time): a 409 then says an earlier one arrived.
    */
-  async finish(ok: boolean, summary?: string, finishWaitMs = 3000, more: ProgressFinishMore = {}, retry?: number): Promise<unknown> {
+  async finish(ok: boolean, summary?: string, finishWaitMs = 3000, more: ProgressFinishMore = {}, retry?: readonly number[]): Promise<unknown> {
     // agent-protocol: a step line the wrapper parses (stepLine), never shown
     if (this.lines && more.logPath && !this.finished) this.lines(`##cw-progress log=${clip(more.logPath, MAX_LOG_PATH)}`)
     if (!this.target || this.finished) return null
@@ -264,10 +265,11 @@ export class ProgressRun {
         }
         const path = `/v1/progress/${encodeURIComponent(id)}/finish`
         let r = await this.call('POST', path, body, finishWaitMs)
-        if (!r && retry !== undefined) {
-          await new Promise((res) => setTimeout(res, retry))
+        for (const delay of retry ?? []) {
+          if (r) break
+          await new Promise((res) => setTimeout(res, delay))
           r = await this.call('POST', path, body, finishWaitMs)
-          // The first one arrived after all (its reply was what got lost): ended, but how it counted isn't known.
+          // An earlier one arrived after all (its reply was what got lost): ended, but how it counted isn't known.
           if (r?.status === 409) {
             this.finishOutcome = 'endedBefore'
             return null
@@ -280,7 +282,7 @@ export class ProgressRun {
     // Its start may still be waiting for Combwork (a quick command's start goes as it ends): what is left of the start's own
     // time comes first, so a start Combwork takes within it is followed by the finish (HR2's round 1), then the finish's.
     const startLeft = Math.max(0, this.startedAt + this.startTimeoutMs - Date.now())
-    const bound = startLeft + (retry !== undefined ? 2 * finishWaitMs + retry : finishWaitMs) + 250
+    const bound = startLeft + (retry ?? []).reduce((t, d) => t + d + finishWaitMs, finishWaitMs) + 250
     const answer = await Promise.race([done, new Promise((r) => (timer = setTimeout(() => r(null), bound)))])
     clearTimeout(timer)
     this.finishOutcome ??= 'noReply'
@@ -362,14 +364,17 @@ function unreachableOf(e: unknown): Unreachable {
 /**
  * Asks Combwork what a run is for before its command starts (POST /v1/progress/resolve): `link` when it answered, `refused`
  * with its reason (a revision that isn't checked out, an unknown card, a check with no command), or `unreachable` with
- * why (`Unreachable`). `retry` (HI-1892): a slow or failed ask is asked once more after that many ms (never a refused
- * connection: that fails at once).
+ * why (`Unreachable`). `retry` (HI-1892): a slow or failed ask is asked again after each of its delays in turn (HI-3377:
+ * backing off; the same ask, which starts nothing), never after a refused connection: that fails at once.
  */
-export async function resolveRun(target: ProgressTarget, ask: RunAsk, opts: { fetch?: Fetch; timeoutMs?: number; retry?: number } = {}): Promise<{ link: RunLink } | { refused: string } | { wait: string; ticket?: string } | Unreachable> {
-  const first = await resolveOnce(target, ask, opts)
-  if (!('unreachable' in first) || first.why === 'refused' || opts.retry === undefined) return first
-  await new Promise((r) => setTimeout(r, opts.retry))
-  return resolveOnce(target, ask, opts)
+export async function resolveRun(target: ProgressTarget, ask: RunAsk, opts: { fetch?: Fetch; timeoutMs?: number; retry?: readonly number[] } = {}): Promise<{ link: RunLink } | { refused: string } | { wait: string; ticket?: string } | Unreachable> {
+  let r = await resolveOnce(target, ask, opts)
+  for (const delay of opts.retry ?? []) {
+    if (!('unreachable' in r) || r.why === 'refused') break
+    await new Promise((res) => setTimeout(res, delay))
+    r = await resolveOnce(target, ask, opts)
+  }
+  return r
 }
 
 async function resolveOnce(target: ProgressTarget, ask: RunAsk, opts: { fetch?: Fetch; timeoutMs?: number }): Promise<{ link: RunLink } | { refused: string } | { wait: string; ticket?: string } | Unreachable> {

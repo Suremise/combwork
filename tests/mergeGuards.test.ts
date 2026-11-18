@@ -29,13 +29,15 @@ import {
   type AddedFile,
   type MergeGuard
 } from '../src/shared/workflow/mergeGuards'
-import { cancelPreview, checkMergeGuards, emptyMatchProblems, guardWorkers, inWorker, previewMergeGuard, PREVIEWS_AT_ONCE, previewsNow, schedulePreview, useGuardsWorker } from '../src/main/workflow/mergeGuardsRun'
+import { cancelPreview, checkMergeGuards, EMPTY_CHECK_MS, emptyMatchProblems, guardWorkers, inWorker, previewMergeGuard, PREVIEW_LIMITS, PREVIEWS_AT_ONCE, previewsNow, schedulePreview, useGuardsWorker } from '../src/main/workflow/mergeGuardsRun'
 import { withGuardsWorker } from './guardsWorker'
 import { guardedShown } from '../src/main/workflow/queueState'
 import { storedLineText } from '../src/shared/taskHistory'
 import { tr } from '../src/shared/i18n'
 import { takesOption } from '../src/shared/workflow/options'
 import { tempDir } from './tempDir'
+import { freshGitRepo, sh } from './workflow/harness'
+import { addedDiff } from '../src/main/platform/git'
 
 const fixture = (name: string): string => readFileSync(join(__dirname, 'fixtures', 'mergeGuards', name), 'utf8')
 const guard = (over: Partial<MergeGuard> = {}): MergeGuard => ({ name: 'No secrets', pattern: 'secret', message: 'Take it out.', ...over })
@@ -310,6 +312,39 @@ describe('the example guard (HI-3284’s decision)', () => {
   })
 })
 
+// HI-3364: the user's git configuration can change the diff's form; addedDiff pins each setting the parser depends on.
+describe('the merge’s diff read with real git, whatever the repository’s diff settings', () => {
+  it('a submodule moved and hunks near each other, under diff.submodule=log, interHunkContext and suppressBlankEmpty: read, never malformed', { timeout: HUNG_MS }, async () => {
+    const repo = freshGitRepo(join(tempDir('guards-diff-'), 'repo'))
+    sh(repo, 'update-index', '--add', '--cacheinfo', `160000,${'1'.repeat(40)},sub`)
+    // Only what is staged: `add -A` would take the gitlink, which has no folder, for a deletion.
+    const only = (content: string, message: string): string => {
+      writeFileSync(join(repo, 'blank.txt'), content)
+      sh(repo, 'add', '--', 'blank.txt')
+      sh(repo, 'commit', '-q', '-m', message)
+      return sh(repo, 'rev-parse', 'HEAD')
+    }
+    const base = only('a\n\nb\n', 'base')
+    sh(repo, 'update-index', '--cacheinfo', `160000,${'2'.repeat(40)},sub`)
+    const head = only('A\n\nB\n', 'head')
+    for (const [k, v] of [['diff.submodule', 'log'], ['diff.interHunkContext', '3'], ['diff.suppressBlankEmpty', 'true'], ['diff.noprefix', 'true'], ['diff.mnemonicPrefix', 'true'], ['color.ui', 'always']]) sh(repo, 'config', k, v)
+    // The settings do change what a plain `git diff` prints: the reasons the pins exist.
+    const plain = sh(repo, 'diff', '-U0', base, head)
+    expect(plain).toContain(`Submodule sub ${'1'.repeat(7)}...${'2'.repeat(7)}`)
+    expect(parseAddedLines(plain)).toEqual({ incomplete: 'malformed' })
+    const read = await addedDiff(repo, base, head)
+    if (!('text' in read)) throw new Error(JSON.stringify(read))
+    // A gitlink reads as git's default form says it (its `Subproject commit` line), as without the setting.
+    expect(parseAddedLines(read.text)).toEqual({
+      files: [
+        { path: 'blank.txt', lines: [{ n: 1, text: 'A' }, { n: 3, text: 'B' }] },
+        { path: 'sub', lines: [{ n: 1, text: `Subproject commit ${'2'.repeat(40)}` }] }
+      ],
+      lines: 3
+    })
+  })
+})
+
 describe('the worker', () => {
   const built = withGuardsWorker()
 
@@ -327,10 +362,68 @@ describe('the worker', () => {
     const text = `diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -0,0 +1 @@\n+${'a'.repeat(40)}!\n`
     // A time limit the pattern can't meet (2^40 steps), so the thread is ended mid-match.
     const r = await checkMergeGuards(runaway, async () => ({ text }), { timeoutMs: 300, maxLines: 10 })
-    expect(r).toMatchObject({ hits: [], incomplete: 'timedOut:Runaway' })
-    expect(r.transient).toBeUndefined()
+    // HI-3377: not checked, the environment's (the same revision may go back), never a match.
+    expect(r).toMatchObject({ hits: [], incomplete: 'timedOut:Runaway', transient: true })
     expect(guardFailureText(r)).toContain('guard "Runaway" ran past its time limit')
   }, HUNG_MS)
+
+  // HI-3377: the request's time starts at the worker's ready, after its module loaded, never at the thread's start; a worker
+  // never ready is bounded on its own, and ran no pattern. Workers of the test's own: the real one loaded late, and one that
+  // never says it is ready.
+  describe('its start and its ready', () => {
+    const late = (ms: number): string => {
+      const f = join(tempDir('cw-guards-late-'), 'late.cjs')
+      writeFileSync(f, `setTimeout(() => require(${JSON.stringify(built.bundle)}), ${ms})\n`)
+      return f
+    }
+    const never = (): string => {
+      const f = join(tempDir('cw-guards-never-'), 'never.cjs')
+      writeFileSync(f, 'setInterval(() => {}, 1000)\n')
+      return f
+    }
+    // Not a React hook, whatever its name: the worker's script for these tests (lint's hook rule reads names).
+    const setScript = useGuardsWorker
+    const withScript = async <T,>(script: string, fn: () => Promise<T>): Promise<T> => {
+      setScript(script)
+      try {
+        return await fn()
+      } finally {
+        setScript(built.bundle)
+      }
+    }
+
+    it('loaded after its thread started, longer than the request’s time: still answered (the time runs from its ready)', async () => {
+      const r = await withScript(late(1500), () => checkMergeGuards([guard()], async () => ({ text: diff }), { timeoutMs: 1000, maxLines: 200_000 })) // timing-ok: the limit under test, shorter than the worker's late load on purpose
+      expect(r.hits).toHaveLength(6)
+      expect(r.incomplete).toBeUndefined()
+      expect(guardWorkers.live).toBe(0)
+    }, HUNG_MS)
+
+    it('never ready: ended at its start bound, recorded as not ready (transient), no pattern blamed; a save says unchecked', async () => {
+      const r = await withScript(never(), () => inWorker({ type: 'empty', guards: [guard()] }, HUNG_MS, undefined, 300))
+      expect(r).toEqual({ ended: 'failed', starting: true })
+      const c = await withScript(never(), () => checkMergeGuards([guard()], async () => ({ text: diff }), { ...limits, startMs: 300 }))
+      expect(c).toMatchObject({ hits: [], incomplete: 'failed:notReady', transient: true })
+      expect(guardFailureText(c)).not.toContain('time limit')
+      expect(guardWorkers.live).toBe(0)
+    }, HUNG_MS)
+
+    it('cancelled while starting, and while matching: cancelled, its worker ended', async () => {
+      const starting = new AbortController()
+      const a = withScript(never(), () => inWorker({ type: 'empty', guards: [guard()] }, HUNG_MS, starting.signal, HUNG_MS))
+      await expect.poll(() => guardWorkers.live, { timeout: HUNG_MS }).toBe(1)
+      starting.abort()
+      expect(await a).toEqual({ ended: 'cancelled' })
+      expect(guardWorkers.live).toBe(0)
+      const matching = new AbortController()
+      const text = `diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -0,0 +1 @@\n+${'a'.repeat(40)}!\n`
+      const b = checkMergeGuards([guard({ name: 'Runaway', pattern: '^(a+)+$' })], async () => ({ text }), { ...limits, signal: matching.signal })
+      await expect.poll(() => guardWorkers.live, { timeout: HUNG_MS }).toBe(1)
+      matching.abort()
+      expect(await b).toMatchObject({ incomplete: 'cancelled', transient: true })
+      expect(guardWorkers.live).toBe(0)
+    }, HUNG_MS)
+  })
 
   it('is incomplete for a read too large, unreadable (transient), past its lines, or cancelled', async () => {
     expect(await checkMergeGuards([guard()], async () => ({ tooLarge: true }), limits)).toMatchObject({ incomplete: 'tooLarge' })
@@ -348,8 +441,16 @@ describe('the worker', () => {
     expect(await emptyMatchProblems([guard(), guard({ pattern: 'x?' })])).toEqual([{ guard: 1, field: 'pattern', why: 'matchesEmpty' }])
     expect(await emptyMatchProblems([guard()])).toEqual([])
     expect(await emptyMatchProblems(undefined)).toEqual([])
-    // The worker named which guard it was on when its time ran out (here, a limit no worker can meet).
-    expect(await emptyMatchProblems([guard(), guard({ pattern: 'y' })], 0)).toMatchObject([{ field: 'pattern', why: 'timedOut' }])
+    // Its time ran out (a worker of the test's own, ready but never answering): the pattern's time, named; the save refused.
+    const silent = join(tempDir('cw-guards-silent-'), 'silent.cjs')
+    writeFileSync(silent, "require('worker_threads').parentPort.postMessage({ ready: true }); setInterval(() => {}, 1000)\n")
+    useGuardsWorker(silent)
+    try {
+      expect(await emptyMatchProblems([guard(), guard({ pattern: 'y' })], 300)).toEqual([{ guard: 0, field: 'pattern', why: 'timedOut' }])
+    } finally {
+      useGuardsWorker(built.bundle)
+    }
+    expect(EMPTY_CHECK_MS).toBe(10_000)
   })
 
   it('previews what a guard already matches in a project: the files given, or a walk leaving out dot folders and the excluded', async () => {
@@ -368,7 +469,16 @@ describe('the worker', () => {
     const listed = await previewMergeGuard(root, ['LICENSE', 'gone.txt'], [], guard())
     expect(listed).toMatchObject({ count: 1, hits: [{ file: 'LICENSE', line: 1 }] })
     expect(await previewMergeGuard(root, null, [], guard({ pattern: '(' }))).toMatchObject({ incomplete: 'invalid' })
-    expect(await previewMergeGuard(root, null, [], guard(), { timeoutMs: 0 })).toMatchObject({ incomplete: 'timedOut' })
+    // Its time from the worker's ready (HI-3377): a worker of the test's own, ready but never answering, runs past it.
+    const silent = join(tempDir('cw-guards-silent-'), 'silent.cjs')
+    writeFileSync(silent, "require('worker_threads').parentPort.postMessage({ ready: true }); setInterval(() => {}, 1000)\n")
+    useGuardsWorker(silent)
+    try {
+      expect(await previewMergeGuard(root, null, [], guard(), { timeoutMs: 300 })).toMatchObject({ incomplete: 'timedOut' }) // timing-ok: the limit under test, which the silent worker runs past
+    } finally {
+      useGuardsWorker(built.bundle)
+    }
+    expect(PREVIEW_LIMITS.timeoutMs).toBe(30_000)
     const ac = new AbortController()
     ac.abort()
     expect(await previewMergeGuard(root, null, [], guard(), { signal: ac.signal })).toMatchObject({ incomplete: 'cancelled' })

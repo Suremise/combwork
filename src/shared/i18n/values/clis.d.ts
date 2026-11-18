@@ -25,6 +25,7 @@ interface CombworkMessageValues {
   'clis.problem.badMode': { value: string | number }
   'clis.problem.badPattern': { field: string | number; error: string | number }
   'clis.problem.badPlaceholder': { field: string | number; name: string | number; known: string | number }
+  'clis.problem.badSeconds': { field: string | number; min: string | number; max: string | number }
   'clis.problem.badType': { field: string | number; kind: string }
   'clis.problem.duplicate': { id: string | number; other: string | number }
   'clis.problem.fileBadJson': { error: string | number }

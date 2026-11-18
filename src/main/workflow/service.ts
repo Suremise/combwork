@@ -16,7 +16,7 @@ import type { JjCardDeps } from '../platform/jjPlatform'
 import { basename, resolve as resolvePath } from 'path'
 import { projectAgents } from '../../shared/defaults'
 import { advanced } from '../advanced'
-import { FOCUSED_PICK_SECONDS, WORKFLOW_ENFORCE } from '../../shared/advanced'
+import { FOCUSED_PICK_DEFAULT_S, FOCUSED_PICK_SECONDS, WORKFLOW_ENFORCE } from '../../shared/advanced'
 import { childEnv } from '../ptyHost'
 import { boardSavepoint, boardWrite } from '../boardStore'
 import { samePlace } from '../fsutil'
@@ -302,7 +302,19 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
       // The reconciler imports this module: loaded when needed. It follows the service holding the project (workspaceOf),
       // never a window's proxy of it, which this workflow may have been made from.
       // HI-2950: and one put back or Done, so an ended cycle's candidate is cleaned up soon (JjPlatform's sweep).
-      if ((to === 'approved' || to === 'todo' || to === 'done') && alive()) void Promise.all([import('./reconciler'), import('../workspace')]).then(([m, w]) => m.reconcileCard(w.workspaceOf(project.path), card.id, project.name)).catch(() => undefined)
+      // HI-3366: a card into Done reconciles each project it blocks a card of, too: a jj card held for it (HI-3265) has no
+      // merge-queue entry for kickDependents to run again, and nothing else reconciles its project when it is another one.
+      if ((to === 'approved' || to === 'todo' || to === 'done') && alive()) {
+        const elsewhere = to === 'done' ? store.dependents(card.id).flatMap((dep) => {
+          const p = store.projectOf(dep)
+          return p && p.toLowerCase() !== project.name.toLowerCase() ? [{ dep, p }] : []
+        }) : []
+        void Promise.all([import('./reconciler'), import('../workspace')]).then(([m, w]) => {
+          const at = w.workspaceOf(project.path)
+          m.reconcileCard(at, card.id, project.name)
+          for (const { dep, p } of elsewhere) m.reconcileCard(at, dep, p)
+        }).catch(() => undefined)
+      }
     },
     // HI-3188: the churn's levels as the project's preferences say now, and a simplify check told to the Assistant first.
     // The resolved options (read afresh by each workflowFor) carry the preferences, the defaults filled in.
@@ -326,7 +338,7 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // #1651: a check run that has finished is in its card's facts before a submit reads them.
     checksSettled: () => checksSettled(ws, project.path),
     // G20 (HI-1367): a submission's pick runs as a check does (a session command's environment), within its limit.
-    focused: { env: () => childEnv(), timeoutMs: () => Math.max(10, Number(advanced.get(FOCUSED_PICK_SECONDS)) || 180) * 1000, life },
+    focused: { env: () => childEnv(), timeoutMs: () => Math.max(10, Number(advanced.get(FOCUSED_PICK_SECONDS)) || FOCUSED_PICK_DEFAULT_S) * 1000, life },
     // A branch rename Repair recorded and hasn't finished (#1305): its new name, which a card on the old line follows.
     pendingRename: async (line) => (await ws.projectConfig(project.path)).pendingBranchRenames?.find((r) => r.from.toLowerCase() === line.toLowerCase())?.to ?? null,
     // A move Repair hasn't recorded (#1343): the workspace's or the project's last folder isn't where it is now.

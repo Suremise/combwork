@@ -175,7 +175,7 @@ export const ADVANCED: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.opencode.server.readySeconds.title', defaultMessage: 'Server: time to start', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.opencode.server.readySeconds.desc', defaultMessage: "How long an OpenCode agent's private server gets to answer before the launch gives up and ends it. Too short, an agent on a slow PC doesn't start.", description: 'What the advanced setting "Server: time to start" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
-    default: 30,
+    default: 120,
     min: 5,
     max: 300,
     unit: 's',

@@ -51,7 +51,8 @@ import type { RunCheck } from '../../shared/types'
 import type { QueueStep, QueueStuck } from '../../shared/workflow/queue'
 import { agentMsg, say } from '../../shared/agentText'
 import { asCardCounts } from './containment'
-import { guardReportLog, guardsKey, guardsOf, guardsRefuse, MERGE_GUARDS_CHECK, type GuardReport } from '../../shared/workflow/mergeGuards'
+import { FOCUSED_PICK_DEFAULT_S } from '../../shared/advanced'
+import { GUARD_CHECK_DEFAULTS, guardReportLog, guardsKey, guardsOf, guardsRefuse, MERGE_GUARDS_CHECK, type GuardReport } from '../../shared/workflow/mergeGuards'
 import { checkMergeGuards } from './mergeGuardsRun'
 
 /** A focused-test run's results Combwork couldn't read, as its check's output (HI-2463: Combwork's name). */
@@ -403,6 +404,18 @@ export function focusedProofGone(s: CardState, commands: Readonly<Record<string,
   return tests.filter((t) => !focusedProof(s, commands, reviewers, t, entry.revision))
 }
 
+/**
+ * HI-3284: whether the merge guards `now` (their key; '' for none) aren't those `result` was checked with for `entry`.
+ * Read from the card's facts (HI-3363), never the queue's memory: the host makes a new MergeQueue for each run, and a run
+ * ends at Ask each time's pause, so the Approve is taken by another queue than the one that checked (and after a restart,
+ * by another Combwork). Fresh only when the entry's last guards run on exactly `result` passed, counted, under `now`.
+ */
+export function guardsStaleIn(s: CardState, entry: string, result: string, now: string): boolean {
+  if (now === '') return false
+  const run = s.checks.filter((c) => c.name === MERGE_GUARDS_CHECK && c.entry === entry && c.tested === result).at(-1)
+  return !run || run.result !== 'passed' || !run.counted || run.guardsKey !== now
+}
+
 function advanceApprovedIn(s: CardState, entry: string, expected: string, result: string): boolean {
   return s.approvals.some((a) => {
     const r = s.made[a.request]
@@ -469,8 +482,6 @@ export function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Pro
  * counting (#1349), before it pauses.
  */
 export const MAX_RETESTS = 3
-/** HI-3284: the most entries whose merge guards' result the queue keeps (each released when its attempt ends). */
-export const GUARDED_KEPT = 256
 /** HI-3284: how often a merge guards' check reads that the queue still holds its lease (lost: its worker ends). */
 const GUARD_LEASE_WATCH_MS = 500
 
@@ -1461,7 +1472,7 @@ export class MergeQueue {
       if (focusedProofGone(s, r.options.commands, proofReviewers(this.wf.store.card(card.id).reviewer, s), entry, data.result).length) return 'proofGone' as const
       // HI-3284: and the merge guards' result, read again against the options as they are now: changed since, it goes
       // round again the same way (its evidence gone), checked under the guards now.
-      if (this.guardsStale(entry.id, data.result)) return 'proofGone' as const
+      if (guardsStaleIn(s, entry.id, data.result, this.guardsKeyNow())) return 'proofGone' as const
       if (this.cfg.enforced && !this.cfg.enforced()) return 'rulesOff' as const
       if (this.wf.store.queuePause(entry.target) || this.cfg.teamPaused?.()) return 'held' as const
       // A checked-out target under Ask each time (OP-40): only with the user's Approve of this entry and test merge, as
@@ -1487,15 +1498,10 @@ export class MergeQueue {
    * where it was. One git step (#1386): what it asks about fixed commits is asked once; refs, HEAD and files are read anew.
    */
   private async process(card: CardRecord, entry: QueueEntry, ready?: { expected: string; result: string }): Promise<QueueOutcome> {
-    let o: QueueOutcome | undefined
     try {
-      o = await readStep(() => this.steps(card, entry, ready))
-      return o
+      return await readStep(() => this.steps(card, entry, ready))
     } finally {
       this.cfg.onStep?.(null)
-      // HI-3284 (HR2's round 1, finding 6): what the entry's result was checked with is kept only while it waits, open
-      // (paused, an approval asked for, blocked): any other outcome, or none (a throw), ends it.
-      if (!o || (o.outcome !== 'paused' && o.outcome !== 'waiting')) this.guardedRuns.delete(entry.id)
     }
   }
 
@@ -1703,8 +1709,8 @@ export class MergeQueue {
       const last = this.stillApproved(card, entry)
       if (!last.ok) return this.skip(card, entry, last.cancelled)
       // HI-3284: the merge guards as the options are now aren't those this result was checked with (changed while it was
-      // queued or checked, or never checked here: an approved advance after a restart): round again, checked anew.
-      if (this.guardsStale(entry.id, result)) {
+      // queued or checked, or no counted pass recorded for this result): round again, checked anew.
+      if (guardsStaleIn(last.s, entry.id, result, this.guardsKeyNow())) {
         if (++retests > MAX_RETESTS) return this.pause(target, card, entry, 'targetMovesFast')
         continue
       }
@@ -1969,28 +1975,9 @@ export class MergeQueue {
     return { kind: 'green' }
   }
 
-  /**
-   * What each open entry's result was checked with by the merge guards (HI-3284): their key, and the result. Released
-   * when its attempt ends (process); at most GUARDED_KEPT, the oldest dropped first (an entry dropped is checked again).
-   */
-  private readonly guardedRuns = new Map<string, { key: string; result: string }>()
-
   /** The merge guards' key as the project's options are now. */
   private guardsKeyNow(): string {
     return guardsKey(guardsOf(this.wf.cfg.options()))
-  }
-
-  /** Whether the guards now aren't those `result` was checked with for `entry` (no guards, never checked: not stale). */
-  private guardsStale(entry: string, result: string): boolean {
-    const now = this.guardsKeyNow()
-    const was = this.guardedRuns.get(entry)
-    return was ? was.key !== now || was.result !== result : now !== ''
-  }
-
-  private keepGuarded(entry: string, key: string, result: string): void {
-    this.guardedRuns.delete(entry)
-    this.guardedRuns.set(entry, { key, result })
-    while (this.guardedRuns.size > GUARDED_KEPT) this.guardedRuns.delete(this.guardedRuns.keys().next().value!)
   }
 
   /**
@@ -2001,13 +1988,9 @@ export class MergeQueue {
   private async guardsCheck(card: CardRecord, entry: QueueEntry, result: string, expected: string): Promise<ChecksOutcome | null> {
     const guards = guardsOf(this.wf.cfg.options())
     const key = guardsKey(guards)
-    this.guardedRuns.delete(entry.id)
-    if (!guards.length) {
-      this.keepGuarded(entry.id, key, result)
-      return null
-    }
+    if (!guards.length) return null
     const t0 = Date.now()
-    const limits = this.cfg.guardLimits?.() ?? { timeoutMs: 10_000, maxLines: 200_000 }
+    const limits = this.cfg.guardLimits?.() ?? GUARD_CHECK_DEFAULTS
     const history = this.history(card)
     // The check's life is the queue's (HR2's round 1, finding 3): its lease lost, the worker ends at once.
     const life = new AbortController()
@@ -2022,11 +2005,9 @@ export class MergeQueue {
     this.stillHolds(entry.target)
     const refused = guardsRefuse(r)
     const data: FactData['CheckRan'] = { name: MERGE_GUARDS_CHECK, command: MERGE_GUARDS_CHECK, revision: result, tested: result, result: refused ? 'failed' : 'passed', run: randomUUID(), durationMs: Math.max(0, Date.now() - t0), by: CW_RUNS, counted: !r.incomplete, entry: entry.id, guardsKey: key, base: expected }
+    // The record is the proof the queue reads again before the advance (guardsStaleIn), whichever queue takes it on.
     await this.write(card, (w) => w.fact('CheckRan', data))
-    if (!refused) {
-      this.keepGuarded(entry.id, key, result)
-      return null
-    }
+    if (!refused) return null
     const { transient, ...report } = r
     return { kind: 'red', transient: !!transient, output: guardReportLog(report), check: MERGE_GUARDS_CHECK, guards: report, guardsKey: key }
   }
@@ -2050,7 +2031,7 @@ export class MergeQueue {
     const run = o.commands[FOCUSED_RUN]?.trim()
     if (!run) return { kind: 'focused', focused: { why: 'noRunner' } } // i18n-ignore: codes (a why, a check name), never shown as text
     const f = this.cfg.folder
-    const deps = { env: this.cfg.focused?.env ?? (() => ({})), timeoutMs: this.cfg.focused?.pickTimeoutMs() ?? 60_000 }
+    const deps = { env: this.cfg.focused?.env ?? (() => ({})), timeoutMs: this.cfg.focused?.pickTimeoutMs() ?? FOCUSED_PICK_DEFAULT_S * 1000 }
     const approved = chosenTests(choice)
     // The result's own changes: every path not exactly as submitted, picked here (all the submission's when the result's are unread).
     const now = await pathChanges(f, expected, result)

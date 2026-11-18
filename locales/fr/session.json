@@ -231,5 +231,7 @@
   "session.tracker.stopped": "Le suivi des processus de Combwork s’est arrêté ({why})",
   "session.tracker.title": "Combwork ne peut pas suivre les processus des agents",
   "session.tracker.unavailable": "Le suivi des processus n’est pas disponible",
-  "session.tracker.windowsOnly": "Le suivi des processus nécessite Windows"
+  "session.tracker.windowsOnly": "Le suivi des processus nécessite Windows",
+  "session.notice.startContextTitle": "{agent} a démarré sans le contexte de démarrage de Combwork",
+  "session.notice.startContextBody": "Combwork n’a pas pu {why, select, slow {le préparer à temps} failed {le préparer} other {le placer dans la session}}, donc {agent} travaille pour l’instant sans la vue du tableau de Combwork ni ses consignes. Arrêtez-le et redémarrez-le pour réessayer."
 }

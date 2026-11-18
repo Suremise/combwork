@@ -1045,7 +1045,7 @@
     "audience": "both"
   },
   "settings.advanced.codex.mcp.startupTimeoutSeconds.desc": {
-    "text": "How long Codex waits for Combwork's combwork server to start, when your own Codex config has a server named combwork with a startup timeout of its own: Combwork gives Codex this one instead (otherwise Codex's own, 10 s, applies). Too short, and Codex agents start without Combwork's tools.",
+    "text": "How long Codex waits for Combwork's combwork server to start: Combwork gives Codex this one for it at every launch, over Codex's own (10 s) and over a startup timeout your own Codex config sets for a server named combwork. Too short, and Codex agents start without Combwork's tools.",
     "note": "What the advanced setting \"Combwork tools: startup timeout in Codex\" is for, and what goes wrong when it is wrong (Settings → Advanced). combwork is the name of Combwork's MCP server.",
     "audience": "both"
   },
@@ -1859,6 +1859,16 @@
     "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in characters (\"80 characters\"): the length of a card title an agent writes past which Combwork suggests a shorter one.",
     "audience": "both"
   },
+  "settings.advanced.cw.cli.probeSeconds.desc": {
+    "text": "How long each coding agent's CLI gets to print its version when Combwork looks for it (at start, Check Again, after an install). One that takes longer is skipped and shows as not installed: a CLI's first start, with antivirus scanning it on a slow disk, can take tens of seconds.",
+    "note": "What the advanced setting \"Finding the CLIs: version check timeout\" does (Settings → Advanced, under Combwork). A CLI is the command-line program of a coding agent (Claude Code, Codex).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.cli.probeSeconds.title": {
+    "text": "Finding the CLIs: version check timeout",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"60 s\").",
+    "audience": "both"
+  },
   "settings.advanced.cw.console.showText.desc": {
     "text": "Show the text in the developer console: prompts, replies, commands and tools' arguments, under a banner saying it is unredacted, and start each recording with its text box ticked. Tokens, API keys and sign-in details stay masked whatever this says; agents' cw_console stays redacted, and a recording with text is never attached to Copy Diagnostics.",
     "note": "What the advanced setting \"Developer console: show prompt, reply and command text\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
@@ -2080,8 +2090,8 @@
     "audience": "both"
   },
   "settings.advanced.cw.mcpCatalog.downloadSeconds.desc": {
-    "text": "How long Install and Update wait for a catalogue server's zip, redirects included, before they stop with nothing installed. Raise it on a slow connection.",
-    "note": "What the advanced setting \"MCP catalogues: downloading a server\" is for (Settings → Advanced, HI-545).",
+    "text": "How long Install and Update wait with nothing arriving while they download a catalogue server's zip, before they stop with nothing installed. A slow download that keeps arriving is never stopped; Cancel download stops one. Raise it on a connection that pauses for long.",
+    "note": "What the advanced setting \"MCP catalogues: downloading a server\" is for (Settings → Advanced, HI-545). HI-3377: the time with no data arriving, not the whole download’s time.",
     "audience": "both"
   },
   "settings.advanced.cw.mcpCatalog.downloadSeconds.title": {
@@ -2130,8 +2140,8 @@
     "audience": "both"
   },
   "settings.advanced.cw.mergeGuards.seconds.desc": {
-    "text": "How long matching the merge guards against a merge’s added lines may take. Past it the check ends unfinished, which sends the card back like a match, naming the guard that was running. Raise it for very large merges; a pattern that takes this long usually needs rewriting.",
-    "note": "What the advanced setting \"Merge guards: longest the check takes\" does, and what goes wrong when it is wrong (Settings → Advanced, HI-3284).",
+    "text": "How long matching the merge guards against a merge’s added lines may take, once their check has started. Past it the merge isn’t checked: nothing merges, and the card comes back to be submitted again unchanged, naming the guard that was running (not as a match). Raise it for very large merges; a pattern that takes this long usually needs rewriting.",
+    "note": "What the advanced setting \"Merge guards: longest the check takes\" does, and what goes wrong when it is wrong (Settings → Advanced, HI-3284, HI-3377).",
     "audience": "both"
   },
   "settings.advanced.cw.mergeGuards.seconds.title": {
@@ -2300,7 +2310,7 @@
     "audience": "both"
   },
   "settings.advanced.cw.progress.replySeconds.desc": {
-    "text": "How long cw-progress waits for Combwork to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks once more, then runs nothing and says Combwork is slow. Raise it when a busy Combwork makes checks fail with \"Combwork is slow to answer\" (HI-1892). Kept at 2 minutes at most.",
+    "text": "How long cw-progress waits for Combwork to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks again (after 5 s, then 15 s), then runs nothing and says Combwork is slow. Raise it when a busy Combwork makes checks fail with \"Combwork is slow to answer\" (HI-1892). Kept at 10 minutes at most.",
     "note": "What the advanced setting \"cw-progress: Combwork's reply time\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
     "audience": "both"
   },
@@ -2539,6 +2549,16 @@
     "note": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"300 s\"). A retry wait: an agent's coding agent waiting to try its model request again.",
     "audience": "both"
   },
+  "settings.advanced.cw.server.checkInferSeconds.desc": {
+    "text": "How long Check Server waits for a model server to answer its test request. A local model that isn't loaded yet loads first, which on modest hardware can take minutes; past this time the check reports a timeout.",
+    "note": "What the advanced setting \"Check Server: test request timeout\" does (Settings → Advanced, under Combwork). Check Server tests a model server the user added for a CLI (its address and model).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.server.checkInferSeconds.title": {
+    "text": "Check Server: test request timeout",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"600 s\"). Check Server is a button for a model server (Settings → Accounts & Connections).",
+    "audience": "both"
+  },
   "settings.advanced.cw.sessions.signFailFast.desc": {
     "text": "When a repository signs commits, an agent's commit with Git for Windows' gpg or ssh-keygen, GnuPG's gpg or Windows' ssh-keygen signs with nobody there, or fails at once and tells the agent why, instead of waiting for a passphrase nobody can type. Signing stays on, and your git and gpg settings are never changed: sessions get a signer of Combwork's in their environment only. Other signers run as before. Turned off, sessions use git's own signer, as before.",
     "note": "What the advanced setting \"Agents' signed commits never wait for a passphrase\" does (Settings → Advanced). gpg, ssh-keygen, Git for Windows and GnuPG are names: keep them.",
@@ -2687,6 +2707,16 @@
   "settings.advanced.cw.terminal.osc52.title": {
     "text": "A CLI putting text on the clipboard",
     "note": "An advanced setting's title (Settings → Advanced), listed under Combwork: what Combwork does when an agent's CLI asks to set the clipboard (OSC 52).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.typed.takeSeconds.desc": {
+    "text": "How long an agent's CLI has to take a line Combwork typed into it (start working on it) before Combwork presses Enter again, once, as soon as that is safe (within six times this). Not taken in this time again, Combwork tells you the line may be waiting in its prompt and types nothing more into that agent until it is taken. Raise it if a slow or busy machine shows that notice for lines that were taken.",
+    "note": "What the advanced setting \"Typed line: wait to be taken\" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-3373).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.typed.takeSeconds.title": {
+    "text": "Typed line: wait to be taken",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A line: a message Combwork typed into an agent's terminal; taken: the agent's CLI started working on it.",
     "audience": "both"
   },
   "settings.advanced.cw.usage.timelineDetailDays.desc": {

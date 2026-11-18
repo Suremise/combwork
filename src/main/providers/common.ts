@@ -2,7 +2,8 @@ import { execFile } from 'child_process'
 import { existsSync, readFileSync, statSync } from 'original-fs'
 import { appendFile, mkdir, readdir, readFile, writeFile } from 'original-fs/promises'
 import { basename, delimiter, dirname, join } from 'path'
-import { agentField, englishText, shownText, type TextPart } from '../../shared/advanced'
+import { CLI_PROBE_SECONDS, agentField, englishText, shownText, type TextPart } from '../../shared/advanced'
+import { advanced } from '../advanced'
 import { msg, tr } from '../../shared/i18n'
 import type { AgentInstallInfo, ReadinessIssue, RecacheEstimate, SessionUsage } from '../../shared/types'
 import { readFirstLineOf } from '../transcriptFiles'
@@ -21,6 +22,19 @@ export function readFirstLine(path: string, max = 1 << 20): Promise<string> {
 }
 
 /** Helpers shared by provider adapters. */
+
+/**
+ * HI-3375: how long a CLI's version probe (`--version`, as Combwork looks for it) may take before the candidate is skipped:
+ * Settings → Advanced's `cw.cli.probeSeconds`. A Node CLI's first start under antivirus on a slow disk takes tens of
+ * seconds, and one skipped reads as not installed.
+ */
+export function cliProbeMs(): number {
+  return advanced.number(CLI_PROBE_SECONDS) * 1000
+}
+
+/** HI-3375: how long `where.exe` (or `which`) may take to list a CLI on PATH: a long PATH, network folders, antivirus. */
+export const WHERE_MS = 20_000
+
 
 /** `ended`: it didn't exit by itself (its timeout ended it, or it couldn't start): its code says nothing then. */
 export function run(file: string, args: string[], timeoutMs = 15000, env?: NodeJS.ProcessEnv): Promise<{ stdout: string; stderr: string; code: number; ended?: true; timedOut?: true }> {
@@ -523,7 +537,8 @@ const COPIES_COMMENT_HEAD = "# Combwork's copies of workspace skills" // i18n-ig
 /** Keeps Combwork's copies (and a swap's dot-folders) out of git, in the repository's info/exclude. */
 export async function excludeCopies(cwd: string): Promise<void> {
   // The repository's own exclude file, from the context port (HI-2789: Git's info/exclude, as this named it before).
-  const exclude = await excludeFile(cwd, { timeout: 5000 })
+  // HI-3375: git.exe's first start under antivirus; skipped, the copies would show as untracked files.
+  const exclude = await excludeFile(cwd, { timeout: 30_000 })
   if (!exclude) return
   const text = await readFile(exclude, 'utf8').catch(() => '')
   const lines = text.split(/\r?\n/)

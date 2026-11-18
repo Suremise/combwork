@@ -1581,6 +1581,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       return r.canceled || !r.filePaths[0] ? null : r.filePaths[0]
     },
     'mcp:previewFile': (file) => mcp.previewMcpFile(file),
+    'mcp:nameTaken': (name, folder) => mcp.mcpNameTaken(String(name), folder === true),
     'mcp:addFromFile': async (file, name, replace, places) => {
       const m = await mcp.addMcpFromFile(file, name, replace, shownPlaces(places))
       emit({ type: 'skills-changed' })
@@ -1589,7 +1590,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
     'mcp:catalog': (opts) => mcpCatalog.catalogPages(opts && typeof opts === 'object' ? opts : {}),
     'mcp:catalogNoted': (url) => mcpCatalog.noteCatalogSource(String(url)),
-    'mcp:catalogPrepare': (source, name) => mcpCatalog.prepareCatalogServer(String(source), String(name)),
+    'mcp:catalogPrepare': (source, name, op) => mcpCatalog.prepareCatalogServer(String(source), String(name), typeof op === 'string' ? op : undefined),
+    'mcp:catalogCancel': (op) => mcpCatalog.cancelCatalogPrepare(String(op)),
     'mcp:catalogDrop': (id) => mcpCatalog.dropPrepared(String(id)),
     'mcp:catalogInstall': async (id, name, replace, places) => {
       await mcpCatalog.installCatalogServer(String(id), String(name), replace === true, shownPlaces(places))
