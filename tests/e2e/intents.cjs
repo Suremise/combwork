@@ -332,7 +332,7 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
       const calls = []
       const server = http.createServer((q, r) => {
         if (q.method === 'GET') return r.end('{}')
-        calls.push({ path: q.url, key: q.headers['x-combwork-request'] })
+        calls.push({ path: q.url, key: q.headers['x-combwork-request'], at: Date.now() })
         if (calls.length <= drops) return q.socket.destroy()
         r.writeHead(200, { 'Content-Type': 'application/json' })
         r.end(JSON.stringify({ replayed: true, applied: true, produced: { card: key } }))
@@ -349,6 +349,9 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     lost.server.close()
     const keptKeys = fs.existsSync(keysFile) ? JSON.parse(fs.readFileSync(keysFile, 'utf8')) : null
     check('a write with no reply after its retries is kept by its key in the agent\'s file', first3.isError && lost.calls.length === 3 && keptKeys?.entries?.length === 1, JSON.stringify({ calls: lost.calls, keptKeys }))
+    // HI-3377: its retries back off (2 s, then 10 s), never three tries in a row; the gaps are at least the waits, never a bound.
+    const gaps = lost.calls.slice(1).map((c, i) => c.at - lost.calls[i].at)
+    check('a lost write is sent again after 2 s, then after 10 s', gaps.length === 2 && gaps[0] >= 1900 && gaps[1] >= 9900, JSON.stringify(gaps))
     const later = await dropping(0)
     const relaunched = await runMcp(later.port, 'cw_update_task', { number: key, comment: 'Kept key.' }, { CW_REQUEST_KEYS_FILE: keysFile })
     later.server.close()

@@ -7,7 +7,7 @@ import { execFileSync } from 'child_process'
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { DatabaseSync } from 'node:sqlite'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
@@ -135,6 +135,47 @@ describe('a keyed write is applied once (HI-3195)', () => {
     await expect(inWorkspace(w, () => receipts.onceFor(w, req(KEY(6), { text: 'Other' }), slow))).rejects.toBeInstanceOf(receipts.KeyReused)
     release()
     const [ra, rb] = await Promise.all([a, b])
+    expect([ran, await comments(w, card)]).toEqual([1, 1])
+    expect((rb as { number: number }).number).toBe((ra as { number: number }).number)
+  })
+
+  // HI-3377: a retry joins its first try for as long as its client waits for a reply (cw.mcp.replySeconds) and a margin:
+  // a first try still working past the old 120 s is joined, never run beside it.
+  it('the join waits for the client’s reply time and 30 s (330 s by default, as the setting says), past the old 120 s', async () => {
+    expect(receipts.joinWaitMs()).toBe(330_000)
+    await advanced.set('cw.mcp.replySeconds', 600)
+    try {
+      expect(receipts.joinWaitMs()).toBe(630_000)
+    } finally {
+      await advanced.set('cw.mcp.replySeconds', null)
+    }
+    expect(receipts.joinWaitMs()).toBe(330_000)
+    const { w } = await workspace()
+    const card = await inWorkspace(w, async () => (await tasks.createTask({ title: 'Work', project: 'p' }, user)).number)
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    let ran = 0
+    const slow = () => inWorkspace(w, async () => {
+      ran++
+      await gate
+      return tasks.commentTask(card, 'A note', agent)
+    })
+    const a = inWorkspace(w, () => receipts.onceFor(w, req(KEY(60)), slow))
+    // The retry's own wait on a clock the test moves: 150 s on, it still waits for the first try.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    let b: Promise<unknown>
+    let settled = false
+    try {
+      b = inWorkspace(w, () => receipts.onceFor(w, req(KEY(60)), slow))
+      void b.then(() => (settled = true))
+      await vi.advanceTimersByTimeAsync(150_000)
+      expect(settled).toBe(false)
+      expect(ran).toBe(1)
+    } finally {
+      vi.useRealTimers()
+    }
+    release()
+    const [ra, rb] = await Promise.all([a, b!])
     expect([ran, await comments(w, card)]).toEqual([1, 1])
     expect((rb as { number: number }).number).toBe((ra as { number: number }).number)
   })

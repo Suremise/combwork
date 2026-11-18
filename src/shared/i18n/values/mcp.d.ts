@@ -13,6 +13,7 @@ interface CombworkMessageValues {
   'mcp.catalog.badgeNeeds': undefined
   'mcp.catalog.badgeOther': undefined
   'mcp.catalog.badgeUpdate': { version: string | number }
+  'mcp.catalog.cancelDownload': undefined
   'mcp.catalog.cantRun': undefined
   'mcp.catalog.check.app': { value: string | number }
   'mcp.catalog.check.build': { value: string | number }
@@ -64,6 +65,7 @@ interface CombworkMessageValues {
   'mcp.catalog.source': undefined
   'mcp.catalog.sourceTaken': undefined
   'mcp.catalog.sourceUrl': undefined
+  'mcp.catalog.stalled': { url: string | number; seconds: number }
   'mcp.catalog.timeout': { url: string | number; seconds: number }
   'mcp.catalog.tooLarge': { url: string | number; max: number }
   'mcp.catalog.tooManySources': { max: number }

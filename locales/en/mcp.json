@@ -47,6 +47,10 @@
     "defaultMessage": "Update to {version}",
     "description": "A badge on a catalogue server (HI-545): a newer version is available."
   },
+  "mcp.catalog.cancelDownload": {
+    "defaultMessage": "Cancel download",
+    "description": "A catalogue server's view (HI-545, HI-3377), in place of Install… or Update… while its download runs: stops the download; nothing is installed."
+  },
   "mcp.catalog.cantRun": {
     "defaultMessage": "This PC doesn't meet a requirement above, so it can't be installed.",
     "description": "A catalogue server's view (HI-545) when a requirement Combwork checked is not met: Install is greyed out."
@@ -250,6 +254,10 @@
   "mcp.catalog.sourceUrl": {
     "defaultMessage": "A catalogue is an https:// or file:// address of its catalog.json.",
     "description": "An error adding an MCP catalogue source (Settings → MCP Catalogues, HI-545): the address is neither."
+  },
+  "mcp.catalog.stalled": {
+    "defaultMessage": "{url} stopped sending (nothing received for {seconds, number} s).",
+    "description": "An error downloading a server from an MCP catalogue (HI-545, HI-3377): no data arrived for the time Settings → Advanced allows; a slow download that keeps receiving is never stopped."
   },
   "mcp.catalog.timeout": {
     "defaultMessage": "{url} took too long (over {seconds, number} s).",

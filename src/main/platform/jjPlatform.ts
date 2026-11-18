@@ -51,7 +51,7 @@ import { anyRetainedDue, dueRetained, markRetainedDue, publishTargets, recordInt
 import { folderIdentity, type PublishCommitAnswer, type PublishCommitRequest } from './jjPublishCommit'
 import { advanceStep, candidateFingerprint, candidateKey, candidateShown, checksAgain, clearEndedCycle, cycleOver, publishCandidateChecks, reconcileJj, type CandidateWords, type JjChecksUpdate, type JjProved } from '../workflow/reconcile'
 import { candidateCheckNames, checksJournalKey, checksKeyOf, readChecksJournal, runCandidateChecks, writeChecksJournal, type CandidateChecksDeps, type ChecksJournal } from './jjCandidateChecks'
-import { GUARD_DIFF_BYTES, guardsKey, guardsOf } from '../../shared/workflow/mergeGuards'
+import { GUARD_CHECK_DEFAULTS, GUARD_DIFF_BYTES, guardsKey, guardsOf } from '../../shared/workflow/mergeGuards'
 import type { DiffRead } from './types'
 import { checkMergeGuards } from '../workflow/mergeGuardsRun'
 import { jjCandidateEntry, jjReturnedComment, jjReturnedWake } from './jjCandidateReturn'
@@ -1415,7 +1415,7 @@ export class JjPlatform implements PlatformAdapter {
           valid,
           // HI-3284: the guards this run checks are those its key was made with (a change since makes it invalid).
           // HI-3284 (HR2's round 1, finding 3): its worker ends with the workspace (the checks' signal).
-          ...(guards.length ? { guards: async (expected: string, result: string) => ({ ...(await checkMergeGuards(guards, () => this.addedDiff(expected, result), { ...(host.guardLimits?.() ?? { timeoutMs: 10_000, maxLines: 200_000 }), ...(host.signal ? { signal: host.signal } : {}) })), key: guardsKey(guards) }) } : {}),
+          ...(guards.length ? { guards: async (expected: string, result: string) => ({ ...(await checkMergeGuards(guards, () => this.addedDiff(expected, result), { ...(host.guardLimits?.() ?? GUARD_CHECK_DEFAULTS), ...(host.signal ? { signal: host.signal } : {}) })), key: guardsKey(guards) }) } : {}),
           checkRan: async (c) => {
             const data: FactData['CheckRan'] = { name: c.name, command: c.command, revision: c.revision, tested: c.tested, result: c.ok ? 'passed' : 'failed', run: c.run || randomUUID(), durationMs: c.durationMs, by: CW_RUNS, counted: c.counted, ...(c.whyNot ? { whyNot: c.whyNot } : {}), entry: jjCandidateEntry(offer.attempt), ...(c.guardsKey !== undefined ? { guardsKey: c.guardsKey, base: c.base } : {}) }
             await wf.write(wf.store.card(card0.id), null, 'combwork', (w) => void w.fact('CheckRan', data))

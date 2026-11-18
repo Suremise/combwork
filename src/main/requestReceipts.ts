@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import { createHash } from 'crypto'
 import type { DatabaseSync } from 'node:sqlite'
+import { advanced } from './advanced'
 import { boardRead, setBoardCommitHook, setBoardPartHooks } from './boardStore'
 import type { WorkspaceService } from './workspace'
 
@@ -24,8 +25,19 @@ export const REQUEST_KEY = /^[A-Za-z0-9_-]{16,64}$/
 export const RECEIPT_HOURS = 24
 /** At most this many keyed requests in flight at once (each joined by its retries); past it, a new key waits its turn (503). */
 export const IN_FLIGHT_MAX = 256
-/** The longest a retry waits for the request in flight it joined before asking the table (a hung first try). */
-export const JOIN_WAIT_MS = 120_000
+/**
+ * The longest a retry waits for the request in flight it joined before asking the table (a hung first try): HI-3377, its
+ * client's own reply time (Settings → Advanced, "Combwork tools: reply timeout", cw-mcp's wait before it retries) and
+ * JOIN_MARGIN_MS, so a first try still working when its client gave up is joined, not run beside (120 s was shorter than
+ * the client's 300 s).
+ */
+export function joinWaitMs(): number {
+  const s = Number(advanced.number(MCP_REPLY_SECONDS))
+  return Math.round((Number.isFinite(s) && s > 0 ? s : MCP_REPLY_DEFAULT_S) * 1000) + JOIN_MARGIN_MS
+}
+export const JOIN_MARGIN_MS = 30_000
+const MCP_REPLY_SECONDS = 'cw.mcp.replySeconds'
+const MCP_REPLY_DEFAULT_S = 300
 
 /**
  * A keyed request: whose it is (`run`: the agent, `<project path>#<agent id>`, so a retry from its next launch after a
@@ -191,7 +203,7 @@ export async function onceFor<T>(ws: WorkspaceService, req: KeyedRequest, handle
   const joined = inFlight.get(id)
   if (joined) {
     if (joined.fingerprint !== req.fingerprint) throw new KeyReused()
-    const settled = await Promise.race([joined.outcome.then((v) => ({ v }), () => null), new Promise<null>((r) => setTimeout(() => r(null), JOIN_WAIT_MS).unref?.())])
+    const settled = await Promise.race([joined.outcome.then((v) => ({ v }), () => null), new Promise<null>((r) => setTimeout(() => r(null), joinWaitMs()).unref?.())])
     if (settled) return settled.v as T
     // Its first try failed, or hangs: what the table says (applied, or not, so it runs).
     const r = receipt(ws, req.run, req.key)
