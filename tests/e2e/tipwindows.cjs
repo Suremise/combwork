@@ -51,6 +51,8 @@ const TITLE = (id) =>
 
   let { app, page, inv } = await lib.launch({ userData, viewport: { width: 1400, height: 900 } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
+  // Window 1 focused (a tip waits for a focused window, and a test copy never has the focus: HI-3404); window 2 isn't.
+  await lib.stubFocus(app)
   await lib.openWorkspace(inv, page, wsA)
   // The second window starts before either change, so its copy of the state has neither.
   const next = app.waitForEvent('window')
@@ -94,6 +96,7 @@ const TITLE = (id) =>
   ;({ app, page, inv } = await lib.launch({ userData, viewport: { width: 1400, height: 900 } }))
   page.on('pageerror', (e) => check('no page errors (restarted)', false, e.message))
   for (const w of app.windows().slice(1)) await w.close().catch(() => undefined)
+  await lib.stubFocus(app)
   const kept = (await inv('ui:get')).tips
   check('restarted: the tip seen in window 1 is still seen', kept?.seen?.includes(MOMENT) && kept.used?.length > 0, JSON.stringify(kept))
   await inv('ui:changeTips', { shownOn: '2000-01-01' })

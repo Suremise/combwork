@@ -752,7 +752,9 @@ export const useStore = create<State>(() => ({
   taskDoing: null,
   removeProjectFor: null,
 
-  windowFocused: true,
+  // Not focused until main says so (HI-3404): the page asks as it starts, and until the answer nothing on screen counts
+  // as seen and no pop-up's clock runs.
+  windowFocused: false,
   maximized: false,
   alwaysOnTop: false,
   notesVersion: 0,

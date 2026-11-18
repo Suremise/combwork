@@ -99,11 +99,15 @@ const check = (name, ok, extra = '') => {
       return /4\.8/.test(t) && t
     }, HUNG_MS)
     check('its pane shows the model it runs on now', !!mark, String(mark))
+    // Seen once Combwork is focused with its pane on screen (stubbed: a test copy never has the focus, and its page knows
+    // that, HI-3404); then in the background again, where Combwork's notices are Windows notifications (the log read here).
+    await lib.stubFocus(app)
     const seen = await until(async () => {
       const s = await live(alpha, id)
       return s?.safeguard && !s.safeguard.unseen && s
     }, HUNG_MS)
     check('its pane on screen counts as seen (out of the attention inbox)', !!seen, JSON.stringify(seen?.safeguard))
+    await lib.stubFocus(app, false)
     const told = await until(() => notices().find((n) => /now runs on/.test(n.title ?? '')), HUNG_MS)
     check("Combwork's notice says so", !!told && /safety classifier stopped a response/.test(told.body ?? ''), JSON.stringify(notices()))
     const comment = await until(async () => {
