@@ -230,6 +230,24 @@ describe('Add MCP Server from File', () => {
     expect(existsSync(join(mcpDir, 'ollama'))).toBe(false)
   })
 
+  it('HI-3371: a folder left without its definition: the name is taken but listed as no server; Replace, added nowhere, puts the .zip in its place', async () => {
+    // A .zip's folder kept when a plain .json replaced it, then the server deleted (its definition running nothing in the folder).
+    await run(() => mcp.addMcpFromFile(file('ollama.zip', ollamaZip()), 'ollama'))
+    await run(() => mcp.addMcpFromFile(file('ollama.json', JSON.stringify({ command: 'npx', args: ['-y', 'ollama-mcp'] })), 'ollama', true, { projects: [], assistant: false }))
+    await run(() => mcp.deleteMcp('ollama'))
+    expect([existsSync(join(mcpDir, 'ollama.json')), existsSync(join(mcpDir, 'ollama'))]).toEqual([false, true])
+    expect((await run(() => mcp.listMcp())).some((m) => m.name === 'ollama')).toBe(false)
+    const f = file('ollama-v3.zip', zipSync({ 'ollama/combwork-mcp.json': json(OLLAMA), 'ollama/server.js': strToU8('// v3') }))
+    // What the window reads to ask Replace: the name taken (exists), though no server is listed under it.
+    expect((await run(() => mcp.previewMcpFile(f))).exists).toBe(true)
+    await expect(run(() => mcp.addMcpFromFile(f, 'ollama'))).rejects.toThrow('already exists')
+    const added = await run(() => mcp.addMcpFromFile(f, 'ollama', true, { projects: [], assistant: false }))
+    expect(added.name).toBe('ollama')
+    expect(readFileSync(join(mcpDir, 'ollama', 'server.js'), 'utf8')).toBe('// v3')
+    expect(existsSync(join(mcpDir, 'ollama', 'lib'))).toBe(false)
+    expect((await run(() => mcp.listMcp())).find((m) => m.name === 'ollama')).toMatchObject({ projects: [], assistant: false })
+  })
+
   it('refuses unsafe zips: paths outside the folder, absolute or Windows-invalid paths, links, no definition', async () => {
     const def = json(OLLAMA)
     const refused = async (z: Uint8Array, message: string): Promise<void> => {
