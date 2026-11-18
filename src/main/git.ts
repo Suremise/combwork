@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'async_hooks'
+import { INDEX_BUSY as INDEX_BOUNDS, retryWhile } from './retryBounds'
 import { join, resolve, sep } from 'path'
 import { SHARE_ENV, Worker } from 'worker_threads'
 import { lstat, readFile, readlink, realpath, stat } from 'original-fs/promises'
@@ -333,17 +334,13 @@ export function useGitWorker(file: string | null): void {
 
 /** Git couldn't read the index for a moment (another git command, a user's `git add`, is rewriting it): worth trying again (#222). */
 export const INDEX_BUSY = /index file open failed|unable to (open|read|create).*index|could not read.*index|index\.lock|index file smaller than expected|bad index file/i
-const BUSY_TRIES = 4
-const BUSY_RETRY_MS = 50
 
-/** git(), tried again briefly while the index is busy (`INDEX_BUSY`): a read that fails only for that moment isn't a failure. */
+/**
+ * git(), tried again while the index is busy (`INDEX_BUSY`): a read that fails only for that moment isn't a failure.
+ * HI-3374: for INDEX_BOUNDS.read (waits of 50 ms doubling to 1.6 s, 3.2 s in all; it was 4 tries 50 ms apart).
+ */
 export async function gitReading(cwd: string, args: string[]): Promise<GitResult> {
-  let r = await git(cwd, args)
-  for (let t = 1; t < BUSY_TRIES && !r.ok && INDEX_BUSY.test(r.err); t++) {
-    await new Promise((res) => setTimeout(res, BUSY_RETRY_MS))
-    r = await git(cwd, args)
-  }
-  return r
+  return retryWhile(() => git(cwd, args), (r) => !r.ok && INDEX_BUSY.test(r.err), { bound: INDEX_BOUNDS.read })
 }
 
 /** The Changes tab's refusals and notes, in the window's language (#850): only the window reads them. */

@@ -22,6 +22,7 @@
 // the `args` attribute) are jj 0.47.1's mechanics, not an API: anything unexpected is uncertain, never worked around.
 
 import { createHash } from 'crypto'
+import { heldError, RENAME_RETRY, untilBound } from '../retryBounds'
 import { mkdir, open, readdir, readFile, rename, stat, unlink } from 'original-fs/promises'
 import { join } from 'path'
 import type { RunResult } from './repoContext'
@@ -229,8 +230,8 @@ export interface AdvanceJournal {
 
 /**
  * Writes a file whole and durably: a temp file beside it written and synced, then renamed over it (Windows' rename
- * replaces; a reader sees the old file or the new, never half of one). Renames are retried briefly where Windows holds
- * the file (an antivirus scan, a reader).
+ * replaces; a reader sees the old file or the new, never half of one). Renames are retried where Windows holds the file
+ * (an antivirus scan, a reader), for RENAME_RETRY's bound (HI-3374: it was 6 tries, about 0.6 s).
  */
 export async function writeDurable(file: string, text: string): Promise<void> {
   const tmp = `${file}.${process.pid}.${Date.now()}.tmp`
@@ -241,16 +242,7 @@ export async function writeDurable(file: string, text: string): Promise<void> {
   } finally {
     await h.close()
   }
-  for (let i = 0; ; i++) {
-    try {
-      await rename(tmp, file)
-      return
-    } catch (e) {
-      const code = (e as NodeJS.ErrnoException).code
-      if (i >= 5 || (code !== 'EPERM' && code !== 'EACCES' && code !== 'EBUSY')) throw e
-      await new Promise((r) => setTimeout(r, 20 * 2 ** i))
-    }
-  }
+  await untilBound(() => rename(tmp, file), { bound: RENAME_RETRY, transient: heldError })
 }
 
 const safe = (s: string): string => s.replace(/[^A-Za-z0-9_-]/g, '_')

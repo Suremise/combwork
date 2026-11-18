@@ -84,12 +84,17 @@ describe('Files tab: a failed git check-ignore (#222)', () => {
     expect(await dimmed()).toEqual(['dist'])
     for (let i = 0; i < IGNORE_TRIES; i++) failNext.push(BUSY)
     expect(await dimmed()).toEqual(['dist'])
-    expect(checkIgnoreCalls).toBe(1 + IGNORE_TRIES)
+    // HI-3374: tried again for INDEX_BOUNDS.read's time (at most IGNORE_TRIES tries in it), then given up: what is
+    // left of the failures queued isn't for the next look.
+    expect(checkIgnoreCalls).toBeGreaterThan(2)
+    expect(checkIgnoreCalls).toBeLessThanOrEqual(1 + IGNORE_TRIES)
+    failNext.length = 0
     await vi.waitFor(() => expect(r.seen).toEqual([['']]), { timeout: HUNG_MS })
     // Failing on every re-list: at most RELIST_MAX of them in a row.
     for (let k = 0; k < files.RELIST_MAX + 2; k++) {
       for (let i = 0; i < IGNORE_TRIES; i++) failNext.push(BUSY)
       await dimmed()
+      failNext.length = 0
       await new Promise((res) => setTimeout(res, 700))
     }
     expect(r.seen.length).toBe(files.RELIST_MAX)
@@ -97,9 +102,11 @@ describe('Files tab: a failed git check-ignore (#222)', () => {
     expect(await dimmed()).toEqual(['dist'])
     for (let i = 0; i < IGNORE_TRIES; i++) failNext.push(BUSY)
     await dimmed()
+    failNext.length = 0
     await vi.waitFor(() => expect(r.seen.length).toBe(files.RELIST_MAX + 1), { timeout: HUNG_MS })
     r.off()
-  })
+    // HI-3374: each failing look retries for INDEX_BOUNDS.read (3.2 s): a bound for a hung run, not the time it takes.
+  }, 120_000)
 
   it('a folder never listed before shows nothing dimmed while git fails, and is listed again', async () => {
     const r = relists()

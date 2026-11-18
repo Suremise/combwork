@@ -1,4 +1,5 @@
 import { spawn as spawnChild, type ChildProcess } from 'child_process'
+import { RENAME_RETRY, retryWait } from '../../retryBounds'
 import { endTreeAsync } from '../../processTree'
 import { request as httpRequest } from 'http'
 import { closeSync, createWriteStream, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'original-fs'
@@ -235,12 +236,11 @@ export interface CoreDeps {
 }
 
 /**
- * A mirror's rename over the published file, at most this many tries, the n-th wait `n × RENAME_PAUSE_MS` (HI-2778): on
- * Windows the rename fails (EPERM, EACCES, EBUSY) while another handle has the mirror open, such as the transcript
- * viewer or the Sessions list reading it at that moment. The waits are synchronous: the check and the rename stay one step.
+ * A mirror's rename over the published file, retried for RENAME_RETRY's bound (HI-3374: it was 5 tries, 50 ms; HI-2778):
+ * on Windows the rename fails (EPERM, EACCES, EBUSY) while another handle has the mirror open, such as the transcript
+ * viewer or the Sessions list reading it at that moment. The waits are synchronous (this is the history's own worker
+ * thread): the check and the rename stay one step. A core shut down meanwhile stops retrying.
  */
-const RENAME_TRIES = 5
-const RENAME_PAUSE_MS = 10
 const RENAME_BUSY = new Set(['EPERM', 'EACCES', 'EBUSY'])
 const pauseSync = (ms: number): void => void Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
 
@@ -995,7 +995,7 @@ export class HistoryCore {
     }
   }
 
-  /** Writes a temp file and renames it over the mirror, retrying a rename a reader's open handle refuses (RENAME_TRIES). */
+  /** Writes a temp file and renames it over the mirror, retrying a rename a reader's open handle refuses (RENAME_RETRY). */
   private write(s: Session, text: string): void {
     const dir = mirrorDir(s.home)
     mkdirSync(dir, { recursive: true })
@@ -1003,6 +1003,8 @@ export class HistoryCore {
     const tmp = `${p}.${process.pid}.tmp`
     writeFileSync(tmp, text)
     const rename = this.deps.rename ?? renameSync
+    const now = this.deps.now ?? Date.now
+    const started = now()
     for (let tries = 1; ; tries++) {
       try {
         rename(tmp, p)
@@ -1010,11 +1012,12 @@ export class HistoryCore {
         return
       } catch (e) {
         const code = (e as NodeJS.ErrnoException | null)?.code ?? ''
-        if (tries >= RENAME_TRIES || !RENAME_BUSY.has(code)) {
+        const left = RENAME_RETRY.boundMs - (now() - started)
+        if (left <= 0 || this.closed || !RENAME_BUSY.has(code)) {
           rmSync(tmp, { force: true })
           throw e
         }
-        ;(this.deps.pause ?? pauseSync)(tries * RENAME_PAUSE_MS)
+        ;(this.deps.pause ?? pauseSync)(Math.min(retryWait(RENAME_RETRY, tries - 1), left))
       }
     }
   }
