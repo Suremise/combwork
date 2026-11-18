@@ -440,21 +440,25 @@ export interface BuilderJob {
   endedAt: number | null
 }
 
+/** When a progress run was last heard from (HI-3406): now while it runs and reports (not quiet), else its last report or its end. */
+export const heardAt = (run: Pick<ProgressRun, 'state' | 'finishedAt' | 'updatedAt'>, now: number): number => (run.state === 'running' && run.finishedAt === null ? now : run.updatedAt)
+
 /**
  * The card's builder's job for it (HI-1993): its agent's open Progress runs for the card (`card`), and its background
  * tasks (`builder`: its session as it is, its tasks' count and when they last ended; a builder's tasks while its card
- * is in Review are taken as that card's). Each is held to `limitMs` (Settings → Agents, the background task limit) from
- * its start: a run that never ends counts as ended then. On 28 Oct a builder ran an agreed 50-run stress proof in the
- * background and its reviewer, waiting on it, showed stalled. Null when it has had none.
+ * is in Review are taken as that card's). A run is held to `limitMs` (Settings → Agents, the background task limit)
+ * from when it was last heard from (HI-3406, heardAt): one still reporting goes on, and one gone quiet counts as ended
+ * that long after its last report. On 28 Oct a builder ran an agreed 50-run stress proof in the background and its
+ * reviewer, waiting on it, showed stalled. Null when it has had none.
  */
-export function builderJobOf(card: Pick<TaskCard, 'number' | 'project' | 'agent'>, runs: Pick<ProgressRun, 'agentId' | 'projectPath' | 'card' | 'state' | 'staleReason' | 'startedAt' | 'finishedAt'>[], builder: { backgroundTasks?: number; backgroundEndedAt?: string } | null, limitMs: number, now = Date.now()): BuilderJob | null {
+export function builderJobOf(card: Pick<TaskCard, 'number' | 'project' | 'agent'>, runs: Pick<ProgressRun, 'agentId' | 'projectPath' | 'card' | 'state' | 'staleReason' | 'startedAt' | 'updatedAt' | 'finishedAt'>[], builder: { backgroundTasks?: number; backgroundEndedAt?: string } | null, limitMs: number, now = Date.now()): BuilderJob | null {
   if (!card.agent) return null
   const project = card.project.toLowerCase()
   const mine = runs.filter((r) => r.agentId === card.agent && r.card === card.number && !!r.projectPath && baseName(r.projectPath).toLowerCase() === project)
   // Open: running, or quiet (its process is still there: the sweep ends a run whose process is gone); not one whose agent stopped.
   const open = (r: (typeof mine)[number]): boolean => r.finishedAt === null && (r.state === 'running' || (r.state === 'stale' && r.staleReason === 'quiet'))
-  const running = mine.some((r) => open(r) && now - r.startedAt < limitMs) || (builder?.backgroundTasks ?? 0) > 0
-  const ends = [...mine.map((r) => (open(r) ? r.startedAt + limitMs : (r.finishedAt ?? NaN))), Date.parse(builder?.backgroundEndedAt ?? '')].filter((t) => Number.isFinite(t) && t <= now)
+  const running = mine.some((r) => open(r) && now - heardAt(r, now) < limitMs) || (builder?.backgroundTasks ?? 0) > 0
+  const ends = [...mine.map((r) => (open(r) ? heardAt(r, now) + limitMs : (r.finishedAt ?? NaN))), Date.parse(builder?.backgroundEndedAt ?? '')].filter((t) => Number.isFinite(t) && t <= now)
   if (!running && !ends.length) return null
   return { running, endedAt: ends.length ? Math.max(...ends) : null }
 }

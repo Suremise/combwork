@@ -372,6 +372,13 @@ export class ProgressStore {
     return null
   }
 
+  /** One agent's own runs (HI-3406: when they were last heard from keeps its background tasks counted). */
+  runsOf(projectPath: string, agentId: string): ProgressRun[] {
+    const out: ProgressRun[] = []
+    for (const list of this.runs.values()) for (const x of list) if (x.source === 'agent' && x.agentId === agentId && key(x.projectPath ?? '') === key(projectPath)) out.push(x)
+    return out
+  }
+
   /** `link`: what it runs for (#1220: its card, revision, check and folder), resolved and checked by the caller. */
   start(caller: ProgressCaller, body: Record<string, unknown>, link: RunFor = {}): ProgressRun {
     // Every field is checked before anything changes.

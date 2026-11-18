@@ -296,7 +296,7 @@ describe("a started review waiting on its builder's background job for the card 
   const started = (over: Partial<TaskCard> = {}) => card(191, { column: 'review', agent: 'b1', review: { agent: 'r1', agentName: 'LR1', since: at(0) }, ...over })
   // LR1 asked for a 50-run stress proof two minutes in, and went back to watching the card for it.
   const watching = [{ name: 'LR1', project: 'alpha', agentId: 'r1', cards: [191], status: 'watching', watchSince: at(2) }]
-  const run = (over: Record<string, unknown> = {}) => ({ agentId: 'b1', projectPath: 'D:\\work\\alpha', card: 191, state: 'running' as const, staleReason: null, startedAt: ms(3), finishedAt: null, ...over })
+  const run = (over: Record<string, unknown> = {}) => ({ agentId: 'b1', projectPath: 'D:\\work\\alpha', card: 191, state: 'running' as const, staleReason: null, startedAt: ms(3), updatedAt: ms(3), finishedAt: null, ...over })
   const stall = (job: ReturnType<typeof builderJobOf>, now: number) => reviewVerdictWaitReason(started(), watching, now, undefined, job)
 
   it("no stall while the builder's run for the card goes, or its background tasks do", () => {
@@ -315,10 +315,13 @@ describe("a started review waiting on its builder's background job for the card 
     const tasks = { backgroundTasks: 0, backgroundEndedAt: at(30) }
     expect(stall(builderJobOf(started(), [], tasks, limit, ms(44)), ms(44))).toBeNull()
     expect(stall(builderJobOf(started(), [], tasks, limit, ms(45)), ms(45))).toMatch(/^LR1 started reviewing #191 but has given no verdict/)
-    // A run that never ends counts only to the background task limit from its start: then it is taken as ended.
-    expect(builderJobOf(started(), [run()], null, limit, ms(63) - 1)).toEqual({ running: true, endedAt: null })
-    expect(builderJobOf(started(), [run()], null, limit, ms(63))).toEqual({ running: false, endedAt: ms(63) })
-    expect(stall(builderJobOf(started(), [run()], null, limit, ms(78)), ms(78))).toMatch(/watching it for 15 min\.$/)
+    // HI-3406: a run still reporting goes on past the background task limit; one gone quiet counts only to the limit
+    // from its last report: then it is taken as ended.
+    expect(builderJobOf(started(), [run()], null, limit, ms(300))).toEqual({ running: true, endedAt: null })
+    const quiet = run({ state: 'stale', staleReason: 'quiet', updatedAt: ms(10) })
+    expect(builderJobOf(started(), [quiet], null, limit, ms(70) - 1)).toEqual({ running: true, endedAt: null })
+    expect(builderJobOf(started(), [quiet], null, limit, ms(70))).toEqual({ running: false, endedAt: ms(70) })
+    expect(stall(builderJobOf(started(), [quiet], null, limit, ms(85)), ms(85))).toMatch(/watching it for 15 min\.$/)
     // A run its agent stopped before it finished isn't going.
     expect(stall(builderJobOf(started(), [run({ state: 'stale', staleReason: 'agent-stopped' })], null, limit, ms(30)), ms(30))).toMatch(/^LR1 started reviewing/)
   })

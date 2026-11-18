@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **A long test run that still reports no longer stalls its lane** (HI-3406). Combwork stopped counting an agent's background task at **Count background tasks for up to** from its start, even while its `cw-progress` run was still reporting, so the agent showed finished and its lane stalled. Now a task counts for that long from when its agent's progress was last heard from: a run that keeps reporting stays counted, and one gone quiet still stops counting. A task that ends after Combwork stopped counting it wakes the agent again.
 - **Quitting no longer waits for ever after an agent left Windows Sandbox's broker running** (HI-3402). Quit soon after an agent stopped with only Windows Sandbox's idle broker left behind, Combwork showed *Closing agents…* until you pressed **Don't wait**: the agent's slot was kept for the next start, but the quit still waited for it. Now the slot is freed as Combwork quits, and the broker keeps running.
 - **A pooled reviewer whose lane just ended reviews in a review copy** (HI-3402). An agent that builds and reviews could be given a pool card as its own lane ended, while it was still in its lane's slot. It then reviewed there, without a review copy of the card. Now it gets the card once it has left the slot, started in the project folder with its review copy.
 

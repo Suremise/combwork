@@ -414,7 +414,12 @@ export type { BackgroundTaskType } from '../../shared/types'
  * task that ended starts again under its id (a subagent given a message after it finished).
  */
 /** `stopped`: an end the agent made itself (Claude Code's TaskStop, #640): its CLI isn't told, so no turn follows. */
-export type BackgroundTaskEvent = { kind: 'start'; id: string; at: number; expiresAt?: number; type?: BackgroundTaskType; description?: string; resumed?: true } | { kind: 'end'; id: string; at: number; stopped?: true }
+/**
+ * A background task starting or ending, when its record was written (`at`). A start's `began`, where known: when the tool
+ * call that started it was made (HI-3406), which may be well before `at` (a command moved to the background after
+ * running a while, one whose call returned after a wait): its own progress runs start from then.
+ */
+export type BackgroundTaskEvent = { kind: 'start'; id: string; at: number; began?: number; expiresAt?: number; type?: BackgroundTaskType; description?: string; resumed?: true } | { kind: 'end'; id: string; at: number; stopped?: true }
 
 /** A turn as the transcript identifies it (#1371): its id, when its prompt was written (Unix ms), whether the model took it up. */
 export interface TranscriptTurn {

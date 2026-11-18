@@ -808,7 +808,7 @@
   "settings.agentApi.viewers.tip": "アプリごとに名前を付けてください。%APPDATA%\\Combwork\\agent-api-viewers.jsonに保存されます。取り消すと、そのアプリはすぐに接続できなくなります。アプリは、%APPDATA%\\Combwork\\agent-api-discovery.json（アドレスのみで、トークンは含みません）で実行中のCombworkを見つけます。",
   "settings.agentApi.viewers.title": "閲覧用トークン",
   "settings.agents.backgroundTaskMinutes.desc": "エージェントが自分で開始したバックグラウンドタスク（テストの実行など）を待つ時間（分）です。これを過ぎると、Combworkは終了したものと見なします。",
-  "settings.agents.backgroundTaskMinutes.tip": "開始したタスクがまだ実行中のままターンを終えたエージェントは、作業終了ではなく、バックグラウンドタスク待ちとして表示されます。Claude Codeはタスクが終わると自分で続行します。Combworkはテストの実行と、開発サーバーのように終わらないものを区別できないため、この時間を過ぎるとタスクを数えなくなります（Monitorも期限が切れると同様です）。Codexはバックグラウンドのターミナルが終わっても通知されないため、数えて表示するだけです。{min, number}〜{max, plural, other {#分}}です。",
+  "settings.agents.backgroundTaskMinutes.tip": "開始したタスクがまだ実行中のままターンを終えたエージェントは、作業終了ではなく、バックグラウンドタスク待ちとして表示されます。Claude Codeはタスクが終わると自分で続行します。Combworkはテストの実行と、開発サーバーのように終わらないものを区別できないため、この時間を過ぎるとタスクを数えなくなります（Monitorも期限が切れると同様です）。cw-progressで実行中の処理が進捗を報告し続けている間はタスクを数え続け、この時間は最後の報告から数えます。Codexはバックグラウンドのターミナルが終わっても通知されないため、数えて表示するだけです。{min, number}〜{max, plural, other {#分}}です。",
   "settings.agents.backgroundTaskMinutes.title": "バックグラウンドタスクを数える最長時間",
   "settings.agents.leftoverProcesses.desc": "エージェントが停止したときに、そのエージェントが開始してまだ実行中のプロセス（プレビューサーバーやtail -fなど）をどうするかです。",
   "settings.agents.leftoverProcesses.option.ask": "確認する",

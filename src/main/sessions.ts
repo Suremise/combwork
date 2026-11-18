@@ -24,6 +24,7 @@ import { ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { formatDateTime } from '../shared/dates'
 import { formatSize } from '../shared/units'
 import { backgroundTaskMinutes } from '../shared/tasks'
+import { lastHeard } from '../shared/progress'
 import { assistantTools, hiddenForSide, isReservedServerName, sideAllows, toolSideOf, TOOLS_SERVER, workflowAllows, workflowHiddenOf } from '../shared/assistantTools'
 import { CW_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, launchedWithOf, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
 import { defaultPurpose, legacySetupPending, legacyWorktree, namedFolders, type StoredAgent, resumeHold, resumeHome, shownPlace, slotAt, type FolderFacts, type FolderPurpose, type NamedFolder, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
@@ -54,6 +55,7 @@ import type {
   McpServerInfo,
   PermissionMode,
   ProjectConfig,
+  ProgressRun,
   ProviderId,
   InboxSummary,
   SessionBulkAction,
@@ -610,9 +612,11 @@ interface LiveSession {
    * Background tasks started in this launch that haven't ended: id → when it started, when it expires, what it is and
    * its CLI's description (a subagent's, #1584: user text).
    */
-  tasks?: Map<string, { at: number; expiresAt?: number; type?: BackgroundTaskType; description?: string }>
+  tasks?: Map<string, { at: number; began?: number; expiresAt?: number; type?: BackgroundTaskType; description?: string }>
   /** Tasks seen to end, so a start read late doesn't count one again. */
   tasksEnded?: Set<string>
+  /** Tasks the time limit stopped counting (HI-3406): one that ends later still wakes the CLI, as a counted one does. */
+  tasksDropped?: Set<string>
   /** Bytes of the transcript already read for background tasks. */
   tasksOffset?: number
   /** What the adapter keeps between those reads (a call whose output comes later). */
@@ -1438,6 +1442,8 @@ export type NoticeDraft = { text: string; commit: () => void }
 
 class SessionManager {
   private live = new Map<string, LiveSession>()
+  /** An agent's own progress runs (progressService's, HI-3406): their reports keep its background tasks counted. */
+  private progressRuns: (projectPath: string, agentId: string) => readonly Pick<ProgressRun, 'state' | 'finishedAt' | 'updatedAt' | 'startedAt'>[] = () => []
   /** Server markers of runs that have ended, held until their record says so or they are kept (HI-1829: serverRunEnding). */
   private readonly serverEnding = new Map<string, number>()
   /**
@@ -5981,11 +5987,13 @@ class SessionManager {
       if (ev.kind === 'start') {
         // A start read after its end counts nothing, unless the task starts again (a subagent resumed, #1584).
         if (ev.resumed) ended.delete(ev.id)
-        if (!ended.has(ev.id)) tasks.set(ev.id, { at: ev.at, expiresAt: ev.expiresAt, type: ev.type, description: ev.description })
+        if (!ended.has(ev.id)) tasks.set(ev.id, { at: ev.at, ...(ev.began !== undefined ? { began: ev.began } : {}), expiresAt: ev.expiresAt, type: ev.type, description: ev.description })
         continue
       }
-      // A task the agent stopped itself wakes nothing (#640: read after its Stop, it showed HB3 working with no turn).
-      if (tasks.delete(ev.id) && !ev.stopped) woke = true
+      // A task the agent stopped itself wakes nothing (#640: read after its Stop, it showed HB3 working with no turn). One the
+      // time limit stopped counting wakes it as a counted one does (HI-3406): its CLI begins that turn all the same.
+      const counted = tasks.delete(ev.id)
+      if ((l.tasksDropped?.delete(ev.id) || counted) && !ev.stopped) woke = true
       ended.add(ev.id)
       if (ended.size > 500) ended.delete(ended.values().next().value!)
     }
@@ -6294,11 +6302,27 @@ class SessionManager {
     if (src && s) await this.readBackground(l, src, s.size).catch((e) => log.warn('background tasks: read failed', e))
   }
 
-  /** Drops tasks past their expiry or the time limit and updates the count. True if the limit dropped one. */
+  /** Follows the agents' progress runs (progressService, at startup; HI-3406). */
+  followProgress(runsOf: (projectPath: string, agentId: string) => readonly Pick<ProgressRun, 'state' | 'finishedAt' | 'updatedAt' | 'startedAt'>[]): void {
+    this.progressRuns = runsOf
+  }
+
+  /**
+   * Drops tasks past their expiry or the time limit and updates the count. True if the limit dropped one. The limit
+   * counts from the agent's progress runs last heard from, where later (HI-3406: a long test run still reporting isn't
+   * dropped); a dropped task is remembered, so its end still wakes the agent (readBackground).
+   */
   private sweepTasks(l: LiveSession): boolean {
     const minutes = taskMinutes()
-    const dropped = l.tasks ? expireTasks(l.tasks, Date.now(), minutes) : []
-    for (const id of dropped) log.info(`${userText(this.label(l.state))}: stopped counting background task ${id} after ${minutes} minutes`)
+    const now = Date.now()
+    const progressHeard = (since: number): number | null => lastHeard(this.progressRuns(l.state.projectPath, l.state.agentId), since, now)
+    const dropped = l.tasks ? expireTasks(l.tasks, now, minutes, progressHeard) : []
+    for (const id of dropped) {
+      log.info(`${userText(this.label(l.state))}: stopped counting background task ${id} after ${minutes} minutes with no progress reported`)
+      const set = (l.tasksDropped ??= new Set())
+      set.add(id)
+      if (set.size > 100) set.delete(set.values().next().value!)
+    }
     const had = l.state.backgroundTasks
     l.state.backgroundTasks = l.tasks?.size || undefined
     // When they last ended (HI-1993): a review waiting on them starts its stall clock again from then.
@@ -6339,6 +6363,13 @@ class SessionManager {
         st.status = 'background'
         st.unseen = false
         changed = true
+      } else if (woke && st.status === 'finished') {
+        // A task the time limit stopped counting has ended (HI-3406): its CLI begins a turn for it, as for a counted one.
+        st.status = 'working'
+        setStatus(st, null)
+        st.unseen = false
+        l.woke = true
+        changed = true
       } else if (woke && st.status === 'background') {
         // One of several ended (subagents a turn started together, #1584): its CLI begins a turn for it while the others
         // run on, so that wake may open a turn too (turnLedger rule 1).
@@ -6352,6 +6383,7 @@ class SessionManager {
   private clearTasks(l: LiveSession): void {
     l.tasks?.clear()
     l.tasksEnded?.clear()
+    l.tasksDropped?.clear()
     l.tasksOffset = 0
     l.tasksMemo = undefined
     l.state.backgroundTasks = undefined

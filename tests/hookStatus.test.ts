@@ -713,6 +713,29 @@ describe('background tasks: their time limit', () => {
     // At exactly the limit it stops counting.
     expect(expireTasks(new Map([['a', { at: now - 10 * min }]]), now, 10)).toEqual(['a'])
   })
+
+  // HI-3406: HB5's fake-codex scenario run (cw-progress at step 28 of 64) and HB6's two-hour unit run were dropped at a
+  // fixed 120 minutes; MB1's hyper-v run, silent from 03:34, really was stuck.
+  it("counts the limit from the agent's progress last heard from: a long run still reporting is kept, a stuck one dropped", async () => {
+    const { expireTasks } = await import('../src/main/hookStatus')
+    const { lastHeard } = await import('../src/shared/progress')
+    const now = Date.parse('2026-11-18T06:00:00Z')
+    const min = 60_000
+    const started = now - 150 * min
+    const run = (over: Record<string, unknown> = {}) => ({ state: 'running' as const, finishedAt: null, startedAt: started + 2_000, updatedAt: now - 20_000, ...over })
+    const heard = (runs: ReturnType<typeof run>[]) => (since: number) => lastHeard(runs, since, now)
+    const tasks = () => new Map([['tests', { at: started }]])
+    // A long run with progress: still reporting, so kept past the limit.
+    expect(expireTasks(tasks(), now, 120, heard([run()]))).toEqual([])
+    // A run gone quiet (stale) is heard from at its last report: kept for the limit from then, dropped after.
+    expect(expireTasks(tasks(), now, 120, heard([run({ state: 'stale', updatedAt: now - 60 * min })]))).toEqual([])
+    expect(expireTasks(tasks(), now, 120, heard([run({ state: 'stale', updatedAt: started + 4 * min })]))).toEqual(['tests'])
+    // A run that finished long ago, and no run at all: dropped at the limit from the task's start, as before.
+    expect(expireTasks(tasks(), now, 120, heard([run({ state: 'passed', finishedAt: started + 9 * min, updatedAt: started + 9 * min })]))).toEqual(['tests'])
+    expect(expireTasks(tasks(), now, 120, heard([]))).toEqual(['tests'])
+    // A run from before the task began isn't its: it keeps nothing counted.
+    expect(expireTasks(tasks(), now, 120, heard([run({ startedAt: started - 30 * min })]))).toEqual(['tests'])
+  })
 })
 
 describe("a CLI's start, read from its screen (#679)", () => {
