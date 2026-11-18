@@ -467,7 +467,7 @@ const W = {
   staleChange: agentMsg({ id: 'runtime.wake.stalePaths', text: 'stale: your paths changed since the pass, submit again', note: "The builder's wake when its declared paths changed after its pass." }),
   approvedMerge: agentMsg({ id: 'runtime.wake.approvedMerge', text: 'approved: merge it and report the merge', note: "The builder's wake when its card passed and the builder merges it." }),
   movedAhead: agentMsg({ id: 'runtime.submit.movedAhead', text: 'moved ahead of {cards} (not started); its reviewer is told', note: "A submit's lane field: the card was moved before its lane's cards nobody has started. {cards}: their keys." }),
-  followUp: agentMsg({ id: 'runtime.wake.followUp', text: '{card}: follow-up submitted for review at {revision} (submission {submission}). Start your review again (cw_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused', note: "HI-1832: the reviewer's wake for a follow-up (the card stays in Review, so no arrival wakes it). {revision}: short. {submission}: its number." }),
+  followUp: agentMsg({ id: 'runtime.wake.followUp', text: '{card}: follow-up submitted for review{revision, select, none {} other { at {revision}}} (submission {submission}). Start your review again (cw_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused', note: "HI-1832: the reviewer's wake for a follow-up (the card stays in Review, so no arrival wakes it). {revision}: short, or none for a no-code card's follow-up, which records no revision (HI-3409). {submission}: its number." }),
   aheadInLane: agentMsg({ id: 'runtime.wake.aheadInLane', text: '{card} is in Review ahead of {cards}, earlier in its lane, which nobody has started: Combwork moved it before them in the lane. Review {card} now; the lane goes on to {next} after it', note: "The reviewer's wake for a card submitted ahead of its lane's unstarted cards. {cards}: their keys. {next}: the first of them." }),
   inReview: agentMsg({ id: 'runtime.wake.inReview', text: '{card} is in Review', note: "The reviewer's wake for a card's arrival in Review." }),
   failedReview: agentMsg({ id: 'runtime.wake.failedReview', text: '{card} failed review', note: "The builder's wake for a failing verdict." }),
@@ -2114,7 +2114,8 @@ export class Workflow {
         const owner = this.store.cardAgent(card.id) ?? now.started?.builder ?? null
         if (agent && agent !== owner) return { rule: 'submit.followUpNotBuilder', values: { card: card.key } } as GuardRefusal
       }
-      const ins = this.submitInputs(g)
+      // A follow-up isn't a no-code card's second copy (HI-3409): submit.notDuplicate reads it.
+      const ins = { ...this.submitInputs(g), ...(followUp ? { followUp: true } : {}) }
       const bad = args.drag ? this.across(w, 'submit', 'review', ins, args.drag, g.only) : (this.check(w, 'submit', ins, g.only) ?? this.agentHasSeen(w, ins, g.only))
       if (bad) return bad
       // Ahead of earlier cards of its lane nobody has started (#1410): it goes before them, so its reviewer takes it next.
@@ -2291,7 +2292,7 @@ export class Workflow {
       w.action('assignReviewer', { submission: sub.seq })
     }
     // A follow-up (HI-1832): the card stays in Review, so no arrival wakes its reviewer; told what to do, its words kept.
-    else if (reviewerAgent(g.o.review) && args.followUp) this.wake(w, this.reviewerOf(g.card), stored(W.followUp, { card: g.card.key, revision: (g.revision ?? '').slice(0, 7), submission: sub.seq }), 'review')
+    else if (reviewerAgent(g.o.review) && args.followUp) this.wake(w, this.reviewerOf(g.card), stored(W.followUp, { card: g.card.key, revision: g.revision ? g.revision.slice(0, 7) : 'none', submission: sub.seq }), 'review')
     else if (reviewerAgent(g.o.review) && ahead) {
       const keys = ahead.map((c) => c.key).join(', ')
       this.wake(w, this.reviewerOf(g.card), stored(W.aheadInLane, { card: g.card.key, cards: keys, next: ahead[0].key }), 'review')

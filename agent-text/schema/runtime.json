@@ -251,7 +251,7 @@
   "runtime.wake.followUp": {
     "placeholders": {
       "card": "plain",
-      "revision": "plain",
+      "revision": "select",
       "submission": "plain"
     }
   },

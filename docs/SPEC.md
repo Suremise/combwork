@@ -4909,7 +4909,7 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
 | `start.notBlocked` | The card isn't blocked. | — | G14 / N6 (with "Cards start only when…"); off in all-off, where a blocked card starts with a warning |
 | `start.dependenciesIntegrated` | Every `blockedBy` card is **Done by facts** (integrated or accepted), not just Approved. | containment | G14 / N6 |
 | `start.slotAvailable` | A slot can be lent (or the project folder is the card's folder). Never holds a no-code card, which takes no slot (HI-2335). | isolation | G11 = slots |
-| `submit.notDuplicate` | This revision (or, for no-code, this card) has no submission still waiting for review or approval, and no open queue entry. A revision that failed review may be submitted again unchanged, with a note (§16.8.1) [answering HR2's round 1 finding 7 and round 2 finding 1]. | revisions | Always (it can't refuse an ordinary move: it only stops a second copy of a submission already waiting) |
+| `submit.notDuplicate` | This revision (or, for no-code, this card, except its builder's follow-up in Review: HI-3409) has no submission still waiting for review or approval, and no open queue entry; a refusal names the waiting submission's recorded revision, or none for a no-code one. A revision that failed review may be submitted again unchanged, with a note (§16.8.1) [answering HR2's round 1 finding 7 and round 2 finding 1]. | revisions | Always (it can't refuse an ordinary move: it only stops a second copy of a submission already waiting) |
 | `requeue.allowed` | Re-entering the queue with an **unchanged** approved, unstale revision: its last entry ended with `IntegrationFailed` marked `transient` (or was cancelled by a hold or by the user), and fewer than **2** unchanged requeues **after transient failures** have followed the last new revision; a hold or the user's own cancel resets that count, so holding a card never strands it [HB3's round 3 finding 3]. A conflict, red checks or a failing hook need a new revision. At the limit the card gets For you (Decide: retry once more, take it over, or send it back) [HB3's round 2 finding E]. | integration | Combwork merges |
 | `submit.ready` | The revision is ready (no stored conflicts; jj's snapshot taken) (§16.3.1). | revisions | Any rule that needs the card's change (as `submit.clean`); not in all-off rulesets |
 | `submit.clean` | The card's folder has no uncommitted changes (shared folder: none in the agent's own paths). | revisions | Any rule that needs the card's change: review, "Committed is done", Combwork merges, the agent merges |
@@ -5966,12 +5966,16 @@ The `review` parameter of `cw_update_task` maps onto the intents for one release
   watch): `cw_submit` with `followUp`, its builder's: the card's agent on the board when the write decides (a card
   given to another in Review keeps its `Started`: HR4's round 1), given to nobody its cycle's builder, the user or the
   Assistant either way (`submit.followUpNotBuilder` otherwise, checked in the write; the same revision
-  `submit.notDuplicate`), makes the commit the revision under review: a `Submitted` fact
+  `submit.notDuplicate`, naming the revision waiting), makes the commit the revision under review: a `Submitted` fact
   (`followUp`, the same round), its pin and `prepareReviewCopy`, no move, no one reassigned, the board's line "Follow-up
   submitted for review at <commit>", and the reviewer woken (a `review` loop wake due until it starts again or gives a
   verdict, though it is already reviewing). The earlier submission's review doesn't carry: a verdict on it is refused
   (`verdict.currentSubmission`, or `review.headMoved` for a pass), one on the follow-up needs its review started on it
   (`verdict.reviewing`, which moves the review copy), and passes given before it no longer count (`passingReviewers`).
+  On a no-code card (HI-3409: one the user made no-code while its code submission waited in Review, MC-1559, whose
+  follow-ups were refused as duplicates naming no revision, so its reviewer had to fail it) a follow-up records a new
+  submission with no revision, its summary the evidence (a commit named there is supporting evidence, never a recorded
+  revision), and is otherwise the same; any other submit while one waits stays `submit.notDuplicate`.
   The loop step's `followUp` stays for Approved and for a change with no commit (a screenshot's). On 26 Oct HR4 OK'd HB4's
   follow-up commit and passed the submitted one: the pass went stale at once and HI-1737 sat in Approved, nobody told.
   **A pass that goes stale afterwards is never silent:** its builder's wake names what was passed, where the line is and
