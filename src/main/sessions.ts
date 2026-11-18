@@ -6315,8 +6315,8 @@ class SessionManager {
   private sweepTasks(l: LiveSession): boolean {
     const minutes = taskMinutes()
     const now = Date.now()
-    const heard = (since: number): number | null => lastHeard(this.progressRuns(l.state.projectPath, l.state.agentId), since, now)
-    const dropped = l.tasks ? expireTasks(l.tasks, now, minutes, heard) : []
+    const progressHeard = (since: number): number | null => lastHeard(this.progressRuns(l.state.projectPath, l.state.agentId), since, now)
+    const dropped = l.tasks ? expireTasks(l.tasks, now, minutes, progressHeard) : []
     for (const id of dropped) {
       log.info(`${userText(this.label(l.state))}: stopped counting background task ${id} after ${minutes} minutes with no progress reported`)
       const set = (l.tasksDropped ??= new Set())
