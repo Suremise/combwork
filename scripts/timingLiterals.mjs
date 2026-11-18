@@ -31,6 +31,8 @@ export const ALLOW_FILE = join(TESTS, 'timingAllow.json')
 const SKIP = /[\\/](node_modules|fixtures|fake-[^\\/]*)[\\/]|[\\/]tests[\\/]timing(\.ci)?\.(json|cjs|d\.cts)$/
 const FILE = /\.(ts|mts|cts|cjs|mjs|js)$/
 const OPT_OUT = /timing-ok:/
+/** A literal value (a string, a number, a template with nothing in it): never a check to wait on. */
+const isLiteralArg = (n) => !!n && (n.type === 'StringLiteral' || n.type === 'NumericLiteral' || (n.type === 'TemplateLiteral' && n.expressions.length === 0))
 
 export const WHAT = {
   testTimeout: "a test's or hook's timeout",
@@ -116,8 +118,9 @@ function findings(src, fileName) {
       const args = node.arguments
       const last = args[args.length - 1]
       if (name && TEST_CALLS.has(name) && args.length >= 2 && isNum(last)) add('testTimeout', last)
-      // until(check, N): its first argument a check (a function, or one by name); until('reads', 2) counts something else.
-      else if (name === 'until' && isNum(args[1]) && /^(ArrowFunctionExpression|FunctionExpression|Identifier|MemberExpression)$/.test(args[0]?.type ?? '')) add('until', args[1])
+      // until(check, N), whatever expression gives the check (a function, a name, a factory's call, a conditional); only a
+      // literal first argument is no check: until('reads', 2) counts something else.
+      else if (name === 'until' && isNum(args[1]) && !isLiteralArg(args[0])) add('until', args[1])
       else if ((name === 'sleep' || name === 'waitForTimeout') && args.length === 1 && isNum(args[0])) add('sleep', args[0])
       else if (name === 'setTimeout' && args.length === 2 && unwrap(args[0])?.type === 'Identifier' && isNum(args[1])) add('promiseSleep', args[1])
       else if ((name === 'toBeLessThan' || name === 'toBeLessThanOrEqual') && args.length === 1 && isNum(args[0])) {

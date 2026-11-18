@@ -79,6 +79,7 @@ describe('reviewing a card', () => {
     const c = await done()
     const first = await run(() => tasks.updateTask(c.number, { review: 'start' }, reviewer))
     await expect(run(() => tasks.updateTask(c.number, { review: 'start' }, third))).rejects.toThrow(/Reviewer is already reviewing/)
+    // A clock tick, so the renewed mark's time is later than the first.
     await new Promise((r) => setTimeout(r, timing('pace.tick')))
     const again = await run(() => tasks.updateTask(c.number, { review: 'start' }, reviewer))
     expect(again.review!.since > first.review!.since).toBe(true)

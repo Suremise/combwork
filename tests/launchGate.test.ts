@@ -11,6 +11,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import { commandLineOf, launchGate, type GateWord } from '../src/main/launchGate'
 import { tempDir } from './tempDir'
 import { timing } from './timing.cjs'
+import { waitOptions } from './waits'
 // What the test started that is still running: stopped by its command line (it names the test's folder) and start,
 // never by a pid remembered from earlier, which Windows may have given another process since: under load that could
 // be a concurrent run's Vitest worker (#547: a likely cause of one exiting with code 1, not reproduced).
@@ -85,9 +86,12 @@ if (process.argv[4] === '--stay') {
     const code = await new Promise<number>((resolve) => {
       spawnPty(`gate-${name}`, { file: process.execPath, args: [cli, ran, server, ...extra], cwd: dir, env, track, onData: (d) => (output += d), onExit: (c) => resolve(c) })
     })
-    await new Promise((r) => setTimeout(r, timing('quiet.briefMs')))
+    const ranAt = existsSync(ran) ? Number(readFileSync(ran, 'utf8')) : 0
+    // A CLI that ran started its server, which writes its own pid file, maybe after the CLI ended: wait for it. One
+    // that never ran started none.
+    if (ranAt) await vi.waitFor(() => expect(existsSync(server) && readFileSync(server, 'utf8') !== '').toBe(true), waitOptions())
     const serverPid = existsSync(server) ? Number(readFileSync(server, 'utf8')) : 0
-    return { code, output: plain(output), ranAt: existsSync(ran) ? Number(readFileSync(ran, 'utf8')) : 0, serverPid }
+    return { code, output: plain(output), ranAt, serverPid }
   }
 
   it('keeps in the job a server the CLI starts the moment it runs, with the job host cold', async () => {

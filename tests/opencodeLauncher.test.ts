@@ -74,7 +74,7 @@ function alive(pid: number): boolean {
 }
 
 /** Polls until fn gives something truthy (a bound for a hung run, never how long it should take). */
-async function until<T>(fn: () => T | Promise<T>, what: string, ms = 30000): Promise<NonNullable<T>> {
+async function until<T>(fn: () => T | Promise<T>, what: string, ms = timing('wait.hang')): Promise<NonNullable<T>> {
   const end = Date.now() + ms
   for (;;) {
     const v = await fn()
@@ -233,7 +233,7 @@ describe.runIf(windows)('the launcher owns the server (design s13: a kill-on-clo
     const killed = Date.now()
     o.main.kill()
     // Bounded well below the server's 60 s and the launch's 30 s wait: the launcher sees its owner go within a poll.
-    await until(() => !alive(o.launcherPid) && !alive(s.serve) && !alive(s.kid), 'the launcher, server and child to end', 15000)
+    await until(() => !alive(o.launcherPid) && !alive(s.serve) && !alive(s.kid), 'the launcher, server and child to end', timing('budget.promptEndMs'))
     expect(Date.now() - killed).toBeLessThan(timing('budget.promptEndMs'))
     await until(() => portFree(s.port), "the server's port to be free")
     expect(infoOf(r2)).toBeNull()

@@ -145,6 +145,7 @@ console.log(copyToMain({ root: ${JSON.stringify(root)}, version: '9.9.9', info: 
     build(more[0], info('held'))
     mkdirSync(join(main, 'dist', '.installer-copy.lock'), { recursive: true })
     const waiting = copyIn(more[0], 'held')
+    // A quiet window (nothing copied in it is the point): the copy, waiting on the lock, has nothing to show until it lets go.
     await new Promise((r) => setTimeout(r, timing('quiet.unitMs')))
     // Still waiting: nothing copied while the lock is held.
     expect(existsSync(join(main, 'dist', 'Combwork-Setup-9.9.9.exe'))).toBe(false)

@@ -189,7 +189,7 @@ async function sleeper(): Promise<Listed> {
   return identify(k.pid!)
 }
 /** Waits for a condition, bounded only against a hang. */
-const until = (fn: () => Promise<boolean> | boolean): Promise<void> => vi.waitFor(async () => expect(await fn()).toBe(true), { timeout: HUNG_MS, interval: 200 })
+const until = (fn: () => Promise<boolean> | boolean, ms: number): Promise<void> => vi.waitFor(async () => expect(await fn()).toBe(true), { timeout: ms, interval: 200 })
 
 describe("a Codex launch's preflights on a connection (HR6's round 1, finding 1)", () => {
   // Each call recorded: its arguments, its CODEX_HOME, and whether it got a login variable.
@@ -373,7 +373,7 @@ process.stdin.on('end', () => process.exit(0))
     codexCheckSeams.beforeConfirm = async () => {
       const sup = await identify(sharedHost.pid!)
       await windowsProbe.end([sup])
-      await until(async () => (await running(sup)) === false)
+      await until(async () => (await running(sup)) === false, HUNG_MS)
     }
     expect(await status(s.cmd, homeOf('a-replaced'))).toEqual(ID)
     expect(await s.left()).toEqual([])
@@ -409,7 +409,7 @@ process.stdin.on('end', () => process.exit(0))
     const escaped = { ok: false, error: "a process Codex started left Combwork's job: its end can't be confirmed" }
     expect(await status(s.cmd, homeOf('a-escaped'))).toEqual(escaped)
     expect(codexCheckHeld(homeOf('a-escaped'))).toBe(true)
-    await until(async () => (await running(k)) === false)
+    await until(async () => (await running(k)) === false, HUNG_MS)
     // Its job's own end confirmed, yet never released: the next check is refused the same way.
     codexCheckSeams.afterAssign = undefined
     expect(await status(s.cmd, homeOf('a-escaped'))).toEqual(escaped)
@@ -437,8 +437,8 @@ process.stdin.on('end', () => process.exit(0))
   it('a check waiting for its answer, then quit: the quit ends it and its child before it returns', async () => {
     const s = server('waiting-cli', { stubborn: true, answers: false })
     const check = status(s.cmd, homeOf('a-waiting'))
-    await until(() => s.started())
-    await until(async () => (await s.left()).length === 2)
+    await until(() => s.started(), HUNG_MS)
+    await until(async () => (await s.left()).length === 2, HUNG_MS)
     await stopCodexChecks()
     expect(await s.left()).toEqual([])
     expect(await check).toEqual({ ok: false, error: 'Combwork is quitting' })
@@ -459,7 +459,7 @@ process.stdin.on('end', () => process.exit(0))
     // A later check retries the old end, slowly (the supervisor slow to answer); Combwork quits meanwhile.
     flaky.slow = 1500
     const retry = status(s.cmd, homeOf('a-retry'))
-    await until(() => inFlight === 1)
+    await until(() => inFlight === 1, HUNG_MS)
     await stopCodexChecks()
     await retry
     expect(most).toBe(1)

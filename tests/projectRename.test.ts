@@ -101,6 +101,7 @@ describe('a project renamed: found by its id (#514)', () => {
     expect(journal(ws).projects[id].former).toEqual(['gamma', 'alpha'])
     // Read again and again: nothing more.
     for (let i = 0; i < 3; i++) await w.projectIds({ fresh: true })
+    // A quiet window: a rename recorded twice would land in it (nothing more is the point).
     await new Promise((r) => setTimeout(r, timing('quiet.briefMs')))
     expect(journal(ws).renames).toHaveLength(2)
     // The project.json is the project's own: no names in it.
@@ -250,6 +251,7 @@ describe('what keeps a project by name or path follows a rename, once (#514)', (
     expect(await handovers(w, 'alpha')).toEqual([])
     // Read again: nothing is done twice.
     for (let i = 0; i < 3; i++) await w.projectIds({ fresh: true })
+    // A quiet window: a rename recorded twice would land in it (nothing more is the point).
     await new Promise((r) => setTimeout(r, timing('quiet.briefMs')))
     expect([prefs(ws, 'beta'), prefs(ws, 'alpha'), measured(w, 'beta'), measured(w, 'alpha')]).toEqual(['codex', 'claude-code', 1, 2])
     progress.clear(ws)

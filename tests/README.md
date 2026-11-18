@@ -175,8 +175,8 @@ Both are passed from the e2e runner to its suites (`PASS_ENV` in `tests/e2e/runC
 a new name in `tests/timing.json`, with its kind and a note.
 
 **`check:repo` fails a number written in place** (`npm run test:waits -- --literals`, `scripts/timingLiterals.mjs`):
-a test's or hook's timeout, `vi.setConfig`'s limits, a `timeout:` value, `until`'s bound (`until(check, N)`: its first
-argument a check; `until('reads', 2)` counts something else), `sleep`/`waitForTimeout`, a
+a test's or hook's timeout, `vi.setConfig`'s limits, a `timeout:` value, `until`'s bound (`until(check, N)`, whatever
+expression gives the check; only a literal first argument, as in `until('reads', 2)`, counts something else), `sleep`/`waitForTimeout`, a
 Promise around `setTimeout`, a `Date.now() - t < N` loop, a `*_MS` constant, or `toBeLessThan(N)` on a clock reading,
 anywhere in `tests/**` (fakes, fixtures and the timing files apart; simulated time is none). A number that is no wait
 (a value under test, a child's own lifetime) says `timing-ok: <why>` on its line or the line above: a timeout whose

@@ -7,6 +7,7 @@ import { join } from 'path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { timing } from './timing.cjs'
+import { waitOptions } from './waits'
 
 const gate = vi.hoisted(() => ({ hold: null as Promise<void> | null, opened: [] as string[] }))
 vi.mock('fs/promises', async (original) => {
@@ -70,8 +71,11 @@ function hold(): () => void {
     release()
   }
 }
-const settle = (): Promise<void> => new Promise((r) => setTimeout(r, timing('quiet.briefMs')))
 const reads = (dir: string): number => gate.opened.filter((p) => p.startsWith(dir)).length
+/** Once each walk has reached the held opendir of its tree: caught half way, as each test means it to be. */
+const entered = (...trees: string[]): Promise<void> => vi.waitFor(() => expect(trees.filter((t) => reads(t) === 0)).toEqual([]), waitOptions())
+/** A window in which a walk that carried on would read on (nothing happening is the point): one that stopped reads at most the opendir it was held in. */
+const quietWindow = (): Promise<void> => new Promise((r) => setTimeout(r, timing('quiet.briefMs')))
 
 beforeEach(() => {
   gate.hold = null
@@ -84,12 +88,12 @@ describe('abandoning a storage measurement', () => {
     projects.set(p.path, p.tree)
     const release = hold()
     const call = projectStorage(p.path, true, 'page-1')
-    await settle()
+    await entered(p.tree)
     abandonStorage('page-1')
     await expect(call).rejects.toBeInstanceOf(StorageStopped)
     const before = reads(p.tree)
     release()
-    await settle()
+    await quietWindow()
     expect(reads(p.tree) - before).toBeLessThanOrEqual(1)
     const again = await projectStorage(p.path, false)
     expect(again.worktrees[0].bytes).toBe(DIRS * 100)
@@ -101,7 +105,7 @@ describe('abandoning a storage measurement', () => {
     const release = hold()
     const first = projectStorage(p.path, true, 'window-a')
     const second = projectStorage(p.path, true, 'window-b')
-    await settle()
+    await entered(p.tree)
     abandonStorage('window-a')
     await expect(first).rejects.toBeInstanceOf(StorageStopped)
     release()
@@ -115,7 +119,7 @@ describe('abandoning a storage measurement', () => {
     const release = hold()
     const page = projectStorage(p.path, true, 'page-2')
     const plain = projectStorage(p.path, true)
-    await settle()
+    await entered(p.tree)
     abandonStorage('page-2')
     await expect(page).rejects.toBeInstanceOf(StorageStopped)
     release()
@@ -130,11 +134,11 @@ describe('abandoning a storage measurement', () => {
     projects.set(b.path, b.tree)
     const release = hold()
     const call = workspaceStorage(true, 'settings-1')
-    await settle()
+    await entered(a.tree)
     abandonStorage('settings-1')
     await expect(call).rejects.toBeInstanceOf(StorageStopped)
     release()
-    await settle()
+    await quietWindow()
     expect(reads(b.tree)).toBe(0)
     projects.clear()
   })
@@ -158,7 +162,7 @@ describe("a window's requests", () => {
     // Both pages happen to use the same request id: each is its own window's.
     const one = projectStorage(p.path, true, 'page', 1)
     const two = projectStorage(p.path, true, 'page', 2)
-    await settle()
+    await entered(p.tree)
     abandonWindowStorage(1)
     await expect(one).rejects.toBeInstanceOf(StorageStopped)
     release()
@@ -172,14 +176,14 @@ describe("a window's requests", () => {
     const release = hold()
     const one = projectStorage(p.path, true, 'page-a', 1)
     const two = projectStorage(p.path, true, 'page-b', 2)
-    await settle()
+    await entered(p.tree)
     abandonWindowStorage(1)
     await expect(one).rejects.toBeInstanceOf(StorageStopped)
     abandonWindowStorage(2)
     await expect(two).rejects.toBeInstanceOf(StorageStopped)
     const before = reads(p.tree)
     release()
-    await settle()
+    await quietWindow()
     expect(reads(p.tree) - before).toBeLessThanOrEqual(1)
   })
 
@@ -189,7 +193,7 @@ describe("a window's requests", () => {
     const release = hold()
     const page = projectStorage(p.path, true, 'page', 3)
     const plain = projectStorage(p.path, true)
-    await settle()
+    await entered(p.tree)
     abandonWindowStorage(3)
     await expect(page).rejects.toBeInstanceOf(StorageStopped)
     release()
@@ -221,7 +225,7 @@ describe("a window's requests", () => {
     const other = projectStorage(beta.path, true, 'storage-1', 7)
     const theirs = projectStorage(beta.path, true, 'storage-1', 8)
     const plain = projectStorage(alpha.path, true)
-    await settle()
+    await entered(alpha.tree, beta.tree)
     abandonWindowStorage(7)
     for (const call of [first, again, other]) await expect(call).rejects.toBeInstanceOf(StorageStopped)
     release()
@@ -235,13 +239,13 @@ describe("a window's requests", () => {
     const release = hold()
     const first = projectStorage(p.path, true, 'storage-2', 9)
     const again = projectStorage(p.path, true, 'storage-2', 9)
-    await settle()
+    await entered(p.tree)
     abandonStorage('storage-2', 9)
     await expect(first).rejects.toBeInstanceOf(StorageStopped)
     await expect(again).rejects.toBeInstanceOf(StorageStopped)
     const before = reads(p.tree)
     release()
-    await settle()
+    await quietWindow()
     expect(reads(p.tree) - before).toBeLessThanOrEqual(1)
   })
 
@@ -255,12 +259,12 @@ describe("a window's requests", () => {
     const waiting = projectStorage(slow.path, true, 'storage-3', 10)
     // Answered at once from the last result, under the same request, while the other still runs.
     expect((await projectStorage(quick.path, false, 'storage-3', 10)).worktrees[0].bytes).toBe(DIRS * 100)
-    await settle()
+    await entered(slow.tree)
     abandonWindowStorage(10)
     await expect(waiting).rejects.toBeInstanceOf(StorageStopped)
     const before = reads(slow.tree)
     release()
-    await settle()
+    await quietWindow()
     expect(reads(slow.tree) - before).toBeLessThanOrEqual(1)
     // A new call with the id after it was abandoned is a request of its own, and runs.
     expect((await projectStorage(slow.path, true, 'storage-3', 10)).worktrees[0].bytes).toBe(DIRS * 100)
@@ -280,7 +284,7 @@ describe("a window's requests", () => {
     const fresh = workspaceStorage(true, 'storage-4', 11)
     const stopped = expect(old).rejects.toBeInstanceOf(StorageStopped)
     list([p.path])
-    await settle()
+    await entered(p.tree)
     release()
     await stopped
     expect((await fresh).projects.find((x) => x.path === p.path)?.worktrees[0].bytes).toBe(DIRS * 100)
@@ -295,11 +299,11 @@ describe("a window's requests", () => {
     projects.set(b.path, b.tree)
     const release = hold()
     const call = workspaceStorage(true, 'settings', 6)
-    await settle()
+    await entered(a.tree)
     abandonWindowStorage(6)
     await expect(call).rejects.toBeInstanceOf(StorageStopped)
     release()
-    await settle()
+    await quietWindow()
     expect(reads(b.tree)).toBe(0)
     projects.clear()
   })

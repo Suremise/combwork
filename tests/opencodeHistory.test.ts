@@ -934,7 +934,7 @@ describe("OpenCode's subagent sessions (HI-2773)", () => {
     await (h as any).exportSession(home, PARENT.info.id, 'runEnd')
     for (let i = 0; i < 400 && !existsSync(mirrorPath(home, CHILD.info.id)); i++) {
       await h.idle()
-      await new Promise((r) => setTimeout(r, timing('pace.shortMs')))
+      await new Promise((r) => setTimeout(r, timing('wait.interval')))
     }
     expect(asked).toEqual([['session', 'export', PARENT.info.id], ['session', 'export', CHILD.info.id]])
     expect(mirrorState(readFileSync(mirrorPath(home, CHILD.info.id), 'utf8')).header?.parent).toBe(PARENT.info.id)

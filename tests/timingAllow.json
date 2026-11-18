@@ -213,6 +213,7 @@
       "until check('…the user’s exclusion stays: the workspace excluded, the test area scanned again', !!(await lib.until(async () => /Excluded/.test(await rowText(0)) && /Scanned/.test(await rowText(1)), 5000)), await panel.innerText())"
     ],
     "tests/e2e/asarfiles.cjs": [
+      "until check('a new project folder shows', !!(await lib.until(hasProject('beta'), 10000)))",
       "until check('a shared note written outside Combwork is noticed', !!(await lib.until(async () => (await eventsOf('notes-changed')).length > 0, 10000)))",
       "until const gone = await lib.until(async () => (await eventsOf('workspace-changed')).some((e) => e.workspace && !e.workspace.projects.some((p) => p.name === 'beta')), 10000)",
       "until const seen = await lib.until(() => page.evaluate(() => window.__events.some((e) => e.type === 'files-changed')), 10000)"

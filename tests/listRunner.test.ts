@@ -48,7 +48,7 @@ function world(codes: number[], opts: { observer?: boolean } = {}) {
 
 const step = (name: string, command: string, needed = false, folder = '') => ({ name, command, folder, needed })
 const job = (steps: ReturnType<typeof step>[], values: ListJob['values'] = { workspace: 'D:\\ws', name: 'ws', reason: 'open' }): ListJob => ({ list: true, steps, values, home: 'D:\\home' })
-const until = (fn: () => void): Promise<void> => vi.waitFor(fn, { timeout: HUNG_MS, interval: 5 })
+const until = (fn: () => void, ms: number): Promise<void> => vi.waitFor(fn, { timeout: ms, interval: 5 })
 
 describe('a list run by one runner', () => {
   it('runs each step in order, in the workspace folder, its placeholders filled, then ends done', async () => {
@@ -61,9 +61,9 @@ describe('a list run by one runner', () => {
   it('a failure waits for its choice; Rerun runs it again as the next attempt; a stale or repeated control does nothing', async () => {
     const w = world([1, 2, 0, 0])
     const done = runList(DIR, job([step('A', 'a'), step('B', 'b')]), w.deps, {})
-    await until(() => expect(w.status().awaiting).toEqual({ step: 0, attempt: 1 }))
+    await until(() => expect(w.status().awaiting).toEqual({ step: 0, attempt: 1 }), HUNG_MS)
     w.say('control-0-1.json', { action: 'rerun' })
-    await until(() => expect(w.status().awaiting).toEqual({ step: 0, attempt: 2 }))
+    await until(() => expect(w.status().awaiting).toEqual({ step: 0, attempt: 2 }), HUNG_MS)
     // The first attempt's control again, or a second one for it: not this attempt's, so nothing happens.
     w.say('control-0-1.json', { action: 'stop' })
     expect(w.spawned).toHaveLength(2)
@@ -76,12 +76,12 @@ describe('a list run by one runner', () => {
   it('Skip it and continue runs the rest; Stop here skips the rest and ends stopped', async () => {
     const skip = world([1, 0])
     const d1 = runList(DIR, job([step('A', 'a', true), step('B', 'b')]), skip.deps, {})
-    await until(() => expect(skip.status().awaiting).toEqual({ step: 0, attempt: 1 }))
+    await until(() => expect(skip.status().awaiting).toEqual({ step: 0, attempt: 1 }), HUNG_MS)
     skip.say('control-0-1.json', { action: 'skip' })
     expect(await d1).toMatchObject({ ended: 'done', steps: [{ state: 'failed', exitCode: 1 }, { state: 'ok' }] })
     const stop = world([1, 0])
     const d2 = runList(DIR, job([step('A', 'a'), step('B', 'b'), step('C', 'c')]), stop.deps, {})
-    await until(() => expect(stop.status().awaiting).toEqual({ step: 0, attempt: 1 }))
+    await until(() => expect(stop.status().awaiting).toEqual({ step: 0, attempt: 1 }), HUNG_MS)
     stop.say('control-0-1.json', { action: 'stop' })
     expect(await d2).toMatchObject({ ended: 'stopped', steps: [{ state: 'failed' }, { state: 'skipped' }, { state: 'skipped' }] })
     expect(stop.spawned).toHaveLength(1)
@@ -99,7 +99,7 @@ describe('a list run by one runner', () => {
   it("Don't wait while a failure waits for its choice: settled by the rule at once", async () => {
     const w = world([1, 0])
     const done = runList(DIR, job([step('A', 'a'), step('B', 'b')]), w.deps, {})
-    await until(() => expect(w.status().awaiting).toEqual({ step: 0, attempt: 1 }))
+    await until(() => expect(w.status().awaiting).toEqual({ step: 0, attempt: 1 }), HUNG_MS)
     w.say('control-detach.json', { action: 'detach' })
     expect(await done).toMatchObject({ attended: false, ended: 'done', steps: [{ state: 'failed' }, { state: 'ok' }] })
   })
@@ -107,7 +107,7 @@ describe('a list run by one runner', () => {
   it('nobody watching (the observer stale) while a failure waits: the rule settles it', async () => {
     const w = world([1, 0])
     const done = runList(DIR, job([step('A', 'a', true), step('B', 'b')]), w.deps, {})
-    await until(() => expect(w.status().awaiting).toEqual({ step: 0, attempt: 1 }))
+    await until(() => expect(w.status().awaiting).toEqual({ step: 0, attempt: 1 }), HUNG_MS)
     w.tick(OBSERVER_STALE_MS + 1)
     expect(await done).toMatchObject({ attended: false, ended: 'stopped', steps: [{ state: 'failed' }, { state: 'skipped' }] })
   })
@@ -115,11 +115,11 @@ describe('a list run by one runner', () => {
   it("a placeholder it can't fill, or a folder that isn't there, fails the step before anything runs; Rerun with values now runs it", async () => {
     const w = world([0])
     const done = runList(DIR, job([step('A', 'deploy "{project:api}"'), step('B', 'b', false, 'D:\\gone')]), w.deps, {})
-    await until(() => expect(w.status().awaiting).toEqual({ step: 0, attempt: 1 }))
+    await until(() => expect(w.status().awaiting).toEqual({ step: 0, attempt: 1 }), HUNG_MS)
     expect(w.status().steps[0]).toMatchObject({ state: 'failed', failure: 'placeholder', detail: '{project:api}' })
     expect(w.spawned).toHaveLength(0)
     w.say('control-0-1.json', { action: 'rerun', values: { workspace: 'D:\\ws', name: 'ws', reason: 'open', projects: { api: 'D:\\ws\\api' } } })
-    await until(() => expect(w.status().awaiting).toEqual({ step: 1, attempt: 1 }))
+    await until(() => expect(w.status().awaiting).toEqual({ step: 1, attempt: 1 }), HUNG_MS)
     expect(w.spawned.map((s) => s.command)).toEqual(['deploy "D:\\ws\\api"'])
     expect(w.status().steps[1]).toMatchObject({ state: 'failed', failure: 'folder', detail: 'D:\\gone' })
     w.say('control-1-1.json', { action: 'skip' })

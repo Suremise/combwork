@@ -64,7 +64,7 @@ describe('workspace boundaries', () => {
     // Closing the old workspace takes a moment: the other window's check must still see this one's claim.
     for (const w of [a, b]) {
       const close = bound(w, w.close)
-      w.close = async () => (await new Promise((r) => setTimeout(r, timing('pace.shortMs'))), close())
+      w.close = async () => (await new Promise((r) => setTimeout(r, timing('pace.shortMs'))), close()) // a slow close is the point: the race it opens is what the test checks
     }
     const results = await Promise.allSettled([a.open(outer), b.open(inner)])
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)

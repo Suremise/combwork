@@ -5,10 +5,11 @@
 // large catalog (docs/ARCHITECTURE.md has the numbers).
 import { appendFileSync, existsSync, mkdirSync, readdirSync, rmSync, symlinkSync, unlinkSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { timing } from './timing.cjs'
+import { waitOptions } from './waits'
 
 const base = tempDir('cw-revisions-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -236,8 +237,7 @@ describe('sharing a scan', () => {
     expect(runs).toBe(1)
     gates.shift()!()
     expect(await a).toBe(1)
-    await new Promise((r) => setTimeout(r, timing('pace.tick')))
-    expect(runs).toBe(2)
+    await vi.waitFor(() => expect(runs).toBe(2), waitOptions())
     gates.shift()!()
     expect([await b, await c]).toEqual([2, 2])
     expect(runs).toBe(2)

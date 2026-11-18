@@ -402,7 +402,7 @@ describe('the lanes service', () => {
   })
   const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
   const make = (title: string) => run(() => tasks.createTask({ title, project: 'alpha' }, user))
-  const until = async (fn: () => boolean | Promise<boolean>, ms = 10_000): Promise<boolean> => {
+  const until = async (fn: () => boolean | Promise<boolean>, ms = timing('wait.hang')): Promise<boolean> => {
     const t = Date.now()
     while (!(await fn()) && Date.now() - t < ms) await new Promise((r) => setTimeout(r, timing('wait.interval')))
     return fn()

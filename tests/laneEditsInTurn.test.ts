@@ -3,6 +3,7 @@
 // the second lane back to an older revision, and its next edit was refused as changed meanwhile. Here main and its
 // replies are stood in for: each read of the lanes answers only when the test lets it, in any order.
 import { describe, expect, it, vi } from 'vitest'
+import { timing } from './timing.cjs'
 
 const state = vi.hoisted(() => {
   const s = {
@@ -19,8 +20,13 @@ const state = vi.hoisted(() => {
   }
   return s
 })
-/** Until main has had `n` edits, or `n` reads of the lanes. */
-const until = (what: 'edits' | 'reads', n: number): Promise<void> => new Promise((go) => (state[what].length >= n ? go() : state.waiting.push({ what, n, go })))
+/** Once main has had `n` edits, or `n` reads of the lanes; one that never comes fails after wait.hang rather than hanging. */
+const seen = (what: 'edits' | 'reads', n: number): Promise<void> =>
+  new Promise((go, fail) => {
+    if (state[what].length >= n) return go()
+    const bound = setTimeout(() => fail(new Error(`${n} ${what} not seen within wait.hang (${state[what].length} seen)`)), timing('wait.hang'))
+    state.waiting.push({ what, n, go: () => (clearTimeout(bound), go()) })
+  })
 
 vi.mock('../src/renderer/src/store', () => ({
   get: () => state.store,
@@ -71,15 +77,15 @@ describe("quick edits of two lanes, in turn (HI-2932, HR1's round 1)", () => {
     const b2 = move('B', 0)
     // A's edit made, and its read of the lanes (A1, B0) has reached main, held. B's edit waits for that read's answer, so
     // main hasn't had it (round 1's per-lane turns sent it before this read was even asked).
-    await until('reads', 1)
+    await seen('reads', 1)
     expect(state.edits).toEqual([{ lane: 'A', rev: 0 }])
     state.reads[0].answer()
     // Then B's, on B0, and its read (A1, B1), held; B's second waits for it.
-    await until('reads', 2)
+    await seen('reads', 2)
     expect(state.edits).toEqual([{ lane: 'A', rev: 0 }, { lane: 'B', rev: 0 }])
     state.reads[1].answer()
     // Then B's second, on what B's first left.
-    await until('reads', 3)
+    await seen('reads', 3)
     expect(state.edits).toEqual([{ lane: 'A', rev: 0 }, { lane: 'B', rev: 0 }, { lane: 'B', rev: 1 }])
     state.reads[2].answer()
     expect(await Promise.all([a, b, b2])).toEqual(['made', 'made', 'made'])

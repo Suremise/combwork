@@ -107,7 +107,7 @@ async function project(o: { noNext?: boolean; released?: boolean } = {}): Promis
 }
 
 /** Polls (a condition, never a time) for the followed project's offer to be `ok`. */
-async function offerSoon(w: WS, repo: string, ok: (o: ReturnType<typeof currentOffer>) => boolean, ms = 20_000) {
+async function offerSoon(w: WS, repo: string, ok: (o: ReturnType<typeof currentOffer>) => boolean, ms = timing('wait.hang')) {
   const end = Date.now() + ms
   for (;;) {
     const o = currentOffer(w, repo)
@@ -151,6 +151,7 @@ describe('a release offer followed (HI-3155)', () => {
     // Ticks with nothing moved read nothing more.
     const before = readsOf(repo)
     const until = Date.now() + 1000
+    // A quiet window of ticks: a read in it is the failure (nothing is the point).
     while (Date.now() < until) await new Promise((r) => setTimeout(r, timing('wait.interval')))
     expect(readsOf(repo)).toBe(before)
     git(repo, 'branch', '1.5.0')
@@ -271,6 +272,7 @@ describe('a release offer whose refs can’t be watched (HR2’s round 1)', () =
     const until = Date.now() + 2000
     while (Date.now() < until) {
       releaseOfferTestHooks.look(repo)
+      // A quiet window after each look: a read in it, looped, is the failure (nothing is the point).
       await new Promise((r) => setTimeout(r, timing('quiet.briefMs')))
     }
     expect(readsOf(repo)).toBe(1)
@@ -283,6 +285,7 @@ describe('a release offer whose refs can’t be watched (HR2’s round 1)', () =
     const now = readsOf(repo)
     for (let i = 0; i < 5; i++) {
       releaseOfferTestHooks.look(repo)
+      // A quiet window after each look: a read in it, looped, is the failure (nothing is the point).
       await new Promise((r) => setTimeout(r, timing('quiet.briefMs')))
     }
     expect(readsOf(repo)).toBe(now)

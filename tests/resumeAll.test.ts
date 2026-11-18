@@ -47,6 +47,7 @@ describe('resume all', () => {
     let most = 0
     await resumeAll([agent('A', 'stopped'), agent('B', 'stopped'), agent('C', 'stopped')], async () => {
       most = Math.max(most, ++active)
+      // Held across a turn of the event loop, so a second resume started meanwhile would overlap it.
       await new Promise((r) => setTimeout(r, timing('pace.tick')))
       active--
     })

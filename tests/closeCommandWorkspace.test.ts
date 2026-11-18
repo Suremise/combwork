@@ -40,9 +40,9 @@ const gate = (): { wait: Promise<void>; open: () => void } => {
   return { wait: new Promise<void>((r) => (open = r)), open }
 }
 /** Lets what is ready run: each await a step. */
-const settle = async (until: () => boolean): Promise<boolean> => {
-  for (let i = 0; i < 200 && !until(); i++) await new Promise((r) => setImmediate(r))
-  return until()
+const settle = async (ready: () => boolean): Promise<boolean> => {
+  for (let i = 0; i < 200 && !ready(); i++) await new Promise((r) => setImmediate(r))
+  return ready()
 }
 
 describe("a switch whose old workspace's close is held", () => {

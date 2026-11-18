@@ -2224,6 +2224,7 @@ describe('the shared Codex test home: changes to its config.toml under a lock (l
       // This runner holds the lock (mid-change: it has read the file and not yet written it back).
       mkdirSync(join(home, 'config.toml.lock'))
       const other = trustIn(home, 'C:/lane1/codex-ws/demo')
+      // A quiet window (no change to the file in it is the point): the other runner, waiting on the lock, shows nothing.
       await new Promise((r) => setTimeout(r, timing('quiet.unitMs')))
       // The other runner is waiting: the file is as this one read it.
       expect(entries(home)).toEqual([])

@@ -99,7 +99,7 @@ async function until(ok: () => boolean, ms = HUNG_MS): Promise<void> {
   const by = Date.now() + ms
   while (!ok()) {
     if (Date.now() > by) throw new Error('git commands still running after the read ended') // i18n-ignore: a test's own failure
-    await new Promise((r) => setTimeout(r, timing('pace.shortMs')))
+    await new Promise((r) => setTimeout(r, timing('wait.interval')))
   }
 }
 

@@ -34,11 +34,11 @@ beforeAll(async () => {
 }, timing('hook.hang'))
 afterAll(() => void useBaselineWorker(null))
 
-async function until(ok: () => boolean): Promise<void> {
-  const end = Date.now() + HUNG_MS
+async function until(ok: () => boolean, ms: number): Promise<void> {
+  const end = Date.now() + ms
   while (!ok()) {
-    if (Date.now() > end) throw new Error('still not so after HUNG_MS')
-    await new Promise((r) => setTimeout(r, timing('pace.tick')))
+    if (Date.now() > end) throw new Error(`still not so after ${ms} ms`)
+    await new Promise((r) => setTimeout(r, timing('wait.interval')))
   }
 }
 
@@ -89,7 +89,7 @@ describe("a None check's points, off main's thread (HI-2358)", () => {
     t.hold()
     let started = false
     const s = checkStart(forNone(p), logOf([])).then((x) => ((started = true), x))
-    await until(() => t.pending === 1)
+    await until(() => t.pending === 1, HUNG_MS)
     expect(started).toBe(false)
     t.release()
     expect((await s).revision).toMatch(/^[0-9a-f]{64}$/)
@@ -151,7 +151,7 @@ describe("a None check's points, off main's thread (HI-2358)", () => {
     t.hold()
     const a = checkStart(forNone(p), logOf([]))
     const b = checkStart(forNone(q, ['src']), logOf([]))
-    await until(() => t.pending === 2)
+    await until(() => t.pending === 2, HUNG_MS)
     t.release()
     const [x, y] = await Promise.all([a, b])
     expect(x.revision).not.toBe(y.revision)

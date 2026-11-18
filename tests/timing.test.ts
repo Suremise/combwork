@@ -96,6 +96,11 @@ describe('the guard: no literal waits in new test code (HI-3378, scripts/timingL
     // A helper named until that counts something (until('reads', 2): two reads seen) has no bound: its first argument is no check.
     expect(kinds("await until('reads', 2)")).toEqual([])
     expect(kinds('await until(check, 9000)')).toEqual(['until'])
+    // HR1's round 1 on HI-3381: a check given by any other expression is still a check.
+    expect(kinds('await until(makeCheck(), 9000)')).toEqual(['until'])
+    expect(kinds('await until(flag ? checkA : checkB, 9000)')).toEqual(['until'])
+    expect(kinds('await until(async () => ok(), 9000)')).toEqual(['until'])
+    expect(kinds('await until(`reads`, 2)')).toEqual([])
     expect(kinds('await lib.sleep(500)')).toEqual(['sleep'])
     expect(kinds('await page.waitForTimeout(300)')).toEqual(['sleep'])
     expect(kinds('await new Promise((r) => setTimeout(r, 200))')).toEqual(['promiseSleep'])

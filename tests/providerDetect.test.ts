@@ -41,6 +41,7 @@ describe('detection before Automatic decides (#506)', () => {
     const waiting = providerService.detected().then((ok) => (settled = ok))
     hear('codex', true)
     hear('claude-code', true)
+    // A window under the 200 ms detect wait: settling in it, before Copilot answers, is the failure (nothing is the point).
     await new Promise((r) => setTimeout(r, timing('pace.shortMs')))
     // Copilot hasn't answered.
     expect(settled).toBeNull()

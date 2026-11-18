@@ -22,11 +22,11 @@ afterEach(() => {
 const files = { 'a.txt': 'a\n', 'big/one.txt': '1\n', 'big/two.txt': '2\n' }
 const none = (): Env => (env = setup({ ...preset('none', 'pair'), preChecks: [] }, { files }))
 
-async function until(ok: () => boolean): Promise<void> {
-  const end = Date.now() + HUNG_MS
+async function until(ok: () => boolean, ms: number): Promise<void> {
+  const end = Date.now() + ms
   while (!ok()) {
-    if (Date.now() > end) throw new Error('still not so after HUNG_MS')
-    await new Promise((r) => setTimeout(r, timing('pace.tick')))
+    if (Date.now() > end) throw new Error(`still not so after ${ms} ms`)
+    await new Promise((r) => setTimeout(r, timing('wait.interval')))
   }
 }
 
@@ -34,7 +34,7 @@ async function until(ok: () => boolean): Promise<void> {
 async function heldStart(e: Env, key: string): Promise<{ p: Promise<unknown> }> {
   baselineThread().hold()
   const p = e.wf.start(key, B1)
-  await until(() => baselineThread().pending === 1)
+  await until(() => baselineThread().pending === 1, HUNG_MS)
   return { p }
 }
 
@@ -100,7 +100,7 @@ describe('a None start or submit waiting on its whole-project read (HI-2340)', (
     put(e.project, 'a.txt', 'a, edited\n')
     baselineThread().hold()
     const p = e.wf.submit(card.key, B1, { summary: 'x' })
-    await until(() => baselineThread().pending === 1)
+    await until(() => baselineThread().pending === 1, HUNG_MS)
     e.store.updateCard(card.id, { paths: ['a.txt', 'big'] })
     baselineThread().release()
     refusedBy(await p, 'evidence.changed')
@@ -118,14 +118,14 @@ describe('a None start or submit waiting on its whole-project read (HI-2340)', (
     const held = t.answersHeld
     t.hold({ after: true })
     const declared = e.wf.declarePaths(a.key, B1, ['a.txt'])
-    await until(() => t.answersHeld === held + 1)
+    await until(() => t.answersHeld === held + 1, HUNG_MS)
     // The user edits outside.txt; then B submits its own file.
     put(e.project, 'outside.txt', 'edited by the user\n')
     e.wf.noteWrite('outside.txt', { agents: [], user: true })
     put(e.project, 'b.txt', 'B\n')
     e.wf.noteEdit(b, 'b.txt')
     const submitted = e.wf.submit(b.key, B2, { summary: 'b' })
-    await until(() => t.pending === 2)
+    await until(() => t.pending === 2, HUNG_MS)
     t.release()
     await declared
     const r = await submitted
@@ -143,7 +143,7 @@ describe('a None start or submit waiting on its whole-project read (HI-2340)', (
     t.hold()
     let done = false
     const linked = e.wf.platformOf(rec).runRevision(rec, e.wf.state(rec), null, null).then((x) => ((done = true), x))
-    await until(() => t.pending === 1)
+    await until(() => t.pending === 1, HUNG_MS)
     expect(done).toBe(false)
     t.release()
     const r = await linked
