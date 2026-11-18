@@ -6058,6 +6058,18 @@ write; each asker (else the builder) is woken once it commits, with the requests
 user clears as with any answer. The card dialog's For you section lists them (`WorkView.resolvedByDecision`, the newest
 10: the question as asked, Combwork's own in the window's language, the decision by its id, *recorded by …*, when).
 
+**An option answer is recorded with what it chose (HI-3356).** A decision the user gives as a bare option label (the
+whole answer one letter or a 1–2 digit number, optionally `(a)`, `a)`, `a.` or `a:`), by Record as Decision, by a note
+approving an agent's question (HI-2286), or by the Assistant's decision answering exactly one request, is recorded with
+the chosen option's text and the request's id (`A: <option> (HI-12/r9)`), so the card's decision stands alone for its
+agents and reviewers. Options are found only as list entries: lines starting (after an indent and an optional Markdown
+bullet or emphasis) with a label and `:`, `)`, `.` or ` -` (or `(a)`), an optional bracketed aside before it, at least
+two of them, each label once, all letters or all numbers, at one indent; the option's text runs to the next one, its
+continuation lines included. Anything less certain (inline prose, repeated labels, nesting, the label not among them)
+keeps the whole question instead: `A (HI-12/r9: “<question>”)`. Nothing is cut: the length limit applies to what the user
+typed, and what is added is the request's own stored text. Any other answer, and the reply or comment, stay as typed;
+an Assistant decision answering several requests is kept as written (`shared/decisionChoice.ts`).
+
 **Answering, main side (#1269).** Only the user answers (point 7, as recommended: never an agent or the
 Assistant, which relays and asks; HI-1932's decision the Assistant records in the user's words is the user's answer): the window's `tasks:answer(n, request, answer)` on the intent path, the answer
 checked under the transaction as above. What an answer may be follows the request (`answerFits`, checked in `tasks.ts`

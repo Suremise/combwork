@@ -384,6 +384,13 @@ const check = (name, ok, extra = '') => {
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
     await more.click()
     check('…Show all shows it whole', !!(await lib.until(async () => (await question.evaluate((el) => el.scrollHeight <= el.clientHeight + 1)) && (await more.innerText()).trim() === 'Show less', HUNG_MS)), await more.innerText().catch(() => ''))
+    // HI-3356: answered with just an option's number, Record as Decision records what it chose, with the request.
+    const mRequest = ((await inv('tasks:forYou')).items ?? []).find((i) => i.card === m)?.request
+    await mDialog.locator('[data-section="for-you"] textarea.for-you-reply').fill('2')
+    await mDialog.locator('[data-section="for-you"]').getByRole('button', { name: 'Record as Decision' }).click()
+    const chosen = `2: **For you:** each action shows as a button with its reason, which you can edit. (${mRequest})`
+    check('an option answered "2" is recorded with the option chosen and its request, whole (HI-3356)', !!mRequest && !!(await lib.until(async () => ((await card(m))?.decisions ?? []).some((d) => d.text === chosen), HUNG_MS)), JSON.stringify({ request: mRequest, decisions: (await card(m))?.decisions }))
+    check('…and still once its question has left For you', ((await inv('tasks:forYou')).items ?? []).every((i) => i.card !== m) && ((await card(m))?.decisions ?? []).some((d) => d.text === chosen), JSON.stringify((await card(m))?.decisions))
     await page.keyboard.press('Escape')
 
     // HR5's round 1 (#1637): a question that fits, then wraps past the fold once the window is zoomed in, is folded
