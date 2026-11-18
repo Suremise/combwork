@@ -51,6 +51,7 @@
   "mcp.catalog.notInstalled": "{name}はこのカタログからインストールされていません。代わりにインストールしてください。",
   "mcp.catalog.notRead": "このカタログを読み込めませんでした：{reason}",
   "mcp.catalog.ok": "満たしている",
+  "mcp.catalog.otherDownload": "{name}をダウンロード中です。サーバーは一度に1つずつダウンロードされます。",
   "mcp.catalog.pick": "カタログでサーバーを選ぶと、必要なものを確認してインストールできます。",
   "mcp.catalog.placesChanged": "更新の待機中に、{name}の追加先が変わりました。もう一度確認してください。",
   "mcp.catalog.redirects": "{url}のダウンロードでリダイレクトが多すぎます。",

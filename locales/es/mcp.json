@@ -51,6 +51,7 @@
   "mcp.catalog.notInstalled": "{name} no está instalado desde este catálogo: instálalo en su lugar.",
   "mcp.catalog.notRead": "No se pudo leer este catálogo: {reason}",
   "mcp.catalog.ok": "Se cumple",
+  "mcp.catalog.otherDownload": "Descargando {name}: se descarga un servidor cada vez.",
   "mcp.catalog.pick": "Selecciona un servidor en el Catálogo para ver lo que necesita e instalarlo.",
   "mcp.catalog.placesChanged": "Dónde está agregado {name} cambió mientras la actualización esperaba: vuelve a mirarlo.",
   "mcp.catalog.redirects": "Demasiadas redirecciones al descargar {url}.",

@@ -51,6 +51,7 @@
   "mcp.catalog.notInstalled": "{name} ist nicht aus diesem Katalog installiert: Installiere ihn stattdessen.",
   "mcp.catalog.notRead": "Dieser Katalog konnte nicht gelesen werden: {reason}",
   "mcp.catalog.ok": "Erfüllt",
+  "mcp.catalog.otherDownload": "Lädt {name} herunter: Es wird immer nur ein Server gleichzeitig heruntergeladen.",
   "mcp.catalog.pick": "Wähle im Katalog einen Server, um zu sehen, was er braucht, und ihn zu installieren.",
   "mcp.catalog.placesChanged": "Wo {name} hinzugefügt ist, hat sich geändert, während das Update wartete: Sieh es dir erneut an.",
   "mcp.catalog.redirects": "Zu viele Weiterleitungen beim Herunterladen von {url}.",

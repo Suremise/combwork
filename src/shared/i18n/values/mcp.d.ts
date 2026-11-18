@@ -53,6 +53,7 @@ interface CombworkMessageValues {
   'mcp.catalog.notInstalled': { name: string | number }
   'mcp.catalog.notRead': { reason: string | number }
   'mcp.catalog.ok': undefined
+  'mcp.catalog.otherDownload': { name: string | number }
   'mcp.catalog.pick': undefined
   'mcp.catalog.placesChanged': { name: string | number }
   'mcp.catalog.redirects': { url: string | number }

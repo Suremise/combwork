@@ -1215,10 +1215,13 @@ const CATALOG_FAILED = msg({ id: 'mcp.catalog.failed', defaultMessage: 'Could no
  * the old one's places, HI-3327). Otherwise installed, it is added to no project yet (HI-2059): its view opens, for Add to….
  */
 /**
- * HI-3377: a catalogue server downloaded and checked for Install or Update, cancellable meanwhile (the row's Cancel
- * download): its own id, so a Cancel ends only this one. Cancelled: null, and nothing is said; failed: undefined, said.
+ * HI-3377: a catalogue server downloaded and checked for Install or Update, cancellable meanwhile (Cancel download): its
+ * own id, so a Cancel ends only this one. One at a time in the window (HR1's round 1): while one runs, the others' Install
+ * and Update are off and their views name it, with its Cancel, so none loses its Cancel and none opens a dialog behind
+ * another's. Cancelled, or another running: null, and nothing is said; failed: undefined, said.
  */
 async function prepareCatalog(row: Pick<McpCatalogRow, 'source' | 'name'>): Promise<McpCatalogPrepared | null | undefined> {
+  if (get().catalogPreparing) return null
   const op = crypto.randomUUID()
   set({ catalogPreparing: { source: row.source, name: row.name, op } })
   try {

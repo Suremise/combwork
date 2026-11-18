@@ -51,6 +51,7 @@
   "mcp.catalog.notInstalled": "Serwer {name} nie jest zainstalowany z tego katalogu: zainstaluj go.",
   "mcp.catalog.notRead": "Nie udało się odczytać tego katalogu: {reason}",
   "mcp.catalog.ok": "Spełnione",
+  "mcp.catalog.otherDownload": "Pobieranie {name}: serwery są pobierane pojedynczo.",
   "mcp.catalog.pick": "Wybierz serwer w Katalogu, aby zobaczyć, czego potrzebuje, i go zainstalować.",
   "mcp.catalog.placesChanged": "Miejsca, do których dodano serwer {name}, zmieniły się, gdy aktualizacja czekała: sprawdź ponownie.",
   "mcp.catalog.redirects": "Za dużo przekierowań przy pobieraniu {url}.",

@@ -10,8 +10,8 @@ import { createHash, randomUUID } from 'crypto'
 import { execFile } from 'child_process'
 import { fileURLToPath } from 'url'
 import { join } from 'path'
-import { existsSync } from 'original-fs'
-import { readFile, stat } from 'original-fs/promises'
+import { createReadStream, existsSync } from 'original-fs'
+import { stat } from 'original-fs/promises'
 import { msg } from '../shared/i18n/msg'
 import { tr } from '../shared/i18n'
 import { OUR_CATALOG_URL, catalogRowShown, isOurCatalogUrl, sameCatalogSource, catalogUrlAllowed, checkRequirements, compareVersions, editionOf, readCatalog, type PcFacts, type ReadCatalog } from '../shared/mcpCatalog'
@@ -125,7 +125,12 @@ type Policy = 'https' | 'file'
 const policyOf = (sourceUrl: string): Policy => (/^file:/i.test(sourceUrl) ? 'file' : 'https')
 
 /** For tests: what fetch and the PC probes are. */
-export const testHooks: { fetch?: typeof fetch; probe?: (cmd: string, args: string[]) => Promise<string>; facts?: PcFacts; stat?: (path: string) => Promise<{ size: number }> } = {}
+export const testHooks: { fetch?: typeof fetch; probe?: (cmd: string, args: string[]) => Promise<string>; facts?: PcFacts; stat?: (path: string) => Promise<{ size: number }>; read?: (path: string, signal: AbortSignal) => AsyncIterable<Uint8Array> } = {}
+
+/** A file's bytes as they are read, ended by `signal` (its stream destroyed: no read goes on after). */
+function readChunks(path: string, signal: AbortSignal): AsyncIterable<Uint8Array> {
+  return createReadStream(path, { signal })
+}
 
 /**
  * Bytes from `url` within one budget: `ms` for the whole download, every redirect included, and `max` bytes, counted
@@ -164,11 +169,21 @@ export async function download(url: string, policy: Policy, max: number, ms: num
       const path = fileURLToPath(url)
       const size = await Promise.race([(testHooks.stat ?? stat)(path).then((s) => s.size), new Promise<never>((_, reject) => stop.addEventListener('abort', () => reject(ended()), { once: true }))])
       if (size > max) throw combworkError(M.tooLarge, { url, max })
-      const bytes = await readFile(path, { signal: stop }).catch((e) => {
+      // Read as it comes (HI-3377): each chunk counted against `max` and, for a server's zip, starting the idle clock
+      // again, so a slow share that keeps reading finishes; the stream ends with the read, whatever ends it.
+      const chunks: Buffer[] = []
+      let got = 0
+      try {
+        for await (const chunk of (testHooks.read ?? readChunks)(path, stop)) {
+          arm()
+          got += chunk.length
+          if (got > max) throw combworkError(M.tooLarge, { url, max })
+          chunks.push(Buffer.from(chunk))
+        }
+      } catch (e) {
         throw stop.aborted ? ended() : e
-      })
-      if (bytes.length > max) throw combworkError(M.tooLarge, { url, max })
-      return { bytes }
+      }
+      return { bytes: Buffer.concat(chunks) }
     }
     let at = url
     for (let hop = 0; ; hop++) {

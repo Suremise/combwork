@@ -51,6 +51,7 @@
   "mcp.catalog.notInstalled": "{name} 不是从此目录安装的：请改为安装它。",
   "mcp.catalog.notRead": "无法读取此目录：{reason}",
   "mcp.catalog.ok": "已满足",
+  "mcp.catalog.otherDownload": "正在下载 {name}：一次只下载一个服务器。",
   "mcp.catalog.pick": "在目录中选择一个服务器，查看它的要求并安装。",
   "mcp.catalog.placesChanged": "在更新等待期间，{name} 的添加位置发生了变化：请重新查看。",
   "mcp.catalog.redirects": "下载 {url} 时重定向次数过多。",

@@ -207,6 +207,10 @@
     "defaultMessage": "Met",
     "description": "A requirement's state in a catalogue server's view (HI-545), for screen readers."
   },
+  "mcp.catalog.otherDownload": {
+    "defaultMessage": "Downloading {name}: one server downloads at a time.",
+    "description": "A catalogue server's view (HI-545, HI-3377) while another server's download for Install or Update runs: this one's Install… and Update… wait. {name} is the server downloading; Cancel download stops it."
+  },
   "mcp.catalog.pick": {
     "defaultMessage": "Select a server in the Catalogue to see what it needs and install it.",
     "description": "The MCP view's main area with the Catalogue tab and nothing selected (HI-545)."

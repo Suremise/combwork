@@ -211,6 +211,52 @@ describe('downloads (HI-545/s17)', () => {
       catalog.testHooks.stat = undefined
     }
   })
+
+  // HI-3377 (HR1's round 1, finding 2): a file:// zip is read as it comes, so the idle time holds for a share as for https:
+  // a read that keeps arriving finishes past the idle time in all; one that stops arriving stops; a cancel ends the read.
+  it('a file:// zip under the idle time: a slow share that keeps reading finishes; a stall stops; a cancel ends the read', async () => {
+    const d = tempDir('cw-mcp-catalog-share-')
+    writeFileSync(join(d, 'demo.zip'), 'x'.repeat(8))
+    const url = pathToFileURL(join(d, 'demo.zip')).href
+    const wait = (ms: number, signal: AbortSignal) =>
+      new Promise<void>((r, reject) => {
+        const t = setTimeout(r, ms)
+        signal.addEventListener('abort', () => (clearTimeout(t), reject(new DOMException('aborted', 'AbortError'))), { once: true })
+      })
+    let reading = 0
+    /** One byte each `every` ms, `chunks` of them (a hang from `stallAfter` on); counts the reads going on. */
+    const share = (chunks: number, every: number, stallAfter = Infinity) =>
+      async function* (_path: string, signal: AbortSignal): AsyncIterable<Uint8Array> {
+        reading++
+        try {
+          for (let i = 0; i < chunks; i++) {
+            if (i >= stallAfter) await wait(3_600_000, signal)
+            await wait(every, signal)
+            yield new Uint8Array([120])
+          }
+        } finally {
+          reading--
+        }
+      }
+    try {
+      catalog.testHooks.read = share(8, 100)
+      expect((await catalog.download(url, 'file', 100, 300, undefined, undefined, { idle: true }))!.bytes.length).toBe(8)
+      catalog.testHooks.read = share(8, 50, 2)
+      await expect(catalog.download(url, 'file', 100, 300, undefined, undefined, { idle: true })).rejects.toThrow('stopped sending')
+      // Still held to the catalogue's size as it reads.
+      catalog.testHooks.read = share(8, 10)
+      await expect(catalog.download(url, 'file', 4, 300, undefined, undefined, { idle: true })).rejects.toThrow('is larger than its catalogue says')
+      catalog.testHooks.read = share(1000, 50)
+      const cancel = new AbortController()
+      const going = catalog.download(url, 'file', 10_000, 60_000, cancel.signal, undefined, { idle: true })
+      await expect.poll(() => reading, { timeout: HUNG_MS }).toBe(1)
+      cancel.abort()
+      await expect(going).rejects.toThrow()
+      expect(reading).toBe(0)
+    } finally {
+      catalog.testHooks.read = undefined
+    }
+  }, HUNG_MS)
 })
 
 describe('installing and updating (HI-545)', () => {

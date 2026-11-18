@@ -51,6 +51,7 @@
   "mcp.catalog.notInstalled": "{name} n’est pas installé depuis ce catalogue : installe-le plutôt.",
   "mcp.catalog.notRead": "Impossible de lire ce catalogue : {reason}",
   "mcp.catalog.ok": "Rempli",
+  "mcp.catalog.otherDownload": "Téléchargement de {name} : un seul serveur est téléchargé à la fois.",
   "mcp.catalog.pick": "Sélectionne un serveur dans le Catalogue pour voir ce qu’il lui faut et l’installer.",
   "mcp.catalog.placesChanged": "Les endroits où {name} est ajouté ont changé pendant que la mise à jour attendait : regarde de nouveau.",
   "mcp.catalog.redirects": "Trop de redirections pendant le téléchargement de {url}.",
