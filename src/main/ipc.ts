@@ -154,7 +154,7 @@ import { jjOperationPreview, jjOperations } from './platform/jjOperations'
 import { checkRepoTools } from './platform/repoPorts'
 import { gitCantRead, slotWorkspaces } from './platform/workspacePorts'
 import { opsAt, refuseUnoffered, repoOpHandlers } from './repoOpsIpc'
-import { cancelGitRun, cancellableGit, dropGitRuns, withGitCancel, type CancelOwner } from './gitCancel'
+import { cancelGitRun, cancellableGit, cancelOwnerOf, withGitCancel, type CancelOwner } from './gitCancel'
 import { nextVersionPlan, previewFor, startNextVersion } from './workflow/nextVersion'
 import { checkOffer, dismissOffer, releaseOffers } from './workflow/releaseOffer'
 import { branchStartArg } from '../shared/nextVersion'
@@ -239,28 +239,8 @@ const advancedState = (): AdvancedState => advanced.state(workspace.path ? (work
 /** The window an IPC call came from, for calls that keep something per window (the developer console's subscription). */
 const senderStore = new AsyncLocalStorage<WebContents>()
 
-/** HI-3372: the windows and workspaces whose closing takes their runs off gitCancel's list (each listened to once). */
-const cancelWatchedWindows = new WeakSet<WebContents>()
-const cancelWatchedWorkspaces = new WeakSet<WorkspaceService>()
-
-/**
- * HI-3372: who may cancel a run started now: this window, this workspace's open, the project (its path as recorded).
- * Watches the window and the workspace once, so a run outlives neither's list.
- */
-function cancelOwner(projectPath: string): CancelOwner {
-  const wc = senderStore.getStore()
-  const ws = currentWorkspace()
-  if (wc && !cancelWatchedWindows.has(wc)) {
-    cancelWatchedWindows.add(wc)
-    const id = wc.id
-    wc.once('destroyed', () => dropGitRuns({ sender: id }))
-  }
-  if (!cancelWatchedWorkspaces.has(ws)) {
-    cancelWatchedWorkspaces.add(ws)
-    ws.lifetime.addEventListener('abort', () => dropGitRuns({ ws }), { once: true })
-  }
-  return { sender: wc?.id ?? -1, ws, project: resolve(projectPath) }
-}
+/** HI-3372: who may cancel a run started now: this window, this open of its workspace, the project (gitCancel.ts). */
+const cancelOwner = (projectPath: string): CancelOwner => cancelOwnerOf(senderStore.getStore(), currentWorkspace(), projectPath)
 
 /** A Commit or Set aside, Fetch, Pull or Push the user can cancel (`op`: the window's id for it). */
 const cancellableRun = <T>(p: string, op: unknown, fn: () => T | Promise<T>): Promise<T> => withGitCancel(op, cancelOwner(workspace.assertProject(p)), async (signal) => (signal ? cancellableGit(signal, async () => fn()) : fn()))

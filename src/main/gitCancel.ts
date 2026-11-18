@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import { combworkError } from './combworkError'
+import { resolve } from 'path'
 import { msg } from '../shared/i18n/msg'
 import type { WorkspaceService } from './workspace'
 
@@ -12,11 +13,44 @@ import type { WorkspaceService } from './workspace'
  * cancels a push). No agent tool or Agent API route reaches it: these are the user's window actions only.
  */
 
-/** Who may cancel a run: the window that started it, in that workspace's open, for that project. */
+/**
+ * Who may cancel a run: the window that started it, in that open of its workspace (`life`: the WorkspaceService is reused
+ * across a close and a reopen, each open with a lifetime of its own, HR2's round 1), for that project.
+ */
 export interface CancelOwner {
   sender: number
   ws: WorkspaceService
+  life: AbortSignal
   project: string
+}
+
+/** The window a run comes from, as Electron gives it: its id, and its end. */
+export interface CancelWindow {
+  id: number
+  once(event: 'destroyed', listener: () => void): unknown
+}
+
+/** The windows and workspace opens whose end takes their runs off the list, each listened to once. */
+const watchedWindows = new WeakSet<CancelWindow>()
+const watchedLives = new WeakSet<AbortSignal>()
+
+/**
+ * The owner of a run starting now: `wc`, the window it came from (none: a caller that can never cancel it), `ws`'s open as
+ * it is now (its lifetime, captured), the project. Listens once to the window's end and to that open's end, either taking
+ * its runs off the list (never cancelling them: a close never ends a push).
+ */
+export function cancelOwnerOf(wc: CancelWindow | undefined, ws: WorkspaceService, project: string): CancelOwner {
+  const life = ws.lifetime
+  if (wc && !watchedWindows.has(wc)) {
+    watchedWindows.add(wc)
+    const id = wc.id
+    wc.once('destroyed', () => dropGitRuns({ sender: id }))
+  }
+  if (!watchedLives.has(life)) {
+    watchedLives.add(life)
+    life.addEventListener('abort', () => dropGitRuns({ life }), { once: true })
+  }
+  return { sender: wc?.id ?? -1, ws, life, project: resolve(project) }
 }
 
 const M = {
@@ -38,7 +72,7 @@ export const cancellableGit = <T>(signal: AbortSignal, fn: () => Promise<T>): Pr
 /** The Cancel of the user's git run in progress here, if any. */
 export const gitRunSignal = (): AbortSignal | undefined => current.getStore()
 
-const sameOwner = (a: CancelOwner, b: CancelOwner): boolean => a.sender === b.sender && a.ws === b.ws && a.project.toLowerCase() === b.project.toLowerCase()
+const sameOwner = (a: CancelOwner, b: CancelOwner): boolean => a.sender === b.sender && a.ws === b.ws && a.life === b.life && !a.life.aborted && a.project.toLowerCase() === b.project.toLowerCase()
 
 /**
  * Runs `run` under `op` (the window's id), cancellable by its owner with cancelGitRun. No id: run as before, with no
@@ -63,9 +97,9 @@ export function cancelGitRun(op: unknown, caller: CancelOwner): void {
   if (r && sameOwner(r.owner, caller)) r.ctl.abort()
 }
 
-/** A window closed (its webContents id), or a workspace's open ended: its runs off the list, running on to their end. */
-export function dropGitRuns(gone: { sender?: number; ws?: WorkspaceService }): void {
-  for (const [op, r] of runs) if ((gone.sender !== undefined && r.owner.sender === gone.sender) || (gone.ws !== undefined && r.owner.ws === gone.ws)) runs.delete(op)
+/** A window closed (its webContents id), or a workspace's open ended (its lifetime): its runs off the list, running on to their end. */
+export function dropGitRuns(gone: { sender?: number; life?: AbortSignal }): void {
+  for (const [op, r] of runs) if ((gone.sender !== undefined && r.owner.sender === gone.sender) || (gone.life !== undefined && r.owner.life === gone.life)) runs.delete(op)
 }
 
 /** Tests: the runs registered now. */

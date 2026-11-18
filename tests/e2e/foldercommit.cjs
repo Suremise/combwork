@@ -126,22 +126,16 @@ const lastCommitFiles = () => git('show', '--no-renames', '--name-only', '--form
         await commitBtn.click().catch(() => undefined)
         return null
       }
-      return fs.existsSync(hold) && (await cancelBtn.count()) === 1
+      // Held once the hook's own process (node) has started and said its pid (HR2's round 1).
+      return fs.existsSync(hold) && fs.existsSync(pidFile) && (await cancelBtn.count()) === 1
     }))
+    const held = heldOk ? lib.identify([Number(fs.readFileSync(pidFile, 'utf8'))]) : []
     if (!heldOk) await page.screenshot({ path: path.join(lib.WORK, 'foldercommit-held-failed.png') })
     check('Commit held by its hook: Cancel beside the buttons while it runs', heldOk, `${await m.text('main')} | hook ran: ${fs.existsSync(hold)} | notices: ${[...seen].join(' / ')}`)
     await f.themes(page, m.card('main'), 'foldercommit-commit-running')
     await cancelBtn.click()
     const stopped = page.locator('.toast', { hasText: 'You cancelled the commit' })
-    const alive = (pid) => {
-      try {
-        process.kill(pid, 0)
-        return true
-      } catch {
-        return false
-      }
-    }
-    check('…Cancel: said Stopped, nothing committed; the hook ended; the buttons back', !!(await waitHung(async () => (await stopped.count()) >= 1 && (await cancelBtn.count()) === 0 && (await commitBtn.count()) === 1)) && /Nothing was committed/.test(await stopped.first().innerText()) && git('rev-parse', 'HEAD') === before && !!(await waitHung(() => fs.existsSync(pidFile) && !alive(Number(fs.readFileSync(pidFile, 'utf8'))))), await m.text('main'))
+    check('…Cancel: said Stopped, nothing committed; the hook ended; the buttons back', !!(await waitHung(async () => (await stopped.count()) >= 1 && (await cancelBtn.count()) === 0 && (await commitBtn.count()) === 1)) && /Nothing was committed/.test(await stopped.first().innerText()) && git('rev-parse', 'HEAD') === before && !!(await waitHung(() => lib.stillSame(held).length === 0)), `${await m.text('main')} | still running: ${JSON.stringify(lib.stillSame(held))}`)
     fs.rmSync(path.join(fx.alpha, '.git', 'hooks', 'pre-commit'))
     await commitBtn.click()
     const ours = () => git('log', '--format=%H', '--grep=Commit changes before merging', `${before}..HEAD`)

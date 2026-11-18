@@ -21,7 +21,7 @@ const { applyAdvancedLimits } = await import('../src/main/limitsApp')
 const { platformLimits } = await import('../src/main/platform/limits')
 const { gitIntegration } = await import('../src/main/platform/gitIntegration')
 const { SIGN_CHECK_MS } = await import('../src/main/platform/gitSigning')
-const { cancelGitRun, dropGitRuns, gitRunsNow, withGitCancel } = await import('../src/main/gitCancel')
+const { cancelGitRun, cancelOwnerOf, gitRunsNow, withGitCancel } = await import('../src/main/gitCancel')
 
 advanced.load(join(base, 'profile'))
 afterAll(() => advanced.stop())
@@ -68,9 +68,18 @@ describe('the git and jj limits’ settings (HI-3372)', () => {
 })
 
 describe('the user’s Cancel of their git run: its owner alone (HI-3372)', () => {
-  const ws1 = {} as WorkspaceService
-  const ws2 = {} as WorkspaceService
-  const owner = { sender: 1, ws: ws1, project: 'C:\\work\\p' }
+  /** A window as Electron gives one (its id, its end), the test ending it. */
+  const window = (id: number) => {
+    let end = (): void => undefined
+    return { wc: { id, once: (_e: 'destroyed', fn: () => void) => void (end = fn) }, close: () => end() }
+  }
+  /** A workspace service reused across opens, as Combwork's is: each open with a lifetime of its own (HR2's round 1). */
+  const service = () => {
+    let life = new AbortController()
+    const ws = { get lifetime() { return life.signal } } as unknown as WorkspaceService
+    return { ws, close: () => life.abort(), reopen: () => void (life = new AbortController()) }
+  }
+  const P = 'C:\\work\\p'
   /** A run that waits until its signal is aborted (or `end` is called), then says which. */
   const waiting = () => {
     let end!: () => void
@@ -79,53 +88,85 @@ describe('the user’s Cancel of their git run: its owner alone (HI-3372)', () =
   }
 
   it('another window, workspace or project, an unknown id: nothing; its owner (the project in any letter case): cancelled', async () => {
+    const w1 = window(1)
+    const w2 = window(2)
+    const a = service()
+    const b = service()
     const w = waiting()
-    const going = withGitCancel('op-1', owner, w.run)
+    const going = withGitCancel('op-1', cancelOwnerOf(w1.wc, a.ws, P), w.run)
     expect(gitRunsNow()).toBe(1)
-    cancelGitRun('op-1', { ...owner, sender: 2 })
-    cancelGitRun('op-1', { ...owner, ws: ws2 })
-    cancelGitRun('op-1', { ...owner, project: 'C:\\work\\other' })
-    cancelGitRun('op-unknown', owner)
-    cancelGitRun(undefined, owner)
-    cancelGitRun('op-1', { ...owner, project: 'c:\\WORK\\p' })
+    cancelGitRun('op-1', cancelOwnerOf(w2.wc, a.ws, P))
+    cancelGitRun('op-1', cancelOwnerOf(w1.wc, b.ws, P))
+    cancelGitRun('op-1', cancelOwnerOf(w1.wc, a.ws, 'C:\\work\\other'))
+    cancelGitRun('op-unknown', cancelOwnerOf(w1.wc, a.ws, P))
+    cancelGitRun(undefined, cancelOwnerOf(w1.wc, a.ws, P))
+    cancelGitRun('op-1', cancelOwnerOf(w1.wc, a.ws, 'c:\\WORK\\p'))
     expect(await going).toBe('cancelled')
     expect(gitRunsNow()).toBe(0)
   })
 
   it('a duplicate id while it runs is refused, nothing started; a Cancel after it ended, nothing (a later run of that id untouched)', async () => {
-    const a = waiting()
-    const first = withGitCancel('op-2', owner, a.run)
+    const w1 = window(1)
+    const a = service()
+    const owner = () => cancelOwnerOf(w1.wc, a.ws, P)
+    const x = waiting()
+    const first = withGitCancel('op-2', owner(), x.run)
     let ran = false
-    await expect(withGitCancel('op-2', owner, async () => void (ran = true))).rejects.toThrow('That action is already running.')
+    await expect(withGitCancel('op-2', owner(), async () => void (ran = true))).rejects.toThrow('That action is already running.')
     expect(ran).toBe(false)
-    a.end()
+    x.end()
     expect(await first).toBe('done')
-    cancelGitRun('op-2', owner)
-    const b = waiting()
-    const second = withGitCancel('op-2', owner, b.run)
-    b.end()
+    cancelGitRun('op-2', owner())
+    const y = waiting()
+    const second = withGitCancel('op-2', owner(), y.run)
+    y.end()
     expect(await second).toBe('done')
   })
 
   it('no id: no Cancel, run as before; a run that throws leaves the list too', async () => {
+    const owner = cancelOwnerOf(window(1).wc, service().ws, P)
     expect(await withGitCancel(undefined, owner, async (signal) => signal)).toBeUndefined()
     await expect(withGitCancel('op-3', owner, async () => Promise.reject(new Error('failed start')))).rejects.toThrow('failed start')
     expect(gitRunsNow()).toBe(0)
   })
 
-  it('its window or workspace closing takes its runs off the list: they run to their end, uncancelled', async () => {
+  it('its window closing takes its runs off the list: they run to their end, uncancelled', async () => {
+    const w1 = window(1)
+    const a = service()
     const w = waiting()
-    const going = withGitCancel('op-4', owner, w.run)
-    dropGitRuns({ sender: 1 })
+    const going = withGitCancel('op-4', cancelOwnerOf(w1.wc, a.ws, P), w.run)
+    w1.close()
     expect(gitRunsNow()).toBe(0)
-    cancelGitRun('op-4', owner)
+    cancelGitRun('op-4', cancelOwnerOf(w1.wc, a.ws, P))
     w.end()
     expect(await going).toBe('done')
-    const v = waiting()
-    const other = withGitCancel('op-5', owner, v.run)
-    dropGitRuns({ ws: ws1 })
-    cancelGitRun('op-5', owner)
-    v.end()
-    expect(await other).toBe('done')
+  })
+
+  it('open, close, reopen, close: each open’s runs leave with it, never cancelled; a later open’s caller never matches an earlier open’s run', async () => {
+    const w1 = window(1)
+    const a = service()
+    // First open: its run, then the workspace closes: off the list, running on.
+    const first = waiting()
+    const one = withGitCancel('op-5', cancelOwnerOf(w1.wc, a.ws, P), first.run)
+    a.close()
+    expect(gitRunsNow()).toBe(0)
+    // Reopened: the same window, service and project, a new open, can't cancel the first open's run.
+    a.reopen()
+    cancelGitRun('op-5', cancelOwnerOf(w1.wc, a.ws, P))
+    first.end()
+    expect(await one).toBe('done')
+    // The second open's own run: cancellable by its owner; then closed again, off the list, running on.
+    const second = waiting()
+    const two = withGitCancel('op-6', cancelOwnerOf(w1.wc, a.ws, P), second.run)
+    const third = waiting()
+    const three = withGitCancel('op-7', cancelOwnerOf(w1.wc, a.ws, P), third.run)
+    cancelGitRun('op-6', cancelOwnerOf(w1.wc, a.ws, P))
+    expect(await two).toBe('cancelled')
+    a.close()
+    expect(gitRunsNow()).toBe(0)
+    a.reopen()
+    cancelGitRun('op-7', cancelOwnerOf(w1.wc, a.ws, P))
+    third.end()
+    expect(await three).toBe('done')
   })
 })

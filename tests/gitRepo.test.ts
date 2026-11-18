@@ -217,6 +217,40 @@ describe('Fetch, Pull and Push: cancelled, or at their bound (HI-3372)', () => {
     await vi.waitFor(() => expect(h.pid() !== null && !alive(h.pid()!)).toBe(true), { timeout: timing('wait.hang') })
   })
 
+  // HR2's round 1: the merge is the pull's forward step. Cancelled while it waits for the merge lock: no merge starts, the
+  // branch where it was. Cancelled while git merges (its post-merge hook held, the fast-forward written): ended, said as
+  // maybe brought in, and it was.
+  it('Pull cancelled while it waits for the merge lock: no merge starts; HEAD where it was', async () => {
+    theyPush('theirs.txt')
+    const before = git(proj, 'rev-parse', 'HEAD')
+    let entered!: () => void
+    let open!: () => void
+    const atDoor = new Promise<void>((r) => (entered = r))
+    lockDoor = { entered, open: new Promise<void>((r) => (open = r)) }
+    const ac = new AbortController()
+    const done = cancellableGit(ac.signal, () => repo.pull(proj)).then(
+      () => 'done',
+      (e: Error) => e.message
+    )
+    await atDoor
+    ac.abort()
+    open()
+    expect(await done).toMatch(/^Stopped the pull here/)
+    expect(git(proj, 'rev-parse', 'HEAD')).toBe(before)
+  })
+
+  it('Pull cancelled while git merges (its post-merge hook held): ended, said as maybe brought in; the hook ended', async () => {
+    theyPush('theirs.txt')
+    const h = holdScript(tempDir('cw-gitrepo-hold-'))
+    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+    writeFileSync(join(proj, '.git', 'hooks', 'post-merge'), `#!/bin/sh\nsh "${fwd(h.script)}"\n`)
+    const said = await cancelAt(h.started, () => repo.pull(proj))
+    expect(said).toMatch(/^Stopped the pull here: it may have fetched or brought commits in already/)
+    // The fast-forward was written before its post-merge hook ran: brought in, as the message allows.
+    expect(git(proj, 'rev-parse', 'HEAD')).toBe(git(proj, 'rev-parse', 'origin/main'))
+    await vi.waitFor(() => expect(h.pid() !== null && !alive(h.pid()!)).toBe(true), { timeout: timing('wait.hang') })
+  })
+
   it('its bound is cw.git.networkMinutes as main sets it: past it, git gave up, said in minutes', async () => {
     heldFetch()
     const was = platformLimits.gitNetworkMs

@@ -1002,7 +1002,14 @@ export async function pull(projectPath: string): Promise<string> {
     if (!u || u.gone) throw refusal(msg({ id: 'service.gitRepo.upstreamGone', defaultMessage: '{upstream} is gone from the remote.', description: 'An error pulling in the Git view: the remote branch {upstream} the branch follows was deleted there.' }), { upstream: s.upstream.name })
     if (u.behind === 0) return tr(msg({ id: 'service.gitRepo.upToDate', defaultMessage: '{branch} is up to date with {upstream}.', description: 'After pulling in the Git view: the branch {branch} has every commit of the remote branch {upstream} already.' }), { branch: now.branch ?? '', upstream: u.name })
     if (u.ahead > 0) throw refusal(msg({ id: 'service.gitRepo.diverged', defaultMessage: '{branch} and {upstream} have diverged ({ahead, plural, one {# commit} other {# commits}} here, {behind, number} there), so pulling needs a merge or rebase. Do that in a terminal, or ask an agent to.', description: 'An error pulling in the Git view: the branch {branch} has {ahead} commits the remote branch {upstream} hasn\'t, and it has {behind} the branch hasn\'t; Combwork pulls only when no merge is needed.' }), { branch: now.branch ?? '', upstream: u.name, ahead: u.ahead, behind: u.behind })
-    const r = await changeFolder(projectPath, 'pull', now.branch, () => git(projectPath, ['merge', '--ff-only', '@{upstream}']))
+    // HI-3372 (HR2's round 1): the merge is the pull's forward step: a Cancel while it waited for the lock and the checks
+    // starts no merge; one while git merges ends it (said as maybe applied: a fast-forward may have moved the branch).
+    const r = await changeFolder(projectPath, 'pull', now.branch, () => {
+      stopIfCancelled('pull')
+      const signal = gitRunSignal()
+      return git(projectPath, ['merge', '--ff-only', '@{upstream}'], undefined, undefined, signal ? { signal } : {})
+    })
+    if (r.cancelled) throw stopped('pull')
     if (!r.ok) throw failed(msg({ id: 'service.gitRepo.pullFailed', defaultMessage: "Couldn't pull: {why}", description: "An error pulling in the Git view; {why} is git's own words." }), {}, r)
     log.info(`Pulled ${userText(projectPath)}`)
     await changed(projectPath)

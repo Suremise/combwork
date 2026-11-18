@@ -82,21 +82,16 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitrem
         const script = path.join(dir, 'hold.sh')
         fs.writeFileSync(script, `#!/bin/sh\n: > "${fwd(started)}"\n"${fwd(process.execPath)}" -e 'require("fs").writeFileSync(process.argv[1], String(process.pid)); setTimeout(() => {}, 120000)' "${fwd(pidFile)}"\n`)
         g(alpha, 'config', 'remote.origin.uploadpack', `sh "${fwd(script)}" #`)
-        const alive = (pid) => {
-          try {
-            process.kill(pid, 0)
-            return true
-          } catch {
-            return false
-          }
-        }
         await branches.locator('[data-action="fetch"]').click()
         const cancelFetch = branches.locator('[data-action="cancel-git-run"]')
-        check('Fetch held by the remote: Cancel beside it while it runs', !!(await lib.until(async () => fs.existsSync(started) && (await cancelFetch.count()) === 1, HUNG_MS)), await text(branches))
+        // Held once the remote's own process (node) has started and said its pid: its identity taken then, while it is
+        // known to be the test's (HR2's round 1: never a pid read after the cancel, which may never have been written).
+        check('Fetch held by the remote: Cancel beside it while it runs', !!(await lib.until(async () => fs.existsSync(started) && fs.existsSync(pidFile) && (await cancelFetch.count()) === 1, HUNG_MS)), await text(branches))
+        const held = lib.identify([Number(fs.readFileSync(pidFile, 'utf8'))])
         await shot(page, 'fetch-running')
         await cancelFetch.click()
         const stopped = page.locator('.toast', { hasText: 'Stopped the fetch here' })
-        check('…Cancel: said Stopped, with what may have reached the remote; git and its upload-pack ended', !!(await lib.until(async () => (await stopped.count()) >= 1 && (await cancelFetch.count()) === 0, HUNG_MS)) && /refresh to see where things stand/.test(await text(stopped.first())) && !!(await lib.until(() => fs.existsSync(pidFile) && !alive(Number(fs.readFileSync(pidFile, 'utf8'))), HUNG_MS)), await text(stopped.first()))
+        check('…Cancel: said Stopped, with what may have reached the remote; git and its upload-pack ended', !!(await lib.until(async () => (await stopped.count()) >= 1 && (await cancelFetch.count()) === 0, HUNG_MS)) && /refresh to see where things stand/.test(await text(stopped.first())) && !!(await lib.until(() => lib.stillSame(held).length === 0, HUNG_MS)), `${await text(stopped.first())} | still running: ${JSON.stringify(lib.stillSame(held))}`)
         await shot(page, 'fetch-stopped')
         g(alpha, 'config', '--unset', 'remote.origin.uploadpack')
       }
