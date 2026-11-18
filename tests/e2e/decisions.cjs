@@ -58,7 +58,6 @@ const check = (name, ok, extra = '') => {
   const shot = async (name) => {
     await page.screenshot({ path: path.join(lib.WORK, `decisions-${name}-dark.png`) })
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
-    await lib.sleep(200)
     await page.screenshot({ path: path.join(lib.WORK, `decisions-${name}-light.png`) })
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
   }
@@ -95,7 +94,7 @@ const check = (name, ok, extra = '') => {
 
   // Work on it starts; an agent's (here the Agent API's) record comes after: "new since start", recorded by the caller.
   await inv('tasks:update', n, { column: 'doing' })
-  await lib.sleep(20)
+  await lib.sleep(lib.timing('pace.shortMs')) // the clock moves on, so what follows is recorded after what came before
   const recorded = await api('PATCH', `/v1/tasks/${n}`, { decision: 'Show each error under its own field, not in a banner.', reply: 'short' })
   check('the Agent API records a decision', recorded.status === 200 && JSON.stringify(recorded.body).includes('Recorded a decision'), JSON.stringify(recorded))
   const read = await api('GET', `/v1/tasks/${n}`)
@@ -149,18 +148,17 @@ const check = (name, ok, extra = '') => {
   check('Cancel asks too', !!(await until(async () => (await discard.count()) === 1, lib.timing('hang.ui'))))
   await discard.getByRole('button', { name: 'Keep Editing' }).click()
   // Saving it slowly: the card can't close until it is saved.
-  await app.evaluate(() => {
-    process.env.CW_TEST_SLOW_IPC = 'tasks:editDecision=2500*1'
-  })
+  // The save is held in main (CW_TEST_HOLD_IPC) from the click until the suite lets it go, so the Escape comes while it
+  // runs, by the suite's say, not a delay's (HI-2652).
+  const holdSave = (on) => app.evaluate((_e, v) => void (v ? (process.env.CW_TEST_HOLD_IPC = 'tasks:editDecision') : delete process.env.CW_TEST_HOLD_IPC), on)
+  await holdSave(true)
   await changing.getByRole('button', { name: 'Save' }).click()
-  await lib.sleep(300)
+  await until(async () => (await app.evaluate(() => globalThis.__cwHeldIpc?.['tasks:editDecision'] ?? 0)) >= 1, lib.timing('hang.ui'))
   await page.keyboard.press('Escape')
-  await lib.sleep(300)
+  await lib.sleep(lib.timing('quiet.busyEscapeMs')) // A quiet window on purpose: this checks that the Escape closes nothing and asks nothing.
   check('closing waits while a decision is being saved', (await dialog.count()) === 1 && (await discard.count()) === 0)
+  await holdSave(false)
   check('…which then saves it', !!(await until(async () => (await card(n)).decisions[0].text === 'Show each error under its field, in red.', lib.timing('hang.ui'))))
-  await app.evaluate(() => {
-    delete process.env.CW_TEST_SLOW_IPC
-  })
   await until(async () => (await changing.getByLabel('Decision').count()) === 0, lib.timing('hang.ui'))
   await page.keyboard.press('Escape')
   check('with nothing unsaved, the card closes', !!(await until(async () => (await dialog.count()) === 0, lib.timing('hang.ui'))))
@@ -244,7 +242,7 @@ const check = (name, ok, extra = '') => {
   const viaMoveToDoing = async (fail) => {
     await mDialog.locator('select').nth(2).selectOption('doing')
     await mDialog.locator('.dialog-footer').getByRole('button', { name: 'Save', exact: true }).click()
-    if (!(await until(async () => (await moveDialog.count()) === 1, 5000))) {
+    if (!(await until(async () => (await moveDialog.count()) === 1, lib.timing('hang.ui')))) {
       await page.screenshot({ path: path.join(lib.WORK, 'decisions-move-missing.png') })
       return false
     }
@@ -297,7 +295,7 @@ const check = (name, ok, extra = '') => {
   }
   await inv('tasks:update', n, { agent: coder.id })
   check("the agent's read of its card has no flag", (await asCoder(`/v1/tasks/${n}`)).notice === null)
-  await lib.sleep(20)
+  await lib.sleep(lib.timing('pace.shortMs')) // the clock moves on, so what follows is recorded after what came before
   await inv('tasks:update', n, { decision: 'Errors stay on screen until fixed.' })
   // Notices name the card by its key with the number the tools take (#1219): its own key, from the board.
   const named = `${(await card(n)).key}`
@@ -327,7 +325,7 @@ const check = (name, ok, extra = '') => {
   check('read in full, it is no longer flagged', (await asCoder('/v1/projects/alpha')).notice === null)
   // The call that moves the card on (to Review) still hears of a decision it hasn't read: the card was its own when the
   // call began.
-  await lib.sleep(20)
+  await lib.sleep(lib.timing('pace.shortMs')) // the clock moves on, so what follows is recorded after what came before
   await inv('tasks:update', n, { decision: 'One message per field.' })
   const moved = await asCoder(`/v1/tasks/${n}`, 'PATCH', { column: 'review', reply: 'short' })
   check('moving the card to Review with a decision unread: that reply flags it', moved.status === 200 && moved.notice === `[CW] ${named} has 1 new decision since you last read it: read the card (cw_read_task) at your next checkpoint.`, JSON.stringify(moved))

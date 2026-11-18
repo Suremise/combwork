@@ -55,12 +55,7 @@ const check = (name, ok, extra = '') => {
     return { status: r.status, body: await r.json().catch(() => null) }
   }
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
-    return v
-  }
+  const until = lib.until
   const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
   const wakes = (agent) => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
@@ -138,7 +133,7 @@ const check = (name, ok, extra = '') => {
   check('at 900 px in two panes, ⋯ is where a click lands on it', narrow.clickable, JSON.stringify(narrow))
   await page.screenshot({ path: path.join(lib.WORK, 'cardloop-watching-narrow.png') })
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
-  await lib.sleep(500)
+  await until(() => page.evaluate(() => innerWidth === 1500), HUNG_MS)
   const activity = await api('GET', `/v1/projects/alpha/agents/Reviewer/activity`)
   check('the Agent API reports it watching, with the cards', activity.body?.status === 'watching' && activity.body?.watching?.cards?.[0] === c1 && activity.body?.statusMessage === `Waiting for ${first.key} → Review`, JSON.stringify(activity.body).slice(0, 200))
   // Every status reply says what it waits for: project status, the project list and its short rows.
@@ -181,7 +176,7 @@ const check = (name, ok, extra = '') => {
   check('…and nothing was typed into it (still watching)', (await live(reviewer.id))?.status === 'watching')
   const t0 = Date.now()
   const waited = await api('POST', '/v1/agents/wait', { agents: [{ project: 'alpha', agent: 'Reviewer' }], timeoutSeconds: 20 })
-  check('cw_wait_for_agents doesn’t wait on a watcher: it reports watching at once, with what for', waited.body?.agents?.[0]?.status === 'watching' && waited.body?.agents?.[0]?.statusMessage === label && waited.body?.agents?.[0]?.watching?.cards?.[0] === c1 && Date.now() - t0 < 5000 && waited.body?.timedOut === false, JSON.stringify(waited.body))
+  check('cw_wait_for_agents doesn’t wait on a watcher: it reports watching at once, with what for', waited.body?.agents?.[0]?.status === 'watching' && waited.body?.agents?.[0]?.statusMessage === label && waited.body?.agents?.[0]?.watching?.cards?.[0] === c1 && Date.now() - t0 < lib.timing('budget.watcherReportMs') && waited.body?.timedOut === false, JSON.stringify(waited.body))
 
   const joined = (await api('GET', '/v1/lanes')).body?.[0]
   check('the reviewer joining made the lane (#483): the builder, the reviewer, the cards in order', joined?.builder?.name === 'Builder' && joined?.reviewer?.name === 'Reviewer' && joined?.cards?.map((c) => c.number).join() === `${c1},${c2}` && joined?.state === 'active' && joined?.current === c1, JSON.stringify(joined))
@@ -244,7 +239,7 @@ const check = (name, ok, extra = '') => {
   // The user types (no Enter) in its terminal, then the card changes: no wake while the user may still be typing.
   await inv('pty:write', lib.ptyKey(alpha, third.id), 'half a thought')
   await inv('tasks:comment', c3, 'First change')
-  await lib.sleep(2000) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.
+  await lib.sleep(lib.timing('quiet.wakeTypedOnceMs')) // A quiet window on purpose: this checks that no wake comes while the user may still be typing.
   check('no wake while the user is typing there', wakes('Third').length === 0, JSON.stringify(wakes('Third')))
   const afterPause = await until(async () => wakes('Third').length === 1, lib.timing('hang.ui'))
   check('…and one wake once the typing pause has passed', !!afterPause && wakes('Third').length === 1)
@@ -255,7 +250,7 @@ const check = (name, ok, extra = '') => {
   await say(third.id, 'work 4')
   await until(async () => (await live(third.id))?.status === 'working', HUNG_MS)
   await inv('tasks:comment', c3, 'Second change')
-  await lib.sleep(1500) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.
+  await lib.sleep(lib.timing('quiet.wakeHeldMs')) // A quiet window on purpose: this checks that no wake comes while it works.
   check('no wake while the agent is working', wakes('Third').length === 1)
   check('…and one wake when its turn ends', !!(await until(async () => wakes('Third').length === 2, lib.timing('hang.step'))))
   await until(async () => (await live(third.id))?.status === 'finished', HUNG_MS)
@@ -266,7 +261,7 @@ const check = (name, ok, extra = '') => {
   await inv('session:stop', alpha, third.id)
   await until(async () => !(await live(third.id)), HUNG_MS)
   await inv('tasks:comment', c3, 'Third change')
-  await lib.sleep(1500) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.
+  await lib.sleep(lib.timing('quiet.wakeHeldMs')) // A quiet window on purpose: this checks that no wake comes while it is stopped.
   check('no wake while it is stopped', wakes('Third').length === 2)
   await inv('session:start', alpha, { agentId: third.id, resumeId: sid })
   check('…and one wake after it is resumed', !!(await until(async () => wakes('Third').length === 3, lib.timing('hang.step'))))
@@ -275,7 +270,7 @@ const check = (name, ok, extra = '') => {
   await say(third.id, wait(c3, { changes: ['comment'] }))
   await until(async () => (await live(third.id))?.status === 'watching', HUNG_MS)
   await page.keyboard.press('Control+3')
-  await lib.sleep(500)
+  await until(() => page.locator('.pane-header-bar', { hasText: 'Third' }).first().isVisible(), HUNG_MS)
   // Compact… in its ⋯ (#977).
   await page.locator('.pane-header-bar', { hasText: 'Third' }).getByLabel('More').first().click()
   const compactItem = page.locator('.menu .menu-item', { hasText: 'Compact…' })
@@ -287,7 +282,7 @@ const check = (name, ok, extra = '') => {
   const compactingNow = await until(async () => (await live(third.id))?.status === 'working', lib.timing('hang.step'))
   check('…it compacts, its watch kept', !!compactingNow && !!(await live(third.id))?.watch, JSON.stringify(await live(third.id)))
   await inv('tasks:comment', c3, 'During the compaction')
-  await lib.sleep(1500) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.
+  await lib.sleep(lib.timing('quiet.wakeHeldMs')) // A quiet window on purpose: this checks that no wake comes while it compacts.
   check('no wake while it compacts', wakes('Third').length === 3, JSON.stringify(wakes('Third')))
   check('…and one wake once the compaction has ended', !!(await until(async () => wakes('Third').length === 4, lib.timing('hang.ui'))))
   await until(async () => (await live(third.id))?.status === 'finished', HUNG_MS)
@@ -298,7 +293,7 @@ const check = (name, ok, extra = '') => {
   await say(third.id, wait([c3, ...open], { changes: ['comment'] }))
   check('Third watches three cards', !!(await until(async () => (await live(third.id))?.watch?.cards?.length === 3 && (await live(third.id))?.status === 'watching', HUNG_MS)), JSON.stringify(await live(third.id)))
   await page.keyboard.press('Control+3')
-  await lib.sleep(500)
+  await until(() => page.locator('.pane-header-bar', { hasText: 'Third' }).first().isVisible(), HUNG_MS)
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.webContents.setZoomFactor(1))
   await lib.fitWindow(app, page, { width: 1100, height: 750 })
   const tight = await cancelHitWhenSettled('Third')
@@ -309,9 +304,9 @@ const check = (name, ok, extra = '') => {
   await page.getByText('Cancel Card Watch').first().click()
   check('Cancel ends the watch', !!(await until(async () => (await live(third.id))?.status === 'finished' && !(await live(third.id))?.watch, lib.timing('hang.step'))))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
-  await lib.sleep(500)
+  await until(() => page.evaluate(() => innerWidth === 1500), HUNG_MS)
   await inv('tasks:comment', c3, 'Fourth change')
-  await lib.sleep(2500) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.
+  await lib.sleep(lib.timing('quiet.cancelledWatchMs')) // A quiet window on purpose: this checks that a cancelled watch wakes nothing.
   check('…and a later change wakes nothing', wakes('Third').length === 4)
 
   // --- A watch on another agent's card (a dependency, #143): the wake says whose card it is, and that Passed isn't merged.
@@ -353,12 +348,11 @@ const check = (name, ok, extra = '') => {
   const byVerdict = await onChange(() => say(reviewer.id, `boardreview ${c4} start then boardreview ${c4} failed`), { changes: ['verdict'] })
   check('it returns on a review verdict', byVerdict.r?.changes?.[0]?.changes?.includes('verdict'), JSON.stringify(byVerdict.r))
   // Per caller: at most two at a time.
-  const a1 = api('POST', '/v1/tasks/wait', { cards: [c4], timeoutSeconds: 3 })
-  const a2 = api('POST', '/v1/tasks/wait', { cards: [c4], timeoutSeconds: 3 })
-  await lib.sleep(300)
-  const a3 = await api('POST', '/v1/tasks/wait', { cards: [c4], timeoutSeconds: 3 })
-  check('a third wait at once from the same caller is refused (429)', a3.status === 429, JSON.stringify(a3))
-  await Promise.all([a1, a2])
+  // Three sent together (no wait for the first two to arrive): the two that arrive first wait their 3 s, and whichever
+  // arrives third is refused, while they still run.
+  const three = await Promise.all([1, 2, 3].map(() => api('POST', '/v1/tasks/wait', { cards: [c4], timeoutSeconds: 3 })))
+  const statuses = three.map((x) => x.status).sort()
+  check('a third wait at once from the same caller is refused (429)', JSON.stringify(statuses) === '[200,200,429]', JSON.stringify(three))
   // Scope: a project agent's token waits only on its own project's cards.
   fs.mkdirSync(path.join(ws, 'beta'), { recursive: true })
   await inv('workspace:refresh')
@@ -387,7 +381,7 @@ const check = (name, ok, extra = '') => {
   check('a quit is pending, waiting on the watcher', !!pendingNow && (await inv('app:quitState')).working === 1, JSON.stringify(await inv('app:quitState')))
   const quitting = await lib.quitWatch(app)
   await inv('tasks:update', q1, { column: 'done' })
-  await lib.sleep(2500) // A fixed wait on purpose: this checks that Combwork does NOT quit yet, which no condition can show.
+  await lib.sleep(lib.timing('quiet.quitHeldMs')) // A quiet window on purpose: this checks that Combwork does NOT quit yet.
   const still = await inv('app:quitState')
   check('…still waiting while the other card it watches is in Doing with the builder', still?.pending === true && still?.working === 1, JSON.stringify(still))
   const moved = Date.now()

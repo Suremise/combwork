@@ -46,12 +46,7 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)
-    return v
-  }
+  const until = lib.until
 
   await page.getByText('alpha', { exact: true }).first().click()
   const coder = await lib.addAgent(inv, alpha, { name: 'Coder' })
@@ -72,7 +67,7 @@ const check = (name, ok, extra = '') => {
 
   // A card in Todo for it shows nothing; in Doing it shows.
   const card = await inv('tasks:create', { title: 'Attention inbox', project: 'alpha', agent: coder.id })
-  await lib.sleep(800) // On purpose: that nothing shows is the check, so it gives a chip time to show wrongly.
+  await lib.sleep(lib.timing('quiet.todoChipMs')) // A quiet window on purpose: that nothing shows is the check, so it gives a chip time to show wrongly.
   check('a Todo card shows no chip', (await header.locator('.card-chip').count()) === 0)
   await inv('tasks:update', card.number, { column: 'doing' })
   check('the pane header shows the card’s key only, at any width (#311, #1221)', !!(await until(async () => (await header.locator('.card-chip').innerText().catch(() => '')).trim() === `${card.key}`, lib.timing('hang.ui'))), await header.locator('.card-chip').innerText().catch(() => ''))
@@ -92,7 +87,7 @@ const check = (name, ok, extra = '') => {
   // A second Doing card: "+1".
   const second = await inv('tasks:create', { title: 'Prompt snippets', project: 'alpha', agent: coder.id, column: 'doing' })
   check('a second Doing card shows +1', !!(await until(async () => /\+1/.test(await header.locator('.card-chip').innerText().catch(() => '')), lib.timing('hang.ui'))))
-  const headerChip = async () => (await header.locator('.card-chip').innerText({ timeout: 1000 }).catch(() => '')).replace(/\s+/g, '')
+  const headerChip = async () => (await header.locator('.card-chip').innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')).replace(/\s+/g, '')
   check('…in the pane header too, still without titles', !!(await until(async () => (await headerChip()) === `${card.key}+1`, lib.timing('hang.ui'))), await headerChip())
   const both = (t) => t.includes(`${card.key} Attention inbox`) && t.includes(`${second.key} Prompt snippets`)
   tip = await lib.hoverTip(page, header.locator('.card-chip'), both)

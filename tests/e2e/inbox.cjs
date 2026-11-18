@@ -52,12 +52,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-    return v
-  }
+  const until = lib.until
   // Focus as the test says, not as Windows allows: Windows doesn't give a background app the focus while another window
   // has it (focus-stealing protection), so the window's focus is stubbed (as taskbar.cjs does) and the event Combwork
   // listens for is sent with it.
@@ -88,7 +83,8 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
     // Typed once the fake takes prompts, and waited for by its own turn (#684, lib.fakePrompts).
     check(`${id}'s turn ${n} ends`, !!(await lib.fakePrompts(inv, lib.ptyKey(proj, id), () => live(proj, id), { home: claudeHome }).say(`${id} turn ${n}`)))
     await until(async () => String(await inv('pty:buffer', lib.ptyKey(proj, id))).includes(`Done: ${id} turn ${n}`), HUNG_MS)
-    await lib.sleep(600)
+    // Its end recorded in main (finished, and unseen until the window says it was seen).
+    await until(async () => (await live(proj, id))?.status === 'finished', HUNG_MS)
   }
   const item = page.locator('.statusbar .inbox-item:not(.inbox-finished)')
   const itemText = async () => ((await item.count()) ? (await item.innerText()).trim() : '')
@@ -107,7 +103,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
   }
   const openProject = async (name) => {
     await page.locator('.project-row', { hasText: name }).first().click()
-    await lib.sleep(600)
+    await until(async () => (await page.locator('.project-row.selected', { hasText: name }).count()) === 1, HUNG_MS)
   }
 
   const one = await lib.addAgent(inv, alpha, { name: 'One' })
@@ -125,7 +121,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
 
   // A finish on screen is seen as it happens.
   await turn(alpha, one.id)
-  check('a finish on screen: not unseen', (await live(alpha, one.id))?.unseen === false)
+  check('a finish on screen: not unseen', !!(await until(async () => (await live(alpha, one.id))?.unseen === false, lib.timing('hang.ui'))))
   check('…and nothing needs you', (await itemText()) === '', await itemText())
   check('…no Projects badge', (await projectsBadge()) === '')
 
@@ -133,12 +129,12 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
   await openProject('beta')
   await inv('session:start', beta, { agentId: three.id })
   check('Three asks whether to trust its folder', !!(await until(async () => (await live(beta, three.id))?.status === 'waiting', lib.timing('hang.ui'))))
-  await lib.sleep(800)
   check('a waiting agent on screen still needs you', !!(await until(async () => (await itemText()) === '1 needs you', lib.timing('hang.ui'))), await itemText())
   await turn(alpha, one.id)
-  check('a finish in another project stays unseen', (await live(alpha, one.id))?.unseen === true)
   // #1632's case: one agent at a prompt, another finished: 1 needs you, and the finish told apart.
   check('the status bar says 1 needs you: the finish is not a need', !!(await until(async () => (await itemText()) === '1 needs you' && (await finishedText()) === '1 finished', lib.timing('hang.ui'))), `${await itemText()} | ${await finishedText()}`)
+  // The window has the finish (above), and would have said it was seen as it drew it: it stays unseen.
+  check('a finish in another project stays unseen', (await live(alpha, one.id))?.unseen === true)
   const needTip = await lib.hoverTip(page, item, (t) => t.includes('1 agent needs you'))
   check('…its tooltip says what it counts: cards and agents, each once (HI-1931)', needTip.includes('1 agent needs you'), needTip)
   const finishedTip = await lib.hoverTip(page, finishedItem, (t) => t.startsWith('Agents that finished'))
@@ -176,6 +172,8 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
   const backgrounded = await until(async () => !(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isFocused())), lib.timing('hang.ui'))
   if (backgrounded) {
     await turn(alpha, one.id)
+    // The window has the finish (its quiet item counts it), and would have said it was seen as it drew it.
+    await until(async () => (await finishedText()) === '1 finished', lib.timing('hang.ui'))
     check('a finish while the window is in the background is unseen', (await live(alpha, one.id))?.unseen === true)
     await focusWindow()
     check('…and seen once the window has focus again', !!(await until(async () => (await live(alpha, one.id))?.unseen === false, lib.timing('hang.ui'))))
@@ -187,11 +185,10 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
   git(two.worktree.path, 'commit', '-q', '-m', 'b')
   await focusWindow()
   await turn(alpha, two.id)
-  check('Two finished on screen is seen', (await live(alpha, two.id))?.unseen === false)
+  check('Two finished on screen is seen', !!(await until(async () => (await live(alpha, two.id))?.unseen === false, lib.timing('hang.ui'))))
   const branch = await until(async () => (await inv('agents:branchStatuses')).find((b) => b.agentId === two.id && b.status?.ahead === 1)?.status, lib.timing('hang.ui'))
   check('its branch has a diff summary', branch?.diff?.files === 1 && branch.diff.insertions === 1, JSON.stringify(branch))
   await item.click()
-  await lib.sleep(400)
   const review = page.locator('.inbox-panel .inbox-row', { hasText: 'alpha · Two' })
   check('Two is listed to review', !!(await until(async () => (await review.count()) === 1, lib.timing('hang.ui'))))
   check('…with its summary', (await review.locator('.inbox-state').innerText().catch(() => '')) === '1 file, +1 −0 · 1 commit', await review.locator('.inbox-state').innerText().catch(() => ''))

@@ -85,93 +85,6 @@
       "clockLoop check('a message rings its doorbell within seconds while the task runs', left.status === 200 && !!heard && Date.now() - t1 < 15000 && during?.backgroundTasks === 1, JSON.stringify({ left: left.body, ms: Date.now() - t1, tasks: during?.backgroundTasks }))",
       "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)"
     ],
-    "tests/e2e/board.cjs": [
-      "sleep await lib.sleep(400)",
-      "sleep await lib.sleep(500)",
-      "sleep await lib.sleep(900)",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)"
-    ],
-    "tests/e2e/boardarchive.cjs": [
-      "sleep await lib.sleep(200)"
-    ],
-    "tests/e2e/boardbulk.cjs": [
-      "sleep await lib.sleep(200)",
-      "sleep await lib.sleep(300)"
-    ],
-    "tests/e2e/boardfold.cjs": [
-      "promiseSleep await (timer ? new Promise((r) => setTimeout(r, 0)) : Promise.resolve())",
-      "sleep await lib.sleep(200)",
-      "sleep await lib.sleep(400)",
-      "until if (!(await until(async () => (await tile(n.t1).count()) === 1, 3000))) await page.getByRole('button', { name: 'Task Board' }).click()"
-    ],
-    "tests/e2e/boardgates.cjs": [
-      "sleep await lib.sleep(1500) // A fixed wait on purpose: this checks that nothing happens (no drop, no question).",
-      "sleep await lib.sleep(1500) // A fixed wait on purpose: this checks that nothing starts after Cancel."
-    ],
-    "tests/e2e/boardscope.cjs": [
-      "msConstant const LAUNCH_RECORD_MS = 20000",
-      "sleep await lib.sleep(100)",
-      "sleep await lib.sleep(100)",
-      "sleep await lib.sleep(100)",
-      "sleep await lib.sleep(500)",
-      "sleep await lib.sleep(800)",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)"
-    ],
-    "tests/e2e/boardscroll.cjs": [
-      "sleep await lib.sleep(100)",
-      "sleep await lib.sleep(100)",
-      "sleep await lib.sleep(150)",
-      "sleep await lib.sleep(200)",
-      "sleep await lib.sleep(200)",
-      "sleep await lib.sleep(200)",
-      "sleep await lib.sleep(200)",
-      "sleep await lib.sleep(200)",
-      "sleep await lib.sleep(300)",
-      "sleep await lib.sleep(300)",
-      "sleep await lib.sleep(400)",
-      "sleep await lib.sleep(500)",
-      "sleep await lib.sleep(500)",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(100)"
-    ],
-    "tests/e2e/cardchip.cjs": [
-      "sleep await lib.sleep(800) // On purpose: that nothing shows is the check, so it gives a chip time to show wrongly.",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)",
-      "timeout const headerChip = async () => (await header.locator('.card-chip').innerText({ timeout: 1000 }).catch(() => '')).replace(/\\s+/g, '')"
-    ],
-    "tests/e2e/carddialog.cjs": [
-      "sleep await lib.sleep(200)",
-      "sleep await lib.sleep(300)",
-      "sleep await lib.sleep(300)",
-      "sleep await lib.sleep(400)",
-      "sleep await lib.sleep(400)",
-      "sleep await lib.sleep(500)",
-      "sleep await lib.sleep(500)",
-      "sleep await lib.sleep(500)",
-      "sleep await lib.sleep(500)",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(100)"
-    ],
-    "tests/e2e/cardlinks.cjs": [
-      "sleep await lib.sleep(150)",
-      "sleep await lib.sleep(300)",
-      "sleep await lib.sleep(500)",
-      "sleep await lib.sleep(600)",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)"
-    ],
-    "tests/e2e/cardloop.cjs": [
-      "clockLoop check('cw_wait_for_agents doesn’t wait on a watcher: it reports watching at once, with what for', waited.body?.agents?.[0]?.status === 'watching' && waited.body?.agents?.[0]?.statusMessage === label && waited.body?.agents?.[0]?.watching?.cards?.[0] === c1 && Date.now() - t0 < 5000 && waited.body?.timedOut === false, JSON.stringify(waited.body))",
-      "sleep await lib.sleep(1500) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.",
-      "sleep await lib.sleep(1500) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.",
-      "sleep await lib.sleep(1500) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.",
-      "sleep await lib.sleep(2000) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.",
-      "sleep await lib.sleep(2500) // A fixed wait on purpose: this checks that Combwork does NOT quit yet, which no condition can show.",
-      "sleep await lib.sleep(2500) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.",
-      "sleep await lib.sleep(300)",
-      "sleep await lib.sleep(500)",
-      "sleep await lib.sleep(500)",
-      "sleep await lib.sleep(500)",
-      "sleep await lib.sleep(500)",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)"
-    ],
     "tests/e2e/codex-appserver.cjs": [
       "msConstant const CALL_MS = 60000",
       "sleep await lib.sleep(10) // on purpose: typed in pieces, as Combwork types",
@@ -207,41 +120,6 @@
     ],
     "tests/e2e/codexqueued.cjs": [
       "sleep await lib.sleep(300)"
-    ],
-    "tests/e2e/decisions.cjs": [
-      "sleep await lib.sleep(20)",
-      "sleep await lib.sleep(20)",
-      "sleep await lib.sleep(20)",
-      "sleep await lib.sleep(200)",
-      "sleep await lib.sleep(300)",
-      "sleep await lib.sleep(300)",
-      "until if (!(await until(async () => (await moveDialog.count()) === 1, 5000))) {"
-    ],
-    "tests/e2e/decisionwake.cjs": [
-      "sleep await lib.sleep(3500) // A fixed wait on purpose: this checks that nothing is typed over the user's typing.",
-      "sleep await lib.sleep(4000) // A fixed wait on purpose: this checks that a second line does NOT come.",
-      "sleep await lib.sleep(4500) // A fixed wait on purpose: this checks that nothing is typed while it works.",
-      "sleep await lib.sleep(500)",
-      "sleep await lib.sleep(800)",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)"
-    ],
-    "tests/e2e/doingmove.cjs": [
-      "sleep await lib.sleep(100)",
-      "sleep await lib.sleep(1000) // A fixed wait on purpose: this checks that nothing starts.",
-      "sleep await lib.sleep(500)",
-      "sleep await lib.sleep(500)",
-      "sleep await lib.sleep(800)",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)"
-    ],
-    "tests/e2e/donemove.cjs": [
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)"
-    ],
-    "tests/e2e/inbox.cjs": [
-      "sleep await lib.sleep(400)",
-      "sleep await lib.sleep(600)",
-      "sleep await lib.sleep(600)",
-      "sleep await lib.sleep(800)",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)"
     ],
     "tests/e2e/lanes.mjs": [
       "sleep await sleep(50)",
@@ -401,9 +279,6 @@
       "sleep await lib.sleep(400)",
       "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)"
     ],
-    "tests/e2e/review.cjs": [
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)"
-    ],
     "tests/e2e/reviewcopies.cjs": [
       "msConstant const LOOK_MS = 120000"
     ],
@@ -490,16 +365,6 @@
       "sleep await lib.sleep(150)",
       "sleep await lib.sleep(400)",
       "sleep await lib.sleep(400)"
-    ],
-    "tests/e2e/taskbar.cjs": [
-      "sleep await lib.sleep(100)",
-      "sleep await lib.sleep(800)",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)"
-    ],
-    "tests/e2e/taskoverview.cjs": [
-      "clockLoop while (Date.now() - t < 1500) {",
-      "sleep await lib.sleep(20)",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(150)"
     ],
     "tests/e2e/teampause.cjs": [
       "sleep await lib.sleep(4000) // on purpose: longer than a wake takes, to see none is typed while paused"

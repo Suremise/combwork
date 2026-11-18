@@ -22,12 +22,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms) => {
-  const t = Date.now()
-  let v
-  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-  return v
-}
+const until = lib.until
 
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
@@ -80,9 +75,8 @@ const until = async (fn, ms) => {
       }
     })
   }
-  // How long its launch line may take to appear once Combwork shows it ready: generous, for a loaded machine.
-  const LAUNCH_RECORD_MS = 20000
-  const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), LAUNCH_RECORD_MS)
+  // Its launch line, once Combwork shows it ready: a bound for a hung run, never how long it takes.
+  const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), lib.timing('hang.ui'))
   const mcpServers = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers : {}
   check('the agent launched with the Combwork MCP server', !!mcpServers.combwork, JSON.stringify({ sessionId, launch: !!launch, servers: Object.keys(mcpServers), api: await inv('api:info').then((i) => ({ enabled: i.enabled, running: i.running, url: i.url, error: i.error })) }))
   if (!mcpServers.combwork) throw new Error('no Combwork MCP server in the launch: the rest needs its token')
@@ -185,16 +179,14 @@ const until = async (fn, ms) => {
 
   // --- Its Combwork tools (the fake's "boardmove") use the same token: its own card moves, beta's doesn't.
   const before = fs.existsSync(path.join(claudeHome, 'fake-calls.jsonl')) ? fs.readFileSync(path.join(claudeHome, 'fake-calls.jsonl'), 'utf8').split('\n').filter(Boolean).length : 0
-  await inv('pty:write', lib.ptyKey(alpha, agent.id), `boardmove ${n.A2} doing boardmove ${n.B2} doing`)
-  await lib.sleep(100)
-  await inv('pty:write', lib.ptyKey(alpha, agent.id), '\r')
-  await until(async () => (await live())?.status === 'finished', lib.timing('hang.step'))
+  await lib.typeThenEnter(inv, lib.ptyKey(alpha, agent.id), `boardmove ${n.A2} doing boardmove ${n.B2} doing`)
+  // Its call made and its turn over (the status alone is still the last turn's "finished" until it takes the prompt).
+  const callsMade = () => (fs.existsSync(path.join(claudeHome, 'fake-calls.jsonl')) ? fs.readFileSync(path.join(claudeHome, 'fake-calls.jsonl'), 'utf8').split('\n').filter(Boolean).length : 0)
+  await until(async () => callsMade() > before && (await live())?.status === 'finished', lib.timing('hang.step'))
   const calls = fs.readFileSync(path.join(claudeHome, 'fake-calls.jsonl'), 'utf8').split('\n').filter(Boolean).slice(before).map((l) => JSON.parse(l))
   // The fake makes one call per prompt (the first boardmove); a second prompt tries beta's.
   check("through its Combwork tools' path: its card moves", calls[0]?.status === 200 && (await inv('tasks:list')).find((c) => c.number === n.A2).column === 'doing', JSON.stringify(calls))
-  await inv('pty:write', lib.ptyKey(alpha, agent.id), `boardmove ${n.B2} doing`)
-  await lib.sleep(100)
-  await inv('pty:write', lib.ptyKey(alpha, agent.id), '\r')
+  await lib.typeThenEnter(inv, lib.ptyKey(alpha, agent.id), `boardmove ${n.B2} doing`)
   await until(async () => fs.readFileSync(path.join(claudeHome, 'fake-calls.jsonl'), 'utf8').split('\n').filter(Boolean).length > before + 1, lib.timing('hang.ui'))
   const last = JSON.parse(fs.readFileSync(path.join(claudeHome, 'fake-calls.jsonl'), 'utf8').trim().split('\n').at(-1))
   check("…and beta's card is not found", last.status === 404 && (await inv('tasks:list')).find((c) => c.number === n.B2).column === 'todo', JSON.stringify(last))
@@ -222,7 +214,8 @@ const until = async (fn, ms) => {
   }
   const agentStream = listen(agentToken)
   const scriptStream = listen(workspaceToken)
-  await lib.sleep(500)
+  // Both streams answered (their headers come once Combwork has them listening) before anything happens on them.
+  await until(() => agentStream.status && scriptStream.status, lib.timing('hang.ui'))
   const secret = await make('PRIVATE BETA TITLE', 'beta')
   await inv('tasks:update', secret, { description: 'PRIVATE BETA DESCRIPTION' })
   await inv('tasks:start', secret, { kind: 'agent', agentId: other.id })
@@ -263,15 +256,15 @@ const until = async (fn, ms) => {
   r = await as('POST', '/v1/projects/alpha/activate')
   check('its own project it may activate', r.status === 200 && r.body?.active === true, JSON.stringify(r).slice(0, 300))
   // Something of alpha's own, so its stream has something to show.
-  await inv('pty:write', lib.ptyKey(alpha, agent.id), 'hello')
-  await lib.sleep(100)
-  await inv('pty:write', lib.ptyKey(alpha, agent.id), '\r')
+  await lib.typeThenEnter(inv, lib.ptyKey(alpha, agent.id), 'hello')
   await until(async () => (await live())?.status === 'finished', lib.timing('hang.step'))
-  await lib.sleep(800)
-  agentStream.stop()
-  scriptStream.stop()
   const betaPath = JSON.stringify(beta).slice(1, -1)
   const alphaPath = JSON.stringify(alpha).slice(1, -1)
+  // What each stream should carry has come: alpha's session (its latest events) on both, beta's on the workspace token's.
+  // A stream sends in order, so beta's, from before alpha's last, would have reached the agent's by then.
+  await until(() => agentStream.text.includes(alphaPath) && scriptStream.text.includes(alphaPath) && scriptStream.text.includes(betaPath), lib.timing('hang.ui'))
+  agentStream.stop()
+  scriptStream.stop()
   check('the event stream is open to the agent', agentStream.status === 200 && agentStream.text.includes(alphaPath), `${agentStream.status} ${agentStream.text.slice(0, 200)}`)
   check("…and carries nothing of beta's sessions", !agentStream.text.includes(betaPath) && !agentStream.text.includes('PRIVATE'), agentStream.text.slice(0, 400))
   check("the workspace token's stream has beta's sessions too", scriptStream.text.includes(betaPath) && scriptStream.text.includes(alphaPath), scriptStream.text.slice(0, 200))
