@@ -15,6 +15,7 @@ import { localProfileInUse } from './profileFolders'
 import { agentProvider, asksAddedDirs, extraArgsProblem, isProviderEnabled, modeOption, providerDescriptor, PROVIDERS, signInConnections } from '../shared/providers'
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
 import { advanced } from './advanced'
+import { realForm } from './agentTemp'
 import { COPIES_REVIEW } from '../shared/advanced'
 import { agentWorkflowRole, reviewsWork } from '../shared/workflow/roles'
 import { localLimitsTest } from './localLimitsTest'
@@ -1088,9 +1089,10 @@ async function targetSlot<T>(fn: () => Promise<T>): Promise<T> {
 
 /** One project's folder for the trust check (trustTargets). */
 async function resolveTarget(p: Projects[number]): Promise<ProjectTarget> {
-  // The worktrees folder (HI-3337): a plain folder Set Up opens in, so made if there isn't one yet (Combwork's own).
+  // The worktrees folder (HI-3337): a plain folder, read where it is or would be (its nearest existing parent's real
+  // place), never made by this reading (HI-3395: a check made it beside the workspace); Set Up makes it (setUpPlace).
   if (p.copies) {
-    const real = await mkdir(p.path, { recursive: true }).then(() => realpath(p.path)).catch(() => null)
+    const real = await realForm(p.path).catch(() => null)
     return { project: p.name, root: real, git: false, short: false, folder: real, copies: true }
   }
   const real = await realpath(p.path).catch(() => null)
@@ -1266,7 +1268,10 @@ export async function setUpPlace(id: string): Promise<ConnectionTrust['setUpIn']
   const answer = await new Promise<TrustAnswer | null | 'cancelled'>((r) => st.waiters.push(r))
   // Removed, or its workspace closed, while Combwork checked: Set Up opens nowhere (never its own folder instead).
   if (answer === 'cancelled') throw combworkError(msg({ id: 'main.accounts.setUpCancelled', defaultMessage: "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Combwork checked its folders.", description: "An error opening a connection's Set Up (Settings → Accounts & Connections, HI-1870; {name}, its name): Combwork was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started." }), { name: a.name }, { kind: 'conflict' })
-  return answer ? setUpTarget(a, answer.pending) : undefined
+  const place = answer ? setUpTarget(a, answer.pending) : undefined
+  // The worktrees folder, made only now (HI-3395): the CLI opens in it, and reading its trust never made it.
+  if (place?.copies) await mkdir(place.folder, { recursive: true })
+  return place
 }
 
 /**

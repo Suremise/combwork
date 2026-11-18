@@ -3,7 +3,7 @@
 // while one runs, the watches, and a workspace's choice of accounts. All in this file's temp folders: the CLI is never
 // run (its status is faked), nothing signs in, and no real home or accounts folder is touched.
 import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'fs'
-import { basename, join, resolve } from 'path'
+import { basename, dirname, join, resolve } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { accountState, baseConnection, connectionReadiness, duplicateLogins, movedConnection, switchedOn, topOfOrder, trustInputsKey, workspaceAccounts } from '../src/shared/accounts'
@@ -614,10 +614,17 @@ describe("whether a connection trusts a workspace's folders (HI-1870)", () => {
     }
   })
 
-  it('the worktrees folder as a target for review copies (HI-3337): plain, made if not there yet, its name the project', async () => {
-    const root = join(base, 'trust-copies', 'ws.worktrees')
+  it('the worktrees folder as a target for review copies (HI-3337): plain, its name the project, read where it would be and never made by the reading (HI-3395)', async () => {
+    const parent = join(base, 'trust-copies')
+    mkdirSync(parent, { recursive: true })
+    const root = join(parent, 'ws.worktrees')
     const [got] = await accounts.trustTargets([{ name: 'ws.worktrees', path: root, copies: true }])
-    expect(got).toMatchObject({ project: 'ws.worktrees', root: realpathSync.native(root), git: false, copies: true })
+    expect(got).toMatchObject({ project: 'ws.worktrees', root: join(realpathSync.native(parent), 'ws.worktrees'), git: false, copies: true })
+    expect(existsSync(root)).toBe(false)
+    // Once it is there, its own real place.
+    mkdirSync(root)
+    const [made] = await accounts.trustTargets([{ name: 'ws.worktrees', path: root, copies: true }])
+    expect(made).toMatchObject({ root: realpathSync.native(root), copies: true })
   })
 
   it("finds each project's folder as the CLIs look it up: a worktree project's main repository root, which covers its slots", async () => {
@@ -1081,10 +1088,21 @@ describe("a workspace's accounts", () => {
         row()
         await vi.waitFor(() => expect(mine().at(-1)!.projects).toBe(3), { timeout: HUNG_MS })
         const last = mine().at(-1)!
-        expect(last.targets[2]).toMatchObject({ root: realpathSync.native(w.worktreesRoot), git: false, copies: true })
+        // Read where it would be, and not made by the reading (HI-3395: the check made it beside the workspace).
+        expect(existsSync(w.worktreesRoot)).toBe(false)
+        const trees = join(realpathSync.native(dirname(w.worktreesRoot)), basename(w.worktreesRoot))
+        expect(last.targets[2]).toMatchObject({ root: trees, git: false, copies: true })
         last.answer([true, true, false])
-        await vi.waitFor(() => expect(row().trust?.pending).toEqual([{ project: basename(w.worktreesRoot), folder: realpathSync.native(w.worktreesRoot), git: false, copies: true }]), { timeout: HUNG_MS })
-        expect(row().trust?.setUpIn).toEqual({ folder: realpathSync.native(w.worktreesRoot), project: basename(w.worktreesRoot), copies: true })
+        await vi.waitFor(() => expect(row().trust?.pending).toEqual([{ project: basename(w.worktreesRoot), folder: trees, git: false, copies: true }]), { timeout: HUNG_MS })
+        expect(row().trust?.setUpIn).toEqual({ folder: trees, project: basename(w.worktreesRoot), copies: true })
+        expect(existsSync(w.worktreesRoot)).toBe(false)
+        // Set Up opens there, so it makes the folder then.
+        const reads = mine().length
+        const place = run(() => accounts.setUpPlace(a.id))
+        await vi.waitFor(() => expect(mine().length).toBeGreaterThan(reads), { timeout: HUNG_MS })
+        mine().at(-1)!.answer([true, true, false])
+        expect(await place).toEqual({ folder: trees, project: basename(w.worktreesRoot), copies: true })
+        expect(existsSync(w.worktreesRoot)).toBe(true)
         // Review copies off (Settings → Advanced): no folder to trust for them.
         await advanced.set(COPIES_REVIEW, false)
         try {
