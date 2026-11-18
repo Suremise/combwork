@@ -77,11 +77,15 @@ function sizes(home) {
     { name: 'Codex', a: codex, home: codexHome, key: lib.ptyKey(alpha, codex.id) }
   ]
   const state = (key) => page.evaluate((k) => window.__cwTerminalState(k), key)
+  // HI-3386: every terminal fitted to its pane and its CLI given that size (fake-sizes.jsonl's last line): what a window,
+  // zoom or layout change, or the turns' output, leaves once its work is done. Waited for, never a settle pause.
+  const sizesDelivered = async () => (await page.evaluate(() => window.__cwTerminalsFitted())) && lib.sizesGiven(await Promise.all(agents.map(async (g) => ({ term: await state(g.key), given: sizes(g.home).at(-1) }))))
+  const sizesSettled = () => lib.readyWithin('each terminal fitted and its CLI given that size', sizesDelivered, lib.timing('hang.ui'))
   // Turns until each terminal has scrolled.
   for (const g of agents) {
     for (let i = 1; i <= 12 && !((await state(g.key))?.baseY > 0); i++) {
       await inv('pty:write', g.key, `turn ${i}`)
-      await lib.sleep(100)
+      await lib.sleep(lib.timing('pace.keysThenEnterMs')) // on purpose: the fake reads a typed line before its Enter, as a CLI does
       await inv('pty:write', g.key, '\r')
       // The turn starting may be over before it is seen (a fast turn): up to 3 s for it, then the wait for its end.
       await lib.until(async () => (await live(g.a.id))?.status !== 'finished', lib.timing('pace.turnStartSeenMs'))
@@ -93,22 +97,22 @@ function sizes(home) {
     const s = await state(g.key)
     check(`${g.name}: its terminal has scrolled and is at the bottom`, atBottom(s) && s.baseY > 0, JSON.stringify(s))
   }
-  await lib.sleep(500)
+  await sizesSettled() // the turns' sizes delivered before each round trip takes its before
 
   /** Hides the terminals with `hide`, waits, shows them with `show`: what each CLI was given meanwhile and after. */
   const roundTrip = async (label, hide, show, { whileHidden, sizeChanges = false } = {}) => {
     const before = agents.map((g) => ({ g, n: sizes(g.home).length, last: sizes(g.home).at(-1), term: null }))
     for (const b of before) b.term = await state(b.g.key)
     await hide()
-    await lib.sleep(700)
+    await lib.sleep(lib.timing('quiet.terminalSizeMs'))
     if (whileHidden) await whileHidden()
-    await lib.sleep(900)
+    await lib.sleep(lib.timing('quiet.terminalSizeMs'))
     const hidden = agents.map((g, i) => sizes(g.home).slice(before[i].n))
     await show()
     // Shown again: one new size after a font change; otherwise none, which only time can tell (on purpose).
     if (sizeChanges) await lib.until(() => agents.every((g, i) => sizes(g.home).length > before[i].n), lib.timing('hang.ui'))
     // No further size may follow, and past the time Combwork holds a terminal at the bottom, it must stay there.
-    await lib.sleep(1600) // on purpose
+    await lib.sleep(lib.timing('quiet.terminalHoldMs')) // on purpose
     for (const [i, b] of before.entries()) {
       const g = b.g
       const during = hidden[i]
@@ -136,22 +140,22 @@ function sizes(home) {
   // Shown again, xterm can move the view itself a moment later (its scroll position synced from a stale one): Combwork puts
   // a terminal that follows its output back at the bottom. The same move, made just after coming back from Settings.
   await settingsBtn.click()
-  await lib.sleep(500)
+  await lib.until(async () => (await page.locator('.settings-nav').count()) > 0, lib.timing('hang.ui'))
   await projectsBtn.click()
-  await lib.sleep(200)
+  await lib.until(async () => (await page.locator('.terminal-host:not(.hidden)').count()) >= agents.length, lib.timing('hang.ui'))
   for (const g of agents) await page.evaluate((k) => window.__cwTerminalScrollLines(k, -3), g.key)
-  await lib.sleep(1600) // on purpose: past the hold, it must still be at the bottom
+  await lib.sleep(lib.timing('quiet.terminalHoldMs')) // on purpose: past the hold, it must still be at the bottom
   for (const g of agents) check(`late scroll after Settings: ${g.name} is put back at the bottom`, atBottom(await state(g.key)), JSON.stringify(await state(g.key)))
   await roundTrip('Files tab', () => page.locator('.tabs .tab', { hasText: 'Files' }).first().click(), () => page.locator('.tabs .tab', { hasText: 'Session' }).first().click())
   await roundTrip('Another project', () => page.getByText('beta', { exact: true }).first().click(), () => page.getByText('alpha', { exact: true }).first().click())
   // One at a time hides the Codex agent; it may be given its new pane's size when shown, never a tiny one.
   const n0 = sizes(codexHome).length
   await page.locator('.layout-switch button[aria-label="One at a time"]').click()
-  await lib.sleep(1000) // on purpose: nothing may happen
+  await lib.sleep(lib.timing('quiet.terminalSizeMs')) // on purpose: nothing may happen
   check('One at a time: the hidden Codex agent is told nothing', sizes(codexHome).length === n0, JSON.stringify(sizes(codexHome).slice(n0)))
   await page.locator('.layout-switch button[aria-label="Two columns"]').click()
   await lib.until(async () => (await page.locator('.agent-pane:visible').count()) === 2, lib.timing('hang.ui'))
-  await lib.sleep(600)
+  await lib.sleep(lib.timing('quiet.terminalSizeMs')) // A quiet window on purpose: no size below the least follows the layout change
   for (const g of agents) {
     const small = sizes(g.home).filter((s) => s.cols < MIN_COLS || s.rows < MIN_ROWS)
     check(`whole run: ${g.name} was never given a size below ${MIN_COLS} × ${MIN_ROWS}`, small.length === 0, JSON.stringify(small))
@@ -163,12 +167,12 @@ function sizes(home) {
   await lib.fitWindow(app, page, { width: 1000, height: 650 })
   for (const zoom of [1, 1.25]) {
     await app.evaluate(({ BrowserWindow }, z) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(z), zoom)
-    await lib.sleep(1500) // on purpose: the new window size and zoom settle first
+    await sizesSettled() // the new window size and zoom delivered first
     await roundTrip(`Settings at 1000 × 650, ${zoom * 100}%`, () => settingsBtn.click(), () => projectsBtn.click())
   }
   await page.screenshot({ path: path.join(lib.WORK, 'termsize-zoom.png') })
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1))
-  await lib.sleep(1500) // on purpose: settle again
+  await sizesSettled() // and back at 100%
 
   // Scrolled up to read: Settings and back leaves it on its line; scrolled back down, it follows the output again.
   const writer = agents[0]
@@ -178,9 +182,9 @@ function sizes(home) {
   const reading = await state(writer.key)
   check('reader: Claude Code scrolled up', !atBottom(reading), JSON.stringify(reading))
   await settingsBtn.click()
-  await lib.sleep(500)
+  await lib.until(async () => (await page.locator('.settings-nav').count()) > 0, lib.timing('hang.ui'))
   await projectsBtn.click()
-  await lib.sleep(1600) // on purpose: nothing may move it
+  await lib.sleep(lib.timing('quiet.terminalHoldMs')) // on purpose: nothing may move it
   const back = await state(writer.key)
   check('reader: still on the same line after Settings', back.viewportY === reading.viewportY && back.baseY === reading.baseY, JSON.stringify({ reading, back }))
   await page.locator(`.terminal-host[data-pty=${JSON.stringify(writer.key)}]`).hover()

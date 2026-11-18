@@ -62,7 +62,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const idle = async (id) => ['ready', 'finished'].includes((await live(id))?.status)
     const say = async (id, text) => {
       await inv('pty:write', lib.ptyKey(alpha, id), text)
-      await lib.sleep(300)
+      await lib.sleep(lib.timing('pace.keysThenEnterMs')) // on purpose: the fake reads a typed line before its Enter, as a CLI does
       await inv('pty:write', lib.ptyKey(alpha, id), '\r')
     }
     const wakes = () => lines(path.join(codexHome, 'fake-wakes.jsonl')).filter((w) => w.agent === 'Codex')

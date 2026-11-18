@@ -96,7 +96,7 @@ function tui(args) {
   const type = async (s) => {
     for (let i = 0; i < s.length; i += 8) {
       t.write(s.slice(i, i + 8))
-      await lib.sleep(10) // on purpose: typed in pieces, as Combwork types
+      await lib.sleep(lib.timing('pace.typedPieceMs')) // on purpose: typed in pieces, as Combwork types
     }
   }
   /** The end of `s` (spaces left out, as the TUI wraps it) shows on the screen. */
@@ -104,7 +104,7 @@ function tui(args) {
   /** `s` typed, and shown in the prompt: a step that needs it there fails, saying what the screen showed. */
   const typeShown = async (s) => {
     await type(s)
-    if (!(await lib.until(() => shows(s), 20000, 100))) throw new Error(`"${s}" didn't show in the TUI's prompt: ${tail(screen())}`)
+    if (!(await lib.until(() => shows(s), lib.timing('hang.ui')))) throw new Error(`"${s}" didn't show in the TUI's prompt: ${tail(screen())}`)
   }
   /** A line typed and sent once it shows in the prompt. */
   const say = async (s) => {
@@ -124,7 +124,7 @@ const methods = (events) => events.map((e) => e.method).filter((m) => !/delta|to
 const notices = new Set()
 
 /** How long Combwork's client waits for the app server to open its connection or answer a call. */
-const CALL_MS = 60000
+const CALL_MS = lib.timing('hang.step')
 
 /**
  * Combwork's side: a JSON-RPC client on the app server's WebSocket. Its connection and every call are bounded (CALL_MS),
@@ -223,7 +223,7 @@ async function client(port) {
     fs.writeFileSync(authFile, 'Authorization: Bearer e2e')
     const command = `curl.exe -s -m 5 -X POST -H "@${authFile.split('\\').join('/')}" -H "Content-Type: application/json" --data-binary "@-" "http://127.0.0.1:${hooks.address().port}/hook"`
     const sortDeep = (v) => (Array.isArray(v) ? v.map(sortDeep) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortDeep(v[k])])) : v)
-    const hash = (label) => 'sha256:' + createHash('sha256').update(JSON.stringify(sortDeep({ event_name: label, hooks: [{ type: 'command', command, timeout: 5, async: false }] }))).digest('hex')
+    const hash = (label) => 'sha256:' + createHash('sha256').update(JSON.stringify(sortDeep({ event_name: label, hooks: [{ type: 'command', command, timeout: 5, async: false }] }))).digest('hex') // timing-ok: the hook's own timeout in seconds, data hashed as Codex hashes it for its trust
     const flags = 'C:\\<session-flags>\\config.toml'
     const hookArgs = []
     for (const [event] of [['UserPromptSubmit'], ['Stop']]) hookArgs.push('-c', `hooks.${event}=[{hooks=[{type="command",command='${command}',timeout=5}]}]`)

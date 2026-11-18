@@ -187,7 +187,7 @@ const mode = ({ name, word: w }) =>
   await inv('session:start', home, { resumeId: session, agentId: 'assistant' })
   await lib.cliStep('resumed again, it is not told the mode again', { session: key }, async () => {
     check('Claude Code resumes it again', !!(await idle()))
-    await lib.sleep(3000) // on purpose: a second mode message would be typed by now
+    await lib.sleep(lib.timing('quiet.noLineTypedMs')) // on purpose: a second mode message would be typed by now
     check('…without a second Charlie message', (await told(session, modes.charlie)) === 1, String(await told(session, modes.charlie)))
   })
   await stop()

@@ -7,7 +7,6 @@ const fs = require('fs')
 const path = require('path')
 const scratch = lib.WORK
 const userData = path.join(scratch, 'cxsetup-profile')
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const results = []
 const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 ;(async () => {
@@ -29,21 +28,17 @@ const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${
   const key = await inv('provider:task', 'codex', 'setup')
   check('setup task starts', key === 'task:codex:setup', key)
   let text = ''
-  for (let i = 0; i < 40 && !/Set up default sandbox|Unrecognized/i.test(text); i++) {
-    await sleep(1000) // The poll interval of the loop around it, which waits for a condition (not a fixed wait).
+  await lib.until(async () => {
     text = (await inv('pty:buffer', key)).replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, ' ').replace(/\s+/g, ' ')
-  }
+    return /Set up default sandbox|Unrecognized/i.test(text)
+  }, lib.timing('hang.step'))
   check('Codex opened without a trust prompt', !/Trust this folder/.test(text))
   check('Codex shows its sandbox setup prompt', /Set up default sandbox/i.test(text) && /non-admin sandbox/i.test(text), text.slice(-400))
   check('no unrecognized command', !/Unrecognized command/i.test(text))
   // Codex stays open after the setup; Combwork closes it once the config names a sandbox. Stands in for Codex
   // finishing (the real setup needs the user) by writing what Codex writes.
   fs.writeFileSync(path.join(home, 'config.toml'), '[windows]\nsandbox = "unelevated"\n')
-  let closed = false
-  for (let i = 0; i < 15 && !closed; i++) {
-    await sleep(1000) // The poll interval of the loop around it, which waits for a condition (not a fixed wait).
-    closed = (await inv('pty:buffer', key)) === ''
-  }
+  const closed = !!(await lib.until(async () => (await inv('pty:buffer', key)) === '', lib.timing('hang.ui')))
   check('Combwork closes Codex once the sandbox is set up', closed)
   if (!closed) await inv('pty:kill', key)
   await lib.until(async () => (await inv('pty:buffer', key).catch(() => '')) === '', lib.timing('hang.ui'))

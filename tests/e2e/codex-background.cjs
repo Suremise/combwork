@@ -57,7 +57,7 @@ const check = (name, ok, extra = '') => {
       const s = await live()
       if (s) seen.add(s.status)
       if ((v = await fn(s)) || Date.now() - t > ms) return v
-      await lib.sleep(700)
+      await lib.sleep(lib.timing('poll.intervalMs'))
     }
   }
 
@@ -74,7 +74,7 @@ const check = (name, ok, extra = '') => {
     // Typed the way Combwork types prompts (a long text at once is a paste to Codex, and Enter then adds a line).
     for (let i = 0; i < prompt.length; i += 8) {
       await inv('pty:write', key, prompt.slice(i, i + 8))
-      await lib.sleep(15)
+      await lib.sleep(lib.timing('pace.typedPieceMs'))
     }
     await lib.until(async () => (await inv('pty:buffer', key)).replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '').replace(/\s+/g, '').includes('endyourturn.'), lib.timing('hang.ui')) // the whole prompt is in Codex's input
     await inv('pty:write', key, '\r')

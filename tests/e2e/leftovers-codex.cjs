@@ -77,7 +77,7 @@ const pidOf = (tag) => {
         // Typed the way Combwork types prompts (a long text at once is a paste to Codex, and Enter then adds a line).
         for (let i = 0; i < prompt.length; i += 8) {
           await inv('pty:write', key, prompt.slice(i, i + 8))
-          await lib.sleep(15)
+          await lib.sleep(lib.timing('pace.typedPieceMs'))
         }
         await lib.until(async () => lib.plainText(await inv('pty:buffer', key)).replace(/\s+/g, '').includes('endyourturn.'), lib.timing('hang.ui'))
         await inv('pty:write', key, '\r')
