@@ -2415,7 +2415,7 @@ changes. Git's runner and worker are untouched.
     no snapshot, and a stale workspace isn't brought up to date) and `--config=snapshot.auto-update-stale=false`. J0's
     reads are `jj --version`, `jj root` and `jj git root` (pinned, below); colocation is read from the files (below), not from
     `jj git colocation status`.
-  - **Bounds:** an output cap (16 MB unless given), a time limit (a minute unless given) and cancellation (an
+  - **Bounds:** an output cap (16 MB unless given), a time limit (`cw.jj.commandSeconds` unless given: 300 s since HI-3372, a minute passed a first snapshot of a large working copy) and cancellation (an
     `AbortSignal`). Each ends jj's whole process tree by identity (`processTree.ts`, moved from cw-progress, which ends
     its command's the same way: listed with start times, children first, each ended only while its pid still names
     the process listed, so a reused pid is never ended, #655), and the result settles once its output has closed, after
@@ -6438,8 +6438,8 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    - **Signing:** the repository's config (never overridden). Combwork's commits run with no terminal: no input,
      `GIT_TERMINAL_PROMPT=0`, `SSH_ASKPASS_REQUIRE=never`, `GCM_INTERACTIVE=never`. In the app they go through the
      queue runner's recorded spawn (#1360). When `commit.gpgsign` is on, the commit (hooks included) has a bound:
-     Settings → Advanced, `cw.queue.signSeconds`, 60 s. At the bound the whole tree (git, its hooks, the signer) is
-     ended.
+     Settings → Advanced, `cw.queue.signSeconds`, 300 s (HI-3372: 60 s cut a repository's commit hooks short). At the
+     bound the whole tree (git, its hooks, the signer) is ended.
      - **Ended at the bound:** always a pause, decided by what was running when it was ended (the stream as far as
        it had come then). Ending a hook may make it exit non-zero, and that is never its rejection. A hook running
        then pauses `hookTimedOut`. The signer, or nothing known in a repository that signs, pauses `signingWaits`,
@@ -6531,7 +6531,7 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    never taken for settled: it pauses `pushUnreadable` (Combwork's own words, translated), still owed, so no later merge goes ahead of it; else it pushes `refs/heads/<target>` to what the target tracks
    (`branch.<target>.remote` and `.merge`), or with nothing tracked to the only remote or `origin` under the same name,
    never `--force` and never `--set-upstream`, with no prompt (`GIT_TERMINAL_PROMPT=0`, no askpass, the credential
-   manager non-interactive) and within the Git view's 5 minutes. Pushed, or up to date already (a retry after a crash
+   manager non-interactive) and within `cw.queue.networkMinutes` (HI-3372: 30 min; 5 cut a slow link short). Pushed, or up to date already (a retry after a crash
    before the clear), it is cleared, only if still the same result (a newer merge's stays owed). Refused (the remote
    has commits the target lacks), failed (git's message: a sign-in, the network, the bound) or with no remote: the
    queue pauses (`pushRejected`, `pushFailed`, `pushNoRemote`, naming the merged card, which stays Done), the next entry
@@ -6851,8 +6851,18 @@ touched:
   made there since the check, in no stash, is kept; the refusal is said with the stash made); either
   side shown brings the other. A file added then deleted on disk (`AD`): git stashes it, then says "No valid patches
   in input"; with the stash made and none of the paths changed any more, that is done, never said as a problem.
-  **Bounded** (HI-3021): a commit or stash still running after two
-  minutes (a slow hook, a signer waiting for an answer) has git's whole process tree ended (git.ts's time limit: every
+  **Cancellable, and bounded** (HI-3372): while Commit or Set aside runs, the window offers **Cancel** (beside its buttons;
+  on a notification of its own when it was started from one, Files' Commit it included). The window names the run by an
+  id of its own, which main registers before anything runs with its owner (the window, its workspace's open and the
+  project, `gitCancel.ts`): only that owner's Cancel ends it, a duplicate id is refused, and a run leaves the list however
+  it ends (a closed window or workspace takes its runs off the list; they run to their end). A Cancel ends git's tree as
+  the bound does (the same identity-checked end, HI-3358's included) and only the steps that make it take it (the
+  private index's adds, the commit, the stash's push); reading HEAD and the stashes, the index put back and a lock taken
+  away run to their end. Precedence: git exited first, its own outcome (a success stays one); else whichever ended it
+  first, the bound or the Cancel. What is said is what is true: nothing committed; HEAD moved (to …, or unread), the
+  index left; no stash made; a stash made, named, to look at. **Bounded** (HI-3021): a commit or stash still running
+  after `cw.git.commitMinutes` (30 min, a last resort since HI-3372; it was two minutes: a slow hook, a signer waiting
+  for an answer) has git's whole process tree ended (git.ts's time limit: every
   timed git command, not git.exe alone, which on Windows never removes the `index.lock` it holds and leaves the hook
   running). **Started after the listing too** (HI-3358): the tree is listed once, so it is ended by one PowerShell
   session that keeps a handle on each process it ends (checked by start time first), which keeps that process's pid
@@ -7359,8 +7369,11 @@ each secret value of the snapshot, its URL's query values included). Where it ca
    `IntegrationStarted` with its record, then two journal phases:
    - `prePush`: the project's pre-push hook, once, in the project (`git hook run --ignore-missing --to-stdin`), with the
      remote's name and the URL without credentials as its arguments and git's own line for an object-name source on its
-     stdin (`<X> <X> <ref> <onto>`). Refused: nothing published, the entry fails (`pushRefused`, transient), the card is
-     queued again and the queue pauses `publishRefused` with its words; ran too long, `hookTimedOut`.
+     stdin (`<X> <X> <ref> <onto>`), within `cw.queue.checkMinutes` (HI-3372: it is a check). Refused: nothing
+     published, the entry fails (`pushRefused`, transient), the card is queued again and the queue pauses
+     `publishRefused` with its words; ran too long, `hookTimedOut`. Follow mode's fetches and its push take
+     `cw.queue.networkMinutes` (30 min; 5 before HI-3372), as do a slotted card's fetch of its remote head and Bring up
+     to date's fetches (a minute before).
    - `push`: `git push --porcelain --no-verify --force-with-lease=<ref>:<onto> <url> <X>:<ref>`. The remote takes it
      only while its ref is exactly `onto`, and it is a fast-forward by construction, so the lease never discards remote
      history. Pushed, or at the result already (`atResult`: the lease never applied, counted only because the result

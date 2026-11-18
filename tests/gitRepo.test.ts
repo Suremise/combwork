@@ -95,6 +95,7 @@ vi.mock('../src/main/git', async (importOriginal) => {
 })
 
 const repo = await import('../src/main/gitRepo')
+const { platformLimits } = await import('../src/main/platform/limits')
 const fence = await import('../src/main/folderFence')
 const { gitTestHooks: gitHooks } = await import('../src/main/git')
 
@@ -143,6 +144,87 @@ beforeEach(() => {
   asUser.mockClear()
   workTarget = ''
   cardLines = []
+})
+
+// HI-3372: Fetch, Pull and Push cancellable by the user (gitCancel.ts runs them inside cancellableNet), bounded by
+// cw.git.networkMinutes as a last resort. A remote held at a boundary of the test's own: a waiting upload-pack (nothing
+// has arrived), and a post-receive hook (the push already applied there). What is said is only what is true.
+describe('Fetch, Pull and Push: cancelled, or at their bound (HI-3372)', () => {
+  const fwd = (p: string): string => p.replace(/\\/g, '/')
+  const alive = (pid: number): boolean => {
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch {
+      return false
+    }
+  }
+  /** A shell script that marks `started`, then a node that writes its pid and waits a minute (ended with git's tree). */
+  const holdScript = (dir: string): { script: string; started: string; pid: () => number | null } => {
+    const started = join(dir, 'started')
+    const pidFile = join(dir, 'pid')
+    const script = join(dir, 'hold.sh')
+    writeFileSync(script, `#!/bin/sh\n: > "${fwd(started)}"\n"${fwd(process.execPath)}" -e 'require("fs").writeFileSync(process.argv[1], String(process.pid)); setTimeout(() => {}, 60000)' "${fwd(pidFile)}"\n`)
+    return { script, started, pid: () => (existsSync(pidFile) ? Number(readFileSync(pidFile, 'utf8')) : null) }
+  }
+  /** The remote's upload-pack (what a fetch talks to) held: the script runs in its place, so nothing arrives. */
+  const heldFetch = (): ReturnType<typeof holdScript> => {
+    const h = holdScript(tempDir('cw-gitrepo-hold-'))
+    // The path git gives upload-pack is left to the comment: the script alone runs.
+    git(proj, 'config', 'remote.origin.uploadpack', `sh "${fwd(h.script)}" #`)
+    return h
+  }
+  /** Runs `fn` cancellable, cancels it once `started` is there, and gives its outcome (its error's text). */
+  const cancelAt = async (started: string, fn: () => Promise<unknown>): Promise<string> => {
+    const ac = new AbortController()
+    const done = repo.cancellableNet(ac.signal, fn).then(
+      () => 'done',
+      (e: Error) => e.message
+    )
+    await vi.waitFor(() => expect(existsSync(started)).toBe(true), { timeout: 30_000 })
+    ac.abort()
+    return done
+  }
+
+  it('Fetch cancelled while the remote holds it: stopped, said with what may be true; git and what it started ended', async () => {
+    const h = heldFetch()
+    const said = await cancelAt(h.started, () => repo.fetchAll(proj))
+    expect(said).toMatch(/^Stopped the fetch here\. What reached the remote before it stopped may have been applied: refresh/)
+    await vi.waitFor(() => expect(h.pid() !== null && !alive(h.pid()!)).toBe(true), { timeout: 30_000 })
+  })
+
+  it('Pull cancelled during its fetch: the merge never starts; the branch where it was', async () => {
+    theyPush('theirs.txt')
+    const before = git(proj, 'rev-parse', 'HEAD')
+    const h = heldFetch()
+    const said = await cancelAt(h.started, () => repo.pull(proj))
+    expect(said).toMatch(/^Stopped the pull here: it may have fetched or brought commits in already/)
+    expect(git(proj, 'rev-parse', 'HEAD')).toBe(before)
+  })
+
+  it('Push cancelled after the remote took it (its post-receive hook running): said as maybe applied, and it was', async () => {
+    const h = holdScript(tempDir('cw-gitrepo-hold-'))
+    mkdirSync(join(remote, 'hooks'), { recursive: true })
+    writeFileSync(join(remote, 'hooks', 'post-receive'), `#!/bin/sh\nsh "${fwd(h.script)}"\n`)
+    commit(proj, 'mine.txt')
+    const mine = git(proj, 'rev-parse', 'HEAD')
+    const said = await cancelAt(h.started, () => repo.push(proj))
+    expect(said).toMatch(/^Stopped the push here\. What reached the remote before it stopped may have been applied: refresh to see where things stand\./)
+    // The remote's ref was written before its post-receive ran: applied, as the message allows.
+    expect(git(remote, 'rev-parse', 'refs/heads/main')).toBe(mine)
+    await vi.waitFor(() => expect(h.pid() !== null && !alive(h.pid()!)).toBe(true), { timeout: 30_000 })
+  })
+
+  it('its bound is cw.git.networkMinutes as main sets it: past it, git gave up, said in minutes', async () => {
+    heldFetch()
+    const was = platformLimits.gitNetworkMs
+    platformLimits.gitNetworkMs = () => 2000
+    try {
+      await expect(repo.fetchAll(proj)).rejects.toThrow(/git gave up after 0 minutes/)
+    } finally {
+      platformLimits.gitNetworkMs = was
+    }
+  })
 })
 
 describe('the summary', () => {

@@ -523,7 +523,7 @@ export interface CombworkRequests {
    * refused unless that pause is still current, and the queue resumed only if it still is and its condition is gone), or
    * a start's warning's (`folder`, with `pause` null).
    */
-  'queue:settleChanges': (projectPath: string, target: string, action: FolderChangeAction, shown: string[], pause: QueuePauseRef | null, folder?: string | null) => QueueChangesSettled
+  'queue:settleChanges': (projectPath: string, target: string, action: FolderChangeAction, shown: string[], pause: QueuePauseRef | null, folder?: string | null, op?: string) => QueueChangesSettled
   /** Remove from queue (the user's override): the card back to Approved, never merged; refused once its merge has begun. */
   'queue:remove': (n: number, reason?: string) => TaskCard
   /** Retry merge (the user's override): requeues a returned card's unchanged revision, once. */
@@ -1140,7 +1140,7 @@ export interface CombworkRequests {
   /** Include again: removes the plain line that ignores the item. */
   'files:gitInclude': (projectPath: string, items: { rel: string; isDir: boolean }[]) => FileGitDone
   /** HI-2944: Commit it, after a shared exclude: the top .gitignore as it is now, committed alone on the project folder's branch. */
-  'files:gitCommitIgnore': (projectPath: string) => FolderChangesDone
+  'files:gitCommitIgnore': (projectPath: string, op?: string) => FolderChangesDone
   /** Why is this ignored?: the file of the rule that ignores the item, its text and line, for Combwork's viewer (a rule outside the Files tab's tree). */
   'files:gitRuleText': (projectPath: string, items: { rel: string; isDir: boolean }[]) => FileGitRuleText
 
@@ -1193,7 +1193,7 @@ export interface CombworkRequests {
   /** HI-1185: how the project's commits are signed, and whether its signer could sign just now with nobody there (null: a platform without signing). */
   'git:signing': (projectPath: string, force?: boolean) => SigningInfo | null
   'git:deleteBranches': (projectPath: string, branches: BranchAt[], unmerged?: boolean) => string
-  'git:deleteRemoteBranches': (projectPath: string, remote: string, branches: BranchAt[]) => string
+  'git:deleteRemoteBranches': (projectPath: string, remote: string, branches: BranchAt[], op?: string) => string
   'git:branchDrops': (projectPath: string, branch: string) => BranchDrops
   'git:history': (projectPath: string, ref?: string | null, page?: number) => GitHistory
   /** Each action replies with what it did, in a sentence. Switching (and creating a branch to switch to) or pulling is refused while an agent works in the folder or its merge slot is held (`folderBusy`). */
@@ -1213,20 +1213,23 @@ export interface CombworkRequests {
   'git:missingBranches': (projectPath: string, names: string[]) => string[]
   'git:addRemote': (projectPath: string, name: string, url: string) => string
   'git:setRemoteUrl': (projectPath: string, name: string, url: string) => string
-  'git:fetch': (projectPath: string) => string
-  'git:pull': (projectPath: string) => string
+  /** HI-3372: `op`, the window's id for this run, which `git:cancel` names (Fetch, Pull, Push and the rest). */
+  'git:fetch': (projectPath: string, op?: string) => string
+  'git:pull': (projectPath: string, op?: string) => string
   /** To the upstream, or to `remote` (setting it as the upstream) when the branch has none. Never forced. */
-  'git:push': (projectPath: string, remote?: string) => string
+  'git:push': (projectPath: string, remote?: string, op?: string) => string
   /** Push to… (#1385): the branch checked out, or every branch and tag, to any remote; never changes what a branch tracks. */
-  'git:pushTo': (projectPath: string, remote: string, scope: PushScope, branch?: string) => string
+  'git:pushTo': (projectPath: string, remote: string, scope: PushScope, branch?: string, op?: string) => string
+  /** HI-3372: the user's Cancel of their run `op`, in the project they started it in; anyone else's, or an id not running, changes nothing. */
+  'git:cancel': (op: string, projectPath: string) => void
   /** The local branches tracking a remote, all of them: what Remove's confirmation lists (#1385). */
   'git:remoteTracking': (projectPath: string, remote: string) => string[]
   /** `expected`: the branches the confirmation listed; refused when those tracking it now differ. */
   'git:removeRemote': (projectPath: string, name: string, expected?: string[]) => string
   'git:renameRemote': (projectPath: string, from: string, to: string) => string
   /** What a local branch tracks (#1385): `remote`'s `remoteBranch`, or nothing (`remote` null); `pushFirst` makes it there first. */
-  'git:setUpstream': (projectPath: string, branch: string, remote: string | null, remoteBranch?: string, pushFirst?: boolean) => string
-  'git:createTag': (projectPath: string, name: string, message: string, pushTo?: string) => string
+  'git:setUpstream': (projectPath: string, branch: string, remote: string | null, remoteBranch?: string, pushFirst?: boolean, op?: string) => string
+  'git:createTag': (projectPath: string, name: string, message: string, pushTo?: string, op?: string) => string
   /** This repository's own user.name and user.email; empty removes it (the global one applies). */
   'git:setIdentity': (projectPath: string, name: string, email: string) => string
   /** Initialise repository (#701): whether it can be done, and what the dialog asks; then git init on main, .combwork excluded first, a starter .gitignore, the first commit. */

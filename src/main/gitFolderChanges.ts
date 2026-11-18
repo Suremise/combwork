@@ -11,6 +11,7 @@
 // signer past its bound never leaves the real index locked; once something is made, its entries for the paths are
 // taken into the real index in one short step.
 import { copyFile, lstat, open, readFile, readdir, rename, rm, writeFile } from 'original-fs/promises'
+import { AsyncLocalStorage } from 'async_hooks'
 import { randomBytes } from 'crypto'
 import { basename, dirname, join, resolve } from 'path'
 import type { FolderChangeAction, FolderChangesDone } from '../shared/types'
@@ -26,6 +27,7 @@ import { createLogger, userText } from './logger'
 import { checkouts, worktreeNow } from './platform/git'
 import type { SubmoduleChange } from './platform/history'
 import { isUnknown } from './platform/types'
+import { platformLimits } from './platform/limits'
 import { withRepoLock } from './repoLock'
 import { workspace } from './workspace'
 
@@ -49,6 +51,9 @@ const M = {
   commitTimedOutMoved: msg({ id: 'service.folderChanges.commitTimedOutMoved', defaultMessage: "Git didn't finish the commit in {seconds, number} seconds (a hook still running, or signing waiting for an answer), so Combwork ended it and everything it had started. {head, select, none {Combwork couldn't read the branch's commit afterwards} other {The branch moved meanwhile, to {head}, and Combwork can't tell that it is this commit}}, so it left the index as it was. Check git log and git status before going on.", description: "HI-3075: an error from Commit (a paused merge, a start's warning) or Files' Commit it: git's commit ran past its time limit ({seconds}) and Combwork ended it, but the branch's commit changed meanwhile ({head}, a commit id; none when it couldn't be read), which may or may not be this commit; git's index (staging area) wasn't updated. Keep git log and git status as they are: commands." }),
   indexNotTaken: msg({ id: 'service.folderChanges.indexNotTaken', defaultMessage: "{action, select, commit {Git made the commit ({made})} other {Git set the changes aside in a stash ({made})}}, but Combwork couldn't update the index for those files afterwards: {why}. Until it's updated, git status may show them as changed in the index: once no git command is running, run git reset on them.", description: "HI-3021, HI-3059: the text under a warning notification after Commit or Set aside (a paused merge, a start's warning, Files' Commit it), titled as done: git committed (or stashed) the files ({made}, a commit or stash id), but updating git's index (staging area) for them afterwards failed; {why} is git's own message (English), often another git command holding the index. {action} is commit or setAside. Keep git status and git reset as they are: commands." }),
   indexKept: msg({ id: 'service.folderChanges.indexKept', defaultMessage: "{action, select, commit {Git made the commit ({made})} other {Git set the changes aside in a stash ({made})}}, but another git command staged {file}{others, plural, =0 {} one { and one other file} other { and # other files}} meanwhile, so Combwork kept that staging as it was. Check git status before going on.", description: "HI-3053, HI-3059: the text under a warning notification after Commit or Set aside (a paused merge, a start's warning) or Files' Commit it, titled as done: git committed (or stashed) the files ({made}, a commit or stash id), but while it ran another git command (the user's git add, say) changed git's index (staging area) for {file} (a path) and {others} more files; Combwork left those as that command staged them rather than writing over them. {action} is commit or setAside. Keep git status as it is: a command." }),
+  commitCancelled: msg({ id: 'service.folderChanges.commitCancelled', defaultMessage: 'You cancelled the commit: Combwork ended git and everything it had started. Nothing was committed, and the files and the index are as they were.', description: "HI-3372: after the user cancelled Commit (a paused merge, a start's warning) or Files' Commit it before git made the commit: git and its hook were ended; nothing was committed, and the files and git's index (staging area) are unchanged. Keep git as it is." }),
+  commitCancelledMoved: msg({ id: 'service.folderChanges.commitCancelledMoved', defaultMessage: "You cancelled the commit: Combwork ended git and everything it had started. {head, select, none {Combwork couldn't read the branch's commit afterwards} other {The branch moved meanwhile, to {head}, and Combwork can't tell that it is this commit}}, so it left the index as it was. Check git log and git status before going on.", description: "HI-3372: after the user cancelled Commit or Files' Commit it: git was ended, but the branch's commit changed meanwhile ({head}, a commit id; none when it couldn't be read), which may or may not be this commit; git's index (staging area) wasn't updated. Keep git log and git status as they are: commands." }),
+  stashCancelled: msg({ id: 'service.folderChanges.stashCancelled', defaultMessage: 'You cancelled setting the changes aside: Combwork ended git and everything it had started.{made, select, yes { Git had made a stash ({stash}) by then: look at it (git stash list) and at the files before going on.} other { No stash was made: check the files before going on.}}', description: "HI-3372: after the user cancelled Set aside (a paused merge, a start's warning): git stash was ended. {made} is yes when git had made a stash ({stash}, its id) by then. Keep git stash list as it is: a command." }),
   stashTimedOut: msg({ id: 'service.folderChanges.stashTimedOut', defaultMessage: "Git didn't finish setting the changes aside in {seconds, number} seconds, so Combwork ended it and everything it had started.{made, select, yes { It had kept them in a stash ({stash}) by then.} other {}} Check git stash list and the files before going on.", description: "HI-3021: an error from Set aside (a paused merge, a start's warning): git stash ran past its time limit ({seconds}) and Combwork ended it. {made} is yes when git had made a stash ({stash}, its id) by then. Keep git stash list as it is: a command." }),
   stashFailed: msg({ id: 'service.folderChanges.stashFailed', defaultMessage: 'Git did not set the changes aside: {why}', description: "HI-2944: an error from Set aside: git refused to stash the changes; {why} is its own message (English). The files are as they were." }),
   deletedKept: msg({ id: 'service.folderChanges.deletedKept', defaultMessage: "{file} is staged for removal from Git: commit it yourself in Git; Combwork won't add it back.", description: "HI-2982: an error from Commit or Set aside (a paused merge, a start's warning): the file ({file}, a path) had its removal from Git staged (Files' Stop Tracking) and is still on disk; git's commit or stash would put it back, so nothing was done. The user commits the removal in Git themselves." }),
@@ -77,10 +82,35 @@ const FENCE = {
 }
 
 /**
- * The most a commit or stash may take (`actMs`): a hook or a signer can wait; a bound for a hung one, never how long it
- * should take. Tests shorten it.
+ * HI-3372: the user's Cancel of the Commit or Set aside running now (gitCancel.ts runs it inside it). Only the steps that
+ * make it take it (the private index's adds, the commit, the stash's push); reading what happened, the index put back,
+ * a lock taken away run to their end whatever, so what is said is what is true.
  */
-export const folderChangesBounds = { actMs: 120_000 }
+const actCancel = new AsyncLocalStorage<AbortSignal>()
+
+/** Runs a Commit or Set aside (`fn`) the user can cancel with `signal`. */
+export const cancellableAct = <T>(signal: AbortSignal, fn: () => Promise<T>): Promise<T> => actCancel.run(signal, fn)
+
+/** A forward step's options: bounded, and cancellable when the user can cancel the action. */
+function forward(env: NodeJS.ProcessEnv): { env: NodeJS.ProcessEnv; timeout: number; signal?: AbortSignal } {
+  const signal = actCancel.getStore()
+  return { env, timeout: folderChangesBounds.actMs, ...(signal ? { signal } : {}) }
+}
+
+let actMsSet: number | null = null
+/**
+ * The most a commit or stash may take (`actMs`): a hook or a signer can wait; a bound for a hung one, never how long it
+ * should take. HI-3372: Settings → Advanced's `cw.git.commitMinutes` (30 min: 2 min cut a pre-commit hook running the
+ * tests short), a last resort, since the user can cancel one. Tests set it to shorten it.
+ */
+export const folderChangesBounds = {
+  get actMs(): number {
+    return actMsSet ?? platformLimits.gitCommitMs()
+  },
+  set actMs(ms: number) {
+    actMsSet = ms
+  }
+}
 
 /** HI-3021: the bound a commit or stash ended at, in seconds, as its refusal says it. */
 const boundSeconds = (): number => Math.round(folderChangesBounds.actMs / 1000)
@@ -606,14 +636,16 @@ async function commitPaths(folder: string, files: string[], untracked: string[],
   if (before === undefined) throw failed(M.commitFailed, "git couldn't read HEAD") // i18n-ignore: stands in for git's own (English) words
   return withPrivateIndex(folder, files, M.commitFailed, async (env, copy, take) => {
     const r = byIndex ? await commitByIndex(folder, env, files, message, byIndex) : await commitOnly(folder, env, copy, files, untracked, message)
-    if (r.timedOut) {
+    if (r.timedOut || r.cancelled) {
       // HI-3075: a commit ended at its bound is never credited, whatever HEAD is now: a hook's own git
       // (which inherits everything this one has) can move HEAD or commit too, and nothing proves which made it. HEAD
       // where it started: nothing was made. Moved (or unread): said so, where it is now, the index left as it was.
+      // HI-3372: the user's Cancel the same, said as theirs.
       const now = await headOf(folder)
-      if (now === before) throw combworkError(M.commitTimedOut, { seconds: boundSeconds() })
-      log.warn(`A commit in ${userText(folder)} was ended at its bound, HEAD moved meanwhile to ${now ?? '(unread)'}: not credited`)
-      throw combworkError(M.commitTimedOutMoved, { seconds: boundSeconds(), head: typeof now === 'string' ? now.slice(0, 12) : 'none' })
+      if (now === before) throw r.cancelled ? combworkError(M.commitCancelled) : combworkError(M.commitTimedOut, { seconds: boundSeconds() })
+      log.warn(`A commit in ${userText(folder)} was ended ${r.cancelled ? 'by the user' : 'at its bound'}, HEAD moved meanwhile to ${now ?? '(unread)'}: not credited`)
+      const head = typeof now === 'string' ? now.slice(0, 12) : 'none'
+      throw r.cancelled ? combworkError(M.commitCancelledMoved, { head }) : combworkError(M.commitTimedOutMoved, { seconds: boundSeconds(), head })
     }
     if (!r.ok) throw failed(M.commitFailed, `${r.err}\n${r.out}`)
     // HI-3125: this commit, never whatever HEAD is now (another git can commit right after it): the one git says it made.
@@ -673,12 +705,13 @@ async function commitOnly(folder: string, env: NodeJS.ProcessEnv, copy: string, 
     // fsmonitor), as for the step into the real index (noHooks), and bounded as the commit is. Ended, nothing was made.
     const quiet = await noHooks(folder, copy)
     if (!quiet.ok) throw failed(M.commitFailed, quiet.why)
-    const add = await git(folder, [...quiet.args, 'add', '--intent-to-add', ...PATHS_IN], undefined, pathsIn(untracked), { env, timeout: folderChangesBounds.actMs })
+    const add = await git(folder, [...quiet.args, 'add', '--intent-to-add', ...PATHS_IN], undefined, pathsIn(untracked), forward(env))
+    if (!add.ok && add.cancelled) throw combworkError(M.commitCancelled)
     if (!add.ok && add.timedOut) throw combworkError(M.commitTimedOut, { seconds: boundSeconds() })
     if (!add.ok) throw failed(M.commitFailed, add.err)
   }
   // Not --quiet (HI-3125): its summary names the commit it made (reportedCommit).
-  return git(folder, ['commit', '--only', '-m', message, ...PATHS_IN], undefined, pathsIn(files), { env, timeout: folderChangesBounds.actMs })
+  return git(folder, ['commit', '--only', '-m', message, ...PATHS_IN], undefined, pathsIn(files), forward(env))
 }
 
 /**
@@ -690,7 +723,8 @@ async function commitOnly(folder: string, env: NodeJS.ProcessEnv, copy: string, 
  * index is Combwork's own to leave.
  */
 async function commitByIndex(folder: string, env: NodeJS.ProcessEnv, files: string[], message: string, by: { removed: string[]; staged: string[] }): Promise<GitResult> {
-  const bound = { env, timeout: folderChangesBounds.actMs }
+  // Each step in the private index, and the commit, cancellable (a Cancel between them starts none after it).
+  const bound = forward(env)
   const step = async (args: string[], paths: string[]): Promise<GitResult | null> => {
     if (!paths.length) return null
     const r = await git(folder, [...args, ...PATHS_IN], undefined, pathsIn(paths), bound)
@@ -828,10 +862,10 @@ async function setAsidePaths(folder: string, files: string[], message: string, r
     if (ita.length) {
       const quiet = await noHooks(folder, copy)
       if (!quiet.ok) throw failed(M.stashFailed, quiet.why)
-      const out = await git(folder, [...quiet.args, 'rm', '--cached', '-q', '--ignore-unmatch', ...PATHS_IN], undefined, pathsIn(ita), { env, timeout: folderChangesBounds.actMs })
-      if (!out.ok) throw out.timedOut ? combworkError(M.stashTimedOut, { seconds: boundSeconds(), made: 'no', stash: '' }) : failed(M.stashFailed, out.err)
+      const out = await git(folder, [...quiet.args, 'rm', '--cached', '-q', '--ignore-unmatch', ...PATHS_IN], undefined, pathsIn(ita), forward(env))
+      if (!out.ok) throw out.cancelled ? combworkError(M.stashCancelled, { made: 'no', stash: '' }) : out.timedOut ? combworkError(M.stashTimedOut, { seconds: boundSeconds(), made: 'no', stash: '' }) : failed(M.stashFailed, out.err)
     }
-    let pushed = await git(folder, ['stash', 'push', '--include-untracked', '--quiet', '-m', message, ...PATHS_IN], undefined, pathsIn(stashed), { env, timeout: folderChangesBounds.actMs })
+    let pushed = await git(folder, ['stash', 'push', '--include-untracked', '--quiet', '-m', message, ...PATHS_IN], undefined, pathsIn(stashed), forward(env))
     const own = await ownStash(folder, before, message)
     if (own === 'unproved') {
       // HR1's round 2: never another git's stash taken for its own, nor its index step run on one; the stashes kept.
@@ -845,10 +879,11 @@ async function setAsidePaths(folder: string, files: string[], message: string, r
     const said = stash ? indexWarning('setAside', stash, await take()) : undefined
     return { r: pushed, made: stash, warning: said }
   })
-  if (!r.ok && r.timedOut) {
-    // HI-3021: ended at its bound, part way: the stash it made by then named, kept.
-    if (made) log.warn(`A stash was made in ${userText(folder)} before git was ended at its bound: ${made}`)
-    throw combworkError(M.stashTimedOut, { seconds: boundSeconds(), made: made ? 'yes' : 'no', stash: made ? made.slice(0, 12) : '' })
+  if (!r.ok && (r.timedOut || r.cancelled)) {
+    // HI-3021: ended at its bound, part way: the stash it made by then named, kept. HI-3372: by the user's Cancel the same.
+    if (made) log.warn(`A stash was made in ${userText(folder)} before git was ended ${r.cancelled ? 'by the user' : 'at its bound'}: ${made}`)
+    const stash = { made: made ? 'yes' : 'no', stash: made ? made.slice(0, 12) : '' }
+    throw r.cancelled ? combworkError(M.stashCancelled, stash) : combworkError(M.stashTimedOut, { seconds: boundSeconds(), ...stash })
   }
   // HI-3022: a file added then deleted on disk (`AD`): git stashes it, then says "No valid patches in input" putting
   // back what it has none of. With the stash made and none of the paths changed any more, that is the job done.

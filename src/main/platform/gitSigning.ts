@@ -22,8 +22,11 @@ import { agentMsg, say } from '../../shared/agentText'
 import { NEEDS, envGet, isKnownSigner, lastScoped, resolveProgramWith, signerRun } from './signerRules'
 import type { GitScope, ScopedValue, SigningInfo, SigningStatus } from '../../shared/gitSigning'
 
-/** How long a check waits on its signer before ending it (a few seconds: a signer that asks takes longer). */
-export const SIGN_CHECK_MS = 5_000
+/**
+ * How long a check waits on its signer before ending it (HI-3372: 15 s, gpg-agent's first start on a slow disk took several;
+ * a signer that asks for a passphrase takes longer).
+ */
+export const SIGN_CHECK_MS = 15_000
 
 /** What a check needs: git and a program run in the commit's folder, with its overrides and environment. */
 export interface SignDeps {

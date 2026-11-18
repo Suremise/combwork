@@ -6,7 +6,7 @@ import type { FolderChangeAction, QueuePauseRef } from '@shared/types'
 import type { QueuePauseInfo } from '@shared/workflow/queue'
 import { shownText } from '@shared/advanced'
 import { msg, tr } from '@shared/i18n'
-import * as actions from './actions'
+import { gitRun } from './gitRuns'
 import { offered, repoOp } from './repoOps'
 import { bumpGit, notify, showVersionControl } from './store'
 
@@ -19,6 +19,9 @@ const T = {
   setAsideWarning: msg({ id: 'folderChanges.setAsideWarning', defaultMessage: '{count, plural, one {Set # file aside} other {Set # files aside}} on {branch}, with a warning', description: "HI-3059: a warning notification's title after Set aside: the files were stashed in the branch {branch}, but something about git's index (staging area) needs checking afterwards; the text under it says what." }),
   setAsideDetail: msg({ id: 'folderChanges.setAsideDetail', defaultMessage: 'Git keeps them in a stash named "{name}": git stash pop brings them back.', description: 'HI-2944: under the notification after Set aside: where the changes are and how to get them back. {name} is the stash\'s message. Keep git stash pop as it is: a command.' }),
   resumed: msg({ id: 'folderChanges.resumed', defaultMessage: 'The merge goes on.', description: 'HI-2944: under the notification after Commit or Set aside on a paused merge: the merge queue resumed.' }),
+  committing: msg({ id: 'folderChanges.committing', defaultMessage: 'Committing on {branch}…', description: "HI-3372: a notification while Commit runs (started from a notification, with no button to stand beside), with a Cancel button: the folder's changes being committed on the branch {branch}." }),
+  settingAside: msg({ id: 'folderChanges.settingAside', defaultMessage: 'Setting the changes aside on {branch}…', description: "HI-3372: a notification while Set aside runs (started from a notification), with a Cancel button: the folder's changes being stashed on the branch {branch}." }),
+  committingIgnore: msg({ id: 'folderChanges.committingIgnore', defaultMessage: 'Committing .gitignore…', description: "HI-3372: a notification while Files' Commit it commits .gitignore, with a Cancel button. Keep .gitignore: a file name." }),
   stillPaused: msg({ id: 'folderChanges.stillPaused', defaultMessage: 'The merge is still paused: see why on it.', description: 'HI-2944: under the notification after Commit or Set aside on a paused merge: the queue stays paused (something else still stops it, shown on the paused merge).' })
 }
 
@@ -26,8 +29,10 @@ const T = {
  * Commit or Set aside exactly `files` in the folder `target` is checked out in. From a paused merge `pause` is that
  * pause as shown: main acts only while it is still the current one, and the merge goes on only if it then can.
  */
-export async function settleFolderChanges(projectPath: string, target: string, action: FolderChangeAction, files: string[], pause: QueuePauseRef | null = null, folder: string | null = null): Promise<boolean> {
-  const r = await actions.attempt(tr(action === 'commit' ? T.commitFailed : T.setAsideFailed), () => repoOp('queue:settleChanges', projectPath, target, action, files, pause, folder))
+export async function settleFolderChanges(projectPath: string, target: string, action: FolderChangeAction, files: string[], pause: QueuePauseRef | null = null, folder: string | null = null, onOp?: (op: string | null) => void): Promise<boolean> {
+  // HI-3372: cancellable while it runs: beside its buttons (`onOp`), else on a notification of its own.
+  const shown = onOp ? {} : { running: tr(action === 'commit' ? T.committing : T.settingAside, { branch: target }) }
+  const r = await gitRun(projectPath, tr(action === 'commit' ? T.commitFailed : T.setAsideFailed), (op) => repoOp('queue:settleChanges', projectPath, target, action, files, pause, folder, op), { ...shown, ...(onOp ? { onOp } : {}) })
   if (!r) return false
   bumpGit(projectPath)
   const { done } = r
@@ -40,7 +45,7 @@ export async function settleFolderChanges(projectPath: string, target: string, a
 
 /** Files' Commit it: the top .gitignore as it is now, committed alone. */
 export async function commitIgnore(projectPath: string): Promise<void> {
-  const r = await actions.attempt(tr(T.commitFailed), () => repoOp('files:gitCommitIgnore', projectPath))
+  const r = await gitRun(projectPath, tr(T.commitFailed), (op) => repoOp('files:gitCommitIgnore', projectPath, op), { running: tr(T.committingIgnore) })
   if (!r) return
   bumpGit(projectPath)
   if (r.warning) notify('warning', tr(T.committedWarning, { count: 1, branch: r.branch }), shownText(r.warning))

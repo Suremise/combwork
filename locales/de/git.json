@@ -13,6 +13,7 @@
   "git.branches.cleanUp": "Gemergte Branches aufräumen…",
   "git.branches.cleanUpTip": "{n, plural, =0 {Kein Branch ist in {target} gemergt und ungenutzt.} one {# Branch hier oder auf einem Remote ist in {target} gemergt und ungenutzt: Wähle, was gelöscht wird.} other {# Branches hier oder auf einem Remote sind in {target} gemergt und ungenutzt: Wähle, welche gelöscht werden.}}",
   "git.branches.copyRevision": "Revision {revision} kopieren",
+  "git.branches.deletingOn": "Branches auf {remote} werden gelöscht…",
   "git.branches.earlierCards": "{n, plural, one {+# frühere Karte} other {+# frühere Karten}}",
   "git.branches.group": "{group, select, inUse {In Gebrauch} merged {In {target} gemergt} other {Nicht in {target} gemergt}}",
   "git.branches.groupTip": "{group, select, inUse {Der Zielbranch, der Standardbranch, der des Projektordners und die, die ein Slot, ein Worktree oder eine offene Karte nutzt.} merged {Jeder Commit davon ist in {target}, und nichts nutzt sie: „Gemergte Branches aufräumen“ löscht sie.} other {Diese haben Commits, die nicht in {target} sind. Lösche einen erst, nachdem du die Commits geprüft hast, die dabei verloren gehen.}}",

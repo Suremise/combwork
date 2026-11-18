@@ -154,6 +154,9 @@ import { jjOperationPreview, jjOperations } from './platform/jjOperations'
 import { checkRepoTools } from './platform/repoPorts'
 import { gitCantRead, slotWorkspaces } from './platform/workspacePorts'
 import { opsAt, refuseUnoffered, repoOpHandlers } from './repoOpsIpc'
+import { cancelGitRun, dropGitRuns, withGitCancel, type CancelOwner } from './gitCancel'
+import { cancellableNet } from './gitRepo'
+import { cancellableAct } from './gitFolderChanges'
 import { nextVersionPlan, previewFor, startNextVersion } from './workflow/nextVersion'
 import { checkOffer, dismissOffer, releaseOffers } from './workflow/releaseOffer'
 import { branchStartArg } from '../shared/nextVersion'
@@ -237,6 +240,34 @@ const advancedState = (): AdvancedState => advanced.state(workspace.path ? (work
 
 /** The window an IPC call came from, for calls that keep something per window (the developer console's subscription). */
 const senderStore = new AsyncLocalStorage<WebContents>()
+
+/** HI-3372: the windows and workspaces whose closing takes their runs off gitCancel's list (each listened to once). */
+const cancelWatched = new WeakSet<object>()
+
+/**
+ * HI-3372: who may cancel a run started now: this window, this workspace's open, the project (its path as recorded).
+ * Watches the window and the workspace once, so a run outlives neither's list.
+ */
+function cancelOwner(projectPath: string): CancelOwner {
+  const wc = senderStore.getStore()
+  const ws = currentWorkspace()
+  if (wc && !cancelWatched.has(wc)) {
+    cancelWatched.add(wc)
+    const id = wc.id
+    wc.once('destroyed', () => dropGitRuns({ sender: id }))
+  }
+  if (!cancelWatched.has(ws)) {
+    cancelWatched.add(ws)
+    ws.lifetime.addEventListener('abort', () => dropGitRuns({ ws }), { once: true })
+  }
+  return { sender: wc?.id ?? -1, ws, project: resolve(projectPath) }
+}
+
+/** A Fetch, Pull or Push the user can cancel (`op`: the window's id for it). */
+const netRun = <T>(p: string, op: unknown, fn: () => T | Promise<T>): Promise<T> => withGitCancel(op, cancelOwner(workspace.assertProject(p)), async (signal) => (signal ? cancellableNet(signal, async () => fn()) : fn()))
+
+/** A Commit or Set aside the user can cancel (`op`: the window's id for it). */
+const actRun = <T>(p: string, op: unknown, fn: () => T | Promise<T>): Promise<T> => withGitCancel(op, cancelOwner(workspace.assertProject(p)), async (signal) => (signal ? cancellableAct(signal, async () => fn()) : fn()))
 
 /**
  * The Combwork window whose IPC request is being served now (HI-2355), or null outside one (a timer, a hook, the Agent API):
@@ -528,6 +559,17 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
   const impl: Impl = {
     // The repository mutations (HI-2788): each through the operations port, gated by its operation.
     ...repoOpHandlers,
+    // HI-3372: the user's network actions and Commit it, each under the window's id for it (`op`), which its Cancel names.
+    'git:fetch': (p, op) => netRun(p, op, () => repoOpHandlers['git:fetch'](p)),
+    'git:pull': (p, op) => netRun(p, op, () => repoOpHandlers['git:pull'](p)),
+    'git:push': (p, remote, op) => netRun(p, op, () => repoOpHandlers['git:push'](p, remote)),
+    'git:pushTo': (p, remote, scope, branch, op) => netRun(p, op, () => repoOpHandlers['git:pushTo'](p, remote, scope, branch)),
+    'git:setUpstream': (p, branch, remote, remoteBranch, pushFirst, op) => netRun(p, op, () => repoOpHandlers['git:setUpstream'](p, branch, remote, remoteBranch, pushFirst)),
+    'git:createTag': (p, name, message, pushTo, op) => netRun(p, op, () => repoOpHandlers['git:createTag'](p, name, message, pushTo)),
+    'git:deleteRemoteBranches': (p, remote, items, op) => netRun(p, op, () => repoOpHandlers['git:deleteRemoteBranches'](p, remote, items)),
+    'files:gitCommitIgnore': (p, op) => actRun(p, op, () => repoOpHandlers['files:gitCommitIgnore'](p)),
+    // The owner's Cancel of its run `op` (the project it recorded with it): another window's, workspace's or project's changes nothing.
+    'git:cancel': (op, p) => cancelGitRun(op, cancelOwner(String(p ?? ''))),
     'app:info': () => getAppInfo(),
     'app:planUsage': () => config.get().planUsage,
     'app:connectionPlanUsage': () => config.get().connectionPlanUsage ?? {},
@@ -1128,7 +1170,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
     'queue:resume': (p, target) => resumeQueue(workspace, workspace.assertProject(p), queueTarget(target)),
     // HI-2944: the port refuses it first where the project's version control doesn't offer it.
-    'queue:settleChanges': (p, target, action, shown, pause, folder) => settleQueueChanges(workspace, workspace.assertProject(p), queueTarget(target), action === 'setAside' ? 'setAside' : 'commit', shown, pauseRef(pause), typeof folder === 'string' && folder ? folder : null, opsAt('queue:settleChanges')),
+    'queue:settleChanges': (p, target, action, shown, pause, folder, op) => actRun(p, op, () => settleQueueChanges(workspace, workspace.assertProject(p), queueTarget(target), action === 'setAside' ? 'setAside' : 'commit', shown, pauseRef(pause), typeof folder === 'string' && folder ? folder : null, opsAt('queue:settleChanges'))),
     'queue:remove': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'removeFromQueue', typeof reason === 'string' ? reason : '')).card,
     'queue:retry': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'retryMerge', typeof reason === 'string' ? reason : '')).card,
     // HI-2959: Resolve on a builder, on a forward merge the queue returned: the card made for a builder.

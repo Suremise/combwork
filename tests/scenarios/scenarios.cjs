@@ -5307,12 +5307,12 @@ module.exports.SCENARIOS = [
         ['cw.jj.commandSeconds', /snapshot|jj command/i]
       ]
       const looked = [...ran(o, 'cw_list_settings'), ...ran(o, 'cw_read_setting')]
-      const replies = looked.map((x) => String(x.reply ?? '')).join('\n')
+      const said = looked.map((x) => String(x.reply ?? '')).join('\n')
       return [
         ['read the tune-settings skill', read(o, 'tune-settings'), o.skillsRead.join(',')],
         ['looked the settings up (cw_list_settings or cw_read_setting)', looked.length >= 1, o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
         // Each of the four new settings, its id and its description's own words, in a reply it got (HR2's s14).
-        ...LIMITS.map(([id, words]) => [`a settings reply carried ${id} and its description`, looked.some((x) => String(x.reply ?? '').includes(id) && words.test(String(x.reply ?? ''))), replies.slice(0, 600)]),
+        ...LIMITS.map(([id, words]) => [`a settings reply carried ${id} and its description`, looked.some((x) => String(x.reply ?? '').includes(id) && words.test(String(x.reply ?? ''))), said.slice(0, 600)]),
         ['changed no setting: it only suggested', ran(o, 'cw_update_setting').length === 0],
         ...(c.fake
           ? []

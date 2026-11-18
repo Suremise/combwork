@@ -1,4 +1,5 @@
 // First: the thread pool's size is set before anything uses it (HI-1702).
+import { applyAdvancedLimits } from './limitsApp'
 import './threadPool'
 import { initWatches, onWatchedCardsMoved, watchKeepsQuitWaiting } from './watches'
 import { initLoopWakes } from './loopWakes'
@@ -1074,6 +1075,8 @@ app.whenReady().then(async () => {
   await startI18n(config.settings)
   // Advanced settings (#367): advanced.json's overrides, followed as it changes.
   advanced.load()
+  // HI-3372: the version-control ports' bounds (a commit, a fetch or push, the queue's network, jj) from those settings.
+  applyAdvancedLimits()
   // The user's own CLIs (HI-3196): their descriptions read and registered before anything looks for a provider.
   await startClis()
   // Connections' launch settings (HI-2670): the app-wide switches they replaced copied onto them once, and agents on a

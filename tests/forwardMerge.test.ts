@@ -30,6 +30,8 @@ const { workflowFor } = await import('../src/main/workflow/service')
 const { preset } = await import('../src/shared/workflow/options')
 const { forwardOf } = await import('../src/shared/workflow/compile')
 const { MergeQueue } = await import('../src/main/workflow/mergeQueue')
+const { platformLimits } = await import('../src/main/platform/limits')
+const { gitTestHooks } = await import('../src/main/git')
 
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
@@ -45,7 +47,7 @@ const agent = { kind: 'agent', name: 'B1 (p)', self: { project: 'p', agentId: 'b
 let n = 0
 
 /** A Pair project merging into main, listing 1.2.0 (made from main), main then `ahead` commits ahead. */
-async function project(ahead = 1, targets: { target: string; otherTargets: string[] } = { target: 'main', otherTargets: ['1.2.0'] }): Promise<{ w: WS; repo: string }> {
+async function project(ahead = 1, targets: { target: string; otherTargets: string[] } = { target: 'main', otherTargets: ['1.2.0'] }, extra: Record<string, unknown> = {}, before?: (repo: string) => void): Promise<{ w: WS; repo: string }> {
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
   mkdirSync(join(repo, '.combwork'), { recursive: true })
@@ -62,7 +64,8 @@ async function project(ahead = 1, targets: { target: string; otherTargets: strin
     git(repo, 'commit', '-qm', `fix ${i}`)
   }
   const { platform: _p, ...pair } = preset('git', 'pair')
-  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], workflow: { platform: 'git', preset: 'pair', options: { ...pair, ...targets } } }))
+  before?.(repo)
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], workflow: { platform: 'git', preset: 'pair', options: { ...pair, ...targets, ...extra } } }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
@@ -70,6 +73,30 @@ async function project(ahead = 1, targets: { target: string; otherTargets: strin
 }
 
 describe('the forward request (HI-2679)', () => {
+  // HI-3372: a project whose targets follow their remote fetches each branch's remote head, bounded by cw.queue.networkMinutes
+  // as main sets it (a value of the test's own, seen as git starts the fetch).
+  it('following the remote, each fetch is bounded by the merge queue network setting', async () => {
+    const remote = (repo: string): void => {
+      const bare = join(base, `remote-${n}.git`)
+      git(repo, 'init', '-q', '--bare', '-b', 'main', bare)
+      git(repo, 'remote', 'add', 'origin', bare)
+      git(repo, 'push', '-q', '-u', 'origin', 'main', '1.2.0')
+    }
+    const { w, repo } = await project(1, undefined, { finish: 'combworkMerges', followRemote: true }, remote)
+    const fetches: (number | undefined)[] = []
+    const was = platformLimits.queueNetworkMs
+    platformLimits.queueNetworkMs = () => 1_234_000
+    gitTestHooks.started = (_cwd, args, timeout) => void (args.includes('fetch') && fetches.push(timeout))
+    try {
+      await inWorkspace(w, () => controls.forwardMerge(w, repo, 'main', '1.2.0', user))
+    } finally {
+      platformLimits.queueNetworkMs = was
+      gitTestHooks.started = undefined
+    }
+    expect(fetches.length).toBeGreaterThan(0)
+    expect(fetches.every((t) => t === 1_234_000)).toBe(true)
+  })
+
   it("is the user's or the Assistant's, for two of the project's existing targets", async () => {
     const { w, repo } = await project()
     const ask = (from: string, to: string, actor: Parameters<typeof controls.forwardMerge>[4] = user) => inWorkspace(w, () => controls.forwardMerge(w, repo, from, to, actor))

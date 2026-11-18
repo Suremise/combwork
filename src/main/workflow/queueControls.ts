@@ -16,6 +16,8 @@ import { CombworkError, combworkError } from '../combworkError'
 import type { OpsFor } from '../platform/repoOps'
 import { fmt, msg, tr } from '../../shared/i18n'
 import { withValues } from '../../shared/advanced'
+// HI-3126: how long a forward request waits for each remote branch it fetches: cw.queue.networkMinutes (HI-3372).
+import { platformLimits } from '../platform/limits'
 import { forwardOf } from '../../shared/workflow/compile'
 import { merges } from '../../shared/platform/descriptors'
 import { branchExists, defaultBranch, forwardSources, projectTargets, type ProjectTargets } from './targets'
@@ -948,8 +950,6 @@ const FORWARD_TEXT = {
   noGit: msg({ id: 'service.forward.noGit', defaultMessage: 'This project merges no work through Combwork’s merge queue, so it has nothing to bring up to date.', description: 'HI-2679: a forward merge asked of a project that isn’t a Git project merging through the queue.' })
 }
 
-/** HI-3126: how long a forward request waits for each remote branch it fetches (the window or the Assistant waits for it). */
-const FORWARD_FETCH_MS = 60_000
 
 /** Whether the project's targets follow their remotes now (G21: the options as they are, as the queue reads them). */
 function followsRemote(wf: Workflow): boolean {
@@ -985,7 +985,7 @@ async function forwardEnds(wf: Workflow, projectPath: string, from: string, to: 
   const P = historyFor(wf.cfg.options().platform)
   const pin = (branch: string): string => `refs/cw/forward/${branch.replace(/[^A-Za-z0-9._-]/g, '-')}`
   const remoteHead = async (branch: string, own: string): Promise<string> => {
-    const r = await P.trackedHead!(projectPath, branch, pin(branch), FORWARD_FETCH_MS)
+    const r = await P.trackedHead!(projectPath, branch, pin(branch), platformLimits.queueNetworkMs())
     if (isUnknown(r)) throw unreadableForward(from, to ?? from, r)
     return r === 'untracked' ? own : r
   }
