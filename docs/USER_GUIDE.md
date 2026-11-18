@@ -684,8 +684,8 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand JABQAHIAbwBnAHIAZQBzAHMAUAByAGUAZgBlAHIAZQBuAGMAZQA9ACcAUwBpAGwAZQBuAHQAbAB5AEMAbwBuAHQAaQBuAHUAZQAnAAoAJAB1AD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBVAFIATAA7ACAAJABhAD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBBAFUAVABIAF8ARgBJAEwARQAKAGkAZgAgACgALQBuAG8AdAAgACQAdQAgAC0AbwByACAALQBuAG8AdAAgACQAYQApACAAewAgAGUAeABpAHQAIAAwACAAfQAKAFMAZQB0AC0ATABvAGMAYQB0AGkAbwBuACAALQBMAGkAdABlAHIAYQBsAFAAYQB0AGgAIAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAtAEwAaQB0AGUAcgBhAGwAUABhAHQAaAAgACQAYQApAAoAYwB1AHIAbAAuAGUAeABlACAALQBzACAALQBtACAANQAgAC0AWAAgAFAATwBTAFQAIAAtAEgAIAAiAEAAJAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAkAGEAIAAtAEwAZQBhAGYAKQAiACAALQBIACAAIgBDAG8AbgB0AGUAbgB0AC0AVAB5AHAAZQA6ACAAYQBwAHAAbABpAGMAYQB0AGkAbwBuAC8AagBzAG8AbgAiACAALQAtAGQAYQB0AGEALQBiAGkAbgBhAHIAeQAgACIAQAAtACIAIAAiACQAKAAkAHUAKQAiAAoAZQB4AGkAdAAgADAA",
-            "timeout": 5
+            "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand JABQAHIAbwBnAHIAZQBzAHMAUAByAGUAZgBlAHIAZQBuAGMAZQA9ACcAUwBpAGwAZQBuAHQAbAB5AEMAbwBuAHQAaQBuAHUAZQAnAAoAJAB1AD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBVAFIATAA7ACAAJABhAD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBBAFUAVABIAF8ARgBJAEwARQAKAGkAZgAgACgALQBuAG8AdAAgACQAdQAgAC0AbwByACAALQBuAG8AdAAgACQAYQApACAAewAgAGUAeABpAHQAIAAwACAAfQAKAFMAZQB0AC0ATABvAGMAYQB0AGkAbwBuACAALQBMAGkAdABlAHIAYQBsAFAAYQB0AGgAIAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAtAEwAaQB0AGUAcgBhAGwAUABhAHQAaAAgACQAYQApAAoAYwB1AHIAbAAuAGUAeABlACAALQBzACAALQBtACAAMwAwACAALQBYACAAUABPAFMAVAAgAC0ASAAgACIAQAAkACgAUwBwAGwAaQB0AC0AUABhAHQAaAAgACQAYQAgAC0ATABlAGEAZgApACIAIAAtAEgAIAAiAEMAbwBuAHQAZQBuAHQALQBUAHkAcABlADoAIABhAHAAcABsAGkAYwBhAHQAaQBvAG4ALwBqAHMAbwBuACIAIAAtAC0AZABhAHQAYQAtAGIAaQBuAGEAcgB5ACAAIgBAAC0AIgAgACIAJAAoACQAdQApACIACgBlAHgAaQB0ACAAMAA=",
+            "timeout": 30
           }
         ]
       }
@@ -696,7 +696,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -714,7 +714,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 10,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -732,7 +732,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -749,7 +749,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -766,7 +766,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -783,7 +783,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -800,7 +800,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -817,7 +817,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -834,7 +834,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -848,7 +848,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
   },
   "statusLine": {
     "type": "command",
-    "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand JABQAHIAbwBnAHIAZQBzAHMAUAByAGUAZgBlAHIAZQBuAGMAZQA9ACcAUwBpAGwAZQBuAHQAbAB5AEMAbwBuAHQAaQBuAHUAZQAnAAoAJAB1AD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBVAFIATAA7ACAAJABhAD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBBAFUAVABIAF8ARgBJAEwARQAKAGkAZgAgACgALQBuAG8AdAAgACQAdQAgAC0AbwByACAALQBuAG8AdAAgACQAYQApACAAewAgAGUAeABpAHQAIAAwACAAfQAKAFMAZQB0AC0ATABvAGMAYQB0AGkAbwBuACAALQBMAGkAdABlAHIAYQBsAFAAYQB0AGgAIAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAtAEwAaQB0AGUAcgBhAGwAUABhAHQAaAAgACQAYQApAAoAYwB1AHIAbAAuAGUAeABlACAALQBzACAALQBtACAANQAgAC0AWAAgAFAATwBTAFQAIAAtAEgAIAAiAEAAJAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAkAGEAIAAtAEwAZQBhAGYAKQAiACAALQBIACAAIgBDAG8AbgB0AGUAbgB0AC0AVAB5AHAAZQA6ACAAYQBwAHAAbABpAGMAYQB0AGkAbwBuAC8AagBzAG8AbgAiACAALQAtAGQAYQB0AGEALQBiAGkAbgBhAHIAeQAgACIAQAAtACIAIAAiACQAKAAkAHUAKQA/AHMAdABhAHQAdQBzAGwAaQBuAGUAIgAKAGUAeABpAHQAIAAwAA==",
+    "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand JABQAHIAbwBnAHIAZQBzAHMAUAByAGUAZgBlAHIAZQBuAGMAZQA9ACcAUwBpAGwAZQBuAHQAbAB5AEMAbwBuAHQAaQBuAHUAZQAnAAoAJAB1AD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBVAFIATAA7ACAAJABhAD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBBAFUAVABIAF8ARgBJAEwARQAKAGkAZgAgACgALQBuAG8AdAAgACQAdQAgAC0AbwByACAALQBuAG8AdAAgACQAYQApACAAewAgAGUAeABpAHQAIAAwACAAfQAKAFMAZQB0AC0ATABvAGMAYQB0AGkAbwBuACAALQBMAGkAdABlAHIAYQBsAFAAYQB0AGgAIAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAtAEwAaQB0AGUAcgBhAGwAUABhAHQAaAAgACQAYQApAAoAYwB1AHIAbAAuAGUAeABlACAALQBzACAALQBtACAAMwAwACAALQBYACAAUABPAFMAVAAgAC0ASAAgACIAQAAkACgAUwBwAGwAaQB0AC0AUABhAHQAaAAgACQAYQAgAC0ATABlAGEAZgApACIAIAAtAEgAIAAiAEMAbwBuAHQAZQBuAHQALQBUAHkAcABlADoAIABhAHAAcABsAGkAYwBhAHQAaQBvAG4ALwBqAHMAbwBuACIAIAAtAC0AZABhAHQAYQAtAGIAaQBuAGEAcgB5ACAAIgBAAC0AIgAgACIAJAAoACQAdQApAD8AcwB0AGEAdAB1AHMAbABpAG4AZQAiAAoAZQB4AGkAdAAgADAA",
     "padding": 0
   }
 }
@@ -861,7 +861,7 @@ $ProgressPreference='SilentlyContinue'
 $u=$env:CW_HOOK_URL; $a=$env:CW_HOOK_AUTH_FILE
 if (-not $u -or -not $a) { exit 0 }
 Set-Location -LiteralPath (Split-Path -LiteralPath $a)
-curl.exe -s -m 5 -X POST -H "@$(Split-Path $a -Leaf)" -H "Content-Type: application/json" --data-binary "@-" "$($u)"
+curl.exe -s -m 30 -X POST -H "@$(Split-Path $a -Leaf)" -H "Content-Type: application/json" --data-binary "@-" "$($u)"
 exit 0
 ```
 

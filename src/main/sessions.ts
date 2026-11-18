@@ -1371,8 +1371,15 @@ export async function deliveredSkillSizes(adapter: ProviderAdapter, ctx: LaunchC
 /** How soon after the user's Enter in an agent's pane its CLI must take a prompt for it to count as theirs (#418). */
 const USER_REPLY_MS = 15_000
 
-/** How long a prompt Combwork typed counts as pending (the agent just given a task) while its CLI hasn't taken it (#416). */
-const PENDING_MS = 30_000
+/**
+ * How long a prompt Combwork typed counts as pending (the agent just given a task) while its CLI hasn't taken it (#416).
+ * HI-3373: 120 s (it was 30): a CLI starting several MCP servers can be ready long before it takes its first task, and
+ * pending ends at that first prompt anyway.
+ */
+const PENDING_MS = 120_000
+
+/** The longest a Shift+Tab press waits for the footer to show the mode it moved to (HI-3373: 4 s gave up on a busy machine). */
+const MODE_PRESS_MS = 30_000
 
 /** How often a connection switch waiting for its safe point looks again with no event (HI-3213: as a lane's end does). */
 const SWITCH_RECHECK_MS = 5000
@@ -4396,8 +4403,10 @@ class SessionManager {
       if (before) seen.add(before)
       writePty(key, '\x1b[Z')
       const t = Date.now()
-      // The footer redraw that shows the new mode can take a few seconds on a busy machine or just after the start.
-      while (Date.now() - t < 4000 && st.permissionMode === before) await new Promise((r) => setTimeout(r, 50))
+      // Each press waits for the footer to show its effect before the next (HI-3373): the redraw can take seconds on a busy
+      // machine or just after the start, and a press before it would cycle past the mode. MODE_PRESS_MS bounds a redraw
+      // that never comes (nothing changed: the mode isn't offered), never how long one should take.
+      while (Date.now() - t < MODE_PRESS_MS && st.permissionMode === before) await new Promise((r) => setTimeout(r, 50))
       if (st.permissionMode === mode) {
         log.info(`${userText(this.label(st))}: switched to ${mode}`)
         this.refreshSizeSoon(l)

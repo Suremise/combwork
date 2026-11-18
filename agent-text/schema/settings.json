@@ -1643,6 +1643,12 @@
   "settings.advanced.cw.terminal.osc52.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.typed.takeSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.typed.takeSeconds.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.usage.timelineDetailDays.desc": {
     "placeholders": {}
   },

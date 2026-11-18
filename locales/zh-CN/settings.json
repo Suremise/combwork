@@ -526,6 +526,8 @@
   "settings.advanced.cw.lanes.waitYouMinutes.title": "通道：等你处理太久",
   "settings.advanced.cw.lostLine.steadySeconds.desc": "Combwork 输入到智能体、其 CLI 未接收且此后已从输入框消失的一行（被 CLI 的某个界面接走）：输入框在提示符处保持为空、且没有接收任何内容需要持续多久，Combwork 才会重新输入它；若没有可重新输入的内容，则通知你。如果在较慢的电脑上某行被输入了两次，请调大此值。",
   "settings.advanced.cw.lostLine.steadySeconds.title": "丢失的行：等待时间",
+  "settings.advanced.cw.typed.takeSeconds.desc": "智能体的 CLI 接收 Combwork 输入的一行（开始处理它）所能使用的时间，超过后 Combwork 会在安全时（在这个时间的六倍之内）再按一次 Enter（仅一次）。如果之后在这个时间内仍未被接收，Combwork 会告诉你这一行可能还在提示符处等待，并且在它被接收之前不再向该智能体输入任何内容。如果较慢或繁忙的电脑对已被接收的行也显示这条提示，请调大此值。",
+  "settings.advanced.cw.typed.takeSeconds.title": "输入的行：等待接收",
   "settings.advanced.cw.mcp.connectSeconds.desc": "智能体就绪后，Combwork 等待其 CLI 连接 Combwork 工具的时长，超过后仍会告知智能体有新工作。恢复的会话可能在工具就绪之前就已就绪，此时的消息会耗费一个没有工具的回合（#865）。如果 CLI 不连接 Combwork 工具的智能体收到消息较晚，请调低此值。",
   "settings.advanced.cw.mcp.connectSeconds.title": "Combwork 工具：等待连接",
   "settings.advanced.cw.mcp.replySeconds.desc": "combwork MCP 服务器等待 Combwork 回应其某个工具的时长（等待类工具自身的等待时间另计）。如果机器较慢或非常繁忙，导致 Combwork 工具因“Combwork didn't reply within 300 s”而失败（#371），请调高此值。",

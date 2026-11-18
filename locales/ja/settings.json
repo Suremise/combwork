@@ -526,6 +526,8 @@
   "settings.advanced.cw.lanes.waitYouMinutes.title": "レーン：対応待ちが長い",
   "settings.advanced.cw.lostLine.steadySeconds.desc": "CombworkがエージェントにCLIが受け取らずに入力した行で、その後入力欄から消えたもの（CLIの画面が受け取った）について、プロンプトで入力欄が空のまま何も受け取られない状態が、どれだけ続いたらCombworkがもう一度入力するか（入力し直すものがなければ、知らせるか）。遅いマシンで行が2回入力される場合は長くしてください。",
   "settings.advanced.cw.lostLine.steadySeconds.title": "失われた行：待機時間",
+  "settings.advanced.cw.typed.takeSeconds.desc": "Combwork が入力した行をエージェントの CLI が受け取る（作業を始める）までの時間です。過ぎると Combwork は安全になりしだい（この時間の 6 倍以内に）Enter をもう一度だけ押します。それでもこの時間内に受け取られなければ、行がプロンプトで待っているかもしれないとお知らせし、受け取られるまでそのエージェントには何も入力しません。遅いマシンや混み合ったマシンで、受け取られた行にもこのお知らせが出る場合は値を大きくしてください。",
+  "settings.advanced.cw.typed.takeSeconds.title": "入力した行：受け取りの待機時間",
   "settings.advanced.cw.mcp.connectSeconds.desc": "エージェントの準備ができてから、そのCLIがCombworkのツールに接続するのをCombworkが待つ時間です。この時間が過ぎると、接続を待たずに新しい作業を知らせます。再開したセッションはツールより先に準備ができることがあり、その時点のメッセージはツールなしのターンになります（#865）。CLIがCombworkのツールに接続しないエージェントにメッセージが遅れて届く場合は、値を下げてください。",
   "settings.advanced.cw.mcp.connectSeconds.title": "Combworkツール：接続の待機",
   "settings.advanced.cw.mcp.replySeconds.desc": "combwork MCPサーバーが、ツールへのCombworkの応答を待つ時間です（待機ツール自体の時間はこれに加わります）。遅いマシンや非常に忙しいマシンで、Combworkツールが「Combwork didn't reply within 300 s」で失敗する場合に増やしてください（#371）。",
