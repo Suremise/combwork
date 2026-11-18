@@ -100,18 +100,49 @@ describe('endTreeAsync: what the tree started after its listing (HI-3358)', () =
     expect(root.kill).toHaveBeenCalledTimes(1)
   })
 
-  it('bounded (HR1): a session that never answers is ended at its bound, said, and the teardown settles by TREE_END_MS', async () => {
+  it('bounded (HR1): a session that never answers the end is ended at its bound, said, the root ended through its handle, and the teardown settles by TREE_END_MS', async () => {
     vi.useFakeTimers()
     probe.listings = [lines('4141 0 1000', '4200 4141 1100')]
     const root = fakeChild(4141)
     let settled = false
+    const left = vi.fn()
     // The listing answers; the session started after it never does.
-    probe.onList = () => void (probe.hang = true)
-    void endTreeAsync(root as unknown as ChildProcess, 'win32').then(() => (settled = true))
+    probe.answers = 0
+    void endTreeAsync(root as unknown as ChildProcess, 'win32', undefined, { onLateLeft: left }).then(() => (settled = true))
     await vi.advanceTimersByTimeAsync(TREE_END_MS - 1)
     expect(settled).toBe(true)
     expect(probe.requests).toEqual(['end 4200:1100,4141:1000'])
+    expect(left.mock.calls).toEqual([['its ending session ended before it answered the end']])
     expect(root.kill).toHaveBeenCalledTimes(1)
+  })
+
+  it('bounded (HR1): a session that ends the tree but never answers the listing after it is ended at its bound, said, and the teardown settles by TREE_END_MS', async () => {
+    vi.useFakeTimers()
+    probe.listings = [lines('4141 0 1000', '4200 4141 1100')]
+    const root = fakeChild(4141)
+    let settled = false
+    const left = vi.fn()
+    probe.answers = 1
+    void endTreeAsync(root as unknown as ChildProcess, 'win32', undefined, { onLateLeft: left }).then(() => (settled = true))
+    await vi.advanceTimersByTimeAsync(TREE_END_MS - 1)
+    expect(settled).toBe(true)
+    expect(probe.requests).toEqual(['end 4200:1100,4141:1000', 'list'])
+    expect(left.mock.calls).toEqual([['its ending session ended before a listing after the end']])
+    // The root was ended by the first end: not again through its handle.
+    expect(root.kill).not.toHaveBeenCalled()
+  })
+
+  it('a session that ends during a late end: said, and the teardown settles by TREE_END_MS', async () => {
+    vi.useFakeTimers()
+    probe.listings = [lines('4141 0 1000'), lines('4300 4141 1500')]
+    const left = vi.fn()
+    let settled = false
+    probe.answers = 2
+    void endTreeAsync(fakeChild(4141) as unknown as ChildProcess, 'win32', undefined, { onLateLeft: left }).then(() => (settled = true))
+    await vi.advanceTimersByTimeAsync(TREE_END_MS - 1)
+    expect(settled).toBe(true)
+    expect(probe.requests).toEqual(['end 4141:1000', 'list', 'end 4300:1500'])
+    expect(left.mock.calls).toEqual([['its ending session ended during a late end']])
   })
 })
 

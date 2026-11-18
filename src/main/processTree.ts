@@ -238,7 +238,7 @@ export const TREE_END_MS = TREE_END_BOUNDS.listMs + TREE_END_BOUNDS.endMs
 
 /** What a teardown tells its caller, for the log. */
 export interface TeardownNotes {
-  /** HI-3358: what the ended processes started after their listing may be left running, and why. */
+  /** HI-3358: the teardown may have left some of the tree running (its ending session didn't finish, or the late rounds ran out), and why. */
   onLateLeft?: (why: string) => void
 }
 
@@ -355,7 +355,10 @@ async function endFollowing(tree: ListedProcess[], notes: TeardownNotes): Promis
   const s = endSession(TREE_END_BOUNDS.endMs)
   try {
     const first = await s.ask(endRequest(tree))
-    if (!first) return []
+    if (!first) {
+      notes.onLateLeft?.('its ending session ended before it answered the end') // i18n-ignore: for the log
+      return []
+    }
     const held = heldOf(first, tree)
     const tried = [...tree]
     for (let round = 1; ; round++) {

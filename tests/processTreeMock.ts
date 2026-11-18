@@ -17,7 +17,9 @@ export const probe = {
   gone: new Set<string>(),
   /** Run as each listing is read, before it is answered. */
   onList: null as (() => void) | null,
-  hang: false
+  hang: false,
+  /** How many of an ending session's requests are answered: past that, it answers nothing more until it is killed. */
+  answers: Infinity
 }
 
 export function resetProbe(): void {
@@ -28,6 +30,7 @@ export function resetProbe(): void {
   probe.gone.clear()
   probe.onList = null
   probe.hang = false
+  probe.answers = Infinity
 }
 
 /** The ending session's `end` requests, each as its targets (`pid:started`). */
@@ -63,7 +66,7 @@ export function mocked<T extends object>(real: T): T {
         stdin.write = (s: string) => {
           const request = s.trim()
           probe.requests.push(request)
-          if (probe.hang) return
+          if (probe.hang || probe.requests.length > probe.answers) return
           let answer: string[] = []
           if (request === 'list') answer = nextListing().split('\n')
           else if (request.startsWith('end '))

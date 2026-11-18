@@ -53,7 +53,7 @@ export interface GitOutcome {
   held?: boolean
   /** Ended at its time limit, but its Git Bash programs couldn't be looked for, and why (HI-3047): its process tree alone was ended. */
   msysIncomplete?: string
-  /** Ended at its time limit, but what its processes started after the listing may be left running, and why (HI-3358). */
+  /** Ended at its time limit, but some of what it started may be left running, and why (HI-3358). */
   lateLeft?: string
 }
 
