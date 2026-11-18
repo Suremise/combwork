@@ -86,6 +86,7 @@ describe("the merge queue's candidate through the integration port", () => {
     // window never reach jj's advance, only the adapter's optional ports (HI-2840's decision: no jj in the app's code).
     expect(files.filter((f) => importsOf(f).includes('src/main/platform/jjAdvance')).filter((f) => !f.startsWith('src/main/platform/'))).toEqual([])
     expect(files.filter((f) => importsOf(f).includes('src/main/platform/jjAdvance'))).toEqual(['src/main/platform/jjPlatform.ts'])
-    expect(importsOf('src/main/platform/jjAdvance.ts').sort()).toEqual(['src/main/platform/jjRunner', 'src/main/platform/repoContext'])
+    // HI-3374: and retryBounds (no imports of its own: its rename's retry bound).
+    expect(importsOf('src/main/platform/jjAdvance.ts').sort()).toEqual(['src/main/platform/jjRunner', 'src/main/platform/repoContext', 'src/main/retryBounds'])
   })
 })

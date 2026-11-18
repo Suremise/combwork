@@ -9,6 +9,7 @@ import { HISTORY_TEXT, OpencodeConversationParser, buildMirror, forkCopies, inco
 import { Failed, HistoryCore, dbFiles, markPath, mirrorPath, plainLocalGet, statePath, type CoreDeps, type CoreEvent } from '../src/main/providers/opencode/historyCore'
 import { OpencodeHistory, SHUTDOWN_MS, historyWorkerForTests } from '../src/main/providers/opencode/history'
 import { TREE_END_MS } from '../src/main/processTree'
+import { RENAME_RETRY, triesWithin } from '../src/main/retryBounds'
 import { serverInfoPath } from '../src/main/providers/opencode/launcher'
 import { englishText } from '../src/shared/advanced'
 import type { TranscriptItem } from '../src/shared/types'
@@ -1389,7 +1390,8 @@ describe("a mirror's publication while a reader has it open (HI-2778)", () => {
     await ask(core, { type: 'refresh', runId: 'run1', force: true })
     await ask(core, { type: 'idle' })
     expect(mirrorState(readFileSync(mirrorPath(home, srv.info.id), 'utf8')).header).toMatchObject({ state: 'complete', source: 'api' })
-    expect(pauses).toEqual([10, 20])
+    // HI-3374: RENAME_RETRY's waits (15 ms, growing by 10).
+    expect(pauses).toEqual([15, 25])
     expect(events.some((e) => e.event === 'published')).toBe(true)
     expect(events.some((e) => e.event === 'log' && /published at try 3/.test(e.text))).toBe(true)
     expect(readdirSync(join(home, 'combwork-sessions')).filter((f) => f.endsWith('.tmp'))).toEqual([])
@@ -1437,8 +1439,8 @@ describe("a mirror's publication while a reader has it open (HI-2778)", () => {
     writeFileSync(good, JSON.stringify({ info: { ...SHELL.info, id: sid }, messages: SHELL.messages }))
     await ask(core, { type: 'export', home, sessionId: sid, reason: 'repair', command: { file: process.execPath, args: ['-e', `process.stdout.write(require('fs').readFileSync(${JSON.stringify(good)}))`], env: childEnv() } })
     await ask(core, { type: 'idle' })
-    // The publish's five tries, then the notice's five.
-    expect(tries).toBe(10)
+    // The publish's tries, then the notice's, each as many as RENAME_RETRY's bound allows (HI-3374).
+    expect(tries).toBe(2 * triesWithin(RENAME_RETRY))
     expect(readFileSync(mirrorPath(home, sid), 'utf8')).toBe(placeholderMirror())
     expect(JSON.parse(readFileSync(statePath(home, sid), 'utf8'))).toMatchObject({ attempts: 1 })
     expect(events.some((e) => e.event === 'log' && /notice couldn't be written/.test(e.text))).toBe(true)
