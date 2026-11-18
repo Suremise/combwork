@@ -534,7 +534,8 @@ async function screenNow(inv, key) {
  */
 async function typeThenEnter(inv, key, text, ms = timing('hang.ui')) {
   await inv('pty:write', key, text)
-  const drawn = !!(await until(async () => drawnCount(inputOf(await screenNow(inv, key)), text) > 0, ms))
+  // Claude Code's box marks its input with `❯` and a no-break space (2.1.312, as the fake draws it): read as a space.
+  const drawn = !!(await until(async () => drawnCount(inputOf((await screenNow(inv, key)).replace(/ /g, ' ')), text) > 0, ms))
   if (!drawn) console.log(`INFO typeThenEnter: ${JSON.stringify(text.slice(0, 40))} not drawn on its input line within ${ms / 1000} s: Enter anyway`)
   await inv('pty:write', key, '\r')
   return drawn

@@ -143,9 +143,15 @@ const LIGHT = { color: '#f3f3f3', dim: '#868686', dim2: '#4a4a4a' }
   }
   /** The window's inside as the page sees it (CSS pixels: a zoom changes it too). */
   const view = () => page.evaluate(() => [innerWidth, innerHeight])
-  /** Waits until the page has seen a resize from `before` (a zoom too), and the card has settled after it. */
-  const resizedFrom = async (before) => {
-    await until(async () => JSON.stringify(await view()) !== JSON.stringify(before), HUNG_MS)
+  /**
+   * Waits until the page has had a change of the window (a resize, a maximise, a zoom) and the card has settled after it.
+   * The page's size doesn't always change (lib.fitWindow fixes Playwright's viewport, which a maximise or a zoom then
+   * leaves as it is): main's message about the window has reached the page by the time a call made after it answers
+   * (one channel, in order), then a frame is drawn, then the window's size and the card read the same twice.
+   */
+  const settled = async () => {
+    await inv('app:info')
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r())))
     await steady(async () => [await view(), await box(header)])
   }
 
@@ -220,9 +226,8 @@ const LIGHT = { color: '#f3f3f3', dim: '#868686', dim2: '#4a4a4a' }
   const resizes = {
     'made smaller': async () => lib.fitWindow(app, page, { width: 900, height: 600 }),
     'maximised and restored smaller': async () => {
-      const v = await view()
       await maximise()
-      await until(async () => JSON.stringify(await view()) !== JSON.stringify(v), HUNG_MS)
+      await settled()
       await unmaximise()
       await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(900, 600))
     }
@@ -230,9 +235,8 @@ const LIGHT = { color: '#f3f3f3', dim: '#868686', dim2: '#4a4a4a' }
   for (const [what, resize] of Object.entries(resizes)) {
     await dragBy(3000, 3000)
     await dragBy(-60, -40, { release: false })
-    const was = await view()
     await resize()
-    await resizedFrom(was)
+    await settled()
     await page.keyboard.press('Escape')
     await page.mouse.up()
     // The drag over (put back, or ended by the resize), and the card and any question over it at rest.
@@ -249,19 +253,16 @@ const LIGHT = { color: '#f3f3f3', dim: '#868686', dim2: '#4a4a4a' }
     const xNow = await box(close)
     const v = await page.evaluate(() => ({ w: innerWidth, h: innerHeight }))
     check(`${what} during a drag, then Escape: its × is in the window`, xNow.x + xNow.width <= v.w + 0.5 && xNow.y + xNow.height <= v.h + 0.5, JSON.stringify(xNow))
-    const small = await view()
     await lib.fitWindow(app, page, { width: 1400, height: 860 })
-    await resizedFrom(small)
+    await settled()
   }
 
   // Maximised and restored: still in the window, the buttons still dimmed.
-  let v = await view()
   await maximise()
-  await resizedFrom(v)
+  await settled()
   check('maximised: the header in the window, the buttons dimmed', (await inWindow()) && (await buttons()) === DARK.dim)
-  v = await view()
   await unmaximise()
-  await resizedFrom(v)
+  await settled()
   check('restored: the same', (await inWindow()) && (await buttons()) === DARK.dim)
 
   // A theme change while it is open: the new theme's colours, dimmed.
@@ -283,18 +284,16 @@ const LIGHT = { color: '#f3f3f3', dim: '#868686', dim2: '#4a4a4a' }
   check('reopened in the usual place', Math.abs(again.x - start.x) <= 1 && Math.abs(again.y - start.y) <= 1, `${start.x},${start.y} vs ${again.x},${again.y}`)
 
   // Display scaling (UI zoom 150%): it still follows the pointer and stays in the window.
-  v = await view()
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1.5))
-  await resizedFrom(v)
+  await settled()
   const z0 = await box()
   await dragBy(-80, 60)
   const z1 = await box()
   check('at 150%: the card follows the pointer', Math.abs(z1.x - z0.x + 80) <= 2 && Math.abs(z1.y - z0.y - 60) <= 2, `${z0.x},${z0.y} → ${z1.x},${z1.y}`)
   await dragBy(3000, 3000)
   check('at 150%: and stays in the window', await inWindow(), JSON.stringify(await box(header)))
-  v = await view()
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1))
-  await resizedFrom(v)
+  await settled()
 
   // A new card is movable too.
   await page.keyboard.press('Escape')
