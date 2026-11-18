@@ -19,7 +19,10 @@ export const probe = {
   onList: null as (() => void) | null,
   hang: false,
   /** How many of an ending session's requests are answered: past that, it answers nothing more until it is killed. */
-  answers: Infinity
+  answers: Infinity,
+  /** HI-3376: how long (ms, fake or real time) the first listing run, and each session request by its index, takes to answer. */
+  listDelayMs: 0,
+  delays: [] as number[]
 }
 
 export function resetProbe(): void {
@@ -31,6 +34,8 @@ export function resetProbe(): void {
   probe.onList = null
   probe.hang = false
   probe.answers = Infinity
+  probe.listDelayMs = 0
+  probe.delays = []
 }
 
 /** The ending session's `end` requests, each as its targets (`pid:started`). */
@@ -71,14 +76,21 @@ export function mocked<T extends object>(real: T): T {
           if (request === 'list') answer = nextListing().split('\n')
           else if (request.startsWith('end '))
             for (const t of request.slice(4).split(',')) if (!probe.gone.has(t)) answer.push(`held ${t}`, `ended ${t.split(':')[0]}`)
-          queueMicrotask(() => c.stdout.emit('data', Buffer.from([...answer, 'ok', ''].join('\r\n'))))
+          const say = (): void => void (closed || c.stdout.emit('data', Buffer.from([...answer, 'ok', ''].join('\r\n'))))
+          const delay = probe.delays[probe.requests.length - 1] ?? 0
+          if (delay) setTimeout(say, delay)
+          else queueMicrotask(say)
         }
         c.stdin = stdin
-      } else if (!probe.hang)
-        queueMicrotask(() => {
+      } else if (!probe.hang) {
+        const say = (): void => {
+          if (closed) return
           c.stdout.emit('data', Buffer.from(cmd.includes('Get-CimInstance') ? nextListing() : ''))
           close()
-        })
+        }
+        if (probe.listDelayMs) setTimeout(say, probe.listDelayMs)
+        else queueMicrotask(say)
+      }
       return c
     }
   } as T

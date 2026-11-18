@@ -330,9 +330,11 @@ const howLong = (ms: number): string => (ms < 120_000 ? `${Math.round(ms / 1000)
 const SIZE_REFRESH_DELAY_MS = 500
 /** How many running agents "Switch Now" switches at once (applyModeSettings): the rest wait for one to end. */
 const MODE_SWITCHES_AT_ONCE = 6
+/** HI-3376: the least a restart in a new mode waits for the old run's exit (it ends as soon as the run exits). */
+export const MODE_RESTART_STOP_MS = 30_000
 
-/** After a kill, how long a CLI's console takes to be gone (its processes listed and ended, then its exit). */
-const KILL_EXIT_MS = 1000
+/** After a kill, how long a CLI's console takes to be gone (its processes listed and ended, then its exit). HI-3376: 5 s, a listing on a busy machine taking seconds itself. */
+export const KILL_EXIT_MS = 5000
 
 /** The most a start waits for its agent's ended runs' slot writers to be released (HI-1867): a bound for a hung one. */
 const WRITER_SETTLE_MS = 15_000
@@ -5215,7 +5217,7 @@ class SessionManager {
     // fixed 8 s a slow CLI outlasts (HI-1869). Exited, its slot's writer release is under way, and the start below waits
     // for it (placeFor's earlierWritersSettled, HI-1867), refused only if its processes are kept or not known to end.
     let timer: NodeJS.Timeout | undefined
-    await Promise.race([exited, new Promise((r) => (timer = setTimeout(r, stopWaitMs(8000, [l.adapter.launch.exitKeys?.graceMs]))))])
+    await Promise.race([exited, new Promise((r) => (timer = setTimeout(r, stopWaitMs(MODE_RESTART_STOP_MS, [l.adapter.launch.exitKeys?.graceMs]))))])
     clearTimeout(timer)
     // Still running: said so, rather than the start's "already running" (its old run keeps its slot meanwhile).
     if (this.live.get(id)?.state.runId === l.state.runId) throw combworkError(msg({ id: 'session.restartMode.didntStop', defaultMessage: "{agent} didn't stop in time, so it wasn't restarted in the new mode. Try again once it has stopped.", description: "Switching a running agent's permission mode (it restarts in the new mode) is refused: the agent ({agent}, its name) was told to stop but hadn't ended yet, so nothing was started." }), { agent: l.state.agentName ?? agentId }, { kind: 'conflict' })

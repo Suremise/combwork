@@ -13,8 +13,8 @@
 import { clearJournal, journalOf, sealJournal } from './workflow/queueJobs'
 import { treeOf, type Listed, type ProcessProbe } from './workflow/queueProcs'
 
-/** How long a settle waits for the processes it ended to be gone. */
-const END_WAIT_MS = 15_000
+/** How long a settle waits for the processes it ended to be gone (HI-3376: each look is a listing that takes seconds on a busy machine). */
+export const END_WAIT_MS = 60_000
 
 export interface JobSettling {
   /** Ends the job by its name and waits for it to be empty: true once it is (or it is gone). */

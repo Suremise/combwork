@@ -1,15 +1,16 @@
 // Codex waiting to retry its model request (HI-1972): Codex 0.164.0 shows only "Working" for minutes after a 429, and
 // its only record of the wait is a row of its log database. Here: the default pattern reads the recorded rows, nonsense
 // numbers are refused, the worker's read finds the newest row of a thread (and says why when it can't), and the reads
-// main waits on are bounded (a deadline, a cap on those under way, a worker started again after two missed deadlines).
+// main waits on are bounded (a deadline, a cap on those under way, a worker started again only once it answers nothing
+// for a while: HI-3376).
 import { readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { DatabaseSync } from 'node:sqlite'
 import { build } from 'esbuild'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { ADVANCED_DEFS } from '../src/shared/advanced'
 import { handleRequest, type LogAnswer, type LogRequest } from '../src/main/providers/codex/threads/logWorker'
-import { DEADLINE_MS, MAX_PENDING, codexRetryWait, parseRetry, pendingReads, useCodexLogTransport } from '../src/main/providers/codex/retryLog'
+import { DEADLINE_MS, MAX_OUTSTANDING, MAX_PENDING, codexRetryWait, logLimits, logWorkerRestarts, parseRetry, pendingReads, useCodexLogTransport } from '../src/main/providers/codex/retryLog'
 import { tempDir } from './tempDir'
 
 const tmp = tempDir('cw-codex-retry-log-')
@@ -128,13 +129,97 @@ describe("Codex's log's worker (HI-1972)", () => {
 })
 
 describe("the reads main waits on (HI-1972)", () => {
-  it('a read that never answers is none after the deadline, and the session can look again', async () => {
+  afterEach(() => void vi.useRealTimers())
+  const read = () => codexRetryWait({ sessionId: THREAD, env: { CODEX_HOME: tmp }, since: 0 })
+
+  it('a read that never answers is none after the deadline (15 s, HI-3376), and the session can look again; the worker is started again only after it answered nothing for unresponsiveMs', async () => {
+    expect(DEADLINE_MS).toBe(15_000)
+    vi.useFakeTimers()
     await useCodexLogTransport(() => new Promise<LogAnswer>(() => undefined))
-    const started = Date.now()
-    expect(await codexRetryWait({ sessionId: THREAD, env: { CODEX_HOME: tmp }, since: 0 })).toBeNull()
-    expect(Date.now() - started).toBeGreaterThanOrEqual(DEADLINE_MS - 50)
+    const restarts = logWorkerRestarts()
+    let got: unknown = 'pending'
+    void read().then((w) => (got = w))
+    await vi.advanceTimersByTimeAsync(logLimits.deadlineMs - 1)
+    expect(got).toBe('pending')
+    await vi.advanceTimersByTimeAsync(1)
+    expect(got).toBeNull()
     expect(pendingReads()).toBe(0)
-  }, 20_000)
+    // Past the caller's deadline, not a fault yet.
+    expect(logWorkerRestarts()).toBe(restarts)
+    await vi.advanceTimersByTimeAsync(logLimits.unresponsiveMs - logLimits.deadlineMs)
+    expect(logWorkerRestarts()).toBe(restarts + 1)
+  })
+
+  it('HI-3376: replies that come late (past the callers\' deadline) keep a slow worker going: never started again', async () => {
+    vi.useFakeTimers()
+    const late = logLimits.deadlineMs + 5000
+    await useCodexLogTransport(() => new Promise<LogAnswer>((resolve) => setTimeout(() => resolve({ row: null }), late)))
+    const restarts = logWorkerRestarts()
+    // A read every 10 s for three minutes, each answered 20 s after it was sent.
+    for (let t = 0; t < 180_000; t += 10_000) {
+      void read()
+      await vi.advanceTimersByTimeAsync(10_000)
+    }
+    await vi.advanceTimersByTimeAsync(late)
+    expect(logWorkerRestarts()).toBe(restarts)
+  })
+
+  it('HI-3376: reads still being sent to a worker that answers none of them don\'t keep it going: started again unresponsiveMs after the oldest', async () => {
+    vi.useFakeTimers()
+    await useCodexLogTransport(() => new Promise<LogAnswer>(() => undefined))
+    const restarts = logWorkerRestarts()
+    for (let t = 0; t < logLimits.unresponsiveMs - 5000; t += 5000) {
+      void read()
+      await vi.advanceTimersByTimeAsync(5000)
+    }
+    expect(logWorkerRestarts()).toBe(restarts)
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(logWorkerRestarts()).toBe(restarts + 1)
+    // Nothing outstanding after it: no watchdog while idle.
+    await vi.advanceTimersByTimeAsync(10 * logLimits.unresponsiveMs)
+    expect(logWorkerRestarts()).toBe(restarts + 1)
+  })
+
+  it("HI-3376: a reply from the worker before it was started again counts for nothing: the new one's own silence still starts it again", async () => {
+    vi.useFakeTimers()
+    const held: ((a: LogAnswer) => void)[] = []
+    let answering = true
+    await useCodexLogTransport(() => new Promise<LogAnswer>((resolve) => (answering ? held.push(resolve) : undefined)))
+    const restarts = logWorkerRestarts()
+    void read()
+    await vi.advanceTimersByTimeAsync(logLimits.unresponsiveMs)
+    expect(logWorkerRestarts()).toBe(restarts + 1)
+    // The new generation's read is never answered; the old one's reply comes half way.
+    answering = false
+    void read()
+    await vi.advanceTimersByTimeAsync(logLimits.unresponsiveMs / 2)
+    held[0]({ row: null })
+    await vi.advanceTimersByTimeAsync(logLimits.unresponsiveMs / 2)
+    expect(logWorkerRestarts()).toBe(restarts + 2)
+  })
+
+  it('HI-3376: what was sent and is unanswered is bounded apart from the callers: past MAX_OUTSTANDING, a read is none at once', async () => {
+    vi.useFakeTimers()
+    const limits = { ...logLimits }
+    // The watchdog out of the way: the worker isn't started again while the reads pile up.
+    logLimits.unresponsiveMs = 60 * 60_000
+    try {
+      await useCodexLogTransport(() => new Promise<LogAnswer>(() => undefined))
+      // Each batch of callers gives up at its deadline, its reads still outstanding.
+      for (let sent = 0; sent < MAX_OUTSTANDING; sent += MAX_PENDING) {
+        for (let i = 0; i < MAX_PENDING; i++) void read()
+        await vi.advanceTimersByTimeAsync(logLimits.deadlineMs)
+      }
+      expect(pendingReads()).toBe(0)
+      let got: unknown = 'pending'
+      void read().then((w) => (got = w))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(got).toBeNull()
+      expect(pendingReads()).toBe(0)
+    } finally {
+      Object.assign(logLimits, limits)
+    }
+  })
 
   it('at most MAX_PENDING reads are under way: one more is none at once, not queued', async () => {
     const held: ((a: LogAnswer) => void)[] = []
@@ -169,18 +254,26 @@ describe("Codex's log's worker as a thread (HI-1972)", () => {
   }, 60_000)
   afterAll(() => useCodexLogTransport(null))
 
-  it('a worker that misses its deadline twice is ended, and the next read starts another', async () => {
-    // A worker that never answers, and says each time it starts.
-    const started = join(tmp, 'started.txt')
-    const stuck = join(tmp, 'stuck-worker.cjs')
-    writeFileSync(stuck, `require('fs').appendFileSync(${JSON.stringify(started)}, 'x'); require('worker_threads').parentPort.on('message', () => {})`)
-    await useCodexLogTransport(null, stuck)
-    const read = () => codexRetryWait({ sessionId: THREAD, env: { CODEX_HOME: tmp }, since: 0 })
-    expect(await read()).toBeNull()
-    expect(await read()).toBeNull()
-    expect(pendingReads()).toBe(0)
-    expect(await read()).toBeNull()
-    expect(readFileSync(started, 'utf8')).toBe('xx')
+  it('a worker that answers nothing for unresponsiveMs is ended, and the next read starts another (HI-3376)', async () => {
+    const limits = { ...logLimits }
+    // Short bounds, so the real worker thread is followed in real time.
+    Object.assign(logLimits, { deadlineMs: 200, unresponsiveMs: 600 })
+    try {
+      // A worker that never answers, and says each time it starts.
+      const started = join(tmp, 'started.txt')
+      const stuck = join(tmp, 'stuck-worker.cjs')
+      writeFileSync(stuck, `require('fs').appendFileSync(${JSON.stringify(started)}, 'x'); require('worker_threads').parentPort.on('message', () => {})`)
+      await useCodexLogTransport(null, stuck)
+      const restarts = logWorkerRestarts()
+      const read = () => codexRetryWait({ sessionId: THREAD, env: { CODEX_HOME: tmp }, since: 0 })
+      expect(await read()).toBeNull()
+      expect(pendingReads()).toBe(0)
+      await vi.waitFor(() => expect(logWorkerRestarts()).toBe(restarts + 1), { timeout: 10_000 })
+      expect(await read()).toBeNull()
+      expect(readFileSync(started, 'utf8')).toBe('xx')
+    } finally {
+      Object.assign(logLimits, limits)
+    }
   }, 30_000)
 
   it('reads in its own thread, and a worker that ended is started again by the next read', async () => {

@@ -19,8 +19,8 @@ export const MIGRATED_QUIT = msg({ id: 'commands.migrated.quit', defaultMessage:
 export const CONTROL_MS = 250
 /** Combwork touches a list's `observer` file this often while it watches its run. */
 export const OBSERVE_MS = 5000
-/** An `observer` older than this: nobody watches, and a failure waiting for a choice is settled as unattended. */
-export const OBSERVER_STALE_MS = 30_000
+/** An `observer` older than this: nobody watches, and a failure waiting for a choice is settled as unattended (HI-3376: 2 minutes, for a busy machine's late touches). */
+export const OBSERVER_STALE_MS = 2 * 60_000
 
 export const MAX_NAME = 100
 export const MAX_COMMAND = 4000
