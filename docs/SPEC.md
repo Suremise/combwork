@@ -7652,11 +7652,13 @@ workspace and project levels, none by default) are patterns a merge may not add.
   head its lines were read from.
 - **Authority:** a result counts only for the merged result or candidate it checked, its base, and the guards it was
   checked with (their key: the list as it applies, in order). The queue reads the guards again just before the advance and
-  in the advance's own write: changed since (while queued, while the check ran, or before an approved advance after a
-  restart), the entry is tested again, never advanced on the old green; and a red result is acted on only under the guards
-  it was checked with, read again in the return's own write: changed meanwhile, the entry is tested again under the guards
-  now, never returned for a guard removed or relaxed. A check's worker ends with the queue's (a lease lost, Combwork
-  closing). The queue keeps a result's key only while its entry is open. jj's checks key takes the guards' key, so a change
+  in the advance's own write: changed since (while queued, while the check ran, or while it waited for an approval), the
+  entry is tested again, never advanced on the old green; and a red result is acted on only under the guards it was
+  checked with, read again in the return's own write: changed meanwhile, the entry is tested again under the guards now,
+  never returned for a guard removed or relaxed. A check's worker ends with the queue's (a lease lost, Combwork closing).
+  The key a result was checked with is read from the card's record of the check (the entry's last `merge guards` run on
+  that result, passed and counted), never kept in memory (HI-3363): an Approve under Ask each time, taken by a later run
+  of the queue or after a restart, advances the test merge it approved. jj's checks key takes the guards' key, so a change
   makes the candidate's checks, and the consent bound to that key, stale: they run again before anything is offered or
   integrated.
 - **At submit:** `cw_submit` matches what the revision adds since its base and, on a match, adds a warning to its reply.
