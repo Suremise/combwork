@@ -434,6 +434,13 @@ export function App() {
       handleEvent(e)
       early.note(e)
     })
+    // The window's state from the start (HI-3404): main sends it only when it changes, so the store starts unfocused and
+    // asks. The answer is applied as it comes: a window-state event handled before it was sent before it, and one sent
+    // after it is handled after it. Asked before the workspace loads; one restored on top (its workspace was left
+    // pinned) shows its pin lit.
+    void call('window:state').then((st) => {
+      if (early.active()) set({ maximized: st.maximized, windowFocused: st.focused, alwaysOnTop: st.alwaysOnTop })
+    }).catch(() => undefined)
     void (async () => {
       const [s, ui, snap, recent, ag, api, info, live] = await Promise.all([
         call('settings:get'),
@@ -451,12 +458,6 @@ export function App() {
       set({ settings: s, sidebarWidth: ui.sidebarWidth, sidebarVisible: ui.sidebarVisible, sidebarCompact: !!ui.sidebarCompact, panes: ui.panes ?? {}, skillsProvider: ui.skillsProvider ?? {}, skillsFold: ui.skillsFold ?? {}, sessionsTree: ui.sessionsTree ?? {}, combworkVcsNotice: ui.combworkVcsNotice ?? {}, assistantFold: ui.assistantFold ?? {}, boardFold: ui.boardFold ?? {}, progressFilter: ui.progressFilter ?? {}, tabs: ui.tabs ?? {}, laneOrder: ui.laneOrder ?? {}, tips: tipsState(ui.tips), workspace: ws, recent, providers: ag, api, appInfo: info })
       early.settle()
       set({ assistantOpen: assistantWasOpen(ws?.path) })
-      // The window's state from the start (HI-3404): main sends it only when it changes, so a window opened without the
-      // focus would think it had it (and run its pop-ups' clocks) until first focused or blurred, and one restored on top
-      // (its workspace was left pinned) shows its pin lit.
-      void call('window:state').then((st) => {
-        if (early.active()) set({ maximized: st.maximized, windowFocused: st.focused, alwaysOnTop: st.alwaysOnTop })
-      }).catch(() => undefined)
       if (ws) set({ selectedProject: (ws.projects.find((p) => p.active) ?? ws.projects[0])?.path ?? null })
       for (const l of live) applyLiveState(l)
       void loadLeftovers()

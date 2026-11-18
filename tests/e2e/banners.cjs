@@ -273,6 +273,36 @@ const check = (name, ok, extra = '') => {
   check('in the background: a Windows notification, no pop-up', !!(await lib.until(() => osNotes().length > before, lib.timing('hang.ui'))) && (await banners().count()) === 0, JSON.stringify(osNotes()))
   await inv('settings:update', { notifications: { bannerScope: 'all' } })
 
+  // --- Before the window knows its focus (HI-3404, HR1's round 1): reloaded unfocused with its answer to window:state held
+  // in main (CW_TEST_HOLD_IPC), the page has its workspace and live agents but counts as unfocused, so an unseen agent on
+  // screen stays unseen and a pop-up holds its clock; once the answer comes (unfocused) nothing changes, and once the
+  // window is focused both go on as ever.
+  await showProject('alpha')
+  await send(alpha, one, 'go work 1')
+  await turnEnds(alpha, one)
+  check('in the background, an agent finishing on screen is unseen', !!(await lib.until(async () => (await live(alpha, one))?.unseen === true, lib.timing('hang.ui'))), JSON.stringify(await live(alpha, one)))
+  const answered = () => app.evaluate(() => globalThis.__cwSettledIpc?.['window:state'] ?? 0)
+  const answeredBefore = await answered()
+  await app.evaluate(() => { process.env.CW_TEST_HOLD_IPC = 'window:state' })
+  await page.reload()
+  await lib.appReady(page)
+  check('reloaded, its window:state answer is held', !!(await lib.until(() => app.evaluate(() => (globalThis.__cwHeldIpc?.['window:state'] ?? 0) === 1), lib.timing('hang.ui'))))
+  await showProject('alpha')
+  await lib.until(async () => (await lib.paneHeader(page, 'One').count()) === 1, lib.timing('hang.ui'))
+  const pending = { ...early, id: 'unfocused-2', title: 'Before the answer', timestamp: new Date().toISOString() }
+  await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'toast', toast: pending })
+  await lib.until(async () => (await banners().count()) === 1, lib.timing('hang.ui'))
+  await lib.sleep(lib.timing('quiet.bannerStaysMs')) // The window is the point: past a banner's 2 s, with the page's workspace loaded, nothing is marked seen or closed.
+  check('…while held: the agent on screen stays unseen', (await live(alpha, one))?.unseen === true, JSON.stringify(await live(alpha, one)))
+  check('…and the pop-up stays past its seconds', (await banners().count()) === 1, JSON.stringify(await bannerTitles()))
+  await app.evaluate(() => { delete process.env.CW_TEST_HOLD_IPC })
+  check('the answer comes (unfocused)', !!(await lib.until(async () => (await answered()) > answeredBefore, lib.timing('hang.ui'))))
+  await lib.sleep(lib.timing('quiet.bannerStaysMs')) // The window is the point: past a banner's 2 s, an unfocused answer changes nothing.
+  check('…and changes nothing: still unseen, the pop-up still there', (await live(alpha, one))?.unseen === true && (await banners().count()) === 1)
+  await setFocus(true)
+  check('focused: the agent on screen is seen', !!(await lib.until(async () => (await live(alpha, one))?.unseen !== true, lib.timing('hang.ui'))), JSON.stringify(await live(alpha, one)))
+  check('…and the pop-up closes after its seconds', !!(await lib.until(async () => (await banners().count()) === 0, lib.timing('hang.ui'))))
+
   for (const [p, a] of [[alpha, one], [beta, two]]) await inv('session:stop', p, a.id).catch(() => undefined)
   await lib.until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))
   await app.close()
