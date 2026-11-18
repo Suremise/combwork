@@ -324,7 +324,7 @@ function endSession(timeoutMs: number): EndSession {
 }
 
 /** The request that ends `targets` (END_SESSION_PS's `end`). */
-const endRequest = (targets: ListedProcess[]): string => `end ${targets.map((t) => `${t.pid}:${t.started}`).join(',')}`
+const endRequest = (targets: ListedProcess[]): string => `end ${targets.map((t) => `${t.pid}:${t.started}`).join(',')}` // i18n-ignore: a request to PowerShell
 
 /** Of `targets`, those an `end` answer says it holds (`held <pid>:<started>`). */
 const heldOf = (answer: string[], targets: ListedProcess[]): ListedProcess[] => targets.filter((t) => answer.includes(`held ${t.pid}:${t.started}`))
