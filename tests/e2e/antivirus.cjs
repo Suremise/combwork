@@ -38,6 +38,13 @@ const probe = (over = {}) => ({
 const setFixture = (f) => fs.writeFileSync(fixture, JSON.stringify(f))
 const calls = () => (fs.existsSync(callLog) ? fs.readFileSync(callLog, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
 const changes = (kind) => calls().filter((c) => c.call !== 'probe' && (!kind || c.call === kind))
+const probesStarted = () => calls().filter((c) => c.call === 'probe').length
+/** Check Again, answered: its button is disabled while it checks (and gone when there's nothing to check). */
+const checkedAgain = async (panel) => {
+  const button = panel.getByRole('button', { name: 'Check Again' })
+  await button.click()
+  await lib.until(async () => !(await button.isDisabled({ timeout: lib.timing('poll.readMs') }).catch(() => false)), lib.timing('hang.ui'))
+}
 
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -106,8 +113,7 @@ const check = (name, ok, extra = '') => {
   fs.rmSync(trees, { recursive: true, force: true })
 
   // Add: exactly the folders shown; the elevated script asks only for those the user hadn't excluded.
-  await panel.getByRole('button', { name: 'Check Again' }).click()
-  await lib.sleep(300)
+  await checkedAgain(panel)
   const adds = changes('add').length
   await add()
   await dialog.locator('.btn.primary').click()
@@ -138,10 +144,7 @@ const check = (name, ok, extra = '') => {
   check('a policy keeping local exclusions from applying: said, not counted as added', !!(await lib.until(async () => /organisation/.test(await panel.innerText()), lib.timing('hang.ui'))) && !(await inv('antivirus:status', false)).paths.some((p) => p.addedByCombwork), await panel.innerText())
 
   // Another antivirus, ReFS and a Dev Drive, not Windows.
-  const checkAgain = async () => {
-    await panel.getByRole('button', { name: 'Check Again' }).click()
-    await lib.sleep(400)
-  }
+  const checkAgain = () => checkedAgain(panel)
   setFixture({ probe: probe({ defender: { antivirus: true, realTime: true, mode: 'Passive Mode' }, products: [{ name: 'Windows Defender', state: 393472 }, { name: 'Norton Security', state: 266240 }] }) })
   await checkAgain()
   check('another antivirus: named, and nothing offered', !!(await lib.until(async () => /Another antivirus is active \(Norton Security\)/.test(await panel.innerText()), lib.timing('hang.ui'))) && (await panel.getByRole('button', { name: 'Add Exclusions…' }).count()) === 0)
@@ -160,8 +163,10 @@ const check = (name, ok, extra = '') => {
   // Overlapping probes: one started before the worktrees folder appeared doesn't answer a request made after it, and
   // finishing later doesn't replace the newer answer.
   setFixture({ probe: probe(), elevated: {}, probeDelayMs: 2500 })
+  const probesBefore = probesStarted()
   const slow = inv('antivirus:status', true)
-  await lib.sleep(400) // A fixed wait on purpose: the slow probe must be under way before the folder appears.
+  // The slow probe under way (logged as it starts) before the folder appears.
+  await lib.until(() => probesStarted() > probesBefore, lib.timing('hang.ui'))
   fs.mkdirSync(trees, { recursive: true })
   setFixture({ probe: probe(), elevated: {} })
   const hasTrees = (st) => st.paths.some((p) => p.kind === 'worktrees')
@@ -200,7 +205,7 @@ const check = (name, ok, extra = '') => {
   await startBoth()
   check('two agents running: the suggestion, once', !!(await lib.until(async () => (await toast.count()) === 1, lib.timing('hang.ui'))))
   await shot('suggestion-dark')
-  await lib.sleep(1500) // A fixed wait on purpose: checks that no second suggestion comes.
+  await lib.sleep(lib.timing('quiet.avSuggestionMs')) // The window is the point: no second suggestion comes within it.
   check('…not twice', (await toast.count()) === 1)
   check('…and not again for the same folders', (await inv('antivirus:suggestion')).offer === null)
   await closeToast()
@@ -240,7 +245,7 @@ const check = (name, ok, extra = '') => {
   // (#561: under load they used up a fixed 12 s). Once both are back, it is fixed at that long after they came back.
   const lastOffered = () => { try { return JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).antivirus?.offered?.[ws.toLowerCase()] ?? null } catch { return null } }
   // How long config.json may take to be saved with the reminder's offer (it is written a moment after a change).
-  const OFFER_SAVED_MS = 10000
+  const OFFER_SAVED_MS = lib.timing('hang.ui')
   const lastOffer = await lib.until(() => (lastOffered()?.count ?? 0) >= 2 && lastOffered(), OFFER_SAVED_MS)
   check('the reminder is remembered (offered.lastAt)', !!lastOffer, JSON.stringify(lastOffered()))
   const DUE_AFTER_BACK_MS = REMIND
@@ -256,7 +261,7 @@ const check = (name, ok, extra = '') => {
         return fs.renameSync(tmp, fixture)
       } catch (e) {
         if (i >= 50) throw e
-        await lib.sleep(20)
+        await lib.sleep(lib.timing('pace.renameAgainMs'))
       }
     }
   }
@@ -264,7 +269,7 @@ const check = (name, ok, extra = '') => {
   const armer = (async () => {
     while (arming.on) {
       await setFixtureWhole(dueFrom(Date.now()))
-      await lib.sleep(100)
+      await lib.sleep(lib.timing('pace.rearmMs'))
     }
   })()
   await stopBoth()
@@ -288,7 +293,7 @@ const check = (name, ok, extra = '') => {
   setFixture({ probe: probe({ exclusions: [tests] }), elevated: {} })
   await inv('antivirus:status', true)
   await startBoth()
-  await lib.sleep(2500) // A fixed wait on purpose: checks that no suggestion comes.
+  await lib.sleep(lib.timing('quiet.avSuggestionMs')) // The window is the point: no suggestion comes within it.
   check('after Don’t Ask Again: never again for this workspace', (await toast.count()) === 0 && (await inv('antivirus:suggestion')).offer === null)
   await stopBoth()
 
@@ -298,7 +303,7 @@ const check = (name, ok, extra = '') => {
   await inv('settings:update', { appearance: { theme: 'light' } })
   await lib.until(async () => (await page.locator('.antivirus').count()) === 1, lib.timing('hang.ui'))
   await page.locator('.antivirus').scrollIntoViewIfNeeded()
-  await lib.sleep(500)
+  await lib.settled(page)
   await shot('light')
   // The Add dialog in a narrow window: each folder still on its own line, a long one wrapping inside itself (#347).
   setFixture({ probe: probe(), elevated: {} })
@@ -307,7 +312,7 @@ const check = (name, ok, extra = '') => {
   const offered = (await inv('antivirus:prepare', 'add')).paths
   await add()
   await lib.fitWindow(app, page, { width: 560, height: 700 })
-  await lib.sleep(300)
+  await lib.settled(page)
   const narrow = await dialog.locator('.dialog-list li').evaluateAll((li) => li.map((l) => ({ text: l.textContent, top: l.getBoundingClientRect().top })))
   check('narrow window: still one folder per row, in order', narrow.length >= 2 && JSON.stringify(narrow.map((l) => l.text)) === JSON.stringify(offered) && narrow.every((l, i) => i === 0 || l.top > narrow[i - 1].top), JSON.stringify({ narrow, offered }))
   await shot('add-dialog-light-narrow')

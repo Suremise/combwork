@@ -1,13 +1,6 @@
 {
   "$comment": "HI-3378: the test files' waits and timeouts that still write numbers in place, by occurrence (each its kind and its line's text, whitespace folded): the backlog HI-3381 (unit) and HI-3382 (e2e, scenarios) migrate to names from tests/timing.json (scripts/timingLiterals.mjs). check:repo fails a literal no entry here covers (added, or changed), and an entry with no literal left; `node scripts/testWaits.mjs --literals --shrink` drops those, and never adds one. Never add an entry by hand.",
   "files": {
-    "tests/e2e/about.cjs": [
-      "sleep await page.keyboard.press('Escape'); await sleep(300)",
-      "sleep await page.keyboard.press('Escape'); await sleep(300)",
-      "sleep await sleep(300)",
-      "sleep for (let i = 0; i < 50 && !/### Log/.test(shown); i++) { await sleep(200); shown = await preview.innerText().catch(() => '') }",
-      "timeout const pageText = () => page.locator('.scroll-page').innerText({ timeout: 1000 }).catch(() => '')"
-    ],
     "tests/e2e/agentmessage.cjs": [
       "sleep await lib.sleep(2000) // A fixed wait on purpose: this checks that the cancelled message is NOT typed.",
       "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)"
@@ -45,21 +38,6 @@
       "sleep await lib.sleep(500)",
       "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)"
     ],
-    "tests/e2e/antigravityreal.cjs": [
-      "msConstant const TURN_MS = 180000"
-    ],
-    "tests/e2e/antivirus.cjs": [
-      "msConstant const OFFER_SAVED_MS = 10000",
-      "sleep await lib.sleep(100)",
-      "sleep await lib.sleep(1500) // A fixed wait on purpose: checks that no second suggestion comes.",
-      "sleep await lib.sleep(20)",
-      "sleep await lib.sleep(2500) // A fixed wait on purpose: checks that no suggestion comes.",
-      "sleep await lib.sleep(300)",
-      "sleep await lib.sleep(300)",
-      "sleep await lib.sleep(400)",
-      "sleep await lib.sleep(400) // A fixed wait on purpose: the slow probe must be under way before the folder appears.",
-      "sleep await lib.sleep(500)"
-    ],
     "tests/e2e/assistant-control.cjs": [
       "sleep await lib.sleep(300)",
       "sleep await lib.sleep(500)",
@@ -74,9 +52,6 @@
     "tests/e2e/assistantbatch.cjs": [
       "sleep await lib.sleep(4000) // on purpose: a lost context would show within xterm's 3 s wait for it to come back",
       "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)"
-    ],
-    "tests/e2e/assistantcodex.cjs": [
-      "msConstant const LAUNCH_MS = 90000"
     ],
     "tests/e2e/assistantcompact.cjs": [
       "sleep await lib.sleep(300) // on purpose: the fake reads a typed line before its Enter, as a CLI does"
@@ -106,35 +81,9 @@
       "sleep await lib.sleep(200)",
       "sleep await lib.sleep(300)"
     ],
-    "tests/e2e/attention.cjs": [
-      "sleep await lib.sleep(1200) // A fixed wait on purpose: the count must not rise past two, which no condition can show.",
-      "sleep await lib.sleep(1200) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.",
-      "sleep await lib.sleep(1200) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.",
-      "sleep await lib.sleep(150)",
-      "sleep await lib.sleep(1600) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.",
-      "sleep await lib.sleep(1600) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(100)",
-      "timeout await mark.hover({ timeout: 500 }).catch(() => undefined)"
-    ],
     "tests/e2e/background.cjs": [
       "clockLoop check('a message rings its doorbell within seconds while the task runs', left.status === 200 && !!heard && Date.now() - t1 < 15000 && during?.backgroundTasks === 1, JSON.stringify({ left: left.body, ms: Date.now() - t1, tasks: during?.backgroundTasks }))",
       "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)"
-    ],
-    "tests/e2e/banners.cjs": [
-      "sleep await lib.sleep(100)",
-      "sleep await lib.sleep(3500) // A fixed wait on purpose: longer than the 2 s a finished banner stays, to show a waiting one does NOT close.",
-      "sleep await lib.sleep(3500) // A fixed wait on purpose: longer than the banner's 2 s, to show it does NOT close while focused.",
-      "sleep await lib.sleep(3500) // A fixed wait on purpose: longer than the banner's 2 s, to show it does NOT close while hovered.",
-      "sleep await lib.sleep(4500) // A fixed wait on purpose: the finish group (3 s) and a banner's time, to show nothing comes.",
-      "sleep await lib.sleep(4500) // A fixed wait on purpose: the finish group (3 s), to show nothing pops up.",
-      "sleep await lib.sleep(500)"
-    ],
-    "tests/e2e/bell.cjs": [
-      "sleep await lib.sleep(150)",
-      "sleep await lib.sleep(300)",
-      "sleep await lib.sleep(300)",
-      "sleep await lib.sleep(300)",
-      "sleep await lib.sleep(300)"
     ],
     "tests/e2e/board.cjs": [
       "sleep await lib.sleep(400)",
@@ -184,21 +133,6 @@
       "sleep await lib.sleep(500)",
       "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(100)"
     ],
-    "tests/e2e/bursts.cjs": [
-      "sleep await lib.sleep(100)",
-      "sleep await lib.sleep(2500) // A fixed wait on purpose: the previous burst's window has to close first, or these finishes would join it.",
-      "sleep await lib.sleep(4500) // A fixed wait on purpose: it waits out the burst window (agents finishing together are told in one notification, gathered over a few seconds) to show only one arrives.",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)"
-    ],
-    "tests/e2e/busy.cjs": [
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(150)",
-      "timeout await commentBtn.click({ force: true, timeout: 300 }).catch(() => {})",
-      "timeout await del.waitFor({ timeout: 3000 })",
-      "timeout await startBtn.click({ force: true, timeout: 500 }).catch(() => {})"
-    ],
-    "tests/e2e/cardattach.cjs": [
-      "timeout const viewerTitle = () => viewer.getAttribute('aria-label', { timeout: 2000 }).then((x) => x ?? '', () => '')"
-    ],
     "tests/e2e/cardchip.cjs": [
       "sleep await lib.sleep(800) // On purpose: that nothing shows is the check, so it gives a chip time to show wrongly.",
       "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)",
@@ -238,34 +172,6 @@
       "sleep await lib.sleep(500)",
       "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)"
     ],
-    "tests/e2e/cardwork.cjs": [
-      "timeout const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })"
-    ],
-    "tests/e2e/carryingon.cjs": [
-      "sleep await lib.sleep(300)"
-    ],
-    "tests/e2e/changes.cjs": [
-      "sleep await lib.sleep(3500) // A fixed wait on purpose: the slowed answer for the old choice arrives later, and this checks it doesn't replace the new one.",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(150)"
-    ],
-    "tests/e2e/changespicker.cjs": [
-      "sleep await lib.sleep(300)",
-      "sleep await lib.sleep(300)"
-    ],
-    "tests/e2e/claude-real.cjs": [
-      "timeout const [caveatRight, caveat] = await lib.haikuAutoCaveat(page, { timeoutMs: 30000 }) // its read starts the real CLI"
-    ],
-    "tests/e2e/closewindow.cjs": [
-      "sleep await lib.sleep(150)",
-      "sleep await lib.sleep(300)",
-      "sleep await lib.sleep(300)",
-      "sleep await lib.sleep(300)",
-      "sleep await lib.sleep(300)",
-      "sleep await lib.sleep(400)",
-      "timeout const closedAfter = closes.waitForEvent('close', { timeout: 15000 }).then(() => true).catch(() => false)",
-      "timeout const closedB = p2.waitForEvent('close', { timeout: 15000 }).then(() => true).catch(() => false)",
-      "timeout const closedOnly = asked ? asked.waitForEvent('close', { timeout: 15000 }).then(() => true).catch(() => false) : Promise.resolve(false)"
-    ],
     "tests/e2e/codex-appserver.cjs": [
       "msConstant const CALL_MS = 60000",
       "sleep await lib.sleep(10) // on purpose: typed in pieces, as Combwork types",
@@ -290,10 +196,6 @@
       "sleep await sleep(800)",
       "sleep await sleep(800)"
     ],
-    "tests/e2e/codex-mcpapproval.cjs": [
-      "msConstant const SHOWN_MS = 30000",
-      "msConstant const TURN_MS = 180000"
-    ],
     "tests/e2e/codex-setup.cjs": [
       "sleep await sleep(1000) // The poll interval of the loop around it, which waits for a condition (not a fixed wait).",
       "sleep await sleep(1000) // The poll interval of the loop around it, which waits for a condition (not a fixed wait)."
@@ -303,60 +205,8 @@
       "sleep await sleep(500)",
       "sleep const waitFor = async (fn, ms) => { const t = Date.now(); while (Date.now() - t < ms) { const v = await fn(); if (v) return v; await sleep(500) } return null }"
     ],
-    "tests/e2e/codexfolder.cjs": [
-      "promiseSleep await new Promise((r) => setTimeout(r, 1000))",
-      "promiseSleep await new Promise((r) => setTimeout(r, 1000))"
-    ],
-    "tests/e2e/codexoverrides.cjs": [
-      "msConstant const READY_MS = 90000",
-      "msConstant const TURN_MS = 180000",
-      "msConstant const WAITING_MS = 30000"
-    ],
     "tests/e2e/codexqueued.cjs": [
       "sleep await lib.sleep(300)"
-    ],
-    "tests/e2e/combworkvcs.cjs": [
-      "sleep await lib.sleep(300)",
-      "sleep await lib.sleep(300)"
-    ],
-    "tests/e2e/compact.cjs": [
-      "sleep await inv('workspace:open', ws); await sleep(800)"
-    ],
-    "tests/e2e/concurrency.mjs": [
-      "sleep for (const t = Date.now(); Date.now() - t < ms; await sleep(100)) if (fn()) return true",
-      "until const held = await until(() => slots() === 1, 60_000)",
-      "until const queued = await until(() => slots() === 2 && waiting() === 1, 120_000)",
-      "until const taken = await until(() => slots() === 1, 60_000)",
-      "until const waiting = await until(() => waitLine.test(said.e2e) && waitLine.test(said.scenario), 300_000)",
-      "until let lined = await until(() => waiting() === 1, 60_000)",
-      "until lined = await until(() => waiting() === 1, 60_000)",
-      "until lined = lined && (await until(() => waiting() === 2 && existsSync(join(pool, `wait-${doomed.pid}.json`)), 60_000))",
-      "until lined = lined && (await until(() => waiting() === 2, 60_000))",
-      "until lined = lined && (await until(() => waiting() === 3, 60_000))"
-    ],
-    "tests/e2e/context.cjs": [
-      "sleep await lib.sleep(400)",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)"
-    ],
-    "tests/e2e/contrast.cjs": [
-      "sleep await lib.sleep(120)",
-      "sleep await lib.sleep(120)",
-      "sleep await lib.sleep(150)",
-      "sleep await lib.sleep(150)",
-      "sleep await lib.sleep(150)",
-      "sleep await lib.sleep(150)",
-      "sleep await lib.sleep(200)",
-      "sleep await lib.sleep(300)"
-    ],
-    "tests/e2e/copilot.cjs": [
-      "msConstant const DIALOG_DRAWN_MS = 30000"
-    ],
-    "tests/e2e/copyquiet.cjs": [
-      "clockLoop check(\"R2's start review on B waits: the pool's copies are in use\", Date.now() - returnedAt < 60_000 && /^Waiting for a review copy \\(the pool's 1 copy is in use; copy-1, returned \\d+ min ago, is held back by R1 \\(working\\)\\)/.test(first), first)",
-      "msConstant const QUIET_MS = 180000"
-    ],
-    "tests/e2e/ctxpercent.cjs": [
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)"
     ],
     "tests/e2e/decisions.cjs": [
       "sleep await lib.sleep(20)",
@@ -375,20 +225,6 @@
       "sleep await lib.sleep(800)",
       "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)"
     ],
-    "tests/e2e/defaultprovider.cjs": [
-      "sleep await lib.sleep(1000) // on purpose: nothing should appear",
-      "sleep await lib.sleep(300)"
-    ],
-    "tests/e2e/deliveries.cjs": [
-      "msConstant const OVERDUE_MS = 8000"
-    ],
-    "tests/e2e/dialectlaunch.cjs": [
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)"
-    ],
-    "tests/e2e/dialectsview.cjs": [
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)",
-      "timeout const noteText = (n) => note(n).innerText({ timeout: 1000 }).catch(() => '')"
-    ],
     "tests/e2e/doingmove.cjs": [
       "sleep await lib.sleep(100)",
       "sleep await lib.sleep(1000) // A fixed wait on purpose: this checks that nothing starts.",
@@ -399,67 +235,6 @@
     ],
     "tests/e2e/donemove.cjs": [
       "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)"
-    ],
-    "tests/e2e/drafts.cjs": [
-      "sleep await sleep(600)",
-      "sleep await sleep(600)",
-      "sleep await sleep(800)",
-      "timeout check('note: unsaved edits kept after changing view', !!(await lib.until(async () => (await page.locator('.split-main .monaco').first().innerText({ timeout: 1000 }).catch(() => '')).includes('DRAFT-1'), HUNG_MS)))",
-      "timeout const dialogText = () => page.locator('.dialog').last().innerText({ timeout: 1000 }).catch(() => '')"
-    ],
-    "tests/e2e/editor.cjs": [
-      "sleep await sleep(800)",
-      "timeout check('svg: rendered as image', !!(await lib.until(() => pane.locator('.image-preview img').evaluate((i) => i.complete && i.naturalWidth === 120, null, { timeout: 1000 }).catch(() => false), HUNG_MS)))"
-    ],
-    "tests/e2e/evidence.cjs": [
-      "timeout db = new DatabaseSync(file, { readOnly: true, timeout: 5000 })"
-    ],
-    "tests/e2e/filelinks.cjs": [
-      "sleep await lib.sleep(200)",
-      "sleep await lib.sleep(200)",
-      "sleep await lib.sleep(200)",
-      "sleep await lib.sleep(400)",
-      "sleep await lib.sleep(500)",
-      "sleep await lib.sleep(500)",
-      "sleep await lib.sleep(500)",
-      "sleep await lib.sleep(600)",
-      "sleep await lib.sleep(700)",
-      "sleep await lib.sleep(700)",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)"
-    ],
-    "tests/e2e/files.cjs": [
-      "sleep await sleep(300)",
-      "sleep await sleep(300)",
-      "sleep await sleep(300)",
-      "sleep await sleep(400)",
-      "sleep await sleep(400)",
-      "sleep await sleep(500)",
-      "sleep await sleep(800)",
-      "sleep await sleep(800)",
-      "timeout check('viewer navigates', !!(await lib.until(async () => (await page.locator('.dialog-header h2').innerText({ timeout: 1000 }).catch(() => '')).includes('10-00-00'), HUNG_MS)))",
-      "timeout check('viewer: a log shows its text', !!(await lib.until(async () => /line one/.test(await page.locator('.attachment-text').innerText({ timeout: 1000 }).catch(() => '')), HUNG_MS)))",
-      "timeout check('why (this PC): the editor is at the rule\\'s line', !!(await lib.until(async () => (await page.locator('.ignore-rule-file .line-numbers.active-line-number').innerText({ timeout: 1000 }).catch(() => '')).trim() === String(ruleLine), HUNG_MS)))",
-      "timeout check('why (this PC): the viewer names the file, line and rule', !!(await lib.until(async () => (await ruleAt.innerText({ timeout: 1000 }).catch(() => '')) === `Line ${ruleLine} of .git/info/exclude: \\`/made-outside.txt\\``, HUNG_MS)), await ruleAt.innerText().catch(() => ''))",
-      "timeout const cls = (loc) => loc.getAttribute('class', { timeout: 1000 }).catch(() => '').then((c) => c ?? '')",
-      "timeout const title = () => page.locator('.dialog-header h2').innerText({ timeout: 1000 }).catch(() => '')"
-    ],
-    "tests/e2e/flightrecorder.cjs": [
-      "msConstant const SILENT_MS = 2000"
-    ],
-    "tests/e2e/foldercommit.cjs": [
-      "timeout const db = new DatabaseSync(path.join(fx.ws, '.combwork', 'combwork.db'), { timeout: 5000 })"
-    ],
-    "tests/e2e/footerfit.cjs": [
-      "sleep await lib.sleep(100)",
-      "sleep await lib.sleep(300) // on purpose: the fake reads a typed line before its Enter, as a CLI does",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(150)"
-    ],
-    "tests/e2e/freshpath.cjs": [
-      "sleep await lib.sleep(300)",
-      "sleep await lib.sleep(300)"
-    ],
-    "tests/e2e/gitmissing.cjs": [
-      "sleep await lib.sleep(300)"
     ],
     "tests/e2e/gitview.cjs": [
       "timeout const switchTicked = await lib.until(async () => await dialog.locator('[data-field=\"switch\"]').isChecked({ timeout: 1000 }).catch(() => false), HUNG_MS)"

@@ -31,7 +31,7 @@ const check = (name, ok, extra = '') => {
 const until = async (fn, ms) => {
   const t = Date.now()
   let v
-  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(150)
+  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
   return v
 }
 
@@ -228,7 +228,7 @@ function problems(states, { hasTasks, hasSize, hasPlain }) {
   const key = lib.ptyKey(alpha, claude.id)
   // A turn that pads its transcript past 1 MB and leaves a background task running (ten minutes: past the suite's end).
   await inv('pty:write', key, 'hello window 1000 pad 1200 background 600')
-  await lib.sleep(100)
+  await lib.sleep(lib.timing('pace.keysThenEnterMs'))
   await inv('pty:write', key, '\r')
   await until(async () => (await live(claude.id))?.backgroundTasks > 0 && (await live(claude.id))?.transcriptBytes > 1024 * 1024, lib.timing('hang.ui'))
 
@@ -372,7 +372,7 @@ function problems(states, { hasTasks, hasSize, hasPlain }) {
   // before any turn (HI-2688): its start, restart or resume
   check('the Assistant runs', !!(await until(async () => (await assistantLive())?.status === 'ready', lib.timing('hang.step'))))
   await inv('pty:write', lib.ptyKey(home, 'assistant'), 'hello')
-  await lib.sleep(300) // on purpose: the fake reads a typed line before its Enter, as a CLI does
+  await lib.sleep(lib.timing('pace.keysThenEnterMs')) // the fake reads a typed line before its Enter, as a CLI does
   await inv('pty:write', lib.ptyKey(home, 'assistant'), '\r')
   const af = page.locator('.assistant-footer .pane-footer-bar')
   const aReady = await until(async () => {

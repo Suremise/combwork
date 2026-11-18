@@ -75,7 +75,7 @@ function inUse(project, name) {
   await lib.openWorkspace(inv, page, ws)
   const theme = async (t) => {
     await inv('settings:update', { appearance: { theme: t } })
-    await lib.sleep(300)
+    await lib.themeSettled(page, t)
   }
   const shots = async (name) => {
     for (const t of ['dark', 'light']) {
@@ -133,7 +133,7 @@ function inUse(project, name) {
 
   // --- Back again: the last list at once, checked again in the background.
   await page.locator('.tab', { hasText: 'Overview' }).click()
-  await lib.sleep(300)
+  await lib.until(async () => (await page.locator('.tab.active', { hasText: 'Overview' }).count()) === 1, lib.timing('hang.ui'))
   await page.locator('.tab', { hasText: 'Version Control' }).click()
   const refreshing = page.locator('[data-unused-refreshing]')
   check('coming back shows the last list at once, while it checks them again', !!(await lib.until(async () => (await rows.count()) === 2 && (await refreshing.count()) === 1, HUNG_MS)) && (await loadingPage.count()) === 0, await page.locator('.split-main').innerText().catch(() => ''))
