@@ -76,10 +76,13 @@ export function claimOf(t: QuietTarget): QuietClaim | null {
 }
 
 /** The pool's operation on `t` now, with its holder's identity, or null when `t` isn't the pool's. */
-function holdIn(db: DatabaseSync, t: QuietTarget): { op: string | null; pid: number; started: number } | null {
-  const r = db.prepare(`SELECT op, op_pid, op_started FROM ${t.kind === 'slot' ? 'slots' : 'copies'} WHERE project = ? AND name = ?`).get(t.project, t.name) as { op: string | null; op_pid: number | null; op_started: number | null } | undefined // i18n-ignore: SQL
-  return r ? { op: r.op ?? null, pid: r.op_pid ?? 0, started: r.op_started ?? 0 } : null
+function holdIn(db: DatabaseSync, t: QuietTarget): { op: string | null; pid: number; started: number; folder: string } | null {
+  const r = db.prepare(`SELECT op, op_pid, op_started, folder FROM ${t.kind === 'slot' ? 'slots' : 'copies'} WHERE project = ? AND name = ?`).get(t.project, t.name) as { op: string | null; op_pid: number | null; op_started: number | null; folder: string } | undefined // i18n-ignore: SQL
+  return r ? { op: r.op ?? null, pid: r.op_pid ?? 0, started: r.op_started ?? 0, folder: r.folder } : null
 }
+
+/** One folder path, however it is spelled (Windows: case, separators). */
+const samePath = (a: string, b: string): boolean => a.replace(/[\\/]+/g, '/').toLowerCase() === b.replace(/[\\/]+/g, '/').toLowerCase()
 
 /** The pool's own hold on `t` now: its operation's token and when it was last used (its generation for a claim). */
 function generationIn(db: DatabaseSync, t: QuietTarget): { op: string | null; usedAt: string | null } | null {
@@ -142,7 +145,9 @@ export async function recoverClaim(t: QuietTarget, c: QuietClaim): Promise<Recov
     // another process's operation on it is a hold the claim doesn't override (held, looked at again); the slot or copy
     // gone from the pool, needs the user.
     const cur = holdIn(db, t)
-    if (!cur) return 'needs'
+    // HR3's round 2: the entry still the one claimed, at the folder claimed: moved, replaced or made again elsewhere, its
+    // old place is never filled again from the aside (needs the user).
+    if (!cur || !samePath(cur.folder, c.folder)) return 'needs'
     if (cur.op && cur.op !== c.op && !sameOwner({ pid: cur.pid, started: cur.started }, me)) return 'held'
     db.prepare('UPDATE quiet_claims SET owner_pid = ?, owner_started = ? WHERE project = ? AND kind = ? AND name = ?').run(me.pid, me.started, t.project, t.kind, t.name) // i18n-ignore: SQL
     return 'ok'

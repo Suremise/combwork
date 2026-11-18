@@ -180,6 +180,23 @@ describe('the quiet check claims its rename aside (HI-3374)', () => {
     }
   })
 
+  it("HR3's round 2: the copy's entry now at another folder (moved or made again elsewhere), no operation on it: needs you, its old place not filled again", async () => {
+    const s = setup()
+    try {
+      const aside = `${s.folder}.cw-quiet-mmmmmm`
+      const c = await as(P1, {}, () => takeClaim(s.a, s.folder, aside))
+      renameSync(s.folder, aside)
+      await s.one.write((db) => db.prepare("UPDATE copies SET folder = ? WHERE project = 'p' AND name = 'c1'").run(join(s.dir, 'copies', 'c1-new')))
+      const r = await as(P2, { [P1.pid]: 'dead' }, () => recoverClaim(s.b, c!))
+      expect(r.state).toBe('needs')
+      expect(existsSync(aside)).toBe(true)
+      expect(existsSync(s.folder)).toBe(false)
+      expect(claimOf(s.b)).not.toBeNull()
+    } finally {
+      s.close()
+    }
+  })
+
   it("another process's operation on the copy now: held (not put back under it), looked at again; the copy gone from the pool: needs you", async () => {
     const s = setup()
     try {
