@@ -139,6 +139,14 @@ export const QUEUE_NETWORK_CODES = 'cw.queue.networkCodes'
 
 /** The longest the merge queue's signed merge commit takes before its signer is ended (#1350): read by main's queueHost. */
 export const QUEUE_SIGN_SECONDS = 'cw.queue.signSeconds'
+/** HI-3372: the last resort for a Commit or Set aside of a folder's changes (the user can cancel it from the window). */
+export const GIT_COMMIT_MINUTES = 'cw.git.commitMinutes'
+/** HI-3372: the last resort for the user's Fetch, Pull and Push (cancellable from the window). */
+export const GIT_NETWORK_MINUTES = 'cw.git.networkMinutes'
+/** HI-3372: the merge queue's own fetches and pushes. */
+export const QUEUE_NETWORK_MINUTES = 'cw.queue.networkMinutes'
+/** HI-3372: one jj command's bound (its `--version` keeps its own). */
+export const JJ_COMMAND_SECONDS = 'cw.jj.commandSeconds'
 /** HI-3284: the longest the merge guards' matching runs before the check ends incomplete (never a pass). */
 export const MERGE_GUARDS_SECONDS = 'cw.mergeGuards.seconds'
 /** HI-3284: the most lines a merge may add for its guards to check them (past it, incomplete, never a pass). */
@@ -988,6 +996,56 @@ const SOURCES: readonly AdvancedSource[] = [
       { from: `${FIX}/advanced/network-node-24.19.0-econnrefused.txt`, version: '24.19.0', text: 'Error: connect ECONNREFUSED' } // i18n-ignore: Node's recorded output (#367)
     ]
   },
+  // HI-3372: the user's own git work and Combwork's network steps, bounded only as a last resort (a commit or a fetch, pull
+  // or push can be cancelled from the window), and jj's commands, whose first snapshot of a large working copy passed a minute.
+  {
+    id: GIT_COMMIT_MINUTES,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.git.commitMinutes.title', defaultMessage: 'Git: longest a commit or set aside takes', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes. Commit and Set aside are the buttons that commit or stash a folder's uncommitted changes (HI-3372)." }),
+    desc: msg({ id: 'settings.advanced.cw.git.commitMinutes.desc', defaultMessage: "How long Commit and Set aside of a folder's changes may run, the repository's pre-commit hook, filters and signer included, before Combwork ends git as stuck. You can cancel one from the window at any time: this is a last resort for one nobody is watching. Raise it if a hook really runs longer.", description: 'What the advanced setting "Git: longest a commit or set aside takes" does, and when to change it (Settings → Advanced, HI-3372).' }),
+    kind: 'number',
+    default: 30,
+    min: 1,
+    max: 240,
+    unit: 'min',
+    applies: 'now'
+  },
+  {
+    id: GIT_NETWORK_MINUTES,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.git.networkMinutes.title', defaultMessage: 'Git: longest a fetch, pull or push takes', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes: the Fetch, Pull and Push actions in Version Control (HI-3372)." }),
+    desc: msg({ id: 'settings.advanced.cw.git.networkMinutes.desc', defaultMessage: 'How long Fetch, Pull and Push in Version Control (and Push to…, pushing a tag, deleting remote branches) may run, a sign-in window included, before Combwork ends git as stuck. You can cancel one from the window at any time; raise it for a large first fetch or push on a slow connection.', description: 'What the advanced setting "Git: longest a fetch, pull or push takes" does, and when to change it (Settings → Advanced, HI-3372). Push to… is an action\'s name.' }),
+    kind: 'number',
+    default: 30,
+    min: 1,
+    max: 240,
+    unit: 'min',
+    applies: 'now'
+  },
+  {
+    id: QUEUE_NETWORK_MINUTES,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.queue.networkMinutes.title', defaultMessage: 'Merge queue: longest a fetch or push takes', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes: the merge queue's own fetches and pushes (HI-3372)." }),
+    desc: msg({ id: 'settings.advanced.cw.queue.networkMinutes.desc', defaultMessage: "How long the merge queue's own fetches and pushes may take: pushing a merged target, a target that follows its remote (its fetch and push), reading the remote's head as a card starts, and Bring up to date. Past it git is ended and the merge waits or pauses. Raise it for a slow connection or a large repository.", description: 'What the advanced setting "Merge queue: longest a fetch or push takes" does, and when to change it (Settings → Advanced, HI-3372). Bring up to date is an action\'s name.' }),
+    kind: 'number',
+    default: 30,
+    min: 1,
+    max: 240,
+    unit: 'min',
+    applies: 'now'
+  },
+  {
+    id: JJ_COMMAND_SECONDS,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.jj.commandSeconds.title', defaultMessage: 'jj: longest a command takes', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds. jj is the Jujutsu version control tool: keep its name (HI-3372)." }),
+    desc: msg({ id: 'settings.advanced.cw.jj.commandSeconds.desc', defaultMessage: "How long one jj command Combwork runs may take, a snapshot of a large working copy included, before Combwork ends it: a read then counts as unknown, and a change made during a merge is left for you to settle. Raise it for a very large repository or a slow disk.", description: 'What the advanced setting "jj: longest a command takes" does, and when to change it (Settings → Advanced, HI-3372). jj is the Jujutsu version control tool.' }),
+    kind: 'number',
+    default: 300,
+    min: 30,
+    max: 3600,
+    unit: 's',
+    applies: 'now'
+  },
   // How long the merge queue's own commit may take when the repository signs its commits (#1350, SPEC §16.9.1 step 4):
   // past it, the signer is taken to be waiting for a passphrase, ended, and the queue pauses.
   {
@@ -1000,7 +1058,8 @@ const SOURCES: readonly AdvancedSource[] = [
       description: 'What the advanced setting "Merge queue: longest a signed merge commit takes" does, and what goes wrong when it is wrong (Settings → Advanced). “signing waits for you” is how the queue’s pause reads.'
     }),
     kind: 'number',
-    default: 60,
+    // HI-3372: it bounds the repository's commit hooks too, which 60 s cut short.
+    default: 300,
     min: 5,
     max: 3600,
     unit: 's',

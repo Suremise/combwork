@@ -2003,6 +2003,22 @@
     "defaultMessage": "Focused tests: longest the choice of tests runs",
     "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds: how long the project's command that chooses a card's focused tests may run, when the card is submitted and at its merge."
   },
+  "settings.advanced.cw.git.commitMinutes.desc": {
+    "defaultMessage": "How long Commit and Set aside of a folder's changes may run, the repository's pre-commit hook, filters and signer included, before Combwork ends git as stuck. You can cancel one from the window at any time: this is a last resort for one nobody is watching. Raise it if a hook really runs longer.",
+    "description": "What the advanced setting \"Git: longest a commit or set aside takes\" does, and when to change it (Settings → Advanced, HI-3372)."
+  },
+  "settings.advanced.cw.git.commitMinutes.title": {
+    "defaultMessage": "Git: longest a commit or set aside takes",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes. Commit and Set aside are the buttons that commit or stash a folder's uncommitted changes (HI-3372)."
+  },
+  "settings.advanced.cw.git.networkMinutes.desc": {
+    "defaultMessage": "How long Fetch, Pull and Push in Version Control (and Push to…, pushing a tag, deleting remote branches) may run, a sign-in window included, before Combwork ends git as stuck. You can cancel one from the window at any time; raise it for a large first fetch or push on a slow connection.",
+    "description": "What the advanced setting \"Git: longest a fetch, pull or push takes\" does, and when to change it (Settings → Advanced, HI-3372). Push to… is an action's name."
+  },
+  "settings.advanced.cw.git.networkMinutes.title": {
+    "defaultMessage": "Git: longest a fetch, pull or push takes",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes: the Fetch, Pull and Push actions in Version Control (HI-3372)."
+  },
   "settings.advanced.cw.guidance.desc": {
     "defaultMessage": "With Combwork's tools, each project agent gets Combwork's guidance: how to use the tools, the board and handovers, and its project's latest handover. Claude Code and Copilot get it as the combwork server's instructions, Codex after your own developer_instructions. Turned off, agents still get Combwork's tools, without the guidance, from their next session. The Assistant always gets its own: they are its role.",
     "description": "What the advanced setting \"Combwork's guidance for agents\" does (Settings → Advanced, under Combwork). Claude Code, Copilot and Codex are CLIs' names, combwork the name of Combwork's MCP server and developer_instructions a Codex setting: keep them."
@@ -2050,6 +2066,14 @@
   "settings.advanced.cw.inbox.stopContinuation.title": {
     "defaultMessage": "Keep an agent going when it stops with unread items",
     "description": "An advanced setting's title (Settings → Advanced), listed under Combwork: when an agent is about to end its turn with items in its inbox it hasn't read, Combwork makes it carry on and read them."
+  },
+  "settings.advanced.cw.jj.commandSeconds.desc": {
+    "defaultMessage": "How long one jj command Combwork runs may take, a snapshot of a large working copy included, before Combwork ends it: a read then counts as unknown, and a change made during a merge is left for you to settle. Raise it for a very large repository or a slow disk.",
+    "description": "What the advanced setting \"jj: longest a command takes\" does, and when to change it (Settings → Advanced, HI-3372). jj is the Jujutsu version control tool."
+  },
+  "settings.advanced.cw.jj.commandSeconds.title": {
+    "defaultMessage": "jj: longest a command takes",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds. jj is the Jujutsu version control tool: keep its name (HI-3372)."
   },
   "settings.advanced.cw.journal.builds.desc": {
     "defaultMessage": "When Combwork's own installer is built from its source code (npm run dist, or npm run release), Combwork writes the build into the Assistant's journal as its own entry: the version, the commit, what kind of build it was and where the installer is. Only a successful build is written, and only while the journal is on with events in its scope. Turned off, builds aren't written, and a build left for Combwork while it was closed is dropped when the workspace opens.",
@@ -2386,6 +2410,14 @@
   "settings.advanced.cw.queue.networkCodes.title": {
     "defaultMessage": "Merge queue: network errors that count as temporary",
     "description": "An advanced setting's title (Settings → Advanced), listed under Combwork. The merge queue tests a card's work before merging it; a check that fails for the network, not the work, lets the card's builder submit the same revision again."
+  },
+  "settings.advanced.cw.queue.networkMinutes.desc": {
+    "defaultMessage": "How long the merge queue's own fetches and pushes may take: pushing a merged target, a target that follows its remote (its fetch and push), reading the remote's head as a card starts, and Bring up to date. Past it git is ended and the merge waits or pauses. Raise it for a slow connection or a large repository.",
+    "description": "What the advanced setting \"Merge queue: longest a fetch or push takes\" does, and when to change it (Settings → Advanced, HI-3372). Bring up to date is an action's name."
+  },
+  "settings.advanced.cw.queue.networkMinutes.title": {
+    "defaultMessage": "Merge queue: longest a fetch or push takes",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes: the merge queue's own fetches and pushes (HI-3372)."
   },
   "settings.advanced.cw.queue.signSeconds.desc": {
     "defaultMessage": "When a repository signs its commits, how long the merge queue waits for its merge commit, hooks included, before it takes the signer to be waiting for a passphrase. It then ends the commit, changes nothing in the target and pauses the queue with “signing waits for you”. Raise it when signing or the repository’s commit hooks really take longer; too long, and a signer waiting for you holds the queue up that long.",

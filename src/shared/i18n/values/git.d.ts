@@ -15,6 +15,7 @@ interface CombworkMessageValues {
   'git.branches.cleanUp': undefined
   'git.branches.cleanUpTip': { n: number; target: string | number }
   'git.branches.copyRevision': { revision: string | number }
+  'git.branches.deletingOn': { remote: string | number }
   'git.branches.earlierCards': { n: number }
   'git.branches.group': { group: string; target: string | number }
   'git.branches.groupTip': { group: string; target: string | number }

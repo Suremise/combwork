@@ -140,6 +140,7 @@ vi.setConfig({ testTimeout: 60_000 })
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const changes = await import('../src/main/gitFolderChanges')
+const { cancellableGit } = await import('../src/main/gitCancel')
 const { checkouts, worktreeNow } = await import('../src/main/platform/git')
 const { GitPlatform } = await import('../src/main/platform/gitPlatform')
 const { isUnknown } = await import('../src/main/platform/types')
@@ -642,6 +643,110 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     expect(sh(proj, 'show', 'HEAD:a.txt')).toBe('edit again')
   })
 
+  // HI-3372: the user's Cancel, at the same boundaries as the bound (a hook, a clean filter before any stash, a smudge
+  // filter after it): ended the same way, its tree included, and said as theirs, with what is true (no commit; no stash;
+  // the stash made, named, to look at). Its recovery (HEAD read, the stashes listed, the index left) runs uncancelled.
+  describe('cancelled by the user (HI-3372)', () => {
+    /** Runs `fn` cancellable, cancels it once `started` is there (the hook or filter running), and gives its outcome. */
+    const cancelAt = async (started: string, fn: () => Promise<unknown>): Promise<unknown> => {
+      const ac = new AbortController()
+      const done = cancellableGit(ac.signal, fn).catch((e: Error) => e)
+      await vi.waitFor(() => expect(existsSync(started)).toBe(true), { timeout: 20_000 })
+      ac.abort()
+      return done
+    }
+    beforeEach(() => {
+      // The bound out of the way (it only bounds a hung one): the Cancel ends it.
+      changes.folderChangesBounds.actMs = 120_000
+    })
+
+    it('Commit cancelled while its pre-commit hook runs: the hook ended too; nothing committed, the index as it was', async () => {
+      const pids = join(tempDir('cw-folderchanges-pids-'), 'pids')
+      const started = join(tempDir('cw-folderchanges-started-'), 'started')
+      mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+      writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), slowScript(pids, false, started))
+      writeFileSync(join(proj, 'new.txt'), 'new\n')
+      writeFileSync(join(proj, 'a.txt'), 'edit\n')
+      const before = head()
+      const was = lines()
+      const err = await cancelAt(started, () => settle('commit', ['new.txt', 'a.txt']))
+      expect(String(err)).toMatch(/You cancelled the commit.*Nothing was committed, and the files and the index are as they were/)
+      await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: 10_000 })
+      expect(head()).toBe(before)
+      expect(lines()).toEqual(was)
+      expect(existsSync(lockPath())).toBe(false)
+      expect(leftovers()).toEqual([])
+    })
+
+    it('a Cancel never pressed: Commit and Set Aside (a staged file) done as without one', async () => {
+      const ac = new AbortController()
+      writeFileSync(join(proj, 'a.txt'), 'edit\n')
+      const done = await cancellableGit(ac.signal, () => settle('commit', ['a.txt'])).catch((e: Error) => e)
+      expect(done).not.toBeInstanceOf(Error)
+      expect(sh(proj, 'show', 'HEAD:a.txt')).toBe('edit')
+      writeFileSync(join(proj, 'b.txt'), 'staged\n')
+      sh(proj, 'add', 'b.txt')
+      const aside = await cancellableGit(ac.signal, () => settle('setAside', ['b.txt'])).catch((e: Error) => e)
+      expect(String(aside instanceof Error ? aside.message : 'ok')).toBe('ok')
+      expect(sh(proj, 'show', 'refs/stash:b.txt')).toBe('staged')
+    })
+
+    it('Commit cancelled before it starts: no git commit runs (no hook), nothing committed', async () => {
+      const started = join(tempDir('cw-folderchanges-started-'), 'started')
+      mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+      writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), `#!/bin/sh\n: > "${fwd(started)}"\n`)
+      writeFileSync(join(proj, 'a.txt'), 'edit\n')
+      const before = head()
+      const ac = new AbortController()
+      ac.abort()
+      const err = await cancellableGit(ac.signal, () => settle('commit', ['a.txt'])).catch((e: Error) => e)
+      expect(String(err)).toMatch(/You cancelled the commit/)
+      expect(existsSync(started)).toBe(false)
+      expect(head()).toBe(before)
+      expect(leftovers()).toEqual([])
+    })
+
+    it('Set Aside cancelled in a clean filter, before any stash: no stash made, said so; the files as they were', async () => {
+      const pids = join(tempDir('cw-folderchanges-pids-'), 'pids')
+      const dir = tempDir('cw-folderchanges-filter-')
+      const filter = join(dir, 'slow.sh')
+      const started = join(dir, 'started')
+      writeFileSync(filter, slowScript(pids, false, started))
+      sh(proj, 'config', 'filter.slow.required', 'true')
+      sh(proj, 'config', 'filter.slow.clean', `sh "${fwd(filter)}"`)
+      sh(proj, 'config', 'filter.slow.smudge', 'cat')
+      writeFileSync(join(proj, '.git', 'info', 'attributes'), 'new.txt filter=slow\n')
+      writeFileSync(join(proj, 'new.txt'), 'new\n')
+      const err = await cancelAt(started, () => settle('setAside', ['new.txt']))
+      expect(String(err)).toMatch(/You cancelled setting the changes aside.*No stash was made/)
+      expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
+      await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: timing('wait.hang') })
+      expect(existsSync(lockPath())).toBe(false)
+      expect(leftovers()).toEqual([])
+      expect(read('new.txt')).toBe('new\n')
+    })
+
+    it('Set Aside cancelled in a smudge filter, after its stash: the stash named, to look at; kept', async () => {
+      const pids = join(tempDir('cw-folderchanges-pids-'), 'pids')
+      const dir = tempDir('cw-folderchanges-filter-')
+      const filter = join(dir, 'slow.sh')
+      const started = join(dir, 'started')
+      writeFileSync(filter, slowScript(pids, false, started))
+      sh(proj, 'config', 'filter.slow.clean', 'cat')
+      sh(proj, 'config', 'filter.slow.smudge', `sh "${fwd(filter)}"`)
+      writeFileSync(join(proj, '.git', 'info', 'attributes'), 'a.txt filter=slow\n')
+      writeFileSync(join(proj, 'a.txt'), 'edit\n')
+      const err = await cancelAt(started, () => settle('setAside', ['a.txt']))
+      const made = sh(proj, 'rev-parse', 'refs/stash')
+      expect(String(err)).toMatch(/You cancelled setting the changes aside.*Git had made a stash \(\w+\) by then: look at it/)
+      expect(String(err)).toContain(made.slice(0, 12))
+      expect(sh(proj, 'show', 'refs/stash:a.txt')).toBe('edit')
+      await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: timing('wait.hang') })
+      expect(existsSync(lockPath())).toBe(false)
+      expect(leftovers()).toEqual([])
+    })
+  })
+
   it('Set Aside held up in a clean filter, before any stash: ended, no stash, the real index and the files as they were', async () => {
     const pids = join(tempDir('cw-folderchanges-pids-'), 'pids')
     const dir = tempDir('cw-folderchanges-filter-')
@@ -669,12 +774,12 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     sh(proj, 'config', 'filter.slow.clean', `sh "${fwd(filter)}"`)
     const done = settle('setAside', ['new.txt']).catch((e: Error) => e)
     // Held at the filter, by its own word, and kept there (30 s) until the bound ends it.
-    await vi.waitFor(() => expect(existsSync(started)).toBe(true), { timeout: 20_000 })
+    await vi.waitFor(() => expect(existsSync(started)).toBe(true), { timeout: timing('wait.hang') })
     const err = await done
     expect(String(err)).toMatch(new RegExp(`didn't finish setting the changes aside in ${seconds} seconds`))
     expect(String(err)).not.toMatch(/in a stash/)
     expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
-    await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: 10_000 })
+    await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: timing('wait.hang') })
     expect(existsSync(lockPath())).toBe(false)
     expect(leftovers()).toEqual([])
     expect(read('new.txt')).toBe('new\n')
