@@ -1844,7 +1844,13 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
     return 'held'
   }
   startWaits(projectPath, agentId, `#${n}`, null)
-  const resumeId = !st && conv?.is === 'resume' ? conv.id : null
+  // HI-3360: its conversation idle so long its resume would be cold (Settings → Advanced): a new one, the card its prompt,
+  // as with none to resume. An unattended start asks nobody; the old conversation stays in Sessions. After the holds above.
+  const cold = !st && conv?.is === 'resume' ? await sessions.idleOf(projectPath, conv.id).catch(() => null) : null
+  if (gone()) return 'done'
+  if (cold && (!quiet(projectPath, agentId) || isResuming(projectPath, agentId) || sessions.liveFor(projectPath, agentId))) return 'wait'
+  if (cold) log.info(`#${n}: ${userText(agent.name)}'s conversation ${conv?.is === 'resume' ? conv.id : ''} in ${userText(cycle.started.slot)} idle ${Math.round(cold.idleMs / 60_000)} min: a new conversation instead of a cold resume`)
+  const resumeId = !st && conv?.is === 'resume' && !cold ? conv.id : null
   let how: FactData['BuilderPlaced']['how'] = there ? 'typed' : st ? 'newConversation' : resumeId ? 'resumed' : 'started'
   /** The builder's launch here: its lease's conversation resumed, else a new one; a failed resume counted. */
   const launch = async (line?: string): Promise<LiveSessionState> => {

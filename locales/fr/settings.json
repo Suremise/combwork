@@ -1693,5 +1693,9 @@
   "settings.advanced.cw.activity.mapMotion.off": "Désactivé",
   "settings.advanced.cw.activity.mapMotion.on": "Activé",
   "settings.advanced.cw.activity.mapMotion.system": "Comme Windows le dit",
-  "settings.advanced.cw.activity.mapMotion.title": "Impulsions animées de la carte d’activité"
+  "settings.advanced.cw.activity.mapMotion.title": "Impulsions animées de la carte d’activité",
+  "settings.advanced.cw.resume.idleAsk.title": "Reprendre : demander avant de rouvrir une conversation inactive depuis longtemps",
+  "settings.advanced.cw.resume.idleAsk.desc": "Une conversation inactive depuis plus longtemps que la durée ci-dessous a très probablement perdu le cache des prompts de la CLI, donc la reprendre peut retraiter tout son contexte. Reprendre demande d’abord, propose de repartir de zéro et indique depuis combien de temps elle est inactive et sa taille ; l’Assistant reçoit les mêmes informations et choisit. Le démarrage d’un couloir ou d’une carte donne plutôt à son auteur une nouvelle conversation, avec la carte comme prompt. Les agents que Combwork reprend après un redémarrage, une mise à jour ou une fermeture reprennent comme avant. Désactivé, chaque reprise se fait comme avant, avec seulement la question du cache expiré qu’avaient les sessions de Claude Code.",
+  "settings.advanced.cw.resume.idleMinutes.title": "Reprendre : une conversation est inactive depuis longtemps après",
+  "settings.advanced.cw.resume.idleMinutes.desc": "Le temps écoulé depuis la dernière activité d’une conversation (la dernière entrée de sa transcription, sinon le moment où Combwork l’a vue pour la dernière fois) avant que sa reprise demande d’abord. La valeur par défaut est le plus long cache des prompts que gardent les CLI : une heure."
 }

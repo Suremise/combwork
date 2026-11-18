@@ -612,6 +612,10 @@ interface CombworkMessageValues {
   'settings.advanced.cw.restart.resumeAfterUpdate.title': undefined
   'settings.advanced.cw.restart.resumeReadySeconds.desc': undefined
   'settings.advanced.cw.restart.resumeReadySeconds.title': undefined
+  'settings.advanced.cw.resume.idleAsk.desc': undefined
+  'settings.advanced.cw.resume.idleAsk.title': undefined
+  'settings.advanced.cw.resume.idleMinutes.desc': undefined
+  'settings.advanced.cw.resume.idleMinutes.title': undefined
   'settings.advanced.cw.retry.tellAssistantAfterSeconds.desc': undefined
   'settings.advanced.cw.retry.tellAssistantAfterSeconds.title': undefined
   'settings.advanced.cw.sessions.signFailFast.desc': undefined

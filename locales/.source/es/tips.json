@@ -500,6 +500,8 @@
   "tips.resumeAfterUpdate.title": "Updates leave your agents where they were",
   "tips.resumeAll.text": "After a restart, Resume All Agents in the project header resumes every stopped agent's last session in one go.",
   "tips.resumeAll.title": "Resume all agents at once",
+  "tips.resumeLongIdle.text": "A conversation idle for over an hour has most likely lost its prompt cache, so resuming it may cost many tokens. Resume says how long it has been idle and how big it is, and offers Archive and Start Fresh instead.",
+  "tips.resumeLongIdle.title": "A long-idle conversation asks before it resumes",
   "tips.retargetRelease.text": "Changing Work merges into from 1.1.0 to 1.2.0? Save… lists the Todo cards and free slots still on 1.1.0 that can follow 1.2.0, and what stays, with why. Leave Also retarget what can move ticked to move them.",
   "tips.retargetRelease.title": "When a release ships, move what’s left onto the next",
   "tips.retryWait.text": "When a Codex, Claude Code or Copilot agent's requests are refused, often by a rate limit, it waits and tries again while its screen says only Working. Combwork reads the wait from the agent's own records, and its status says so.",

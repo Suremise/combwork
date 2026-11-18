@@ -1191,5 +1191,6 @@
   "board.workQueue.testing": "テスト中：{step}",
   "board.workQueue.unreadRef": "読み取れません",
   "board.workQueue.waiting": "{target}のキューで、{cards} の完了を待機中",
-  "board.workflows": "ワークフロー"
+  "board.workflows": "ワークフロー",
+  "board.laneStart.yieldCantStart": "{card}は{first}を待っていますが、{first}はまだ開始できません（ブロックされているか、自身が依存するカードを待っています）。このリストは{card}が完了してから適用され、それまでは「今すぐ適用」でも何も変わりません。"
 }

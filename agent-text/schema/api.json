@@ -26,6 +26,16 @@
   "api.agent.freshWhySession": {
     "placeholders": {}
   },
+  "api.agent.idleResume": {
+    "placeholders": {
+      "agent": "plain",
+      "session": "plain",
+      "idle": "plain",
+      "size": "select",
+      "tokens": "plain",
+      "bytes": "plain"
+    }
+  },
   "api.agent.inputDisabled": {
     "placeholders": {}
   },

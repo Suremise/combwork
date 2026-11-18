@@ -1693,5 +1693,9 @@
   "settings.advanced.cw.activity.mapMotion.off": "关",
   "settings.advanced.cw.activity.mapMotion.on": "开",
   "settings.advanced.cw.activity.mapMotion.system": "跟随 Windows",
-  "settings.advanced.cw.activity.mapMotion.title": "活动地图的移动脉冲"
+  "settings.advanced.cw.activity.mapMotion.title": "活动地图的移动脉冲",
+  "settings.advanced.cw.resume.idleAsk.title": "恢复：重新打开长时间空闲的对话前先询问",
+  "settings.advanced.cw.resume.idleAsk.desc": "空闲时间超过下方时长的对话很可能已失去 CLI 的提示词缓存，因此恢复它可能会重新处理其全部上下文。“恢复”会先询问，提供重新开始的选项，并说明它已空闲多久、有多大；助手也会得到同样的信息并自行选择。通道或卡片的启动会改为给其构建者一个新对话，并以卡片作为提示词。Combwork 在重启、更新或退出后恢复的智能体照旧恢复。关闭后，所有恢复照旧进行，只保留 Claude Code 会话原有的缓存过期询问。",
+  "settings.advanced.cw.resume.idleMinutes.title": "恢复：对话空闲多久后算作长时间空闲",
+  "settings.advanced.cw.resume.idleMinutes.desc": "自对话最后一次活动（其记录文件的最后一条，否则为 Combwork 最后一次看到它的时间）起经过多久，恢复前就先询问。默认值是各 CLI 保留提示词缓存的最长时间：一小时。"
 }

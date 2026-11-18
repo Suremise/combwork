@@ -1693,5 +1693,9 @@
   "settings.advanced.cw.activity.mapMotion.off": "Desligado",
   "settings.advanced.cw.activity.mapMotion.on": "Ligado",
   "settings.advanced.cw.activity.mapMotion.system": "Como o Windows diz",
-  "settings.advanced.cw.activity.mapMotion.title": "Pulsos em movimento do mapa de atividade"
+  "settings.advanced.cw.activity.mapMotion.title": "Pulsos em movimento do mapa de atividade",
+  "settings.advanced.cw.resume.idleAsk.title": "Retomar: perguntar antes de reabrir uma conversa ociosa há muito tempo",
+  "settings.advanced.cw.resume.idleAsk.desc": "Uma conversa ociosa por mais tempo que o indicado abaixo muito provavelmente perdeu o cache de prompt da CLI, então retomá-la pode processar todo o contexto de novo. Retomar pergunta primeiro, oferece começar do zero e diz há quanto tempo ela está ociosa e qual é o tamanho; o Assistente recebe as mesmas informações e escolhe. O início de uma raia ou de um cartão dá ao executor uma conversa nova em vez disso, com o cartão como prompt. Os agentes que o Combwork retoma após uma reinicialização, uma atualização ou um encerramento são retomados como antes. Desligado, toda retomada segue como antes, só com a pergunta do cache expirado que as sessões do Claude Code tinham.",
+  "settings.advanced.cw.resume.idleMinutes.title": "Retomar: uma conversa conta como ociosa há muito tempo após",
+  "settings.advanced.cw.resume.idleMinutes.desc": "Quanto tempo desde a última atividade de uma conversa (a última entrada da transcrição, ou então quando o Combwork a viu pela última vez) até que retomá-la pergunte primeiro. O padrão é o cache de prompt mais longo que as CLIs mantêm: uma hora."
 }

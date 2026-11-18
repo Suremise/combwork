@@ -50,7 +50,7 @@ import { progress, progressSeq } from './progressService'
 import { mergeSlots, recoverMergeSlots, workspaceSlots } from './mergeSlotHost'
 import { followNames } from './projectRename'
 import { slotBranch } from './mergeSlots'
-import { endLane, laneReleaseCheck, lanesEndedSince, listLanes, stampLaneProjects } from './lanes'
+import { endLane, laneReleaseCheck, laneYieldTo, lanesEndedSince, listLanes, stampLaneProjects } from './lanes'
 import { editLanes, endedSinceOf, laneEditOf } from './laneEdits'
 import { laneStartInfo, oweFreshForTest, retryFreshStart, startLaneFromWindow } from './laneStart'
 import { loopChecksOf } from './loopCheck'
@@ -1665,6 +1665,11 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       return startLaneFromWindow(currentWorkspace(), workspace.assertProject(p), { builder: r.builder, reviewer: typeof r.reviewer === 'string' && r.reviewer ? r.reviewer : null, pool: r.pool === true, cards, note: typeof r.note === 'string' ? r.note.slice(0, 4000) : '', name: typeof r.name === 'string' ? r.name.slice(0, 200) : null, ...(r.applyNow === true ? { applyNow: true } : {}), ...(typeof r.target === 'string' && r.target ? { target: r.target.slice(0, 250) } : {}), ...(r.released && typeof r.released.target === 'string' && r.released.target && typeof r.released.reason === 'string' && r.released.reason.trim() ? { released: { target: r.released.target.slice(0, 250), reason: r.released.reason.trim().slice(0, 4000) } } : {}) })
     },
     'lanes:startInfo': (p) => laneStartInfo(currentWorkspace(), workspace.assertProject(p)),
+    'lanes:yieldTo': (p, builder, cards, behind) => {
+      const list = Array.isArray(cards) ? cards.filter((n: unknown): n is number => Number.isInteger(n) && (n as number) > 0).slice(0, 200) : []
+      if (typeof builder !== 'string' || !builder || !Number.isInteger(behind)) return null
+      return laneYieldTo(currentWorkspace(), basename(workspace.assertProject(p)), builder, list, behind)
+    },
     'lanes:releaseCheck': (p, builder, target) => laneReleaseCheck(currentWorkspace(), basename(workspace.assertProject(p)), typeof builder === 'string' ? builder : '', typeof target === 'string' && target ? target.slice(0, 250) : null),
     'costs:cards': (q) => {
       if (!workspace.path) return []

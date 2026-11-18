@@ -636,5 +636,7 @@
   "tips.versionControlJj.text": "Dans un dépôt jj, choisis jj en haut de l’onglet Gestion de versions : son Historique montre chaque id de changement à côté de son id de commit, et Comparer, Signets et Conflits lisent le dépôt sans le modifier. Combwork intègre le travail relu, ou tu le fais.",
   "tips.versionControlJj.title": "Voir un dépôt jj",
   "tips.activityMap.text": "Activité dessine ses agents en nid d’abeilles : chaque appel d’outil part vers sa station (Lire, Modifier, Shell, Agents, Outils, Toi), avec un anneau de contexte par agent. Choisis un agent dans Agents ▾ pour sa propre carte ; Afficher masque la carte, son fil et les anneaux.",
-  "tips.activityMap.title": "Une carte de ce que font tes agents"
+  "tips.activityMap.title": "Une carte de ce que font tes agents",
+  "tips.resumeLongIdle.title": "Une conversation inactive depuis longtemps demande avant de reprendre",
+  "tips.resumeLongIdle.text": "Une conversation inactive depuis plus d’une heure a très probablement perdu son cache des prompts, donc la reprendre peut coûter beaucoup de jetons. Reprendre indique depuis combien de temps elle est inactive et sa taille, et propose plutôt Archiver et repartir de zéro."
 }

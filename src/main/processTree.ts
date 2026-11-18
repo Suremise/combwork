@@ -225,6 +225,168 @@ export function treesToEnd(list: ListedProcess[], root: number | null, extra: Li
   return out
 }
 
+/** HI-3358: at most this many more ends after the first, for what the ended processes started after their listing. */
+export const LATE_ROUNDS = 3
+
+/**
+ * How long endTreeAsync's listing, and then its ending session (the end and its late rounds, HI-3358), may each take
+ * before they are ended. TREE_END_MS is the longest endTreeAsync takes without an MSYS search: a caller that waits for
+ * a teardown (opencode's shutdown) waits at least that.
+ */
+export const TREE_END_BOUNDS = { listMs: 10_000, endMs: 15_000 }
+export const TREE_END_MS = TREE_END_BOUNDS.listMs + TREE_END_BOUNDS.endMs
+
+/** What a teardown tells its caller, for the log. */
+export interface TeardownNotes {
+  /** HI-3358: the teardown may have left some of the tree running (its ending session didn't finish, or the late rounds ran out), and why. */
+  onLateLeft?: (why: string) => void
+}
+
+/**
+ * HI-3358: the PowerShell session endTreeAsync ends a tree with. It reads requests a line each and answers each, ending
+ * with `ok`: `end <pid>:<started>,…` ends each process only through a handle whose start time it checked, and keeps
+ * that handle until the session ends (`held <pid>:<started>`, then `ended <pid>` once ended); `list` prints every
+ * process as LIST_PS does. A process whose handle is held keeps its pid (Windows gives a pid to another process only
+ * once every handle to its process is closed), so while the session runs, a listed parent id that names a held process
+ * names that process.
+ */
+const END_SESSION_PS = [
+  '$held = New-Object System.Collections.ArrayList',
+  '$out = [Console]::Out',
+  'while ($null -ne ($l = [Console]::In.ReadLine())) {',
+  "  if ($l -eq 'list') { Get-CimInstance Win32_Process | ForEach-Object { $out.WriteLine(('{0} {1} {2}' -f $_.ProcessId, $_.ParentProcessId, ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds())) } }",
+  "  elseif ($l.StartsWith('end ')) { foreach ($t in $l.Substring(4).Split(',')) { $id, $at = $t.Split(':'); try { $p = [Diagnostics.Process]::GetProcessById([int]$id); $null = $p.Handle; if ([Math]::Abs(([DateTimeOffset]$p.StartTime).ToUnixTimeMilliseconds() - [long]$at) -le 1) { $null = $held.Add($p); $out.WriteLine(\"held $t\"); $p.Kill(); $out.WriteLine(\"ended $id\") } } catch {} } }",
+  "  $out.WriteLine('ok'); $out.Flush()",
+  '}'
+].join('\n')
+
+/** A running END_SESSION_PS: each request's answer (its lines before `ok`), null once the session has gone. */
+interface EndSession {
+  ask(request: string): Promise<string[] | null>
+  /** Ends the session (its stdin closed, so it exits), its handles released. */
+  close(): void
+}
+
+/** Starts END_SESSION_PS, ended at `timeoutMs` if it hasn't exited by then (whatever was asked of it then gets null). */
+function endSession(timeoutMs: number): EndSession {
+  let c: ChildProcess | null = null
+  try {
+    c = spawn(POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', END_SESSION_PS], { windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] })
+  } catch {
+    // answered null below
+  }
+  const waiting: ((lines: string[] | null) => void)[] = []
+  let lines: string[] = []
+  let rest = ''
+  let gone = !c
+  const end = (): void => {
+    gone = true
+    clearTimeout(t)
+    for (const w of waiting.splice(0)) w(null)
+  }
+  const t = setTimeout(() => {
+    try {
+      c?.kill()
+    } catch {
+      // gone
+    }
+    end()
+  }, timeoutMs)
+  c?.stdout?.on('data', (d: Buffer) => {
+    const parts = (rest + d.toString('utf8')).split(/\r?\n/)
+    rest = parts.pop() ?? ''
+    for (const l of parts.map((x) => x.trim())) {
+      if (l !== 'ok') lines.push(l)
+      else {
+        waiting.shift()?.(lines)
+        lines = []
+      }
+    }
+  })
+  c?.stdin?.on('error', () => undefined)
+  c?.once('error', end)
+  c?.once('close', end)
+  return {
+    ask: (request) =>
+      new Promise((res) => {
+        if (gone || !c?.stdin?.writable) return res(null)
+        waiting.push(res)
+        c.stdin.write(`${request}\n`)
+      }),
+    close: () => {
+      try {
+        c?.stdin?.end()
+      } catch {
+        // gone
+      }
+    }
+  }
+}
+
+/** The request that ends `targets` (END_SESSION_PS's `end`). */
+const endRequest = (targets: ListedProcess[]): string => `end ${targets.map((t) => `${t.pid}:${t.started}`).join(',')}` // i18n-ignore: a request to PowerShell
+
+/** Of `targets`, those an `end` answer says it holds (`held <pid>:<started>`). */
+const heldOf = (answer: string[], targets: ListedProcess[]): ListedProcess[] => targets.filter((t) => answer.includes(`held ${t.pid}:${t.started}`))
+
+/** The pids an `end` answer says it ended. */
+const endedOf = (answer: string[]): number[] => answer.flatMap((l) => (/^ended (\d+)$/.test(l) ? [Number(l.slice(6))] : []))
+
+/**
+ * HI-3358: the processes of `list` (read while `held` were held: END_SESSION_PS) that a held process started, each with
+ * what it started in turn (treeToEnd, read from the same listing), children before their parents, none of `tried`
+ * again. A process counts only when its parent id names a held process and it started no earlier than that process:
+ * that pid has named the held process from its start until now, so the parent id is it. One whose parent was never
+ * held (it had exited before its end, or its pid named another process by then) is left: its parent id is only a
+ * number, which may name a process started since.
+ */
+export function lateStarted(list: ListedProcess[], held: ListedProcess[], tried: ListedProcess[]): ListedProcess[] {
+  const same = (a: ListedProcess, b: ListedProcess): boolean => a.pid === b.pid && a.started === b.started
+  const late = list.filter((k) => !tried.some((d) => same(d, k)) && held.some((p) => p.pid === k.parent && k.started >= p.started))
+  return treesToEnd(list, null, late).filter((p) => !tried.some((d) => same(d, p)))
+}
+
+/**
+ * Ends `tree` in one END_SESSION_PS (bounded: TREE_END_BOUNDS.endMs), then (HI-3358) lists again and ends what the held
+ * processes started since (lateStarted), until a listing finds none or LATE_ROUNDS more ends have run; what may be left
+ * is said (onLateLeft). Returns the pids the first end ended.
+ */
+async function endFollowing(tree: ListedProcess[], notes: TeardownNotes): Promise<number[]> {
+  const s = endSession(TREE_END_BOUNDS.endMs)
+  try {
+    const first = await s.ask(endRequest(tree))
+    if (!first) {
+      notes.onLateLeft?.('its ending session ended before it answered the end') // i18n-ignore: for the log
+      return []
+    }
+    const held = heldOf(first, tree)
+    const tried = [...tree]
+    for (let round = 1; ; round++) {
+      const listed = await s.ask('list')
+      if (!listed) {
+        notes.onLateLeft?.('its ending session ended before a listing after the end') // i18n-ignore: for the log
+        break
+      }
+      const late = lateStarted(parseProcessList(listed.join('\n')), held, tried)
+      if (!late.length) break
+      if (round > LATE_ROUNDS) {
+        notes.onLateLeft?.(`it was still starting processes after ${LATE_ROUNDS} more ends`) // i18n-ignore: for the log
+        break
+      }
+      const answer = await s.ask(endRequest(late))
+      if (!answer) {
+        notes.onLateLeft?.('its ending session ended during a late end') // i18n-ignore: for the log
+        break
+      }
+      held.push(...heldOf(answer, late))
+      tried.push(...late)
+    }
+    return endedOf(first)
+  } finally {
+    s.close()
+  }
+}
+
 /**
  * endTree without blocking the caller's thread (HI-1185: Electron's main thread carries every keystroke): the same
  * listing, identity check and order, through PowerShell runs it awaits rather than spawnSync. With `msys` (HI-3047), the
@@ -237,14 +399,20 @@ export function treesToEnd(list: ListedProcess[], root: number | null, extra: Li
  * already name another process, so no tree is walked from that number. Its marked MSYS programs, found by their marker,
  * not their parent, are still ended with what they started; native programs it started, whose parent is then only a
  * number, are left, as when it exits before any teardown.
+ *
+ * HI-3358: the listing is one moment, and a process the tree starts after it, before the end, wasn't in it. The end
+ * runs in a session that holds each process it ends, then lists again and ends what those started since (endFollowing,
+ * by identity), so a command still starting processes as its bound fires leaves none of them running (notes.onLateLeft
+ * says what may have been). Bounded: TREE_END_MS, plus the MSYS search's bounds with `msys`. The promise settles once
+ * those rounds are over.
  */
-export async function endTreeAsync(child: ChildProcess, platform = process.platform, msys?: MsysMark): Promise<void> {
+export async function endTreeAsync(child: ChildProcess, platform = process.platform, msys?: MsysMark, notes: TeardownNotes = {}): Promise<void> {
   const exited = (): boolean => child.exitCode !== null || child.signalCode !== null
   if (exited()) return
   if (platform === 'win32' && child.pid) {
     // Searched before the listing: a match's process must still be the one listed (msysMatches).
     const found = msys ? await (msys.discover ?? findMsysMarked)(msys).catch((e: Error) => ({ error: `it couldn't run (${e.message})` })) : null // i18n-ignore: for the log
-    const list = parseProcessList(await powershell(LIST_PS))
+    const list = parseProcessList(await powershell(LIST_PS, TREE_END_BOUNDS.listMs))
     // Read after the listing, in the same turn as the walk (HI-3054): not exited yet, so the listing's entry is its own.
     const root = exited() ? null : child.pid
     let extra: ListedProcess[] = []
@@ -254,7 +422,7 @@ export async function endTreeAsync(child: ChildProcess, platform = process.platf
       else msys.onIncomplete?.('error' in found ? found.error : 'its answer was malformed') // i18n-ignore: for the log
     }
     const tree = treesToEnd(list, root, extra)
-    const ended = tree.length ? pidsOf(await powershell(endListedPs(tree))) : []
+    const ended = tree.length ? await endFollowing(tree, notes) : []
     if (root === null || ended.includes(root)) return
   }
   try {
@@ -279,11 +447,11 @@ export interface TreeEnding {
  * spawnSync (about 2.4 s of the thread for PowerShell's listing and ending), and whatever waited on the tree having ended
  * (an outcome, a time-out's grace) waits on the teardown instead. Never rejects.
  */
-export function treeEnding(platform = process.platform, msys?: MsysMark): TreeEnding {
+export function treeEnding(platform = process.platform, msys?: MsysMark, notes: TeardownNotes = {}): TreeEnding {
   let teardown: Promise<void> | null = null
   return {
     end: (child) => {
-      if (child && !teardown) teardown = endTreeAsync(child, platform, msys).catch(() => undefined)
+      if (child && !teardown) teardown = endTreeAsync(child, platform, msys, notes).catch(() => undefined)
     },
     after: (fn) => {
       if (teardown) void teardown.then(fn)

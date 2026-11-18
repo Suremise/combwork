@@ -325,7 +325,9 @@ it. The side slot and model trials are set beside it (HI-2070), read the same wa
 
 **Unit tests under load.** `npm test` uses half the cores (`maxWorkers: '50%'` in `vitest.config.ts`) and allows 20 s
 a test and 30 s a hook, so a full run beside an e2e set doesn't hit Vitest's 5 s default. A test that needs longer says
-so itself (`it(…, 60_000)`), and a test that waits for something waits for it (polling), not for a fixed time.
+so itself (`it(…, 60_000)`), and a test that waits for something waits for it (polling), not for a fixed time. CI's
+run on GitHub's runner uses one worker (`--maxWorkers=1` in `.github/workflows/ci.yml`, HI-3355): with two, a test file
+there took several times as long as here, and bounds meant for a hung run tripped.
 
 ## Which suites to run, and who runs them
 

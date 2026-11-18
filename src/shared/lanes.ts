@@ -171,6 +171,8 @@ export function waitsOnCard(c: { blockedBy: readonly number[]; waitingFor?: { re
 export interface YieldCard {
   column: string
   archived?: boolean
+  /** Why it is blocked (HI-3368: a blocked first card can't start, so the lane never yields to it). */
+  blocked?: string | null
   agent?: string | null
   blockedBy: readonly number[]
   waitingFor?: { reason: string } | null
@@ -180,10 +182,12 @@ export interface YieldCard {
 /**
  * HI-3323: the card a new list (`list`) makes its lane yield to, or null: the list keeps the builder's card in flight
  * `behind` (in Doing, its own or nobody's), and its first own open card (not Done or archived, the builder's or nobody's)
- * is another, in Todo, that `behind` waits on (waitsOnCard). One rule for the lanes' save (yieldOf), a reorder applied now
- * and Start Lane's hint, so what the window says is what a start does.
+ * is another, in Todo, that `behind` waits on (waitsOnCard), and that can start (HI-3368): not blocked, and not waiting on
+ * its own dependencies (`depsWait`: where its rules start it only once they are Done). A first card that can't start would
+ * put `behind` back for nothing, its builder idle: the list then waits as any queued change. One rule for the lanes' save
+ * (yieldOf), a reorder applied now and Start Lane's hint, so what the window says is what a start does.
  */
-export function laneYieldFirst(list: readonly number[], behind: number, cardOf: (n: number) => YieldCard | null | undefined, builder: string): number | null {
+export function laneYieldFirst(list: readonly number[], behind: number, cardOf: (n: number) => YieldCard | null | undefined, builder: string, depsWait: (n: number) => boolean = () => false): number | null {
   if (!list.includes(behind)) return null
   const c = cardOf(behind)
   if (!c || c.archived || c.column !== 'doing' || (c.agent && c.agent !== builder)) return null
@@ -193,7 +197,7 @@ export function laneYieldFirst(list: readonly number[], behind: number, cardOf: 
   })
   if (first === undefined || first === behind) return null
   const f = cardOf(first)
-  return f && f.column === 'todo' && waitsOnCard(c, first, f.key) ? first : null
+  return f && f.column === 'todo' && !f.blocked && waitsOnCard(c, first, f.key) && !depsWait(first) ? first : null
 }
 
 /** A lane's due card's dependency wait (HI-2618, LaneRecord.depEpisode). */

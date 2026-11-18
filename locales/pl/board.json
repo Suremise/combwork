@@ -1191,5 +1191,6 @@
   "board.workQueue.testing": "Trwa testowanie: {step}",
   "board.workQueue.unreadRef": "nie odczytano",
   "board.workQueue.waiting": "W kolejce do {target}, czeka, aż {cards} trafi do Gotowe",
-  "board.workflows": "Przepływy pracy"
+  "board.workflows": "Przepływy pracy",
+  "board.laneStart.yieldCantStart": "Karta {card} czeka na kartę {first}, która nie może jeszcze wystartować (jest zablokowana albo czeka na własną kartę): ta lista zacznie obowiązywać, gdy karta {card} będzie gotowa, a „Zastosuj teraz” wcześniej niczego nie zmienia."
 }

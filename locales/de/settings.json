@@ -1693,5 +1693,9 @@
   "settings.advanced.cw.activity.mapMotion.off": "Aus",
   "settings.advanced.cw.activity.mapMotion.on": "Ein",
   "settings.advanced.cw.activity.mapMotion.system": "Wie Windows es sagt",
-  "settings.advanced.cw.activity.mapMotion.title": "Bewegte Impulse der Aktivitätskarte"
+  "settings.advanced.cw.activity.mapMotion.title": "Bewegte Impulse der Aktivitätskarte",
+  "settings.advanced.cw.resume.idleAsk.title": "Fortsetzen: vor dem Öffnen einer lange ruhenden Unterhaltung fragen",
+  "settings.advanced.cw.resume.idleAsk.desc": "Eine Unterhaltung, die länger als die unten angegebene Zeit ruht, hat den Prompt-Cache der CLI höchstwahrscheinlich verloren, daher wird beim Fortsetzen womöglich ihr ganzer Kontext erneut verarbeitet. „Fortsetzen“ fragt zuerst, bietet einen Neuanfang an und sagt, wie lange sie ruht und wie groß sie ist; der Assistent erfährt dasselbe und entscheidet. Der Start einer Lane oder Karte gibt ihrem Bearbeiter stattdessen eine neue Unterhaltung, mit der Karte als Prompt. Agenten, die Combwork nach einem Neustart, einem Update oder einem Beenden fortsetzt, werden wie bisher fortgesetzt. Ausgeschaltet läuft jedes Fortsetzen wie bisher, nur mit der Frage zum abgelaufenen Cache, die Sitzungen von Claude Code hatten.",
+  "settings.advanced.cw.resume.idleMinutes.title": "Fortsetzen: eine Unterhaltung gilt als lange ruhend nach",
+  "settings.advanced.cw.resume.idleMinutes.desc": "Wie lange seit der letzten Aktivität einer Unterhaltung (dem letzten Eintrag ihres Transkripts, sonst dem Zeitpunkt, zu dem Combwork sie zuletzt sah), bevor ihr Fortsetzen zuerst fragt. Der Standard ist der längste Prompt-Cache, den die CLIs halten: eine Stunde."
 }

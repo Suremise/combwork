@@ -219,6 +219,10 @@
     "defaultMessage": "{s}s",
     "description": "A very short duration in seconds (\"40s\"), as a compact figure. Keep it as short as possible."
   },
+  "actions.idleResume.message": {
+    "defaultMessage": "{what, select, conversation {This conversation} other {This session}} was last active {unit, select, days {{days, plural, one {# day} other {# days}}} other {{duration}}} ago{size, select, tokens {, with about {tokens} tokens of context} bytes {; its transcript is {bytes}} other {}}. It has most likely lost its prompt cache, so resuming may process that context again.",
+    "description": "The question before resuming a session (what: other) or an Assistant conversation idle for a long time (HI-3360). unit: days, {days} whole days; other, {duration} a short duration such as 5 h. size: tokens, about {tokens} tokens (\"120K\") of context; bytes, only the transcript's size on disk is known ({bytes}, such as 4.2 MB: never call it tokens); other, nothing is known. A prompt cache is what the CLI keeps of a conversation so a resumed one is read cheaply: it is an estimate, so keep the 'most likely' and 'may'."
+  },
   "actions.keys.ctrl": {
     "defaultMessage": "Ctrl",
     "description": "The Ctrl key's name as shortcuts show it (\"Ctrl+B\"): as printed on keyboards in the language (German: Strg)."
@@ -783,9 +787,13 @@
     "defaultMessage": "{n, plural, one {Resume All left one agent} other {Resume All left # agents}}",
     "description": "A notification's title after Resume All (#1434): it left {n} agents stopped, whose conversations can't resume now where they ran (a slot that is free, so only their own Resume takes it, or holds other work); the lines below say why."
   },
+  "actions.resumeAll.idleLine": {
+    "defaultMessage": "• {agent} — last active {unit, select, days {{days, plural, one {# day} other {# days}}} other {{duration}}} ago{size, select, tokens {, about {tokens} tokens} bytes {, transcript {bytes}} other {}}",
+    "description": "A line of Resume All's question (HI-3360): an agent ({agent}) whose conversation has been idle a long time. unit: days, {days} whole days; other, {duration} a short duration such as 5 h. size: tokens, about {tokens} tokens (\"120K\") of context; bytes, only its transcript's size on disk is known ({bytes}, such as 4.2 MB: never call it tokens); other, nothing is known."
+  },
   "actions.resumeAll.message": {
-    "defaultMessage": "The prompt cache has expired for {who, select, all {all of them} other {{cold, plural, one {one agent} other {# agents}}}}. Resuming re-caches on the first message:",
-    "description": "Resume All's question, above the agents whose prompt cache expired: all of them (all), or how many ({cold})."
+    "defaultMessage": "The prompt cache has most likely expired for {who, select, all {all of them} other {{cold, plural, one {one agent} other {# agents}}}}. Resuming may process their context again on the first message:",
+    "description": "Resume All's question, above the agents whose prompt cache has expired or most likely expired (HI-3360: idle a long time): all of them (all), or how many ({cold}). An estimate: keep 'most likely' and 'may'."
   },
   "actions.resumeAll.nothing": {
     "defaultMessage": "Nothing to resume",

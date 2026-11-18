@@ -26,7 +26,7 @@ import { routePattern } from './routePattern'
 import { fallbackEfforts, infoAt, listedConnections, offeredModels } from '../shared/models'
 import { agentRuntime, hooksMissingText, retryWaitText, unknownStateText } from '../shared/runtime'
 import { ASSISTANT_AGENT_ID, ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
-import { timeLeft } from '../shared/progress'
+import { shortDuration, timeLeft } from '../shared/progress'
 import { ProgressError, admitReport, type ProgressCaller } from './progress'
 import { progress, progressGate } from './progressService'
 import { cardOfRef, isCardRef, keysForSearch, withCardNames } from './projectKeys'
@@ -1034,11 +1034,26 @@ route('GET', '/v1/projects/:name/sessions', async ({ params }) => {
   return sessions.list(p)
 })
 
+/**
+ * HI-3360: a start that would resume a long-idle conversation (`resumeId`, latest or named alike) is refused until its
+ * caller chooses: its age and size said, and `resumeIdle: true` to resume it anyway. The window asks its own question.
+ */
+async function refuseColdResume(p: string, agent: string, resumeId: string | undefined, body: any): Promise<void> {
+  if (!resumeId || body?.resumeIdle === true) return
+  const idle = await sessions.idleOf(p, resumeId).catch(() => null)
+  if (!idle) return
+  const size = idle.tokens !== null ? 'tokens' : idle.bytes !== null ? 'bytes' : 'other'
+  throw new HttpError(409, apiSaid(API.agent.idleResume, { agent, session: resumeId, idle: shortDuration(idle.idleMs), size, tokens: String(idle.tokens ?? ''), bytes: idle.bytes !== null ? `${(idle.bytes / 1048576).toFixed(1)} MB` : '' })) // agent-facing English, never the window's units
+}
+
 route('POST', '/v1/projects/:name/sessions', async ({ params, body }) => {
   const p = projectByName(params[0])
   if (assistantCaller()) throw new HttpError(400, apiSaid(API.agent.useStartAgent))
   ownProjectOnly(p, [API.own.starting])
-  return sessions.start(p, { resumeId: body?.resumeId, name: body?.name, agentId: await agentParam(p, body?.agent) })
+  const agentId = await agentParam(p, body?.agent)
+  const resumeId = typeof body?.resumeId === 'string' && body.resumeId ? body.resumeId : undefined
+  if (resumeId) await refuseColdResume(p, agentId ? (await agentDefOf(p, agentId)).name : '', resumeId, body)
+  return sessions.start(p, { resumeId: body?.resumeId, name: body?.name, agentId })
 })
 
 route('POST', '/v1/projects/:name/stop', async ({ params, query, body }) => {
@@ -1675,6 +1690,7 @@ route('POST', '/v1/projects/:name/agents/:agent/start', async ({ params, body })
       resumeId = (await workspace.projectInfo(p)).agents.find((x) => x.id === agentId)?.resume?.id
       if (!resumeId) throw new HttpError(409, apiSaid(API.agent.noConversation, { agent: a.name }))
     }
+    await refuseColdResume(p, a.name, resumeId, body)
     const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''
     const st = prompt ? await startOnTask(p, agentId, a.name, prompt, (line) => sessions.start(p, { agentId, resumeId, prompt: line, allowed: guard })) : await sessions.start(p, { agentId, resumeId, allowed: guard })
     // A resume that started a new conversation says so, and why (HI-2540).
