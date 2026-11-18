@@ -91,6 +91,7 @@ function sharedTexts(): { name: string; text: string }[] {
     status({ reason: 'startWait', why: 'refused', agent: 'B1', slot: 'slot-b', held: 'session', heldBy: 'CB1' }),
     status({ reason: 'startWait', why: 'refused', agent: 'B1', slot: 'slot-b', held: 'session' }),
     status({ reason: 'startWait', why: 'refused', agent: 'B1', slot: 'slot-b', held: 'process' }),
+    status({ reason: 'startWait', why: 'refused', agent: 'B1', slot: 'slot-b', held: 'card', heldBy: 'B1', heldFor: 7 }),
     status({ reason: 'startWait', why: 'refused', agent: 'B1', slot: 'slot-b', held: 'left', heldBy: 'B1', program: 'node' }),
     status({ reason: 'startWait', why: 'refused', agent: 'B1', slot: 'slot-b', held: 'left', heldBy: 'B1', program: 'node', more: 3 }),
     status({ reason: 'startWait', why: 'refused', agent: 'B1', slot: 'slot-b', held: 'lastRun', heldBy: 'B1' }),

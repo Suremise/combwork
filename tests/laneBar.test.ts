@@ -518,6 +518,8 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     // HI-2468: a running builder's start refused for its slot held: the slot and what holds it; else as before.
     const refusedStart = { reason: 'startWait' as const, card: 12, why: 'refused' as const, agent: 'B1' }
     expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'session', heldBy: 'CB1' }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (CB1’s session is still in it), and Combwork tries again')
+    // HI-3353: its builder's one slot lent to a card: in HI-3168's words.
+    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'card', heldBy: 'B1', heldFor: 7 }, name, tr)).toBe('waiting for a slot: B1 still builds in slot-a for HI-7, which keeps it until that card is Done or put back')
     expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'process' }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (a process still has a file or folder in it open), and Combwork tries again')
     expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer', idle: false }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (a process still has a file or folder in it open: Windows Sandbox’s broker (WindowsSandboxServer) is working in it, with a Sandbox running), and Combwork tries again')
     expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'left', heldBy: 'B1', program: 'node' }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (B1’s last run left node running in it), and Combwork tries again')

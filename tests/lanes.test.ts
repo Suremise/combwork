@@ -130,6 +130,10 @@ describe('a lane on slots (#1438)', () => {
     expect(laneLine(view({ slot: 'slot-a', held: 'left', agent: 'B1', program: 'node', more: 2 }))).toContain("slot-a still in use (B1's last run left node and 2 more running in it); Combwork tries again")
     expect(view({ slot: 'slot-a', held: 'left', agent: 'B1', program: 'node', more: 2 }).status).toMatchObject({ held: 'left', heldBy: 'B1', program: 'node', more: 2 })
     expect(laneLine(view({ slot: 'slot-a', held: 'lastRun', agent: 'B1' }))).toContain("slot-a still in use (B1's last run there isn't known to have ended); Combwork tries again")
+    // HI-3353: its builder's one slot lent to a card: that slot and card, as a lane waiting for a slot says it (HI-3168).
+    const byCard = view({ slot: 'slot-b', held: 'card', agent: 'B1', card: 7 })
+    expect(byCard.status).toEqual({ reason: 'startWait', card: 2, why: 'refused', agent: 'B1', slot: 'slot-b', held: 'card', heldBy: 'B1', heldFor: 7 })
+    expect(laneLine(byCard)).toContain('waiting for a slot: B1 still builds in slot-b for #7, which keeps it until that card is Done or put back')
     // Refused for another reason, or nothing held any more: as before HI-2468.
     const bare = view()
     expect(bare.status).toEqual({ reason: 'startWait', card: 2, why: 'refused', agent: 'B1' })
