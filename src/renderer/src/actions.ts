@@ -20,6 +20,9 @@ import { shownText } from '@shared/advanced'
 import { fmt, tr } from '@shared/i18n'
 import { msg } from '@shared/i18n/msg'
 import { freshQuestion } from './freshResume'
+import { IDLE_RESUME_FLOOR_TOKENS, type IdleResume } from '@shared/sessionFresh'
+import { durationText } from '@shared/tasks'
+import { formatBytes } from '@shared/units'
 import { HAND_OVER_TEXT } from '@shared/handOver'
 import type { McpCatalogRow, McpServerInfo, ProjectInfo, ProviderId, SessionLayout, SessionListItem, SessionView, TemplateLoadPlan, ToastAction } from '@shared/types'
 import type { TemplateWorkflow } from '@shared/workflow/templateOptions'
@@ -593,7 +596,34 @@ export function agentsForSession(p: ProjectInfo, item: Pick<SessionListItem, 'cw
   return p.agents.filter((a) => sessionInAgentFolder(p.path, a, item))
 }
 
-type ResumeItem = Pick<SessionListItem, 'id' | 'recache' | 'title' | 'name' | 'agentId' | 'agentName' | 'cwd' | 'slot' | 'hold' | 'fresh'> & { provider?: ProviderId }
+/**
+ * HI-3360: why resuming a long-idle conversation may cost tokens, for Resume's question: how long ago it was last active
+ * (days past two, else a duration) and its size as far as it is known, worded as an estimate.
+ */
+function idleMessage(idle: IdleResume, what: 'conversation' | 'session'): string {
+  const days = Math.floor(idle.idleMs / 86_400_000)
+  const size = idle.tokens !== null ? 'tokens' : idle.bytes !== null ? 'bytes' : 'none'
+  return tr(
+    msg({
+      id: 'actions.idleResume.message',
+      defaultMessage: '{what, select, conversation {This conversation} other {This session}} was last active {unit, select, days {{days, plural, one {# day} other {# days}}} other {{duration}}} ago{size, select, tokens {, with about {tokens} tokens of context} bytes {; its transcript is {bytes}} other {}}. It has most likely lost its prompt cache, so resuming may process that context again.',
+      description: "The question before resuming a session (what: other) or an Assistant conversation idle for a long time (HI-3360). unit: days, {days} whole days; other, {duration} a short duration such as 5 h. size: tokens, about {tokens} tokens (\"120K\") of context; bytes, only the transcript's size on disk is known ({bytes}, such as 4.2 MB: never call it tokens); other, nothing is known. A prompt cache is what the CLI keeps of a conversation so a resumed one is read cheaply: it is an estimate, so keep the 'most likely' and 'may'."
+    }),
+    { what, unit: days >= 2 ? 'days' : 'other', days, duration: durationText(idle.idleMs, tr), size, tokens: idle.tokens !== null ? formatTokens(idle.tokens) : '', bytes: idle.bytes !== null ? formatBytes(idle.bytes) : '' }
+  ) // i18n-ignore: select keys, never shown
+}
+
+/** HI-3360: a line of Resume All's question for an agent whose conversation is long idle: its age and size, as idleMessage says them. */
+function idleLine(agent: string, idle: IdleResume): string {
+  const days = Math.floor(idle.idleMs / 86_400_000)
+  const size = idle.tokens !== null ? 'tokens' : idle.bytes !== null ? 'bytes' : 'none'
+  return tr(
+    msg({ id: 'actions.resumeAll.idleLine', defaultMessage: '• {agent} — last active {unit, select, days {{days, plural, one {# day} other {# days}}} other {{duration}}} ago{size, select, tokens {, about {tokens} tokens} bytes {, transcript {bytes}} other {}}', description: "A line of Resume All's question (HI-3360): an agent ({agent}) whose conversation has been idle a long time. unit: days, {days} whole days; other, {duration} a short duration such as 5 h. size: tokens, about {tokens} tokens (\"120K\") of context; bytes, only its transcript's size on disk is known ({bytes}, such as 4.2 MB: never call it tokens); other, nothing is known." }),
+    { agent, unit: days >= 2 ? 'days' : 'other', days, duration: durationText(idle.idleMs, tr), size, tokens: idle.tokens !== null ? formatTokens(idle.tokens) : '', bytes: idle.bytes !== null ? formatBytes(idle.bytes) : '' }
+  ) // i18n-ignore: select keys, never shown
+}
+
+type ResumeItem = Pick<SessionListItem, 'id' | 'idle' | 'recache' | 'title' | 'name' | 'agentId' | 'agentName' | 'cwd' | 'slot' | 'hold' | 'fresh'> & { provider?: ProviderId }
 
 /**
  * What a restart resumes (stopped, then resumed at once): its running conversation, with its name, folder and slot as the
@@ -652,16 +682,19 @@ async function resume(path: string, item: ResumeItem, held: string | null, agent
     const assistant = isAssistantPath(path)
     const ok = await confirm({ ...freshQuestion(item.fresh, { assistant, agent: agentOf(p, target)?.name ?? item.agentName ?? '' }), action: 'start' })
     if (!ok) return
-  } else if (item.recache && !item.recache.warm && item.recache.tokens > 20000) {
+  } else if (item.idle || (item.recache && !item.recache.warm && item.recache.tokens > IDLE_RESUME_FLOOR_TOKENS)) {
     // The Combwork Assistant's are conversations; an agent's are sessions.
     const what = isAssistantPath(path) ? 'conversation' : 'session'
     const choice = await choose({
       title: tr(msg({ id: 'actions.recache.title', defaultMessage: '{what, select, conversation {Resume conversation?} other {Resume session?}}', description: "Title of the question before resuming a session (other) or an Assistant conversation whose prompt cache expired." }), { what }),
-      message: tr(msg({ id: 'actions.recache.message', defaultMessage: '{what, select, conversation {The prompt cache for this conversation has expired.} other {The prompt cache for this session has expired.}} Resuming will re-cache about {tokens} tokens on the first message.', description: "The question before resuming a session whose prompt cache expired: resuming costs about {tokens} tokens (\"120K\") again." }), { what, tokens: formatTokens(item.recache.tokens) }),
+      // Long idle (HI-3360): its age and size, as an estimate (tokens when known, else the transcript's size, never called
+      // tokens); else the expired cache, as before.
+      message: item.idle ? idleMessage(item.idle, what) : tr(msg({ id: 'actions.recache.message', defaultMessage: '{what, select, conversation {The prompt cache for this conversation has expired.} other {The prompt cache for this session has expired.}} Resuming will re-cache about {tokens} tokens on the first message.', description: "The question before resuming a session whose prompt cache expired: resuming costs about {tokens} tokens (\"120K\") again." }), { what, tokens: formatTokens(item.recache?.tokens ?? 0) }),
       detail: tr(msg({ id: 'actions.recache.detail', defaultMessage: '{what, select, conversation {To save tokens, archive it and start a fresh conversation instead. The archived one stays readable.} other {To save tokens, archive it and start a fresh session instead. The archived one stays readable, and a handover note can carry the work on.}}', description: 'Under the question before resuming a session (other) or an Assistant conversation whose prompt cache expired.' }), { what }),
+      // The last is the default (HI-3360): Archive and Start Fresh, Resume one click away.
       choices: [
-        { label: tr(msg({ id: 'actions.recache.fresh', defaultMessage: 'Archive and Start Fresh', description: 'Button: archives the session and starts a new one.' })), value: 'fresh', action: 'archive-start' },
-        { label: tr(msg({ id: 'actions.recache.resume', defaultMessage: 'Resume', description: 'Button: resumes the session anyway.' })), value: 'resume', action: 'resume' }
+        { label: tr(msg({ id: 'actions.recache.resume', defaultMessage: 'Resume', description: 'Button: resumes the session anyway.' })), value: 'resume', action: 'resume' },
+        { label: tr(msg({ id: 'actions.recache.fresh', defaultMessage: 'Archive and Start Fresh', description: 'Button: archives the session and starts a new one.' })), value: 'fresh', action: 'archive-start' }
       ]
     })
     if (!choice) return
@@ -819,14 +852,15 @@ async function resumeAll_(path: string): Promise<void> {
     if (a.live) return []
     const s = list.find((x) => x.id === a.resume!.id)
     // One that starts a new conversation (HI-2540) re-caches nothing.
+    if (s?.idle && !s.fresh) return [idleLine(a.name, s.idle)]
     const r = s && !s.fresh ? s.recache : null
-    return r && !r.warm && r.tokens > 20000 ? [tr(msg({ id: 'actions.resumeAll.coldLine', defaultMessage: '• {agent} — about {tokens} tokens', description: "A line of Resume All's question: an agent ({agent}) whose prompt cache expired, and about how many tokens ({tokens}: \"120K\") resuming re-caches." }), { agent: a.name, tokens: formatTokens(r.tokens) })] : []
+    return r && !r.warm && r.tokens > IDLE_RESUME_FLOOR_TOKENS ? [tr(msg({ id: 'actions.resumeAll.coldLine', defaultMessage: '• {agent} — about {tokens} tokens', description: "A line of Resume All's question: an agent ({agent}) whose prompt cache expired, and about how many tokens ({tokens}: \"120K\") resuming re-caches." }), { agent: a.name, tokens: formatTokens(r.tokens) })] : []
   })
   if (cold.length) {
     const n = stopped.length
     const ok = await confirm({
       title: tr(msg({ id: 'actions.resumeAll.title', defaultMessage: '{n, plural, one {Resume the agent?} other {Resume all agents?}}', description: "Title of Resume All's question about expired prompt caches ({n} agents to resume)." }), { n }),
-      message: tr(msg({ id: 'actions.resumeAll.message', defaultMessage: 'The prompt cache has expired for {who, select, all {all of them} other {{cold, plural, one {one agent} other {# agents}}}}. Resuming re-caches on the first message:', description: "Resume All's question, above the agents whose prompt cache expired: all of them (all), or how many ({cold})." }), { who: cold.length === n && cold.length > 1 ? 'all' : 'some', cold: cold.length }),
+      message: tr(msg({ id: 'actions.resumeAll.message', defaultMessage: 'The prompt cache has most likely expired for {who, select, all {all of them} other {{cold, plural, one {one agent} other {# agents}}}}. Resuming may process their context again on the first message:', description: "Resume All's question, above the agents whose prompt cache has expired or most likely expired (HI-3360: idle a long time): all of them (all), or how many ({cold}). An estimate: keep 'most likely' and 'may'." }), { who: cold.length === n && cold.length > 1 ? 'all' : 'some', cold: cold.length }),
       detail: cold.join('\n'),
       confirmLabel: tr(msg({ id: 'actions.resumeAll.confirm', defaultMessage: '{n, plural, one {Resume} other {Resume all}}', description: "Resume All's button ({n} agents)." }), { n }),
       action: 'resume'

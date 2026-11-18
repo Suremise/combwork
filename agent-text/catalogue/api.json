@@ -18,6 +18,10 @@
   "api.agent.freshWhySession": {
     "text": "the Assistant's session that asked for it ended meanwhile"
   },
+  "api.agent.idleResume": {
+    "text": "{agent}'s conversation {session} was last active {idle} ago{size, select, tokens {, with about {tokens} tokens of context} bytes {; its transcript is {bytes}} other {}}. It has most likely lost its prompt cache, so resuming it may process that context again; a fresh conversation may save tokens. Leave resume out for a new conversation, or pass resumeIdle: true to resume this one anyway.",
+    "note": "HI-3360: a start that would resume a long-idle conversation is refused until the caller chooses. {idle}: how long, such as 3 h 5 min; size: tokens (the context's, when the CLI says), bytes (only the transcript's size known: never called tokens), other (neither). resume and resumeIdle are the start's arguments."
+  },
   "api.agent.inputDisabled": {
     "text": "Session input is disabled. Enable it in Settings → Agent API."
   },

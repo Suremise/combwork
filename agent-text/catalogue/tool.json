@@ -634,7 +634,7 @@
     "text": "Token usage, cache use and compaction history for a project session (the live one by default), as JSON. days=true adds its usage by day."
   },
   "tool.startAgent.description": {
-    "text": "Start a stopped agent: a new conversation, or resume=true for its last; with prompt, on that task. For a card, use cw_start_task. A folder new to its CLI asks the user to trust it first: tell them."
+    "text": "Start a stopped agent: a new conversation, or resume=true for its last; with prompt, on that task. A long-idle conversation is refused with its age and size: resume it only with resumeIdle=true. For a card, use cw_start_task. A folder new to its CLI asks the user to trust it first: tell them."
   },
   "tool.startAgent.reply.started": {
     "text": "{resumed, select, yes {Resumed} other {Started}} {agent} in {project}: {status}{hasSession, select, yes {, session {session}} other {}}. Follow it with cw_wait_for_agents."

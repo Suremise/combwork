@@ -636,5 +636,7 @@
   "tips.versionControlJj.text": "Em um repositório jj, escolha jj no alto da aba Controle de versão: o Histórico mostra cada change id ao lado do seu commit id, e Comparar, Bookmarks e Conflitos leem o repositório sem alterá-lo. O Combwork integra o trabalho revisado, ou você faz isso.",
   "tips.versionControlJj.title": "Veja um repositório jj",
   "tips.activityMap.text": "Atividade desenha seus agentes como um favo de mel: cada chamada de ferramenta vai até sua estação (Ler, Editar, Shell, Agentes, Ferramentas, Você), com um anel de contexto por agente. Escolha um agente em Agentes ▾ para ver o mapa dele; Mostrar desliga o mapa, seu registro e os anéis.",
-  "tips.activityMap.title": "Um mapa do que seus agentes estão fazendo"
+  "tips.activityMap.title": "Um mapa do que seus agentes estão fazendo",
+  "tips.resumeLongIdle.title": "Uma conversa ociosa há muito tempo pergunta antes de ser retomada",
+  "tips.resumeLongIdle.text": "Uma conversa ociosa há mais de uma hora muito provavelmente perdeu o cache de prompt, então retomá-la pode custar muitos tokens. Retomar diz há quanto tempo ela está ociosa e qual é o tamanho, e oferece Arquivar e começar do zero em vez disso."
 }

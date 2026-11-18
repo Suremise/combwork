@@ -192,3 +192,26 @@ describe("Resume All joining a start of that same conversation (HI-1746)", () =>
     }
   })
 })
+
+// HI-3360: whether resuming one of these counts as cold, as its listing says (sessions.idleOf), which the Agent API's start
+// and a placement read. Their last activity is the record's (no usage read for them), weeks before now.
+describe('a long-idle conversation (HI-3360)', () => {
+  it("idle past the threshold: its age, and no size where none is known; a Codex one (no prompt-cache TTL) too", async () => {
+    const idle = await run(() => sessions.idleOf(project, 'c-new'))
+    expect(idle).toMatchObject({ since: '2026-10-27T02:00:00.000Z', tokens: null })
+    expect(idle!.idleMs).toBeGreaterThan(60 * 60_000)
+    expect(await run(() => sessions.idleOf(project, 'c-codex'))).toMatchObject({ since: '2026-10-27T04:00:00.000Z' })
+  })
+
+  it('the rule off: not cold; one not listed: nothing to tell it by', async () => {
+    const { advanced } = await import('../src/main/advanced')
+    const { RESUME_IDLE_ASK } = await import('../src/shared/advanced')
+    await advanced.set(RESUME_IDLE_ASK, false)
+    try {
+      expect(await run(() => sessions.idleOf(project, 'c-new'))).toBeNull()
+    } finally {
+      await advanced.set(RESUME_IDLE_ASK, null)
+    }
+    expect(await run(() => sessions.idleOf(project, 'no-such'))).toBeNull()
+  })
+})

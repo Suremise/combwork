@@ -56,6 +56,7 @@ interface CombworkMessageValues {
   'actions.duration.hoursMinutes': { h: number; m: string | number }
   'actions.duration.minutes': { m: string | number }
   'actions.duration.seconds': { s: string | number }
+  'actions.idleResume.message': { what: string; unit: string; days: number; duration: string | number; size: string; tokens: string | number; bytes: string | number }
   'actions.keys.ctrl': undefined
   'actions.keys.delete': undefined
   'actions.keys.shift': undefined
@@ -197,6 +198,7 @@ interface CombworkMessageValues {
   'actions.resumeAll.failed': { all: string; tried: number; failed: string | number }
   'actions.resumeAll.heldLine': { agent: string | number; why: string | number }
   'actions.resumeAll.heldTitle': { n: number }
+  'actions.resumeAll.idleLine': { agent: string | number; unit: string; days: number; duration: string | number; size: string; tokens: string | number; bytes: string | number }
   'actions.resumeAll.message': { who: string; cold: number }
   'actions.resumeAll.nothing': undefined
   'actions.resumeAll.nothingMessage': undefined

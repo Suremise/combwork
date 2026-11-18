@@ -6,7 +6,7 @@ import { maskText } from '../shared/redact'
 import { randomUUID, randomBytes } from 'crypto'
 import { StepTimes } from './stepTimes'
 import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
-import { COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, SIGN_FAIL_FAST, SIGN_TIMEOUT, drawnWaitId, englishText, overrideId, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
+import { COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, RESUME_IDLE_ASK, RESUME_IDLE_MINUTES, SIGN_FAIL_FAST, SIGN_TIMEOUT, drawnWaitId, englishText, overrideId, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
 import { launchPolicy, MCP_ISOLATION, terminalPreset, type LaunchPolicy } from '../shared/launchPolicy'
 import { capturedText, errorText, combworkError, CombworkError, shownError } from './combworkError'
 import { assertUpgraded } from './boardStore'
@@ -171,7 +171,7 @@ import { observer } from './platform/observe'
 import { projectPreferences } from './workflow/preferences'
 import { driveExitKeys, type ExitKeysIO } from './exitKeys'
 import { movedFolders, movedPath } from './combworkMove'
-import { freshReasonOf, SESSION_NAMES, type FreshReason } from '../shared/sessionFresh'
+import { freshReasonOf, idleResume, SESSION_NAMES, type FreshReason, type IdleResume } from '../shared/sessionFresh'
 import type { FolderMove } from '../shared/combworkFolderMove'
 import { LEGACY_PROVIDER } from '../shared/providers'
 import { clearKeyWaitId } from '../shared/advancedDef'
@@ -336,6 +336,17 @@ const KILL_EXIT_MS = 1000
 
 /** The most a start waits for its agent's ended runs' slot writers to be released (HI-1867): a bound for a hung one. */
 const WRITER_SETTLE_MS = 15_000
+
+/** HI-3360: the minutes after which a resume counts as cold (Settings → Advanced), or null with the rule turned off. */
+export function resumeIdleMinutes(): number | null {
+  return advanced.get<boolean>(RESUME_IDLE_ASK) === false ? null : advanced.number(RESUME_IDLE_MINUTES)
+}
+
+/** A listed session's `idle` (HI-3360): its tokens where its transcript gives them (0: not known), apart from its bytes. */
+function idleField(since: string | null | undefined, usage: SessionUsage | null, bytes: number | null, minutes: number | null): { idle?: IdleResume } {
+  const idle = idleResume(since, { tokens: usage?.contextTokens || null, bytes }, minutes)
+  return idle ? { idle } : {}
+}
 
 /**
  * How long stopping sessions waits for them to end: its own timeout, or longer where a CLI is given time to exit by
@@ -8786,6 +8797,15 @@ class SessionManager {
     return this.listNow(key, projectPath)
   }
 
+  /**
+   * HI-3360: whether resuming conversation `id` counts as cold (idle past Settings → Advanced's minutes, and not small),
+   * as its listing says it; null when it doesn't, the rule is off, or it isn't listed (nothing to tell it by).
+   */
+  async idleOf(projectPath: string, id: string): Promise<IdleResume | null> {
+    if (resumeIdleMinutes() === null) return null
+    return (await this.list(projectPath)).find((i) => i.id === id)?.idle ?? null
+  }
+
   private ownListing(key: string, projectPath: string): Promise<SessionListItem[]> {
     return this.listings(key, () => {
       const p = this.listOwn(projectPath)
@@ -8823,6 +8843,8 @@ class SessionManager {
     // Read once for the whole list, not once per session.
     const ctx: ListContext = { records: file.sessions, cfg: await workspace.projectConfig(projectPath), stored: await usageHistory.storedUsage(projectPath).catch(() => new Map()) }
     const ttl = config.settings.sessions.cacheTtl
+    // Long idle when resumed (HI-3360), by the rule the API and the placement read.
+    const idleMinutes = resumeIdleMinutes()
     // Which start fresh when resumed (HI-2540), by the rule the start reads: the window asks before, not afterwards.
     const moves = await this.folderMoves(projectPath)
     const items: SessionListItem[] = []
@@ -8862,7 +8884,8 @@ class SessionManager {
         transcriptBytes: st?.size ?? null,
         ...(!ctx.stored?.has(rec.id) && (hasTranscript || hasBackup) ? { pending: true } : {}),
         usage,
-        recache: usage && providerDescriptor(provider).capabilities.usage?.promptCacheTtl ? recacheEstimate(usage, ttl) : null
+        recache: usage && providerDescriptor(provider).capabilities.usage?.promptCacheTtl ? recacheEstimate(usage, ttl) : null,
+        ...idleField(usage?.lastActivity ?? rec.lastActiveAt, usage, st?.size ?? null, idleMinutes)
       }
     })
     items.push(...listed)
@@ -8931,6 +8954,7 @@ class SessionManager {
           ...(same ? {} : { pending: true }),
           usage,
           recache: usage && adapter.descriptor.capabilities.usage?.promptCacheTtl ? recacheEstimate(usage, ttl) : null,
+          ...idleField(usage?.lastActivity ?? ext.modified, usage, st?.size ?? null, resumeIdleMinutes()),
           ...(ext.sub ? { sub: ext.sub } : {})
         })
       }

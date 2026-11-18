@@ -502,6 +502,8 @@ interface CombworkMessageValues {
   'tips.resumeAfterUpdate.title': undefined
   'tips.resumeAll.text': undefined
   'tips.resumeAll.title': undefined
+  'tips.resumeLongIdle.text': undefined
+  'tips.resumeLongIdle.title': undefined
   'tips.retargetRelease.text': undefined
   'tips.retargetRelease.title': undefined
   'tips.retryWait.text': undefined

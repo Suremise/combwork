@@ -2003,6 +2003,14 @@
     "defaultMessage": "Resume all agents at once",
     "description": "A tip's title."
   },
+  "tips.resumeLongIdle.text": {
+    "defaultMessage": "A conversation idle for over an hour has most likely lost its prompt cache, so resuming it may cost many tokens. Resume says how long it has been idle and how big it is, and offers Archive and Start Fresh instead.",
+    "description": "A tip. A prompt cache is what a CLI keeps of a conversation so a resumed one is read cheaply. Names of Combwork's buttons: keep them as Combwork shows them."
+  },
+  "tips.resumeLongIdle.title": {
+    "defaultMessage": "A long-idle conversation asks before it resumes",
+    "description": "A tip's title (HI-3360)."
+  },
   "tips.retargetRelease.text": {
     "defaultMessage": "Changing Work merges into from 1.1.0 to 1.2.0? Save… lists the Todo cards and free slots still on 1.1.0 that can follow 1.2.0, and what stays, with why. Leave Also retarget what can move ticked to move them.",
     "description": "A tip (HI-2680). Work merges into, Save… and Also retarget what can move are names in Combwork's window: keep them as Combwork shows them. Keep 1.1.0 and 1.2.0 as they are."

@@ -1511,6 +1511,18 @@
   "settings.advanced.cw.restart.resumeReadySeconds.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.resume.idleAsk.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.resume.idleAsk.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.resume.idleMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.resume.idleMinutes.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.desc": {
     "placeholders": {}
   },
