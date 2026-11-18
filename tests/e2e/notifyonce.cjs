@@ -57,10 +57,10 @@ const check = (name, ok, extra = '') => {
     check('the agent starts', !!(await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))))
     const send = async (text) => {
       const key = lib.ptyKey(alpha, one.id)
-      const mark = String((await inv('pty:buffer', key)) ?? '').length
       await inv('pty:write', key, text)
-      // HI-3396: Enter once the fake has drawn the text on its line.
-      await lib.readyWithin('the typed text drawn', async () => lib.plainText(String((await inv('pty:buffer', key)) ?? '').slice(mark)).includes(text), lib.timing('hang.ui'))
+      // HI-3396: its Enter after pace.typedEnterMs, on purpose: this fake has no input log and reads a typed line before
+      // its Enter, as a CLI does (its screen doesn't echo the line as plain text here, so there is nothing to wait on).
+      await lib.sleep(lib.timing('pace.typedEnterMs'))
       await inv('pty:write', key, '\r')
     }
     const status = async () => (await live())?.status
