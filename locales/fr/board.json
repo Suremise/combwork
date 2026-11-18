@@ -1191,5 +1191,6 @@
   "board.workQueue.testing": "En test : {step}",
   "board.workQueue.unreadRef": "non lu",
   "board.workQueue.waiting": "En file pour {target}, en attente que {cards} soit dans Terminé",
-  "board.workflows": "Flux de travail"
+  "board.workflows": "Flux de travail",
+  "board.laneStart.yieldCantStart": "{card} attend {first}, qui ne peut pas encore démarrer (elle est bloquée, ou attend une carte à elle) : cette liste s’applique une fois que {card} est en Terminé, et Appliquer maintenant ne change rien avant."
 }

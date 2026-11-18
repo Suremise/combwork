@@ -1191,5 +1191,6 @@
   "board.workQueue.testing": "Wird gerade getestet: {step}",
   "board.workQueue.unreadRef": "nicht gelesen",
   "board.workQueue.waiting": "In der Warteschlange für {target}, wartet darauf, dass {cards} in Erledigt ist",
-  "board.workflows": "Workflows"
+  "board.workflows": "Workflows",
+  "board.laneStart.yieldCantStart": "{card} wartet auf {first}, das noch nicht starten kann (es ist blockiert oder wartet auf eine eigene Karte): Diese Liste gilt, sobald {card} erledigt ist, und „Jetzt anwenden“ ändert vorher nichts."
 }

@@ -1021,6 +1021,8 @@ export interface CombworkRequests {
   'lanes:start': (projectPath: string, req: LaneStartRequest) => LaneStartResult
   /** What Start Lane… offers for a project (#1443): the reviewer pool's agents when its rules have G17 a shared pool, else null. */
   'lanes:startInfo': (projectPath: string) => LaneStartInfo
+  /** HI-3368: the card the builder's running lane would yield to for this list now (its card in flight `behind`, `to`), or the card it waits on that can't start (`cantStart`: queued for its Done, Apply now too), or null: Start Lane's hint, by the start's own rule. */
+  'lanes:yieldTo': (projectPath: string, builder: string, cards: number[], behind: number) => { to: number } | { cantStart: number } | null
   /**
    * HI-3148: whether Start lane… for this builder on `target` (null: the project's Work merges into) would be refused for
    * its line being released or unreadable: the line and the refusal, for Start Anyway; null, it wouldn't.

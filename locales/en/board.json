@@ -2123,6 +2123,10 @@
     "defaultMessage": "Waiting for these agents to be idle: {agents}…",
     "description": "In the Start Lane dialog, after Wait and Start: it waits for the busy agents ({agents}: their names, joined) before starting the lane. Cancel stops waiting. The names follow a colon (glossary §1 rule 4)."
   },
+  "board.laneStart.yieldCantStart": {
+    "defaultMessage": "{card} waits on {first}, which can’t start yet (it is blocked, or waits on a card of its own): this list applies once {card} is Done, and Apply now changes nothing before that.",
+    "description": "HI-3368: under the Apply now checkbox of the Start Lane dialog, instead of the usual hint, when the new list puts first {first} (a card's key, such as HI-28), a card that the builder's card in progress {card} (its key) waits on, but {first} can't be started yet: it is blocked, or a card it depends on isn't Done where the project's rules wait for that. So the lane doesn't switch to it: the list waits until {card} is Done, with or without Apply now."
+  },
   "board.laneStart.yieldHint": {
     "defaultMessage": "{card} waits on {first}: once {builder} ends its turn with {card}’s work committed, {card} goes back to Todo (its work stays on its branch), this list applies and {first} starts. The lane comes back to {card} after.",
     "description": "HI-3323: under the Apply now checkbox of the Start Lane dialog, instead of the usual hint, when the new list puts first {first}, a card that the builder's card in progress {card} waits on (both keys). {builder} is an agent's name. Combwork makes the switch by itself at the builder's turn end, Apply now or not. Todo is a board column."

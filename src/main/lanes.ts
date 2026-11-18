@@ -5,7 +5,7 @@ import { projectPreferences } from './workflow/preferences'
 import { existsSync } from 'original-fs'
 import { CW_DIR, projectAgents } from '../shared/defaults'
 import { agentWorkflowRole, buildsWork, inWorkflow, reviewsWork } from '../shared/workflow/roles'
-import { allDone, isFrozen, keptLanes, laneName, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, laneYieldFirst, type LaneYield, type LaneAgent, type FreshStart, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneSlotHeld, type LaneStartWait, type WaitStamp } from '../shared/lanes'
+import { allDone, isFrozen, keptLanes, laneName, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, laneYieldFirst, waitsOnCard, type LaneYield, type LaneAgent, type FreshStart, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneSlotHeld, type LaneStartWait, type WaitStamp } from '../shared/lanes'
 import type { CombworkErrorKind, DueDeps, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
 import { columnSince } from '../shared/tasks'
 import { designReviewer, reviewingNow } from '../shared/workflow/reviewerPool'
@@ -1293,8 +1293,12 @@ async function putBackForReorder(ws: WorkspaceService, s: StartLane, builder: La
   if (flying.column !== 'doing') throw new LaneError(409, say(A.inReview, { card: key, where: flying.column === 'review' ? 'review' : 'other' }))
   // HI-3323: the new first card is one the card in flight waits on: never put back here, idle builder or not. The start's
   // edit queues it as a yield, which runLaneYields runs in its one guarded board change (fenced at its commit on the
-  // builder's run, turn, Stop, launch, the team's pause and its role), at once when the builder is free.
-  if (laneYieldFirst(s.cards, flying.number, (n) => cards.get(n), builder.id, await depsWaitOf(ws, s.project)) !== null) return null
+  // builder's run, turn, Stop, launch, the team's pause and its role), at once when the builder is free. HI-3368: whether
+  // or not that card can start: one that can't (blocked, or waiting on its own dependency) is queued as an ordinary
+  // change for the card's Done, never put back here for nothing (HR1's round 1: Apply now left the builder idle).
+  const flyingCard = cards.get(flying.number)
+  const head = first !== undefined ? cards.get(first) : undefined
+  if (flyingCard && head && first !== undefined && head.column === 'todo' && waitsOnCard(flyingCard, first, head.key)) return null
   const { sessions } = await import('./sessions')
   const st = sessions.liveFor(projectPath, builder.id)
   if (st && IN_A_TURN.has(st.status)) throw new LaneError(409, say(A.inATurn, { agent: builder.name, status: st.status }))
@@ -1390,6 +1394,21 @@ async function yieldCardsHold(ws: WorkspaceService, l: LaneRecord, y: LaneYield)
   if (!l.cards.includes(y.card)) return false
   const board = await cardsNow(ws, [...new Set([...pending, y.card])])
   return laneYieldFirst(pending, y.card, (n) => board.get(n), l.builder.id, await depsWaitOf(ws, l.project)) === y.first
+}
+
+/**
+ * HI-3368: the card a new list (`cards`) would make the builder's running lane yield to now, or null: Start Lane's hint,
+ * by the rule and the board the save itself uses (yieldOf: the card in flight `behind`, the first card's dependency wait
+ * from its workflow), so what the window says is what the start does.
+ */
+export async function laneYieldTo(ws: WorkspaceService, project: string, builder: string, cards: readonly number[], behind: number): Promise<{ to: number } | { cantStart: number } | null> {
+  if (!cards.includes(behind)) return null
+  const board = await cardsNow(ws, [...new Set([...cards, behind])])
+  const to = laneYieldFirst(cards, behind, (n) => board.get(n), builder, await depsWaitOf(ws, project))
+  if (to !== null) return { to }
+  // The card in flight waits on the first card, which can't start: queued for its Done, Apply now included (putBackForReorder).
+  const waitedOn = laneYieldFirst(cards, behind, (n) => { const c = board.get(n); return c ? { ...c, blocked: null } : c }, builder)
+  return waitedOn !== null ? { cantStart: waitedOn } : null
 }
 
 /**
