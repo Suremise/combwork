@@ -44,21 +44,26 @@ const check = (name, ok, extra = '') => {
   const retry = page.getByRole('button', { name: 'Retry' })
   check('a git failure shows the error, with Retry', !!(await until(async () => (await retry.count()) === 1 && /failed/.test(await page.locator('.empty-state').first().innerText()), lib.timing('hang.ui'))))
   await page.screenshot({ path: path.join(lib.WORK, 'changes-1-error.png') })
+  // Main counts the git:diff calls answered (globalThis.__cwSettledIpc, HI-2971). Read before Retry asks for the first
+  // diff (a.ts's, slowed 3 s by CW_TEST_SLOW_IPC), so each answer after it is counted.
+  const diffsAnswered = () => app.evaluate(() => globalThis.__cwSettledIpc?.['git:diff'] ?? 0)
+  const answeredBefore = await diffsAnswered()
   await retry.click()
   const row = (name) => page.locator('.split-list .row', { hasText: name })
   check('Retry loads the changes', !!(await until(async () => (await row('a.ts').count()) === 1 && (await row('b.ts').count()) === 1, lib.timing('hang.ui'))))
 
   // a.ts is selected and its diff is slow (3 s); b.ts answers at once and must stay shown after a.ts's late answer.
   check('the first file waits for its diff', !!(await until(async () => /Loading the diff/.test(await page.locator('.split-main').innerText()), HUNG_MS)))
-  // Main counts the git:diff calls answered (globalThis.__cwSettledIpc, HI-2971): a.ts's slowed one is still out now.
-  const diffsAnswered = () => app.evaluate(() => globalThis.__cwSettledIpc?.['git:diff'] ?? 0)
-  const answeredBefore = await diffsAnswered()
   await row('b.ts').click()
   const shown = () => page.locator('.split-main .editor-toolbar strong').innerText().catch(() => '')
   check("the selected file's diff shows", !!(await until(async () => (await shown()) === 'b.ts', lib.timing('hang.ui'))), await shown())
-  // Both answered (b.ts's at once, a.ts's late one after its delay), and the window has taken the reply: then the check.
-  const lateArrived = !!(await until(async () => (await diffsAnswered()) >= answeredBefore + 2, HUNG_MS))
-  check("a.ts's late answer reached the window before the check below", lateArrived, `${await diffsAnswered()} answered, ${answeredBefore} before`)
+  // The order, observed: b.ts shown with one diff answered, so that one was b.ts's (it can't show without it) and a.ts's
+  // was still out. A machine slow enough to answer a.ts first fails here, never passes the check below untested.
+  const answeredAtB = await diffsAnswered()
+  check("b.ts's diff answered while a.ts's was still out", answeredAtB === answeredBefore + 1, `${answeredAtB} answered, ${answeredBefore} before Retry`)
+  // Then a.ts's late answer, and the window has taken the reply: only then the check.
+  const lateArrived = !!(await until(async () => (await diffsAnswered()) === answeredBefore + 2, HUNG_MS))
+  check("a.ts's late answer reached the window after b.ts's, before the check below", lateArrived, `${await diffsAnswered()} answered, ${answeredBefore} before Retry`)
   await lib.settled(page)
   check("a late answer for another file doesn't replace it", (await shown()) === 'b.ts' && (await row('b.ts').getAttribute('class')).includes('selected'), await shown())
   await page.screenshot({ path: path.join(lib.WORK, 'changes-2-diff.png') })
