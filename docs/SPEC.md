@@ -6842,7 +6842,13 @@ touched:
   **Bounded** (HI-3021): a commit or stash still running after two
   minutes (a slow hook, a signer waiting for an answer) has git's whole process tree ended (git.ts's time limit: every
   timed git command, not git.exe alone, which on Windows never removes the `index.lock` it holds and leaves the hook
-  running). **Git Bash's own programs too** (HI-3047): one a hook's shell starts (`sleep`, `cat`, `perl`) has a Windows
+  running). **Started after the listing too** (HI-3358): the tree is listed once, so it is ended by one PowerShell
+  session that keeps a handle on each process it ends (checked by start time first), which keeps that process's pid
+  from going to another process; the session then lists again and ends what a held process started since (its parent
+  id names a held process, and it started no earlier), until a listing finds none, at most three more ends. A process
+  whose parent couldn't be held (it had exited first) is left: its parent id is only a number. What may have been left
+  is logged. The listing and the session are bounded (10 s and 15 s), the outcome comes after all of it, and none of it
+  runs on main's thread; OpenCode's history waits for that bound, and a margin, before ending its worker at a quit. **Git Bash's own programs too** (HI-3047): one a hook's shell starts (`sleep`, `cat`, `perl`) has a Windows
   parent already gone (MSYS's exec), so no tree walk finds it. Each timed git runs with a fresh random
   `COMBWORK_RUN=<marker>` in its environment, which what it starts inherits; at its end, that Git's own `sh.exe` is
   asked, with a script of builtins only (it starts nothing; 3 s and 1 MB, then ended), which MSYS programs have exactly
