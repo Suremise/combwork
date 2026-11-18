@@ -415,14 +415,14 @@ export function applyStep(st: { status: SessionStatus; statusMessage?: string; s
  * Drops background tasks past their own expiry (a Monitor's) or the time limit (`minutes`, Settings → Agents &
  * Worktrees: Combwork can't tell a test run from a dev server that never ends). Returns the ids the limit dropped.
  * The limit counts from the task's start or, later, when its agent's progress runs were last heard from (`heard`, given
- * the task's start; HI-3406: lastHeard): a run still reporting keeps its task counted, and one gone quiet has the
- * limit from its last report, so a stuck run still stops counting.
+ * when the task's tool call was made, `began`, else its start; HI-3406: lastHeard): a run still reporting keeps its task
+ * counted, and one gone quiet has the limit from its last report, so a stuck run still stops counting.
  */
-export function expireTasks(tasks: Map<string, { at: number; expiresAt?: number }>, now: number, minutes: number, heard?: (since: number) => number | null): string[] {
+export function expireTasks(tasks: Map<string, { at: number; began?: number; expiresAt?: number }>, now: number, minutes: number, heard?: (since: number) => number | null): string[] {
   const dropped: string[] = []
   for (const [id, t] of tasks) {
     if (t.expiresAt && t.expiresAt <= now) tasks.delete(id)
-    else if (now - t.at >= minutes * 60_000 && now - (heard?.(t.at) ?? 0) >= minutes * 60_000) {
+    else if (now - t.at >= minutes * 60_000 && now - (heard?.(t.began ?? t.at) ?? 0) >= minutes * 60_000) {
       tasks.delete(id)
       dropped.push(id)
     }

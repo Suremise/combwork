@@ -80,9 +80,10 @@ export function isOpenRun(run: Pick<ProgressRun, 'state' | 'finishedAt'>): boole
 }
 
 /**
- * When an agent's progress runs were last heard from (HI-3406), of those started at or after `since` (a background
- * task's start, less a few seconds: a run that task began, or a later one), or null with none. Liveness for a long
- * background task: its time limit counts from this, not from the task's start.
+ * When an agent's progress runs were last heard from (HI-3406), of those started at or after `since` (when the tool call
+ * that started a background task was made, where its CLI's records say, else the task's start; less a few seconds for
+ * clocks: a run that task began, or a later one), or null with none. A run from before the call isn't the task's. Liveness
+ * for a long background task: its time limit counts from this, not from the task's start.
  */
 export function lastHeard(runs: readonly Pick<ProgressRun, 'state' | 'finishedAt' | 'updatedAt' | 'startedAt'>[], since: number, now: number): number | null {
   let latest: number | null = null

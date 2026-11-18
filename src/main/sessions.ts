@@ -612,7 +612,7 @@ interface LiveSession {
    * Background tasks started in this launch that haven't ended: id → when it started, when it expires, what it is and
    * its CLI's description (a subagent's, #1584: user text).
    */
-  tasks?: Map<string, { at: number; expiresAt?: number; type?: BackgroundTaskType; description?: string }>
+  tasks?: Map<string, { at: number; began?: number; expiresAt?: number; type?: BackgroundTaskType; description?: string }>
   /** Tasks seen to end, so a start read late doesn't count one again. */
   tasksEnded?: Set<string>
   /** Tasks the time limit stopped counting (HI-3406): one that ends later still wakes the CLI, as a counted one does. */
@@ -5987,7 +5987,7 @@ class SessionManager {
       if (ev.kind === 'start') {
         // A start read after its end counts nothing, unless the task starts again (a subagent resumed, #1584).
         if (ev.resumed) ended.delete(ev.id)
-        if (!ended.has(ev.id)) tasks.set(ev.id, { at: ev.at, expiresAt: ev.expiresAt, type: ev.type, description: ev.description })
+        if (!ended.has(ev.id)) tasks.set(ev.id, { at: ev.at, ...(ev.began !== undefined ? { began: ev.began } : {}), expiresAt: ev.expiresAt, type: ev.type, description: ev.description })
         continue
       }
       // A task the agent stopped itself wakes nothing (#640: read after its Stop, it showed HB3 working with no turn). One the

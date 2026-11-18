@@ -28,8 +28,10 @@ const s = sessions as unknown as {
 const min = 60_000
 const line = (o: Record<string, unknown>): string => JSON.stringify(o) + '\n'
 const iso = (ms: number): string => new Date(ms).toISOString()
-// As Claude Code writes a background Bash call's result, and its end.
-const startedLine = (id: string, at: number): string => line({ type: 'user', timestamp: iso(at), toolUseResult: { stdout: '', stderr: '', interrupted: false, backgroundTaskId: id } })
+// As Claude Code writes a Bash call, its result once the command is in the background, and its end.
+const callLine = (id: string, at: number): string => line({ type: 'assistant', timestamp: iso(at), message: { role: 'assistant', content: [{ type: 'tool_use', id: `toolu_${id}`, name: 'Bash', input: { command: 'cw-progress -- npm test' } }] } })
+const startedLine = (id: string, at: number): string =>
+  line({ type: 'user', timestamp: iso(at), message: { role: 'user', content: [{ tool_use_id: `toolu_${id}`, type: 'tool_result', content: `Command running in background with ID: ${id}.` }] }, toolUseResult: { stdout: '', stderr: '', interrupted: false, backgroundTaskId: id } })
 const endedLine = (id: string, at: number): string =>
   line({ type: 'queue-operation', operation: 'enqueue', timestamp: iso(at), content: `<task-notification>\n<task-id>${id}</task-id>\n<status>completed</status>\n<summary>Background command "Run tests" completed (exit code 0)</summary>\n</task-notification>` })
 
@@ -44,15 +46,17 @@ afterEach(() => {
 let n = 0
 /**
  * A Claude Code agent whose turn ended while task `id`, started `startedMinAgo` minutes ago, runs; `progress`: its
- * cw-progress runs. Its first read is a look, so the limit applies at once.
+ * cw-progress runs; `calledMinAgo`: when its Bash call was made, if before (a command moved to the background later).
+ * Its first read is a look, so the limit applies at once.
  */
-async function agent(id: string, startedMinAgo: number, progress: Run[] = []): Promise<{ l: Live; file: string; read: () => Promise<void> }> {
+async function agent(id: string, startedMinAgo: number, progress: Run[] = [], calledMinAgo = startedMinAgo): Promise<{ l: Live; file: string; read: () => Promise<void> }> {
   config.settings.agents.backgroundTaskMinutes = 120
   runs = progress
   const file = join(base, `t${++n}.jsonl`)
   const at = Date.now() - startedMinAgo * min
-  writeFileSync(file, startedLine(id, at))
-  const state = { provider: 'claude-code', runId: `run-${n}`, projectPath: join(base, 'p'), agentId: `a${n}`, sessionId: '55c580da-ba19-49b0-850b-41b41157471b', status: 'working', startedAt: iso(at - min) }
+  const called = Date.now() - calledMinAgo * min
+  writeFileSync(file, callLine(id, called) + startedLine(id, at))
+  const state = { provider: 'claude-code', runId: `run-${n}`, projectPath: join(base, 'p'), agentId: `a${n}`, sessionId: '55c580da-ba19-49b0-850b-41b41157471b', status: 'working', startedAt: iso(called - min) }
   const l: Live = { state, adapter: claudeCode, transcriptPath: file }
   const read = async (): Promise<void> => s.settleBackground(l, await s.readBackground(l, file, statSync(file).size))
   await read()
@@ -66,6 +70,18 @@ describe('background tasks past the time limit (HI-3406)', () => {
     s.settleBackground(l, false)
     expect(l.tasks?.size).toBe(1)
     expect([l.state.status, l.state.backgroundTasks]).toEqual(['background', 1])
+  })
+
+  // HR1's round 1: a command moved to the background after running a while (Claude Code writes its backgroundTaskId
+  // only then) had a cw-progress run that started before that record; it is still the command's own.
+  it('a command that reported first and went to the background later: kept while its run reports, past the limit', async () => {
+    const reporting = { state: 'running' as const, finishedAt: null, startedAt: Date.now() - 155 * min + 10_000, updatedAt: Date.now() - 5_000 }
+    const { l } = await agent('b5', 150, [reporting], 155)
+    expect([l.tasks?.size, l.state.status]).toEqual([1, 'background'])
+    // A run from before its call isn't its: an older run still reporting keeps nothing counted.
+    const { l: other } = await agent('b6', 150, [{ ...reporting, startedAt: Date.now() - 170 * min }], 155)
+    s.settleBackground(other, false)
+    expect([other.tasks?.size, other.state.status]).toEqual([0, 'finished'])
   })
 
   it('a truly stuck run (its progress quiet since soon after it began) still stops counting at the limit', async () => {
