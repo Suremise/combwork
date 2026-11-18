@@ -312,7 +312,7 @@ describe('the advanced store', () => {
     s.noteCli('codex', '0.162.1')
     s.load(dir)
     expect(s.state(null).madeFor['codex.trust.prompt']).toEqual({ version: '0.162.1', value: 'trust it' })
-    expect(s.number('codex.hooks.timeoutSeconds')).toBe(5)
+    expect(s.number('codex.hooks.timeoutSeconds')).toBe(30)
     expect(s.pattern('codex.trust.prompt').source).toBe('trust it')
     // Changed by hand while Combwork runs: read again when the file changes.
     writeFileSync(file, JSON.stringify({ format: 1, values: { 'codex.trust.prompt': 'trust here' } }))

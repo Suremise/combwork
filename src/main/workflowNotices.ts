@@ -114,7 +114,8 @@ async function commentFromAction(a: ActionRow, ws: WorkspaceService): Promise<vo
   // the worker records the action failed, never done without its comment; one stopped by its workspace closing waits
   // for the next run there, which writes it (or finds it written: its id is the action's).
   if (noticeTestHooks.commentFails) throw new Error('the board refused the change (a test)') // i18n-ignore: a test's error, logged
-  await commentAsCombwork(a.card, shown ? { text, shown } : text, ws, undefined, `action-${a.id}`)
+  // HI-3367: a comment that must reach the card however it is (`evenArchived`: an advance superseded by its archiving).
+  await commentAsCombwork(a.card, shown ? { text, shown } : text, ws, undefined, `action-${a.id}`, a.payload.evenArchived === true)
 }
 
 /** How much of an agent's question a request's notice shows (its first sentence or two). */

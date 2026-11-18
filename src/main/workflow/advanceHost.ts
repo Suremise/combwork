@@ -25,11 +25,18 @@ const log = createLogger('advance')
 export const previewDeclinedKey = (card: string, cycle: number, plan: string): string => `advance_declined:${card.toLowerCase()}:${cycle}:${plan}`
 
 /** The project's meta (scoped to it) marking its one-time note about the advance being its default (HI-3235). */
+/**
+ * HI-3367: the project's meta (scoped to it) marking an attempt of a card's earlier cycle (or of an archived card)
+ * superseded: its notice, when it may have moved, committed with it in one write, so a retry never says it twice.
+ */
+export const supersededKey = (card: string, cycle: number, attempt: string): string => `advance_superseded:${card.toLowerCase()}:${cycle}:${attempt}`
+
 export const advanceNoteKey = (project: string): string => `advance_note:${project.toLowerCase()}`
 
 /** HI-3235: what agents read of the advance's card comment and notice (the window shows FOR_YOU's messages beside them). */
 const A = {
   refused: agentMsg({ id: 'workflow.advance.refused', text: "Combwork didn't move {target} for {card}: refused before anything changed ({why}: {detail}). It tries again once the repository changes; the user can integrate it themselves.", note: 'A card comment (HI-3235): Combwork’s jj advance refused at its base read; {why} a code, {detail} refs or folders.' }),
+  superseded: agentMsg({ id: 'workflow.advance.superseded', text: "An integration of {card} into {target} from before it was restarted or archived was never settled: Combwork couldn't prove what it did, so {target} may hold that move. Combwork may have integrated this card again since. Check {target}'s history if it matters.", note: 'A card comment (HI-3367): an unsettled jj advance of an earlier cycle of the card, retired when the card restarted or was archived; it may have moved {target}.' }),
   note: agentMsg({ id: 'workflow.advance.note', text: "Combwork now integrates {project}'s jj cards itself once their merge checks pass (Version Control → Workflow → Who integrates).", note: 'A notice, once per jj project (HI-3235): the new default finish applies to it.' })
 }
 
@@ -274,6 +281,34 @@ export function advanceHostOf(wf: Workflow): AdvanceHost {
         )
       }),
     previewDeclined: (card, cycle, plan) => !!wf.store.meta(previewDeclinedKey(card.key, cycle, plan)),
+    superseded: async (card, ref, warn) => {
+      const key = supersededKey(card.key, ref.cycle, ref.attempt)
+      try {
+        if (wf.store.meta(key)) return 'already'
+        const s = wf.state(wf.store.card(card.id))
+        return await wf.write(
+          card,
+          wf.rulesetOf(card, s),
+          'combwork',
+          (w): 'recorded' | 'already' => {
+            if (w.tx.meta(key)) return 'already'
+            w.tx.setMeta(key, new Date().toISOString())
+            if (warn) {
+              const text = workflowText(FOR_YOU.advanceSuperseded, { card: card.key, target: warn.target })
+              // Agents read the card's comments: its English is the agent message, the window's the stored message.
+              // On the card even when it's archived (HR1's round 1): the notice replaces the question it no longer has.
+              w.action('comment', { text: inDefaultDialect(() => say(A.superseded, { card: card.key, target: warn.target })), shown: text, evenArchived: true })
+            }
+            return 'recorded'
+          },
+          undefined,
+          quiet
+        )
+      } catch (e) {
+        log.warn(`advance superseded for ${card.key} not recorded: ${userText((e as Error).message)}`) // i18n-ignore: the log (English)
+        return 'failed'
+      }
+    },
     noteDefault: async (card) => {
       if (!wf.cfg.finishInherited?.()) return
       const key = advanceNoteKey(wf.cfg.projectId?.() ?? wf.cfg.project)

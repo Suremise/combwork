@@ -21,6 +21,7 @@ interface CombworkMessageValues {
   'workflow.forYou.advancePreview': { again: string; card: string | number; target: string | number; expected: string | number; result: string | number; style: string; commits: string | number; more: number }
   'workflow.forYou.advanceRefused': { target: string | number; result: string | number; card: string | number; why: string; detail: string | number }
   'workflow.forYou.advanceStopped': { again: string; target: string | number; result: string | number; card: string | number; why: string; detail: string | number }
+  'workflow.forYou.advanceSuperseded': { card: string | number; target: string | number }
   'workflow.forYou.advanceUncertain': { again: string; target: string | number; result: string | number; card: string | number; detail: string | number; op: string }
   'workflow.forYou.churnLimit': { card: string | number; churn: number }
   'workflow.forYou.decidedAfterMerge': { card: string | number }

@@ -5,6 +5,7 @@
 // In the app since P3: reconciliation, the adoption and the runtime (main/workflow) read Git through it.
 
 import { AsyncLocalStorage } from 'async_hooks'
+import { heldError, INDEX_BUSY, untilBound } from '../retryBounds'
 import { closeSync, copyFileSync, existsSync, openSync, readFileSync, renameSync, statSync, unlinkSync } from 'original-fs'
 import { access, lstat, readFile, stat } from 'original-fs/promises'
 import { isAbsolute, join, resolve as resolvePath } from 'path'
@@ -918,15 +919,17 @@ export async function moveLineLocked(folder: string, to: string, expect: { line:
     // 3. The index published: the lock renamed over it (tried again a few times: Windows refuses a rename while another
     // process has the file open for a moment).
     let failed: Error | null = null
-    for (let tries = 0; tries < PUBLISH_TRIES; tries++) {
-      try {
-        renameSync(lock, index)
-        placed = true
-        return true
-      } catch (e) {
-        failed = e as Error
-        await new Promise((r) => setTimeout(r, PUBLISH_RETRY_MS))
+    try {
+      // HI-3374: for INDEX_BUSY.publish's bound (10 s, waits doubling to 1.6 s; it was 5 tries 100 ms apart), while held,
+      // and only while the move is still its owner's (`go`, checked before each try): refused, it is put back below.
+      const owner = (): void => {
+        if (!go()) throw new Error("the move is no longer its owner's") // i18n-ignore: a log line's reason
       }
+      await untilBound(() => renameSync(lock, index), { bound: INDEX_BUSY.publish, transient: heldError, guard: owner })
+      placed = true
+      return true
+    } catch (e) {
+      failed = e as Error
     }
     // Not published: the branch back to the head (only if still where this moved it), the files with it.
     const back = await git(folder, ['update-ref', '-m', 'Combwork: put back, its index not written', `refs/heads/${expect.line}`, expect.head, to])
@@ -940,10 +943,6 @@ export async function moveLineLocked(folder: string, to: string, expect: { line:
     }
   }
 }
-
-/** How often, and how far apart, the moved line's index is tried as it is published (moveLineLocked). */
-const PUBLISH_TRIES = 5
-const PUBLISH_RETRY_MS = 100
 
 /**
  * A line moved part way that couldn't be put back (moveLineLocked): the branch, its files or its index may not agree.

@@ -1,4 +1,5 @@
 import { closeSync, constants, existsSync, mkdirSync, openSync, readFileSync, readSync, renameSync, rmSync, statSync, writeFileSync, writeSync, type Dirent, type Stats } from 'original-fs'
+import { heldError, RENAME_RETRY, untilBound, type RetryBound } from './retryBounds'
 import { copyFile, link, lstat, mkdir, open, opendir, readFile, readlink, rename, writeFile, stat, symlink, cp, rm, utimes } from 'original-fs/promises'
 import { basename, dirname, relative, resolve, sep } from 'path'
 import { createHash } from 'crypto'
@@ -645,7 +646,7 @@ export async function writeTextAtomic(path: string, text: string, opts: { mkdir?
   // removes it, so failed saves leave nothing behind (#1016). A crash part way still can: sweepLeftovers removes those.
   try {
     await writeFile(tmp, text, 'utf8')
-    await renameRetrying(tmp, path, 20, opts.guard, (a, b) => (atomicTestHooks.renameOnce ?? rename)(a, b))
+    await renameRetrying(tmp, path, RENAME_RETRY, opts.guard, (a, b) => (atomicTestHooks.renameOnce ?? rename)(a, b))
   } catch (e) {
     await rm(tmp, { force: true }).catch(() => undefined)
     throw e
@@ -654,25 +655,13 @@ export async function writeTextAtomic(path: string, text: string, opts: { mkdir?
 
 /**
  * A rename that Windows may refuse for a moment (a virus scanner or the search indexer looking at a file just written,
- * or another rename of the target): retried, waiting a little longer each time (about 2.3 s over 20 tries). `guard`,
- * when given, runs before every attempt (after each wait too) and stops the rename by throwing: work whose owner went
+ * or another rename of the target): retried while it is held (EPERM, EACCES, EBUSY), waiting a little longer each time,
+ * for up to `bound` (HI-3374: RENAME_RETRY, 15 s; it was 20 tries, about 2.3 s). Any other error is thrown at once.
+ * `guard`, when given, runs before every attempt and every wait and stops the rename by throwing: work whose owner went
  * away meanwhile (a closed workspace) never renames late. `renameOnce` is the single rename (tests replace it).
  */
-export async function renameRetrying(from: string, to: string, tries = 20, guard?: () => void | Promise<void>, renameOnce: (a: string, b: string) => Promise<void> = rename): Promise<void> {
-  const started = Date.now()
-  for (let attempt = 0; ; attempt++) {
-    await guard?.()
-    try {
-      await renameOnce(from, to)
-      return
-    } catch (e) {
-      const code = (e as NodeJS.ErrnoException).code
-      const held = code === 'EPERM' || code === 'EACCES' || code === 'EBUSY'
-      if (held && attempt >= tries) renameGaveUp(to, code, attempt + 1, Date.now() - started)
-      if (attempt >= tries || !held) throw e
-      await new Promise((r) => setTimeout(r, 15 + attempt * 10))
-    }
-  }
+export async function renameRetrying(from: string, to: string, bound: RetryBound = RENAME_RETRY, guard?: () => void | Promise<void>, renameOnce: (a: string, b: string) => Promise<void> = rename): Promise<void> {
+  await untilBound(() => renameOnce(from, to), { bound, transient: heldError, guard, onGaveUp: (e, tries, ms) => renameGaveUp(to, (e as NodeJS.ErrnoException).code ?? 'EPERM', tries, ms) })
 }
 
 /**
@@ -763,22 +752,18 @@ const identity = (s: Stats | null): string => (s ? `${s.ino}:${s.size}:${s.mtime
  * it runs. Each retry (Windows briefly refuses a rename while another process holds the file) checks again.
  */
 async function publishCopy(tmp: string, dest: string, began: string): Promise<void> {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      if (identity(statOrNull(dest)) !== began) {
-        rmSync(tmp, { force: true })
-        return
-      }
-      renameSync(tmp, dest)
-      return
-    } catch (e) {
-      const code = (e as NodeJS.ErrnoException).code
-      if (attempt >= 20 || !(code === 'EPERM' || code === 'EACCES' || code === 'EBUSY')) {
-        rmSync(tmp, { force: true })
-        throw e
-      }
-      await new Promise((r) => setTimeout(r, 15 + attempt * 10))
-    }
+  try {
+    // HI-3374: retried for RENAME_RETRY's bound while held, the check made again at each try.
+    await untilBound(
+      () => {
+        if (identity(statOrNull(dest)) !== began) return rmSync(tmp, { force: true })
+        renameSync(tmp, dest)
+      },
+      { bound: RENAME_RETRY, transient: heldError }
+    )
+  } catch (e) {
+    rmSync(tmp, { force: true })
+    throw e
   }
 }
 
@@ -1181,7 +1166,7 @@ export async function swapIn(src: string, dest: string, o: { prepare?: (copy: st
     if (before) throw before
     const had = await exists(dest)
     // A file in the old one held open by a running session keeps it from moving: a few tries, then it stays.
-    if (had) await renameRetrying(dest, old, 5)
+    if (had) await renameRetrying(dest, old)
     // Checked again once moved aside: a difference, or a look that fails (HI-2620: never thrown past this), puts it back.
     const moved = had && check ? await unlikeHash(old, expected, stored(A.changedWhileReplaced, { name })) : null
     if (moved) {
@@ -1255,7 +1240,7 @@ export async function swapOut(dest: string, expected: string): Promise<void> {
   const remove = async (): Promise<void> => {
     const before = await unlike(dest, stored(A.changedBeforeRemoved, { name }))
     if (before) throw before
-    await renameRetrying(dest, old, 5)
+    await renameRetrying(dest, old)
     const putBack = async (why: SwapAbandoned): Promise<never> => {
       // Whether its place is still empty: only an absence says so (HI-2611). A look that fails leaves it aside, where
       // cleanSwaps finds it again, never made a conflict copy on a guess: an I/O failure, so SwapUnreadable.

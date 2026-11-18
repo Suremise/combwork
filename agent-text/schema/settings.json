@@ -1163,6 +1163,12 @@
   "settings.advanced.cw.copies.review.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.db.busySeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.db.busySeconds.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.disableHardwareAcceleration.desc": {
     "placeholders": {}
   },
@@ -1665,6 +1671,12 @@
     "placeholders": {}
   },
   "settings.advanced.cw.terminal.osc52.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.typed.takeSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.typed.takeSeconds.title": {
     "placeholders": {}
   },
   "settings.advanced.cw.usage.timelineDetailDays.desc": {

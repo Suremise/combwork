@@ -684,8 +684,8 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand JABQAHIAbwBnAHIAZQBzAHMAUAByAGUAZgBlAHIAZQBuAGMAZQA9ACcAUwBpAGwAZQBuAHQAbAB5AEMAbwBuAHQAaQBuAHUAZQAnAAoAJAB1AD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBVAFIATAA7ACAAJABhAD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBBAFUAVABIAF8ARgBJAEwARQAKAGkAZgAgACgALQBuAG8AdAAgACQAdQAgAC0AbwByACAALQBuAG8AdAAgACQAYQApACAAewAgAGUAeABpAHQAIAAwACAAfQAKAFMAZQB0AC0ATABvAGMAYQB0AGkAbwBuACAALQBMAGkAdABlAHIAYQBsAFAAYQB0AGgAIAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAtAEwAaQB0AGUAcgBhAGwAUABhAHQAaAAgACQAYQApAAoAYwB1AHIAbAAuAGUAeABlACAALQBzACAALQBtACAANQAgAC0AWAAgAFAATwBTAFQAIAAtAEgAIAAiAEAAJAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAkAGEAIAAtAEwAZQBhAGYAKQAiACAALQBIACAAIgBDAG8AbgB0AGUAbgB0AC0AVAB5AHAAZQA6ACAAYQBwAHAAbABpAGMAYQB0AGkAbwBuAC8AagBzAG8AbgAiACAALQAtAGQAYQB0AGEALQBiAGkAbgBhAHIAeQAgACIAQAAtACIAIAAiACQAKAAkAHUAKQAiAAoAZQB4AGkAdAAgADAA",
-            "timeout": 5
+            "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand JABQAHIAbwBnAHIAZQBzAHMAUAByAGUAZgBlAHIAZQBuAGMAZQA9ACcAUwBpAGwAZQBuAHQAbAB5AEMAbwBuAHQAaQBuAHUAZQAnAAoAJAB1AD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBVAFIATAA7ACAAJABhAD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBBAFUAVABIAF8ARgBJAEwARQAKAGkAZgAgACgALQBuAG8AdAAgACQAdQAgAC0AbwByACAALQBuAG8AdAAgACQAYQApACAAewAgAGUAeABpAHQAIAAwACAAfQAKAFMAZQB0AC0ATABvAGMAYQB0AGkAbwBuACAALQBMAGkAdABlAHIAYQBsAFAAYQB0AGgAIAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAtAEwAaQB0AGUAcgBhAGwAUABhAHQAaAAgACQAYQApAAoAYwB1AHIAbAAuAGUAeABlACAALQBzACAALQBtACAAMwAwACAALQBYACAAUABPAFMAVAAgAC0ASAAgACIAQAAkACgAUwBwAGwAaQB0AC0AUABhAHQAaAAgACQAYQAgAC0ATABlAGEAZgApACIAIAAtAEgAIAAiAEMAbwBuAHQAZQBuAHQALQBUAHkAcABlADoAIABhAHAAcABsAGkAYwBhAHQAaQBvAG4ALwBqAHMAbwBuACIAIAAtAC0AZABhAHQAYQAtAGIAaQBuAGEAcgB5ACAAIgBAAC0AIgAgACIAJAAoACQAdQApACIACgBlAHgAaQB0ACAAMAA=",
+            "timeout": 30
           }
         ]
       }
@@ -696,7 +696,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -714,7 +714,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 10,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -732,7 +732,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -749,7 +749,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -766,7 +766,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -783,7 +783,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -800,7 +800,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -817,7 +817,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -834,7 +834,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
           {
             "type": "http",
             "url": "http://127.0.0.1:47821/hook",
-            "timeout": 5,
+            "timeout": 30,
             "headers": {
               "Authorization": "Bearer $CW_HOOK_TOKEN"
             },
@@ -848,7 +848,7 @@ The dialog fills in your port and your hook timeouts. For port 47821 and the def
   },
   "statusLine": {
     "type": "command",
-    "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand JABQAHIAbwBnAHIAZQBzAHMAUAByAGUAZgBlAHIAZQBuAGMAZQA9ACcAUwBpAGwAZQBuAHQAbAB5AEMAbwBuAHQAaQBuAHUAZQAnAAoAJAB1AD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBVAFIATAA7ACAAJABhAD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBBAFUAVABIAF8ARgBJAEwARQAKAGkAZgAgACgALQBuAG8AdAAgACQAdQAgAC0AbwByACAALQBuAG8AdAAgACQAYQApACAAewAgAGUAeABpAHQAIAAwACAAfQAKAFMAZQB0AC0ATABvAGMAYQB0AGkAbwBuACAALQBMAGkAdABlAHIAYQBsAFAAYQB0AGgAIAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAtAEwAaQB0AGUAcgBhAGwAUABhAHQAaAAgACQAYQApAAoAYwB1AHIAbAAuAGUAeABlACAALQBzACAALQBtACAANQAgAC0AWAAgAFAATwBTAFQAIAAtAEgAIAAiAEAAJAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAkAGEAIAAtAEwAZQBhAGYAKQAiACAALQBIACAAIgBDAG8AbgB0AGUAbgB0AC0AVAB5AHAAZQA6ACAAYQBwAHAAbABpAGMAYQB0AGkAbwBuAC8AagBzAG8AbgAiACAALQAtAGQAYQB0AGEALQBiAGkAbgBhAHIAeQAgACIAQAAtACIAIAAiACQAKAAkAHUAKQA/AHMAdABhAHQAdQBzAGwAaQBuAGUAIgAKAGUAeABpAHQAIAAwAA==",
+    "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand JABQAHIAbwBnAHIAZQBzAHMAUAByAGUAZgBlAHIAZQBuAGMAZQA9ACcAUwBpAGwAZQBuAHQAbAB5AEMAbwBuAHQAaQBuAHUAZQAnAAoAJAB1AD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBVAFIATAA7ACAAJABhAD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBBAFUAVABIAF8ARgBJAEwARQAKAGkAZgAgACgALQBuAG8AdAAgACQAdQAgAC0AbwByACAALQBuAG8AdAAgACQAYQApACAAewAgAGUAeABpAHQAIAAwACAAfQAKAFMAZQB0AC0ATABvAGMAYQB0AGkAbwBuACAALQBMAGkAdABlAHIAYQBsAFAAYQB0AGgAIAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAtAEwAaQB0AGUAcgBhAGwAUABhAHQAaAAgACQAYQApAAoAYwB1AHIAbAAuAGUAeABlACAALQBzACAALQBtACAAMwAwACAALQBYACAAUABPAFMAVAAgAC0ASAAgACIAQAAkACgAUwBwAGwAaQB0AC0AUABhAHQAaAAgACQAYQAgAC0ATABlAGEAZgApACIAIAAtAEgAIAAiAEMAbwBuAHQAZQBuAHQALQBUAHkAcABlADoAIABhAHAAcABsAGkAYwBhAHQAaQBvAG4ALwBqAHMAbwBuACIAIAAtAC0AZABhAHQAYQAtAGIAaQBuAGEAcgB5ACAAIgBAAC0AIgAgACIAJAAoACQAdQApAD8AcwB0AGEAdAB1AHMAbABpAG4AZQAiAAoAZQB4AGkAdAAgADAA",
     "padding": 0
   }
 }
@@ -861,7 +861,7 @@ $ProgressPreference='SilentlyContinue'
 $u=$env:CW_HOOK_URL; $a=$env:CW_HOOK_AUTH_FILE
 if (-not $u -or -not $a) { exit 0 }
 Set-Location -LiteralPath (Split-Path -LiteralPath $a)
-curl.exe -s -m 5 -X POST -H "@$(Split-Path $a -Leaf)" -H "Content-Type: application/json" --data-binary "@-" "$($u)"
+curl.exe -s -m 30 -X POST -H "@$(Split-Path $a -Leaf)" -H "Content-Type: application/json" --data-binary "@-" "$($u)"
 exit 0
 ```
 
@@ -2345,6 +2345,7 @@ By default Combwork integrates a jj card itself: once it passes review and its c
 - **What can still happen.** jj can't make the move conditional, so while Combwork moves the bookmark a few races can still happen: the bookmark moved away and back before the move, someone moving it to an earlier commit of the candidate, a Git checkout of the target switched during the export (which jj detaches), or another bookmark or tag made waiting for export during it (which the export writes too). Combwork stops when it sees what the last one leaves, but can't prevent or undo it. Only *You integrate it yourself* avoids these races.
 - **When it stops.** For you says what Combwork saw. **Undo Combwork's move** shows in one case only: the move is exactly Combwork's own and nothing else changed, yet Combwork couldn't prove the card's work is in the target. Undo reverts Combwork's own jj operation, checks again and frees the card (**Leave it to me** changes nothing). Every other stop means something besides Combwork's move changed the repository, so there is nothing of Combwork's alone to undo. Then, or when Combwork couldn't prove what happened (after a crash, say), the question shows what was read and `jj op log`: **It's integrated** if the card's work is in the target (Combwork marks it Done on your word, not as checked; its Work section says *Done by you, integration not proved*), or **Not integrated, start again**, which Combwork accepts only once the target is known not to contain the candidate; it then builds a new candidate and runs its checks again. Until you answer, the card takes no other integration. A card whose move was undone isn't integrated again on its own: integrate it yourself, or it gets a new candidate when the target moves.
 - **After a crash or restart**, Combwork reads each attempt's record and the repository again, and never repeats a step it may already have taken.
+- **A card put back while an integration is unsettled.** If you put the card back to Todo (or archive it) before answering a question about its integration, the question goes with that round of the card. When the card starts again, Combwork stops tracking the old attempt and, if it may have moved the target, says so on the card: the target may already hold that move. Combwork can integrate the card's new work automatically after that, so look at the target's history if the old move matters.
 
 #### Undoing a jj operation <a id="jj-operations"></a>
 
@@ -2586,6 +2587,7 @@ Combwork's developer console shows what each coding agent's CLI sends Combwork (
 **Settings → Advanced** lists details Combwork relies on that a coding agent's CLI update can break, and timeouts and limits for power users: the question each CLI asks before trusting a folder, the text that means it's ready, the messages that mean its sign-in was refused, the fields it sends plan limits in, what its screen shows while it works or once a turn is done, how its footer shows each permission mode (Claude Code's and Copilot's), the labels of Codex's `/permissions` menu, how Combwork tells a safety classifier stopped an agent's response (Claude Code's note and question), the timeouts Combwork gives its hooks and the `cw_` tools, how long a stopped Copilot gets to exit by itself, whether right-click in Copilot panes goes to Copilot (see [Keyboard shortcuts](#keyboard-shortcuts)), the longest an agent's wait lasts, how many lanes the Progress panel shows, and whether the developer console shows prompt, reply and command text (see [The developer console](#the-developer-console)). Combwork's defaults work with the CLI versions it was tested with; change one only when something stops working after a CLI update, or Combwork's notes say to.
 
 - The list is on tabs: **Combwork**, then each CLI (**Claude Code**, **Codex**, **GitHub Copilot**, **Antigravity**, **OpenCode**), and it opens on the tab you last chose. A CLI you turned off in Settings → Providers keeps its tab, dimmed and marked **off**, with a line atop its values saying so: they apply once you turn it on. **Filter** it, or tick **Modified only**; Settings' own search and Modified only find them too. While any of these filters it, each tab shows how many of its values match, the list shows a tab with matches (searching for a value's name, such as `codex.trust.prompt`, opens its tab), and clearing them goes back to the tab you had. **Show developer features** is first on the Combwork tab: it is in `advanced.json` too, as `cw.showDeveloperFeatures`.
+- **Databases: wait for another program's lock** (`cw.db.busySeconds`, 15 s) is how long a write to the board, the Assistant's journal or the usage history waits while another program (another Combwork on the same workspace, a script) holds its database, before the write is refused. It bounds a wait, not a speed: while a board write waits, the window doesn't respond. It takes effect after a restart.
 - Each value shows its name (as `advanced.json` has it) and what it is for. Change it in its box: a changed one is marked, with its **default** beside it and **Reset** to put it back. A value Combwork can't use (a regular expression that doesn't compile, a number out of range) is refused; the box says why.
 - A value for a CLI also says when it no longer finds what that CLI was recorded showing ("It doesn't find what Claude Code 2.1.296 showed"): fine when the CLI changed, which is usually why you changed it.
 - A value for a CLI (what Combwork reads from it, or a timeout Combwork gives it) records the CLI version it was made for, also when you edit `advanced.json` by hand. After that CLI updates, the value is flagged (**Made for Claude Code 2.1.296; 2.1.300 is installed now**): check it still works, then click **Keep for 2.1.300**, or **Reset** it if the new version no longer needs it.

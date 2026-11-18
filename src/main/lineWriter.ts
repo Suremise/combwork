@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import { agentMsg, say } from '../shared/agentText'
 import type { DeliveryNeed } from '../shared/deliveries'
+import { advanced } from './advanced'
 import { createLogger, userText } from './logger'
 import { folderChanging, folderSteady } from './folderFence'
 import { readyFor } from './readiness'
@@ -17,14 +18,18 @@ import { sessions } from './sessions'
 // Its log lines are the wakes' as they always were (e2e suites read them).
 const log = createLogger('watches')
 
-/** How long a typed line has to be taken (the CLI starts a turn) before Enter is pressed again, once (#376). */
-const TAKE_MS = 10_000
-/** For unit tests: how long a typed line has to be taken (TAKE_MS). */
+/**
+ * How long a typed line has to be taken (the CLI starts a turn) before Enter is pressed again, once (#376): Settings →
+ * Advanced, cw.typed.takeSeconds (HI-3373: 30 s, as a prompt hook on a busy 2–4 core machine can pass 10). Enter again
+ * waits for a safe moment up to six times it; not taken in it again, the line is told as maybe waiting in its prompt.
+ */
+export const TAKE_SECONDS = 'cw.typed.takeSeconds'
+/** For unit tests: how long a typed line has to be taken (the setting's). */
 export const testHooks: { takeMs?: number } = {}
-/** TAKE_MS, or a unit test's, or an unpackaged test build's (CW_TEST_WAKE_TAKE_MS). */
+/** The setting, or a unit test's, or an unpackaged test build's (CW_TEST_WAKE_TAKE_MS). */
 function takeMs(): number {
   const v = !app.isPackaged ? Number(process.env.CW_TEST_WAKE_TAKE_MS) : NaN
-  return testHooks.takeMs ?? (Number.isFinite(v) && v >= 0 ? v : TAKE_MS)
+  return testHooks.takeMs ?? (Number.isFinite(v) && v >= 0 ? v : advanced.number(TAKE_SECONDS) * 1000)
 }
 
 const agentKey = (projectPath: string, agentId: string): string => `${projectPath.toLowerCase()}#${agentId}`

@@ -496,6 +496,8 @@ interface CombworkMessageValues {
   'settings.advanced.cw.copies.quietWaitMinutes.title': undefined
   'settings.advanced.cw.copies.review.desc': undefined
   'settings.advanced.cw.copies.review.title': undefined
+  'settings.advanced.cw.db.busySeconds.desc': undefined
+  'settings.advanced.cw.db.busySeconds.title': undefined
   'settings.advanced.cw.disableHardwareAcceleration.desc': undefined
   'settings.advanced.cw.disableHardwareAcceleration.title': undefined
   'settings.advanced.cw.focused.pickSeconds.desc': undefined
@@ -664,6 +666,8 @@ interface CombworkMessageValues {
   'settings.advanced.cw.terminal.osc52.block': undefined
   'settings.advanced.cw.terminal.osc52.desc': undefined
   'settings.advanced.cw.terminal.osc52.title': undefined
+  'settings.advanced.cw.typed.takeSeconds.desc': undefined
+  'settings.advanced.cw.typed.takeSeconds.title': undefined
   'settings.advanced.cw.usage.timelineDetailDays.desc': undefined
   'settings.advanced.cw.usage.timelineDetailDays.title': undefined
   'settings.advanced.cw.wait.agentsMaxSeconds.desc': undefined

@@ -497,6 +497,18 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
+    id: 'cw.db.busySeconds',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.db.busySeconds.title', defaultMessage: "Databases: wait for another program's lock", description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"15 s\")." }),
+    desc: msg({ id: 'settings.advanced.cw.db.busySeconds.desc', defaultMessage: "How long a write to the board, the Assistant's journal or the usage history waits while another program (another Combwork on this workspace, a script) holds its database's lock, before the write is refused. It bounds a wait, not a speed: a write to the board waits on Combwork's main thread, so the window doesn't respond while it waits. Takes effect after Combwork restarts.", description: 'What the advanced setting "Databases: wait for another program\'s lock" does (Settings → Advanced, HI-3374). The window not responding while it waits is a real warning: keep it.' }),
+    kind: 'number',
+    default: 15,
+    min: 1,
+    max: 120,
+    unit: 's',
+    applies: 'restart'
+  },
+  {
     id: 'cw.recorder.minutes',
     group: 'cw',
     title: msg({ id: 'settings.advanced.cw.recorder.minutes.title', defaultMessage: 'Flight recorder: one capture per trigger and agent every', description: "An advanced setting's title (Settings → Advanced), followed by its value in minutes (\"10 min\")." }),
@@ -666,7 +678,7 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.cw.hooks.missingSeconds.title', defaultMessage: 'Hooks missing: wait', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Hooks: the calls an agent's coding agent makes to Combwork as it works." }),
     desc: msg({ id: 'settings.advanced.cw.hooks.missingSeconds.desc', defaultMessage: "How long an agent's CLI may go without a hook, from its start (a CLI that sends one then) or from a prompt it went to work on, before Combwork says its hooks aren't arriving and shows its status as unknown (#1336). A long think after a prompt's hook never counts. Raise it if a slow machine shows that notice for agents that are fine.", description: 'What the advanced setting "Hooks missing: wait" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
-    default: 60,
+    default: 180,
     min: 1,
     max: 600,
     unit: 's',
@@ -678,9 +690,21 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.cw.lostLine.steadySeconds.title', defaultMessage: 'Lost line: wait', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A line: a message Combwork typed into an agent's terminal." }),
     desc: msg({ id: 'settings.advanced.cw.lostLine.steadySeconds.desc', defaultMessage: "A line Combwork typed into an agent that its CLI didn't take, gone from its input since (a screen of the CLI's took it): how long its input must stay empty, at its prompt, with nothing taken, before Combwork types it again or, with nothing to type again, tells you. Raise it if a slow machine has a line typed twice.", description: 'What the advanced setting "Lost line: wait" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1959).' }),
     kind: 'number',
-    default: 2,
+    default: 5,
     min: 1,
     max: 30,
+    unit: 's',
+    applies: 'now'
+  },
+  {
+    id: 'cw.typed.takeSeconds',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.typed.takeSeconds.title', defaultMessage: 'Typed line: wait to be taken', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A line: a message Combwork typed into an agent's terminal; taken: the agent's CLI started working on it." }),
+    desc: msg({ id: 'settings.advanced.cw.typed.takeSeconds.desc', defaultMessage: "How long an agent's CLI has to take a line Combwork typed into it (start working on it) before Combwork presses Enter again, once, as soon as that is safe (within six times this). Not taken in this time again, Combwork tells you the line may be waiting in its prompt and types nothing more into that agent until it is taken. Raise it if a slow or busy machine shows that notice for lines that were taken.", description: 'What the advanced setting "Typed line: wait to be taken" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-3373).' }),
+    kind: 'number',
+    default: 30,
+    min: 5,
+    max: 300,
     unit: 's',
     applies: 'now'
   },

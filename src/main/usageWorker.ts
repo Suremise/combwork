@@ -1,10 +1,13 @@
-import { parentPort } from 'worker_threads'
+import { parentPort, workerData } from 'worker_threads'
 import { createHash } from 'crypto'
 import { open, stat } from 'original-fs/promises'
 import { dirname, join } from 'path'
 import type { AppSettings, ProviderId, SessionUsage } from '../shared/types'
 import { baselineOfRows, baselineOfUsage, baselineAsFree, baselineWithoutReports, dominates, ledgerRows, mergeBaselines, reshareRows, rowsAsFree, rowsWithoutReports, sessionRows, summaryOf, unknownOnCards, type LedgerRow, type SessionHold } from '../shared/usageLedger'
-import { OPENABLE_WAIT_MS, openableNow, openDb, untilOpenable, type Db } from './db'
+import { OPENABLE_WAIT_MS, openableNow, openDb, setDbBusyMs, untilOpenable, type Db } from './db'
+// HI-3374: main's wait for another program's database lock (cw.db.busySeconds), given as this worker starts, before it opens one.
+const givenBusyMs = (workerData as { dbBusyMs?: unknown } | null)?.dbBusyMs
+if (typeof givenBusyMs === 'number') setDbBusyMs(givenBusyMs)
 import { advancedValues, readAdvancedFrom, valuesReader } from './advancedValues'
 import type { DatabaseSync } from 'node:sqlite'
 import { baselineOf, cardRows, cursorOf, fileSpace, getMeta, giveSpaceBack, markLocality, replaceRows, rollUpCandidates, rollUpSession, sessionIds, setMeta, storedSession, storedSessions, storedTimelines, updateMeta, USAGE_MIGRATIONS, writeSession, type SessionMeta, type SessionWrite } from './usageDb'
