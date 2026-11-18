@@ -59,5 +59,22 @@
   "budget.logWriteMs": { "kind": "budget", "ms": 150, "note": "a log line written without waiting on the disk" },
   "budget.shutdownBackupMs": { "kind": "budget", "ms": 250, "note": "shutdown's backup step kept short" },
   "budget.walCheckpointMs": { "kind": "budget", "ms": 1000, "note": "a WAL checkpoint kept short" },
-  "budget.screenMs": { "kind": "budget", "ms": 1000, "note": "a terminal screen rendered within a frame budget" }
+  "budget.screenMs": { "kind": "budget", "ms": 1000, "note": "a terminal screen rendered within a frame budget" },
+  "pace.lineBeforeEnterMs": { "kind": "pace", "ms": 300, "note": "a line typed into a CLI before its Enter: the fakes, like a CLI, read a typed line before the Enter that sends it" },
+  "pace.typedPieceMs": { "kind": "pace", "ms": 15, "note": "between the 8-character pieces a prompt is typed in, as Combwork types one (a whole text at once is a paste to Codex)" },
+  "pace.userKeyMs": { "kind": "pace", "ms": 500, "note": "a user typing in a pane: a key this often, well inside Combwork's typing pause (agentwatch)" },
+  "quiet.noLineTypedMs": { "kind": "quiet", "ms": 3000, "note": "with the agents' turns over, no further line typed into one within this: no wake for a working agent, no second wake for one event, a cancelled message or a mode never typed (twice)" },
+  "quiet.flagGraceMs": { "kind": "quiet", "ms": 4500, "note": "past the e2e build's not-watching grace (seam.loopGraceMs): no flag or second notice comes (loopwatch)" },
+  "quiet.cancelledStartMs": { "kind": "quiet", "ms": 4000, "note": "a cancelled start (its workspace closed, Start New cancelled) starts or stops no agent within this" },
+  "quiet.quitHeldMs": { "kind": "quiet", "ms": 2000, "note": "Combwork doesn't quit within this while an agent it waits for works" },
+  "quiet.keepAwakeMs": { "kind": "quiet", "ms": 500, "note": "a working agent's keep-awake request not made within this, with Keep awake set to Never" },
+  "quiet.backgroundViewMs": { "kind": "quiet", "ms": 6000, "note": "← on an empty prompt: the session doesn't move into Claude Code's background view within this" },
+  "quiet.contextLostMs": { "kind": "quiet", "ms": 4000, "note": "a terminal's lost WebGL context would show within this (xterm waits 3 s for it to come back)" },
+  "quiet.dialogReopenMs": { "kind": "quiet", "ms": 500, "note": "a dialog opened again by the key press that closed it would show within this" },
+  "quiet.terminalSizeMs": { "kind": "quiet", "ms": 1500, "note": "a terminal's CLI given no new size within this: while hidden, or once a layout, window or zoom change has settled" },
+  "quiet.terminalHoldMs": { "kind": "quiet", "ms": 1600, "note": "past the second Combwork holds a shown terminal at the bottom: it must still be there (or still where the user scrolled)" },
+  "seam.loopGraceMs": { "kind": "seam", "ms": 3000, "note": "CW_TEST_LOOP_GRACE_MS: the e2e build's grace before an agent in a loop with no watch is flagged (loopwatch)" },
+  "budget.doorbellMs": { "kind": "budget", "ms": 15000, "note": "a message rings an agent's doorbell within this while it runs a background task (background): seconds, not the turn's end" },
+  "pace.closeThenKillMs": { "kind": "pace", "ms": 5000, "note": "app.close given this before a copy that didn't quit is ended by its process (its Quit dialog would hold app.close for ever: quit.cjs)" },
+  "seam.slowStartMs": { "kind": "seam", "ms": 4000, "note": "CW_TEST_SLOW_IPC's hold on session:start (startbusy): long enough to see the busy state under load" }
 }

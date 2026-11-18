@@ -13,7 +13,7 @@ const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = lib.timing('hang.ui')
 // How long session:start is held: long enough to see the busy state under load, not part of any check.
-const SLOW_MS = 4000
+const SLOW_MS = lib.timing('seam.slowStartMs')
 
 const userData = path.join(lib.WORK, 'startbusy-profile')
 const ws = path.join(lib.WORK, 'startbusy-ws')
@@ -54,7 +54,7 @@ const check = (name, ok, extra = '') => {
     const converse = async (proj, id) => {
       if (!(await lib.until(async () => (await liveOf(proj, id))?.status === 'ready', HUNG_MS))) return false
       await inv('pty:write', lib.ptyKey(proj, id), 'hello')
-      await lib.sleep(300) // on purpose: the fake reads a typed line before its Enter, as a CLI does
+      await lib.sleep(lib.timing('pace.lineBeforeEnterMs')) // on purpose: the fake reads a typed line before its Enter, as a CLI does
       await inv('pty:write', lib.ptyKey(proj, id), '\r')
       return !!(await lib.until(async () => (await liveOf(proj, id))?.status === 'finished', HUNG_MS))
     }

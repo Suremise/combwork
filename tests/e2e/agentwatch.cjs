@@ -58,7 +58,7 @@ const check = (name, ok, extra = '') => {
   const until = async (fn, ms) => {
     const t = Date.now()
     let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
+    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
     return v
   }
   const wakes = (agent) => {
@@ -142,7 +142,7 @@ const check = (name, ok, extra = '') => {
   await page.screenshot({ path: path.join(lib.WORK, 'agentwatch-watching.png') })
   go('agentwatch-first')
   await until(async () => wakes('Watcher').length >= 1, HUNG_MS)
-  await lib.sleep(2000) // A fixed wait on purpose: this checks that a second line does NOT come.
+  await lib.sleep(lib.timing('quiet.noLineTypedMs')) // A quiet window on purpose: this checks that a second line does NOT come.
   const w1 = wakes('Watcher')
   check('woken exactly once when the worker finished, with its reply', w1.length === 1 && w1[0].startsWith('[CW] Worker (alpha) finished: "Done: work 1 holduntil agentwatch-first"') && w1[0].includes('Your agent watch has ended'), JSON.stringify(w1))
   await until(() => idle(watcher.id), HUNG_MS)
@@ -181,7 +181,7 @@ const check = (name, ok, extra = '') => {
   await until(async () => (await live(watcher.id))?.status === 'working', HUNG_MS)
   go('agentwatch-busy')
   await until(() => idle(worker.id), HUNG_MS)
-  await lib.sleep(2500) // A fixed wait on purpose: this checks that no line comes while the watcher works.
+  await lib.sleep(lib.timing('quiet.noLineTypedMs')) // A quiet window on purpose: this checks that no line comes while the watcher works.
   check('no line while the watcher works', wakes('Watcher').length === 2 && (await live(watcher.id))?.status === 'working', JSON.stringify({ lines: wakes('Watcher').slice(2), watcher: (await live(watcher.id))?.status }))
   go('agentwatch-busy-watcher')
   check('…then one, once its turn has ended', !!(await until(async () => wakes('Watcher').length === 3, HUNG_MS)) && wakes('Watcher')[2].startsWith('[CW] Worker (alpha) finished'), JSON.stringify(wakes('Watcher').slice(2)))
@@ -198,13 +198,13 @@ const check = (name, ok, extra = '') => {
   const keepTyping = (async () => {
     // A key every half second, well inside the 4 s pause: typing, not a wait for a check.
     while (typing.on) {
-      await lib.sleep(500)
+      await lib.sleep(lib.timing('pace.userKeyMs'))
       if (typing.on) await inv('pty:write', key, '.')
     }
   })()
   go('agentwatch-typing')
   await until(() => idle(worker.id), HUNG_MS)
-  await lib.sleep(1500) // A fixed wait on purpose: this checks that no line comes while the user types.
+  await lib.sleep(lib.timing('quiet.noLineTypedMs')) // A quiet window on purpose: this checks that no line comes while the user types.
   check('no line while the user is typing there', wakes('Watcher').length === 3, JSON.stringify(wakes('Watcher').slice(3)))
   typing.on = false
   await keepTyping
@@ -232,13 +232,13 @@ const check = (name, ok, extra = '') => {
   check('cancel ends the agent watch', (await lastWaitReply(watcher.id)) === 'Cancelled your agent watch.' && !(await live(watcher.id))?.watch, await lastWaitReply(watcher.id))
   go('agentwatch-cancelled')
   await until(() => idle(worker.id), HUNG_MS)
-  await lib.sleep(3000) // A fixed wait on purpose: this checks that no line comes after a cancel.
+  await lib.sleep(lib.timing('quiet.noLineTypedMs')) // A quiet window on purpose: this checks that no line comes after a cancel.
   check('…and no line came when the worker finished', wakes('Watcher').length === 5, JSON.stringify(wakes('Watcher').slice(5)))
 
   // --- The limit: a minute with Slow still working ends Limiter's watch with a "still working" line.
-  const left = 60000 - (Date.now() - limitFrom)
-  if (left > 0) await lib.sleep(left)
-  await until(async () => wakes('Limiter').length >= 1, HUNG_MS)
+  // Its line comes once the minute (limitMinutes: 1, the limit under test) has passed: waited for, bounded by that minute's rest and a hang bound.
+  const left = Math.max(0, 60000 - (Date.now() - limitFrom)) // timing-ok: limitMinutes 1, the watch's own limit under test
+  await until(async () => wakes('Limiter').length >= 1, left + HUNG_MS)
   const lw = wakes('Limiter')
   check('limitMinutes passing with the agent still working: one "still working" line', lw.length === 1 && lw[0].startsWith('[CW] Slow is still working after 1 min: your agent watch has ended'), JSON.stringify(lw))
   check('…while Slow still works', ['working'].includes((await live(slow.id))?.status), (await live(slow.id))?.status)

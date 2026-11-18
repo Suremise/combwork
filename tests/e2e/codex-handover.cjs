@@ -9,7 +9,6 @@ const scratch = lib.WORK
 const userData = path.join(scratch, 'cxcont-profile')
 const ws = path.join(scratch, 'cxcont-ws')
 const proj = path.join(ws, 'demo')
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const results = []
 const check = (name, ok, extra = '') => {
   lib.checked(ok)
@@ -40,7 +39,7 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('demo', { exact: true }).first().click()
-  await sleep(500)
+  await lib.projectShown(page)
   const agents = () => inv('workspace:get').then((w) => w.projects.find((p) => p.name === 'demo').agents)
   // An agent's turn has run (#782): the line Combwork gave it (its inbox's doorbell) is in its transcript, it answered after
   // it, and the turn is over. Ready alone isn't: a CLI that never took the line is ready too.
@@ -56,15 +55,14 @@ const check = (name, ok, extra = '') => {
   const cx = await lib.addAgent(inv, proj, { name: 'Codex', ...small })
   const cx2 = await lib.addAgent(inv, proj, { name: 'Codex 2', ...small })
   check('agents added', (await agents()).length === 3)
-  await sleep(800)
   // The dialog, from the pane header's menu (panes show in a multi-column layout).
   await inv('project:updateConfig', proj, { layout: 'columns2' })
-  await sleep(800)
+  await lib.until(async () => (await page.locator('.pane-header-bar').count()) >= 2, lib.timing('hang.ui'))
   await page.screenshot({ path: path.join(scratch, 'cont-0-before.png') })
   await page.locator('.pane-header-bar').first().click({ button: 'right' })
-  await sleep(300)
+  await lib.until(async () => (await page.getByText('Hand Over to…').count()) > 0, lib.timing('hang.ui'))
   await page.getByText('Hand Over to…').first().click()
-  await sleep(400)
+  await lib.until(async () => (await page.locator('.dialog-header', { hasText: 'Hand over' }).count()) > 0, lib.timing('hang.ui'))
   const dialog = await page.locator('.dialog-header', { hasText: 'Hand over' }).count()
   await page.screenshot({ path: path.join(scratch, 'cont-1-dialog.png') })
   check('dialog opens', dialog > 0)

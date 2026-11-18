@@ -32,8 +32,7 @@ const check = (name, ok, extra = '') => {
   const agent = await lib.soloAgent(inv, proj)
   await inv('session:start', proj, { agentId: agent.id })
   await lib.acceptClaudeTrust(inv, proj, agent.id)
-  const t0 = Date.now()
-  while (Date.now() - t0 < 25000 && (await inv('session:live'))[0]?.status !== 'ready') await lib.sleep(300)
+  await lib.until(async () => (await inv('session:live'))[0]?.status === 'ready', lib.timing('hang.ui'))
   const live = (await inv('session:live'))[0]
   check('session ready', live?.status === 'ready', live?.status)
   const claude = live?.executable || path.join(process.env.USERPROFILE, '.local', 'bin', 'claude.exe')
@@ -47,7 +46,7 @@ const check = (name, ok, extra = '') => {
   // before any turn (HI-2688): its start, restart or resume
   await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === agent.id)?.status === 'ready', lib.timing('hang.step'))
   await inv('pty:write', lib.ptyKey(proj, agent.id), '\x1b[D')
-  await lib.sleep(6000) // A fixed wait on purpose: this checks that the session does NOT move into Claude Code's background view after ←.
+  await lib.sleep(lib.timing('quiet.backgroundViewMs')) // A quiet window on purpose: this checks that the session does NOT move into Claude Code's background view after ←.
   const left = jobs()
   check('← on an empty prompt keeps the session in Combwork', left.length === 0, JSON.stringify(left))
   check('the session is still running in Combwork', (await inv('session:live'))[0]?.status === 'ready')

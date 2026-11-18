@@ -47,7 +47,7 @@ const check = (name, ok, extra = '') => {
     await page.evaluate(() => document.activeElement?.blur())
     await page.keyboard.press('Control+Shift+P')
     await page.locator('.palette input').fill(q)
-    await lib.sleep(200)
+    await lib.until(async () => (await page.locator('.palette-item').allTextContents()).some((t) => t.toLowerCase().includes(q)), lib.timing('hang.ui'))
     return page.locator('.palette-item').allTextContents()
   }
 
@@ -85,14 +85,14 @@ const check = (name, ok, extra = '') => {
   await page.mouse.move(rb.x + rb.width / 2 + 60, rb.y + 200, { steps: 5 })
   await page.mouse.move(rb.x + rb.width / 2 + 120, rb.y + 200, { steps: 5 })
   await page.mouse.up()
-  await lib.sleep(200)
+  await lib.until(async () => Math.abs((await layout()).panel.width - before - 120) <= 4, lib.timing('hang.ui'))
   l = await layout()
   check('on the left it is resized from its right edge (dragged right: wider)', Math.abs(l.panel.width - before - 120) <= 4, `${before} → ${l.panel.width}`)
   check('…and the main area gives the room', leftOfMain(l, 'panel'), JSON.stringify(l))
   await page.mouse.move(900, 600)
   await page.screenshot({ path: path.join(lib.WORK, 'assistantside-left-dark.png') })
   await inv('settings:update', { appearance: { theme: 'light' } })
-  await lib.sleep(300)
+  await lib.themeShown(page, 'light')
   await page.screenshot({ path: path.join(lib.WORK, 'assistantside-left-light.png') })
   await inv('settings:update', { appearance: { theme: 'dark' } })
 

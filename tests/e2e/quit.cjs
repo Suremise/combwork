@@ -49,7 +49,7 @@ async function launch(name, config) {
  * Combwork quits: it decides to (its own quit work done, timed from the watch's start) within ms, and its process ends after.
  * The process's part is Electron's on a loaded machine, so it is only waited for, up to GONE_MS (#424).
  */
-const GONE_MS = 30000
+const GONE_MS = lib.timing('app.closeMs')
 const quits = async (q, ms = 10000) => !!(await q.untilDecided(ms)) && (await q.gone(GONE_MS))
 /**
  * Until n sessions are ready (idle), not just past starting: in a folder Claude Code hasn't seen, its trust question
@@ -58,7 +58,7 @@ const quits = async (q, ms = 10000) => !!(await q.untilDecided(ms)) && (await q.
 const untilReady = (inv, n) => lib.until(async () => (await inv('session:live')).filter((l) => l.status === 'ready').length >= n, lib.timing('hang.step'))
 /** Closes a copy that didn't quit by itself: app.close() alone waits at its Quit dialog for ever. */
 const forceClose = async (app) => {
-  await Promise.race([app.close().catch(() => undefined), sleep(5000)])
+  await Promise.race([app.close().catch(() => undefined), sleep(lib.timing('pace.closeThenKillMs'))])
   try {
     app.process().kill()
   } catch {

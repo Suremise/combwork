@@ -100,7 +100,7 @@ const check = (name, ok, extra = '') => {
   check('…with Restart in This Mode… and Manage Modes…', items.some((t) => t.startsWith('Restart in This Mode')) && items.some((t) => t.startsWith('Manage Modes')), JSON.stringify(items))
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    await lib.sleep(300) // on purpose: the theme's colours settle
+    await lib.themeShown(page, theme)
     await page.screenshot({ path: path.join(lib.WORK, `assistantmode-menu-${theme}.png`) })
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })
@@ -120,7 +120,7 @@ const check = (name, ok, extra = '') => {
   const working = await prompts.type('work 6')
   check('it works on something', !!(await lib.until(async () => (await live())?.turn?.id !== working.before && (await live())?.status === 'working', lib.TURN_HUNG_MS)), JSON.stringify((await live())?.turn))
   await pick('QA triager')
-  await lib.sleep(1000) // on purpose: nothing is typed into a working Assistant
+  await lib.sleep(lib.timing('quiet.noLineTypedMs')) // on purpose: nothing is typed into a working Assistant
   check('switching while it works types nothing yet', !(await buffer()).includes('[CW] Mode: QA triager'))
   check('…and is saved at once', agentFile().mode === 'qa-triager', JSON.stringify(agentFile()))
   check('…then told once it has finished', !!(await lib.until(async () => (await buffer()).includes('[CW] Mode: QA triager (chosen by the user). Take a report'), lib.TURN_HUNG_MS)))
@@ -164,7 +164,7 @@ const check = (name, ok, extra = '') => {
   await lib.until(async () => !(await live()), lib.timing('hang.ui'))
   await inv('session:start', home, { resumeId: session, agentId: 'assistant' })
   await idle()
-  await lib.sleep(2000) // on purpose: a second message would be typed by now
+  await lib.sleep(lib.timing('quiet.noLineTypedMs')) // on purpose: a second message would be typed by now
   check("resumed again in the same mode, it isn't told again", told(session, 'Release manager') === 1, String(told(session, 'Release manager')))
   await inv('session:stop', home, 'assistant')
   await lib.until(async () => !(await live()), lib.timing('hang.ui'))

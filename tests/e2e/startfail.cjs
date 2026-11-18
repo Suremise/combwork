@@ -43,7 +43,7 @@ const check = (name, ok, extra = '') => {
   const until = async (fn, ms) => {
     const t = Date.now()
     let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
+    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
     return v
   }
   await page.getByText('alpha', { exact: true }).first().click()
@@ -70,7 +70,7 @@ const check = (name, ok, extra = '') => {
   await bar.getByRole('button', { name: 'Agent Settings…' }).click()
   check('Agent Settings… opens them', !!(await until(async () => (await page.getByRole('dialog', { name: 'Starter settings' }).count()) === 1, lib.timing('hang.ui'))))
   await page.keyboard.press('Escape')
-  await lib.sleep(300)
+  await lib.until(async () => (await page.getByRole('dialog', { name: 'Starter settings' }).count()) === 0, lib.timing('hang.ui'))
 
   // --- ✕ puts back the usual "Session ended" bar.
   await bar.getByRole('button', { name: /Dismiss/ }).click()

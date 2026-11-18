@@ -98,7 +98,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   // before any turn (HI-2688): its start, restart or resume
   await lib.until(async () => (await live(claude.id))?.status === 'ready', lib.timing('hang.step'))
   await inv('pty:write', lib.ptyKey(alpha, claude.id), 'hello')
-  await lib.sleep(300)
+  await lib.sleep(lib.timing('pace.lineBeforeEnterMs')) // on purpose: the fake reads a typed line before its Enter, as a CLI does
   await inv('pty:write', lib.ptyKey(alpha, claude.id), '\r')
   check('Claude runs a session', !!(await lib.until(async () => (await live(claude.id))?.status === 'finished', lib.timing('hang.step'))))
   const liveId = (await live(claude.id)).sessionId
@@ -241,7 +241,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   await branch('Claude').first().click()
   await lib.until(async () => !(await names()).includes('Old notes'), HUNG_MS)
   await page.locator('.sessions-list .pane-header [aria-label="Refresh"]').click()
-  await lib.sleep(700)
+  await lib.sleep(lib.timing('quiet.nothingMs')) // A quiet window on purpose: the refreshed list lands within it, and the branch staying folded is the point
   check('a folded branch stays folded when the list refreshes, though its session is shown', !(await names()).includes('Old notes') && /Old notes/.test(await page.locator('.transcript-toolbar strong').first().innerText().catch(() => '')))
   await branch('Claude').first().click()
   await lib.until(async () => (await names()).includes('Old notes'), HUNG_MS)
@@ -335,12 +335,12 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
     })
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    await lib.sleep(300)
+    await lib.themeShown(page, theme)
     const button = await legible(blocked.locator('button.act-resume[disabled]'))
     check(`${theme}: the blocked Resume is unfaded and readable`, button.opacity === 1 && button.ratio >= 4.5, JSON.stringify(button))
     await row('Gone session').click({ button: 'right' })
     const entry = page.locator('.menu .menu-item.act-resume.disabled', { hasText: 'Resume' })
-    await entry.waitFor({ timeout: 3000 }).catch(() => undefined)
+    await lib.until(async () => (await entry.count()) > 0, lib.timing('hang.ui'))
     const item = (await entry.count()) ? await legible(entry.locator('.menu-label')) : null
     check(`${theme}: its menu's disabled Resume is unfaded and readable`, !!item && item.opacity === 1 && item.ratio >= 4.5, JSON.stringify(item))
     await page.keyboard.press('Escape')

@@ -18,7 +18,6 @@ fs.writeFileSync(path.join(proj, 'a.txt'), 'a\n'); g('add -A'); g('commit -q -m 
 // A branch in the way of cw/ws/demo/…: cw/ws, made outside Combwork. New branches go to
 // cw/ws-2/demo/…, the dialog's default too, and it stays.
 g('branch cw/ws')
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let pass = 0, fail = 0
 const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.log(ok ? 'PASS' : 'FAIL', name, extra) }
 ;(async () => {
@@ -30,9 +29,9 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await lib.fitWindow(app, page, { width: 1500, height: 950 })
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
-  await inv('workspace:open', ws); await sleep(800)
-  await page.getByText('demo', { exact: true }).first().click(); await sleep(500)
-  await inv('project:updateConfig', proj, { worktreeSetup: 'npm install' }); await inv('workspace:refresh'); await sleep(300)
+  await lib.openWorkspace(inv, page, ws)
+  await page.getByText('demo', { exact: true }).first().click(); await lib.projectShown(page)
+  await inv('project:updateConfig', proj, { worktreeSetup: 'npm install' }); await inv('workspace:refresh')
 
   // A new project starts with no agents. Add Agent's main click is Configure Agent and Add… (#286): the dialog, nothing
   // added yet; the quick add (Ctrl+Alt+Shift+N) gives one with the default provider.
@@ -42,7 +41,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await lib.addMenuRun(page, 'Configure Agent and Add…')
   const addDialog = page.locator('.dialog', { hasText: 'Add an agent' })
   check("+ Add ▾ → Configure Agent and Add… opens the Add Agent dialog (#975)", !!(await lib.until(async () => (await addDialog.count()) === 1, lib.timing('hang.ui'))))
-  await sleep(500)
+  await lib.sleep(lib.timing('quiet.nothingMs')) // A quiet window on purpose: an agent the dialog added would be listed by now
   check('…without adding an agent', (await inv('workspace:refresh')).projects[0].agents.length === 0)
   await page.keyboard.press('Escape')
   await lib.until(async () => (await addDialog.count()) === 0, HUNG_MS)
@@ -113,7 +112,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   let p = (await inv('workspace:refresh')).projects[0]
   check('the 0.9 agent on its branch, shown as its 0.9 worktree (#1442)', p.agents.some((a) => a.name === 'Tester' && a.worktree?.branch === 'cw/ws-2/demo/tester' && a.place?.is === 'legacy' && a.place.branch === 'cw/ws-2/demo/tester'), JSON.stringify(p.agents.map((a) => a.place)))
   check('two agents: two columns, automatically', (p.config.layout ?? 'auto') === 'auto' && (await page.locator('.agent-pane').count()) === 2, JSON.stringify(p.config.layout))
-  await sleep(500)
+  await lib.painted(page)
   await page.screenshot({ path: path.join(scratch, 'ui-2-strip.png') })
 
   // Merge dialog
@@ -128,7 +127,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   check('…and Merge is off', await page.locator('.dialog').getByRole('button', { name: 'Merge', exact: true }).isDisabled())
   // No workflow, so no merge style of the project's (HI-1765): a merge commit.
   check('…starting on a merge commit for a project with no workflow', !!(await lib.until(async () => (await page.locator('.dialog .choice-list[data-merge-style="read"]').count()) === 1, HUNG_MS)) && (await page.locator('.dialog .choice-list input[type="radio"]').first().isChecked()))
-  await page.keyboard.press('Escape'); await sleep(300)
+  await page.keyboard.press('Escape'); await lib.until(async () => (await page.locator('.dialog').count()) === 0, lib.timing('hang.ui'))
 
   // Project settings: General (opened first: its key), then Agents (HI-1765)
   await lib.openProjectSettings(page)
@@ -143,13 +142,13 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   check('search finds no file locks here', (await page.locator('.setting', { hasText: 'File locks' }).count()) === 0)
 
   // Files tab root selector
-  await page.locator('.tabs .tab', { hasText: 'Files' }).click(); await sleep(600)
+  await page.locator('.tabs .tab', { hasText: 'Files' }).click(); await lib.until(async () => (await page.locator('.root-select').count()) === 1, lib.timing('hang.ui'))
   await page.locator('.root-select').selectOption(t.id); await lib.until(async () => (await page.getByText('b.txt').count()) > 0, lib.timing('hang.ui'))
   check('files shows worktree', await page.getByText('b.txt').count() > 0)
   await page.screenshot({ path: path.join(scratch, 'ui-5-files.png') })
 
   // Global settings
-  await page.evaluate(() => document.querySelector('[aria-label="Settings"]')?.click()); await sleep(600)
+  await page.evaluate(() => document.querySelector('[aria-label="Settings"]')?.click()); await lib.until(async () => (await page.locator('.settings-nav .row').count()) > 0, lib.timing('hang.ui'))
   await page.locator('.settings-nav .row', { hasText: /^\s*Agents\s*$/ }).first().click()
   check('global agents settings', !!(await lib.until(async () => (await page.locator('.setting', { hasText: 'Count background tasks for up to' }).count()) === 1, HUNG_MS)))
   check('…without File locks, a workflow option since HI-1766', (await page.locator('.setting', { hasText: 'File locks' }).count()) === 0)
