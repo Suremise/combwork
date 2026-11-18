@@ -157,6 +157,40 @@ async function until(fn, ms, interval = timing('poll.intervalMs')) {
   return v
 }
 
+/**
+ * Whether `promise` settles within ms (HI-3384): true once it has, false when ms passes first, never taken as done. A
+ * call that can hang outside a polling wait (a page.evaluate for a frame, an IPC round trip: Playwright bounds neither)
+ * is raced against its deadline; a rejection is thrown. The promise left behind is not cancelled, only no longer awaited.
+ */
+async function within(promise, ms) {
+  if (typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0) throw new Error(`within needs its deadline, a name from tests/timing.json: got ${ms}`)
+  let timer
+  const late = new Promise((done) => {
+    timer = setTimeout(() => done(false), ms)
+  })
+  try {
+    return await Promise.race([Promise.resolve(promise).then(() => true), late])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/**
+ * Waits until read() gives the same value (JSON) twice a look apart (HI-3384): what it reads has stopped changing (a
+ * layout after a resize, a column after its scrolling). Whether it did within ms; false when it kept changing.
+ */
+async function steady(read, ms) {
+  let last
+  let looked = false
+  return !!(await until(async () => {
+    const now = JSON.stringify(await read())
+    const same = looked && now === last
+    last = now
+    looked = true
+    return same
+  }, ms))
+}
+
 /** The suite's line a wait was called from: the first frame outside lib.cjs, repo-relative. */
 function waitCaller(stack) {
   const frames = (stack ?? '').split('\n').slice(1).map((l) => /\(?([A-Za-z]:[^():]+|\/[^():]+):(\d+):\d+\)?$/.exec(l.trim())).filter(Boolean)
@@ -2253,4 +2287,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { timing, PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, trustWorktrees, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, CLAUDE_TRUST, CLAUDE_AT_PROMPT, trustQuestion, screenNow, typeThenEnter, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }
+module.exports = { timing, PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, within, steady, hoverTip, quitWatch, appReady, openWorkspace, trustWorktrees, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, CLAUDE_TRUST, CLAUDE_AT_PROMPT, trustQuestion, screenNow, typeThenEnter, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }

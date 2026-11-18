@@ -75,15 +75,8 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   const board = () => page.locator('.board').evaluate((e) => ({ client: e.clientWidth, scroll: e.scrollWidth, right: Math.round(e.lastElementChild.getBoundingClientRect().right - e.getBoundingClientRect().right) }))
   /** The widths once the layout has stopped changing (a collapse's or a resize's): two reads a look apart the same. */
   const settled = async () => {
-    let last = null
-    let w = null
-    await until(async () => {
-      w = await widths()
-      const same = JSON.stringify(w) === last
-      last = JSON.stringify(w)
-      return same
-    }, lib.timing('hang.ui'))
-    return w
+    if (!(await lib.steady(widths, lib.timing('hang.ui')))) throw new Error(`the columns' widths kept changing for ${lib.timing('hang.ui') / 1000} s`)
+    return widths()
   }
   const collapse = async (label) => {
     await column(label).getByRole('button', { name: `Collapse ${label}` }).click()

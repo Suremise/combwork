@@ -49,21 +49,16 @@ const check = (name, ok, extra = '') => {
   /** Scrolls a column to `top` ('end': its bottom), and waits until it reads there (no fixed wait for the scroll). */
   const scrollTo = async (label, top) => {
     await body(label).evaluate((el, t) => (el.scrollTop = t === 'end' ? el.scrollHeight : t), top)
-    await until(async () => {
+    const there = await until(async () => {
       const s = await scroll(label)
       return top === 'end' ? s.top >= s.max - 1 : s.top === Math.min(top, s.max)
     }, lib.timing('hang.ui'))
+    if (!there) throw new Error(`${label} didn't scroll to ${top} within ${lib.timing('hang.ui') / 1000} s`)
   }
   /** Waits until a column stops scrolling: two reads a look apart the same; its place then. */
   const stopped = async (label) => {
-    let last = null
-    await until(async () => {
-      const now = (await scroll(label)).top
-      const same = now === last
-      last = now
-      return same
-    }, lib.timing('hang.ui'))
-    return last
+    if (!(await lib.steady(async () => (await scroll(label)).top, lib.timing('hang.ui')))) throw new Error(`${label} kept scrolling for ${lib.timing('hang.ui') / 1000} s`)
+    return (await scroll(label)).top
   }
   check('the columns are taller than the window', (await scroll('Todo')).max > 400 && (await scroll('Active')).max > 400, JSON.stringify(await scroll('Todo')))
 
