@@ -236,7 +236,10 @@ describe('SessionManager.compact: typing the /compact', () => {
     const { sessions, l, state } = await running('run-1', { shows: 'no input box on this screen' })
     const compact = sessions.compact(project, 'short', 'a1')
     const failed = expect(compact).rejects.toThrow(/couldn't be seen empty/)
-    await vi.advanceTimersByTimeAsync(5_000)
+    // Refused once Advanced's wait for each key has passed (HI-3373 made it 10 s): time moves on until it has settled.
+    const over = { settled: false }
+    void compact.catch(() => undefined).finally(() => (over.settled = true))
+    while (!over.settled) await vi.advanceTimersByTimeAsync(100)
     await failed
     expect(typed.map((t) => t.data)).toEqual(['\x15'])
     // Nothing is left reserved: the agent is as it was, and the next Compact can start.

@@ -1120,6 +1120,15 @@ describe('a follow-up submitted in Review (HI-1832): the revision under review m
     const dup = GUARD_FNS['submit.notDuplicate']({ card: { key: card.key, kind: 'no-code', labels: [], blocked: null }, state: e.wf.state(card), ruleset: e.wf.rulesetOf(card, e.wf.state(card)), agent: 'B1', revision: null })
     expect(dup).toEqual({ rule: 'submit.notDuplicate', values: { card: card.key, revision: first.revision!.slice(0, 7) } })
     expect(tr(REFUSALS['submit.notDuplicate'].message, dup!.values as { card: string; revision: string })).toBe(`${card.key} is already submitted at ${first.revision!.slice(0, 7)} and waits for review or merging.`)
+    // HI-3410 (the same card, MC-1559): while its own line holds the code submission's commits its target lacks, a no-code
+    // submission would leave it unmerged, so the follow-up is refused as a plain submit is, naming it, for the user to say
+    // whether it merges (the card made code again) or is dropped.
+    const { line } = e.wf.state(card).started!
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'again' }), 'done.noCodeUnmerged')
+    expect(refusedBy(await e.wf.submit(card.key, B1, { summary: 'The live proof', followUp: true }), 'done.noCodeUnmerged').message).toContain(`its branch ${line} has 2 commits`)
+    expect(e.wf.state(card).submissions).toHaveLength(1)
+    // Its commits merged into its target, nothing is left behind: HI-3409's follow-up applies.
+    sh(e.project, 'merge', '-q', '--no-ff', '-m', `merge ${card.key}`, line!)
     // A plain submit in Review stays refused, with followUp named.
     refusedBy(await e.wf.submit(card.key, B1, { summary: 'again' }), 'move.notFromHere')
     e.wakes.length = 0
