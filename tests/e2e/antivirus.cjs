@@ -307,8 +307,16 @@ const check = (name, ok, extra = '') => {
   await shot('light')
   // The Add dialog in a narrow window: each folder still on its own line, a long one wrapping inside itself (#347).
   setFixture({ probe: probe(), elevated: {} })
-  await panel.getByRole('button', { name: 'Check Again' }).click()
-  await lib.until(async () => (await rows.allInnerTexts()).every((t) => /Unknown/.test(t)), lib.timing('hang.ui'))
+  await checkedAgain(panel)
+  // Defender's list is hidden again, so the rows come from the administrator check kept since the Dev Drive one above
+  // (it read the simulated list, the user's exclusion of the workspace left after Remove): the workspace excluded; the
+  // test area and the worktrees folder (Tree's, now in the set) scanned. Never Unknown: a readable kept list is known.
+  const keptStates = { [root]: 'Excluded', [tests]: 'Scanned', [fs.realpathSync.native(trees)]: 'Scanned' }
+  const rowsAsKept = async () => {
+    const texts = (await rows.allInnerTexts()).map((t) => t.replace(/\s+/g, ' '))
+    return texts.length === 3 && Object.entries(keptStates).every(([p, state]) => texts.some((t) => t.includes(p) && t.includes(state)))
+  }
+  check('Check Again with the list hidden: the kept administrator check still says what is excluded', !!(await lib.until(rowsAsKept, lib.timing('hang.ui'))), await panel.innerText())
   const offered = (await inv('antivirus:prepare', 'add')).paths
   await add()
   await lib.fitWindow(app, page, { width: 560, height: 700 })
