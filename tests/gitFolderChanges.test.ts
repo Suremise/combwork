@@ -678,6 +678,19 @@ describe('a commit or stash past its bound (HI-3021)', () => {
       expect(leftovers()).toEqual([])
     })
 
+    it('a Cancel never pressed: Commit and Set Aside (a staged file) done as without one', async () => {
+      const ac = new AbortController()
+      writeFileSync(join(proj, 'a.txt'), 'edit\n')
+      const done = await cancellableGit(ac.signal, () => settle('commit', ['a.txt'])).catch((e: Error) => e)
+      expect(done).not.toBeInstanceOf(Error)
+      expect(sh(proj, 'show', 'HEAD:a.txt')).toBe('edit')
+      writeFileSync(join(proj, 'b.txt'), 'staged\n')
+      sh(proj, 'add', 'b.txt')
+      const aside = await cancellableGit(ac.signal, () => settle('setAside', ['b.txt'])).catch((e: Error) => e)
+      expect(String(aside instanceof Error ? aside.message : 'ok')).toBe('ok')
+      expect(sh(proj, 'show', 'refs/stash:b.txt')).toBe('staged')
+    })
+
     it('Commit cancelled before it starts: no git commit runs (no hook), nothing committed', async () => {
       const started = join(tempDir('cw-folderchanges-started-'), 'started')
       mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
