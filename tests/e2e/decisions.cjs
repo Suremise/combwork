@@ -159,7 +159,9 @@ const check = (name, ok, extra = '') => {
   check('closing waits while a decision is being saved', (await dialog.count()) === 1 && (await discard.count()) === 0)
   await holdSave(false)
   check('…which then saves it', !!(await until(async () => (await card(n)).decisions[0].text === 'Show each error under its field, in red.', lib.timing('hang.ui'))))
-  await until(async () => (await changing.getByLabel('Decision').count()) === 0, lib.timing('hang.ui'))
+  // Its editor closes once saved: the box by its exact name, as "Change this decision" and "Remove this decision" are
+  // labels holding "Decision" too (HI-3398).
+  check('…and closes its editor', !!(await until(async () => (await changing.getByLabel('Decision', { exact: true }).count()) === 0, lib.timing('hang.ui'))))
   await page.keyboard.press('Escape')
   check('with nothing unsaved, the card closes', !!(await until(async () => (await dialog.count()) === 0, lib.timing('hang.ui'))))
 
