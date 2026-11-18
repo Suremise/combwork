@@ -326,7 +326,6 @@ const POOL_RUN_MS = 40 * 60_000
 const POOL_RUN_JS = `// The test pass on the pool VM: queued here, run there. Nothing of it runs on this machine.
 const fs = require('fs')
 const path = require('path')
-const { timing } = require('../timing.cjs')
 const RUN_MS = ${POOL_RUN_MS}
 const dir = path.join(__dirname, 'pool')
 const file = path.join(dir, 'run.json')
@@ -424,6 +423,7 @@ async function inReview(c, pool = false, description = 'greet.js returns "Hello,
 /** card-decision's decision recorded while the agent works (HI-2854: what a refused submit must give in full). */
 const CARD_DECISION_LATER = 'Show each error under its own field, not in a banner at the top.'
 const { refusedWithDecision } = require('./freshnessChecks.cjs')
+const { timing } = require('../timing.cjs')
 const SOLO = { finish: 'committed', folder: 'project', dependenciesDone: true, sharedFolderWarning: true }
 /** HI-2854's A/B task (the card's own: a CSV line parser and 8 node:test cases, run until green). */
 const AB_TASK =

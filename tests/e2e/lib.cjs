@@ -181,7 +181,7 @@ let quitWatches = 0
 /**
  * Watches a test copy of Combwork quit, telling Combwork's part from the process's (#424). Start it before the quit.
  * `untilDecided(ms)`: the time Combwork called app.quit (or app.exit), recorded in main as it calls it: its own quit work is
- * done (sessions stopped, state saved), or null if it hasn't within ms. `gone(ms)`: the process has ended since. What
+ * done (sessions stopped, state saved), or null if it hasn't within ms; `decidedAt()` reads it once. `gone(ms)`: the process has ended since. What
  * comes between (Electron closing windows and processes) is the machine's, and a loaded one stretches it to seconds, so
  * a suite times Combwork's part and only waits for the rest. `timings()` says both, for the suite's log.
  */
@@ -214,6 +214,8 @@ async function quitWatch(app) {
   }
   return {
     untilDecided: (ms) => until(decided, ms),
+    // The time Combwork decided to quit if it has, read once (no wait: until's bound is never 0).
+    decidedAt: decided,
     // Its timer goes once the process has ended, so a suite that has finished isn't kept alive for the rest of ms.
     gone: (ms) =>
       new Promise((resolve) => {

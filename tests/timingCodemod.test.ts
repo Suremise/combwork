@@ -109,6 +109,19 @@ describe('timeouts and constants (HI-3382)', () => {
     expect(plain).toContain("const HUNG_MS = timing('hang.ui')")
   })
 
+  it('a lib required only inside a function is no lib for the top level: timing is required instead', () => {
+    const src = "const path = require('path')\nconst HUNG_MS = 20000\nif (require.main === module) {\n  const lib = require('./lib.cjs')\n}\n"
+    const out = migrate(src, 'tests/e2e/i18nshots.cjs').out
+    expect(out).toContain("const path = require('path')\nconst { timing } = require('../timing.cjs')")
+    expect(out).toContain("const HUNG_MS = timing('hang.ui')")
+  })
+
+  it("a child's limit past spawn.hang is left, never shortened", () => {
+    const r = migrate(`${lib}execFileSync('git', [], { timeout: 600000 })\n`, SUITE)
+    expect(r.changed).toEqual([])
+    expect(r.left).toHaveLength(1)
+  })
+
   it('the require goes at the top level, never inside a function that requires something first', () => {
     const src = "function f() {\n  const lib = require('../e2e/lib.cjs')\n}\nconst fs = require('fs')\nconst HUNG_MS = 20000\n"
     const out = migrate(src, 'tests/scenarios/s.cjs').out

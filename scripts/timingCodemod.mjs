@@ -29,6 +29,8 @@ const STEP_WORK = /\b(start(?:s|ed|ing)?|merg(?:e|ed|es|ing)|lanes?|queue[ds]?|s
 const PW = new Set(['waitFor', 'waitForSelector', 'waitForFunction', 'waitForEvent', 'waitForURL', 'waitForLoadState', 'click', 'dblclick', 'fill', 'type', 'press', 'pressSequentially', 'hover', 'check', 'uncheck', 'focus', 'innerText', 'textContent', 'innerHTML', 'inputValue', 'isVisible', 'isHidden', 'isChecked', 'isEnabled', 'getAttribute', 'screenshot', 'selectOption', 'setInputFiles', 'scrollIntoViewIfNeeded', 'boundingBox', 'dispatchEvent', 'tap', 'dragTo', 'evaluate', 'firstWindow', 'waitForPage', 'newPage', 'goto'])
 /** Child processes whose `timeout:` bounds a run: spawn.hang. */
 const CHILD = new Set(['execFileSync', 'execSync', 'spawnSync', 'execFile', 'exec', 'spawn', 'fork'])
+/** spawn.hang (tests/timing.json): a child's limit past it is left, never shortened. */
+const SPAWN_HANG_MS = 120_000
 /** A Playwright timeout under this is an action budget (a click given 300 ms to land), never moved by this. */
 const SHORT_MS = 5000
 
@@ -125,8 +127,10 @@ export function migrate(src, fileName = 'x.cjs') {
   const lineOf = (at) => src.slice(0, at).split('\n').length
   const textAt = (at) => src.split('\n')[lineOf(at) - 1].trim().slice(0, 160)
   const isLib = /(^|[\\/])lib\.cjs$/.test(fileName)
-  const hasLib = /\bconst\s+lib\s*=\s*require\(\s*['"]\.\/lib\.cjs['"]\s*\)/.test(src)
-  const definesTiming = /\b(?:const|let|var)\s*\{[^}]*\btiming\b[^}]*\}\s*=\s*require\(/.test(src)
+  // Only a top-level binding reaches every wait in the file: a `lib` required inside a function doesn't (i18nshots.cjs).
+  const topDecls = ast.program.body.filter((s) => s.type === 'VariableDeclaration').flatMap((s) => s.declarations)
+  const hasLib = topDecls.some((d) => d.id.type === 'Identifier' && d.id.name === 'lib' && isCall(d.init) && d.init.callee.name === 'require' && /^\.\/lib\.cjs$/.test(d.init.arguments[0]?.value ?? ''))
+  const definesTiming = topDecls.some((d) => d.id.type === 'ObjectPattern' && d.id.properties.some((p) => p.type === 'ObjectProperty' && p.key.name === 'timing'))
   const ref = isLib || definesTiming ? 'timing' : hasLib ? 'lib.timing' : 'timing'
   const needsRequire = !isLib && !definesTiming && !hasLib
   const edits = []
@@ -187,6 +191,7 @@ export function migrate(src, fileName = 'x.cjs') {
           }
         } else if (method && CHILD.has(method)) {
           if (ms < SHORT_MS) leave(node.value, `a short child-process limit (${ms} ms): by hand`)
+          else if (ms > SPAWN_HANG_MS) leave(node.value, `a child-process limit past spawn.hang (${ms} ms): by hand`)
           else replace(node.value, name('spawn.hang'))
         } else leave(node.value, `a timeout: on ${method ?? 'an option object'}: by hand (not plainly a page's or a child's hang bound)`)
       }

@@ -135,7 +135,7 @@ const forceClose = async (app) => {
     const closed = await quits(q)
     check('idle + default: quits without asking', closed)
     // Combwork's own shutdown (stopping the session, up to 3 s, and saving), not the process's teardown after it.
-    const decided = await q.untilDecided(0)
+    const decided = q.decidedAt()
     check('idle + default: shutdown under 5 s', !!decided && decided - t0 < 5000)
     results.push(`INFO  idle + default: ${q.timings(t0)}`)
     // It asked instead: close it, or it stays open (at the dialog) after the suite, holding the runner's port.
