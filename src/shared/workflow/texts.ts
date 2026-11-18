@@ -53,6 +53,11 @@ export const FOR_YOU = {
     description:
       'A card comment (HI-3235): Combwork’s automatic advance of a jj target bookmark ({target}) to a card’s candidate ({result}: a short commit id) was refused before it changed anything, for the reason {why} (a code: keep the select keys); {detail}: refs or folders, kept as they are. {card} a card key like AM-12. A bookmark is jj’s name for a branch; “jj git export” is a command, as typed.'
   }),
+  advancePreviewClosed: msg({
+    id: 'workflow.forYou.advancePreviewClosed',
+    defaultMessage: '{clicked, select, yes {Integrate on the preview of {card} didn’t run} other {Combwork closed the preview of {card}}}: {why, select, finish {the project no longer integrates when you click (Version Control → Workflow → Who integrates)} blocked {it waits for {cards} to be Done, and is previewed again once they are} other {it no longer applies}}.',
+    description: 'A card comment (HI-3390): a preview of a jj card’s integration (the For you question with Integrate) was closed by Combwork, or the user’s Integrate click on it did nothing ({clicked}: yes), because the project’s Who integrates option no longer integrates on a click ({why}: finish) or the card now depends on cards that aren’t Done ({why}: blocked; {cards}: their keys, like AM-12, AM-13). Keep the select keys. “Integrate” is the button’s name and Version Control → Workflow → Who integrates the option’s place, as translated there.'
+  }),
   advanceSuperseded: msg({
     id: 'workflow.forYou.advanceSuperseded',
     defaultMessage: 'An integration of {card} into {target} from before it was restarted or archived was never settled: Combwork couldn’t prove what it did, so {target} may hold that move. Combwork may have integrated this card again since. Check {target}’s history if it matters.',

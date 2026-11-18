@@ -81,6 +81,16 @@ function block(w: World, card: { id: number }, by: { id: number }[]): void {
   }
 }
 
+/** HI-3390: the card's comments of Combwork's about a preview closed or a click that ran nothing (their English). */
+function previewNotes(w: World, card: { id: number }): string[] {
+  const db = new DatabaseSync(boardFile(w.home), { readOnly: true })
+  try {
+    return (db.prepare("SELECT payload FROM card_actions WHERE card = ? AND kind = 'comment'").all(card.id) as { payload: string }[]).map((r) => String((JSON.parse(r.payload) as { text: unknown }).text)).filter((t) => /preview of/.test(t))
+  } finally {
+    db.close()
+  }
+}
+
 /** Options applied to the card in flight, as the window's Apply to cards in flight records it (optionsForm.ts). */
 function reapply(w: World, card: { id: number }, o: Partial<WorkflowOptions>): void {
   w.wf.cfg.options = () => ({ ...opts, ...o })
@@ -186,8 +196,11 @@ describe.skipIf(!jjExe)(`preview and click for jj (jj ${TESTED_JJ.version}), HI-
       await w.wf.runActions()
       expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(0)
       expect(w.main()).toBe(head)
+      // HI-3390: said on the card, never dropped silently.
+      expect(previewNotes(w, card)).toEqual([`Integrate on the preview of ${card.key} didn't run: it waits for ${second.key} to be Done, and is previewed again once they are.`])
       await pass(w, card)
       expect(previews(w, card)).toHaveLength(0)
+      expect(previewNotes(w, card)).toHaveLength(1)
       moved(await w.wf.move(second.key, 'done', 'user', { confirm: true, reason: 'not needed' }))
       await pass(w, card)
       const [p2] = previews(w, card)
@@ -343,6 +356,71 @@ describe.skipIf(!jjExe)(`preview and click for jj (jj ${TESTED_JJ.version}), HI-
       const [p2] = previews(w, card)
       expect(p2).toBeTruthy()
       expect(p2.result).not.toBe(p1.result)
+    })
+
+    // HI-3390: a preview whose consent no longer holds is closed, saying why; a click that raced the change says why it ran nothing.
+    for (const to of ['userIntegrates', 'combworkAdvances'] as const) {
+      it(`HI-3390: the finish changed to ${to} while a preview is open: the next reconcile closes it, saying why on the card${to === 'combworkAdvances' ? ', and the card is integrated automatically' : ', and nothing moves'}`, async () => {
+        const w = await world(colocated, { candidates: true, oneSlot: true, advance: 'preview' })
+        const card = await approved(w)
+        const head = w.main()
+        await pass(w, card)
+        const [p] = previews(w, card)
+        expect(p).toBeTruthy()
+        reapply(w, card, { finish: to })
+        await pass(w, card)
+        expect(previews(w, card)).toHaveLength(0)
+        expect(facts(w, card, 'RequestClosed').filter((r) => r.request === p.request)).toHaveLength(1)
+        expect(previewNotes(w, card)).toEqual([`Combwork closed the preview of ${card.key}: the project no longer integrates when the user clicks.`])
+        if (to === 'combworkAdvances') {
+          expect(facts(w, card, 'Integrated')).toHaveLength(1)
+        } else {
+          expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(0)
+          expect(w.main()).toBe(head)
+          // Again: nothing more said.
+          await pass(w, card)
+          expect(previewNotes(w, card)).toHaveLength(1)
+        }
+      })
+    }
+
+    it('HI-3390: a blocker added while a preview is open: the next reconcile closes it, saying why; once the blocker is Done it is previewed again, and its click integrates', async () => {
+      const w = await world(colocated, { candidates: true, oneSlot: true, advance: 'preview' })
+      const card = await approved(w)
+      await pass(w, card)
+      const [p1] = previews(w, card)
+      expect(p1).toBeTruthy()
+      const blocker = w.wf.createCard({ title: 'blocker' })
+      block(w, card, [blocker])
+      await pass(w, card)
+      expect(previews(w, card)).toHaveLength(0)
+      expect(previewNotes(w, card)).toEqual([`Combwork closed the preview of ${card.key}: it waits for ${blocker.key} to be Done, and is previewed again once they are.`])
+      await pass(w, card)
+      expect(previewNotes(w, card)).toHaveLength(1)
+      moved(await w.wf.move(blocker.key, 'done', 'user', { confirm: true, reason: 'not needed' }))
+      await pass(w, card)
+      const [p2] = previews(w, card)
+      expect(p2).toBeTruthy()
+      await click(w, card, p2.request, 'approved')
+      await w.wf.runActions()
+      expect(facts(w, card, 'Integrated')).toHaveLength(1)
+    })
+
+    it('HI-3390: Integrate clicked after the finish changed, before any reconcile: nothing runs, the card says why once (a replay says nothing more)', async () => {
+      const w = await world(colocated, { candidates: true, oneSlot: true, advance: 'preview' })
+      const card = await approved(w)
+      const head = w.main()
+      await pass(w, card)
+      const [p] = previews(w, card)
+      reapply(w, card, { finish: 'userIntegrates' })
+      await click(w, card, p.request, 'approved')
+      await w.wf.runActions()
+      expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(0)
+      expect(w.main()).toBe(head)
+      expect(previewNotes(w, card)).toEqual([`Integrate on the preview of ${card.key} didn't run: the project no longer integrates when the user clicks.`])
+      await jjp(w, card).advanceAnswer!(w.wf.store.card(card.id), payloadOf(w, card, p.request, 'approved'), advanceHostOf(w.wf))
+      await w.wf.runActions()
+      expect(previewNotes(w, card)).toHaveLength(1)
     })
   })
 })

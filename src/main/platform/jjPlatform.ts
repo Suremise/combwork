@@ -1153,7 +1153,16 @@ export class JjPlatform implements PlatformAdapter {
     if (!(await this.settleAdvances(h, integ, journals, c, host))) return false
     const c2 = wf.store.card(card.id)
     const s2 = wf.state(c2)
-    if (s2.cycle !== ans.cycle || c2.stage !== 'approved' || s2.integrated || advanceUnresolved(s2) || !this.consentHolds(c2, s2, 'preview') || host.waitsFor(c2).length) return false
+    if (s2.cycle !== ans.cycle || c2.stage !== 'approved' || s2.integrated || advanceUnresolved(s2)) return false
+    // HI-3390: a click whose consent went since its preview was asked (the finish changed, a blocker added) runs nothing,
+    // and the card says why (once for the request), never dropped silently.
+    const waits = host.waitsFor(c2)
+    const finishGone = !finishPreviews(wf.rulesetOf(c2, s2).options.finish)
+    if (finishGone || waits.length) {
+      await host.previewClosed(c2, s2.cycle, finishGone ? 'finish' : 'blocked', waits, ans.request)
+      return false
+    }
+    if (!this.consentHolds(c2, s2, 'preview')) return false
     const ready = await this.readyPlan(h, integ, journals, c2, s2, host)
     if (!ready || ready.planId !== ans.plan) return false
     return (await this.attemptUnder(h, integ, journals, c2, s2, ready.plan, ready.planId, host, 'preview')).integrated

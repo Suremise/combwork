@@ -4292,7 +4292,12 @@ with s34, its mapping HI-3235/s7, s10, s13 and s16. gate:advance is open.
   nothing, and a fresh preview comes once the new plan is ready. A card has one open preview or one pending answer
   while its plan is actionable; a reconcile never replaces a preview whose click is queued; only the card's newest
   preview (by its fact's seq) can start an attempt; **Not for this plan** dismisses that plan (project meta) until the
-  plan changes. Same residual races as automatic once clicked.
+  plan changes. Same residual races as automatic once clicked. HI-3390: an open preview whose consent no longer holds
+  is closed by the generic advance step (`advanceStep`, before it asks the adapter anything), with a card comment
+  saying why (`previewClosed`, the reason read again in that write): the finish no longer previews (changed to
+  automatic, which then advances, or to the user's own integration), or the card waits for blockers (previewed again
+  once they are Done). An Integrate that raced such a change runs nothing and the card says why, once for its request
+  (project meta), never dropped silently.
 - **For you** (the user's alone: an agent's or the Assistant's answer is refused). The window names each answer: the
   preview's Integrate / Not for this plan, a stop's Undo Combwork's move / Leave it to me, an uncertain attempt's It's
   integrated / Not integrated, start again (an attested card shows *Done by you, integration not proved*). A stop whose undo conditions hold

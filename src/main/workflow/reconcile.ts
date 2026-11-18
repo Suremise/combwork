@@ -13,7 +13,7 @@
 
 import { statSync } from 'original-fs'
 import { join } from 'path'
-import { advanceUnresolved, approvedByUser, foldCard, openEntry, passingReviewers, type CardState, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
+import { ADVANCE_PREVIEW_GATE, advanceUnresolved, approvedByUser, foldCard, openEntry, passingReviewers, type CardState, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
 import { finishAdvances, finishPreviews } from '../../shared/workflow/options'
 import { okBeforeApplies } from '../../shared/workflow/guards'
 import { advanceHostOf } from './advanceHost'
@@ -289,6 +289,14 @@ export async function advanceStep(wf: Workflow, card0: CardRecord): Promise<void
   if (!p.advance && !p.advancePreview) return
   const r = wf.rulesetOf(card, s)
   const advances = finishAdvances(r.options.finish)
+  // HI-3390: an open preview whose consent no longer holds (the finish changed, or a blocker added since it was asked)
+  // is closed, saying why on the card, so its Integrate can't be clicked to no effect. One closed for its blockers is
+  // asked again once they are Done (advancePreview).
+  if (s.requests.some((q) => q.gate === ADVANCE_PREVIEW_GATE)) {
+    const waits = wf.queueWaitingOn(card.id)
+    const why = !finishPreviews(r.options.finish) ? 'finish' : waits.length ? 'blocked' : null
+    if (why && (await advanceHostOf(wf).previewClosed(card, s.cycle, why, waits, null)) && wf.cfg.autoRun !== false) await wf.runActions()
+  }
   // HI-3236: a finish that previews asks the adapter for its preview (never an attempt: only the user's Integrate starts one).
   if (!advances && !(finishPreviews(r.options.finish) && p.advancePreview)) return
   if (wf.enforced() && okBeforeApplies(r, card.labels) && !approvedByUser(s, 'okBefore')) return

@@ -3,6 +3,10 @@
     "text": "Combwork now integrates {project}'s jj cards itself once their merge checks pass (Version Control → Workflow → Who integrates).",
     "note": "A notice, once per jj project (HI-3235): the new default finish applies to it."
   },
+  "workflow.advance.previewClosed": {
+    "text": "{clicked, select, yes {Integrate on the preview of {card} didn't run} other {Combwork closed the preview of {card}}}: {why, select, finish {the project no longer integrates when the user clicks} blocked {it waits for {cards} to be Done, and is previewed again once they are} other {it no longer applies}}.",
+    "note": "A card comment (HI-3390): a jj card’s preview closed, or the user’s Integrate on it ran nothing ({clicked}: yes), because the finish no longer previews ({why}: finish) or it waits for blockers ({why}: blocked; {cards} their keys)."
+  },
   "workflow.advance.refused": {
     "text": "Combwork didn't move {target} for {card}: refused before anything changed ({why}: {detail}). It tries again once the repository changes; the user can integrate it themselves.",
     "note": "A card comment (HI-3235): Combwork’s jj advance refused at its base read; {why} a code, {detail} refs or folders."
@@ -92,6 +96,11 @@
   "workflow.forYou.advancePreview": {
     "text": "{again, select, planChanged {Asked again: the plan changed since the last preview. } other {}}Integrate {card} into {target}? Combwork moves {target} from {expected} to its candidate {result} ({style, select, squash {one squashed commit} rebase {its commits copied on top} other {a merge commit}}), adding: {commits}{more, plural, =0 {} other {, and # more}}. Integrate moves it now; Not for this plan dismisses this preview until the plan changes (a new candidate after the target moves or new work), and you can still integrate it yourself.",
     "note": "A For you request (HI-3236, preview and click): Combwork shows what its jj advance would move, and moves the target bookmark ({target}) from its commit {expected} to the card’s candidate {result} (short commit ids) only when the user clicks Integrate. {commits}: the commits the move adds, each a short id and its first line, kept as they are; {more}: how many more there are. {style}: how the candidate was built (keep the select keys). {again}: planChanged when asked again because the plan changed. “Integrate” and “Not for this plan” are the buttons’ names, as translated there. {card} a card key like AM-12; a bookmark is jj’s name for a branch.",
+    "audience": "both"
+  },
+  "workflow.forYou.advancePreviewClosed": {
+    "text": "{clicked, select, yes {Integrate on the preview of {card} didn’t run} other {Combwork closed the preview of {card}}}: {why, select, finish {the project no longer integrates when you click (Version Control → Workflow → Who integrates)} blocked {it waits for {cards} to be Done, and is previewed again once they are} other {it no longer applies}}.",
+    "note": "A card comment (HI-3390): a preview of a jj card’s integration (the For you question with Integrate) was closed by Combwork, or the user’s Integrate click on it did nothing ({clicked}: yes), because the project’s Who integrates option no longer integrates on a click ({why}: finish) or the card now depends on cards that aren’t Done ({why}: blocked; {cards}: their keys, like AM-12, AM-13). Keep the select keys. “Integrate” is the button’s name and Version Control → Workflow → Who integrates the option’s place, as translated there.",
     "audience": "both"
   },
   "workflow.forYou.advanceRefused": {
