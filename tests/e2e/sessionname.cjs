@@ -44,7 +44,7 @@ const check = (name, ok, extra = '') => {
   const until = async (fn, ms) => {
     const t = Date.now()
     let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
+    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
     return v
   }
   await page.getByText('alpha', { exact: true }).first().click()
@@ -126,7 +126,7 @@ const check = (name, ok, extra = '') => {
   const startedCell = page.locator('tr', { has: page.locator('td', { hasText: /^Started$/ }) }).locator('td').nth(1)
   check("…in the Overview's session details", !!(await until(async () => dmy.test((await startedCell.innerText().catch(() => '')).trim()), lib.timing('hang.step'))), await startedCell.innerText().catch(() => ''))
   await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()
-  await lib.sleep(400)
+  await lib.until(async () => (await page.locator('.tabs .tab.active', { hasText: 'Session' }).count()) === 1, lib.timing('hang.ui'))
   await inv('settings:update', { general: { dateFormat: 'ymd', timeFormat: '24h' } })
   check('back to yyyy-mm-dd, 24-hour', !!(await until(async () => /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(await text()), lib.timing('hang.ui'))), await text())
   await type('turn 1')
@@ -156,7 +156,7 @@ const check = (name, ok, extra = '') => {
   check('the Sessions tab shows it too', !!(await until(async () => /Guide only/.test(await row.innerText().catch(() => '')), lib.timing('hang.step'))), await row.innerText().catch(() => ''))
   await page.screenshot({ path: path.join(lib.WORK, 'sessionname-2-sessions.png') })
   await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()
-  await lib.sleep(500)
+  await lib.until(async () => (await page.locator('.tabs .tab.active', { hasText: 'Session' }).count()) === 1, lib.timing('hang.ui'))
 
   // Renamed in Combwork again: Combwork's is the newer.
   await inv('session:rename', alpha, st.sessionId, 'Final docs')
@@ -181,7 +181,7 @@ const check = (name, ok, extra = '') => {
   await inv('session:rename', alpha, st.sessionId, 'A rather long session name that cannot possibly fit in a narrow pane')
   await until(async () => /rather long/.test(await text()), lib.timing('hang.ui'))
   await lib.fitWindow(app, page, { width: 760, height: 700 })
-  await lib.sleep(800)
+  await lib.settled(page)
   const fits = (loc) => loc.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)
   check('the context stays whole', await fits(ctx))
   await page.screenshot({ path: path.join(lib.WORK, 'sessionname-3-narrow.png') })

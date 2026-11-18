@@ -84,7 +84,7 @@ const stamp = (d, name) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.
     await lib.until(async () => (await field.count()) === 1 && (await field.evaluate((el) => el === document.activeElement)), lib.timing('hang.ui'))
     await page.keyboard.type(name)
     await page.keyboard.press('Enter')
-    await lib.sleep(500) // on purpose: a dialog opened again by the same key press would be on screen by now
+    await lib.sleep(lib.timing('quiet.dialogReopenMs')) // on purpose: a dialog opened again by the same key press would be on screen by now
   }
   await newMode('Enter Test')
   check('Enter in New Mode… makes the mode', !!(await lib.until(async () => fs.existsSync(path.join(ws, '.combwork', 'modes', 'enter-test.md')), lib.timing('hang.ui'))))

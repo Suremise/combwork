@@ -57,7 +57,7 @@ const check = (name, ok, extra = '') => {
   const until = async (fn, ms) => {
     const t = Date.now()
     let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
+    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
     return v
   }
 
@@ -153,7 +153,7 @@ const check = (name, ok, extra = '') => {
     await until(async () => (await asked.count()) === 1, lib.timing('hang.ui'))
     await asked.getByRole('button', { name: 'Start new', exact: true }).click()
     check(`batch ${b}: every agent has a new session`, !!(await until(() => allReady(old), lib.timing('hang.step'))))
-    await lib.sleep(4000) // on purpose: a lost context would show within xterm's 3 s wait for it to come back
+    await lib.sleep(lib.timing('quiet.contextLostMs')) // on purpose: a lost context would show within xterm's 3 s wait for it to come back
     const after = await state()
     console.log(`after batch ${b}`, JSON.stringify(after), `leaked ${await leaked()}`, lost.length ? JSON.stringify(lost) : '')
   }

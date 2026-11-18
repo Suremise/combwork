@@ -55,7 +55,7 @@ const check = (name, ok, extra = '') => {
   const until = async (fn, ms) => {
     const t = Date.now()
     let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
+    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
     return v
   }
   const type = async (id, text) => {
@@ -95,7 +95,7 @@ const check = (name, ok, extra = '') => {
   const tipOf = async (name) => {
     await header.getByRole('button', { name, exact: true }).hover()
     const tip = page.locator('.tip')
-    await tip.waitFor({ timeout: 3000 }).catch(() => undefined)
+    await lib.until(async () => (await tip.count()) > 0, lib.timing('hang.ui'))
     const t = (await tip.count()) ? (await tip.innerText()).trim() : null
     await page.mouse.move(0, 0)
     await lib.until(async () => (await page.locator('.tip').count()) === 0, HUNG_MS)
@@ -273,7 +273,7 @@ const check = (name, ok, extra = '') => {
   // --- Menus: the Project menu lists every tab in the strip's order; the Session menu has both new actions.
   const menuItems = async (name) => {
     await page.locator('.menubar .menubar-item', { hasText: name }).click()
-    await lib.sleep(250)
+    await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, lib.timing('hang.ui'))
     const t = await page.locator('.menu .menu-item > span:not(.menu-key)').allInnerTexts()
     await page.keyboard.press('Escape')
     return t.map((x) => x.trim())
@@ -288,7 +288,7 @@ const check = (name, ok, extra = '') => {
     await page.evaluate(() => document.activeElement?.blur())
     await page.keyboard.press('Control+Shift+P')
     await page.locator('.palette input').fill('Start New')
-    await lib.sleep(300)
+    await lib.until(async () => (await page.locator('.palette-item').allInnerTexts()).some((t) => t.includes('Start New (3)…')), lib.timing('hang.ui'))
     const found = await page.locator('.palette-item').allInnerTexts()
     // The palette's first Escape clears what was typed (#433), the next closes it.
     await page.keyboard.press('Escape')
@@ -376,7 +376,7 @@ const check = (name, ok, extra = '') => {
   check('…the working one stopped first, in the warning colour; the stopped one only starts', newTable.rows.Worker?.[3]?.text === 'Stopped (will be interrupted), then a new session' && newTable.rows.Worker[3].warn && newTable.rows.Stopped?.[3]?.text === 'A new session' && !newTable.rows.Stopped[3].warn && newTable.rows.Stopped?.[1]?.text === 'Not running', JSON.stringify(newTable.rows))
   await bothThemes('startall-confirm')
   await dialog.getByRole('button', { name: 'Cancel' }).click()
-  await lib.sleep(1500) // on purpose: nothing may stop or start after Cancel
+  await lib.sleep(lib.timing('quiet.cancelledStartMs')) // on purpose: nothing may stop or start after Cancel
   check('Cancel changes nothing', (await live(w.id))?.sessionId === before.w && (await live(w.id))?.status === 'working' && (await live(i.id))?.sessionId === before.i && !(await live(s.id)))
   await lib.agentsMenuRun(page, 'Start New (3)')
   await dialog.waitFor({ timeout: lib.timing('hang.ui') })

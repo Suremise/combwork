@@ -349,6 +349,22 @@ async function noDialog(page, ms = timing('hang.ui')) {
   return readyWithin('without a dialog', async () => (await page.locator('[role="dialog"]:visible').count()) === 0, ms)
 }
 
+/**
+ * HI-3387: waits for `locator`'s element with no CSS animation or transition running on it or inside it (sliding in,
+ * fading), so where it is now is where it stays: read its box after this. Each look finds the element within the bound
+ * too (never Playwright's longer default). Still moving, or not there, within ms, it throws, saying what ran.
+ */
+async function animationsDone(locator, ms = timing('hang.ui')) {
+  const look = Math.min(ms, timing('poll.readMs'))
+  let seen = null
+  const atRest = async () => {
+    seen = await locator.evaluate((el) => el.getAnimations({ subtree: true }).filter((a) => a.playState === 'running').map((a) => a.animationName || a.transitionProperty || 'an animation'), undefined, { timeout: look }).catch((e) => ({ error: e.message }))
+    return Array.isArray(seen) && seen.length === 0
+  }
+  if (!(await until(atRest, ms))) throw new Error(`${locator} still animating, or not there, after ${ms} ms: ${JSON.stringify(seen)}`)
+  return true
+}
+
 let quitWatches = 0
 /**
  * Watches a test copy of Combwork quit, telling Combwork's part from the process's (#424). Start it before the quit.
@@ -531,6 +547,23 @@ function trustWorktrees(home, ws) {
   json.projects = { ...json.projects, [key]: { ...json.projects?.[key], hasTrustDialogAccepted: true } }
   fs.writeFileSync(file, JSON.stringify(json, null, 2))
   return key
+}
+
+/**
+ * A project's view shown (its session toolbar) after a click on its name, instead of a fixed wait (HI-3386). Each look
+ * is bounded (readyWithin, HI-3388), and it throws naming what isn't so once ms have passed: never a pass by timeout.
+ */
+async function projectShown(page, ms = timing('hang.ui')) {
+  return readyWithin("the project's view shown", async () => (await page.locator('.session-toolbar').count()) > 0, ms)
+}
+
+/**
+ * HI-3386: each terminal's CLI has been given the size its terminal now has. `pairs`: { term, given } per terminal, its
+ * terminal's { cols, rows } (null if not drawn) and the last size its CLI recorded (undefined if none). A resize still on
+ * its way (the CLI's size behind its terminal's) is false: what a window, zoom or layout change leaves once done.
+ */
+function sizesGiven(pairs) {
+  return pairs.length > 0 && pairs.every(({ term, given }) => !!term && !!given && term.cols === given.cols && term.rows === given.rows)
 }
 
 /** Opens a workspace and waits until the window shows it (its name in the title), instead of a fixed wait. */
@@ -2425,4 +2458,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { timing, PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, within, exitWithin, steady, settled, themeSettled, noDialog, hoverTip, quitWatch, appReady, openWorkspace, trustWorktrees, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, themeShown, CLAUDE_TRUST, CLAUDE_AT_PROMPT, trustQuestion, screenNow, typeThenEnter, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip, zoomTo, viewportIs, framesDrawn, ipcSettled, ipcAnswered, answersDrawn, readyWithin }
+module.exports = { timing, PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, within, steady, settled, themeSettled, noDialog, hoverTip, quitWatch, appReady, openWorkspace, trustWorktrees, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, themeShown, CLAUDE_TRUST, CLAUDE_AT_PROMPT, trustQuestion, screenNow, typeThenEnter, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip, zoomTo, viewportIs, framesDrawn, ipcSettled, ipcAnswered, answersDrawn, readyWithin, projectShown, sizesGiven, animationsDone, exitWithin }

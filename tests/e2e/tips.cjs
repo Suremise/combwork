@@ -36,12 +36,7 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('alpha', { exact: true }).first().click()
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(150)
-    return v
-  }
+  const until = (fn, ms) => lib.until(fn, ms)
   const card = page.locator('.tip-card')
   const title = () => card.locator('.tip-title').innerText().catch(() => '')
   const saved = () => JSON.parse(fs.readFileSync(cfgFile, 'utf8')).ui?.tips ?? {}
@@ -76,7 +71,8 @@ const check = (name, ok, extra = '') => {
   await page.screenshot({ path: path.join(lib.WORK, 'tips-2-moment.png') })
   await card.getByRole('button', { name: 'Close' }).click()
   await lib.addAgent(inv, alpha, { name: 'Three' })
-  await lib.sleep(1500) // A fixed wait on purpose: this checks that the tip does NOT show again, which no condition can show.
+  // The moment is used (saved), and the window shows Three's pane: the panes the tip is offered from have drawn it again.
+  await until(async () => (saved().moments ?? []).includes('second-agent') && (await page.locator('.pane-header-bar .agent-name', { hasText: /^Three$/ }).count()) > 0, HUNG_MS)
   check('only once', (await card.count()) === 0)
 
   // Reloading the window the same day shows no tip again: tips.test.ts ("shows one a day", today's shownOn), and below the
@@ -120,18 +116,23 @@ const check = (name, ok, extra = '') => {
   check('the list has the setting, on', (await sw.getAttribute('aria-checked')) === 'true')
   await dialog.getByRole('button', { name: 'Close' }).last().click()
   // Another window shows the day's tip while this one is still loading (#295): this one's older snapshot mustn't undo
-  // it. Its startup is held on a slowed call, and the change comes meanwhile (as R5's probe for #266 did).
+  // it. Its startup is held on a call (CW_TEST_HOLD_IPC), the change comes while it waits there, then the call goes on
+  // (as R5's probe for #266 did, by a delay then).
   await inv('ui:changeTips', { shownOn: '2000-01-01' })
   await app.evaluate(() => {
-    process.env.CW_TEST_SLOW_IPC = 'provider:info=2500*1'
+    process.env.CW_TEST_HOLD_IPC = 'provider:info'
   })
   await page.reload()
   await page.waitForLoadState('domcontentloaded')
-  await lib.sleep(500) // A fixed wait on purpose: the change must come while startup waits on the slowed call (2.5 s).
+  await until(() => app.evaluate(() => (globalThis.__cwHeldIpc?.['provider:info'] ?? 0) > 0), HUNG_MS)
   const now = new Date()
   await inv('ui:changeTips', { shownOn: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}` })
+  await app.evaluate(() => {
+    delete process.env.CW_TEST_HOLD_IPC
+  })
   await lib.appReady(page)
-  await lib.sleep(6000) // A fixed wait on purpose: this checks that no tip shows on start (one would within 4 s of loading), which no condition can show.
+  // On purpose: no tip shows on start, which no condition can show (one would within dayTipMs of loading).
+  await lib.sleep(lib.timing('quiet.dayTipMs'))
   check("a tip another window showed while this one loaded counts (none again today)", (await card.count()) === 0)
 
   // The next day: as if the last tip showed long ago.
@@ -143,7 +144,9 @@ const check = (name, ok, extra = '') => {
   check('and turns the setting off', !!(await until(async () => JSON.parse(fs.readFileSync(cfgFile, 'utf8')).settings.general.showTips === false, HUNG_MS)))
   await inv('ui:changeTips', { shownOn: '2000-01-01' })
   await page.reload()
-  await lib.sleep(6000) // A fixed wait on purpose: this checks that no tip shows on start (one would within 4 s of loading), which no condition can show.
+  await lib.appReady(page)
+  // On purpose: no tip shows on start, which no condition can show (one would within dayTipMs of loading).
+  await lib.sleep(lib.timing('quiet.dayTipMs'))
   check('with tips off, none shows on start', (await card.count()) === 0)
 
   await app.close()

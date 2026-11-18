@@ -52,7 +52,7 @@ const check = (name, ok, extra = '') => {
   const until = async (fn, ms) => {
     const t = Date.now()
     let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)
+    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
     return v
   }
   // Adding agents and giving them tasks is the Assistant's: start it (also the fake) and use its token.
@@ -177,7 +177,7 @@ const check = (name, ok, extra = '') => {
   const left = await api('POST', '/v1/projects/alpha/agents/Tester/message', { text: 'Sam pushed the tag: carry on with the release.' })
   const heard = await until(async () => doorbells().length > rang, HUNG_MS)
   const during = await live(alpha, id)
-  check('a message rings its doorbell within seconds while the task runs', left.status === 200 && !!heard && Date.now() - t1 < 15000 && during?.backgroundTasks === 1, JSON.stringify({ left: left.body, ms: Date.now() - t1, tasks: during?.backgroundTasks }))
+  check('a message rings its doorbell within seconds while the task runs', left.status === 200 && !!heard && Date.now() - t1 < lib.timing('budget.doorbellMs') && during?.backgroundTasks === 1, JSON.stringify({ left: left.body, ms: Date.now() - t1, tasks: during?.backgroundTasks }))
   const read = await until(async () => {
     const inbox = (await api('GET', '/v1/projects/alpha/agents/Tester/activity')).body?.inbox
     return !!inbox?.deliveries?.some((d) => d.id === left.body?.id && (d.state === 'received' || d.state === 'acked'))

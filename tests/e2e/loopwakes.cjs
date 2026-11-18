@@ -52,7 +52,7 @@ const check = (name, ok, extra = '') => {
   const until = async (fn, ms) => {
     const t = Date.now()
     let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
+    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
     return v
   }
   const wakes = (agent) => {
@@ -110,10 +110,10 @@ const check = (name, ok, extra = '') => {
   check('the reviewer is working', !!(await until(async () => (await live(reviewer.id))?.status === 'working', lib.timing('hang.step'))))
   await say(builder.id, `boardmove ${c1} review`)
   await until(async () => (await said(c1)).some((x) => /Returned for review, round 2|Moved to Review/.test(x) && x.startsWith('Builder')), lib.timing('hang.ui'))
-  await lib.sleep(3000) // A fixed wait on purpose: this checks that nothing is typed while it works.
+  await lib.sleep(lib.timing('quiet.noLineTypedMs')) // A quiet window on purpose: this checks that nothing is typed while it works.
   check('nothing is typed into a working agent', (await live(reviewer.id))?.status === 'working' && wakes('Reviewer').length === 1, JSON.stringify({ status: (await live(reviewer.id))?.status, wakes: wakes('Reviewer') }))
   check('…it is woken once it is idle', !!(await until(async () => wakes('Reviewer').length === 2, lib.timing('hang.ui'))) && wakes('Reviewer')[1].startsWith(`[CW] ${n1} (Builder's card) is in Review.`), JSON.stringify(wakes('Reviewer')))
-  await lib.sleep(2000) // A fixed wait on purpose: no second line for the same handoff.
+  await lib.sleep(lib.timing('quiet.noLineTypedMs')) // A quiet window on purpose: no second line for the same handoff.
   check('…once', wakes('Reviewer').length === 2, JSON.stringify(wakes('Reviewer')))
   await until(async () => (await idle(reviewer.id)) && (await idle(builder.id)), lib.timing('hang.ui'))
 
@@ -127,7 +127,7 @@ const check = (name, ok, extra = '') => {
   check('the reviewer watches the next card', !!(await until(async () => (await live(reviewer.id))?.status === 'watching', lib.timing('hang.step'))))
   await say(builder.id, `boardmove ${c2} review`)
   check("its own watch wakes it", !!(await until(async () => wakes('Reviewer').length === 3, lib.timing('hang.ui'))) && /Your card watch has ended/.test(wakes('Reviewer')[2]), JSON.stringify(wakes('Reviewer')))
-  await lib.sleep(3000) // A fixed wait on purpose: this checks that a second line does NOT come.
+  await lib.sleep(lib.timing('quiet.noLineTypedMs')) // A quiet window on purpose: this checks that a second line does NOT come.
   check('…one line, not two', wakes('Reviewer').length === 3 && !(await said(c2)).some((x) => x.startsWith('Combwork: Woke')), JSON.stringify({ wakes: wakes('Reviewer').slice(2), history: await said(c2) }))
   await until(async () => (await idle(reviewer.id)) && (await idle(builder.id)), lib.timing('hang.ui'))
 
@@ -145,7 +145,7 @@ const check = (name, ok, extra = '') => {
   await until(() => idle(reviewer.id), lib.timing('hang.ui'))
   await say(reviewer.id, `boardreview ${c2} start then boardreview ${c2} passed passed`)
   check('…and the passing one comes from its watch', !!(await until(async () => wakes('Builder').length === 4, lib.timing('hang.ui'))) && /Your card watch has ended/.test(wakes('Builder')[3]), JSON.stringify(wakes('Builder')))
-  await lib.sleep(3000) // A fixed wait on purpose: this checks that a second line does NOT come.
+  await lib.sleep(lib.timing('quiet.noLineTypedMs')) // A quiet window on purpose: this checks that a second line does NOT come.
   check('…one line, not two', wakes('Builder').length === 4 && (await said(c2)).filter((x) => x === 'Combwork: Woke Builder (alpha) with its verdict (a loop wake)').length === 1, JSON.stringify({ wakes: wakes('Builder').slice(3), history: await said(c2) }))
   await until(async () => (await idle(reviewer.id)) && (await idle(builder.id)), lib.timing('hang.ui'))
 
@@ -157,7 +157,7 @@ const check = (name, ok, extra = '') => {
   check('…and reviews the card that arrived meanwhile', !!(await until(async () => (await said(c6)).includes('Reviewer (alpha): Review failed'), lib.timing('hang.ui'))), JSON.stringify(await said(c6)))
   check('the builder is woken with that verdict', !!(await until(async () => wakes('Builder').some((x) => x.startsWith(`[CW] ${n6} is in Doing: Reviewer (alpha) failed it`)), lib.timing('hang.ui'))), JSON.stringify(wakes('Builder')))
   await until(() => idle(reviewer.id), lib.timing('hang.ui'))
-  await lib.sleep(3000) // A fixed wait on purpose: this checks that the reviewed arrival is NOT told.
+  await lib.sleep(lib.timing('quiet.noLineTypedMs')) // A quiet window on purpose: this checks that the reviewed arrival is NOT told.
   check("the reviewer isn't told of the arrival it has reviewed", wakes('Reviewer').length === 4 && !(await said(c6)).some((x) => x.startsWith('Combwork: Woke Reviewer')), JSON.stringify({ wakes: wakes('Reviewer').slice(4), history: await said(c6) }))
   await until(async () => (await idle(reviewer.id)) && (await idle(builder.id)), lib.timing('hang.ui'))
 
@@ -171,7 +171,7 @@ const check = (name, ok, extra = '') => {
   check("the lane's reviewer is now Other", !!(await until(async () => (await inv('lanes:list')).some((l) => l.reviewer?.id === other.id), lib.timing('hang.step'))))
   check('the waiting wake goes to the new reviewer', !!(await until(async () => wakes('Other').length === 1, lib.timing('hang.ui'))) && wakes('Other')[0].startsWith(`[CW] ${n5} (Builder's card) is in Review. You review this card in its loop`), JSON.stringify(wakes('Other')))
   await until(() => idle(reviewer.id), lib.timing('hang.ui'))
-  await lib.sleep(3000) // A fixed wait on purpose: this checks that the old reviewer gets nothing.
+  await lib.sleep(lib.timing('quiet.noLineTypedMs')) // A quiet window on purpose: this checks that the old reviewer gets nothing.
   check('…and not to the old one', wakes('Reviewer').length === 4, JSON.stringify(wakes('Reviewer').slice(4)))
   await until(async () => (await idle(other.id)) && (await idle(builder.id)), lib.timing('hang.ui'))
 
@@ -179,7 +179,7 @@ const check = (name, ok, extra = '') => {
   const c4 = await newCard('Fourth')
   await say(builder.id, `boardmove ${c4} review`)
   await until(async () => (await card(c4))?.column === 'review', lib.timing('hang.ui'))
-  await lib.sleep(3000) // A fixed wait on purpose: this checks that nothing comes.
+  await lib.sleep(lib.timing('quiet.noLineTypedMs')) // A quiet window on purpose: this checks that nothing comes.
   check('a card with no reviewer wakes no one', wakes('Reviewer').length === 4, JSON.stringify(wakes('Reviewer').slice(4)))
 
   // HI-2428 (HI-2410): the reviewer starts its review, asks its builder with cw_request_builder and ends its turn with
@@ -203,7 +203,7 @@ const check = (name, ok, extra = '') => {
   await lib.setOwnOptions(inv, alpha, { loopWakes: false })
   await say(builder.id, `boardmove ${c3} review`)
   await until(async () => (await card(c3))?.column === 'review', lib.timing('hang.ui'))
-  await lib.sleep(3000) // A fixed wait on purpose: this checks that nothing comes.
+  await lib.sleep(lib.timing('quiet.noLineTypedMs')) // A quiet window on purpose: this checks that nothing comes.
   check('turned off in its options: no one is woken', wakes('Reviewer').length === 4 && wakes('Other').length === otherSeen && !(await said(c3)).some((x) => x.startsWith('Combwork: Woke')), JSON.stringify({ wakes: [...wakes('Reviewer').slice(4), ...wakes('Other').slice(otherSeen)], history: await said(c3) }))
 
   // #1475, on again: a blocked card's news wakes a lane watch, and a lane abandoned ends its reviewer's card watch, which
