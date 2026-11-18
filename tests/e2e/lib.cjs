@@ -537,11 +537,13 @@ function trustFakeWorktrees(home, ws) {
 /**
  * Records in a Claude Code home (its .claude.json) that it trusts the workspace's worktrees folder, as Set Up leaves it
  * (HI-3337, HI-3342): its real path with forward slashes, the rest of the file kept. A file that isn't JSON throws rather
- * than be written afresh (a real home's holds its sign-in and onboarding). Returns the folder's key.
+ * than be written afresh (a real home's holds its sign-in and onboarding). Returns the folder's key. The folder isn't
+ * made (HI-3395: that gave every such suite a worktrees folder before Combwork made one, which antivirus and repairdefender
+ * check): its key is where it would be, its parent's real path and its name, as its real path is once made.
  */
 function trustWorktrees(home, ws) {
-  fs.mkdirSync(`${ws}.worktrees`, { recursive: true })
-  const key = fs.realpathSync.native(`${ws}.worktrees`).replace(/\\/g, '/')
+  const trees = `${ws}.worktrees`
+  const key = (fs.existsSync(trees) ? fs.realpathSync.native(trees) : path.join(fs.realpathSync.native(path.dirname(trees)), path.basename(trees))).replace(/\\/g, '/')
   const file = path.join(home, '.claude.json')
   const json = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {}
   json.projects = { ...json.projects, [key]: { ...json.projects?.[key], hasTrustDialogAccepted: true } }
