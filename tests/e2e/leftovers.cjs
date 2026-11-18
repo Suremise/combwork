@@ -106,7 +106,7 @@ const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile,
     // The notification is a toast for 15 s from the stop, then only in the Notifications panel (without its buttons):
     // looked for from now, beside the checks below, not after them, which can take longer than that under load (#673).
     const toast = page.locator('.toast', { hasText: 'left 2 processes running' })
-    const offered = lib.until(async () => (await toast.locator('button', { hasText: 'End Them' }).count()) > 0, 30000).catch(() => false)
+    const offered = lib.until(async () => (await toast.locator('button', { hasText: 'End Them' }).count()) > 0, lib.timing('hang.ui')).catch(() => false)
     check('the agent left two processes running as it stopped', two.length === 2 && two.every(alive), JSON.stringify(two))
     const found = await lib.until(async () => {
       const l = await listed()

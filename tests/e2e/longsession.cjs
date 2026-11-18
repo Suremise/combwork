@@ -45,11 +45,13 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)
-    return v
+  // HI-3396: lib's until (its bound required, the file's interval).
+  const until = (fn, ms) => lib.until(fn, ms)
+  /** HI-3396: text typed into the fake, once it has drawn it on its line (its input echoed), so its Enter can follow. */
+  const typed = async (key, text) => {
+    const mark = String((await inv('pty:buffer', key)) ?? '').length
+    await inv('pty:write', key, text)
+    await until(async () => lib.plainText(String((await inv('pty:buffer', key)) ?? '').slice(mark)).includes(text), lib.timing('hang.ui'))
   }
 
   await page.getByText('alpha', { exact: true }).first().click()
@@ -60,8 +62,7 @@ const check = (name, ok, extra = '') => {
   await inv('pty:write', lib.ptyKey(alpha, id), '\r')
   await until(async () => (await live(id))?.status === 'ready', HUNG_MS)
   const key = lib.ptyKey(alpha, id)
-  await inv('pty:write', key, 'hello')
-  await lib.sleep(300)
+  await typed(key, 'hello')
   await inv('pty:write', key, '\r')
   await until(async () => (await live(id))?.status === 'finished', HUNG_MS)
   // Under the limit: plain, on the footer's right (#1013), and in the context's hover; not a warning (#978).
@@ -79,8 +80,7 @@ const check = (name, ok, extra = '') => {
   const firstSession = (await live(id)).sessionId
 
   // Past 1 MB: orange, one notification, and the size in the agent's activity.
-  await inv('pty:write', key, 'pad 1200')
-  await lib.sleep(300)
+  await typed(key, 'pad 1200')
   await inv('pty:write', key, '\r')
   await until(async () => (await live(id))?.status === 'finished' && (await live(id)).transcriptBytes > 1024 * 1024, HUNG_MS)
   check('past the limit it is a warning in the line', !!(await until(async () => (await size.count()) === 1 && /MB/.test(await size.innerText()) && (await size.getAttribute('class')).includes('warn'), lib.timing('hang.ui'))), await size.innerText().catch(() => ''))
@@ -91,15 +91,16 @@ const check = (name, ok, extra = '') => {
   // The context count opens the Overview at this agent's session.
   await page.locator('.pane-footer-bar .pane-foot-item', { hasText: 'ctx' }).click()
   const head = page.locator('.session-head')
-  await head.waitFor({ timeout: 10000 }).catch(() => undefined)
-  await lib.sleep(800)
-  const inView = await head.evaluate((el) => {
+  // HI-3396: scrolled to it (a smooth scroll), waited for, then checked.
+  const shownAt = () => head.evaluate((el) => {
     const r = el.getBoundingClientRect()
     return r.top >= 0 && r.top < window.innerHeight
   }).catch(() => false)
+  const inView = !!(await until(shownAt, lib.timing('hang.ui')))
   check("the context count opens the Overview at the agent's session", inView)
-  await page.locator('.tab', { hasText: 'Session' }).first().click()
-  await lib.sleep(500)
+  const sessionTab = page.locator('.tab', { hasText: 'Session' }).first()
+  await sessionTab.click()
+  await until(() => sessionTab.evaluate((e) => e.classList.contains('active') || e.getAttribute('aria-selected') === 'true'), lib.timing('hang.ui'))
 
   // The size opens Hand Over to…, with the agent itself (a new conversation) chosen for a long one.
   await size.click()

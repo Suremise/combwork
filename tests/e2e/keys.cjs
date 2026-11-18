@@ -12,7 +12,6 @@ const HUNG_MS = lib.timing('hang.ui')
 const scratch = lib.WORK, userData = path.join(scratch, 'keys-profile'), ws = path.join(scratch, 'keys-ws')
 for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
 for (const n of ['alpha', 'bravo']) fs.mkdirSync(path.join(ws, n), { recursive: true })
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let pass = 0, fail = 0
 const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.log(ok ? 'PASS' : 'FAIL', name, extra) }
 ;(async () => {
@@ -291,7 +290,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   const labels = () => page.locator('.kb-table tbody td.kb-label').evaluateAll((tds) => tds.map((td) => td.firstChild.textContent.trim()))
   check('Command sorts every command A to Z', !!(await lib.until(async () => { const l = await labels(); return l.length === t0[0].count && l.every((x, i) => !i || l[i - 1].localeCompare(x, undefined, { sensitivity: 'base' }) <= 0) }, HUNG_MS)), (await labels()).slice(0, 10).join(' | '))
   await page.locator('.kb-table th button', { hasText: 'Command' }).click(); await page.locator('.kb-table th button', { hasText: 'Command' }).click()
-  await page.locator('.kb-toolbar input').fill('Show Notifications'); await sleep(200)
+  await page.locator('.kb-toolbar input').fill('Show Notifications'); await lib.until(() => page.locator('.kb-table tbody tr').evaluateAll((rs) => rs.length > 0 && rs.every((r) => /Show Notifications/.test(r.textContent))), HUNG_MS)
   const row = page.locator('.kb-table tr', { hasText: 'Show Notifications' }).first()
   await row.locator('.icon-btn[aria-label^="Change shortcut"]').click(); await lib.until(async () => /Press the keys/.test(await row.innerText()), HUNG_MS)
   check('recording prompt', /Press the keys/.test(await row.innerText()))
@@ -320,22 +319,22 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await page.keyboard.press('Escape'); await lib.until(async () => (await bell.count()) === 0, HUNG_MS)
   check('Escape closes the bell', await bell.count() === 0)
   // Chord
-  await row.locator('.icon-btn[aria-label^="Change shortcut"]').click(); await sleep(200)
-  // The chord's two presses a beat apart, as a person types them; then the wait for the saved chord.
-  await page.keyboard.press('Control+K'); await sleep(300); await page.keyboard.press('Control+J'); await lib.until(async () => (await inv('settings:get')).keybindings['view.notifications'] === 'Mod+K Mod+J', HUNG_MS)
+  await row.locator('.icon-btn[aria-label^="Change shortcut"]').click(); await lib.until(async () => /Press the keys/.test(await row.innerText()), HUNG_MS)
+  // The chord's two presses a beat apart (pace.chordBeatMs), as a person types them; then the wait for the saved chord.
+  await page.keyboard.press('Control+K'); await lib.sleep(lib.timing('pace.chordBeatMs')); await page.keyboard.press('Control+J'); await lib.until(async () => (await inv('settings:get')).keybindings['view.notifications'] === 'Mod+K Mod+J', HUNG_MS)
   s = await inv('settings:get')
   check('chord recorded', s.keybindings['view.notifications'] === 'Mod+K Mod+J', s.keybindings['view.notifications'])
   // Refused key
-  await row.locator('.icon-btn[aria-label^="Change shortcut"]').click(); await sleep(200)
+  await row.locator('.icon-btn[aria-label^="Change shortcut"]').click(); await lib.until(async () => /Press the keys/.test(await row.innerText()), HUNG_MS)
   await page.keyboard.press('Control+C'); await lib.until(async () => (await page.locator('.toast', { hasText: "can't be used" }).count()) >= 1, lib.timing('hang.ui'))
   check('Ctrl+C refused: its pop-up shows', (await page.locator('.toast', { hasText: "can't be used" }).count()) >= 1)
   s = await inv('settings:get')
   check('Ctrl+C refused: the chord is kept', s.keybindings['view.notifications'] === 'Mod+K Mod+J', s.keybindings['view.notifications'])
   // Conflict asks
-  await row.locator('.icon-btn[aria-label^="Change shortcut"]').click(); await sleep(200)
+  await row.locator('.icon-btn[aria-label^="Change shortcut"]').click(); await lib.until(async () => /Press the keys/.test(await row.innerText()), HUNG_MS)
   await page.keyboard.press('Control+Shift+P'); await lib.until(async () => (await page.locator('.dialog', { hasText: 'Shortcut already in use' }).count()) === 1, lib.timing('hang.ui'))
   check('conflict asks first', await page.locator('.dialog', { hasText: 'Shortcut already in use' }).count() === 1)
-  await page.locator('.dialog button', { hasText: 'Cancel' }).click(); await sleep(200)
+  await page.locator('.dialog button', { hasText: 'Cancel' }).click(); await lib.until(async () => (await page.locator('.dialog', { hasText: 'Shortcut already in use' }).count()) === 0, HUNG_MS)
   // Remove, then reset
   await row.locator('.icon-btn[aria-label="Remove shortcut"]').click(); await lib.until(async () => (await inv('settings:get')).keybindings['view.notifications'] === null, HUNG_MS)
   check('removed', (await inv('settings:get')).keybindings['view.notifications'] === null)
@@ -345,7 +344,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   // Project override: alpha gets Alt+F for Files; bravo keeps Alt+6
   await page.keyboard.press('Escape')
   if (!(await page.locator('.project-row').count())) await page.locator('.activity-btn[aria-label="Projects"]').click()
-  await sleep(300)
+  await lib.until(async () => (await page.locator('.project-row').count()) > 0, HUNG_MS)
   console.log('rows before alpha', await page.locator('.project-row').count(), await page.evaluate(() => document.querySelector('.activity-btn.active')?.getAttribute('aria-label')))
   await page.locator('.project-row', { hasText: 'alpha' }).click(); await lib.until(async () => /alpha/.test(await page.locator('.project-header h1').innerText().catch(() => '')), HUNG_MS)
   await lib.openProjectSettings(page)
@@ -356,19 +355,20 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   check('…its tabs: All, Project and Session, All chosen (its own remembered tab)', JSON.stringify(projectTabs.map((t) => [t.id, t.selected])) === JSON.stringify([['all', true], ['project', false], ['session', false]]), JSON.stringify(projectTabs))
   console.log('rows after kb nav', await page.locator('.project-row').count())
   const frow = page.locator('.kb-table tr', { hasText: 'Go to Files' }).first()
-  await frow.locator('.icon-btn[aria-label^="Change shortcut"]').click(); await sleep(200)
+  await frow.locator('.icon-btn[aria-label^="Change shortcut"]').click(); await lib.until(async () => /Press the keys/.test(await frow.innerText()), HUNG_MS)
   await page.keyboard.press('Alt+F'); await lib.until(async () => (await inv('workspace:refresh')).projects.find((x) => x.name === 'alpha')?.config.keybindings?.['project.tab.files'] === 'Alt+F', lib.timing('hang.ui'))
   const alpha = (await inv('workspace:refresh')).projects.find((x) => x.name === 'alpha')
   check('saved in the project', alpha.config.keybindings?.['project.tab.files'] === 'Alt+F', JSON.stringify(alpha.config.keybindings))
   await page.screenshot({ path: path.join(scratch, 'keys-2-project.png') })
   console.log('rows after record', await page.locator('.project-row').count())
-  await page.locator('.tabs .tab', { hasText: 'Session' }).first().click(); await sleep(200)
+  await page.locator('.tabs .tab', { hasText: 'Session' }).first().click(); await lib.until(async () => /Session/.test(await tab().catch(() => '')), HUNG_MS)
   await page.keyboard.press('Alt+F'); await lib.until(async () => /Files/.test(await tab().catch(() => '')), HUNG_MS)
   console.log('rows after altF', await page.locator('.project-row').count())
   check('Alt+F opens Files in alpha', /Files/.test(await tab()), await tab())
   await page.locator('.project-row', { hasText: 'bravo' }).click(); await lib.until(async () => /bravo/.test(await page.locator('.project-header h1').innerText().catch(() => '')), HUNG_MS)
   await page.locator('.tabs .tab', { hasText: 'Session' }).first().click(); await lib.until(async () => /Session/.test(await tab().catch(() => '')), HUNG_MS)
-  await page.keyboard.press('Alt+F'); await sleep(500) // A fixed wait on purpose: this checks that Alt+F does NOT switch tabs in bravo.
+  // A window on purpose (quiet.keyIgnoredMs): this checks that Alt+F does NOT switch tabs in bravo.
+  await page.keyboard.press('Alt+F'); await lib.sleep(lib.timing('quiet.keyIgnoredMs'))
   check('Alt+F does nothing in bravo', /Session/.test(await tab()), await tab())
   await page.keyboard.press('Alt+6'); await lib.until(async () => /Files/.test(await tab().catch(() => '')), HUNG_MS)
   check('bravo keeps Alt+6', /Files/.test(await tab()), await tab())

@@ -115,7 +115,8 @@ const beta = path.join(fx.ws, 'beta')
       let other = null
       const shown = await waitHung(async () => {
         await page.mouse.move(5, 5)
-        if (!(await lib.until(async () => (await tips().count()) === 0, 5000))) return false
+        // A try: the tip gone once the mouse has left, else the hover is tried again.
+        if (!(await lib.until(async () => (await tips().count()) === 0, lib.timing('pace.tipGoneMs')))) return false
         await target.hover()
         const t = await lib.until(async () => (await tips().count()) > 0 && (await tipText()), lib.timing('hang.ui'))
         if (t && want(t)) return true

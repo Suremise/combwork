@@ -3,6 +3,7 @@
 // (tests/e2e/i18nshots.cjs has the case format) with locale-independent means only: IPC, command ids and structural
 // hooks (data-section, data-setting, data-action, data-advanced, classes), never English text.
 const fs = require('fs')
+const { timing } = require('../../timing.cjs')
 const path = require('path')
 
 /** The window's size the route photographs in (lib.fitWindow), and the tallest a section is photographed at. */
@@ -44,7 +45,7 @@ const restoreWindow = (ctx) => ctx.lib.fitWindow(ctx.app, ctx.page, WINDOW)
 /** Its Cancel (a dialog's first subtle button), until no dialog is open. */
 async function cancelDialog(ctx) {
   const { page, lib } = ctx
-  const cancel = () => page.locator('.dialog').last().locator('button.subtle').first().click({ timeout: 2000 }).then(() => false, () => false)
+  const cancel = () => page.locator('.dialog').last().locator('button.subtle').first().click({ timeout: timing('poll.clickMs') }).then(() => false, () => false)
   if (!(await lib.until(async () => (await page.locator('.dialog').count()) === 0 || (await cancel()), ctx.hungMs))) throw new Error("the dialog didn't close")
 }
 

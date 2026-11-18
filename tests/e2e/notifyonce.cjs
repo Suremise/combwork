@@ -56,9 +56,12 @@ const check = (name, ok, extra = '') => {
     // before any turn (HI-2688): its start, restart or resume
     check('the agent starts', !!(await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))))
     const send = async (text) => {
-      await inv('pty:write', lib.ptyKey(alpha, one.id), text)
-      await lib.sleep(100)
-      await inv('pty:write', lib.ptyKey(alpha, one.id), '\r')
+      const key = lib.ptyKey(alpha, one.id)
+      const mark = String((await inv('pty:buffer', key)) ?? '').length
+      await inv('pty:write', key, text)
+      // HI-3396: Enter once the fake has drawn the text on its line.
+      await lib.until(async () => lib.plainText(String((await inv('pty:buffer', key)) ?? '').slice(mark)).includes(text), lib.timing('hang.ui'))
+      await inv('pty:write', key, '\r')
     }
     const status = async () => (await live())?.status
     const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
@@ -120,7 +123,8 @@ const check = (name, ok, extra = '') => {
     }, HUNG_MS)), JSON.stringify(await told(finishTitle)))
     check('cw_notify warning accepted in the background', (await notifyApi({ title: 'Hooks are quiet', level: 'warning', source: alpha })) === 200)
     check('…Combwork\'s own warning: a pop-up that waits in the window, no Windows notification', !!(await lib.until(async () => same(await told('Hooks are quiet'), { entries: ['popup'], windows: 0, bell: ['shown'], popups: 1 }), HUNG_MS)))
-    await lib.sleep(3500) // A fixed wait on purpose: longer than its 2 s, to show it does NOT close while the window is in the background.
+    // A window on purpose (quiet.popupStaysMs): longer than its 2 s, to show it does NOT close while the window is in the background.
+    await lib.sleep(lib.timing('quiet.popupStaysMs'))
     check('…still there while the window is in the background', (await told('Hooks are quiet')).popups === 1)
     await setFocus(true)
     check('…and closes after its seconds once the window is focused', !!(await lib.until(async () => (await told('Hooks are quiet')).popups === 0, HUNG_MS)))

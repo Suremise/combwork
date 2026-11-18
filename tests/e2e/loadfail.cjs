@@ -46,12 +46,8 @@ const check = (name, ok, extra = '') => {
   // Every call fails until cleared (failAll('')): the sidebar's and the main area's read both fail.
   const failAll = (channel) => app.evaluate((_e, v) => (process.env.CW_TEST_FAIL_IPC = v), channel && `${channel},round${++round}`)
   const slowNext = (channel, ms) => app.evaluate((_e, v) => (process.env.CW_TEST_SLOW_IPC = v), `${channel}=${ms}*1,round${++round}`)
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(150)
-    return v
-  }
+  // HI-3396: lib's until (its bound required, the file's interval).
+  const until = (fn, ms) => lib.until(fn, ms)
   const text = (sel) => page.locator(sel).first().innerText().catch(() => '')
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('alpha', { exact: true }).first().click()
@@ -109,19 +105,22 @@ const check = (name, ok, extra = '') => {
   await page.getByRole('button', { name: 'Retry' }).first().click()
   check("skills: Retry loads beta's own", !!(await until(async () => (await failedBox.count()) === 0 && (await page.locator('.skill-group').count()) > 0, HUNG_MS)) && (await alphaOnly.count()) === 0)
   // Alpha's answer arrives late, after beta is shown: it isn't shown as beta's.
+  // HI-3396: alpha's (slowed) list asked for before beta is picked (it shows loading), then both answers in the window.
+  const asked = await lib.ipcSettled(app, 'skills:list')
   await slowNext('skills:list', 2500)
   await project('alpha')
-  await lib.sleep(300)
+  await until(async () => /Loading/.test(await text('.split-list .pane-body')), HUNG_MS)
   await project('beta')
   await until(async () => (await page.locator('.skill-group').count()) > 0, HUNG_MS)
-  await lib.sleep(3500) // A fixed wait on purpose: the slowed answer for the old choice arrives later, and this checks it doesn't replace the new one.
+  await until(async () => (await lib.ipcSettled(app, 'skills:list')) >= asked + 2, HUNG_MS)
+  await lib.answersDrawn(inv, page)
   check("skills: alpha's late answer isn't shown in beta", (await alphaOnly.count()) === 0 && (await page.locator('.skill-group').count()) > 0)
   await project('alpha')
   check('skills: back in alpha, its own again', !!(await until(async () => (await alphaOnly.count()) === 1, HUNG_MS)))
   // While beta's own load is slow, alpha's list isn't shown as beta's: beta is loading.
   await slowNext('skills:list', 2500)
   await project('beta')
-  await lib.sleep(600)
+  await until(async () => /Loading/.test(await text('.split-list .pane-body')), HUNG_MS)
   check("skills: while beta loads, alpha's skills aren't shown", (await alphaOnly.count()) === 0 && /Loading/.test(await text('.split-list .pane-body')))
   check('skills: then beta has its own', !!(await until(async () => (await page.locator('.skill-group').count()) > 0, HUNG_MS)) && (await alphaOnly.count()) === 0)
 
