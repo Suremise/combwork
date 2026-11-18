@@ -10,6 +10,7 @@ import { createRequire } from 'module'
 import { join, resolve } from 'path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { tempDir } from './tempDir'
+import { timing, waitOptions } from './waits'
 import { commit, gitRepo, sh } from './workflow/harness'
 import type { GitResult } from '../src/main/git'
 import { msysBinFor } from '../src/main/gitWorker'
@@ -1035,7 +1036,8 @@ describe('a commit or stash past its bound (HI-3021)', () => {
         if (!run) throw new Error("the first refresh's filter has not started both its processes")
         return run
       },
-      { timeout: 20_000 }
+      // HI-3378: HI-3355's bounds as names from the tests' timing file.
+      waitOptions()
     )
     expect(existsSync(lockPath())).toBe(false)
     sh(proj, 'add', 'b.txt')
@@ -1052,7 +1054,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
         ids.push(...identities(run))
         return run
       },
-      { timeout: changes.folderChangesBounds.actMs + 20_000 }
+      { timeout: changes.folderChangesBounds.actMs + timing('wait.hang'), interval: timing('wait.interval') }
     )
     const done = await settling
     const runs = [first, await second]

@@ -4,6 +4,7 @@ import { configDefaults, defineConfig } from 'vitest/config'
 import { globsUncached } from './tests/globCacheKey.mts'
 import { progressWanted, VitestProgress } from './tests/progressReport.mts'
 import { startRunTemp } from './tests/runTemp.mts'
+import { timing } from './tests/timing.cjs'
 
 // The run's temp folder is the tests' own, in combwork-test\tmp (tests/runTemp.mts, #992), not %TEMP%: Vitest's copies of the
 // modules it serves the workers (about 600 files a run, which it leaves behind), the temp files of Combwork's code under test
@@ -40,9 +41,12 @@ export default defineConfig({
     // leaves it room, and longer limits. Not to cover a wait for time: tests wait for conditions (#524's rule,
     // #528); the limit bounds slow work (git, file scans). Measured with four full runs at once (#528): 83 of 2,228 tests
     // took over 5 s and 39 over 10 s, so it can't come back to 5 s. A test that needs more says so itself.
+    // HI-3378: the limits come from the tests' one timing file (tests/timing.json, by name), so a run tightens or loosens
+    // them in one place (CW_TEST_TIMING, CW_TEST_TIMING_SCALE); 120 s, 120 s and 60 s, as a 4-core runner needs.
     maxWorkers: '50%',
-    testTimeout: 20_000,
-    hookTimeout: 30_000,
+    testTimeout: timing('test.hang'),
+    hookTimeout: timing('hook.hang'),
+    teardownTimeout: timing('teardown.hang'),
     // Run inside a Combwork agent's session: the files' progress in Combwork's Progress panel (tests/progressReport.mts), added to
     // Vitest's own reporters (which it picks by where it runs: minimal for a coding agent), so the output is unchanged.
     ...(progressWanted() ? { reporters: [...configDefaults.reporters, new VitestProgress()] } : {})

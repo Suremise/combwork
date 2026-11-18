@@ -14,7 +14,7 @@ import { AREAS, DOCS_ONLY, EVERYTHING, REAL_TIER, REASONS_PER_SUITE, UNIT_ONLY, 
 // @ts-expect-error: plain .mjs modules without types
 import { fingerprint } from './e2e/record.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { DEV_SEAMS, PACKAGED_SEAMS, TEST_CHANNELS, devBuildOnly, isRealCli, keepLimits, noCombworkProblems, needsDevBuild, packagedPlan, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, recordStatus, repeatStatus, resultLines, selectSuites, suiteDevOnly, suiteFiles as filesOfSuite, suiteLimitMs, suiteOutcome, suiteSource, suiteStartsCombwork } from './e2e/runner.mjs'
+import { DEV_SEAMS, PACKAGED_SEAMS, TEST_CHANNELS, defaultJobs, devBuildOnly, isRealCli, keepLimits, noCombworkProblems, needsDevBuild, packagedPlan, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, recordStatus, repeatStatus, resultLines, selectSuites, suiteDevOnly, suiteFiles as filesOfSuite, suiteLimitMs, suiteOutcome, suiteSource, suiteStartsCombwork } from './e2e/runner.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { recordJson, recordMarkdown, selectionLine, selectionOf } from './e2e/record.mjs'
 // @ts-expect-error: plain .mjs modules without types
@@ -1071,11 +1071,17 @@ describe("each run's own log folder (logs.mjs)", () => {
     expect(keepLimits('board', ['pl'])).toEqual({})
   })
 
-  it("a --lang run's time limit grows with its languages; every other suite keeps 10 minutes (HI-2159)", () => {
-    expect(suiteLimitMs('i18nshots', [])).toBe(10 * 60_000)
-    expect(suiteLimitMs('i18nshots', ['en-XA'])).toBe(10 * 60_000)
-    expect(suiteLimitMs('i18nshots', ['en-XA', 'pl', 'de', 'es', 'fr', 'ja', 'pt-BR'])).toBe(42 * 60_000)
-    expect(suiteLimitMs('board', ['pl', 'de', 'es'])).toBe(10 * 60_000)
+  it("a --lang run's time limit grows with its languages; every other suite keeps the timing file's suite.limitMs (HI-2159, HI-3378)", async () => {
+    const { timing } = await import('./timing.cjs')
+    const limit = timing('suite.limitMs')
+    expect(suiteLimitMs('i18nshots', [])).toBe(limit)
+    expect(suiteLimitMs('i18nshots', ['en-XA'])).toBe(limit)
+    expect(suiteLimitMs('i18nshots', ['en-XA', 'pl', 'de', 'es', 'fr', 'ja', 'pt-BR'])).toBe(Math.max(limit, 42 * 60_000))
+    expect(suiteLimitMs('board', ['pl', 'de', 'es'])).toBe(limit)
+  })
+
+  it('runs a quarter of the cores at once by default, one to four (HI-3378)', () => {
+    expect([defaultJobs(2), defaultJobs(4), defaultJobs(8), defaultJobs(16), defaultJobs(64)]).toEqual([1, 1, 2, 4, 4])
   })
 
   it('a failed run survives ten newer passing runs for a day, with its failed suites’ screenshots, then goes (#223)', () => {

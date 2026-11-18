@@ -89,8 +89,8 @@ Anyone who clones the repository must get the same results, on any machine and u
 - **A timeout bounds a hung run, and never makes a test pass.** Make it generous, and name or explain it. Raising a
   timeout isn't a fix: a change that raises one says why, in the code and on the card.
 - **Every wait states its bound** (#570). No `vi.waitFor`, `expect.poll` or `until` is left to its default (Vitest's
-  1 s is a time budget under load; until's 10 s is a default nobody chose): each passes a named bound for a hung run,
-  `HUNG_MS` (10–30 s) in the file, as `until(fn, HUNG_MS)` or `{ timeout: HUNG_MS }`. A bound under 5 s is a time
+  1 s is a time budget under load; until's default is a value nobody chose): each passes a named bound for a hung run
+  from the timing file (below), as `until(fn, lib.timing('hang.ui'))`, `waitUntil(fn)` or `{ timeout: timing('wait.hang') }`. A bound under 5 s is a time
   budget, so it needs a comment saying why it is short: a retry's pace (press again if this one was lost), or a quiet
   period that is the point of the check (nothing comes within it).
 - **Wait for Combwork to settle, not for a quiet spell.** Watches and loop wakes finish their work in the background (a
@@ -137,6 +137,49 @@ lines before its check, and a wait under another helper's name; and a comment co
 Reviewers look for those and judge the reasons. `-- --all` lists every such wait and sleep in the tests, the older
 ones too (the backlog in #524's audit); it is a report and exits 0. Builders run the default check before Review, and reviewers fail a new or changed test that sleeps and then
 checks, reads state once after an action, or raises a timeout with no stated reason.
+
+## Timing: every wait and timeout by name, in one file (HI-3378) <a id="timing"></a>
+
+Every test wait and timeout reads a name from **`tests/timing.json`**, never a number written in place, so a run can
+tighten or loosen them in one place. Read one with `timing(name)` from `tests/timing.cjs` (unit tests import it, or
+`waitUntil`/`waitOptions` from `tests/waits.ts`; e2e suites have it as `lib.timing`); an unknown name throws, so a typo
+can't become a default. Each entry says its kind:
+
+- **`hang`**: generous, it only bounds a hung run: `test.hang` (a unit test, `vitest.config.ts`' testTimeout),
+  `wait.hang` (a unit test's wait), `spawn.hang`, `hang.ui` (an e2e wait for the window, and Playwright's default),
+  `hang.step` (a step of Combwork's), `hang.slow`, `app.readyMs`, `suite.limitMs` and the rest.
+- **`budget`**: narrow on purpose: a performance check, its number the point.
+- **`quiet`** and **`pace`**: a window where nothing happening is the point, a sleep that paces input.
+- **`interval`**: how often a wait looks. **`seam`**: a value given to one of Combwork's `CW_TEST_*` seams.
+- **`lock`**: an ownership threshold (`runner.lockStaleMs`: when one run may take another's claims lock on this
+  shared machine), never scaled.
+
+**To check a narrow result**, change the value in one place, without touching a test:
+
+- a file of your own, of the same shape or plain numbers by name, named by **`CW_TEST_TIMING`** (merged over the
+  defaults by name; a name it gives that the file doesn't have is an error). CI commits `tests/timing.ci.json` and
+  sets it once in its workflow;
+- **`CW_TEST_TIMING_SCALE=<n>`**: multiplies the `hang` values alone (a slow machine), never a budget, a quiet window, a
+  pace, an interval or a lock's age.
+
+Every value in force is a whole number of ms from 1 to a Node timer's most (2^31 − 1), after an override and a scale, or
+loading fails; names are own properties only (`constructor` is no timing).
+
+Both are passed from the e2e runner to its suites (`PASS_ENV` in `tests/e2e/runContext.cjs`). A new kind of wait gets
+a new name in `tests/timing.json`, with its kind and a note.
+
+**`check:repo` fails a number written in place** (`npm run test:waits -- --literals`, `scripts/timingLiterals.mjs`):
+a test's or hook's timeout, `vi.setConfig`'s limits, a `timeout:` value, `until`'s bound, `sleep`/`waitForTimeout`, a
+Promise around `setTimeout`, a `Date.now() - t < N` loop, a `*_MS` constant, or `toBeLessThan(N)` on a clock reading,
+anywhere in `tests/**` (fakes, fixtures and the timing files apart; simulated time is none). A number that is no wait
+(a value under test, a child's own lifetime) says `timing-ok: <why>` on its line or the line above.
+Each file is parsed (`@babel/parser`, its syntax tree), so a call counts as the call it is: written over several lines,
+with a trailing comma or a regular expression inside, or made by `it.each(…)(…)`; text that only looks like a wait (in a
+string, a template, a regular expression or a comment) is none, and a file that can't be parsed is a finding of its own. `tests/timingAllow.json` is the backlog not migrated yet (HI-3381 for
+unit tests, HI-3382 for e2e and scenarios), **by occurrence**: each existing literal's kind and line text. A literal it
+doesn't cover fails, in a backlog file too (one added, or one changed); an entry with no literal left fails until
+`node scripts/testWaits.mjs --literals --shrink` drops it, which never adds one. `-- --literals --all` prints the backlog,
+per file.
 
 A test that flakes anyway is investigated with the `investigate-flake` skill (`.claude/skills`, `.agents/skills`).
 

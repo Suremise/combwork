@@ -19,6 +19,11 @@ permissions:
 jobs:
   check:
     runs-on: windows-latest
+    # HI-3378: a hung job ends here, not at GitHub's 6 hours; the one-worker unit run takes about 170 minutes at most.
+    timeout-minutes: 240
+    # HI-3378: the tests' timings on this runner, in one file (merged over tests/timing.json by name).
+    env:
+      CW_TEST_TIMING: tests/timing.ci.json
     steps:
       - uses: actions/checkout@v5
         with:
