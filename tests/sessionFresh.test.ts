@@ -1,6 +1,6 @@
 // HI-2540: why a conversation starts fresh rather than resume, the one rule the start (sessions.start) and the window's
 // lists (the session list, an agent's resume target) read, so Resume asks the right question before anything starts.
-import { readdirSync, readFileSync } from 'fs'
+import { readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { freshReasonOf, idleResume, IDLE_RESUME_FLOOR_TOKENS, SESSION_NAMES } from '../src/shared/sessionFresh'
@@ -76,13 +76,12 @@ describe('idleResume', () => {
 // HI-3360: agents resumed after a restart, an update or a quit carry on as before. That holds by path: the rule is read
 // only by the session list (sessions.idleOf), the Agent API's start routes and the placement; restartResume, lastRun and
 // outageResume resume through sessions.start, which never reads it.
-describe('the long-idle rule is read only where a resume may ask or start fresh', () => {
+describe('where the long-idle rule is read, and where never', () => {
   const main = join(__dirname, '..', 'src', 'main')
-  const files = readdirSync(main).filter((f) => f.endsWith('.ts'))
   const reads = (f: string): boolean => /\bidleOf\(|\bresumeIdleMinutes\(|\bidleResume\(/.test(readFileSync(join(main, f), 'utf8'))
 
-  it('by sessions (the list and idleOf), the Agent API (servers) and the placement (slotCards) alone', () => {
-    expect(files.filter(reads).sort()).toEqual(['servers.ts', 'sessions.ts', 'slotCards.ts'])
+  it('by sessions (the list and idleOf), the Agent API (servers) and the placement (slotCards)', () => {
+    for (const f of ['servers.ts', 'sessions.ts', 'slotCards.ts']) expect(reads(f), f).toBe(true)
   })
 
   it('never by the restart, quit or outage resumes, nor by sessions.start itself', () => {

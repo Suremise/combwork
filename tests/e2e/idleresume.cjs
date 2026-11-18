@@ -68,6 +68,7 @@ function backup(id, at) {
   // Before any turn: the Assistant's launch reaching ready (or its trust question, answered), not a turn's end.
   await lib.until(async () => (['waiting', 'ready'].includes((await assistantLive())?.status) ? true : null), HUNG_MS, 200)
   if ((await assistantLive())?.status === 'waiting') await inv('pty:write', lib.ptyKey(home, 'assistant'), '\r')
+  // Still before any turn: its launch ready once the trust question is answered.
   await lib.until(async () => ((await assistantLive())?.status === 'ready' ? true : null), HUNG_MS, 200)
   const token = JSON.parse(fs.readFileSync(path.join(userData, 'assistant-api', `${createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`), 'utf8')).token
   const api = (method, url, body) =>
