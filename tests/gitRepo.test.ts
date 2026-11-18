@@ -161,12 +161,15 @@ describe('Fetch, Pull and Push: cancelled, or at their bound (HI-3372)', () => {
       return false
     }
   }
-  /** A shell script that marks `started`, then a node that writes its pid and waits a minute (ended with git's tree). */
+  /**
+   * A shell script running a node that writes its pid, then marks `started`, and waits a minute (ended with git's tree).
+   * `started` means the node has registered (HR2's round 2): a Cancel after it always has a pid to see ended.
+   */
   const holdScript = (dir: string): { script: string; started: string; pid: () => number | null } => {
     const started = join(dir, 'started')
     const pidFile = join(dir, 'pid')
     const script = join(dir, 'hold.sh')
-    writeFileSync(script, `#!/bin/sh\n: > "${fwd(started)}"\n"${fwd(process.execPath)}" -e 'require("fs").writeFileSync(process.argv[1], String(process.pid)); setTimeout(() => {}, 60000)' "${fwd(pidFile)}"\n`)
+    writeFileSync(script, `#!/bin/sh\n"${fwd(process.execPath)}" -e 'const fs = require("fs"); fs.writeFileSync(process.argv[1], String(process.pid)); fs.writeFileSync(process.argv[2], ""); setTimeout(() => {}, 60000)' "${fwd(pidFile)}" "${fwd(started)}"\n`)
     return { script, started, pid: () => (existsSync(pidFile) ? Number(readFileSync(pidFile, 'utf8')) : null) }
   }
   /** The remote's upload-pack (what a fetch talks to) held: the script runs in its place, so nothing arrives. */
