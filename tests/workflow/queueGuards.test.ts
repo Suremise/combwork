@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { commit, GIT_HEAVY_MS, moved, R1, B1, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { MERGE_GUARDS_CHECK, type MergeGuard } from '../../src/shared/workflow/mergeGuards'
+import { QUEUE_ADVANCE_GATE } from '../../src/shared/workflow/facts'
 import { withGuardsWorker } from '../guardsWorker'
 
 // A user's pattern runs only in the guards' worker, never on main's thread: the real one, built for these tests.
@@ -133,20 +134,38 @@ describe('merge guards in the merge queue', () => {
     expect(e.wf.state(card).entries.at(-1)?.failure).toBeUndefined()
   })
 
-  it('keeps no entry’s guard result once its attempt ends: merged or returned (HR2’s round 1, finding 6)', { timeout: GIT_HEAVY_MS }, async () => {
-    const e = team([secrets])
-    const q = e.queue()
-    const runs = (): number => (q as unknown as { guardedRuns: Map<string, unknown> }).guardedRuns.size
-    await queued(e, { 'src/a.txt': 'fine\n' })
-    expect((await q.drain('main'))[0]).toMatchObject({ outcome: 'integrated' })
-    expect(runs()).toBe(0)
-    await queued(e, { 'src/b.txt': 'my secret\n' })
-    expect((await q.drain('main'))[0]).toMatchObject({ outcome: 'returned' })
-    expect(runs()).toBe(0)
-    e.options.mergeGuards = []
-    await queued(e, { 'src/c.txt': 'fine\n' })
-    expect((await q.drain('main'))[0]).toMatchObject({ outcome: 'integrated' })
-    expect(runs()).toBe(0)
+  // HI-3363: the host makes a new MergeQueue for each run, so the Approve of Ask each time is taken by another queue than
+  // the one that checked: the guards' proof is the card's facts, never one queue's memory (that asked again forever).
+  describe('Ask each time: the Approve taken by a new queue, as the host makes one', () => {
+    const ask = { checkedOutTarget: () => 'ask' as const }
+    const asked = (e: Env, card: { id: number }) => e.wf.state(e.store.card(card.id)).requests.filter((r) => r.gate === QUEUE_ADVANCE_GATE)
+    const guardRuns = (e: Env, card: { id: number }) => e.wf.state(e.store.card(card.id)).checks.filter((c) => c.name === MERGE_GUARDS_CHECK)
+
+    it('the guards passed for the approved test merge: it advances, with no new test merge or question', { timeout: GIT_HEAVY_MS }, async () => {
+      const e = team([secrets])
+      const card = await queued(e, { 'src/a.txt': 'fine\n' })
+      expect((await e.queue(ask).drain('main'))[0]).toMatchObject({ outcome: 'paused', reason: 'approval' })
+      const [first] = asked(e, card)
+      moved(await e.wf.answer(card.key, first.request, 'approved'))
+      expect((await e.queue(ask).drain('main'))[0]).toMatchObject({ outcome: 'integrated' })
+      expect(mainHead(e)).toBe(first.result)
+      // Every question it was asked, open or retired: the one.
+      expect(Object.values(e.wf.state(e.store.card(card.id)).made).filter((r) => r.gate === QUEUE_ADVANCE_GATE)).toHaveLength(1)
+      expect(guardRuns(e, card).map((c) => c.result)).toEqual(['passed'])
+    })
+
+    it('the guards changed while it waited for the Approve: checked again under the new ones, never advanced on the old green', { timeout: GIT_HEAVY_MS }, async () => {
+      const e = team([{ name: 'Nothing', pattern: 'zzz-never', message: 'n/a' }])
+      const card = await queued(e, { 'src/a.txt': 'my secret\n' })
+      const before = mainHead(e)
+      expect((await e.queue(ask).drain('main'))[0]).toMatchObject({ outcome: 'paused', reason: 'approval' })
+      const [first] = asked(e, card)
+      e.options.mergeGuards = [secrets]
+      moved(await e.wf.answer(card.key, first.request, 'approved'))
+      expect((await e.queue(ask).drain('main'))[0]).toMatchObject({ outcome: 'returned', reason: 'checks' })
+      expect(mainHead(e)).toBe(before)
+      expect(guardRuns(e, card).map((c) => c.result)).toEqual(['passed', 'failed'])
+    })
   })
 
   it('guards changed while the check runs: its green is for the old guards, so it is checked again under the new', { timeout: GIT_HEAVY_MS }, async () => {

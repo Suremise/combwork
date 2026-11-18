@@ -364,12 +364,13 @@ same code while every required check still runs:
   phase of five merges took hours) and was the load Combwork crashed under (#988). Every card has already passed review
   with its focused suites, which its reviewer checked. A pre-merge run still goes first in the slot queue (#558). A
   real suite skipped for the environment doesn't block a merge, but the record says so and the reviewer decides
-  whether it must run again first. The full unit run (`npm test`, about 7 minutes) is a release's checks, and on
-  request, never a card's while building (AGENTS.md, Tests per card: no builder or reviewer runs or asks for it); CI
+  whether it must run again first. The full unit run (`npm test`, about 7 minutes) is a release's checks (a version's full passes
+  included), and on request, never a card's while building (AGENTS.md, Tests per card: no builder or reviewer runs or asks for it); CI
   runs only the unit tests.
 - **The full set runs at checkpoints**: `npm run e2e -- --all --build --record` **on the integration branch when the
   lanes go quiet** (a phase's end, overnight with the load capped, before a long pause; a failure is carded at once and
-  bisected over the merge commits since the last full run), **once for a version's first RC** (RELEASING.md, What a
+  bisected over the merge commits since the last full run), **twice during a version, as its full passes**
+  (RELEASING.md, The release path, stage 1), **once for a version's first RC** (RELEASING.md, What a
   release checks; the real tier then runs on its own, `--all --only-real` with Copilot's suites named, RELEASING Step 4; an RC
   fix round and the release rerun only the slices a change invalidates, by the release's coverage ledger), and **on request** (the user, or a card that asks for it). Run the real tier on its own
   (`--all --only-real`) **after updating Claude Code or Codex**. `--affected` (below) stays a tool for picking the
