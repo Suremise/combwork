@@ -296,6 +296,28 @@ describe("a turn its transcript shows (#1371)", () => {
     expect(w.flagged).toBeNull()
   })
 
+  // HR1's round 1: which turn is the prompt's is told by the turn's own time, never by when Combwork read it.
+  it('an older turn read late, while a prompt is watched and seen working: the transcript names that turn, as before', () => {
+    const w = idWatch()
+    promptSent(w, 10_000, true)
+    const working = { ...quiet, screen: 'working' as const }
+    expect(hooksMissing(w, working, 10_200, BOUND)).toBeNull()
+    // Begun at 1.5 s (before the prompt), found only at 10.5 s.
+    transcriptTurns(w, [turn('OLD', 1_500)], 10_500, since)
+    expect(hooksMissing(w, working, 10_500 + BOUND, BOUND)).toBe('transcript')
+    expect(w.flagged).toBe('OLD')
+  })
+
+  it('two turns begun since the prompt: the first is the prompt’s, the next the transcript names', () => {
+    const w = idWatch()
+    promptSent(w, 10_000, true)
+    const working = { ...quiet, screen: 'working' as const }
+    expect(hooksMissing(w, working, 10_200, BOUND)).toBeNull()
+    transcriptTurns(w, [turn('MINE', 10_100), turn('NEXT', 10_400)], 10_500, since)
+    expect(hooksMissing(w, working, 10_500 + BOUND, BOUND)).toBe('transcript')
+    expect(w.flagged).toBe('NEXT')
+  })
+
   it('a prompt watched whose screen never shows it working: its turn in the transcript names it', () => {
     const w = idWatch()
     promptSent(w, 10_000, true)
