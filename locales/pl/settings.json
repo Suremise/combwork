@@ -461,6 +461,8 @@
   "settings.advanced.copilotFooter.title": "Stopka: {mode}",
   "settings.advanced.cw.db.busySeconds.desc": "Jak długo zapis na tablicy, w dzienniku Asystenta lub w historii użycia czeka, gdy inny program (inny Combwork w tym obszarze roboczym, skrypt) trzyma blokadę jego bazy danych, zanim zapis zostanie odrzucony. Ogranicza czas oczekiwania, nie szybkość: zapis na tablicy czeka w głównym wątku Combwork, więc okno nie reaguje w tym czasie. Działa po ponownym uruchomieniu Combwork.",
   "settings.advanced.cw.db.busySeconds.title": "Bazy danych: czekanie na blokadę innego programu",
+  "settings.advanced.cw.input.hiddenSeconds.desc": "Jak długo pola wpisywania agenta może nie być na jego ekranie, licząc od pierwszego razu, gdy Combwork nie mógł z tego powodu nic w nim wpisać, zanim Combwork przestanie próbować i pokaże, że agent czeka na Ciebie (HI-3411): coś, co jego CLI narysowało w miejscu pola, na przykład pytanie, którego Combwork nie rozpoznaje, przechwytuje klawisze. Gdy pole znów się pokaże, zostanie wpisane to, co czekało.",
+  "settings.advanced.cw.input.hiddenSeconds.title": "Ukryte pole wpisywania: czas oczekiwania",
   "settings.advanced.data.desc": "Combwork przechowuje ustawienia w pliku %APPDATA%\\Combwork\\config.json.",
   "settings.advanced.data.tip": "Ustawienia projektu są w folderze .combwork każdego projektu, a ustawienia obszaru roboczego w folderze .combwork obszaru roboczego.",
   "settings.advanced.data.title": "Plik ustawień",

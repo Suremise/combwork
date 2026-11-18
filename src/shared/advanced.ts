@@ -685,6 +685,18 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
+    id: 'cw.input.hiddenSeconds',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.input.hiddenSeconds.title', defaultMessage: 'Input box hidden: wait', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"120 s\"). The input box: where a coding agent's terminal takes what is typed to it." }),
+    desc: msg({ id: 'settings.advanced.cw.input.hiddenSeconds.desc', defaultMessage: "How long an agent's input box may stay off its screen, from the first time Combwork couldn't type into it for that, before Combwork stops trying and shows the agent as waiting for you (HI-3411): something its CLI drew in the box's place, such as a question Combwork doesn't recognise, takes the keys. Once the box shows again, what waited is typed.", description: 'What the advanced setting "Input box hidden: wait" is for (Settings → Advanced). HI-3411 is a card key: keep it as it is.' }),
+    kind: 'number',
+    default: 120,
+    min: 10,
+    max: 3600,
+    unit: 's',
+    applies: 'now'
+  },
+  {
     id: 'cw.lostLine.steadySeconds',
     group: 'cw',
     title: msg({ id: 'settings.advanced.cw.lostLine.steadySeconds.title', defaultMessage: 'Lost line: wait', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A line: a message Combwork typed into an agent's terminal." }),

@@ -2067,6 +2067,14 @@
     "defaultMessage": "Keep an agent going when it stops with unread items",
     "description": "An advanced setting's title (Settings → Advanced), listed under Combwork: when an agent is about to end its turn with items in its inbox it hasn't read, Combwork makes it carry on and read them."
   },
+  "settings.advanced.cw.input.hiddenSeconds.desc": {
+    "defaultMessage": "How long an agent's input box may stay off its screen, from the first time Combwork couldn't type into it for that, before Combwork stops trying and shows the agent as waiting for you (HI-3411): something its CLI drew in the box's place, such as a question Combwork doesn't recognise, takes the keys. Once the box shows again, what waited is typed.",
+    "description": "What the advanced setting \"Input box hidden: wait\" is for (Settings → Advanced). HI-3411 is a card key: keep it as it is."
+  },
+  "settings.advanced.cw.input.hiddenSeconds.title": {
+    "defaultMessage": "Input box hidden: wait",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"120 s\"). The input box: where a coding agent's terminal takes what is typed to it."
+  },
   "settings.advanced.cw.jj.commandSeconds.desc": {
     "defaultMessage": "How long one jj command Combwork runs may take, a snapshot of a large working copy included, before Combwork ends it: a read then counts as unknown, and a change made during a merge is left for you to settle. Raise it for a very large repository or a slow disk.",
     "description": "What the advanced setting \"jj: longest a command takes\" does, and when to change it (Settings → Advanced, HI-3372). jj is the Jujutsu version control tool."

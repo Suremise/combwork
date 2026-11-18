@@ -518,6 +518,8 @@ interface CombworkMessageValues {
   'settings.advanced.cw.inbox.idleWakes.title': undefined
   'settings.advanced.cw.inbox.stopContinuation.desc': undefined
   'settings.advanced.cw.inbox.stopContinuation.title': undefined
+  'settings.advanced.cw.input.hiddenSeconds.desc': undefined
+  'settings.advanced.cw.input.hiddenSeconds.title': undefined
   'settings.advanced.cw.jj.commandSeconds.desc': undefined
   'settings.advanced.cw.jj.commandSeconds.title': undefined
   'settings.advanced.cw.journal.builds.desc': undefined
