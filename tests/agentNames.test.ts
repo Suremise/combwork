@@ -12,6 +12,7 @@ import { duplicateAgentNames, nameTaken, projectPrefix, suggestAgentName } from 
 import type { AgentDef, CombworkEvent } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-agentnames-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -25,7 +26,7 @@ const { onCombworkEvent } = await import('../src/main/events')
 const { withAgentNames } = await import('../src/main/agentNames')
 
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 describe('the name rules', () => {
   it("a project's prefix is its initials", () => {

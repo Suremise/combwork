@@ -13,6 +13,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { build } from 'esbuild'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const told = vi.hoisted(() => ({ toasts: [] as { title: string; body: string }[] }))
 vi.mock('../src/main/events', async (orig) => ({
@@ -27,7 +28,7 @@ const OLD_STEM = OLD_DB_FILE.replace(/\.db$/, '')
 
 const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs')
 const base = tempDir('boardfilemove-')
-const WAIT = { timeout: 30_000, interval: 25 }
+const WAIT = { timeout: timing('wait.hang'), interval: 25 }
 let n = 0
 
 const checkpoint = async (file: string): Promise<{ ok: boolean; error?: string }> => checkpointFile({ kind: 'checkpoint', file })
@@ -203,7 +204,7 @@ m.moveBoardFile(dir, async (f) => w.checkpointFile({ kind: 'checkpoint', file: f
 `
     )
     await build({ entryPoints: [entry], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs', electron: join(__dirname, 'electron-stub.ts') }, external: ['node:sqlite'], logLevel: 'silent' })
-  }, 60_000)
+  }, timing('hook.hang'))
 
   for (const point of ['checkpointed', 'renamed']) {
     it(`killed after ${point}: the next open finishes, the cards row for row`, async () => {

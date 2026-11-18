@@ -59,7 +59,7 @@ describe('merge slot', () => {
   })
 
   it("waits at most MAX_WAIT_MS in one call, under the 300 s after which Node's fetch gives up", async () => {
-    expect(MAX_WAIT_MS).toBeLessThan(300_000)
+    expect(MAX_WAIT_MS).toBeLessThan(300_000) // timing-ok: data, not a wait
     const { slots, start } = setup()
     const [a, b] = [agent('A'), agent('B')]
     start(a, b)

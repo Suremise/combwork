@@ -147,9 +147,15 @@ can't become a default. Each entry says its kind:
 
 - **`hang`**: generous, it only bounds a hung run: `test.hang` (a unit test, `vitest.config.ts`' testTimeout),
   `wait.hang` (a unit test's wait), `spawn.hang`, `hang.ui` (an e2e wait for the window, and Playwright's default),
-  `hang.step` (a step of Combwork's), `hang.slow`, `app.readyMs`, `suite.limitMs` and the rest.
-- **`budget`**: narrow on purpose: a performance check, its number the point.
-- **`quiet`** and **`pace`**: a window where nothing happening is the point, a sleep that paces input.
+  `hang.step` (a step of Combwork's), `hang.slow`, `app.readyMs`, `suite.limitMs` and the rest. A unit test's come in
+  steps for what it drives: `test.hang`, `test.hangReal` (real git or processes at length), `test.hangRealJj` (the real
+  jj), `test.hangStress`; the same for `wait.*` and `spawn.*`; `db.busyMs` is a test's SQLite busy timeout.
+- **`budget`**: narrow on purpose: a performance check, its number the point (`budget.promptEndMs`: an end that must come
+  well before the slow path's own limit; `budget.scanMs`: a scan that must stay linear; one of its own where a check has
+  its own number). A budget must stay under what it guards: a check that something ends before a 60 s wait never reads
+  a hang name, which is as long as the wait.
+- **`quiet`** and **`pace`**: a window where nothing happening is the point (`quiet.nothingMs`, `quiet.unitMs`,
+  `quiet.briefMs`), a sleep that paces input (`pace.tick`, a turn of the event loop; `pace.shortMs`).
 - **`interval`**: how often a wait looks. **`seam`**: a value given to one of Combwork's `CW_TEST_*` seams.
 - **`lock`**: an ownership threshold (`runner.lockStaleMs`: when one run may take another's claims lock on this
   shared machine), never scaled.
@@ -169,14 +175,17 @@ Both are passed from the e2e runner to its suites (`PASS_ENV` in `tests/e2e/runC
 a new name in `tests/timing.json`, with its kind and a note.
 
 **`check:repo` fails a number written in place** (`npm run test:waits -- --literals`, `scripts/timingLiterals.mjs`):
-a test's or hook's timeout, `vi.setConfig`'s limits, a `timeout:` value, `until`'s bound, `sleep`/`waitForTimeout`, a
+a test's or hook's timeout, `vi.setConfig`'s limits, a `timeout:` value, `until`'s bound (`until(check, N)`: its first
+argument a check; `until('reads', 2)` counts something else), `sleep`/`waitForTimeout`, a
 Promise around `setTimeout`, a `Date.now() - t < N` loop, a `*_MS` constant, or `toBeLessThan(N)` on a clock reading,
 anywhere in `tests/**` (fakes, fixtures and the timing files apart; simulated time is none). A number that is no wait
-(a value under test, a child's own lifetime) says `timing-ok: <why>` on its line or the line above.
+(a value under test, a child's own lifetime) says `timing-ok: <why>` on its line or the line above: a timeout whose
+expiry the test checks (`{ timeout: 5000 }` then `timedOut: true`, a SQLite `timeout: 0` refused at once) keeps its
+number, since a hang name there would only make the test wait longer for the same result.
 Each file is parsed (`@babel/parser`, its syntax tree), so a call counts as the call it is: written over several lines,
 with a trailing comma or a regular expression inside, or made by `it.each(…)(…)`; text that only looks like a wait (in a
-string, a template, a regular expression or a comment) is none, and a file that can't be parsed is a finding of its own. `tests/timingAllow.json` is the backlog not migrated yet (HI-3381 for
-unit tests, HI-3382 for e2e and scenarios), **by occurrence**: each existing literal's kind and line text. A literal it
+string, a template, a regular expression or a comment) is none, and a file that can't be parsed is a finding of its own. `tests/timingAllow.json` is the backlog not migrated yet (the
+unit tests are off it since HI-3381; HI-3382 for e2e and scenarios), **by occurrence**: each existing literal's kind and line text. A literal it
 doesn't cover fails, in a backlog file too (one added, or one changed); an entry with no literal left fails until
 `node scripts/testWaits.mjs --literals --shrink` drops it, which never adds one. `-- --literals --all` prints the backlog,
 per file.

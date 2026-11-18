@@ -12,6 +12,7 @@ import { isoWeek, weekStart } from '../src/shared/journal'
 import { utf8Bytes } from '../src/shared/metrics'
 import { START_VIEW_MAX_BYTES, startView, type StartViewInput, type ViewCard, type ViewEntry } from '../src/shared/startView'
 import type { LiveSessionState } from '../src/shared/types'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-start-view-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -26,7 +27,7 @@ const { ClaudeCodeAdapter } = await import('../src/main/providers/claude/adapter
 const { advanced } = await import('../src/main/advanced')
 const { ASSISTANT_START_VIEW } = await import('../src/shared/advanced')
 
-vi.setConfig({ testTimeout: 30_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 const user = { kind: 'user' } as const
 const DAY = 86_400_000
 

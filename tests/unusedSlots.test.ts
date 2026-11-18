@@ -10,6 +10,7 @@ import * as electron from 'electron'
 import { homeListed, slotsListed, type SlotSeen } from '../src/shared/unusedWorktrees'
 import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 const base = tempDir('unusedslots-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -55,7 +56,7 @@ describe('which slots are listed (#1450)', () => {
   })
 })
 
-describe('Unused Worktrees and the Merge dialog on slots (#1450)', { timeout: 120_000 }, () => {
+describe('Unused Worktrees and the Merge dialog on slots (#1450)', { timeout: timing('test.hang') }, () => {
   const wsPath = join(base, 'ws')
   const project = join(wsPath, 'alpha')
   const ws = createWorkspaceService()

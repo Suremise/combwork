@@ -5,9 +5,10 @@ import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { redactLog } from '../src/shared/redact'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 // Its own user data folder, so the auth files never meet another test's.
 const userData = await vi.hoisted(async () => (await import('./tempDir')).tempDir('cw-hook-tokens-'))

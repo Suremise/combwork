@@ -5,8 +5,9 @@ import { join, relative } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 // A rename across drives (EXDEV) where a test asks for one: the test trash folder can't be on another drive here. And the
 // renames Windows refused, so a test can wait for one.

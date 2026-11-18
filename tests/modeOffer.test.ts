@@ -7,6 +7,7 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 // The notices Combwork raises, recorded (and still sent).
 const toasts = vi.hoisted(() => ({ titles: [] as string[] }))
@@ -45,7 +46,7 @@ const refresh = () => run(async () => sessions.liveInfo(p, await w.projectConfig
 // Its mode is its connection's (HI-2106): changed as the connection dialog changes it (HI-2122).
 const setMode = (mode: string) => run(async () => accounts.updateConnection((await w.projectConfig(p)).agents.find((a) => a.id === 'amb1')!.connection!, { permissionMode: mode as never }))
 /** Bounds a hung run only: the offer is sent 400 ms after the refresh that makes it. */
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 const offered = () => s.modeOffers.size > 0 || s.modeOfferTimer !== null
 
 describe('the offer to switch a running agent to a changed permission mode', () => {

@@ -619,7 +619,7 @@ describe("the queue's own git's output, read whole before a failure is told (HI-
       cp.exitCode = 0
       cp.emit('exit', 0, null)
     } })
-    const r = await gitTree('.', ['merge', 'x'], { env: {}, timeoutMs: 50 })
+    const r = await gitTree('.', ['merge', 'x'], { env: {}, timeoutMs: 50 }) // timing-ok: the timeout under test (its expiry is what the test checks)
     expect(r).toMatchObject({ ok: true, code: 0, err: 'told' })
     expect(r.timedOut).toBeUndefined()
     expect(child!.killed).toBe(0)
@@ -642,7 +642,7 @@ describe("the queue's own git's output, read whole before a failure is told (HI-
         })
       }
     } })
-    const r = await gitTree('.', ['merge', 'x'], { env: {}, timeoutMs: 50 })
+    const r = await gitTree('.', ['merge', 'x'], { env: {}, timeoutMs: 50 }) // timing-ok: the timeout under test (its expiry is what the test checks)
     expect(r).toMatchObject({ ok: false, timedOut: true, errAtTimeout: 'waiting for a passphrase', err: 'waiting for a passphrase; ended' })
     expect(r.signal).toBeUndefined()
     expect(child!.killed).toBe(1)

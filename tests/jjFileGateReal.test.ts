@@ -18,6 +18,7 @@ import { refFromFiles } from '../src/main/platform/jjPublishTail'
 import { boundaryOf } from '../src/main/platform/repoBoundary'
 import type { RunResult } from '../src/main/platform/repoContext'
 import { harness, jjExe } from './jjWorkspaceHarness'
+import { timing } from './timing.cjs'
 
 const OFF = process.env.HI2918_GATE_OFF === '1'
 if (OFF) {
@@ -97,7 +98,7 @@ describe.skipIf(!jjExe)(`Combwork's readers against its jj writes (HI-2918, jj $
           expect(run.reads, said).toBeGreaterThan(WRITES)
           expect({ failures: failures.length, gitBehind, stale }, said).toEqual({ failures: 0, gitBehind: 0, stale: false })
           expect(jjFileGate.size).toBe(0)
-        }, 240_000)
+        }, timing('test.hangReal'))
       }
     })
   }

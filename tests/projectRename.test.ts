@@ -13,6 +13,7 @@ import { moveFolder as move } from './moveFolder'
 import { tempDir } from './tempDir'
 import { readCardIn } from './boardDb'
 import { closeAllBoards } from '../src/main/boardStore'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-projectrename-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -34,7 +35,7 @@ const metrics = await import('../src/main/metrics')
 const kept = await import('../src/main/benchmarks')
 const { metricsReport } = await import('../src/main/metricsUsage')
 
-vi.setConfig({ testTimeout: 30_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 beforeAll(() => {
   WorkspaceService.onIdsRead = followNames
 })
@@ -56,13 +57,13 @@ function oldHandover(ws: string, file: string, projectName: string, session?: st
   writeFileSync(join(ws, '.combwork', 'shared', 'handovers', file), `# Handover\n\n- **Project:** ${projectName}\n${session ? `- **Session:** ${session}\n` : ''}- **Date:** 2026-10-01 10:00 (2026-10-01T10:00:00Z)\n\nWhere things stand.\n`)
 }
 /** Bounds a wait for the projects' names to be followed (in the background, after each read): only a hung run takes this long. */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 /** Until `want` holds (up to HUNG_MS): the ids read again (each read is followed in the background). */
 async function until(w: WS, want: () => boolean | Promise<boolean>): Promise<boolean> {
   for (const end = Date.now() + HUNG_MS; Date.now() < end; ) {
     if (await want()) return true
     await w.projectIds({ fresh: true })
-    await new Promise((r) => setTimeout(r, 20))
+    await new Promise((r) => setTimeout(r, timing('wait.interval')))
   }
   return !!(await want())
 }
@@ -100,7 +101,7 @@ describe('a project renamed: found by its id (#514)', () => {
     expect(journal(ws).projects[id].former).toEqual(['gamma', 'alpha'])
     // Read again and again: nothing more.
     for (let i = 0; i < 3; i++) await w.projectIds({ fresh: true })
-    await new Promise((r) => setTimeout(r, 200))
+    await new Promise((r) => setTimeout(r, timing('quiet.briefMs')))
     expect(journal(ws).renames).toHaveLength(2)
     // The project.json is the project's own: no names in it.
     expect(projectJson(join(ws, 'delta'))).not.toHaveProperty('formerNames')
@@ -249,7 +250,7 @@ describe('what keeps a project by name or path follows a rename, once (#514)', (
     expect(await handovers(w, 'alpha')).toEqual([])
     // Read again: nothing is done twice.
     for (let i = 0; i < 3; i++) await w.projectIds({ fresh: true })
-    await new Promise((r) => setTimeout(r, 200))
+    await new Promise((r) => setTimeout(r, timing('quiet.briefMs')))
     expect([prefs(ws, 'beta'), prefs(ws, 'alpha'), measured(w, 'beta'), measured(w, 'alpha')]).toEqual(['codex', 'claude-code', 1, 2])
     progress.clear(ws)
     await disposeWorkspaceService(w)

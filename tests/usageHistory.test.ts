@@ -10,6 +10,7 @@ import { priceUsage } from '../src/shared/usageDays'
 import { DEFAULT_SETTINGS } from '../src/shared/defaults'
 import type { SessionListItem, SessionUsage } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-usage-history-')
 // The CLIs' homes are the test's own (HI-1666): a list looks in each for sessions started outside Combwork, and the user's
@@ -138,7 +139,7 @@ describe('the usage history of a workspace', () => {
     appendFileSync(cliFile(id), request(id, 9, 90))
     // The sweep (every ten minutes, and after a workspace's import) finds it changed and reads it.
     await usageHistory['sweep'](w)
-    await vi.waitFor(async () => expect(outputOf(await run(() => sessions.usageItems(p)), id)).toBe(100), { timeout: 10_000 })
+    await vi.waitFor(async () => expect(outputOf(await run(() => sessions.usageItems(p)), id)).toBe(100), { timeout: timing('wait.hang') })
   })
 
   it("a deleted session's usage is recorded before its copies go, and stays in the totals", async () => {
@@ -433,7 +434,7 @@ describe('the usage history of a workspace', () => {
     let open!: () => void
     const gate = usageHistory['enqueue']('gate', 0, () => new Promise<null>((r) => (open = () => r(null))))
     // Bounded for a hung run (HI-3349), not Vitest's 1 s, which a loaded runner outlasts.
-    await vi.waitFor(() => expect(open).toBeTypeOf('function'), { timeout: 20_000 })
+    await vi.waitFor(() => expect(open).toBeTypeOf('function'), { timeout: timing('wait.hang') })
     usageHistory['rolledUp'].clear()
     const rolled = run(() => usageHistory['rollUp'](w, { path: w.path!, signal: w.lifetime }))
     live.set(`${p.toLowerCase()}#resumed`, { state: { sessionId: resumed, projectPath: p, provider: 'claude-code' } })

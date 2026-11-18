@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 vi.mock('../src/main/workflow/service', async (orig) => ({ ...(await orig<object>()), workflowEnforced: () => true }))
 // B1's lane, running (the slot pass ends a lane's lease once its lane isn't): only what the pass reads of it.
@@ -28,7 +29,7 @@ const { loadedWatchFor } = await import('../src/main/watches')
 const tasks = await import('../src/main/tasks')
 const { DEFAULT_PROJECT_CONFIG } = await import('../src/shared/defaults')
 
-const HUNG_MS = 20_000
+const HUNG_MS = timing('wait.hang')
 type Ws = ReturnType<typeof createWorkspaceService>
 const cleanups: (() => Promise<void> | void)[] = []
 afterEach(async () => {

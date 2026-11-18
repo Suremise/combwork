@@ -17,12 +17,13 @@ import { statSync } from 'fs'
 import { describe, expect, it } from 'vitest'
 import { TESTED_JJ } from '../src/shared/jjTool'
 import { harness, jjExe } from './jjWorkspaceHarness'
+import { timing } from './timing.cjs'
 
 type Rec = { phase?: string; token?: string; name?: string; store?: string; tokenFolder?: string; tokenGeneration?: string; ws?: string; wsGeneration?: string; residues?: { path: string; name?: string; why: string }[] }
 
 // A hung test's bound (HI-3350), not a time budget: each test runs real jj and Git processes, and alone, one file at a time,
 // the longest took 7.3 s, over a third of Vitest's 20 s default; a loaded full run needs at least 3 times that.
-const REAL_JJ_MS = 30_000
+const REAL_JJ_MS = timing('wait.hang')
 
 describe.skipIf(!jjExe)(`jj's control workspace, its attempts and their recovery (jj ${TESTED_JJ.version}), HI-2887`, { timeout: REAL_JJ_MS }, () => {
   describe.each([true, false] as const)('colocated: %s', (colocated) => {

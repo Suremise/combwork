@@ -8,6 +8,7 @@ import { pathToFileURL } from 'url'
 import { describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-agy-transcript-')
 process.env.CW_USER_DATA = join(base, 'userdata')
@@ -23,7 +24,7 @@ const { newUsageParser } = await import('../src/main/usageParsers')
 
 const FIX = join(__dirname, 'fixtures', 'antigravity')
 /** The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take. */
-const HUNG_MS = 20000
+const HUNG_MS = timing('wait.hang')
 /** Waits for a condition, at most `ms`. */
 async function until(ok: () => boolean, ms: number): Promise<void> {
   const end = Date.now() + ms

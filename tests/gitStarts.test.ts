@@ -13,9 +13,10 @@ import { contains, firstParents, forgetKeptAnswers, gitStep, isAncestor, mergeBa
 import { reconcile } from '../src/main/workflow/reconcile'
 import { allOff, preset } from '../src/shared/workflow/options'
 import { isUnknown } from '../src/main/platform/types'
+import { timing } from './timing.cjs'
 
 // Real git work, not a wait: a few dozen git commands per test.
-vi.setConfig({ testTimeout: 60_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 /** The git commands started while `fn` ran (their arguments), and its answer. */
 async function counted<T>(fn: () => Promise<T>): Promise<{ ran: string[][]; v: T }> {

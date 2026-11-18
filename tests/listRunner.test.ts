@@ -6,10 +6,11 @@
 import { EventEmitter } from 'events'
 import { describe, expect, it, vi } from 'vitest'
 import { runList, OBSERVER_STALE_MS, type ListDeps, type ListJob, type ListStatus } from '../src/main/closeCommand/listRunner'
+import { timing } from './timing.cjs'
 
 const DIR = 'D:\\run'
 /** The longest a wait here waits for what it expects: a bound for a hung run, never how long it should take. */
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 
 /** A stand-in for the run's folder and the commands: each spawn exits with the next of `codes` once the test lets it. */
 function world(codes: number[], opts: { observer?: boolean } = {}) {
@@ -30,7 +31,7 @@ function world(codes: number[], opts: { observer?: boolean } = {}) {
     write: (file, data) => files.set(file, { data: data.toString(), mtime: clock }),
     now: () => new Date(clock),
     pid: 77,
-    setTimer: (fn) => setTimeout(fn, 0),
+    setTimer: (fn) => setTimeout(fn, 0), // timing-ok: a timer stub: the next turn of the event loop
     clearTimer: (t) => clearTimeout(t as NodeJS.Timeout),
     exists: (p) => files.has(p),
     read: (p) => files.get(p)?.data ?? null,

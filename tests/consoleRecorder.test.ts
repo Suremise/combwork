@@ -6,6 +6,7 @@ import type { WebContents } from 'electron'
 import { sessionSourceId, type ConsoleSource } from '../src/shared/devConsole'
 import { parseRecording, recordingName } from '../src/shared/consoleFixtures.mts'
 import { SECRET_SAMPLES } from './secretSamples'
+import { timing } from './timing.cjs'
 
 // Recording a console source (#638), the service itself: one recording per window, only while the window still wants
 // it (a start overtaken by a close, a stop or a newer start records nothing, whenever it is overtaken); a file each,
@@ -55,7 +56,7 @@ vi.mock('../src/main/logger', () => ({ createLogger: () => ({ info: () => undefi
 const { devConsole } = await import('../src/main/devConsole')
 const { latestRecording, recordingOf, recordingsDir, startRecording, stopRecording } = await import('../src/main/consoleRecorder')
 
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 const alpha = join('C:\\', 'work', 'alpha')
 const A1 = sessionSourceId(alpha, 'a1')
 const source: ConsoleSource = { id: A1, kind: 'session', label: 'alpha · B1', workspacePath: join('C:\\', 'work'), projectPath: alpha, agentId: 'a1', provider: 'claude-code', capturing: false, events: 0 }

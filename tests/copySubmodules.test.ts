@@ -15,6 +15,7 @@ import { COPIES_DIR, CopyPool, CopyStore } from '../src/main/copies'
 import { gitWorkspacePort } from '../src/main/platform/gitWorkspacePort'
 import { fileSlotConn, type OpHolder, type SlotRun, type SlotRunEnd } from '../src/main/slots'
 import { commit, gitRepo } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 void gitWorkspacePort
 const req = createRequire(import.meta.url)
@@ -36,7 +37,7 @@ const g = (cwd: string, ...args: string[]): string => execFileSync('git', ['-c',
 async function runner(r: SlotRun): Promise<SlotRunEnd> {
   const end: SlotRunEnd = { ok: true, exitCode: 0, logPath: null, settled: true }
   if (!r.files) return end
-  const x = r.files.tool.exec({ spawn, env: { ...RUN_ENV, ...r.env }, log: { write: () => undefined }, timeoutMs: 120_000 })
+  const x = r.files.tool.exec({ spawn, env: { ...RUN_ENV, ...r.env }, log: { write: () => undefined }, timeoutMs: timing('spawn.hang') })
   try {
     const o = await r.files.tool.prepare(x, r.files.step)
     return o.ok ? end : { ok: false, exitCode: 1, error: o.error, logPath: null, settled: true }
@@ -79,7 +80,7 @@ async function leased(pool: CopyPool, card: number, revision: string, keep = fal
   return r.copy.folder
 }
 
-describe("HI-3028: a copy reset from a submodule to ordinary files at its path", { timeout: 120_000 }, () => {
+describe("HI-3028: a copy reset from a submodule to ordinary files at its path", { timeout: timing('test.hang') }, () => {
   it("holds the revision cleanly: no .git of the old clone left, and git in the folder sees the copy's repository", async () => {
     const { pool, at1, at2 } = project()
     const first = await leased(pool, 1, at1)
@@ -103,7 +104,7 @@ describe("HI-3028: a copy reset from a submodule to ordinary files at its path",
   })
 })
 
-describe('HI-3080: a copy reset from ordinary files to a submodule at their path, an earlier run having left ignored files there', { timeout: 120_000 }, () => {
+describe('HI-3080: a copy reset from ordinary files to a submodule at their path, an earlier run having left ignored files there', { timeout: timing('test.hang') }, () => {
   /** A copy leased at the vendored revision, a run's ignored output left in libs/s (and `more` there too), returned. */
   async function leftOver(more?: (dir: string) => void): Promise<{ pool: CopyPool; at1: string; f: string }> {
     const { pool, at1, at2 } = project()

@@ -12,6 +12,7 @@ import { gitChangedLines, gitRevision, lineDiff, memoryRevision } from './e2e/af
 // @ts-expect-error: plain .mjs modules without types
 import { importGraph, narrowChange, narrowRelated, narrowRelatedInTree, resolveSpecifier, setupFilesOf, workerEntriesOf } from './e2e/relatedTests.mjs'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const runContext = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 const root = join(__dirname, '..')
@@ -560,5 +561,5 @@ describe('HI-2654 (git history): a WorkspaceService member, searched by its name
     expect(r.why.join('\n').length).toBeLessThan(3000)
     // It parses every code file the repository's tests reach (about 2,000: 17 s alone, more under a full run's load),
     // and censuses both trees' whole programs (about 45 s each).
-  }, 300_000)
+  }, timing('test.hangReal'))
 })

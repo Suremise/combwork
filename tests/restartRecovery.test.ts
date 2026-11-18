@@ -7,8 +7,9 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { dropLoggerListenersAfterEach, loggerListenerCounts } from './loggerListeners'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 
 type Live = { projectPath: string; agentId: string; agentName?: string; runId: string; status: string; sessionId: string; provider: string }
 const h = vi.hoisted(() => ({

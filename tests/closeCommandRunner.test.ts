@@ -11,6 +11,7 @@ import { tempDir } from './tempDir'
 import { runJob, TailRing, TAIL_BYTES, WRITE_MS, type RunnerDeps } from '../src/main/closeCommand/runner'
 import { carryRuns, planRun, pruneRuns, runFolderName, runPrefix, runsCloseCommands, startRun, tailLines, READ_TAIL_BYTES, PANEL_LINES, LINE_CHARS } from '../src/main/closeCommand/runs'
 import { fillCloseCommand } from '../src/shared/closeCommand'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-close-runner-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
@@ -121,7 +122,7 @@ describe('the runner, with a real command', () => {
     expect(statSync(join(dir, 'tail.txt')).size).toBe(TAIL_BYTES)
     expect(readFileSync(join(dir, 'tail.txt'), 'utf8').endsWith('last line\n')).toBe(true)
     expect(WRITE_MS).toBe(250)
-  }, 60_000)
+  }, timing('test.hang'))
 })
 
 describe('what Combwork reads of a run', () => {

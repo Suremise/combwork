@@ -31,6 +31,7 @@ import { TESTED_JJ } from '../src/shared/jjTool'
 import { jjExe } from './jjWorkspaceHarness'
 import { B1, R1, moved } from './workflow/harness'
 import { started, world, type World } from './jjCardsWorld'
+import { timing } from './timing.cjs'
 
 if (!jjExe) console.warn(`jjAdvanceRuntime.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
@@ -38,7 +39,7 @@ if (!jjExe) console.warn(`jjAdvanceRuntime.test.ts skipped: jj ${TESTED_JJ.versi
  * A hung test's bound (jjCandidateRuntime's, raised: two cards in some): each runs many real jj and git commands. A full
  * unit run on a loaded machine took one 61 s (HI-3349).
  */
-const REAL_JJ_MS = 200_000
+const REAL_JJ_MS = timing('wait.hangRealJj')
 
 class Crash extends Error {}
 

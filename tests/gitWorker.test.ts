@@ -13,9 +13,10 @@ import { git, readRefsOffMain, useGitWorker, type GitResult } from '../src/main/
 import { runGit } from '../src/main/gitWorker'
 import { readRepoRefs } from '../src/main/platform/repoRefs'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 // The longest a test here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 30_000
+const HUNG_MS = timing('wait.hang')
 
 // The run's allowlisted environment and test git config for every git child, as the suites' git has (never this
 // process's environment).
@@ -31,7 +32,7 @@ beforeAll(async () => {
   execFileSync('git', ['-C', repo, '-c', 'user.name=T', '-c', 'user.email=t@example.com', 'commit', '-q', '--allow-empty', '-m', 'first'], { windowsHide: true, env: gitEnv() })
   // A file of a megabyte, for output far over Node's pool (moved, not copied).
   writeFileSync(join(repo, 'big.txt'), 'x'.repeat(1024 * 1024))
-}, 60_000)
+}, timing('hook.hang'))
 afterAll(() => useGitWorker(null))
 
 /**
@@ -117,7 +118,7 @@ describe("git's worker (HI-1783)", () => {
   it('stops a command at its time limit and says so', async () => {
     useGitWorker(bundle)
     // hash-object --stdin with no input waits on its stdin, which is left open.
-    const r = await git(repo, ['hash-object', '--stdin'], undefined, undefined, { timeout: 300 })
+    const r = await git(repo, ['hash-object', '--stdin'], undefined, undefined, { timeout: 300 }) // timing-ok: the timeout under test (its expiry is what the test checks)
     expect(r).toMatchObject({ ok: false, timedOut: true })
   })
 
@@ -126,7 +127,7 @@ describe("git's worker (HI-1783)", () => {
     for (const route of [join(tmp, 'none.cjs'), bundle]) {
       useGitWorker(route)
       const h = holding(true)
-      const r = await git(repo, h.args, undefined, undefined, { env: gitEnv(), timeout: 5000 })
+      const r = await git(repo, h.args, undefined, undefined, { env: gitEnv(), timeout: 5000 }) // timing-ok: the timeout under test (its expiry is what the test checks)
       expect(r).toMatchObject({ ok: false, timedOut: true })
       // It had started (it writes its pid first): ended, not never begun.
       expect(h.started()).toBe(true)

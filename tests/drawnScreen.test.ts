@@ -1,5 +1,6 @@
 import { createRequire } from 'module'
 import { describe, expect, it } from 'vitest'
+import { timing } from './timing.cjs'
 
 // HI-3210: sendPrompt (tests/e2e/lib.cjs) reads a CLI's screen as drawn and presses Enter once the prompt shows there.
 const { renderScreen, drawnCount, inputOf } = createRequire(import.meta.url)('./e2e/drawnScreen.cjs') as {
@@ -95,7 +96,7 @@ describe("lib.cjs's sendPrompt (HI-3210)", () => {
     // No wait for a clear, only the count before the paste: the history's copy can never go (the bug waited out its
     // 10 s bound here, about 40 reads).
     expect(s.reads).toEqual([1])
-  }, 20000)
+  }, timing('test.hang'))
 
   it('a retry waits for its Ctrl+U to clear the text its last attempt left in the input, then pastes it again', async () => {
     const { s, inv } = cli('Codex', 1)
@@ -103,7 +104,7 @@ describe("lib.cjs's sendPrompt (HI-3210)", () => {
     expect(s.sent).toEqual([PROMPT])
     // The input emptied at once: read once to see it cleared, then the count before the paste.
     expect(s.reads).toEqual([1, 2])
-  }, 20000)
+  }, timing('test.hang'))
 
   it('a pasted prompt gets its Enter once it shows; a typed one into a CLI that draws nothing typed (the fake Codex) gets it with no wait', async () => {
     const pasted = cli('Codex')
@@ -113,5 +114,5 @@ describe("lib.cjs's sendPrompt (HI-3210)", () => {
     expect(typed.s.sent).toEqual([PROMPT])
     // One look at the screen after the pause (the old wait read it about 40 times over its 10 s bound here).
     expect(typed.s.readsBeforeEnter).toBe(1)
-  }, 20000)
+  }, timing('test.hang'))
 })

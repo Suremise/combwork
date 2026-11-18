@@ -10,6 +10,7 @@ import { checkoutOf, clearDistInfo, copySet, copyToMain, DIST_CLAIM, finishDist,
 // @ts-expect-error: a plain .mjs module without types
 import { packagedStatus } from './e2e/runner.mjs'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 type Info = { version: string; code: string; head: string; branch: string | null; builtAt: string }
 
@@ -137,14 +138,14 @@ console.log(copyToMain({ root: ${JSON.stringify(root)}, version: '9.9.9', info: 
       // The one that refused named the winner's code as what is there.
       expect(outs.find((o) => /built from other code/.test(o))).toContain(`other code: ${code}`)
     }
-  }, 60_000)
+  }, timing('test.hang'))
 
   it('a copy waits while another holds the main dist, then checks again what is there', async () => {
     rmSync(join(main, 'dist'), { recursive: true, force: true })
     build(more[0], info('held'))
     mkdirSync(join(main, 'dist', '.installer-copy.lock'), { recursive: true })
     const waiting = copyIn(more[0], 'held')
-    await new Promise((r) => setTimeout(r, 800))
+    await new Promise((r) => setTimeout(r, timing('quiet.unitMs')))
     // Still waiting: nothing copied while the lock is held.
     expect(existsSync(join(main, 'dist', 'Combwork-Setup-9.9.9.exe'))).toBe(false)
     // Meanwhile the holder copies another build; once it lets go, the waiting copy sees it and refuses.
@@ -153,7 +154,7 @@ console.log(copyToMain({ root: ${JSON.stringify(root)}, version: '9.9.9', info: 
     rmSync(join(main, 'dist', '.installer-copy.lock'), { recursive: true })
     expect(await waiting).toMatch(/built from other code: holder/)
     expect(consistent()).toBe('holder')
-  }, 30_000)
+  }, timing('test.hang'))
 
   it('a copy that fails part-way leaves no build-info.json describing a set it doesn’t match', () => {
     const to = join(main, 'dist')

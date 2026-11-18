@@ -19,6 +19,7 @@ import { estimateCost } from '../src/shared/prices'
 import type { AppSettings, ProviderId, SessionUsage } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { leftByAKill, refusedNow, whileMapped } from './mappedShm'
+import { timing } from './timing.cjs'
 
 const T0 = Date.parse('2026-10-12T10:00:00.000Z')
 const line = (i: number, output = 100): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'claude-opus-5-5', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: output } } }) + '\n'
@@ -26,7 +27,7 @@ const prompt = (i: number): string => JSON.stringify({ type: 'user', timestamp: 
 
 let id = 0
 // The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 
 /** Holds a file open the way an editor or a virus scanner can: no sharing, so it can't be read (as sessionInUse.test.ts does). */
 async function hold(file: string): Promise<ChildProcess> {

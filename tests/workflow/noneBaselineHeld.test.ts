@@ -7,9 +7,10 @@ import { B1, B2, moved, put, refusedBy, setup, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { isRefusal } from '../../src/main/workflow/runtime'
 import { baselineThread } from '../../src/main/noneBaseline'
+import { timing } from '../timing.cjs'
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30_000
+const HUNG_MS = timing('wait.hang')
 
 let env: Env | null = null
 afterEach(() => {
@@ -25,7 +26,7 @@ async function until(ok: () => boolean): Promise<void> {
   const end = Date.now() + HUNG_MS
   while (!ok()) {
     if (Date.now() > end) throw new Error('still not so after HUNG_MS')
-    await new Promise((r) => setTimeout(r, 5))
+    await new Promise((r) => setTimeout(r, timing('pace.tick')))
   }
 }
 

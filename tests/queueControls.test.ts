@@ -11,6 +11,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { RECENT_MAX, type QueueRecent, type QueueView } from '../src/shared/workflow/queue'
 import type { KeptReturn } from '../src/shared/progressQueue'
+import { timing } from './timing.cjs'
 
 const host = vi.hoisted(() => ({ kicked: [] as string[], changed: [] as string[], stamp: '' }))
 vi.mock('../src/main/workflow/queueHost', () => ({
@@ -45,7 +46,7 @@ const { config } = await import('../src/main/config')
 
 // A bound for a hung test (HI-3349): each makes real merges, and a full unit run on a loaded machine took one 10.2 s of
 // Vitest's 20 s default. Those that state their own keep it.
-vi.setConfig({ testTimeout: 60_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
@@ -767,7 +768,7 @@ describe('the queue on the card, in the Git tab and in the Merge dialog (#1357)'
 })
 
 describe("the window's merge queues and badges on a board shaped like a long-used one (#1629)", () => {
-  it('list the cards in flight as reading every card did, and each read takes under 50 ms', { timeout: 120_000 }, async () => {
+  it('list the cards in flight as reading every card did, and each read takes under 50 ms', { timeout: timing('test.hang') }, async () => {
     const { w, wt, repo } = await workspace()
     const store_ = FactStore.forBoard(w, { project: 'p', key: 'p' })
     // As the maintainer's board: 1,277 archived cards from before 1.0 and 140 live ones in Todo and Done.
@@ -824,7 +825,7 @@ describe("the window's merge queues and badges on a board shaped like a long-use
 })
 
 describe("a queue listing's cost doesn't grow with the queue's history (HI-3169)", () => {
-  it("reads the same cards' records with 50 or 450 merged cards behind it, and names the rows it lists", { timeout: 120_000 }, async () => {
+  it("reads the same cards' records with 50 or 450 merged cards behind it, and names the rows it lists", { timeout: timing('test.hang') }, async () => {
     const { w, wt, repo } = await workspace()
     const store_ = FactStore.forBoard(w, { project: 'p', key: 'p' })
     const queued = await approved(w, wt)
@@ -907,7 +908,7 @@ describe("a project's queue listings, worked out once per state (HI-1683)", () =
     expect(await list()).toBe(second)
     // ...another process's commit to the board (read before Combwork's poll tells it): one of the project's own
     // (HI-3291: a value of its workflow), not one of nobody's, which keeps the listing...
-    const other = new DatabaseSync(store.boardFile(ws), { timeout: 5000 })
+    const other = new DatabaseSync(store.boardFile(ws), { timeout: timing('db.busyMs') })
     try {
       other.prepare("INSERT INTO board_meta (key, value) VALUES ('hi1683-probe', '1')").run()
       expect(await list()).toBe(second)
@@ -954,7 +955,7 @@ describe("a project's queue listings, worked out once per state (HI-1683)", () =
     const second = await list()
     expect(second).not.toBe(first)
     expect(await list()).toBe(second)
-    const other = new DatabaseSync(store.boardFile(ws), { timeout: 5000 })
+    const other = new DatabaseSync(store.boardFile(ws), { timeout: timing('db.busyMs') })
     try {
       other.prepare("INSERT INTO card_labels (card, ord, label) VALUES (?, 1, 'two')").run(card)
     } finally {
@@ -968,7 +969,7 @@ describe("a project's queue listings, worked out once per state (HI-1683)", () =
 
   // 24 writes, each with a listing kept and one made fresh, after real merges: 6 s alone, and a full unit run on a loaded
   // machine took it past the 20 s default (HI-3349). Its own bound, for a hung run.
-  it('HI-3296: each quiet write, to a merged, a returned and a queued card waiting on a blocker, keeps the listing, and what is kept equals a listing made fresh', { timeout: 60_000 }, async () => {
+  it('HI-3296: each quiet write, to a merged, a returned and a queued card waiting on a blocker, keeps the listing, and what is kept equals a listing made fresh', { timeout: timing('test.hang') }, async () => {
     const { tellListeners } = await import('../src/main/events')
     const { CW_RUNS } = await import('../src/main/progress')
     const { w, wt, repo, ws } = await workspace()

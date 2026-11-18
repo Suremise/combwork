@@ -26,6 +26,7 @@ import { admitted } from './admitted'
 import { harness } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
 import { B1, moved } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 export const closers: (() => void)[] = []
 afterEach(() => {
@@ -82,7 +83,7 @@ export async function world(colocated: boolean, o: { hook?: (point: JjIntegratio
   const bundles = new Map<string, JjBundle[]>()
   const gitOn = (gitDir: string, args: readonly string[]) => {
     try {
-      const buf = execFileSync('git', ['--git-dir', gitDir, ...args], { env: h.env, windowsHide: true, timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
+      const buf = execFileSync('git', ['--git-dir', gitDir, ...args], { env: h.env, windowsHide: true, timeout: timing('spawn.hang'), stdio: ['ignore', 'pipe', 'pipe'] })
       return Promise.resolve({ ok: true, out: buf.toString('utf8'), err: '', buf, code: 0 })
     } catch (e) {
       const x = e as { stdout?: Buffer; stderr?: Buffer; status?: number }

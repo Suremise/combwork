@@ -6,6 +6,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const { syncCalls } = vi.hoisted(() => ({ syncCalls: [] as string[] }))
 vi.mock('node:child_process', async (importOriginal) => {
@@ -34,7 +35,7 @@ describe.skipIf(process.platform !== 'win32')("a jj process's tree ended off the
       writeFileSync(fake, `const { spawn } = require('child_process'); const c = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' }); require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(c.pid)); setInterval(() => {}, 1000)\n`)
       const ac = new AbortController()
       const run = runJj({ exe: process.execPath, args: [fake], cwd: dir, env: { SYSTEMROOT: process.env.SYSTEMROOT, PATH: '' }, maxOutput: 1e6, timeout: how === 'timedOut' ? 1500 : 60_000 }, ac.signal)
-      await vi.waitFor(() => expect(existsSync(pidFile) && readFileSync(pidFile, 'utf8').length > 0).toBe(true), { timeout: 20_000, interval: 50 })
+      await vi.waitFor(() => expect(existsSync(pidFile) && readFileSync(pidFile, 'utf8').length > 0).toBe(true), { timeout: timing('wait.hang'), interval: 50 })
       const child = Number(readFileSync(pidFile, 'utf8'))
       expect(alive(child)).toBe(true)
       // The thread's ticks while the tree is ended: a teardown on it would show as no tick until it was over.
@@ -49,6 +50,6 @@ describe.skipIf(process.platform !== 'win32')("a jj process's tree ended off the
       expect(ticks).toBeGreaterThan(5)
       // The ordering kept: by the outcome, jj's own child has gone too.
       expect(alive(child)).toBe(false)
-    }, 60_000)
+    }, timing('test.hang'))
   }
 })

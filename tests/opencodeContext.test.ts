@@ -7,6 +7,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const require = createRequire(import.meta.url)
 const { childEnv } = require('./e2e/runContext.cjs') as { childEnv: (vars?: Record<string, string>) => Record<string, string> }
@@ -75,7 +76,7 @@ describe('the OpenCode state view in its session (HI-2771)', () => {
     // None there: removed is still what it is.
     expect(await deliverContext(l.runId, l.sid, null, signal())).toBe('removed')
     l.stop()
-  }, 60000)
+  }, timing('test.hang'))
 
   it('a view over the limit (its body\'s UTF-8 bytes) is never sent, nor trimmed: Combwork\'s entry is removed instead', async () => {
     const l = await launch()
@@ -84,7 +85,7 @@ describe('the OpenCode state view in its session (HI-2771)', () => {
     expect(await l.entries()).toEqual([])
     expect(l.logged().filter((e) => e.method === 'PUT').map((e) => e.status)).toEqual([204])
     l.stop()
-  }, 60000)
+  }, timing('test.hang'))
 
   it('only for its own run and session, on a loopback server named by the launch\'s own record; refused or cut off, never a success', async () => {
     const l = await launch()
@@ -112,7 +113,7 @@ describe('the OpenCode state view in its session (HI-2771)', () => {
     cut.abort()
     expect(await out).toBe('uncertain')
     hung.stop()
-  }, 90000)
+  }, timing('test.hang'))
 
   it("its trigger: the launch's baseline snapshot (a compaction's end comes as its tracker's compactEnd hooks)", () => {
     expect(contextTrigger({ hook_event_name: 'OpencodeSnapshot', snapshot: {} })).toEqual({ source: 'start' })
@@ -141,7 +142,7 @@ describe('the OpenCode state view in its session (HI-2771)', () => {
       contextIo.readRecord = read
     }
     l.stop()
-  }, 60000)
+  }, timing('test.hang'))
 
   it('the fake answers as 2.2.6 did (the recording)', async () => {
     const l = await launch()
@@ -155,5 +156,5 @@ describe('the OpenCode state view in its session (HI-2771)', () => {
       if (c.body !== undefined) expect(r.body, k).toEqual(c.body)
     }
     l.stop()
-  }, 60000)
+  }, timing('test.hang'))
 })

@@ -1,13 +1,14 @@
 // The headless screen Combwork keeps of each session's terminal (TerminalScreen, #1572): whatever a CLI prints, at whatever
 // size, never stops it, and never throws where nothing can catch it (xterm parses in its own timer).
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { timing } from './timing.cjs'
 
 const { warnings } = vi.hoisted(() => ({ warnings: [] as string[] }))
 vi.mock('../src/main/logger', () => ({ createLogger: () => ({ info: () => undefined, warn: (m: string) => void warnings.push(m), debug: () => undefined }), userText: (s: string) => s }))
 const { TerminalScreen } = await import('../src/main/terminalScreen')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 type Screen = InstanceType<typeof TerminalScreen>
 const screens: Screen[] = []

@@ -56,7 +56,7 @@ describe('WinGet’s version of a package', () => {
       return reply
     }
     expect(await wingetVersion('GitHub.Copilot', run)).toBe('1.0.106')
-    expect(calls).toEqual([{ file: 'winget.exe', args: wingetShowArgs('GitHub.Copilot'), timeoutMs: 30_000 }])
+    expect(calls).toEqual([{ file: 'winget.exe', args: wingetShowArgs('GitHub.Copilot'), timeoutMs: 30_000 }]) // timing-ok: data, not a wait
     expect(calls[0].args).toEqual(expect.arrayContaining(['show', '--exact', '--source', 'winget', '--disable-interactivity']))
     expect(calls[0].args).not.toContain('upgrade')
     reply = { stdout: '', stderr: '', code: -1978335212 }

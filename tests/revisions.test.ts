@@ -8,6 +8,7 @@ import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-revisions-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -103,7 +104,7 @@ describe('status polls', () => {
     expect(none(await measure('large, 10 concurrent', large, 3, 10))).toEqual({ files: 0, bytes: 0, metaBytes: 0 })
     await disposeWorkspaceService(small)
     await disposeWorkspaceService(large)
-  }, 120_000)
+  }, timing('test.hang'))
 
   it("listing a workspace's skills (as the skill API does before reading one) reads only their headers", async () => {
     const ws = join(base, 'headers')
@@ -127,7 +128,7 @@ describe('status polls', () => {
   // about 8,000 file system calls through Node's four I/O threads. Measured: 1 s alone, 2 to 5 s under a full unit run
   // beside other runs, over 20 s under heavier load. So it is bounded by FS_HUNG_MS rather than the suite's 20 s: only a
   // hung read takes a minute.
-  const FS_HUNG_MS = 60_000
+  const FS_HUNG_MS = timing('wait.hang')
   it('ten polls at once on a cold workspace read what one poll does', { timeout: FS_HUNG_MS }, async () => {
     // Combwork's shipped skills have one inventory for the whole process (revisions.ts), hashed by its first poll, whichever
     // test makes it: polled here first, so the polls compared below read only their own workspaces' skills.
@@ -235,7 +236,7 @@ describe('sharing a scan', () => {
     expect(runs).toBe(1)
     gates.shift()!()
     expect(await a).toBe(1)
-    await new Promise((r) => setTimeout(r, 0))
+    await new Promise((r) => setTimeout(r, timing('pace.tick')))
     expect(runs).toBe(2)
     gates.shift()!()
     expect([await b, await c]).toEqual([2, 2])

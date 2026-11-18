@@ -6,6 +6,7 @@ import { build } from 'esbuild'
 import { afterAll, beforeAll } from 'vitest'
 import { useGuardsWorker } from '../src/main/workflow/mergeGuardsRun'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 /** Builds the worker before the file's tests and gives it back after; its bundle's path. */
 export function withGuardsWorker(): { bundle: string } {
@@ -13,7 +14,7 @@ export function withGuardsWorker(): { bundle: string } {
   beforeAll(async () => {
     await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'workflow', 'mergeGuardsWorker.ts')], outfile: out.bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
     useGuardsWorker(out.bundle)
-  }, 60_000)
+  }, timing('hook.hang'))
   afterAll(() => useGuardsWorker(null))
   return out
 }

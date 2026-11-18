@@ -7,8 +7,9 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { DEFAULT_JOURNAL } from '../src/shared/journal'
+import { timing } from './timing.cjs'
 // The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 
 const base = tempDir('cw-journal-service-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -22,7 +23,7 @@ const deliveries = await import('../src/main/deliveries')
 const { workflowFor } = await import('../src/main/workflow/service')
 const { runFinish } = await import('../src/main/finishPath')
 
-vi.setConfig({ testTimeout: 30_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 type WS = ReturnType<typeof createWorkspaceService>
 const user = { kind: 'user' } as const
 

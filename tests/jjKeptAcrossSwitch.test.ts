@@ -19,6 +19,7 @@ import { boardPrepStore, jjLineKey } from '../src/main/platform/jjSlotPrep'
 import { admitted } from './admitted'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 if (!jjExe) console.warn('jjKeptAcrossSwitch skipped: jj is not fetched')
 
@@ -78,7 +79,7 @@ async function keptThenGit(o: { inFlight?: PoolDeps['inFlight'] } = {}) {
   return { pool, store, row, R, h, repo }
 }
 
-describe.skipIf(!jjExe)('HI-3069: a kept jj slot under a project switched back to Git', { timeout: 180_000 }, () => {
+describe.skipIf(!jjExe)('HI-3069: a kept jj slot under a project switched back to Git', { timeout: timing('test.hangReal') }, () => {
   it('its card is refused naming switch-back while its folder is there, and Remove… once its folder is gone; then it starts afresh', async () => {
     const { pool, store, row, R, h, repo } = await keptThenGit()
     expect(pool.keptAcross(1)).toEqual({ slot: row.name, platform: 'jj', now: 'git', gone: false })

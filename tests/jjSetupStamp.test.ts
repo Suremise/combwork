@@ -9,6 +9,7 @@ import { tempDir } from './tempDir'
 import { knownStamp, setupStampOf } from '../src/main/jjSetupStamp'
 import { runCandidateChecks, type CandidateChecksDeps, type CandidateChecksInput } from '../src/main/workflow/jjCandidateChecks'
 import type { JjCandidateFingerprint } from '../src/main/platform/jjCandidateStep'
+import { timing } from './timing.cjs'
 
 /** A project folder with its project.json. */
 function project(cfg: Record<string, unknown>): string {
@@ -95,7 +96,7 @@ describe('HI-3122: the setup stamp a jj candidate’s checks depend on', () => {
     save(p, { worktreeSetup: 'npm ci', agents: [{ id: 'b1', lastSessionId: 'new-conversation' }] })
     // Several of the runner's polls go by after the save (every 10 ms here): none ends it.
     const at = r.polls()
-    await expect.poll(() => r.polls(), { timeout: 10_000 }).toBeGreaterThan(at + 3)
+    await expect.poll(() => r.polls(), { timeout: timing('wait.hang') }).toBeGreaterThan(at + 3)
     expect(r.log).toEqual([])
     r.release()
     expect(await r.out).toEqual({ green: true, checks: ['typecheck'] })

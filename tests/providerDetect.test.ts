@@ -6,6 +6,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import type { AgentInstallInfo, ProviderId } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-provider-detect-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -40,7 +41,7 @@ describe('detection before Automatic decides (#506)', () => {
     const waiting = providerService.detected().then((ok) => (settled = ok))
     hear('codex', true)
     hear('claude-code', true)
-    await new Promise((r) => setTimeout(r, 20))
+    await new Promise((r) => setTimeout(r, timing('pace.shortMs')))
     // Copilot hasn't answered.
     expect(settled).toBeNull()
     hear('copilot', false)

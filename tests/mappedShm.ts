@@ -7,9 +7,10 @@ import { join } from 'path'
 import { expect, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { powershellEnv } from './powershellEnv'
+import { timing } from './timing.cjs'
 
 // The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 let n = 0
 
 /** Leaves `file` as a process that ended without closing it leaves it: written to, its -wal and -shm there. */

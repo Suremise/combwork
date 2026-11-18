@@ -29,6 +29,7 @@ import { APPLY_OPTIONS } from '../src/shared/workflow/workView'
 import { jjExe } from './jjWorkspaceHarness'
 import { B1, R1, moved } from './workflow/harness'
 import { opts, started, world, type World } from './jjCardsWorld'
+import { timing } from './timing.cjs'
 
 if (!jjExe) console.warn(`jjCandidateRuntime.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
@@ -79,7 +80,7 @@ function reapply(w: World, card: { id: number }, o: Partial<WorkflowOptions>): v
  * A hung test's bound, as jjCandidatesReal's (HI-2921): each runs many real jj and git commands, slow on a busy machine.
  * Alone the slowest took 36 s, and a full unit run on a loaded machine took one past 60 s (HI-3349).
  */
-const REAL_JJ_MS = 180_000
+const REAL_JJ_MS = timing('wait.hangReal')
 
 describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_JJ.version}), HI-2871`, { timeout: REAL_JJ_MS }, () => {
   describe.each([true, false] as const)('colocated: %s', (colocated) => {
@@ -723,7 +724,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
 
   // HI-2992 (found by HI-2967): a candidate's build interrupted, then more operations than recovery's old walk read.
   describe.each([true, false] as const)('an interrupted attempt recovered however far the operation log moved on (HI-2992), colocated: %s', (colocated) => {
-    it('a crash after its pins, then 205 operations: the next run recovers and drops it, and offers a new candidate', { timeout: 170_000 }, async () => {
+    it('a crash after its pins, then 205 operations: the next run recovers and drops it, and offers a new candidate', { timeout: timing('test.hangReal') }, async () => {
       const w = await world(colocated, { candidates: true, oneSlot: true })
       w.deps.candidateHook = async (point) => {
         if (point === 'pinned') throw new Error('crash')

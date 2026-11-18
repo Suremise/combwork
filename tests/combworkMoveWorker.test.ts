@@ -7,6 +7,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
 import { cardsTestHooks, rewriteCards } from '../src/main/combworkMoveWorker'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const WS = 'D:\\ws'
 // old-name: begin combworkMoveWorker-inputs
@@ -50,7 +51,7 @@ afterEach(() => {
 describe("the move's card rewrite and a user's edits", () => {
   it('an edit committed just before a batch is kept, its paths rewritten', () => {
     const file = board()
-    const user = new DatabaseSync(file, { timeout: 5000 })
+    const user = new DatabaseSync(file, { timeout: timing('db.busyMs') })
     let edited = 0
     cardsTestHooks.beforeBatch = () => {
       if (edited++) return
@@ -66,7 +67,7 @@ describe("the move's card rewrite and a user's edits", () => {
 
   it('an edit tried while a batch holds the write waits for it, then lands as written', () => {
     const file = board()
-    const user = new DatabaseSync(file, { timeout: 0 })
+    const user = new DatabaseSync(file, { timeout: 0 }) // timing-ok: no busy wait: a lock refused at once is what the test checks
     const refused: string[] = []
     cardsTestHooks.inBatch = () => {
       for (const sql of ["UPDATE cards SET description = 'mid-batch' WHERE number = 1", "UPDATE card_comments SET text = 'mid-batch' WHERE card = 1", "UPDATE card_context SET ref = 'mid-batch' WHERE card = 1"]) {

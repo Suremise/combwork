@@ -19,6 +19,7 @@ import { trustTargets } from '../src/main/accounts'
 import { memoryBase } from '../src/main/providers/claude/memoryDir'
 import { excludeCopies } from '../src/main/providers/common'
 import { commit, gitRepo, sh } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 const FIXTURE = join(__dirname, 'fixtures', 'contextTraces.json')
 const RECORD = process.env.CW_RECORD_CONTEXT_TRACES === '1'
@@ -55,7 +56,7 @@ function same(step: string, trace: string[]): void {
   else expect(trace, step).toEqual(expected()[step])
 }
 
-describe('copies and context reads through the ports (HI-2789)', { timeout: 90_000 }, () => {
+describe('copies and context reads through the ports (HI-2789)', { timeout: timing('test.hang') }, () => {
   it('a check copy made, returned, reset at another revision and removed', async () => {
     const base = tempDir('context-traces-')
     const ws = join(base, 'ws')

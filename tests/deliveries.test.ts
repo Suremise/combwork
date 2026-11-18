@@ -12,9 +12,10 @@ import type { TaskCard } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { putStoreDocs } from './storeDocs'
+import { timing } from './timing.cjs'
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 const at = '2026-10-12T03:00:00.000Z'
 const rec = (over: Partial<DeliveryRecord> = {}): DeliveryRecord => ({ id: 'm1', seq: 1, agentId: 'b1', conversation: null, kind: 'rebrief', from: { kind: 'assistant', name: 'the Assistant', workspace: 'C:/ws', launch: 'a1' }, body: 'Rebase first.', state: 'queued', created: at, expires: '2026-10-13T03:00:00.000Z', ...over })
@@ -442,7 +443,7 @@ describe('the delivery service (#647)', async () => {
       let settled = false
       const given = task(`Card task ${fail ? 'after a failed pull' : 'after a switch'}`).finally(() => (settled = true))
       // Held, not cancelled: it waits, untyped, while git runs.
-      await vi.waitFor(async () => expect((await states()).at(-1)).toMatch(/ queued$/), { timeout: 15_000 })
+      await vi.waitFor(async () => expect((await states()).at(-1)).toMatch(/ queued$/), { timeout: timing('wait.hang') })
       await new Promise<void>((r) => setImmediate(r))
       expect(settled).toBe(false)
       expect(st.typed.length).toBe(typedBefore + (fail ? 1 : 0))
@@ -965,7 +966,7 @@ describe('the delivery service (#647)', async () => {
     expect(await states()).toEqual([`${m.id} offered`])
     st.status = 'working'
     await deliveries.readInbox(alpha, 'b1')
-    await vi.waitFor(() => expect(taken).toHaveBeenCalledWith(alpha, 'b1', 'r1', m.id, `${m.id}, which it rang for, was read`), { timeout: 5000 })
+    await vi.waitFor(() => expect(taken).toHaveBeenCalledWith(alpha, 'b1', 'r1', m.id, `${m.id}, which it rang for, was read`), { timeout: timing('wait.hang') })
     // Two lines in the launch, each offering its own delivery, read together later: each read names its own delivery, so
     // only the line that rang for it is cleared (round 1 finding: never another line's mark).
     taken.mockClear()
@@ -978,7 +979,7 @@ describe('the delivery service (#647)', async () => {
     expect(await states()).toEqual(expect.arrayContaining([`${a.id} offered`, `${b.id} offered`]))
     st.status = 'working'
     await deliveries.readInbox(alpha, 'b1')
-    await vi.waitFor(() => expect(taken).toHaveBeenCalledTimes(2), { timeout: 5000 })
+    await vi.waitFor(() => expect(taken).toHaveBeenCalledTimes(2), { timeout: timing('wait.hang') })
     expect(taken.mock.calls.map((c) => c[3]).sort()).toEqual([a.id, b.id].sort())
     // Read without having been offered (queued): no line rang for it, nothing to clear.
     taken.mockClear()

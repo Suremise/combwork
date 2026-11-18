@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { join } from 'path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const hooks: { beforeWrite: null | { match: RegExp; run: () => void }; deny: RegExp | null; writes: 'short' | 'none' | null; writeCalls: number } = { beforeWrite: null, deny: null, writes: null, writeCalls: 0 }
 vi.mock('fs/promises', async (original) => {
@@ -131,7 +132,7 @@ describe('Codex: a source changing while it is copied', () => {
       expect(readFileSync(join(copy, 'SKILL.md'), 'utf8')).toContain('v1')
       expect(out.ok).toEqual({ revision: await contentHash(ok) })
       expect(readdirSync(join(cwd, '.agents', 'skills')).filter((f) => f.startsWith('.'))).toEqual([])
-    }, 60_000)
+    }, timing('test.hang'))
   }
 
   it('grown past the limits with no copy before: none, and why; nothing half-copied', async () => {
@@ -180,7 +181,7 @@ describe('Claude Code: a source changing while it is copied', () => {
       const skills = join(project, '.combwork', 'launch-a1', 'plugin', 'skills')
       expect(existsSync(join(skills, 'bad'))).toBe(false)
       expect(out.ok).toEqual({ revision: await contentHash(join(skills, 'ok')) })
-    }, 60_000)
+    }, timing('test.hang'))
   }
 
   it('changed but still valid: delivered as copied', async () => {

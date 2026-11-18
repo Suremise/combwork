@@ -6,6 +6,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const gate = vi.hoisted(() => ({ hold: null as Promise<void> | null, opened: [] as string[] }))
 vi.mock('fs/promises', async (original) => {
@@ -69,7 +70,7 @@ function hold(): () => void {
     release()
   }
 }
-const settle = (): Promise<void> => new Promise((r) => setTimeout(r, 50))
+const settle = (): Promise<void> => new Promise((r) => setTimeout(r, timing('quiet.briefMs')))
 const reads = (dir: string): number => gate.opened.filter((p) => p.startsWith(dir)).length
 
 beforeEach(() => {

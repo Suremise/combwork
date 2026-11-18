@@ -12,6 +12,7 @@ import { tempDir } from './tempDir'
 import { readCardIn, writeCardOutside } from './boardDb'
 import { storeDocs } from './storeDocs'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-projectids-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -22,9 +23,9 @@ const lanes = await import('../src/main/lanes')
 const { movePlan, repairMove } = await import('../src/main/workspaceMove')
 const { atomicTestHooks } = await import('../src/main/fsutil')
 
-vi.setConfig({ testTimeout: 30_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 /** Bounds a wait for Combwork's folder watcher: only a hung watcher takes this long. */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 
 const user = { kind: 'user' } as const
 const readCard = (ws: string, n: number): Record<string, unknown> => readCardIn(ws, n)

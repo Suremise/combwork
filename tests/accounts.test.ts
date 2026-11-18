@@ -11,6 +11,7 @@ import type { Account } from '../src/shared/types'
 import { COPIES_REVIEW } from '../src/shared/advanced'
 import type { TrustTarget } from '../src/main/providers/types'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 /**
  * The terminals (HI-1870): which are open, by key, and what closing one does. `endsOnKill` (the default) ends it as a
@@ -48,7 +49,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const { claudeAccountStatus, parseClaudeAuthStatus } = await import('../src/main/providers/claude/adapter')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 const FIX = join(__dirname, 'fixtures', 'advanced', 'auth-status-claude-2.1.310.jsonl')
 const FIELDS = { loggedIn: 'loggedIn', email: 'email', orgId: 'orgId', plan: 'subscriptionType' }
 
@@ -202,7 +203,7 @@ describe('removing an account', () => {
     expect(mine()).toEqual([`first ${a.id}`, `first undone ${a.id}`])
     // The late one answers: it is taken back at once, as the removal it answered for was refused.
     answer()
-    for (let i = 0; i < 200 && !mine().includes(`second undone ${a.id}`); i++) await new Promise((r) => setTimeout(r, 5))
+    for (let i = 0; i < 200 && !mine().includes(`second undone ${a.id}`); i++) await new Promise((r) => setTimeout(r, timing('wait.interval')))
     expect(mine()).toEqual([`first ${a.id}`, `first undone ${a.id}`, `second ${a.id}`, `second undone ${a.id}`])
   })
 

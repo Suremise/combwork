@@ -8,6 +8,7 @@ import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { leftoversSummary, processLabel } from '../src/shared/agentProcesses'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 // What the test started that is still running: stopped by its command line (it names the test's folder) and start,
 // never by a pid remembered from earlier, which Windows may have given another process since: under load that could
 // be a concurrent run's Vitest worker (#547: a likely cause of one exiting with code 1, not reproduced).
@@ -102,7 +103,7 @@ async function until(fn: () => boolean, ms: number): Promise<boolean> {
   const end = Date.now() + ms
   while (Date.now() < end) {
     if (fn()) return true
-    await new Promise((r) => setTimeout(r, 100))
+    await new Promise((r) => setTimeout(r, timing('wait.interval')))
   }
   return fn()
 }
@@ -156,7 +157,7 @@ else {
     expect(await trackLaunch({ runId, projectPath: dir, agentId, agentName: 'Website' }, cli.pid!)).toEqual({ tracked: true })
     cli.stdin!.write('go\n')
     await new Promise((r) => cli.once('exit', r))
-    expect(await until(() => Object.keys(pidsIn(out)).length === 2, 10000)).toBe(true)
+    expect(await until(() => Object.keys(pidsIn(out)).length === 2, timing('wait.hang'))).toBe(true)
     return cli
   }
 
@@ -172,7 +173,7 @@ else {
     const other = join(dir, 'other.txt')
     const strangerProc = spawn(process.execPath, [script, 'stranger', other], { detached: true, stdio: 'ignore', windowsHide: true })
     strangerProc.unref()
-    expect(await until(() => !!pidsIn(other).stranger, 10000)).toBe(true)
+    expect(await until(() => !!pidsIn(other).stranger, timing('wait.hang'))).toBe(true)
     const stranger = pidsIn(other).stranger
 
     const out = join(dir, 'run1.txt')
@@ -185,7 +186,7 @@ else {
     expect(events.at(-1)).toMatchObject({ type: 'agent-leftovers', leftovers: { agentId: 'a1', agentName: 'Website' } })
 
     expect(await settleLeftovers(dir, 'a1', 'end')).toBe(2)
-    expect(await until(() => !alive(child) && !alive(grandchild), 5000)).toBe(true)
+    expect(await until(() => !alive(child) && !alive(grandchild), timing('wait.hang'))).toBe(true)
     expect(alive(stranger)).toBe(true)
     expect(leftoversOf(dir, 'a1').processes).toHaveLength(0)
     expect(events.at(-1)).toMatchObject({ type: 'agent-leftovers', leftovers: { agentId: 'a1', processes: [] } })
@@ -193,7 +194,7 @@ else {
     expect(await settleLeftovers(dir, 'a2', 'end')).toBe(0)
     expect(await settleLeftovers(dir, 'a1', 'end')).toBe(0)
     await endHeld(strangerProc)
-  }, 60000)
+  }, timing('test.hang'))
 
   it("says each running launch's process's parent state (HI-2111): the exited CLI's child is an orphan, the child's own child isn't", async () => {
     const { launchLineage, launchEnded, settleLeftovers } = await import('../src/main/agentProcesses')
@@ -217,7 +218,7 @@ else {
     // A CLI that keeps running: no "go" needed, it writes its pid and sleeps.
     const cli = spawn(process.execPath, [script, 'holder', out], { stdio: 'ignore', windowsHide: true })
     expect(await trackLaunch({ runId: 'mem1', projectPath: dir, agentId: 'm1', agentName: 'Busy' }, cli.pid!)).toEqual({ tracked: true })
-    expect(await until(() => !!pidsIn(out).holder, 10000)).toBe(true)
+    expect(await until(() => !!pidsIn(out).holder, timing('wait.hang'))).toBe(true)
     const m = await agentsMemory()
     expect(m?.agents).toBe(1)
     // A Node process's own private memory is several MB at least, far below a GB.
@@ -226,7 +227,7 @@ else {
     await endHeld(cli)
     await launchEnded('mem1')
     expect(await agentsMemory()).toBeNull()
-  }, 60000)
+  }, timing('test.hang'))
 
   it("Combwork quitting keeps a run as ended for its slot writer only once its job is seen empty, never while what its CLI started still runs (HI-1886)", async () => {
     const { endedEarlier, launchEnded, recordEndedLaunches, runningProcesses, runTookWriter, trackLaunch } = await import('../src/main/agentProcesses')
@@ -239,12 +240,12 @@ else {
     expect(await trackLaunch({ runId: 'quit1', projectPath: dir, agentId: 'q1', agentName: 'Quitter' }, cli.pid!)).toEqual({ tracked: true })
     cli.stdin!.write('go\n')
     await new Promise((r) => cli.once('exit', r))
-    expect(await until(() => Object.keys(pidsIn(out)).length === 2, 10000)).toBe(true)
+    expect(await until(() => Object.keys(pidsIn(out)).length === 2, timing('wait.hang'))).toBe(true)
     // A CLI that ended with nothing left: its job empty.
     const holderOut = join(dir, 'quit2.txt')
     const holder = spawn(process.execPath, [script, 'holder', holderOut], { stdio: 'ignore', windowsHide: true })
     expect(await trackLaunch({ runId: 'quit2', projectPath: dir, agentId: 'q2', agentName: 'Done' }, holder.pid!)).toEqual({ tracked: true })
-    expect(await until(() => !!pidsIn(holderOut).holder, 10000)).toBe(true)
+    expect(await until(() => !!pidsIn(holderOut).holder, timing('wait.hang'))).toBe(true)
     await endHeld(holder)
     const left = (await runningProcesses()).find((l) => l.runId === 'quit1')?.processes ?? []
     expect(left.map((p) => p.pid).sort()).toEqual(Object.values(pidsIn(out)).sort())
@@ -252,10 +253,10 @@ else {
     expect(await endedEarlier('quit2')).toBe(true)
     expect(await endedEarlier('quit1')).toBe(false)
     endListed(left)
-    expect(await until(() => Object.values(pidsIn(out)).every((pid) => !alive(pid)), 10000)).toBe(true)
+    expect(await until(() => Object.values(pidsIn(out)).every((pid) => !alive(pid)), timing('wait.hang'))).toBe(true)
     await launchEnded('quit1')
     await launchEnded('quit2')
-  }, 60000)
+  }, timing('test.hang'))
 
   it('tells when a process joins a running launch (#1134), once until its processes are listed again', async () => {
     const { launchEnded, onLaunchProcessJoined, runningProcesses, settleLeftovers, trackLaunch } = await import('../src/main/agentProcesses')
@@ -277,16 +278,16 @@ else {
       expect(await trackLaunch({ runId: 'joins1', projectPath: dir, agentId: 'j1', agentName: 'Busy' }, cli.pid!)).toEqual({ tracked: true })
       // The CLI joining its job as the launch starts is told, and so is a process it starts later, each found by the
       // listing its notice leads to: nothing here lists on a timer.
-      expect(await until(() => seen.has(cli.pid!), 10000)).toBe(true)
+      expect(await until(() => seen.has(cli.pid!), timing('wait.hang'))).toBe(true)
       cli.stdin!.write('1\n')
-      expect(await until(() => !!pidsIn(out).leaf0 && seen.has(pidsIn(out).leaf0), 10000)).toBe(true)
+      expect(await until(() => !!pidsIn(out).leaf0 && seen.has(pidsIn(out).leaf0), timing('wait.hang'))).toBe(true)
       // With no listing, told at most once however many processes start (other processes joining included: a console
       // host taken in, #543).
       relist = false
       await listing
       const told = joined
       cli.stdin!.write('20\n')
-      expect(await until(() => Object.keys(pidsIn(out)).length === 21, 20000)).toBe(true)
+      expect(await until(() => Object.keys(pidsIn(out)).length === 21, timing('wait.hang'))).toBe(true)
       expect(joined - told).toBeLessThanOrEqual(1)
       const all = (await runningProcesses()).flatMap((l) => l.processes).map((p) => p.pid)
       expect(Object.values(pidsIn(out)).every((pid) => all.includes(pid))).toBe(true)
@@ -296,7 +297,7 @@ else {
       await launchEnded('joins1')
       await settleLeftovers(dir, 'j1', 'end')
     }
-  }, 60000)
+  }, timing('test.hang'))
 
   it('keeps them running when asked, and stops listing them', async () => {
     const { launchEnded, leftoversOf, settleLeftovers } = await import('../src/main/agentProcesses')
@@ -309,7 +310,7 @@ else {
     expect(leftoversOf(dir, 'a1').processes).toHaveLength(0)
     expect(alive(child) && alive(grandchild)).toBe(true)
     expect(endListed(listed)).toBe(2)
-  }, 60000)
+  }, timing('test.hang'))
 
   it("keeps listing what it couldn't end, says so, and ends it when tried again", async () => {
     const { launchEnded, leftoversOf, settleLeftovers } = await import('../src/main/agentProcesses')
@@ -327,16 +328,16 @@ else {
     expect(events.at(-1)).toMatchObject({ type: 'agent-leftovers', leftovers: { agentId: 'a1', processes: [{}, {}] } })
     expect(alive(child) && alive(grandchild)).toBe(true)
     expect(await settleLeftovers(dir, 'a1', 'end')).toBe(2)
-    expect(await until(() => !alive(child) && !alive(grandchild), 5000)).toBe(true)
+    expect(await until(() => !alive(child) && !alive(grandchild), timing('wait.hang'))).toBe(true)
     expect(leftoversOf(dir, 'a1').processes).toHaveLength(0)
-  }, 60000)
+  }, timing('test.hang'))
 
   it('adopts what escaped the job (#543): a child outside every job whose parent is in it, and its own child, listed and ended', async () => {
     const { launchEnded, leftoversOf, settleLeftovers, trackLaunch } = await import('../src/main/agentProcesses')
     const out = join(dir, 'run5.txt')
     const cli = spawn(process.execPath, [script, 'escaper', out], { stdio: ['pipe', 'ignore', 'ignore'], windowsHide: true })
     // Both started before the CLI joins its job: neither is in it.
-    expect(await until(() => Object.keys(pidsIn(out)).length === 2, 10000)).toBe(true)
+    expect(await until(() => Object.keys(pidsIn(out)).length === 2, timing('wait.hang'))).toBe(true)
     const { child, grandchild } = pidsIn(out)
     expect(await trackLaunch({ runId: 'run5', projectPath: dir, agentId: 'a5', agentName: 'Escaper' }, cli.pid!)).toEqual({ tracked: true })
     // The CLI exits at once: they are adopted as it ends (its id held meanwhile), not left to a later look.
@@ -345,9 +346,9 @@ else {
     const left = await launchEnded('run5')
     expect(left?.processes.map((p) => p.pid).sort()).toEqual([child, grandchild].sort())
     expect(await settleLeftovers(dir, 'a5', 'end')).toBe(2)
-    expect(await until(() => !alive(child) && !alive(grandchild), 5000)).toBe(true)
+    expect(await until(() => !alive(child) && !alive(grandchild), timing('wait.hang'))).toBe(true)
     expect(leftoversOf(dir, 'a5').processes).toHaveLength(0)
-  }, 60000)
+  }, timing('test.hang'))
 
   // The Store's PowerShell 7 is a packaged app: what it starts leaves every job (#543). Only where it is installed.
   const storePwsh = join(process.env.LOCALAPPDATA ?? '', 'Microsoft', 'WindowsApps', 'pwsh.exe')
@@ -389,11 +390,11 @@ else {
     expect(listed.filter((p) => !own.includes(p)), why).toEqual([])
     expect(unlisted.filter(alive), why).toEqual([])
     expect(await settleLeftovers(dir, 'a6', 'end')).toBe(listed.length)
-    expect(await until(() => !alive(pwsh) && !alive(lone), 5000)).toBe(true)
+    expect(await until(() => !alive(pwsh) && !alive(lone), timing('wait.hang'))).toBe(true)
     // Ended before it was listed, not by this launch: the shell is in its package's job, which another program's job on
     // the PC can take in (as this tracker's did before #659) and end with its own.
     if (unlisted.length) ctx.skip(`the Store's PowerShell or what it ran had ended before it was listed (${unlisted.join(', ')}): ${why}`)
-  }, 60000)
+  }, timing('test.hang'))
 
   // An escaped process already in a job is followed, never assigned to the launch's (#659): Windows would nest one job in
   // the other. The Store PowerShell's job is its package's, which every Store PowerShell joins: when it had no parent,
@@ -439,9 +440,9 @@ if (-not $a.HasExited) { Stop-Process -Id $a.Id -Force }
 $r | ConvertTo-Json -Compress
 `
     )
-    const out = execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe, src, process.execPath], { windowsHide: true, timeout: 120000 })
+    const out = execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe, src, process.execPath], { windowsHide: true, timeout: timing('spawn.hang') })
     expect(JSON.parse(String(out).trim().split(/\r?\n/).at(-1)!)).toEqual({ inOther: true, added: 'the process has exited', taken: true, followed: true, inJob: false, listed: true, ended: true })
-  }, 120000)
+  }, timing('test.hang'))
 
   // HI-2309: "paths" gives each process's executable by id and start time (a system broker is known by it): one whose
   // id names another process by now, or none, is left out. HI-2304: "running" says which executable names run on the
@@ -469,7 +470,7 @@ if (-not $a.HasExited) { Stop-Process -Id $a.Id -Force }
 $r | ConvertTo-Json -Compress
 `
     )
-    const out = execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe, src, process.execPath], { windowsHide: true, timeout: 120000 })
+    const out = execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe, src, process.execPath], { windowsHide: true, timeout: timing('spawn.hang') })
     const r = JSON.parse(String(out).trim().split(/\r?\n/).at(-1)!) as { added: string; id: string; paths: string; running: string; ended: boolean }
     expect(r.added).toBe('ok')
     expect(r.ended).toBe(true)
@@ -478,7 +479,7 @@ $r | ConvertTo-Json -Compress
     expect(Object.keys(paths)).toEqual([r.id])
     expect(paths[r.id].toLowerCase()).toBe(process.execPath.toLowerCase())
     expect(JSON.parse(r.running)).toEqual(['node.exe'])
-  }, 120000)
+  }, timing('test.hang'))
 
   // A packaged app's process (the Store's PowerShell) is in no job for its first few ms, until Windows puts it in its
   // package's job (#678). A sweep that sees it then must follow it, not assign it: assigned, Windows nested the package's
@@ -618,13 +619,13 @@ $r | ConvertTo-Json -Compress
     const cli = join(dir, 'packagedcli.cjs')
     // Exits with 3 when Windows refuses to start the Store PowerShell (#585), as a throw (EPERM) or an error.
     writeFileSync(cli, `process.stdin.once('data', () => { try { require('child_process').spawn(process.argv[2], ['-NoProfile', '-Command', 'Start-Sleep 10'], { stdio: 'ignore', windowsHide: true }).on('error', () => process.exit(3)) } catch { process.exit(3) } setTimeout(() => process.exit(0), 20000) })\n`)
-    const out = execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe, src, process.execPath, storePwsh, cli], { windowsHide: true, timeout: 240000 })
+    const out = execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe, src, process.execPath, storePwsh, cli], { windowsHide: true, timeout: timing('spawn.hangReal') })
     const r = JSON.parse(String(out).trim().split(/\r?\n/).at(-1)!)
     expect(r).toMatchObject({ staleKept: false, staleSurvived: true, ownKept: true, ownEnded: true })
     // Windows' refusals (#585), and a moment never caught, aren't the tracker's.
     if (!r.caught) ctx.skip(`no Store PowerShell was caught before it joined its package's job in ${r.tries} tries (${r.refused} refused by Windows)`)
     expect(r).toMatchObject({ caught: true, shellFollowed: true, shellInJob: false, otherInJob: false, otherListed: false })
-  }, 240000)
+  }, timing('test.hangReal'))
 
   // The host's C# driven directly, in a PowerShell of the test's own, with identities a late snapshot or a late port
   // notification could carry (#543): an id that names another process by now is never taken in, and a followed
@@ -675,7 +676,7 @@ foreach ($p in @($m, $u, $v, $w)) { if (-not $p.HasExited) { Stop-Process -Id $p
 $r | ConvertTo-Json -Compress
 `
     )
-    const out = execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe, src, process.execPath], { windowsHide: true, timeout: 120000 })
+    const out = execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe, src, process.execPath], { windowsHide: true, timeout: timing('spawn.hang') })
     const r = JSON.parse(String(out).trim().split(/\r?\n/).at(-1)!)
     expect(r).toEqual({
       added: 'ok',
@@ -695,7 +696,7 @@ $r | ConvertTo-Json -Compress
       survivorEnded: true,
       othersEnded: true
     })
-  }, 150000)
+  }, timing('test.hangReal'))
 
   // The port's events in an order of the test's own (#604): an exit is gathered, then let go of at the batch's end
   // (Settle). Only the entry held as that exit was read is let go of, once its process has exited: an entry whose
@@ -751,10 +752,10 @@ try {
 $r | ConvertTo-Json -Compress
 `
     )
-    const out = execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe, src, process.execPath], { windowsHide: true, timeout: 120000 })
+    const out = execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe, src, process.execPath], { windowsHide: true, timeout: timing('spawn.hang') })
     const r = JSON.parse(String(out).trim().split(/\r?\n/).at(-1)!)
     expect(r).toEqual({ added: 'ok', heldOld: 'old', runningKept: 'old', forgotten: null, addedNew: 'ok', heldNew: 'new', exited: true, newKept: 'new', letGo: null })
-  }, 150000)
+  }, timing('test.hangReal'))
 
   // Joins and listings in an order of the test's own (#1134, round 1): a notice due for one launch's process is never
   // taken back by listing another launch (the port's thread had told it, the input thread listed B before the notice was
@@ -790,10 +791,10 @@ $r.afterListing = & $told
 $r | ConvertTo-Json -Compress
 `
     )
-    const out = execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe, src], { windowsHide: true, timeout: 120000 })
+    const out = execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe, src], { windowsHide: true, timeout: timing('spawn.hang') })
     const r = JSON.parse(String(out).trim().split(/\r?\n/).at(-1)!)
     expect(r).toEqual({ otherListed: 1, again: 1, otherJob: 2, afterListing: 3 })
-  }, 150000)
+  }, timing('test.hangReal'))
 
   it('lists nothing for a launch that left nothing running, nor for one it never tracked', async () => {
     const { launchEnded, trackLaunch } = await import('../src/main/agentProcesses')
@@ -802,7 +803,7 @@ $r | ConvertTo-Json -Compress
     await new Promise((r) => cli.once('exit', r))
     expect(await launchEnded('run3')).toBeNull()
     expect(await launchEnded('never')).toBeNull()
-  }, 30000)
+  }, timing('test.hang'))
 
   it('keeps what is listed across a restart, by pid and start time, and ends exactly those processes (#614)', async () => {
     const kept = join(profile.dir, 'leftovers.json')
@@ -823,7 +824,7 @@ $r | ConvertTo-Json -Compress
     const other = join(dir, 'other7.txt')
     const strangerProc = spawn(process.execPath, [script, 'stranger', other], { detached: true, stdio: 'ignore', windowsHide: true })
     strangerProc.unref()
-    expect(await until(() => !!pidsIn(other).stranger, 10000)).toBe(true)
+    expect(await until(() => !!pidsIn(other).stranger, timing('wait.hang'))).toBe(true)
     const stranger = pidsIn(other).stranger
     saved.launches[0].processes.push({ pid: stranger, name: 'node.exe', label: 'node old.js', created: '116444736000000000' })
     // An older launch's record of the child's pid with another start time (a process the pid named before): two
@@ -863,13 +864,13 @@ $r | ConvertTo-Json -Compress
 
     expect(await after.settleLeftovers(dir, 'a9', 'keep')).toBe(5)
     expect(await after.settleLeftovers(dir, 'a7', 'end')).toBe(2)
-    expect(await until(() => !alive(child) && !alive(grandchild), 5000)).toBe(true)
+    expect(await until(() => !alive(child) && !alive(grandchild), timing('wait.hang'))).toBe(true)
     expect(alive(stranger)).toBe(true)
     expect(after.leftoversOf(dir, 'a7').processes).toHaveLength(0)
     expect(await keptNow()).toEqual([])
     await after.closeProcessTracking()
     await endHeld(strangerProc)
-  }, 90000)
+  }, timing('test.hang'))
 })
 
 // Stop Them's whole tree (#1008): EndTree picks what to end by the parent ids of a snapshot, holding a handle on each
@@ -932,7 +933,7 @@ $r.twice = Pick '10:100,20:150' @{ 10 = @(20) } @{ 10 = @{ created = 100 }; 20 =
 $r | ConvertTo-Json -Compress -Depth 4
 `
     )
-    const out = execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe, src], { windowsHide: true, timeout: 120000 })
+    const out = execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe, src], { windowsHide: true, timeout: timing('spawn.hang') })
     const r = JSON.parse(String(out).trim().split(/\r?\n/).at(-1)!) as Record<string, { picked: string[]; closed: number[]; failed: string[] }>
     expect(r.tree).toEqual({ picked: ['10:100', '20:150', '30:160'], closed: [40], failed: [], unverified: [] })
     expect(r.reused).toEqual({ picked: ['10:100'], closed: [20], failed: [], unverified: [] })
@@ -943,7 +944,7 @@ $r | ConvertTo-Json -Compress -Depth 4
     expect(r.unopenable).toEqual({ picked: ['10:100'], closed: [25], failed: ['21:151'], unverified: [22, 25] })
     expect(r.rootUnread).toEqual({ picked: [], closed: [10], failed: ['10:100'], unverified: [] })
     expect(r.twice).toEqual({ picked: ['10:100', '20:150'], closed: [], failed: [], unverified: [] })
-  }, 120000)
+  }, timing('test.hang'))
 })
 
 // A job's listing (HI-2858): a member that exits between the job's list and its description is no longer one. Counted,
@@ -1000,9 +1001,9 @@ $r.followedUnread = ReadWhole @(10) @{ 20 = 1; 30 = -1 }
 $r | ConvertTo-Json -Compress
 `
     )
-    const out = execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe, src], { windowsHide: true, timeout: 120000 })
+    const out = execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe, src], { windowsHide: true, timeout: timing('spawn.hang') })
     const r = JSON.parse(String(out).trim().split(/\r?\n/).at(-1)!) as Record<string, number | string>
     expect(r).toEqual({ goneMember: 0, stillListed: 0, childOfDeparted: 1, idTakenAgain: 1, notDescribedRuns: 3, describedLeft: 2, pastMax: 2, secondUnread: 2, wholeRead: '10,20', listUnread: 'unknown', followedUnread: 'unknown' })
-  }, 120000)
+  }, timing('test.hang'))
 })
 

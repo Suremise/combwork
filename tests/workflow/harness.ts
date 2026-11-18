@@ -17,6 +17,7 @@ import type { PlatformId } from '../../src/shared/platform/descriptors'
 import { agentActor, agentOf, type Actor, type FactKind } from '../../src/shared/workflow/facts'
 import type { Refusal } from '../../src/shared/workflow/refusals'
 import type { StoredText } from '../../src/shared/types'
+import { timing } from '../timing.cjs'
 
 export const B1 = agentActor('B1')
 export const B2 = agentActor('B2')
@@ -35,7 +36,7 @@ const runContext = createRequire(import.meta.url)('../e2e/runContext.cjs') as { 
  * set (some in more than one). A bound for a hung run, as that limit is, never a wait: three times it. Each test that
  * takes it says why beside it; only those take it, and S27's second case, which shares its test.
  */
-export const GIT_HEAVY_MS = 60_000
+export const GIT_HEAVY_MS = timing('test.hang')
 
 /** git in a folder, as a person in a terminal would run it; its output. */
 export function sh(cwd: string, ...args: string[]): string {

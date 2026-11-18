@@ -8,6 +8,7 @@ import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readRepoRefs, type RepoRefs } from '../src/main/platform/repoRefs'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 // Each read asked of the worker, held until let go.
 const held = vi.hoisted(() => ({ reads: [] as { common: string; go: () => void }[] }))
@@ -20,7 +21,7 @@ vi.mock('../src/main/git', async (original) => {
 const { Observer } = await import('../src/main/platform/observe')
 
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 // The run's allowlisted environment and test git config for every git child (never this process's environment).
 const { gitEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { gitEnv: (vars?: Record<string, string>) => NodeJS.ProcessEnv }

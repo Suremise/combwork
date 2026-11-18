@@ -11,9 +11,10 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { freshWhy, workFinished, type FreshNow } from '../src/shared/freshStarts'
 import type { CombworkEvent } from '../src/shared/types'
+import { timing } from './timing.cjs'
 
 /** A bound for a hung run (the waits are for conditions). */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 
 const now = (status: FreshNow['status'], o: Partial<FreshNow> = {}): FreshNow => ({ status, pending: false, backgroundTasks: 0, ...o })
 

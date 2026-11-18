@@ -11,12 +11,13 @@ import { junction, shortPath } from './pathAliases'
 import { moveFolder } from './moveFolder'
 import { DEFAULT_JOURNAL, type JournalSettings } from '../src/shared/journal'
 import { bound, spyOnPrivate } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-assistant-aliases-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 ;(electron.shell as unknown as { trashItem: (f: string) => Promise<void> }).trashItem = async (f) => rmSync(f, { force: true })
 // The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 const journal = await import('../src/main/journal')

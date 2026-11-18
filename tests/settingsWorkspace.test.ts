@@ -8,6 +8,7 @@ import * as electron from 'electron'
 import { settingDefault, settingEntry, settingPatch, settingPath, settingValue } from '../src/shared/settingsCatalog'
 import { DEFAULT_SETTINGS } from '../src/shared/defaults'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", async () => {
   const base = tempDir('cw-settings-ws-')
@@ -167,11 +168,11 @@ describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", a
         // The developer setting (its own catalogue entry) is kept in advanced.json too: an unreadable file refuses it, nothing changed.
         const { config } = await import('../src/main/config')
         writeFileSync(join(profile, 'advanced.json'), '{')
-        await vi.waitFor(() => expect(advanced.state(null).fileError).toBeTruthy(), { timeout: 10_000 })
+        await vi.waitFor(() => expect(advanced.state(null).fileError).toBeTruthy(), { timeout: timing('wait.hang') })
         await expect(applySetting(entryOf('advanced.showDeveloperFeatures'), true, null)).rejects.toThrow('Fix advanced.json')
         expect(config.settings.advanced.showDeveloperFeatures).toBe(false)
         writeFileSync(join(profile, 'advanced.json'), '{}')
-        await vi.waitFor(() => expect(advanced.state(null).fileError).toBeNull(), { timeout: 10_000 })
+        await vi.waitFor(() => expect(advanced.state(null).fileError).toBeNull(), { timeout: timing('wait.hang') })
         await applySetting(entryOf('advanced.showDeveloperFeatures'), true, null)
         expect(JSON.parse(readFileSync(join(profile, 'advanced.json'), 'utf8')).values).toEqual({ 'cw.showDeveloperFeatures': true })
         expect(config.settings.advanced.showDeveloperFeatures).toBe(true)

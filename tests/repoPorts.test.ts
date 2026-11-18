@@ -7,6 +7,7 @@ import { join, resolve } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { gitRepo, sh } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 /** Each repository lock request the lock's worker got, in order: take or release, and its store. */
 const lockTrace: string[] = []
@@ -29,7 +30,7 @@ const { hasRepository, portsOf, repoContext, repoContexts, repoPortsOf, withFold
 const { sameStore } = await import('../src/main/platform/repoContext')
 
 // Real git work, not a wait: a few git commands per test.
-vi.setConfig({ testTimeout: 60_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 afterEach(() => {
   gitTestHooks.started = undefined

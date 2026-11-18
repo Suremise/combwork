@@ -14,6 +14,7 @@ import { DatabaseSync, backup } from 'node:sqlite'
 import { describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from '../tempDir'
+import { timing } from '../timing.cjs'
 
 const SRC = process.env.CW_TRIAL_WS ?? ''
 const base = tempDir('wscopy-trial-')
@@ -34,7 +35,7 @@ const under = (p: string, root: string): boolean => p.toLowerCase().startsWith(r
 const report: string[] = []
 
 describe.skipIf(!SRC)('the slots migration on a copy of a 0.9 workspace (#1441)', () => {
-  it('copies it, upgrades the copy and migrates it, twice', { timeout: 600_000 }, async () => {
+  it('copies it, upgrades the copy and migrates it, twice', { timeout: timing('test.hangRealJj') }, async () => {
     const dst = join(base, basename(SRC))
     const at = (p: string): string => (under(p, SRC) ? dst + p.slice(SRC.length) : p)
     // The workspace's own files, read-only.

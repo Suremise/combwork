@@ -16,6 +16,7 @@ import { gitWorkspacePort } from '../src/main/platform/gitWorkspacePort'
 import { gitRelocation } from '../src/main/platform/gitRelocation'
 import { fileSlotConn, SlotPool, SlotStore, type OpHolder, type SlotRenamer, type SlotRun, type SlotRunEnd } from '../src/main/slots'
 import { commit, gitRepo } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 void gitWorkspacePort
 const req = createRequire(import.meta.url)
@@ -66,7 +67,7 @@ function project(nested = false, releaseTag?: 'light' | 'annotated'): { ws: stri
 async function runner(r: SlotRun): Promise<SlotRunEnd> {
   const end: SlotRunEnd = { ok: true, exitCode: 0, logPath: null, settled: true }
   if (!r.files) return end
-  const x = r.files.tool.exec({ spawn, env: { ...RUN_ENV, ...r.env }, log: { write: () => undefined }, timeoutMs: 120_000 })
+  const x = r.files.tool.exec({ spawn, env: { ...RUN_ENV, ...r.env }, log: { write: () => undefined }, timeoutMs: timing('spawn.hang') })
   try {
     const o = await r.files.tool.prepare(x, r.files.step)
     return o.ok ? end : { ok: false, exitCode: 1, error: o.error, logPath: null, settled: true }
@@ -134,7 +135,7 @@ function unpushed(dir: string, keep: (dir: string) => void): void {
   g(dir, 'checkout', '-q', '--detach', 'HEAD~1')
 }
 
-describe('HI-3026: a slot whose submodule the files step set up', { timeout: 120_000 }, () => {
+describe('HI-3026: a slot whose submodule the files step set up', { timeout: timing('test.hang') }, () => {
   it('free and clean, with no stash: removed, folder and all', async () => {
     const { pool: pl, name, folder } = await usedSlot()
     expect(await pl.remove(name)).toBeNull()

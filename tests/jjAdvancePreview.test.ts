@@ -24,11 +24,12 @@ import type { WorkflowOptions } from '../src/shared/workflow/options'
 import { AdvanceJournals } from '../src/main/platform/jjAdvance'
 import { DatabaseSync } from 'node:sqlite'
 import { boardFile } from '../src/main/boardStore'
+import { timing } from './timing.cjs'
 
 if (!jjExe) console.warn(`jjAdvancePreview.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
 // A hung test's bound: each runs many real jj and git commands, and a full unit run on a loaded machine took one 49 s (HI-3349).
-const REAL_JJ_MS = 150_000
+const REAL_JJ_MS = timing('wait.hangReal')
 
 async function approved(w: World, title = 'jj work', file = 'work.txt') {
   const a = w.slots['slot-a']

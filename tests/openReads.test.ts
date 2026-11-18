@@ -8,6 +8,7 @@ import * as electron from 'electron'
 import { atMost, whenAll } from '../src/shared/atMost'
 import { tempDir } from './tempDir'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-openreads-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -15,7 +16,7 @@ const base = tempDir('cw-openreads-')
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 /** A promise the test settles when it says. */
 const gate = () => {

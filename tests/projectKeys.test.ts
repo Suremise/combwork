@@ -16,6 +16,7 @@ import { taskPrompt } from '../src/shared/tasks'
 import { taskRow, taskRowText } from '../src/shared/toolReplies'
 import { unexpectedCloseText } from '../src/shared/unexpectedClose'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-keys-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -29,7 +30,7 @@ const { openDb } = await import('../src/main/db')
 const { staleWhy } = await import('../src/main/deliveries')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 15000
+const HUNG_MS = timing('wait.hang')
 const user = { kind: 'user' } as const
 let n = 0
 type WS = ReturnType<typeof createWorkspaceService>

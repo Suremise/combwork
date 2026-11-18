@@ -16,16 +16,17 @@ import { endedLine, failedLine, readBaseline, useBaselineWorker, type BaselineTh
 import { MARKED_LOG, redactLog, type RedactContext } from '../src/shared/redact'
 import { scanProject } from '../src/main/noneBaselineWorker'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30_000
+const HUNG_MS = timing('wait.hang')
 
 const tmp = tempDir('cw-none-baseline-')
 const bundle = join(tmp, 'none-baseline-worker.cjs')
 
 beforeAll(async () => {
   await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'noneBaselineWorker.ts')], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
-}, 60_000)
+}, timing('hook.hang'))
 afterAll(() => void useBaselineWorker(null))
 
 let n = 0
@@ -47,7 +48,7 @@ async function until(ok: () => boolean): Promise<void> {
   const end = Date.now() + HUNG_MS
   while (!ok()) {
     if (Date.now() > end) throw new Error('still not so after HUNG_MS')
-    await new Promise((r) => setTimeout(r, 5))
+    await new Promise((r) => setTimeout(r, timing('pace.tick')))
   }
 }
 
@@ -174,7 +175,7 @@ describe("a None project's whole-project read in its worker (HI-2340)", () => {
   })
 
   it('a read past its bound ends its worker and is answered with nothing; a late answer is no later read\'s', async () => {
-    const bounded = useBaselineWorker(bundle, { timeoutMs: 150 })
+    const bounded = useBaselineWorker(bundle, { timeoutMs: 150 }) // timing-ok: the timeout under test (its expiry is what the test checks)
     try {
       const a = new NoneAdapter(project(3), ['node_modules'])
       bounded.hold()
@@ -214,5 +215,5 @@ describe("a None project's whole-project read in its worker (HI-2340)", () => {
     const inWorker = await gapDuring(() => readBaseline(new NoneAdapter(root)))
     console.info(`HI-2340 benchmark, 5,000 x 1 KB: main's longest gap ${Math.round(onMain)} ms on main's thread, ${Math.round(inWorker)} ms with the read in its worker`)
     expect(inWorker).toBeGreaterThanOrEqual(0)
-  }, 120_000)
+  }, timing('test.hang'))
 })

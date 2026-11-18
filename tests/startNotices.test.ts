@@ -9,10 +9,11 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { dropLoggerListenersAfterEach, loggerListenerCounts } from './loggerListeners'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take. The updater's
 // notice is told 4 s after it starts, so this is well past it.
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 
 const h = vi.hoisted(() => ({
   workspaces: [] as unknown[],

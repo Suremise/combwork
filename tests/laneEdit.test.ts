@@ -8,6 +8,7 @@ import * as electron from 'electron'
 import type { LaneEdit, LaneEditResult } from '../src/shared/types'
 import { LANE_MAX_CARDS } from '../src/shared/lanes'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-lane-edit-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -20,7 +21,7 @@ const { advanced } = await import('../src/main/advanced')
 const { ENFORCE } = await import('../src/main/workflow/service')
 const { dayBounds } = await import('../src/shared/laneDay')
 
-vi.setConfig({ testTimeout: 60_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 describe('laneEditOf: what IPC passes is checked field by field', () => {
   it('takes each op, and refuses a malformed one', () => {

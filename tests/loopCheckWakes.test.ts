@@ -8,6 +8,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import type { LiveSessionState } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 describe('loop agents with no watch, and the loop wakes that reach them (HI-1693)', async () => {
   const base = tempDir('cw-loopcheck-wakes-')
@@ -31,7 +32,7 @@ describe('loop agents with no watch, and the loop wakes that reach them (HI-1693
   afterEach(() => deliveries.setReadsInboxForTests(null))
 
   // The longest a wait here waits: a bound for a hung run, never how long it should take.
-  const HANG = { timeout: 10_000 }
+  const HANG = { timeout: timing('wait.hang') }
   const WORKFLOW = { workflow: { platform: 'none', preset: null, options: { review: 'agent', noSelfReview: true } } }
   let n = 0
   /** A workspace whose project alpha has a builder (b1) and a reviewer (r1). */

@@ -13,6 +13,7 @@ import { DEFAULT_SETTINGS } from '../src/shared/defaults'
 import type { SessionListItem, SessionUsage } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { bound, spyOnPrivate } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-usage-backfill-')
 // The CLIs' homes are the test's own (HI-1666): a list looks in each for sessions started outside Combwork, and the user's
@@ -135,7 +136,7 @@ describe("the usage history's import", () => {
       await vi.waitFor(async () => {
         const later = await run(() => sessions.list(p))
         expect([stopped, running].map((id) => outputOf(later, id))).toEqual([1000, 1000])
-      }, { timeout: 10_000 })
+      }, { timeout: timing('wait.hang') })
       expect(readFor(usageFor)).not.toContain(stopped)
       // The running one, unchanged since: the worker isn't asked again.
       expect(readFor(workerReads)).toEqual([running])

@@ -12,6 +12,7 @@ import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-recorder-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -232,7 +233,7 @@ describe('recording facts from the board’s moves (#1216)', () => {
     expect(await giveUnseen(w, 'a1', card, 'p')).toEqual([])
   })
 
-  it("HI-2854 (HR2's round 2): a comment of the user's archived more than a page deep is found and given by a refused submit, then received; a card moved to another project gives nothing", { timeout: 300_000 }, async () => {
+  it("HI-2854 (HR2's round 2): a comment of the user's archived more than a page deep is found and given by a refused submit, then received; a card moved to another project gives nothing", { timeout: timing('test.hangReal') }, async () => {
     const { giveUnseen } = await import('../src/main/cardFreshness')
     const { w } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Deep archive', project: 'p' }, user))).number

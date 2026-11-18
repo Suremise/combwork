@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { readCard, writeCard } from './boardDb'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-review-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -78,7 +79,7 @@ describe('reviewing a card', () => {
     const c = await done()
     const first = await run(() => tasks.updateTask(c.number, { review: 'start' }, reviewer))
     await expect(run(() => tasks.updateTask(c.number, { review: 'start' }, third))).rejects.toThrow(/Reviewer is already reviewing/)
-    await new Promise((r) => setTimeout(r, 5))
+    await new Promise((r) => setTimeout(r, timing('pace.tick')))
     const again = await run(() => tasks.updateTask(c.number, { review: 'start' }, reviewer))
     expect(again.review!.since > first.review!.since).toBe(true)
     // Saved, not only returned; and still one line in the history.

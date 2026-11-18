@@ -18,6 +18,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 const state = vi.hoisted(() => ({ renameOn: true, enforced: true, cardsFail: false, copyFails: false }))
 vi.mock('../src/main/workflow/service', async (orig) => ({ ...(await orig<object>()), workflowEnforced: () => state.enforced }))
@@ -78,7 +79,7 @@ type Renamer = import('../src/main/slots').SlotRenamer
 type Pool = InstanceType<typeof SlotPool>
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 20000
+const HUNG_MS = timing('wait.hang')
 const wsPath = join(base, 'ws')
 const project = join(wsPath, 'alpha')
 const trees = join(base, 'trees')

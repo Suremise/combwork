@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Account, AgentDef, Connection, PlanLimit, ProjectConfig, UsageMoveRule } from '../src/shared/types'
 import { tempRoot } from './tempDir'
+import { timing } from './timing.cjs'
 
 /**
  * HI-2195: an account's usage move. The pure rules (shared/usageMoves.ts), how a usage move and HI-1755's own switch share
@@ -125,7 +126,7 @@ const { accountUsageText } = await import('../src/shared/toolReplies')
 
 const HOUR = 3600e3
 // The longest a wait here waits: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 const ahead = (h: number): string => new Date(Date.now() + h * HOUR).toISOString()
 const weekly = (used: number, resetsAt = ahead(48)): PlanLimit => ({ id: 'seven_day', label: 'weekly', windowMinutes: 10080, usedPercent: used, resetsAt })
 const fiveHour = (used: number, resetsAt = ahead(2)): PlanLimit => ({ id: 'five_hour', label: '5-hour', windowMinutes: 300, usedPercent: used, resetsAt })

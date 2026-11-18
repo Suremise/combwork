@@ -9,6 +9,7 @@ import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-lockrecord-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -38,7 +39,7 @@ afterAll(async () => {
 })
 
 /** The bound for a hung run. */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 const user = { kind: 'user' } as const
 const agent = (id: string) => ({ kind: 'agent', name: `${id} (p)`, self: { project: 'p', agentId: id }, scope: 'p' }) as const
 const A = agent('a1')

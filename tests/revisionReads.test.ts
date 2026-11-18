@@ -11,6 +11,7 @@ import { revisionReadsOf } from '../src/main/platform/revisionReadsPorts'
 import { jjRevisionReadsWith } from '../src/main/platform/jjRevisionReads'
 import { MAX_DIFF_BYTES } from '../src/main/git'
 import { harness, jjExe } from './jjWorkspaceHarness'
+import { timing } from './timing.cjs'
 
 // The fixtures' git (HR1's round 2): the run context's allowlist, a global config of the test's own and no system config,
 // never the shell's environment or the machine's git settings (signing, hooks, filters, GIT_* overrides).
@@ -107,5 +108,5 @@ describe.skipIf(!jjExe)('jj: a submission file from its base to its revision (HI
     expect(await reads.fileDiff(d, base, revision, 'big.txt')).toMatchObject({ path: 'big.txt', binary: true, original: '' })
     // A commit jj doesn't have is an error, never an empty side.
     await expect(reads.fileDiff(d, base, 'f'.repeat(40), 'a.txt')).rejects.toThrow()
-  }, 60000)
+  }, timing('test.hang'))
 })

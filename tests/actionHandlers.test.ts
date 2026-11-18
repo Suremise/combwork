@@ -10,6 +10,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { follow } from './followDoorbell'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-action-handlers-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -93,7 +94,7 @@ const user = { kind: 'user' } as const
 const agent = (id: string, name: string) => ({ kind: 'agent', name: `${name} (alpha)`, self: { project: 'alpha', agentId: id }, scope: 'alpha' }) as const
 const b1 = agent('b1', 'B1')
 const r1 = agent('r1', 'R1')
-const HANG = { timeout: 10_000 }
+const HANG = { timeout: timing('wait.hang') }
 /** Everything the changes so far started: their actions run, their wakes made and tried. */
 async function settled(): Promise<void> {
   await worker.actionsSettled()

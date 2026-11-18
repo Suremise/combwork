@@ -9,6 +9,7 @@ import { tempDir } from './tempDir'
 import { junction } from './pathAliases'
 // @ts-expect-error: plain .mjs module without types
 import { acquireCodexHome, codexLockDir, usesCodexHome } from './e2e/codexHomeLock.mjs'
+import { timing } from './timing.cjs'
 
 const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs')
 const tmp = tempDir('cw-codex-home-lock-')
@@ -78,7 +79,7 @@ describe('machine-wide Codex test-home lease (#478)', () => {
     const f = fixture()
     const url = pathToFileURL(join(__dirname, 'e2e', 'codexHomeLock.mjs')).href
     const script = `import(${JSON.stringify(url)}).then(async ({ acquireCodexHome }) => { await acquireCodexHome(${JSON.stringify(f.home)}, { poolRoot: ${JSON.stringify(f.poolRoot)} }); process.exit(0); })`
-    execFileSync(process.execPath, ['-e', script], { env: ctx.baseEnv(), encoding: 'utf8', timeout: 20_000 })
+    execFileSync(process.execPath, ['-e', script], { env: ctx.baseEnv(), encoding: 'utf8', timeout: timing('spawn.hang') })
     expect(readdirSync(codexLockDir(f.home, f.poolRoot)).filter((n) => n.endsWith('.json'))).toEqual([])
   })
 })

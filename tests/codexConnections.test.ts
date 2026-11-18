@@ -14,6 +14,7 @@ import { signInConnections } from '../src/shared/providers'
 import { acceptable } from '../src/shared/accounts'
 import type { Account } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-codex-connections-')
 const home = join(base, 'codex-home')
@@ -38,7 +39,7 @@ type Listed = import('../src/main/workflow/queueProcs').Listed
 // Child processes get the run context's allowlisted environment (tests/e2e/runContext.cjs), never this shell's.
 const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 30_000
+const HUNG_MS = timing('wait.hang')
 // Codex's checks run on a real process supervisor of the tests' own (as the merge queue's tests), in this file's folder.
 const sharedHost = queueHost()
 codexCheckSeams.host = sharedHost
@@ -328,7 +329,7 @@ process.stdin.on('end', () => { if (!${!!o.stubborn}) { child.kill(); process.ex
     expect(await status(s.cmd, homeOf('a-willing'))).toEqual(ID)
     expect(await s.left()).toEqual([])
     expect(codexCheckHeld(homeOf('a-willing'))).toBe(false)
-  }, 60_000)
+  }, timing('test.hang'))
 
   it("with Advanced's non-admin sandbox on (HI-1893): the status check passes it, with the connection's login store", async () => {
     const argsLog = join(base, 'status-args.json')
@@ -355,14 +356,14 @@ process.stdin.on('end', () => process.exit(0))
     const args = JSON.parse(readFileSync(argsLog, 'utf8')) as string[]
     expect(args.join(' ')).toContain(CONNECTION_STORE.join(' '))
     expect(args.includes('windows.sandbox="unelevated"')).toBe(process.platform === 'win32')
-  }, 60_000)
+  }, timing('test.hang'))
 
   it('one that ignores its stdin closing, behind a .cmd launcher: its job ends it and its child; the identity only then', async () => {
     const s = server('stubborn-cli', { stubborn: true })
     expect(await status(s.cmd, homeOf('a-stubborn'))).toEqual(ID)
     expect(await s.left()).toEqual([])
     expect(codexCheckHeld(homeOf('a-stubborn'))).toBe(false)
-  }, 60_000)
+  }, timing('test.hang'))
 
   it("its supervisor ended between the job's end and its confirmation: confirmed only once no job by its name is left (kill on close), on a new supervisor", async () => {
     const s = server('replaced-cli', { stubborn: true })
@@ -378,7 +379,7 @@ process.stdin.on('end', () => process.exit(0))
     expect(await s.left()).toEqual([])
     expect(sharedHost.instance).not.toBe(before)
     expect(codexCheckHeld(homeOf('a-replaced'))).toBe(false)
-  }, 90_000)
+  }, timing('test.hang'))
 
   it("an end its supervisor can't confirm: a failed check, the connection held (sign-in, removal and checks refused); a later check confirms it, then runs", async () => {
     const a = await accounts.addAccount('codex', 'Held')
@@ -398,7 +399,7 @@ process.stdin.on('end', () => process.exit(0))
     expect(codexCheckHeld(folder)).toBe(false)
     expect(await s.left()).toEqual([])
     await accounts.removeAccount(a.id)
-  }, 90_000)
+  }, timing('test.hang'))
 
   it('a process of the check that leaves its job (ended by the supervisor, unconfirmed): a failed check, held until Combwork restarts', async () => {
     const s = server('escaped-cli')
@@ -416,7 +417,7 @@ process.stdin.on('end', () => process.exit(0))
     // A restart releases the hold: not a confirmation that the escaped branch ended (the preview limit accepted on HI-1757/r94).
     resetCodexChecksForTests()
     expect(codexCheckHeld(homeOf('a-escaped'))).toBe(false)
-  }, 90_000)
+  }, timing('test.hang'))
 
   it('a check held before its supervisor starts, then quit: nothing is launched after the quit', async () => {
     const s = server('paused-cli')
@@ -431,7 +432,7 @@ process.stdin.on('end', () => process.exit(0))
     expect(await check).toMatchObject({ ok: false })
     expect(s.started()).toBe(false)
     expect(codexCheckHeld(homeOf('a-paused'))).toBe(false)
-  }, 60_000)
+  }, timing('test.hang'))
 
   it('a check waiting for its answer, then quit: the quit ends it and its child before it returns', async () => {
     const s = server('waiting-cli', { stubborn: true, answers: false })
@@ -442,7 +443,7 @@ process.stdin.on('end', () => process.exit(0))
     expect(await s.left()).toEqual([])
     expect(await check).toEqual({ ok: false, error: 'Combwork is quitting' })
     expect(codexCheckHeld(homeOf('a-waiting'))).toBe(false)
-  }, 60_000)
+  }, timing('test.hang'))
 
   it("a held check's retry under way when Combwork quits: the quit's end runs after it, never beside it", async () => {
     const s = server('retry-cli')
@@ -462,7 +463,7 @@ process.stdin.on('end', () => process.exit(0))
     await stopCodexChecks()
     await retry
     expect(most).toBe(1)
-  }, 90_000)
+  }, timing('test.hang'))
 
   it('no supervisor, or a launcher whose command is missing: a failed check, nothing held', async () => {
     codexCheckSeams.host = { ensure: async () => false } as never
@@ -472,7 +473,7 @@ process.stdin.on('end', () => process.exit(0))
     const r = await status(join(base, 'no-such-codex.exe'), homeOf('a-nostart'))
     expect(r.ok).toBe(false)
     expect(codexCheckHeld(homeOf('a-nostart'))).toBe(false)
-  }, 60_000)
+  }, timing('test.hang'))
 })
 
 
@@ -559,4 +560,4 @@ afterAll(async () => {
   }, { timeout: HUNG_MS, interval: 200 })
   vi.restoreAllMocks()
   rmSync(base, { recursive: true, force: true })
-}, 90_000)
+}, timing('hook.hang'))

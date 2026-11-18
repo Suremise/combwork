@@ -8,6 +8,7 @@ import { tempDir } from './tempDir'
 import { audit, dropRichTypeArgs, mixedPlaceholders, patchCounts, removeCopy, siteKind, tscErrors } from '../scripts/i18nNumbers.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { valuesDts } from '../scripts/i18nValues.mjs'
+import { timing } from './timing.cjs'
 
 const ROOT = resolve(__dirname, '..')
 
@@ -41,7 +42,7 @@ describe('i18n:numbers', () => {
     expect(counts.filter(([, , n]) => n !== 1).map(([file, from, n]) => `${file} (${n}×): ${from}`)).toEqual([])
   })
 
-  it('run on a probe, finds numbers through tr and tRich (its type argument given or not), and calls of a message not known there; formatted numbers and text pass', { timeout: 120_000 }, () => {
+  it('run on a probe, finds numbers through tr and tRich (its type argument given or not), and calls of a message not known there; formatted numbers and text pass', { timeout: timing('test.hang') }, () => {
     // The copy goes in a temp folder of the test's, never in the repository (it links to its node_modules).
     const work = tempDir('cw-i18n-numbers-')
     const { sites, other, dir } = audit({ extra: { [PROBE]: PROBE_TEXT }, dir: work }) as { sites: Site[]; other: unknown[]; dir: string }

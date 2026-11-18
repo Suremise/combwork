@@ -16,6 +16,7 @@ import { gitExe } from '../../src/main/gitTool'
 import { withLauncherEnv } from '../../src/main/gitWorker'
 import { git } from '../../src/main/git'
 import { quoteArgMsvc } from '../../src/main/platform/signerRules'
+import { timing } from '../timing.cjs'
 
 let env: Env | null = null
 afterEach(() => {
@@ -26,7 +27,7 @@ afterEach(() => {
 
 const slash = (p: string): string => p.replace(/\\/g, '/')
 /** The bound of a wait for a condition: a hung run, never the wait itself. */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 const gitEnv = (): NodeJS.ProcessEnv => {
   const use = gitExe()
   return use.launcherEnv ? withLauncherEnv(process.env, use.launcherEnv) : process.env
@@ -134,7 +135,7 @@ describe('the merge queue checks signing before it signs (HI-1185)', () => {
     const t0 = Date.now()
     const out = await e.queue({ ...cfg, signTimeoutMs: 60_000 }).drain('main')
     expect(out.at(-1)).toMatchObject({ outcome: 'paused', reason: 'signingWaits' })
-    expect(Date.now() - t0).toBeLessThan(30_000)
+    expect(Date.now() - t0).toBeLessThan(timing('budget.promptEndMs'))
     expect(sh(e.project, 'rev-parse', 'main')).toBe(before)
     expect(runs).toHaveLength(1)
     e.queue().resume('main')
@@ -346,11 +347,11 @@ describe('the signing check (HI-1185)', () => {
       worst = Math.max(worst, Date.now() - last)
       last = Date.now()
     }, 20)
-    const timed = await boundedSpawn(process.execPath, spin, { cwd: process.cwd(), env: process.env, timeoutMs: 400 })
+    const timed = await boundedSpawn(process.execPath, spin, { cwd: process.cwd(), env: process.env, timeoutMs: 400 }) // timing-ok: the timeout under test (its expiry is what the test checks)
     clearInterval(beat)
     expect(timed.timedOut).toBe(true)
     expect(worst).toBeLessThan(500)
-    const running = boundedSpawn(process.execPath, spin, { cwd: process.cwd(), env: process.env, timeoutMs: 30_000, owner: 'C:/proj' })
+    const running = boundedSpawn(process.execPath, spin, { cwd: process.cwd(), env: process.env, timeoutMs: timing('spawn.hang'), owner: 'C:/proj' })
     let ended = false
     void running.then(() => (ended = true))
     await endBoundedSpawns((o) => o === 'C:/proj')

@@ -4,9 +4,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { boundedQueue, coalesced, joined, latestOnly } from '../src/shared/coalesce'
 import { makeBadgeSource } from '../src/shared/workflow/badgeSource'
 import type { WorkBadge } from '../src/shared/workflow/workView'
+import { timing } from './timing.cjs'
 
 /** A bound for a hung run only: the waits are for promises the test settles itself. */
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 
 /** A call the test settles: each one made, with what it was for. */
 function held<T>() {

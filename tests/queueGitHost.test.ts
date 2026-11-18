@@ -21,6 +21,7 @@ import { windowsProbe, type Listed } from '../src/main/workflow/queueProcs'
 import { checkGit, gitExe, gitTool, realGitBehind, setGitToolForTests } from '../src/main/gitTool'
 import { git as combworkGit, withGitRoute } from '../src/main/git'
 import { gitRepo, put, sh } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
@@ -46,7 +47,7 @@ async function identify(pid: number): Promise<Listed> {
 }
 
 const running = (p: Listed): Promise<boolean | null> => windowsProbe.alive(p.pid, p.started)
-const ends = (p: Listed): Promise<void> => vi.waitFor(async () => expect(await running(p)).toBe(false), { timeout: 30_000, interval: 200 })
+const ends = (p: Listed): Promise<void> => vi.waitFor(async () => expect(await running(p)).toBe(false), { timeout: timing('wait.hang'), interval: 200 })
 
 /** A frame as the host writes it. */
 const frame = (kind: FrameKind | string, id: number, payload: string | Buffer = ''): Buffer => {
@@ -103,7 +104,7 @@ function own(env: NodeJS.ProcessEnv = baseEnv()): { host: GitHost; child: ChildP
 
 const node = (cwd: string, code: string, extra: { env?: NodeJS.ProcessEnv; input?: string } = {}) => ({ command: process.execPath, args: ['-e', code], cwd, env: extra.env ?? baseEnv(), ...(extra.input !== undefined ? { input: extra.input } : {}) })
 
-describe('a git host (HI-2079)', { timeout: 60_000 }, () => {
+describe('a git host (HI-2079)', { timeout: timing('test.hang') }, () => {
   it('each request its own, several at once: output, error output, exit code, input, folder and environment', async () => {
     const { host, lost } = own()
     const dirs = [tempDir('gh-a-'), tempDir('gh-b-'), tempDir('gh-c-')]
@@ -154,7 +155,7 @@ describe('a git host (HI-2079)', { timeout: 60_000 }, () => {
     const code = `const k = require('child_process').spawn(process.execPath, ['-e', ${JSON.stringify(later)}], { stdio: ['ignore', 'inherit', 'inherit'], detached: true, windowsHide: true, env: process.env }); k.unref(); process.stdout.write('p')`
     expect(await host.request(node(dir, code))).toMatchObject({ out: 'p', err: '', code: 0 })
     writeFileSync(go, '')
-    await vi.waitFor(() => expect(existsSync(mark)).toBe(true), { timeout: 30_000, interval: 100 })
+    await vi.waitFor(() => expect(existsSync(mark)).toBe(true), { timeout: timing('wait.hang'), interval: 100 })
     // Written to a pipe the host no longer reads: nothing framed, nothing lost, and the host goes on.
     expect(await host.request(node(dir, `process.stdout.write('next')`))).toMatchObject({ out: 'next', err: '', code: 0 })
     expect(lost).toEqual([])
@@ -185,7 +186,7 @@ describe('a git host (HI-2079)', { timeout: 60_000 }, () => {
     const told = await host.request(node(dir, `process.stdout.write('done')`))
     const pidFile = join(dir, 'pid')
     const waiting = host.request(node(dir, `require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setInterval(() => {}, 1000)`))
-    await vi.waitFor(() => expect(existsSync(pidFile)).toBe(true), { timeout: 30_000, interval: 100 })
+    await vi.waitFor(() => expect(existsSync(pidFile)).toBe(true), { timeout: timing('wait.hang'), interval: 100 })
     // Its command, outside any job here, is the test's to end.
     await identify(Number(readFileSync(pidFile, 'utf8')))
     await windowsProbe.end([await identify(child.pid!)])
@@ -452,7 +453,7 @@ const acquire = async (w: World, hooks: NonNullable<Parameters<typeof QueueRunne
 
 const kinds = (w: World, lease: string): string[] => w.store.queueProcs(lease).map((p) => p.what).sort()
 
-describe("the runner's git host (HI-2079)", { timeout: 120_000 }, () => {
+describe("the runner's git host (HI-2079)", { timeout: timing('test.hang') }, () => {
   it('git with no bound: one host for the lease, in its job and recorded once, answering as git does; release ends it', async () => {
     const w = world()
     const runner = await acquire(w)
@@ -534,11 +535,11 @@ describe("the runner's git host (HI-2079)", { timeout: 120_000 }, () => {
       expect(await runner.git(w.project, ['rev-parse', 'HEAD'], 'testMerge', { env: baseEnv() })).toMatchObject({ ok: true })
       const pid = runner.gitHostPid
       const c = stuckCommit(w)
-      const r = await runner.git(w.project, c.args, 'testMerge', { env: c.env, timeoutMs: 5_000 })
+      const r = await runner.git(w.project, c.args, 'testMerge', { env: c.env, timeoutMs: 5_000 }) // timing-ok: the timeout under test (its expiry is what the test checks)
       expect(r).toMatchObject({ ok: false, timedOut: true })
       // Its editor (the tree's leaf) ended with it.
       const editor = Number(readFileSync(c.pidFile, 'utf8'))
-      await vi.waitFor(async () => expect((await windowsProbe.list())!.some((p) => p.pid === editor)).toBe(false), { timeout: 30_000, interval: 200 })
+      await vi.waitFor(async () => expect((await windowsProbe.list())!.some((p) => p.pid === editor)).toBe(false), { timeout: timing('wait.hang'), interval: 200 })
       expect(runner.gitHostPid).toBe(pid)
       expect(runner.failed).toBe(false)
     } finally {
@@ -553,7 +554,7 @@ describe("the runner's git host (HI-2079)", { timeout: 120_000 }, () => {
     try {
       const c = stuckCommit(w)
       const stuck = runner.git(w.project, c.args, 'testMerge', { env: c.env })
-      await vi.waitFor(() => expect(existsSync(c.pidFile)).toBe(true), { timeout: 30_000, interval: 100 })
+      await vi.waitFor(() => expect(existsSync(c.pidFile)).toBe(true), { timeout: timing('wait.hang'), interval: 100 })
       const editor = await identify(Number(readFileSync(c.pidFile, 'utf8')))
       const host = await identify(runner.gitHostPid!)
       const lease = runner.lease
@@ -640,8 +641,8 @@ describe("the runner's git host (HI-2079)", { timeout: 120_000 }, () => {
       // The launcher's MSYSTEM and its shell tools, seen by an alias through sh.
       const alias = ['-c', 'alias.cwmsys=!echo "$MSYSTEM $(command -v sed)"', 'cwmsys']
       expect(await runner.git(w.project, alias, 'testMerge', { env })).toMatchObject({ ok: true, out: `${resolved.launcherEnv!.msystem} /usr/bin/sed\n` })
-      expect(await runner.git(w.project, ['rev-parse', 'HEAD'], 'testMerge', { env, timeoutMs: 60_000 })).toMatchObject({ ok: true })
-      await vi.waitFor(() => expect(started().filter((a) => a.toLowerCase() === real.toLowerCase())).toHaveLength(2), { timeout: 10_000, interval: 50 })
+      expect(await runner.git(w.project, ['rev-parse', 'HEAD'], 'testMerge', { env, timeoutMs: timing('spawn.hang') })).toMatchObject({ ok: true })
+      await vi.waitFor(() => expect(started().filter((a) => a.toLowerCase() === real.toLowerCase())).toHaveLength(2), { timeout: timing('wait.hang'), interval: 50 })
       // The real git gone (uninstalled, moved): the command runs with PATH's git, which is what Combwork starts from then on.
       const gone = join(tempDir('qgh-gone-'), 'git.exe')
       setGitToolForTests({ state: 'ok', version: '2.51.0' }, { exe: gone })
@@ -649,7 +650,7 @@ describe("the runner's git host (HI-2079)", { timeout: 120_000 }, () => {
       const rs = await Promise.all([
         runner.git(w.project, ['rev-parse', 'HEAD'], 'testMerge', { env }),
         runner.git(w.project, ['rev-parse', 'HEAD'], 'testMerge', { env }),
-        runner.git(w.project, ['rev-parse', 'HEAD'], 'testMerge', { env, timeoutMs: 60_000 })
+        runner.git(w.project, ['rev-parse', 'HEAD'], 'testMerge', { env, timeoutMs: timing('spawn.hang') })
       ])
       for (const r of rs) expect(r).toMatchObject({ ok: true })
       expect(gitExe().exe).not.toBe(gone)
@@ -676,7 +677,7 @@ describe("the runner's git host (HI-2079)", { timeout: 120_000 }, () => {
       expect(await runner.git(w.project, ['rev-parse', 'HEAD'], 'testMerge', { env: baseEnv() })).toMatchObject({ ok: true })
       const lease = runner.lease
       await windowsProbe.end([await identify(runner.gitHostPid!)])
-      await vi.waitFor(() => expect(runner.failed).toBe(true), { timeout: 30_000, interval: 50 })
+      await vi.waitFor(() => expect(runner.failed).toBe(true), { timeout: timing('wait.hang'), interval: 50 })
       await runner.release()
       // Its lease gone, its duties kept for the next settle.
       expect(w.store.queueLease('main')).toBeNull()

@@ -13,6 +13,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { StoredAgent } from '../src/shared/agentFolders'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-template-api-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -33,7 +34,7 @@ const store = await import('../src/main/boardStore')
 const { apiErrorReply } = await import('../src/main/servers')
 
 // Projects, boards and git are written: under a full run's load the default 5 s is too short (a bound, not a wait).
-vi.setConfig({ testTimeout: 60_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 describe('names given by key (namesFromKeys)', () => {
   const raw = ['{key}-B{n}', '{key}-B{n}', 'Tester']

@@ -8,6 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-live-reads-')
 process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
@@ -150,7 +151,7 @@ describe("a refresh's running agents share the workspace's reads (#1002)", () =>
     const held = heldRefreshes()
     try {
       w.scheduleRefresh()
-      await vi.waitFor(() => expect(held.started()).toBe(1), { timeout: 10_000 })
+      await vi.waitFor(() => expect(held.started()).toBe(1), { timeout: timing('wait.hang') })
       const settled = w.refreshesSettled()
       expect(await pending(settled)).toBe(true)
       held.release()
@@ -165,7 +166,7 @@ describe("a refresh's running agents share the workspace's reads (#1002)", () =>
     const held = heldRefreshes()
     try {
       w.scheduleRefresh()
-      await vi.waitFor(() => expect(held.started()).toBe(1), { timeout: 10_000 })
+      await vi.waitFor(() => expect(held.started()).toBe(1), { timeout: timing('wait.hang') })
       const settled = w.refreshesSettled()
       w.scheduleRefresh()
       held.release()
@@ -201,7 +202,7 @@ describe("a refresh's running agents share the workspace's reads (#1002)", () =>
     })
     try {
       w2.scheduleRefresh()
-      await vi.waitFor(() => expect(started).toBe(1), { timeout: 10_000 })
+      await vi.waitFor(() => expect(started).toBe(1), { timeout: timing('wait.hang') })
       const closing = w2.close()
       expect(await pending(closing)).toBe(true)
       expect(w2.lifetime.aborted).toBe(true)

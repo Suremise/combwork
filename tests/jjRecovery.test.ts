@@ -12,6 +12,7 @@ import type { WorkspaceIdentity } from '../src/main/platform/workspacePort'
 import { harness, jjExe, type Harness } from './jjWorkspaceHarness'
 import { junction } from './pathAliases'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const yes = { still: () => true }
 const quiet = async (): Promise<boolean> => true
@@ -53,7 +54,7 @@ async function stale(colocated: boolean, o: { destEdit?: (repo: string) => void;
   const id = (await h.port.identity!(slot))!
   const git: GitRun = async (cwd, args) => {
     try {
-      const buf = execFileSync('git', args, { cwd, env: h.env, windowsHide: true, timeout: 60_000, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
+      const buf = execFileSync('git', args, { cwd, env: h.env, windowsHide: true, timeout: timing('spawn.hang'), maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
       return { ok: true, out: buf.toString('utf8'), buf, err: '' }
     } catch (e) {
       const err = e as { stderr?: Buffer; stdout?: Buffer }
@@ -77,7 +78,7 @@ const divergentCount = (s: Stale): number => s.visible().filter((l) => l.endsWit
 
 // A hung test's bound (HI-3350), not a time budget: each test runs real jj and Git processes, and alone, one file at a time,
 // the longest took 8.3 s, over a third of Vitest's 20 s default; a loaded full run needs at least 3 times that.
-const REAL_JJ_MS = 30_000
+const REAL_JJ_MS = timing('wait.hang')
 
 describe.skipIf(!jjExe)(`a stale jj workspace's recovery (jj ${TESTED_JJ.version})`, { timeout: REAL_JJ_MS }, () => {
   for (const colocated of [true, false]) {
@@ -339,7 +340,7 @@ async function raced(colocated: boolean): Promise<Stale & { X: string; E2: strin
   const id = (await h.port.identity!(slot))!
   const git: GitRun = async (cwd, args) => {
     try {
-      const buf = execFileSync('git', args, { cwd, env: h.env, windowsHide: true, timeout: 60_000, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
+      const buf = execFileSync('git', args, { cwd, env: h.env, windowsHide: true, timeout: timing('spawn.hang'), maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
       return { ok: true, out: buf.toString('utf8'), buf, err: '' }
     } catch (e) {
       const err = e as { stderr?: Buffer; stdout?: Buffer }
@@ -381,7 +382,7 @@ describe.skipIf(!jjExe)('HI-3134: a stale slot whose own commit is still in jj b
       expect(await s.h.port.stale(s.slot)).toBe(true)
       // Refused before anything was written: no journal to resume.
       expect(s.h.journals.of('rec').read()).toBeNull()
-    }, 120_000)
+    }, timing('test.hang'))
 
     it(`a recovery resumed from its journal is refused the same right before jj's update, its journal kept (colocated: ${colocated})`, async () => {
       // A stale slot (its commit rebased by the default workspace), its recovery stopped once its bytes were preserved.
@@ -398,7 +399,7 @@ describe.skipIf(!jjExe)('HI-3134: a stale slot whose own commit is still in jj b
       expect(files(s.slot)).toEqual(before)
       expect(headOf(s)).toBe(head)
       expect(s.h.journals.of('rec').read()).toMatchObject({ phase: 'preserved' })
-    }, 120_000)
+    }, timing('test.hang'))
 
     it(`the head moving between its last read and jj's update (the folder's commit made visible then): refused, the folder as it was, its journal kept (colocated: ${colocated})`, async () => {
       // HR1's round 1: the pre-update read sees WS hidden (the usual stale slot); then, before the write's recheck, a user's
@@ -417,7 +418,7 @@ describe.skipIf(!jjExe)('HI-3134: a stale slot whose own commit is still in jj b
       expect(files(s.slot)).toEqual(before)
       expect(await s.h.port.stale(s.slot)).toBe(true)
       expect(s.h.journals.of('rec').read()).toMatchObject({ phase: 'preserved' })
-    }, 120_000)
+    }, timing('test.hang'))
 
     it(`once the user gives the slot the folder's version again, it isn't stale and nothing is lost (colocated: ${colocated})`, async () => {
       const s = await raced(colocated)
@@ -430,6 +431,6 @@ describe.skipIf(!jjExe)('HI-3134: a stale slot whose own commit is still in jj b
       expect(files(s.slot)).toEqual(before)
       expect(await run(s, s.deps())).toMatchObject({ ok: false, why: 'notStale' })
       expect(files(s.slot)).toEqual(before)
-    }, 120_000)
+    }, timing('test.hang'))
   }
 })

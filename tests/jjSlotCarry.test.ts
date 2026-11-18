@@ -15,11 +15,12 @@ import { TESTED_JJ } from '../src/shared/jjTool'
 import { admitted } from './admitted'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 if (!jjExe) console.warn(`jjSlotCarry.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
 // A hung test's bound, as jjCards.test.ts' (real jj slot preparations): not a time budget.
-const REAL_JJ_MS = 90_000
+const REAL_JJ_MS = timing('wait.hangReal')
 
 const closers: (() => void | Promise<void>)[] = []
 afterEach(async () => {

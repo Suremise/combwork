@@ -10,6 +10,7 @@ import { build } from 'vite'
 import { describe, expect, it } from 'vitest'
 import { monacoDompurify } from '../electron.vite.config'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const root = resolve(__dirname, '..')
 const monacoEsm = join(root, 'node_modules', 'monaco-editor', 'esm', 'vs', 'base', 'browser')
@@ -52,5 +53,5 @@ describe("Monaco's DOMPurify is Combwork's (#1141)", () => {
     const own = versionOf(ours)
     expect(own).toMatch(/^\d/)
     expect(versionsIn(code)).toEqual([own])
-  }, 60_000)
+  }, timing('test.hang'))
 })

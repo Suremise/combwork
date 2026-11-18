@@ -6,6 +6,7 @@ import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-assistant-ask-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -36,7 +37,7 @@ describe("the Assistant's questions to the user (HI-1994)", () => {
 
   it('unanswered in time: timed out, the question closed, and a later answer is nothing', async () => {
     vi.useFakeTimers()
-    const how = ask(WS, q, { timeoutMs: 1000 })
+    const how = ask(WS, q, { timeoutMs: 1000 }) // timing-ok: the timeout under test (its expiry is what the test checks)
     const id = questions(WS)[0].id
     await vi.advanceTimersByTimeAsync(1000)
     expect(await how).toBe('timedOut')
@@ -48,7 +49,7 @@ describe("the Assistant's questions to the user (HI-1994)", () => {
 
   it('its caller gone (the request aborted): withdrawn at once, never left open', async () => {
     const caller = new AbortController()
-    const how = ask(WS, q, { timeoutMs: 60_000, signal: caller.signal })
+    const how = ask(WS, q, { timeoutMs: timing('spawn.hang'), signal: caller.signal })
     expect(questions(WS)).toHaveLength(1)
     caller.abort()
     expect(await how).toBe('gone')

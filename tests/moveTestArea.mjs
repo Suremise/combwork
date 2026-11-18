@@ -31,6 +31,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'path'
 import { fileURLToPath } from 'url'
 import { convertBenchmarks } from './convertBenchmarks.mjs'
 import { claimHeld } from './e2e/lanes.mjs'
+const { timing } = createRequire(import.meta.url)('./timing.cjs')
 
 const require = createRequire(import.meta.url)
 const { NAME, OLD_NAME, MARKER, absent, present, areas } = require('./testArea.cjs')
@@ -63,8 +64,8 @@ export function rewriteText(text, froms, to) {
   return { text, count }
 }
 
-/** A folder in a claim folder this new, with no claim in it yet, is a claim being made (build.mjs's and lanes.mjs's locks: their 30 s). */
-export const CLAIM_MAKING_MS = 30_000
+/** A folder in a claim folder this new, with no claim in it yet, is a claim being made (build.mjs's lock, 30 s, and lanes.mjs's, the timing file's runner.lockStaleMs: the longer, an ownership threshold never scaled). */
+export const CLAIM_MAKING_MS = timing('runner.lockStaleMs')
 
 /**
  * The claims in root's claim folders that keep the area busy: [{ file, pid, what }]. Fails closed (HR1, HI-2590 round
@@ -261,7 +262,7 @@ if (main) {
     // Read only: whether each home is still signed in (Codex says it on stderr). One command line for the shell, which
     // finds claude and codex (.cmd or .exe) on PATH.
     const status = (command, env) => {
-      const r = spawnSync(command, { encoding: 'utf8', env: { ...baseEnv(), ...env }, timeout: 60_000, shell: true, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+      const r = spawnSync(command, { encoding: 'utf8', env: { ...baseEnv(), ...env }, timeout: timing('spawn.hang'), shell: true, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
       const out = `${r.stdout ?? ''}\n${r.stderr ?? ''}`.trim()
       return r.error ? `couldn't tell (${r.error.message})` : out || `nothing said (exit ${r.status})`
     }

@@ -18,6 +18,7 @@ import type { WorkflowRole } from '../src/shared/workflow/roles'
 import type { CopyPool as Pool } from '../src/main/copies'
 import '../src/shared/agentText/asyncScope'
 import { inDialectOf, inDialectScope, setChainResolver, type DialectChain } from '../src/shared/agentText'
+import { timing } from './timing.cjs'
 
 // The app's message to a reviewer (tellReviewer) as leaveMessage gets it: its text, and the reviewer's.
 const sent = vi.hoisted(() => [] as { agent: string; text: string }[])
@@ -225,7 +226,7 @@ function world(size = 2, tell?: ConstructorParameters<typeof ReviewCopies>[0]['t
     runner: async (r) => {
       const logPath = join(logs, `${runs++}.log`)
       const out = new BoundedLog(logPath, FILE_IO)
-      const e = await execCommand({ spawn: nodeSpawn, platform: process.platform, timeoutMs: 60_000, env: () => ({ ...baseEnv(), ...r.env }) }, r.command, r.folder, out)
+      const e = await execCommand({ spawn: nodeSpawn, platform: process.platform, timeoutMs: timing('spawn.hang'), env: () => ({ ...baseEnv(), ...r.env }) }, r.command, r.folder, out)
       out.close()
       return { ok: !e.spawnError && !e.timedOut && e.exitCode === 0, exitCode: e.exitCode, logPath, settled: true }
     },

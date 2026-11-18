@@ -9,6 +9,7 @@ import { preset } from '../../src/shared/workflow/options'
 import { MERGE_GUARDS_CHECK, type MergeGuard } from '../../src/shared/workflow/mergeGuards'
 import { QUEUE_ADVANCE_GATE } from '../../src/shared/workflow/facts'
 import { withGuardsWorker } from '../guardsWorker'
+import { timing } from '../timing.cjs'
 
 // A user's pattern runs only in the guards' worker, never on main's thread: the real one, built for these tests.
 withGuardsWorker()
@@ -125,7 +126,7 @@ describe('merge guards in the merge queue', () => {
           changed = true
           e.options.mergeGuards = [{ name: 'Nothing', pattern: 'zzz-never', message: 'n/a' }]
         }
-        return { timeoutMs: 30_000, maxLines: 200_000 }
+        return { timeoutMs: timing('spawn.hang'), maxLines: 200_000 }
       }
     })
     const [o] = await q.drain('main')
@@ -179,7 +180,7 @@ describe('merge guards in the merge queue', () => {
           changed = true
           e.options.mergeGuards = [secrets]
         }
-        return { timeoutMs: 30_000, maxLines: 200_000 }
+        return { timeoutMs: timing('spawn.hang'), maxLines: 200_000 }
       }
     })
     const [o] = await q.drain('main')

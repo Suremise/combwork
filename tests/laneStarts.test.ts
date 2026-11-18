@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { claudeInput } from './claudeInputStandIn'
+import { timing } from './timing.cjs'
 
 // What Combwork types into agents' terminals, recorded instead (no process runs).
 const pty = vi.hoisted(() => ({ typed: [] as string[] }))
@@ -348,7 +349,7 @@ describe("Combwork starts a lane's next card (HI-1990)", () => {
     await vi.waitFor(async () => {
       await checkLaneStarts(w)
       expect(await columnOf(first)).toBe('doing')
-    }, { timeout: 10_000 })
+    }, { timeout: timing('wait.hang') })
     await lanes.endLane(w, lane.id, { abandoned: true })
   })
 

@@ -7,6 +7,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { commit, gitRepo } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-lane-given-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -18,7 +19,7 @@ const tasks = await import('../src/main/tasks')
 const lanes = await import('../src/main/lanes')
 const { DEFAULT_PROJECT_CONFIG } = await import('../src/shared/defaults')
 
-vi.setConfig({ testTimeout: 120_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 const cleanups: (() => Promise<void> | void)[] = []
 afterAll(async () => {
   for (const c of cleanups.splice(0).reverse()) await c()

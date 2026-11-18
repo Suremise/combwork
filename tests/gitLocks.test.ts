@@ -7,6 +7,7 @@ import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { GIT_PREFIX, git, gitStatus } from '../src/main/git'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-gitlocks-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
@@ -23,7 +24,7 @@ async function landed(call: () => Promise<unknown>): Promise<unknown> {
       return await call()
     } catch (e) {
       if (!RACING.test(String(e)) || attempt >= 1000) throw e
-      await new Promise((r) => setTimeout(r, 5))
+      await new Promise((r) => setTimeout(r, timing('pace.tick')))
     }
   }
 }
@@ -131,7 +132,7 @@ describe("Combwork's git calls and the index (#212)", () => {
         // Touched, not changed: what makes a refresh write the index, until the next add.
         touch('b.txt')
         touch('c.txt')
-        await new Promise((r) => setTimeout(r, 5))
+        await new Promise((r) => setTimeout(r, timing('pace.tick')))
       }
     } finally {
       // The refreshers stop and finish however this ends, a write here throwing too, so none is left running git in the
@@ -142,5 +143,5 @@ describe("Combwork's git calls and the index (#212)", () => {
     expect(results.map((r) => r.error).filter(Boolean)).toEqual([])
     for (const r of results) expect(r.k).toBeGreaterThan(0)
     expect(failures).toEqual([])
-  }, 20000)
+  }, timing('test.hang'))
 })

@@ -11,6 +11,7 @@ import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 const base0 = tempDir('repo-read-traces-')
 mkdirSync(join(base0, 'profile'), { recursive: true })
@@ -91,14 +92,14 @@ async function traced(base: string, fn: () => Promise<unknown>): Promise<string[
 }
 
 /** The bound for a hung run, never how long a step should take. */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 
 /** Waits for `ok` (a bound for a hung run, never how long it should take). */
 async function until(ok: () => boolean, ms = HUNG_MS): Promise<void> {
   const by = Date.now() + ms
   while (!ok()) {
     if (Date.now() > by) throw new Error('git commands still running after the read ended') // i18n-ignore: a test's own failure
-    await new Promise((r) => setTimeout(r, 10))
+    await new Promise((r) => setTimeout(r, timing('pace.shortMs')))
   }
 }
 
@@ -107,7 +108,7 @@ function same(step: string, trace: string[]): void {
   else expect(trace, step).toEqual(expected()[step])
 }
 
-describe("the window's repository reads (HI-2785)", { timeout: 120_000 }, () => {
+describe("the window's repository reads (HI-2785)", { timeout: timing('test.hang') }, () => {
   it('summary, info, leftovers, History, compare and diff, pins and errors, a line status and the Merge dialog’s branches', async () => {
     const base = tempDir('repo-read-traces-')
     const ws = join(base, 'ws')

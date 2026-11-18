@@ -70,7 +70,7 @@ describe('duplicate hook deliveries (HI-2777)', () => {
     claim(r,'PreToolUse:slow')
     const started = Date.now()
     expect(await claim(r,'PreToolUse:slow')!.entry.twinReply(50)).toEqual({ reply: null, carries: false })
-    expect(Date.now() - started).toBeLessThan(2000)
+    expect(Date.now() - started).toBeLessThan(2000) // timing-ok: the 50 ms bound under test, with room: a wait past it fails
     endTwins(r)
   })
 

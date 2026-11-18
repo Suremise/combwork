@@ -12,6 +12,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 const base = tempDir('repo-ops-boundary-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -31,7 +32,7 @@ const control = await import('../src/main/assistantControl')
 const { userUndo } = await import('../src/main/assistantUndo')
 const { makeBranchAt } = await import('../src/main/gitRepo')
 
-vi.setConfig({ testTimeout: 60_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 type WS = ReturnType<typeof createWorkspaceService>
 type Op = (typeof OPERATIONS)[number]

@@ -13,6 +13,7 @@ import { ACCEPT_MAX, changedSince, chosenTests, choiceStands, parsePick, readRes
 import { parseRaw, pathChanges } from '../../src/main/workflow/focusedRun'
 import { queueChecks } from '../../src/main/workflow/queueChecks'
 import { acceptedRuns, isRefusal } from '../../src/main/workflow/runtime'
+import { timing } from '../timing.cjs'
 
 let env: Env | null = null
 afterEach(() => {
@@ -430,7 +431,7 @@ describe("HR4's round 1: what the merge takes as proof, decisions and results", 
     const e = env
     const { card } = await built(e)
     const submitting = e.wf.submit(card.key, B1, { summary: 'x' })
-    await vi.waitFor(() => expect(existsSync(pid)).toBe(true), { timeout: 30_000 })
+    await vi.waitFor(() => expect(existsSync(pid)).toBe(true), { timeout: timing('wait.hang') })
     const n = Number(readFileSync(pid, 'utf8'))
     life.abort()
     refusedBy(await submitting, 'submit.focusedChosen')
@@ -442,7 +443,7 @@ describe("HR4's round 1: what the merge takes as proof, decisions and results", 
         return false
       }
     }
-    await vi.waitFor(() => expect(alive()).toBe(false), { timeout: 30_000 })
+    await vi.waitFor(() => expect(alive()).toBe(false), { timeout: timing('wait.hang') })
   })
 
   // HR4's round 2 finding 1: with the builder's own list too (none, empty, some), an ended submission is never recorded.
@@ -455,7 +456,7 @@ describe("HR4's round 1: what the merge takes as proof, decisions and results", 
       const e = team(p.command, runner().command)
       const { card } = await built(e)
       const first = e.wf.submit(card.key, B1, { summary: 'OLD', ...(tests ? { tests: [...tests] } : {}) })
-      await vi.waitFor(() => expect(existsSync(pid)).toBe(true), { timeout: 30_000 })
+      await vi.waitFor(() => expect(existsSync(pid)).toBe(true), { timeout: timing('wait.hang') })
       p.set({ pick: [] })
       moved(await e.wf.submit(card.key, B1, { summary: 'NEW', ...(tests ? { tests: [...tests] } : {}) }))
       refusedBy(await first, 'submit.focusedChosen')
@@ -471,7 +472,7 @@ describe("HR4's round 1: what the merge takes as proof, decisions and results", 
       env = setup({ ...preset('git', 'team', { quick: [], tests: [] }), preChecks: [], mergeChecks: [], okBefore: { mode: 'never', labels: [] }, focusedTests: true, commands: { 'focused.pick': p.command, 'focused.run': runner().command } }, { focused: { env: base, timeoutMs: () => 60_000, life: life.signal } })
       const { card } = await built(env)
       const submitting = env.wf.submit(card.key, B1, { summary: 'x', ...(tests ? { tests: [...tests] } : {}) })
-      await vi.waitFor(() => expect(existsSync(pid)).toBe(true), { timeout: 30_000 })
+      await vi.waitFor(() => expect(existsSync(pid)).toBe(true), { timeout: timing('wait.hang') })
       life.abort()
       refusedBy(await submitting, 'submit.focusedChosen')
       expect(env.wf.state(card).submissions).toEqual([])
@@ -502,13 +503,13 @@ describe("HR4's round 1: what the merge takes as proof, decisions and results", 
       const e = env
       const { card, folder } = await built(e)
       const old = e.wf.submit(card.key, B1, { summary: 'OLD', ...(tests ? { tests: [...tests] } : {}) })
-      await vi.waitFor(() => expect(atBoundary).toBe(true), { timeout: 30_000 })
+      await vi.waitFor(() => expect(atBoundary).toBe(true), { timeout: timing('wait.hang') })
       // NEW starts and is held in its picker: its operation has ended OLD's.
       const pid = join(tempDir('focused-pid-'), 'pid')
       const go = join(tempDir('focused-go-'), 'go')
       p.set({ pick: [], holdFor: go, pidTo: pid })
       const next = e.wf.submit(card.key, B1, { summary: 'NEW', ...(tests ? { tests: [...tests] } : {}) })
-      await vi.waitFor(() => expect(existsSync(pid)).toBe(true), { timeout: 30_000 })
+      await vi.waitFor(() => expect(existsSync(pid)).toBe(true), { timeout: timing('wait.hang') })
       // A stat-only change of the evidence: the index touched, its contents the same.
       const index = join(folder, sh(folder, 'rev-parse', '--git-path', 'index'))
       const later = new Date(Date.now() + 5_000)

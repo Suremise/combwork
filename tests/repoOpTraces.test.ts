@@ -13,6 +13,7 @@ import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 const base0 = tempDir('repo-op-traces-')
 mkdirSync(join(base0, 'profile'), { recursive: true })
@@ -42,14 +43,14 @@ afterAll(async () => {
 })
 
 /** The bound for a hung run, never how long a step should take. */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 
 /** Waits for `ok` (a bound for a hung run, never how long it should take). */
 async function until(ok: () => boolean, ms = HUNG_MS): Promise<void> {
   const by = Date.now() + ms
   while (!ok()) {
     if (Date.now() > by) throw new Error('git commands still running after the call ended') // i18n-ignore: a test's own failure
-    await new Promise((r) => setTimeout(r, 10))
+    await new Promise((r) => setTimeout(r, timing('pace.shortMs')))
   }
 }
 
@@ -96,7 +97,7 @@ function same(step: string, trace: string[]): void {
   else expect(trace, step).toEqual(expected()[step])
 }
 
-describe("the window's repository mutations (HI-2788)", { timeout: 180_000 }, () => {
+describe("the window's repository mutations (HI-2788)", { timeout: timing('test.hangReal') }, () => {
   it('branches, update, merge, remotes, push and fetch, tags, identity, init and the Files tab’s ignore writes', async () => {
     const base = tempDir('repo-op-traces-')
     const ws = join(base, 'ws')

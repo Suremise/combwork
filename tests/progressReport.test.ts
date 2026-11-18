@@ -16,6 +16,7 @@ import { combworkInstructions, progressRule, wrapsLongCommands } from '../src/sh
 import { STALE_GRACE_MS } from '../src/shared/progress'
 import { launchParts } from '../src/main/guidance'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 // A process by its identity (pid and start time), never by a remembered pid alone (#603).
 type Identity = { pid: number; started: number }
 const { identify, stillSame, endExactly } = createRequire(import.meta.url)('./e2e/folderProcesses.cjs') as { identify: (pids: number[]) => Identity[]; stillSame: (ids: Identity[]) => number[]; endExactly: (ids: Identity[]) => number }
@@ -59,7 +60,7 @@ let startDelayMs = 0
 /** What the stand-in answers a run's finish (#1654: how a check's run counted). */
 let finishReply: Record<string, unknown> = {}
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 const seenFile = join(dir, 'seen.json')
 /** The agent's token in its file, as a session has it (HI-2262: never CW_API_TOKEN). */
 const agentTokenFile = join(dir, 'agent-token.json')
@@ -228,7 +229,7 @@ describe.runIf(process.platform === 'win32')('stopping a command on Windows (#54
     writeFileSync(serve, `@echo off\r\n"${node}" "${serverJs}"\r\n`)
     const stop: NodeJS.Signals = 'SIGUSR2'
     const going = runWrapped(['--', serve], { env: env(), cwd: dir, stdout: { write: () => true }, stderr: { write: () => true }, stdin: 'ignore', minIntervalMs: 100, startWaitMs: 0, signals: [stop] })
-    await vi.waitFor(() => expect(existsSync(pidFile) && calls.length > 0).toBe(true), { timeout: 15_000 })
+    await vi.waitFor(() => expect(existsSync(pidFile) && calls.length > 0).toBe(true), { timeout: timing('wait.hang') })
     const pid = Number(readFileSync(pidFile, 'utf8'))
     // Its identity while it is known to be the server: the checks and the clean-up never take a later process with its pid.
     const serverId = identify([pid])
@@ -239,14 +240,14 @@ describe.runIf(process.platform === 'win32')('stopping a command on Windows (#54
       process.emit(stop)
       process.emit(stop)
       expect(await going).not.toBe(0)
-      await vi.waitFor(() => expect(alive()).toBe(false), { timeout: 30_000 })
+      await vi.waitFor(() => expect(alive()).toBe(false), { timeout: timing('wait.hang') })
       expect(calls.at(-1)).toMatchObject({ path: '/v1/progress/run-1/finish', body: { ok: false, stopped: true, summary: 'interrupted' } })
     } finally {
       endExactly(serverId)
     }
     // Bounds for a hung run, not waits: the test and the stop start PowerShell five times or more in a row (identify,
     // each alive(), the stop's list and end), and under a full e2e set one start took up to 21 s (#616).
-  }, 90_000)
+  }, timing('test.hang'))
 })
 
 describe('which processes stopping a command ends (#655)', () => {
@@ -412,7 +413,7 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
       ['POST', '/v1/progress', 'typecheck'],
       ['POST', '/v1/progress/ID/finish', true]
     ])
-  }, 30_000)
+  }, timing('test.hang'))
 
   it("the setting's reply time, within 1 s and 2 minutes whatever is set; 15 s without it (HI-1892)", () => {
     expect(replyTimeoutMs({})).toBe(15_000)
@@ -434,7 +435,7 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
     await new Promise<void>((r) => closed.close(() => r()))
     const from = Date.now()
     const refused = await wrap(['--check', 'lint'], env({ CW_API_URL: gone }), 0, dir, { resolveTimeoutMs: 60_000, retryMs: 60_000 })
-    expect(Date.now() - from).toBeLessThan(HUNG_MS)
+    expect(Date.now() - from).toBeLessThan(timing('budget.promptEndMs'))
     expect(refused).toMatchObject({ code: 2, out: '' })
     expect(refused.err).toBe(`cw-progress: Combwork couldn't be reached to look up the command for lint (connection refused at ${gone}), so nothing was run. Is Combwork running? A sandbox that blocks local network access (Claude Code's Bash sandbox does) stops it too: run the command outside the sandbox.\n`)
     expect(calls).toEqual([])
@@ -464,7 +465,7 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
     resolveReply = { status: 404, body: { error: 'No such route' } }
     expect(await wrap(['--', node, '-e', 'process.exit(3)'], env(), 0, dir, quick)).toEqual({ code: 3, out: '', err: '' })
     expect(finishes()).toBe(1)
-  }, 30_000)
+  }, timing('test.hang'))
 
   it("a quick check's start Combwork takes late but within its time is followed by its finish, never given up first (HR2's round 1)", async () => {
     // Its finish's own budget (twice 300 ms and a 50 ms pause) is shorter than the start's wait: the start's time comes first.
@@ -553,7 +554,7 @@ describe('reporting a run', () => {
     calls.length = 0
     await wrap(['--', ...ok], env(), 0)
     expect(calls[0].body.estimateMs).toBeGreaterThan(500_000)
-    expect(calls[0].body.estimateMs).toBeLessThanOrEqual(600_000)
+    expect(calls[0].body.estimateMs).toBeLessThanOrEqual(600_000) // timing-ok: data, not a wait
     // Titled with the command line (clipped: the temporary folder's path is long).
     expect(commandLabel(ok).startsWith(String(calls[0].body.title).replace(/…$/, ''))).toBe(true)
   })
@@ -605,7 +606,7 @@ describe('reporting a run', () => {
     const cmd = ['--', node, '-e', "console.log('out'); process.exit(4)"]
     const t0 = Date.now()
     expect(await wrap(cmd, env({ CW_API_URL: 'http://127.0.0.1:9' }))).toEqual({ code: 4, out: 'out\n', err: '' })
-    expect(Date.now() - t0).toBeLessThan(5000)
+    expect(Date.now() - t0).toBeLessThan(timing('budget.promptEndMs'))
     refuse = true
     expect(await wrap(cmd, env())).toEqual({ code: 4, out: 'out\n', err: '' })
     expect(calls.map((c) => c.path)).toEqual(['/v1/progress'])
@@ -648,7 +649,7 @@ describe('reporting a run', () => {
     calls.length = 0
     const stop: NodeJS.Signals = 'SIGUSR2'
     const going = runWrapped(['--', ...seenNode, '-e', `seen((c) => c.length > 0).then(() => setInterval(() => {}, 1000))`], { env: env(), cwd: dir, stdout: { write: () => true }, stderr: { write: () => true }, stdin: 'ignore', minIntervalMs: 100, startWaitMs: 0, signals: [stop] })
-    await vi.waitFor(() => expect(calls.length).toBeGreaterThan(0), { timeout: 10_000 })
+    await vi.waitFor(() => expect(calls.length).toBeGreaterThan(0), { timeout: timing('wait.hang') })
     // The first stop gives it a moment; a second ends it at once.
     process.emit(stop)
     process.emit(stop)
@@ -664,7 +665,7 @@ describe('reporting a run', () => {
     const cmd = [...seenNode, '-e', `seen((c) => c.length > 0).then(() => setInterval(() => require('fs').existsSync(${JSON.stringify(stopFile)}) && process.exit(0), 20))`]
     const stop: NodeJS.Signals = 'SIGUSR2'
     const going = runWrapped(['--', ...cmd], { env: env(), cwd: dir, stdout: { write: () => true }, stderr: { write: () => true }, stdin: 'ignore', minIntervalMs: 100, startWaitMs: 0, signals: [stop] })
-    await vi.waitFor(() => expect(calls.length).toBeGreaterThan(0), { timeout: 10_000 })
+    await vi.waitFor(() => expect(calls.length).toBeGreaterThan(0), { timeout: timing('wait.hang') })
     process.emit(stop)
     writeFileSync(stopFile, '')
     expect(await going).toBe(0)

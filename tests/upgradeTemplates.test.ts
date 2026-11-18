@@ -14,6 +14,7 @@ import { as09 } from './boardDb'
 import { TEMPLATE_VERSION } from '../src/shared/templates'
 import type { CombworkEvent } from '../src/shared/types'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-upgrade-templates-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -25,7 +26,7 @@ const step = await import('../src/main/templateUpgrade')
 const templates = await import('../src/main/templates')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 15000
+const HUNG_MS = timing('wait.hang')
 let n = 0
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []

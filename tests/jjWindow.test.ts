@@ -12,6 +12,7 @@ import { TO_CHECK_PAGE, markCheckedIn, toCheckPage, type ToCheckCursor } from '.
 import { SlotStore, fileSlotConn } from '../src/main/slots'
 import { admitted } from './admitted'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const closers: (() => void)[] = []
 afterEach(() => {
@@ -23,7 +24,7 @@ function database(): DatabaseSync {
   const home = tempDir('jjwindow-')
   const dismiss = admitted(home)
   workspaceDb(home)
-  const db = new DatabaseSync(boardFile(home), { timeout: 5000 })
+  const db = new DatabaseSync(boardFile(home), { timeout: timing('db.busyMs') })
   closers.push(() => {
     db.close()
     closeBoard(home)

@@ -8,6 +8,7 @@ import { withFileLock, writeTextAtomic, writeTextUnlessChanged } from '../src/ma
 import { createWorkspaceService, disposeWorkspaceService, type WorkspaceService } from '../src/main/workspace'
 import { tempDir } from './tempDir'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-bounds-')
 const dir = (...p: string[]): string => {
@@ -63,7 +64,7 @@ describe('workspace boundaries', () => {
     // Closing the old workspace takes a moment: the other window's check must still see this one's claim.
     for (const w of [a, b]) {
       const close = bound(w, w.close)
-      w.close = async () => (await new Promise((r) => setTimeout(r, 30)), close())
+      w.close = async () => (await new Promise((r) => setTimeout(r, timing('pace.shortMs'))), close())
     }
     const results = await Promise.allSettled([a.open(outer), b.open(inner)])
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
@@ -155,7 +156,7 @@ describe('writes that keep other changes', () => {
     const append = (line: string): Promise<void> =>
       withFileLock(f, async () => {
         const existing = await readFile(f, 'utf8').catch(() => '')
-        await new Promise((r) => setTimeout(r, 20))
+        await new Promise((r) => setTimeout(r, timing('pace.shortMs')))
         await writeTextAtomic(f, existing + line + '\n')
       })
     await Promise.all([append('a'), append('b'), append('c')])

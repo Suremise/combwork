@@ -7,6 +7,7 @@ import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-startfailure-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -18,7 +19,7 @@ const { resetAgentStartsForTests, startBegun, startEnded, startFailed, startNow 
 const { agentNowOf } = await import('../src/main/cardStall')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 const wsPath = join(base, 'ws')
 const p = join(wsPath, 'alpha')
 type Internals = {
