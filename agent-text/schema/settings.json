@@ -236,6 +236,18 @@
   "settings.advanced.claude-code.autoModeSetup.offer.title": {
     "placeholders": {}
   },
+  "settings.advanced.claude-code.background.idField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.background.idField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.background.pidField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.background.pidField.title": {
+    "placeholders": {}
+  },
   "settings.advanced.claude-code.connections.remoteModels.desc": {
     "placeholders": {}
   },
