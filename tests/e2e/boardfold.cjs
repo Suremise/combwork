@@ -73,9 +73,17 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   /** Widths of the columns as drawn: expanded ones share the room equally, collapsed strips stay narrow. */
   const widths = () => columns.evaluateAll((els) => els.map((e) => ({ id: e.dataset.column, w: Math.round(e.getBoundingClientRect().width), collapsed: e.classList.contains('collapsed') })))
   const board = () => page.locator('.board').evaluate((e) => ({ client: e.clientWidth, scroll: e.scrollWidth, right: Math.round(e.lastElementChild.getBoundingClientRect().right - e.getBoundingClientRect().right) }))
+  /** The widths once the layout has stopped changing (a collapse's or a resize's): two reads a look apart the same. */
   const settled = async () => {
-    await lib.sleep(400)
-    return widths()
+    let last = null
+    let w = null
+    await until(async () => {
+      w = await widths()
+      const same = JSON.stringify(w) === last
+      last = JSON.stringify(w)
+      return same
+    }, lib.timing('hang.ui'))
+    return w
   }
   const collapse = async (label) => {
     await column(label).getByRole('button', { name: `Collapse ${label}` }).click()
@@ -167,12 +175,13 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   for (const after of ['a microtask', 'a timer']) {
     await page.reload()
     await lib.appReady(page)
-    // Not shown within 3 s, the board is opened by its button; then the wait for its card, bounded.
-    if (!(await until(async () => (await tile(n.t1).count()) === 1, 3000))) await page.getByRole('button', { name: 'Task Board' }).click()
+    // A try's pace, not a bound: not shown within it, the board is opened by its button (a click on it while it shows
+    // would close it); then the wait for its card, bounded.
+    if (!(await until(async () => (await tile(n.t1).count()) === 1, lib.timing('pace.reloadedBoardMs')))) await page.getByRole('button', { name: 'Task Board' }).click()
     await until(async () => (await tile(n.t1).count()) === 1, lib.timing('hang.ui'))
     await tile(n.t1).evaluate(async (el, timer) => {
       el.click()
-      await (timer ? new Promise((r) => setTimeout(r, 0)) : Promise.resolve())
+      await (timer ? new Promise((r) => setTimeout(r, 0)) : Promise.resolve()) // timing-ok: a timer's turn (0 ms) is the case under test (#288), not a wait
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     }, after === 'a timer')
     const closed = await until(async () => (await page.locator('.dialog').count()) === 0 || (await discard.count()) === 1, HUNG_MS)
@@ -227,7 +236,6 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   await page.screenshot({ path: path.join(lib.WORK, 'boardfold-dark.png') })
   await page.locator('.board').screenshot({ path: path.join(lib.WORK, 'boardfold-arrows-dark.png') })
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
-  await lib.sleep(200)
   await page.screenshot({ path: path.join(lib.WORK, 'boardfold-light.png') })
   await page.locator('.board').screenshot({ path: path.join(lib.WORK, 'boardfold-arrows-light.png') })
   const stripColour = await column('Done').locator('.board-column-strip .board-column-label').evaluate((e) => getComputedStyle(e).color)

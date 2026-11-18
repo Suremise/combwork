@@ -210,7 +210,7 @@ const check = (name, ok, extra = '') => {
     await startAsk.screenshot({ path: path.join(lib.WORK, 'boardgates-start-ask-dark.png') })
     await startAsk.getByRole('button', { name: 'Cancel' }).click()
     await lib.until(async () => (await startAsk.count()) === 0, HUNG_MS)
-    await lib.sleep(1500) // A fixed wait on purpose: this checks that nothing starts after Cancel.
+    await lib.sleep(lib.timing('quiet.noStartMs')) // A quiet window on purpose: this checks that nothing starts after Cancel.
     check('Cancel: nothing done, no agent started', (await card(s))?.column === 'todo' && !(await facts(s)).includes('Started') && !(await facts(s)).includes('Override') && (await live()) === liveBefore, JSON.stringify({ column: (await card(s))?.column, facts: await facts(s), live: await live(), liveBefore }))
     // The Move to Active dialog may still be open behind it (the start didn't happen): close it.
     if (await doingDialog.count()) await doingDialog.getByRole('button', { name: 'Cancel' }).click()
@@ -227,7 +227,7 @@ const check = (name, ok, extra = '') => {
     // --- Every rule off (S39): nothing asks; a column its rules don't have (Review) takes no drop.
     const c = await create('Read the docs', 'beta')
     await drag(c, 'Review')
-    await lib.sleep(1500) // A fixed wait on purpose: this checks that nothing happens (no drop, no question).
+    await lib.sleep(lib.timing('quiet.refusedDropMs')) // A quiet window on purpose: this checks that nothing happens (no drop, no question).
     check("a column the card's rules don't have takes no drop", (await card(c))?.column === 'todo' && (await dialog.count()) === 0, (await card(c))?.column)
     check('…which tasks:columns says', JSON.stringify(await inv('tasks:columns', c)) === JSON.stringify(['hold', 'todo', 'doing', 'done']), JSON.stringify(await inv('tasks:columns', c)))
     await drag(c, 'Done')

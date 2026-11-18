@@ -25,12 +25,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms) => {
-  const t = Date.now()
-  let v
-  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(100)
-  return v
-}
+const until = lib.until
 
 // The window buttons' colours: the theme's, and dimmed as the backdrops (black at 45% each, stacked) dim them.
 const DARK = { color: '#1f1f1f', dim: '#111111', dim2: '#090909' }
@@ -136,6 +131,23 @@ const LIGHT = { color: '#f3f3f3', dim: '#868686', dim2: '#4a4a4a' }
     const v = page.viewportSize() ?? (await page.evaluate(() => ({ width: innerWidth, height: innerHeight })))
     return h.x >= -0.5 && h.x + h.width <= v.width + 0.5 && h.y >= (await titleBarBottom()) - 0.5 && h.y + h.height <= v.height + 0.5
   }
+  /** Waits until read() gives the same twice a look apart: what it reads has stopped changing. */
+  const steady = async (read) => {
+    let last = null
+    return until(async () => {
+      const now = JSON.stringify(await read())
+      const same = now === last
+      last = now
+      return same
+    }, HUNG_MS)
+  }
+  /** The window's inside as the page sees it (CSS pixels: a zoom changes it too). */
+  const view = () => page.evaluate(() => [innerWidth, innerHeight])
+  /** Waits until the page has seen a resize from `before` (a zoom too), and the card has settled after it. */
+  const resizedFrom = async (before) => {
+    await until(async () => JSON.stringify(await view()) !== JSON.stringify(before), HUNG_MS)
+    await steady(async () => [await view(), await box(header)])
+  }
 
   // --- #88: the native buttons dim with the card, and stay dimmed under a question over it.
   await open()
@@ -201,16 +213,16 @@ const LIGHT = { color: '#f3f3f3', dim: '#868686', dim2: '#4a4a4a' }
   // The window gets smaller: the card is moved back in.
   await dragBy(3000, 3000)
   await lib.fitWindow(app, page, { width: 900, height: 600 })
-  await lib.sleep(400)
-  check('the window made smaller: the header is moved back into it', await inWindow(), JSON.stringify(await box(header)))
+  check('the window made smaller: the header is moved back into it', !!(await until(inWindow, HUNG_MS)), JSON.stringify(await box(header)))
   await lib.fitWindow(app, page, { width: 1400, height: 860 })
 
   // The window changes in the middle of a drag, then Escape: back where the drag began, as far as the window allows now.
   const resizes = {
     'made smaller': async () => lib.fitWindow(app, page, { width: 900, height: 600 }),
     'maximised and restored smaller': async () => {
+      const v = await view()
       await maximise()
-      await lib.sleep(400)
+      await until(async () => JSON.stringify(await view()) !== JSON.stringify(v), HUNG_MS)
       await unmaximise()
       await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(900, 600))
     }
@@ -218,11 +230,14 @@ const LIGHT = { color: '#f3f3f3', dim: '#868686', dim2: '#4a4a4a' }
   for (const [what, resize] of Object.entries(resizes)) {
     await dragBy(3000, 3000)
     await dragBy(-60, -40, { release: false })
+    const was = await view()
     await resize()
-    await lib.sleep(500)
+    await resizedFrom(was)
     await page.keyboard.press('Escape')
     await page.mouse.up()
-    await lib.sleep(200)
+    // The drag over (put back, or ended by the resize), and the card and any question over it at rest.
+    await until(async () => !(await dialog.evaluate((d) => d.classList.contains('dragging'))), HUNG_MS)
+    await steady(async () => [await question.count(), await box()])
     // Maximising can end the drag (the window drops the pointer capture): then Escape closes the card, which asks
     // first (its title is edited). Keep editing.
     if ((await question.count()) === 1) {
@@ -234,16 +249,19 @@ const LIGHT = { color: '#f3f3f3', dim: '#868686', dim2: '#4a4a4a' }
     const xNow = await box(close)
     const v = await page.evaluate(() => ({ w: innerWidth, h: innerHeight }))
     check(`${what} during a drag, then Escape: its × is in the window`, xNow.x + xNow.width <= v.w + 0.5 && xNow.y + xNow.height <= v.h + 0.5, JSON.stringify(xNow))
+    const small = await view()
     await lib.fitWindow(app, page, { width: 1400, height: 860 })
-    await lib.sleep(300)
+    await resizedFrom(small)
   }
 
   // Maximised and restored: still in the window, the buttons still dimmed.
+  let v = await view()
   await maximise()
-  await lib.sleep(500)
+  await resizedFrom(v)
   check('maximised: the header in the window, the buttons dimmed', (await inWindow()) && (await buttons()) === DARK.dim)
+  v = await view()
   await unmaximise()
-  await lib.sleep(500)
+  await resizedFrom(v)
   check('restored: the same', (await inWindow()) && (await buttons()) === DARK.dim)
 
   // A theme change while it is open: the new theme's colours, dimmed.
@@ -265,16 +283,18 @@ const LIGHT = { color: '#f3f3f3', dim: '#868686', dim2: '#4a4a4a' }
   check('reopened in the usual place', Math.abs(again.x - start.x) <= 1 && Math.abs(again.y - start.y) <= 1, `${start.x},${start.y} vs ${again.x},${again.y}`)
 
   // Display scaling (UI zoom 150%): it still follows the pointer and stays in the window.
+  v = await view()
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1.5))
-  await lib.sleep(500)
+  await resizedFrom(v)
   const z0 = await box()
   await dragBy(-80, 60)
   const z1 = await box()
   check('at 150%: the card follows the pointer', Math.abs(z1.x - z0.x + 80) <= 2 && Math.abs(z1.y - z0.y - 60) <= 2, `${z0.x},${z0.y} → ${z1.x},${z1.y}`)
   await dragBy(3000, 3000)
   check('at 150%: and stays in the window', await inWindow(), JSON.stringify(await box(header)))
+  v = await view()
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1))
-  await lib.sleep(300)
+  await resizedFrom(v)
 
   // A new card is movable too.
   await page.keyboard.press('Escape')
