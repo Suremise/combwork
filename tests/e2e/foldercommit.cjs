@@ -106,6 +106,29 @@ const lastCommitFiles = () => git('show', '--no-renames', '--name-only', '--form
     check('the Merges tab: the paused merge names .gitignore, with Commit and Set Aside', !!(await waitHung(async () => (await commitBtn.count()) === 1)) && (await m.card('main').locator('[data-action="set-aside-changes"]').count()) === 1 && /\.gitignore/.test(await m.text('main')), await m.text('main'))
     await f.themes(page, m.card('main'), 'foldercommit-merges-paused')
     const before = git('rev-parse', 'HEAD')
+    // HI-3372: Commit held by a pre-commit hook of the test's own: Cancel beside the buttons while it runs; pressed, git and
+    // the hook are ended, the notice says so (nothing committed), and the paused merge's buttons are back.
+    const hold = path.join(lib.probeDir('foldercommit-hold'), 'started')
+    const pidFile = `${hold}.pid`
+    const fwd = (p) => p.replace(/\\/g, '/')
+    fs.mkdirSync(path.join(fx.alpha, '.git', 'hooks'), { recursive: true })
+    fs.writeFileSync(path.join(fx.alpha, '.git', 'hooks', 'pre-commit'), `#!/bin/sh\n: > "${fwd(hold)}"\n"${fwd(process.execPath)}" -e 'require("fs").writeFileSync(process.argv[1], String(process.pid)); setTimeout(() => {}, 120000)' "${fwd(pidFile)}"\n`)
+    await commitBtn.click()
+    const cancelBtn = m.card('main').locator('[data-action="cancel-git-run"]')
+    check('Commit held by its hook: Cancel beside the buttons while it runs', !!(await waitHung(async () => fs.existsSync(hold) && (await cancelBtn.count()) === 1)), await m.text('main'))
+    await f.themes(page, m.card('main'), 'foldercommit-commit-running')
+    await cancelBtn.click()
+    const stopped = page.locator('.toast', { hasText: 'You cancelled the commit' })
+    const alive = (pid) => {
+      try {
+        process.kill(pid, 0)
+        return true
+      } catch {
+        return false
+      }
+    }
+    check('…Cancel: said Stopped, nothing committed; the hook ended; the buttons back', !!(await waitHung(async () => (await stopped.count()) >= 1 && (await cancelBtn.count()) === 0 && (await commitBtn.count()) === 1)) && /Nothing was committed/.test(await stopped.first().innerText()) && git('rev-parse', 'HEAD') === before && !!(await waitHung(() => fs.existsSync(pidFile) && !alive(Number(fs.readFileSync(pidFile, 'utf8'))))), await m.text('main'))
+    fs.rmSync(path.join(fx.alpha, '.git', 'hooks', 'pre-commit'))
     await commitBtn.click()
     const ours = () => git('log', '--format=%H', '--grep=Commit changes before merging', `${before}..HEAD`)
     check('Commit: .gitignore alone committed in the project folder, its message naming the card', !!(await waitHung(() => ours() || null)) && git('show', '--no-renames', '--name-only', '--format=', ours().split(/\s+/)[0]) === '.gitignore', git('log', '--format=%h %s', `${before}..HEAD`))

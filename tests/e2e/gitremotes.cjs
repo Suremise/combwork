@@ -72,6 +72,35 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitrem
         await lib.until(() => page.evaluate((x) => document.documentElement.dataset.theme === x, t), HUNG_MS)
       }
 
+      // --- HI-3372: Fetch held by the remote (an upload-pack of the test's own that waits): Cancel beside it while it runs;
+      // pressed, git and what it started are ended, and the notice says only what is true.
+      {
+        const dir = lib.probeDir('gitremotes-hold')
+        const started = path.join(dir, 'started')
+        const pidFile = path.join(dir, 'pid')
+        const fwd = (p) => p.replace(/\\/g, '/')
+        const script = path.join(dir, 'hold.sh')
+        fs.writeFileSync(script, `#!/bin/sh\n: > "${fwd(started)}"\n"${fwd(process.execPath)}" -e 'require("fs").writeFileSync(process.argv[1], String(process.pid)); setTimeout(() => {}, 120000)' "${fwd(pidFile)}"\n`)
+        g(alpha, 'config', 'remote.origin.uploadpack', `sh "${fwd(script)}" #`)
+        const alive = (pid) => {
+          try {
+            process.kill(pid, 0)
+            return true
+          } catch {
+            return false
+          }
+        }
+        await branches.locator('[data-action="fetch"]').click()
+        const cancelFetch = branches.locator('[data-action="cancel-git-run"]')
+        check('Fetch held by the remote: Cancel beside it while it runs', !!(await lib.until(async () => fs.existsSync(started) && (await cancelFetch.count()) === 1, HUNG_MS)), await text(branches))
+        await shot(page, 'fetch-running')
+        await cancelFetch.click()
+        const stopped = page.locator('.toast', { hasText: 'Stopped the fetch here' })
+        check('…Cancel: said Stopped, with what may have reached the remote; git and its upload-pack ended', !!(await lib.until(async () => (await stopped.count()) >= 1 && (await cancelFetch.count()) === 0, HUNG_MS)) && /refresh to see where things stand/.test(await text(stopped.first())) && !!(await lib.until(() => fs.existsSync(pidFile) && !alive(Number(fs.readFileSync(pidFile, 'utf8'))), HUNG_MS)), await text(stopped.first()))
+        await shot(page, 'fetch-stopped')
+        g(alpha, 'config', '--unset', 'remote.origin.uploadpack')
+      }
+
       // --- Push to… this branch (main), the folder switched to feature/x in a terminal before Push is clicked: main goes,
       // as the form named it, never the branch checked out by then (HR5's round 1).
       await branches.locator('[data-action="push-to"]').click()
