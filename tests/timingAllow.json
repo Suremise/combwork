@@ -597,10 +597,6 @@
       "timeout const textOf = (loc) => loc.innerText({ timeout: 500 }).catch(() => '')",
       "timeout const textOf = (loc) => loc.innerText({ timeout: 500 }).catch(() => '')"
     ],
-    "tests/e2e/lanenotices.cjs": [
-      "sleep await lib.sleep(3000) // A fixed wait on purpose: this checks that nothing comes (a lane is looked at within a second of a change).",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)"
-    ],
     "tests/e2e/lanes.mjs": [
       "sleep await sleep(50)",
       "sleep else await sleep(50)"
@@ -613,10 +609,6 @@
     ],
     "tests/e2e/lanestages.cjs": [
       "until if (!(await lib.until(async () => (await tips().count()) === 0, 5000))) return false"
-    ],
-    "tests/e2e/lanewatch.cjs": [
-      "sleep await lib.sleep(3000) // A fixed wait on purpose: this checks that a plain move into Review does NOT wake it.",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)"
     ],
     "tests/e2e/launchrace.cjs": [
       "sleep await lib.sleep(4000) // A fixed wait on purpose: this checks that the cancelled start does NOT start an agent later."
@@ -674,10 +666,6 @@
     ],
     "tests/e2e/mergeburst.cjs": [
       "msConstant const STALL_MS = 1000"
-    ],
-    "tests/e2e/mergeslot.cjs": [
-      "msConstant const HOLD_MS = 20000",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)"
     ],
     "tests/e2e/mode.cjs": [
       "clockLoop const t0 = Date.now(); while (Date.now() - t0 < 20000 && (await live())?.status !== 'ready') await sleep(300)",
@@ -799,30 +787,11 @@
     "tests/e2e/presetstep.cjs": [
       "timeout const db = new DatabaseSync(path.join(upgradedWs, '.combwork', 'combwork.db'), { timeout: 5000 })"
     ],
-    "tests/e2e/progress.cjs": [
-      "promiseSleep const frame = () => page.evaluate(() => new Promise((r) => (requestAnimationFrame(() => setTimeout(r, 0)), setTimeout(r, 2000))))",
-      "promiseSleep const frame = () => page.evaluate(() => new Promise((r) => (requestAnimationFrame(() => setTimeout(r, 0)), setTimeout(r, 2000))))",
-      "sleep await lib.sleep(200)",
-      "sleep await lib.sleep(250)",
-      "sleep await lib.sleep(800)",
-      "sleep const text = await Promise.race([got, lib.sleep(15000).then(() => '(no reply)')])",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)",
-      "until if (!(await until(async () => (await page.locator('.agent-pane.flash, .assistant-panel.flash').count()) === 0, 5000))) throw new Error('a pane still flashes')"
-    ],
     "tests/e2e/progressgates.cjs": [
       "until if (!(await until(async () => (await page.locator('.progress-panel').count()) === 1, 5000))) await page.locator('.progress-rail').click()"
     ],
-    "tests/e2e/progresslanes.cjs": [
-      "sleep await lib.sleep(250)",
-      "sleep await lib.sleep(250)",
-      "sleep await lib.sleep(400)",
-      "until if (!(await until(async () => (await page2.locator('.progress-panel').count()) === 1, 5000))) await page2.locator('.progress-rail').click()"
-    ],
     "tests/e2e/progressqueue.cjs": [
       "clockLoop check('…and straight after, still shown with Open card and Show log (round 4)', (await cardText()).includes(`${p4.key} returned`) && (await cardText()).includes(`${p3.key} returned`) && (await card.locator(`.progress-queue-returned[data-entry^=\"${p3.key}/\"] [data-action=\"show-log\"]`).count()) === 1 && Date.now() - seenAt < 10_000, await cardText())"
-    ],
-    "tests/e2e/progressreport.cjs": [
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)"
     ],
     "tests/e2e/progresstabs.cjs": [
       "timeout await reviewRow.hover({ timeout: 2000 }).catch(() => undefined)",
@@ -877,11 +846,6 @@
     ],
     "tests/e2e/recycleBin.mjs": [
       "timeout const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', '(New-Object -ComObject Shell.Application).NameSpace(10).Items().Count'], { encoding: 'utf8', timeout: 60_000, windowsHide: true, env: runContext.baseEnv() })"
-    ],
-    "tests/e2e/removeall.cjs": [
-      "sleep await lib.sleep(1500) // on purpose: nothing may stop or go after Cancel",
-      "sleep await lib.sleep(300)",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)"
     ],
     "tests/e2e/removeprojectslots.cjs": [
       "timeout const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })"
@@ -1031,9 +995,6 @@
     ],
     "tests/e2e/slotoptions.cjs": [
       "timeout const db = new DatabaseSync(path.join(fx.ws, '.combwork', 'combwork.db'), { timeout: 5000 })"
-    ],
-    "tests/e2e/slotsessions.cjs": [
-      "sleep await lib.sleep(300)"
     ],
     "tests/e2e/stalls.cjs": [
       "promiseSleep while (socks.length < reads.length) await new Promise((r) => setTimeout(r, 10))"
@@ -1199,10 +1160,6 @@
       "sleep await sleep(800)",
       "sleep await sleep(800)",
       "sleep await sleep(900)"
-    ],
-    "tests/e2e/unusedwt.cjs": [
-      "sleep await lib.sleep(500)",
-      "sleep await lib.sleep(500)"
     ],
     "tests/e2e/update.cjs": [
       "sleep await Promise.race([closed, sleep(10000)])",
