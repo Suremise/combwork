@@ -103,9 +103,9 @@ export const ADVANCED: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.claude-code.accounts.statusSeconds.title', defaultMessage: 'Connections: sign-in check timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.accounts.statusSeconds.desc', defaultMessage: "How long Combwork gives `claude auth status` to say who a connection's folder is signed in as. Past it, the connection shows \"Couldn't check\", never signed out.", description: 'What the advanced setting "Connections: sign-in check timeout" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status` as it is (a command).' }),
     kind: 'number',
-    default: 10,
+    default: 30,
     min: 3,
-    max: 60,
+    max: 120,
     unit: 's',
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/auth-status-claude-2.1.310.jsonl`, version: '2.1.310', text: '"loggedIn": true', shows: "Claude Code's sign-in status, as `claude auth status --json` gives it in an account's folder" }] // i18n-ignore: a CLI's recorded text (#367)

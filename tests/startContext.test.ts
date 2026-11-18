@@ -283,10 +283,13 @@ describe('the start context in the hook replies (#1065)', () => {
       }
     })
 
-    it('within its budget: a view that takes too long is never sent, a request still out is cut off (uncertain), and the reply comes in time', async () => {
+    it('within its budget: a view that takes too long is never sent, a request still out is cut off (uncertain), and the reply comes in time; each told to the user (HI-3375)', async () => {
       const saved = sessions.startContext
       const budget = S.constructor.SESSION_CONTEXT_MS
       S.constructor.SESSION_CONTEXT_MS = 200
+      // HI-3375: a start context skipped is told to the user (a notice), never only logged.
+      const skipped = vi.spyOn(sessions as unknown as { startContextSkipped: (l: object, why: string) => void }, 'startContextSkipped')
+      const told = vi.spyOn(sessions as unknown as { notify: (...a: unknown[]) => void }, 'notify')
       try {
         let release!: () => void
         let building!: () => void
@@ -306,13 +309,19 @@ describe('the start context in the hook replies (#1065)', () => {
         release()
         await queued(st)
         expect(slow.calls).toEqual([])
+        expect(skipped.mock.calls.map((c) => c[1])).toEqual(['slow'])
+        expect(told.mock.calls.some((c) => JSON.stringify(c[1]).includes('session.notice.startContextTitle') && c[3] === 'notice')).toBe(true)
         sessions.startContext = saved
         const hung = intoSession({ hold: true })
         const t1 = Date.now()
         expect(await post(agent(hung.adapter), snapshot())).toBeNull()
         expect(Date.now() - t1).toBeLessThan(2000)
         expect(hung.calls.map((c) => [c.text, c.aborted])).toEqual([['[CW] view (startup)', true]])
+        // Its request cut off at the deadline (uncertain): told too.
+        await vi.waitFor(() => expect(skipped.mock.calls.map((c) => c[1])).toEqual(['slow', 'notSent']), { timeout: 5000 })
       } finally {
+        skipped.mockRestore()
+        told.mockRestore()
         S.constructor.SESSION_CONTEXT_MS = budget
         sessions.startContext = saved
       }

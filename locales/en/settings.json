@@ -1280,7 +1280,7 @@
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.mcp.startupTimeoutSeconds.desc": {
-    "defaultMessage": "How long Codex waits for Combwork's combwork server to start, when your own Codex config has a server named combwork with a startup timeout of its own: Combwork gives Codex this one instead (otherwise Codex's own, 10 s, applies). Too short, and Codex agents start without Combwork's tools.",
+    "defaultMessage": "How long Codex waits for Combwork's combwork server to start: Combwork gives Codex this one for it at every launch, over Codex's own (10 s) and over a startup timeout your own Codex config sets for a server named combwork. Too short, and Codex agents start without Combwork's tools.",
     "description": "What the advanced setting \"Combwork tools: startup timeout in Codex\" is for, and what goes wrong when it is wrong (Settings → Advanced). combwork is the name of Combwork's MCP server."
   },
   "settings.advanced.codex.mcp.startupTimeoutSeconds.title": {
@@ -1931,6 +1931,14 @@
     "defaultMessage": "Suggest a shorter title past",
     "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in characters (\"80 characters\"): the length of a card title an agent writes past which Combwork suggests a shorter one."
   },
+  "settings.advanced.cw.cli.probeSeconds.desc": {
+    "defaultMessage": "How long each coding agent's CLI gets to print its version when Combwork looks for it (at start, Check Again, after an install). One that takes longer is skipped and shows as not installed: a CLI's first start, with antivirus scanning it on a slow disk, can take tens of seconds.",
+    "description": "What the advanced setting \"Finding the CLIs: version check timeout\" does (Settings → Advanced, under Combwork). A CLI is the command-line program of a coding agent (Claude Code, Codex)."
+  },
+  "settings.advanced.cw.cli.probeSeconds.title": {
+    "defaultMessage": "Finding the CLIs: version check timeout",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"60 s\")."
+  },
   "settings.advanced.cw.console.showText.desc": {
     "defaultMessage": "Show the text in the developer console: prompts, replies, commands and tools' arguments, under a banner saying it is unredacted, and start each recording with its text box ticked. Tokens, API keys and sign-in details stay masked whatever this says; agents' cw_console stays redacted, and a recording with text is never attached to Copy Diagnostics.",
     "description": "What the advanced setting \"Developer console: show prompt, reply and command text\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -2466,6 +2474,14 @@
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.title": {
     "defaultMessage": "Retry wait: tell the Assistant after",
     "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"300 s\"). A retry wait: an agent's coding agent waiting to try its model request again."
+  },
+  "settings.advanced.cw.server.checkInferSeconds.desc": {
+    "defaultMessage": "How long Check Server waits for a model server to answer its test request. A local model that isn't loaded yet loads first, which on modest hardware can take minutes; past this time the check reports a timeout.",
+    "description": "What the advanced setting \"Check Server: test request timeout\" does (Settings → Advanced, under Combwork). Check Server tests a model server the user added for a CLI (its address and model)."
+  },
+  "settings.advanced.cw.server.checkInferSeconds.title": {
+    "defaultMessage": "Check Server: test request timeout",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"600 s\"). Check Server is a button for a model server (Settings → Accounts & Connections)."
   },
   "settings.advanced.cw.sessions.signFailFast.desc": {
     "defaultMessage": "When a repository signs commits, an agent's commit with Git for Windows' gpg or ssh-keygen, GnuPG's gpg or Windows' ssh-keygen signs with nobody there, or fails at once and tells the agent why, instead of waiting for a passphrase nobody can type. Signing stays on, and your git and gpg settings are never changed: sessions get a signer of Combwork's in their environment only. Other signers run as before. Turned off, sessions use git's own signer, as before.",

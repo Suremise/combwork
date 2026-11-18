@@ -50,8 +50,8 @@ export const JJ_PREFIX = [
  */
 export const JJ_READ = ['--ignore-working-copy', '--config=snapshot.auto-update-stale=false'] as const
 
-/** A command's bounds, unset: 16 MB of output (git()'s), a minute. */
-export const JJ_DEFAULTS = { maxOutput: 16 * 1024 * 1024, timeout: 60_000, versionTimeout: 10_000 }
+/** A command's bounds, unset: 16 MB of output (git()'s), a minute; `jj --version` 30 s (HI-3375: its first start under antivirus). */
+export const JJ_DEFAULTS = { maxOutput: 16 * 1024 * 1024, timeout: 60_000, versionTimeout: 30_000 }
 
 /** A jj command's options: port 1's, plus cancellation and whether it may write. */
 export interface JjRunOptions extends RunOptions {

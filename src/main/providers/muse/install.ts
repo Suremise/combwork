@@ -8,7 +8,7 @@ import { providerSettings } from '../../../shared/providers'
 import { config } from '../../config'
 import { advanced } from '../../advanced'
 import { createLogger, userText } from '../../logger'
-import { EDITOR_EXTENSION_PATH, installText, notInstalledIssue, run, toSpawnable } from '../common'
+import { EDITOR_EXTENSION_PATH, installText, notInstalledIssue, run, toSpawnable, WHERE_MS, cliProbeMs } from '../common'
 import type { CommandSpec } from '../types'
 import { museEnv, museHome } from './home'
 
@@ -24,7 +24,7 @@ async function candidates(env: Record<string, string>): Promise<{ path: string; 
   const out: { path: string; source: string }[] = []
   const custom = providerSettings(config.settings, MUSE).executablePath.trim()
   if (custom) out.push({ path: custom, source: 'settings' })
-  const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', ['muse'], 5000, env)
+  const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', ['muse'], WHERE_MS, env)
   for (const line of where.stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {
     if (process.platform !== 'win32' || /\.(exe|cmd|bat)$/i.test(line)) out.push({ path: line, source: 'PATH' })
   }
@@ -79,7 +79,7 @@ export async function locateMuse(): Promise<AgentInstallInfo> {
       continue
     }
     const s = toSpawnable(c.path, ['--version'])
-    const r = await run(s.file, s.args, 15000, env)
+    const r = await run(s.file, s.args, cliProbeMs(), env)
     const version = parseMuseVersion(`${r.stdout}\n${r.stderr}`)
     if (!version) {
       // The path and what it printed are the user's: left out of Copy Diagnostics.

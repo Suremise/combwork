@@ -97,8 +97,11 @@ export function gitOnPath(env: NodeJS.ProcessEnv = process.env): string | null {
  * Runs `git --version` through `git()`, like every git call Combwork makes (SPEC §16.3.1), one check at a time, and records
  * what it found. HI-2137: PATH's git each time, and the git Combwork starts found again with it.
  */
+/** HI-3375: how long `git --version` and the real-git lookup may take: git.exe's first start under antivirus. */
+const GIT_CHECK_MS = 30_000
+
 export function checkGit(): Promise<GitTool> {
-  checking ??= git(process.cwd(), ['--version'], undefined, undefined, { timeout: 10_000, exe: PATH_GIT.exe }).then(async (r) => {
+  checking ??= git(process.cwd(), ['--version'], undefined, undefined, { timeout: GIT_CHECK_MS, exe: PATH_GIT.exe }).then(async (r) => {
     const path = gitOnPath() ?? undefined
     started = r.ok && parseGitVersion(r.out) ? await realGit(r.out, path ?? null) : PATH_GIT
     const version = parseGitVersion(r.out)
@@ -118,7 +121,7 @@ export function checkGit(): Promise<GitTool> {
 /** A git command of gitTool's own check, run by `exe`: its output, or null when it failed. */
 type CheckRun = (exe: string, args: string[]) => Promise<string | null>
 const checkRun: CheckRun = async (exe, args) => {
-  const r = await git(process.cwd(), args, undefined, undefined, { timeout: 10_000, exe })
+  const r = await git(process.cwd(), args, undefined, undefined, { timeout: GIT_CHECK_MS, exe })
   return r.ok ? r.out : null
 }
 

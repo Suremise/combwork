@@ -484,6 +484,8 @@ interface CombworkMessageValues {
   'settings.advanced.cw.cards.attachmentMax.title': undefined
   'settings.advanced.cw.cards.titleNudgeChars.desc': undefined
   'settings.advanced.cw.cards.titleNudgeChars.title': undefined
+  'settings.advanced.cw.cli.probeSeconds.desc': undefined
+  'settings.advanced.cw.cli.probeSeconds.title': undefined
   'settings.advanced.cw.console.showText.desc': undefined
   'settings.advanced.cw.console.showText.title': undefined
   'settings.advanced.cw.copies.quietWaitMinutes.desc': undefined
@@ -618,6 +620,8 @@ interface CombworkMessageValues {
   'settings.advanced.cw.resume.idleMinutes.title': undefined
   'settings.advanced.cw.retry.tellAssistantAfterSeconds.desc': undefined
   'settings.advanced.cw.retry.tellAssistantAfterSeconds.title': undefined
+  'settings.advanced.cw.server.checkInferSeconds.desc': undefined
+  'settings.advanced.cw.server.checkInferSeconds.title': undefined
   'settings.advanced.cw.sessions.signFailFast.desc': undefined
   'settings.advanced.cw.sessions.signFailFast.title': undefined
   'settings.advanced.cw.sessions.signTimeoutSeconds.desc': undefined

@@ -231,5 +231,7 @@
   "session.tracker.stopped": "El rastreador de procesos de Combwork se detuvo ({why})",
   "session.tracker.title": "Combwork no puede rastrear los procesos de los agentes",
   "session.tracker.unavailable": "Su rastreador de procesos no está disponible",
-  "session.tracker.windowsOnly": "Rastrear procesos requiere Windows"
+  "session.tracker.windowsOnly": "Rastrear procesos requiere Windows",
+  "session.notice.startContextTitle": "{agent} se inició sin el contexto de inicio de Combwork",
+  "session.notice.startContextBody": "Combwork no pudo {why, select, slow {prepararlo a tiempo} other {ponerlo en la sesión}}, así que {agent} trabaja por ahora sin la vista del tablero de Combwork ni su guía. Detenlo y vuelve a iniciarlo para intentarlo de nuevo."
 }

@@ -339,8 +339,12 @@ describe("Codex: Combwork's server over a native one of that name", () => {
   it('how it starts: the session’s folder, Combwork’s startup timeout (Codex’s own default, from Settings → Advanced), not required, its environment emptied', async () => {
     for (const place of places) {
       const ctx = where(place, 'command = "node"\ncwd = "Z:/does-not-exist"\nstartup_timeout_sec = 1\nstartup_timeout_ms = 500\nrequired = true\nenv = { NODE_OPTIONS = "--inspect", CW_API_URL = "http://elsewhere" }\nenv_vars = ["SECRET"]\n')
-      expect(table(ctx), place).toMatchObject({ cwd: ctx.cwd, startup_timeout_sec: 10, startup_timeout_ms: 10000, required: false, env: { NODE_OPTIONS: '' }, env_vars: [] })
+      expect(table(ctx), place).toMatchObject({ cwd: ctx.cwd, startup_timeout_sec: 30, startup_timeout_ms: 30000, required: false, env: { NODE_OPTIONS: '' }, env_vars: [] })
     }
+    // HI-3375: given at every launch, a native server or none (Codex's own 10 s is too short for a cold start).
+    process.env.CODEX_HOME = join(base, `native-${++n}`, 'codex-home')
+    const plain = codex.buildCommand('C:\\bin\\codex.exe', context()).args.find((a) => a.startsWith('mcp_servers.combwork='))!
+    expect(parseToml(`combwork = ${plain.slice('mcp_servers.combwork='.length)}`).combwork).toMatchObject({ startup_timeout_sec: 30 })
     // The startup timeout follows Settings → Advanced.
     await advanced.set('codex.mcp.startupTimeoutSeconds', 45)
     expect(table(where('home', 'command = "node"\nstartup_timeout_sec = 1\nstartup_timeout_ms = 500\n'))).toMatchObject({ startup_timeout_sec: 45, startup_timeout_ms: 45000 })
@@ -619,7 +623,7 @@ describe("Combwork's guidance for agents (#1285, row 13)", () => {
   })
 
   it("reads Codex's render no longer than Settings → Advanced says (codex.promptInput.timeoutSeconds)", () => {
-    expect(advancedDef('codex.promptInput.timeoutSeconds')).toMatchObject({ group: 'codex', kind: 'number', default: 15, unit: 's', applies: 'sessions' })
+    expect(advancedDef('codex.promptInput.timeoutSeconds')).toMatchObject({ group: 'codex', kind: 'number', default: 60, max: 300, unit: 's', applies: 'sessions' })
   })
 
   it('is a switch of its own under Combwork, on by default, taken by sessions started afterwards (e2e agentguidance checks the combwork server it gives)', async () => {

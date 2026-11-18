@@ -23,12 +23,15 @@ import { checkedUrl, onServerChanged, serverOf } from './serverConnections'
 import { createLogger } from './logger'
 import { combworkError } from './combworkError'
 import { msg } from '../shared/i18n/msg'
+import { SERVER_CHECK_INFER_SECONDS } from '../shared/advanced'
+import { advanced } from './advanced'
 
 const log = createLogger('servers')
 
-/** A read's deadline; an inference's (a model loading cold can take a while); the most of a reply read; of an error's. */
+/** A read's deadline; the most of a reply read; of an error's. */
 const READ_TIMEOUT_MS = 10_000
-const INFER_TIMEOUT_MS = 120_000
+/** An inference's deadline (HI-3375): Settings → Advanced's, a local model loading cold on modest hardware can take minutes. */
+const inferTimeoutMs = (): number => advanced.number(SERVER_CHECK_INFER_SECONDS) * 1000
 const MAX_BYTES = 1024 * 1024
 const ERROR_BYTES = 8 * 1024
 /** Checks at once, in all; results kept. */
@@ -212,7 +215,7 @@ export function testServerTools(id: string, model: string, request: string, rand
     id,
     model,
     request,
-    INFER_TIMEOUT_MS * 2,
+    inferTimeoutMs() * 2,
     async ({ b, current, signal, headers }) => {
       const url = `${b.url}/v1/messages`
       const send = async (body: unknown): Promise<StepReply | null> => {

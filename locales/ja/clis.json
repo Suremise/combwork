@@ -46,5 +46,6 @@
   "clis.settings.open": "フォルダーを開く",
   "clis.settings.reload": "再読み込み",
   "clis.settings.reloaded": "{n, plural, =0 {記述ファイルからのCLIはありません} other {記述ファイルからのCLI：#個}}{problems, plural, =0 {} other {、使われていない記述ファイル：#個}}",
-  "clis.settings.what": "専用のプロバイダーがないCLIは、記述ファイルで動作します。記述ファイルは、Combworkのプロファイルのclisフォルダーに置くJSONファイルです。Combworkは状態を画面から読み取り、CLI自身の設定は変更しません。"
+  "clis.settings.what": "専用のプロバイダーがないCLIは、記述ファイルで動作します。記述ファイルは、Combworkのプロファイルのclisフォルダーに置くJSONファイルです。Combworkは状態を画面から読み取り、CLI自身の設定は変更しません。",
+  "clis.problem.badSeconds": "「{field}」は{min}から{max}までの秒数である必要があります。"
 }

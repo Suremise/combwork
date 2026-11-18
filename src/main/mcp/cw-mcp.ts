@@ -1628,7 +1628,8 @@ async function instructions(): Promise<string> {
   // Without a project (the Combwork Assistant's session) there is no "latest handover for this project".
   if (!PROJECT) return INSTRUCTIONS
   try {
-    const latest = await Promise.race([handovers(PROJECT || undefined), new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 1500))])
+    // HI-3375: 10 s, a bound for a hung read (Combwork's main thread busy), not a budget: past it, no handover pointer.
+    const latest = await Promise.race([handovers(PROJECT || undefined), new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 10_000))])
     if (latest[0]) return withLatestHandover(INSTRUCTIONS, latest[0].relPath)
   } catch {
     // Combwork not reachable yet: the static instructions still apply.

@@ -95,6 +95,10 @@
     "defaultMessage": "“{field}” names {name}, which isn’t one of {known}.",
     "description": "Why a CLI description is refused: an argument names a placeholder Combwork doesn’t fill. {field} is its name as written in the file; {name} the placeholder ({x}); {known} the ones it fills. Keep them as they are."
   },
+  "clis.problem.badSeconds": {
+    "defaultMessage": "“{field}” must be a number of seconds from {min} to {max}.",
+    "description": "Why a CLI description is refused (HI-3375): a field that is a time in seconds has another value, or one out of its range. {field} is its name as written in the file (keep it); {min} and {max} are numbers."
+  },
   "clis.problem.badType": {
     "defaultMessage": "“{field}” must be {kind, select, text {text} list {a list of texts} object {an object} yesNo {true or false} other {{kind}}}.",
     "description": "Why a CLI description is refused: a field has the wrong kind of value. {field} is its name as written in the file (keep it)."

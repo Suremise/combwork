@@ -50,6 +50,23 @@ const problems = (d: Desc, taken?: Map<string, string>): string[] => {
   return r.ok ? [] : r.problems.map((p) => englishText(p))
 }
 
+// HI-3375: a described CLI's grace to exit after its exit command, its description's own (3-300 s), 30 s when it doesn't say
+// (before: 5 s, hard-coded, beside the built-in CLIs' longer graces).
+describe("a description's exit grace (HI-3375)", () => {
+  const withGrace = (g: unknown) => desc({ status: { ready: '^> ', exit: '/exit', exitGraceSeconds: g } })
+  it('kept as given within 3 to 300 seconds; refused otherwise, naming the field and its range', () => {
+    expect(ok(withGrace(90)).status.exitGraceSeconds).toBe(90)
+    expect(ok(withGrace(3)).status.exitGraceSeconds).toBe(3)
+    expect(ok(desc()).status).not.toHaveProperty('exitGraceSeconds')
+    for (const bad of [2, 301, '30', Number.NaN]) expect(problems(withGrace(bad)), String(bad)).toEqual(['“status.exitGraceSeconds” must be a number of seconds from 3 to 300.'])
+  })
+  it("its quit's grace: the description's, else 30 s", () => {
+    const quit = (d: Record<string, unknown>) => new CliAdapter({ ...cliModule(ok(d)), cli: ok(d) }).quitLine
+    expect(quit(desc())).toEqual({ line: '/exit', graceMs: 30_000 })
+    expect(quit(withGrace(90))).toEqual({ line: '/exit', graceMs: 90_000 })
+  })
+})
+
 describe('a description (HI-3196)', () => {
   it('checks out, keeping only the fields Combwork knows', () => {
     const cli = ok({ ...desc(), extra: 'ignored' })

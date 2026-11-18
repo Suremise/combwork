@@ -166,11 +166,11 @@ public static class CwStream {
     }
   }
 
-  /** Posts one body to Combwork's hook server; whether it took it. */
+  /** Posts one body to Combwork's hook server; whether it took it. 30 s (HI-3375): Combwork's start step takes up to 20 s (SESSION_CONTEXT_MS). */
   static bool Post(string body) {
     try {
       var r = (HttpWebRequest)WebRequest.Create(HookUrl);
-      r.Method = "POST"; r.Timeout = 5000; r.ReadWriteTimeout = 5000; r.Proxy = null; r.ContentType = "application/json";
+      r.Method = "POST"; r.Timeout = 30000; r.ReadWriteTimeout = 30000; r.Proxy = null; r.ContentType = "application/json";
       r.Headers["Authorization"] = "Bearer " + HookToken;
       byte[] data = Encoding.UTF8.GetBytes(body);
       r.ContentLength = data.Length;

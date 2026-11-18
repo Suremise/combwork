@@ -126,6 +126,8 @@ interface CombworkMessageValues {
   'session.notice.question': { agent: string | number }
   'session.notice.questionBody': undefined
   'session.notice.safeguardSwitch': { agent: string | number; model: string | number }
+  'session.notice.startContextBody': { why: string; agent: string | number }
+  'session.notice.startContextTitle': { agent: string | number }
   'session.notice.tasksEnded': undefined
   'session.notice.untaken': undefined
   'session.notice.untakenRetried': undefined

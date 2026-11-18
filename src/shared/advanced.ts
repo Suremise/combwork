@@ -115,6 +115,12 @@ export const RESUME_AFTER_UPDATE = 'cw.restart.resumeAfterUpdate'
 /** How long an agent resumed after a restart has to be ready, in seconds (HI-1707): read by main's restartResume. */
 export const RESTART_READY_SECONDS = 'cw.restart.resumeReadySeconds'
 
+/** How long a CLI's version probe (`--version`, as Combwork looks for it) may take (HI-3375), in seconds: read by main's providers. */
+export const CLI_PROBE_SECONDS = 'cw.cli.probeSeconds'
+
+/** How long Check Server's test inference may take while a local model loads (HI-3375), in seconds: read by main's serverDiagnostics. */
+export const SERVER_CHECK_INFER_SECONDS = 'cw.server.checkInferSeconds'
+
 /** Agents whose turn a dropped connection ended are resumed once it is back (HI-1612): read by main's outageResume. */
 export const OUTAGE_RESUME = 'cw.outage.resume'
 /** Errors that are never a dropped connection (a usage limit, a sign-in, "overloaded"), whatever a CLI's pattern finds (HI-1612). */
@@ -600,9 +606,35 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.cw.mcpCatalog.probeSeconds.title', defaultMessage: "MCP catalogues: checking this PC's requirements", description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (HI-545)." }),
     desc: msg({ id: 'settings.advanced.cw.mcpCatalog.probeSeconds.desc', defaultMessage: "How long each check of this PC for a catalogue server's requirements (its Windows edition and build, Node.js, Docker) may take before it shows as not checked.", description: 'What the advanced setting "MCP catalogues: checking this PC’s requirements" is for (Settings → Advanced, HI-545).' }),
     kind: 'number',
-    default: 5,
+    default: 15,
     min: 1,
     max: 60,
+    unit: 's',
+    applies: 'now'
+  },
+  // HI-3375: a CLI's first start under antivirus on a slow disk takes tens of seconds; one skipped reads as not installed.
+  {
+    id: CLI_PROBE_SECONDS,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.cli.probeSeconds.title', defaultMessage: 'Finding the CLIs: version check timeout', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"60 s\")." }),
+    desc: msg({ id: 'settings.advanced.cw.cli.probeSeconds.desc', defaultMessage: "How long each coding agent's CLI gets to print its version when Combwork looks for it (at start, Check Again, after an install). One that takes longer is skipped and shows as not installed: a CLI's first start, with antivirus scanning it on a slow disk, can take tens of seconds.", description: 'What the advanced setting "Finding the CLIs: version check timeout" does (Settings → Advanced, under Combwork). A CLI is the command-line program of a coding agent (Claude Code, Codex).' }),
+    kind: 'number',
+    default: 60,
+    min: 10,
+    max: 300,
+    unit: 's',
+    applies: 'now'
+  },
+  // HI-3375: a local model loading cold on modest hardware takes minutes to answer its first request.
+  {
+    id: SERVER_CHECK_INFER_SECONDS,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.server.checkInferSeconds.title', defaultMessage: 'Check Server: test request timeout', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"600 s\"). Check Server is a button for a model server (Settings → Accounts & Connections)." }),
+    desc: msg({ id: 'settings.advanced.cw.server.checkInferSeconds.desc', defaultMessage: "How long Check Server waits for a model server to answer its test request. A local model that isn't loaded yet loads first, which on modest hardware can take minutes; past this time the check reports a timeout.", description: 'What the advanced setting "Check Server: test request timeout" does (Settings → Advanced, under Combwork). Check Server tests a model server the user added for a CLI (its address and model).' }),
+    kind: 'number',
+    default: 600,
+    min: 30,
+    max: 3600,
     unit: 's',
     applies: 'now'
   },
@@ -682,9 +714,9 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.cw.restart.resumeReadySeconds.title', defaultMessage: 'Resuming after a restart: ready within', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"90 s\")." }),
     desc: msg({ id: 'settings.advanced.cw.restart.resumeReadySeconds.desc', defaultMessage: "How long an agent Combwork resumes after a restart has to be ready. One that isn't is stopped and listed as not resumed, and the next one starts.", description: 'What the advanced setting "Resuming after a restart: ready within" does (Settings → Advanced).' }),
     kind: 'number',
-    default: 90,
+    default: 300,
     min: 10,
-    max: 600,
+    max: 1800,
     unit: 's',
     workspace: true,
     applies: 'now'
