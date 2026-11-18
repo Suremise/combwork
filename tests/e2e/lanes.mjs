@@ -11,6 +11,7 @@
 import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { createServer } from 'net'
 import { join } from 'path'
+import { createRequire } from 'module'
 import { processAlive } from './logs.mjs'
 
 /**
@@ -26,9 +27,12 @@ export const LANES = 10
 export const LANE_PORTS = 10
 /** A claim older than this is from a runner that never finished (or one stuck far beyond any run). */
 const CLAIM_MAX_MS = 24 * 60 * 60_000
-/** The lock held while a runner looks at the claims and writes its own: only for milliseconds, so an old one is a crash. */
+/**
+ * The lock held while a runner looks at the claims and writes its own: only for milliseconds, so an old one is a crash.
+ * Counted stale after the timing file's runner.lockStaleMs (HI-3378: 60 s, so a live holder on a slow disk keeps it).
+ */
 const LOCK = '.claiming'
-const LOCK_MAX_MS = 10_000
+const LOCK_MAX_MS = createRequire(import.meta.url)('../timing.cjs').timing('runner.lockStaleMs')
 
 /**
  * Where the lanes of a pool of its own (CW_TEST_LANES_DIR, runContext's OWN_LANES: concurrency.mjs's check of a run

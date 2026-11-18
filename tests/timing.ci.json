@@ -1,0 +1,10 @@
+{
+  "$comment": "HI-3378: the tests' timings on GitHub's 4-vCPU Windows runner (ci.yml sets CW_TEST_TIMING to this file), merged over tests/timing.json by name. That runner runs a test file several times slower than a developer's machine (HI-3355: gitFolderChanges.test.ts 375 s), so its hang bounds are doubled; budgets, quiet windows and intervals stay as they are.",
+  "test.hang": 240000,
+  "test.hangReal": 600000,
+  "hook.hang": 240000,
+  "wait.hang": 120000,
+  "wait.hangReal": 360000,
+  "spawn.hang": 240000,
+  "worker.start": 120000
+}
