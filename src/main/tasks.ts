@@ -40,6 +40,7 @@ import { linkToComment, moveCardFolder, publish, removeCardAttachments, trashCar
 import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } from '../shared/cardAttachments'
 import { hasStage, laneTargetOf, skipReviewOf } from '../shared/workflow/compile'
 import { isStageId, STAGE_TEXT, stageName, type StageNames } from '../shared/workflow/stages'
+import { decisionWithChoice } from '../shared/decisionChoice'
 import { answerFits, CHURN_GATES, churnTotal, approveNote, ASK_ACTIONS, ATTEMPT_STAGES, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, advanceUnresolved, foldCard, openEntry, type Actor, type AttemptKey, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type PauseChoice, type StageId } from '../shared/workflow/facts'
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
@@ -2696,7 +2697,10 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
   const reply = one ? undefined : typed
   const outcome = one ? 'answered' : a.outcome
   // HI-2286: an agent's question approved with a note: the note is a reply and the user's decision on the card too.
-  const decision = !asked && !one && req.kind === 'approve' && a.outcome === 'approved' && reply && approveNote(req) === 'decision' ? text(reply, MAX_DECISION, 'decision') : decided
+  const typedDecision = !asked && !one && req.kind === 'approve' && a.outcome === 'approved' && reply && approveNote(req) === 'decision' ? text(reply, MAX_DECISION, 'decision') : decided
+  // HI-3356: a bare option label ("A", "(a)", "2") is recorded with what it chose, or with the question whole: never a
+  // bare letter. Its length was checked as typed; what it adds is the request's own stored text, never cut.
+  const decision = typedDecision === undefined ? undefined : decisionWithChoice(typedDecision, req.text, req.request)
   // What each kind takes (answerFits): an approval is approved or declined; at the round limit, a choice (a carry on with
   // its rounds); any other question, a reply or a decision. Checked before anything is written.
   const choice = a.choice as PauseChoice | undefined
@@ -2784,8 +2788,8 @@ export function checkDecisionAnswers(actor: TaskActor, answers: unknown, wrong: 
 async function decideAndAnswer(n: number, patch: TaskPatch, actor: TaskActor, opts: Parameters<typeof updateTaskLocked>[3] = {}): Promise<TaskCard> {
   const ws = workspace
   const { answers, decision, ...rest } = patch
-  const t = typeof decision === 'string' ? text(decision, MAX_DECISION, 'decision').trim() : ''
-  checkDecisionAnswers(actor, answers, !t || Object.entries(rest).some(([, v]) => v !== undefined) || !!opts.comment)
+  const said = typeof decision === 'string' ? text(decision, MAX_DECISION, 'decision').trim() : ''
+  checkDecisionAnswers(actor, answers, !said || Object.entries(rest).some(([, v]) => v !== undefined) || !!opts.comment)
   const requests = [...new Set(answers.map((x) => x.trim()))]
   const head = ws.path ? cardHeads(ws, [n])[0] : undefined
   if (!head) throw unknownTask(n)
@@ -2802,6 +2806,10 @@ async function decideAndAnswer(n: number, patch: TaskPatch, actor: TaskActor, op
     const req = open.find((r) => r.request === id)
     if (!req || !decisionAnswers(req)) throw combworkError(DECIDE.not, { why: req ? 'kind' : 'open', request: id, card: cardRef(n) }, { kind: req ? 'invalid' : 'conflict' }) // i18n-ignore: select keys, never shown
   }
+  // HI-3356: a bare option label answering one request is recorded with what it chose (decisionWithChoice); answering
+  // several, it is kept as written: which question's options it names isn't guessed.
+  const one = requests.length === 1 ? open.find((r) => r.request === requests[0])! : null
+  const t = one ? decisionWithChoice(said, one.text, one.request) : said
   const decisionId = entryId()
   const recordedBy = actorName(actor)
   const lines = requests.map((id) => storedText(HISTORY.closedByDecision, { question: clip(open.find((r) => r.request === id)!.text) }))
