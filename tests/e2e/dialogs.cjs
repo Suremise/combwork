@@ -93,7 +93,8 @@ const check = (name, ok, extra = '') => {
   await lib.until(async () => (await page.locator('.pane-footer-bar .pane-foot-item').count()) > 0, lib.timing('hang.ui'))
   await page.locator('.pane-footer-bar .pane-foot-item').first().click()
   const settings = top()
-  await lib.until(async () => (await settings.innerText().catch(() => '')).includes('Model'), lib.timing('hang.ui'))
+  // Open once its note field is there (the dialog no longer names a model: that went to the connection, HI-2108).
+  await lib.until(async () => (await settings.locator('#agent-role').count()) === 1, lib.timing('hang.ui'))
   await movesWell('Agent Settings', settings)
   // Its fields still take input where they are, after a move. (Its effort picker went to the connection, HI-2108.)
   await dragBy(settings, 120, -40)
