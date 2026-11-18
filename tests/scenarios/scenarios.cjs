@@ -5298,7 +5298,7 @@ module.exports.SCENARIOS = [
     changeSettings: true,
     prompt: "Combwork keeps cutting things off on our big repository: committing from Combwork stops after two minutes because our pre-commit hook runs the tests, fetching and pushing over the VPN (ours and the merge queue's) gets cut off, and jj commands time out. Which Combwork settings would help? Don't change anything, just tell me.",
     // Settings → Advanced's entries are named advanced.<id> to the settings tools.
-    fake: 'skill tune-settings cw cw_read_setting {"id":"advanced.cw.git.commitMinutes"} cw cw_read_setting {"id":"advanced.cw.git.networkMinutes"} cw cw_read_setting {"id":"advanced.cw.queue.networkMinutes"} cw cw_read_setting {"id":"advanced.cw.jj.commandSeconds"}',
+    fake: 'skill tune-settings then cw cw_read_setting {"id":"advanced.cw.git.commitMinutes"} then cw cw_read_setting {"id":"advanced.cw.git.networkMinutes"} then cw cw_read_setting {"id":"advanced.cw.queue.networkMinutes"} then cw cw_read_setting {"id":"advanced.cw.jj.commandSeconds"}',
     expect: (o, c) => {
       // Each setting, and words only its description has (src/shared/advanced.ts).
       const LIMITS = [
