@@ -44,6 +44,8 @@ const FAKE_CLAUDE_ONLY = [
   'assistant-dispatch', 'assistant-reply-decision', 'assistant-doing-nobody', 'assistant-decision-answers', 'assistant-decision-answers-one', 'assistant-card-question', 'assistant-look-lanes', 'assistant-lane-reorder-now', 'assistant-lane-yield', 'assistant-bulk-move', 'assistant-retarget-release',
   'assistant-next-version-ask', 'assistant-next-version', 'assistant-next-version-retarget', 'assistant-release-offer', 'assistant-ask-wait', 'assistant-ask-go',
   // The coordinator and fresh starts.
+  // HI-3360: a long-idle resume refused with its age; the refusal and what the Assistant called, after the server.
+  'assistant-idle-resume',
   'coordinator-wake-failed', 'coordinator-recurring-finding', 'coordinator-wake-question', 'coordinator-build-beside-lanes', 'coordinator-reassign', 'coordinator-follow-up', 'coordinator-one-card-lane', 'coordinator-start-reviewer',
   'coordinator-lanes-only-watch', 'coordinator-ten-rounds', 'coordinator-no-code-done', 'coordinator-merge-due', 'coordinator-fact-before-asking', 'coordinator-look-before-asking', 'fresh-start-lane-running', 'fresh-start-question-waits',
   // Modes: each mode's launch text on all three is mode-coordinator-plans's; the others' differ only in the mode's name.
