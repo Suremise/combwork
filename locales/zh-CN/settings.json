@@ -808,7 +808,7 @@
   "settings.agentApi.viewers.tip": "按应用为每个令牌命名。保存在 %APPDATA%\\Combwork\\agent-api-viewers.json 中。撤销后，对应应用会立即被断开。应用通过 %APPDATA%\\Combwork\\agent-api-discovery.json（只有地址，不含令牌）找到正在运行的 Combwork。",
   "settings.agentApi.viewers.title": "查看者令牌",
   "settings.agents.backgroundTaskMinutes.desc": "智能体等待自己启动的后台任务（如测试运行）的分钟数，超过后 Combwork 仍会将其视为已结束。",
-  "settings.agents.backgroundTaskMinutes.tip": "智能体结束回合时，如果它启动的任务仍在运行，会显示为等待后台任务，而不是已结束：任务结束后 Claude Code 会自行继续。Combwork 无法区分测试运行和永不结束的进程（如开发服务器），因此超过这个时长就不再计入该任务（Monitor 到期时也是如此）。Codex 不会收到其后台终端结束的通知，因此它们只会被计数和显示。{min, number} 到 {max, plural, other {# 分钟}}。",
+  "settings.agents.backgroundTaskMinutes.tip": "智能体结束回合时，如果它启动的任务仍在运行，会显示为等待后台任务，而不是已结束：任务结束后 Claude Code 会自行继续。Combwork 无法区分测试运行和永不结束的进程（如开发服务器），因此超过这个时长就不再计入该任务（Monitor 到期时也是如此）。在 cw-progress 下运行且仍在报告进度的任务会继续计入，此时长从其最后一次报告起算。Codex 不会收到其后台终端结束的通知，因此它们只会被计数和显示。{min, number} 到 {max, plural, other {# 分钟}}。",
   "settings.agents.backgroundTaskMinutes.title": "后台任务计入时长上限",
   "settings.agents.leftoverProcesses.desc": "智能体停止时，Combwork 如何处理它启动且仍在运行的进程，例如预览服务器或 tail -f。",
   "settings.agents.leftoverProcesses.option.ask": "询问",
