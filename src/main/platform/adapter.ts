@@ -324,6 +324,12 @@ export interface AdvanceHost {
   declinePreview(card: CardRecord, cycle: number, plan: string): Promise<boolean>
   /** HI-3236: whether the user dismissed the preview of `plan` in `cycle`. */
   previewDeclined(card: CardRecord, cycle: number, plan: string): boolean
+  /**
+   * HI-3367: an attempt no longer attached to its card's cycle (`ref`: the attempt's own cycle), its marker and, when it may
+   * have moved its target (`warn`), the card's comment saying so, in one write. 'recorded': this write committed them;
+   * 'already': an earlier one did; 'failed': nothing was committed (its journal stays live, to be tried again).
+   */
+  superseded(card: CardRecord, ref: AdvanceRef, warn: { target: string } | null): Promise<'recorded' | 'already' | 'failed'>
   /** The one-time note that the project's default finish is Combwork's advance (once per project). */
   noteDefault(card: CardRecord): Promise<void>
 }

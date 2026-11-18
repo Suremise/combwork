@@ -4255,6 +4255,24 @@ with s34, its mapping HI-3235/s7, s10, s13 and s16. gate:advance is open.
   moved; any later phase without a fact, or a fact without a journal, is uncertain; an `…ing` phase is classified on
   the state now (before an integrate, no marked operation in any history is nothing moved); `verified` without its
   Integrated records it once. Nothing is ever run again blind.
+- **Superseded attempts** (HI-3367). A new `Started` ends the cycle's advance on the card (its question too), but not
+  its journal. A live journal of an earlier cycle (the card put back and restarted) is retired in `settleAdvances`,
+  under the card's lock and the repository lock, read again there, before anything else it does, so on every path that
+  can attempt or preview (`advance`, `advancePreview`, a preview's Integrate, recovery); until each is retired, the new
+  cycle gets no attempt or preview (`busy`). The current cycle's journals are never retired. Each is marked first, in
+  one write: the meta `advance_superseded:<card>:<cycle>:<attempt>`, and with it a comment action on the card when the
+  attempt may have moved its target (anything but a known phase before `integrating` with every undo known to be
+  before its revert, `attemptPreMutation`). Only then is it archived whole to `settled/` as `superseded`, its phase,
+  operation and undos kept: it is no longer attached to the card's cycle, never proved integrated or undone. A write
+  that fails keeps the journal live; an archive that fails is archived by the next pass, its marker saying it was told
+  (no second comment). The marker and the action are committed before the new cycle's `AdvanceAttempted`; the action
+  is delivered by the actions worker afterwards, so the user may not have seen the comment before an automatic attempt,
+  which the comment says. Superseding settles nothing about the old move: the new plan's base check doesn't prove it
+  harmless (a target that already holds it passes that check), and the comment says the target may hold it. An
+  archived card's live journals are all retired so (current cycle too), its archived state read again under its
+  locks: unarchived meanwhile, they stay. A card with no row is gone: its journals are archived under the repository
+  lock (an attempt holds it from its first journal to its outcome), the card read again as missing there, with nothing
+  said; a board read that fails keeps them.
 - **Preview and click** (HI-3236; its mapping HI-3236/s7, s10, s13). A finish that previews (`finishPreviews`) asks the
   adapter's optional `advancePreview` port, never `advance`: once the plan is ready (as an automatic attempt's would be,
   not dismissed), For you previews it (gate `advancePreview`, bound to the plan id: the move E → R, the candidate's style,

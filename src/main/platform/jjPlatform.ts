@@ -26,7 +26,7 @@ import type { CardRecord } from '../workflow/factStore'
 import type { ReconcileHooks } from '../workflow/reconcile'
 import type { Workflow } from '../workflow/runtime'
 import type { AdvanceAnswer, AdvanceHost, AdvanceRef, AdvanceStep, AdvanceWords, PreviewWords, CheckBracket, FinishInputs, HeadMove, KeptWork, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
-import { AdvanceJournals, baseRefusalNow, classifyUndoNow, commitsAdded, fingerprintHash, journalAbandoned, journalNewUndo, journalRequested, journalSettled, journalUndoAs, planIdOf, recoverAdvance, resultContained, runAdvance, runUndo, underLock, undoOfferedNow, undoPreMutation, type AdvanceJournal, type AdvanceOutcome, type Held, type JjAdvanceDeps, type JjAdvancePlan } from './jjAdvance'
+import { AdvanceJournals, attemptPreMutation, baseRefusalNow, classifyUndoNow, commitsAdded, fingerprintHash, journalAbandoned, journalNewUndo, journalRequested, journalSettled, journalUndoAs, planIdOf, recoverAdvance, resultContained, runAdvance, runUndo, underLock, undoOfferedNow, undoPreMutation, type AdvanceJournal, type AdvanceOutcome, type Held, type JjAdvanceDeps, type JjAdvancePlan } from './jjAdvance'
 import { ADVANCE_GATES, ADVANCE_PREVIEW_GATE, ADVANCE_UNCERTAIN_GATE, advanceUnresolved, approvedByUser } from '../../shared/workflow/facts'
 import { finishAdvances, finishPreviews } from '../../shared/workflow/options'
 
@@ -964,6 +964,9 @@ export class JjPlatform implements PlatformAdapter {
     const wf = this.wf!
     const card = wf.store.card(card0.id)
     const cycle = wf.state(card).cycle
+    // HI-3367: its live journals of earlier cycles (a card put back and restarted) retired first, read again here under
+    // its locks: none is ever answered again. Until each is, no attempt or preview of this cycle runs (false: busy).
+    if (!(await this.retireOthers(journals, card.key, card, cycle, cycle, host))) return false
     const recovery = this.advanceDeps(integ, journals, () => true)
     const listed = await journals.list(card.key, cycle)
     for (const { attempt, journal } of listed) {
@@ -1146,10 +1149,14 @@ export class JjPlatform implements PlatformAdapter {
       await host.declinePreview(c, s.cycle, ans.plan)
       return false
     }
-    if (c.stage !== 'approved' || s.integrated || advanceUnresolved(s) || !this.consentHolds(c, s, 'preview') || host.waitsFor(c).length) return false
-    const ready = await this.readyPlan(h, integ, journals, c, s, host)
+    // HI-3367: the card's earlier attempts settled first (an earlier cycle's retired), as before any attempt.
+    if (!(await this.settleAdvances(h, integ, journals, c, host))) return false
+    const c2 = wf.store.card(card.id)
+    const s2 = wf.state(c2)
+    if (s2.cycle !== ans.cycle || c2.stage !== 'approved' || s2.integrated || advanceUnresolved(s2) || !this.consentHolds(c2, s2, 'preview') || host.waitsFor(c2).length) return false
+    const ready = await this.readyPlan(h, integ, journals, c2, s2, host)
     if (!ready || ready.planId !== ans.plan) return false
-    return (await this.attemptUnder(h, integ, journals, c, s, ready.plan, ready.planId, host, 'preview')).integrated
+    return (await this.attemptUnder(h, integ, journals, c2, s2, ready.plan, ready.planId, host, 'preview')).integrated
   }
 
   /**
@@ -1248,6 +1255,75 @@ export class JjPlatform implements PlatformAdapter {
     }
   }
 
+  /**
+   * HI-3367: a card's live journals in cycles other than `keep` (null: all, an archived card's) retired, under its card
+   * lock and the repository lock (its caller's). Each is marked superseded on the card first, in one write with its comment
+   * when it may have moved its target (attemptPreMutation), then archived whole. Kept live where that write wasn't
+   * committed, or the archive failed (the next pass archives it, its marker saying it was told). False: one is still live.
+   */
+  private async retireOthers(journals: AdvanceJournals, fileKey: string, card: CardRecord, keep: number | null, cycleNow: number, host: AdvanceHost): Promise<boolean> {
+    let ok = true
+    for (const o of await journals.others(fileKey, keep)) {
+      const warn = attemptPreMutation(o.journal) ? null : { target: o.journal !== 'unreadable' ? o.journal.plan.target : (this.wf!.state(card).started?.target ?? '-') }
+      if ((await host.superseded(card, { cycle: o.cycle, attempt: o.attempt }, warn)) === 'failed') {
+        ok = false
+        continue
+      }
+      try {
+        await journals.supersede(o.name, o.journal, cycleNow)
+      } catch (e) {
+        ok = false
+        checksLog.warn(`archiving ${userText(card.key)}'s superseded advance journal`, e) // i18n-ignore: a log line, English
+      }
+    }
+    return ok
+  }
+
+  /**
+   * HI-3367: live journals whose card isn't one of the project's active cards. Its card read from the board by the
+   * journal's key (archived ones included); a read that fails keeps them. An archived card's are retired whole (every cycle)
+   * under its card lock and the repository lock, rechecked there: unarchived meanwhile, they stay for its own settling. A
+   * card with no row (gone) has no lock: the repository lock is the fence (an attempt holds it from its first journal to its
+   * outcome), the card rechecked missing under it, and its journals archived with nothing said (no card to say it on).
+   */
+  private async retireStray(integ: JjIntegrationDeps, journals: AdvanceJournals, fileKey: string, host: AdvanceHost): Promise<void> {
+    const wf = this.wf!
+    let card: CardRecord | null
+    try {
+      card = wf.store.cardByKey(fileKey)
+    } catch (e) {
+      checksLog.warn(`reading the card of advance journals ${userText(fileKey)}`, e) // i18n-ignore: a log line, English
+      return
+    }
+    if (card) {
+      const id = card.id
+      if (!wf.store.isArchived(id)) return
+      await this.withCardLock(id, () =>
+        underLock(integ.view.store, integ.lock, async () => {
+          if (!wf.store.isArchived(id)) return
+          const now = wf.store.card(id)
+          await this.retireOthers(journals, fileKey, now, null, wf.state(now).cycle, host)
+        })
+      )
+      return
+    }
+    await underLock(integ.view.store, integ.lock, async () => {
+      try {
+        if (wf.store.cardByKey(fileKey)) return
+      } catch {
+        return
+      }
+      for (const o of await journals.others(fileKey, null)) {
+        try {
+          await journals.supersede(o.name, o.journal, null)
+          checksLog.info(`advance journal ${userText(o.name)} retired: its card is gone`) // i18n-ignore: a log line, English
+        } catch (e) {
+          checksLog.warn(`archiving advance journal ${userText(o.name)} of a gone card`, e) // i18n-ignore: a log line, English
+        }
+      }
+    })
+  }
+
   /** HI-3235: the project's journaled advances settled (a crash, a card no reconcile reached), card by card under its locks. */
   async recoverAdvances(host: AdvanceHost): Promise<void> {
     const d = this.deps
@@ -1255,8 +1331,12 @@ export class JjPlatform implements PlatformAdapter {
     const journals = this.advanceJournals()
     if (!wf || !d?.records || !journals) return
     const keys = new Set((await journals.all()).filter((j) => !j.settled || j.settled === 'stopped' || j.settled === 'uncertain').map((j) => j.plan.card.toLowerCase()))
-    const cards = wf.store.cards().filter((c) => keys.has(c.key.toLowerCase()) || advanceUnresolved(wf.state(c)))
-    if (!cards.length) return
+    const active = wf.store.cards()
+    const cards = active.filter((c) => keys.has(c.key.toLowerCase()) || advanceUnresolved(wf.state(c)))
+    // HI-3367: and journals of cards that aren't active (archived, or gone), which no card's settling reaches.
+    const own = new Set(active.map((c) => c.key.toLowerCase()))
+    const strays = [...(await journals.cardsNamed())].filter((k) => !own.has(k.toLowerCase()))
+    if (!cards.length && !strays.length) return
     const integ = await d.integration()
     if (!integ) {
       // jj unreadable now: nothing classified, but an unsettled attempt keeps a question (its journal read only for its words).
@@ -1264,6 +1344,7 @@ export class JjPlatform implements PlatformAdapter {
       return
     }
     for (const c of cards) await this.withCardLock(c.id, () => underLock(integ.view.store, integ.lock, (h) => this.settleAdvances(h, integ, journals, c, host)))
+    for (const k of strays) await this.retireStray(integ, journals, k, host)
   }
 
   /** Whether a target's head is still `expected` (J5's read): false when it moved or can't be read. */
