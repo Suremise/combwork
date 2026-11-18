@@ -1983,6 +1983,20 @@ describe('a trial the environment stops (trialEnvironment)', () => {
       expect(launchEnded({ code: '1', auth: { loggedIn: false } }).environment).toMatch(/^not signed in: /)
     })
 
+    // HI-3392: the screen a failed trial recorded (Claude Code 2.1.327, the Assistant's workspace): no choices in it.
+    it("sees Claude Code's trust question by its title on its drawn screen, not only by its choices", () => {
+      const { claudeTrustAsked } = require('./scenarios/harness.cjs') as { claudeTrustAsked: (raw?: string, drawn?: string) => boolean }
+      const seen = "──────── Accessing workspace: C:\\x\\lanes\\0\\assistant-settings-git-limits-cc\\ws Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source project, or work from your team). If not, take a moment to review what's in this folder first. Claude Code'll be able to read, edit, and execute files here."
+      expect(claudeTrustAsked(seen, seen)).toBe(true)
+      expect(claudeTrustAsked('', seen)).toBe(true)
+      // Its choices in the output, as before.
+      expect(claudeTrustAsked('❯ 1. Yes, I trust this folder  2. No, exit', '')).toBe(true)
+      // Answered: its prompt drawn after it; and in the output only (its text stays there once erased): no question.
+      expect(claudeTrustAsked('', `${seen}\n> \n? for shortcuts`)).toBe(false)
+      expect(claudeTrustAsked(seen, '> \n? for shortcuts')).toBe(false)
+      expect(claudeTrustAsked('', '')).toBe(false)
+    })
+
     it('anything else is an error at once, saying what it showed', () => {
       expect(launchEnded({ reason: "error: option '--model <model>' argument 'x' is invalid.", auth: { loggedIn: true } })).toEqual({ error: "the session ended at launch: error: option '--model <model>' argument 'x' is invalid." })
       expect(launchEnded({})).toEqual({ error: 'the session ended at launch' })

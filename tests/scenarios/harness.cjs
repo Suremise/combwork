@@ -380,6 +380,19 @@ const logLines = (file) => {
     return []
   }
 }
+/**
+ * HI-3392: whether Claude Code asks to trust a folder now: its choices in its output's plain text (`raw`), or, on its
+ * screen as drawn (`drawn`, lib.screenNow), its title or first words too, its prompt not drawn after them. Claude Code
+ * 2.1.327's question for the Assistant's workspace showed its title and words but not its choices in the output's plain
+ * text, so a check of its choices alone missed it, and the prompt typed into it later chose "No, exit" (exit 1).
+ */
+const CLAUDE_TRUST_ASKED = /Accessing workspace:|Quick safety check|Is this a project you created or one you trust/i
+function claudeTrustAsked(raw = '', drawn = '') {
+  if (lib.CLAUDE_TRUST.test(raw)) return true
+  const text = lib.plainText(drawn)
+  const at = text.search(CLAUDE_TRUST_ASKED)
+  return at >= 0 && !lib.CLAUDE_AT_PROMPT.test(text.slice(at))
+}
 /** Whether Combwork's log says this agent's terminal exited (its process ended). */
 const ptyExitedIn = (file, agentId) => logLines(file).some((l) => /\[pty\] exit /.test(l) && l.includes(`#${agentId}⁩`))
 /**
@@ -962,7 +975,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       if (/Do you trust the files in this folder/i.test(plain(await inv('pty:buffer', key).catch(() => '')))) {
         await inv('pty:write', key, '\r')
         await answered()
-      } else if (lib.CLAUDE_TRUST.test(plain(await inv('pty:buffer', key).catch(() => '')))) {
+      } else if (p.provider === 'codex' ? lib.CLAUDE_TRUST.test(plain(await inv('pty:buffer', key).catch(() => ''))) : claudeTrustAsked(plain(await inv('pty:buffer', key).catch(() => '')), await lib.screenNow(inv, key).catch(() => ''))) {
         // Claude Code's menu starts on "No, exit": lib's answer presses Enter only once "Yes" shows selected (#218).
         if (p.provider === 'codex') await inv('pty:write', key, '\r')
         else await lib.acceptClaudeTrust(inv, host, agentId)
@@ -1033,6 +1046,7 @@ async function runScenario(sc, providerKey, opts = {}) {
         const auth = p.provider === 'claude-code' ? claudeAuthStatus(combworkLog, agentId, env) : null
         const gone = endedNow()
         if (gone) {
+          result.endedDiag = { lastScreen: lastScreen.slice(-3000), drawn: lib.plainText(drawn).slice(-1500), log: logLines(combworkLog).filter((l) => l.includes(agentId)).slice(-40) }
           endedAtLaunch = launchEnded({ screen: lib.plainText(drawn) || lastScreen, reason: startFailureIn(combworkLog), auth, code: gone.code })
           if (endedAtLaunch.environment) return skipFor(endedAtLaunch.environment)
         }
@@ -1290,4 +1304,4 @@ async function runScenario(sc, providerKey, opts = {}) {
   return result
 }
 
-module.exports = { runScenario, scenarioFolder, PROVIDER_TAGS, dialectForRun, dialectRecord,forgetClaudeMemory, observeTranscript, tokenSightings, knownTokens, maskTokens, retainedObserved, skillRefsOf, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, relaunchTrust, keptReply, REPLY_KEPT, cliNotices, launchEnded, startFailureIn, terminalEnded, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }
+module.exports = { runScenario, scenarioFolder, PROVIDER_TAGS, dialectForRun, dialectRecord,forgetClaudeMemory, observeTranscript, tokenSightings, knownTokens, maskTokens, retainedObserved, skillRefsOf, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, relaunchTrust, keptReply, REPLY_KEPT, cliNotices, launchEnded, startFailureIn, terminalEnded, claudeTrustAsked, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }
