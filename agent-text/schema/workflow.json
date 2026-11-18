@@ -12,6 +12,12 @@
       "detail": "plain"
     }
   },
+  "workflow.advance.superseded": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain"
+    }
+  },
   "workflow.contradiction.combworkMergesNeedsGit": {
     "placeholders": {}
   },
@@ -95,6 +101,12 @@
       "card": "plain",
       "why": "select",
       "detail": "plain"
+    }
+  },
+  "workflow.forYou.advanceSuperseded": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain"
     }
   },
   "workflow.forYou.advanceUncertain": {

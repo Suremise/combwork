@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **A jj card put back while its integration was unsettled says so** (HI-3367). Put back and restarted (or archived) while For you asked about its integration, a jj card lost that question with nothing said, and Combwork went on reading the old attempt at every check of the project. Now Combwork stops tracking it once the card starts again or is archived, and comments on the card when the old attempt may have moved the target.
 - **A jj card waiting for a card in another project goes on as soon as that card is Done** (HI-3366). A jj card held for a card it depends on in another project wasn't integrated, and its lane didn't go on, until something else made Combwork look at its own project again (a jj operation there, or focusing a window). Now the other card's Done is enough.
 
 ## 1.6.0 — 2026-11-17

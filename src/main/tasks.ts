@@ -3292,11 +3292,12 @@ export async function noteOnCard(n: number, what: string | StoredText, ws: Works
  * `key`: the comment's id, at most once on the card. Or both (HI-2087): its English as agents read it (`text`, longer
  * than the window's), and the message the window shows (`shown`).
  */
-export async function commentAsCombwork(n: number, said: string | StoredText | { text: string; shown: StoredText }, ws: WorkspaceService = workspace, still: (card: TaskCard) => boolean = () => true, key?: string): Promise<boolean> {
+export async function commentAsCombwork(n: number, said: string | StoredText | { text: string; shown: StoredText }, ws: WorkspaceService = workspace, still: (card: TaskCard) => boolean = () => true, key?: string, evenArchived = false): Promise<boolean> {
   return boardLock(ws, async () => {
     const card = await getTask(n, ws)
-    // `key` (HI-2014): the comment's id, written once on the card: a retry finds it and writes nothing.
-    if (card.archived || !still(card) || (key && card.comments.some((c) => c.id === key))) return false
+    // `key` (HI-2014): the comment's id, written once on the card: a retry finds it and writes nothing. An archived card
+    // gets none unless `evenArchived` (HI-3367: a notice that replaces a question it lost).
+    if ((card.archived && !evenArchived) || !still(card) || (key && card.comments.some((c) => c.id === key))) return false
     // Agents' English beside the window's message (and, where it is worded apart, what it is said from: `agent`).
     if (typeof said !== 'string' && 'shown' in said) addComment(card, BY.combwork, said.text, said.shown, key)
     else addComment(card, BY.combwork, typeof said === 'string' ? said : englishSaid(said), typeof said === 'string' ? undefined : said, key)
