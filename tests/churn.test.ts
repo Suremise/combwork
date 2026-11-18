@@ -217,6 +217,44 @@ describe('the simplify check and the hard stop (HI-3188)', () => {
   })
 })
 
+// HI-3370 (bug hunt, 18 Nov): the Assistant's churn-simplify delivery is given only while its question is still open: the
+// user's answer under For you, or the setting retiring it, ends it, so the Assistant is never told to answer a question
+// that no longer exists (its cw_answer_simplify would be refused).
+describe("the Assistant's simplify-check delivery follows its question (HI-3370)", () => {
+  it('open while For you has it; answered by the user, or retired by the setting: no longer open; a card gone: neither', async () => {
+    const { simplifyQuestionOpen } = await import('../src/main/churnAssistant')
+    const { w, wt, repo } = await workspace({ ...PAIR, simplifyAt: 3, churnStopAt: 0 })
+    const reach = async (): Promise<{ card: number; request: string }> => {
+      const card = await create(w)
+      await failedOnce(w, wt, card)
+      await design(w, card)
+      await ask(w, card)
+      const [check] = open(w, card, SIMPLIFY_GATE)
+      expect(check).toBeTruthy()
+      return { card, request: check.request }
+    }
+    const told = (q: { card: number; request: string }) => ({ ref: `#${q.card}/${q.request}`, meta: { card: q.card, project: 'p' } })
+    const wf = await inWorkspace(w, () => service.workflowFor(w, repo))
+    // Answered by the user under For you.
+    const a = await reach()
+    expect(simplifyQuestionOpen(wf, told(a))).toBe(true)
+    await inWorkspace(w, () => tasks.answerTask(a.card, a.request, { outcome: 'answered', choice: 'carryOn' }))
+    expect(open(w, a.card, SIMPLIFY_GATE)).toHaveLength(0)
+    expect(simplifyQuestionOpen(wf, told(a))).toBe(false)
+    // Retired by its setting (the level set to 0 closes it, HI-3188).
+    const b = await reach()
+    expect(simplifyQuestionOpen(wf, told(b))).toBe(true)
+    await levels(w, repo, { simplifyAt: 0 })
+    await inWorkspace(w, () => service.closeStaleChurn(w, repo))
+    expect(open(w, b.card, SIMPLIFY_GATE)).toHaveLength(0)
+    expect(simplifyQuestionOpen(await inWorkspace(w, () => service.workflowFor(w, repo)), told(b))).toBe(false)
+    // Not to be told from (no runtime, a ref with no request): unknown, given as before; a card gone: no longer open.
+    expect(simplifyQuestionOpen(null, told(a))).toBeNull()
+    expect(simplifyQuestionOpen(wf, { ref: `#${a.card}`, meta: { card: a.card } })).toBeNull()
+    expect(simplifyQuestionOpen(wf, { ref: '#99999/x', meta: { card: 99999, project: 'p' } })).toBe(false)
+  })
+})
+
 describe("the questions' guard reaches every caller and path (HR3's round 1)", () => {
   it("a lane reviewer's comments recorded as its requests count and stop the loop; while it waits a comment is a plain one", async () => {
     const { w, wt } = await workspace({ ...PAIR_HERE, simplifyAt: 0, churnStopAt: 2 })

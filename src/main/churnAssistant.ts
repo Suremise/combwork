@@ -1,8 +1,11 @@
 import { agentMsg, inDialectOf, say } from '../shared/agentText'
 import { assistantCanAct } from './answerRelay'
 import { createDelivery, offerNow, registerSource } from './deliveries'
+import type { DeliveryRecord } from '../shared/deliveries'
 import { createLogger } from './logger'
 import { workspaceFor, type WorkspaceService } from './workspace'
+import { workflowNow } from './workflow/service'
+import type { Workflow } from './workflow/runtime'
 
 /**
  * HI-3188 (Q4): a card's simplify check is told to the Assistant first, when it is set up and may act on
@@ -48,14 +51,50 @@ export async function tellAssistantSimplify(ws: WorkspaceService, q: SimplifyAsk
   }
 }
 
-registerSource(SOURCE, {
-  // Given only while the Assistant can act on it (its Control may have been turned down since).
-  refresh: async (_r, host) => {
-    const ws = workspaceFor(host)
-    return ws && assistantCanAct(ws) ? null : { cancel: 'the Assistant may not act on it now' } // i18n-ignore: why a delivery was cancelled, for the log
-  },
-  holds: (_r, host) => {
-    const ws = workspaceFor(host)
-    return !!ws && assistantCanAct(ws)
+/**
+ * HI-3370: whether the question a `churn-simplify` delivery tells of is still open on its card (its ref's request among
+ * the card's open requests, For you): the user may have answered it, or the setting retired it, since it was made, and the
+ * Assistant is then never told to answer a question that no longer exists. `wf`: the project's runtime, else unknown
+ * (null), which gives it as before.
+ */
+export function simplifyQuestionOpen(wf: Pick<Workflow, 'state' | 'store'> | null, r: Pick<DeliveryRecord, 'ref' | 'meta'>): boolean | null {
+  const card = typeof r.meta?.card === 'number' ? r.meta.card : null
+  const request = r.ref?.slice(r.ref.indexOf('/') + 1) ?? ''
+  if (!wf || card === null || !request || !r.ref?.includes('/')) return null
+  try {
+    return wf.state(wf.store.card(card)).requests.some((q) => q.request === request)
+  } catch {
+    // A card gone from the board: its question with it.
+    return false
   }
-})
+}
+
+/** The delivery's project folder, by the name it was made with (its meta), in its workspace now; null when it isn't there. */
+function projectPathOf(ws: WorkspaceService, r: Pick<DeliveryRecord, 'meta'>): string | null {
+  const name = typeof r.meta?.project === 'string' ? r.meta.project.toLowerCase() : null
+  return (name && ws.info()?.projects.find((p) => p.name.toLowerCase() === name)?.path) || null
+}
+
+const GONE = 'its question was answered or retired' // i18n-ignore: why a delivery was cancelled, for the log
+
+/** The source's checks (exported for tests, HI-3370): given only while the Assistant may act and the question is open. */
+export const churnSimplifySource = {
+  // Given only while the Assistant can act on it (its Control may have been turned down since), and its question is still
+  // open (HI-3370: the user's answer, or the setting retiring it, ends it): its project's runtime read for that.
+  refresh: async (r: DeliveryRecord, host: string): Promise<{ cancel: string } | null> => {
+    const ws = workspaceFor(host)
+    if (!ws || !assistantCanAct(ws)) return { cancel: 'the Assistant may not act on it now' } // i18n-ignore: why a delivery was cancelled, for the log
+    const path = projectPathOf(ws, r)
+    const wf = path ? await (await import('./workflow/service')).workflowFor(ws, path).catch(() => null) : null
+    return simplifyQuestionOpen(wf, r) === false ? { cancel: GONE } : null
+  },
+  // At hand-out, synchronously: the runtime as this workspace already has it (workflowNow), else as before.
+  holds: (r: DeliveryRecord, host: string): boolean => {
+    const ws = workspaceFor(host)
+    if (!ws || !assistantCanAct(ws)) return false
+    const path = projectPathOf(ws, r)
+    return simplifyQuestionOpen(path ? workflowNow(ws, path) : null, r) !== false
+  }
+}
+
+registerSource(SOURCE, churnSimplifySource)
