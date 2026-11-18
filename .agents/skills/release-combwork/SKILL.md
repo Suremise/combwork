@@ -24,6 +24,9 @@ RELEASING.md's **The user's OK** lists the decisions that are the user's. Do eac
 
 - Work merges into the release branch (`<version>`) through the merge queue. Its draft pull request into `main` is what runs CI on each push: if there isn't one yet, ask the user to open it at the next push (their OK). A red CI on it is carded and fixed now.
 - Don't add release branches to `ci.yml`'s push trigger (RELEASING, stage 1, says why).
+- **CI reds by class** (RELEASING, stage 1): name each red's class on its card (runner timing, the runner's environment, the code) and count the release's earlier reds of that class. The second of a class is a card for the class (a sweep of that pattern, or CI's load), not another single fix; before a third, ask the user (`cw_ask_user`) whether to simplify or change the approach.
+- **The version's full passes** (RELEASING, stage 1): when one is due (most planned cards Done, and again before the freeze), propose its card; each is the first RC's unit run (as CI runs it), full fake set and real tier on the branch's head, sign-ins checked first (Before the real tier). Card each failure into the version at once rather than holding it for rc.1, and say on the pass card how long it took.
+- **The CI rehearsal** (RELEASING, Steps, step 2): before you ask the user to push your release card's commit, run the full unit run as `ci.yml` runs it (its worker setting) on that commit, fix what fails first, and name the run and its time on the card. A version-only bump keeps an earlier rehearsal.
 
 ## Stage 2: freeze and rc.1
 

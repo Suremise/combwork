@@ -912,7 +912,8 @@ describe("the repository's AGENTS.md", () => {
       /\*\*Docs or text, or a test-expectation fix\*\*, \*\*5–15 min\*\*/,
       /\*\*Shared storage, concurrency, launch or workflow-safety change\*\*, \*\*30–60 min\*\*, its reason named on the card/,
       /\*\*A merge into the integration branch\*\*, \*\*10–20 min\*\*/,
-      /\*\*Preparing a release\*\* applies only when a release card or an RC is in hand[^\n]*\*\*first RC\*\*, about \*\*2–3 hours\*\*[^\n]*\*\*RC fix round\*\*, \*\*15–45 min\*\*[^\n]*\*\*release of the tested candidate\*\*, \*\*15–30 min\*\*/,
+      // HI-3359: a version's two full passes, the CI rehearsal before a push and CI reds by class, RELEASING's to own.
+      /\*\*Preparing a release\*\* applies only when a release card, a version's full pass or an RC is in hand[^\n]*\*\*version's full pass\*\*, about \*\*2–3 hours\*\*[^\n]*\*\*first RC\*\*, about \*\*2–3 hours\*\*[^\n]*\*\*RC fix round\*\*, \*\*15–45 min\*\*[^\n]*\*\*release of the tested candidate\*\*, \*\*15–30 min\*\*[^\n]*the CI rehearsal[^\n]*\(RELEASING\.md, Steps, step 2\)[^\n]*carded by its class[^\n]*\(RELEASING\.md, stage 1\)/,
       /It never asks for a full unit run or other wide re-runs\./,
       /\*\*Flake work:\*\* at most 2 spinner workers and 3 repeats per repro \(`--repeat 3`; the `investigate-flake` skill\)\. A flake seen only under a full run's load waits for the release window, unless it blocks merges\./,
       /never open the main checkout .* with one until the 1\.0 baseline is installed \(#1288\)/,
