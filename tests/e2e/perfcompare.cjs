@@ -40,7 +40,7 @@ const check = (name, ok, extra = '') => {
     const before = await lib.ipcSettled(app, 'benchmarks:import')
     await page.locator(`${pageSel} button`, { hasText: 'Import' }).click()
     // HI-3396: its import answered and drawn.
-    await until(async () => (await lib.ipcSettled(app, 'benchmarks:import')) > before, HUNG_MS)
+    await lib.ipcAnswered(app, 'benchmarks:import', before + 1, HUNG_MS)
     await lib.answersDrawn(inv, page)
   }
   const statusOf = async (id) => (await page.locator(`${pageSel} .perf-scenarios tbody tr`, { hasText: id }).first().locator('.badge').innerText().catch(() => '')).trim()
@@ -108,7 +108,7 @@ const check = (name, ok, extra = '') => {
   })
   await page.locator(`${pageSel} select[aria-label="Run"]`).selectOption({ label: 'fake, fixtures v5 (smaller replies)' })
   // HI-3396: the old pair's slowed reads answered and drawn (main's count), then checked.
-  await until(async () => (await lib.ipcSettled(app, 'benchmarks:read')) >= reads + 4, HUNG_MS)
+  await lib.ipcAnswered(app, 'benchmarks:read', reads + 4, HUNG_MS)
   await lib.answersDrawn(inv, page)
   check("a pair switched during a slow read shows the new pair, not the old one's late answer", (await statusOf('card-detail')) === 'Smaller, still correct', await statusOf('card-detail'))
   check('the choice is remembered for the scope', (await inv('benchmarks:list', { kind: 'workspace' })).run !== null)
@@ -173,7 +173,7 @@ const check = (name, ok, extra = '') => {
   await page.locator(`${pageSel} button`, { hasText: 'Keep current view' }).click()
   await page.locator('.dialog input.input').first().fill('Today, whole workspace')
   await page.locator('.dialog .btn.primary').click()
-  await until(async () => (await page.locator('.dialog').count()) === 0, HUNG_MS)
+  await lib.readyWithin('its dialog closed', async () => (await page.locator('.dialog').count()) === 0, HUNG_MS)
   await page.locator(`${pageSel} select[aria-label="Run"]`).selectOption({ label: 'Today, whole workspace' })
   check('an export against a benchmark is not comparable, and says why', !!(await until(async () => /measure different things/.test(await page.locator(`${pageSel} .banner.warn`).innerText().catch(() => '')), HUNG_MS)))
 
@@ -189,7 +189,7 @@ const check = (name, ok, extra = '') => {
     await page.locator(`${pageSel} button`, { hasText: 'Keep current view' }).click()
     await page.locator('.dialog input.input').first().fill(label)
     await page.locator('.dialog .btn.primary').click()
-    await until(async () => (await page.locator('.dialog').count()) === 0, HUNG_MS)
+    await lib.readyWithin('its dialog closed', async () => (await page.locator('.dialog').count()) === 0, HUNG_MS)
   }
   check("…its own kept views compare, per hour recorded", !!(await until(async () => (await page.locator(`${pageSel} .perf-comparison table`).count()) === 1, HUNG_MS)))
   const alphaList = await inv('benchmarks:list', { kind: 'project', project: 'alpha' })
@@ -210,7 +210,7 @@ const check = (name, ok, extra = '') => {
   check('…and back to worst first', (await page.locator(`${pageSel} .perf-scenarios th[aria-sort="ascending"]`, { hasText: 'Result' }).count()) === 1, (await scenarioIds()).join())
   check('the kept list is a table too', (await page.locator(`${pageSel} .perf-kept th`, { hasText: 'When' }).count()) === 1)
   await inv('settings:update', { appearance: { theme: 'light' } })
-  await lib.themeShown(page, 'light')
+  await lib.themeSettled(page, 'light')
   await shot('failing-light')
   await lib.fitWindow(app, page, { width: 720, height: 900 })
   await lib.viewportIs(page, 720)

@@ -64,7 +64,7 @@ const HUNG_MS = lib.timing('hang.ui')
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('demo', { exact: true }).first().click()
   await page.locator('.tab', { hasText: 'Files' }).click()
-  await lib.until(async () => (await page.locator('.file-row').count()) > 0, lib.timing('hang.ui'))
+  await lib.readyWithin('its files listed', async () => (await page.locator('.file-row').count()) > 0, lib.timing('hang.ui'))
   const row = (rel) => page.locator(`.file-row[data-rel="${rel}"]`)
   const pane = page.locator('.split-main')
 

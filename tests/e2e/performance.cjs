@@ -186,7 +186,7 @@ const check = (name, ok, extra = '') => {
   const refreshed = await lib.ipcSettled(app, 'metrics:query')
   await page.locator('.performance-page:visible button[aria-label="Refresh"]').click()
   // HI-3396: its read answered and drawn, then checked.
-  await until(async () => (await lib.ipcSettled(app, 'metrics:query')) > refreshed, HUNG_MS)
+  await lib.ipcAnswered(app, 'metrics:query', refreshed + 1, HUNG_MS)
   await lib.answersDrawn(inv, page)
   check('reading the page adds nothing to it', (await requests()) === '47', await requests())
 
@@ -249,12 +249,12 @@ const check = (name, ok, extra = '') => {
   })
   await page.locator('.sidebar .row', { hasText: 'alpha' }).click()
   // HI-3396: alpha's (slowed) query asked for, by its pick drawn, before beta is picked.
-  await until(async () => (await page.locator('.sidebar .row.selected', { hasText: 'alpha' }).count()) === 1, HUNG_MS)
+  await lib.readyWithin('its project shown', async () => (await page.locator('.sidebar .row.selected', { hasText: 'alpha' }).count()) === 1, HUNG_MS)
   await lib.framesDrawn(page)
   await page.locator('.sidebar .row', { hasText: 'beta' }).click()
   check('a scope switched during a slow query shows the new scope', !!(await until(async () => (await requests()) === '12', HUNG_MS)), await requests())
   // HI-3396: alpha's slowed reply answered and drawn (main's count), then checked.
-  await until(async () => (await lib.ipcSettled(app, 'metrics:query')) >= queried + 2, HUNG_MS)
+  await lib.ipcAnswered(app, 'metrics:query', queried + 2, HUNG_MS)
   await lib.answersDrawn(inv, page)
   check("…and the old scope's late reply doesn't replace it", (await requests()) === '12', await requests())
   await app.evaluate(() => {
@@ -307,7 +307,7 @@ const check = (name, ok, extra = '') => {
   // Light theme, and a narrow window.
   await page.locator('.activitybar button[aria-label="Performance"]').click()
   await inv('settings:update', { appearance: { theme: 'light' } })
-  await lib.themeShown(page, 'light')
+  await lib.themeSettled(page, 'light')
   await shot('wide-light')
   await lib.fitWindow(app, page, { width: 720, height: 900 })
   await lib.viewportIs(page, 720)
@@ -331,7 +331,7 @@ const check = (name, ok, extra = '') => {
   check('narrow: each route is on one line', !!(await until(routesOnOneLine, HUNG_MS)), JSON.stringify(routeLines))
   await shot('narrow-light')
   await inv('settings:update', { appearance: { theme: 'dark' } })
-  await lib.themeShown(page, 'dark')
+  await lib.themeSettled(page, 'dark')
   await shot('narrow-dark')
 
   await app.close()

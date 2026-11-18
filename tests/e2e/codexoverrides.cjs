@@ -23,11 +23,11 @@ const proj = path.join(ws, 'demo')
 const small = { provider: 'codex', model: 'gpt-6-luna', effort: 'low' }
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = lib.timing('hang.ui')
-const READY_MS = 90000
-const TURN_MS = 180000
+const READY_MS = lib.timing('hang.step')
+const TURN_MS = lib.timing('turn.realMs')
 // How long Combwork may take to show the agent waiting once Codex's approval is on its screen (a hook or the title follows
 // the screen): a bound for a hung run.
-const WAITING_MS = 30000
+const WAITING_MS = lib.timing('hang.ui')
 const TEXT = 'SELECTME alpha beta gamma delta'
 const TITLE_ID = 'codex.override.terminalTitle'
 const RIGHT_ID = 'codex.mouse.rightClickToCli'

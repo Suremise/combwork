@@ -46,7 +46,7 @@ const check = (name, ok, extra = '') => {
   const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === agent.id)
   await inv('session:start', alpha, { agentId: agent.id })
   check('a Codex agent starts', !!(await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), lib.timing('hang.step'))), JSON.stringify(await live()))
-  await new Promise((r) => setTimeout(r, 1000))
+  await lib.sleep(lib.timing('quiet.folderWarningMs')) // The window is the point: no warning comes within it.
   check('…with no warning: the project’s .codex holds only Codex’s configuration (config, a custom agent, rules)', (await warnings()).length === 0, (await warnings()).join(' | '))
 
   // An agent writes its probe into .codex while the Codex agent works.
@@ -64,7 +64,7 @@ const check = (name, ok, extra = '') => {
   check('…and Combwork warns of the stray .codex folder, naming it and what it holds', told?.length === 1 && told[0].includes(path.join(alpha, '.codex')) && told[0].includes('scratch'), (told ?? []).join(' | '))
   await page.screenshot({ path: path.join(lib.WORK, 'codexfolder-warning.png') })
   check('another turn ends', !!(await turn('again')), JSON.stringify(await live()))
-  await new Promise((r) => setTimeout(r, 1000))
+  await lib.sleep(lib.timing('quiet.folderWarningMs')) // The window is the point: no second warning comes within it.
   check('…with no second warning', (await warnings()).length === 1, (await warnings()).join(' | '))
 
   await inv('session:stop', alpha, agent.id)

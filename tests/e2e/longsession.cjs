@@ -98,11 +98,11 @@ const check = (name, ok, extra = '') => {
     const r = el.getBoundingClientRect()
     return r.top >= 0 && r.top < window.innerHeight
   }).catch(() => false)
-  const inView = !!(await until(shownAt, lib.timing('hang.ui')))
+  const inView = !!(await lib.readyWithin('scrolled into view', shownAt, lib.timing('hang.ui')))
   check("the context count opens the Overview at the agent's session", inView)
   const sessionTab = page.locator('.tab', { hasText: 'Session' }).first()
   await sessionTab.click()
-  await until(() => sessionTab.evaluate((e) => e.classList.contains('active') || e.getAttribute('aria-selected') === 'true'), lib.timing('hang.ui'))
+  await lib.readyWithin('its tab chosen', () => sessionTab.evaluate((e) => e.classList.contains('active') || e.getAttribute('aria-selected') === 'true'), lib.timing('hang.ui'))
 
   // The size opens Hand Over to…, with the agent itself (a new conversation) chosen for a long one.
   await size.click()

@@ -178,36 +178,56 @@ async function themeShown(page, theme, ms = timing('hang.ui')) {
 }
 
 /**
- * HI-3396: sets the first window's zoom to z, and whether its page then draws at it, waited for up to ms: its
- * devicePixelRatio is z times its display's scale, and no CSS transition still runs. A measure taken then is the zoom's.
+ * HI-3396: sets the first window's zoom to z, then waits, within ms in all, until its page draws at it (devicePixelRatio
+ * z times its display's scale) and has settled (lib.settled). Each call is bounded (readyWithin's looks); it throws
+ * otherwise, so nothing measured or shot goes on as if it had.
  */
 async function zoomTo(app, page, z, ms = timing('hang.ui')) {
-  const scale = await app.evaluate(({ BrowserWindow, screen }, f) => {
-    const w = BrowserWindow.getAllWindows()[0]
-    w.webContents.setZoomFactor(f)
-    return screen.getDisplayMatching(w.getBounds()).scaleFactor
-  }, z)
-  return !!(await until(() => page.evaluate((want) => Math.abs(devicePixelRatio - want) < 0.01 && !document.getAnimations().some((a) => a instanceof CSSTransition && a.playState === 'running'), z * scale), ms))
+  const deadline = Date.now() + ms
+  let scale = null
+  await readyWithin(`zoomed to ${z * 100}% by main`, async () => {
+    scale = await app.evaluate(({ BrowserWindow, screen }, f) => {
+      const w = BrowserWindow.getAllWindows()[0]
+      w.webContents.setZoomFactor(f)
+      return screen.getDisplayMatching(w.getBounds()).scaleFactor
+    }, z)
+    return typeof scale === 'number'
+  }, ms, deadline)
+  await readyWithin(`drawn at ${z * 100}%`, () => page.evaluate((want) => Math.abs(devicePixelRatio - want) < 0.01, z * scale), ms, deadline)
+  return settled(page, ms, deadline)
 }
 
-/** HI-3396: the window's next two frames drawn (what a change just made renders, and its effects run). */
-const framesDrawn = (page) => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(true)))))
+/** HI-3396: the window's next two frames drawn (what a change just made renders, its effects run), within ms; it throws otherwise. */
+async function framesDrawn(page, ms = timing('hang.ui')) {
+  return readyWithin('two frames drawn', () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(true))))), ms)
+}
 
-/** HI-2971, HI-3396: how many calls on `channel` main has answered (or failed) so far (dev builds' __cwSettledIpc). */
+/** HI-2971, HI-3396: how many calls on `channel` main has answered (or failed) so far (dev builds' __cwSettledIpc): one read. */
 const ipcSettled = (app, channel) => app.evaluate((_e, c) => globalThis.__cwSettledIpc?.[c] ?? 0, channel)
 
 /**
- * HI-2971, HI-3396: every answer main has sent so far has reached the window and been drawn: a call answered after them
- * (the same pipe, in order), then two frames. With ipcSettled, a late answer's effect is checked without waiting a time.
+ * HI-2971, HI-3396: main has answered at least n calls on `channel` (ipcSettled), within ms (each read bounded); it throws
+ * otherwise. A late answer is then known to have gone to the window, without waiting a time.
  */
-async function answersDrawn(inv, page) {
-  await inv('app:info')
-  await framesDrawn(page)
+async function ipcAnswered(app, channel, n, ms = timing('hang.ui')) {
+  return readyWithin(`${n} ${channel} answer(s) from main`, async () => (await ipcSettled(app, channel)) >= n, ms)
 }
 
-/** HI-3396: whether the page's viewport is `width` CSS pixels wide (a resize applied) with no CSS transition running, waited for up to ms. */
+/**
+ * HI-2971, HI-3396: every answer main has sent so far has reached the window and been drawn, within ms in all: a call
+ * answered after them (the same pipe, in order), then two frames. It throws otherwise.
+ */
+async function answersDrawn(inv, page, ms = timing('hang.ui')) {
+  const deadline = Date.now() + ms
+  await readyWithin('answered by main after its earlier answers', async () => !!(await inv('app:info')), ms, deadline)
+  return readyWithin('two frames drawn', () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(true))))), ms, deadline)
+}
+
+/** HI-3396: the page's viewport `width` CSS pixels wide (a resize applied) and settled, within ms in all; it throws otherwise. */
 async function viewportIs(page, width, ms = timing('hang.ui')) {
-  return !!(await until(() => page.evaluate((w) => innerWidth === w && !document.getAnimations().some((a) => a instanceof CSSTransition && a.playState === 'running'), width), ms))
+  const deadline = Date.now() + ms
+  await readyWithin(`${width} px wide`, () => page.evaluate((w) => innerWidth === w, width), ms, deadline)
+  return settled(page, ms, deadline)
 }
 
 async function hoverTip(page, locator, want, ms = timing('hang.ui')) {
@@ -216,6 +236,49 @@ async function hoverTip(page, locator, want, ms = timing('hang.ui')) {
   await until(async () => (await page.locator('.tip:visible').count()) === 0, ms)
   await locator.hover()
   return (await until(async () => { const t = await tip(); return want(t) && t }, ms)) || (await tip())
+}
+
+/**
+ * HI-3388: one look of a readiness wait, bounded: `look()` (a call into the page) raced against what is left of the deadline
+ * and at most poll.readMs, so a renderer that never answers (no frame drawn, an evaluate that never returns) is a look
+ * that came back false, never a wait that outlives its bound. Its pending call is left to the page.
+ */
+async function boundedLook(look, deadline) {
+  const left = Math.min(deadline - Date.now(), timing('poll.readMs'))
+  if (left <= 0) return false
+  let timer
+  const out = await Promise.race([Promise.resolve().then(look).catch(() => false), new Promise((r) => (timer = setTimeout(() => r(false), left)))])
+  clearTimeout(timer)
+  return out
+}
+
+/** A readiness wait: `look` true within ms (each look bounded), or it throws naming `what` (never a pass by timeout). */
+async function readyWithin(what, look, ms, deadline = Date.now() + ms) {
+  const ok = await until(() => boundedLook(look, deadline), Math.max(1, deadline - Date.now()))
+  if (!ok) throw new Error(`not ${what} within ${ms} ms`)
+  return true
+}
+
+/**
+ * HI-3388: the page settled, for a screenshot or a measurement: two frames drawn and no finite CSS animation or transition
+ * still running (a spinner's endless one doesn't count). A condition, never a fixed pause before the shot; it throws
+ * when the page hasn't settled within ms, so nothing goes on as if it had.
+ */
+async function settled(page, ms = timing('hang.ui'), deadline = Date.now() + ms) {
+  const still = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(document.getAnimations().every((a) => a.playState !== 'running' || a.effect?.getTiming?.().iterations === Infinity))))))
+  return readyWithin('settled (two frames drawn, no animation running)', still, ms, deadline)
+}
+
+/** HI-3388: a theme applied (the page's data-theme says it) and the page settled, within ms in all; it throws otherwise. */
+async function themeSettled(page, theme, ms = timing('hang.ui')) {
+  const deadline = Date.now() + ms
+  await readyWithin(`in the ${theme} theme`, async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, ms, deadline)
+  return settled(page, ms, deadline)
+}
+
+/** HI-3388: no dialog left open (an Escape or a close taken) within ms; it throws otherwise. */
+async function noDialog(page, ms = timing('hang.ui')) {
+  return readyWithin('without a dialog', async () => (await page.locator('[role="dialog"]:visible').count()) === 0, ms)
 }
 
 let quitWatches = 0
@@ -2279,4 +2342,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { timing, PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, trustWorktrees, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, themeShown, zoomTo, viewportIs, framesDrawn, ipcSettled, answersDrawn, CLAUDE_TRUST, CLAUDE_AT_PROMPT, trustQuestion, screenNow, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }
+module.exports = { timing, PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, settled, themeSettled, noDialog, hoverTip, quitWatch, appReady, openWorkspace, trustWorktrees, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, themeShown, CLAUDE_TRUST, CLAUDE_AT_PROMPT, trustQuestion, screenNow, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip, zoomTo, viewportIs, framesDrawn, ipcSettled, ipcAnswered, answersDrawn, readyWithin }

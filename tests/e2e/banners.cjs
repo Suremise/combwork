@@ -62,7 +62,7 @@ const check = (name, ok, extra = '') => {
   check('both agents start', !!(await lib.until(async () => (await live(alpha, one))?.status === 'ready' && (await live(beta, two))?.status === 'ready', lib.timing('hang.step'))))
   const send = async (p, a, text) => {
     await inv('pty:write', lib.ptyKey(p, a.id), text)
-    await lib.sleep(100)
+    await lib.sleep(lib.timing('pace.keysThenEnterMs'))
     await inv('pty:write', lib.ptyKey(p, a.id), '\r')
   }
   const turnEnds = (p, a) => lib.until(async () => (await live(p, a))?.status === 'finished', lib.timing('hang.step'))
@@ -99,7 +99,7 @@ const check = (name, ok, extra = '') => {
   await turnEnds(alpha, one)
   await lib.until(async () => (await banners().count()) === 1, lib.timing('hang.ui'))
   await banners().first().hover()
-  await lib.sleep(3500) // A fixed wait on purpose: longer than the banner's 2 s, to show it does NOT close while hovered.
+  await lib.sleep(lib.timing('quiet.bannerStaysMs')) // The window is the point: past a banner's 2 s, it doesn't close while hovered.
   check('…but not while the pointer is on it', (await banners().count()) === 1)
   await page.mouse.move(650, 600)
   check('…and closes once it moves away', !!(await lib.until(async () => (await banners().count()) === 0, lib.timing('hang.ui'))))
@@ -132,7 +132,7 @@ const check = (name, ok, extra = '') => {
   await page.keyboard.press('Shift+Tab')
   check('…reached with the keyboard', await page.evaluate(() => document.activeElement?.classList.contains('toast-open') ?? false))
   await page.screenshot({ path: path.join(lib.WORK, 'banners-2-keyboard.png'), clip: { x: 500, y: 560, width: 800, height: 240 }, animations: 'disabled' })
-  await lib.sleep(3500) // A fixed wait on purpose: longer than the banner's 2 s, to show it does NOT close while focused.
+  await lib.sleep(lib.timing('quiet.bannerStaysMs')) // The window is the point: past a banner's 2 s, it doesn't close while focused.
   check('…it stays open while it has the focus', (await banners().count()) === 1)
   await page.keyboard.press('Enter')
   check('Enter on it shows the agent\'s project, and closes it', !!(await lib.until(async () => (await page.locator('.project-header h1').innerText().catch(() => '')).includes('alpha'), lib.timing('hang.ui'))) && (await banners().count()) === 0)
@@ -164,7 +164,7 @@ const check = (name, ok, extra = '') => {
   // --- Waiting: stays until the agent moves on (it finishes after 8 s here).
   await send(alpha, one, 'ask work 8')
   check('an agent waiting for you: a pop-up', !!(await lib.until(async () => (await page.locator('.popups .popup.kind-needsYou').count()) === 1, lib.timing('hang.ui'))), JSON.stringify(await bannerTitles()))
-  await lib.sleep(3500) // A fixed wait on purpose: longer than the 2 s a finished banner stays, to show a waiting one does NOT close.
+  await lib.sleep(lib.timing('quiet.bannerStaysMs')) // The window is the point: past the 2 s a finished banner stays, a waiting one doesn't close.
   check('…that stays while it waits', (await page.locator('.popups .popup.kind-needsYou').count()) === 1)
   await turnEnds(alpha, one)
   check('…and closes once it is no longer waiting', !!(await lib.until(async () => (await page.locator('.popups .popup.kind-needsYou').count()) === 0, lib.timing('hang.ui'))))
@@ -184,7 +184,7 @@ const check = (name, ok, extra = '') => {
   check('…which shows the fifth: none was dropped', !!(await lib.until(async () => (await page.locator('.popups .popup.kind-needsYou').count()) === 5, lib.timing('hang.ui'))) && (await bannerTitles()).some((t) => /Waiting 1\b/.test(t)), JSON.stringify(await bannerTitles()))
   await page.screenshot({ path: path.join(lib.WORK, 'banners-3-five-waiting.png') })
   for (let i = 1; i <= 4; i++) await sendEvent(entry(`f${i}`, 'finished', `Finished ${i}`, 'Done.'))
-  await lib.sleep(500)
+  await lib.sleep(lib.timing('quiet.bannerStaysMs')) // The window is the point: the finishes come and go, and no waiting one is dropped.
   check('four finished after them: all five waiting are still there', (await page.evaluate(() => document.querySelectorAll('.popups .popup.kind-needsYou').length + Number((document.querySelector('.notice-more')?.textContent ?? '').replace(/\D/g, '') || 0))) >= 5)
   await lib.until(async () => (await page.locator('.popups .popup.kind-finished').count()) === 0, lib.timing('hang.ui'))
   await resolved([1, 2, 3, 4, 5].map((i) => `w${i}`))
@@ -238,7 +238,7 @@ const check = (name, ok, extra = '') => {
   await showProject('beta')
   await send(alpha, one, 'go work 1')
   await turnEnds(alpha, one)
-  await lib.sleep(4500) // A fixed wait on purpose: the finish group (3 s) and a banner's time, to show nothing comes.
+  await lib.sleep(lib.timing('quiet.finishGroupMs')) // The window is the point: a finish group (3 s) and a banner's time pass, and nothing comes.
   check('This project: another project\'s finish pops up nothing, no Windows notification, a quiet row in the bell', (await banners().count()) === 0 && osNotes().length === 0 && ((await bellTitles()) ?? []).some((t) => t.startsWith('quiet:alpha finished')), JSON.stringify(osNotes()))
   await send(beta, two, 'go work 1')
   await turnEnds(beta, two)
@@ -252,7 +252,7 @@ const check = (name, ok, extra = '') => {
   await inv('settings:update', { notifications: { bannerScope: 'none' } })
   await send(alpha, one, 'go work 1')
   await turnEnds(alpha, one)
-  await lib.sleep(4500) // A fixed wait on purpose: the finish group (3 s), to show nothing pops up.
+  await lib.sleep(lib.timing('quiet.finishGroupMs')) // The window is the point: a finish group (3 s) passes, and nothing pops up.
   check('None (only in the bell): no pop-up, no Windows notification while focused', (await banners().count()) === 0 && osNotes().length === before)
 
   // --- Combwork in the background: a Windows notification and a quiet bell row, never a pop-up, whatever the scope.

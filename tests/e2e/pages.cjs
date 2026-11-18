@@ -35,7 +35,7 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('crowd', { exact: true }).first().click()
-  await lib.until(async () => (await page.locator('.project-row.selected', { hasText: 'crowd' }).count()) === 1, lib.timing('hang.ui'))
+  await lib.readyWithin('its project shown', async () => (await page.locator('.project-row.selected', { hasText: 'crowd' }).count()) === 1, lib.timing('hang.ui'))
   // Panes on screen, and the agents in them (an empty pane has no header).
   const panes = () => page.locator('.agent-pane').count()
   const shown = async () => (await page.locator('.pane-header-bar .agent-name').allInnerTexts()).map((t) => t.trim()).join(',')

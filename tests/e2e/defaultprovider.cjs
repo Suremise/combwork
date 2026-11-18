@@ -50,7 +50,7 @@ const check = (name, ok, extra = '') => {
   check('…with no warning, and nothing about Claude Code', (await card.locator('[data-provider-warning]').count()) === 0 && !text.includes('Claude Code'), text)
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    await lib.sleep(300)
+    await lib.themeSettled(page, theme)
     await shot(`codex-only-${theme}`)
   }
 
@@ -118,7 +118,7 @@ const check = (name, ok, extra = '') => {
   await two.page.getByText('alpha', { exact: true }).first().click()
   await lib.until(async () => (await two.page.locator('.session-empty-card').count()) === 1, lib.timing('hang.step'))
   // Combwork has looked for the CLIs (launch waited for it): Provider Setup would open at once if it were going to.
-  await lib.sleep(1000) // on purpose: nothing should appear
+  await lib.sleep(lib.timing('quiet.setupOfferMs')) // The window is the point: no Provider Setup or banner comes within it.
   const banners = await two.page.locator('.providers-banner').allInnerTexts()
   check('no banner about Claude Code', !banners.some((b) => b.includes('Claude Code')), JSON.stringify(banners))
   check('Provider Setup did not open by itself', (await two.page.locator('.dialog', { hasText: 'Provider Setup' }).count()) === 0)

@@ -79,7 +79,7 @@ const check = (name, ok, extra = '') => {
     const dialogsIn = async (k) => (lib.plainText(await inv('pty:buffer', k).catch(() => '')).match(DIALOG) ?? []).length
     const dialogsAtSend = new Map()
     // How long Copilot may take to draw a dialog after Combwork shows it waiting: generous, for a loaded machine.
-    const DIALOG_DRAWN_MS = 30000
+    const DIALOG_DRAWN_MS = lib.timing('hang.ui')
     const answer = async (k, keys) => {
       const before = dialogsAtSend.get(k) ?? 0
       if (!(await lib.until(async () => (await dialogsIn(k)) > before, DIALOG_DRAWN_MS, 200))) {

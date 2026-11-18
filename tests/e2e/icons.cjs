@@ -42,7 +42,7 @@ async function launch(name) {
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('demo', { exact: true }).first().click()
   // HI-3396: its project shown (its row selected, its tabs drawn).
-  await lib.until(async () => (await page.locator('.project-row.selected', { hasText: 'demo' }).count()) === 1 && (await page.locator('.tabs .tab').count()) > 0, lib.timing('hang.ui'))
+  await lib.readyWithin('its project shown', async () => (await page.locator('.project-row.selected', { hasText: 'demo' }).count()) === 1 && (await page.locator('.tabs .tab').count()) > 0, lib.timing('hang.ui'))
   return { app, page, inv }
 }
 
@@ -74,7 +74,7 @@ async function away(page) {
   const tab = page.locator('.tabs .tab', { hasText: /^\s*Session\s*$/ })
   await tab.click()
   // HI-3396: its tab shown as chosen.
-  await lib.until(() => tab.evaluate((e) => e.classList.contains('active') || e.getAttribute('aria-selected') === 'true'), lib.timing('hang.ui'))
+  await lib.readyWithin('its tab chosen', () => tab.evaluate((e) => e.classList.contains('active') || e.getAttribute('aria-selected') === 'true'), lib.timing('hang.ui'))
 }
 
 ;(async () => {

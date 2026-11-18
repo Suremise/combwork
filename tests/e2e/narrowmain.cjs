@@ -97,7 +97,7 @@ const check = (name, ok, extra = '') => {
   const run = async (label, project, buttons, panes) => {
     await page.locator('.project-row', { hasText: project }).first().click()
     // HI-3396: its project shown, laid out.
-    await lib.until(async () => (await page.locator('.project-row.selected', { hasText: project }).count()) === 1, lib.timing('hang.ui'))
+    await lib.readyWithin('its project shown', async () => (await page.locator('.project-row.selected', { hasText: project }).count()) === 1, lib.timing('hang.ui'))
     const p = await probe()
     check(`${label}: the main area is squeezed between the panels`, !!p.main && p.main.width < 400 && !!p.sides.assistant && !!p.sides.progress && p.panes === panes, JSON.stringify(p))
     check(`${label}: nothing of the main area over the side panels${panes > 1 ? ', nor of a pane over the other' : ''}`, p.leakCount === 0, JSON.stringify(p))
@@ -130,7 +130,7 @@ const check = (name, ok, extra = '') => {
   }
   // Light theme, the tightest case again.
   await inv('settings:update', { appearance: { theme: 'light' } })
-  await lib.themeShown(page, 'light')
+  await lib.themeSettled(page, 'light')
   await lib.zoomTo(app, page, 1.25)
   await run('light, 125%, no agents', 'alpha', [['New Session', '.session-empty-card .btn.act-start']], 1)
   await page.screenshot({ path: path.join(lib.WORK, 'narrowmain-light-125-alpha.png') })
@@ -232,7 +232,7 @@ const check = (name, ok, extra = '') => {
   await lib.appReady(page)
   await lib.fitWindow(app, page, { width: 1600, height: 900 })
   await page.locator('.project-row', { hasText: 'alpha' }).first().click()
-  await lib.until(async () => (await page.locator('.project-row.selected', { hasText: 'alpha' }).count()) === 1, lib.timing('hang.ui'))
+  await lib.readyWithin('its project shown', async () => (await page.locator('.project-row.selected', { hasText: 'alpha' }).count()) === 1, lib.timing('hang.ui'))
   const roomy = await page.evaluate(() => {
     const e = [...document.querySelectorAll('.session-empty')].find((x) => x.getClientRects().length)
     const c = e?.querySelector('.session-empty-card')?.getBoundingClientRect()

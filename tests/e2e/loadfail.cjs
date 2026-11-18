@@ -109,10 +109,10 @@ const check = (name, ok, extra = '') => {
   const asked = await lib.ipcSettled(app, 'skills:list')
   await slowNext('skills:list', 2500)
   await project('alpha')
-  await until(async () => /Loading/.test(await text('.split-list .pane-body')), HUNG_MS)
+  await lib.readyWithin('loading shown', async () => /Loading/.test(await text('.split-list .pane-body')), HUNG_MS)
   await project('beta')
   await until(async () => (await page.locator('.skill-group').count()) > 0, HUNG_MS)
-  await until(async () => (await lib.ipcSettled(app, 'skills:list')) >= asked + 2, HUNG_MS)
+  await lib.ipcAnswered(app, 'skills:list', asked + 2, HUNG_MS)
   await lib.answersDrawn(inv, page)
   check("skills: alpha's late answer isn't shown in beta", (await alphaOnly.count()) === 0 && (await page.locator('.skill-group').count()) > 0)
   await project('alpha')
@@ -120,7 +120,7 @@ const check = (name, ok, extra = '') => {
   // While beta's own load is slow, alpha's list isn't shown as beta's: beta is loading.
   await slowNext('skills:list', 2500)
   await project('beta')
-  await until(async () => /Loading/.test(await text('.split-list .pane-body')), HUNG_MS)
+  await lib.readyWithin('loading shown', async () => /Loading/.test(await text('.split-list .pane-body')), HUNG_MS)
   check("skills: while beta loads, alpha's skills aren't shown", (await alphaOnly.count()) === 0 && /Loading/.test(await text('.split-list .pane-body')))
   check('skills: then beta has its own', !!(await until(async () => (await page.locator('.skill-group').count()) > 0, HUNG_MS)) && (await alphaOnly.count()) === 0)
 

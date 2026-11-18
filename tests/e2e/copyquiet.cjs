@@ -15,7 +15,7 @@ const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = lib.timing('hang.step')
 // The quiet wait's minute, a look at the pools (every 30 s) and a loaded machine.
-const QUIET_MS = 180000
+const QUIET_MS = lib.timing('hang.slow')
 
 const at = (x) => path.join(lib.WORK, `copyquiet-${x}`)
 const userData = at('profile')
@@ -111,7 +111,7 @@ const lines = (file) => {
     // --- R2's review of B waits; past the minute, it says what still uses copy-1.
     const startB = async () => (await call(tr2, 'PATCH', `/v1/tasks/${b}`, { review: 'start' })).body?.reviewCopy ?? ''
     const first = await startB()
-    check("R2's start review on B waits: the pool's copies are in use", Date.now() - returnedAt < 60_000 && /^Waiting for a review copy \(the pool's 1 copy is in use; copy-1, returned \d+ min ago, is held back by R1 \(working\)\)/.test(first), first)
+    check("R2's start review on B waits: the pool's copies are in use", Date.now() - returnedAt < lib.timing('budget.copyQuietMs') && /^Waiting for a review copy \(the pool's 1 copy is in use; copy-1, returned \d+ min ago, is held back by R1 \(working\)\)/.test(first), first)
     let said = ''
     const past = await until(async () => /copy-1 is still in use by R1 \(working\)/.test((said = await startB())), QUIET_MS, 5000)
     check('past the wait (1 min), it says what still uses it: "copy-1 is still in use by R1 (working)"', !!past && Date.now() - returnedAt >= 60_000, `${said} R1: ${JSON.stringify(await live(r1.id))}`)

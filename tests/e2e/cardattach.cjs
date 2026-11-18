@@ -261,7 +261,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     // #387, nothing attached is ever run), Remove from Card for a card's, Delete for a pane's, a file gone said in place.
     // Open in Its App is never clicked here: it would start Windows' own viewer.
     const viewer = page.locator('.dialog[role="dialog"]').filter({ has: page.locator('.image-viewer') })
-    const viewerTitle = () => viewer.getAttribute('aria-label', { timeout: 2000 }).then((x) => x ?? '', () => '')
+    const viewerTitle = () => viewer.getAttribute('aria-label', { timeout: lib.timing('poll.readMs') }).then((x) => x ?? '', () => '')
     const footer = async () => ({ open: await viewer.locator('[data-action="viewer-open"]').count(), show: await viewer.locator('[data-action="viewer-show"]').count(), remove: (await viewer.locator('[data-action="viewer-remove"]').innerText().catch(() => '')).trim(), position: (await viewer.locator('.dialog-footer .faint').first().innerText().catch(() => '')).trim() })
     const otherGroup = section.locator(`[data-card="${other.number}"]`)
     await page.locator('.attachment-filter', { hasText: 'All' }).click()

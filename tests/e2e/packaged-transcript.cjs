@@ -187,8 +187,8 @@ const text = (loc) => loc.textContent({ timeout: lib.timing('poll.readMs') }).th
 
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
   await page.locator('.session-row', { hasText: 'Zebra test fix' }).click()
-  await lib.until(async () => (await page.locator('.session-row.selected', { hasText: 'Zebra test fix' }).count()) === 1, lib.timing('hang.ui'))
-  await lib.themeShown(page, 'light')
+  await lib.readyWithin('its session shown', async () => (await page.locator('.session-row.selected', { hasText: 'Zebra test fix' }).count()) === 1, lib.timing('hang.ui'))
+  await lib.themeSettled(page, 'light')
   await page.screenshot({ path: path.join(shots, '7-light.png') })
 
   await app.close()

@@ -60,7 +60,7 @@ const check = (name, ok, extra = '') => {
       const mark = String((await inv('pty:buffer', key)) ?? '').length
       await inv('pty:write', key, text)
       // HI-3396: Enter once the fake has drawn the text on its line.
-      await lib.until(async () => lib.plainText(String((await inv('pty:buffer', key)) ?? '').slice(mark)).includes(text), lib.timing('hang.ui'))
+      await lib.readyWithin('the typed text drawn', async () => lib.plainText(String((await inv('pty:buffer', key)) ?? '').slice(mark)).includes(text), lib.timing('hang.ui'))
       await inv('pty:write', key, '\r')
     }
     const status = async () => (await live())?.status

@@ -56,7 +56,7 @@ const excludeOf = (p) => {
   check('…why it matters, with Learn more and no Exclude (no repository to add it to)', /sessions, transcript backups and launch settings/.test(await notice.innerText()) && (await notice.locator('button', { hasText: 'Learn more' }).count()) === 1 && (await notice.locator('button', { hasText: 'Exclude' }).count()) === 0)
   await shot('overview-dark')
   await inv('settings:update', { appearance: { theme: 'light' } })
-  await lib.sleep(300)
+  await lib.themeSettled(page, 'light')
   await shot('overview-light')
   await inv('settings:update', { appearance: { theme: 'dark' } })
   // Dismissed in the Overview: gone there, still in Project Settings.
@@ -86,7 +86,7 @@ const excludeOf = (p) => {
   check('the Overview says it is committed, with the command and Untrack…', !!(await lib.until(async () => (await trackedNotice.count()) === 1, lib.timing('hang.step'))) && (await trackedNotice.innerText()).includes('git rm -r --cached .combwork') && (await trackedNotice.getByRole('button', { name: 'Untrack…' }).count()) === 1, await trackedNotice.innerText().catch(() => ''))
   await shot('tracked-dark')
   await inv('settings:update', { appearance: { theme: 'light' } })
-  await lib.sleep(300)
+  await lib.themeSettled(page, 'light')
   await shot('tracked-light')
   await inv('settings:update', { appearance: { theme: 'dark' } })
   await trackedNotice.getByRole('button', { name: 'Untrack…' }).click()
