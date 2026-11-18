@@ -47,11 +47,13 @@ const check = (name, ok, extra = '') => {
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
   // HI-3396: lib's until (its bound required, the file's interval).
   const until = (fn, ms) => lib.until(fn, ms)
-  /** HI-3396: text typed into the fake, once it has drawn it on its line (its input echoed), so its Enter can follow. */
+  /**
+   * HI-3396: text typed into the fake, then its Enter after pace.typedEnterMs, on purpose: this suite's fake has no input
+   * log, and reads a typed line before its Enter, as a CLI does (its screen doesn't echo the line as plain text here).
+   */
   const typed = async (key, text) => {
-    const mark = String((await inv('pty:buffer', key)) ?? '').length
     await inv('pty:write', key, text)
-    await until(async () => lib.plainText(String((await inv('pty:buffer', key)) ?? '').slice(mark)).includes(text), lib.timing('hang.ui'))
+    await lib.sleep(lib.timing('pace.typedEnterMs'))
   }
 
   await page.getByText('alpha', { exact: true }).first().click()
