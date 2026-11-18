@@ -1,7 +1,7 @@
 /**
  * Stages Muse Code's real-binary check for a Windows Sandbox turn (HI-3202; README.md beside this). Bundles run.ts with
  * Combwork's own launch code (src/main/providers/muse) into one run.cjs, and copies beside it the pinned muse.exe (its
- * SHA-256 checked), this Node's node.exe, the MCP stub and go.cmd, into a new folder inside the checkout (the Sandbox maps
+ * SHA-256 checked), this Node's node.exe, the MCP stub, the tests' timing.json and go.cmd, into a new folder inside the checkout (the Sandbox maps
  * only folders under its client's roots): out\muse-real-<time>, which git ignores.
  *
  *   node tests/sandbox/muse-real/stage.mjs [--muse <muse.exe>]   stage it; prints the folder
@@ -38,6 +38,8 @@ await build({
   logLevel: 'warning'
 })
 copyFileSync(join(HERE, 'mcp.cjs'), join(out, 'mcp.cjs'))
+// The tests' timing values (HI-3393): run.cjs bundles tests/timing.cjs, which reads timing.json from beside itself.
+copyFileSync(join(ROOT, 'tests', 'timing.json'), join(out, 'timing.json'))
 
 if (dry) {
   const r = spawnSync(process.execPath, [join(out, 'run.cjs')], { env: { ...process.env, MUSE_REAL_DRY: out }, stdio: 'inherit' })

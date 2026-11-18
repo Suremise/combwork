@@ -48,12 +48,8 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (p, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
-    return v
-  }
+  // HI-3385: lib's until (its bound required, the file's interval).
+  const until = (fn, ms) => lib.until(fn, ms)
   /** The lines Combwork typed into the Assistant (fake-wakes.jsonl; the project agents' loop wakes left out), as text. */
   const rawWakes = () => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
@@ -109,7 +105,8 @@ const check = (name, ok, extra = '') => {
   check('…and its turn ending on the lane watch gets no line (HI-2069)', laneNotices().length === 1, JSON.stringify(laneNotices()))
   const before = wakes().length
   await inv('tasks:update', a, { column: 'review' })
-  await lib.sleep(3000) // A fixed wait on purpose: this checks that a plain move into Review does NOT wake it.
+  // A window on purpose (HI-3385: quiet.laneLookedMs): this checks that a plain move into Review does NOT wake it.
+  await lib.sleep(lib.timing('quiet.laneLookedMs'))
   check('a card moved into Review stays quiet', wakes().length === before && (await live(home, 'assistant'))?.status === 'watching', JSON.stringify(wakes().slice(before)))
 
   // (a) A comment on the release card wakes the same watch.
