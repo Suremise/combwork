@@ -101,6 +101,17 @@ describe('the guard: no literal waits in new test code (HI-3378, scripts/timingL
     expect(kinds('expect(Date.now() - t0).toBeLessThan(2000)')).toEqual(['clockAssert'])
   })
 
+  it("read from the syntax tree (HR1's round 2): a regular expression inside, a trailing comma, it.each(…)(…); a regular expression that looks like a wait is none", () => {
+    expect(kinds("it('x', async () => { const re = /\\)/; work(re) }, 12345)")).toEqual(['testTimeout'])
+    expect(kinds("it('x', () => {}, 12345,)")).toEqual(['testTimeout'])
+    expect(kinds("it.each([1, 2])('x %s', async (n) => { work(n) }, 12345)")).toEqual(['testTimeout'])
+    expect(kinds("test.each`a\n${1}`('x', () => {}, 30000)")).toEqual(['testTimeout'])
+    expect(kinds('const pattern = /sleep(500)/;')).toEqual([])
+    expect(kinds('const pattern = /setTimeout\\(r, 200\\)/')).toEqual([])
+    // A file the guard can't parse is a finding of its own, never a pass by silence.
+    expect(kinds('const x = (')).toEqual(['unparsed'])
+  })
+
   it("written over several lines too (HR1's round 1): a test's timeout, until's bound, a Promise's sleep, options", () => {
     expect(kinds("it('x', async () => {\n  work()\n}, 12345)")).toEqual(['testTimeout'])
     expect(kinds("describe('d', () => {\n  it('x', () => {})\n}, 45000)")).toEqual(['testTimeout'])

@@ -173,8 +173,9 @@ a test's or hook's timeout, `vi.setConfig`'s limits, a `timeout:` value, `until`
 Promise around `setTimeout`, a `Date.now() - t < N` loop, a `*_MS` constant, or `toBeLessThan(N)` on a clock reading,
 anywhere in `tests/**` (fakes, fixtures and the timing files apart; simulated time is none). A number that is no wait
 (a value under test, a child's own lifetime) says `timing-ok: <why>` on its line or the line above.
-The calls are read across lines (comments and strings blanked, parentheses matched), so a test's timeout or a Promise's
-`setTimeout` written over several lines counts. `tests/timingAllow.json` is the backlog not migrated yet (HI-3381 for
+Each file is parsed (`@babel/parser`, its syntax tree), so a call counts as the call it is: written over several lines,
+with a trailing comma or a regular expression inside, or made by `it.each(…)(…)`; text that only looks like a wait (in a
+string, a template, a regular expression or a comment) is none, and a file that can't be parsed is a finding of its own. `tests/timingAllow.json` is the backlog not migrated yet (HI-3381 for
 unit tests, HI-3382 for e2e and scenarios), **by occurrence**: each existing literal's kind and line text. A literal it
 doesn't cover fails, in a backlog file too (one added, or one changed); an entry with no literal left fails until
 `node scripts/testWaits.mjs --literals --shrink` drops it, which never adds one. `-- --literals --all` prints the backlog,

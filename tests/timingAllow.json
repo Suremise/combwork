@@ -22,12 +22,14 @@
       "timeout await vi.waitFor(() => expect(read(file).madeFor).toEqual({ 'codex.trust.prompt': { version: '0.162.1', value: 'trust it' }, 'codex.ready.placeholder': { version: '0.162.1', value: 'Ask Codex' } }), { timeout: 10_000 })",
       "timeout await vi.waitFor(() => expect(read(file).madeFor['copilot.trust.prompt'].version).toBe('1.0.95'), { timeout: 10_000 })",
       "timeout await vi.waitFor(() => expect(s.pattern('codex.trust.prompt').source).toBe('trust here'), { timeout: 10_000 })",
-      "timeout await vi.waitFor(() => expect(s.state(null).fileError).toBeTruthy(), { timeout: 10_000 })"
+      "timeout await vi.waitFor(() => expect(s.state(null).fileError).toBeTruthy(), { timeout: 10_000 })",
+      "timeout await vi.waitFor(() => expect(s.state(null).fileError).toMatch(/isn't valid JSON/), { timeout: 10_000 })"
     ],
     "tests/advancedReload.test.ts": [
       "msConstant const HUNG_MS = 10_000"
     ],
     "tests/affectedUnits.test.ts": [
+      "testTimeout }, 300_000)",
       "testTimeout }, 300_000)"
     ],
     "tests/agentApiCall.test.ts": [
@@ -54,7 +56,9 @@
       "testTimeout }, 150000)",
       "testTimeout }, 150000)",
       "testTimeout }, 150000)",
+      "testTimeout }, 240000)",
       "testTimeout }, 30000)",
+      "testTimeout }, 60000)",
       "testTimeout }, 60000)",
       "testTimeout }, 60000)",
       "testTimeout }, 60000)",
@@ -552,9 +556,11 @@
       "until check('a declined administrator prompt: nothing changed, and it says so', !!(await lib.until(async () => /prompt was declined/.test(await panel.innerText()), 5000)) && !(await inv('antivirus:status', false)).paths.some((p) => p.addedByCombwork))",
       "until check('a failed run that couldn’t read Defender’s list: said, and the folders stay unknown (never “Scanned”)', !!(await lib.until(async () => /refused the change/.test(await panel.innerText()), 5000)) && (await rows.allInnerTexts()).every((t) => /Unknown/.test(t)) && !(await inv('antivirus:status', false)).paths.some((p) => p.addedByCombwork), await panel.innerText())",
       "until check('a policy keeping local exclusions from applying: said, not counted as added', !!(await lib.until(async () => /organisation/.test(await panel.innerText()), 5000)) && !(await inv('antivirus:status', false)).paths.some((p) => p.addedByCombwork), await panel.innerText())",
+      "until check('a redacted list before Add: nothing changed, said, and the folders stay unknown', !!(await lib.until(async () => /couldn’t be read even with administrator rights|couldn't be read even with administrator rights/.test(await panel.innerText()), 5000)) && (await rows.allInnerTexts()).every((t) => /Unknown/.test(t)) && changes('add-requested').length === requestedBefore, await panel.innerText())",
       "until check('a worktree agent adds the worktrees folder: suggested again', !!(await lib.until(async () => (await toast.count()) === 1, 15000)))",
       "until check('another antivirus: named, and nothing offered', !!(await lib.until(async () => /Another antivirus is active \\(Norton Security\\)/.test(await panel.innerText()), 5000)) && (await panel.getByRole('button', { name: 'Add Exclusions…' }).count()) === 0)",
       "until check('not Windows: nothing to check', !!(await lib.until(async () => /Only Windows/.test(await panel.innerText()), 5000)))",
+      "until check('the administrator check confirms a trusted Dev Drive: with performance mode on, not slowed', !!(await lib.until(async () => /yes, trusted/.test(await rowText(1)), 5000)) && (await inv('antivirus:status', false)).slowed === false, await panel.innerText())",
       "until check('the folders changed while asking (a worktrees folder appeared): refused, nothing elevated', !!(await lib.until(async () => /folders changed since you were asked/.test(await panel.innerText()), 5000)) && changes().length === before, JSON.stringify(changes().slice(before)))",
       "until check('two agents running: the suggestion, once', !!(await lib.until(async () => (await toast.count()) === 1, 10000)))",
       "until check('…and a redacted administrator check keeps them unknown', !!(await lib.until(async () => /couldn’t be read afterwards/.test(await panel.innerText()), 5000)) && (await rows.allInnerTexts()).every((t) => /Unknown/.test(t)) && (await inv('antivirus:status', false)).exclusionsFrom === null, await panel.innerText())",
@@ -883,6 +889,7 @@
       "until check('Restore brings it back', !!(await until(async () => (await names()).includes('delta'), 8000)))",
       "until check('Settings → Board has a colour picker per column', !!(await until(async () => (await page.locator('.column-color input[type=\"color\"]').count()) === 6, 5000)))",
       "until check('Settings → Workspace lists it', !!(await until(async () => (await row.count()) === 1, 5000)))",
+      "until check('a Doing card whose agent stopped shows as stalled', !!(await until(async () => ((await tile(1).getAttribute('class')) ?? '').includes('stalled') && /Stalled: .* isn't running/.test(await tile(1).innerText()), 8000)), await tile(1).innerText())",
       "until check('a new card shows in Todo', !!(await until(async () => (await column('Todo').locator('.task-card[data-task=\"1\"]').count()) === 1, 5000)))",
       "until check('a new card’s title takes the keyboard', !!(await lib.until(() => page.evaluate(() => !!document.activeElement?.classList.contains('task-title-input')), 5000, 20)))",
       "until check('an agent moves one card to the bottom', bottom.status === 200 && !!(await until(async () => (await todoOrder()).join() === [rA, 1, rB].join(), 5000)), (await todoOrder()).join())",
@@ -1040,10 +1047,6 @@
     ],
     "tests/e2e/boardstages.cjs": [
       "msConstant const HUNG_MS = 60000"
-    ],
-    "tests/e2e/build.mjs": [
-      "msConstant const LOCK_MAX_MS = 60 * 60_000",
-      "msConstant const WAIT_MS = 20 * 60_000"
     ],
     "tests/e2e/buildfacts.cjs": [
       "msConstant const HUNG_MS = 10000"
@@ -1313,12 +1316,14 @@
       "until check(\"Combwork's hooks given to the app server run for a typed turn (UserPromptSubmit, Stop)\", !!(await lib.until(() => ['UserPromptSubmit', 'Stop'].every((h) => seenHooks.slice(h0).includes(h)), 20000)), JSON.stringify(seenHooks.slice(h0)))",
       "until check(\"answered in the TUI, Combwork's client sees it resolved\", !!(await lib.until(() => c.seen('serverRequest/resolved', () => true, n), 20000)))",
       "until check(\"…and Combwork's hooks run for it too\", !!(await lib.until(() => ['UserPromptSubmit', 'Stop'].every((h) => seenHooks.slice(h1).includes(h)), 20000)), JSON.stringify(seenHooks.slice(h1)))",
+      "until check('…and the TUI asks it', !!(await lib.until(() => /Would you like to run|Yes, proceed/.test(ui.screen()), 20000)), ui.screen().split('\\n').filter(Boolean).slice(-6).join(' | '))",
       "until check('…the TUI shows it, and the draft the user is typing stays in its prompt', !!(await lib.until(() => /New in your inbox: 1 message \\(m1\\)/.test(ui.screen()) && /DRAFT kept/.test(ui.screen()), 15000)), ui.screen().split('\\n').filter(Boolean).slice(-6).join(' | '))",
       "until if (!(await lib.until(() => shows(s), 20000, 100))) throw new Error(`\"${s}\" didn't show in the TUI's prompt: ${tail(screen())}`)"
     ],
     "tests/e2e/codex-background.cjs": [
       "sleep await lib.sleep(15)",
       "sleep await lib.sleep(700)",
+      "until await lib.until(async () => (await inv('pty:buffer', key)).replace(/\\x1b\\[[0-9;?]*[ -/]*[@-~]/g, '').replace(/\\s+/g, '').includes('endyourturn.'), 15000) // the whole prompt is in Codex's input",
       "until await lib.until(async () => (await inv('session:live')).length === 0, 15000)",
       "until await until(() => Date.now() - t0 > 60000, 30000)",
       "until check('Codex starts', !!(await until((s) => s?.status === 'ready', 60000)))",
@@ -1340,6 +1345,7 @@
       "until await lib.until(async () => (await inv('session:live')).length === 0, 15000)",
       "until await lib.until(async () => (await inv('workspace:refresh')).projects.find((p) => p.path.toLowerCase() === proj.toLowerCase())?.config.allowSessionInput === true, 10000)",
       "until await lib.until(async () => ['ready', 'finished'].includes((await inv('session:live')).find((x) => x.agentId === a1.id)?.status), 15000) // the interrupt landed",
+      "until await lib.until(async () => { const d = path.join(proj, '.combwork', 'attachments', l.sessionId); return fs.existsSync(d) && fs.readdirSync(d).length > 0 && /\\[Image|image #|\\.png/i.test((await text(a1.id)).slice(-600)) }, 15000) // the pasted image saved, and shown by Codex",
       "until const edited = await lib.until(async () => /from agent 1/.test(notes()), 180000, 1000)",
       "until if (await lib.until(async () => (await asking.count()) > 0, 5000)) break",
       "until if (await lib.until(async () => (await askingShell.count()) > 0, 5000)) break"
@@ -1587,6 +1593,7 @@
       "until check('once the CLI reports it: the percentage', !!(await until(async () => /^\\s*ctx \\d+%$/.test(await text()), 8000)), await text())",
       "until check('the agent starts', !!(await until(async () => (await live())?.status === 'ready', 20000)))",
       "until check('without a known window: its tokens', !!(await until(async () => /^\\s*ctx \\d+(\\.\\d)?k?$/.test(await text()), 8000)), await text())",
+      "until check('…and the tooltip shows it: the status line still reports (#330)', !!(await until(async () => / of 200,000\\n[\\s\\S]*its auto-compact window is 200,000 \\(autoCompactWindow in --settings cli-settings\\.json\\)/.test(await tip.innerText().catch(() => '')), 5000)), await tip.innerText().catch(() => ''))",
       "until check('…and where Claude Code compacts by itself, for a 200K window: its default, nothing set (#242)', !!(await until(async () => (await tip.innerText().catch(() => '')).includes('Claude Code compacts by itself at about 167,000, its default for this window'), 5000)), await tip.innerText().catch(() => ''))",
       "until check('…scrolled into view', !!(await until(async () => history.evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.top < window.innerHeight - 40 }), 5000)))"
     ],
@@ -1622,6 +1629,7 @@
       "until check('Ctrl+Enter adds it', !!(await until(async () => (await items.count()) === 2, 5000)))",
       "until check('Ctrl+Enter in the decision box adds only the decision', !!(await until(async () => (await card(m)).decisions.length === 4, 5000)) && (await card(m)).comments.length === 2 && (await mDialog.getByLabel('New comment').inputValue()) === 'Not yet.')",
       "until check('Escape with a decision being changed asks', !!(await until(async () => (await discard.count()) === 1, 5000)) && /your change to a decision/.test(await discard.innerText()), await discard.innerText().catch(() => ''))",
+      "until check('Save with a decision changed to nothing refuses it, says why and keeps the editor', !!(await until(async () => /A decision can't be empty/.test(await mDialog.innerText().catch(() => '')), 5000)) && (await mDialog.count()) === 1 && (await mItems.nth(0).getByLabel('Decision').count()) === 1 && JSON.stringify((await card(m)).decisions) === before)",
       "until check('changing one saves it, marked edited', !!(await until(async () => /Show each error under its own field\\.\\s/.test(await items.nth(1).innerText()) && /edited/.test(await items.nth(1).innerText()), 5000)))",
       "until check('closing with a decision half-written asks', !!(await until(async () => (await discard.count()) === 1, 5000)) && /the decision you are writing/.test(await discard.innerText()))",
       "until check('removing one asks, then removes it', !!(await until(async () => (await items.count()) === 1 && (await card(n)).decisions.length === 1 && (await card(n)).decisions[0].id === id, 5000)))",
@@ -2176,12 +2184,12 @@
       "msConstant const HUNG_MS = 10000"
     ],
     "tests/e2e/lanes.mjs": [
-      "clockLoop if ((e.code === 'EPERM' || e.code === 'EACCES') && Date.now() - start <= 4 * LOCK_MAX_MS) {",
-      "msConstant const CLAIM_MAX_MS = 24 * 60 * 60_000",
       "sleep await sleep(50)",
       "sleep else await sleep(50)"
     ],
     "tests/e2e/laneslotretry.cjs": [
+      "clockLoop const beating = (beat) => fs.existsSync(beat) && Date.now() - Number(fs.readFileSync(beat, 'utf8') || 0) < 2000",
+      "clockLoop const holding = (p) => !!p && p.exitCode === null && fs.existsSync(holdBeat) && Date.now() - Number(fs.readFileSync(holdBeat, 'utf8') || 0) < 2000",
       "clockLoop return c.exitCode === null && beat.pid === c.pid && same(beat.cwd, cwd) && Date.now() - beat.at < 2000 ? beat : null",
       "msConstant const HUNG_MS = 90000",
       "promiseSleep await new Promise((r) => setTimeout(r, 250))"
@@ -2320,10 +2328,6 @@
     "tests/e2e/lockask.cjs": [
       "msConstant const HUNG_MS = 30000"
     ],
-    "tests/e2e/logs.mjs": [
-      "msConstant const ACTIVE_MAX_MS = 24 * 60 * 60_000",
-      "msConstant export const FAILED_KEEP_MS = 24 * 60 * 60_000"
-    ],
     "tests/e2e/longsession.cjs": [
       "msConstant const HUNG_MS = 20000",
       "sleep await lib.sleep(300)",
@@ -2427,6 +2431,7 @@
       "until check('moved to another project: no longer stalled, and the mark leaves the agent', !!(await until(async () => !(await stalledOf(c1)) && !(await live(reviewer.id))?.notWatching, 8000)), JSON.stringify({ stalled: await stalledOf(c1), mark: (await live(reviewer.id))?.notWatching }))",
       "until check('once the user answers, its card is the builder\\'s move again: flagged after the grace', !!(await until(async () => ((await stalledOf(c3)) ?? '').startsWith(\"Builder isn't watching #\"), 20000)), String(await stalledOf(c3)))",
       "until check('one notice tells the user', !!(await until(async () => told().length === 1, 5000)), JSON.stringify(notices()))",
+      "until check('the board shows the card stalled', !!(await until(async () => /Stalled: Reviewer hasn't taken the wake Combwork typed/.test((await tile.innerText().catch(() => '')) ?? ''), 8000)), await tile.innerText().catch(() => ''))",
       "until check('working again clears it', !!(await until(async () => (await live(builder.id))?.status === 'working' && !(await live(builder.id))?.notWatching && !(await stalledOf(c2)), 8000)))",
       "until check('…a turn since leaves the stop out', !!(await until(async () => !(await live(builder.id))?.safeguard?.latest && !/safety filter/.test((await stalledOf(c6)) ?? ''), 20000)), String(await stalledOf(c6)))",
       "until check('…and stays clear while it watches again', !!(await until(async () => (await live(reviewer.id))?.status === 'watching', 10000)) && !(await stalledOf(c1)))",
@@ -2435,6 +2440,7 @@
       "until check('…is woken, asks the user and ends its turn with no watch', !!(await until(async () => !!(await question()) && ['ready', 'finished'].includes((await live(builder.id))?.status) && !(await live(builder.id))?.watch, 15000)), `${JSON.stringify((await inv('tasks:forYou', 'alpha')).items)} ${await why(builder.id)}`)",
       "until check('…is woken, comments and ends its turn with no watch', !!(await until(async () => wakes('Builder').length === 1 && ['ready', 'finished'].includes((await live(builder.id))?.status), 15000)))",
       "until check('…is woken, its turn stopped by the safety classifier (its latest turn noted), ending with no watch', !!(await until(async () => !!(await live(builder.id))?.safeguard?.latest && ['ready', 'finished'].includes((await live(builder.id))?.status), 20000)), JSON.stringify((await live(builder.id))?.safeguard ?? null))",
+      "until check('…the line was never sent, and Combwork says so', !!(await until(async () => /still wasn't taken/.test(combworkLog()), 8000)) && wakes('Reviewer').length === 1)",
       "until if (await until(async () => (await said(id, text)) > before, 10000)) return",
       "until }, 20000)"
     ],
@@ -3085,8 +3091,7 @@
       "timeout const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', '(New-Object -ComObject Shell.Application).NameSpace(10).Items().Count'], { encoding: 'utf8', timeout: 60_000, windowsHide: true, env: runContext.baseEnv() })"
     ],
     "tests/e2e/releaseoffer.cjs": [
-      "msConstant const HUNG_MS = 30000",
-      "msConstant const OFFER_MS = 2 * 60000 + HUNG_MS"
+      "msConstant const HUNG_MS = 30000"
     ],
     "tests/e2e/removeall.cjs": [
       "msConstant const HUNG_MS = 20000",
@@ -3108,6 +3113,7 @@
       "sleep while (!(v = await fn().catch(() => null)) && Date.now() - t < ms) await lib.sleep(250)",
       "until check(\"its terminal shows what it printed before\", !!(await until(() => js(`window.__cwTerminalTextAt?.(${JSON.stringify(key)}, 'remember this line') ?? null`), 10000)))",
       "until check('Reload reloads the page', !!(await until(async () => (await js('performance.timeOrigin')) !== before && (await pageBack()), 20000)))",
+      "until check('a hang offers Wait and Reload after a few seconds', !!(await until(async () => (await boxes()).some((b) => /isn't responding/.test(b.message) && b.buttons === 'Wait,Reload'), 9000)))",
       "until check('a note says it was reloaded and the agents kept running', !!(await until(async () => /Your agents kept running/.test(await toastText()), 10000)))",
       "until check('a second crash asks', !!(await until(async () => (await boxes()).some((b) => /stopped working/.test(b.message)), 10000)))",
       "until check('it answers', !!(await until(async () => (await live())?.status === 'finished', 10000)))",
@@ -3251,7 +3257,6 @@
     ],
     "tests/e2e/reviewcopiesreal.cjs": [
       "msConstant const HUNG_MS = 60000",
-      "msConstant const TURN_MS = 5 * 60000",
       "timeout const s = spawnSync(claudeExe, ['auth', 'status', '--json'], { encoding: 'utf8', timeout: 30000, env: lib.childEnv({ CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME }) })",
       "until await lib.until(async () => (await live(r.def.id))?.status !== 'waiting', 15000, 500)"
     ],
@@ -3329,14 +3334,21 @@
       "sleep await lib.sleep(300)",
       "sleep await lib.sleep(700)",
       "timeout await entry.waitFor({ timeout: 3000 }).catch(() => undefined)",
+      "until await lib.until(async () => !(await names()).includes('Codex work'), 8000)",
+      "until await lib.until(async () => !(await names()).includes('Tray fixes'), 8000)",
+      "until await lib.until(async () => (await archivedToast.count()) > 0, 8000)",
       "until await lib.until(async () => (await live(claude.id))?.status === 'ready', 20000)",
+      "until await lib.until(async () => (await names()).includes('Codex work'), 5000)",
       "until await lib.until(async () => (await names()).includes('Review rm'), 5000)",
       "until await lib.until(async () => (await names()).length > 1, 5000)",
       "until await lib.until(async () => (await page.locator('.sessions-tree .search-hit').count()) > 0, 10000)",
       "until await lib.until(async () => (await page.locator('.sessions-tree .session-branch').count()) > 0, 10000)",
       "until await lib.until(async () => (await page.locator('.sessions-tree .session-branch').count()) > 0, 15000)",
+      "until await lib.until(async () => (await toast.count()) > 0, 10000)",
+      "until await lib.until(async () => /Codex work/.test(await page.locator('.transcript-toolbar strong').first().innerText().catch(() => '')), 5000)",
       "until await lib.until(async () => JSON.stringify(await names()) === JSON.stringify(['Codex work', 'Review push']), 8000)",
       "until await lib.until(async () => ['waiting', 'ready'].includes((await live(claude.id))?.status), 20000)",
+      "until await lib.until(async () => held, 20000)",
       "until await lib.until(async () => savedPrefs()['p:codex'] === false, 5000)",
       "until check('Claude runs a session', !!(await lib.until(async () => (await live(claude.id))?.status === 'finished', 20000)))",
       "until check('moving onto a session shows its transcript', firstSession === 'Running now' && !!(await lib.until(async () => (await page.locator('.transcript-toolbar strong').first().innerText().catch(() => '')).trim() === firstSession, 5000)), firstSession)",
@@ -3449,7 +3461,6 @@
       "timeout const db = new DatabaseSync(path.join(fx.ws, '.combwork', 'combwork.db'), { timeout: 5000 })"
     ],
     "tests/e2e/slotpool.cjs": [
-      "msConstant const DAY_MS = 24 * 60 * 60 * 1000",
       "msConstant const HUNG_MS = 60000"
     ],
     "tests/e2e/slotrecovery.cjs": [
@@ -3460,9 +3471,6 @@
     ],
     "tests/e2e/slotreleaseapi.cjs": [
       "msConstant const HUNG_MS = 45000"
-    ],
-    "tests/e2e/slotscripts.cjs": [
-      "msConstant const DAY_MS = 24 * 60 * 60 * 1000"
     ],
     "tests/e2e/slotsessions.cjs": [
       "msConstant const HUNG_MS = 45000",
@@ -3615,6 +3623,7 @@
       "until await until(async () => (await live(beta, two))?.status === 'finished', 10000)",
       "until check('a question in the background flashes the button', !!(await until(async () => (await flashes()).includes(true), 8000)), JSON.stringify(await flashes()))",
       "until check('and the badge', !!(await until(async () => (await overlay())?.png === null, 5000)))",
+      "until check('once it goes on, the count clears', !!(await until(async () => !/^\\(\\d/.test(await title()), 8000)), await title())",
       "until check('the agents start', !!(await until(async () => (await live(alpha, one))?.status === 'ready' && (await live(beta, two))?.status === 'ready', 20000)))",
       "until check('the title shows the count', !!(await until(async () => (await title()).startsWith('(1) '), 10000)), await title())",
       "until const badge = await until(async () => (await overlay())?.png && (await overlay()), 5000)",
@@ -3718,6 +3727,7 @@
       "until check('…Save is refused, saying why', !!(await lib.until(async () => /changed since you started editing it/.test(await editor.innerText()), 5000)), await editor.innerText())",
       "until check('…and never says it was saved again meanwhile (its own save)', !(await lib.until(async () => (await editor.locator('.template-stale').count()) > 0, 1500)))",
       "until check('…and the next agent Save is saved too, with nothing left unsaved', !!(await lib.until(async () => teamNow().agents.find((a) => a.name === 'Tester')?.note === 'second-save' && (await editor.locator('.template-unsaved-note').count()) === 0, 5000)))",
+      "until check('…and the view shows it again, with its description', !!(await lib.until(async () => (await detail.count()) === 1 && /Builds, then reviews\\./.test(await detail.innerText()), 5000)))",
       "until check('…another template: the list marks this one \"Not saved\"', !!(await lib.until(async () => (await teamRow.locator('.template-unsaved').count()) === 1, 5000)))",
       "until check('…back: the editor opens again with the change', !!(await lib.until(async () => (await editor.count()) === 1 && (await editor.locator('#template-name').inputValue()) === 'Team pending', 5000)))",
       "until check('…the editor stays open, with nothing left unsaved', !!(await lib.until(async () => (await editor.count()) === 1 && (await editor.locator('.template-unsaved-note').count()) === 0 && (await editor.getByRole('button', { name: 'Save Template' }).isDisabled()), 5000)))",
@@ -3942,6 +3952,7 @@
       "until check('…and the picker no longer lists it', !!(await lib.until(async () => (await picker2.locator(`option[value=\"unused:${claudette.worktree.path.replace(/\\\\/g, '\\\\\\\\')}\"]`).count()) === 0, 8000)))",
       "until check('…its Merge opens the Merge dialog on it', !!(await lib.until(async () => (await mergeDialog.count()) === 1 && /Merges\\s+1 commit\\s+from/.test(await mergeDialog.innerText()), 8000)), await page.locator('.dialog').last().innerText().catch(() => ''))",
       "until check('…its Review goes to the list', !!(await lib.until(async () => (await section.count()) === 1, 8000)))",
+      "until check('…its ⓘ: removed agents (by hand or by a template), made outside Combwork, which can go; no template gives them back', !!(await lib.until(async () => /when a template's agents replaced it.*made outside Combwork.*Loading a template gives none of them to its agents\\. Those merged into/s.test(await tipText()), 5000)) && !/gives them back/.test(await tipText()), await tipText())",
       "until check('…which opens Changes at the list', !!(await lib.until(async () => (await section.count()) === 1, 8000)))"
     ],
     "tests/e2e/update.cjs": [
@@ -4054,7 +4065,28 @@
       "msConstant const HUNG_MS = 30000"
     ],
     "tests/e2e/wsmove.cjs": [
-      "timeout const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })"
+      "timeout const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })",
+      "until await lib.until(() => page.evaluate(() => document.documentElement.dataset.theme === 'dark'), 10000)",
+      "until await lib.until(() => page.evaluate(() => document.documentElement.dataset.theme === 'light'), 10000)",
+      "until await lib.until(() => readJson(path.join(betaB1, '.combwork', 'project.json')).lastPath, 10000)",
+      "until await lib.until(async () => !(await inv('session:live')).some((s) => s.agentId === coder.id), 10000)",
+      "until await lib.until(async () => !(await live()), 10000)",
+      "until await lib.until(async () => (await dialog.count()) === 0, 5000)",
+      "until await lib.until(async () => (await inv('session:live')).some((s) => s.agentId === coder.id && s.status === 'ready'), 15000)",
+      "until await lib.until(async () => (await live())?.status === 'finished', 15000)",
+      "until await lib.until(async () => (await live())?.status === 'ready', 15000)",
+      "until check('after a restart, the banner is still there', !!(await lib.until(async () => (await banner.count()) === 1, 15000)))",
+      "until check('after the failed write and a restart, the banner is still there', !!(await lib.until(async () => (await banner.count()) === 1, 15000)))",
+      "until check('found again with only a conflicting file: the banner shows', !!(await lib.until(async () => (await r2.page.locator('.moved-banner').count()) === 1, 15000)))",
+      "until check('reopened at its new folder: the banner says where it was moved from', !!(await lib.until(async () => (await banner.count()) === 1 && (await banner.innerText()).includes(ws1), 15000)), await banner.innerText().catch(() => ''))",
+      "until check('the banner is gone', !!(await lib.until(async () => (await banner.count()) === 0, 10000)))",
+      "until check('the dialog says to stop the agent, Repair disabled', !!(await lib.until(async () => /Stop the running agents first/.test(await dialog.innerText().catch(() => '')), 10000)) && (await dialog.locator('button', { hasText: /^Repair$/ }).isDisabled()))",
+      "until check('the dialog shows what Repair will do', !!(await lib.until(async () => /Builder.s worktree: was [^;]*, now [^;]*; will git worktree repair/.test(await text()) && /Second.s worktree: was [^;]*; will recreate, locate or remove its link/.test(await text()) && /Sessions: was [^;]*, now [^;]*; will point 1 session/.test(await text()) && /Claude Code.s conversations and memory: was 2 folders; will copy \\d+ files?; the old ones stay/.test(await text()), 10000)), await text())",
+      "until check('worktrees left behind: the banner shows', !!(await lib.until(async () => (await r.page.locator('.moved-banner').count()) === 1, 15000)))",
+      "until check('…Recreate worktree: the plan says it is made again on its branch', !!(await lib.until(async () => /Third.s worktree: was [^;]*; will recreate on cw\\/ws\\/alpha\\/third/.test(await text()), 10000)), await text())",
+      "until check('…and the banner is gone', !!(await lib.until(async () => (await r2.page.locator('.moved-banner').count()) === 0, 10000)))",
+      "until check('…then what it did, with problems: the copy that failed, and the worktree still to locate', !!(await lib.until(async () => /with problems/.test(await text()) && /for Builder.s worktree couldn.t be copied/.test(await text()) && /Second.s worktree wasn.t found/.test(await text()), 20000)), await text())",
+      "until const recorded = await lib.until(() => readJson(path.join(ws1, '.combwork', 'workspace.json')).lastPath && readJson(path.join(alpha1, '.combwork', 'project.json')).lastPath, 10000)"
     ],
     "tests/e2e/wsoverview.cjs": [
       "msConstant const HUNG_MS = 10000",
@@ -4128,6 +4160,12 @@
       "timeout await vi.waitFor(() => expect(writes).toEqual(['\\r']), { timeout: 5000 })"
     ],
     "tests/folderProcesses.test.ts": [
+      "testTimeout }, 30000)",
+      "testTimeout }, 30000)",
+      "testTimeout }, 30000)",
+      "testTimeout }, 60000)",
+      "testTimeout }, 60000)",
+      "testTimeout }, 60000)",
       "timeout await vi.waitFor(() => expect(count()).toBeGreaterThan(0), { timeout: 15000, interval: 50 })",
       "timeout await vi.waitFor(() => expect(count()).toBeGreaterThan(at), { timeout: 15000, interval: 50 })",
       "timeout await vi.waitFor(() => expect(existsSync(childPid) && Number(readFileSync(childPid, 'utf8')) > 0).toBe(true), { timeout: 15000, interval: 100 })",
@@ -4200,6 +4238,7 @@
     ],
     "tests/gitRepo.test.ts": [
       "setConfig vi.setConfig({ testTimeout: 60_000 })",
+      "testTimeout }, 120_000)",
       "testTimeout }, 120_000)",
       "testTimeout }, 120_000)",
       "testTimeout }, 120_000)",
@@ -4329,6 +4368,12 @@
     ],
     "tests/jjControl.test.ts": [
       "msConstant const REAL_JJ_MS = 30_000"
+    ],
+    "tests/jjEarlyWork.test.ts": [
+      "timeout describe.skipIf(!jjExe)(\"a jj lane's next card, its builder at work before its slot is prepared (HI-3115, decision B)\", { timeout: 300_000 }, () => {"
+    ],
+    "tests/jjFileGateReal.test.ts": [
+      "testTimeout }, 240_000)"
     ],
     "tests/jjGitLink.test.ts": [
       "msConstant const REAL_JJ_MS = 180_000"
@@ -4662,6 +4707,19 @@
       "msConstant export const CLAIM_MAKING_MS = 30_000",
       "timeout const r = spawnSync(command, { encoding: 'utf8', env: { ...baseEnv(), ...env }, timeout: 60_000, shell: true, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })"
     ],
+    "tests/msysMarked.test.ts": [
+      "testTimeout }, 60_000)",
+      "testTimeout }, 60_000)",
+      "testTimeout }, 60_000)",
+      "timeout await vi.waitFor(() => expect([alive(top.pid!), alive(child), alive(marked)]).toEqual([false, false, false]), { timeout: 10_000 })",
+      "timeout await vi.waitFor(() => expect([alive(top.pid!), alive(child)]).toEqual([false, false]), { timeout: 10_000 })",
+      "timeout await vi.waitFor(() => expect(alive(pid)).toBe(false), { timeout: 10_000 })",
+      "timeout await vi.waitFor(() => expect(alive(pid)).toBe(false), { timeout: 10_000 })",
+      "timeout await vi.waitFor(() => expect(existsSync(file) && /\\d/.test(readFileSync(file, 'utf8'))).toBe(true), { timeout: 20_000 })",
+      "timeout await vi.waitFor(() => expect(existsSync(file) && readFileSync(file, 'utf8').length > 0).toBe(true), { timeout: 20_000 })",
+      "timeout const r = await boundedOutput(process.execPath, ['-e', \"setInterval(() => process.stdout.write('x'.repeat(4096)), 1)\"], { timeoutMs: 20_000, maxBuffer: 64 * 1024, env: baseEnv() })",
+      "timeout const r = await boundedOutput(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { timeoutMs: 500, maxBuffer: 1024, env: baseEnv() })"
+    ],
     "tests/nextVersion.test.ts": [
       "setConfig vi.setConfig({ testTimeout: 60_000 })"
     ],
@@ -4698,6 +4756,8 @@
       "msConstant const HUNG_MS = 10000"
     ],
     "tests/opencode.test.ts": [
+      "testTimeout }, 120000)",
+      "testTimeout }, 60000)",
       "testTimeout }, 60000)",
       "testTimeout }, 60000)",
       "testTimeout }, 60000)",
@@ -4729,6 +4789,7 @@
       "testTimeout }, 30_000)",
       "testTimeout }, 30_000)",
       "testTimeout }, 30_000)",
+      "testTimeout }, 30_000)",
       "testTimeout }, 60_000)",
       "testTimeout }, 60_000)",
       "timeout await vi.waitFor(() => expect(rootClosed).toBe(true), { timeout: 20_000, interval: 20 })"
@@ -4739,6 +4800,8 @@
       "testTimeout }, 120000)",
       "testTimeout }, 120000)",
       "testTimeout }, 180000)",
+      "testTimeout }, 180000)",
+      "testTimeout }, 60000)",
       "testTimeout }, 60000)",
       "testTimeout }, 60000)",
       "testTimeout }, 60000)",
@@ -4763,6 +4826,13 @@
       "testTimeout }, 90000)"
     ],
     "tests/opencodeStreamBounds.test.ts": [
+      "testTimeout }, 60000)",
+      "testTimeout }, 60000)",
+      "testTimeout }, 60000)",
+      "testTimeout }, 60000)",
+      "testTimeout }, 60000)",
+      "testTimeout }, 60000)",
+      "testTimeout }, 60000)",
       "testTimeout }, 60000)"
     ],
     "tests/orphanProcesses.test.ts": [
@@ -4784,6 +4854,7 @@
     "tests/processTracker.test.ts": [
       "clockAssert expect(Date.now() - t).toBeLessThan(10_000)",
       "promiseSleep while (Date.now() < end && !fn()) await new Promise((r) => setTimeout(r, 100))",
+      "testTimeout }, 30_000)",
       "testTimeout }, 30_000)",
       "testTimeout }, 30_000)",
       "testTimeout }, 30_000)",
@@ -4923,6 +4994,9 @@
       "timeout expect(() => runInContext('redactLog(text, ctx)', vmContext, { timeout: 5000 }), `log ${JSON.stringify(text.slice(0, 12))}`).not.toThrow()",
       "timeout for (const text of long) expect(() => runInNewContext('maskText(text)', { maskText, text }, { timeout: 5000 }), text.slice(0, 20)).not.toThrow()"
     ],
+    "tests/relatedTests.test.ts": [
+      "testTimeout }, 300_000)"
+    ],
     "tests/releaseOffer.test.ts": [
       "promiseSleep await new Promise((r) => setTimeout(r, 100))",
       "promiseSleep await new Promise((r) => setTimeout(r, 100))",
@@ -5040,10 +5114,8 @@
       "msConstant const HUNG_MS = 10000"
     ],
     "tests/runRecords.test.ts": [
-      "msConstant const HUNG_MS = 10_000"
-    ],
-    "tests/runTemp.mts": [
-      "msConstant const STALE_MS = 24 * 60 * 60_000"
+      "msConstant const HUNG_MS = 10_000",
+      "testTimeout }, 20_000)"
     ],
     "tests/runningProcesses.test.ts": [
       "promiseSleep while (Date.now() < end && !fn()) await new Promise((r) => setTimeout(r, 100))",
@@ -5098,6 +5170,7 @@
       "until const made = await until(async () => fs.existsSync(path.join(KEPT_WS, TREE_BEFORE, DB_BEFORE)) && fs.existsSync(path.join(KEPT_PROJECT, TREE_BEFORE, 'project.json')), 30_000)",
       "until const made = await until(async () => fs.existsSync(path.join(KEPT_WS, TREE_BEFORE, OLD_DB)) && fs.existsSync(path.join(KEPT_WS, 'demo', TREE_BEFORE, 'project.json')), 30_000)",
       "until const moved = await until(async () => movedNow(), 30_000)",
+      "until const offered = await until(async () => (await offHere.count()) > 0 && /Sandbox, your Claude Code account, is off in this workspace/.test(await offHere.innerText()), 20_000)",
       "until const on = await until(async () => { const i = (await inv('provider:info'))['claude-code']; return i && !i.checking && i }, 30_000)",
       "until const opened = await until(async () => (await page.locator('.welcome').count()) === 0 && fs.existsSync(path.join(ws, '.combwork')), 30_000)",
       "until const opened = await until(async () => (await rows.count()) > 0, 10_000)",
@@ -5159,13 +5232,11 @@
       "clockLoop for (let t = Date.now(); Date.now() - t < 60000 && !['ready', 'finished'].includes((await coderLive(c))?.status); ) await new Promise((r) => setTimeout(r, 500))",
       "clockLoop for (let t = Date.now(); Date.now() - t < 90000 && !['ready', 'finished'].includes((await coderLive(c, agent))?.status); ) {",
       "clockLoop if (Date.now() - c.blockedAt < 15000) return",
-      "clockLoop keepWaiting: async (c) => !!c.firstEnd && Date.now() - c.firstEnd.at < 8 * 60_000 && (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body?.column === 'doing',",
       "clockLoop keepWaiting: async (c) => !!c.verdictAt && !c.woke && Date.now() - c.verdictAt < 40000,",
       "clockLoop return !c.sent2At || (Date.now() - c.sent2At < 240000 && !(second && (second.state === 'acked' || !!second.ended)))",
       "clockLoop return !c.sentAt || (Date.now() - c.sentAt < 240000 && !(msg && (msg.state === 'acked' || !!msg.ended)))",
       "clockLoop return !c.sentAt || (Date.now() - c.sentAt < 240000 && !(msg && (msg.state === 'acked' || !!msg.ended)))",
       "clockLoop return Date.now() - c.answeredAt < 240000 && (await c.api('GET', `/v1/tasks/${c.cards.b}`)).body?.column !== 'done'",
-      "msConstant const POOL_RUN_MS = 40 * 60_000",
       "promiseSleep await new Promise((r) => setTimeout(r, 1100))",
       "promiseSleep await new Promise((r) => setTimeout(r, 1100))",
       "promiseSleep await new Promise((r) => setTimeout(r, 20))",
@@ -5178,6 +5249,8 @@
       "timeout const r = require('child_process').spawnSync(process.execPath, ['--test'], { cwd: c.alpha, env: require('../e2e/runContext.cjs').baseEnv(), encoding: 'utf8', timeout: 60000 })",
       "timeout const testsPass = (c) => require('child_process').spawnSync(process.execPath, ['--test'], { cwd: c.alpha, env: require('../e2e/runContext.cjs').baseEnv(), encoding: 'utf8', timeout: 60000 }).status === 0",
       "timeout return require('child_process').execFileSync(portableJj(), ['--no-pager', ...args], { cwd: opts.cwd ?? c.alpha, env, windowsHide: true, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })",
+      "until c.returnDiff = await require('../e2e/lib.cjs').until(() => submittedDiff(c, c.cards.a), 15000)",
+      "until const there = await require('../e2e/lib.cjs').until(async () => (await c.api('GET', `/v1/tasks/${n}`)).body?.column === column && (column !== 'review' || (await submitted()) > before), 15000)",
       "until const told = await lib.until(async () => (await c.deliveries('coder')).find((d) => d.card === b && /couldn.t get .* ready/i.test(String(d.body ?? d.text ?? ''))), 180000)",
       "until const told = await lib.until(async () => (await c.deliveries('coder')).find((d) => d.card === c.cards.p && /merge check lint failed on the candidate/.test(String(d.body ?? d.text ?? ''))), 240000)",
       "until if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), 60000))) throw new Error(\"setup: Coder didn't stop\")",
@@ -5186,7 +5259,12 @@
       "until if (!(await lib.until(async () => !(await live()), 60000))) throw new Error(`setup: ${key} didn't stop after registering its lane`)",
       "until if (!(await lib.until(async () => ((await c.inv('tasks:facts', n).catch(() => null)) ?? []).some((f) => f.kind === 'BuilderPlaced'), 90000))) throw new Error(`setup: Combwork didn't give #${n} to ${key} in its slot`)",
       "until if (!(await lib.until(async () => (await c.api('GET', `/v1/tasks/${a}`)).body?.column === 'done', 120000))) throw new Error(`setup: #${a} didn't go Done after the user's rebase: ${(await c.api('GET', `/v1/tasks/${a}`)).body?.column}`)",
-      "until if (!(await lib.until(landed, 90000))) throw new Error(`setup: Combwork's start of #${n} on ${key} (its lane's first card, HI-2029) didn't land in its launch: ${JSON.stringify({ column: (await c.api('GET', `/v1/tasks/${n}`)).body?.column, status: (await coderLive(c, agent))?.status ?? null, deliveries: (await c.deliveries(key)).filter((x) => x.card === n) })}; its screen ends: ${(await screen()).trim().slice(-400)}`)"
+      "until if (!(await lib.until(landed, 90000))) throw new Error(`setup: Combwork's start of #${n} on ${key} (its lane's first card, HI-2029) didn't land in its launch: ${JSON.stringify({ column: (await c.api('GET', `/v1/tasks/${n}`)).body?.column, status: (await coderLive(c, agent))?.status ?? null, deliveries: (await c.deliveries(key)).filter((x) => x.card === n) })}; its screen ends: ${(await screen()).trim().slice(-400)}`)",
+      "until if (!(await require('../e2e/lib.cjs').until(() => submittedDiff(c, n), 15000))) await assertDiff(c, n)",
+      "until if (!(await require('../e2e/lib.cjs').until(async () => (await coderLive(c))?.status === 'watching', 30000))) throw new Error(`setup: Coder isn't watching #${c.cards.w} (status ${(await coderLive(c))?.status})`)",
+      "until if (!(await require('../e2e/lib.cjs').until(async () => (await coderLive(c))?.status === 'watching', 30000))) throw new Error(`setup: Coder isn't watching #${c.cards.w} (status ${(await coderLive(c))?.status})`)",
+      "until if (!(await require('../e2e/lib.cjs').until(given, 30000))) throw new Error(`setup: Combwork didn't give #${n} to Implementer`)",
+      "until if (!(await require('../e2e/lib.cjs').until(wakeIsRead, 120000))) throw new Error(`setup: Coder's wake for #${c.cards[key]} wasn't read: ${JSON.stringify(await c.deliveries('coder'))}, ${await c.subjectStatus()}`)"
     ],
     "tests/serverConnections.test.ts": [
       "msConstant const HUNG_MS = 10_000"
@@ -5287,8 +5365,13 @@
     "tests/slots.test.ts": [
       "timeout await vi.waitFor(async () => expect(await quiet(folder)).toBe(true), { timeout: 30_000, interval: 100 })",
       "timeout const e = r.signal.aborted ? null : await execCommand({ spawn: nodeSpawn, platform: process.platform, timeoutMs: 60_000, env: () => ({ ...baseEnv(), ...r.env }) }, r.command, r.folder, out)",
+      "timeout describe(\"HI-3003: a slot's failures in its platform's words\", { timeout: 90_000 }, () => {",
+      "timeout describe(\"an operation is its pool's from before its reservation (HR1 round 2)\", { timeout: 90_000 }, () => {",
       "timeout describe('guarded clean-up (#1429)', { timeout: 90_000 }, () => {",
       "timeout describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {",
+      "timeout describe('moving a free slot onto another target (HI-2680)', { timeout: 90_000 }, () => {",
+      "timeout describe('operations own a slot while it changes (HR1 round 1)', { timeout: 90_000 }, () => {",
+      "timeout describe('preparing a lent slot for its card (#1438)', { timeout: 90_000 }, () => {",
       "timeout describe('the pool (#1429)', { timeout: 60_000 }, () => {",
       "timeout describe('warming (#1429)', { timeout: 60_000 }, () => {"
     ],
@@ -5391,6 +5474,9 @@
     "tests/upgradeTemplates.test.ts": [
       "msConstant const HUNG_MS = 15000"
     ],
+    "tests/usageBackfill.test.ts": [
+      "timeout }, { timeout: 10_000 })"
+    ],
     "tests/usageClosedWorkspace.test.ts": [
       "timeout await vi.waitFor(() => expect(boardOpen(wsE)).toBe(false), { timeout: 20000 })",
       "timeout await vi.waitFor(() => expect(boardOpen(wsE)).toBe(true), { timeout: 20000 })",
@@ -5430,12 +5516,14 @@
       "promiseSleep await new Promise((r) => setTimeout(r, 5))",
       "promiseSleep await new Promise((r) => setTimeout(r, 5))",
       "promiseSleep await new Promise((res) => setTimeout(res, 5))",
-      "promiseSleep await new Promise((res) => setTimeout(res, 5))"
+      "promiseSleep await new Promise((res) => setTimeout(res, 5))",
+      "testTimeout }, 20_000)"
     ],
     "tests/windowsExits.test.ts": [
       "timeout const r = spawnSync(process.execPath, ['-e', 'process.exit(-1073741502)'], { stdio: 'ignore', windowsHide: true, timeout: 30000, env: childEnv() })"
     ],
     "tests/workerImports.test.ts": [
+      "testTimeout }, 60_000)",
       "testTimeout }, 60_000)"
     ],
     "tests/workflow/adoption.test.ts": [
@@ -5458,9 +5546,6 @@
     ],
     "tests/workflow/queueCommits.test.ts": [
       "clockAssert expect(Date.now() - t0).toBeLessThan(15_000)"
-    ],
-    "tests/workflow/queueFollow.test.ts": [
-      "timeout it('a remote that keeps moving pauses the queue (the three-retests limit), nothing published', { timeout: 2 * GIT_HEAVY_MS }, async () => {"
     ],
     "tests/workflow/queueGuards.test.ts": [
       "timeout return { timeoutMs: 30_000, maxLines: 200_000 }",

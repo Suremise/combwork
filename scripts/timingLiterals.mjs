@@ -8,8 +8,9 @@
 //   - the limit of a `Date.now() - t < N` loop;
 //   - the value of a `*_MS` constant;
 //   - toBeLessThan(N) on a clock reading (its statement naming Date.now, performance.now, elapsed, took or ms).
-// Each file is read whole, its comments and strings blanked (newlines kept), calls matched by their parentheses, so a call
-// written over several lines counts as one. Simulated time (vi.advanceTimersByTime and its kin) matches no kind. A number
+// Each file is parsed (@babel/parser: its syntax tree, never its text), so a call written over several lines, with a
+// trailing comma, a regular expression or a comment inside, counts as the call it is, and text that only looks like a
+// wait (in a string, a template, a regular expression or a comment) is none. Simulated time (vi.advanceTimersByTime and its kin) matches no kind. A number
 // that is no wait (a value under test, a child's own life) says `timing-ok: <why>` on its line or the line above.
 //
 // The backlog (HI-3381, HI-3382 migrate it): tests/timingAllow.json, each file's existing literals by occurrence (its kind
@@ -19,6 +20,9 @@
 // entries, so the baseline can't grow by the tool, and one grown by hand shows in review as an addition to that file.
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { createRequire } from 'node:module'
+// @babel/parser (a dev dependency: TypeScript 7 has no JavaScript compiler API), for each file's syntax tree.
+const { parse } = createRequire(import.meta.url)('@babel/parser')
 
 const ROOT = join(import.meta.dirname, '..')
 const TESTS = join(ROOT, 'tests')
@@ -26,8 +30,6 @@ export const ALLOW_FILE = join(TESTS, 'timingAllow.json')
 /** A fake is a CLI, a fixture is data; the timing files are where the numbers belong. */
 const SKIP = /[\\/](node_modules|fixtures|fake-[^\\/]*)[\\/]|[\\/]tests[\\/]timing(\.ci)?\.(json|cjs|d\.cts)$/
 const FILE = /\.(ts|mts|cts|cjs|mjs|js)$/
-const NUM = String.raw`\d[\d_]*(?:\.\d+)?(?:e\d+)?`
-const IS_NUM = new RegExp(`^${NUM}$`)
 const OPT_OUT = /timing-ok:/
 
 export const WHAT = {
@@ -39,126 +41,109 @@ export const WHAT = {
   promiseSleep: 'a sleep',
   clockLoop: "a loop's time limit",
   msConstant: 'a *_MS constant',
-  clockAssert: 'a bound on a clock reading'
+  clockAssert: 'a bound on a clock reading',
+  unparsed: "a file the guard can't parse, so its waits can't be checked"
 }
 
-/**
- * The file's code with its comments and its string and template literals blanked to spaces (newlines kept, positions
- * unchanged), so a test's text or a note never matches, and a template's `${…}` code still does.
- */
-export function blank(src) {
-  const out = src.split('')
-  const n = src.length
-  const fill = (a, b) => {
-    for (let k = a; k < b; k++) if (out[k] !== '\n' && out[k] !== '\r') out[k] = ' '
+/** A numeric literal written in place (`5000`, `60_000`), never a name or an expression. */
+const isNum = (n) => !!n && n.type === 'NumericLiteral'
+const TEST_CALLS = new Set(['it', 'test', 'describe', 'beforeAll', 'afterAll', 'beforeEach', 'afterEach', 'suite', 'bench'])
+const CLOCK = /Date\.now|performance\.now|elapsed|took|\bms\b|\w+Ms\b/i
+/** Wrappers that change nothing of an expression (a cast, a `!`, parentheses). */
+const unwrap = (e) => {
+  while (e && (e.type === 'TSNonNullExpression' || e.type === 'TSAsExpression' || e.type === 'TSSatisfiesExpression' || e.type === 'ParenthesizedExpression' || e.type === 'TypeCastExpression')) e = e.expression
+  return e
+}
+const isCall = (n) => !!n && (n.type === 'CallExpression' || n.type === 'OptionalCallExpression')
+const isMember = (n) => !!n && (n.type === 'MemberExpression' || n.type === 'OptionalMemberExpression')
+const propName = (m) => (m.computed ? (m.property.type === 'StringLiteral' ? m.property.value : null) : m.property.name)
+
+/** The identifier a chain starts from (`it` in it.each(…)(…), `lib` in lib.until). */
+function rootName(expr) {
+  let e = unwrap(expr)
+  for (;;) {
+    if (!e) return null
+    if (e.type === 'Identifier') return e.name
+    if (isMember(e)) e = unwrap(e.object)
+    else if (isCall(e)) e = unwrap(e.callee)
+    else if (e.type === 'TaggedTemplateExpression') e = unwrap(e.tag)
+    else return null
   }
-  let i = 0
-  const tpl = [] // a template's ${ depth, when inside its code
-  while (i < n) {
-    const c = src[i]
-    const d = src[i + 1]
-    if (c === '/' && d === '/') {
-      const e = src.indexOf('\n', i)
-      const end = e < 0 ? n : e
-      fill(i, end)
-      i = end
-    } else if (c === '/' && d === '*') {
-      const e = src.indexOf('*/', i + 2)
-      const end = e < 0 ? n : e + 2
-      fill(i, end)
-      i = end
-    } else if (c === "'" || c === '"') {
-      let j = i + 1
-      while (j < n && src[j] !== c && src[j] !== '\n') j += src[j] === '\\' ? 2 : 1
-      fill(i + 1, j)
-      i = j + 1
-    } else if (c === '`' || (c === '}' && tpl.length && tpl[tpl.length - 1] === 0)) {
-      // A template's text, from its start (or the end of a ${…}) to its end or its next ${.
-      if (c === '}') tpl.pop()
-      let j = i + 1
-      while (j < n && src[j] !== '`' && !(src[j] === '$' && src[j + 1] === '{')) j += src[j] === '\\' ? 2 : 1
-      fill(i + 1, j)
-      if (src[j] === '$') {
-        tpl.push(0)
-        i = j + 2
-      } else i = j + 1
-    } else {
-      if (tpl.length && c === '{') tpl[tpl.length - 1]++
-      else if (tpl.length && c === '}') tpl[tpl.length - 1]--
-      i++
-    }
+}
+
+/** The name a call is made by: `it` for it(…), it.only(…), it.each([…])(…); `until` for until(…), lib.until(…). */
+function calleeName(callee) {
+  const e = unwrap(callee)
+  if (!e) return null
+  if (e.type === 'Identifier') return e.name
+  if (isMember(e)) {
+    // A method's own name (page.waitForTimeout, lib.until), unless its chain starts at a test function (it.only, it.each).
+    const root = rootName(e.object)
+    return TEST_CALLS.has(root) ? root : propName(e)
   }
-  return out.join('')
+  // it.each([…])(…), test.each`…`(…): the call is made by what it.each returns.
+  return (isCall(e) || e.type === 'TaggedTemplateExpression') && TEST_CALLS.has(rootName(e)) ? rootName(e) : null
 }
 
-/** A call's arguments from the position just after its `(`: each top-level argument's text and start, and where it ends. */
-function callArgs(code, open) {
-  const args = []
-  let depth = 0
-  let start = open
-  for (let k = open; k < code.length; k++) {
-    const c = code[k]
-    if (c === '(' || c === '[' || c === '{') depth++
-    else if (c === ')' || c === ']' || c === '}') {
-      if (depth === 0) {
-        args.push({ text: code.slice(start, k), at: start })
-        return { args, end: k }
-      }
-      depth--
-    } else if (c === ',' && depth === 0) {
-      args.push({ text: code.slice(start, k), at: start })
-      start = k + 1
-    }
+/** Each child node of a node (its fields that hold nodes), never its position data or comments. */
+function* children(node) {
+  for (const key in node) {
+    if (key === 'loc' || key === 'start' || key === 'end' || key === 'extra' || key === 'range' || key.endsWith('Comments')) continue
+    const v = node[key]
+    if (Array.isArray(v)) {
+      for (const x of v) if (x && typeof x.type === 'string') yield x
+    } else if (v && typeof v.type === 'string') yield v
   }
-  return null
 }
 
-/** The position of a numeric argument's number (its text trimmed is a number), else -1. */
-const numberAt = (arg) => {
-  if (!arg) return -1
-  const t = arg.text.trim()
-  return IS_NUM.test(t) ? arg.at + arg.text.indexOf(t) : -1
-}
-
-/** Every finding in a file: { kind, at } (the number's position). */
-function findings(code) {
+/** Every finding in a file: { kind, at } (its number's position), read from its syntax tree (@babel/parser). */
+function findings(src, fileName) {
+  let ast
+  try {
+    ast = parse(src, { sourceType: 'unambiguous', errorRecovery: true, allowReturnOutsideFunction: true, allowAwaitOutsideFunction: true, allowImportExportEverywhere: true, plugins: /\.(ts|mts|cts)$/.test(fileName) ? ['typescript'] : ['jsx'] })
+  } catch {
+    // Not parseable: its waits can't be checked, which is a finding of its own (never a pass by silence).
+    return [{ kind: 'unparsed', at: 0 }]
+  }
   const out = []
-  const add = (kind, at) => at >= 0 && out.push({ kind, at })
-  // Calls whose last or second argument is the bound.
-  const CALLS = [
-    { re: /\b(?:it|test|describe|beforeAll|afterAll|beforeEach|afterEach)(?:\.\w+)*\s*\(/g, kind: 'testTimeout', arg: (a) => (a.length >= 2 ? a[a.length - 1] : null) },
-    { re: /(?<![\w$.])(?:lib\.)?until\s*\(/g, kind: 'until', arg: (a) => a[1] },
-    { re: /\b(?:sleep|waitForTimeout)\s*\(/g, kind: 'sleep', arg: (a) => (a.length === 1 ? a[0] : null) },
-    { re: /\bsetTimeout\s*\(/g, kind: 'promiseSleep', arg: (a) => (a.length === 2 && /^\s*[A-Za-z_$][\w$]*\s*$/.test(a[0].text) ? a[1] : null) }
-  ]
-  for (const c of CALLS) {
-    for (const m of code.matchAll(c.re)) {
-      const r = callArgs(code, m.index + m[0].length)
-      if (r) add(c.kind, numberAt(c.arg(r.args)))
-    }
+  const add = (kind, node) => node && out.push({ kind, at: node.start })
+  const textOf = (n) => src.slice(n.start, n.end)
+  const stack = [ast.program]
+  while (stack.length) {
+    const node = stack.pop()
+    if (isCall(node)) {
+      const name = calleeName(node.callee)
+      const args = node.arguments
+      const last = args[args.length - 1]
+      if (name && TEST_CALLS.has(name) && args.length >= 2 && isNum(last)) add('testTimeout', last)
+      else if (name === 'until' && isNum(args[1])) add('until', args[1])
+      else if ((name === 'sleep' || name === 'waitForTimeout') && args.length === 1 && isNum(args[0])) add('sleep', args[0])
+      else if (name === 'setTimeout' && args.length === 2 && unwrap(args[0])?.type === 'Identifier' && isNum(args[1])) add('promiseSleep', args[1])
+      else if ((name === 'toBeLessThan' || name === 'toBeLessThanOrEqual') && args.length === 1 && isNum(args[0])) {
+        // A bound on a clock reading: the expect(…) this matcher ends reads a clock or an elapsed time.
+        let e = unwrap(node.callee)
+        while (e && !(isCall(e) && unwrap(e.callee)?.type === 'Identifier' && unwrap(e.callee).name === 'expect')) e = isMember(e) ? unwrap(e.object) : isCall(e) ? unwrap(e.callee) : null
+        if (e && e.arguments[0] && CLOCK.test(textOf(e.arguments[0]))) add('clockAssert', args[0])
+      }
+    } else if ((node.type === 'ObjectProperty' || node.type === 'Property') && !node.computed && isNum(node.value)) {
+      const key = node.key.type === 'Identifier' ? node.key.name : node.key.type === 'StringLiteral' ? node.key.value : null
+      if (key === 'testTimeout' || key === 'hookTimeout' || key === 'teardownTimeout') add('setConfig', node.value)
+      else if (key === 'timeout' || key === 'timeoutMs') add('timeout', node.value)
+    } else if (node.type === 'BinaryExpression' && (node.operator === '<' || node.operator === '<=') && isNum(node.right)) {
+      // `Date.now() - t < N`: a loop's limit on a clock.
+      const l = unwrap(node.left)
+      if (l.type === 'BinaryExpression' && l.operator === '-' && /^(?:Date|performance)\.now\(\)$/.test(textOf(unwrap(l.left)).replace(/\s+/g, ''))) add('clockLoop', node.right)
+    } else if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier' && /^[A-Z][A-Z0-9_]*_MS$/.test(node.id.name) && isNum(node.init)) add('msConstant', node.init)
+    for (const c of children(node)) stack.push(c)
   }
-  const PATTERNS = [
-    { re: new RegExp(String.raw`\b(?:testTimeout|hookTimeout|teardownTimeout)\s*:\s*(${NUM})\b`, 'g'), kind: 'setConfig' },
-    { re: new RegExp(String.raw`\btimeout(?:Ms)?\s*:\s*(${NUM})\b`, 'g'), kind: 'timeout' },
-    { re: new RegExp(String.raw`(?:Date|performance)\.now\(\)\s*-\s*[\w.]+\s*<=?\s*(${NUM})\b`, 'g'), kind: 'clockLoop' },
-    { re: new RegExp(String.raw`\b(?:const|let|var)\s+[A-Z][A-Z0-9_]*_MS\s*=\s*(${NUM})\b`, 'g'), kind: 'msConstant' }
-  ]
-  for (const p of PATTERNS) for (const m of code.matchAll(p.re)) add(p.kind, m.index + m[0].lastIndexOf(m[1]))
-  // A bound on a clock reading: toBeLessThan(N) whose statement (back to its expect) reads a clock or an elapsed time.
-  for (const m of code.matchAll(new RegExp(String.raw`toBeLessThan(?:OrEqual)?\(\s*(${NUM})\s*\)`, 'g'))) {
-    const stmt = code.slice(Math.max(0, code.lastIndexOf('expect', m.index)), m.index)
-    if (/Date\.now|performance\.now|elapsed|took|\bms\b|\w+Ms\b/i.test(stmt)) add('clockAssert', m.index + m[0].lastIndexOf(m[1]))
-  }
-  // One finding per number (a setTimeout's bound inside a matched sleep counts once).
-  const seen = new Set()
-  return out.filter((f) => (seen.has(f.at) ? false : (seen.add(f.at), true))).sort((a, b) => a.at - b.at)
+  return out.sort((a, b) => a.at - b.at)
 }
 
 /** A line's text as a baseline keys it: whitespace folded. */
 const fold = (s) => s.trim().replace(/\s+/g, ' ')
 
 /** A file's literal waits: { line, kind, what, text, key }, in order; `key` is its kind and line, as the baseline holds it. */
-export function literalsIn(src) {
+export function literalsIn(src, fileName = 'test.ts') {
   const lines = src.split(/\r?\n/)
   const starts = []
   for (let i = 0, p = 0; i < lines.length; i++) {
@@ -176,7 +161,7 @@ export function literalsIn(src) {
     return lo
   }
   const out = []
-  for (const f of findings(blank(src))) {
+  for (const f of findings(src, fileName)) {
     const i = lineOf(f.at)
     if (OPT_OUT.test(lines[i]) || (i > 0 && OPT_OUT.test(lines[i - 1]))) continue
     out.push({ line: i + 1, kind: f.kind, what: WHAT[f.kind], text: lines[i].trim().slice(0, 160), key: `${f.kind} ${fold(lines[i])}` })
@@ -221,7 +206,7 @@ export function checkTree(files = testFiles(), baseline = readBaseline(), read =
   const backlog = []
   const shrunk = Object.create(null)
   for (const f of files) {
-    const lits = literalsIn(read(f))
+    const lits = literalsIn(read(f), f)
     const left = new Map()
     for (const k of baseline[f] ?? []) left.set(k, (left.get(k) ?? 0) + 1)
     const kept = []
