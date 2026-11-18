@@ -27,7 +27,7 @@ const check = (name, ok, extra = '') => {
   const shot = async (name) => {
     for (const t of ['dark', 'light']) {
       await page.evaluate((x) => document.documentElement.setAttribute('data-theme', x), t)
-      await lib.sleep(200)
+      await lib.themeShown(page, t)
       await page.screenshot({ path: path.join(lib.WORK, `searchclear-${name}-${t}.png`) })
     }
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))

@@ -32,7 +32,7 @@ const check = (name, ok, extra = '') => {
     const shot = async (name) => {
       for (const t of ['dark', 'light']) {
         await page.evaluate((x) => document.documentElement.setAttribute('data-theme', x), t)
-        await lib.sleep(200) // on purpose: the theme's colours settle
+        await lib.themeShown(page, t)
         await page.screenshot({ path: at(`${name}-${t}.png`) })
       }
       await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))

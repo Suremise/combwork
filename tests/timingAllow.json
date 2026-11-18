@@ -1,33 +1,9 @@
 {
   "$comment": "HI-3378: the test files' waits and timeouts that still write numbers in place, by occurrence (each its kind and its line's text, whitespace folded): the backlog HI-3381 (unit) and HI-3382 (e2e, scenarios) migrate to names from tests/timing.json (scripts/timingLiterals.mjs). check:repo fails a literal no entry here covers (added, or changed), and an entry with no literal left; `node scripts/testWaits.mjs --literals --shrink` drops those, and never adds one. Never add an entry by hand.",
   "files": {
-    "tests/e2e/connections-codex.cjs": [
-      "sleep await lib.sleep(300) // on purpose: the fake takes a typed line before its Enter, as Codex does",
-      "sleep await lib.sleep(300) // on purpose: the fake takes a typed line before its Enter, as Codex does",
-      "sleep await lib.sleep(300) // on purpose: the fake takes a typed line before its Enter, as Codex does"
-    ],
-    "tests/e2e/dialogs.cjs": [
-      "sleep await lib.sleep(300)"
-    ],
     "tests/e2e/lanes.mjs": [
       "sleep await sleep(50)",
       "sleep else await sleep(50)"
-    ],
-    "tests/e2e/mode.cjs": [
-      "clockLoop const t0 = Date.now(); while (Date.now() - t0 < 20000 && (await live())?.status !== 'ready') await sleep(300)",
-      "clockLoop const t1 = Date.now(); while (relaunch.spawned && Date.now() - t1 < 25000 && !((await live())?.permissionMode === 'dontAsk' && (await live())?.status === 'ready')) await sleep(300)",
-      "sleep await inv('workspace:open', ws); await sleep(600)",
-      "sleep await inv('workspace:refresh'); await sleep(1200) // A fixed wait on purpose: this checks that no second offer appears.",
-      "sleep await lib.setProjectLaunch(inv, proj, 'claude-code', { permissionMode: 'plan' }); await inv('workspace:refresh'); await sleep(1200) // A fixed wait on purpose: this checks the mode does NOT change until asked.",
-      "sleep await page.getByText('demo', { exact: true }).first().click(); await sleep(400)",
-      "sleep await page.keyboard.press('Control+Alt+M'); await sleep(400)",
-      "sleep await page.keyboard.press('Escape'); await sleep(200)",
-      "sleep await page.locator('.menu .menu-item', { hasText: \"Don't ask\" }).click(); await sleep(400)",
-      "sleep await page.locator('.pane-footer-bar .mode-badge').click(); await sleep(300)",
-      "sleep await page.locator('.pane-footer-bar .mode-badge').click(); await sleep(400)",
-      "sleep const t0 = Date.now(); while (Date.now() - t0 < 20000 && (await live())?.status !== 'ready') await sleep(300)",
-      "sleep const t1 = Date.now(); while (relaunch.spawned && Date.now() - t1 < 25000 && !((await live())?.permissionMode === 'dontAsk' && (await live())?.status === 'ready')) await sleep(300)",
-      "sleep const waitMode = async (m, ms = 30000) => { const t = Date.now(); while (Date.now() - t < ms) { if ((await live())?.permissionMode === m) return true; await sleep(200) } return false }"
     ],
     "tests/e2e/pin.cjs": [
       "sleep await lib.sleep(1500) // A fixed wait on purpose: this checks that the other window's workspace events do NOT unpin it.",
@@ -64,18 +40,6 @@
     ],
     "tests/e2e/providerdetect.cjs": [
       "msConstant const HOLD_MS = 12000"
-    ],
-    "tests/e2e/providers.cjs": [
-      "sleep await sleep(300)",
-      "sleep await sleep(300)",
-      "sleep await sleep(300)",
-      "sleep await sleep(300)",
-      "sleep await sleep(300)",
-      "sleep await sleep(300)",
-      "sleep await sleep(300)",
-      "sleep await sleep(500)",
-      "sleep await sleep(500)",
-      "sleep await sleep(800)"
     ],
     "tests/e2e/queueupgrade.cjs": [
       "timeout const db = new DatabaseSync(dbFile, { readOnly: true, timeout: 5000 })",
@@ -155,17 +119,11 @@
       "timeout const r = await runScenario(scenario, 'fake', { workRoot, port: lib.port(47824), timeoutMs: 60000 })",
       "timeout const u = await runScenario(unnamed, 'fake', { workRoot, port: lib.port(47824), timeoutMs: 60000 })"
     ],
-    "tests/e2e/searchclear.cjs": [
-      "sleep await lib.sleep(200)"
-    ],
     "tests/e2e/sessioncleanup.cjs": [
       "msConstant const TURN_MS = 20000"
     ],
     "tests/e2e/settingsnav.cjs": [
       "timeout const tip = await lib.until(async () => { const t = await page.locator('.tip:visible').last().innerText({ timeout: 1000 }).catch(() => ''); return t === all[cutAt].text && t }, HUNG_MS)"
-    ],
-    "tests/e2e/settingstips.cjs": [
-      "sleep await lib.sleep(200) // on purpose: the theme's colours settle"
     ],
     "tests/e2e/signin.cjs": [
       "sleep await lib.sleep(100)",
@@ -173,36 +131,6 @@
       "sleep await lib.sleep(4500) // A fixed wait on purpose: it waits out the gathering window (agents refused together are told in one notification) to show only one arrives.",
       "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)",
       "until check('Resume (n) counts the two still stopped', (await until(async () => ((await resume.count()) === 1 ? true : null), 5000)) === true)"
-    ],
-    "tests/e2e/skillaudience.cjs": [
-      "sleep await sleep(200)",
-      "sleep await sleep(300)",
-      "sleep await sleep(500)",
-      "sleep await sleep(500)",
-      "sleep await sleep(500)",
-      "sleep await sleep(500)",
-      "sleep await sleep(500)",
-      "sleep await sleep(600)",
-      "sleep await sleep(600)",
-      "sleep await sleep(700)",
-      "sleep await sleep(700)",
-      "sleep await sleep(800)",
-      "sleep await sleep(800)",
-      "sleep await sleep(800)",
-      "sleep await sleep(800)",
-      "until if (!(await lib.until(() => fs.existsSync(path.join(skillsDir, 'coordinate-agents', 'SKILL.md')), 20000))) throw new Error('The bundled coordinate-agents skill was never added')"
-    ],
-    "tests/e2e/skilldelivery.cjs": [
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)"
-    ],
-    "tests/e2e/skills.cjs": [
-      "sleep await sleep(300)",
-      "sleep await sleep(300)",
-      "sleep await sleep(400)",
-      "sleep await sleep(400)",
-      "sleep await sleep(500)",
-      "sleep await sleep(600)",
-      "sleep await sleep(800)"
     ],
     "tests/e2e/slotoptions.cjs": [
       "timeout const db = new DatabaseSync(path.join(fx.ws, '.combwork', 'combwork.db'), { timeout: 5000 })"
@@ -234,11 +162,6 @@
       "sleep await lib.sleep(400)",
       "sleep await lib.sleep(400)"
     ],
-    "tests/e2e/tabstrip.cjs": [
-      "sleep await lib.sleep(120)",
-      "sleep await lib.sleep(150)",
-      "sleep await lib.sleep(300)"
-    ],
     "tests/e2e/teampause.cjs": [
       "sleep await lib.sleep(4000) // on purpose: longer than a wake takes, to see none is typed while paused"
     ],
@@ -269,20 +192,6 @@
       "sleep await lib.sleep(300)",
       "sleep await lib.sleep(300)"
     ],
-    "tests/e2e/tipcorner.cjs": [
-      "sleep await lib.sleep(300)",
-      "sleep await lib.sleep(300)",
-      "sleep await lib.sleep(300)",
-      "sleep await lib.sleep(300)",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)"
-    ],
-    "tests/e2e/tips.cjs": [
-      "sleep await lib.sleep(1500) // A fixed wait on purpose: this checks that the tip does NOT show again, which no condition can show.",
-      "sleep await lib.sleep(500) // A fixed wait on purpose: the change must come while startup waits on the slowed call (2.5 s).",
-      "sleep await lib.sleep(6000) // A fixed wait on purpose: this checks that no tip shows on start (one would within 4 s of loading), which no condition can show.",
-      "sleep await lib.sleep(6000) // A fixed wait on purpose: this checks that no tip shows on start (one would within 4 s of loading), which no condition can show.",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(150)"
-    ],
     "tests/e2e/tooltips.cjs": [
       "sleep await lib.sleep(300)"
     ],
@@ -311,26 +220,6 @@
       "sleep await lib.sleep(100)",
       "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)"
     ],
-    "tests/e2e/unsaved.cjs": [
-      "sleep await lib.sleep(1500) // A fixed wait on purpose: this checks that Combwork does NOT quit, which no condition can show.",
-      "sleep await sleep(2500) // on purpose: the single-instance lock goes a moment after the process, before the next launch",
-      "sleep await sleep(300)",
-      "sleep await sleep(300)",
-      "sleep await sleep(300)",
-      "sleep await sleep(300)",
-      "sleep await sleep(500)",
-      "sleep await sleep(500)",
-      "sleep await sleep(500)",
-      "sleep await sleep(500)",
-      "sleep await sleep(500)",
-      "sleep await sleep(600)",
-      "sleep await sleep(600)",
-      "sleep await sleep(800)",
-      "sleep await sleep(800)",
-      "sleep await sleep(800)",
-      "sleep await sleep(800)",
-      "sleep await sleep(900)"
-    ],
     "tests/e2e/update.cjs": [
       "sleep await Promise.race([closed, sleep(10000)])",
       "sleep await dlg.locator('button', { hasText: 'Later' }).click(); await sleep(300)",
@@ -352,11 +241,6 @@
     ],
     "tests/e2e/welcomefit.cjs": [
       "sleep await lib.sleep(300) // Layout after a zoom change."
-    ],
-    "tests/e2e/windows.cjs": [
-      "sleep await sleep(300)",
-      "sleep await sleep(500)",
-      "timeout const exited = app.waitForEvent('close', { timeout: 20000 }).then(() => true).catch(() => false)"
     ],
     "tests/e2e/workflowdefaults.cjs": [
       "timeout const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })"

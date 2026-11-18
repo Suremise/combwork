@@ -54,6 +54,7 @@
   "quiet.nothingMs": { "kind": "quiet", "ms": 2000, "note": "a window in which nothing happening is the point of the check" },
   "pace.trustEnterMs": { "kind": "pace", "ms": 3000, "note": "Claude Code's trust question: how long after an Enter on Yes before lib.chooseTrust presses it again (a dropped key, #218); a try, not a bound" },
   "pace.trustDownMs": { "kind": "pace", "ms": 2000, "note": "Claude Code's trust question: how long after a Down before lib.chooseTrust looks again and sends another (a menu still drawing, #218); a try, not a bound" },
+  "quiet.dayTipMs": { "kind": "quiet", "ms": 6000, "note": "no day's tip within this of a window's start: one shows 4 s after the window settles (App.tsx's showTodaysTip), so none by then is the check (tips.cjs)" },
   "quiet.tipMs": { "kind": "quiet", "ms": 1500, "note": "a tooltip that would show after its delay hasn't within this: a hover that fits shows none (onelinedesc, settingsnav)" },
   "pace.escapeAgainMs": { "kind": "pace", "ms": 3000, "note": "a dialog not closed this long after Escape: Escape is pressed again (board.cjs; its tries bound the whole)" },
   "pace.typedDrawnMs": { "kind": "pace", "ms": 5000, "note": "text typed into a pane drawn on its line within this, else Enter goes anyway (loopwatch.cjs)" },
