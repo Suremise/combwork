@@ -15,7 +15,7 @@ import { AddAgentDialog, AgentSettingsDialog, askWorkflowToolsRestart, HandOverD
 import { BranchMergeDialog } from './components/BranchMerge'
 import { BoardUpgradeAsk, BoardUpgradeBanner } from './components/BoardUpgrade'
 import { WorkspaceOpening } from './components/WorkspaceOpening'
-import { CloseCommandPanel } from './components/CloseCommandPanel'
+import { CloseCommandPanel, ClosingAgentsPanel } from './components/CloseCommandPanel'
 import { ArchiveAllDialog, BoardView, MoveToDoingDialog, TaskDialog, TaskStartDialog } from './components/Board'
 import { LaneStartDialog } from './components/LaneStartDialog'
 import { WorkspaceOverviewView } from './views/WorkspaceOverview'
@@ -251,6 +251,9 @@ function handleEvent(e: CombworkEvent): void {
     case 'close-command':
       set({ closeCommand: e.run })
       break
+    case 'closing-agents':
+      set({ closingAgents: e.state })
+      break
     case 'keep-awake':
       set({ keepAwake: e.working })
       break
@@ -474,6 +477,10 @@ export function App() {
       const closing = await call('closeCommand:state')
       if (!early.active()) return
       set({ closeCommand: closing })
+      // And its wait for agents to close (HI-3376).
+      const agentsClosing = await call('closingAgents:state')
+      if (!early.active()) return
+      set({ closingAgents: agentsClosing })
       applyTheme()
       noticeUnmanagedMcp()
       // The day's tip, once the window has settled.
@@ -617,6 +624,7 @@ export function App() {
       <SetAsideDialog />
       <BoardUpgradeAsk />
       <WorkspaceOpening />
+      <ClosingAgentsPanel />
       <CloseCommandPanel />
       <AddAgentDialog />
       <AgentSettingsDialog />

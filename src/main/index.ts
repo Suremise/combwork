@@ -106,7 +106,8 @@ import { apiEnv, assistantApiUrl, startApiServer, startHookServer } from './serv
 import { clearDiscovery, clearDiscoveryNow } from './apiDiscovery'
 import { clearHookAuth } from './hookTokens'
 import { assistantHome, assistantTokenFile, endAssistant, newAssistantToken, newTurn } from './assistantControl'
-import { sessions } from './sessions'
+import { CLOSE_WRITERS_MS, sessions } from './sessions'
+import { waitForAgentsClosed, type ClosingPending } from './closingAgents'
 import { forgetPicks } from './dialects/view'
 import { usageHistory } from './usageHistory'
 import { notificationIcon } from './paths'
@@ -645,6 +646,22 @@ function askBeforeStopping(mine: QuitSession[]): boolean {
 }
 
 /**
+ * HI-3376: waits for what of `which`'s projects is closing (`parts` of it) to have closed, shown in `wins` past a second,
+ * said there as still closing past `deadlineMs`, until it has or the user's Don't wait (closingAgents.ts). Logged unless
+ * it closed.
+ */
+async function agentsClosed(what: string, which: ((projectPath: string) => boolean) | undefined, parts: (keyof ClosingPending)[], deadlineMs: number, wins: () => BrowserWindow[]): Promise<void> {
+  const pending = (): ClosingPending => {
+    const p = sessions.closingPending(which)
+    return { running: parts.includes('running') ? p.running : 0, starting: parts.includes('starting') ? p.starting : 0, writers: parts.includes('writers') ? p.writers : 0 }
+  }
+  const how = await waitForAgentsClosed({ pending, deadlineMs, windows: wins, send: (w, state) => emitTo(w as BrowserWindow, { type: 'closing-agents', state }), quiet: testQuiet() })
+  if (how === 'settled') return
+  const p = pending()
+  log.warn(`${what}: ${how === 'skipped' ? "Don't wait pressed" : 'no window to wait in'} with ${p.running} runs, ${p.starting} starts and ${p.writers} slot writers still closing after ${Math.round(deadlineMs / 1000)} s; going on`) // i18n-ignore: for the log
+}
+
+/**
  * Closing a window's workspace, or switching the window to another one: its agents are stopped, after asking as
  * closing the window does. False when the user cancels. Unsaved files were already dealt with by the page.
  */
@@ -660,10 +677,13 @@ async function stopWorkspaceAgents(from: BrowserWindow, scope: 'workspace' | 'sw
   // Also cancels agents still starting (not listed: they have no session yet). No new one starts until the
   // workspace has closed or switched (ipc clears the flag).
   e.ws.closing = true
-  await sessions.stopWhereAndWait((s) => workspaceFor(s.projectPath) === e.ws, 3000, 'closed')
-  // Their slot writers released while the workspace is open (HI-2299: released after it closed, they failed). Each
-  // waits for its run's job to be seen empty (about 2 s), so a bound of 5 s, as the quit's look has.
-  await sessions.writersSettled(5000, (p) => workspaceFor(p) === e.ws)
+  // HI-3376: until they have closed, each run through its exit work and its slot writer released while the workspace is
+  // open (HI-2299: released after it closed, they failed), however long their CLIs' exits take; said in the window past a
+  // second, with Don't wait. The stop's own wait isn't taken for their end.
+  const mineOf = (p: string): boolean => workspaceFor(p) === e.ws
+  const deadline = sessions.closeDeadlineMs(mineOf)
+  void sessions.stopWhereAndWait((s) => mineOf(s.projectPath), 0, 'closed')
+  await agentsClosed("closing a window's workspace", mineOf, ['running', 'starting', 'writers'], deadline, () => [e.win]) // i18n-ignore: for the log
   return true
 }
 
@@ -684,10 +704,13 @@ async function requestCloseWindow(e: CombworkWindow, done: AlreadyAsked = {}): P
     if (choice === 'cancel') return
   }
   e.ws.closing = true
-  await sessions.stopWhereAndWait((s) => workspaceFor(s.projectPath) === e.ws, 3000, 'closed')
-  // Their slot writers released while the workspace is open (HI-2299: released after it closed, they failed). Each
-  // waits for its run's job to be seen empty (about 2 s), so a bound of 5 s, as the quit's look has.
-  await sessions.writersSettled(5000, (p) => workspaceFor(p) === e.ws)
+  // HI-3376: until they have closed, each run through its exit work and its slot writer released while the workspace is
+  // open (HI-2299: released after it closed, they failed), however long their CLIs' exits take; said in the window past a
+  // second, with Don't wait. The stop's own wait isn't taken for their end.
+  const mineOf = (p: string): boolean => workspaceFor(p) === e.ws
+  const deadline = sessions.closeDeadlineMs(mineOf)
+  void sessions.stopWhereAndWait((s) => mineOf(s.projectPath), 0, 'closed')
+  await agentsClosed("closing a window's workspace", mineOf, ['running', 'starting', 'writers'], deadline, () => [e.win]) // i18n-ignore: for the log
   saveWindowsWithout(e)
   // Its workspace closed here, its close command run in it while it is still shown (HI-1368), then the window goes.
   await closeWithCommand(e.ws, 'window', e.win).catch((err) => log.warn("closing the window's workspace", err))
@@ -800,10 +823,15 @@ async function quitNow(tellUser: boolean): Promise<void> {
   // A plain quit that installs on its way out is a quit (HI-3167): the user quit, and Combwork doesn't restart itself.
   const reason: RestartReason = quitReason ?? closeReason(installConsent()?.kind ?? null, relaunchOnQuit)
   await recordClosing(reason).catch((e) => log.warn('recording the agents as Combwork closes', e))
-  await sessions.stopAllAndWait(3000)
+  // HI-3376: every run through its exit work (its last transcript backup, its session list) however long its CLI's exit
+  // takes, said in the windows past a second (a hidden one shown), with Don't wait; the stop's own wait isn't taken for it.
+  const runsDeadline = sessions.closeDeadlineMs() - CLOSE_WRITERS_MS
+  void sessions.stopAllAndWait(0)
+  const allWindows = (): BrowserWindow[] => combworkWindows().map((x) => x.win)
+  await agentsClosed('quitting', undefined, ['running', 'starting'], runsDeadline, allWindows)
   await quitLeftovers()
   // The stopped runs' slot writers released before the workspaces close (HI-1801): their outcomes are known by now.
-  await sessions.writersSettled(3000)
+  await agentsClosed('quitting', undefined, ['writers'], CLOSE_WRITERS_MS, allWindows)
   // The merge queues' runners: their processes ended and their leases given up, so another Combwork can run them at once.
   await releaseQueueRunners()
   // HI-1185: platforms' owned work (the Git view's signing checks): no new one admitted from here, and those running

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { CloseCommandRun, CloseCommandStep } from '@shared/types'
+import type { CloseCommandRun, CloseCommandStep, ClosingAgentsState } from '@shared/types'
 import { msg, tr } from '@shared/i18n'
 import { durationText } from '@shared/tasks'
 import { call } from '../api'
@@ -39,7 +39,9 @@ const M = {
   ranFor: msg({ id: 'workspace.commands.ranFor', defaultMessage: '{time}', description: 'In the commands dialog\'s list (HI-1954): how long a command took or has run so far. {time} is a short duration ("12 s", "2 min"); usually kept as it is.' }),
   exitCode: msg({ id: 'workspace.commands.exitCode', defaultMessage: 'exit code {code}', description: "In the commands dialog's list (HI-1954): a command that failed, its exit code (a number, kept as it is)." }),
   notRun: msg({ id: 'workspace.commands.notRun', defaultMessage: "didn't run", description: "In the commands dialog's list (HI-1954): a command that failed before it started (a placeholder, its folder, or Windows couldn't start it)." }),
-  skippedStep: msg({ id: 'workspace.commands.skipped', defaultMessage: 'skipped', description: "In the commands dialog's list (HI-1954): a command skipped (Stop here, or after a failure)." })
+  skippedStep: msg({ id: 'workspace.commands.skipped', defaultMessage: 'skipped', description: "In the commands dialog's list (HI-1954): a command skipped (Stop here, or after a failure)." }),
+  closingAgents: msg({ id: 'workspace.closingAgents.title', defaultMessage: '{late, select, yes {{n, plural, one {An agent is still closing} other {# agents are still closing}}} other {Closing agents… {n, number} left}}', description: "The heading of the panel Combwork shows while it waits for agents to close as a workspace closes or switches, or as Combwork quits (HI-3376): {n} still closing (runs ending, starts being cancelled, slot records being released). late yes: it has waited longer than their coding agents' exit usually takes." }),
+  closingAgentsNote: msg({ id: 'workspace.closingAgents.note', defaultMessage: "{late, select, yes {Combwork keeps waiting so their last messages and slots are saved. If you don't wait, it goes on and what is left is handled as quitting leaves agents running.} other {Combwork waits for each to save its last messages and let go of its slot.}}", description: "Under the heading of the panel Combwork shows while it waits for agents to close (HI-3376). late yes: past the usual time; Don't wait then goes on, and what is still running is handled as Settings → Agents says for agents left running at a quit." })
 }
 
 const ICONS: Record<CloseCommandStep['state'], string> = { waiting: 'circle-large-outline', running: 'loading', ok: 'check', failed: 'error', skipped: 'dash' }
@@ -69,6 +71,49 @@ export function CloseCommandPanel() {
   const run = useStore((s) => s.closeCommand)
   if (!run || (run.state !== 'saving' && run.state !== 'running' && run.state !== 'failed')) return null
   return <Panel run={run} />
+}
+
+/**
+ * HI-3376: the panel over the window while Combwork waits for agents to close (its workspace closing or switching, or
+ * Combwork quitting): how many are left, and Don't wait. Main sends it with closing-agents; nothing behind takes input. A
+ * close command's panel, when one is up, comes first (its own state, never this one's).
+ */
+export function ClosingAgentsPanel() {
+  const state = useStore((s) => s.closingAgents)
+  const run = useStore((s) => s.closeCommand)
+  if (!state || run) return null
+  return <AgentsPanel state={state} />
+}
+
+function AgentsPanel({ state }: { state: ClosingAgentsState }) {
+  useLanguage()
+  const card = useRef<HTMLDivElement>(null)
+  const footer = useRef<HTMLDivElement>(null)
+  useKeyboardModal(card, footer)
+  const n = state.running + state.starting + state.writers
+  const late = state.late ? 'yes' : 'no'
+  return (
+    <div className="overlay close-command closing-agents" data-state={state.late ? 'late' : 'waiting'}>
+      <div ref={card} className="dialog close-command-card" role="alertdialog" aria-modal="true" aria-labelledby="closing-agents-title" aria-describedby="closing-agents-note">
+        <div className="dialog-header">
+          <Icon name="loading" spin />
+          <h2 id="closing-agents-title" aria-live="polite">
+            {tr(M.closingAgents, { late, n })}
+          </h2>
+        </div>
+        <div className="dialog-body">
+          <p id="closing-agents-note" className="faint close-command-note">
+            {tr(M.closingAgentsNote, { late })}
+          </p>
+        </div>
+        <div ref={footer} className="dialog-footer">
+          <button className="btn" data-lead autoFocus onClick={() => void call('closingAgents:dontWait', state.id)}>
+            {tr(M.dontWait)}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 /** The panel up now: its card and its buttons, which keep the keyboard while it is. */

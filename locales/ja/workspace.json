@@ -128,6 +128,8 @@
   "workspace.closeCommand.skip": "コマンドをスキップ",
   "workspace.closeCommand.skipped": "スキップしました：コマンドは実行されません。Combworkはワークスペースを閉じる処理を仕上げています。",
   "workspace.closeCommand.spawn": "{kind, select, quit {終了時のコマンドを開始できませんでした} other {閉じるときのコマンドを開始できませんでした}}",
+  "workspace.closingAgents.note": "{late, select, yes {最後のメッセージとスロットが保存されるよう、Combworkは待ち続けます。待たない場合は先に進み、残ったものは終了時に実行中のまま残ったエージェントと同じように扱われます。} other {Combworkは、それぞれが最後のメッセージを保存してスロットを手放すのを待っています。}}",
+  "workspace.closingAgents.title": "{late, select, yes {{n, plural, other {# 個のエージェントがまだ終了処理中です}}} other {エージェントを終了しています… 残り {n, number}}}",
   "workspace.commands.dontWaitNote": "{point, select, open {待たない場合、Combworkは先に進み、残りのコマンドは順番に自動で実行されます。エージェントは今すぐ起動します。} other {待たない場合、Combworkは先に進み、残りのコマンドは順番に自動で実行されます。}}",
   "workspace.commands.exitCode": "終了コード{code}",
   "workspace.commands.failedExit": "「{name}」が失敗しました（終了コード{code}）",

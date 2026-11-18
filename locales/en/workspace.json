@@ -515,6 +515,14 @@
     "defaultMessage": "{kind, select, quit {Your quit command couldn't be started} other {Your close command couldn't be started}}",
     "description": "The heading of the close command panel when Windows couldn't start the user's command (the system's reason follows). kind quit: the command run as Combwork quits; other: as a workspace closes."
   },
+  "workspace.closingAgents.note": {
+    "defaultMessage": "{late, select, yes {Combwork keeps waiting so their last messages and slots are saved. If you don't wait, it goes on and what is left is handled as quitting leaves agents running.} other {Combwork waits for each to save its last messages and let go of its slot.}}",
+    "description": "Under the heading of the panel Combwork shows while it waits for agents to close (HI-3376). late yes: past the usual time; Don't wait then goes on, and what is still running is handled as Settings → Agents says for agents left running at a quit."
+  },
+  "workspace.closingAgents.title": {
+    "defaultMessage": "{late, select, yes {{n, plural, one {An agent is still closing} other {# agents are still closing}}} other {Closing agents… {n, number} left}}",
+    "description": "The heading of the panel Combwork shows while it waits for agents to close as a workspace closes or switches, or as Combwork quits (HI-3376): {n} still closing (runs ending, starts being cancelled, slot records being released). late yes: it has waited longer than their coding agents' exit usually takes."
+  },
   "workspace.commands.dontWaitNote": {
     "defaultMessage": "{point, select, open {If you don't wait, Combwork goes on and the rest run by themselves, in order. Agents start now.} other {If you don't wait, Combwork goes on and the rest run by themselves, in order.}}",
     "description": "Under the commands dialog's Don't wait button (HI-1954): the commands not finished keep running in the background, one after another. point open: the workspace is opening, and its agents, held back meanwhile, can start now."

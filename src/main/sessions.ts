@@ -87,6 +87,7 @@ import { usesOwnPrices } from '../shared/prices'
 import { priceUsage, withCostFree } from '../shared/usageDays'
 import { summaryOf, usageFromRows, type LedgerRow } from '../shared/usageLedger'
 import { listProcesses, type ListedProcess } from './processTree'
+import type { ClosingPending } from './closingAgents'
 import type { AdoptionHandle, Ask, BackgroundTaskType, ExternalSession, HookEvent, HookOccurrence, LaunchContext, LaunchHooks, LaunchSkill, LiveDetails, NormalizedHook, ProviderAdapter, SkillDelivery } from './providers/types'
 import { HOOK_FIRED_MAX, HOOK_SHORT_MAX, clip, type ActivityHookBlock, type HookFired, type SessionHooks } from '../shared/hooks'
 import { providerService } from './providerService'
@@ -333,6 +334,8 @@ const SIZE_REFRESH_DELAY_MS = 500
 const MODE_SWITCHES_AT_ONCE = 6
 /** HI-3376: the least a restart in a new mode waits for the old run's exit (it ends as soon as the run exits). */
 export const MODE_RESTART_STOP_MS = 30_000
+/** HI-3376: the time a close gives the slot writers of its stopped runs to be released, after their exit (closeDeadlineMs). */
+export const CLOSE_WRITERS_MS = 30_000
 /** HI-3376: how long Stop It and Resume waits to see a stopped background job end before it gives up (and doesn't resume). */
 export const BACKGROUND_END_MS = 30_000
 /** How often it looks meanwhile (each look is a CLI run and a process listing). */
@@ -2326,6 +2329,29 @@ class SessionManager {
     let timer: NodeJS.Timeout | undefined
     await Promise.race([Promise.all(mine), new Promise<void>((r) => (timer = setTimeout(r, timeoutMs)))])
     clearTimeout(timer)
+  }
+
+  /**
+   * HI-3376: what of the projects `which` names (every one without it) is still closing, for closingAgents.ts: runs still
+   * running (each until it has been through onExit), starts not yet cancelled, slot writers not yet released (or found held).
+   */
+  closingPending(which?: (projectPath: string) => boolean): ClosingPending {
+    const mine = (p: string): boolean => !which || which(p)
+    return {
+      running: [...this.live.values()].filter((l) => mine(l.state.projectPath)).length,
+      starting: [...this.starting.values()].filter((p) => mine(p.projectPath)).length,
+      writers: which ? [...this.writerSettlingOf.values()].filter((e) => which(e.projectPath)).length : this.writersSettling.size
+    }
+  }
+
+  /**
+   * HI-3376: how long closing the runs `which` names may take before the closing window says they are still closing: the
+   * longest of their CLIs' exit graces with the kill's time after it (stopWaitMs), and the slot writers' release after
+   * that (CLOSE_WRITERS_MS). With the defaults: 30 + 5 + 30 s. A threshold for saying so, never taken as their end.
+   */
+  closeDeadlineMs(which?: (projectPath: string) => boolean): number {
+    const graces = [...this.live.values()].filter((l) => !which || which(l.state.projectPath)).map((l) => l.adapter.launch.exitKeys?.graceMs)
+    return stopWaitMs(0, graces) + CLOSE_WRITERS_MS
   }
 
   /**

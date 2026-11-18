@@ -128,6 +128,8 @@
   "workspace.closeCommand.skip": "跳过命令",
   "workspace.closeCommand.skipped": "已跳过：命令不会运行。Combwork 正在完成关闭工作区。",
   "workspace.closeCommand.spawn": "{kind, select, quit {无法启动退出时的命令} other {无法启动关闭时的命令}}",
+  "workspace.closingAgents.note": "{late, select, yes {Combwork 会继续等待，以保存它们的最后消息和槽位。如果不等待，它会继续，剩下的将按退出时仍在运行的代理处理。} other {Combwork 正在等待每个代理保存最后的消息并释放其槽位。}}",
+  "workspace.closingAgents.title": "{late, select, yes {{n, plural, other {# 个代理仍在关闭}}} other {正在关闭代理… 还剩 {n, number} 个}}",
   "workspace.commands.dontWaitNote": "{point, select, open {如果不再等待，Combwork 会继续，其余命令会按顺序自行运行。智能体现在启动。} other {如果不再等待，Combwork 会继续，其余命令会按顺序自行运行。}}",
   "workspace.commands.exitCode": "退出码 {code}",
   "workspace.commands.failedExit": "“{name}”失败（退出码 {code}）",
