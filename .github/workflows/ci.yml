@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 jobs:
-  check:
+  unit:
     runs-on: windows-latest
     # HI-3381: the unit run in three shards, each a job of its own with one worker (HI-3355: one file at a time on this
     # 4-vCPU runner, so a hung run's bounds hold), so the run takes a third of the one-worker run's wall-clock (about 170
@@ -26,7 +26,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3]
-    name: check (unit shard ${{ matrix.shard }}/3)
+    name: unit (shard ${{ matrix.shard }}/3)
     # HI-3378: a hung job ends here, not at GitHub's 6 hours; a shard takes about an hour.
     timeout-minutes: 150
     # HI-3378: the tests' timings on this runner, in one file (merged over tests/timing.json by name).
@@ -89,3 +89,14 @@ jobs:
       # Informational: missing translations show in English and never fail.
       - if: matrix.shard == 1
         run: npm run i18n:coverage
+
+  # HI-3381: GitHub's ruleset requires a check named exactly "check": this job stands for the whole run, and passes only
+  # when every shard (shard 1 with the checks that aren't unit tests) passed. It runs whatever they did, so a failed or
+  # cancelled shard fails it rather than leaving the required check unreported.
+  check:
+    if: always()
+    needs: [unit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: test "${{ needs.unit.result }}" = success
