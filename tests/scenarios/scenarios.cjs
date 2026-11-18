@@ -240,7 +240,7 @@ async function coderTask(c, task, agent = c.agents.coder) {
   // Reused when Combwork started it first (HI-2094: a lane's builder is started with its card by Combwork's lane start, which
   // may land before or during this start), then waited for until it is ready as one started here.
   if (!(await coderLive(c, agent))) await c.inv('session:start', c.alpha, { agentId: agent.id }).catch(async (e) => { if (!(await coderLive(c, agent))) throw e })
-  for (let t = Date.now(); Date.now() - t < 90000 && !['ready', 'finished'].includes((await coderLive(c, agent))?.status); ) {
+  for (let t = Date.now(); Date.now() - t < timing('hang.step') && !['ready', 'finished'].includes((await coderLive(c, agent))?.status); ) {
     // Terminal UIs draw spaces as cursor moves: matched as plain text.
     const lib = require('../e2e/lib.cjs')
     const screen = lib.plainText(String(await c.inv('pty:buffer', key).catch(() => '')))
@@ -250,7 +250,7 @@ async function coderTask(c, task, agent = c.agents.coder) {
     else if (lib.trustChoice(screen)) await lib.acceptClaudeTrust(c.inv, c.alpha, agent.id, 20000)
     // Codex's: Yes first.
     else if (/trust this folder/i.test(screen)) await c.inv('pty:write', key, '\r')
-    await sleep(500)
+    await sleep(timing('scenario.startLookMs'))
   }
   if (!['ready', 'finished'].includes((await coderLive(c, agent))?.status)) await fail("didn't get ready in 90 s")
   if (!task) return
@@ -308,7 +308,7 @@ async function wakeRead(c, key) {
     // acted on the wake (answered and armed a watch), watching.
     return mine.some((d) => ['received', 'acked'].includes(d.state)) && !mine.some((d) => ['queued', 'offered', 'uncertain'].includes(d.state)) && ['ready', 'finished', 'watching'].includes(await c.subjectStatus())
   }
-  if (!(await require('../e2e/lib.cjs').until(wakeIsRead, 120000))) throw new Error(`setup: Coder's wake for #${c.cards[key]} wasn't read: ${JSON.stringify(await c.deliveries('coder'))}, ${await c.subjectStatus()}`)
+  if (!(await require('../e2e/lib.cjs').until(wakeIsRead, timing('hang.step')))) throw new Error(`setup: Coder's wake for #${c.cards[key]} wasn't read: ${JSON.stringify(await c.deliveries('coder'))}, ${await c.subjectStatus()}`)
 }
 /**
  * The card loop lanes' first card (card-loop-lane, -defaults, -override, -submit-watch): a change asked for plainly, as
@@ -463,10 +463,10 @@ const PAIR = { review: 'agent', noSelfReview: true, preChecks: [], finish: 'comb
 async function builderStopped(c, card, key) {
   const lib = require('../e2e/lib.cjs')
   const n = c.cards[card]
-  if (!(await lib.until(async () => ((await c.inv('tasks:facts', n).catch(() => null)) ?? []).some((f) => f.kind === 'BuilderPlaced'), 90000))) throw new Error(`setup: Combwork didn't give #${n} to ${key} in its slot`)
+  if (!(await lib.until(async () => ((await c.inv('tasks:facts', n).catch(() => null)) ?? []).some((f) => f.kind === 'BuilderPlaced'), timing('hang.step')))) throw new Error(`setup: Combwork didn't give #${n} to ${key} in its slot`)
   const id = c.agents[key].id
   await c.inv('session:stop', c.alpha, id).catch(() => undefined)
-  if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), 60000))) throw new Error(`setup: ${key} didn't stop after Combwork gave it #${n}`)
+  if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), timing('hang.step')))) throw new Error(`setup: ${key} didn't stop after Combwork gave it #${n}`)
 }
 /**
  * Card `key` of agent `who` ('coder' or 'implementer') in Review with a real submission (#1537): started, its work
@@ -504,7 +504,7 @@ async function reviewedWork(c, key, { files = {}, work, after = [], ...card }, w
     c.git('-c', `user.name=${who}`, '-c', `user.email=${who}@example.com`, 'commit', '-qm', card.title)
   }
   await c.inv('tasks:update', n, { column: 'review', agent: c.agents[who].id })
-  if (!(await require('../e2e/lib.cjs').until(() => submittedDiff(c, n), 15000))) await assertDiff(c, n)
+  if (!(await require('../e2e/lib.cjs').until(() => submittedDiff(c, n), timing('hang.ui')))) await assertDiff(c, n)
   for (const text of after) await c.api('POST', `/v1/tasks/${n}/comments`, { text })
   return n
 }
@@ -1515,8 +1515,8 @@ module.exports.SCENARIOS = [
         ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
         handedOnCheck(o, c, 'a'),
         ['the test is there, and passes', !!test && testsPass(c), test ? 'node --test failed' : 'no notify.test.js'],
-        ["it doesn't sleep and then check", !!test && timed.length === 0, `${timed.map((w) => `${w.line}: ${w.code}`).join(' | ')} in: ${test.slice(0, 1500)}`],
-        ['it waits for the line (polls the file, or waits on its change)', /\bwhile\s*\(|\bif\s*\(.*\b(?:break|return)\b|until|waitFor|poll|setInterval|watch/.test(test), test.slice(0, 300)],
+        ["it doesn't sleep and then check", !!test && timed.length === 0, `${timed.map((w) => `${w.line}: ${w.code}`).join(' | ')} in: ${test.slice(0, 1500)}`], // timing-ok: `test` is the agent's test file's text, sliced (no test call, no wait)
+        ['it waits for the line (polls the file, or waits on its change)', /\bwhile\s*\(|\bif\s*\(.*\b(?:break|return)\b|until|waitFor|poll|setInterval|watch/.test(test), test.slice(0, 300)], // timing-ok: `test` is the agent's test file's text, sliced (no test call, no wait),
         ['notify.js unchanged', c.read('notify.js') === NOTIFY['notify.js']]
       ]
     },
@@ -1931,7 +1931,7 @@ module.exports.SCENARIOS = [
     // Until the message is acked or has ended, at most 4 minutes after it was left.
     keepWaiting: async (c) => {
       const msg = sentMessage(c)
-      return !c.sentAt || (Date.now() - c.sentAt < 240000 && !(msg && (msg.state === 'acked' || !!msg.ended)))
+      return !c.sentAt || (Date.now() - c.sentAt < timing('scenario.messageTakenMs') && !(msg && (msg.state === 'acked' || !!msg.ended)))
     },
     // HI-2265: "Nothing else for now" stood against the Assistant's message to work on the card.
     prompt: () => 'Read greeting.txt and tell me what it says.',
@@ -1975,7 +1975,7 @@ module.exports.SCENARIOS = [
     // Until the second is acked or has ended, at most 4 minutes after it was left.
     keepWaiting: async (c) => {
       const second = secondMessage(c)
-      return !c.sent2At || (Date.now() - c.sent2At < 240000 && !(second && (second.state === 'acked' || !!second.ended)))
+      return !c.sent2At || (Date.now() - c.sent2At < timing('scenario.messageTakenMs') && !(second && (second.state === 'acked' || !!second.ended)))
     },
     prompt: (c) => `Work on card #${c.cards.a}.`,
     fake: (c) => `skill work-on-card then ${fakeStart(c.cards.a)} then work 3 then checkpoint then work 4 then checkpoint then ${fakeSubmit(c.cards.a)}`,
@@ -2033,7 +2033,7 @@ module.exports.SCENARIOS = [
       await c.api('POST', `/v1/tasks/${c.cards.r}/comments`, { text: 'Round 1: failed. 1. greet.js says "Helo".' })
       await c.api('POST', `/v1/tasks/${c.cards.r}/comments`, { text: 'Fixed: greet.js says "Hello, <name>" now.' })
       // Deliberate: the decision's time must come after the comments' (the scenario is about a decision made since).
-      await new Promise((r) => setTimeout(r, 20))
+      await new Promise((r) => setTimeout(r, timing('pace.shortMs')))
       await c.inv('tasks:update', c.cards.r, { decision: 'Greet with "Hi, <name>", never "Hello".' })
     },
     // The decision tells Coder (its round 1 reviewer) in its inbox: that wake read first, or on Copilot its doorbell's
@@ -2267,7 +2267,7 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await c.handover('Old plan', '## Next steps\n1. Create old.txt containing "old".\n')
       // Deliberate: the newer handover's time must be a later second than the old one's (the newest is the one written last).
-      await new Promise((r) => setTimeout(r, 1100))
+      await new Promise((r) => setTimeout(r, timing('pace.nextSecondMs')))
       await c.handover('Notes feature', '## Current state\nnotes.txt holds 1 line.\n\n## Next steps\n1. Create next.txt containing "next".\n')
       c.write('notes.txt', 'one\ntwo\n')
     },
@@ -2286,7 +2286,7 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await c.handover('Old plan', '## Next steps\n1. Create old.txt containing "old".\n')
       // Deliberate: the newer handover's time must be a later second than the old one's (the newest is the one written last).
-      await new Promise((r) => setTimeout(r, 1100))
+      await new Promise((r) => setTimeout(r, timing('pace.nextSecondMs')))
       await c.handover('Notes feature', '## Next steps\n1. Create next.txt containing "next".\n')
     },
     prompt: 'Continue from the handover titled "Old plan" and do its next step.',
@@ -2589,7 +2589,7 @@ module.exports.SCENARIOS = [
       jjIn(c, 'bookmark', 'set', c.target, '-r', c.sub.revision)
       c.bookmarks = jjBookmarks(c)
       let card = null
-      for (const t = Date.now(); Date.now() - t < 120000; await new Promise((r) => setTimeout(r, 500))) {
+      for (const t = Date.now(); Date.now() - t < timing('hang.step'); await new Promise((r) => setTimeout(r, timing('poll.intervalMs')))) {
         card = (await c.api('GET', `/v1/tasks/${c.cards.p}`)).body
         if (card?.column === 'done') break
       }
@@ -2640,7 +2640,7 @@ module.exports.SCENARIOS = [
       if (!told || column !== 'doing') throw new Error(`setup: #${c.cards.p} didn't come back from its candidate's lint: ${JSON.stringify({ column, deliveries: (await c.deliveries('coder')).map((d) => String(d.body ?? d.text ?? '').slice(0, 120)) })}`)
       const id = c.agents.coder.id
       await c.inv('session:stop', c.alpha, id).catch(() => undefined)
-      if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), 60000))) throw new Error("setup: Coder didn't stop")
+      if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), timing('hang.step')))) throw new Error("setup: Coder didn't stop")
       c.told = String(told.body ?? told.text ?? '')
       c.bookmarks = jjBookmarks(c)
       c.bookmarksBefore = c.bookmarks
@@ -2704,13 +2704,13 @@ module.exports.SCENARIOS = [
       // a goes Done; b started as the user starts it, in the lane's slot: its preparation fails, and Combwork leaves Coder
       // the reason.
       const lib = require('../e2e/lib.cjs')
-      if (!(await lib.until(async () => (await c.api('GET', `/v1/tasks/${a}`)).body?.column === 'done', 120000))) throw new Error(`setup: #${a} didn't go Done after the user's rebase: ${(await c.api('GET', `/v1/tasks/${a}`)).body?.column}`)
+      if (!(await lib.until(async () => (await c.api('GET', `/v1/tasks/${a}`)).body?.column === 'done', timing('hang.step')))) throw new Error(`setup: #${a} didn't go Done after the user's rebase: ${(await c.api('GET', `/v1/tasks/${a}`)).body?.column}`)
       await userMove(c, b, 'doing')
       const told = await lib.until(async () => (await c.deliveries('coder')).find((d) => d.card === b && /couldn.t get .* ready/i.test(String(d.body ?? d.text ?? ''))), timing('hang.slow'))
       if (!told) throw new Error(`setup: Coder wasn't told #${b}'s slot couldn't be prepared: ${JSON.stringify({ a: (await c.api('GET', `/v1/tasks/${a}`)).body?.column, b: (await c.api('GET', `/v1/tasks/${b}`)).body?.column, deliveries: await c.deliveries('coder') })}`)
       const id = c.agents.coder.id
       await c.inv('session:stop', c.alpha, id).catch(() => undefined)
-      if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), 60000))) throw new Error("setup: Coder didn't stop")
+      if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), timing('hang.step')))) throw new Error("setup: Coder didn't stop")
       c.slot = slot
       c.folder = folder
       c.told = String(told.body ?? told.text ?? '')
@@ -3180,7 +3180,7 @@ module.exports.SCENARIOS = [
         const cards = await Promise.all([...new Set(c.atAnswer.asked.map((x) => x.key))].map(async (k) => (await c.api('GET', `/v1/tasks/${c.cards[k]}`)).body))
         return !cards.every((x) => answerToldTo(x, c.answeredAt) >= 1)
       }
-      return Date.now() - c.answeredAt < 240000 && (await c.api('GET', `/v1/tasks/${c.cards.b}`)).body?.column !== 'done'
+      return Date.now() - c.answeredAt < timing('scenario.answerLandsMs') && (await c.api('GET', `/v1/tasks/${c.cards.b}`)).body?.column !== 'done'
     },
     prompt: LANE_END.prompt,
     fake: LANE_END.fake,
@@ -3514,7 +3514,7 @@ module.exports.SCENARIOS = [
       c.verdictAt = Date.now()
     },
     // Its wake comes at once (a watch's settle): at most 40 s, within a fake's minute.
-    keepWaiting: async (c) => !!c.verdictAt && !c.woke && Date.now() - c.verdictAt < 40000,
+    keepWaiting: async (c) => !!c.verdictAt && !c.woke && Date.now() - c.verdictAt < timing('scenario.wakeComesMs'),
     prompt: (c) => `You are the builder of card #${c.cards.a} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). Do the card and hand it to your reviewer as your loop says.`,
     fake: (c) => `skill card-loop then ${fakeSubmit(c.cards.a, 'Ready for review: greet.js says Hi.')}`,
     expect: (o, c) => {
@@ -4513,7 +4513,7 @@ module.exports.SCENARIOS = [
     // Until the message is acked or has ended, at most 4 minutes after it was left; and before it, until part 1 is in.
     keepWaiting: async (c) => {
       const msg = sentMessage(c)
-      return !c.sentAt || (Date.now() - c.sentAt < 240000 && !(msg && (msg.state === 'acked' || !!msg.ended)))
+      return !c.sentAt || (Date.now() - c.sentAt < timing('scenario.messageTakenMs') && !(msg && (msg.state === 'acked' || !!msg.ended)))
     },
     prompt: (c) => `You are the builder of card #${c.cards.a} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). Combwork has started the card for you: do it as its decision says, and hand it to your reviewer as your loop says.`,
     fake: () => `skill card-loop then ${LOOP_COMMIT}`,
@@ -4984,7 +4984,7 @@ module.exports.SCENARIOS = [
       await c.card('n', { title: 'Add a CONTRIBUTING.md', description: 'Add a CONTRIBUTING.md with one line: "Open an issue before a pull request."' })
       // Coder's last lane: a conversation of its own, finished and idle.
       await coderTask(c, 'Reply "done" and nothing else. (work 1)')
-      for (let t = Date.now(); Date.now() - t < 60000 && !['ready', 'finished'].includes((await coderLive(c))?.status); ) await new Promise((r) => setTimeout(r, 500))
+      for (let t = Date.now(); Date.now() - t < timing('hang.step') && !['ready', 'finished'].includes((await coderLive(c))?.status); ) await new Promise((r) => setTimeout(r, timing('poll.intervalMs')))
       c.before = await coderLive(c)
     },
     prompt: (c) => `Coder has finished its last lane and is idle. Start its next lane: Coder builds card #${c.cards.n} with the card-loop skill (rounds: 3, wait: 1h); there is no reviewer yet. Don't wait for it.`,
@@ -5033,7 +5033,7 @@ module.exports.SCENARIOS = [
       await coderTask(c)
       const watch = await c.as('coder', 'POST', '/v1/tasks/wait', { cards: [c.cards.w], column: 'review', wake: true })
       if (watch.status !== 200 || !watch.body?.watching) throw new Error(`setup: Coder's watch on #${c.cards.w}: ${watch.status} ${JSON.stringify(watch.body)}`)
-      if (!(await require('../e2e/lib.cjs').until(async () => (await coderLive(c))?.status === 'watching', 30000))) throw new Error(`setup: Coder isn't watching #${c.cards.w} (status ${(await coderLive(c))?.status})`)
+      if (!(await require('../e2e/lib.cjs').until(async () => (await coderLive(c))?.status === 'watching', timing('hang.ui')))) throw new Error(`setup: Coder isn't watching #${c.cards.w} (status ${(await coderLive(c))?.status})`)
     },
     prompt: (c) => `I've decided card #${c.cards.w}'s open question: exports are JSON. Coder reviews that card in its card loop and is waiting for it to arrive in Review: tell Coder, so it checks for JSON in its review.`,
     fake: (c) => `skill coordinate-agents then cw cw_message_agent {"project":"alpha","agent":"Coder","text":"The user decided #${c.cards.w}: exports are JSON. Check for JSON when you review it."}`,
@@ -5123,7 +5123,7 @@ module.exports.SCENARIOS = [
       await coderTask(c)
       const watch = await c.as('coder', 'POST', '/v1/tasks/wait', { cards: [c.cards.w], column: 'review', wake: true })
       if (watch.status !== 200 || !watch.body?.watching) throw new Error(`setup: Coder's watch on #${c.cards.w}: ${watch.status} ${JSON.stringify(watch.body)}`)
-      if (!(await require('../e2e/lib.cjs').until(async () => (await coderLive(c))?.status === 'watching', 30000))) throw new Error(`setup: Coder isn't watching #${c.cards.w} (status ${(await coderLive(c))?.status})`)
+      if (!(await require('../e2e/lib.cjs').until(async () => (await coderLive(c))?.status === 'watching', timing('hang.ui')))) throw new Error(`setup: Coder isn't watching #${c.cards.w} (status ${(await coderLive(c))?.status})`)
     },
     prompt: (c) => `In alpha, start card #${c.cards.n} with Coder: the user wants it built next.`,
     fake: (c) => `skill run-lanes then cw cw_start_task {"number":"#${c.cards.n}","agent":"Coder"} then cw cw_lane {"action":"start","project":"alpha","builder":"Coder","reviewer":"Implementer","cards":[${c.cards.w},${c.cards.n}]}`,
@@ -5190,7 +5190,7 @@ module.exports.SCENARIOS = [
         c.blockedAt = Date.now()
         return
       }
-      if (Date.now() - c.blockedAt < 15000) return
+      if (Date.now() - c.blockedAt < timing('pace.userAnswersMs')) return
       // The fix, committed: its submission is a commit after the card's base (HI-2223).
       c.write('upload.js', "module.exports = async function upload(send) {\n  const r = await send()\n  if (r.ok) return r\n  const wait = Math.min(Number(r.headers?.['retry-after'] ?? 0), 60)\n  await new Promise((done) => setTimeout(done, wait * 1000))\n  return send()\n}\n")
       c.git('add', '-A')
@@ -5399,12 +5399,12 @@ module.exports.SCENARIOS = [
       c.git('branch', '1.5.0')
       await pairInProject(c, { target: '1.4.0', otherTargets: ['1.5.0'] })
       // The offer read before the session starts (a condition, never a time); before HI-3155 there is none to wait for.
-      const end = Date.now() + 120_000
+      const end = Date.now() + timing('hang.step')
       for (;;) {
         const offers = await c.inv('workflow:releaseOffers').catch(() => null)
         if (!offers || offers.some((o) => o.move?.moveTo === '1.5.0')) break
         if (Date.now() > end) throw new Error('setup: no release offer for alpha')
-        await new Promise((r) => setTimeout(r, 200))
+        await new Promise((r) => setTimeout(r, timing('poll.intervalMs')))
       }
     },
     prompt: "alpha's 1.4.0 has shipped. Move its work on to the next version: I've checked, go ahead.",
@@ -5654,7 +5654,7 @@ async function builderLane(c, key, body, { keepRunning = false } = {}) {
   if (keepRunning) return r
   await c.inv('session:stop', c.alpha, id)
   const lib = require('../e2e/lib.cjs')
-  if (!(await lib.until(async () => !(await live()), 60000))) throw new Error(`setup: ${key} didn't stop after registering its lane`)
+  if (!(await lib.until(async () => !(await live()), timing('hang.step')))) throw new Error(`setup: ${key} didn't stop after registering its lane`)
   return r
 }
 /**
@@ -5757,7 +5757,7 @@ async function combworkStartedLaneCard(c, key, n) {
     }
     return laneStartLanded({ column: (await c.api('GET', `/v1/tasks/${n}`)).body?.column, live, deliveries: await c.deliveries(key), shown }, n)
   }
-  if (!(await lib.until(landed, 90000))) throw new Error(`setup: Combwork's start of #${n} on ${key} (its lane's first card, HI-2029) didn't land in its launch: ${JSON.stringify({ column: (await c.api('GET', `/v1/tasks/${n}`)).body?.column, status: (await coderLive(c, agent))?.status ?? null, deliveries: (await c.deliveries(key)).filter((x) => x.card === n) })}; its screen ends: ${(await screen()).trim().slice(-400)}`)
+  if (!(await lib.until(landed, timing('hang.step')))) throw new Error(`setup: Combwork's start of #${n} on ${key} (its lane's first card, HI-2029) didn't land in its launch: ${JSON.stringify({ column: (await c.api('GET', `/v1/tasks/${n}`)).body?.column, status: (await coderLive(c, agent))?.status ?? null, deliveries: (await c.deliveries(key)).filter((x) => x.card === n) })}; its screen ends: ${(await screen()).trim().slice(-400)}`)
 }
 /**
  * Two running lanes: Coder and Implementer on greet.js (#a, #b), Builder2 and Reviewer2 on the README (#c, and #d if
@@ -6275,7 +6275,7 @@ module.exports.SCENARIOS.push(
       const n = await submittedCard(c, 'r', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', files: { 'src/greet.js': 'module.exports = (name) => `Hi, ${name}`\n', 'test/greet.test.js': "require('assert').strictEqual(require('../src/greet')('Ada'), 'Hi, Ada')\n" }, after: ['Ready: greet() returns "Hi, <name>", with a test. Committed.'] })
       // HI-2046: a loose card in Review is Combwork's to give out; the Assistant is woken once it has.
       const given = async () => ((await c.inv('tasks:facts', n).catch(() => null)) ?? []).some((f) => f.kind === 'ReviewerAssigned' && f.data?.reviewer === c.agents.implementer.id)
-      if (!(await require('../e2e/lib.cjs').until(given, 30000))) throw new Error(`setup: Combwork didn't give #${n} to Implementer`)
+      if (!(await require('../e2e/lib.cjs').until(given, timing('hang.ui')))) throw new Error(`setup: Combwork didn't give #${n} to Implementer`)
     },
     prompt: (c) => `[CW] #${c.cards.r} (Coder's card) is in Review; latest comment by Coder: "Ready: greet() returns "Hi, <name>", with a test. Committed." Your card watch has ended: carry on (cw_read_task with latestComment for the comment in full).`,
     fake: (c) => `skill coordinate-agents then cw cw_read_task {"number":${c.cards.r},"latestComment":true}`,

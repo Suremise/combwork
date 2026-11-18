@@ -14,6 +14,7 @@ const { timing } = require('../timing.cjs')
 const path = require('path')
 const { execFileSync } = require('child_process')
 const lib = require('../e2e/lib.cjs')
+const { waitTurnEnd, UNKNOWN } = require('./turnEnd.cjs')
 const { processes, leftoverIdentities } = require('../e2e/folderProcesses.cjs')
 const { measuresOf, metricsTotals } = require('./benchmark.cjs')
 const { readWhole, withScriptCalls } = require('./codexScripts.cjs')
@@ -789,14 +790,14 @@ async function runScenario(sc, providerKey, opts = {}) {
         const up = async () => (await inv('session:live')).find((x) => x.projectPath.toLowerCase() === home.toLowerCase() && x.agentId === 'assistant')
         if (!(await up())) await inv('session:start', home, { agentId: 'assistant' })
         const k = lib.ptyKey(home, 'assistant')
-        for (let t = Date.now(); Date.now() - t < 90000 && !['ready', 'finished', 'working'].includes((await up())?.status); ) {
+        for (let t = Date.now(); Date.now() - t < timing('hang.step') && !['ready', 'finished', 'working'].includes((await up())?.status); ) {
           const screen = plain(await inv('pty:buffer', k).catch(() => ''))
           if (/Do you trust the files in this folder/i.test(screen)) await inv('pty:write', k, '\r')
           else if (lib.CLAUDE_TRUST.test(screen)) {
             if (p.provider === 'codex') await inv('pty:write', k, '\r')
-            else await lib.acceptClaudeTrust(inv, home, 'assistant', 3000)
+            else await lib.acceptClaudeTrust(inv, home, 'assistant', timing('cli.trustMs'))
           }
-          await sleep(500)
+          await sleep(timing('scenario.startLookMs'))
         }
         if (!['ready', 'finished', 'working'].includes((await up())?.status)) throw new Error(`setup: the Assistant didn't get ready (${(await up())?.status ?? 'not running'})`)
       },
@@ -897,7 +898,7 @@ async function runScenario(sc, providerKey, opts = {}) {
         return result
       }
       if (refused) throw refused
-    } else if (!(await lib.until(async () => !!(launchRun = (await live())?.runId ?? null), 90000))) {
+    } else if (!(await lib.until(async () => !!(launchRun = (await live())?.runId ?? null), timing('hang.step')))) {
       result.error = "Combwork didn't start the session under test"
       return result
     }
@@ -982,7 +983,7 @@ async function runScenario(sc, providerKey, opts = {}) {
         else await lib.acceptClaudeTrust(inv, host, agentId)
         await answered()
       }
-      await sleep(500)
+      await sleep(timing('scenario.startLookMs'))
     }
     // What the session under test was given at its launch (after setup): Combwork's guidance and each skill as delivered.
     const subject = sc.role === 'assistant' ? (await inv('workspace:refresh')).assistant : (await inv('workspace:refresh')).projects.find((x) => x.name === 'alpha')
@@ -1064,72 +1065,92 @@ async function runScenario(sc, providerKey, opts = {}) {
         }
       }
     }
-    const sentAt = Date.now()
     // Later runs of the session under test whose trust question was answered (below).
     const subjectTrusted = new Set()
 
-    // Wait for the turn to end: working (or background) first, then finished/ready for a few seconds. `during` sees the
-    // board while it works, for scenarios that change things under it. A quick turn can start and end between two looks
-    // (each look is several calls, slow under load: #1311), so the prompt answered counts as the work seen too.
+    // Wait for the turn to end (HI-3400, tests/scenarios/turnEnd.cjs): this prompt's work seen (Combwork's statuses since
+    // statesFrom, or the prompt answered) and ended (the prompt answered, or an end status after the work), or a person
+    // asked (Combwork's runtime attention); nothing pending (a trust question, a dispatched agent at work, the
+    // scenario's keepWaiting, Combwork about to type into it); then quiet for scenario.quietMs (asked:
+    // scenario.waitingQuietMs). Each read is bounded by the limit and scenario.readMs: one that fails or doesn't answer
+    // holds the turn, never ends it. `during` sees the board while it works.
     // A session that ended at launch, or whose prompt was never taken, has no turn to wait for.
-    const limit = endedAtLaunch || notTaken ? Date.now() : Date.now() + (opts.timeoutMs ?? 300000)
-    let sawWork = false
-    let quietSince = 0
+    const limit = endedAtLaunch || notTaken ? Date.now() : Date.now() + (opts.timeoutMs ?? timing('hang.slow'))
     const trustAnswered = new Set()
-    while (Date.now() < limit) {
-      const s = await live()
-      const status = s?.status ?? 'stopped'
+    const working = (x) => ['working', 'background'].includes(x.status)
+    const thisPrompt = () => ctx.statesSeen(statesFrom)
+    const screenOf = async (k) => plain(await inv('pty:buffer', k).catch(() => '')).slice(-2000)
+    /** The subject's trust question on its screen, in a run after its launch's (relaunchTrust: 'enter', 'claude'), or null. */
+    const trustKind = async (s) => (s?.status === 'waiting' ? relaunchTrust({ status: s.status, runId: s.runId, launchRun, answered: subjectTrusted, screen: await screenOf(key), provider: p.provider }) : null)
+    const otherAgents = async () => (await inv('session:live')).filter((x) => x.projectPath.toLowerCase() === alpha.toLowerCase())
+    const reads = {
+      live: async () => (await live()) ?? null,
       // The CLI's own notes in the transcript (an API error, "Login expired · Please run /login", a usage limit: notices,
-      // never the prompt or the model's replies), or Combwork waiting for a sign-in: skipped for the environment at once,
-      // rather than waiting out the limit and failing every check (#302).
-      const notices = s?.sessionId ? cliNotices((await inv('transcript:read', host, s.sessionId).catch(() => null))?.items) : []
-      const stopped = trialEnvironment({ status, replies: notices })
-      if (stopped) return skipFor(stopped)
-      if (['working', 'background', 'starting'].includes(status)) {
-        sawWork = true
-        quietSince = 0
-      } else if (sawWork || (sawWork = await ctx.answered(text)) || Date.now() - sentAt > 60000) {
-        quietSince ||= Date.now()
-        if (Date.now() - quietSince > (status === 'waiting' ? 3000 : 6000)) break
-      }
-      // The session under test asking to trust a folder again (HI-2225): Combwork gave it its card in a slot, a new run there
-      // (preset-pair-lane), whose question (waiting) ended the trial 3 s later, unanswered. Until it is answered the run is
-      // still starting.
-      // (The screen read only while it waits.)
-      const trust = status === 'waiting' ? relaunchTrust({ status, runId: s.runId, launchRun, answered: subjectTrusted, screen: plain(await inv('pty:buffer', key).catch(() => '')).slice(-2000), provider: p.provider }) : null
-      if (trust === 'enter') await inv('pty:write', key, '\r')
-      if (trust === 'enter' || (trust === 'claude' && (await lib.acceptClaudeTrust(inv, host, agentId, 10000)))) {
-        subjectTrusted.add(s.runId)
-        quietSince = 0
-      }
+      // never the prompt or the model's replies), or Combwork waiting for a sign-in: the trial skipped for the
+      // environment at once, rather than waiting out the limit and failing every check (#302).
+      stop: async ({ live: s }) => {
+        const notices = s?.sessionId ? cliNotices((await inv('transcript:read', host, s.sessionId).catch(() => null))?.items) : []
+        return trialEnvironment({ status: s?.status ?? 'stopped', replies: notices }) || null
+      },
+      workSeen: async () => (await thisPrompt()).some(working) || (await ctx.answered(text)),
+      endSeen: async () => {
+        const states = await thisPrompt()
+        const from = states.findIndex(working)
+        return (from >= 0 && states.slice(from + 1).some((x) => ['ready', 'finished', 'watching'].includes(x.status))) || (await ctx.answered(text))
+      },
+      // A person asked (Combwork's runtime facts): not a trust question on its screen, nor a sign-in.
+      asks: async ({ live: s }) => s?.runtime?.attention === 'waiting' && s.runtime.lifecycle === 'running' && !/Do you trust the files in this folder|trust this folder/i.test(await screenOf(key)) && !lib.CLAUDE_TRUST.test(await screenOf(key)),
+      // Combwork types nothing into it now or next: its composer free and (in a project) nothing queued to be offered.
+      quiet: async ({ live: s }) => {
+        if (!s || s.runtime?.composer !== 'free') return false
+        if (host.toLowerCase() !== alpha.toLowerCase()) return true
+        const token = s.runId ? lib.launchToken(userData, s.runId) : null
+        return !!token && (await lib.inboxQuiet(port, 'alpha', s.agentName, token))
+      },
+      trust: async ({ live: s }) => !!(await trustKind(s)),
+      // A dispatched agent's work is part of the outcome: wait while one is still working, or at a question (#498).
+      dispatchedBusy: sc.waitForAgents ? async () => (await otherAgents()).some((x) => x.agentId !== agentId && ['working', 'starting', 'background', 'waiting'].includes(x.status)) : undefined,
+      // Something Combwork does after the turn has ended (a line it types later, #401) is part of the outcome.
+      keepWaiting: sc.keepWaiting ? async ({ live: s }) => !!(await sc.keepWaiting(ctx, s?.status ?? 'stopped')) : undefined
+    }
+    /** After each look: answer trust questions (the subject's relaunch, HI-2225; dispatched agents', #498), and `during`. */
+    const act = async (look) => {
+      const s = look.values.live && typeof look.values.live === 'object' ? look.values.live : null
+      const status = s?.status ?? 'stopped'
+      const kind = await trustKind(s)
+      if (kind === 'enter') await inv('pty:write', key, '\r')
+      if (kind === 'enter' || (kind === 'claude' && (await lib.acceptClaudeTrust(inv, host, agentId, timing('cli.trustMs'))))) subjectTrusted.add(s.runId)
       if (sc.during) await sc.during(ctx, status)
       // Other agents of the project started during the run (the Assistant dispatching one) ask to trust its folder, once
       // each. Claude Code's menu starts on "No, exit": lib's answer presses Enter only with "Yes" selected (#498: a blind
       // Down and Enter could quit it, and was sent again each second while the question was still in the buffer).
-      const running = (await inv('session:live').catch(() => [])).filter((x) => x.projectPath.toLowerCase() === alpha.toLowerCase())
+      const running = await otherAgents()
       for (const a of Object.values(ctx.agents)) {
         if ((sc.role !== 'assistant' && a.id === coder.id) || trustAnswered.has(a.id) || !running.some((x) => x.agentId === a.id)) continue
         const k = lib.ptyKey(alpha, a.id)
-        const tail = plain(await inv('pty:buffer', k).catch(() => '')).slice(-2000)
+        const tail = await screenOf(k)
         if (/Do you trust the files in this folder/i.test(tail)) {
           await inv('pty:write', k, '\r')
           trustAnswered.add(a.id)
         } else if (lib.CLAUDE_TRUST.test(tail)) {
           if (p.provider === 'codex') await inv('pty:write', k, '\r')
-          if (p.provider === 'codex' || (await lib.acceptClaudeTrust(inv, alpha, a.id, 3000))) trustAnswered.add(a.id)
+          if (p.provider === 'codex' || (await lib.acceptClaudeTrust(inv, alpha, a.id, timing('cli.trustMs')))) trustAnswered.add(a.id)
         }
       }
-      // A dispatched agent's work is part of the outcome: wait while one is still working, or at a question (its folder's
-      // trust, answered above; #498), within the limit.
-      if (sc.waitForAgents && quietSince && running.some((x) => ['working', 'starting', 'background', 'waiting'].includes(x.status))) quietSince = Date.now()
-      // Something Combwork does after the turn has ended (a line it types later, #401) is part of the outcome: wait for it.
-      if (sc.keepWaiting && quietSince && (await sc.keepWaiting(ctx, status))) quietSince = Date.now()
-      await sleep(1000)
     }
+    let envStop = null
+    const onLook = (look) => {
+      if (look.values.stop && look.values.stop !== UNKNOWN) envStop = look.values.stop
+    }
+    const ended = await waitTurnEnd({ reads, act, onLook, deadline: limit, floors: { quietMs: timing('scenario.quietMs'), waitingQuietMs: timing('scenario.waitingQuietMs') }, readMs: timing('scenario.readMs'), lookMs: timing('scenario.lookMs'), sleep })
+    if (ended.outcome === 'environment') return skipFor(envStop)
+    result.turnEnd = { outcome: ended.outcome, why: ended.why }
     const s = await live()
     if (endedAtLaunch) result.error = endedAtLaunch.error
     else if (notTaken) result.error = notTaken
-    else if (!s || Date.now() >= limit) result.error = s ? 'timed out' : 'the session ended'
+    else if (ended.outcome === 'act failed') result.error = ended.why
+    else if (ended.outcome === 'timed out') result.error = 'timed out'
+    else if (ended.outcome === 'ended' || !s) result.error = 'the session ended'
     // The bridges report their calls to Combwork a batch at a time (every 2 s, or as their CLI closes input): read the
     // metrics once they count every call the bridges logged (allCallsReported). Not all within the bound (a report
     // dropped): the last read, shown as partial.
