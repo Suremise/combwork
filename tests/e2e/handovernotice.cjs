@@ -210,7 +210,10 @@ const check = (name, ok, extra = '') => {
     const launches = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
     const token = launches().find((l) => l.sessionId === idleSession)?.token
     const slotRun = handOverSelf(idle)
-    check('Combwork asks Idle for a handover', !!(await asked(idle)) && (await writing('Idle').count()) > 0)
+    // Its notice is looked for as it shows, not once the ask's turn is over: a pop-up closes by itself after its seconds,
+    // shorter than that turn (HI-3403).
+    const writingShown = !!(await lib.until(async () => (await writing('Idle').count()) > 0, HUNG_MS, 200))
+    check('Combwork asks Idle for a handover', writingShown && !!(await asked(idle)), JSON.stringify({ writingShown }))
     const claim = await api(token, 'POST', '/v1/projects/alpha/merge-slot/claim', { cards: [], timeoutSeconds: 0 })
     check('…it takes the merge slot meanwhile', !!(await lib.until(async () => !!(await live(idle.id))?.mergeSlot, HUNG_MS, 200)), JSON.stringify(claim))
     writeHandover('Idle', idleSession)
