@@ -393,7 +393,7 @@ describe('the worker', () => {
     }
 
     it('loaded after its thread started, longer than the request’s time: still answered (the time runs from its ready)', async () => {
-      const r = await withScript(late(1500), () => checkMergeGuards([guard()], async () => ({ text: diff }), { timeoutMs: 1000, maxLines: 200_000 }))
+      const r = await withScript(late(1500), () => checkMergeGuards([guard()], async () => ({ text: diff }), { timeoutMs: 1000, maxLines: 200_000 })) // timing-ok: the limit under test, shorter than the worker's late load on purpose
       expect(r.hits).toHaveLength(6)
       expect(r.incomplete).toBeUndefined()
       expect(guardWorkers.live).toBe(0)
@@ -474,7 +474,7 @@ describe('the worker', () => {
     writeFileSync(silent, "require('worker_threads').parentPort.postMessage({ ready: true }); setInterval(() => {}, 1000)\n")
     useGuardsWorker(silent)
     try {
-      expect(await previewMergeGuard(root, null, [], guard(), { timeoutMs: 300 })).toMatchObject({ incomplete: 'timedOut' })
+      expect(await previewMergeGuard(root, null, [], guard(), { timeoutMs: 300 })).toMatchObject({ incomplete: 'timedOut' }) // timing-ok: the limit under test, which the silent worker runs past
     } finally {
       useGuardsWorker(built.bundle)
     }

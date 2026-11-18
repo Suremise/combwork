@@ -13,6 +13,7 @@ import { strToU8, zipSync } from 'fflate'
 import * as electron from 'electron'
 import { OUR_CATALOG_URL, catalogRowShown, isOurCatalogUrl, sameCatalogSource, checkRequirements, compareVersions, editionOf, readCatalog, type PcFacts } from '../src/shared/mcpCatalog'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-mcp-catalog-')
 const profile = join(base, 'profile')
@@ -85,8 +86,8 @@ describe('catalog.json v1 (HI-545)', () => {
   })
 })
 
-// The longest a wait here waits: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30_000
+// The longest a wait here waits: a bound for a hung run, never how long it should take (#570; HI-3378's timing file).
+const HUNG_MS = timing('wait.hang')
 
 describe('downloads (HI-545/s17)', () => {
   afterEach(() => {
@@ -160,7 +161,7 @@ describe('downloads (HI-545/s17)', () => {
       const hops = ['https://a.com/0', 'https://a.com/1', 'https://a.com/2', 'https://a.com/3']
       catalog.testHooks.fetch = (async (url: string, init?: RequestInit) => {
         await new Promise<void>((r, reject) => {
-          const t = setTimeout(r, 150)
+          const t = setTimeout(r, 150) // timing-ok: the fake server's delay before each redirect, the premise of the test
           init?.signal?.addEventListener('abort', () => (clearTimeout(t), reject(new DOMException('aborted', 'AbortError'))), { once: true })
         })
         const i = hops.indexOf(url)

@@ -140,7 +140,7 @@ describe('merge guards in the merge queue', () => {
   it('a guard past its time limit: not checked, transient; the same revision goes back, at most twice; nothing merged', { timeout: GIT_HEAVY_MS }, async () => {
     const runaway: MergeGuard = { name: 'Runaway', pattern: '^(a+)+$', message: 'n/a' }
     // The pattern can't meet a limit (2^40 steps): the submit's early warning stops at it too, saying nothing.
-    const limits = () => ({ timeoutMs: 300, maxLines: 200_000 })
+    const limits = () => ({ timeoutMs: 300, maxLines: 200_000 }) // timing-ok: the limit under test, which the pattern can't meet
     const e = (env = setup({ ...preset('git', 'team', { quick: [], tests: [] }), preChecks: [], okBefore: { mode: 'never', labels: [] }, mergeChecks: [], commands: {}, mergeGuards: [runaway] }, { guardLimits: limits }))
     const card = await queued(e, { 'src/a.txt': `${'a'.repeat(40)}!\n` })
     const before = mainHead(e)
