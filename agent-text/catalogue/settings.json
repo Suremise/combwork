@@ -1045,7 +1045,7 @@
     "audience": "both"
   },
   "settings.advanced.codex.mcp.startupTimeoutSeconds.desc": {
-    "text": "How long Codex waits for Combwork's combwork server to start, when your own Codex config has a server named combwork with a startup timeout of its own: Combwork gives Codex this one instead (otherwise Codex's own, 10 s, applies). Too short, and Codex agents start without Combwork's tools.",
+    "text": "How long Codex waits for Combwork's combwork server to start: Combwork gives Codex this one for it at every launch, over Codex's own (10 s) and over a startup timeout your own Codex config sets for a server named combwork. Too short, and Codex agents start without Combwork's tools.",
     "note": "What the advanced setting \"Combwork tools: startup timeout in Codex\" is for, and what goes wrong when it is wrong (Settings → Advanced). combwork is the name of Combwork's MCP server.",
     "audience": "both"
   },
@@ -1859,6 +1859,16 @@
     "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in characters (\"80 characters\"): the length of a card title an agent writes past which Combwork suggests a shorter one.",
     "audience": "both"
   },
+  "settings.advanced.cw.cli.probeSeconds.desc": {
+    "text": "How long each coding agent's CLI gets to print its version when Combwork looks for it (at start, Check Again, after an install). One that takes longer is skipped and shows as not installed: a CLI's first start, with antivirus scanning it on a slow disk, can take tens of seconds.",
+    "note": "What the advanced setting \"Finding the CLIs: version check timeout\" does (Settings → Advanced, under Combwork). A CLI is the command-line program of a coding agent (Claude Code, Codex).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.cli.probeSeconds.title": {
+    "text": "Finding the CLIs: version check timeout",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"60 s\").",
+    "audience": "both"
+  },
   "settings.advanced.cw.console.showText.desc": {
     "text": "Show the text in the developer console: prompts, replies, commands and tools' arguments, under a banner saying it is unredacted, and start each recording with its text box ticked. Tokens, API keys and sign-in details stay masked whatever this says; agents' cw_console stays redacted, and a recording with text is never attached to Copy Diagnostics.",
     "note": "What the advanced setting \"Developer console: show prompt, reply and command text\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
@@ -2527,6 +2537,16 @@
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.title": {
     "text": "Retry wait: tell the Assistant after",
     "note": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"300 s\"). A retry wait: an agent's coding agent waiting to try its model request again.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.server.checkInferSeconds.desc": {
+    "text": "How long Check Server waits for a model server to answer its test request. A local model that isn't loaded yet loads first, which on modest hardware can take minutes; past this time the check reports a timeout.",
+    "note": "What the advanced setting \"Check Server: test request timeout\" does (Settings → Advanced, under Combwork). Check Server tests a model server the user added for a CLI (its address and model).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.server.checkInferSeconds.title": {
+    "text": "Check Server: test request timeout",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"600 s\"). Check Server is a button for a model server (Settings → Accounts & Connections).",
     "audience": "both"
   },
   "settings.advanced.cw.sessions.signFailFast.desc": {

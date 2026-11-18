@@ -20,7 +20,7 @@ import { createLogger, userText } from '../../logger'
 import { combworkError } from '../../combworkError'
 import { plainHttpsJson } from '../../plainHttpsJson'
 import { findSecretWarnings } from '../../mcpSecrets'
-import { AGENTS_SKILLS, EDITOR_EXTENSION_PATH, EDITOR_ROOTS, agentsSkillCopyPath, childArgs, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, installText, keepBounded, notInstalledIssue, readFirstLine, run, signedOutIssue, syncAgentsSkills, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
+import { AGENTS_SKILLS, EDITOR_EXTENSION_PATH, EDITOR_ROOTS, agentsSkillCopyPath, childArgs, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, installText, keepBounded, notInstalledIssue, readFirstLine, run, signedOutIssue, syncAgentsSkills, taskArgs, toSpawnable, updateIssue, userMemoryLabel, WHERE_MS, cliProbeMs } from '../common'
 import { isWingetPath, wingetUpgradeCommand, wingetUpToDate, wingetVersion } from '../winget'
 import { storePwshFirst, storePwshIssue } from './storePwsh'
 import type { BackgroundTaskEvent, CatalogRead, CommandSpec, ConnectionStatus, TrustReading, TrustTarget, ExternalSession, KeySteps, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn, UsageParser } from '../types'
@@ -499,6 +499,8 @@ export function codexMcpServer(name: string, def: McpServerDef, combwork: Combwo
   const table: Record<string, unknown> = { command: def.command, ...approval(name) }
   // Combwork's own tools can wait minutes (for agents to finish, or for the user to answer the Assistant).
   if (name === TOOLS_SERVER) table.tool_timeout_sec = advanced.number('codex.mcp.toolTimeoutSeconds')
+  // HI-3375: its startup bound given at every launch (Codex's own, 10 s, is too short for a cold Node start under antivirus).
+  if (name === TOOLS_SERVER) table.startup_timeout_sec = advanced.number('codex.mcp.startupTimeoutSeconds')
   if (def.args?.length) table.args = def.args.map(String)
   if (typeof def.cwd === 'string') table.cwd = def.cwd
   const env: Record<string, string> = {}
@@ -687,7 +689,7 @@ export class CodexAdapter implements ProviderAdapter {
     const out: { path: string; source: string }[] = []
     const custom = providerSettings(config.settings, this.id).executablePath.trim()
     if (custom) out.push({ path: custom, source: 'settings' })
-    const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', ['codex'], 5000)
+    const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', ['codex'], WHERE_MS)
     for (const line of where.stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {
       if (process.platform !== 'win32' || /\.(exe|cmd|bat)$/i.test(line)) out.push({ path: line, source: 'PATH' })
     }
@@ -718,7 +720,7 @@ export class CodexAdapter implements ProviderAdapter {
         info.rejected!.push(c.path)
         continue
       }
-      const r = await run(c.path, ['--version'])
+      const r = await run(c.path, ['--version'], cliProbeMs())
       const m = r.stdout.match(/(\d+\.\d+\.\d+[\w.-]*)/)
       if (!m) {
         log.warn(`Candidate ${userText(c.path)} did not report a version: ${userText(r.stderr.slice(0, 200))}`)

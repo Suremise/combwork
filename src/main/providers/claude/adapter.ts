@@ -14,7 +14,7 @@ import { config } from '../../config'
 import { containsPlace, contentHash, ContentTooLarge, copyMissing, copySkillTree, sourceProblem, tooBigToDeliver, isDir, isFile, linksNotCopied, placeMatcher, readJson, realPath, removePath, writeJsonAtomic, type PlannedCopies } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
 import { plainHttpsJson } from '../../plainHttpsJson'
-import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, keepBounded, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, updateStayedIssue, userMemoryLabel } from '../common'
+import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, keepBounded, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, updateStayedIssue, userMemoryLabel, WHERE_MS, cliProbeMs } from '../common'
 import type { StartHint } from '../../../shared/startFailure'
 import type { ConnectionStatus, TrustReading, TrustTarget, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, HookOccurrence, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, RunningJobs, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
 import { autoCompactOf, effectiveEnv, settingsScopes } from './autoCompact'
@@ -358,7 +358,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     const custom = providerSettings(config.settings, this.id).executablePath.trim()
     if (custom) out.push({ path: custom, source: 'settings' })
 
-    const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', ['claude'], 5000)
+    const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', ['claude'], WHERE_MS)
     for (const line of where.stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {
       // Prefer real executables over extension-less shims that node-pty cannot start on Windows.
       if (process.platform !== 'win32' || /\.(exe|cmd|bat)$/i.test(line)) out.push({ path: line, source: 'PATH' })
@@ -402,7 +402,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
         info.rejected!.push(c.path)
         continue
       }
-      const r = await run(c.path, ['--version'])
+      const r = await run(c.path, ['--version'], cliProbeMs())
       const m = r.stdout.match(/(\d+\.\d+\.\d+[\w.-]*)/)
       if (!m) {
         log.warn(`Candidate ${userText(c.path)} did not report a version: ${userText(r.stderr.slice(0, 200))}`)

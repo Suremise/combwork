@@ -231,5 +231,7 @@
   "session.tracker.stopped": "Combworkのプロセストラッカーが停止しました（{why}）",
   "session.tracker.title": "Combworkがエージェントのプロセスを追跡できません",
   "session.tracker.unavailable": "プロセストラッカーを利用できません",
-  "session.tracker.windowsOnly": "プロセスの追跡にはWindowsが必要です"
+  "session.tracker.windowsOnly": "プロセスの追跡にはWindowsが必要です",
+  "session.notice.startContextTitle": "{agent}はCombworkの開始コンテキストなしで起動しました",
+  "session.notice.startContextBody": "Combworkは開始コンテキストを{why, select, slow {時間内に作成} failed {作成} other {セッションに追加}}できなかったため、{agent}は当面、Combworkのボードの見方やガイダンスなしで作業します。もう一度試すには、停止してから再び起動してください。"
 }

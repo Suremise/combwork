@@ -23,6 +23,7 @@
   "clis.problem.badMode": "“launch.modes” has a mode {value} that isn’t a short lower-case name, or is given twice.",
   "clis.problem.badPattern": "“{field}” isn’t a valid regular expression: {error}",
   "clis.problem.badPlaceholder": "“{field}” names {name}, which isn’t one of {known}.",
+  "clis.problem.badSeconds": "“{field}” must be a number of seconds from {min} to {max}.",
   "clis.problem.badType": "“{field}” must be {kind, select, text {text} list {a list of texts} object {an object} yesNo {true or false} other {{kind}}}.",
   "clis.problem.duplicate": "Its id {id} is also in {other}: neither is used.",
   "clis.problem.fileBadJson": "It isn’t valid JSON: {error}",

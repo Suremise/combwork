@@ -27,6 +27,8 @@ describe("the installer's request to close (checkRequest)", () => {
   it('is taken when it names this process, its start, this copy, and is fresh', () => {
     const r = checkRequest(request(), target(), same)
     expect(r.ok).toBe(true)
+    // HI-3375: written nine minutes ago (an installer slowed by antivirus), it still counts.
+    expect(checkRequest(request({ at: new Date(NOW - 9 * 60_000).toISOString() }), target(), same).ok).toBe(true)
   })
 
   it.each([
@@ -37,7 +39,8 @@ describe("the installer's request to close (checkRequest)", () => {
     ['for another process', request({ pid: 999 }), /another process/],
     ['for an earlier process with the same id', request({ pidCreated: new Date(NOW - 9_000_000).toISOString() }), /earlier process/],
     ['for another copy of Combwork', request({ exe: 'C:\\Other\\Combwork.exe' }), /another copy/],
-    ['stale', request({ at: new Date(NOW - 120_000).toISOString() }), /stale/]
+    // HI-3375: ten minutes (an installer under antivirus), not one.
+    ['stale', request({ at: new Date(NOW - 11 * 60_000).toISOString() }), /stale/]
   ])('is refused when %s', (_what, text, why) => {
     const r = checkRequest(text, target(), same)
     expect(r.ok).toBe(false)

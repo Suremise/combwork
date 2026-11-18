@@ -46,5 +46,6 @@
   "clis.settings.open": "Ouvrir le dossier",
   "clis.settings.reload": "Recharger",
   "clis.settings.reloaded": "{n, plural, =0 {Aucune CLI à partir de descriptions} one {# CLI à partir d’une description} many {# CLI à partir de descriptions} other {# CLI à partir de descriptions}}{problems, plural, =0 {} one {; # description non utilisée} many {; # descriptions non utilisées} other {; # descriptions non utilisées}}",
-  "clis.settings.what": "Une CLI sans fournisseur propre fonctionne à partir d’une description : un fichier JSON dans le dossier clis de ton profil Combwork. Combwork lit son statut sur son écran, et ne modifie jamais sa propre configuration."
+  "clis.settings.what": "Une CLI sans fournisseur propre fonctionne à partir d’une description : un fichier JSON dans le dossier clis de ton profil Combwork. Combwork lit son statut sur son écran, et ne modifie jamais sa propre configuration.",
+  "clis.problem.badSeconds": "« {field} » doit être un nombre de secondes entre {min} et {max}."
 }

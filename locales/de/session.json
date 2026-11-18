@@ -231,5 +231,7 @@
   "session.tracker.stopped": "Die Prozessverfolgung von Combwork wurde beendet ({why})",
   "session.tracker.title": "Combwork kann die Prozesse der Agenten nicht verfolgen",
   "session.tracker.unavailable": "Die Prozessverfolgung ist nicht verfügbar",
-  "session.tracker.windowsOnly": "Die Prozessverfolgung erfordert Windows"
+  "session.tracker.windowsOnly": "Die Prozessverfolgung erfordert Windows",
+  "session.notice.startContextTitle": "{agent} wurde ohne den Startkontext von Combwork gestartet",
+  "session.notice.startContextBody": "Combwork konnte ihn {why, select, slow {nicht rechtzeitig erstellen} failed {nicht erstellen} other {nicht in die Sitzung legen}}, daher arbeitet {agent} vorerst ohne die Sicht von Combwork auf das Board und ohne seine Anleitung. Stoppe und starte ihn erneut, um es noch einmal zu versuchen."
 }
