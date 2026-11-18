@@ -86,6 +86,7 @@ import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcript
 import { usesOwnPrices } from '../shared/prices'
 import { priceUsage, withCostFree } from '../shared/usageDays'
 import { summaryOf, usageFromRows, type LedgerRow } from '../shared/usageLedger'
+import { listProcesses, type ListedProcess } from './processTree'
 import type { AdoptionHandle, Ask, BackgroundTaskType, ExternalSession, HookEvent, HookOccurrence, LaunchContext, LaunchHooks, LaunchSkill, LiveDetails, NormalizedHook, ProviderAdapter, SkillDelivery } from './providers/types'
 import { HOOK_FIRED_MAX, HOOK_SHORT_MAX, clip, type ActivityHookBlock, type HookFired, type SessionHooks } from '../shared/hooks'
 import { providerService } from './providerService'
@@ -332,6 +333,46 @@ const SIZE_REFRESH_DELAY_MS = 500
 const MODE_SWITCHES_AT_ONCE = 6
 /** HI-3376: the least a restart in a new mode waits for the old run's exit (it ends as soon as the run exits). */
 export const MODE_RESTART_STOP_MS = 30_000
+/** HI-3376: how long Stop It and Resume waits to see a stopped background job end before it gives up (and doesn't resume). */
+export const BACKGROUND_END_MS = 30_000
+/** How often it looks meanwhile (each look is a CLI run and a process listing). */
+const BACKGROUND_LOOK_MS = 1000
+
+/** Tests: the process listing backgroundJobEnded uses (null: processTree's). */
+export const backgroundTestHooks: { list?: () => Promise<ListedProcess[] | null> } = {}
+const listAll = (): Promise<ListedProcess[] | null> => (backgroundTestHooks.list ?? listProcesses)()
+
+/**
+ * HI-3376: a running background job's own process (its pid, as the CLI lists the job, and that process's start, as
+ * Windows lists it), so its end is seen by identity, never by a pid number alone; null when the CLI can't list its jobs,
+ * doesn't list this one, or gives no process for it.
+ */
+async function jobProcess(adapter: ProviderAdapter, exe: string, jobId: string): Promise<ListedProcess | null> {
+  const jobs = await adapter.background?.runningBackgroundJobs?.(exe).catch(() => null)
+  const pid = jobs?.find((j) => j.id === jobId)?.pid
+  if (!pid) return null
+  return (await listAll().catch(() => null))?.find((p) => p.pid === pid) ?? null
+}
+
+/**
+ * HI-3376: whether a background job told to stop has ended, looked at until it has or BACKGROUND_END_MS passes:
+ * `ended` once the CLI's listing of running jobs (parsed: a listing that failed is no answer) doesn't name it and its
+ * own process (`before`, by pid and start) isn't running; `running` while either still holds; `unknown` when the CLI
+ * can't list its jobs (or has no way to) at the last look.
+ */
+export async function backgroundJobEnded(adapter: ProviderAdapter, exe: string, jobId: string, before: ListedProcess | null, now = Date.now): Promise<'ended' | 'running' | 'unknown'> {
+  const deadline = now() + BACKGROUND_END_MS
+  for (;;) {
+    const jobs = adapter.background?.runningBackgroundJobs ? await adapter.background.runningBackgroundJobs(exe).catch(() => null) : null
+    let state: 'ended' | 'running' | 'unknown' = jobs === null ? 'unknown' : jobs.some((j) => j.id === jobId) ? 'running' : 'ended'
+    if (state === 'ended' && before) {
+      const list = await listAll().catch(() => null)
+      state = list === null ? 'unknown' : list.some((p) => p.pid === before.pid && p.started === before.started) ? 'running' : 'ended'
+    }
+    if (state === 'ended' || now() >= deadline) return state
+    await new Promise((r) => setTimeout(r, BACKGROUND_LOOK_MS))
+  }
+}
 
 /** After a kill, how long a CLI's console takes to be gone (its processes listed and ended, then its exit). HI-3376: 5 s, a listing on a busy machine taking seconds itself. */
 export const KILL_EXIT_MS = 5000
@@ -5388,10 +5429,17 @@ class SessionManager {
       if (!stillApplies()) return
       const info = providerService.info(adapter.id)
       if (!adapter.background?.stopBackgroundJob || !info.path) throw combworkError(msg({ id: 'session.background.cantStop', defaultMessage: "{provider} can't stop background sessions.", description: "Stop It and Resume is refused: the coding agent can't stop its background service's job. {provider} is its name." }), { provider: adapter.descriptor.name }, { kind: 'invalid' })
+      // HI-3376: the job's own process, as it is before the stop, so its end can be seen by identity (pid and start).
+      const before = await jobProcess(adapter, info.path, jobId)
       await adapter.background?.stopBackgroundJob(info.path, jobId)
-      // The job lets go of the conversation as it exits.
-      await new Promise((r) => setTimeout(r, 1500))
+      // The job lets go of the conversation as it exits: resumed only once it is seen to have ended (bounded).
+      const ended = await backgroundJobEnded(adapter, info.path, jobId, before)
       if (!stillApplies()) return
+      if (ended !== 'ended') {
+        log.warn(`Stop It and Resume: ${adapter.descriptor.name}'s background job ${jobId} was told to stop but is ${ended === 'running' ? 'still running' : 'not known to have ended'} after ${BACKGROUND_END_MS / 1000} s, so its conversation wasn't resumed`) // i18n-ignore: for the log
+        resolveOffer(offer, tr(OUTCOME.stillInBackground))
+        return
+      }
       await this.start(projectPath, { agentId, resumeId: sessionId })
       resolveOffer(offer, tr(OUTCOME.stoppedAndResumed))
     } finally {

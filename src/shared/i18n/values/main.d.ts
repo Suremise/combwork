@@ -280,6 +280,7 @@ interface CombworkMessageValues {
   'main.outcome.released': undefined
   'main.outcome.resuming': undefined
   'main.outcome.runsAnother': undefined
+  'main.outcome.stillInBackground': undefined
   'main.outcome.stoppedAndResumed': undefined
   'main.outcome.updateInstalling': undefined
   'main.outcome.updateNotReady': undefined

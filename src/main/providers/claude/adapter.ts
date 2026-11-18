@@ -260,6 +260,27 @@ export function launchModel(ctx: Pick<LaunchContext, 'model' | 'use200kContext' 
   return lastModelArg(withoutSettingsArgs(ctx.extraArgs)) ?? modelArg(ctx)
 }
 
+
+/**
+ * HI-3376: the background jobs in what `claude agents --json` printed (Settings → Advanced's id and process fields), each
+ * with its own process id when it has one; null when it isn't a JSON list (no answer, not the same as none running).
+ */
+export function runningJobsIn(stdout: string): { id: string; pid: number | null }[] | null {
+  let rows: unknown
+  try {
+    rows = JSON.parse(stdout)
+  } catch {
+    return null
+  }
+  if (!Array.isArray(rows)) return null
+  const idField = advanced.get<string>('claude-code.background.idField')
+  const pidField = advanced.get<string>('claude-code.background.pidField')
+  return rows.flatMap((x) => {
+    const id = x && typeof x === 'object' ? (x as Record<string, unknown>)[idField] : undefined
+    const pid = x && typeof x === 'object' ? (x as Record<string, unknown>)[pidField] : undefined
+    return typeof id === 'string' && id ? [{ id, pid: typeof pid === 'number' && Number.isInteger(pid) && pid > 0 ? pid : null }] : []
+  })
+}
 export class ClaudeCodeAdapter implements ProviderAdapter {
   readonly id = CLAUDE_CODE
   readonly descriptor = CLAUDE_DESCRIPTOR
@@ -906,6 +927,20 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   async stopBackgroundJob(executable: string, jobId: string): Promise<void> {
     const r = await run(executable, ['stop', jobId], 20000)
     if (r.code !== 0) throw new Error((r.stderr || r.stdout).trim() || `claude stop ${jobId} failed`) // i18n-ignore: a CLI command's name, when it said nothing itself
+  }
+
+  /**
+   * HI-3376: `claude agents --json` lists the sessions running now, interactive and background (2.1.327: a background one
+   * has `id`, the job's, and `pid`, its own claude.exe, a child of the shared background service; an interactive one has
+   * no `id`). A stopped job is gone from it at once (it stays in `--all`, without a pid). Run without
+   * CLAUDE_CODE_DISABLE_AGENT_VIEW, which turns the command off (Combwork sets it only in its agents' sessions).
+   */
+  async runningBackgroundJobs(executable: string): Promise<{ id: string; pid: number | null }[] | null> {
+    const env = { ...process.env }
+    delete env.CLAUDE_CODE_DISABLE_AGENT_VIEW
+    const r = await run(executable, ['agents', '--json'], 20000, env)
+    if (r.code !== 0 || r.timedOut || r.ended) return null
+    return runningJobsIn(r.stdout)
   }
 
   // -------------------------------------------------------------------------

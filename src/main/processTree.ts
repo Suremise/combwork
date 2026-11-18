@@ -94,6 +94,12 @@ function powershell(command: string, timeoutMs: number): Promise<string> {
   })
 }
 
+/** HI-3376: every process, listed without blocking (bounded: TREE_END_BOUNDS.listMs); null when the listing gave nothing. */
+export async function listProcesses(): Promise<ListedProcess[] | null> {
+  const list = parseProcessList(await powershell(LIST_PS, TREE_END_BOUNDS.listMs))
+  return list.length ? list : null
+}
+
 /**
  * HI-3047: a command whose MSYS programs (Git Bash's own: its `sleep`, `cat`, `perl`) are ended with its tree. MSYS's
  * exec starts such a program from a forked sh.exe that then exits, so its Windows parent id names a process already gone

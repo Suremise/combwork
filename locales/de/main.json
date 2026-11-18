@@ -278,6 +278,7 @@
   "main.outcome.released": "Freigegeben",
   "main.outcome.resuming": "Wird fortgesetzt, einer nach dem anderen",
   "main.outcome.runsAnother": "Hier läuft jetzt eine andere Unterhaltung des Agenten",
+  "main.outcome.stillInBackground": "Gestoppt, aber das Ende ist nicht bestätigt: Setzen Sie sie fort, sobald sie beendet ist",
   "main.outcome.stoppedAndResumed": "Gestoppt und hier fortgesetzt",
   "main.outcome.updateInstalling": "Wird installiert: Combwork startet neu",
   "main.outcome.updateNotReady": "Nicht mehr bereit zur Installation",

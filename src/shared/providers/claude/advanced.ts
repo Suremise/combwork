@@ -154,6 +154,26 @@ export const ADVANCED: readonly AdvancedSource[] = [
     samples: [{ from: `${FIX}/advanced/auth-status-claude-2.1.310.jsonl`, version: '2.1.310', fields: ['loggedIn', 'authMethod', 'apiProvider', 'analyticsDisabled', 'projectsDirectory', 'configDirectory', 'email', 'orgId', 'orgName', 'subscriptionType'] }]
   },
   {
+    id: 'claude-code.background.idField',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.background.idField.title', defaultMessage: 'Background sessions: job id field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.claude-code.background.idField.desc', defaultMessage: "The field of `claude agents --json` with a background session's id (the one `claude stop` takes). Stop It and Resume reads it to see the session has stopped before resuming its conversation (HI-3376). Wrong, Combwork can't tell, and Stop It and Resume says so instead of resuming.", description: 'What the advanced setting "Background sessions: job id field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude agents --json`, `claude stop` and Stop It and Resume (a button\'s name) as they are.' }),
+    kind: 'field',
+    default: 'id',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/agents-json-claude-2.1.327.jsonl`, version: '2.1.327', fields: ['pid', 'id', 'cwd', 'kind', 'startedAt', 'sessionId', 'name', 'status', 'state'] }]
+  },
+  {
+    id: 'claude-code.background.pidField',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.background.pidField.title', defaultMessage: 'Background sessions: process field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.claude-code.background.pidField.desc', defaultMessage: "The field of `claude agents --json` with a background session's own process id (not its background service's). Stop It and Resume waits for that process to be gone before resuming its conversation (HI-3376). Wrong, Combwork relies on the listing alone.", description: 'What the advanced setting "Background sessions: process field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude agents --json` and Stop It and Resume (a button\'s name) as they are.' }),
+    kind: 'field',
+    default: 'pid',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/agents-json-claude-2.1.327.jsonl`, version: '2.1.327', fields: ['pid', 'id', 'cwd', 'kind', 'startedAt', 'sessionId', 'name', 'status', 'state'] }]
+  },
+  {
     id: 'claude-code.accounts.loginExpiresField',
     group: 'claude-code',
     title: msg({ id: 'settings.advanced.claude-code.accounts.loginExpiresField.title', defaultMessage: 'Connections: sign-in expiry field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),

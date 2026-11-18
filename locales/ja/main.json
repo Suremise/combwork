@@ -278,6 +278,7 @@
   "main.outcome.released": "解放しました",
   "main.outcome.resuming": "1つずつ再開しています",
   "main.outcome.runsAnother": "今はここで別の会話を実行しています",
+  "main.outcome.stillInBackground": "停止しましたが、終了を確認できていません。終了してから再開してください",
   "main.outcome.stoppedAndResumed": "停止してここで再開しました",
   "main.outcome.updateInstalling": "インストール中：Combworkが再起動します",
   "main.outcome.updateNotReady": "インストールの準備ができていません",

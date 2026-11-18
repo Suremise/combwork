@@ -278,6 +278,7 @@
   "main.outcome.released": "Released",
   "main.outcome.resuming": "Resuming, one at a time",
   "main.outcome.runsAnother": "It runs another conversation here now",
+  "main.outcome.stillInBackground": "Stopped, but it hasn't confirmed it has ended: resume it once it has",
   "main.outcome.stoppedAndResumed": "Stopped and resumed here",
   "main.outcome.updateInstalling": "Installing: Combwork restarts",
   "main.outcome.updateNotReady": "No longer ready to install",
