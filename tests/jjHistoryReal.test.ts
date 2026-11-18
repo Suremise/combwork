@@ -27,6 +27,7 @@ import type { FolderChanges, WriteLog } from '../src/main/platform/history'
 import type { Fact } from '../src/shared/workflow/facts'
 import type { Maybe } from '../src/main/platform/types'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const require = createRequire(import.meta.url)
 const { portableJj } = require('./jjPortable.cjs') as { portableJj: () => string | null }
@@ -87,8 +88,8 @@ class WatchLog implements WriteLog {
 describe.skipIf(!exe)(`jj history, attribution and evidence on the real jj (${TESTED_JJ.version})`, () => {
   const env = isolated()
   const runner = createJjRunner({ exe: exe!, env })
-  const jj = (cwd: string, ...args: string[]): string => execFileSync(exe!, args, { cwd, env, windowsHide: true, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
-  const git = (cwd: string, ...args: string[]): string => execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.invalid', ...args], { cwd, env, windowsHide: true, encoding: 'utf8', timeout: 60_000 })
+  const jj = (cwd: string, ...args: string[]): string => execFileSync(exe!, args, { cwd, env, windowsHide: true, encoding: 'utf8', timeout: timing('spawn.hang'), stdio: ['ignore', 'pipe', 'pipe'] })
+  const git = (cwd: string, ...args: string[]): string => execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.invalid', ...args], { cwd, env, windowsHide: true, encoding: 'utf8', timeout: timing('spawn.hang') })
   const logs: WatchLog[] = []
   afterAll(() => {
     for (const l of logs) l.close()

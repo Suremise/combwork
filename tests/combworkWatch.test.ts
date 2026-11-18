@@ -7,6 +7,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { CombworkEvent } from '../src/shared/types'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-combwork-watch-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -29,7 +30,7 @@ const events: string[] = []
 vi.spyOn(w, 'emit').mockImplementation((e: CombworkEvent) => void events.push(e.type))
 const combwork = join(ws, '.combwork')
 /** Waits for an event of this type after `from` (the watch's events come a moment after the write). */
-const told = (type: string, from: number): Promise<void> => vi.waitFor(() => expect(events.slice(from)).toContain(type), { timeout: 10_000, interval: 50 })
+const told = (type: string, from: number): Promise<void> => vi.waitFor(() => expect(events.slice(from)).toContain(type), { timeout: timing('wait.hang'), interval: 50 })
 /** Writes `file` until an event of this type is told: a watch starts (or takes a new folder) a moment after it is asked to. */
 const toldOnceWatched = (type: string, file: string): Promise<void> => {
   const from = events.length
@@ -39,7 +40,7 @@ const toldOnceWatched = (type: string, file: string): Promise<void> => {
       writeFileSync(file, `written ${++n}\n`)
       expect(events.slice(from)).toContain(type)
     },
-    { timeout: 15_000, interval: 200 }
+    { timeout: timing('wait.hang'), interval: 200 }
   )
 }
 

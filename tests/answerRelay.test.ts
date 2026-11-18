@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { timing } from './timing.cjs'
 
 // main/answerRelay.ts's delivery source with its services stood in for (HI-2452): a relay that ends unread tells the
 // user, and when telling them fails, that failure is logged, never left as an unhandled rejection.
@@ -43,7 +44,7 @@ beforeEach(() => {
 })
 afterEach(() => void process.off('unhandledRejection', onUnhandled))
 
-const HUNG_MS = 10000 // Bounds a hung ended handler; completion is observed through the condition.
+const HUNG_MS = timing('wait.hang') // Bounds a hung ended handler; completion is observed through the condition.
 /** Waits until the condition holds (the ended handler's work is fire-and-forget). */
 async function until(cond: () => boolean, ms: number): Promise<void> {
   await vi.waitFor(() => expect(cond()).toBe(true), { timeout: ms })

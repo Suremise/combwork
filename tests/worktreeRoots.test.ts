@@ -12,6 +12,7 @@ import type { ProjectConfig } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { legacyWorktree } from '../src/shared/agentFolders'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-worktreeroots-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -19,7 +20,7 @@ const base = tempDir('cw-worktreeroots-')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 describe("agents' worktrees follow the newest config read, in whatever order reads end (#784)", () => {
   // Each case has a workspace of its own, with alpha's agent in tree('old') and gamma's in tree('gamma').

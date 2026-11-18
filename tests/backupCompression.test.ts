@@ -9,6 +9,7 @@ import { gunzipSync, gzipSync } from 'zlib'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-backup-gz-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -137,7 +138,7 @@ describe('compressed transcript backups', () => {
       const x = await run(() => sessions.usage(p, id))
       if (!x) throw new Error('no usage yet')
       return x
-    }, { timeout: 30000 })
+    }, { timeout: timing('wait.hang') })
     expect([u.inputTokens, u.outputTokens]).toEqual([400, 2000])
   })
 

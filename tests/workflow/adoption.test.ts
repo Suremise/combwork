@@ -11,6 +11,7 @@ import { commit, gitRepo, sh } from './harness'
 import { allOff } from '../../src/shared/workflow/options'
 import { foldCard, type Fact } from '../../src/shared/workflow/facts'
 import { bound } from '../keepType'
+import { timing } from '../timing.cjs'
 
 const base = tempDir('cw-adoption-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -311,5 +312,5 @@ describe.runIf(!!process.env.CW_STORE_ROUNDTRIP_DB && existsSync(process.env.CW_
     for (const c of after) expect(c.preWorkflow !== c.facts).toBe(true)
     console.log(`adoption of a live board copy: ${after.length} cards, ${r!.adopted} adopted, ${r!.marked} marked in ${ms.toFixed(0)} ms`)
     expect(await adoptNow(w)).toBeNull()
-  }, 120_000)
+  }, timing('test.hang'))
 })

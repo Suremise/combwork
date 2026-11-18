@@ -9,6 +9,7 @@ import { createRequire } from 'module'
 import { tempDir } from './tempDir'
 import { CodexConversationParser } from '../src/main/providers/codex/rollout'
 import { DISPLAY_LIMIT, toolForDisplay } from '../src/main/transcriptDisplay'
+import { timing } from './timing.cjs'
 
 const require = createRequire(import.meta.url)
 const { observeTranscript, tokenSightings } = require('./scenarios/harness.cjs') as {
@@ -1270,8 +1271,8 @@ describe('the fixtures fail when nothing was done', () => {
   // 1 s); 23 to 32 s under heavier load. So each is bounded by GIT_HUNG_MS, about three times the slowest seen, rather than
   // the suite's 20 s. The processes run synchronously, which no test timeout interrupts, so each has PROCESS_HUNG_MS too:
   // only a hung git or node takes that long, and it fails the test instead of holding its worker.
-  const GIT_HUNG_MS = 90_000
-  const PROCESS_HUNG_MS = 30_000
+  const GIT_HUNG_MS = timing('wait.hangReal')
+  const PROCESS_HUNG_MS = timing('wait.hang')
   it('merge-main-moved (#306): merging without taking the moved base in, or without checking it again, fails', { timeout: GIT_HUNG_MS }, async () => {
     const fs = require('fs') as typeof import('fs')
     const path = require('path') as typeof import('path')
@@ -1916,7 +1917,7 @@ describe('a trial the environment stops (trialEnvironment)', () => {
   // #577: Claude Code 2.1.296 with an OAuth session it couldn't refresh printed this and exited with 1 at launch.
   describe('a CLI that exits at launch (launchEnded)', () => {
     const { launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus } = require('./scenarios/harness.cjs') as {
-      launchEnded: (o: { screen?: string; reason?: string; auth?: { loggedIn?: boolean } | null }) => { environment?: string; error?: string }
+      launchEnded: (o: { screen?: string; reason?: string; auth?: { loggedIn?: boolean } | null; code?: string | null }) => { environment?: string; error?: string }
       startFailureIn: (file: string) => string
       claudeAuthStatus: (file: string, agentId: string, env: { CLAUDE_CONFIG_DIR?: string }) => { loggedIn?: boolean } | null
       parseAuthStatus: (out: string) => { loggedIn?: boolean } | null
@@ -1961,7 +1962,41 @@ describe('a trial the environment stops (trialEnvironment)', () => {
       writeFileSync(join(home, 'fake-signin.json'), JSON.stringify({ expired: true, atLaunch: true }))
       expect(claudeAuthStatus(log, 'a-1', { CLAUDE_CONFIG_DIR: home })).toMatchObject({ loggedIn: false })
       expect(claudeAuthStatus(log, 'a-2', { CLAUDE_CONFIG_DIR: home })).toBeNull()
-    }, 30000)
+    }, timing('test.hang'))
+
+    // HI-3392: a session Combwork keeps as stopped, its terminal ended: ended at launch, never typed into for 90 s.
+    it("whether its terminal ended since its launch, by Combwork's log: its last spawn or exit, and its code", () => {
+      const { terminalEnded } = require('./scenarios/harness.cjs') as { terminalEnded: (file: string, agentId: string, since?: number) => { code: string | null } | null }
+      const log = join(tempDir('cw-terminal-ended-'), 'combwork.log')
+      const spawn = '2026-11-18T10:07:30.000Z [INFO] [pty] spawn \u2068session:c:\\x\\a#assistant\u2069: claude.exe ["--session-id","x"]'
+      const exit = (code: string) => `2026-11-18T10:07:31.000Z [INFO] [pty] exit \u2068session:c:\\x\\a#assistant\u2069: ${code}`
+      writeFileSync(log, [spawn, exit('1'), ''].join('\n'))
+      expect(terminalEnded(log, 'assistant')).toEqual({ code: '1' })
+      expect(terminalEnded(log, 'a-2')).toBeNull()
+      // An exit before its launch (a run before) doesn't count; a spawn after an exit is a new run, still going.
+      expect(terminalEnded(log, 'assistant', 2)).toBeNull()
+      writeFileSync(log, [spawn, exit('1'), spawn, ''].join('\n'))
+      expect(terminalEnded(log, 'assistant')).toBeNull()
+      writeFileSync(log, [spawn, exit('undefined (process 12 gone, not killed by Combwork)'), ''].join('\n'))
+      expect(terminalEnded(log, 'assistant')).toEqual({ code: 'undefined' })
+      expect(launchEnded({ code: '1' })).toEqual({ error: 'the session ended at launch (exit code 1)' })
+      expect(launchEnded({ code: 'undefined' })).toEqual({ error: 'the session ended at launch' })
+      expect(launchEnded({ code: '1', auth: { loggedIn: false } }).environment).toMatch(/^not signed in: /)
+    })
+
+    // HI-3392: the screen a failed trial recorded (Claude Code 2.1.327, the Assistant's workspace): no choices in it.
+    it("sees Claude Code's trust question by its title on its drawn screen, not only by its choices", () => {
+      const { claudeTrustAsked } = require('./scenarios/harness.cjs') as { claudeTrustAsked: (raw?: string, drawn?: string) => boolean }
+      const seen = "──────── Accessing workspace: C:\\x\\lanes\\0\\assistant-settings-git-limits-cc\\ws Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source project, or work from your team). If not, take a moment to review what's in this folder first. Claude Code'll be able to read, edit, and execute files here."
+      expect(claudeTrustAsked(seen, seen)).toBe(true)
+      expect(claudeTrustAsked('', seen)).toBe(true)
+      // Its choices in the output, as before.
+      expect(claudeTrustAsked('❯ 1. Yes, I trust this folder  2. No, exit', '')).toBe(true)
+      // Answered: its prompt drawn after it; and in the output only (its text stays there once erased): no question.
+      expect(claudeTrustAsked('', `${seen}\n> \n? for shortcuts`)).toBe(false)
+      expect(claudeTrustAsked(seen, '> \n? for shortcuts')).toBe(false)
+      expect(claudeTrustAsked('', '')).toBe(false)
+    })
 
     it('anything else is an error at once, saying what it showed', () => {
       expect(launchEnded({ reason: "error: option '--model <model>' argument 'x' is invalid.", auth: { loggedIn: true } })).toEqual({ error: "the session ended at launch: error: option '--model <model>' argument 'x' is invalid." })

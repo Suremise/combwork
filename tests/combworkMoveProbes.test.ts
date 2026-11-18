@@ -142,7 +142,7 @@ describe("HR1's round-1 probes against the derived map", () => {
     board(file)
     const db = new DatabaseSync(file)
     db.prepare('INSERT INTO cards VALUES(1, ?)').run(`Evidence D:/ws/${OLD_DIR}/shared/a.md`)
-    const other = new DatabaseSync(file, { timeout: 0 })
+    const other = new DatabaseSync(file, { timeout: 0 }) // timing-ok: no busy wait: a lock refused at once is what the test checks
     let tried: string | null = null
     cardsTestHooks.inBatch = () => {
       if (tried !== null) return

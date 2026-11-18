@@ -457,7 +457,7 @@ Hooks are normalised by each adapter into one set of events (start, prompt, tool
 **Hooks health** (#1336; there is no hooks-free mode, §16.15 row 10): hooks that stop arriving while Combwork thinks all is well (a CLI update changed them, a policy turned them off, Combwork refused their token) are said, never left as a wrong status. Read from what Combwork already has, no status engine of its own (`main/hooksHealth.ts`), each sign needing time and evidence, never time alone, within **Hooks missing: wait** (Settings → Advanced, `cw.hooks.missingSeconds`, 60 s):
 - **its start**: a CLI that sends a hook as it starts (`capabilities.session.startHook`: Claude Code's SessionStart; Codex's and Copilot's come with the first prompt) sent none within the wait, the time a question at its start (folder trust) is on its screen not counted;
 - **a prompt**: one sent while it was idle (the user's Enter in its pane, a line Combwork typed, a task on its command line) had no hook of a current turn after it for the wait (the turn ledger's verdict: a late hook of a turn that is over answers nothing; while the user's own Enter waits, for a CLI with `typedTurnsWithoutPrompt`, a hook of a turn the launch has never seen answers it, HI-2673, since it can't be late news: not an earlier turn's, a sub-agent's, or one past the bound on the ids kept; the ledger remembers the turn it answered for, so the same turn's hook again answers no later prompt), while its screen reading said working (it was idle when the prompt went, so that work is this prompt's), seen at least 15 s before (at most the wait). The check runs in the launch's hook order, so a hook that came first is taken first. A long silent think never counts (its prompt's hook came), nor a prompt sent while it works; an Enter that started nothing (a menu, a local command) is dropped once its screen shows it idle.
-- **a turn its transcript shows** (#1371): a turn the CLI's own records identify, begun by a prompt written since this launch started and taken up by the model, with no hook naming it for the wait since Combwork found it. Identity, not position: Claude Code's turn is its prompt's `promptId` (every user entry carries it; an assistant entry belongs to the turn its `parentUuid` chain leads to), which its hooks carry as `prompt_id`; Codex's is its `turn_id` (its prompt's `item_completed` UserMessage, or before 0.159 its `user_message` inside the task; its model's items and reply), carried by its hooks; Copilot's is an `interactionId` (`user.message`, then `assistant.turn_start`/`assistant.message`), and its hooks carry none, so its prompt hook answers it by the prompt's text (Copilot records the prompt once that hook has returned) and any hook received after the prompt was recorded answers it too. A hook naming the turn answers it whenever it comes, before or after the transcript is written (a Stop that comes first, a response flushed late after a local command: both are their own turn's). Not turns: a local command (no model work), a compaction, a sub-agent's or side conversation's (`isSidechain`, Codex's sub-turns), Claude Code's task-notification wakes (whether their hooks come isn't certain). The reading (`turnsReader.ts`, each adapter's `transcriptTurns`) is one per conversation and file, done in the 5 s transcript look: this launch's new conversation from its start, any other (resumed, switched to by `/clear` or `/resume`, found later) from its end then, so history never counts (nor a prompt older than the launch); another path or conversation, a shrink or other first bytes (a file replaced under its name) start it again and drop what it found; whole lines only, a line begun before the reading dropped; more than 4 MB since the last look forgets what it knew, so a turn whose prompt it didn't read is unknown; what a read found is kept only if the launch, conversation and reading are still the ones it read for. The check only reads what was stored: no hook waits on a read. A quick turn over before Combwork's first look at its screen is caught this way, and Copilot too.
+- **a turn its transcript shows** (#1371): a turn the CLI's own records identify, begun by a prompt written since this launch started and taken up by the model, with no hook naming it for the wait since Combwork found it. Identity, not position: Claude Code's turn is its prompt's `promptId` (every user entry carries it; an assistant entry belongs to the turn its `parentUuid` chain leads to), which its hooks carry as `prompt_id`; Codex's is its `turn_id` (its prompt's `item_completed` UserMessage, or before 0.159 its `user_message` inside the task; its model's items and reply), carried by its hooks; Copilot's is an `interactionId` (`user.message`, then `assistant.turn_start`/`assistant.message`), and its hooks carry none, so its prompt hook answers it by the prompt's text (Copilot records the prompt once that hook has returned) and any hook received after the prompt was recorded answers it too. A hook naming the turn answers it whenever it comes, before or after the transcript is written (a Stop that comes first, a response flushed late after a local command: both are their own turn's). Not turns: a local command (no model work), a compaction, a sub-agent's or side conversation's (`isSidechain`, Codex's sub-turns), Claude Code's task-notification wakes (whether their hooks come isn't certain). The reading (`turnsReader.ts`, each adapter's `transcriptTurns`) is one per conversation and file, done in the 5 s transcript look: this launch's new conversation from its start, any other (resumed, switched to by `/clear` or `/resume`, found later) from its end then, so history never counts (nor a prompt older than the launch); another path or conversation, a shrink or other first bytes (a file replaced under its name) start it again and drop what it found; whole lines only, a line begun before the reading dropped; more than 4 MB since the last look forgets what it knew, so a turn whose prompt it didn't read is unknown; what a read found is kept only if the launch, conversation and reading are still the ones it read for. The check only reads what was stored: no hook waits on a read. A quick turn over before Combwork's first look at its screen is caught this way, and Copilot too. The first turn begun since the prompt Combwork watches (above; by the turn's own time within the clocks' skew, never by when Combwork read it), its screen seen working on it, is that prompt's: the prompt's check names it (HI-3383: weighed first, the transcript named it whenever both were due at one look, as when a loaded machine read the screen late), and the transcript names it only where its screen never showed it working; any other turn, older or after it, is the transcript's.
 - **Not covered**: a new Codex session's turns while its hooks are missing (with no hook it reports no session id, so there is no rollout to read; a turn long enough to be seen on its screen is caught, and its start with a task); a Copilot turn whose turn before's late hook arrives after its prompt was recorded (taken as its hook: it errs toward saying nothing); Claude Code's task-notification wakes.
 
 Then, for that launch (`LiveSessionState.hooksMissing`: since, after start, prompt or transcript (with the turn's id), and why when Combwork can tell: it refused their token, the CLI's settings turn them off (Claude Code: the first scope setting `disableAllHooks`), a setting found on the PC keeps them away (HI-2777: `allowManagedHooksOnly`, an HTTP hook allowlist; its name and where), only SessionStart came, nothing local explains them (an organisation's remote policy may), or the CLI is newer than Combwork was tested with, said as just that: Combwork knows the version only at launch, so it never guesses at an update during the session, HI-2673): its status reads **"Status unknown: no hooks from Claude Code"** (pane, sidebar row, board, the Agent API's `statusMessage`), its mark is stalled, nothing is typed into it (`readyFor`: no wakes, messages or tasks), its lanes pause (`hooks`: "paused: B6's hooks aren't arriving"), the project's banner over its pane says why and what to do with **Restart session**, and a toast says it once a conversation (kept in Notifications). A current turn's hook of that launch clears it (a late hook of a turn that is over doesn't); one a transcript turn raised clears only on that turn's hook or a newer turn's, by identity. The invariant (#1371): a transcript turn T stops being waited on, alarm or not, only on a hook naming T or a turn the transcript places after T, whichever comes first, the hook or the record; nothing else but dropping the reading ends it. One transition does it (`answeredUpTo`, from `hookTurn` as each hook is taken, or from `transcriptTurns` when a hook came before its record), whether or not an alarm has fired: a newer turn's hook before the deadline means the older turn is never flagged. An id the transcript hasn't placed is unknown, never newer, whatever the ledger makes of it (the ledger's current turn may be older than the flagged one) (Copilot: any hook answers a standing flag, and only the turns read so far). Places are bounded (the latest 500): a turn still waited on or flagged keeps its own place when they let go of it, and one let go that wasn't (answered, or never worked) is remembered as forgotten, so a late record of it is unknown, never placed anew as newer. What is answered stays answered for that reading: a record of an answered turn appended later (Claude Code chains one to it) isn't waited on again, while a turn read after the answer still is. The transcript reading starting again (another file, a shrink, other first bytes, another conversation) drops that alarm with the evidence it came from; a start or prompt alarm stays. A read whose file changed while it waited (a hook naming another transcript) is dropped. A restart starts a new launch.
@@ -2415,7 +2415,7 @@ changes. Git's runner and worker are untouched.
     no snapshot, and a stale workspace isn't brought up to date) and `--config=snapshot.auto-update-stale=false`. J0's
     reads are `jj --version`, `jj root` and `jj git root` (pinned, below); colocation is read from the files (below), not from
     `jj git colocation status`.
-  - **Bounds:** an output cap (16 MB unless given), a time limit (a minute unless given) and cancellation (an
+  - **Bounds:** an output cap (16 MB unless given), a time limit (`cw.jj.commandSeconds` unless given: 300 s since HI-3372, a minute passed a first snapshot of a large working copy) and cancellation (an
     `AbortSignal`). Each ends jj's whole process tree by identity (`processTree.ts`, moved from cw-progress, which ends
     its command's the same way: listed with start times, children first, each ended only while its pid still names
     the process listed, so a reused pid is never ended, #655), and the result settles once its output has closed, after
@@ -3571,7 +3571,11 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   holds or waits on the store (its file gate, HI-2918): unreadable then, never an empty ref, which looked like a change
   by content and refused the start beside a slot being detached (HI-3012). A start refused as `evidence.changed` logs which check refused
   it (the plan, the write, the lane, the baseline) and on which pass, and each pass gathered again logs why. The
-  target's read itself is made again whole when the head moves under it, at most three reads.
+  target's read itself is made again whole when the head moves under it, at most three reads. A verdict (HI-3216) and
+  an answer to a request (HI-3391: an advance's Integrate, It's integrated, start again or undo, an agent's question)
+  take the same passes: a jj operation anywhere in the repository (another lane's commit, a review copy's checkout)
+  moves the head they keep while they decide, and they are gathered again, from before the write or from the write
+  itself, while only that moved; a change by content (the card's slot, the cards it waits for) still refuses at once.
 - **The provenance epoch:** a counter in board_meta (`provenance_epoch:<project id>`) the fact store moves in the same
   transaction as every Submitted or Adopted fact it appends, whatever the platform; never a per-card seq.
 - **The lease's hold** (HR2's round 1): the app's `slotHold` answers whether the card's lease is open, on its Started slot,
@@ -4212,7 +4216,17 @@ with s34, its mapping HI-3235/s7, s10, s13 and s16. gate:advance is open.
   (`baseRefusalNow`, under the locks), so a cause that persists while jj operations come and go costs reads on each
   pass, never a journal, an attempt or facts; no preview is asked meanwhile either. The attempt's own base read
   checks the same again (a change in between refuses it as before, journaled). (In a repository with no Git working
-  copy beside it, jj exports nothing by itself: the target and any other bookmark must be exported first.)
+  copy beside it, jj exports nothing by itself: the target and any other bookmark must be exported first.) Under
+  preview and click, the comment says no preview is offered while the cause holds, since that finish never moves T by
+  itself (HI-3365).
+- **Nothing moved past the base, for a reason of jj's** (HI-3365): the prepare exits non-zero or names no operation
+  (`notInHistory`), or names one that isn't the move asked for (`prepareInvalid`). jj answers the same plan the same
+  way (a newer, untested jj whose message differs, say), so the plan isn't attempted again while the plan, the cycle
+  and jj's version stay the same (`planHeld`), and the card's comments say why, once per plan and reason. A new plan
+  (the target moved, new work) or another jj is attempted; the hold is kept in memory, so a restart (a Combwork update
+  that reads jj's answers differently among them) tries once more, without a second comment. Only a live attempt's
+  answer holds it: the same outcome classified by recovery after a crash is tried again, as is a lease lost to
+  another writer or a read that failed (a lasting read failure stops the base check before any attempt).
 - **The steps**, each journaled before its command: `--at-op P0 --no-integrate-operation bookmark move T --from E --to
   R` (O, validated: parent P0, the attempt's marker, its view P0's but for T), `op integrate O`, `git export`, then
   every head, view and the Git side read twice. The lease (the plan unchanged, the card in Approved, the workspace
@@ -4255,6 +4269,34 @@ with s34, its mapping HI-3235/s7, s10, s13 and s16. gate:advance is open.
   moved; any later phase without a fact, or a fact without a journal, is uncertain; an `…ing` phase is classified on
   the state now (before an integrate, no marked operation in any history is nothing moved); `verified` without its
   Integrated records it once. Nothing is ever run again blind.
+- **Superseded attempts** (HI-3367). A new `Started` ends the cycle's advance on the card (its question too), but not
+  its journal. A live journal of an earlier cycle (the card put back and restarted) is retired in `settleAdvances`,
+  under the card's lock and the repository lock, read again there, before anything else it does, so on every path that
+  can attempt or preview (`advance`, `advancePreview`, a preview's Integrate, recovery); until each is retired, the new
+  cycle gets no attempt or preview (`busy`). The current cycle's journals are never retired. Each is marked first, in
+  one write: the meta `advance_superseded:<card>:<cycle>:<attempt>`, and with it a comment action on the card when the
+  attempt may have moved its target (anything but a known phase before `integrating` with every undo known to be
+  before its revert, `attemptPreMutation`). Only then is it archived whole to `settled/` as `superseded`, its phase,
+  operation and undos kept: it is no longer attached to the card's cycle, never proved integrated or undone. A write
+  that fails keeps the journal live; an archive that fails is archived by the next pass, its marker saying it was told
+  (no second comment). The marker and the action are committed before the new cycle's `AdvanceAttempted`; the action
+  is delivered by the actions worker afterwards, so the user may not have seen the comment before an automatic attempt,
+  which the comment says. Superseding settles nothing about the old move: the new plan's base check doesn't prove it
+  harmless (a target that already holds it passes that check), and the comment says the target may hold it. The
+  comment reaches an archived card too (the action's `evenArchived`, which the comment handler honours), written once
+  with the action's id. The journals' folder is the workspace's, shared by its projects: a journal's card is looked up
+  by its key across the whole board, and another project's, or a key not known here, is never touched. This project's
+  archived card has its live journals all retired so (current cycle too), its archived state read again under its
+  locks: unarchived meanwhile, they stay. A key held here with no card is gone: its journals are archived under the
+  repository lock (an attempt holds it from its first journal to its outcome), the card read again as gone there,
+  only those whose plan names this repository's store, with nothing said; one that can't be read stays, as does
+  everything when a board read fails. A folder that can't be listed (anything but missing) is never taken as empty:
+  the card stays busy. Only what this adapter's locks fence is retired (HR1's round 2): under the locks the card is read
+  again as this project's (moved away meanwhile: nothing touched, busy), and a journal only when its plan names the
+  store whose lock is held. One of another repository (a card moved here) stays live, untouched and not waited for (its
+  move wasn't in this repository); one that can't be read can't be fenced, so its notice is given once (its marker)
+  and it stays live, not waited for. Recovery's listing passes over a file it can't parse: the card's next settling
+  finds it.
 - **Preview and click** (HI-3236; its mapping HI-3236/s7, s10, s13). A finish that previews (`finishPreviews`) asks the
   adapter's optional `advancePreview` port, never `advance`: once the plan is ready (as an automatic attempt's would be,
   not dismissed), For you previews it (gate `advancePreview`, bound to the plan id: the move E → R, the candidate's style,
@@ -4264,7 +4306,15 @@ with s34, its mapping HI-3235/s7, s10, s13 and s16. gate:advance is open.
   nothing, and a fresh preview comes once the new plan is ready. A card has one open preview or one pending answer
   while its plan is actionable; a reconcile never replaces a preview whose click is queued; only the card's newest
   preview (by its fact's seq) can start an attempt; **Not for this plan** dismisses that plan (project meta) until the
-  plan changes. Same residual races as automatic once clicked.
+  plan changes. Same residual races as automatic once clicked. HI-3390: an open preview whose consent no longer holds
+  is closed by the generic advance step (`advanceStep`, before it asks the adapter anything), with a card comment
+  saying why (`previewClosed`, the reason read again in that write): the finish no longer previews (changed to
+  automatic, which then advances, or to the user's own integration), or the card waits for blockers (previewed again
+  once they are Done). An Integrate that raced such a change runs nothing and the card says why, once for its request
+  (project meta), never dropped silently. The reason is read again in the explanation's write: gone there (the blocker
+  Done, the finish back to preview), the click is read again and runs if its consent holds now (up to three reads);
+  an explanation that can't be written, or conditions that keep changing, fail the answer's action, never done
+  without it.
 - **For you** (the user's alone: an agent's or the Assistant's answer is refused). The window names each answer: the
   preview's Integrate / Not for this plan, a stop's Undo Combwork's move / Leave it to me, an uncertain attempt's It's
   integrated / Not integrated, start again (an attested card shows *Done by you, integration not proved*). A stop whose undo conditions hold
@@ -6440,8 +6490,8 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    - **Signing:** the repository's config (never overridden). Combwork's commits run with no terminal: no input,
      `GIT_TERMINAL_PROMPT=0`, `SSH_ASKPASS_REQUIRE=never`, `GCM_INTERACTIVE=never`. In the app they go through the
      queue runner's recorded spawn (#1360). When `commit.gpgsign` is on, the commit (hooks included) has a bound:
-     Settings → Advanced, `cw.queue.signSeconds`, 60 s. At the bound the whole tree (git, its hooks, the signer) is
-     ended.
+     Settings → Advanced, `cw.queue.signSeconds`, 300 s (HI-3372: 60 s cut a repository's commit hooks short). At the
+     bound the whole tree (git, its hooks, the signer) is ended.
      - **Ended at the bound:** always a pause, decided by what was running when it was ended (the stream as far as
        it had come then). Ending a hook may make it exit non-zero, and that is never its rejection. A hook running
        then pauses `hookTimedOut`. The signer, or nothing known in a repository that signs, pauses `signingWaits`,
@@ -6533,7 +6583,7 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    never taken for settled: it pauses `pushUnreadable` (Combwork's own words, translated), still owed, so no later merge goes ahead of it; else it pushes `refs/heads/<target>` to what the target tracks
    (`branch.<target>.remote` and `.merge`), or with nothing tracked to the only remote or `origin` under the same name,
    never `--force` and never `--set-upstream`, with no prompt (`GIT_TERMINAL_PROMPT=0`, no askpass, the credential
-   manager non-interactive) and within the Git view's 5 minutes. Pushed, or up to date already (a retry after a crash
+   manager non-interactive) and within `cw.queue.networkMinutes` (HI-3372: 30 min; 5 cut a slow link short). Pushed, or up to date already (a retry after a crash
    before the clear), it is cleared, only if still the same result (a newer merge's stays owed). Refused (the remote
    has commits the target lacks), failed (git's message: a sign-in, the network, the bound) or with no remote: the
    queue pauses (`pushRejected`, `pushFailed`, `pushNoRemote`, naming the merged card, which stays Done), the next entry
@@ -6853,8 +6903,18 @@ touched:
   made there since the check, in no stash, is kept; the refusal is said with the stash made); either
   side shown brings the other. A file added then deleted on disk (`AD`): git stashes it, then says "No valid patches
   in input"; with the stash made and none of the paths changed any more, that is done, never said as a problem.
-  **Bounded** (HI-3021): a commit or stash still running after two
-  minutes (a slow hook, a signer waiting for an answer) has git's whole process tree ended (git.ts's time limit: every
+  **Cancellable, and bounded** (HI-3372): while Commit or Set aside runs, the window offers **Cancel** (beside its buttons;
+  on a notification of its own when it was started from one, Files' Commit it included). The window names the run by an
+  id of its own, which main registers before anything runs with its owner (the window, its workspace's open and the
+  project, `gitCancel.ts`): only that owner's Cancel ends it, a duplicate id is refused, and a run leaves the list however
+  it ends (a closed window or workspace takes its runs off the list; they run to their end). A Cancel ends git's tree as
+  the bound does (the same identity-checked end, HI-3358's included) and only the steps that make it take it (the
+  private index's adds, the commit, the stash's push); reading HEAD and the stashes, the index put back and a lock taken
+  away run to their end. Precedence: git exited first, its own outcome (a success stays one); else whichever ended it
+  first, the bound or the Cancel. What is said is what is true: nothing committed; HEAD moved (to …, or unread), the
+  index left; no stash made; a stash made, named, to look at. **Bounded** (HI-3021): a commit or stash still running
+  after `cw.git.commitMinutes` (30 min, a last resort since HI-3372; it was two minutes: a slow hook, a signer waiting
+  for an answer) has git's whole process tree ended (git.ts's time limit: every
   timed git command, not git.exe alone, which on Windows never removes the `index.lock` it holds and leaves the hook
   running). **Started after the listing too** (HI-3358): the tree is listed once, so it is ended by one PowerShell
   session that keeps a handle on each process it ends (checked by start time first), which keeps that process's pid
@@ -7361,8 +7421,11 @@ each secret value of the snapshot, its URL's query values included). Where it ca
    `IntegrationStarted` with its record, then two journal phases:
    - `prePush`: the project's pre-push hook, once, in the project (`git hook run --ignore-missing --to-stdin`), with the
      remote's name and the URL without credentials as its arguments and git's own line for an object-name source on its
-     stdin (`<X> <X> <ref> <onto>`). Refused: nothing published, the entry fails (`pushRefused`, transient), the card is
-     queued again and the queue pauses `publishRefused` with its words; ran too long, `hookTimedOut`.
+     stdin (`<X> <X> <ref> <onto>`), within `cw.queue.checkMinutes` (HI-3372: it is a check). Refused: nothing
+     published, the entry fails (`pushRefused`, transient), the card is queued again and the queue pauses
+     `publishRefused` with its words; ran too long, `hookTimedOut`. Follow mode's fetches and its push take
+     `cw.queue.networkMinutes` (30 min; 5 before HI-3372), as do a slotted card's fetch of its remote head and Bring up
+     to date's fetches (a minute before).
    - `push`: `git push --porcelain --no-verify --force-with-lease=<ref>:<onto> <url> <X>:<ref>`. The remote takes it
      only while its ref is exactly `onto`, and it is a fast-forward by construction, so the lease never discards remote
      history. Pushed, or at the result already (`atResult`: the lease never applied, counted only because the result

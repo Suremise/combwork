@@ -11,6 +11,7 @@ import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-intents-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -381,14 +382,14 @@ describe('a card by intent (#1267)', () => {
       expect(sub.card.column).toBe('review')
       expect(sub.card.history.at(-1)).toMatchObject({ by: 'Builder (p)', what: 'Moved to Review' })
       await watches.evaluateWatches(w)
-      await vi.waitFor(() => expect(wakes('a2')).toHaveLength(1), { timeout: 10_000 })
+      await vi.waitFor(() => expect(wakes('a2')).toHaveLength(1), { timeout: timing('wait.hang') })
       await watches.settled()
       expect(wakes('a1')).toEqual([])
       // A real verdict still wakes it.
       await act(w, card, reviewer, { kind: 'startReview' })
       await act(w, card, reviewer, { kind: 'verdict', pass: false, comment: 'Round 1: FAILED. 1. Add a test.' })
       await watches.evaluateWatches(w)
-      await vi.waitFor(() => expect(wakes('a1')).toHaveLength(1), { timeout: 10_000 })
+      await vi.waitFor(() => expect(wakes('a1')).toHaveLength(1), { timeout: timing('wait.hang') })
       // The verdict's wake (its wording under load is HI-2016's: told as the comment, or as the failure).
       expect(wakes('a1')[0]).toMatch(/Round 1: FAILED|failed it/)
     } finally {
@@ -422,7 +423,7 @@ describe('a card by intent (#1267)', () => {
       // a2 (a reviewer by its name) watches it with another card, for comments: the card leaves its watch, the other stays.
       await inWorkspace(w, () => watches.registerWatch(w, repo, 'a2', readCondition({ cards: [card, later], changes: ['comment', 'column'] }) as never))
       await watches.evaluateWatches(w)
-      await vi.waitFor(() => expect(watches.watchFor(repo, 'a2')?.cards).toEqual([later]), { timeout: 10_000 })
+      await vi.waitFor(() => expect(watches.watchFor(repo, 'a2')?.cards).toEqual([later]), { timeout: timing('wait.hang') })
       const board = await inWorkspace(w, () => tasks.getTask(card, w))
       expect(board.history.at(-1)?.what).toBe("Ended Reviewer (p)'s watch on it: Other reviews it")
       await watches.cancelWatch(w, repo, 'a2')
@@ -640,7 +641,7 @@ describe('a card by intent (#1267)', () => {
     return { w, card, p: join(w.path!, 'p') }
   }
   /** How long a condition here may take before the test has hung (a template's load under load takes seconds), never a wait. */
-  const HUNG = { timeout: 15_000 }
+  const HUNG = { timeout: timing('wait.hang') }
   const agentIds = (w: WS) => inWorkspace(w, async () => (await w.projectConfig(join(w.path!, 'p'))).agents.map((a) => a.id))
   /** The ways a2 leaves the project: Combwork's removal, a template's load replacing every agent, a change of project.json. */
   const leaving: [string, (w: WS, p: string) => Promise<unknown>][] = [

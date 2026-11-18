@@ -1,4 +1,4 @@
-import { Children, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Children, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { ProjectInfo } from '@shared/types'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
 import { GIT_VIEW_GUIDE, HISTORY_COMMITS, folderBusy, gitStatusText, gitStatusTip, headText, type GitFolderAction, type GitHistory, type GitRepoSummary } from '@shared/gitRepo'
@@ -9,6 +9,7 @@ import { offered, repoOp } from '../repoOps'
 import { gitReader, type GitReadState } from '../gitReads'
 import { attempt } from '../actions'
 import { bumpGit, notify, set, showVersionControl, showView, useStore } from '../store'
+import { cancelGitRun, startGitRun, type GitRunHandle } from '../gitRuns'
 import { awayFromProject } from '../agentPlace'
 import { openGuideAt } from '../tips'
 import { useNow } from '../usage'
@@ -304,8 +305,11 @@ export interface FormSpec {
   validate: (v: Record<string, string>) => string | null
   /** What to know about the values as they are (Track…'s push first, #1385), under the fields; null for nothing. */
   note?: (v: Record<string, string>) => string | null
-  submit: (v: Record<string, string>) => Promise<string>
+  /** `op`: the run's id when the form is `cancellable` (HI-3372), which main's run takes for its Cancel. */
+  submit: (v: Record<string, string>, op?: string) => Promise<string>
   project: ProjectInfo
+  /** HI-3372: its submit reaches a remote (a push, a tag's push): while it runs, the dialog's Cancel cancels it. */
+  cancellable?: boolean
 }
 
 /**
@@ -320,10 +324,17 @@ export function GitForm({ make, onClose }: { make: () => FormSpec; onClose: () =
   const spec = make()
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(spec.fields.map((f) => [f.key, f.initial ?? ''])))
   const { busy, error, run } = useBusy()
+  // HI-3372: a cancellable submit's run, while it goes: the dialog's Cancel cancels it then, rather than closing.
+  const going = useRef<GitRunHandle | null>(null)
   const problem = spec.validate(values)
   const submit = async (): Promise<void> => {
     if (problem) return
-    const r = await run('submit', () => spec.submit(values))
+    const handle = spec.cancellable ? startGitRun(spec.project.path) : null
+    going.current = handle
+    const r = await run('submit', () => spec.submit(values, handle?.op)).finally(() => {
+      handle?.end()
+      going.current = null
+    })
     bumpGit(spec.project.path)
     if (!r) return
     // A reply of several lines (Push to…'s outcomes) is a notice with its first line as the title.
@@ -340,7 +351,7 @@ export function GitForm({ make, onClose }: { make: () => FormSpec; onClose: () =
       error={error}
       footer={
         <>
-          <button className="btn subtle" onClick={onClose}>
+          <button className="btn subtle" data-action={busy && going.current ? 'cancel-git-run' : undefined} onClick={() => (busy && going.current ? cancelGitRun(going.current.op) : onClose())}>
             {tr(M.cancel)}
           </button>
           <BusyButton className="primary" busy={!!busy} busyLabel={spec.busyLabel} disabled={!!problem} onClick={() => void submit()}>
@@ -409,7 +420,9 @@ function tagForm(project: ProjectInfo, s: GitRepoSummary | null): FormSpec {
     confirm: tr(M.createTagButton),
     busyLabel: tr(M.tagging),
     validate: (v) => (!v.name.trim() ? tr(M.enterName) : /\s/.test(v.name.trim()) ? tr(M.tagNoSpaces) : null),
-    submit: (v) => repoOp('git:createTag', project.path, v.name.trim(), v.message ?? '', v.push || undefined)
+    // HI-3372: its push, when it pushes, cancellable from the dialog.
+    cancellable: true,
+    submit: (v, op) => repoOp('git:createTag', project.path, v.name.trim(), v.message ?? '', v.push || undefined, op)
   }
 }
 

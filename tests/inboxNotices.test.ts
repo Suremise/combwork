@@ -10,6 +10,7 @@ import { inDialectOf, setChainResolver } from '../src/shared/agentText'
 import { inboxNotice, noticeCounts } from '../src/shared/doorbell'
 import { tempDir } from './tempDir'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-inbox-notices-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -355,7 +356,7 @@ describe('notices in the hook replies (#650)', () => {
       hold()
       const first = send(stop('p1'))
       const second = send(stop('p1'))
-      await vi.waitFor(() => expect(asked).toBe(1), { timeout: 5000 })
+      await vi.waitFor(() => expect(asked).toBe(1), { timeout: timing('wait.hang') })
       release()
       const replies = await Promise.all([first, second])
       expect(replies.map(context)).toEqual([expect.stringMatching(/^\[CW\] Before you finish: /), undefined])
@@ -370,7 +371,7 @@ describe('notices in the hook replies (#650)', () => {
       await hook(st, { hook_event_name: 'UserPromptSubmit', prompt_id: 'p3', prompt: 'more' })
       hold()
       const atStop = send(stop('p3'))
-      await vi.waitFor(() => expect(asked).toBe(1), { timeout: 5000 })
+      await vi.waitFor(() => expect(asked).toBe(1), { timeout: timing('wait.hang') })
       const next = send(full({ hook_event_name: 'UserPromptSubmit', prompt_id: 'p4', prompt: 'and more' }))
       release()
       expect(context(await atStop)).toMatch(/^\[CW\] Before you finish: /)
@@ -413,7 +414,7 @@ describe('notices in the hook replies (#650)', () => {
           await sessions.handleHook(st.runId, body, reply)
           return reply
         })
-        await vi.waitFor(() => expect(asked).toBe(1), { timeout: 5000 })
+        await vi.waitFor(() => expect(asked).toBe(1), { timeout: timing('wait.hang') })
         // Stopped (gone), or started again as a new launch at work, while the notice is held.
         if (how === 'stop') s.live.delete(key)
         else s.live.set(key, { ...old, state: { ...old.state, runId: `${st.runId}-new`, status: 'working' }, ledger: newLedger() })
@@ -489,7 +490,7 @@ describe('notices in the hook replies (#650)', () => {
         emitted.length = 0
         recorded.length = 0
         const step = c.step(st)
-        await vi.waitFor(() => expect(h.at.reached, c.name).toBe(true), { timeout: 5000 })
+        await vi.waitFor(() => expect(h.at.reached, c.name).toBe(true), { timeout: timing('wait.hang') })
         const old = restart(st)
         h.release()
         const out = await step
@@ -543,7 +544,7 @@ describe('notices in the hook replies (#650)', () => {
       const h = where === 'config' ? holdNext('ensureProject') : holdNext('mutateSessions', 1)
       try {
         const recording = run(() => s3.recordSession.call(sessions, p, { id: st.agentId, name: `Rec ${where}` }, old))
-        await vi.waitFor(() => expect(h.at.reached, where).toBe(true), { timeout: 5000 })
+        await vi.waitFor(() => expect(h.at.reached, where).toBe(true), { timeout: timing('wait.hang') })
         // Started again: the new launch records its own session to resume.
         s.live.set(key, { ...old, state: { ...old.state, runId: `${st.runId}-new` }, ledger: newLedger() })
         if (where === 'cards') h.spy.mockRestore()
@@ -655,7 +656,7 @@ describe('notices in the hook replies (#650)', () => {
     }
     try {
       const atStop = send(stop)
-      await vi.waitFor(() => expect(asked).toBe(1), { timeout: 5000 })
+      await vi.waitFor(() => expect(asked).toBe(1), { timeout: timing('wait.hang') })
       const second = send(full({ hook_event_name: 'UserPromptSubmit', prompt: 'second' }))
       release()
       const drain = (await atStop) as { decision: string; reason: string }

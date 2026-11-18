@@ -8,6 +8,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { CombworkEvent } from '../src/shared/types'
 import type { ForYouSummary } from '../src/shared/workflow/workView'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-card-work-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -90,7 +91,7 @@ describe("a card's work from the board (#1223)", () => {
     expect(cardWork(w, archived)!.revisions[0].summary).toBe(marker)
   })
 
-  it('reads again only the cards a change touched, on a board shaped like a long-used one (#1629)', { timeout: 120_000 }, async () => {
+  it('reads again only the cards a change touched, on a board shaped like a long-used one (#1629)', { timeout: timing('test.hang') }, async () => {
     const w = await workspace()
     const facts = FactStore.forBoard(w, { project: 'p', key: 'P' })
     // As the maintainer's board: 1,277 archived cards from before 1.0, 140 live ones in Todo and Done, and 20 in flight with work.

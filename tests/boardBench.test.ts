@@ -9,6 +9,7 @@ import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 import type { WorkspaceService } from '../src/main/workspace'
+import { timing } from './timing.cjs'
 
 const source = process.env.CW_BOARD_BENCH_DB
 const base = tempDir('cw-board-bench-')
@@ -29,7 +30,7 @@ afterAll(async () => {
 })
 
 describe('the board on a real board’s copy', () => {
-  it.skipIf(!source)('reads and writes, timed', { timeout: 600_000 }, async () => {
+  it.skipIf(!source)('reads and writes, timed', { timeout: timing('test.hangRealJj') }, async () => {
     const ws = join(base, 'ws')
     mkdirSync(join(ws, '.combwork'), { recursive: true })
     const file = join(ws, '.combwork', 'combwork.db')

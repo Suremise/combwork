@@ -10,6 +10,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { Fact } from '../src/shared/workflow/facts'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-run-checks-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -27,7 +28,7 @@ type RunFor = import('../src/main/workflow/runChecks').CheckRunFor
 type Obs = InstanceType<typeof Observer>
 
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
 
 /** A repository on main with one commit (a.txt), `out/` ignored. */

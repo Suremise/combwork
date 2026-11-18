@@ -9,6 +9,7 @@ import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-attribution-burst-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -98,7 +99,7 @@ describe('a shared folder attributes a burst of commits in batches (HI-2379)', (
     // Once more: nothing new.
     await reconcileNow(w, repo, ['main'])
     expect(factsOf(w, card)).toHaveLength(facts.length)
-  }, 120_000)
+  }, timing('test.hang'))
 
   it("two cards in the folder: trailers across a batch's edge go to their card, the rest unattributed, each recorded once", async () => {
     const { w, repo } = await workspace('two')
@@ -122,5 +123,5 @@ describe('a shared folder attributes a burst of commits in batches (HI-2379)', (
     expect(recorded.filter((r) => r.card !== two).every((r) => r.card === null && r.how === 'unattributed')).toBe(true)
     expect(factsOf(w, two).filter((f) => f.kind === 'HeadMoved').map((f) => (f.data as { to: string }).to)).toEqual(toTwo)
     expect(factsOf(w, one).some((f) => f.kind === 'CommitAttributed' || f.kind === 'HeadMoved')).toBe(false)
-  }, 120_000)
+  }, timing('test.hang'))
 })

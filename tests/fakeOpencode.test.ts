@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 // The fake opencode (tests/e2e/fake-opencode, HI-2763) against what the real 2.2.6 did (tests/fixtures/opencode/real-2.2.6):
 // the suites trust it to behave as the real one, so each behaviour here is checked against its recording.
@@ -37,7 +38,7 @@ function ourConfig(servers: object = {}) {
 const run = (env: Env, args: string[], cwd?: string) => spawnSync(process.execPath, [FAKE, ...args], { env, cwd, encoding: 'utf8', windowsHide: true, input: '' })
 
 /** Polls until fn gives something truthy (a bound for a hung run, never how long it should take). */
-async function until<T>(fn: () => T | Promise<T>, what: string, ms = 20000): Promise<NonNullable<T>> {
+async function until<T>(fn: () => T | Promise<T>, what: string, ms = timing('wait.hang')): Promise<NonNullable<T>> {
   const end = Date.now() + ms
   for (;;) {
     const v = await fn()

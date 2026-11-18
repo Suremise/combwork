@@ -13,9 +13,10 @@ import { LANE_DEFAULT_EVENTS } from '../src/shared/laneWatch'
 import { tempDir } from './tempDir'
 import { storeDocs } from './storeDocs'
 import { follow } from './followDoorbell'
+import { timing } from './timing.cjs'
 
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 const nowOf = (over: Partial<AgentNow> = {}): AgentNow => ({ status: 'working', runId: 'r1', prompts: 1, pending: false, ...over })
 const b6 = { projectPath: 'C:\\ws\\demo', agentId: 'b6', name: 'B6', project: 'demo' }
@@ -1236,7 +1237,7 @@ describe('agent watches (main/watches.ts)', async () => {
     const card = async (title: string) => (await inWorkspace(w, () => tasks.createTask({ title, project: 'alpha', agent: 'a2', column: 'doing' }, user))).number
     // Waiting gives up after 10 s, not vi.waitFor's 1 s: four unit suites at once outran that writing the card's history
     // (#560). The bound only says when one has hung.
-    const HANG = { timeout: 10_000 }
+    const HANG = { timeout: timing('wait.hang') }
     for (const [i, change] of [['reassigned', { agent: 'a3' }], ['blocked', { blocked: 'Waiting for a decision' }]] as const) {
       // Builder (a1) awaits Reviewer's card in Review; it works, so the arrival waits to be typed; then the card changes.
       st.status = 'watching'

@@ -23,14 +23,15 @@ import { entriesChanged, ignoredOnly, jjEntries, RUN_NAMES_MAX, RUN_READS_AT_ONC
 import type { ViewOf } from '../src/main/platform/jjView'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 /** A bound for a hung run's waits (tests/README.md). */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 
 const profile = tempDir('cw-jjignored-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(profile, 'profile')
 
-describe.skipIf(!jjExe)('HI-3121: a jj builder’s check in its slot that writes ignored files', { timeout: 180_000 }, () => {
+describe.skipIf(!jjExe)('HI-3121: a jj builder’s check in its slot that writes ignored files', { timeout: timing('test.hangReal') }, () => {
   const h = harness()
   const o = new Observer()
   afterAll(() => o.dispose())

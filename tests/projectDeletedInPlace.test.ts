@@ -10,6 +10,7 @@ import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 // Git as the tests run it (#369, as combworkVcs.test.ts): the run context's environment, the shell's GIT_* kept out of main's.
 const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
@@ -23,9 +24,9 @@ const base = tempDir('cw-deleted-in-place-')
 
 const { configTestHooks, createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 
-vi.setConfig({ testTimeout: 30_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 /** Bounds a wait for a held read to be reached: only a hung read takes this long. */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 
 function project(ws: string, name: string, git = false): string {
   const p = join(ws, name)

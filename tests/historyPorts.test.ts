@@ -9,6 +9,7 @@ import { join, resolve } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 /** git commands this test fails (`notRun`, as a busy machine or an ended worker leaves them), by their first argument. */
 const failing = vi.hoisted(() => ({ cmd: null as string | null, ran: [] as string[] }))
@@ -37,7 +38,7 @@ const { pathChanges } = await import('../src/main/workflow/focusedRun')
 const { isUnknown } = await import('../src/main/platform/types')
 
 // Real git work, not a wait: a few git commands per test.
-vi.setConfig({ testTimeout: 60_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 afterEach(() => {
   gitTestHooks.started = undefined

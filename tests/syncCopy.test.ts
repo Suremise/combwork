@@ -6,6 +6,7 @@ import { appendFile, readFile, readdir, rm, stat, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { SYNC_STEP, syncCopy, syncCopyNow } from '../src/main/fsutil'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs')
 
@@ -118,12 +119,12 @@ describe('syncCopy', () => {
     })
     try {
       // Copies while it appends: each to a new backup, so each is a whole copy.
-      await vi.waitFor(async () => expect((await stat(src)).size).toBeGreaterThan(start), { timeout: 15_000 })
+      await vi.waitFor(async () => expect((await stat(src)).size).toBeGreaterThan(start), { timeout: timing('wait.hang') })
       for (let i = 0; i < 30; i++) await syncCopy(src, join(dir, `w-copy${i}.jsonl`))
     } finally {
       // Before afterEach removes the folder, pass or fail: told to stop, and ended by its own handle if it hangs.
       await writeFile(stop, '')
-      await vi.waitFor(() => expect(ended).toBe(true), { timeout: 15_000 }).catch(() => child.kill())
+      await vi.waitFor(() => expect(ended).toBe(true), { timeout: timing('wait.hang') }).catch(() => child.kill())
       await over
     }
     expect(spawnError).toBeNull()
@@ -132,7 +133,7 @@ describe('syncCopy', () => {
     expect(got.appends).toBeGreaterThan(0)
     expect(got.busy).toBe(0)
     expect(existsSync(join(dir, 'w-copy29.jsonl'))).toBe(true)
-  }, 60_000)
+  }, timing('test.hang'))
 
   it('appends each new byte once when copies overlap', async () => {
     const src = join(dir, 'c.jsonl')

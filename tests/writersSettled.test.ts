@@ -6,13 +6,14 @@ import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('writerssettled-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const { sessions } = await import('../src/main/sessions')
 
 /** The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take. */
-const HUNG_MS = 30_000
+const HUNG_MS = timing('wait.hang')
 const settling = (sessions as unknown as { writersSettling: Set<Promise<void>> }).writersSettling
 
 /** A release under way, as settleWriterOf keeps one until it is written; `written` ends it. */

@@ -10,6 +10,7 @@ import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 import { writeCardOutside } from './boardDb'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-queue-revs-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -45,7 +46,7 @@ async function workspace(): Promise<{ ws: string; w: WS }> {
 
 /** Runs `sql` on the board's file from another connection (another Combwork, a script), in a transaction of its own. */
 function outside(ws: string, sql: string, ...args: (string | number)[]): void {
-  const db = new DatabaseSync(store.boardFile(ws), { timeout: 5000 })
+  const db = new DatabaseSync(store.boardFile(ws), { timeout: timing('db.busyMs') })
   try {
     db.exec('PRAGMA foreign_keys = ON')
     db.prepare(sql).run(...args)

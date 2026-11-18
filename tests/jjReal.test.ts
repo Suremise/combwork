@@ -18,6 +18,7 @@ import { jjContextOf, type JjContext, type JjDetection } from '../src/main/platf
 import { gitRepoPorts } from '../src/main/platform/gitRepoPorts'
 import { sameStore } from '../src/main/platform/repoContext'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const require = createRequire(import.meta.url)
 const { portableJj } = require('./jjPortable.cjs') as { portableJj: () => string | null }
@@ -61,8 +62,8 @@ function treeHash(dir: string): string {
 
 describe.skipIf(!exe)(`the real jj (${TESTED_JJ.version})`, () => {
   const env = isolated()
-  const jj = (cwd: string, ...args: string[]): string => execFileSync(exe!, args, { cwd, env, windowsHide: true, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
-  const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, env, windowsHide: true, encoding: 'utf8', timeout: 60_000 })
+  const jj = (cwd: string, ...args: string[]): string => execFileSync(exe!, args, { cwd, env, windowsHide: true, encoding: 'utf8', timeout: timing('spawn.hang'), stdio: ['ignore', 'pipe', 'pipe'] })
+  const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, env, windowsHide: true, encoding: 'utf8', timeout: timing('spawn.hang') })
   const runner: JjRunner = createJjRunner({ exe: exe!, env })
   const opId = (root: string): string => jj(root, '--ignore-working-copy', 'op', 'log', '--no-graph', '--limit', '1', '-T', 'id').trim()
   const make = (name: string, ...init: string[]): string => {
@@ -273,8 +274,8 @@ describe.skipIf(!exe)(`the real jj (${TESTED_JJ.version})`, () => {
     // jj util exec keeps jj running while its command runs: the command says its pid and jj's (its parent), then waits.
     const script = `require('fs').writeFileSync(${JSON.stringify(said)}, JSON.stringify({ pid: process.pid, jj: process.ppid })); setTimeout(() => {}, 60000)`
     const ac = new AbortController()
-    const running = runner.run(root, ['util', 'exec', '--', process.execPath, '-e', script], { signal: ac.signal, timeout: 90_000 })
-    await expect.poll(() => existsSync(said), { timeout: 30_000 }).toBe(true)
+    const running = runner.run(root, ['util', 'exec', '--', process.execPath, '-e', script], { signal: ac.signal, timeout: timing('spawn.hang') })
+    await expect.poll(() => existsSync(said), { timeout: timing('wait.hang') }).toBe(true)
     const { pid, jj: jjPid } = JSON.parse(readFileSync(said, 'utf8')) as { pid: number; jj: number }
     // Each process by its identity (its pid and start time, #603): never a remembered pid alone.
     const [command, jjIs] = [identify([pid]), identify([jjPid])]

@@ -458,6 +458,24 @@ export class FactStore {
     return ofThis(Number(m[2]))
   }
 
+  /**
+   * HI-3367 (HR1's round 1, finding 1): who holds a card key across the workspace's board, not only this project: the card
+   * (and whether it is this project's), null when the key is one a project holds or held and no card has it (gone), and
+   * 'unknown' when the key's form or prefix isn't known here (never taken as gone). A read that fails throws.
+   */
+  ownerOfKey(key: string): { id: number; own: boolean } | null | 'unknown' {
+    const m = /^(.+)-(\d+)$/.exec(key.trim())
+    if (!m) return 'unknown'
+    const prefix = m[1]
+    const keyed = KEY_FORM.test(prefix) ? this.conn.read((db) => (keysHeld(db).some((k) => k.key === normalKey(prefix)) ? { card: cardOfKey(db, prefix, Number(m[2])) } : null)) : null
+    if (keyed) return keyed.card === null ? null : { id: keyed.card, own: this.isOwn(keyed.card) }
+    if (this.scope.key && prefix.toLowerCase() === this.scope.key.toLowerCase()) {
+      const c = this.cardByKey(key)
+      return c ? { id: c.id, own: true } : null
+    }
+    return 'unknown'
+  }
+
   /** HI-3233: whether card `id` is this project's (one of another project's has its work in another repository). */
   isOwn(id: number): boolean {
     return this.conn.read((db) => !!db.prepare('SELECT 1 FROM cards WHERE number = ? AND project = ?').get(id, this.scope.project))

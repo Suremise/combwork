@@ -7,6 +7,7 @@ import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-retention-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -67,7 +68,7 @@ describe('the largest supported catalog', () => {
       // Ten at once are two scans in turn (coalesced: the first, then one shared by the rest), each after a warm one (#1394).
       expect(nothing(await measure(`${entries} skills, 10 at once`, () => Promise.all(Array.from({ length: 10 }, () => scan(w, modePaths)))))).toEqual({ files: 0, bytes: 0, metaBytes: 0 })
       await disposeWorkspaceService(w)
-    }, 180_000)
+    }, timing('test.hangReal'))
   }
 
   it('with larger bodies (64 KB each, 300 skills): warm scans still read nothing', async () => {
@@ -77,7 +78,7 @@ describe('the largest supported catalog', () => {
     expect(cold.bytes).toBeGreaterThan(added * 65_000)
     expect(nothing(await measure('300 skills of 64 KB, warm', () => scan(w, modePaths)))).toEqual({ files: 0, bytes: 0, metaBytes: 0 })
     await disposeWorkspaceService(w)
-  }, 180_000)
+  }, timing('test.hangReal'))
 })
 
 describe('past the retention limits', () => {
@@ -100,7 +101,7 @@ describe('past the retention limits', () => {
       Object.assign(RETENTION, saved)
       await disposeWorkspaceService(w)
     }
-  }, 60_000)
+  }, timing('test.hang'))
 
   it('headers past their byte budget: the oldest go first, the most recent stay', async () => {
     const { w, ws } = await workspace('header-bytes', 40, 0)
@@ -120,5 +121,5 @@ describe('past the retention limits', () => {
       Object.assign(RETENTION, saved)
       await disposeWorkspaceService(w)
     }
-  }, 60_000)
+  }, timing('test.hang'))
 })

@@ -129,6 +129,8 @@
 //   it couldn't refresh: "Failed to authenticate: OAuth session expired and could not be refreshed", exit 1 (#577).
 //   With "late": true instead, nothing shows it until a prompt is sent: the prompt isn't taken (no turn, no hook) and
 //   "Not logged in · Run /login" shows under it, as Claude Code's status line did in #1321.
+// - With fake-launch-exit.json in CLAUDE_CONFIG_DIR ({ "code": n }), it exits with n once its session has started
+//   (SessionStart sent), before drawing its prompt (HI-3392).
 // - "/crash" typed in it exits with 1 at once, a CLI crashing by itself (HI-1881's stopped pane says so).
 // - `--model fail-start` makes it refuse to start, printing an error and exiting with 1, as Claude Code does for an
 //   argument it rejects.
@@ -1672,6 +1674,20 @@ async function main() {
     : null
   void connectOwnServer(server, held)
   await sessionStart(opts['--resume'] ? 'resume' : 'startup')
+  // HI-3392: fake-launch-exit.json in CLAUDE_CONFIG_DIR ({ "code": n }): it exits with n once its session has started
+  // (its SessionStart hook sent), before it draws its prompt, as Claude Code 2.1.327's blank starts in model trials did:
+  // Combwork keeps such a session, stopped.
+  const launchExit = (() => {
+    try {
+      return JSON.parse(fs.readFileSync(path.join(process.env.CLAUDE_CONFIG_DIR || '', 'fake-launch-exit.json'), 'utf8'))
+    } catch {
+      return null
+    }
+  })()
+  if (launchExit) {
+    process.exit(Number(launchExit.code ?? 1))
+    return
+  }
   promptLine()
   setInterval(() => void whileIdle(), 200)
   if (firstPrompt && take('fake-launch-hold')) while (!take('fake-launch-go')) await sleep(100)

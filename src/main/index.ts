@@ -1,4 +1,5 @@
 // First: the thread pool's size is set before anything uses it (HI-1702).
+import { applyAdvancedLimits } from './limitsApp'
 import './threadPool'
 import { setDbBusyMs } from './db'
 import { initWatches, onWatchedCardsMoved, watchKeepsQuitWaiting } from './watches'
@@ -1075,6 +1076,8 @@ app.whenReady().then(async () => {
   await startI18n(config.settings)
   // Advanced settings (#367): advanced.json's overrides, followed as it changes.
   advanced.load()
+  // HI-3372: the version-control ports' bounds (a commit, a fetch or push, the queue's network, jj) from those settings.
+  applyAdvancedLimits()
   // HI-3374: the databases' wait for another program's lock, before any of them opens (it applies from here on).
   setDbBusyMs(advanced.get<number>('cw.db.busySeconds') * 1000)
   // The user's own CLIs (HI-3196): their descriptions read and registered before anything looks for a provider.

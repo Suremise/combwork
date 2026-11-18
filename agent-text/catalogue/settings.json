@@ -1929,6 +1929,26 @@
     "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds: how long the project's command that chooses a card's focused tests may run, when the card is submitted and at its merge.",
     "audience": "both"
   },
+  "settings.advanced.cw.git.commitMinutes.desc": {
+    "text": "How long Commit and Set aside of a folder's changes may run, the repository's pre-commit hook, filters and signer included, before Combwork ends git as stuck. You can cancel one from the window at any time: this is a last resort for one nobody is watching. Raise it if a hook really runs longer.",
+    "note": "What the advanced setting \"Git: longest a commit or set aside takes\" does, and when to change it (Settings → Advanced, HI-3372).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.git.commitMinutes.title": {
+    "text": "Git: longest a commit or set aside takes",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes. Commit and Set aside are the buttons that commit or stash a folder's uncommitted changes (HI-3372).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.git.networkMinutes.desc": {
+    "text": "How long Fetch, Pull and Push in Version Control (and Push to…, pushing a tag, deleting remote branches) may run, a sign-in window included, before Combwork ends git as stuck. You can cancel one from the window at any time; raise it for a large first fetch or push on a slow connection.",
+    "note": "What the advanced setting \"Git: longest a fetch, pull or push takes\" does, and when to change it (Settings → Advanced, HI-3372). Push to… is an action's name.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.git.networkMinutes.title": {
+    "text": "Git: longest a fetch, pull or push takes",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes: the Fetch, Pull and Push actions in Version Control (HI-3372).",
+    "audience": "both"
+  },
   "settings.advanced.cw.guidance.desc": {
     "text": "With Combwork's tools, each project agent gets Combwork's guidance: how to use the tools, the board and handovers, and its project's latest handover. Claude Code and Copilot get it as the combwork server's instructions, Codex after your own developer_instructions. Turned off, agents still get Combwork's tools, without the guidance, from their next session. The Assistant always gets its own: they are its role.",
     "note": "What the advanced setting \"Combwork's guidance for agents\" does (Settings → Advanced, under Combwork). Claude Code, Copilot and Codex are CLIs' names, combwork the name of Combwork's MCP server and developer_instructions a Codex setting: keep them.",
@@ -1987,6 +2007,16 @@
   "settings.advanced.cw.inbox.stopContinuation.title": {
     "text": "Keep an agent going when it stops with unread items",
     "note": "An advanced setting's title (Settings → Advanced), listed under Combwork: when an agent is about to end its turn with items in its inbox it hasn't read, Combwork makes it carry on and read them.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.jj.commandSeconds.desc": {
+    "text": "How long one jj command Combwork runs may take, a snapshot of a large working copy included, before Combwork ends it: a read then counts as unknown, and a change made during a merge is left for you to settle. Raise it for a very large repository or a slow disk.",
+    "note": "What the advanced setting \"jj: longest a command takes\" does, and when to change it (Settings → Advanced, HI-3372). jj is the Jujutsu version control tool.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.jj.commandSeconds.title": {
+    "text": "jj: longest a command takes",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds. jj is the Jujutsu version control tool: keep its name (HI-3372).",
     "audience": "both"
   },
   "settings.advanced.cw.journal.builds.desc": {
@@ -2407,6 +2437,16 @@
   "settings.advanced.cw.queue.networkCodes.title": {
     "text": "Merge queue: network errors that count as temporary",
     "note": "An advanced setting's title (Settings → Advanced), listed under Combwork. The merge queue tests a card's work before merging it; a check that fails for the network, not the work, lets the card's builder submit the same revision again.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.queue.networkMinutes.desc": {
+    "text": "How long the merge queue's own fetches and pushes may take: pushing a merged target, a target that follows its remote (its fetch and push), reading the remote's head as a card starts, and Bring up to date. Past it git is ended and the merge waits or pauses. Raise it for a slow connection or a large repository.",
+    "note": "What the advanced setting \"Merge queue: longest a fetch or push takes\" does, and when to change it (Settings → Advanced, HI-3372). Bring up to date is an action's name.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.queue.networkMinutes.title": {
+    "text": "Merge queue: longest a fetch or push takes",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes: the merge queue's own fetches and pushes (HI-3372).",
     "audience": "both"
   },
   "settings.advanced.cw.queue.signSeconds.desc": {

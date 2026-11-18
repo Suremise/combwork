@@ -58,6 +58,7 @@ interface CombworkMessageValues {
   'shell.command.files.commitIgnore': undefined
   'shell.command.folderChanges.settle': undefined
   'shell.command.folderChanges.show': undefined
+  'shell.command.git.cancelRun': undefined
   'shell.command.help.about': { app: string | number }
   'shell.command.help.agentSetup': undefined
   'shell.command.help.api': undefined

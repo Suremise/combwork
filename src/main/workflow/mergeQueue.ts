@@ -423,8 +423,8 @@ function advanceApprovedIn(s: CardState, entry: string, expected: string, result
   })
 }
 
-/** The longest a signed merge commit runs when the config gives none (Advanced `cw.queue.signSeconds`'s default). */
-const SIGN_TIMEOUT_MS = 60_000
+/** The longest a signed merge commit runs when the config gives none (Advanced `cw.queue.signSeconds`'s default, HI-3372). */
+const SIGN_TIMEOUT_MS = 300_000
 
 /**
  * git as Combwork runs it, with no input (no terminal to prompt on), in an environment and within a bound: at the bound its

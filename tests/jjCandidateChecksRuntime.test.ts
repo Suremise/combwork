@@ -35,6 +35,7 @@ import { tempDir } from './tempDir'
 import { withGuardsWorker } from './guardsWorker'
 import { B1, R1, moved } from './workflow/harness'
 import { opts, started, world, type World } from './jjCardsWorld'
+import { timing } from './timing.cjs'
 
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
@@ -45,7 +46,7 @@ if (!jjExe) console.warn(`jjCandidateChecksRuntime.test.ts skipped: jj ${TESTED_
  * A hung test's bound, as jjCandidatesReal's (HI-2921): many real jj and git commands, and real check runs. A full unit
  * run on a loaded machine took one 62 s (HI-3349).
  */
-const REAL_JJ_MS = 200_000
+const REAL_JJ_MS = timing('wait.hangRealJj')
 const NODE = `"${process.execPath}"`
 const PASS = `${NODE} -e "process.exit(0)"`
 const FAIL = `${NODE} -e "console.log('lint: 1 problem');process.exit(1)"`
@@ -664,7 +665,7 @@ describe.skipIf(!jjExe)(`merge checks on a jj card's candidate (jj ${TESTED_JJ.v
       const child: ChildProcess = jobSpawn(job)(process.execPath, ['-e', "setInterval(()=>require('fs').writeFileSync('beat.txt',String(Date.now())),50)"], { cwd: copy, env: baseEnv() })
       ends.push(() => void child.kill())
       const beat = join(copy, 'beat.txt')
-      await vi.waitFor(() => expect(existsSync(beat)).toBe(true), { timeout: 30_000, interval: 50 })
+      await vi.waitFor(() => expect(existsSync(beat)).toBe(true), { timeout: timing('wait.hang'), interval: 50 })
       const j: ChecksJournal = { fp: rec.fp, attempt: rec.offer!.attempt, result: rec.offer!.result, expected: rec.offer!.expected, checksKey: rec.checks!.key, lease: old, checks: [{ name: 'typecheck', command: PASS, phase: 'started' }] }
       await w.deps.records!.write((db) => writeChecksJournal(db as unknown as SqlDb, checksJournalKey('p-jj', card.key, cycle, rec.offer!.attempt), j))
       x.h.lease = lease
@@ -680,18 +681,18 @@ describe.skipIf(!jjExe)(`merge checks on a jj card's candidate (jj ${TESTED_JJ.v
       expect(shown(w, card, cycle)?.checks).toMatchObject({ state: 'waiting', why: 'previous' })
       expect(leasedWhileAlive).toBe(0)
       const t0 = statSync(beat).mtimeMs
-      await vi.waitFor(() => expect(statSync(beat).mtimeMs).toBeGreaterThan(t0), { timeout: 30_000, interval: 50 })
+      await vi.waitFor(() => expect(statSync(beat).mtimeMs).toBeGreaterThan(t0), { timeout: timing('wait.hang'), interval: 50 })
       // Its tree ended (as the pool's barrier settles a returned lease's job): then the interrupted check runs again.
       expect(await job.end()).toBe(true)
       await job.close()
-      await vi.waitFor(async () => expect(await leaseJobGone(sup, old)).toBe(true), { timeout: 30_000, interval: 100 })
+      await vi.waitFor(async () => expect(await leaseJobGone(sup, old)).toBe(true), { timeout: timing('wait.hang'), interval: 100 })
       await due(w, card, cycle)
       next.checksWanted()
       await vi.waitFor(() => expect(next.checksBusy()).toBe(false), { timeout: REAL_JJ_MS, interval: 100 })
       expect(shown(w, card, cycle)?.checks).toMatchObject({ state: 'passed' })
       expect(x.leases.length).toBe(1)
       // The old tree ended before the new run leased its copy (no overlap): its process is gone.
-      await vi.waitFor(() => expect(child.exitCode !== null || child.signalCode !== null).toBe(true), { timeout: 30_000, interval: 50 })
+      await vi.waitFor(() => expect(child.exitCode !== null || child.signalCode !== null).toBe(true), { timeout: timing('wait.hang'), interval: 50 })
     })
   })
 

@@ -10,6 +10,7 @@ import { createJjRunner, type JjRunner } from '../src/main/platform/jjRunner'
 import { createJjWorkspacePort, type JjPortDeps, type JjWorkspacePort } from '../src/main/platform/jjWorkspacePort'
 import type { WorkspaceJournal } from '../src/main/platform/workspacePort'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const require = createRequire(import.meta.url)
 const { portableJj } = require('./jjPortable.cjs') as { portableJj: () => string | null }
@@ -88,8 +89,8 @@ export function harness(o: { busy?: string } = {}): Harness {
     },
     ...more
   })
-  const jj = (cwd: string, ...args: string[]): string => execFileSync(jjExe!, args, { cwd, env, windowsHide: true, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
-  const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, env, windowsHide: true, encoding: 'utf8', timeout: 60_000 })
+  const jj = (cwd: string, ...args: string[]): string => execFileSync(jjExe!, args, { cwd, env, windowsHide: true, encoding: 'utf8', timeout: timing('spawn.hang'), stdio: ['ignore', 'pipe', 'pipe'] })
+  const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, env, windowsHide: true, encoding: 'utf8', timeout: timing('spawn.hang') })
   const id = (cwd: string, rev: string): string => jj(cwd, '--ignore-working-copy', 'log', '--no-graph', '-r', rev, '-T', 'commit_id').trim()
   return {
     env,

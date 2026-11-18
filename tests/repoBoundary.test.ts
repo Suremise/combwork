@@ -12,6 +12,7 @@ import { build } from 'esbuild'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { gitRepo, sh } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 /** Each repository lock request the lock's worker got, in order: take or release, and its store. */
 const lockTrace: string[] = []
@@ -41,7 +42,7 @@ const { gitCantRead } = await import('../src/main/platform/workspacePorts')
 const { fileLockDepth } = await import('../src/main/fsutil')
 const { REPO_LOCK_FILE } = await import('../src/main/repoLockCore')
 
-vi.setConfig({ testTimeout: 60_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 afterEach(() => void (lockTrace.length = 0))
 
 const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs')
@@ -184,9 +185,9 @@ describe("the ports' folder answers for a non-colocated jj workspace (s13 §1)",
     expect(await withFolderRepoLocks([w.sub], async () => 'ran')).toBe('ran')
     expect(lockTrace.map((l) => l.split(' ')[0])).toEqual(['take', 'release'])
     expect(lockTrace.every((l) => real(l.slice(l.indexOf(' ') + 1)) === real(w.store))).toBe(true)
-    expect(real(join((await excludeFile(w.sub, { timeout: 5000 }))!, '..'))).toBe(real(join(w.store, 'info')))
-    expect(await trustRoot(w.sub, { timeout: 5000 })).toEqual({ none: true })
-    expect(await mainTree(w.sub, { timeout: 5000 })).toEqual({ main: resolve(realpathSync(w.jj)) })
+    expect(real(join((await excludeFile(w.sub, { timeout: timing('spawn.hang') }))!, '..'))).toBe(real(join(w.store, 'info')))
+    expect(await trustRoot(w.sub, { timeout: timing('spawn.hang') })).toEqual({ none: true })
+    expect(await mainTree(w.sub, { timeout: timing('spawn.hang') })).toEqual({ main: resolve(realpathSync(w.jj)) })
   })
 })
 
@@ -458,7 +459,7 @@ const [dir, out] = process.argv.slice(2)
 `
     )
     await build({ entryPoints: [entry], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
-  }, 60_000)
+  }, timing('hook.hang'))
   afterAll(() => {
     for (const c of children.splice(0)) if (c.exitCode === null) c.kill()
   })
@@ -468,12 +469,12 @@ const [dir, out] = process.argv.slice(2)
     const out = join(tmp, `held-${++n}.txt`)
     writeFileSync(out, '')
     children.push(spawn(process.execPath, [bundle, realpathSync(w.store), out], { env: ctx.baseEnv(), stdio: 'ignore', windowsHide: true }))
-    await vi.waitUntil(() => readFileSync(out, 'utf8').includes('held'), { timeout: 30_000, interval: 50 })
+    await vi.waitUntil(() => readFileSync(out, 'utf8').includes('held'), { timeout: timing('wait.hang'), interval: 50 })
     let ran = false
     await expect(withFolderRepoLocks([w.jj], async () => void (ran = true))).rejects.toThrow(/Another Combwork is merging/)
     expect(ran).toBe(false)
     writeFileSync(`${out}.release`, '')
-    await vi.waitUntil(() => readFileSync(out, 'utf8').includes('released'), { timeout: 30_000, interval: 50 })
+    await vi.waitUntil(() => readFileSync(out, 'utf8').includes('released'), { timeout: timing('wait.hang'), interval: 50 })
     expect(await withFolderRepoLocks([w.jj], async () => 'mine')).toBe('mine')
     expect(existsSync(w.store)).toBe(true)
   })

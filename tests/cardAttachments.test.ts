@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { junction } from './pathAliases'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-cardattach-')
 const trashDir = join(base, 'trash')
@@ -67,7 +68,7 @@ const trashed = (): string[] => {
 }
 const inside = (dir: string): string[] => (existsSync(dir) ? readdirSync(dir) : [])
 /** Bounds a wait for a hung run (HI-3349): the Recycle Bin's move ends after the commit, in the background, and Vitest's default 1 s is a budget a loaded runner outlasts. */
-const HUNG_MS = 20_000
+const HUNG_MS = timing('wait.hang')
 
 describe('keeping files with a card (HI-1700)', () => {
   it("copies a file into the card's folder, named by its number, with a row; the same bytes again give the one kept", async () => {

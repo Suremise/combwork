@@ -13,6 +13,7 @@ import { execFileSync } from 'child_process'
 import { join } from 'path'
 import type { Workflow } from '../../src/main/workflow/runtime'
 import type { WorkspaceService } from '../../src/main/workspace'
+import { timing } from '../timing.cjs'
 
 const ctx = vi.hoisted(() => ({
   wf: null as Workflow | null,
@@ -183,7 +184,7 @@ describe("a runner its git host failed (HI-2079)", () => {
     void kickQueue(ws, e.project, 'main')
     await run
     // A bound for a hung run only: its last release comes as its run ends.
-    await vi.waitFor(() => expect(ctx.events.at(-1)).toBe('released 3'), { timeout: 10_000 })
+    await vi.waitFor(() => expect(ctx.events.at(-1)).toBe('released 3'), { timeout: timing('wait.hang') })
     expect(ctx.events).toEqual(['acquire 1', 'fail 1', 'released 1', 'acquire 2', 'fail 2', 'released 2', 'acquire 3', 'pause 3', 'released 3'])
     expect(e.store.queuePause('main')).toMatchObject({ reason: 'needsYou', card: '' })
     expect(e.wf.state(card).stage).toBe('merging')
@@ -236,7 +237,7 @@ function deferred<T>() {
 // Bounds for a hung run only (#570): each wait waits for what it says. Under the test's own limit (testTimeout, 20 s in
 // vitest.config.ts) with room for its setup's git, so a run too slow or hung fails naming the wait and its last state,
 // not as a bare "Test timed out" (HI-2292: a 30 s bound could never report, and the failure's check was unknown).
-const HUNG = { timeout: 15_000, interval: 20 }
+const HUNG = { timeout: timing('wait.hang'), interval: 20 }
 
 describe("another Combwork's runner, watched (#1455, S50; HR4's #1358 round 1)", () => {
   it('watched while it lives, never run here; once its process is gone, this Combwork runs the queue and merges', async () => {

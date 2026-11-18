@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ActivityProcess } from '../src/shared/activity'
 import type { Lineage, Orphan } from '../src/main/orphanProcesses'
+import { timing } from './timing.cjs'
 
 const switchOn = vi.hoisted(() => ({ on: true }))
 // HI-3206: the minutes (10, the default) and the known hosts' pattern, as Settings → Advanced has them by default.
@@ -155,7 +156,7 @@ describe('a look as the timer makes it', () => {
     const second = lookForTests()
     // Its names are being read: nothing told yet, however often the agent's hooks ask.
     // Bounded for a hung run (HI-3349), not Vitest's 1 s, which a loaded runner outlasts.
-    await vi.waitFor(() => expect(release).not.toBe(null), { timeout: 20_000 })
+    await vi.waitFor(() => expect(release).not.toBe(null), { timeout: timing('wait.hang') })
     expect(orphanLinesFor(launch.projectPath, 'a1')).toBe('')
     release!([proc(20, created)])
     await second

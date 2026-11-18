@@ -38,6 +38,7 @@ import { takesOption } from '../src/shared/workflow/options'
 import { tempDir } from './tempDir'
 import { freshGitRepo, sh } from './workflow/harness'
 import { addedDiff } from '../src/main/platform/git'
+import { timing } from './timing.cjs'
 
 const fixture = (name: string): string => readFileSync(join(__dirname, 'fixtures', 'mergeGuards', name), 'utf8')
 const guard = (over: Partial<MergeGuard> = {}): MergeGuard => ({ name: 'No secrets', pattern: 'secret', message: 'Take it out.', ...over })
@@ -49,7 +50,7 @@ const files = (d: string): AddedFile[] => {
 
 // The longest a wait here waits: a bound for a hung run, never how long it should take (#570). Vitest's default 1 s is a
 // budget a loaded runner outlasts (HI-3349).
-const HUNG_MS = 30_000
+const HUNG_MS = timing('wait.hang')
 
 describe('the diff parser (recorded git 2.56.0 and jj 0.47.1 output)', () => {
   // The same change both tools describe: an added line, a deleted file, a binary change, a non-ASCII name with a space,
@@ -361,7 +362,7 @@ describe('the worker', () => {
     const runaway = [guard({ name: 'Quick' }), guard({ name: 'Runaway', pattern: '^(a+)+$' })]
     const text = `diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -0,0 +1 @@\n+${'a'.repeat(40)}!\n`
     // A time limit the pattern can't meet (2^40 steps), so the thread is ended mid-match.
-    const r = await checkMergeGuards(runaway, async () => ({ text }), { timeoutMs: 300, maxLines: 10 })
+    const r = await checkMergeGuards(runaway, async () => ({ text }), { timeoutMs: 300, maxLines: 10 }) // timing-ok: the timeout under test (its expiry is what the test checks)
     // HI-3377: not checked, the environment's (the same revision may go back), never a match.
     expect(r).toMatchObject({ hits: [], incomplete: 'timedOut:Runaway', transient: true })
     expect(guardFailureText(r)).toContain('guard "Runaway" ran past its time limit')
@@ -504,7 +505,7 @@ describe('the worker', () => {
     const text = `diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -0,0 +1 @@\n+${'a'.repeat(40)}!\n`
     const runaway = [guard({ name: 'Runaway', pattern: '^(a+)+$' })]
     await checkMergeGuards([guard()], async () => ({ text: diff }), limits)
-    await checkMergeGuards(runaway, async () => ({ text }), { timeoutMs: 200, maxLines: 10 })
+    await checkMergeGuards(runaway, async () => ({ text }), { timeoutMs: 200, maxLines: 10 }) // timing-ok: the timeout under test (its expiry is what the test checks)
     const ac = new AbortController()
     const cancelled = checkMergeGuards(runaway, async () => ({ text }), { ...limits, signal: ac.signal })
     await expect.poll(() => guardWorkers.live, { timeout: HUNG_MS }).toBe(1)

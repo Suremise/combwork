@@ -7,10 +7,11 @@ import { createRequire } from 'module'
 import { afterAll, describe, expect, it } from 'vitest'
 import { JobHost } from '../src/main/processSupervisor'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 60_000
+const HUNG_MS = timing('wait.hang')
 const dir = tempDir('cw-jobhost-running-')
 const started: ChildProcessWithoutNullStreams[] = []
 let launches = 0

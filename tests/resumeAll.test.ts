@@ -1,6 +1,7 @@
 // Resume All: only stopped agents with a conversation resume, running ones are skipped, failures don't stop the rest.
 import { describe, expect, it } from 'vitest'
 import { agentsToResume, resumeAll, type ResumeAllAgent } from '../src/shared/resumeAll'
+import { timing } from './timing.cjs'
 
 const agent = (name: string, state: 'running' | 'stopped' | 'none'): ResumeAllAgent => ({
   id: `a-${name}`,
@@ -46,7 +47,8 @@ describe('resume all', () => {
     let most = 0
     await resumeAll([agent('A', 'stopped'), agent('B', 'stopped'), agent('C', 'stopped')], async () => {
       most = Math.max(most, ++active)
-      await new Promise((r) => setTimeout(r, 5))
+      // Held across a turn of the event loop, so a second resume started meanwhile would overlap it.
+      await new Promise((r) => setTimeout(r, timing('pace.tick')))
       active--
     })
     expect(most).toBe(1)

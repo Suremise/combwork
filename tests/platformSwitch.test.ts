@@ -11,6 +11,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { B1, commit, moved, R1, setup } from './workflow/harness'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-vcswitch-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -72,7 +73,7 @@ async function workspace(o: { platform: 'git' | 'none'; workflow?: unknown; none
 }
 
 /** Moves a folder away, again while something holds it a moment (a watcher, the scanner: EPERM under load), within a bound for a hung run. */
-const moveAway = (from: string, to: string): Promise<void> => vi.waitFor(() => renameSync(from, to), { timeout: 20_000, interval: 100 })
+const moveAway = (from: string, to: string): Promise<void> => vi.waitFor(() => renameSync(from, to), { timeout: timing('wait.hang'), interval: 100 })
 
 const workflowOf = async (w: WS, repo: string) => (await w.projectConfig(repo)).workflow
 const platformOf = (w: WS, repo: string) => w.info()!.projects.find((p) => p.path === repo)!.platform!

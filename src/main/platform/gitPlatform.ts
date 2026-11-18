@@ -30,9 +30,9 @@ import { CW_DIR } from '../../shared/defaults'
 import type { TargetChanges } from '../../shared/types'
 import { shellLine } from '../../shared/workflow/queue'
 import type { DiffRead } from './types'
+// How long a slotted card's start waits on fetching the remote its target follows (HI-1183): cw.queue.networkMinutes (HI-3372).
+import { platformLimits } from './limits'
 
-/** How long a slotted card's start waits on fetching the remote its target follows (HI-1183). */
-const SLOT_FETCH_MS = 60_000
 
 /** A file's or folder's size and time, for a fingerprint ("gone" when it isn't there). */
 function statLine(p: string): string {
@@ -285,7 +285,7 @@ export class GitPlatform implements PlatformAdapter {
     if ('pause' in d && d.pause === 'noUpstream' && (await this.untracked(target))) return this.noUpstreamRefusal(target)
     if ('pause' in d) return withDetail(unknown(UNREADABLE.remoteSetup, { target }), d.files?.join(', '))
     const branch = d.snapshot.ref.replace(/^refs\/heads\//, '')
-    const f = await fetchHeadOf(h, d.snapshot, `refs/cw/fetch/${target.replace(/[^A-Za-z0-9._-]/g, '-')}`, SLOT_FETCH_MS)
+    const f = await fetchHeadOf(h, d.snapshot, `refs/cw/fetch/${target.replace(/[^A-Za-z0-9._-]/g, '-')}`, platformLimits.queueNetworkMs())
     if ('failed' in f) return withDetail(unknown(UNREADABLE.remoteHead, { branch, endpoint: d.snapshot.display, target }), f.failed)
     const local = await G.lineHead(this.project, target)
     if (isUnknown(local)) return local

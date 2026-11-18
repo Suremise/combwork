@@ -20,6 +20,7 @@ import { follow } from './followDoorbell'
 import { LANE_NEXT_STALL_MS, laneNextWaitReason, replyWaitReason, RETURN_STALL_MS, returnedWaitReason, setStallRuns, STALE_STALL_MS, staleWaitReason } from '../src/main/cardStall'
 import type { ProgressRun } from '../src/shared/types'
 import { resetAgentStartsForTests, startBegun, startEnded } from '../src/main/agentStarts'
+import { timing } from './timing.cjs'
 /** The merge queue's returns as queueReturnOf finds them (HI-1721), by card: none unless a test sets one. */
 const { returns, stales } = vi.hoisted(() => ({ returns: new Map<number, { at: string; text: string; builder: string | null }>(), stales: new Map<number, { since: string; approved: string | null; current: string | null }>() }))
 vi.mock('../src/main/queueReturn', () => ({ queueReturnOf: async (_ws: unknown, _p: string, n: number) => returns.get(n) ?? null, returnIn: () => null, resubmittedOf: async () => null, resubmittedIn: () => null, staleApprovalOf: async (_ws: unknown, _p: string, n: number) => stales.get(n) ?? null, staleIn: () => null }))
@@ -27,7 +28,7 @@ vi.mock('../src/main/queueReturn', () => ({ queueReturnOf: async (_ws: unknown, 
 const { resuming } = vi.hoisted(() => ({ resuming: new Set<string>() }))
 vi.mock('../src/main/restartResume', async (orig) => ({ ...(await orig<object>()), isResuming: (_p: string, id: string) => resuming.has(id) }))
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 const card = (over: Partial<LaneMark['cards'][string]> = {}) => ({ c: 'doing' as const, b: false, s: false, f: '', p: '', ...over })
 
@@ -721,7 +722,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
 
   // 27 cards and three lanes: about 2 s alone, 5 s with four runs at once, and past the 20 s default with twelve suites
   // four at once beside a full e2e set (#570's proofs). Its bound for a hung run fits that work.
-  const MANY_CARDS_HUNG_MS = 60_000
+  const MANY_CARDS_HUNG_MS = timing('wait.hang')
   it('"all" takes in a lane started later and cards added to a lane, with no card limit; events narrow what counts', async () => {
     const { w, alpha, home } = await open()
     const st = fake(alpha, home)

@@ -15,6 +15,7 @@ import { allOff, contradictions, preset, reviewerModeOf, takesOption, type Workf
 import { designReviewer, heldOnUser, openDesign, poolAssignments, preferredReviewer, reviewingNow, reviewsInProgress, submissionReviewers, type PoolAgent, type PoolCard } from '../src/shared/workflow/reviewerPool'
 import type { LaneRecord } from '../src/shared/lanes'
 import type { AgentDef } from '../src/shared/types'
+import { timing } from './timing.cjs'
 
 /** What the stand-ins do: the switch, the lanes, the agents' sessions, the slots' leases and the deliveries. */
 const state = vi.hoisted(() => ({
@@ -126,7 +127,7 @@ afterEach(() => {
 
 const E1 = agentActor('E1')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 const AGENTS: AgentDef[] = [
   { id: 'B1', name: 'B1', workflowRole: 'builder' },
   { id: 'B2', name: 'B2', workflowRole: 'builder' },
@@ -315,7 +316,7 @@ describe("the pool's choice (#1443)", () => {
   })
 })
 
-describe("the pool's pass (#1443)", { timeout: 60_000 }, () => {
+describe("the pool's pass (#1443)", { timeout: timing('test.hang') }, () => {
   it.each([1, 2] as const)('G1b %i × G17 × G11: every cell valid, each card reviewed by its lane reviewer or the pool', async (reviewers) => {
     for (const reviewerMode of ['lane', 'pool'] as const)
       for (const folder of ['slots', 'project'] as const) {
@@ -548,7 +549,7 @@ describe("the pool's pass (#1443)", { timeout: 60_000 }, () => {
   })
 })
 
-describe('a card in Review outside a lane (HI-2046): given to a free reviewer by the same pass', { timeout: 60_000 }, () => {
+describe('a card in Review outside a lane (HI-2046): given to a free reviewer by the same pass', { timeout: timing('test.hang') }, () => {
   const loose = (reviewers: 1 | 2 = 1, loopWakes = true) => {
     const e = (env = setup({ ...optionsFor(reviewers, 'lane', 'project'), loopWakes, platform: 'git' }, { autoRun: false }))
     state.wf = e.wf
@@ -713,7 +714,7 @@ describe('a card in Review outside a lane (HI-2046): given to a free reviewer by
   })
 })
 
-describe("a pool lane's design step (HI-2310): given out by the pool, its answerer preferred for the review", { timeout: 60_000 }, () => {
+describe("a pool lane's design step (HI-2310): given out by the pool, its answerer preferred for the review", { timeout: timing('test.hang') }, () => {
   const card = (n: number, at: string, o: Partial<PoolCard> = {}): PoolCard => ({ card: n, submission: 1, submittedAt: at, pool: true, builders: ['B1'], seen: [], reviewing: null, quorum: 1, passes: 0, ...o })
   const agent = (id: string, o: Partial<PoolAgent> = {}): PoolAgent => ({ id, role: 'reviewer', leased: false, idle: true, ...o })
   const f = (seq: number, kind: string, data: Record<string, unknown>, actor = 'combwork') => ({ seq, kind, at: `t${seq}`, actor, data })
@@ -851,7 +852,7 @@ describe("a pool lane's design step (HI-2310): given out by the pool, its answer
   })
 })
 
-describe("a reviewer whose card waits on its own question to the user is free for the pool's other cards (HI-2559)", { timeout: 60_000 }, () => {
+describe("a reviewer whose card waits on its own question to the user is free for the pool's other cards (HI-2559)", { timeout: timing('test.hang') }, () => {
   const card = (n: number, at: string, o: Partial<PoolCard> = {}): PoolCard => ({ card: n, submission: 1, submittedAt: at, pool: true, builders: ['B1'], seen: [], reviewing: null, quorum: 1, passes: 0, ...o })
   const agent = (id: string, o: Partial<PoolAgent> = {}): PoolAgent => ({ id, role: 'reviewer', leased: false, idle: true, ...o })
 
@@ -938,7 +939,7 @@ describe("a reviewer whose card waits on its own question to the user is free fo
   })
 })
 
-describe('a reviewer watching a card is free for the pool (HI-2333): only what it reviews, checks or runs holds it', { timeout: 60_000 }, () => {
+describe('a reviewer watching a card is free for the pool (HI-2333): only what it reviews, checks or runs holds it', { timeout: timing('test.hang') }, () => {
   /** One reviewer, R1, as in the cli project's pool that stalled. */
   const ONE = AGENTS.filter((a) => a.id !== 'R2')
   const reviewer = (e: Env, id: number) => async () => designReviewer(e.store.facts(id), () => true)
@@ -1121,7 +1122,7 @@ describe('a reviewer watching a card is free for the pool (HI-2333): only what i
  * aborts its lifetime and gives the same service a new one), and fake timers for the retry's deadline and the board's
  * debounce. What it waits for are the pool's own counts (its passes run and going, its retries pending and fired).
  */
-describe("a refused pool line's retry through the pool's events (HI-2343)", { timeout: 60_000 }, () => {
+describe("a refused pool line's retry through the pool's events (HI-2343)", { timeout: timing('test.hang') }, () => {
   const ONE = AGENTS.filter((a) => a.id !== 'R2')
   const RETRY = 5000
   /** Polled on the event loop's check phase, which fake timers leave alone; bounded for a hung run. */

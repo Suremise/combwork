@@ -10,6 +10,7 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-servers-')
 const home = join(base, 'claude-home')
@@ -46,7 +47,7 @@ const { legacyLaunchSettings: agentLaunchSettings } = await import('../src/share
 // Dummy keys shaped so no other masking rule catches them: only the key matcher can.
 const KEY = 'Zq!7#mP2&vL9^tR4~wX8'
 const KEY2 = 'Hn%3*bQ6(kD1)yU5+eW2'
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 const outcome = (p: Promise<unknown>): Promise<string> => p.then(() => 'ok', (e: Error) => e.message)
 const keyFile = join(profile, 'connection-keys.json')
 

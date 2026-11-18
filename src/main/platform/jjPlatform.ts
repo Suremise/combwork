@@ -26,12 +26,20 @@ import type { CardRecord } from '../workflow/factStore'
 import type { ReconcileHooks } from '../workflow/reconcile'
 import type { Workflow } from '../workflow/runtime'
 import type { AdvanceAnswer, AdvanceHost, AdvanceRef, AdvanceStep, AdvanceWords, PreviewWords, CheckBracket, FinishInputs, HeadMove, KeptWork, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
-import { AdvanceJournals, baseRefusalNow, classifyUndoNow, commitsAdded, fingerprintHash, journalAbandoned, journalNewUndo, journalRequested, journalSettled, journalUndoAs, planIdOf, recoverAdvance, resultContained, runAdvance, runUndo, underLock, undoOfferedNow, undoPreMutation, type AdvanceJournal, type AdvanceOutcome, type Held, type JjAdvanceDeps, type JjAdvancePlan } from './jjAdvance'
+import { AdvanceJournals, attemptPreMutation, baseRefusalNow, classifyUndoNow, commitsAdded, fingerprintHash, journalAbandoned, journalNewUndo, journalRequested, journalSettled, journalUndoAs, planIdOf, recoverAdvance, resultContained, runAdvance, runUndo, underLock, undoOfferedNow, undoPreMutation, type AdvanceJournal, type AdvanceOutcome, type Held, type JjAdvanceDeps, type JjAdvancePlan } from './jjAdvance'
 import { ADVANCE_GATES, ADVANCE_PREVIEW_GATE, ADVANCE_UNCERTAIN_GATE, advanceUnresolved, approvedByUser } from '../../shared/workflow/facts'
 import { finishAdvances, finishPreviews } from '../../shared/workflow/options'
 
 /** HI-3236: the consent an attempt runs under: the automatic finish's, or a preview's click. */
 type AdvanceMode = 'auto' | 'preview'
+
+/**
+ * HI-3365: the outcomes past the base where nothing moved for a reason of jj's own (its prepare failed or gave no
+ * operation id, or gave one that isn't the move asked for). jj answers the same plan the same way, so the plan isn't
+ * tried again this cycle; `leaseLost` (another writer came) and `unreadable` (a read failed: a lasting one stops the
+ * base check before any attempt) are tried again.
+ */
+const HELD_AFTER_BASE = new Set(['notInHistory', 'prepareInvalid'])
 import { okBeforeApplies } from '../../shared/workflow/guards'
 import { dirname } from 'path'
 import { samePath } from '../../shared/movePaths'
@@ -194,6 +202,9 @@ const oneLine = (m: string): string => m.split(/\r?\n/)[0].trim()
 class SamenessUnread extends Error {}
 
 const checksLog = createLogger('jj')
+
+/** HI-3390: how many times a preview's click is read again when its reason to run nothing changed during its write. */
+const PREVIEW_REREADS = 3
 
 /** HI-2938: what the app gives the candidate checks (jjCards.ts). */
 export interface JjChecksHost {
@@ -881,6 +892,27 @@ export class JjPlatform implements PlatformAdapter {
     return facts.some((f) => f.kind === 'AdvanceAttempted' && undone.has((f.data as FactData['AdvanceAttempted']).attempt) && (f.data as FactData['AdvanceAttempted']).plan === planId)
   }
 
+  /**
+   * HI-3365: the plans whose live attempt ended past the base with nothing moved for a reason of jj's own
+   * (HELD_AFTER_BASE), each for the jj that answered: not attempted again while the plan, the cycle and jj stay the same.
+   * Kept in memory, so a restart (a Combwork update among them, which may read jj's answers differently) tries once more;
+   * the card's comment is still written once (its meta). One recovery classifies after a crash isn't held.
+   */
+  private readonly heldPlans = new Set<string>()
+
+  private heldKey(card: CardRecord, cycle: number, planId: string, runner: JjAdvanceDeps['runner']): string {
+    return `${card.id}:${cycle}:${planId}:${runner.readinessNow().version ?? ''}`
+  }
+
+  private planHeld(card: CardRecord, s: CardState, planId: string, runner: JjAdvanceDeps['runner']): boolean {
+    return this.heldPlans.has(this.heldKey(card, s.cycle, planId, runner))
+  }
+
+  /** The finish a card's attempts run under now (HI-3236): a clicked preview, else Combwork's own advance. */
+  private modeOf(c: CardRecord, s: CardState): AdvanceMode {
+    return finishPreviews(this.wf!.rulesetOf(c, s).options.finish) ? 'preview' : 'auto'
+  }
+
   /** Whether the card's cycle has an `AdvanceAttempted` fact for the attempt. */
   private attemptRecorded(card: CardRecord, cycle: number, attempt: string): boolean {
     return this.wf!.store.facts(card.id).some((f) => f.seq >= cycle && f.kind === 'AdvanceAttempted' && (f.data as FactData['AdvanceAttempted']).attempt === attempt)
@@ -892,7 +924,7 @@ export class JjPlatform implements PlatformAdapter {
   }
 
   /** An outcome recorded through the host (s10 §A), and the journal marked settled once it is. Whether Integrated was. */
-  private async recordAdvance(h: Held, deps: JjAdvanceDeps, card: CardRecord, j: AdvanceJournal, out: AdvanceOutcome, host: AdvanceHost): Promise<boolean> {
+  private async recordAdvance(h: Held, deps: JjAdvanceDeps, card: CardRecord, j: AdvanceJournal, out: AdvanceOutcome, host: AdvanceHost, live = false): Promise<boolean> {
     const wf = this.wf!
     const ref: AdvanceRef = { cycle: j.plan.cycle, attempt: j.attempt }
     const s = wf.state(wf.store.card(card.id))
@@ -933,7 +965,13 @@ export class JjPlatform implements PlatformAdapter {
     if (out.kind === 'nothingMoved') {
       if (await host.resolved(card, ref, 'nothingMoved', `${out.code}${out.detail ? `: ${out.detail}` : ''}`)) await journalSettled(h, deps, j, 'nothingMoved', { detail: out.code })
       // Refused at the base for something the user can see to (s30 §1): the card says why, once.
-      if (j.refusedAt && out.code !== 'moved') await host.refused(card, j.plan.cycle, j.planId, this.advanceWords(j, s, out.code, out.detail))
+      const mode = this.modeOf(wf.store.card(card.id), s)
+      if (j.refusedAt && out.code !== 'moved') await host.refused(card, j.plan.cycle, j.planId, { ...this.advanceWords(j, s, out.code, out.detail), mode, next: 'repository' })
+      // HI-3365: past the base, for a reason of jj's: not tried again for this plan (planHeld), and the card says why, once.
+      else if (live && !j.refusedAt && HELD_AFTER_BASE.has(out.code)) {
+        this.heldPlans.add(this.heldKey(card, j.plan.cycle, j.planId, deps.runner))
+        await host.refused(card, j.plan.cycle, j.planId, { ...this.advanceWords(j, s, out.code, out.detail), mode, next: 'plan' })
+      }
       return false
     }
     const stop = { code: out.code, ...(out.detail ? { detail: out.detail } : {}), undo: out.kind === 'stopped' && out.undo, uncertain: out.kind === 'uncertain' }
@@ -964,6 +1002,9 @@ export class JjPlatform implements PlatformAdapter {
     const wf = this.wf!
     const card = wf.store.card(card0.id)
     const cycle = wf.state(card).cycle
+    // HI-3367: its live journals of earlier cycles (a card put back and restarted) retired first, read again here under
+    // its locks: none is ever answered again. Until each is, no attempt or preview of this cycle runs (false: busy).
+    if (!(await this.retireOthers(journals, card.key, card, cycle, cycle, host, integ.view.store))) return false
     const recovery = this.advanceDeps(integ, journals, () => true)
     const listed = await journals.list(card.key, cycle)
     for (const { attempt, journal } of listed) {
@@ -1032,7 +1073,7 @@ export class JjPlatform implements PlatformAdapter {
         if (!this.consentHolds(c, s, 'auto')) return 'notReady'
         // HI-3265 (HI-2709): a blocker that isn't Done holds the advance; the card is tried again once it's Done.
         if (host.waitsFor(c).length) return 'notReady'
-        const ready = await this.readyPlan(h, integ, journals, c, s, host)
+        const ready = await this.readyPlan(h, integ, journals, c, s, host, 'auto')
         if (!ready) return 'notReady'
         await host.noteDefault(c)
         const out = await this.attemptUnder(h, integ, journals, c, s, ready.plan, ready.planId, host, 'auto')
@@ -1051,17 +1092,19 @@ export class JjPlatform implements PlatformAdapter {
    * HI-3264: that check is read-only, before any journal or fact. A refusal writes nothing but the card's comment (once
    * per cycle, plan and reason; none for a target that moved, whose candidate is built again), so a cause that persists
    * while jj operations come and go costs a read on each pass, never a journal or facts; jj unreadable: not ready.
+   * HI-3365: nor a plan an attempt of which ended past the base with nothing moved for a reason of jj's (planHeld).
+   * `mode` words the refusal (a preview's finish never moves the target by itself).
    */
-  private async readyPlan(h: Held, integ: JjIntegrationDeps, journals: AdvanceJournals, c: CardRecord, s: CardState, host: AdvanceHost): Promise<{ plan: JjAdvancePlan; planId: string } | null> {
+  private async readyPlan(h: Held, integ: JjIntegrationDeps, journals: AdvanceJournals, c: CardRecord, s: CardState, host: AdvanceHost, mode: AdvanceMode): Promise<{ plan: JjAdvancePlan; planId: string } | null> {
     const ready = await this.advancePlan(c, s, integ)
     if (!ready) return null
     const planId = planIdOf(ready.plan)
-    if (this.planUndone(c, s, planId) || !(await this.offerCurrent(ready.plan.target, ready.offer))) return null
+    if (this.planUndone(c, s, planId) || this.planHeld(c, s, planId, integ.runner) || !(await this.offerCurrent(ready.plan.target, ready.offer))) return null
     const refused = await baseRefusalNow(h, this.advanceDeps(integ, journals, () => true), ready.plan)
     if (refused === 'unreadable') return null
     if (refused) {
       const detail = refused.kind === 'nothingMoved' ? (refused.detail ?? '') : ''
-      if (refused.kind === 'nothingMoved' && refused.code !== 'moved') await host.refused(c, s.cycle, planId, { target: ready.plan.target, result: ready.plan.result, why: refused.code, detail })
+      if (refused.kind === 'nothingMoved' && refused.code !== 'moved') await host.refused(c, s.cycle, planId, { target: ready.plan.target, result: ready.plan.result, why: refused.code, detail, mode, next: 'repository' })
       return null
     }
     return { plan: ready.plan, planId }
@@ -1077,7 +1120,7 @@ export class JjPlatform implements PlatformAdapter {
       return { step: 'busy', integrated: false }
     }
     const { outcome, journal } = await runAdvance(h, deps, j)
-    return { step: { attempted: attempt }, integrated: await this.recordAdvance(h, deps, c, journal, outcome, host) }
+    return { step: { attempted: attempt }, integrated: await this.recordAdvance(h, deps, c, journal, outcome, host, true) }
   }
 
   /**
@@ -1105,7 +1148,7 @@ export class JjPlatform implements PlatformAdapter {
         if (pending) return 'busy'
         // HI-3265: no preview while a blocker isn't Done (its Integrate couldn't start the attempt).
         if (host.waitsFor(c).length) return 'notReady'
-        const ready = await this.readyPlan(h, integ, journals, c, s, host)
+        const ready = await this.readyPlan(h, integ, journals, c, s, host, 'preview')
         if (!ready || host.previewDeclined(c, s.cycle, ready.planId)) return 'notReady'
         const open = s.requests.find((r) => r.gate === ADVANCE_PREVIEW_GATE)
         if (open?.result === ready.planId) return 'notReady'
@@ -1146,10 +1189,31 @@ export class JjPlatform implements PlatformAdapter {
       await host.declinePreview(c, s.cycle, ans.plan)
       return false
     }
-    if (c.stage !== 'approved' || s.integrated || advanceUnresolved(s) || !this.consentHolds(c, s, 'preview') || host.waitsFor(c).length) return false
-    const ready = await this.readyPlan(h, integ, journals, c, s, host)
+    // HI-3367: the card's earlier attempts settled first (an earlier cycle's retired), as before any attempt.
+    if (!(await this.settleAdvances(h, integ, journals, c, host))) return false
+    // HI-3390: a click whose consent went since its preview was asked (the finish changed, a blocker added) runs nothing,
+    // and the card says why (once for the request), never dropped silently. The reason is read again in that write: gone
+    // there ('changed', HR1's round 1), the click is read again here (a few times: each a change of the board between two
+    // reads), and runs if its consent holds now. Not said ('failed', or still changing): the action fails, never done
+    // without its explanation (the preview comes back by the next reconcile where the finish still previews).
+    let c2 = wf.store.card(card.id)
+    let s2 = wf.state(c2)
+    for (let tries = 0; ; tries++) {
+      c2 = wf.store.card(card.id)
+      s2 = wf.state(c2)
+      if (s2.cycle !== ans.cycle || c2.stage !== 'approved' || s2.integrated || advanceUnresolved(s2)) return false
+      const waits = host.waitsFor(c2)
+      const finishGone = !finishPreviews(wf.rulesetOf(c2, s2).options.finish)
+      if (!finishGone && !waits.length) break
+      const said = await host.previewClosed(c2, s2.cycle, finishGone ? 'finish' : 'blocked', waits, ans.request)
+      if (said === 'recorded' || said === 'already') return false
+      if (said === 'failed') throw new Error("advance preview: why its Integrate ran nothing couldn't be recorded") // i18n-ignore: an action's failure, for the log
+      if (tries >= PREVIEW_REREADS) throw new Error("advance preview: its Integrate's conditions kept changing") // i18n-ignore: an action's failure, for the log
+    }
+    if (!this.consentHolds(c2, s2, 'preview')) return false
+    const ready = await this.readyPlan(h, integ, journals, c2, s2, host, 'preview')
     if (!ready || ready.planId !== ans.plan) return false
-    return (await this.attemptUnder(h, integ, journals, c, s, ready.plan, ready.planId, host, 'preview')).integrated
+    return (await this.attemptUnder(h, integ, journals, c2, s2, ready.plan, ready.planId, host, 'preview')).integrated
   }
 
   /**
@@ -1248,6 +1312,108 @@ export class JjPlatform implements PlatformAdapter {
     }
   }
 
+  /**
+   * HI-3367: a card's live journals in cycles other than `keep` (null: all, an archived card's) retired, under its card
+   * lock and the repository lock (its caller's). Each is marked superseded on the card first, in one write with its comment
+   * when it may have moved its target (attemptPreMutation), then archived whole. Kept live where that write wasn't
+   * committed, or the archive failed (the next pass archives it, its marker saying it was told). False: one is still live.
+   * HR1's round 2: only what this adapter's locks fence is retired. The card is read again as this project's here (moved
+   * to another project while the locks were waited for: false, nothing touched), and a journal only when its plan names
+   * `store`, the repository whose lock is held. One of another repository (a card moved here from another project) is
+   * that repository's writer's: left live, untouched, and not waited for (its move wasn't in this repository). One that
+   * can't be read can't be fenced: its notice is given once (its marker), and it is left live, not waited for again.
+   */
+  private async retireOthers(journals: AdvanceJournals, fileKey: string, card: CardRecord, keep: number | null, cycleNow: number, host: AdvanceHost, store: string): Promise<boolean> {
+    const wf = this.wf!
+    let ok = true
+    let listed: Awaited<ReturnType<AdvanceJournals['others']>>
+    try {
+      listed = await journals.others(fileKey, keep)
+    } catch (e) {
+      // HI-3367 (HR1's round 1, finding 2): the folder can't be listed: what it holds is unknown, so not settled (busy).
+      checksLog.warn(`listing ${userText(card.key)}'s advance journals`, e) // i18n-ignore: a log line, English
+      return false
+    }
+    if (!listed.length) return true
+    try {
+      const owner = wf.store.ownerOfKey(fileKey)
+      if (!wf.store.isOwn(card.id) || owner === 'unknown' || !owner || !owner.own || owner.id !== card.id) return false
+    } catch (e) {
+      checksLog.warn(`reading ${userText(card.key)}'s project`, e) // i18n-ignore: a log line, English
+      return false
+    }
+    for (const o of listed) {
+      if (o.journal !== 'unreadable' && !samePath(o.journal.plan.store, store)) continue
+      const warn = attemptPreMutation(o.journal) ? null : { target: o.journal !== 'unreadable' ? o.journal.plan.target : (wf.state(card).started?.target ?? '-') }
+      if ((await host.superseded(card, { cycle: o.cycle, attempt: o.attempt }, warn)) === 'failed') {
+        ok = false
+        continue
+      }
+      if (o.journal === 'unreadable') continue
+      try {
+        await journals.supersede(o.name, o.journal, cycleNow)
+      } catch (e) {
+        ok = false
+        checksLog.warn(`archiving ${userText(card.key)}'s superseded advance journal`, e) // i18n-ignore: a log line, English
+      }
+    }
+    return ok
+  }
+
+  /**
+   * HI-3367: live journals whose card isn't one of the project's active cards. The folder is the workspace's, shared by its
+   * projects (HR1's round 1, finding 1), so the journal's key is looked up across the whole board (ownerOfKey): another
+   * project's card, or a key not known here, is never this adapter's to touch; a read that fails keeps them too. This
+   * project's archived card has its journals retired whole (every cycle) under its card lock and the repository lock,
+   * rechecked there: unarchived meanwhile, they stay for its own settling. A key held here whose card is gone has no card
+   * lock: the repository lock is the fence (an attempt holds it from its first journal to its outcome), the card rechecked
+   * gone under it, and only a journal whose plan names this repository's store is archived, with nothing said (no card to
+   * say it on); one that can't be read, or of another store, stays.
+   */
+  private async retireStray(integ: JjIntegrationDeps, journals: AdvanceJournals, fileKey: string, host: AdvanceHost): Promise<void> {
+    const wf = this.wf!
+    let owner: ReturnType<typeof wf.store.ownerOfKey>
+    try {
+      owner = wf.store.ownerOfKey(fileKey)
+    } catch (e) {
+      checksLog.warn(`reading the card of advance journals ${userText(fileKey)}`, e) // i18n-ignore: a log line, English
+      return
+    }
+    if (owner === 'unknown' || (owner && !owner.own)) return
+    if (owner) {
+      const id = owner.id
+      if (!wf.store.isArchived(id)) return
+      await this.withCardLock(id, () =>
+        underLock(integ.view.store, integ.lock, async () => {
+          // Read again under the locks (HR1's round 2): still archived, and still this project's (retireOthers).
+          if (!wf.store.isArchived(id)) return
+          const now = wf.store.card(id)
+          await this.retireOthers(journals, fileKey, now, null, wf.state(now).cycle, host, integ.view.store)
+        })
+      )
+      return
+    }
+    await underLock(integ.view.store, integ.lock, async () => {
+      let listed: Awaited<ReturnType<AdvanceJournals['others']>>
+      try {
+        if (wf.store.ownerOfKey(fileKey) !== null) return
+        listed = await journals.others(fileKey, null)
+      } catch (e) {
+        checksLog.warn(`advance journals ${userText(fileKey)} of a gone card kept`, e) // i18n-ignore: a log line, English
+        return
+      }
+      for (const o of listed) {
+        if (o.journal === 'unreadable' || !samePath(o.journal.plan.store, integ.view.store)) continue
+        try {
+          await journals.supersede(o.name, o.journal, null)
+          checksLog.info(`advance journal ${userText(o.name)} retired: its card is gone`) // i18n-ignore: a log line, English
+        } catch (e) {
+          checksLog.warn(`archiving advance journal ${userText(o.name)} of a gone card`, e) // i18n-ignore: a log line, English
+        }
+      }
+    })
+  }
+
   /** HI-3235: the project's journaled advances settled (a crash, a card no reconcile reached), card by card under its locks. */
   async recoverAdvances(host: AdvanceHost): Promise<void> {
     const d = this.deps
@@ -1255,8 +1421,19 @@ export class JjPlatform implements PlatformAdapter {
     const journals = this.advanceJournals()
     if (!wf || !d?.records || !journals) return
     const keys = new Set((await journals.all()).filter((j) => !j.settled || j.settled === 'stopped' || j.settled === 'uncertain').map((j) => j.plan.card.toLowerCase()))
-    const cards = wf.store.cards().filter((c) => keys.has(c.key.toLowerCase()) || advanceUnresolved(wf.state(c)))
-    if (!cards.length) return
+    const active = wf.store.cards()
+    const cards = active.filter((c) => keys.has(c.key.toLowerCase()) || advanceUnresolved(wf.state(c)))
+    // HI-3367: and journals of cards that aren't active (archived, or gone), which no card's settling reaches.
+    const own = new Set(active.map((c) => c.key.toLowerCase()))
+    let named = new Set<string>()
+    try {
+      named = await journals.cardsNamed()
+    } catch (e) {
+      // Unlistable: no stray is retired this pass (what the folder holds is unknown).
+      checksLog.warn('listing the advance journals', e) // i18n-ignore: a log line, English
+    }
+    const strays = [...named].filter((k) => !own.has(k.toLowerCase()))
+    if (!cards.length && !strays.length) return
     const integ = await d.integration()
     if (!integ) {
       // jj unreadable now: nothing classified, but an unsettled attempt keeps a question (its journal read only for its words).
@@ -1264,6 +1441,7 @@ export class JjPlatform implements PlatformAdapter {
       return
     }
     for (const c of cards) await this.withCardLock(c.id, () => underLock(integ.view.store, integ.lock, (h) => this.settleAdvances(h, integ, journals, c, host)))
+    for (const k of strays) await this.retireStray(integ, journals, k, host)
   }
 
   /** Whether a target's head is still `expected` (J5's read): false when it moved or can't be read. */

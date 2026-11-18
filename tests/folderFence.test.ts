@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { sessions } from '../src/main/sessions'
 import { changingFolder, folderChanging, folderSteady } from '../src/main/folderFence'
 import { whyNoLine } from '../src/main/lineWriter'
+import { timing } from './timing.cjs'
 
 const project = 'C:/fake-ws/alpha'
 const id = 'a1'
@@ -68,13 +69,13 @@ describe("a folder being changed holds Combwork's lines to the agents working in
       let ended = false
       const confirmed = writer.confirmTaken(project, id, { runId: 'run1', count: 0 }, '[CW] line').finally(() => (ended = true))
       // Its first window passes with the line not taken; then it waits on the folder, pressing nothing.
-      await vi.waitFor(() => expect(writer.confirmsInFlight()).toBe(1), { timeout: 5000 })
-      await new Promise<void>((r) => setTimeout(r, 200)) // on purpose: well past its 50 ms window, to see no Enter comes
+      await vi.waitFor(() => expect(writer.confirmsInFlight()).toBe(1), { timeout: timing('wait.hang') })
+      await new Promise<void>((r) => setTimeout(r, 200)) // on purpose: well past its 50 ms window, to see no Enter comes // timing-ok: a pause past the code's own window (a product value): its length is the point
       expect(writes).toEqual([])
       expect(ended).toBe(false)
       open()
       await pull
-      await vi.waitFor(() => expect(writes).toEqual(['\r']), { timeout: 5000 })
+      await vi.waitFor(() => expect(writes).toEqual(['\r']), { timeout: timing('wait.hang') })
       // Taken after it: confirmed.
       ;(live.get(key) as { prompts: number }).prompts = 1
       expect(await confirmed).toBe(true)

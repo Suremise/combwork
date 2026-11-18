@@ -17,8 +17,8 @@ describe('Claude Code background tasks', () => {
       lines(
         { type: 'user', timestamp: t, toolUseResult: { stdout: '', stderr: '', interrupted: false, backgroundTaskId: 'bkqkq2vgh' } },
         { type: 'user', timestamp: t, toolUseResult: { stdout: '', backgroundTaskId: 'bum6823gu', timedOutAfterMs: 120000 } },
-        { type: 'user', timestamp: t, toolUseResult: { taskId: 'bi9giyn5m', timeoutMs: 1800000, persistent: false } },
-        { type: 'user', timestamp: t, toolUseResult: { taskId: 'bpersist1', timeoutMs: 1800000, persistent: true } }
+        { type: 'user', timestamp: t, toolUseResult: { taskId: 'bi9giyn5m', timeoutMs: 1800000, persistent: false } }, // timing-ok: data, not a wait
+        { type: 'user', timestamp: t, toolUseResult: { taskId: 'bpersist1', timeoutMs: 1800000, persistent: true } } // timing-ok: data, not a wait
       )
     )
     expect(out).toEqual([

@@ -7,6 +7,7 @@ import { basename, join } from 'path'
 import { describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-opencode-')
 process.env.CW_USER_DATA = join(base, 'userdata')
@@ -353,13 +354,13 @@ describe.runIf(process.platform === 'win32')('a launch prepared and built (again
     expect([basename(cmd.env!.CW_OC_EXE).toLowerCase(), basename(cmd.env!.CW_OC_PREFIX)]).toEqual(['node.exe', 'fake-opencode.cjs'])
     // Built once: a second build of the same launch is a bug.
     expect(() => opencode.buildCommand(FAKE, c as never)).toThrow()
-  }, 60000)
+  }, timing('test.hang'))
 
   it("refuses Claude Agent's models, Combwork's own flags in extra arguments, and a resume of a session another account made", async () => {
     await expect(opencode.prepareLaunch(ctx({ model: 'claude-agent/claude-opus-5-5' }))).rejects.toThrow(/Claude Agent/)
     await expect(opencode.prepareLaunch(ctx({ extraArgs: ['--server http://evil'] }))).rejects.toThrow(/--server/)
     await expect(opencode.prepareLaunch(ctx({ resume: true }))).rejects.toThrow(/another OpenCode account/)
-  }, 60000)
+  }, timing('test.hang'))
 
   it('resumes a session the account made (its record there), as a resume', async () => {
     const c = ctx({ resume: true }) as { connectionHome: string; sessionId: string }
@@ -369,7 +370,7 @@ describe.runIf(process.platform === 'win32')('a launch prepared and built (again
     await opencode.prepareLaunch(c as never)
     expect(opencode.buildCommand(FAKE, c as never).env).toMatchObject({ CW_OC_INTENT: 'resume' })
     expect(existsSync(sessionMark(c.connectionHome, c.sessionId))).toBe(true)
-  }, 60000)
+  }, timing('test.hang'))
 
   it("the connection's own provider only (HI-2769): no model or a malformed one refused, new or resumed; an unknown but valid id taken; the switch off (or the terminal preset) takes none and adds no allowlist", async () => {
     const OWN = 'opencode.override.ownProviderOnly'
@@ -390,7 +391,7 @@ describe.runIf(process.platform === 'win32')('a launch prepared and built (again
     const terminal = ctx({ model: null, overrides: { 'opencode.override.noAutoUpdate': false, 'opencode.override.keepProjectConfigOut': false, 'opencode.override.stripCredentials': false, [OWN]: false } }) as { privateDir: string }
     await opencode.prepareLaunch(terminal as never)
     expect(providerRules(terminal)).toEqual(['claude-agent:deny'])
-  }, 60000)
+  }, timing('test.hang'))
 
   it("asks before an outside folder (HI-2775): every launch, new or resumed, in any mode; the review copies, its skills and its temp folder allowed; the switch off (or the terminal preset) adds no rule", async () => {
     const { sessionMark } = await import('../src/main/providers/opencode/launcher')
@@ -436,7 +437,7 @@ describe.runIf(process.platform === 'win32')('a launch prepared and built (again
       expect(JSON.stringify(written(c))).not.toContain('external_directory')
       expect(opencode.buildCommand(FAKE, c as never).env).toMatchObject({ CW_OC_RULES: '', CW_OC_RULES_AGENT: '' })
     }
-  }, 60000)
+  }, timing('test.hang'))
 
   it("an effort is the model's variant, checked against this account's listing of exactly that model (HI-2767); refused when it can't be set", async () => {
     const withModels = (models: string, over: Record<string, unknown> = {}) => ctx({ env: childEnv({ OPENAI_API_KEY: 'sk-ambient', CW_AGENT: 'Agent 1', FAKE_OPENCODE_MODELS: models }), ...over })
@@ -459,7 +460,7 @@ describe.runIf(process.platform === 'win32')('a launch prepared and built (again
     const noModel = ctx({ model: null, overrides: off }) as never
     await opencode.prepareLaunch(noModel)
     expect(opencode.buildCommand(FAKE, noModel).env).toMatchObject({ CW_OC_MODEL: '', CW_OC_VARIANT: '' })
-  }, 120000)
+  }, timing('test.hang'))
 
   it("gives the launch's first task to the TUI as --prompt (a Combwork start, the Assistant's), none without one", async () => {
     const c = ctx({ initialPrompt: '[CW] Work on "AL-1"\u001fnow', permissionMode: 'build' }) as never
@@ -468,7 +469,7 @@ describe.runIf(process.platform === 'win32')('a launch prepared and built (again
     const d = ctx({ permissionMode: 'build' }) as never
     await opencode.prepareLaunch(d)
     expect(opencode.buildCommand(FAKE, d).env!.CW_OC_TUI_ARGS).toBe('')
-  }, 60000)
+  }, timing('test.hang'))
 })
 
 describe("the real tier's test provider (CW_TEST_OPENCODE_PROVIDER, HI-2763): a test seam, never the production recipe", async () => {

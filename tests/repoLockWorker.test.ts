@@ -13,6 +13,7 @@ import { REPO_LOCK_FILE, repoLockHolder } from '../src/main/repoLockCore'
 import type { LockReply, LockRequest } from '../src/main/repoLockWorker'
 import { useLockWorker, withRepoLock } from '../src/main/repoLock'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const tmp = tempDir('cw-repo-lock-worker-')
 const bundle = join(tmp, 'repo-lock-worker.cjs')
@@ -20,7 +21,7 @@ const bundle = join(tmp, 'repo-lock-worker.cjs')
 beforeAll(async () => {
   await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'repoLockWorker.ts')], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
   useLockWorker(bundle)
-}, 60_000)
+}, timing('hook.hang'))
 afterAll(() => useLockWorker(null))
 
 let n = 0
@@ -66,7 +67,7 @@ describe("the repository lock's worker (HI-1680)", () => {
     // Well under the busy wait's second: on main's thread the gap is the whole wait (1155 ms, against 19 ms here).
     expect(gap).toBeLessThan(700)
     expect(await withRepoLock(folder, async () => 'ran')).toBe('ran')
-  }, 60_000)
+  }, timing('test.hang'))
 
   it('a lock held by a worker that ended is released by its token by the next worker', async () => {
     const { dir } = repo()
@@ -93,5 +94,5 @@ describe("the repository lock's worker (HI-1680)", () => {
     } finally {
       await second.terminate()
     }
-  }, 60_000)
+  }, timing('test.hang'))
 })

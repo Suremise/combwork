@@ -12,6 +12,7 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 // The real Git reads, with a switch making `released` unknown (an unreadable repository, for the recovery case).
 const flaky = vi.hoisted(() => ({ unknown: false, watchNull: false }))
@@ -106,13 +107,13 @@ async function project(o: { noNext?: boolean; released?: boolean } = {}): Promis
 }
 
 /** Polls (a condition, never a time) for the followed project's offer to be `ok`. */
-async function offerSoon(w: WS, repo: string, ok: (o: ReturnType<typeof currentOffer>) => boolean, ms = 20_000) {
+async function offerSoon(w: WS, repo: string, ok: (o: ReturnType<typeof currentOffer>) => boolean, ms = timing('wait.hang')) {
   const end = Date.now() + ms
   for (;;) {
     const o = currentOffer(w, repo)
     if (ok(o)) return o
     if (Date.now() > end) throw new Error(`offer never came: ${JSON.stringify(o)}`)
-    await new Promise((r) => setTimeout(r, 50))
+    await new Promise((r) => setTimeout(r, timing('wait.interval')))
   }
 }
 const readsOf = (repo: string): number => releaseOfferTestHooks.reads.get(repo.toLowerCase()) ?? 0
@@ -150,7 +151,8 @@ describe('a release offer followed (HI-3155)', () => {
     // Ticks with nothing moved read nothing more.
     const before = readsOf(repo)
     const until = Date.now() + 1000
-    while (Date.now() < until) await new Promise((r) => setTimeout(r, 100))
+    // A quiet window of ticks: a read in it is the failure (nothing is the point).
+    while (Date.now() < until) await new Promise((r) => setTimeout(r, timing('wait.interval')))
     expect(readsOf(repo)).toBe(before)
     git(repo, 'branch', '1.5.0')
     await offerSoon(w, repo, (o) => o?.move?.moveTo === '1.5.0')
@@ -175,7 +177,7 @@ describe('a release offer followed (HI-3155)', () => {
     const { w, repo } = await project()
     // Read and found unknown (more than once: it stays due), never an offer on it.
     const end = Date.now() + 20_000
-    while (readsOf(repo) < 2 && Date.now() < end) await new Promise((r) => setTimeout(r, 50))
+    while (readsOf(repo) < 2 && Date.now() < end) await new Promise((r) => setTimeout(r, timing('wait.interval')))
     expect(readsOf(repo)).toBeGreaterThanOrEqual(2)
     expect(currentOffer(w, repo)).toBeNull()
     flaky.unknown = false
@@ -270,7 +272,8 @@ describe('a release offer whose refs can’t be watched (HR2’s round 1)', () =
     const until = Date.now() + 2000
     while (Date.now() < until) {
       releaseOfferTestHooks.look(repo)
-      await new Promise((r) => setTimeout(r, 100))
+      // A quiet window after each look: a read in it, looped, is the failure (nothing is the point).
+      await new Promise((r) => setTimeout(r, timing('quiet.briefMs')))
     }
     expect(readsOf(repo)).toBe(1)
     expect(currentOffer(w, repo)?.move?.moveTo).toBe('1.5.0')
@@ -278,11 +281,12 @@ describe('a release offer whose refs can’t be watched (HR2’s round 1)', () =
     flaky.watchNull = false
     lookAgain(repo)
     const end = Date.now() + 20_000
-    while (readsOf(repo) < 2 && Date.now() < end) await new Promise((r) => setTimeout(r, 50))
+    while (readsOf(repo) < 2 && Date.now() < end) await new Promise((r) => setTimeout(r, timing('wait.interval')))
     const now = readsOf(repo)
     for (let i = 0; i < 5; i++) {
       releaseOfferTestHooks.look(repo)
-      await new Promise((r) => setTimeout(r, 100))
+      // A quiet window after each look: a read in it, looped, is the failure (nothing is the point).
+      await new Promise((r) => setTimeout(r, timing('quiet.briefMs')))
     }
     expect(readsOf(repo)).toBe(now)
   })

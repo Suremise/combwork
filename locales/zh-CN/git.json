@@ -13,6 +13,7 @@
   "git.branches.cleanUp": "清理已合并分支…",
   "git.branches.cleanUpTip": "{n, plural, =0 {没有已合并到 {target} 且未使用的分支。} other {此处或远程有 # 个分支已合并到 {target} 且未使用：选择要删除的分支。}}",
   "git.branches.copyRevision": "复制修订版本 {revision}",
+  "git.branches.deletingOn": "正在删除 {remote} 上的分支…",
   "git.branches.earlierCards": "{n, plural, other {+# 张之前的卡片}}",
   "git.branches.group": "{group, select, inUse {使用中} merged {已合并到 {target}} other {未合并到 {target}}}",
   "git.branches.groupTip": "{group, select, inUse {目标分支、默认分支、项目文件夹的分支，以及槽位、工作树或未完成的卡片正在使用的分支。} merged {它们的每个提交都已在 {target} 中，且没有任何东西在使用：“清理已合并分支”会删除它们。} other {这些分支有不在 {target} 中的提交。请先检查删除会丢弃的提交，再删除。}}",

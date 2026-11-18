@@ -12,6 +12,7 @@ import { tempDir } from './tempDir'
 import { junction } from './pathAliases'
 import { clearJournal, journalPath, LeaseJob, leaseJobGone, queueHost, retireSeal, sealJournal, sweepSeals } from '../src/main/workflow/queueJobs'
 import type { JobHost } from '../src/main/processSupervisor'
+import { timing } from './timing.cjs'
 
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
@@ -72,7 +73,7 @@ describe.runIf(process.platform === 'win32')("a seal goes once its job is gone (
     expect(runs()).toBe(true)
     // Let go: kill on close ends what it ran, and the seal goes.
     await job.close()
-    await vi.waitFor(() => expect(runs()).toBe(false), { timeout: 30_000, interval: 100 })
+    await vi.waitFor(() => expect(runs()).toBe(false), { timeout: timing('wait.hang'), interval: 100 })
     expect(await retireSeal(root, lease, dir, gone)).toBe(true)
     expect(existsSync(seal)).toBe(false)
     expect(readdirSync(dir)).toEqual([])
@@ -97,7 +98,7 @@ describe.runIf(process.platform === 'win32')("a seal goes once its job is gone (
     expect(existsSync(seal)).toBe(true)
     // That supervisor ends (its relay gone, its input closes): the job closes with it, and the next sweep takes the seal.
     expect(endExactly(relay)).toBe(1)
-    await vi.waitFor(async () => expect(await sweepSeals(root, dir, gone)).toBe(1), { timeout: 30_000, interval: 250 })
+    await vi.waitFor(async () => expect(await sweepSeals(root, dir, gone)).toBe(1), { timeout: timing('wait.hang'), interval: 250 })
     expect(existsSync(seal)).toBe(false)
   })
 })

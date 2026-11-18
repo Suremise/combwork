@@ -11,8 +11,9 @@ import { JJ_REFUSED, keptNote } from '../src/main/platform/jjWorkspacePort'
 import type { JjPortDeps } from '../src/main/platform/jjWorkspacePort'
 import type { JjRunner, JjRunResult, JjRunOptions } from '../src/main/platform/jjRunner'
 import { harness, jjExe } from './jjWorkspaceHarness'
+import { timing } from './timing.cjs'
 
-const REAL_JJ_MS = 180_000
+const REAL_JJ_MS = timing('wait.hangReal')
 /** A commit id no repository here has: jj's add fails on it after the folder is there ("doesn't exist"). */
 const NO_SUCH = 'f'.repeat(40)
 

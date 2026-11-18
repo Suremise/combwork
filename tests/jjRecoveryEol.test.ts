@@ -12,6 +12,7 @@ import { recoverStale, storedForm, type GitRun, type RecoveryResult } from '../s
 import { isUnknown } from '../src/main/platform/types'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const yes = { still: () => true }
 const quiet = async (): Promise<boolean> => true
@@ -69,7 +70,7 @@ async function staleRun(eol: string | null, colocated: boolean, crlf = false): P
   const id = (await h.port.identity!(slot))!
   const git: GitRun = async (cwd, args) => {
     try {
-      const buf = execFileSync('git', args, { cwd, env: h.env, windowsHide: true, timeout: 60_000, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
+      const buf = execFileSync('git', args, { cwd, env: h.env, windowsHide: true, timeout: timing('spawn.hang'), maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
       return { ok: true, out: buf.toString('utf8'), buf, err: '' }
     } catch (e) {
       const err = e as { stderr?: Buffer; stdout?: Buffer }
@@ -83,7 +84,7 @@ async function staleRun(eol: string | null, colocated: boolean, crlf = false): P
   return { r, slot, files: readdirSync(slot).sort(), head, divergent }
 }
 
-describe.skipIf(!jjExe)('Recover… with jj line-ending conversion on (HI-3098)', { timeout: 120_000 }, () => {
+describe.skipIf(!jjExe)('Recover… with jj line-ending conversion on (HI-3098)', { timeout: timing('test.hang') }, () => {
   for (const colocated of [true, false]) {
     const layout = colocated ? 'colocated' : 'non-colocated'
     it(`control, no conversion (${layout}): only the local edit restored, no copies`, async () => {

@@ -9,6 +9,7 @@ import { dirname, join } from 'path'
 import { createRequire } from 'module'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const fsState = vi.hoisted(() => ({ renames: [] as [string, string][], gate: null as Promise<void> | null }))
 vi.mock('fs/promises', async (original) => {
@@ -37,7 +38,7 @@ const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 20_000
+const HUNG_MS = timing('wait.hang')
 
 afterEach(() => {
   fsState.renames.length = 0
@@ -52,7 +53,7 @@ function folder(): string {
   return f
 }
 
-describe('the quiet check, several at once on one folder (HI-1753)', { timeout: 60_000 }, () => {
+describe('the quiet check, several at once on one folder (HI-1753)', { timeout: timing('test.hang') }, () => {
   it('runs one rename pair and shares its answer; the folder is in place and nothing is logged', async () => {
     const f = folder()
     let open!: () => void

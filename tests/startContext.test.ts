@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { ProviderAdapter } from '../src/main/providers/types'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-start-context-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -303,7 +304,7 @@ describe('the start context in the hook replies (#1065)', () => {
         const st = agent(slow.adapter)
         const t0 = Date.now()
         expect(await post(st, snapshot())).toBeNull()
-        expect(Date.now() - t0).toBeLessThan(2000)
+        expect(Date.now() - t0).toBeLessThan(timing('budget.promptEndMs'))
         await started
         // Its view done only after the deadline: the discarded step ends, having sent nothing.
         release()
@@ -315,10 +316,10 @@ describe('the start context in the hook replies (#1065)', () => {
         const hung = intoSession({ hold: true })
         const t1 = Date.now()
         expect(await post(agent(hung.adapter), snapshot())).toBeNull()
-        expect(Date.now() - t1).toBeLessThan(2000)
+        expect(Date.now() - t1).toBeLessThan(timing('budget.promptEndMs'))
         expect(hung.calls.map((c) => [c.text, c.aborted])).toEqual([['[CW] view (startup)', true]])
         // Its request cut off at the deadline (uncertain): told too.
-        await vi.waitFor(() => expect(skipped.mock.calls.map((c) => c[1])).toEqual(['slow', 'notSent']), { timeout: 5000 })
+        await vi.waitFor(() => expect(skipped.mock.calls.map((c) => c[1])).toEqual(['slow', 'notSent']), { timeout: timing('wait.hang') })
       } finally {
         skipped.mockRestore()
         told.mockRestore()

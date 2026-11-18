@@ -9,6 +9,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import * as electron from 'electron'
 import type { RetryWait } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-retry-wait-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -21,7 +22,7 @@ const { newLedger } = await import('../src/main/turnLedger')
 const { runtimeLabel } = await import('../src/shared/runtime')
 
 /** The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take. */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 const wsPath = join(base, 'ws')
 const p = join(wsPath, 'alpha')
 type State = { runId: string; agentId: string; sessionId: string; status: string; provider: string; turn?: { state: string }; retryWait?: RetryWait; runtime?: unknown }

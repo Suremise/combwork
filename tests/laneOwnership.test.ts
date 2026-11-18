@@ -13,9 +13,10 @@ import { laneNextText, laneStatus, laneStatusText, type LaneCardFacts } from '..
 import { laneHits, type LaneNow } from '../src/shared/laneWatch'
 import { tempDir } from './tempDir'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 /** The bound for a hung run: the lanes are read again within it after each change. */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 
 const base = tempDir('cw-lane-ownership-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -32,7 +33,7 @@ const { deliveriesOf } = await import('../src/main/deliveries')
 const { agentActor } = await import('../src/shared/workflow/facts')
 const tables = await import('../src/main/storeTables')
 
-vi.setConfig({ testTimeout: 60_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 afterEach(async () => {
   await advanced.set(ENFORCE, true)

@@ -11,8 +11,9 @@ import * as electron from 'electron'
 import type { DeliverySender } from '../src/shared/deliveries'
 import { tempDir } from './tempDir'
 import { admitted } from './admitted'
+import { timing } from './timing.cjs'
 
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 const pause = vi.hoisted(() => ({ on: false }))
 vi.mock('../src/main/teamPause', async (orig) => ({ ...(await orig<object>()), pausedFor: () => (pause.on ? { pauseId: 'p1', since: new Date().toISOString(), by: 'user' } : null) }))
@@ -92,7 +93,7 @@ describe("the team pause's hold on deliveries (HI-2081)", async () => {
     pause.on = true
     const since = new Date(Date.now() - 5_000).toISOString()
     const w = await wake({ expiresMs: 200 })
-    await new Promise((r) => setTimeout(r, 400)) // on purpose: past its expiry, to see it isn't expired while held
+    await new Promise((r) => setTimeout(r, 400)) // on purpose: past its expiry, to see it isn't expired while held // timing-ok: a pause past the code's own window (a product value): its length is the point
     await deliveries.offerNow(alpha, 'b1')
     expect(await states()).toEqual([`${w.id} queued`])
     pause.on = false

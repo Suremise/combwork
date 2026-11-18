@@ -14,6 +14,7 @@ import { AdvancedStore, advanced, bindAdvancedSettings, mcpAdvancedEnv, resetSet
 import { DEFAULT_SETTINGS, mergeDefaults } from '../src/shared/defaults'
 import type { AppSettings } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const ROOT = join(__dirname, '..')
 const def = (id: string): AdvancedDef => advancedDef(id)!
@@ -316,7 +317,7 @@ describe('the advanced store', () => {
     expect(s.pattern('codex.trust.prompt').source).toBe('trust it')
     // Changed by hand while Combwork runs: read again when the file changes.
     writeFileSync(file, JSON.stringify({ format: 1, values: { 'codex.trust.prompt': 'trust here' } }))
-    await vi.waitFor(() => expect(s.pattern('codex.trust.prompt').source).toBe('trust here'), { timeout: 10_000 })
+    await vi.waitFor(() => expect(s.pattern('codex.trust.prompt').source).toBe('trust here'), { timeout: timing('wait.hang') })
   })
 
   it('writes back the CLI version a hand edit was made for, so a restart after the CLI updates still flags it', async () => {
@@ -325,7 +326,7 @@ describe('the advanced store', () => {
     writeFileSync(file, JSON.stringify({ values: { 'codex.trust.prompt': 'trust it', 'codex.ready.placeholder': 'Ask Codex' }, madeFor: { 'codex.ready.placeholder': { version: '0.150.0', value: 'Ask' } } }))
     s.noteCli('codex', '0.162.1')
     s.load(dir)
-    await vi.waitFor(() => expect(read(file).madeFor).toEqual({ 'codex.trust.prompt': { version: '0.162.1', value: 'trust it' }, 'codex.ready.placeholder': { version: '0.162.1', value: 'Ask Codex' } }), { timeout: 10_000 })
+    await vi.waitFor(() => expect(read(file).madeFor).toEqual({ 'codex.trust.prompt': { version: '0.162.1', value: 'trust it' }, 'codex.ready.placeholder': { version: '0.162.1', value: 'Ask Codex' } }), { timeout: timing('wait.hang') })
     s.stop()
     // Combwork starts again after Codex updated.
     const again = store().s
@@ -375,7 +376,7 @@ describe('the advanced store', () => {
     expect(read(file).values).toEqual({ 'acme.someday': 1 })
     expect(s.number('cw.mcp.replySeconds')).toBe(300)
     writeFileSync(file, '{')
-    await vi.waitFor(() => expect(s.state(null).fileError).toBeTruthy(), { timeout: 10_000 })
+    await vi.waitFor(() => expect(s.state(null).fileError).toBeTruthy(), { timeout: timing('wait.hang') })
     await expect(s.resetAll()).rejects.toThrow('Fix or delete advanced.json')
     expect(readFileSync(file, 'utf8')).toBe('{')
   })
@@ -422,7 +423,7 @@ describe('the advanced store', () => {
       expect([read(file).values, on()]).toEqual([{}, false])
       // The file edited by hand: the setting follows.
       writeFileSync(file, JSON.stringify({ format: 1, values: { 'cw.showDeveloperFeatures': true } }))
-      await vi.waitFor(() => expect(on()).toBe(true), { timeout: 10_000 })
+      await vi.waitFor(() => expect(on()).toBe(true), { timeout: timing('wait.hang') })
       expect(advanced.diagnostics([null])).toEqual(['- Advanced settings: 1 override (cw.showDeveloperFeatures)'])
       // Set from the list: the setting too.
       await advanced.set('cw.showDeveloperFeatures', false)
@@ -486,7 +487,7 @@ describe('the advanced store', () => {
     // Two provider checks finishing together, nothing awaited between them.
     s.noteCli('claude-code', '2.1.296')
     s.noteCli('codex', '0.162.1')
-    await vi.waitFor(() => expect([read(file).madeFor['claude-code.trust.prompt']?.version, read(file).madeFor['codex.trust.prompt']?.version]).toEqual(['2.1.296', '0.162.1']), { timeout: 10_000 })
+    await vi.waitFor(() => expect([read(file).madeFor['claude-code.trust.prompt']?.version, read(file).madeFor['codex.trust.prompt']?.version]).toEqual(['2.1.296', '0.162.1']), { timeout: timing('wait.hang') })
     expect([s.state(null).madeFor['claude-code.trust.prompt'].version, s.state(null).madeFor['codex.trust.prompt'].version]).toEqual(['2.1.296', '0.162.1'])
     await Promise.all([s.set('cw.mcp.replySeconds', 600), s.set('cw.wait.cardMaxSeconds', 700), s.set('codex.hooks.timeoutSeconds', 7), s.keep('codex.trust.prompt')])
     expect(read(file).values).toMatchObject({ 'cw.mcp.replySeconds': 600, 'cw.wait.cardMaxSeconds': 700, 'codex.hooks.timeoutSeconds': 7, 'codex.trust.prompt': 'trust (this|the) folder' })
@@ -506,13 +507,13 @@ describe('the advanced store', () => {
       await updateSettingsChecked({ general: { showTips: false } }, update)
       expect(updates).toHaveLength(2)
       writeFileSync(file, '{')
-      await vi.waitFor(() => expect(advanced.state(null).fileError).toBeTruthy(), { timeout: 10_000 })
+      await vi.waitFor(() => expect(advanced.state(null).fileError).toBeTruthy(), { timeout: timing('wait.hang') })
       await expect(updateSettingsChecked({ advanced: { showDeveloperFeatures: false } }, update)).rejects.toThrow('Fix advanced.json')
       expect(updates).toHaveLength(2)
       expect(readFileSync(file, 'utf8')).toBe('{')
       // An edit made since Combwork read the file: refused, the edit read.
       writeFileSync(file, JSON.stringify({ values: { 'cw.showDeveloperFeatures': true } }))
-      await vi.waitFor(() => expect(advanced.state(null).fileError).toBeNull(), { timeout: 10_000 })
+      await vi.waitFor(() => expect(advanced.state(null).fileError).toBeNull(), { timeout: timing('wait.hang') })
       advanced.stop()
       writeFileSync(file, JSON.stringify({ values: { 'cw.showDeveloperFeatures': true, 'cw.mcp.replySeconds': 400 } }))
       await expect(updateSettingsChecked({ advanced: { showDeveloperFeatures: false } }, update)).rejects.toThrow('changed outside Combwork')
@@ -528,7 +529,7 @@ describe('the advanced store', () => {
     writeFileSync(file, JSON.stringify({ values: { 'cw.mcp.replySeconds': 900 } }))
     s.load(dir)
     writeFileSync(file, '{ "values": { "cw.mcp.replySeconds": 9')
-    await vi.waitFor(() => expect(s.state(null).fileError).toMatch(/isn't valid JSON/), { timeout: 10_000 })
+    await vi.waitFor(() => expect(s.state(null).fileError).toMatch(/isn't valid JSON/), { timeout: timing('wait.hang') })
     expect(s.number('cw.mcp.replySeconds')).toBe(900)
     await expect(s.set('cw.mcp.replySeconds', 600)).rejects.toThrow('Fix advanced.json')
     // Through the Agent API (the Assistant's PATCH /v1/settings/:id reaches this set): a refusal by the file's state, 409
@@ -564,7 +565,7 @@ describe('the advanced store', () => {
     await s.set('copilot.trust.prompt', 'trust these files')
     expect(read(file).madeFor['copilot.trust.prompt'].version).toBeNull()
     s.noteCli('copilot', '1.0.95')
-    await vi.waitFor(() => expect(read(file).madeFor['copilot.trust.prompt'].version).toBe('1.0.95'), { timeout: 10_000 })
+    await vi.waitFor(() => expect(read(file).madeFor['copilot.trust.prompt'].version).toBe('1.0.95'), { timeout: timing('wait.hang') })
     s.noteCli('copilot', '1.0.99')
     const row = advancedRow(def('copilot.trust.prompt'), s.state(null))
     expect(row.madeForOther).toBe('1.0.95')

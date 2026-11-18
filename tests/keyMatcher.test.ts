@@ -9,6 +9,7 @@ import { fingerprint, FRAGMENT, maskDeep, maskKeys, maskingState, resetMaskingFo
 import { maskSecrets, maskText } from '../src/shared/redact'
 import { makeEvent } from '../src/shared/devConsole'
 import { logLine } from '../src/main/logger'
+import { timing } from './timing.cjs'
 
 // No `sk-`, no long hex or base64 run, no credential word before it: only the key matcher can find these.
 const KEY = 'Zq!7#mP2&vL9^tR4~wX8'
@@ -74,7 +75,7 @@ describe('a saved key, by its fingerprint', () => {
     const t0 = performance.now()
     expect(maskKeys(long)).toBe(long)
     // A bound for a hung run, not how long it takes.
-    expect(performance.now() - t0).toBeLessThan(5_000)
+    expect(performance.now() - t0).toBeLessThan(timing('budget.scanMs'))
   })
 })
 

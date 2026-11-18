@@ -10,13 +10,14 @@ import { build } from 'esbuild'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const { openDb, transaction } = await import('../src/main/db')
 const wal = await import('../src/main/walCheckpoint')
 const { CLOSING, runCheckpoint, runRestart } = await import('../src/main/walCheckpointWorker')
 
 /** A bound for a hung run (the waits are for conditions). */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 const base = tempDir('cw-wal-checkpoint-worker-')
 const bundle = join(base, 'wal-checkpoint-worker.cjs')
 let n = 0
@@ -25,7 +26,7 @@ const DEFAULTS = { ...wal.checkpointLimits }
 beforeAll(async () => {
   await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'walCheckpointWorker.ts')], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
   wal.useCheckpointWorker(bundle)
-}, 60_000)
+}, timing('hook.hang'))
 afterAll(() => {
   wal.useCheckpointWorker(null)
   Object.assign(wal.checkpointLimits, DEFAULTS)
@@ -335,7 +336,7 @@ describe("the WAL's first write after a checkpoint, in the worker (HI-3289)", ()
   it("a restart's request that can't be sent to the worker (HR1's error path): answered at once, so the gate opens, the lock and the warning's interval are let go, nothing is left in flight, and the next write and restart go through", async () => {
     const l = lock()
     const db = openDb(join(base, `db-${++n}.db`), { migrations: MIGRATIONS, appVersion: 'test', checkpointer: (f, w) => wal.checkpointWhenIdle(f, w, { hold: l.hold }) })
-    const WARN_MS = 987_654
+    const WARN_MS = 987_654 // timing-ok: data, not a wait
     const warnMs = wal.closeLimits.warnMs
     wal.closeLimits.warnMs = WARN_MS
     const set = vi.spyOn(globalThis, 'setInterval')
@@ -390,7 +391,7 @@ describe("the WAL's first write after a checkpoint, in the worker (HI-3289)", ()
       other.exec('BEGIN IMMEDIATE')
       const t = performance.now()
       expect(runRestart({ id: 2, file: db.file, closing: 1, kind: 'restart' }, state)).toMatchObject({ restart: true, busy: true })
-      expect(performance.now() - t).toBeLessThan(1000)
+      expect(performance.now() - t).toBeLessThan(timing('budget.walCheckpointMs'))
       other.exec('ROLLBACK')
       expect(runRestart({ id: 3, file: db.file, closing: 1, kind: 'restart' }, state)).toMatchObject({ restart: true, busy: false })
     } finally {

@@ -34,6 +34,7 @@ import { jjFileGate, pathKey, rootKey } from '../src/main/platform/jjFileGate'
 import { workspaceGateKeys } from '../src/main/platform/jjRunner'
 import { SlotStaleView, type StaleViewRow } from '../src/main/slotStaleView'
 import { harness, jjExe } from './jjWorkspaceHarness'
+import { timing } from './timing.cjs'
 
 if (!jjExe) console.warn(`jjSlotPrepReal.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
@@ -42,7 +43,7 @@ const yes: WorkspaceFence = { still: () => true }
 // A hung test's bound (HI-2897), not a time budget: each test runs tens of real jj and Git processes (3–11 s alone on
 // jj 0.47.1, up to 16 s for the one HR1 crash test before it was split in four), and several times that under a loaded
 // machine or a 2-worker jj run, which Vitest's 20 s default for unit tests doesn't leave room for.
-const REAL_JJ_MS = 60_000
+const REAL_JJ_MS = timing('wait.hang')
 
 /** board_meta in memory, behind the app's store (one transaction per write). */
 function memoryStore(): JjPrepStore {
@@ -230,7 +231,7 @@ describe.skipIf(!jjExe)(`jj slot preparation on the real jj (${TESTED_JJ.version
       let owned = true
       const reader = await jjFileGate.acquire([keys.root], 'shared')
       const lost = prepareFor(w, 1, 1, { fence: { still: () => owned } })
-      await expect.poll(() => jjFileGate.writing(keys.root), { timeout: 60_000 }).toBe(true)
+      await expect.poll(() => jjFileGate.writing(keys.root), { timeout: timing('wait.hang') }).toBe(true)
       const heads = w.heads()?.join()
       owned = false
       reader.release()
@@ -239,7 +240,7 @@ describe.skipIf(!jjExe)(`jj slot preparation on the real jj (${TESTED_JJ.version
       // Kept: the preparation's guards (owns → checkoutOf) read through their tickets, no wait behind their own write.
       const reader2 = await jjFileGate.acquire([keys.root], 'shared')
       const kept = prepareFor(w, 1, 2)
-      await expect.poll(() => jjFileGate.writing(keys.root), { timeout: 60_000 }).toBe(true)
+      await expect.poll(() => jjFileGate.writing(keys.root), { timeout: timing('wait.hang') }).toBe(true)
       reader2.release()
       expect(await kept).toMatchObject({ ok: true })
       expect(jjFileGate.size).toBe(0)
@@ -259,7 +260,7 @@ describe.skipIf(!jjExe)(`jj slot preparation on the real jj (${TESTED_JJ.version
           return seen.quiet ? null : 'the folder is in use'
         }
       })
-      await expect.poll(() => jjFileGate.writing(keys.root), { timeout: 60_000 }).toBe(true)
+      await expect.poll(() => jjFileGate.writing(keys.root), { timeout: timing('wait.hang') }).toBe(true)
       // A Combwork reader outside the write's call tree: queued behind it (writers first).
       const outside = checkoutOf(w.slot)
       first.release()
@@ -299,9 +300,9 @@ describe.skipIf(!jjExe)(`jj slot preparation on the real jj (${TESTED_JJ.version
       // write in the slot (its root and the store, both in the forget's admission).
       const reader = await jjFileGate.acquire([keys.store], 'shared')
       const removal = w.port.remove(w.repo, w.slot, { identity: w.identity, journal: h.journals.of(`remove-${colocated}`), fence: yes })
-      await expect.poll(() => jjFileGate.queued, { timeout: 60_000 }).toBe(1)
+      await expect.poll(() => jjFileGate.queued, { timeout: timing('wait.hang') }).toBe(1)
       const slotWrite = h.runner.run(w.slot, ['status'], { write: true })
-      await expect.poll(() => jjFileGate.queued, { timeout: 60_000 }).toBe(2)
+      await expect.poll(() => jjFileGate.queued, { timeout: timing('wait.hang') }).toBe(2)
       reader.release()
       // The forget's recheck (fence, owns → the removed slot's checkout, the control's check) finishes; it runs and lets go.
       expect(await removal).toMatchObject({ ok: true })

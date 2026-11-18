@@ -8,6 +8,7 @@ import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const started = vi.hoisted(() => [] as string[])
 vi.mock('../src/main/closeCommand/runs', async (orig) => {
@@ -39,9 +40,9 @@ const gate = (): { wait: Promise<void>; open: () => void } => {
   return { wait: new Promise<void>((r) => (open = r)), open }
 }
 /** Lets what is ready run: each await a step. */
-const settle = async (until: () => boolean): Promise<boolean> => {
-  for (let i = 0; i < 200 && !until(); i++) await new Promise((r) => setImmediate(r))
-  return until()
+const settle = async (ready: () => boolean): Promise<boolean> => {
+  for (let i = 0; i < 200 && !ready(); i++) await new Promise((r) => setImmediate(r))
+  return ready()
 }
 
 describe("a switch whose old workspace's close is held", () => {
@@ -65,7 +66,7 @@ describe("a switch whose old workspace's close is held", () => {
       const closing = closeWithCommand(w, 'switch', win as never).then((r) => (outcome = r))
       // Reached by the close's own steps, file work among them (HI-3349): waited for within a bound for a hung run, not a
       // count of event-loop turns a slow disk outlasts. settle's count stays for the check that nothing comes.
-      await vi.waitFor(() => expect(closeCommandState(win as never)?.state === 'saving' && heldFor !== null).toBe(true), { timeout: 20_000 })
+      await vi.waitFor(() => expect(closeCommandState(win as never)?.state === 'saving' && heldFor !== null).toBe(true), { timeout: timing('wait.hang') })
       const saving = closeCommandState(win as never)!
       expect(saving.workspace).toBe('Work')
       dontWait(win as never, saving.id)

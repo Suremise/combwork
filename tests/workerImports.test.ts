@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest'
 import { bundledScriptExists } from '../src/main/workerThreads'
 import { esbuildEagerGlob } from './esbuildGlob'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const root = join(__dirname, '..')
 /** The build's entries (electron.vite.config.ts) other than main's own: each runs where Electron can't be loaded. */
@@ -31,7 +32,7 @@ describe('worker threads load no Electron (HI-1880)', () => {
       .filter(([, i]) => i.imports.some((x) => x.path === 'electron'))
       .map(([p]) => p)
     expect(importers).toEqual([])
-  }, 60_000)
+  }, timing('test.hang'))
 
   it("sees every provider's worker-safe parts behind the usage worker's glob", async () => {
     const usage = entries.find((e) => e.name === 'usage-worker')!
@@ -39,7 +40,7 @@ describe('worker threads load no Electron (HI-1880)', () => {
     const folders = readdirSync(join(root, 'src', 'main', 'providers'), { withFileTypes: true }).filter((d) => d.isDirectory() && existsSync(join(root, 'src', 'main', 'providers', d.name, 'worker.ts')))
     expect(seen.length).toBeGreaterThan(0)
     expect(seen.sort()).toEqual(folders.map((d) => `src/main/providers/${d.name}/worker.ts`).sort())
-  }, 60_000)
+  }, timing('test.hang'))
 })
 
 describe('bundledScriptExists (HI-1880)', () => {

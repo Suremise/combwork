@@ -10,6 +10,7 @@ import { gitHistory } from '../src/main/platform/gitHistory'
 import { jjContextOf } from '../src/main/platform/jjDetect'
 import { integrateCommands } from '../src/shared/jjViews'
 import { harness, jjExe } from './jjWorkspaceHarness'
+import { timing } from './timing.cjs'
 
 describe('integrateCommands (HI-3094)', () => {
   it('copies the card from its base to the reviewed commit, then moves the target to the copy given', () => {
@@ -17,7 +18,7 @@ describe('integrateCommands (HI-3094)', () => {
   })
 })
 
-describe.skipIf(!jjExe)('the integrate commands on a card of two commits (HI-3094)', { timeout: 120_000 }, () => {
+describe.skipIf(!jjExe)('the integrate commands on a card of two commits (HI-3094)', { timeout: timing('test.hang') }, () => {
   it.each([true, false])('the target holds the whole card and it counts as integrated (colocated: %s)', async (colocated) => {
     const h = harness()
     const { repo, base } = h.repo(`intg${colocated ? 'c' : 'n'}`, colocated)

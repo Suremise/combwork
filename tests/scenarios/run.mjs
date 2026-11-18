@@ -12,6 +12,7 @@
 //   npm run scenarios -- --only work-on-card --signed-out   # the fake signed out: the trial is skipped for the environment
 //   npm run scenarios -- --only work-on-card --signed-out=launch   # its OAuth expired: it exits at launch, skipped too
 //   npm run scenarios -- --only work-on-card --signed-out=late   # signed out, shown only once the prompt is sent: skipped too
+//   npm run scenarios -- --only work-on-card --exits-at-launch   # the fake exits once started, before its prompt: an error at once (HI-3392)
 //
 // A trial that Combwork shows waiting for a sign-in, or whose CLI says it hit a limit or can't reach its API, is skipped for
 // the environment at once (no checks failed, no cost), and so are the provider's other trials, said once (#302).
@@ -145,6 +146,13 @@ if (dialect) console.log(`Dialect ${dialect.path}: ${dialect.overrides} override
 const signedOut = argv.includes('--signed-out=launch') ? 'launch' : argv.includes('--signed-out=late') ? 'late' : argv.includes('--signed-out')
 if (signedOut && provider !== 'fake') {
   console.error('--signed-out is for the fake Claude Code (--provider fake) only: a real CLI is never signed out from here.')
+  process.exit(2)
+}
+// --exits-at-launch: the fake Claude Code exits with 1 once its session has started, before drawing its prompt (HI-3392):
+// Combwork keeps it, stopped; the trial ends at launch, at once, never a prompt typed into a stopped terminal.
+const exitsAtLaunch = argv.includes('--exits-at-launch')
+if (exitsAtLaunch && provider !== 'fake') {
+  console.error('--exits-at-launch is for the fake Claude Code (--provider fake) only.')
   process.exit(2)
 }
 // Model trials run only in the providers' test homes, signed in once by hand: never the user's own, never a login here.
@@ -396,7 +404,7 @@ for (const [i, { sc, sample, name }] of trials.entries()) {
   process.stdout.write(`${sc.id} (${provider}${repeats > 1 ? `, ${sample}/${repeats}` : ''})… `)
   // What the trial uses the home with, noted on its lease before it starts (HR2 on round 1): kept after a crash too.
   // A scenario whose outcome comes after a wait of its own (`runMs`, HI-3324: a watch's end some minutes on) runs that long at least.
-  const r = await runScenario(sc, provider, { model, effort, advanced, dialect, keep, workRoot, port: lane.first, evidence, signedOut, timeoutMs: Math.max(timing(fake ? 'scenario.fakeTurnMs' : 'scenario.modelTurnMs'), sc.runMs ?? 0), uses: consumerHooks([realHome?.lease]) })
+  const r = await runScenario(sc, provider, { model, effort, advanced, dialect, keep, workRoot, port: lane.first, evidence, signedOut, exitsAtLaunch, timeoutMs: Math.max(timing(fake ? 'scenario.fakeTurnMs' : 'scenario.modelTurnMs'), sc.runMs ?? 0), uses: consumerHooks([realHome?.lease]) })
   r.sample = sample
   if (r.environment) {
     // Not a result of the scenario: no checks, and no cost assumed.

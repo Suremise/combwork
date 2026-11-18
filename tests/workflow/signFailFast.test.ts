@@ -13,11 +13,12 @@ import { withSessionSigner, encodeArgv, SIGN_ENV, type SessionSigner } from '../
 import { configuredSigner } from '../../src/main/platform/signerPick'
 // @ts-expect-error: a build script (JavaScript), its one function used here
 import { buildSignLauncher, frameworkCsc } from '../../scripts/buildSignLauncher.mjs'
+import { timing } from '../timing.cjs'
 
 /** The bound of one git run or signer: a hung run, never a wait. */
-const HUNG_MS = 60_000
+const HUNG_MS = timing('wait.hang')
 /** How fast a commit that needs someone must fail: seconds, not the minutes a prompt would wait. */
-const FAST_MS = 15_000
+const FAST_MS = timing('budget.promptEndMs')
 const win = process.platform === 'win32'
 const ROOT = join(__dirname, '..', '..')
 const GIT_ROOT = 'C:\\Program Files\\Git'
@@ -325,7 +326,7 @@ describe.skipIf(!ready)('gpg signing through cw-sign', () => {
 
   it("ends a signer at the Advanced setting's bound and says so (not a passphrase)", () => {
     const r = repo('openpgp', open)
-    const c = commit(r, session({ ...signer, timeoutMs: 1 }))
+    const c = commit(r, session({ ...signer, timeoutMs: 1 })) // timing-ok: the timeout under test (its expiry is what the test checks)
     expect(c.status).not.toBe(0)
     expect(c.err).toContain("didn't finish within")
     expect(c.err).not.toContain(NEEDS_LINE)

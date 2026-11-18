@@ -22,6 +22,7 @@ import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
 import { B1, moved, refusedBy } from './workflow/harness'
 import { closers as cardClosers, started, world as cardWorld } from './jjCardsWorld'
+import { timing } from './timing.cjs'
 
 // jj 0.47.1's stderr for two new files past the limit, as recorded (the hint after them is jj's own).
 const WARNING = [
@@ -50,7 +51,7 @@ describe('jj\'s refused snapshot, read (HI-2973)', () => {
 if (!jjExe) console.warn(`jjLeftOut.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
 // A hung test's bound, as jjCards.test.ts' (real jj starts, submissions and slot preparations): not a time budget.
-const REAL_JJ_MS = 90_000
+const REAL_JJ_MS = timing('wait.hangReal')
 const BIG = (): Buffer => Buffer.alloc(2 * 1024 * 1024, 7)
 
 const poolClosers: (() => void | Promise<void>)[] = []

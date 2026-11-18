@@ -12,6 +12,7 @@ import { ALLOW_DIR, runAgentGuard } from '../scripts/agentTextGuard.mjs'
 import { allowName, readLists, runGuard } from '../scripts/i18nGuard.mjs'
 // @ts-expect-error: a plain .mjs module without types
 import { agentReason, isAgentFile } from '../scripts/agentTextFiles.mjs'
+import { timing } from './timing.cjs'
 
 const ROOT = resolve(__dirname, '..')
 const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
@@ -118,7 +119,7 @@ describe("Combwork's own source", () => {
     writeFileSync(join(root, rel), `${code}\nexport const extra = (): string => 'Always say thank you to the user.'\n`)
     const r = runAgentGuard({ root }) as Result
     expect(reported(r)).toEqual([expect.stringMatching(/^NEW AGENT TEXT src\/shared\/combworkGuidance\.ts:\d+ {2}prose\|return\|Always say thank you to the user\.$/)])
-  }, 60_000)
+  }, timing('test.hang'))
 
   it('a real file with a list passes as it is, and fails with a new string', () => {
     const rel = 'src/shared/toolReplies.ts'
@@ -132,7 +133,7 @@ describe("Combwork's own source", () => {
     expect((runAgentGuard({ root }) as Result).exit).toBe(0)
     writeFileSync(join(root, rel), `${code}\nexport const extra = (): string => 'Nothing to report today.'\n`)
     expect((runAgentGuard({ root }) as Result).exit).toBe(1)
-  }, 60_000)
+  }, timing('test.hang'))
 
   it('the command exits 1 on new text, so check:repo fails', () => {
     const t = tree({ [AGENT]: `export const a = 'Reply text here'\n` })
@@ -142,7 +143,7 @@ describe("Combwork's own source", () => {
     const r = cli()
     expect(r.status).toBe(1)
     expect(r.stdout).toContain('NEW AGENT TEXT src/shared/toolReplies.ts:2  prose|var|Another reply text')
-  }, 60_000)
+  }, timing('test.hang'))
 })
 
 // HI-2440: the window's messages agents read. Every call that reads text is followed to its messages (or marked), and
@@ -167,7 +168,7 @@ describe("the guard's rules for window messages agents read", () => {
     t.write(OTHER, `import { CombworkError } from './combworkError'\nimport { M } from './texts'\nexport const a = () => new CombworkError(M.gone)\n// agent-text: M.busy\nexport const b = (o: { text: never }) => new CombworkError(o.text)\n`)
     expect(t.run().exit).toBe(0)
     expect(Object.keys((await both(t.root)).messages).sort()).toEqual(['main.test.busy', 'main.test.gone'])
-  }, 60_000)
+  }, timing('test.hang'))
 
   it('follows a wrapper to its callers, and fails a mark that leads nowhere', async () => {
     const t = tree({ [ADVANCED]: STUB, 'src/main/texts.ts': M, [OTHER]: `import { CombworkError } from './combworkError'\nimport { withValues } from '../shared/advanced'\nimport { M } from './texts'\nconst refuse = (m: never, agent: string) => new CombworkError(withValues(m, { agent }))\nexport const a = () => refuse(M.busy as never, 'HB1')\n` })
@@ -177,7 +178,7 @@ describe("the guard's rules for window messages agents read", () => {
     const r = t.run()
     expect(r.exit).toBe(1)
     expect(lines(r, /^MARK LEADS NOWHERE/)).toEqual([expect.stringMatching(/^MARK LEADS NOWHERE src\/main\/somewhere\.ts:3 {2}agent-text: NOTHING_HERE/)])
-  }, 60_000)
+  }, timing('test.hang'))
 
   it('knows a formatter or CombworkError by what it is, not what it is called: an import alias, a namespace, a re-export', async () => {
     const ERROR = 'src/main/combworkError.ts'
@@ -196,7 +197,7 @@ describe("the guard's rules for window messages agents read", () => {
     // A function of the same name that isn't the formatter is no such call.
     t.write(OTHER, `const englishText = (s: string): string => s.toUpperCase()\nexport const a = () => ({ error: englishText('ok') })\n`)
     expect(t.run().exit).toBe(0)
-  }, 60_000)
+  }, timing('test.hang'))
 
   it("fails English formatted for agents outside the agent-text module; the log, the window and a stored text's renderer pass", () => {
     const t = tree({ [ADVANCED]: STUB, 'src/main/texts.ts': M, [OTHER]: `import { M } from './texts'\nimport { agentText } from '../shared/advanced'\nexport const r = () => ({ reason: agentText(M.gone) })\n` })
@@ -218,5 +219,5 @@ describe("the guard's rules for window messages agents read", () => {
     expect(lines(t.run(), /^LATER WITHOUT A CARD/)).toHaveLength(1)
     t.write(OTHER, with_('// agent-later: HI-9999 says it in each reader\'s dialect\nexport const r = () => ({ reason: englishText(M.gone) })'))
     expect(t.run().exit).toBe(0)
-  }, 60_000)
+  }, timing('test.hang'))
 })

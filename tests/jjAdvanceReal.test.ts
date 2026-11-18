@@ -21,6 +21,7 @@ import { jjContextOf } from '../src/main/platform/jjDetect'
 import type { RunResult } from '../src/main/platform/repoContext'
 import { AdvanceJournals, classifyUndoNow, journalNewUndo, journalRequested, recoverAdvance, resultContained, runAdvance, runUndo, underLock, undoOfferedNow, type AdvanceJournal, type AdvanceOutcome, type AdvancePoint, type JjAdvanceDeps, type JjAdvancePlan } from '../src/main/platform/jjAdvance'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const require = createRequire(import.meta.url)
 const { portableJj } = require('./jjPortable.cjs') as { portableJj: () => string | null }
@@ -37,7 +38,7 @@ class Crash extends Error {}
  * The bound of a case that makes several throwaway repositories (each some 20 jj and git processes): a bound for a hung
  * run, never a wait (tests/jjIntegrationReal.test.ts's REAL_JJ_MS).
  */
-const REAL_JJ_MS = 90_000
+const REAL_JJ_MS = timing('wait.hangReal')
 
 type Mode = 'colocated' | 'plain'
 
@@ -50,7 +51,7 @@ describe.skipIf(!exe)(`jj's target advance on the real jj (${TESTED_JJ.version})
   /** The runner, counting its writes: a replay or a recovery must add none. */
   let writes = 0
   const runner: JjRunner = { ...real, run: (folder, args, o) => (o?.write && ++writes, real.run(folder, args, o)) }
-  const run = (file: string, cwd: string, args: string[]): string => execFileSync(file, args, { cwd, env, windowsHide: true, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
+  const run = (file: string, cwd: string, args: string[]): string => execFileSync(file, args, { cwd, env, windowsHide: true, encoding: 'utf8', timeout: timing('spawn.hang'), stdio: ['ignore', 'pipe', 'pipe'] })
 
   /** A Git-backed jj repository with `main` at E, and commits R (E's child), X (E's other child) and D (R's child). */
   async function repo(mode: Mode) {
@@ -406,7 +407,7 @@ describe.skipIf(!exe)(`jj's target advance on the real jj (${TESTED_JJ.version})
    * on standard error), then integrated with `jj op integrate`, which doesn't export.
    */
   function pendingOp(r: Repo, args: string[]): void {
-    const res = spawnSync(exe!, ['--no-pager', '--color=never', '--ignore-working-copy', '--no-integrate-operation', ...args], { cwd: r.dir, env, encoding: 'utf8', windowsHide: true, timeout: 60_000 })
+    const res = spawnSync(exe!, ['--no-pager', '--color=never', '--ignore-working-copy', '--no-integrate-operation', ...args], { cwd: r.dir, env, encoding: 'utf8', windowsHide: true, timeout: timing('spawn.hang') })
     const op = /requested: ([0-9a-f]{8,})/.exec(`${res.stderr}\n${res.stdout}`)?.[1]
     if (res.status !== 0 || !op) throw new Error(`jj ${args.join(' ')}: ${res.status} ${res.stderr}`)
     r.jj('--ignore-working-copy', 'op', 'integrate', op)

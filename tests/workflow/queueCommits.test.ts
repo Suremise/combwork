@@ -9,6 +9,7 @@ import { B1, commit, GIT_HEAVY_MS, moved, R1, setup, sh, type Env } from './harn
 import { preset, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { git } from '../../src/main/git'
 import { commitFailed, readCommitStream, type QueueGitResult } from '../../src/main/workflow/mergeQueue'
+import { timing } from '../timing.cjs'
 
 let env: Env | null = null
 afterEach(() => {
@@ -200,7 +201,7 @@ describe("Combwork's queue commits (#1350)", () => {
     const [o] = await e.queue({ signTimeoutMs: 3000 }).drain('main')
     expect(o).toMatchObject({ outcome: 'paused', reason: 'signingWaits' })
     // Within the bound (and what ending the tree takes), not the test's.
-    expect(Date.now() - t0).toBeLessThan(15_000)
+    expect(Date.now() - t0).toBeLessThan(timing('budget.promptEndMs'))
     expect(e.store.queuePause('main')).toMatchObject({ reason: 'signingWaits', card: card.key })
     const pid = Number(readFileSync(pidFile, 'utf8'))
     expect(running(pid)).toBe(false)

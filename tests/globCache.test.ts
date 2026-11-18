@@ -11,11 +11,12 @@ import { agentTextSchema } from '../src/main/dialects/schema'
 import { schemaOf } from '../src/main/dialects/format'
 import { globCacheKey, usesImportGlob } from './globCacheKey.mts'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const ROOT = join(__dirname, '..')
 const { childEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs')
 const run = promisify(execFile)
-const HUNG_MS = 30_000
+const HUNG_MS = timing('wait.hang')
 
 describe("import.meta.glob's users and Vitest's module cache", () => {
   it('agentTextSchema() is every agent-text/schema area file on disk now', () => {

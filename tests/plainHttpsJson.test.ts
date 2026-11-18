@@ -4,9 +4,10 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from 'net'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { plainHttpGet, plainHttpsJson } from '../src/main/plainHttpsJson'
+import { timing } from './timing.cjs'
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 type Handler =(req: IncomingMessage, res: ServerResponse) => void
 const routes = new Map<string, Handler>()
@@ -69,7 +70,7 @@ describe('plainHttpsJson', () => {
   it('gives up when the whole reply hasn’t come in time', async () => {
     // Headers sent, the body never finished: the deadline covers the body too.
     routes.set('/hang', (_req, res) => res.writeHead(200, { 'Content-Type': 'application/json' }).write('{"version":'))
-    await expect(plainHttpsJson(`${base}/hang`, { timeoutMs: 200 })).rejects.toThrow(/No reply within/)
+    await expect(plainHttpsJson(`${base}/hang`, { timeoutMs: 200 })).rejects.toThrow(/No reply within/) // timing-ok: the timeout under test (its expiry is what the test checks)
   })
 
   it('rejects a status other than 2xx, and JSON that doesn’t parse', async () => {
@@ -184,9 +185,9 @@ describe('the version checks', () => {
       expect(await codex.latestVersion()).toBe('0.130.1')
       expect(await copilotLatestVersion()).toBe('2.1.300')
       expect(calls).toEqual([
-        { url: 'https://registry.npmjs.org/-/package/@anthropic-ai/claude-code/dist-tags', opts: { timeoutMs: 6000 } },
-        { url: 'https://api.github.com/repos/openai/codex/releases/latest', opts: { timeoutMs: 6000, headers: { Accept: 'application/vnd.github+json' } } },
-        { url: expect.stringMatching(/^https:\/\/registry\.npmjs\.org\/.+\/latest$/), opts: { timeoutMs: 6000 } }
+        { url: 'https://registry.npmjs.org/-/package/@anthropic-ai/claude-code/dist-tags', opts: { timeoutMs: 6000 } }, // timing-ok: data, not a wait
+        { url: 'https://api.github.com/repos/openai/codex/releases/latest', opts: { timeoutMs: 6000, headers: { Accept: 'application/vnd.github+json' } } }, // timing-ok: data, not a wait
+        { url: expect.stringMatching(/^https:\/\/registry\.npmjs\.org\/.+\/latest$/), opts: { timeoutMs: 6000 } } // timing-ok: data, not a wait
       ])
 
       reply = () => Promise.reject(new Error('Refused an encoded reply (br)'))

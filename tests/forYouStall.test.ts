@@ -3,6 +3,7 @@
 // counts (scopedLoads drops it, as useScopedLoad does), so an answered question doesn't come back, and a workspace's
 // questions don't carry into another. useForYou runs here with React's hooks stood in for and the real scopedLoads.
 import { describe, expect, it, vi } from 'vitest'
+import { timing } from './timing.cjs'
 
 const state = vi.hoisted(() => ({
   ws: 'A',
@@ -43,7 +44,7 @@ const { askedByNow, useForYou } = (await import(/* @vite-ignore */ forYouModule)
 const asked = (card: number, asker: string) => ({ items: [{ card, asker, request: `r${card}` }], count: 1 })
 const none = { items: [], count: 0 }
 /** Lets each reply's handlers run (scopedLoads settles on the promise's then). */
-const settle = () => new Promise((r) => setTimeout(r, 0))
+const settle = () => new Promise((r) => setTimeout(r, timing('pace.tick')))
 
 describe("the window's stall check reads For you as accepted (HI-2080)", () => {
   it('an older reply finishing after the answer never brings the question back; another workspace never sees it', async () => {

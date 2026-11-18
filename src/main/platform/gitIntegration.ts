@@ -24,6 +24,7 @@ import { boundedSpawn } from './boundedSpawn'
 import { gitExe } from '../gitTool'
 import { withLauncherEnv } from '../gitWorker'
 import { agentMsg, say } from '../../shared/agentText'
+import { platformLimits } from './limits'
 
 // The card's log when its candidate isn't what was reviewed (agent-facing: the builder reads it on the card).
 const NOT_SAME = UPDATE_NOT_SAME
@@ -158,8 +159,6 @@ const commitOpts = (h: CandidateHost, signed: boolean): QueueGitOptions => ({ en
 // queueControls.ts unchanged. Commands the queue ran with its own git (`this.git`) run with `h.run`; the platform's reads
 // (G.*) and the host's and runner's own git() calls stay as they were, so each runs on the same runner and route as before.
 
-/** A push reaches the remote and can wait on a sign-in window: as the Git view's, long but never forever. */
-const PUSH_MS = 5 * 60_000
 
 /** A push never waits on a prompt nobody sees: no terminal prompt, no askpass, a credential manager kept non-interactive. */
 function pushEnv(): NodeJS.ProcessEnv {
@@ -351,9 +350,10 @@ const advanceAndPublish: Omit<IntegrationPort, 'mergeBase' | 'update' | 'candida
     return only ? { remote: only, ref: `refs/heads/${target}` } : null
   },
 
-  // The captured head, by its commit (HI-1924), to the destination ref: never forced, never --set-upstream, no prompt, within PUSH_MS.
+  // The captured head, by its commit (HI-1924), to the destination ref: never forced, never --set-upstream, no prompt, within
+  // cw.queue.networkMinutes (HI-3372: a push reaches the remote and can wait on a sign-in window; 5 min cut a slow one short).
   async push(h, dest, commit) {
-    const r = await h.run(h.project, ['push', '--', dest.remote, `${commit}:${dest.ref}`], { env: pushEnv(), timeoutMs: PUSH_MS })
+    const r = await h.run(h.project, ['push', '--', dest.remote, `${commit}:${dest.ref}`], { env: pushEnv(), timeoutMs: platformLimits.queueNetworkMs() })
     if (r.ok) return 'pushed'
     const said = `${r.err}\n${r.out}`.trim()
     // HI-1183: the remote's own refusal (a hook, a protected branch), its words kept as they are.

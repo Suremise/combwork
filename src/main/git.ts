@@ -12,7 +12,7 @@ import { withValues } from '../shared/advanced'
 import { msg } from '../shared/i18n'
 import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
-import { runGit, type GitOutcome, type GitReply, type GitRequest, type RefsRequest } from './gitWorker'
+import { CANCELLED, runGit, type CancelRequest, type GitOutcome, type GitReply, type GitRequest, type RefsRequest } from './gitWorker'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 import { readRepoRefs, type RepoRefs } from './platform/repoRefs'
 import type { RunResult } from './platform/repoContext'
@@ -38,6 +38,12 @@ export const GIT_PREFIX = ['--no-optional-locks', '-c', 'diff.autoRefreshIndex=f
 export interface GitRunOptions {
   env?: NodeJS.ProcessEnv
   timeout?: number
+  /**
+   * HI-3372: the user's Cancel. Aborted before it starts, nothing runs; while it runs, its whole tree is ended as its time
+   * limit ends it, and it answers `cancelled` once that has gone. Exited first, its own outcome stands. A route's scope
+   * (HI-2078: another process runs it) takes it only before the start.
+   */
+  signal?: AbortSignal
   /** HI-2137: gitTool's own check of git: this git rather than gitExe()'s, and what it does is not noted as git's state. */
   exe?: string
 }
@@ -46,7 +52,7 @@ export interface GitRunOptions {
  * A seam for unit tests: told of each git command as it starts on git's worker thread (#732 counts a template plan's
  * and load's), and as it ends there (HI-2322: worktree changes never overlap), not of one a route runs (HI-2078).
  */
-export const gitTestHooks: { started?: (cwd: string, args: readonly string[]) => void; ended?: (cwd: string, args: readonly string[]) => void } = {}
+export const gitTestHooks: { started?: (cwd: string, args: readonly string[], timeout?: number) => void; ended?: (cwd: string, args: readonly string[]) => void } = {}
 
 /** HI-2078: where a scope's git runs instead of the worker: the request as the worker gets it, its outcome as execFile's. */
 export type GitRoute = (m: Omit<GitRequest, 'id'>) => Promise<GitOutcome>
@@ -212,12 +218,15 @@ export const worktreeChangesPending = (): number => worktreeChanges.size
 
 /** git() with the git it starts (`use`). */
 async function gitAs(use: GitExe, cwd: string, args: string[], maxBuffer: number, input: string | undefined, opts: GitRunOptions): Promise<GitResult> {
-  const m = { cwd, args: [...GIT_PREFIX, ...args], maxBuffer, ...(use.exe !== 'git' ? { exe: use.exe } : {}), ...(use.launcherEnv ? { launcherEnv: use.launcherEnv } : {}), ...(input !== undefined ? { input } : {}), ...(opts.env ? { env: opts.env } : {}), ...(opts.timeout ? { timeout: opts.timeout } : {}) }
+  const m = { cwd, args: [...GIT_PREFIX, ...args], maxBuffer, ...(use.exe !== 'git' ? { exe: use.exe } : {}), ...(use.launcherEnv ? { launcherEnv: use.launcherEnv } : {}), ...(input !== undefined ? { input } : {}), ...(opts.env ? { env: opts.env } : {}), ...(opts.timeout ? { timeout: opts.timeout } : {}), ...(opts.signal ? { cancellable: true } : {}) }
   const scope = routes.getStore()
   // HI-2078: a route's scope runs it there; else it starts off main's thread (HI-1783): gitWorker.ts runs it as this
   // always did. Either way its outcome is read here.
-  if (!scope?.active) gitTestHooks.started?.(cwd, args)
-  const o = scope?.active ? await scope.route(m) : await thread.run(m)
+  // HI-3372: cancelled before it starts: nothing runs, wherever it would have.
+  if (opts.signal?.aborted) return { out: '', ok: false, buf: Buffer.alloc(0), err: `git ${args[0]} was cancelled`, code: -1, notRun: CANCELLED, cancelled: true } // i18n-ignore: git's side of an error, in English as git's messages are
+  // HI-3372: with its bound, so a test sees what a setting gives a command at its real call site.
+  if (!scope?.active) gitTestHooks.started?.(cwd, args, opts.timeout)
+  const o = scope?.active ? await scope.route(m) : await thread.run(m, opts.signal)
   if (!scope?.active) gitTestHooks.ended?.(cwd, args)
   if (o.held) log.warn(`git ${args[0]}'s output stayed open after it exited, held by another process (HI-1854): taken as read`)
   if (o.msysIncomplete) log.warn(`git ${args[0]} was ended at its time limit, but its Git Bash programs couldn't be looked for (${userText(o.msysIncomplete)}): only its process tree was ended (HI-3047)`)
@@ -245,7 +254,8 @@ async function gitAs(use: GitExe, cwd: string, args: string[], maxBuffer: number
   }
   const stderr = Buffer.from(o.stderr.buffer, o.stderr.byteOffset, o.stderr.byteLength).toString('utf8').trim()
   const said = stderr || (notRun ? `git ${args[0]} didn't run to an exit (${notRun})` : '') // i18n-ignore: git's side of an error, in English as git's messages are
-  return { out: buf.toString('utf8'), ok: !err, buf, err: said, code, ...(missing ? { missing } : {}), ...(notRun ? { notRun } : {}), ...(err?.killed && opts.timeout ? { timedOut: true } : {}) }
+  const cancelled = errCode === CANCELLED
+  return { out: buf.toString('utf8'), ok: !err, buf, err: said, code, ...(missing ? { missing } : {}), ...(notRun ? { notRun } : {}), ...(cancelled ? { cancelled: true } : err?.killed && opts.timeout ? { timedOut: true } : {}) }
 }
 
 /**
@@ -261,13 +271,20 @@ class GitThread {
   /** Why the worker last ended. */
   private lost = ''
 
-  run(m: Omit<GitRequest, 'id'>): Promise<GitOutcome> {
+  run(m: Omit<GitRequest, 'id'>, signal?: AbortSignal): Promise<GitOutcome> {
     const w = this.ensure()
-    if (!w) return runGit(m)
+    if (!w) return runGit(m, undefined, signal)
     const id = ++this.next
+    // HI-3372: a Cancel while it runs asks the worker to end it (by its id); the listener goes as the call settles,
+    // answered or lost with the worker.
+    const onCancel = (): void => w.postMessage({ id, kind: 'cancel' } satisfies CancelRequest)
     return new Promise((done) => {
-      this.calls.set(id, (r) => done(r && 'outcome' in r ? r.outcome : lostOutcome(this.lost)))
+      this.calls.set(id, (r) => {
+        signal?.removeEventListener('abort', onCancel)
+        done(r && 'outcome' in r ? r.outcome : lostOutcome(this.lost))
+      })
       w.postMessage({ ...m, id } satisfies GitRequest)
+      signal?.addEventListener('abort', onCancel, { once: true })
     })
   }
 

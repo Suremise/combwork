@@ -14,6 +14,7 @@ import { ensureJjExcluded, jjGitStoreOf } from '../src/main/platform/jjKeepOut'
 import { combworkVcs } from '../src/main/combworkVcs'
 import { trustRoot } from '../src/main/platform/repoPorts'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const require = createRequire(import.meta.url)
 const { portableJj } = require('./jjPortable.cjs') as { portableJj: () => string | null }
@@ -28,7 +29,7 @@ describe.skipIf(!exe)('jj compatibility on the real jj (HI-2800)', () => {
   const config = join(home, 'jj.toml')
   writeFileSync(config, '[user]\nname = "Combwork Test"\nemail = "test@example.invalid"\n[ui]\npaginate = "never"\n')
   const env = gitEnv({ HOME: home, USERPROFILE: home, APPDATA: home, JJ_CONFIG: config, NO_COLOR: '1' })
-  const jj = (cwd: string, ...args: string[]): string => execFileSync(exe!, args, { cwd, env, windowsHide: true, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
+  const jj = (cwd: string, ...args: string[]): string => execFileSync(exe!, args, { cwd, env, windowsHide: true, encoding: 'utf8', timeout: timing('spawn.hang'), stdio: ['ignore', 'pipe', 'pipe'] })
 
   function repo(name: string, colocate: boolean): string {
     const root = join(tempDir(`jj7r-${name}-`), 'repo')
@@ -102,10 +103,10 @@ describe.skipIf(!exe)('jj compatibility on the real jj (HI-2800)', () => {
 
   it("trust's root: the folder itself when not colocated, Git's main working tree (the jj root) when colocated", async () => {
     const loose = repo('trust-loose', false)
-    expect(await trustRoot(loose, { timeout: 10_000 })).toEqual({ none: true })
+    expect(await trustRoot(loose, { timeout: timing('spawn.hang') })).toEqual({ none: true })
     const colo = repo('trust-colo', true)
     mkdirSync(join(colo, 'sub'))
-    const t = await trustRoot(join(colo, 'sub'), { timeout: 10_000 })
+    const t = await trustRoot(join(colo, 'sub'), { timeout: timing('spawn.hang') })
     expect('root' in t && t.root && resolve(t.root).toLowerCase()).toBe(colo.toLowerCase())
   })
 })

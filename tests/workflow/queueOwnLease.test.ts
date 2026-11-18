@@ -15,6 +15,7 @@ import { kickQueue, setHolderWatch, stopQueueHosts } from '../../src/main/workfl
 import { QueueRunner, queueRunners, releaseQueueRunners } from '../../src/main/workflow/queueRunner'
 import type { Workflow } from '../../src/main/workflow/runtime'
 import type { WorkspaceService } from '../../src/main/workspace'
+import { timing } from '../timing.cjs'
 
 const ctx = vi.hoisted(() => ({
   wf: null as Workflow | null,
@@ -59,7 +60,7 @@ afterEach(() => {
 const wsOf = (home: string, life: AbortController): WorkspaceService =>
   ({ path: home, lifetime: life.signal, worktreesRoot: `${home}/worktrees`, emit: () => undefined, projectConfig: async () => ({}) }) as unknown as WorkspaceService
 
-describe("HI-3120: this Combwork's own stale queue lease", { timeout: 120_000 }, () => {
+describe("HI-3120: this Combwork's own stale queue lease", { timeout: timing('test.hang') }, () => {
   it('a workspace closed while its runner is acquired, then opened again, runs its queue', async () => {
     const e = (env = setup({ ...preset('git', 'team', { quick: [], tests: [] }), preChecks: [], mergeChecks: [], okBefore: { mode: 'never', labels: [] } }))
     const card = e.wf.createCard({ title: 'Queued' })

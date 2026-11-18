@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { CopilotConversationParser, eventsDetails, parseEvents } from '../src/main/providers/copilot/events'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const SAMPLE = readFileSync(join(__dirname, 'fixtures', 'copilot', 'compaction-1.0.98.jsonl'), 'utf8')
 const ID = '53468de9-906c-4619-8d26-cc6b1e15ac4e'
@@ -102,7 +103,7 @@ describe("a Copilot compaction's end ends Combwork's compacting status (#454)", 
     s().live.set(key, { state: st, adapter: copilot, transcriptMtime: '', transcriptPath: null, defaultModel: false, modeTail: '', launchMode: null, configuredMode: null, ledger: newLedger() } as never)
     s().runs.set(st.runId, key)
     await run(async () => sessions.handleHook(st.runId, { ...preCompact(), session_id: ID, cwd: p }, null))
-    await vi.waitFor(() => expect(st.status).toBe('working'), { timeout: 10_000 })
+    await vi.waitFor(() => expect(st.status).toBe('working'), { timeout: timing('wait.hang') })
     return s().live.get(key)!
   }
   /** Everything queued for the launch so far has run (its hooks and what details queued behind them). */
@@ -117,7 +118,7 @@ describe("a Copilot compaction's end ends Combwork's compacting status (#454)", 
     expect(l.state.status).toBe('working')
     const end = later()
     s().applyDetails(l, { compactedAt: end }, l.hooksSeen)
-    await vi.waitFor(() => expect(l.state.status).toBe('ready'), { timeout: 10_000 })
+    await vi.waitFor(() => expect(l.state.status).toBe('ready'), { timeout: timing('wait.hang') })
     expect(l.compactedAt).toBe(end)
   })
 
@@ -134,9 +135,9 @@ describe("a Copilot compaction's end ends Combwork's compacting status (#454)", 
     // The same end read again, or an earlier one, counts once; this compaction's own end ends it.
     const end = later(2000)
     s().applyDetails(l, { compactedAt: end }, l.hooksSeen)
-    await vi.waitFor(() => expect(l.state.status).toBe('ready'), { timeout: 10_000 })
+    await vi.waitFor(() => expect(l.state.status).toBe('ready'), { timeout: timing('wait.hang') })
     await run(async () => sessions.handleHook(l.state.runId, { ...preCompact(), session_id: ID, cwd: p }, null))
-    await vi.waitFor(() => expect(l.state.status).toBe('working'), { timeout: 10_000 })
+    await vi.waitFor(() => expect(l.state.status).toBe('working'), { timeout: timing('wait.hang') })
     s().applyDetails(l, { compactedAt: end }, l.hooksSeen)
     await settled(l)
     expect(l.state.status).toBe('working')

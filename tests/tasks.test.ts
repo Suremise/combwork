@@ -13,6 +13,7 @@ import { boardLockKey, editCard, readCard, removeCard, writeCard, writeCardOutsi
 import { boardTestHooks } from '../src/main/boardStore'
 import { follow } from './followDoorbell'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-tasks-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -40,9 +41,9 @@ const assistant = { kind: 'assistant' } as const
  * Deliberate, not a wait for a state: lets the clock reach a later millisecond, so what is recorded next (a decision, a
  * read) is newer than what came before it (they are compared by time).
  */
-const laterMs = (): Promise<void> => new Promise((r) => setTimeout(r, 5))
+const laterMs = (): Promise<void> => new Promise((r) => setTimeout(r, timing('pace.tick')))
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 function project(ws: string, name: string, agents: { id: string; name: string }[] = []): string {
   const p = join(ws, name)
@@ -631,7 +632,7 @@ describe('archiving in batches', () => {
     expect([again.restored, again.failed]).toEqual([[stuck], []])
     expect(await column('done')).toEqual(expect.arrayContaining(['Comes back', 'Stuck']))
     expect((await run(() => tasks.archiveBatches())).map((b) => b.id)).not.toContain(batch!.id)
-  }, 20_000)
+  }, timing('test.hang'))
 
   it('a card whose neighbours are gone comes back at the top; two batches at once each keep their cards', async () => {
     const [p, q, r] = [await make('P'), await make('Q'), await make('R')]
@@ -1162,7 +1163,7 @@ describe('card decisions', () => {
       refusedTyping = 0
       await decisionWakes.tellNow(w, alpha, 'a1')
       // Asked again and again while the user types (the delivery service tries it again in a moment each time, #649).
-      await expect.poll(() => refusedTyping, { timeout: 10000 }).toBeGreaterThan(3)
+      await expect.poll(() => refusedTyping, { timeout: timing('wait.hang') }).toBeGreaterThan(3)
       expect(mine('a1')).toHaveLength(2)
       typing = false
       await expect.poll(() => mine('a1').length, { timeout: HUNG_MS }).toBe(3)

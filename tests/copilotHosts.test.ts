@@ -13,6 +13,7 @@ import type { AgentInstallInfo, ModelCatalog } from '../src/shared/types'
 import { askCopilotModels, modelEnablement } from '../src/main/providers/copilot/models'
 import { run } from '../src/main/providers/common'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const windows = process.platform === 'win32'
 const base = tempDir('cw-copilot-hosts-')
@@ -133,7 +134,7 @@ async function check(r: CopilotRoute) {
 
 afterEach(() => newGeneration())
 
-describe.runIf(windows)('Copilot on each GitHub host, on fake gh and Copilot', { timeout: 60000 }, () => {
+describe.runIf(windows)('Copilot on each GitHub host, on fake gh and Copilot', { timeout: timing('test.hang') }, () => {
   it('github.com: a stored login is configured; the listing proves models, not identity', async () => {
     freshLog()
     const home = copilotHome([{ host: 'https://github.com', login: 'octo' }])
@@ -278,7 +279,7 @@ describe.runIf(windows)('Copilot on each GitHub host, on fake gh and Copilot', {
   })
 })
 
-describe.runIf(windows)('catalogues per GitHub host (HR2’s round 1 on HI-2779)', { timeout: 60000 }, () => {
+describe.runIf(windows)('catalogues per GitHub host (HR2’s round 1 on HI-2779)', { timeout: timing('test.hang') }, () => {
   const token = { COPILOT_GITHUB_TOKEN: 'x', FAKE_COPILOT_MODE: 'byhost' }
 
   it('two contexts, different models, defaults and availability: each project’s pickers get its own host’s', async () => {

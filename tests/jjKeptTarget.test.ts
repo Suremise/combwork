@@ -12,6 +12,7 @@ import { isUnknown } from '../src/main/platform/types'
 import { B1, B2, moved, refusedBy } from './workflow/harness'
 import { closers, opts, started, world, type World } from './jjCardsWorld'
 import { jjExe } from './jjWorkspaceHarness'
+import { timing } from './timing.cjs'
 
 afterEach(() => {
   for (const c of closers.splice(0).reverse()) c()
@@ -45,7 +46,7 @@ async function keptThenRetargeted(w: World, keptFor: 'slot-a' | 'slot-b' = 'slot
 
 const startedTarget = (w: World, card: number): string | null | undefined => w.wf.state(card).started?.target
 
-describe.skipIf(!jjExe)('a jj card with kept work after the project\'s target changed (HI-3129)', { timeout: 120_000 }, () => {
+describe.skipIf(!jjExe)('a jj card with kept work after the project\'s target changed (HI-3129)', { timeout: timing('test.hang') }, () => {
   // HI-3152: why a target change leaves free jj slots alone. A slot last used on main, lent for a card on next (ahead of
   // main), is prepared at next's head: the start bases it on its card's bookmark, whatever the slot held before.
   it.each([true, false])("a slot used on main, lent for a card on next: prepared at next's head (colocated: %s)", async (colocated) => {
@@ -110,7 +111,7 @@ describe.skipIf(!jjExe)('a jj card with kept work after the project\'s target ch
   })
 })
 
-describe.skipIf(!jjExe)("a kept slot's binding read where its start records the target (HI-3129)", { timeout: 120_000 }, () => {
+describe.skipIf(!jjExe)("a kept slot's binding read where its start records the target (HI-3129)", { timeout: timing('test.hang') }, () => {
   it.each([true, false])("the port's heldTarget: the card's binding's target; another card's, none; another generation, none (colocated: %s)", async (colocated) => {
     const w = await world(colocated)
     const card = await started(w, 'kept work')
@@ -123,7 +124,7 @@ describe.skipIf(!jjExe)("a kept slot's binding read where its start records the 
   })
 })
 
-describe.skipIf(!jjExe)("a jj project's targets: its repository's bookmarks, through the port (HI-3129)", { timeout: 120_000 }, () => {
+describe.skipIf(!jjExe)("a jj project's targets: its repository's bookmarks, through the port (HI-3129)", { timeout: timing('test.hang') }, () => {
   it.each([true, false])('lists local bookmarks, a conflicted one left out; a pick checked through the port (colocated: %s)', async (colocated) => {
     const w = await world(colocated)
     registerWorkspacePort('jj', w.port)

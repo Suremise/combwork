@@ -20,9 +20,10 @@ import type { Fact } from '../src/shared/workflow/facts'
 import { DatabaseSync } from 'node:sqlite'
 import { boardFile } from '../src/main/boardStore'
 import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { timing } from './timing.cjs'
 
 /** The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take. */
-const HUNG_MS = 30_000
+const HUNG_MS = timing('wait.hang')
 
 /** What the stand-ins do: the switches, git's and the worktree list's hooks, the agent, its deliveries and launches. */
 const state = vi.hoisted(() => ({
@@ -334,7 +335,7 @@ const crashAfterRemove = (): void => {
   }
 }
 
-describe("a Done card's merged line (#1438)", { timeout: 60_000 }, () => {
+describe("a Done card's merged line (#1438)", { timeout: timing('test.hang') }, () => {
   it('is kept while its slot has it checked out, deleted once nothing does, and noted on the card', async () => {
     const { e, n, line, slot } = await doneInSlot('Merged work')
     expect(await deleteMergedLine({} as never, e.project, e.wf, n)).toBe(false)
@@ -424,7 +425,7 @@ describe("a Done card's merged line (#1438)", { timeout: 60_000 }, () => {
   })
 })
 
-describe("a finished card's slot (HI-2014, HI-1986)", { timeout: 60_000 }, () => {
+describe("a finished card's slot (HI-2014, HI-1986)", { timeout: timing('test.hang') }, () => {
   const view = (slot: string, open = true) => () => ({ name: 'slot-a', folder: slot, target: 'main', busy: false, open })
   const branch = (slot: string): string => sh(slot, 'rev-parse', '--abbrev-ref', 'HEAD').trim()
   const asked = (e: Env, n: number): number => e.wf.state(e.store.cardByKey(`#${n}`)!).requests.filter((r) => r.gate === 'slotDirty').length
@@ -774,7 +775,7 @@ describe("a finished card's slot (HI-2014, HI-1986)", { timeout: 60_000 }, () =>
   })
 })
 
-describe("a begun deletion settled by the project's pass, whatever the switches (#1438, HR1's round 3)", { timeout: 60_000 }, () => {
+describe("a begun deletion settled by the project's pass, whatever the switches (#1438, HR1's round 3)", { timeout: timing('test.hang') }, () => {
   /** A Done card's deletion cut short right after its ref went, a checkout having come in: as a crash leaves it. */
   async function cutShort(title: string): Promise<{ e: Env; n: number; line: string; head: string; other: string; ws: never }> {
     const { e, n, line, slot } = await doneInSlot(title)
@@ -827,7 +828,7 @@ describe("a begun deletion settled by the project's pass, whatever the switches 
   })
 })
 
-describe("a builder's placement in its slot (#1438, HR1's round 2)", { timeout: 60_000 }, () => {
+describe("a builder's placement in its slot (#1438, HR1's round 2)", { timeout: timing('test.hang') }, () => {
   /** A card started in a slot and prepared there (its `SlotPrepared`), its builder B1: what `place` is asked to do. */
   async function prepared(): Promise<{ e: Env; n: number; slot: string; cycle: NonNullable<ReturnType<typeof cycleIn>>; ws: never }> {
     const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
@@ -935,7 +936,7 @@ describe("a builder's placement in its slot (#1438, HR1's round 2)", { timeout: 
       // The pause's end is the test's to say (HI-3338): its timer is a fake one, from just before the placement starts
       // (the card's preparation waits as it does). A real one raced the test's own setup, which on a slow runner outlasted
       // the pause. Long enough that vi.waitFor's own advance of fake timers (its interval at each check) can't reach it.
-      const PAUSE_MS = 20_000
+      const PAUSE_MS = 20_000 // timing-ok: simulated time (fake timers)
       try {
         const { e, n, placing, said } = await waiting('the user has just typed in its terminal and may still be writing there', () => {
           vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
@@ -975,7 +976,7 @@ describe("a builder's placement in its slot (#1438, HR1's round 2)", { timeout: 
   })
 })
 
-describe("a Start's prompt goes to the slot's placement only while one is due (HI-1953)", { timeout: 60_000 }, () => {
+describe("a Start's prompt goes to the slot's placement only while one is due (HI-1953)", { timeout: timing('test.hang') }, () => {
   // taskStart hands a Start's prompt to the slot's placement when placementDue says one will come; otherwise it gives the
   // card itself (typed in, or its agent started with it). A card back from Review keeps its placed cycle: no new start is
   // written, so no placement comes, and a prompt handed over then was given to nobody.
@@ -1016,7 +1017,7 @@ describe("a Start's prompt goes to the slot's placement only while one is due (H
   })
 })
 
-describe("a slot that couldn't be prepared (HI-1796)", { timeout: 60_000 }, () => {
+describe("a slot that couldn't be prepared (HI-1796)", { timeout: timing('test.hang') }, () => {
   it("tells its card with the workflow's own message (so its history line can show it), once", async () => {
     const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
     state.wf = e.wf
@@ -1047,7 +1048,7 @@ describe("a slot that couldn't be prepared (HI-1796)", { timeout: 60_000 }, () =
   })
 })
 
-describe("a placement owed at a restart resumes its builder's conversation (HI-1746)", { timeout: 60_000 }, () => {
+describe("a placement owed at a restart resumes its builder's conversation (HI-1746)", { timeout: timing('test.hang') }, () => {
   async function owed(): Promise<{ e: Env; n: number; key: string; slot: string; cycle: NonNullable<ReturnType<typeof cycleIn>>; ws: never }> {
     const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
     state.wf = e.wf
@@ -1393,7 +1394,7 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
   })
 })
 
-describe("a lane's brief in every placement of its cards (HI-1795)", { timeout: 60_000 }, () => {
+describe("a lane's brief in every placement of its cards (HI-1795)", { timeout: timing('test.hang') }, () => {
   /** A lane's card started in its slot (the lane's lease, l-1) and prepared there, its builder B1; the lane as kept. */
   async function laneCard(brief: string | null = 'Lane order: a, then b. Stay off src/renderer.'): Promise<{ e: Env; n: number; key: string; slot: string; cycle: NonNullable<ReturnType<typeof cycleIn>>; ws: never }> {
     const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
@@ -1500,7 +1501,7 @@ describe("a lane's brief in every placement of its cards (HI-1795)", { timeout: 
   })
 })
 
-describe('Combwork quitting (#1628)', { timeout: 60_000 }, () => {
+describe('Combwork quitting (#1628)', { timeout: timing('test.hang') }, () => {
   // Each test quits: started again after it, as the next Combwork's start does, so the other tests' passes run.
   afterEach(() => {
     startSlotCards()
@@ -1815,7 +1816,7 @@ describe('Combwork quitting (#1628)', { timeout: 60_000 }, () => {
   })
 })
 
-describe("HI-3010: a lane's next card, its builder busy in the slot", { timeout: 60_000 }, () => {
+describe("HI-3010: a lane's next card, its builder busy in the slot", { timeout: timing('test.hang') }, () => {
   it('the slot is on its line at once, with what its builder committed, and no hook runs; placed once its builder is free', async () => {
     const { gitWorkspacePort } = await import('../src/main/platform/gitWorkspacePort')
     const { NOT_IN_PLACE } = await import('../src/main/slots')
@@ -1883,7 +1884,7 @@ describe("HI-3010: a lane's next card, its builder busy in the slot", { timeout:
   })
 })
 
-describe("HI-3165: a preparation as its pool's port has the line: in place and under the repository's lock, or its own key", { timeout: 60_000 }, () => {
+describe("HI-3165: a preparation as its pool's port has the line: in place and under the repository's lock, or its own key", { timeout: timing('test.hang') }, () => {
   async function preparing(keyed: boolean, early: unknown[] = []) {
     const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
     state.wf = e.wf
@@ -1927,7 +1928,7 @@ describe("HI-3165: a preparation as its pool's port has the line: in place and u
   })
 })
 
-describe("a slot that couldn't be prepared, recorded and recovered (HI-2913)", { timeout: 60_000 }, () => {
+describe("a slot that couldn't be prepared, recorded and recovered (HI-2913)", { timeout: timing('test.hang') }, () => {
   async function failing(error: { error: string; stale?: true }) {
     const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
     state.wf = e.wf

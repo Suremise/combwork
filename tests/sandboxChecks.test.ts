@@ -11,6 +11,7 @@ import path from 'path'
 import { afterAll, beforeAll, test } from 'vitest'
 import { tempDir } from './tempDir'
 import { PROVIDERS } from '../src/shared/providers'
+import { timing } from './timing.cjs'
 
 const require = createRequire(import.meta.url)
 // What the runner and the fakes read and write is plain JSON.
@@ -62,7 +63,7 @@ function scratch(name: string, fail: Json = {}) {
   }
 }
 const stops = (s: Json, by: string) => s.calls.filter((c: Json[string][]) => c[0] === 'stop' && c[2] === by).length
-const runner = (args: string[], env: Json) => spawnSync(process.execPath, [RUNNER, ...args], { env, encoding: 'utf8', timeout: 60_000 })
+const runner = (args: string[], env: Json) => spawnSync(process.execPath, [RUNNER, ...args], { env, encoding: 'utf8', timeout: timing('spawn.hang') })
 
 test('build folder: the common folder of both installers; different drives and the drive root refused (no endless climb)', () => {
   assert.strictEqual(buildRoot('D:\\h\\dist\\rc\\Combwork-Setup-0.6.0.exe', 'D:\\h\\dist\\Combwork-Setup-0.5.1.exe'), 'D:\\h\\dist')
@@ -109,7 +110,7 @@ test('the server from a worktree: the workspace of its main checkout, not the wo
   const slot = path.join(s.dir, 'ws.worktrees', 'combwork', 'slot-a')
   fs.mkdirSync(main, { recursive: true })
   const git = (cwd: string, ...args: string[]) => {
-    const r = spawnSync('git', ['-c', 'user.name=Combwork Test', '-c', 'user.email=combwork-test@example.invalid', ...args], { cwd, env: baseEnv(), encoding: 'utf8', windowsHide: true, timeout: 30_000 })
+    const r = spawnSync('git', ['-c', 'user.name=Combwork Test', '-c', 'user.email=combwork-test@example.invalid', ...args], { cwd, env: baseEnv(), encoding: 'utf8', windowsHide: true, timeout: timing('spawn.hang') })
     assert.strictEqual(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`)
   }
   git(main, 'init', '-q')
@@ -506,7 +507,7 @@ test('what the 1.1+ seeding calls is in 1.1.0 (its IPC channels and routes), and
   for (const r of ["'/v1/lanes'", '/v1/lanes?project=demo', '/v1/tasks/']) assert.ok(drive.includes(r), r)
   const api = fs.readFileSync(path.join(root, 'src', 'shared', 'api.ts'), 'utf8')
   assert.deepStrictEqual(reading.filter((c) => !api.includes(`'${c}'`)), [], 'channels after-upgrade reads, missing from src/shared/api.ts')
-  const show = (f: string) => spawnSync('git', ['show', `v1.1.0:${f}`], { cwd: root, env: baseEnv(), encoding: 'utf8', windowsHide: true, timeout: 30_000, maxBuffer: 64 * 1024 * 1024 })
+  const show = (f: string) => spawnSync('git', ['show', `v1.1.0:${f}`], { cwd: root, env: baseEnv(), encoding: 'utf8', windowsHide: true, timeout: timing('spawn.hang'), maxBuffer: 64 * 1024 * 1024 })
   const api11 = show('src/shared/api.ts')
   if (api11.status !== 0) return // no 1.1.0 tag here
   assert.deepStrictEqual(seeding.filter((c) => !api11.stdout.includes(`'${c}'`)), [], "channels the seeding calls, missing from 1.1.0's src/shared/api.ts")

@@ -9,6 +9,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import { agentPtyKey } from '../src/shared/defaults'
 import { forgetPtys, keptPtyCounts, killPty, PTY_COLS, PTY_ROWS, resizePty, setPtyKeptLimitsForTests, spawnPty, startSize } from '../src/main/ptyHost'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 vi.mock('../src/main/events', () => ({ emit: () => undefined, sendPty: () => undefined }))
 vi.mock('../src/main/providers', () => ({ allProviders: () => [] }))
@@ -27,7 +28,7 @@ describe('the sizes kept for terminals', () => {
     // A terminal with a process, sized first, so it is the oldest when the others come.
     const started = new Promise<void>((resolve) => {
       spawnPty(running, { file: process.execPath, args: ['-e', 'setTimeout(() => {}, 60000)'], cwd: process.cwd(), env, onData: () => resolve() })
-      setTimeout(resolve, 3000)
+      setTimeout(resolve, 3000) // timing-ok: a start for a terminal that prints nothing: the fallback is the point
     })
     resizePty(running, 150, 40)
     await started
@@ -38,7 +39,7 @@ describe('the sizes kept for terminals', () => {
     expect(startSize(agentPtyKey('C:\\ws999\\p', 'a-999'))).toEqual({ cols: 80 + (999 % 50), rows: 24 })
     expect(startSize(agentPtyKey('C:\\ws0\\p', 'a-0'))).toEqual(DEFAULT)
     expect(startSize(running)).toEqual({ cols: 150, rows: 40 })
-  }, 20000)
+  }, timing('test.hang'))
 
   it('give a restarted terminal its pane\u2019s last size', () => {
     const key = agentPtyKey('C:\\keep\\p', 'a-keep')
@@ -83,13 +84,13 @@ describe.runIf(process.platform === 'win32')('more running terminals than the bo
     for (const key of keys) killPty(key)
     // Each exit is waited for. One that never came (once, under four unit suites at once, #560; not seen again in 360
     // kills under load) is named after 30 s, a bound for a hang, rather than the test timing out with no word of which.
-    await Promise.race([Promise.all(exits), new Promise((r) => setTimeout(r, 30_000))])
+    await Promise.race([Promise.all(exits), new Promise((r) => setTimeout(r, timing('wait.hang')))])
     expect(keys.filter((k) => !exited.has(k)), 'terminals killed whose exit never came').toEqual([])
     // Stopped, at most three stopped terminals' sizes remain: the three set last.
     expect(keptPtyCounts().sizes).toBeLessThanOrEqual(3)
     expect(keys.slice(3).map((k) => startSize(k))).toEqual([3, 4, 5].map((i) => ({ cols: 100 + i, rows: 30 })))
     expect(keys.slice(0, 3).every((k) => startSize(k).cols === PTY_COLS)).toBe(true)
-  }, 60000)
+  }, timing('test.hang'))
 })
 
 describe.runIf(process.platform === 'win32')('the output kept from quiet exits', () => {
@@ -98,7 +99,7 @@ describe.runIf(process.platform === 'win32')('the output kept from quiet exits',
       await new Promise<void>((resolve) => spawnPty(`task:quiet-${i}`, { file: process.execPath, args: ['-e', `console.log('run ${i}')`], cwd: process.cwd(), env, quietExit: true, onExit: () => resolve() }))
     }
     expect(keptPtyCounts().carried).toBeLessThanOrEqual(20)
-  }, 120000)
+  }, timing('test.hang'))
 })
 
 describe.runIf(process.platform === 'win32')('the environment the terminals get', () => {
@@ -131,5 +132,5 @@ describe.runIf(process.platform === 'win32')('the environment the terminals get'
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
-  }, 60000)
+  }, timing('test.hang'))
 })

@@ -11,8 +11,9 @@ import { join, resolve } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
-vi.setConfig({ testTimeout: 60_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 const base = tempDir('cw-retargettraces-')
 mkdirSync(join(base, 'profile'), { recursive: true })

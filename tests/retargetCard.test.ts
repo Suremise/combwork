@@ -13,10 +13,11 @@ import { join } from 'path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
-vi.setConfig({ testTimeout: 60_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 /** A bound for a hung run only, never a timing (tests/README.md). */
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 const { endChildTree } = createRequire(import.meta.url)('./e2e/folderProcesses.cjs') as { endChildTree: (child: ChildProcess) => number }
 
 const base = tempDir('cw-retargetcard-')

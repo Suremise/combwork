@@ -14,6 +14,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { msysBinFor } from '../src/main/gitWorker'
 import { boundedOutput, endTreeAsync, findMsysMarked, msysMatches, MSYS_FIND_SCRIPT, RUN_MARK_VAR, treesToEnd, type ListedProcess } from '../src/main/processTree'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
@@ -113,17 +114,17 @@ describe('the MSYS search script starts nothing (HI-3047)', () => {
 
 describe.skipIf(!isWin)('bounded: the search ended at its limits, nothing left (HI-3047)', () => {
   it('past its time limit: an error, and its process gone', async () => {
-    const r = await boundedOutput(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { timeoutMs: 500, maxBuffer: 1024, env: baseEnv() })
+    const r = await boundedOutput(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { timeoutMs: 500, maxBuffer: 1024, env: baseEnv() }) // timing-ok: the timeout under test (its expiry is what the test checks)
     expect(r).toMatchObject({ error: 'it ran past its time limit' })
     const pid = 'pid' in r ? r.pid! : 0
     expect(pid).toBeGreaterThan(0)
-    await vi.waitFor(() => expect(alive(pid)).toBe(false), { timeout: 10_000 })
+    await vi.waitFor(() => expect(alive(pid)).toBe(false), { timeout: timing('wait.hang') })
   })
   it('output past its cap: an error, and its process gone', async () => {
-    const r = await boundedOutput(process.execPath, ['-e', "setInterval(() => process.stdout.write('x'.repeat(4096)), 1)"], { timeoutMs: 20_000, maxBuffer: 64 * 1024, env: baseEnv() })
+    const r = await boundedOutput(process.execPath, ['-e', "setInterval(() => process.stdout.write('x'.repeat(4096)), 1)"], { timeoutMs: timing('spawn.hang'), maxBuffer: 64 * 1024, env: baseEnv() })
     expect(r).toMatchObject({ error: 'its output passed the cap' })
     const pid = 'pid' in r ? r.pid! : 0
-    await vi.waitFor(() => expect(alive(pid)).toBe(false), { timeout: 10_000 })
+    await vi.waitFor(() => expect(alive(pid)).toBe(false), { timeout: timing('wait.hang') })
   })
   it("a shell that isn't there: an error", async () => {
     expect(await findMsysMarked({ mark: 'ab', bin: join(tempDir('msys-none-'), 'usr', 'bin') })).toMatchObject({ error: expect.stringMatching(/couldn't run/) })
@@ -169,7 +170,7 @@ describe.skipIf(!isWin)('endTreeAsync with an MsysMark (HI-3047)', () => {
     const file = join(tempDir('msys-tree-'), 'child.pid')
     const top = spawn(process.execPath, ['-e', `const c = require('child_process').spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' }); require('fs').writeFileSync(${JSON.stringify(file)}, String(c.pid)); setInterval(() => {}, 1000)`], { stdio: 'ignore', windowsHide: true, env: baseEnv() })
     own(top.pid!)
-    await vi.waitFor(() => expect(existsSync(file) && readFileSync(file, 'utf8').length > 0).toBe(true), { timeout: 20_000 })
+    await vi.waitFor(() => expect(existsSync(file) && readFileSync(file, 'utf8').length > 0).toBe(true), { timeout: timing('wait.hang') })
     const child = Number(readFileSync(file, 'utf8'))
     own(child)
     return { top, child }
@@ -185,10 +186,10 @@ describe.skipIf(!isWin)('endTreeAsync with an MsysMark (HI-3047)', () => {
       const { top, child } = await tree()
       const why: string[] = []
       await endTreeAsync(top, 'win32', { mark: 'ab', bin: 'x', onIncomplete: (w) => why.push(w), discover: async () => answer })
-      await vi.waitFor(() => expect([alive(top.pid!), alive(child)]).toEqual([false, false]), { timeout: 10_000 })
+      await vi.waitFor(() => expect([alive(top.pid!), alive(child)]).toEqual([false, false]), { timeout: timing('wait.hang') })
       expect(why).toEqual(['error' in answer ? answer.error : 'its answer was malformed'])
     }
-  }, 60_000)
+  }, timing('test.hang'))
 
   it('a match outside the tree is ended with it; an unrelated process, and one the answer names but started after the search began, are not', async () => {
     const { top, child } = await tree()
@@ -201,10 +202,10 @@ describe.skipIf(!isWin)('endTreeAsync with an MsysMark (HI-3047)', () => {
     const out = said(began, 'a 5 ' + marked, 'a 6 ' + late, 'm 5 ' + marked, 'm 6 ' + late, 'b 5 ' + marked, 'b 6 ' + late)
     const why: string[] = []
     await endTreeAsync(top, 'win32', { mark: 'ab', bin: 'x', onIncomplete: (w) => why.push(w), discover: async () => ({ out }) })
-    await vi.waitFor(() => expect([alive(top.pid!), alive(child), alive(marked)]).toEqual([false, false, false]), { timeout: 10_000 })
+    await vi.waitFor(() => expect([alive(top.pid!), alive(child), alive(marked)]).toEqual([false, false, false]), { timeout: timing('wait.hang') })
     expect([alive(unrelated), alive(late)]).toEqual([true, true])
     expect(why).toEqual([])
-  }, 60_000)
+  }, timing('test.hang'))
 })
 
 describe.skipIf(!isWin)("Git's own sh finds exactly the marker's entry (HI-3047)", () => {
@@ -219,7 +220,7 @@ describe.skipIf(!isWin)("Git's own sh finds exactly the marker's entry (HI-3047)
     const sleeper = async (name: string, vars: Record<string, string>): Promise<number> => {
       const file = join(dir, name)
       spawn(join(bin!, 'sh.exe'), ['-c', SLEEPER, 'sh', file.replace(/\\/g, '/')], { stdio: 'ignore', windowsHide: true, env: { ...baseEnv(), ...vars } })
-      await vi.waitFor(() => expect(existsSync(file) && /\d/.test(readFileSync(file, 'utf8'))).toBe(true), { timeout: 20_000 })
+      await vi.waitFor(() => expect(existsSync(file) && /\d/.test(readFileSync(file, 'utf8'))).toBe(true), { timeout: timing('wait.hang') })
       const pid = Number(readFileSync(file, 'utf8').trim())
       own(pid)
       return pid
@@ -250,7 +251,7 @@ describe.skipIf(!isWin)("Git's own sh finds exactly the marker's entry (HI-3047)
     expect(out2.trim().split(/\r?\n/).at(-1)).toBe('end')
     expect(out2).not.toMatch(new RegExp(`^(x|m) ${msysPid}( |$)`, 'm'))
     expect(out2).toMatch(new RegExp(`^a ${msysPid} `, 'm'))
-  }, 60_000)
+  }, timing('test.hang'))
 })
 
 describe('msysBinFor: the MSYS folder of the git started (HI-3047)', () => {

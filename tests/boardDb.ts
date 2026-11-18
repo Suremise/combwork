@@ -4,6 +4,7 @@ import { BOARD_MIGRATIONS, boardChanged, boardFile, boardWrite, cardDoc, deleteC
 import { composeCard, decomposeCard, readCardRows, writeCardRows } from '../src/main/schema/cardRows'
 import { CARDS_STEP } from '../src/main/schema/v1_0'
 import type { WorkspaceService } from '../src/main/workspace'
+import { timing } from './timing.cjs'
 
 /** A card's document as saved (what its file held before 0.9); throws when there is no such card. */
 export function readCard(ws: WorkspaceService, n: number): Record<string, unknown> {
@@ -39,7 +40,7 @@ export function removeCard(ws: WorkspaceService, n: number): Promise<void> {
  * past the board's lock in this process (a test holding it to make a change wait).
  */
 export function writeCardOutside(workspacePath: string, n: number, doc: Record<string, unknown>): void {
-  const db = new DatabaseSync(boardFile(workspacePath), { timeout: 5000 })
+  const db = new DatabaseSync(boardFile(workspacePath), { timeout: timing('db.busyMs') })
   try {
     db.exec('PRAGMA foreign_keys = ON')
     db.exec('BEGIN IMMEDIATE')
@@ -56,7 +57,7 @@ export function writeCardOutside(workspacePath: string, n: number, doc: Record<s
  * this Combwork (a new file takes every step) that a test needs from before its upgrade. The file must be closed.
  */
 export function as09(file: string): void {
-  const db = new DatabaseSync(file, { timeout: 5000 })
+  const db = new DatabaseSync(file, { timeout: timing('db.busyMs') })
   try {
     const docs = readCardRows(db).map((r) => [r.card.number, JSON.stringify(composeCard(r))] as const)
     // 0.9's tables, and its cards table with its indexes, as the steps before the 1.0 group make them.
@@ -93,7 +94,7 @@ export const boardLockKey = (workspacePath: string): string => `board-lock:${wor
 
 /** A card's document read from the board's file on its own connection (any workspace, open in this Combwork or not). */
 export function readCardIn(workspacePath: string, n: number): Record<string, unknown> {
-  const db = new DatabaseSync(boardFile(workspacePath), { readOnly: true, timeout: 5000 })
+  const db = new DatabaseSync(boardFile(workspacePath), { readOnly: true, timeout: timing('db.busyMs') })
   try {
     const [r] = readCardRows(db, { numbers: [n] })
     if (!r) throw new Error(`no card #${n}`)

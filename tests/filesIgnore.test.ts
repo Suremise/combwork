@@ -10,10 +10,10 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GitResult } from '../src/main/git'
 import { tempDir } from './tempDir'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 /** The stress test's listings and adds, each at least (#1480), and its bound past its time for a hung run. */
 const ENOUGH = 30
-const STRESS_HUNG_MS = 120000
+const STRESS_HUNG_MS = timing('wait.hangReal')
 
 /** check-ignore results to give instead of running it, in order; empty: run it. */
 const failNext: Partial<GitResult>[] = []
@@ -96,7 +96,7 @@ describe('Files tab: a failed git check-ignore (#222)', () => {
       for (let i = 0; i < IGNORE_TRIES; i++) failNext.push(BUSY)
       await dimmed()
       failNext.length = 0
-      await new Promise((res) => setTimeout(res, 700))
+      await new Promise((res) => setTimeout(res, 700)) // timing-ok: past RELIST_MS (500 ms), the relist's own delay
     }
     expect(r.seen.length).toBe(files.RELIST_MAX)
     // Working again: back to normal, and a later failure is listed again once more.
@@ -124,7 +124,7 @@ describe('Files tab: a failed git check-ignore (#222)', () => {
     failNext.push({ err: 'fatal: not a git repository (or any of the parent directories): .git' })
     expect(await dimmed('src')).toEqual([])
     expect(checkIgnoreCalls).toBe(1)
-    await new Promise((res) => setTimeout(res, 700))
+    await new Promise((res) => setTimeout(res, 700)) // timing-ok: past RELIST_MS (500 ms), the relist's own delay
     expect(r.seen).toEqual([])
     r.off()
   })
@@ -167,5 +167,5 @@ describe('Files tab: a failed git check-ignore (#222)', () => {
     // Once under four unit suites at once (#560), never since: if it comes back, what git answered says whether it's git
     // or Combwork (#222's handling).
     expect(undimmed, `listings showing dist undimmed; git's answers without it: ${JSON.stringify(unnamed.slice(0, 5))}`).toEqual([])
-  }, 600000)
+  }, timing('test.hangRealJj'))
 })

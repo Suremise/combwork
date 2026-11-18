@@ -36,6 +36,7 @@ import { jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
 import { B1, B2, R1, moved, refusedBy } from './workflow/harness'
 import { BUSY, closers, ENDED, OPEN, opts, started, world } from './jjCardsWorld'
+import { timing } from './timing.cjs'
 
 if (!jjExe) console.warn(`jjCards.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
@@ -43,7 +44,7 @@ if (!jjExe) console.warn(`jjCards.test.ts skipped: jj ${TESTED_JJ.version} isn't
 // its slots and runs real starts, submissions and pins, tens of jj and Git processes: 5–12.6 s each in a whole-file run
 // on jj 0.47.1, up to 17 s alone, and up to 44 s beside jjSlotPrepReal, 2 spinner workers and other lanes' runs, where
 // Vitest's 20 s default for unit tests timed out the attribution and provenance-epoch tests. About twice the worst seen.
-const REAL_JJ_MS = 90_000
+const REAL_JJ_MS = timing('wait.hangReal')
 
 describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ.version}), HI-2868`, { timeout: REAL_JJ_MS }, () => {
   describe.each([true, false] as const)('colocated: %s', (colocated) => {
@@ -374,6 +375,57 @@ describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ
       expect(writes).toBe(4)
       expect(verdicts()).toBe(1)
       expect(w.wf.state(card).stage).toBe('active')
+    })
+
+    // HI-3391: an answer to a request (an advance's Integrate, an agent's question) took one pass, as verdicts did before
+    // HI-3216: a jj operation elsewhere in the repository (another lane's commit) landing between its reads refused it.
+    it("answer: a jj operation beside it before each of its first three writes gathers it again each time; one before every write refuses once the passes are spent; a commit in the slot refuses (HI-3391)", async () => {
+      const w = await world(colocated)
+      const a = w.slots['slot-a']
+      const card = await started(w, 'answer beside operations')
+      w.commitIn(a.folder, 'p.txt', a.identity.workspace)
+      const ask = async (): Promise<string> => {
+        moved(await w.wf.askTheUser(card.key, B1, { kind: 'approve', text: 'May I go on?' }))
+        return w.wf.state(w.wf.store.card(card.id)).requests.at(-1)!.request
+      }
+      const elsewhere = (): void => void w.h.jj(w.repo, '--ignore-working-copy', 'new', 'main', '--no-edit', '-m', 'elsewhere')
+      const approvals = (): number => w.store.facts(card.id).filter((f) => f.kind === 'Approval').length
+      let writes = 0
+      // Before every write: refused once its passes are spent, nothing recorded.
+      const r1 = await ask()
+      w.wf.cfg.hooks = { beforeWrite: (intent) => void (intent === 'answer' && (writes++, elsewhere())) }
+      refusedBy(await w.wf.answer(card.key, r1, 'approved', { by: 'user' }), 'evidence.changed')
+      expect(writes).toBe(4)
+      expect(approvals()).toBe(0)
+      // A real change in the slot meanwhile (a commit): refused at once, never gathered again.
+      writes = 0
+      w.wf.cfg.hooks = { beforeWrite: (intent) => void (intent === 'answer' && writes++ === 0 && w.commitIn(a.folder, 'late.txt', a.identity.workspace)) }
+      refusedBy(await w.wf.answer(card.key, r1, 'approved', { by: 'user' }), 'evidence.changed')
+      expect(writes).toBe(1)
+      expect(approvals()).toBe(0)
+      // Before each of its first three writes (one pass refused the second): recorded on the fourth gather.
+      writes = 0
+      w.wf.cfg.hooks = { beforeWrite: (intent) => void (intent === 'answer' && writes++ < 3 && elsewhere()) }
+      const out = await w.wf.answer(card.key, r1, 'approved', { by: 'user' })
+      w.wf.cfg.hooks = undefined
+      moved(out)
+      expect(writes).toBe(4)
+      expect(approvals()).toBe(1)
+      // An operation between the gather and the write's own read (not before it): gathered again from the write, recorded.
+      const r2 = await ask()
+      const evidence = JjPlatform.prototype.evidence
+      let reads = 0
+      const spy = vi.spyOn(JjPlatform.prototype, 'evidence').mockImplementation(function (this: JjPlatform, ...x: Parameters<JjPlatform['evidence']>) {
+        // The write's read is the third (gather, revalidate's, the write's): an operation lands just before it.
+        if (++reads === 3) elsewhere()
+        return evidence.apply(this, x)
+      })
+      try {
+        moved(await w.wf.answer(card.key, r2, 'approved', { by: 'user' }))
+      } finally {
+        spy.mockRestore()
+      }
+      expect(approvals()).toBe(2)
     })
 
     it("verdict: the fingerprint unreadable at the write and the read after it (jj's operation heads while a review copy's operation lands): gathered again and recorded (HI-3216)", async () => {
