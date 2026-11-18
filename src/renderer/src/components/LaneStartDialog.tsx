@@ -190,7 +190,10 @@ export function LaneStartDialog() {
   // HI-3323: the list makes the lane yield (the start's own rule, laneYieldFirst): it keeps the card in Doing and puts first
   // a card in Todo that card waits on, so the lane switches at the builder's turn end. A list without that card (this
   // dialog's own lists are Todo cards) is an ordinary list change, and its hint says so.
-  const yieldsTo = canApplyNow ? laneYieldFirst(cards, flying!.number, (n) => tasks.find((x) => x.number === n), builder) : null
+  // HI-3368: never to a first card that can't start: blocked, or with a card it depends on not Done (read from the board:
+  // the window doesn't have the project's Dependencies must be Done, so it reads one as waiting, as most presets have it).
+  const depsWait = (n: number): boolean => (tasks.find((x) => x.number === n)?.blockedBy ?? []).some((b) => tasks.find((x) => x.number === b)?.column !== 'done')
+  const yieldsTo = canApplyNow ? laneYieldFirst(cards, flying!.number, (n) => tasks.find((x) => x.number === n), builder, depsWait) : null
 
   const go = async (): Promise<void> => {
     // Only for the request still open: a dialog closed or opened again since starts nothing.

@@ -770,6 +770,38 @@ describe("Combwork starts a lane's next card (HI-1990)", () => {
         await lanes.endLane(w, lane.id, { abandoned: true })
       })
 
+      // HI-3368 (bug hunt, 18 Nov): the first card put before the card in Doing can't start (blocked, or waiting on its own
+      // dependency where its rules wait for it): never yielded to. Before, the card in Doing went back to Todo at its
+      // builder's turn end and the first card was never started, the builder idle.
+      it("HI-3368: a first card that can't start (blocked, or its own dependency not Done where its rules wait) is no yield: queued for the card's Done, the card left in Doing", async () => {
+        const blocked = await waiting('j9')
+        await run(() => tasks.updateTask(blocked.fix, { blocked: 'waiting for a licence decision' }, user))
+        const rb = await lanes.startLane(w, { project: 'alpha', builder: 'j9', reviewer: 'r1', cards: [blocked.fix, blocked.trial], by: 'the Assistant' })
+        expect(rb.note).toContain('it applies once')
+        expect(rb.lane.status?.first).toBeUndefined()
+        blocked.st.status = 'ready'
+        await look()
+        expect([await columnOf(blocked.trial), await columnOf(blocked.fix)]).toEqual(['doing', 'todo'])
+        await lanes.endLane(w, blocked.lane.id, { abandoned: true })
+
+        const was = (await run(() => w.projectConfig(p))).workflow ?? null
+        await w.mutateProjectConfig(p, () => ({ workflow: { platform: 'none', preset: null, options: { dependenciesDone: true } } }))
+        try {
+          const deps = await waiting('j9')
+          const licence = await card('Licence decision j9', 'o1')
+          await run(() => tasks.updateTask(deps.fix, { blockedBy: [licence] }, user))
+          const rd = await lanes.startLane(w, { project: 'alpha', builder: 'j9', reviewer: 'r1', cards: [deps.fix, deps.trial], by: 'the Assistant' })
+          expect(rd.note).toContain('it applies once')
+          expect(rd.lane.status?.first).toBeUndefined()
+          deps.st.status = 'ready'
+          await look()
+          expect([await columnOf(deps.trial), await columnOf(deps.fix)]).toEqual(['doing', 'todo'])
+          await lanes.endLane(w, deps.lane.id, { abandoned: true })
+        } finally {
+          await w.mutateProjectConfig(p, () => ({ workflow: was ?? undefined }) as never)
+        }
+      })
+
       it("named by the card's waitingFor too; a list change that puts first a card it doesn't wait on stays queued for its Done; applyNow on a yield while its builder works is queued, not refused", async () => {
         const a = await waiting('j2', 'waitingFor')
         const ra = await lanes.startLane(w, { project: 'alpha', builder: 'j2', reviewer: 'r1', cards: [a.fix, a.trial], by: 'the user' })

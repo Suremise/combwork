@@ -980,7 +980,7 @@ export async function applyLaneList(ws: WorkspaceService, was: LaneRecord, cards
 export async function yieldOf(ws: WorkspaceService, was: LaneRecord, cards: readonly number[], behind: number, by: string): Promise<LaneYield | null> {
   if (!cards.includes(behind)) return null
   const board = await cardsNow(ws, [...new Set([...cards, behind])])
-  const first = laneYieldFirst(cards, behind, (n) => board.get(n), was.builder.id)
+  const first = laneYieldFirst(cards, behind, (n) => board.get(n), was.builder.id, await depsWaitOf(ws, was.project))
   if (first === null) return null
   const s = attemptOf(ws, was.project, behind)
   return s && s.stage === 'active' ? { id: newId(), card: behind, first, attempt: s.attempt, by } : null
@@ -1294,7 +1294,7 @@ async function putBackForReorder(ws: WorkspaceService, s: StartLane, builder: La
   // HI-3323: the new first card is one the card in flight waits on: never put back here, idle builder or not. The start's
   // edit queues it as a yield, which runLaneYields runs in its one guarded board change (fenced at its commit on the
   // builder's run, turn, Stop, launch, the team's pause and its role), at once when the builder is free.
-  if (laneYieldFirst(s.cards, flying.number, (n) => cards.get(n), builder.id) !== null) return null
+  if (laneYieldFirst(s.cards, flying.number, (n) => cards.get(n), builder.id, await depsWaitOf(ws, s.project)) !== null) return null
   const { sessions } = await import('./sessions')
   const st = sessions.liveFor(projectPath, builder.id)
   if (st && IN_A_TURN.has(st.status)) throw new LaneError(409, say(A.inATurn, { agent: builder.name, status: st.status }))
@@ -1389,7 +1389,19 @@ async function yieldCardsHold(ws: WorkspaceService, l: LaneRecord, y: LaneYield)
   const pending = l.pending ?? []
   if (!l.cards.includes(y.card)) return false
   const board = await cardsNow(ws, [...new Set([...pending, y.card])])
-  return laneYieldFirst(pending, y.card, (n) => board.get(n), l.builder.id) === y.first
+  return laneYieldFirst(pending, y.card, (n) => board.get(n), l.builder.id, await depsWaitOf(ws, l.project)) === y.first
+}
+
+/**
+ * HI-3368: whether a lane's card waits on its dependencies before it can start (laneStarts' dependencyWait: its rules
+ * start it only once they are Done, and one isn't), as the yield rule asks of its first card. The project's workflow
+ * that can't be read: no wait known (the start then says why), as dependencyWait has it.
+ */
+async function depsWaitOf(ws: WorkspaceService, project: string): Promise<(n: number) => boolean> {
+  const wf = await (await service()).workflowFor(ws, join(ws.path ?? '', project)).catch(() => null)
+  if (!wf) return () => false
+  const { dependencyWaitIn } = await import('./laneStarts')
+  return (n) => !!dependencyWaitIn(wf, n)
 }
 
 /** For tests (HI-3323): awaited after a yield's look without the locks (`looked`), and after its decision under the lanes' lock, before its board change (`decided`). */
