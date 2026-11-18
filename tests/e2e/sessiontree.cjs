@@ -335,7 +335,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
     })
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    await lib.themeShown(page, theme)
+    check(`${theme}: the theme shown, its transitions over`, await lib.themeShown(page, theme))
     const button = await legible(blocked.locator('button.act-resume[disabled]'))
     check(`${theme}: the blocked Resume is unfaded and readable`, button.opacity === 1 && button.ratio >= 4.5, JSON.stringify(button))
     await row('Gone session').click({ button: 'right' })

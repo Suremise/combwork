@@ -48,12 +48,8 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
-    return v
-  }
+  // HI-3385: lib's until (its bound required, the file's interval).
+  const until = (fn, ms) => lib.until(fn, ms)
   const shells = () => {
     const f = path.join(claudeHome, 'fake-shell.jsonl')
     return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []

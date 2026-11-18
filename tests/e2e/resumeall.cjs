@@ -98,7 +98,7 @@ const check = (name, ok, extra = '') => {
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
     await page.mouse.move(0, 0)
-    await lib.themeShown(page, theme)
+    check(`${theme}: the theme shown, its transitions over`, await lib.themeShown(page, theme))
     const [all, one] = [await colours(button), await colours(agentResume)]
     seen.push(all)
     check(`${theme}: Resume All has the Resume button's colours`, all === one, `${all} vs ${one}`)

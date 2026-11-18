@@ -100,7 +100,7 @@ const check = (name, ok, extra = '') => {
   check('…with Restart in This Mode… and Manage Modes…', items.some((t) => t.startsWith('Restart in This Mode')) && items.some((t) => t.startsWith('Manage Modes')), JSON.stringify(items))
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    await lib.themeShown(page, theme)
+    check(`${theme}: the theme shown, its transitions over`, await lib.themeShown(page, theme))
     await page.screenshot({ path: path.join(lib.WORK, `assistantmode-menu-${theme}.png`) })
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })

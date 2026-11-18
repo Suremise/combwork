@@ -92,7 +92,7 @@ const check = (name, ok, extra = '') => {
   await page.mouse.move(900, 600)
   await page.screenshot({ path: path.join(lib.WORK, 'assistantside-left-dark.png') })
   await inv('settings:update', { appearance: { theme: 'light' } })
-  await lib.themeShown(page, 'light')
+  check('light: the theme shown, its transitions over', await lib.themeShown(page, 'light'))
   await page.screenshot({ path: path.join(lib.WORK, 'assistantside-left-light.png') })
   await inv('settings:update', { appearance: { theme: 'dark' } })
 
