@@ -54,7 +54,7 @@ const check = (name, ok, extra = '') => {
   const until = async (fn, ms) => {
     const t = Date.now()
     let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(150)
+    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
     return v
   }
   const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
@@ -111,7 +111,7 @@ const check = (name, ok, extra = '') => {
   await startDialog.locator('label.choice', { hasText: 'A new agent' }).first().click()
   const startBtn = startDialog.locator('.dialog-footer .btn-primary, .dialog-footer button.primary').last()
   await startBtn.click()
-  await startBtn.click({ force: true, timeout: 500 }).catch(() => {})
+  await startBtn.click({ force: true, timeout: lib.timing('pace.actionTryMs') }).catch(() => {})
   check('Start shows Starting… while it runs', !!(await until(async () => /Starting…/.test(await startDialog.innerText().catch(() => '')), HUNG_MS)))
   await page.screenshot({ path: path.join(lib.WORK, 'busy-2-starting.png') })
   await page.keyboard.press('Escape')
@@ -140,7 +140,7 @@ const check = (name, ok, extra = '') => {
   await question.getByRole('button', { name: 'Keep Editing' }).click()
   const commentBtn = d2.locator('.task-comment-new button')
   await commentBtn.click()
-  await commentBtn.click({ force: true, timeout: 300 }).catch(() => {})
+  await commentBtn.click({ force: true, timeout: lib.timing('pace.actionTryMs') }).catch(() => {})
   check('Comment shows Posting… while it runs', !!(await until(async () => /Posting…/.test(await d2.innerText()), HUNG_MS)))
   await until(async () => !(await d2.innerText()).includes('Posting…'), lib.timing('hang.ui'))
   check('the comment is posted once', (await card(c2.number)).comments.length === 1, String((await card(c2.number)).comments.length))
@@ -148,7 +148,7 @@ const check = (name, ok, extra = '') => {
   // --- Delete: the question stays with a spinner until it's done ---
   await d2.getByRole('button', { name: 'Delete' }).click()
   const del = page.locator('.dialog', { hasText: `Delete ${c2.key ?? `#${c2.number}`}?` })
-  await del.waitFor({ timeout: 3000 })
+  await del.waitFor({ timeout: lib.timing('hang.ui') })
   await del.locator('.dialog-footer button').last().click()
   check('Delete shows Deleting…', !!(await until(async () => /Deleting…/.test(await del.innerText().catch(() => '')), HUNG_MS)))
   await page.keyboard.press('Escape')

@@ -72,7 +72,7 @@ const check = (name, ok, extra = '') => {
   const converse = async () => {
     await until(async () => (await live())?.status === 'ready', HUNG_MS)
     await inv('pty:write', lib.ptyKey(home, 'assistant'), 'hello')
-    await lib.sleep(lib.timing('pace.lineBeforeEnterMs')) // on purpose: the fake reads a typed line before its Enter, as a CLI does
+    await lib.sleep(lib.timing('pace.keysThenEnterMs')) // on purpose: the fake reads a typed line before its Enter, as a CLI does
     await inv('pty:write', lib.ptyKey(home, 'assistant'), '\r')
     return !!(await until(async () => (await live())?.status === 'finished', HUNG_MS))
   }
@@ -98,7 +98,7 @@ const check = (name, ok, extra = '') => {
   check("the ended bar Resume is amber, like the agents' Resume", await amber(ended.getByRole('button', { name: 'Resume' })))
   await page.screenshot({ path: path.join(lib.WORK, 'assistantend-1-ended.png') })
   await inv('settings:update', { appearance: { theme: 'light' } }).catch(() => undefined)
-  check('light: the theme shown, its transitions over', await lib.themeShown(page, 'light'))
+  await lib.themeSettled(page, 'light')
   await page.screenshot({ path: path.join(lib.WORK, 'assistantend-1-ended-light.png') })
   await inv('settings:update', { appearance: { theme: 'dark' } }).catch(() => undefined)
   await pointAndClick(ended.getByRole('button', { name: 'Resume' }), 'ended bar Resume')
@@ -165,7 +165,7 @@ const check = (name, ok, extra = '') => {
   check("the start page Resume is amber, like the agents' Resume", await amber(idleResume))
   await page.screenshot({ path: path.join(lib.WORK, 'assistantend-3-idle-light.png') })
   await inv('settings:update', { appearance: { theme: 'dark' } }).catch(() => undefined)
-  check('dark: the theme shown, its transitions over', await lib.themeShown(page, 'dark'))
+  await lib.themeSettled(page, 'dark')
   await page.screenshot({ path: path.join(lib.WORK, 'assistantend-4-idle-dark.png') })
   await inv('agents:update', home, 'assistant', { provider: 'codex' })
   await page.reload()

@@ -181,7 +181,7 @@ const check = (name, ok, extra = '') => {
   await inv('session:rename', alpha, st.sessionId, 'A rather long session name that cannot possibly fit in a narrow pane')
   await until(async () => /rather long/.test(await text()), lib.timing('hang.ui'))
   await lib.fitWindow(app, page, { width: 760, height: 700 })
-  await lib.painted(page)
+  await lib.settled(page)
   const fits = (loc) => loc.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)
   check('the context stays whole', await fits(ctx))
   await page.screenshot({ path: path.join(lib.WORK, 'sessionname-3-narrow.png') })

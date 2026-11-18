@@ -121,7 +121,7 @@ const check = (name, ok, extra = '') => {
   check('Settings → Sessions shows 50, modified', !!(await shows('Settings → Sessions', async () => (await warnValue()) === '50' && (await warn.locator('.modified').count()) === 1)), await warnValue())
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    check(`${theme}: the theme shown, its transitions over`, await lib.themeShown(page, theme))
+    await lib.themeSettled(page, theme)
     await page.screenshot({ path: path.join(lib.WORK, `assistantsettings-changed-${theme}.png`) })
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })

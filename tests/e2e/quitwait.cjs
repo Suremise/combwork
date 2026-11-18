@@ -61,7 +61,7 @@ const visible = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAl
 async function keepBusy(inv, alpha, agent, live, secs) {
   const key = lib.ptyKey(alpha, agent.id)
   await inv('pty:write', key, `please work ${secs}`)
-  await lib.sleep(lib.timing('pace.lineBeforeEnterMs')) // on purpose: the fake reads a typed line before its Enter, as a CLI does
+  await lib.sleep(lib.timing('pace.keysThenEnterMs')) // on purpose: the fake reads a typed line before its Enter, as a CLI does
   await inv('pty:write', key, '\r')
   return until(async () => (await live())?.status === 'working', lib.timing('hang.step'))
 }

@@ -77,11 +77,15 @@ function sizes(home) {
     { name: 'Codex', a: codex, home: codexHome, key: lib.ptyKey(alpha, codex.id) }
   ]
   const state = (key) => page.evaluate((k) => window.__cwTerminalState(k), key)
+  // HI-3386: every terminal fitted to its pane and its CLI given that size (fake-sizes.jsonl's last line): what a window,
+  // zoom or layout change, or the turns' output, leaves once its work is done. Waited for, never a settle pause.
+  const sizesDelivered = async () => (await page.evaluate(() => window.__cwTerminalsFitted())) && lib.sizesGiven(await Promise.all(agents.map(async (g) => ({ term: await state(g.key), given: sizes(g.home).at(-1) }))))
+  const sizesSettled = () => lib.readyWithin('each terminal fitted and its CLI given that size', sizesDelivered, lib.timing('hang.ui'))
   // Turns until each terminal has scrolled.
   for (const g of agents) {
     for (let i = 1; i <= 12 && !((await state(g.key))?.baseY > 0); i++) {
       await inv('pty:write', g.key, `turn ${i}`)
-      await lib.sleep(lib.timing('pace.lineBeforeEnterMs')) // on purpose: the fake reads a typed line before its Enter, as a CLI does
+      await lib.sleep(lib.timing('pace.keysThenEnterMs')) // on purpose: the fake reads a typed line before its Enter, as a CLI does
       await inv('pty:write', g.key, '\r')
       // The turn starting may be over before it is seen (a fast turn): up to 3 s for it, then the wait for its end.
       await lib.until(async () => (await live(g.a.id))?.status !== 'finished', lib.timing('pace.turnStartSeenMs'))
@@ -93,7 +97,7 @@ function sizes(home) {
     const s = await state(g.key)
     check(`${g.name}: its terminal has scrolled and is at the bottom`, atBottom(s) && s.baseY > 0, JSON.stringify(s))
   }
-  await lib.sleep(lib.timing('quiet.terminalSizeMs')) // A quiet window on purpose: the last turns' sizes and output settle before each round trip's before
+  await sizesSettled() // the turns' sizes delivered before each round trip takes its before
 
   /** Hides the terminals with `hide`, waits, shows them with `show`: what each CLI was given meanwhile and after. */
   const roundTrip = async (label, hide, show, { whileHidden, sizeChanges = false } = {}) => {
@@ -163,12 +167,12 @@ function sizes(home) {
   await lib.fitWindow(app, page, { width: 1000, height: 650 })
   for (const zoom of [1, 1.25]) {
     await app.evaluate(({ BrowserWindow }, z) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(z), zoom)
-    await lib.sleep(lib.timing('quiet.terminalSizeMs')) // on purpose: the new window size and zoom settle first
+    await sizesSettled() // the new window size and zoom delivered first
     await roundTrip(`Settings at 1000 × 650, ${zoom * 100}%`, () => settingsBtn.click(), () => projectsBtn.click())
   }
   await page.screenshot({ path: path.join(lib.WORK, 'termsize-zoom.png') })
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1))
-  await lib.sleep(lib.timing('quiet.terminalSizeMs')) // on purpose: settle again
+  await sizesSettled() // and back at 100%
 
   // Scrolled up to read: Settings and back leaves it on its line; scrolled back down, it follows the output again.
   const writer = agents[0]

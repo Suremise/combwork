@@ -84,7 +84,7 @@ function measure([selector, parts]) {
 
   for (const theme of ['light', 'dark']) {
     await inv('settings:update', { appearance: { theme } })
-    await lib.sleep(300)
+    await lib.themeSettled(page, theme)
     // A real menu: the project's, in the sidebar. Then entries of each kind beside its own, drawn by the same rules.
     await page.mouse.move(5, 5)
     await page.locator('.project-row', { hasText: 'demo' }).first().click({ button: 'right' })
@@ -108,7 +108,7 @@ function measure([selector, parts]) {
     const plain = menu.locator('.menu-item', { hasText: 'Project Settings' })
     await plain.evaluate((d) => d.setAttribute('data-probe', 'own'))
     await plain.hover()
-    await lib.sleep(150)
+    await lib.settled(page)
     const own = await page.evaluate(measure, ['.menu [data-probe="own"]', ['', '.codicon']])
     check(`${theme}: a hovered entry's label and icon reach 4.5:1`, !!own && own.label >= 4.5 && own['.codicon'] >= 4.5, JSON.stringify(own))
     for (const [probe, what, want] of [
@@ -118,7 +118,7 @@ function measure([selector, parts]) {
       ['.probe-action', "a session action's label and second line, on its own wash", ['.menu-label', '.menu-detail', '.codicon']]
     ]) {
       await page.locator(probe).hover()
-      await lib.sleep(150)
+      await lib.settled(page)
       const r = await page.evaluate(measure, [`.menu ${probe}`, want])
       const low = r && Object.entries(r).filter(([k, v]) => k !== 'background' && v !== null && v < 4.5)
       check(`${theme}: hovered, ${what} reach 4.5:1`, !!r && low.length === 0, JSON.stringify(r))
@@ -145,18 +145,18 @@ function measure([selector, parts]) {
     // The first Escape clears the box (#433), the next closes the palette.
     await page.keyboard.press('Escape')
     if (await page.locator('.palette').count()) await page.keyboard.press('Escape')
-    await lib.sleep(200)
+    await lib.until(async () => (await page.locator('.palette').count()) === 0, lib.timing('hang.ui'))
 
     // The status bar (#384): one of its own items, resting and hovered; then items of each kind added beside them.
     const bar = page.locator('.statusbar')
     const item = bar.locator('.status-item:not(.warn):not(.caution):not(.update-item)').first()
     await item.evaluate((d) => d.setAttribute('data-probe', 'status'))
     await page.mouse.move(5, 5)
-    await lib.sleep(150)
+    await lib.settled(page)
     const rest = await page.evaluate(measure, ['.statusbar [data-probe="status"]', ['']])
     check(`${theme}: a status bar item reaches 4.5:1`, allAA(rest), JSON.stringify(rest))
     await item.hover()
-    await lib.sleep(150)
+    await lib.settled(page)
     const hovered = await page.evaluate(measure, ['.statusbar [data-probe="status"]', ['']])
     check(`${theme}: hovered, a status bar item reaches 4.5:1`, allAA(hovered), JSON.stringify(hovered))
     await page.mouse.move(5, 5)
@@ -184,12 +184,12 @@ function measure([selector, parts]) {
       check(`${theme}: ${what} in the status bar reaches 4.5:1`, allAA(r), JSON.stringify(r))
       // Hovered too: these keep their own background.
       await page.locator(probe).hover()
-      await lib.sleep(120)
+      await lib.settled(page)
       const h = await page.evaluate(measure, [`.statusbar ${probe}`, want])
       check(`${theme}: hovered, ${what} in the status bar reaches 4.5:1`, allAA(h), JSON.stringify(h))
     }
     await page.mouse.move(5, 5)
-    await lib.sleep(120)
+    await lib.settled(page)
     const vp = page.viewportSize()
     await shot(`${theme}-statusbar`, { x: 0, y: vp.height - 60, width: vp.width, height: 60 })
 

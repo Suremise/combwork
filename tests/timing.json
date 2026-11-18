@@ -66,7 +66,6 @@
   "budget.shutdownBackupMs": { "kind": "budget", "ms": 250, "note": "shutdown's backup step kept short" },
   "budget.walCheckpointMs": { "kind": "budget", "ms": 1000, "note": "a WAL checkpoint kept short" },
   "budget.screenMs": { "kind": "budget", "ms": 1000, "note": "a terminal screen rendered within a frame budget" },
-  "pace.lineBeforeEnterMs": { "kind": "pace", "ms": 300, "note": "a line typed into a CLI before its Enter: the fakes, like a CLI, read a typed line before the Enter that sends it" },
   "pace.typedPieceMs": { "kind": "pace", "ms": 15, "note": "between the 8-character pieces a prompt is typed in, as Combwork types one (a whole text at once is a paste to Codex)" },
   "pace.userKeyMs": { "kind": "pace", "ms": 500, "note": "a user typing in a pane: a key this often, well inside Combwork's typing pause (agentwatch)" },
   "quiet.noLineTypedMs": { "kind": "quiet", "ms": 3000, "note": "with the agents' turns over, no further line typed into one within this: no wake for a working agent, no second wake for one event, a cancelled message or a mode never typed (twice)" },
@@ -82,5 +81,19 @@
   "seam.loopGraceMs": { "kind": "seam", "ms": 3000, "note": "CW_TEST_LOOP_GRACE_MS: the e2e build's grace before an agent in a loop with no watch is flagged (loopwatch)" },
   "budget.doorbellMs": { "kind": "budget", "ms": 15000, "note": "a message rings an agent's doorbell within this while it runs a background task (background): seconds, not the turn's end" },
   "pace.closeThenKillMs": { "kind": "pace", "ms": 5000, "note": "app.close given this before a copy that didn't quit is ended by its process (its Quit dialog would hold app.close for ever: quit.cjs)" },
-  "seam.slowStartMs": { "kind": "seam", "ms": 4000, "note": "CW_TEST_SLOW_IPC's hold on session:start (startbusy): long enough to see the busy state under load" }
+  "seam.slowStartMs": { "kind": "seam", "ms": 4000, "note": "CW_TEST_SLOW_IPC's hold on session:start (startbusy): long enough to see the busy state under load" },
+  "pace.keysThenEnterMs": { "kind": "pace", "ms": 300, "note": "a line typed into an agent's terminal, then this pause before its Enter: the fakes (and CLIs) read a typed line before its Enter, not as a paste" },
+  "pace.actionTryMs": { "kind": "pace", "ms": 500, "note": "an action tried once more that may not land (a second click on a button already busy): its own short timeout, never a bound" },
+  "pace.renameAgainMs": { "kind": "pace", "ms": 20, "note": "a fixture file rename Windows refused (main has it open), tried again after this (antivirus.cjs)" },
+  "pace.rearmMs": { "kind": "pace", "ms": 100, "note": "a fixture rewritten this often so a reminder stays due a fixed time after now while agents stop and start (antivirus.cjs, #561)" },
+  "quiet.toldAgainMs": { "kind": "quiet", "ms": 1600, "note": "an agent's need told once: no second telling within this (its title blinking, a review coming and going: attention.cjs)" },
+  "quiet.bannerStaysMs": { "kind": "quiet", "ms": 3500, "note": "past a finished banner's 2 s: a banner hovered, focused or waiting stays, and none waiting is dropped (banners.cjs)" },
+  "quiet.finishGroupMs": { "kind": "quiet", "ms": 4500, "note": "a finish group (agents finishing together, gathered over 3 s) and its banner's time pass: one notification, or none (banners.cjs, bursts.cjs)" },
+  "quiet.avSuggestionMs": { "kind": "quiet", "ms": 2500, "note": "the antivirus suggestion not offered (again) within this once agents run (antivirus.cjs)" },
+  "quiet.folderWarningMs": { "kind": "quiet", "ms": 1000, "note": "a Codex agent started or its turn ended: no stray .codex warning (or no second one) within this (codexfolder.cjs)" },
+  "quiet.setupOfferMs": { "kind": "quiet", "ms": 1000, "note": "Combwork has looked for the CLIs: no Provider Setup or provider banner comes within this (defaultprovider.cjs)" },
+  "quiet.linkMs": { "kind": "quiet", "ms": 700, "note": "a terminal path hovered or plainly clicked: no link marked and nothing opened within this (filelinks.cjs)" },
+  "budget.copyQuietMs": { "kind": "budget", "ms": 60000, "note": "a returned review copy's quiet minute (Combwork's own): a check made before it ends (copyquiet.cjs)" },
+  "seam.deliveryOverdueMs": { "kind": "seam", "ms": 8000, "note": "CW_TEST_DELIVERY_OVERDUE_MS: a delivery counted overdue this long after it was made (instead of 30 minutes; deliveries.cjs)" },
+  "seam.silentMs": { "kind": "seam", "ms": 2000, "note": "CW_TEST_SILENT_MS: how long a running turn may be silent before Combwork says its state is unknown (flightrecorder.cjs)" }
 }

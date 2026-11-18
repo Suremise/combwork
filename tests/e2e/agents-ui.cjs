@@ -112,7 +112,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   let p = (await inv('workspace:refresh')).projects[0]
   check('the 0.9 agent on its branch, shown as its 0.9 worktree (#1442)', p.agents.some((a) => a.name === 'Tester' && a.worktree?.branch === 'cw/ws-2/demo/tester' && a.place?.is === 'legacy' && a.place.branch === 'cw/ws-2/demo/tester'), JSON.stringify(p.agents.map((a) => a.place)))
   check('two agents: two columns, automatically', (p.config.layout ?? 'auto') === 'auto' && (await page.locator('.agent-pane').count()) === 2, JSON.stringify(p.config.layout))
-  await lib.painted(page)
+  await lib.settled(page)
   await page.screenshot({ path: path.join(scratch, 'ui-2-strip.png') })
 
   // Merge dialog

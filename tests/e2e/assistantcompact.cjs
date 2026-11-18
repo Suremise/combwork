@@ -59,7 +59,7 @@ const check = (name, ok, extra = '') => {
   // before any turn (HI-2688): its start, restart or resume
   check('the Assistant runs', !!(await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))))
   await inv('pty:write', lib.ptyKey(home, 'assistant'), 'hello context 300000')
-  await lib.sleep(lib.timing('pace.lineBeforeEnterMs')) // on purpose: the fake reads a typed line before its Enter, as a CLI does
+  await lib.sleep(lib.timing('pace.keysThenEnterMs')) // on purpose: the fake reads a typed line before its Enter, as a CLI does
   await inv('pty:write', lib.ptyKey(home, 'assistant'), '\r')
   check('it answers', !!(await lib.until(async () => (await live())?.status === 'finished', lib.timing('hang.step'))))
   const ctx = panel.locator('.assistant-footer .pane-foot-item', { has: page.locator('.ctx-text') })

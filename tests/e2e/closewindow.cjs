@@ -80,7 +80,7 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.
     await page.evaluate(() => document.activeElement?.blur())
     await page.keyboard.press('Control+Shift+P')
     await page.locator('.palette input').fill(q)
-    await lib.sleep(150)
+    await lib.settled(page)
     return page.locator('.palette-item').allTextContents()
   }
   /** The quit or close dialog in a window: its title, workspace groups, rows and buttons (null if none). */
@@ -179,7 +179,7 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.
   await p2.evaluate(() => document.activeElement?.blur())
   await p2.keyboard.press('Control+Shift+W')
   check('Ctrl+Shift+W asks the same', JSON.stringify(await waitDialog(p2)) === JSON.stringify(closeByMenu))
-  const closedB = p2.waitForEvent('close', { timeout: 15000 }).then(() => true).catch(() => false)
+  const closedB = p2.waitForEvent('close', { timeout: lib.timing('hang.ui') }).then(() => true).catch(() => false)
   await p2.locator('.dialog button', { hasText: /Close window/ }).last().click()
   check('…and closes B when confirmed', await closedB)
   check("B's agent stopped, A's runs on", !!(await lib.until(async () => !(await liveIn(inv1, beta)), lib.timing('hang.ui'))) && (await liveIn(inv1, alpha)))
@@ -201,13 +201,13 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.
   if (asked) await asked.screenshot({ path: path.join(lib.WORK, 'closewindow-exit-dark.png') })
   if (asked) {
     await invOn(asked)('settings:update', { appearance: { theme: 'light' } })
-    await lib.sleep(300)
+    await lib.themeSettled(asked, 'light')
     await asked.screenshot({ path: path.join(lib.WORK, 'closewindow-exit-light.png') })
     await invOn(asked)('settings:update', { appearance: { theme: 'dark' } })
   }
   const other = asked === p1 ? p2 : p1
   const [mine, theirs] = asked === p1 ? [alpha, beta] : [beta, alpha]
-  const closedOnly = asked ? asked.waitForEvent('close', { timeout: 15000 }).then(() => true).catch(() => false) : Promise.resolve(false)
+  const closedOnly = asked ? asked.waitForEvent('close', { timeout: lib.timing('hang.ui') }).then(() => true).catch(() => false) : Promise.resolve(false)
   if (asked) await asked.locator('.dialog button', { hasText: 'Close this window only' }).click()
   check('"Close this window only" closes that window', await closedOnly)
   const invOther = invOn(other)
@@ -225,7 +225,7 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.
   check('two windows again, an agent in each', !!idNew && !!idTheirs && (await invOther('window:count')) === 2)
   const work = async (inv, project, id) => {
     await inv('pty:write', lib.ptyKey(project, id), 'work 120')
-    await lib.sleep(300)
+    await lib.sleep(lib.timing('pace.keysThenEnterMs'))
     await inv('pty:write', lib.ptyKey(project, id), '\r')
   }
   await work(invOther, theirs, idTheirs)
@@ -264,11 +264,11 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.
     check('100%: every control is inside the dialog, uncut, apart', !l.bad.length, l.bad.join('; '))
     await busyAt.screenshot({ path: path.join(lib.WORK, 'closewindow-busy-dark.png') })
     await invOn(busyAt)('settings:update', { appearance: { theme: 'light' } })
-    await lib.sleep(300)
+    await lib.themeSettled(busyAt, 'light')
     await busyAt.screenshot({ path: path.join(lib.WORK, 'closewindow-busy-light.png') })
     await invOn(busyAt)('settings:update', { appearance: { theme: 'dark' } })
     await onWindow(busyWs, 'w.webContents.setZoomFactor(1.25)')
-    await lib.sleep(400)
+    await lib.settled(busyAt)
     const z = await layout(busyAt)
     check('125%: every control is inside the dialog, uncut, apart', !z.bad.length, z.bad.join('; '))
     await busyAt.screenshot({ path: path.join(lib.WORK, 'closewindow-busy-125.png') })
@@ -296,7 +296,7 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.
   }, lib.timing('hang.ui'))
   check('then it asks about that window\'s agent ("Close this window?"), as Close Window does', then?.rows.length === 1 && then.unsaved === 0, JSON.stringify(then))
   check('…and the window is still open meanwhile', (await invOn(stays)('window:count')) === 2 && (await liveIn(invOn(stays), closesProject)))
-  const closedAfter = closes.waitForEvent('close', { timeout: 15000 }).then(() => true).catch(() => false)
+  const closedAfter = closes.waitForEvent('close', { timeout: lib.timing('hang.ui') }).then(() => true).catch(() => false)
   await closes.locator('.dialog button', { hasText: /Close window/ }).last().click()
   check('confirmed, that window closes', await closedAfter)
   const invStays = invOn(stays)
@@ -341,7 +341,7 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.
     check('dark: the parent folder reads at 4.5:1 or more against the dialog', dark >= 4.5, dark.toFixed(2))
     await dupAt.screenshot({ path: path.join(lib.WORK, 'closewindow-dup-dark.png') })
     await invOn(dupAt)('settings:update', { appearance: { theme: 'light' } })
-    await lib.sleep(300)
+    await lib.themeSettled(dupAt, 'light')
     const light = await whereContrast(dupAt)
     check('light: …and in the light theme', light >= 4.5, light.toFixed(2))
     await dupAt.screenshot({ path: path.join(lib.WORK, 'closewindow-dup-light.png') })

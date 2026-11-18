@@ -250,7 +250,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   check('back to one agent', p.agents.length === 1)
   await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()
   await lib.until(async () => (await page.locator('.tabs .tab.active', { hasText: 'Session' }).count()) === 1, lib.timing('hang.ui'))
-  await lib.painted(page)
+  await lib.settled(page)
   await shot(page, '7-after')
 
   console.log(`${pass}/${pass + fail} passed`)

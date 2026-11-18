@@ -53,7 +53,7 @@ const check = (name, ok, extra = '') => {
     if ((await live(id))?.status === 'waiting') await inv('pty:write', lib.ptyKey(alpha, id), '\r')
     await until(async () => (await live(id))?.status === 'ready', HUNG_MS)
     await inv('pty:write', lib.ptyKey(alpha, id), 'hello')
-    await lib.sleep(lib.timing('pace.lineBeforeEnterMs')) // on purpose: the fake reads a typed line before its Enter, as a CLI does
+    await lib.sleep(lib.timing('pace.keysThenEnterMs')) // on purpose: the fake reads a typed line before its Enter, as a CLI does
     await inv('pty:write', lib.ptyKey(alpha, id), '\r')
     return until(async () => (await live(id))?.status === 'finished', HUNG_MS)
   }
@@ -98,7 +98,7 @@ const check = (name, ok, extra = '') => {
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
     await page.mouse.move(0, 0)
-    check(`${theme}: the theme shown, its transitions over`, await lib.themeShown(page, theme))
+    await lib.themeSettled(page, theme)
     const [all, one] = [await colours(button), await colours(agentResume)]
     seen.push(all)
     check(`${theme}: Resume All has the Resume button's colours`, all === one, `${all} vs ${one}`)
