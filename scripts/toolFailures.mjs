@@ -2,7 +2,7 @@
 // of the classes that point at Combwork's guidance or workflow, and whether a fix made them fall.
 //   node scripts/toolFailures.mjs                  the last 7 days, every project, per day and class
 //   node scripts/toolFailures.mjs --days 3         another window; --since 2026-11-18T00:00 for an exact start
-//   node scripts/toolFailures.mjs --project hive   only transcript folders whose name contains it (D--Development-HIVE-hive…)
+//   node scripts/toolFailures.mjs --project slot-a  only transcript folders whose name contains it (one per folder worked in)
 //   node scripts/toolFailures.mjs --by role        per session role instead of per day (assistant, or unknown: below)
 //   node scripts/toolFailures.mjs --show staleRead  also each call of that class: its tool, input and error, shortened
 //   node scripts/toolFailures.mjs --top 20         also the 20 commonest errors (card keys and numbers made alike)
