@@ -195,6 +195,10 @@ interface CombworkMessageValues {
   'settings.advanced.claude-code.accounts.trustField.title': undefined
   'settings.advanced.claude-code.autoModeSetup.offer.desc': undefined
   'settings.advanced.claude-code.autoModeSetup.offer.title': undefined
+  'settings.advanced.claude-code.background.idField.desc': undefined
+  'settings.advanced.claude-code.background.idField.title': undefined
+  'settings.advanced.claude-code.background.pidField.desc': undefined
+  'settings.advanced.claude-code.background.pidField.title': undefined
   'settings.advanced.claude-code.connections.remoteModels.desc': undefined
   'settings.advanced.claude-code.connections.remoteModels.title': undefined
   'settings.advanced.claude-code.exit.command.desc': undefined

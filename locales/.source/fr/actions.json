@@ -243,6 +243,8 @@
   "actions.startFresh.why.waiting": "waiting for you: left as it is",
   "actions.startFresh.why.watching": "watching cards: left as it is",
   "actions.startFresh.why.working": "working: left as it is",
+  "actions.stillStopping.message": "Nothing else was done. Try again once it has stopped.",
+  "actions.stillStopping.title": "{named, select, yes {{agent} is still stopping} other {{n, plural, one {An agent is still stopping} other {# agents are still stopping}}}}",
   "actions.stop.confirm": "Stop",
   "actions.stop.detail": "The conversation is kept and can be resumed later.",
   "actions.stop.failed": "Could not stop session",

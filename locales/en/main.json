@@ -1115,6 +1115,10 @@
     "defaultMessage": "It runs another conversation here now",
     "description": "What the notice that a conversation runs as a background job says once the agent runs another conversation in Combwork (HI-2320), in place of its Stop It and Resume button."
   },
+  "main.outcome.stillInBackground": {
+    "defaultMessage": "Stopped, but it hasn't confirmed it has ended: resume it once it has",
+    "description": "What the notice that a conversation runs as a background job says after Stop It and Resume (HI-2320, HI-3376), in place of its button, when the background job was told to stop but Combwork couldn't see it end within 30 s, so the conversation wasn't resumed. Keep it short."
+  },
   "main.outcome.stoppedAndResumed": {
     "defaultMessage": "Stopped and resumed here",
     "description": "What the notice that a conversation runs as a background job says after Stop It and Resume (HI-2320), in place of its button."

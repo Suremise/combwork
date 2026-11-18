@@ -128,6 +128,8 @@
   "workspace.closeCommand.skip": "Ignorer la commande",
   "workspace.closeCommand.skipped": "Ignorée : la commande ne sera pas lancée. Combwork termine de fermer l’espace de travail.",
   "workspace.closeCommand.spawn": "{kind, select, quit {Impossible de lancer ta commande de sortie} other {Impossible de lancer ta commande de fermeture}}",
+  "workspace.closingAgents.note": "{late, select, yes {Combwork continue d’attendre pour que leurs derniers messages et leurs slots soient enregistrés. Si vous n’attendez pas, il continue, et ce qui reste est traité comme les agents laissés en cours lorsque vous quittez.} other {Combwork attend que chacun enregistre ses derniers messages et libère son slot.}}",
+  "workspace.closingAgents.title": "{late, select, yes {{n, plural, one {Un agent se ferme encore} many {# agents se ferment encore} other {# agents se ferment encore}}} other {Fermeture des agents… encore {n, number}}}",
   "workspace.commands.dontWaitNote": "{point, select, open {Si tu n’attends pas, Combwork continue et les autres s’exécutent toutes seules, dans l’ordre. Les agents démarrent maintenant.} other {Si tu n’attends pas, Combwork continue et les autres s’exécutent toutes seules, dans l’ordre.}}",
   "workspace.commands.exitCode": "code de sortie {code}",
   "workspace.commands.failedExit": "La commande « {name} » a échoué (code de sortie {code})",

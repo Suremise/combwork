@@ -242,6 +242,8 @@
   "actions.startFresh.why.waiting": "czeka na Ciebie: bez zmian",
   "actions.startFresh.why.watching": "obserwuje karty: bez zmian",
   "actions.startFresh.why.working": "pracuje: bez zmian",
+  "actions.stillStopping.message": "Nic więcej nie zostało zrobione. Spróbuj ponownie, gdy się zatrzyma.",
+  "actions.stillStopping.title": "{named, select, yes {{agent} wciąż się zatrzymuje} other {{n, plural, one {Agent wciąż się zatrzymuje} few {# agenty wciąż się zatrzymują} many {# agentów wciąż się zatrzymuje} other {# agenta wciąż się zatrzymuje}}}}",
   "actions.stop.confirm": "Zatrzymaj",
   "actions.stop.detail": "Rozmowa zostaje zachowana i można ją później wznowić.",
   "actions.stop.failed": "Nie udało się zatrzymać sesji",

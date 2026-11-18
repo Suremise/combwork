@@ -1806,9 +1806,10 @@ describe('Combwork quitting (#1628)', { timeout: 60_000 }, () => {
     expect(at('= quitSlotCards()')).toBeLessThan(at('sessions.stopAllAndWait('))
     expect(at('await slotsQuiet')).toBeLessThan(at('app.quit()'))
     // The stopped runs' slot writers released once their outcomes are known (after the leftovers' look), before the
-    // workspaces close (HI-1801).
-    expect(at('await quitLeftovers()')).toBeLessThan(at('await sessions.writersSettled('))
-    expect(at('await sessions.writersSettled(')).toBeLessThan(at('app.quit()'))
+    // workspaces close (HI-1801); waited for until they are, or the user's Don't wait (HI-3376: closingAgents.ts).
+    const writers = "await agentsClosed('quitting', undefined, ['writers']"
+    expect(at('await quitLeftovers()')).toBeLessThan(at(writers))
+    expect(at(writers)).toBeLessThan(at('app.quit()'))
     const willQuit = src.slice(src.indexOf("app.on('will-quit'"))
     expect(willQuit.indexOf('stopSlotCards()')).toBeLessThan(willQuit.indexOf('closeAllBoards()'))
   })

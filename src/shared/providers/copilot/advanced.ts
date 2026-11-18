@@ -298,9 +298,9 @@ export const ADVANCED: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.copilot.exit.graceSeconds.title', defaultMessage: 'Stop: exit grace', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: withValues(msg({ id: 'settings.advanced.copilot.exit.graceSeconds.desc', defaultMessage: "When Combwork stops Copilot (Stop, Restart, closing a project or quitting), how long it gives Copilot to exit by itself after its Ctrl+C before killing it. Copilot writes the session's token totals only as it exits by itself: one killed first loses them. It took up to {took, plural, one {# second} other {# seconds}} on a busy machine (#716); quitting Combwork or closing a workspace waits up to this long, and a second more, for a Copilot that hangs.", description: 'What the advanced setting "Stop: exit grace" is for, and what goes wrong when it is wrong (Settings → Advanced). {took} is the longest Copilot was seen to take, in seconds (2.4).' }), { took: 2.4 }),
     kind: 'number',
-    default: 10,
+    default: 30,
     min: 3,
-    max: 60,
+    max: 300,
     unit: 's',
     applies: 'now',
     samples: [{ from: `${FIX}/console/copilot.json`, version: '1.0.105', text: '"type": "session.shutdown"', shows: "Copilot stopped by Combwork, writing its token totals (session.shutdown) and exiting by itself (exit code 0)" }] // i18n-ignore: a CLI's recorded text (#367)

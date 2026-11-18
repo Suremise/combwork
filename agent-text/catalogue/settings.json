@@ -394,6 +394,26 @@
     "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Auto mode is one of Claude Code's permission modes.",
     "audience": "both"
   },
+  "settings.advanced.claude-code.background.idField.desc": {
+    "text": "The field of `claude agents --json` with a background session's id (the one `claude stop` takes). Stop It and Resume reads it to see the session has stopped before resuming its conversation (HI-3376). Wrong, Combwork can't tell, and Stop It and Resume says so instead of resuming.",
+    "note": "What the advanced setting \"Background sessions: job id field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude agents --json`, `claude stop` and Stop It and Resume (a button's name) as they are.",
+    "audience": "both"
+  },
+  "settings.advanced.claude-code.background.idField.title": {
+    "text": "Background sessions: job id field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.claude-code.background.pidField.desc": {
+    "text": "The field of `claude agents --json` with a background session's own process id (not its background service's). Stop It and Resume waits for that process to be gone before resuming its conversation (HI-3376). Wrong, Combwork relies on the listing alone.",
+    "note": "What the advanced setting \"Background sessions: process field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude agents --json` and Stop It and Resume (a button's name) as they are.",
+    "audience": "both"
+  },
+  "settings.advanced.claude-code.background.pidField.title": {
+    "text": "Background sessions: process field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
   "settings.advanced.claude-code.connections.remoteModels.desc": {
     "text": "The model names Ollama runs on ollama.com rather than on this PC (its cloud models, such as gpt-oss:120b-cloud), as a regular expression, for an Ollama connection's models typed in rather than read from Ollama (Read Models asks Ollama, which says). Such a connection's sessions aren't free (local). Wrong, a cloud model typed in is counted as free, or a local one as not free.",
     "note": "What the advanced setting \"Connections: Ollama cloud models\" is for, and what goes wrong when it is wrong (Settings → Advanced). Ollama, ollama.com and Read Models (a button) are names; \"free (local)\" is how Combwork shows the cost of sessions run only on this PC.",

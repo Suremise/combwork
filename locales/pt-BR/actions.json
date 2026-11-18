@@ -242,6 +242,8 @@
   "actions.startFresh.why.waiting": "esperando por você: fica como está",
   "actions.startFresh.why.watching": "observando cartões: fica como está",
   "actions.startFresh.why.working": "trabalhando: fica como está",
+  "actions.stillStopping.message": "Nada mais foi feito. Tente de novo quando ele tiver parado.",
+  "actions.stillStopping.title": "{named, select, yes {{agent} ainda está parando} other {{n, plural, one {Um agente ainda está parando} other {# agentes ainda estão parando}}}}",
   "actions.stop.confirm": "Parar",
   "actions.stop.detail": "A conversa é mantida e pode ser retomada depois.",
   "actions.stop.failed": "Não foi possível parar a sessão",

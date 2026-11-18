@@ -34,6 +34,7 @@ import type {
   ArchiveRequest,
   ArchiveResult,
   CloseCommandRun,
+  ClosingAgentsState,
   CommandRef,
   CommandsCombwork,
   CommandsWorkspace,
@@ -218,6 +219,10 @@ export interface CombworkRequests {
   'app:cancelPendingQuit': () => void
   /** This window's close command (HI-1368), for a window that reloads while its panel is up; null: none. */
   'closeCommand:state': () => CloseCommandRun | null
+  /** HI-3376: this window's wait for agents to close, for a window that reloads while its panel is up. */
+  'closingAgents:state': () => ClosingAgentsState | null
+  /** HI-3376: its Don't wait: Combwork stops waiting for those agents to close and goes on (what is left is the quit's leftovers). */
+  'closingAgents:dontWait': (id: string) => void
   /** The panel's Don't wait: Combwork stops waiting for this window's close command and goes on; the command carries on. */
   'closeCommand:dontWait': (id: string) => void
   /** The panel's Close, on a failed close command: Combwork goes on. */

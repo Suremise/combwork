@@ -277,21 +277,48 @@ export async function setProjectActive(path: string, active: boolean): Promise<v
       })
       if (!ok) return undefined
       await call('session:stop', path)
-      await waitForStop(path)
+      if (!(await waitForStop(path))) return stillStopping(path)
     }
     return call('project:setActive', path, active)
   })
   if (ws) set({ workspace: movesShown.keep(ws) })
 }
 
-/** Waits until an agent's session (or, without agentId, every agent of the project) has stopped. */
-export async function waitForStop(path: string, agentId?: string, timeoutMs = 8000): Promise<void> {
-  const start = Date.now()
-  while (Date.now() - start < timeoutMs) {
-    const live = await call('session:live')
-    if (!live.some((l) => l.projectPath.toLowerCase() === path.toLowerCase() && (!agentId || l.agentId === agentId))) return
+/** HI-3376: how long the window waits for an agent to stop before saying it is still stopping (a CLI's exit grace alone is 30 s). */
+export const STOP_WAIT_MS = 60_000
+/** One look at the running sessions: one that doesn't answer in this long counts as still running for that look. */
+const LIVE_LOOK_MS = 5000
+
+/**
+ * Waits until an agent's session (or, without agentId, every agent of the project) has stopped: true once it has; false
+ * when it is still stopping after `timeoutMs` (HI-3376: the caller then goes no further, stillStopping). Each look is
+ * bounded, and the last one is made at the bound.
+ */
+export async function waitForStop(path: string, agentId?: string, timeoutMs = STOP_WAIT_MS): Promise<boolean> {
+  const stopped = async (): Promise<boolean> => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const live = await Promise.race([call('session:live').catch(() => null), new Promise<null>((r) => (timer = setTimeout(() => r(null), LIVE_LOOK_MS)))])
+    clearTimeout(timer)
+    return live !== null && !live.some((l) => l.projectPath.toLowerCase() === path.toLowerCase() && (!agentId || l.agentId === agentId))
+  }
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (await stopped()) return true
     await new Promise((r) => setTimeout(r, 150))
   }
+  return stopped()
+}
+
+/** HI-3376: says that an agent (or, without agentId, the project's agents; `n` of them) is still stopping, so what was asked wasn't done. */
+export function stillStopping(path: string, agentId?: string, n = 1): undefined {
+  const p = project(path)
+  const agent = agentId ? (agentOf(p, agentId)?.name ?? '') : ''
+  notify(
+    'warning',
+    tr(msg({ id: 'actions.stillStopping.title', defaultMessage: '{named, select, yes {{agent} is still stopping} other {{n, plural, one {An agent is still stopping} other {# agents are still stopping}}}}', description: "A warning's title (HI-3376): an agent ({agent}, its name; named: yes), or {n} of a project's agents, hadn't stopped after a minute, so what was asked next (restart, resume, remove, rename…) wasn't done." }), { named: agent ? 'yes' : 'no', agent, n }),
+    tr(msg({ id: 'actions.stillStopping.message', defaultMessage: 'Nothing else was done. Try again once it has stopped.', description: 'Under the warning that an agent is still stopping (HI-3376): what was asked after stopping it was not done.' }))
+  )
+  return undefined
 }
 
 /**
@@ -526,7 +553,7 @@ async function stopIfRunning(path: string, agentId: string, action: StopFor, the
   })
   if (!ok) return false
   await call('session:stop', path, agentId)
-  await waitForStop(path, agentId)
+  if (!(await waitForStop(path, agentId))) return !!stillStopping(path, agentId)
   return true
 }
 
@@ -825,7 +852,9 @@ export async function stopAllAgents(path: string): Promise<void> {
     action: 'stop',
     run: async () => {
       await call('session:stop', path)
-      await Promise.all(running.map((a) => waitForStop(path, a.id)))
+      const stopped = await Promise.all(running.map((a) => waitForStop(path, a.id)))
+      const still = running.filter((_, i) => !stopped[i])
+      if (still.length) stillStopping(path, still.length === 1 ? still[0].id : undefined, still.length)
     }
   })
 }
@@ -1029,7 +1058,10 @@ async function startNewAll_(path: string, archive: boolean): Promise<void> {
   // As they are now: one may have stopped or started while the dialog was open.
   const now = (id: string) => agentOf(project(path), id)
   for (const a of agents) if (now(a.id)?.live) await call('session:stop', path, a.id).catch(() => undefined)
-  await Promise.all(agents.map((a) => waitForStop(path, a.id)))
+  // HI-3376: none is started over while one is still stopping.
+  const stopped = await Promise.all(agents.map((a) => waitForStop(path, a.id)))
+  const still = agents.filter((_, i) => !stopped[i])
+  if (still.length) return stillStopping(path, still.length === 1 ? still[0].id : undefined, still.length)
   const result = await eachAgent(agents, async (a) => {
     const provider = agentProviderOf(a)
     const name = providerName(provider)
@@ -1073,7 +1105,7 @@ export async function archiveCurrent(path: string | null = get().selectedProject
   if (!ok) return
   if (live) {
     await call('session:stop', path, id)
-    await waitForStop(path, id)
+    if (!(await waitForStop(path, id))) return stillStopping(path, id)
   }
   const archived = await attempt(tr(msg({ id: 'actions.archive.failed', defaultMessage: 'Could not archive session', description: "An error's title: archiving a session failed." })), () => call('session:archive', path, target.id, true).then(() => true))
   if (archived) await newSession(path, id)
@@ -1922,7 +1954,10 @@ async function removeAllAgents_(path: string): Promise<void> {
   let result: BatchResult
   try {
     for (const a of agents) if (agentOf(project(path), a.id)?.live) await call('session:stop', path, a.id).catch(() => undefined)
-    await Promise.all(agents.map((a) => waitForStop(path, a.id)))
+    // HI-3376: none is removed while one is still stopping.
+    const stopped = await Promise.all(agents.map((a) => waitForStop(path, a.id)))
+    const still = agents.filter((_, i) => !stopped[i])
+    if (still.length) return stillStopping(path, still.length === 1 ? still[0].id : undefined, still.length)
     result = await eachAgent(agents, async (a) => {
       try {
         const r = await call('agents:remove', path, a.id, { deleteWorktree: deleteMerged ? 'merged-clean' : false, mergedInto: into ?? null, releaseCards })
@@ -2030,7 +2065,7 @@ export async function discardAgent(path: string, agentId: string): Promise<void>
   const done = await runOnce(`removeAgent:${path}#${agentId}`, async () => {
     if (a.live) {
       await call('session:stop', path, agentId)
-      await waitForStop(path, agentId)
+      if (!(await waitForStop(path, agentId))) return !!stillStopping(path, agentId)
     }
     return attempt(tr(msg({ id: 'actions.discard.failed', defaultMessage: 'Could not discard agent', description: "An error's title: discarding a worktree agent failed." })), () => call('agents:remove', path, agentId, { deleteWorktree: true, releaseCards }).then(() => true))
   })

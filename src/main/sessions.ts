@@ -86,6 +86,8 @@ import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcript
 import { usesOwnPrices } from '../shared/prices'
 import { priceUsage, withCostFree } from '../shared/usageDays'
 import { summaryOf, usageFromRows, type LedgerRow } from '../shared/usageLedger'
+import { listProcesses, TREE_END_BOUNDS, type ListedProcess } from './processTree'
+import type { ClosingPending } from './closingAgents'
 import type { AdoptionHandle, Ask, BackgroundTaskType, ExternalSession, HookEvent, HookOccurrence, LaunchContext, LaunchHooks, LaunchSkill, LiveDetails, NormalizedHook, ProviderAdapter, SkillDelivery } from './providers/types'
 import { HOOK_FIRED_MAX, HOOK_SHORT_MAX, clip, type ActivityHookBlock, type HookFired, type SessionHooks } from '../shared/hooks'
 import { providerService } from './providerService'
@@ -330,9 +332,69 @@ const howLong = (ms: number): string => (ms < 120_000 ? `${Math.round(ms / 1000)
 const SIZE_REFRESH_DELAY_MS = 500
 /** How many running agents "Switch Now" switches at once (applyModeSettings): the rest wait for one to end. */
 const MODE_SWITCHES_AT_ONCE = 6
+/** HI-3376: the least a restart in a new mode waits for the old run's exit (it ends as soon as the run exits). */
+export const MODE_RESTART_STOP_MS = 30_000
+/** HI-3376: the time a close gives the slot writers of its stopped runs to be released, after their exit (closeDeadlineMs). */
+export const CLOSE_WRITERS_MS = 30_000
+/** HI-3376: how long Stop It and Resume waits to see a stopped background job end before it gives up (and doesn't resume). */
+export const BACKGROUND_END_MS = 30_000
+/** How often it looks meanwhile (each look is a CLI run and a process listing). */
+const BACKGROUND_LOOK_MS = 1000
 
-/** After a kill, how long a CLI's console takes to be gone (its processes listed and ended, then its exit). */
-const KILL_EXIT_MS = 1000
+/** Tests: the process listing backgroundJobEnded uses (null: processTree's). */
+export const backgroundTestHooks: { list?: (timeoutMs: number) => Promise<ListedProcess[] | null> } = {}
+const listAll = (timeoutMs: number): Promise<ListedProcess[] | null> => (backgroundTestHooks.list ?? listProcesses)(timeoutMs)
+
+/**
+ * HI-3376: what is known of a background job before it is told to stop (HR1's round 1: never one null for all of it):
+ * its own process (`process`: its pid as the CLI lists the job, and that process's start as a complete listing of
+ * Windows' has it); not running (`notRunning`: a parsed listing of the CLI's that doesn't name it); its process already
+ * gone (`gone`: named with a pid that a complete listing doesn't have); or `unknown` (a listing failed, or the CLI names
+ * it without a process: Settings → Advanced's fields wrong, or a CLI that gives none).
+ */
+export type JobBefore = { kind: 'process'; proc: ListedProcess } | { kind: 'notRunning' } | { kind: 'gone' } | { kind: 'unknown' }
+
+export async function jobProcess(adapter: ProviderAdapter, exe: string, jobId: string): Promise<JobBefore> {
+  const listed = adapter.background?.runningBackgroundJobs ? await adapter.background.runningBackgroundJobs(exe).catch(() => null) : null
+  if (listed === null) return { kind: 'unknown' }
+  const job = listed.jobs.find((j) => j.id === jobId)
+  // Named in the listing but not read as a job (its fields wrong, HR3's round 2): unknown, never not running.
+  if (!job) return listed.names(jobId) ? { kind: 'unknown' } : { kind: 'notRunning' }
+  if (!job.pid) return { kind: 'unknown' }
+  const list = await listAll(TREE_END_BOUNDS.listMs).catch(() => null)
+  if (list === null) return { kind: 'unknown' }
+  const proc = list.find((p) => p.pid === job.pid)
+  return proc ? { kind: 'process', proc } : { kind: 'gone' }
+}
+
+/**
+ * HI-3376: whether a background job told to stop has ended, looked at until it has or BACKGROUND_END_MS passes, each look
+ * bounded by the time left: `ended` once a parsed listing of the CLI's running jobs doesn't name it and, when its own
+ * process was known (`before`), a complete listing of Windows' no longer has that process (by pid and start); `running`
+ * while either still holds; `unknown` when what was known before the stop is unknown, or a listing fails at the last look.
+ */
+export async function backgroundJobEnded(adapter: ProviderAdapter, exe: string, jobId: string, before: JobBefore, now = Date.now): Promise<'ended' | 'running' | 'unknown'> {
+  // Not known before the stop: nothing seen after it can show its end (HR1's round 1).
+  if (before.kind === 'unknown' || !adapter.background?.runningBackgroundJobs) return 'unknown'
+  const deadline = now() + BACKGROUND_END_MS
+  const left = (): number => deadline - now()
+  // What the last look saw; a look begun with no time left isn't made.
+  let state: 'ended' | 'running' | 'unknown' = 'unknown'
+  while (left() > 0) {
+    const listed = await adapter.background.runningBackgroundJobs(exe, left()).catch(() => null)
+    state = listed === null ? 'unknown' : listed.jobs.some((j) => j.id === jobId) ? 'running' : listed.names(jobId) ? 'unknown' : 'ended'
+    if (state === 'ended' && before.kind === 'process') {
+      const list = left() > 0 ? await listAll(Math.min(TREE_END_BOUNDS.listMs, left())).catch(() => null) : null
+      state = list === null ? 'unknown' : list.some((p) => p.pid === before.proc.pid && p.started === before.proc.started) ? 'running' : 'ended'
+    }
+    if (state === 'ended') return state
+    if (left() > 0) await new Promise((r) => setTimeout(r, Math.min(BACKGROUND_LOOK_MS, left())))
+  }
+  return state
+}
+
+/** After a kill, how long a CLI's console takes to be gone (its processes listed and ended, then its exit). HI-3376: 5 s, a listing on a busy machine taking seconds itself. */
+export const KILL_EXIT_MS = 5000
 
 /** The most a start waits for its agent's ended runs' slot writers to be released (HI-1867): a bound for a hung one. */
 const WRITER_SETTLE_MS = 15_000
@@ -2294,6 +2356,31 @@ class SessionManager {
     let timer: NodeJS.Timeout | undefined
     await Promise.race([Promise.all(mine), new Promise<void>((r) => (timer = setTimeout(r, timeoutMs)))])
     clearTimeout(timer)
+  }
+
+  /**
+   * HI-3376: what of the projects `which` names (every one without it) is still closing, for closingAgents.ts: runs still
+   * running (each until it has been through onExit), starts not yet cancelled, slot writers not yet released (or found held).
+   */
+  closingPending(which?: (projectPath: string) => boolean): ClosingPending {
+    const mine = (p: string): boolean => !which || which(p)
+    // A run counts from its launch until its exit work is over (`exiting`), not only while it is in `live`.
+    const runs = new Set([...[...this.live.values()].filter((l) => mine(l.state.projectPath)).map((l) => l.state.runId), ...[...this.exiting].filter(([, p]) => mine(p)).map(([r]) => r)])
+    return {
+      running: runs.size,
+      starting: [...this.starting.values()].filter((p) => mine(p.projectPath)).length,
+      writers: which ? [...this.writerSettlingOf.values()].filter((e) => which(e.projectPath)).length : this.writersSettling.size
+    }
+  }
+
+  /**
+   * HI-3376: how long closing the runs `which` names may take before the closing window says they are still closing: the
+   * longest of their CLIs' exit graces with the kill's time after it (stopWaitMs), and the slot writers' release after
+   * that (CLOSE_WRITERS_MS). With the defaults: 30 + 5 + 30 s. A threshold for saying so, never taken as their end.
+   */
+  closeDeadlineMs(which?: (projectPath: string) => boolean): number {
+    const graces = [...this.live.values()].filter((l) => !which || which(l.state.projectPath)).map((l) => l.adapter.launch.exitKeys?.graceMs)
+    return stopWaitMs(0, graces) + CLOSE_WRITERS_MS
   }
 
   /**
@@ -5226,7 +5313,7 @@ class SessionManager {
     // fixed 8 s a slow CLI outlasts (HI-1869). Exited, its slot's writer release is under way, and the start below waits
     // for it (placeFor's earlierWritersSettled, HI-1867), refused only if its processes are kept or not known to end.
     let timer: NodeJS.Timeout | undefined
-    await Promise.race([exited, new Promise((r) => (timer = setTimeout(r, stopWaitMs(8000, [l.adapter.launch.exitKeys?.graceMs]))))])
+    await Promise.race([exited, new Promise((r) => (timer = setTimeout(r, stopWaitMs(MODE_RESTART_STOP_MS, [l.adapter.launch.exitKeys?.graceMs]))))])
     clearTimeout(timer)
     // Still running: said so, rather than the start's "already running" (its old run keeps its slot meanwhile).
     if (this.live.get(id)?.state.runId === l.state.runId) throw combworkError(msg({ id: 'session.restartMode.didntStop', defaultMessage: "{agent} didn't stop in time, so it wasn't restarted in the new mode. Try again once it has stopped.", description: "Switching a running agent's permission mode (it restarts in the new mode) is refused: the agent ({agent}, its name) was told to stop but hadn't ended yet, so nothing was started." }), { agent: l.state.agentName ?? agentId }, { kind: 'conflict' })
@@ -5397,10 +5484,17 @@ class SessionManager {
       if (!stillApplies()) return
       const info = providerService.info(adapter.id)
       if (!adapter.background?.stopBackgroundJob || !info.path) throw combworkError(msg({ id: 'session.background.cantStop', defaultMessage: "{provider} can't stop background sessions.", description: "Stop It and Resume is refused: the coding agent can't stop its background service's job. {provider} is its name." }), { provider: adapter.descriptor.name }, { kind: 'invalid' })
+      // HI-3376: the job's own process, as it is before the stop, so its end can be seen by identity (pid and start).
+      const before = await jobProcess(adapter, info.path, jobId)
       await adapter.background?.stopBackgroundJob(info.path, jobId)
-      // The job lets go of the conversation as it exits.
-      await new Promise((r) => setTimeout(r, 1500))
+      // The job lets go of the conversation as it exits: resumed only once it is seen to have ended (bounded).
+      const ended = await backgroundJobEnded(adapter, info.path, jobId, before)
       if (!stillApplies()) return
+      if (ended !== 'ended') {
+        log.warn(`Stop It and Resume: ${adapter.descriptor.name}'s background job ${jobId} was told to stop but is ${ended === 'running' ? 'still running' : 'not known to have ended'} after ${BACKGROUND_END_MS / 1000} s, so its conversation wasn't resumed`) // i18n-ignore: for the log
+        resolveOffer(offer, tr(OUTCOME.stillInBackground))
+        return
+      }
       await this.start(projectPath, { agentId, resumeId: sessionId })
       resolveOffer(offer, tr(OUTCOME.stoppedAndResumed))
     } finally {
@@ -5417,7 +5511,24 @@ class SessionManager {
     return this.liveStates().filter((s) => s.status === 'working' || s.status === 'waiting' || s.status === 'background' || s.status === 'watching')
   }
 
+  /**
+   * HI-3376 (HR1's round 1): each run whose exit work is under way (onExit, from its first line to its last, errors
+   * included), by run, with its project: it leaves `live` part way through, before its transcript's check and its
+   * session list's write, which a close still waits for (closingPending).
+   */
+  private readonly exiting = new Map<string, string>()
+
   private async onExit(projectPath: string, agentId: string, runId: string, code: number, output = ''): Promise<void> {
+    this.exiting.set(runId, projectPath)
+    try {
+      await this.exitWork(projectPath, agentId, runId, code, output)
+    } finally {
+      this.exiting.delete(runId)
+    }
+  }
+
+  /** What a run's exit does (onExit's). */
+  private async exitWork(projectPath: string, agentId: string, runId: string, code: number, output: string): Promise<void> {
     // What notices offered about this run no longer applies (HI-2320): its conversation ended here.
     resolveOffers((o) => o.startsWith(`transcript:${liveId(projectPath, agentId)}#`), tr(OUTCOME.conversationEnded))
     this.modeOfferGone(liveId(projectPath, agentId))

@@ -41,6 +41,7 @@ import { combworkWorktreeOf, mergeUnused, removalPreview, removeUnusedWorktree, 
 import { lineCard, lineConfirmed } from './branchMerge'
 import { createLogger, logsDir, userText } from './logger'
 import { closeCommandsRun, closeCommandState, closeWithCommand, controlRun, dismiss, dontWait, runByHand, runOpenCommands } from './closeCommand/closeCommands'
+import { closingAgentsDontWait, closingAgentsState } from './closingAgents'
 import { cleanCombwork, cleanWorkspace } from '../shared/commands'
 import { diagnostics } from './diagnostics'
 import { resumeAfterClose, startupStep, stopLeftAfterClose } from './lastRun'
@@ -535,6 +536,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'app:quitDecision': (choice, dontAskAgain, install) => quitControl.decide(win(), choice, dontAskAgain, typeof install === 'string' ? install : null),
     'app:cancelPendingQuit': () => quitControl.cancelPending(),
     'closeCommand:state': () => closeCommandState(win()),
+    'closingAgents:state': () => closingAgentsState(win()),
+    'closingAgents:dontWait': (id) => closingAgentsDontWait(win(), String(id)),
     'closeCommand:dontWait': (id) => dontWait(win(), String(id)),
     'closeCommand:dismiss': (id) => dismiss(win(), String(id)),
     'closeCommand:control': (id, action, step, attempt) => controlRun(win(), String(id), action, step, attempt),

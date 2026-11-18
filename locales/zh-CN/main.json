@@ -278,6 +278,7 @@
   "main.outcome.released": "已释放",
   "main.outcome.resuming": "正在逐个恢复",
   "main.outcome.runsAnother": "它现在在这里运行另一个对话",
+  "main.outcome.stillInBackground": "已停止，但尚未确认已结束：请在它结束后再恢复",
   "main.outcome.stoppedAndResumed": "已停止并在此恢复",
   "main.outcome.updateInstalling": "正在安装：Combwork 将重启",
   "main.outcome.updateNotReady": "已不再可以安装",

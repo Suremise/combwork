@@ -238,7 +238,7 @@ describe('Copilot launch', () => {
     const { stopWaitMs } = await import('../src/main/sessions')
     expect(stopWaitMs(3000, [exit.graceMs])).toBeGreaterThan(exit.graceMs)
     expect(stopWaitMs(3000, [undefined, undefined])).toBe(3000)
-    expect(stopWaitMs(15_000, [exit.graceMs])).toBe(15_000)
+    expect(stopWaitMs(exit.graceMs * 2, [exit.graceMs])).toBe(exit.graceMs * 2)
   })
 
   it('never passes --mouse or --no-mouse, which Copilot saves into the user\'s own settings (#737)', () => {
@@ -252,17 +252,18 @@ describe('Copilot launch', () => {
     const { stopWaitMs } = await import('../src/main/sessions')
     advanced.load(tempDir('cw-copilot-advanced-'))
     try {
-      expect(copilot.exitKeys.graceMs).toBe(10_000)
+      // HI-3376: 30 s by default (a slow disk's last writes), at most 300.
+      expect(copilot.exitKeys.graceMs).toBe(30_000)
       await advanced.set('copilot.exit.graceSeconds', 25)
       expect(copilot.exitKeys.graceMs).toBe(25_000)
       // Quitting waits past the longer grace too.
       expect(stopWaitMs(3000, [copilot.exitKeys.graceMs])).toBeGreaterThan(25_000)
       // A grace shorter than the keys take, or one that would hold quitting for minutes, is refused.
-      await expect(advanced.set('copilot.exit.graceSeconds', 2)).rejects.toThrow(/whole number from 3 to 60/)
-      await expect(advanced.set('copilot.exit.graceSeconds', 61)).rejects.toThrow(/whole number from 3 to 60/)
+      await expect(advanced.set('copilot.exit.graceSeconds', 2)).rejects.toThrow(/whole number from 3 to 300/)
+      await expect(advanced.set('copilot.exit.graceSeconds', 301)).rejects.toThrow(/whole number from 3 to 300/)
       expect(copilot.exitKeys.graceMs).toBe(25_000)
       await advanced.set('copilot.exit.graceSeconds', null)
-      expect(copilot.exitKeys.graceMs).toBe(10_000)
+      expect(copilot.exitKeys.graceMs).toBe(30_000)
     } finally {
       await advanced.resetAll()
       advanced.stop()

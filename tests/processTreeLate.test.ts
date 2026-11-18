@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('node:child_process', async (original) => (await import('./processTreeMock')).mocked(await original<typeof import('node:child_process')>()))
 
-const { endTreeAsync, lateStarted, LATE_ROUNDS, TREE_END_MS, treeEnding } = await import('../src/main/processTree')
+const { endTreeAsync, lateStarted, LATE_ROUNDS, TREE_END_BOUNDS, TREE_END_MS, treeEnding } = await import('../src/main/processTree')
 const { probe, resetProbe, ends } = await import('./processTreeMock')
 
 const fakeChild = (pid: number) => ({ pid, exitCode: null as number | null, signalCode: null as string | null, kill: vi.fn() })
@@ -112,7 +112,7 @@ describe('endTreeAsync: what the tree started after its listing (HI-3358)', () =
     await vi.advanceTimersByTimeAsync(TREE_END_MS - 1)
     expect(settled).toBe(true)
     expect(probe.requests).toEqual(['end 4200:1100,4141:1000'])
-    expect(left.mock.calls).toEqual([['its ending session ended before it answered the end']])
+    expect(left.mock.calls).toEqual([['its ending session ended before it answered the end (its start and first end took over 30 s)']])
     expect(root.kill).toHaveBeenCalledTimes(1)
   })
 
@@ -127,7 +127,7 @@ describe('endTreeAsync: what the tree started after its listing (HI-3358)', () =
     await vi.advanceTimersByTimeAsync(TREE_END_MS - 1)
     expect(settled).toBe(true)
     expect(probe.requests).toEqual(['end 4200:1100,4141:1000', 'list'])
-    expect(left.mock.calls).toEqual([['its ending session ended before a listing after the end']])
+    expect(left.mock.calls).toEqual([['its ending session ended before a listing after the end (a listing took over 30 s)']])
     // The root was ended by the first end: not again through its handle.
     expect(root.kill).not.toHaveBeenCalled()
   })
@@ -142,7 +142,38 @@ describe('endTreeAsync: what the tree started after its listing (HI-3358)', () =
     await vi.advanceTimersByTimeAsync(TREE_END_MS - 1)
     expect(settled).toBe(true)
     expect(probe.requests).toEqual(['end 4141:1000', 'list', 'end 4300:1500'])
-    expect(left.mock.calls).toEqual([['its ending session ended during a late end']])
+    expect(left.mock.calls).toEqual([['its ending session ended during a late end (a late end took over 15 s)']])
+  })
+
+  it('HI-3376: a slow first listing (just under its bound) and a slow listing in the session still end the tree and its late child', async () => {
+    vi.useFakeTimers()
+    probe.listings = [lines('4141 0 1000', '4200 4141 1100'), lines('4300 4200 1500'), lines('9999 1 500')]
+    probe.listDelayMs = TREE_END_BOUNDS.listMs - 1000
+    // The session's requests: the end, a slow listing, the late end, the last listing.
+    probe.delays = [TREE_END_BOUNDS.firstEndMs - 1000, TREE_END_BOUNDS.listMs - 1000, 0, 0]
+    const left = vi.fn()
+    let settled = false
+    void endTreeAsync(fakeChild(4141) as unknown as ChildProcess, 'win32', undefined, { onLateLeft: left }).then(() => (settled = true))
+    await vi.advanceTimersByTimeAsync(TREE_END_MS - 1)
+    expect(settled).toBe(true)
+    expect(ends()).toEqual([['4200:1100', '4141:1000'], ['4300:1500']])
+    expect(left).not.toHaveBeenCalled()
+  })
+
+  it('HI-3376: the whole session is capped (sessionMs) even when each step is within its own bound, and says so', async () => {
+    vi.useFakeTimers()
+    // A late child every round, each step slow but within its bound: the cap ends the session first.
+    const rounds = [lines('4141 0 1000')]
+    for (let r = 1; r <= LATE_ROUNDS + 1; r++) rounds.push(lines(`${5000 + r} ${r === 1 ? 4141 : 5000 + r - 1} ${1000 + r * 100}`))
+    probe.listings = rounds
+    probe.delays = Array.from({ length: 12 }, (_, i) => (i % 2 ? TREE_END_BOUNDS.listMs - 1000 : TREE_END_BOUNDS.lateEndMs - 1000))
+    const left = vi.fn()
+    let settled = false
+    void endTreeAsync(fakeChild(4141) as unknown as ChildProcess, 'win32', undefined, { onLateLeft: left }).then(() => (settled = true))
+    await vi.advanceTimersByTimeAsync(TREE_END_MS - 1)
+    expect(settled).toBe(true)
+    expect(left).toHaveBeenCalledTimes(1)
+    expect(left.mock.calls[0][0]).toContain(`(it passed its ${TREE_END_BOUNDS.sessionMs / 1000} s)`)
   })
 })
 

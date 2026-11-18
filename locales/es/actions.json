@@ -242,6 +242,8 @@
   "actions.startFresh.why.waiting": "te está esperando: se queda como está",
   "actions.startFresh.why.watching": "vigilando tarjetas: se queda como está",
   "actions.startFresh.why.working": "trabajando: se queda como está",
+  "actions.stillStopping.message": "No se hizo nada más. Inténtalo de nuevo cuando se haya detenido.",
+  "actions.stillStopping.title": "{named, select, yes {{agent} aún se está deteniendo} other {{n, plural, one {Un agente aún se está deteniendo} many {# agentes aún se están deteniendo} other {# agentes aún se están deteniendo}}}}",
   "actions.stop.confirm": "Detener",
   "actions.stop.detail": "La conversación se conserva y se puede reanudar más tarde.",
   "actions.stop.failed": "No se pudo detener la sesión",

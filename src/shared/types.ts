@@ -1154,6 +1154,19 @@ export interface CloseCommandSetting {
 export type CloseReason = 'window' | 'switch' | 'quit' | 'update'
 
 /** A close command's run as its panel shows it (HI-1368): the `close-command` event's and closeCommand:state's. */
+/**
+ * HI-3376: a window waiting for agents to close (its workspace closing or switching, or Combwork quitting): how many runs
+ * are still running, starts still being cancelled, and slot writers not yet released; `late` once it has waited longer
+ * than their CLIs' exit graces give. Its own wait's (`id`), never a close command run's.
+ */
+export interface ClosingAgentsState {
+  id: string
+  running: number
+  starting: number
+  writers: number
+  late: boolean
+}
+
 export interface CloseCommandRun {
   id: string
   /** 'workspace': this window's workspace's; 'quit': When Combwork quits, run. */
@@ -4369,6 +4382,8 @@ export type CombworkEvent =
   | { type: 'quit-pending'; pending: boolean; working: number }
   /** This window's close command (HI-1368): the panel shows it while it runs or failed; null: none (the panel goes). */
   | { type: 'close-command'; run: CloseCommandRun | null }
+  /** HI-3376: this window waits for agents to close: the panel shows it; null: none (the panel goes). */
+  | { type: 'closing-agents'; state: ClosingAgentsState | null }
   /** How many working agents keep the PC awake (0: it may sleep). */
   | { type: 'keep-awake'; working: number }
   /** Files changed in a project that has a Files or Images tab open. dirs are relative, '' is the root. */
