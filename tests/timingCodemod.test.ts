@@ -3,6 +3,7 @@
 // non-hang constants are left and reported. A string, a comment or a regular expression that looks like a wait is none.
 import { describe, expect, it } from 'vitest'
 
+// @ts-expect-error: a plain .mjs module without types
 const { migrate, hangName } = (await import('../scripts/timingCodemod.mjs')) as {
   migrate: (src: string, file?: string) => { out: string; changed: { line: number; from: string; to: string }[]; left: { line: number; why: string }[] }
   hangName: (ms: number, text?: string) => string | null
@@ -106,5 +107,12 @@ describe('timeouts and constants (HI-3382)', () => {
     const plain = migrate("const fs = require('fs')\nconst HUNG_MS = 20000\n", 'tests/scenarios/harness.cjs').out
     expect(plain).toContain("const fs = require('fs')\nconst { timing } = require('../timing.cjs')")
     expect(plain).toContain("const HUNG_MS = timing('hang.ui')")
+  })
+
+  it('the require goes at the top level, never inside a function that requires something first', () => {
+    const src = "function f() {\n  const lib = require('../e2e/lib.cjs')\n}\nconst fs = require('fs')\nconst HUNG_MS = 20000\n"
+    const out = migrate(src, 'tests/scenarios/s.cjs').out
+    expect(out).toContain("const fs = require('fs')\nconst { timing } = require('../timing.cjs')")
+    expect(out.indexOf("require('../timing.cjs')")).toBeGreaterThan(out.indexOf('}\n'))
   })
 })

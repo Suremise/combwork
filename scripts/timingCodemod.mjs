@@ -216,16 +216,17 @@ export function migrate(src, fileName = 'x.cjs') {
     for (const c of children(n)) stack.push(c)
   }
 
+  if (edits.length && needsRequire && !/\btiming\s*\(/.test(src.replace(/\/\/.*$/gm, ''))) {
+    // The reader, at the top level: after the file's first top-level statement that requires something (never inside a
+    // function), or at the top. Both e2e and scenario files sit one folder below tests/.
+    const eol = src.includes('\r\n') ? '\r\n' : '\n'
+    const first = ast.program.body.find((s) => /\brequire\(/.test(src.slice(s.start, s.end)) && !/Function|Class/.test(s.type) && !(s.type === 'VariableDeclaration' && s.declarations.some((d) => /Function/.test(d.init?.type ?? ''))))
+    if (first) edits.push({ start: first.end, end: first.end, text: `${eol}const { timing } = require('../timing.cjs')` })
+    else edits.push({ start: 0, end: 0, text: `const { timing } = require('../timing.cjs')${eol}` })
+  }
   edits.sort((a, b) => b.start - a.start)
   let out = src
   for (const e of edits) out = out.slice(0, e.start) + e.text + out.slice(e.end)
-  if (edits.length && needsRequire && !/\btiming\s*\(/.test(src.replace(/\/\/.*$/gm, ''))) {
-    // The reader, after the file's first require (or at the top).
-    const eol = src.includes('\r\n') ? '\r\n' : '\n'
-    const req = `const { timing } = require('${fileName.replace(/\\/g, '/').includes('/scenarios/') ? '../timing.cjs' : '../timing.cjs'}')`
-    const m = /^.*require\(.*$/m.exec(out)
-    out = m ? out.slice(0, m.index + m[0].length) + eol + req + out.slice(m.index + m[0].length) : req + eol + out
-  }
   return { out, changed, left }
 }
 
@@ -233,7 +234,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   const args = process.argv.slice(2)
   const write = args.includes('--write')
   const given = args.filter((a) => !a.startsWith('--'))
-  const files = given.length ? given.map((f) => resolve(f)) : ['tests/e2e', 'tests/scenarios'].flatMap((d) => readdirSync(join(ROOT, d)).filter((f) => /\.cjs$/.test(f)).map((f) => join(ROOT, d, f)))
+  const files = given.length ? given.map((f) => resolve(f)) : ['tests/e2e', 'tests/scenarios'].flatMap((d) => readdirSync(join(ROOT, d)).filter((f) => f.endsWith('.cjs')).map((f) => join(ROOT, d, f)))
   let nChanged = 0
   let nLeft = 0
   for (const file of files) {

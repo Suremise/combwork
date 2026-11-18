@@ -233,7 +233,6 @@ async function coderTask(c, task, agent = c.agents.coder) {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const fail = async (what) => {
     const lib = require('../e2e/lib.cjs')
-const { timing } = require('../timing.cjs')
     const screen = lib.plainText(String(await c.inv('pty:buffer', key).catch(() => ''))).trim()
     const env = lib.environmentProblem(screen)
     throw new Error(`setup: ${agent.name ?? agent.id} ${what} (status ${(await coderLive(c, agent))?.status ?? 'not running'})${env ? `; environment: ${env}` : ''}; its screen ends: ${screen.slice(-400)}`)
@@ -327,6 +326,7 @@ const POOL_RUN_MS = 40 * 60_000
 const POOL_RUN_JS = `// The test pass on the pool VM: queued here, run there. Nothing of it runs on this machine.
 const fs = require('fs')
 const path = require('path')
+const { timing } = require('../timing.cjs')
 const RUN_MS = ${POOL_RUN_MS}
 const dir = path.join(__dirname, 'pool')
 const file = path.join(dir, 'run.json')
