@@ -78,6 +78,7 @@ const until = async (fn, ms) => {
   const live = async (p, a) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === a.id)
   await inv('session:start', alpha, { agentId: one.id })
   await inv('session:start', beta, { agentId: two.id })
+  // before any turn (HI-2688): its start, restart or resume
   check('the agents start', !!(await until(async () => (await live(alpha, one))?.status === 'ready' && (await live(beta, two))?.status === 'ready', lib.timing('hang.step'))))
   const send = async (p, a, text) => {
     await inv('pty:write', lib.ptyKey(p, a.id), text)

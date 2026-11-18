@@ -223,6 +223,7 @@ function problems(states, { hasTasks, hasSize, hasPlain }) {
   const codex = await lib.addAgent(inv, alpha, { name: 'Checker', provider: 'codex', permissionMode: 'approve-for-me' })
   const live = async (id) => (await inv('session:live')).find((s) => s.agentId === id)
   for (const a of [claude, codex]) await inv('session:start', alpha, { agentId: a.id })
+  // before any turn (HI-2688): its start, restart or resume
   check('both agents start', !!(await until(async () => (await live(claude.id))?.status === 'ready' && (await live(codex.id))?.status === 'ready', lib.timing('hang.step'))))
   const key = lib.ptyKey(alpha, claude.id)
   // A turn that pads its transcript past 1 MB and leaves a background task running (ten minutes: past the suite's end).
@@ -368,6 +369,7 @@ function problems(states, { hasTasks, hasSize, hasPlain }) {
   const aHeader = page.locator('.assistant-panel .assistant-header')
   await until(async () => (await aHeader.count()) === 1, HUNG_MS)
   await aHeader.getByRole('button', { name: 'Start', exact: true }).click()
+  // before any turn (HI-2688): its start, restart or resume
   check('the Assistant runs', !!(await until(async () => (await assistantLive())?.status === 'ready', lib.timing('hang.step'))))
   await inv('pty:write', lib.ptyKey(home, 'assistant'), 'hello')
   await lib.sleep(300) // on purpose: the fake reads a typed line before its Enter, as a CLI does

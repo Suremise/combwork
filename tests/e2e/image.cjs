@@ -43,6 +43,7 @@ fs.mkdirSync(shots, { recursive: true })
   await inv('workspace:refresh')
   const st = await inv('session:start', proj, { agentId: agent.id })
   await lib.acceptClaudeTrust(inv, proj, agent.id)
+  // before any turn (HI-2688): its start, restart or resume
   check('the session starts', !!(await lib.until(async () => (await inv('session:live')).some((l) => l.status === 'ready'), lib.timing('hang.step'))))
   const typed = async () => (await inv('pty:buffer', lib.ptyKey(proj, agent.id))).replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
   /** The attachments' paths on the CLI's input line: copies Combwork keeps with the session (.combwork/attachments/<session>/…). */

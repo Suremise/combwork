@@ -98,6 +98,7 @@ const write = (file, text) => {
     // A running session: nothing of it is listed or touched.
     const live = await lib.addAgent(inv, alpha, { name: 'Live' })
     await inv('session:start', alpha, { agentId: live.id })
+    // before any turn (HI-2688): its start, restart or resume
     const state = await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === live.id && s.status === 'ready' && s.sessionId), lib.timing('hang.step'))
     check('the live agent is running', !!state)
     const liveShot = path.join(combworkOf(alpha), 'attachments', state?.sessionId ?? 'none', 'now.png')

@@ -64,6 +64,7 @@ const until = async (fn, ms) => {
   const agents = [[alpha, one], [alpha, two], [beta, three]]
   const live = async (proj, a) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === proj.toLowerCase() && s.agentId === a.id)
   for (const [p, a] of agents) await inv('session:start', p, { agentId: a.id })
+  // before any turn (HI-2688): its start, restart or resume
   check('three agents start', !!(await until(async () => (await Promise.all(agents.map(([p, a]) => live(p, a)))).every((s) => s?.status === 'ready'), lib.timing('hang.step'))))
   const send = async (p, a, text) => {
     await inv('pty:write', lib.ptyKey(p, a.id), text)

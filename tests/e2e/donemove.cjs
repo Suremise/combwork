@@ -54,6 +54,7 @@ const until = async (fn, ms) => {
   const key = lib.ptyKey(alpha, agent.id)
   const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)
   await inv('session:start', alpha, { agentId: agent.id })
+  // before any turn (HI-2688): its start, restart or resume
   check('the agent starts', !!(await until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))))
 
   const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)

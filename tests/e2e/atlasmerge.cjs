@@ -53,6 +53,7 @@ const check = (name, ok, extra = '') => {
     await page.getByText('alpha', { exact: true }).first().click()
     const agent = await lib.addAgent(inv, alpha, { name: 'Writer' })
     await inv('session:start', alpha, { agentId: agent.id })
+    // before any turn (HI-2688): its start, restart or resume
     check('the agent starts', !!(await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === agent.id)?.status === 'ready', lib.timing('hang.step'))))
     const key = lib.ptyKey(alpha, agent.id)
     // Its terminal's screen (found by its key, which has backslashes a selector would need escaped).

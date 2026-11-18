@@ -71,6 +71,7 @@ const pidOf = (tag) => {
     const startInBackground = (tag) =>
       lib.cliStep(`the ${tag} turn`, { session: key }, async () => {
         await inv('session:start', proj, { agentId: agent.id })
+        // before any turn (HI-2688): its start, restart or resume
         check(`Codex starts (${tag})`, !!(await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'), 500)), lib.plainText(await inv('pty:buffer', key)).slice(-400))
         const prompt = `Call exec_command once with cmd "node linger.js ${tag}" and yield_time_ms 1000. It will return a session id while the command keeps running: do not wait for it, poll it or call write_stdin. Reply with the single word STARTED and end your turn.`
         // Typed the way Combwork types prompts (a long text at once is a paste to Codex, and Enter then adds a line).

@@ -49,6 +49,7 @@ const until = async (fn, ms) => {
   const key = lib.ptyKey(alpha, agent.id)
   const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)
   await inv('session:start', alpha, { agentId: agent.id })
+  // before any turn (HI-2688): its start, restart or resume
   check('the agent starts', !!(await until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))))
   // Each prompt is typed once the fake takes prompts, and waited for by its own turn (#684, lib.fakePrompts); a
   // compaction is no turn of its own: the fake's screen says when it's over.
@@ -141,6 +142,7 @@ const until = async (fn, ms) => {
     fs.mkdirSync(path.dirname(file), { recursive: true })
     fs.writeFileSync(file, JSON.stringify(json))
     await inv('session:start', alpha, { agentId: agent.id })
+    // before any turn (HI-2688): its start, restart or resume
     await until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))
     await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()
     await send('hello window 200000')

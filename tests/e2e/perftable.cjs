@@ -34,6 +34,7 @@ const check = (name, ok, extra = '') => {
   const agent = await lib.addAgent(inv, alpha, { name: 'Coder' })
   await inv('session:start', alpha, { agentId: agent.id })
   const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)
+  // before any turn (HI-2688): its start, restart or resume
   await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))
   await lib.sendPrompt(inv, lib.ptyKey(alpha, agent.id), 'hello', { submitted: async () => ['working', 'finished'].includes((await live())?.status) })
   await lib.until(async () => (await live())?.status === 'finished', lib.timing('hang.step'))

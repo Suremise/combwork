@@ -103,6 +103,7 @@ function pathWithoutCodex() {
   const n = runs().length
   await inv('session:start', alpha, { agentId: agent.id })
   const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)
+  // before any turn (HI-2688): its start, restart or resume
   check('a new Codex agent starts with it', !!(await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))), JSON.stringify(await live()))
   const session = runs().slice(n).filter((r) => !['--version', 'login', 'debug', 'app-server'].includes(r.arg))
   check("…and its session's PATH has the new folder", session.length > 0 && session.every((r) => r.hasBin), JSON.stringify(runs().slice(n)))
@@ -125,6 +126,7 @@ function pathWithoutCodex() {
   }, lib.timing('hang.step'))), JSON.stringify(await live()))
   const k = runs().length
   await inv('session:start', alpha, { agentId: agent.id })
+  // before any turn (HI-2688): its start, restart or resume
   check('the agent starts again', !!(await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))), JSON.stringify(await live()))
   const again = runs().slice(k).filter((r) => !['--version', 'login', 'debug', 'app-server'].includes(r.arg))
   check("…and its session's PATH has the tool's folder, with no Check again", again.length > 0 && again.every((r) => r.hasTool), JSON.stringify(runs().slice(k)))

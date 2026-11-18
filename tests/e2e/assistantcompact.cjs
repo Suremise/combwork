@@ -56,6 +56,7 @@ const check = (name, ok, extra = '') => {
   const header = panel.locator('.assistant-header')
   await lib.until(async () => (await header.count()) === 1, lib.timing('hang.ui'))
   await header.getByRole('button', { name: 'Start', exact: true }).click()
+  // before any turn (HI-2688): its start, restart or resume
   check('the Assistant runs', !!(await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))))
   await inv('pty:write', lib.ptyKey(home, 'assistant'), 'hello context 300000')
   await lib.sleep(300) // on purpose: the fake reads a typed line before its Enter, as a CLI does

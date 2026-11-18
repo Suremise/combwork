@@ -91,6 +91,7 @@ const launches = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.json
   holder.stdout.on('data', (d) => (heldOut += d))
   check('(the database is held)', !!(await lib.until(() => heldOut.includes('held'), lib.timing('hang.ui'))))
   await page.getByRole('button', { name: 'Restart session' }).click()
+  // before any turn (HI-2688): its start, restart or resume
   const again = !!(await lib.until(async () => launches().length === 3 && (await inv('session:live')).some((l) => l.status === 'ready'), lib.timing('hang.step')))
   const asked = await page.locator('.dialog').allInnerTexts()
   check('Restart session relaunches while the stopped session is still being saved, asking nothing', again && !asked.length, JSON.stringify({ launches: launches().length, dialogs: asked }))

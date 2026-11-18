@@ -137,6 +137,7 @@ const check = (name, ok, extra = '') => {
   const old = await lib.addAgent(inv, beta, { name: 'Old' })
   const tree = await lib.addAgent(inv, beta, { name: 'Tree', location: 'new-worktree' })
   await inv('session:start', beta, { agentId: old.id })
+  // before any turn (HI-2688): its start, restart or resume
   await lib.until(async () => (await live(beta, old.id))?.status === 'ready', lib.timing('hang.step'))
   fs.writeFileSync(path.join(tree.worktree.path, 'wip.txt'), 'uncommitted')
   await inv('workspace:refresh')

@@ -105,6 +105,7 @@ const check = (name, ok, extra = '') => {
   await inv('workspace:refresh')
   const one = agents[0]
   await inv('session:start', alpha, { agentId: one.id })
+  // before any turn (HI-2688): its start, restart or resume
   await lib.until(async () => (await live(one.id))?.status === 'ready', lib.timing('hang.step'))
   const session = (await live(one.id)).sessionId
   check('four agents in three columns: One, Two, Three on page 1', !!(await settle('One,Two,Three,Four')), JSON.stringify(await paneNames()))

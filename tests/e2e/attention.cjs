@@ -57,6 +57,7 @@ const check = (name, ok, extra = '') => {
   const asking = await lib.addAgent(inv, proj, { name: 'Asking', provider: 'codex', permissionMode: 'ask' })
   const live = async (id) => (await inv('session:live')).find((s) => s.agentId === id)
   for (const a of [reviewed, asking]) await inv('session:start', proj, { agentId: a.id })
+  // before any turn (HI-2688): its start, restart or resume
   check('the agents start', !!(await until(async () => (await live(reviewed.id))?.status === 'ready' && (await live(asking.id))?.status === 'ready', lib.timing('hang.step'))), `${(await live(reviewed.id))?.status} ${(await live(asking.id))?.status}`)
   check('in their modes', (await live(reviewed.id))?.permissionMode === 'approve-for-me' && (await live(asking.id))?.permissionMode === 'ask', `${(await live(reviewed.id))?.permissionMode} ${(await live(asking.id))?.permissionMode}`)
 
@@ -149,6 +150,7 @@ const check = (name, ok, extra = '') => {
   await turn(asking, 'approve')
   await until(async () => (await live(asking.id))?.status === 'waiting', lib.timing('hang.ui'))
   await inv('pty:write', askKey, '\x1b')
+  // ready on purpose (HI-2688): a question rejected with Esc leaves it ready, with no turn
   check('rejected (Esc): ready again, not waiting', !!(await until(async () => (await live(asking.id))?.status === 'ready', lib.timing('hang.step'))), (await live(asking.id))?.status)
   check('told once for that prompt', told('Asking') === 2, String(told('Asking')))
 

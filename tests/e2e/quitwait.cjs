@@ -43,6 +43,7 @@ async function launch(name) {
   const agent = await lib.addAgent(inv, alpha, { name: 'Busy' })
   const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)
   await inv('session:start', alpha, { agentId: agent.id })
+  // before any turn (HI-2688): its start, restart or resume
   const ready = await until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))
   return { app, page, inv, alpha, agent, live, ready, userData }
 }

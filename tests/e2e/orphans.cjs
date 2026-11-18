@@ -71,7 +71,7 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
     pageB.on('pageerror', (e) => check('no page errors (B)', false, e.message))
     const invB = (ch, ...a) => pageB.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await invB('workspace:open', wsB)
-    await until(async () => (await invB('workspace:get'))?.path?.toLowerCase() === wsB.toLowerCase(), lib.timing('hang.ui'))
+    await until(async () => (await invB('workspace:get'))?.path?.toLowerCase() === wsB.toLowerCase())
     await pageB.evaluate(() => {
       window.__toasts = []
       window.combwork.onEvent((e) => {
@@ -83,26 +83,26 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
     const hb2 = await lib.addAgent(inv, alpha, { name: 'HB2' })
     const liveOf = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === hb2.id)
     await inv('session:start', alpha, { agentId: hb2.id })
-    await until(async () => ['ready', 'finished'].includes((await liveOf())?.status), lib.timing('hang.ui'))
+    await until(async () => ['ready', 'finished'].includes((await liveOf())?.status))
     await lib.sendPrompt(inv, lib.ptyKey(alpha, hb2.id), 'linger 1', { submitted: async () => lingering().length > 0 })
-    await until(async () => (await liveOf())?.status === 'finished', lib.timing('hang.step'))
+    await until(async () => (await liveOf())?.status === 'finished')
     const pid = lingering()[0]
     for (const id of lib.identify([pid])) ids.set(id.pid, id)
     check('its command left a process running, its starter gone', !!pid && alive(pid), String(pid))
 
     // --- Shown once past its (shortened) bound: Activity's process is marked, with its CPU time.
     const shownNow = async () => (await inv('activity:now', alpha)).launches.filter((l) => l.agentId === hb2.id).flatMap((l) => l.processes).find((p) => p.pid === pid && p.orphan)
-    const shown = await until(shownNow, lib.timing('hang.ui'))
+    const shown = await until(shownNow)
     check('Activity lists it as left running, with its CPU time', !!shown && typeof shown.orphan.cpuMs === 'number' && !!shown.created, JSON.stringify(shown))
     const ofPid = (list) => list.filter((t) => t.target?.kind === 'agent' && t.message?.includes(String(pid)))
     const mine = async () => ofPid(await toasts())
-    const toast = (await until(async () => (await mine())[0] ?? null, lib.timing('hang.ui'))) ?? null
+    const toast = (await until(async () => (await mine())[0] ?? null)) ?? null
     check('a notice says HB2 left it running, clicking to HB2', !!toast && /^HB2 left .*linger.* running for /.test(toast.title) && toast.target?.kind === 'agent' && toast.target.agentId === hb2.id, JSON.stringify(toast))
     check("…in its own window only: window B, focused last, gets none", ofPid(await pageB.evaluate(() => window.__toasts)).length === 0, JSON.stringify(await pageB.evaluate(() => window.__toasts)))
     const toastEl = page.locator('.toast', { hasText: 'HB2 left' }).first()
     for (const theme of ['dark', 'light']) {
       await inv('settings:update', { appearance: { theme } })
-      await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, lib.timing('hang.ui'))
+      await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)
       await toastEl.screenshot({ path: path.join(shots, `notice-${theme}.png`) }).catch((e) => console.log(`screenshot: ${e.message}`))
     }
     await inv('settings:update', { appearance: { theme: 'dark' } })
@@ -115,12 +115,12 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
       if ((await row.count()) > 0) return true
       await refresh()
       return false
-    }, lib.timing('hang.ui'))
+    })
     check('the Activity tab shows its row: Left running, how long, its CPU time', !!rowShown && /Left running · process \d+ · running .+ · CPU /.test(await row.first().innerText()), await row.first().innerText().catch(() => ''))
     const list = page.locator('.activity-list')
     for (const theme of ['dark', 'light']) {
       await inv('settings:update', { appearance: { theme } })
-      await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, lib.timing('hang.ui'))
+      await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)
       await list.screenshot({ path: path.join(shots, `activity-${theme}.png`) }).catch((e) => console.log(`screenshot: ${e.message}`))
     }
     await inv('settings:update', { appearance: { theme: 'dark' } })
@@ -128,30 +128,30 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
     // --- HB2 is told once, at its next tool call.
     const toldOf = () => notices().filter((n) => n.text.includes(`pid ${pid} `))
     await lib.sendPrompt(inv, lib.ptyKey(alpha, hb2.id), 'checkpoint', { submitted: async () => (await liveOf())?.status === 'working' || toldOf().length > 0 })
-    check('HB2 is told at its next tool call, with the pid and its command', !!(await until(async () => toldOf().length > 0, lib.timing('hang.ui'))) && /linger/.test(toldOf()[0].text), JSON.stringify(notices()))
-    await until(async () => (await liveOf())?.status === 'finished', lib.timing('hang.step'))
+    check('HB2 is told at its next tool call, with the pid and its command', !!(await until(async () => toldOf().length > 0)) && /linger/.test(toldOf()[0].text), JSON.stringify(notices()))
+    await until(async () => (await liveOf())?.status === 'finished')
     const before = notices().length
     await lib.sendPrompt(inv, lib.ptyKey(alpha, hb2.id), 'checkpoint then checkpoint', { submitted: async () => (await liveOf())?.status === 'working' })
-    await until(async () => (await liveOf())?.status === 'finished', lib.timing('hang.step'))
+    await until(async () => (await liveOf())?.status === 'finished')
     check('…once: not again at its next tool calls', toldOf().length === 1, JSON.stringify(notices().slice(before)))
     check('…and one notice in all, look after look', (await mine()).length === 1, JSON.stringify(await mine()))
 
     // --- Pause the team: it is named, not parked.
     await inv('team:pause')
     const items = async () => (await inv('team:state')).workspaces.find((w) => w.workspacePath.toLowerCase() === ws.toLowerCase())?.items ?? []
-    const named = await until(async () => (await items()).find((i) => i.kind === 'process' && i.process?.pid === pid && i.agentId === hb2.id), lib.timing('hang.ui'))
+    const named = await until(async () => (await items()).find((i) => i.kind === 'process' && i.process?.pid === pid && i.agentId === hb2.id))
     check('Pause the team names it, not parked', !!named && (await inv('team:state')).allParked === false && /linger/.test(named.label ?? ''), JSON.stringify(await items()))
 
     // --- End It from Activity, behind its question: exactly that process ends; HB2 still runs.
     await row.first().click()
     const details = page.locator('.activity-details')
     const endIt = details.getByRole('button', { name: 'End It…' })
-    check('its details say Left running, with CPU time and End It', !!(await until(async () => (await endIt.count()) === 1, lib.timing('hang.ui'))) && /Left running/.test(await details.innerText()) && /CPU time/.test(await details.innerText()), await details.innerText().catch(() => ''))
+    check('its details say Left running, with CPU time and End It', !!(await until(async () => (await endIt.count()) === 1)) && /Left running/.test(await details.innerText()) && /CPU time/.test(await details.innerText()), await details.innerText().catch(() => ''))
     await endIt.click()
     await page.getByRole('button', { name: 'End It', exact: true }).last().click()
-    check('confirmed, it ends', !!(await until(async () => !alive(pid), lib.timing('hang.ui'))), String(pid))
+    check('confirmed, it ends', !!(await until(async () => !alive(pid))), String(pid))
     check('…and HB2 still runs', !!(await liveOf()))
-    check('…and Pause the team no longer names it', !!(await until(async () => !(await items()).some((i) => i.process?.pid === pid), lib.timing('hang.ui'))), JSON.stringify(await items()))
+    check('…and Pause the team no longer names it', !!(await until(async () => !(await items()).some((i) => i.process?.pid === pid))), JSON.stringify(await items()))
     await inv('team:resume')
 
     // --- HI-3206: a cw-progress run whose shell is gone while it runs ("progress-orphan 14": its wrapper left with no
@@ -163,7 +163,7 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
     // Its left-running notices only (an agent's turn ending says so in a notice of its own).
     const leftNotices = async () => (await toasts()).slice(mark).filter((t) => (t.title ?? '').startsWith('HB2 left '))
     await lib.sendPrompt(inv, lib.ptyKey(alpha, hb2.id), 'progress-orphan 14', { submitted: async () => leftByRun().length > 0 })
-    await until(async () => (await liveOf())?.status === 'finished', lib.timing('hang.step'))
+    await until(async () => (await liveOf())?.status === 'finished')
     const lpid = leftByRun()[0]
     for (const id of lib.identify([lpid])) ids.set(id.pid, id)
     const sandboxRun = async () => (await inv('progress:list')).find((r) => r.title === 'Sandbox cycle' && r.agentId === hb2.id)
@@ -185,7 +185,7 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
     check('…and only that: the run’s own wrapper, gone with it, is never told', (await leftNotices()).every((t) => t.message?.includes(String(lpid))), JSON.stringify(await leftNotices()))
     const left = (await hb2Processes()).find((p) => p.pid === lpid)
     if (left?.created) await inv('activity:endProcess', alpha, hb2.id, lpid, left.created)
-    check('…and End It ends it', !!(await until(async () => !alive(lpid), lib.timing('hang.ui'))), String(lpid))
+    check('…and End It ends it', !!(await until(async () => !alive(lpid))), String(lpid))
   } catch (err) {
     check('no unexpected error', false, err.stack)
   } finally {

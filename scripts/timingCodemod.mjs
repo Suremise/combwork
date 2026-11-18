@@ -118,12 +118,68 @@ function negative(path, src) {
 }
 
 /**
+ * Whether a wait's result is kept in a variable that is then read negated (`const came = await until(…)`, then
+ * `check(…, !came)`): a negative wait, its bound a window (onelinedesc.cjs, settingsnav.cjs).
+ */
+function negatedLater(path, src) {
+  for (let i = path.length - 1, steps = 0; i >= 0 && steps < 3; i--, steps++) {
+    const p = path[i]
+    if (p.type === 'VariableDeclarator' && p.id.type === 'Identifier') {
+      const fn = path.slice(0, i).reverse().find((q) => /Function|Program/.test(q.type))
+      const rest = src.slice(p.end, fn ? fn.end : src.length)
+      return new RegExp(`(^|[^!])!\\s*${p.id.name}\\b`).test(rest)
+    }
+    if (p.type === 'ExpressionStatement' || /Function/.test(p.type)) break
+  }
+  return false
+}
+
+/**
+ * Whether a wait inside a loop decides the loop's next try (`if (await until(…)) return`, `break`, `continue`, or a
+ * fallback step): its bound is that try's pace, never a hang bound (board.cjs's Escape, loopwatch.cjs's typing).
+ */
+function retryInLoop(path) {
+  let loop = false
+  for (let i = path.length - 1; i >= 0; i--) {
+    if (/Function/.test(path[i].type)) break
+    if (/^(For|ForOf|ForIn|While|DoWhile)Statement$/.test(path[i].type)) {
+      loop = true
+      break
+    }
+  }
+  if (!loop) return false
+  for (let i = path.length - 1, steps = 0; i >= 0 && steps < 4; i--, steps++) {
+    if (path[i].type === 'IfStatement') return true
+    if (path[i].type === 'ExpressionStatement' || path[i].type === 'VariableDeclarator') break
+  }
+  return false
+}
+
+/**
  * What the codemod changes in `src` (a file's text) and what it leaves for a person: { out, changed: [{ line, from, to }],
  * left: [{ line, why, text }] }. `fileName` decides how `timing` is reached (lib.cjs's own, lib.timing, or a require).
  */
 export function migrate(src, fileName = 'x.cjs') {
   const ast = parse(src, { sourceType: 'unambiguous', allowReturnOutsideFunction: true, allowAwaitOutsideFunction: true, errorRecovery: false })
   const names = untilNames(ast)
+  // Each local until wrapper's default bound: its number, null when it is an expression (a name such as HUNG_MS); a
+  // wrapper with none, or a name not declared here, is absent. A name declared twice (in two functions) keeps the longest.
+  const defaults = new Map()
+  {
+    const stack = [ast.program]
+    while (stack.length) {
+      const n = stack.pop()
+      const fn = n.type === 'VariableDeclarator' && n.id.type === 'Identifier' && names.has(n.id.name) && /Function/.test(n.init?.type ?? '') ? n.init : n.type === 'FunctionDeclaration' && n.id && names.has(n.id.name) ? n : null
+      const p = fn?.params[1]
+      if (p?.type === 'AssignmentPattern') {
+        const key = n.id.name
+        const v = isNum(p.right) ? p.right.value : null
+        const was = defaults.get(key)
+        defaults.set(key, was === null || v === null ? null : Math.max(was ?? 0, v))
+      }
+      for (const c of children(n)) stack.push(c)
+    }
+  }
   const lineOf = (at) => src.slice(0, at).split('\n').length
   const textAt = (at) => src.split('\n')[lineOf(at) - 1].trim().slice(0, 160)
   const isLib = /(^|[\\/])lib\.cjs$/.test(fileName)
@@ -153,17 +209,21 @@ export function migrate(src, fileName = 'x.cjs') {
         // The work waited for: the predicate's text and the label of a check(…) it is inside.
         const label = path.slice().reverse().find((p) => isCall(p) && calleeName(p.callee) === 'check' && p.arguments[0]?.type === 'StringLiteral')
         const about = src.slice(args[0].start, args[0].end) + ' ' + (label ? label.arguments[0].value : '')
-        const neg = negative(path, src)
+        const neg = negative(path, src) || negatedLater(path, src) || retryInLoop(path)
         if (args.length === 1) {
-          if (neg) leave(node, 'a negative wait with no bound: name its window by hand (quiet.*)')
+          // What it waited before: a local wrapper's default (`ms = HUNG_MS`, `ms = 10000`), else lib.until's, hang.ui.
+          const wrapped = unwrap(node.callee).type === 'Identifier' ? defaults.get(callee) : undefined
+          if (wrapped === null) {
+            // A wrapper whose default is a name (HUNG_MS…): the call keeps it, never a bound guessed shorter (inputblocked.cjs).
+          } else if (neg) leave(node, 'a negative wait with no bound: name its window by hand (quiet.*)')
           else {
-            const n = hangName(HANG[0].ms, about)
+            const n = hangName(Math.max(HANG[0].ms, wrapped ?? 0), about)
             edits.push({ start: args[0].end, end: args[0].end, text: `, ${name(n)}` })
             changed.push({ line: lineOf(node.start), from: '(no bound)', to: name(n) })
           }
         } else if (isNum(args[1])) {
           const ms = args[1].value
-          if (neg) leave(args[1], 'a negative wait (that nothing happens within it): name its window by hand (quiet.*)')
+          if (neg) leave(args[1], "a negative wait (that nothing happens within it) or a loop's try: name its window by hand (quiet.*, pace.*)")
           else if (ms <= 0) leave(args[1], 'a bound of 0: by hand')
           else {
             const n = hangName(ms, about)

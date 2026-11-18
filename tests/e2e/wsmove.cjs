@@ -117,6 +117,7 @@ async function launch() {
     for (const agent of [builder, third]) {
       await inv('session:start', alpha1, { agentId: agent.id })
       const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)
+      // before any turn (HI-2688): its start, restart or resume
       await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))
       await lib.sendPrompt(inv, lib.ptyKey(alpha1, agent.id), 'hello', { submitted: async () => ['working', 'finished'].includes((await live())?.status) })
       await lib.until(async () => (await live())?.status === 'finished', lib.timing('hang.step'))
@@ -169,6 +170,7 @@ async function launch() {
     // Repair refuses while an agent of the workspace runs.
     const coder = (await inv('workspace:refresh')).projects.find((p) => p.name === 'alpha').agents.find((a) => a.name === 'Coder')
     await inv('session:start', alpha2, { agentId: coder.id })
+    // before any turn (HI-2688): its start, restart or resume
     await lib.until(async () => (await inv('session:live')).some((s) => s.agentId === coder.id && s.status === 'ready'), lib.timing('hang.step'))
     const refused = await inv('workspace:moveRepair').then(() => '', (e) => String(e.message ?? e))
     check('Repair refuses while an agent runs, naming it', /Stop the running agents first: alpha · Coder/.test(refused), refused)

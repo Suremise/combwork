@@ -98,6 +98,7 @@ const check = (name, ok, extra = '') => {
   const panel = page.locator('.assistant-panel')
   await lib.until(async () => (await panel.locator('.assistant-header').count()) === 1, HUNG_MS)
   await panel.locator('.assistant-header').getByRole('button', { name: 'Start', exact: true }).click()
+  // before any turn (HI-2688): its start, restart or resume
   check('the Assistant runs', !!(await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))))
 
   // --- A change: Settings shows it, the panel lists it with Undo.

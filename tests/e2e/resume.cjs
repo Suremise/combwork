@@ -214,6 +214,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `resume-${n
   fs.writeFileSync(fakeFile('fake-start-hold'), '')
   await inv('session:start', proj, { resumeId: OLDER, agentId: A1.id })
   const wrote = await lib.until(() => !fs.existsSync(fakeFile('fake-start-write')) && !fs.existsSync(fakeFile('fake-start-hold')), lib.timing('hang.step'))
+  // before any turn (HI-2688): its start, restart or resume
   const up = await lib.until(async () => (await liveA1())?.status === 'ready', lib.timing('hang.step'))
   check('held after writing its start: ready, from what it wrote', !!wrote && !!up, JSON.stringify((await liveA1())?.status))
   await stopA1()

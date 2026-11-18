@@ -101,6 +101,7 @@ const rollouts = (dir = path.join(codexHome, 'sessions')) => {
     // --- Claude Code: its turns by promptId (prompt_id in its hooks).
     const cc = await lib.addAgent(inv, alpha, { name: 'Builder' })
     await inv('session:start', alpha, { agentId: cc.id })
+    // before any turn (HI-2688): its start, restart or resume
     check('Claude Code starts', !!(await until(async () => (await live(cc))?.status === 'ready', lib.timing('hang.step'))))
     const sessionId = (await live(cc))?.sessionId
     const transcript = path.join(claudeHome, 'projects', alpha.replace(/[^a-zA-Z0-9]/g, '-'), `${sessionId}.jsonl`)
@@ -127,6 +128,7 @@ const rollouts = (dir = path.join(codexHome, 'sessions')) => {
     // --- Codex: its turns by turn_id. Started with its hooks on, so its session (and rollout) is known.
     const cx = await lib.addAgent(inv, alpha, { name: 'Cx', provider: 'codex' })
     await inv('session:start', alpha, { agentId: cx.id })
+    // before any turn (HI-2688): its start, restart or resume
     check('Codex starts', !!(await until(async () => (await live(cx))?.status === 'ready', lib.timing('hang.step'))))
     const turnIdOf = (text) =>
       rollouts()

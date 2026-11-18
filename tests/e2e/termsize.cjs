@@ -70,6 +70,7 @@ function sizes(home) {
   await page.locator('.layout-switch button[aria-label="Two columns"]').click()
   const live = async (id) => (await inv('session:live')).find((s) => s.agentId === id)
   for (const a of [claude, codex]) await inv('session:start', alpha, { agentId: a.id })
+  // before any turn (HI-2688): its start, restart or resume
   check('both agents start', !!(await lib.until(async () => (await live(claude.id))?.status === 'ready' && (await live(codex.id))?.status === 'ready', lib.timing('hang.step'))))
   const agents = [
     { name: 'Claude Code', a: claude, home: claudeHome, key: lib.ptyKey(alpha, claude.id) },
@@ -83,7 +84,7 @@ function sizes(home) {
       await lib.sleep(100)
       await inv('pty:write', g.key, '\r')
       // The turn starting may be over before it is seen (a fast turn): up to 3 s for it, then the wait for its end.
-      await lib.until(async () => (await live(g.a.id))?.status !== 'finished', lib.timing('hang.ui'))
+      await lib.until(async () => (await live(g.a.id))?.status !== 'finished', lib.timing('pace.turnStartSeenMs'))
       await lib.until(async () => (await live(g.a.id))?.status === 'finished', lib.timing('hang.step'))
     }
   }

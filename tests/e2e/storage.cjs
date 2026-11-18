@@ -122,6 +122,7 @@ const write = (file, text) => {
   const live = await lib.addAgent(inv, alpha, { name: 'Live' })
   await lib.addAgent(inv, alpha, { name: 'Tree', location: 'new-worktree' })
   await inv('session:start', alpha, { agentId: live.id })
+  // before any turn (HI-2688): its start, restart or resume
   const state = await until(async () => (await inv('session:live')).find((s) => s.agentId === live.id && s.status === 'ready'), lib.timing('hang.step'))
   check('the live agent is running', !!state)
   const runDir = path.join(dataDir, 'attachments', `run-${state?.runId}`)

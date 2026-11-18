@@ -64,6 +64,7 @@ const check = (name, ok, extra = '') => {
   const launches = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
 
   const st = await inv('session:start', alpha, { agentId: agent.id })
+  // before any turn (HI-2688): its start, restart or resume
   check('the agent starts', !!(await until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))))
   const header = page.locator('.pane-header-bar', { hasText: 'Writer' })
   const footer = page.locator('.agent-pane', { has: header }).locator('.pane-footer-bar')
@@ -167,6 +168,7 @@ const check = (name, ok, extra = '') => {
   await inv('session:stop', alpha, agent.id)
   await until(async () => !(await live()), lib.timing('hang.ui'))
   await inv('session:start', alpha, { agentId: agent.id, resumeId: st.sessionId })
+  // before any turn (HI-2688): its start, restart or resume
   await until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))
   check('resumed with the CLI name passed back', launches().at(-1).opts['--name'] === 'Release notes', launches().at(-1).opts['--name'])
   // Unnamed, it would be named by when it began, as in the Sessions tab, not when it was resumed.

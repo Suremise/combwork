@@ -95,6 +95,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   await inv('session:start', alpha, { agentId: claude.id })
   await lib.until(async () => ['waiting', 'ready'].includes((await live(claude.id))?.status), lib.timing('hang.ui'))
   if ((await live(claude.id))?.status === 'waiting') await inv('pty:write', lib.ptyKey(alpha, claude.id), '\r')
+  // before any turn (HI-2688): its start, restart or resume
   await lib.until(async () => (await live(claude.id))?.status === 'ready', lib.timing('hang.step'))
   await inv('pty:write', lib.ptyKey(alpha, claude.id), 'hello')
   await lib.sleep(300)

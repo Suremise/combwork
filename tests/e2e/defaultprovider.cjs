@@ -63,6 +63,7 @@ const check = (name, ok, extra = '') => {
   const added = await lib.until(async () => (await agents())[0] ?? null, lib.timing('hang.ui'))
   check('New Session adds a Codex agent', added?.provider === 'codex', JSON.stringify(added))
   const live = async () => (await inv('session:live')).find((s) => s.agentId === added?.id)
+  // before any turn (HI-2688): its start, restart or resume
   check('…and starts it', !!(await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))), JSON.stringify(await live()))
   await inv('session:stop', alpha, added.id).catch(() => undefined)
   await lib.until(async () => !(await live()), lib.timing('hang.ui'))

@@ -52,6 +52,7 @@ const check = (name, ok, extra = '') => {
     await lib.addAgent(inv, beta, { name: 'Resting' })
     for (const n of ['Coder', 'Worker']) await inv('session:start', alpha, { agentId: a[n].id })
     const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
+    // before any turn (HI-2688): its start, restart or resume
     check('two agents start', !!(await lib.until(async () => (await live(a.Coder.id))?.status === 'ready' && (await live(a.Worker.id))?.status === 'ready', lib.timing('hang.step'))))
     check('Worker works', (await lib.sendPrompt(inv, lib.ptyKey(alpha, a.Worker.id), 'work 600', { submitted: async () => (await live(a.Worker.id))?.status === 'working' })) > 0)
     await inv('tasks:create', { title: 'Parked work', project: 'alpha', column: 'doing', agent: a.Parked.id })

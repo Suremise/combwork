@@ -145,7 +145,7 @@ const post = (url, token, body) =>
   await lib.cliStep('the locked edit', { session: key1 }, async () => {
     for (let attempt = 0; attempt < 3; attempt++) {
       w = await turn(attempt ? 'Edit notes.txt now: call the apply_patch tool to append the line "from agent 1". Do not answer in text.' : 'Use apply_patch to add the line "from agent 1" at the end of notes.txt. Do nothing else.')
-      if (await lib.until(async () => (await asking.count()) > 0, lib.timing('hang.ui'))) break
+      if (await lib.until(async () => (await asking.count()) > 0, lib.timing('pace.approvalAskedMs'))) break
       if (/from agent 1/.test(notes())) break
       console.log(`Codex didn't try the edit (attempt ${attempt + 1}): asking again`)
       await waitFor(a1.id, (x) => x?.status === 'finished' || x?.status === 'waiting', 60000)
@@ -189,7 +189,7 @@ const post = (url, token, body) =>
       const since = (await live(a1.id))?.statusSince
       await lib.sendPrompt(inv, key1, shellPrompt, { submitted: async () => (await live(a1.id))?.statusSince !== since })
       await lib.until(async () => (await askingShell.count()) > 0 || /from agent 1/.test(shellText()) || ['finished', 'waiting'].includes((await live(a1.id))?.status), lib.timing('hang.step'), 300)
-      if (await lib.until(async () => (await askingShell.count()) > 0, lib.timing('hang.ui'))) break
+      if (await lib.until(async () => (await askingShell.count()) > 0, lib.timing('pace.approvalAskedMs'))) break
       if (/from agent 1/.test(shellText())) break
       console.log(`Codex didn't try the shell edit (attempt ${attempt + 1}): asking again`)
       await waitFor(a1.id, (x) => x?.status === 'finished' || x?.status === 'waiting', 60000)

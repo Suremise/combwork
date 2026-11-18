@@ -55,11 +55,29 @@ describe('until (HI-3382)', () => {
     expect(r.out).toContain("await until(() => a(), lib.timing('hang.ui'))")
   })
 
+  it('a wrapper whose default is a name keeps it for calls with none; a numeric default is never cut', () => {
+    const named = `${lib}const HUNG_MS = 60000\nconst until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 250)\nawait until(() => a())\n`
+    const r = migrate(named, SUITE)
+    expect(r.out).toContain('await until(() => a())\n')
+    expect(r.out).toContain("const HUNG_MS = lib.timing('hang.step')")
+    const numeric = migrate(`${lib}const until = async (fn, ms = 60000) => lib.until(fn, ms)\nawait until(() => b())\n`, SUITE).out
+    expect(numeric).toContain("await until(() => b(), lib.timing('hang.step'))")
+  })
+
   it('a negative wait (nothing happens within it): left, reported', () => {
     const src = `${lib}check('not sent', !(await lib.until(() => sent(), 3000)))\nexpect(await until(() => moved(), 2000)).toBe(false)\n`
     const r = migrate(src, SUITE)
     expect(r.out).toBe(src)
     expect(r.left.map((l) => l.why)).toEqual([expect.stringMatching(/negative/), expect.stringMatching(/negative/)])
+  })
+
+  it("a result kept and read negated, and a loop's try decided by the wait: left, reported", () => {
+    const src = `${lib}const came = await lib.until(() => tip(), 1500)\ncheck('no tip', !came)\nfor (let i = 0; i < 3; i++) {\n  press()\n  if (await until(() => closed(), 3000)) return true\n}\nfor (const x of xs) await until(() => shown(x), 5000)\n`
+    const r = migrate(src, SUITE)
+    expect(r.out).toContain('tip(), 1500)')
+    expect(r.out).toContain('closed(), 3000)')
+    expect(r.out).toContain("shown(x), lib.timing('hang.ui'))")
+    expect(r.left).toHaveLength(2)
   })
 
   it('a bound of 0 or past every name: left, reported', () => {

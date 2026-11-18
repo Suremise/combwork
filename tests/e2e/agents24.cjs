@@ -78,6 +78,7 @@ const check = (name, ok, extra = '') => {
     const refused = await inv('agents:add', crowd, { location: 'project', provider: 'claude-code' }).then(() => '', (e) => String(e.message ?? e))
     check('24 agents added; a 25th refused', agents.length === N && /up to 24 agents/.test(refused), refused)
     for (const a of agents) await inv('session:start', crowd, { agentId: a.id })
+    // before any turn (HI-2688): its start, restart or resume
     const ready = await until(async () => (await lives()).filter((s) => s.status === 'ready').length === N, lib.timing('hang.slow'))
     check('all 24 start', !!ready, JSON.stringify((await lives()).map((s) => s.status)))
     await page.screenshot({ path: path.join(lib.WORK, 'agents24-1-running.png') })

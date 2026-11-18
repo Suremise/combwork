@@ -44,6 +44,7 @@ const check = (name, ok, extra = '') => {
       return []
     }
   }
+  // before any turn (HI-2688): its start, restart or resume
   await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === agent.id)?.status === 'ready', lib.timing('hang.step'))
   await inv('pty:write', lib.ptyKey(proj, agent.id), '\x1b[D')
   await lib.sleep(6000) // A fixed wait on purpose: this checks that the session does NOT move into Claude Code's background view after ←.

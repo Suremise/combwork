@@ -610,12 +610,12 @@ async function chooseTrust(inv, key, id, ready, timeoutMs = timing('cli.trustMs'
       await inv('pty:write', key, '\r')
       entered = true
       // A try's pace, not a bound: its screen not moved on within 3 s, the loop presses Enter again if "Yes" still shows.
-      if (await until(gone, timing('hang.ui'), 150)) return true
+      if (await until(gone, timing('pace.trustEnterMs'), 150)) return true
       continue
     }
     if (q.choice && !onYes(q)) await inv('pty:write', key, '\x1b[B')
     // A try's pace, not a bound: not on "Yes" (or no pointer yet) within 2 s, the loop looks again (timeoutMs bounds the whole).
-    await until(async () => { const n = await now(); return !here(n) || onYes(n) || (!q.choice && !!n?.choice) }, timing('hang.ui'), 150)
+    await until(async () => { const n = await now(); return !here(n) || onYes(n) || (!q.choice && !!n?.choice) }, timing('pace.trustDownMs'), 150)
   }
   return null
 }

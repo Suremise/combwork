@@ -53,6 +53,7 @@ const check = (name, ok, extra = '') => {
     const one = await lib.addAgent(inv, alpha, { name: 'One' })
     const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === one.id)
     await inv('session:start', alpha, { agentId: one.id })
+    // before any turn (HI-2688): its start, restart or resume
     check('the agent starts', !!(await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))))
     const send = async (text) => {
       await inv('pty:write', lib.ptyKey(alpha, one.id), text)

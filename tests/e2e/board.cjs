@@ -74,7 +74,7 @@ const check = (name, ok, extra = '') => {
     for (let i = 0; i < 3; i++) {
       await page.keyboard.press('Escape')
       // A try's pace, not a bound: not closed within 3 s, Escape is pressed again (the three tries are the bound).
-      if (await until(async () => (await d.count()) === 0, lib.timing('hang.ui'))) return true
+      if (await until(async () => (await d.count()) === 0, lib.timing('pace.escapeAgainMs'))) return true
     }
     return false
   }

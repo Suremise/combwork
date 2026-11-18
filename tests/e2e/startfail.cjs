@@ -91,6 +91,7 @@ const check = (name, ok, extra = '') => {
   // Saved by the time agents:update returns, and Retry starts it from what's saved.
   await lib.setLaunch(inv, alpha, agent.id, { model: '' })
   await bar.getByRole('button', { name: 'Retry' }).click()
+  // before any turn (HI-2688): its start, restart or resume
   check('Retry starts it again', !!(await until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))))
   check('the failure is gone once it starts', !!(await until(async () => (await bar.count()) === 0 && !/Failed to start/.test(await text(header)) && (await header.locator('.state-mark.stalled').count()) === 0, HUNG_MS)))
 

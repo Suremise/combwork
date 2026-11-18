@@ -82,6 +82,7 @@ const jsonl = (file) => {
     const key = lib.ptyKey(proj, a.id)
     const live = async () => (await inv('session:live')).find((l) => l.agentId === a.id)
     await inv('session:start', proj, { agentId: a.id })
+    // before any turn (HI-2688): its start, restart or resume
     check('Copilot starts', !!(await until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))), (await live())?.status)
     const events = path.join(copilotHome, 'session-state', (await live())?.sessionId ?? '-', 'events.jsonl')
     /** The prompt's interaction once its turn is over in events.jsonl (its user.message, then Copilot's agentStop hook ran). */

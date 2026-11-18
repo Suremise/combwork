@@ -191,6 +191,7 @@ const check = (name, ok, extra = '') => {
   // --- Dragging files over the (icon-only) Session tab switches to it while an agent runs.
   await lib.addAgent(inv, alpha, { name: 'One' })
   await inv('session:start', alpha, {})
+  // before any turn (HI-2688): its start, restart or resume
   check('the agent starts', !!(await lib.until(async () => (await inv('session:live')).some((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.status === 'ready'), lib.timing('hang.step'))))
   await page.locator('.tabs .tab', { hasText: 'Files' }).click()
   await expectFit('Files active', 'icons')

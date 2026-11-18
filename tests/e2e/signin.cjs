@@ -62,6 +62,7 @@ const until = async (fn, ms) => {
   const live = async (a) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === a.id)
   const all = async () => Promise.all(agents.map(live))
   for (const a of agents) await inv('session:start', alpha, { agentId: a.id })
+  // before any turn (HI-2688): its start, restart or resume
   check('three agents start', !!(await until(async () => (await all()).every((s) => s?.status === 'ready'), lib.timing('hang.step'))))
   await page.getByText('alpha', { exact: true }).first().click()
   const send = async (a, text) => {

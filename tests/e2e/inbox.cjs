@@ -117,6 +117,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase(), two.worktree.path.toLowerCase()]))
   await inv('session:start', alpha, { agentId: one.id })
   await inv('session:start', alpha, { agentId: two.id })
+  // before any turn (HI-2688): its start, restart or resume
   check('alpha\'s agents start', !!(await until(async () => (await live(alpha, one.id))?.status === 'ready' && (await live(alpha, two.id))?.status === 'ready', lib.timing('hang.step'))))
   await openProject('alpha')
   await focusWindow()
@@ -201,6 +202,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
 
   // Answering Three: nothing needs you, and the status bar says what is left to review.
   await lib.acceptClaudeTrust(inv, beta, three.id)
+  // before any turn (HI-2688): its start, restart or resume
   check('Three is answered', !!(await until(async () => (await live(beta, three.id))?.status === 'ready', lib.timing('hang.step'))))
   check('the status bar shows 1 to review', !!(await until(async () => (await itemText()) === '1 to review', lib.timing('hang.ui'))), await itemText())
   check('no Projects badge', (await projectsBadge()) === '')

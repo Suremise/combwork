@@ -85,6 +85,7 @@ const check = (name, ok, extra = '') => {
   await lib.until(async () => (await panel.locator('.assistant-header').count()) === 1, lib.timing('hang.ui'))
   check('the header shows Coordinator, the default mode', !!(await lib.until(async () => (await panel.locator('.assistant-mode').innerText()).includes('Coordinator'), lib.timing('hang.ui'))), await panel.locator('.assistant-mode').innerText())
   await panel.locator('.assistant-header').getByRole('button', { name: 'Start', exact: true }).click()
+  // before any turn (HI-2688): its start, restart or resume
   check('the Assistant runs', !!(await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))))
   const session = (await live()).sessionId
   const given = fs.readFileSync(path.join(home, '.combwork', 'launch-assistant', 'instructions.md'), 'utf8')
@@ -133,6 +134,7 @@ const check = (name, ok, extra = '') => {
   const ask = page.locator('.dialog', { hasText: 'Restart in QA triager mode?' })
   check('Restart in This Mode asks first, saying it re-caches the conversation', !!(await lib.until(async () => (await ask.count()) === 1, lib.timing('hang.step'))) && /cached again/.test(await ask.innerText()))
   await ask.getByRole('button', { name: 'Restart', exact: true }).click()
+  // before any turn (HI-2688): its start, restart or resume
   check('…and resumes the same conversation', !!(await lib.until(async () => (await live())?.status === 'ready' && (await live())?.sessionId === session, lib.timing('hang.step'))), `${session} → ${(await live())?.sessionId}`)
   const retold = fs.readFileSync(path.join(home, '.combwork', 'launch-assistant', 'instructions.md'), 'utf8')
   check('…with the QA triager mode in its instructions', retold.includes('# Your mode: QA triager'))

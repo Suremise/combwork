@@ -46,6 +46,7 @@ const check = (name, ok, extra = '') => {
     check(`the CLI says: ${says}`, !!said)
 
     await inv('session:start', home, { agentId: 'assistant' })
+    // before any turn (HI-2688): its start, restart or resume
     await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))
     const launches = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split(/\r?\n/)
     const opts = JSON.parse(launches.at(-1)).opts

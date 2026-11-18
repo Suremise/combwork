@@ -53,6 +53,7 @@ const until = async (fn, ms) => {
   const live = async (a) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === a.id)
   await inv('session:start', alpha, { agentId: idle.id })
   await inv('session:start', alpha, { agentId: busy.id, prompt: 'work 300' })
+  // before any turn (HI-2688): its start, restart or resume
   check('Idle is ready and Busy is working', !!(await until(async () => (await live(idle))?.status === 'ready' && (await live(busy))?.status === 'working', lib.timing('hang.step'))), JSON.stringify([(await live(idle))?.status, (await live(busy))?.status]))
 
   const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)

@@ -42,7 +42,7 @@ const HUNG_MS = lib.timing('hang.ui')
         await page.mouse.move(5, 5)
         await rows.nth(j).hover()
         // A tip would show after its delay: wait until one does or the bound passes, then say none came.
-        const came = await lib.until(async () => (await page.locator('.tip:visible').count()) > 0, lib.timing('hang.ui'))
+        const came = await lib.until(async () => (await page.locator('.tip:visible').count()) > 0, lib.timing('quiet.tipMs'))
         check(`${what}: a name that fits shows no tooltip`, !came, all[j].text)
       }
       // A click on a row whose name is cut still opens its section.

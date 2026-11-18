@@ -57,6 +57,7 @@ const git = (cwd, ...a) => lib.git(cwd, a)
   const wt = two.worktree.path
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase(), wt.toLowerCase()]))
   await inv('session:start', alpha, { agentId: two.id })
+  // before any turn (HI-2688): its start, restart or resume
   check('the agent starts in its worktree', !!(await until(async () => (await live(two.id))?.status === 'ready', lib.timing('hang.step'))))
 
   const key = lib.ptyKey(alpha, two.id)

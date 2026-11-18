@@ -99,9 +99,9 @@ const check = (name, ok, extra = '') => {
     for (let attempt = 0; attempt < 3; attempt++) {
       // A retry clears what is left on the line first (Ctrl+U); the first try leaves a line Combwork typed alone.
       await inv('pty:write', key, attempt ? `\x15${text}` : text)
-      await until(async () => lib.plainText(await inv('pty:buffer', key).catch(() => '')).trimEnd().endsWith(text), lib.timing('hang.ui'))
+      await until(async () => lib.plainText(await inv('pty:buffer', key).catch(() => '')).trimEnd().endsWith(text), lib.timing('pace.typedDrawnMs'))
       await inv('pty:write', key, '\r')
-      if (await until(async () => (await said(id, text)) > before, lib.timing('hang.ui'))) return
+      if (await until(async () => (await said(id, text)) > before, lib.timing('pace.wakeTakenMs'))) return
     }
   }
   // The card as `#N`, its workspace number: a plain number reading as another card's key is refused (HI-2197).

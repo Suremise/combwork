@@ -59,6 +59,7 @@ const plain = (s) => (s ?? '').replace(/ /g, ' ')
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha, b.worktree?.path].filter(Boolean).map((d) => d.toLowerCase())))
   const live = async (id) => (await inv('session:live')).find((s) => s.agentId === id)
   for (const a of [b, r]) await inv('session:start', alpha, { agentId: a.id })
+  // before any turn (HI-2688): its start, restart or resume
   check('the agents start', !!(await until(async () => (await live(b.id))?.status === 'ready' && (await live(r.id))?.status === 'ready', lib.timing('hang.step'))))
   const launches = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
   const tokenOf = (a) => launches.filter((l) => l.cwd.toLowerCase() === (a.worktree?.path ?? alpha).toLowerCase()).at(-1)?.token

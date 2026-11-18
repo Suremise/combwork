@@ -96,6 +96,7 @@ const check = (name, ok, extra = '') => {
   const agent = await lib.addAgent(inv, alpha, { name: 'Linker' })
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), alpha.toLowerCase()]))
   await inv('session:start', alpha, { agentId: agent.id })
+  // before any turn (HI-2688): its start, restart or resume
   check('the agent starts', !!(await until(async () => (await live(alpha, agent.id))?.status === 'ready', lib.timing('hang.step'))))
   const key = lib.ptyKey(alpha, agent.id)
   const A = `#${live1.number}`
@@ -172,6 +173,7 @@ const check = (name, ok, extra = '') => {
   const panel = page.locator('.assistant-panel')
   await until(async () => (await panel.count()) === 1, lib.timing('hang.ui'))
   await panel.locator('.assistant-header').getByRole('button', { name: 'Start', exact: true }).click()
+  // before any turn (HI-2688): its start, restart or resume
   check('the Assistant runs', !!(await until(async () => (await live(home, 'assistant'))?.status === 'ready', lib.timing('hang.step'))))
   const akey = lib.ptyKey(home, 'assistant')
   await say(home, 'assistant', `${G} is archived; ${A} passed`)

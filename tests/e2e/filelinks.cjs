@@ -85,6 +85,7 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase(), two.worktree.path.toLowerCase()]))
   await inv('session:start', alpha, { agentId: one.id })
   await inv('session:start', alpha, { agentId: two.id })
+  // before any turn (HI-2688): its start, restart or resume
   check('the agents start', !!(await until(async () => (await live(alpha, one.id))?.status === 'ready' && (await live(alpha, two.id))?.status === 'ready', lib.timing('hang.step'))))
 
   const key = lib.ptyKey(alpha, one.id)

@@ -56,6 +56,7 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.
   const startAgent = async (inv, project, name = 'One') => {
     const a = await lib.addAgent(inv, project, { name })
     await inv('session:start', project, { agentId: a.id })
+    // before any turn (HI-2688): its start, restart or resume
     const ready = await lib.until(async () => (await inv('session:live')).some((s) => s.projectPath.toLowerCase() === project.toLowerCase() && s.agentId === a.id && s.status === 'ready'), lib.timing('hang.step'))
     return ready ? a.id : null
   }

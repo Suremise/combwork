@@ -62,6 +62,7 @@ const check = (name, ok, extra = '') => {
   }
 
   await inv('session:start', proj, { agentId: agent.id })
+  // before any turn (HI-2688): its start, restart or resume
   check('Codex starts', !!(await until((s) => s?.status === 'ready', lib.timing('hang.step'))))
   const key = lib.ptyKey(proj, agent.id)
   // Printing only the id is the form that went uncounted (#162): Combwork mustn't depend on what the script prints.

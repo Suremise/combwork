@@ -88,6 +88,7 @@ function commits(wt, n) {
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha, long.worktree.path, other.worktree.path].map((p) => p.toLowerCase())))
   await inv('tasks:create', { title: 'A card with a long title that takes up a lot of the header', project: 'alpha', agent: long.id, column: 'doing' })
   await inv('session:start', alpha, { agentId: long.id })
+  // before any turn (HI-2688): its start, restart or resume
   check('the agent starts', !!(await until(async () => (await live(long.id))?.status === 'ready', lib.timing('hang.step'))))
   const key = lib.ptyKey(alpha, long.id)
   let turns = 0
@@ -128,7 +129,7 @@ function commits(wt, n) {
     let mark = null
     const first = await read()
     const t = Date.now()
-    check(`${a.name}: the header starts with its state mark, a ring while idle`, !!(await until(async () => ok((mark = await read())), lib.timing('hang.ui'))), JSON.stringify(mark))
+    check(`${a.name}: the header starts with its state mark, a ring while idle`, !!(await until(async () => ok((mark = await read())))), JSON.stringify(mark))
     if (!ok(first)) console.log(`  (${a.name}'s mark read ${JSON.stringify(first)} at first, idle ${Date.now() - t} ms later)`)
   }
   await header(long).locator('.agent-name').hover()
@@ -266,7 +267,7 @@ function commits(wt, n) {
       viewport = Math.max(200, Math.round(viewport + (target - w) * zoom * 2))
       await page.setViewportSize({ width: viewport, height: HEIGHT })
       // A short bound on purpose: a size the window can't take (its minimum) leaves the width as it is, and the next step tries again.
-      await until(async () => (await inspect(a)).width !== w, lib.timing('hang.ui'))
+      await until(async () => (await inspect(a)).width !== w, lib.timing('pace.resizeStepMs'))
     }
     for (let i = 0; i < 40; i++) {
       const w = (await inspect(a)).width
@@ -274,7 +275,7 @@ function commits(wt, n) {
       viewport += w < target ? 1 : -1
       await page.setViewportSize({ width: viewport, height: HEIGHT })
       // A short bound on purpose, as above: one pixel the window can't take changes nothing.
-      await until(async () => (await inspect(a)).width !== w, lib.timing('hang.ui'))
+      await until(async () => (await inspect(a)).width !== w, lib.timing('pace.resizePixelMs'))
     }
     return (await inspect(a)).width === target
   }
@@ -468,6 +469,7 @@ function commits(wt, n) {
   // A compaction that fails: it ends, and the agent is ready.
   await turn()
   check('a failing compaction is sent', await compactVia('compactfail hold 2'))
+  // ready on purpose (HI-2688): a failed compaction ends ready, with no turn
   check('after the failure the agent is ready', !!(await until(async () => (await live(long.id))?.status === 'ready', lib.timing('hang.step'))))
   check('and Compact… is offered', !!(await until(compactOffered, HUNG_MS)))
 
@@ -483,9 +485,11 @@ function commits(wt, n) {
   // A new session from ⋯: Stop is back, and a compaction with nothing to compact ends by itself.
   await header(long).getByRole('button', { name: 'More', exact: true }).click()
   await page.locator('.menu .menu-item', { hasText: 'New Session' }).click()
+  // before any turn (HI-2688): its start, restart or resume
   check('a new session starts', !!(await until(async () => (await live(long.id))?.status === 'ready', lib.timing('hang.step'))))
   check('Stop is back', !!(await until(() => header(long).getByRole('button', { name: 'Stop', exact: true }).isVisible(), HUNG_MS)))
   await inv('session:compact', alpha, '', long.id)
+  // ready on purpose (HI-2688): a compaction with nothing to compact ends ready, with no turn
   check('nothing to compact: it ends by itself', !!(await until(async () => (await live(long.id))?.status === 'ready' && !(await statusOf()).includes('Compacting'), lib.timing('hang.step'))))
 
   await inv('session:stop', alpha, long.id).catch(() => undefined)

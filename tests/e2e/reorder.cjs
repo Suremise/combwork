@@ -58,6 +58,7 @@ const check = (name, ok, extra = '') => {
   // One runs, with something in its terminal.
   const one = agents[0]
   await inv('session:start', alpha, { agentId: one.id })
+  // before any turn (HI-2688): its start, restart or resume
   await until(async () => (await live(one.id))?.status === 'ready', lib.timing('hang.step'))
   await inv('pty:write', lib.ptyKey(alpha, one.id), 'hello')
   await lib.sleep(300)

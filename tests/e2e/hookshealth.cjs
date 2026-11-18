@@ -82,6 +82,7 @@ const hooksOff = (agent, off) => {
     // Before the agents start, so their output is all recorded (raw, below).
     await lib.recordPtyOutput(page)
     for (const a of [builder, reviewer]) await inv('session:start', alpha, { agentId: a.id })
+    // before any turn (HI-2688): its start, restart or resume
     check('the agents start', !!(await until(async () => (await live(builder))?.status === 'ready' && (await live(reviewer))?.status === 'ready', lib.timing('hang.step'))))
 
     // Whether any agent's state ever said its hooks were missing (sampled throughout the healthy part).
@@ -192,6 +193,7 @@ const hooksOff = (agent, off) => {
     // the turn that line starts works, though nothing came since.
     const cy = await lib.addAgent(inv, alpha, { name: 'Cy', provider: 'codex', permissionMode: 'full-access' })
     await inv('session:start', alpha, { agentId: cy.id })
+    // before any turn (HI-2688): its start, restart or resume
     check('a second Codex agent starts', !!(await until(async () => (await live(cy))?.status === 'ready', lib.timing('hang.step'))))
     check('…and takes a turn with its hooks working', (await say(cy, 'hh-cy healthy')) > 0 && !!(await until(async () => (await live(cy))?.status === 'finished', HUNG_MS)) && !(await live(cy))?.hooksMissing, JSON.stringify(await live(cy)))
     fs.writeFileSync(path.join(codexHome, 'fake-nohooks-Cy'), '')

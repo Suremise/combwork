@@ -58,6 +58,7 @@ const check = (name, ok, extra = '') => {
   const two = await lib.addAgent(inv, beta, { name: 'Two' })
   const live = async (proj, a) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === proj.toLowerCase() && s.agentId === a.id)
   for (const [p, a] of [[alpha, one], [beta, two]]) await inv('session:start', p, { agentId: a.id })
+  // before any turn (HI-2688): its start, restart or resume
   check('both agents start', !!(await lib.until(async () => (await live(alpha, one))?.status === 'ready' && (await live(beta, two))?.status === 'ready', lib.timing('hang.step'))))
   const send = async (p, a, text) => {
     await inv('pty:write', lib.ptyKey(p, a.id), text)

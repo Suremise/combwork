@@ -85,6 +85,7 @@ const until = (fn, ms) => lib.until(fn, ms, 150)
   await page.getByText('alpha', { exact: true }).first().click()
   const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })
   await inv('session:start', alpha, { agentId: builder.id })
+  // before any turn (HI-2688): its start, restart or resume
   check('the agent starts', !!(await until(async () => (await live(builder.id))?.status === 'ready', lib.timing('hang.step'))))
   await page.locator('.xterm').first().click().catch(() => undefined)
   await page.keyboard.press('Control+Alt+P')

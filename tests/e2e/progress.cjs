@@ -90,6 +90,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   const live = async (id) => (await inv('session:live')).find((s) => s.agentId === id)
   await inv('session:start', alpha, { agentId: alfie.id })
   await inv('session:start', beta, { agentId: betty.id })
+  // before any turn (HI-2688): its start, restart or resume
   check('both agents start', !!(await until(async () => (await live(alfie.id))?.status === 'ready' && (await live(betty.id))?.status === 'ready', lib.timing('hang.step'))))
 
   // Each agent's own token, from its launch environment.
@@ -583,6 +584,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   // A run whose agent was removed since: its details say so rather than offering to show it.
   const cara = await lib.addAgent(inv, beta, { name: 'Cara Featherstonehaugh' })
   await inv('session:start', beta, { agentId: cara.id })
+  // before any turn (HI-2688): its start, restart or resume
   await until(async () => (await live(cara.id))?.status === 'ready', lib.timing('hang.step'))
   const caraSession = (await live(cara.id))?.sessionId
   const caraToken = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).filter((l) => l.sessionId === caraSession).at(-1)?.token
@@ -739,6 +741,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   check('on by default', (await inv('settings:get')).general.progressCommands === true)
   // A launch's MCP config is in its private folder only while it runs (#345): the agent stopped above starts again.
   await inv('session:start', alpha, { agentId: alfie.id })
+  // before any turn (HI-2688): its start, restart or resume
   await until(async () => (await live(alfie.id))?.status === 'ready', lib.timing('hang.step'))
   let told = await instructionsOf(alpha)
   check("a session's guidance says to run long commands through cw-progress", /over 30 s.*`cw-progress --title "<what and why, in a few words>" -- <command>`/.test(told), told.slice(-400))
@@ -758,6 +761,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   await inv('session:stop', alpha, alfie.id)
   await until(async () => !(await live(alfie.id)) || (await live(alfie.id))?.status === 'stopped', lib.timing('hang.ui'))
   await inv('session:start', alpha, { agentId: alfie.id })
+  // before any turn (HI-2688): its start, restart or resume
   check('the agent starts again', !!(await until(async () => (await live(alfie.id))?.status === 'ready', lib.timing('hang.step'))))
   told = await instructionsOf(alpha)
   check('a session started afterwards is told: only when the user asks', /cw-progress --title "[^"]+" -- <command>`.*only when the user asks/.test(told) && !/over 30 s/.test(told), told.slice(-400))
