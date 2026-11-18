@@ -1,7 +1,7 @@
 // HI-3369: the line comments being written over a revision's diff (LineComments.tsx), kept while the window is open, so a
 // draft or an edit being typed comes back when its file's comment layer is made again (another file chosen and back,
 // Retry, the changes or the card closed and opened). No React here: the layer subscribes to what it shows.
-import type { LineSide } from '@shared/workflow/lineComments'
+import type { LineSide } from '../../shared/workflow/lineComments'
 
 /** A comment being written, on one side's lines. */
 export type Draft = { side: LineSide; from: number; to: number }
