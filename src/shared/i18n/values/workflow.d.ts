@@ -19,6 +19,7 @@ interface CombworkMessageValues {
   'workflow.earlierWork.title': { read: string; card: string | number; line: string | number }
   'workflow.forYou.advanceNote': { project: string | number }
   'workflow.forYou.advancePreview': { again: string; card: string | number; target: string | number; expected: string | number; result: string | number; style: string; commits: string | number; more: number }
+  'workflow.forYou.advancePreviewClosed': { clicked: string; card: string | number; why: string; cards: string | number }
   'workflow.forYou.advanceRefused': { target: string | number; result: string | number; card: string | number; why: string; detail: string | number }
   'workflow.forYou.advanceStopped': { again: string; target: string | number; result: string | number; card: string | number; why: string; detail: string | number }
   'workflow.forYou.advanceSuperseded': { card: string | number; target: string | number }

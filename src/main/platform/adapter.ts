@@ -320,6 +320,14 @@ export interface AdvanceHost {
    * in the same write: false when the card isn't in Approved at `cycle`, or an advance is unsettled.
    */
   askPreview(card: CardRecord, cycle: number, plan: string, words: PreviewWords): Promise<boolean>
+  /**
+   * HI-3390: a preview whose consent no longer holds (`why`: the finish no longer previews, or the card waits for `waits`),
+   * said on the card. `clicked` null: the card's open previews closed in the same write. `clicked`: an Integrate that ran
+   * nothing for that reason, said once for its request. 'recorded': this write said it; 'already': an earlier one did (a
+   * replay); 'changed': nothing written, the reason no longer holding in the write (or no preview open, the card moved
+   * on), for the caller to read the card again; 'failed': nothing committed (HR1's round 1).
+   */
+  previewClosed(card: CardRecord, cycle: number, why: 'finish' | 'blocked', waits: string[], clicked: string | null): Promise<'recorded' | 'already' | 'changed' | 'failed'>
   /** HI-3236: the user dismissed the preview of `plan` (Not for this plan): that plan isn't previewed again in this cycle. */
   declinePreview(card: CardRecord, cycle: number, plan: string): Promise<boolean>
   /** HI-3236: whether the user dismissed the preview of `plan` in `cycle`. */

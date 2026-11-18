@@ -4,6 +4,14 @@
       "project": "plain"
     }
   },
+  "workflow.advance.previewClosed": {
+    "placeholders": {
+      "clicked": "select",
+      "card": "plain",
+      "why": "select",
+      "cards": "plain"
+    }
+  },
   "workflow.advance.refused": {
     "placeholders": {
       "target": "plain",
@@ -82,6 +90,14 @@
       "style": "select",
       "commits": "plain",
       "more": "plural"
+    }
+  },
+  "workflow.forYou.advancePreviewClosed": {
+    "placeholders": {
+      "clicked": "select",
+      "card": "plain",
+      "why": "select",
+      "cards": "plain"
     }
   },
   "workflow.forYou.advanceRefused": {

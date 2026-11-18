@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **A jj preview that no longer applies is closed, saying why** (HI-3390). A preview of a jj card's integration stayed in For you after **Who integrates** stopped integrating on a click, or after the card came to depend on a card that isn't Done; clicking **Integrate** then did nothing, with nothing said. Now Combwork closes such a preview and says why on the card (one closed for a dependency comes back once it's Done), and an Integrate that ran nothing says so too.
 - **A jj card put back while its integration was unsettled says so** (HI-3367). Put back and restarted (or archived) while For you asked about its integration, a jj card lost that question with nothing said, and Combwork went on reading the old attempt at every check of the project. Now Combwork stops tracking it once the card starts again or is archived, and comments on the card when the old attempt may have moved the target.
 - **A jj card waiting for a card in another project goes on as soon as that card is Done** (HI-3366). A jj card held for a card it depends on in another project wasn't integrated, and its lane didn't go on, until something else made Combwork look at its own project again (a jj operation there, or focusing a window). Now the other card's Done is enough.
 
