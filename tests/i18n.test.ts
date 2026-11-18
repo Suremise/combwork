@@ -11,6 +11,7 @@ import { availableLanguages, loadCatalogue } from '../src/shared/i18n/catalogues
 import { LANGUAGES, PSEUDO_LANGUAGE, matchLanguage, resolveLanguage } from '../src/shared/i18n/languages'
 import { LANGUAGE_TEXT } from '../src/shared/i18n/languageText'
 import { formatDate, setRegionalFormat } from '../src/shared/dates'
+import { timing } from './timing.cjs'
 
 // #767: the i18n core. Choosing the language, ICU plurals, a broken or missing translation showing English, the
 // pseudo-locale, Intl formatting, the loader, main's switches (the latest wins), agent-facing scripts never reaching
@@ -234,7 +235,7 @@ describe('the translations', () => {
 describe("main's language", () => {
   const settings = (code: string): AppSettings => ({ general: { language: code } }) as AppSettings
   /** Bounds a hung run only: the waits end as soon as the held load has started. */
-  const HUNG_MS = 20_000
+  const HUNG_MS = timing('wait.hang')
 
   /** Holds a language's load until released; others load as usual. */
   function hold(code: string): { started: () => boolean; release: (messages: Record<string, string>) => void } {

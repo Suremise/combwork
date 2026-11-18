@@ -8,6 +8,7 @@ import { app } from 'electron'
 import { atStart, checkRequest, closeReason, mergeSnapshot, parseRecord, recordOpen, resumeNote, REQUEST_FILE, type RestartEntry, type RestartRecord, type RequestTarget } from '../src/shared/restartResume'
 import { dropLoggerListenersAfterEach, loggerListenerCounts } from './loggerListeners'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 // A test that loads restartResume again (vi.resetModules) loads the logger again: what it listens to is taken off after it (HI-1728).
 dropLoggerListenersAfterEach()
@@ -16,7 +17,7 @@ afterAll(() => {
   expect(loggerListenerCounts()).toEqual(listenersAtStart)
 })
 
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 const NONCE = '0f8fad5b-d9cb-469f-a165-70867728950e'
 const NOW = Date.parse('2026-10-26T12:00:00.000Z')
 const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()

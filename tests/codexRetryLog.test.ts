@@ -12,6 +12,7 @@ import { ADVANCED_DEFS } from '../src/shared/advanced'
 import { handleRequest, type LogAnswer, type LogRequest } from '../src/main/providers/codex/threads/logWorker'
 import { DEADLINE_MS, MAX_OUTSTANDING, MAX_PENDING, codexRetryWait, logLimits, logWorkerRestarts, parseRetry, pendingReads, useCodexLogTransport } from '../src/main/providers/codex/retryLog'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const tmp = tempDir('cw-codex-retry-log-')
 const pattern = (): RegExp => {
@@ -251,7 +252,7 @@ describe("Codex's log's worker as a thread (HI-1972)", () => {
   const bundle = join(tmp, 'codex-log-worker.cjs')
   beforeAll(async () => {
     await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'providers', 'codex', 'threads', 'logWorker.ts')], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
-  }, 60_000)
+  }, timing('hook.hang'))
   afterAll(() => useCodexLogTransport(null))
 
   it('a worker that answers nothing for unresponsiveMs is ended, and the next read starts another (HI-3376)', async () => {
@@ -268,13 +269,13 @@ describe("Codex's log's worker as a thread (HI-1972)", () => {
       const read = () => codexRetryWait({ sessionId: THREAD, env: { CODEX_HOME: tmp }, since: 0 })
       expect(await read()).toBeNull()
       expect(pendingReads()).toBe(0)
-      await vi.waitFor(() => expect(logWorkerRestarts()).toBe(restarts + 1), { timeout: 10_000 })
+      await vi.waitFor(() => expect(logWorkerRestarts()).toBe(restarts + 1), { timeout: timing('wait.hang') })
       expect(await read()).toBeNull()
       expect(readFileSync(started, 'utf8')).toBe('xx')
     } finally {
       Object.assign(logLimits, limits)
     }
-  }, 30_000)
+  }, timing('test.hang'))
 
   it('reads in its own thread, and a worker that ended is started again by the next read', async () => {
     const file = codexLog([{ ts: Math.floor(Date.now() / 1000), body: recorded[0].body }])
@@ -284,5 +285,5 @@ describe("Codex's log's worker as a thread (HI-1972)", () => {
     // Ended (as Combwork's quit or a crash would): the next read starts another.
     await useCodexLogTransport(null, bundle)
     expect(await codexRetryWait({ sessionId: THREAD, env: { CODEX_HOME: home }, since: 0 })).toMatchObject({ attempt: 1, status: 429 })
-  }, 30_000)
+  }, timing('test.hang'))
 })

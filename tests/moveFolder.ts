@@ -3,11 +3,12 @@
 // Combwork's own readers and watchers in the test, git, the indexer or a virus scanner, which under a full run's load can
 // hold it for seconds. Combwork's own renames retry the same way (renameRetrying in src/main/fsutil.ts).
 import { renameSync } from 'fs'
+import { timing } from './timing.cjs'
 
 /** How long a rename is tried before the test fails: only a folder held for good (a hang) takes this long. */
-export const MOVE_HUNG_MS = 15_000
+export const MOVE_HUNG_MS = timing('wait.hang')
 /** The pause between tries: the pace of the retry, not a wait for time. */
-const PACE_MS = 50
+const PACE_MS = timing('wait.interval')
 
 const IN_USE = ['EPERM', 'EBUSY', 'EACCES']
 

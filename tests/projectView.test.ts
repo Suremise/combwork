@@ -9,6 +9,7 @@ import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 // Each replace of a project.json, and how many of the next ones fail as a file held open does (EPERM).
 const fs = vi.hoisted(() => ({ renames: 0, failNext: 0 }))
@@ -47,7 +48,7 @@ const { config } = await import('../src/main/config')
 const { renameDiagnostics, renameRetrying, holderLookupsRunning } = await import('../src/main/fsutil')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 const ID = 'p-0a1b2c3d'
 let n = 0
 let w: ReturnType<typeof createWorkspaceService>

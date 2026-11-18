@@ -16,6 +16,7 @@ import { excludeCopies } from '../src/main/providers/common'
 import { onCombworkEvent } from '../src/main/events'
 import { tempDir } from './tempDir'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-platform-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -26,7 +27,7 @@ const run = (cwd: string, ...args: string[]): string => execFileSync('git', args
 const gitInit = (folder: string): void => void run(folder, 'init', '-q', '-b', 'main')
 
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 describe('detection, per case of §16.3.5', () => {
   it('a Git repository is Git, at its root', () => {

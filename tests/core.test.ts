@@ -11,6 +11,7 @@ import { readFile, readdir } from 'fs/promises'
 import { assertSessionId, isSessionId, compactThreshold, DEFAULT_APP_CONFIG, DEFAULT_SETTINGS, effectiveModelLabel, mergeDefaults, migrateConfig, modelLabel } from '../src/shared/defaults'
 import { tempDir, tempRoot } from './tempDir'
 import type { StoredAgent } from '../src/shared/agentFolders'
+import { timing } from './timing.cjs'
 
 const line = (o: unknown): string => JSON.stringify(o)
 
@@ -909,7 +910,7 @@ describe('writeJsonAtomic and withFileLock', () => {
     const add = (id: number) =>
       withFileLock(file, async () => {
         const cur = JSON.parse(await readFile(file, 'utf8')) as { ids: number[] }
-        await new Promise((r) => setTimeout(r, 2))
+        await new Promise((r) => setTimeout(r, timing('pace.tick')))
         cur.ids.push(id)
         await writeJsonAtomic(file, cur)
       })

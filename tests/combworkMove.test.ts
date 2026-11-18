@@ -16,6 +16,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { esbuildEagerGlob } from './esbuildGlob'
+import { timing } from './timing.cjs'
 // old-name: begin combworkMove-inputs
 /** 1.0's folder, board file and exclude line header: the move's input. */
 const OLD_DIR = '.hive'
@@ -36,7 +37,7 @@ const { NAMES_VERSION } = await import('../src/main/nameUpgrade')
 const { dataFolder } = await import('../src/main/combworkFolder')
 
 const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs')
-const WAIT = { timeout: 30_000, interval: 25 }
+const WAIT = { timeout: timing('wait.hang'), interval: 25 }
 
 let n = 0
 const write = (p: string, text: string): void => {
@@ -407,7 +408,7 @@ m.moveFolders(ws).then((r) => appendFileSync(out, 'moved ' + r.moved + '\\n'), (
 `
     )
     await build({ entryPoints: [entry], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs', electron: join(__dirname, 'electron-stub.ts') }, external: ['node:sqlite'], plugins: [esbuildEagerGlob()], logLevel: 'silent' })
-  }, 60_000)
+  }, timing('hook.hang'))
   afterAll(() => {
     for (const c of children) if (c.exitCode === null) c.kill()
   })

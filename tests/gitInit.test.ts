@@ -10,6 +10,7 @@ import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { gitignoreText, initAbout, initProblem } from '../src/shared/gitInit'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 /** The project folders the mocked workspace knows. */
 let projects: string[] = []
@@ -35,7 +36,7 @@ const { setLanguage } = await import('../src/shared/i18n')
 const { shownText } = await import('../src/shared/advanced')
 
 // Real git work, not a wait: each test runs a dozen git commands, slow under a full unit run's load.
-vi.setConfig({ testTimeout: 60_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 const git = (cwd: string, ...a: string[]): string => execFileSync('git', a, { cwd, encoding: 'utf8' }).trim()
 /** Git's answer, or null when it fails (an unset config key, no commit yet). */

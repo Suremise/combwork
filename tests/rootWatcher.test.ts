@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-root-watcher-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -15,7 +16,7 @@ const base = tempDir('cw-root-watcher-')
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 
 /** Bounds a hung run; the tests wait for what they expect, never for a time. */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 
 
 describe("the workspace root's watch (#964)", () => {
@@ -43,7 +44,7 @@ describe("the workspace root's watch (#964)", () => {
     await vi.waitFor(() => expect(refreshes).toBeGreaterThan(0), { timeout: HUNG_MS })
   })
 
-  it('the workspace folder deleted ends the watch (Windows then sends events without end), and made again it is watched again', { timeout: 60_000 }, async () => {
+  it('the workspace folder deleted ends the watch (Windows then sends events without end), and made again it is watched again', { timeout: timing('test.hang') }, async () => {
     expect(w['rootWatcher']).not.toBeNull()
     // .combwork's own watcher holds its folders: closed, so the whole workspace folder can go, as when deleted with Combwork's window showing another.
     await w['watcher']?.close()

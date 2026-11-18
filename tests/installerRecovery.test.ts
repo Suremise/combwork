@@ -9,8 +9,9 @@ import { join } from 'path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { powershellEnv } from './powershellEnv'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
-const HUNG_MS = 60_000
+const HUNG_MS = timing('wait.hang')
 const SCRIPT = join(__dirname, '..', 'build', 'recovery.ps1')
 const NSH = join(__dirname, '..', 'build', 'installer.nsh')
 const root = process.env.SystemRoot ?? 'C:\\Windows'

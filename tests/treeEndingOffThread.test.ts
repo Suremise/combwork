@@ -9,6 +9,7 @@ import { createRequire } from 'module'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const { syncCalls } = vi.hoisted(() => ({ syncCalls: [] as string[] }))
 vi.mock('node:child_process', async (importOriginal) => {
@@ -51,7 +52,7 @@ const fakeSpawn = (script: string) => (_file: string, _args: string[], opts: Spa
  */
 async function ended<T>(pidFile: string, start: () => { run: Promise<T>; cancel?: () => void }): Promise<{ result: T; sync: string[]; ticks: number; childGone: boolean }> {
   const { run, cancel } = start()
-  await vi.waitFor(() => expect(existsSync(pidFile) && readFileSync(pidFile, 'utf8').length > 0).toBe(true), { timeout: 20_000, interval: 50 })
+  await vi.waitFor(() => expect(existsSync(pidFile) && readFileSync(pidFile, 'utf8').length > 0).toBe(true), { timeout: timing('wait.hang'), interval: 50 })
   const child = Number(readFileSync(pidFile, 'utf8'))
   expect(alive(child)).toBe(true)
   // The thread's ticks while the tree is ended: a teardown on it would show as no tick until it was over.
@@ -71,12 +72,12 @@ describe.skipIf(!isWin)("a command's tree ended off main's thread (HI-3009)", ()
     const { dir, script, pidFile } = fakeTree()
     // git runs the fake as an alias (sh, then node): git, a shell and the fake's own child, a tree as a hook makes.
     const alias = `!"${process.execPath.replace(/\\/g, '/')}" "${script.replace(/\\/g, '/')}"`
-    const t = await ended(pidFile, () => ({ run: gitTree(dir, ['-c', `alias.hang=${alias}`, 'hang'], { env: baseEnv(), timeoutMs: 3000 }) }))
+    const t = await ended(pidFile, () => ({ run: gitTree(dir, ['-c', `alias.hang=${alias}`, 'hang'], { env: baseEnv(), timeoutMs: 3000 }) })) // timing-ok: the timeout under test (its expiry is what the test checks)
     expect(t.result).toMatchObject({ ok: false, timedOut: true })
     expect(t.sync).toEqual([])
     expect(t.ticks).toBeGreaterThan(5)
     expect(t.childGone).toBe(true)
-  }, 60_000)
+  }, timing('test.hang'))
 
   for (const how of ['timedOut', 'cancelled'] as const) {
     it(`a card's focused pick, ${how}: never spawnSync, its outcome once the tree has gone`, async () => {
@@ -88,18 +89,18 @@ describe.skipIf(!isWin)("a command's tree ended off main's thread (HI-3009)", ()
       expect(t.sync).toEqual([])
       expect(t.ticks).toBeGreaterThan(5)
       expect(t.childGone).toBe(true)
-    }, 60_000)
+    }, timing('test.hang'))
   }
 
   it("a check's command (and a slot's warming) at its time limit: never spawnSync, its end once the tree has gone", async () => {
     const { dir, script, pidFile } = fakeTree()
-    const o = { spawn: fakeSpawn(script), platform: process.platform, timeoutMs: 1500, env: () => baseEnv() }
+    const o = { spawn: fakeSpawn(script), platform: process.platform, timeoutMs: 1500, env: () => baseEnv() } // timing-ok: the timeout under test (its expiry is what the test checks)
     const t = await ended(pidFile, () => ({ run: execCommand(o, `"${process.execPath}" "${script}"`, dir, { write: () => undefined }) }))
     expect(t.result).toMatchObject({ timedOut: true })
     expect(t.sync).toEqual([])
     expect(t.ticks).toBeGreaterThan(5)
     expect(t.childGone).toBe(true)
-  }, 60_000)
+  }, timing('test.hang'))
 
   for (const how of ['timedOut', 'cancelled'] as const) {
     it(`the submodules step's git, ${how}: never spawnSync, its result once the tree has gone`, async () => {
@@ -116,6 +117,6 @@ describe.skipIf(!isWin)("a command's tree ended off main's thread (HI-3009)", ()
       } finally {
         x.close()
       }
-    }, 60_000)
+    }, timing('test.hang'))
   }
 })

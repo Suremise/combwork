@@ -14,6 +14,7 @@ import { platformLimits } from '../src/main/platform/limits'
 import { runJj } from '../src/main/platform/jjProcess'
 import testedVcs from '../resources/tested-vcs.json'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const dir = tempDir('jj-runner-')
 const fake = join(dir, 'fake-jj.cjs')
@@ -115,7 +116,7 @@ describe("jj's runner", () => {
     let ran = false
     const write = r.run(ws, ['new'], { write: true }).then((x) => ((ran = true), x))
     // Its admission asked for once its keys are read: then it waits behind the reader.
-    await expect.poll(() => jjFileGate.writing(keys.root), { timeout: 20_000 }).toBe(true)
+    await expect.poll(() => jjFileGate.writing(keys.root), { timeout: timing('wait.hang') }).toBe(true)
     expect([ran, existsSync(pid)]).toEqual([false, false])
     reader.release()
     expect((await write).ok).toBe(true)
@@ -138,8 +139,8 @@ describe("jj's runner", () => {
     const keys = (await workspaceGateKeys(ws))!
     const pid = join(tempDir('jj-runner-gate-'), 'pid')
     const ac = new AbortController()
-    const running = runner({ FAKE_JJ_MODE: 'hang', FAKE_JJ_PID: pid }).run(ws, ['new'], { write: true, signal: ac.signal, timeout: 60_000 })
-    await expect.poll(() => existsSync(pid), { timeout: 20_000 }).toBe(true)
+    const running = runner({ FAKE_JJ_MODE: 'hang', FAKE_JJ_PID: pid }).run(ws, ['new'], { write: true, signal: ac.signal, timeout: timing('spawn.hang') })
+    await expect.poll(() => existsSync(pid), { timeout: timing('wait.hang') }).toBe(true)
     const proc = Number(readFileSync(pid, 'utf8'))
     let readerIn = false
     const reader = jjFileGate.read([keys.root], async () => {
@@ -157,7 +158,7 @@ describe("jj's runner", () => {
     const ac2 = new AbortController()
     const queued = runner({ FAKE_JJ_PID: pid2 }).run(ws, ['new'], { write: true, signal: ac2.signal })
     // Its keys found and its admission asked for: queued behind the reader, then cancelled.
-    await expect.poll(() => jjFileGate.queued, { timeout: 20_000 }).toBe(1)
+    await expect.poll(() => jjFileGate.queued, { timeout: timing('wait.hang') }).toBe(1)
     ac2.abort()
     expect(await queued).toMatchObject({ notRun: 'cancelled' })
     expect(jjFileGate.queued).toBe(0)
@@ -174,18 +175,18 @@ describe("jj's runner", () => {
     const read = await runner({ FAKE_JJ_MODE: 'stdin' }).run(dir, ['x'], { input: 'abc' })
     expect(read).toMatchObject({ code: 3, out: 'read:abc' })
     // Nothing given: the end at once, so a prompt reads it rather than waiting.
-    expect(await runner({ FAKE_JJ_MODE: 'stdin' }).run(dir, ['x'], { timeout: 10_000 })).toMatchObject({ code: 3, out: 'read:' })
+    expect(await runner({ FAKE_JJ_MODE: 'stdin' }).run(dir, ['x'], { timeout: timing('spawn.hang') })).toMatchObject({ code: 3, out: 'read:' })
   })
 
   it('ends a command whose output passes the cap: not an answer', async () => {
-    const res = await runner({ FAKE_JJ_MODE: 'flood' }).run(dir, ['log'], { maxOutput: 100_000, timeout: 20_000 })
+    const res = await runner({ FAKE_JJ_MODE: 'flood' }).run(dir, ['log'], { maxOutput: 100_000, timeout: timing('spawn.hang') })
     expect(res).toMatchObject({ ok: false, code: -1, notRun: 'maxOutput' })
     expect(res.buf.length).toBeLessThanOrEqual(100_000)
   })
 
   it('ends a command past its time limit: not an answer, and the process is gone', async () => {
     const pid = join(tempDir('jj-runner-pid-'), 'pid')
-    const res = await runner({ FAKE_JJ_MODE: 'hang', FAKE_JJ_PID: pid }).run(dir, ['log'], { timeout: 500 })
+    const res = await runner({ FAKE_JJ_MODE: 'hang', FAKE_JJ_PID: pid }).run(dir, ['log'], { timeout: 500 }) // timing-ok: the timeout under test (its expiry is what the test checks)
     expect(res).toMatchObject({ ok: false, code: -1, notRun: 'timedOut', timedOut: true })
     expect(alive(Number(readFileSync(pid, 'utf8')))).toBe(false)
   })
@@ -208,8 +209,8 @@ describe("jj's runner", () => {
   it('cancels a command under way: the process is ended and the result says cancelled, never an answer', async () => {
     const pid = join(tempDir('jj-runner-pid-'), 'pid')
     const ac = new AbortController()
-    const running = runner({ FAKE_JJ_MODE: 'hang', FAKE_JJ_PID: pid }).run(dir, ['log'], { signal: ac.signal, timeout: 60_000 })
-    await expect.poll(() => existsSync(pid), { timeout: 20_000 }).toBe(true)
+    const running = runner({ FAKE_JJ_MODE: 'hang', FAKE_JJ_PID: pid }).run(dir, ['log'], { signal: ac.signal, timeout: timing('spawn.hang') })
+    await expect.poll(() => existsSync(pid), { timeout: timing('wait.hang') }).toBe(true)
     ac.abort()
     const res = await running
     expect(res).toMatchObject({ ok: false, code: -1, notRun: 'cancelled', cancelled: true })
@@ -237,10 +238,10 @@ describe("jj's runner", () => {
   it('says an executable that is gone is missing, not a failure of the repository', async () => {
     const r = createJjRunner({ exe: join(dir, 'no-such-jj.exe'), env: env(), here: true })
     expect(await r.readiness()).toEqual({ state: 'missing' })
-    const o = await runJj({ exe: join(dir, 'no-such-jj.exe'), cwd: dir, args: [], env: env(), maxOutput: 1000, timeout: 5000 })
+    const o = await runJj({ exe: join(dir, 'no-such-jj.exe'), cwd: dir, args: [], env: env(), maxOutput: 1000, timeout: timing('spawn.hang') })
     expect(o.end).toMatchObject({ notRun: 'missing' })
     // A working folder that isn't there is a failure, not jj missing.
-    const p = await runJj({ exe: process.execPath, cwd: join(dir, 'gone'), args: ['-e', ''], env: env(), maxOutput: 1000, timeout: 5000 })
+    const p = await runJj({ exe: process.execPath, cwd: join(dir, 'gone'), args: ['-e', ''], env: env(), maxOutput: 1000, timeout: timing('spawn.hang') })
     expect(p.end).toMatchObject({ notRun: 'failed' })
   })
 
@@ -267,7 +268,7 @@ describe("jj's runner", () => {
     const hung = createJjRunner({ exe: process.execPath, before: [fake], env: env({ FAKE_JJ_VERSION_HANG: '1' }), here: true, versionTimeout: 500 })
     expect(await hung.readiness()).toMatchObject({ state: 'unknown', error: 'jj --version took too long' })
     // Nor is anything run with it.
-    expect(await hung.run(dir, ['root'], { timeout: 2000 })).toMatchObject({ ok: false, code: -1 })
+    expect(await hung.run(dir, ['root'], { timeout: 2000 })).toMatchObject({ ok: false, code: -1 }) // timing-ok: the timeout under test (its expiry is what the test checks)
   })
 })
 
@@ -279,8 +280,8 @@ async function shutdownWhileChecking(make: (extra: Record<string, string>) => Re
   const probe = tempDir('jj-runner-barrier-')
   const [started, release, pid] = [join(probe, 'started'), join(probe, 'release'), join(probe, 'pid')]
   const r = make({ FAKE_JJ_VERSION_STARTED: started, FAKE_JJ_RELEASE: release, FAKE_JJ_PID: pid })
-  const running = r.run(dir, ['log'], { timeout: 60_000 })
-  await expect.poll(() => existsSync(started), { timeout: 20_000 }).toBe(true)
+  const running = r.run(dir, ['log'], { timeout: timing('spawn.hang') })
+  await expect.poll(() => existsSync(started), { timeout: timing('wait.hang') }).toBe(true)
   const checker = Number(readFileSync(started, 'utf8'))
   await r.shutdown(10_000)
   // By the time shutdown returns, the check's process is ended (it owned it) and the run has its answer.
@@ -336,7 +337,7 @@ describe("the store's gate for Git readers and prints (HI-2918, HR2's round 1)",
     let ran = false
     const git = storeGitGated(ws, ['rev-parse', 'HEAD'], async () => ((ran = true), { ok: true, out: '', err: '', buf: Buffer.alloc(0), code: 0 }))
     // Its key found and its admission asked for: queued behind the held store, and not run.
-    await expect.poll(() => jjFileGate.queued, { timeout: 10_000 }).toBe(1)
+    await expect.poll(() => jjFileGate.queued, { timeout: timing('wait.hang') }).toBe(1)
     expect(ran).toBe(false)
     held.release()
     expect((await git).ok).toBe(true)
@@ -356,7 +357,7 @@ describe("the store's gate for Git readers and prints (HI-2918, HR2's round 1)",
     const git = storeGitGated(s.top, ['--git-dir', s.worktree, 'rev-parse', 'HEAD'], async () => (ran.push('git'), { ok: true, out: '', err: '', buf: Buffer.alloc(0), code: 0 }))
     // The sync read gets nothing while the write holds its store; both async readers queued behind it, not run.
     expect(port.refSync(s.store)).toBeNull()
-    await expect.poll(() => jjFileGate.queued, { timeout: 10_000 }).toBe(2)
+    await expect.poll(() => jjFileGate.queued, { timeout: timing('wait.hang') }).toBe(2)
     expect(ran).toEqual([])
     held.release()
     expect(await contains).toBe(true)
@@ -384,7 +385,7 @@ describe("the store's gate for Git readers and prints (HI-2918, HR2's round 1)",
     const r = runner()
     const held = await jjFileGate.acquire([key], 'exclusive')
     const queued = r.print!(sources)
-    await expect.poll(() => jjFileGate.queued, { timeout: 10_000 }).toBe(1)
+    await expect.poll(() => jjFileGate.queued, { timeout: timing('wait.hang') }).toBe(1)
     await r.shutdown(1000)
     expect(await queued).toBeNull()
     expect(jjFileGate.queued).toBe(0)
@@ -403,7 +404,7 @@ describe("jj's worker thread", () => {
   const bundle = join(dir, 'jj-worker.cjs')
   beforeAll(async () => {
     await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'platform', 'jjWorker.ts')], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
-  }, 60_000)
+  }, timing('hook.hang'))
   const inWorker = (extra: Record<string, string> = {}) => createJjRunner({ exe: process.execPath, before: [fake], env: env(extra), worker: bundle })
 
   it('runs commands off main with the same answers, caps and time limits', async () => {
@@ -411,15 +412,15 @@ describe("jj's worker thread", () => {
     expect(await r.readiness()).toMatchObject({ state: 'ok', version: '0.47.1' })
     const res = await r.run(dir, ['log'])
     expect(JSON.parse(res.out).args).toEqual([...JJ_PREFIX, ...JJ_READ, 'log'])
-    expect(await inWorker({ FAKE_JJ_MODE: 'flood' }).run(dir, ['log'], { maxOutput: 50_000, timeout: 20_000 })).toMatchObject({ code: -1, notRun: 'maxOutput' })
-    expect(await inWorker({ FAKE_JJ_MODE: 'hang' }).run(dir, ['log'], { timeout: 500 })).toMatchObject({ code: -1, timedOut: true })
+    expect(await inWorker({ FAKE_JJ_MODE: 'flood' }).run(dir, ['log'], { maxOutput: 50_000, timeout: timing('spawn.hang') })).toMatchObject({ code: -1, notRun: 'maxOutput' })
+    expect(await inWorker({ FAKE_JJ_MODE: 'hang' }).run(dir, ['log'], { timeout: 500 })).toMatchObject({ code: -1, timedOut: true }) // timing-ok: the timeout under test (its expiry is what the test checks)
   })
 
   it('cancels a command under way in the worker: the process is ended', async () => {
     const pid = join(tempDir('jj-runner-pid-'), 'pid')
     const ac = new AbortController()
-    const running = inWorker({ FAKE_JJ_MODE: 'hang', FAKE_JJ_PID: pid }).run(dir, ['log'], { signal: ac.signal, timeout: 60_000 })
-    await expect.poll(() => existsSync(pid), { timeout: 20_000 }).toBe(true)
+    const running = inWorker({ FAKE_JJ_MODE: 'hang', FAKE_JJ_PID: pid }).run(dir, ['log'], { signal: ac.signal, timeout: timing('spawn.hang') })
+    await expect.poll(() => existsSync(pid), { timeout: timing('wait.hang') }).toBe(true)
     ac.abort()
     expect(await running).toMatchObject({ code: -1, cancelled: true })
     expect(alive(Number(readFileSync(pid, 'utf8')))).toBe(false)
@@ -431,8 +432,8 @@ describe("jj's worker thread", () => {
     const probe = tempDir('jj-worker-shutdown-')
     const [pid, child] = [join(probe, 'pid'), join(probe, 'child')]
     const r = inWorker({ FAKE_JJ_MODE: 'tree', FAKE_JJ_PID: pid, FAKE_JJ_CHILD: child })
-    const running = r.run(dir, ['log'], { timeout: 60_000 })
-    await expect.poll(() => existsSync(pid) && existsSync(child), { timeout: 20_000 }).toBe(true)
+    const running = r.run(dir, ['log'], { timeout: timing('spawn.hang') })
+    await expect.poll(() => existsSync(pid) && existsSync(child), { timeout: timing('wait.hang') }).toBe(true)
     await r.shutdown(15_000)
     expect(await running).toMatchObject({ code: -1, cancelled: true })
     expect(alive(Number(readFileSync(pid, 'utf8')))).toBe(false)
@@ -448,8 +449,8 @@ describe("jj's teardown and shutdown", () => {
     const bystander = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', windowsHide: true })
     try {
       const ac = new AbortController()
-      const running = runner({ FAKE_JJ_MODE: 'tree', FAKE_JJ_PID: pid, FAKE_JJ_CHILD: child }).run(dir, ['log'], { signal: ac.signal, timeout: 60_000 })
-      await expect.poll(() => existsSync(pid) && existsSync(child), { timeout: 20_000 }).toBe(true)
+      const running = runner({ FAKE_JJ_MODE: 'tree', FAKE_JJ_PID: pid, FAKE_JJ_CHILD: child }).run(dir, ['log'], { signal: ac.signal, timeout: timing('spawn.hang') })
+      await expect.poll(() => existsSync(pid) && existsSync(child), { timeout: timing('wait.hang') }).toBe(true)
       ac.abort()
       // It settles after the teardown: by then jj and what it started are gone.
       expect(await running).toMatchObject({ code: -1, cancelled: true })
@@ -466,11 +467,11 @@ describe("jj's teardown and shutdown", () => {
     const probe = tempDir('jj-runner-shutdown-')
     const [pid, child] = [join(probe, 'pid'), join(probe, 'child')]
     const r = runner({ FAKE_JJ_MODE: 'tree', FAKE_JJ_PID: pid, FAKE_JJ_CHILD: child })
-    const running = r.run(dir, ['log'], { timeout: 60_000 })
-    await expect.poll(() => existsSync(pid) && existsSync(child), { timeout: 20_000 }).toBe(true)
+    const running = r.run(dir, ['log'], { timeout: timing('spawn.hang') })
+    await expect.poll(() => existsSync(pid) && existsSync(child), { timeout: timing('wait.hang') }).toBe(true)
     const t0 = Date.now()
     await r.shutdown(15_000)
-    expect(Date.now() - t0).toBeLessThan(15_000)
+    expect(Date.now() - t0).toBeLessThan(15_000) // timing-ok: the shutdown's own grace, given above: it must end before it
     expect(await running).toMatchObject({ code: -1, cancelled: true })
     expect(alive(Number(readFileSync(pid, 'utf8')))).toBe(false)
     expect(alive(Number(readFileSync(child, 'utf8')))).toBe(false)

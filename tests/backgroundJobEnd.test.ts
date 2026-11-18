@@ -5,6 +5,7 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { timing } from './timing.cjs'
 
 const { runningJobsIn } = await import('../src/main/providers/claude/adapter')
 const { completeProcessList } = await import('../src/main/processTree')
@@ -108,7 +109,7 @@ describe('a real PowerShell listing that reports an error part way is no answer 
       { pid: 4, parent: 0, started: 1000 },
       { pid: 5, parent: 0, started: 1001 }
     ])
-  }, 60_000)
+  }, timing('test.hang'))
 })
 
 describe("a process listing is an answer only when complete (HR1's round 1)", () => {

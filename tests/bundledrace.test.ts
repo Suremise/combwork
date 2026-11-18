@@ -9,6 +9,7 @@ import { join } from 'path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const hooks: { onCopy: null | (() => void | Promise<void>); afterRename: null | ((from: string, to: string) => boolean | Promise<boolean>); failRename: null | ((from: string, to: string) => boolean) } = { onCopy: null, afterRename: null, failRename: null }
 vi.mock('fs/promises', async (original) => {
@@ -230,7 +231,7 @@ describe('a skill changed while Combwork updates it', () => {
     expect(t.from('skills', 'handover')).toBe(oldSkill)
     expect(leftovers(join(t.ws, '.combwork', 'skills'))).toEqual([])
     await wsMod.disposeWorkspaceService(t.w)
-  }, 30_000)
+  }, timing('test.hang'))
 
   it('an untouched old copy still updates, as before', async () => {
     const t = await older()

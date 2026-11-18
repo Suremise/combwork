@@ -11,6 +11,7 @@ import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 import { as09, removeCard, writeCard, writeCardOutside } from './boardDb'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-cards-step-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -264,7 +265,7 @@ describe('the cards step (#1209)', () => {
   })
 
   const golden = process.env.CW_BOARD_GOLDEN_DB
-  it.skipIf(!golden)("a live board's copy: every reader gives the same bytes after the upgrade", { timeout: 600_000 }, async () => {
+  it.skipIf(!golden)("a live board's copy: every reader gives the same bytes after the upgrade", { timeout: timing('test.hangRealJj') }, async () => {
     const ws = workspace()
     const file = store.boardFile(ws)
     mkdirSync(join(ws, '.combwork'), { recursive: true })

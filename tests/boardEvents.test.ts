@@ -11,6 +11,7 @@ import type { CombworkEvent, LiveSessionState } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { writeCardOutside } from './boardDb'
 import { DatabaseSync } from 'node:sqlite'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-board-events-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -45,7 +46,7 @@ const { checkpointHooks } = await import('../src/main/walCheckpointWorker')
 const { fileLockDepth } = await import('../src/main/fsutil')
 
 /** Bounds a hung run; the tests wait for what they expect, never for a time. */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 const user = { kind: 'user' } as const
 
 describe('coalesced (#1011)', () => {
@@ -167,7 +168,7 @@ describe('board events (#1011)', () => {
     const cards = await doneCards(3)
     const before = await Promise.all(cards.map((n) => run(() => tasks.getTask(n))))
     // As a full disk or an I/O error would: SQLite rolls the whole transaction back on the middle card's write.
-    const outside = new DatabaseSync(boardFile(wsPath), { timeout: 5000 })
+    const outside = new DatabaseSync(boardFile(wsPath), { timeout: timing('db.busyMs') })
     outside.exec(`CREATE TRIGGER undo_test BEFORE UPDATE ON cards WHEN old.number = ${cards[1]} BEGIN SELECT RAISE(ROLLBACK, 'disk I/O error (test)'); END`)
     // The trigger is another connection's commit, which the board's poll tells (#1017): wait for that, so it isn't taken for the batches'.
     await vi.waitFor(() => expect(seen).toHaveLength(1), { timeout: HUNG_MS })

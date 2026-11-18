@@ -7,13 +7,14 @@ import { writeFileSync, appendFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 type Lost = { attempt: number; lost: string[] }
 const { typeLine } = createRequire(import.meta.url)('./e2e/lib.cjs') as {
   typeLine: (inv: (ch: string, key: string, data: string) => Promise<unknown>, key: string, home: string, agent: string, text: string, o: Record<string, unknown>) => Promise<Lost>
 }
 /** A hung run's bound: never reached by a working one (the waits below end on their conditions). */
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 
 /** A fake agent's terminal: what is typed is logged (fake-input.jsonl), and a line ending in Enter is taken. */
 function terminal() {

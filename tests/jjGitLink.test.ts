@@ -10,8 +10,9 @@ import { JJ_REFUSED } from '../src/main/platform/jjWorkspacePort'
 import { asideOf, asReceipt, receiptOf, residuesOf } from '../src/main/platform/jjGitLink'
 import type { JjPortDeps } from '../src/main/platform/jjWorkspacePort'
 import { harness, jjExe } from './jjWorkspaceHarness'
+import { timing } from './timing.cjs'
 
-const REAL_JJ_MS = 180_000
+const REAL_JJ_MS = timing('wait.hangReal')
 
 const idOf = (p: string): string => {
   const s = statSync(p, { bigint: true })

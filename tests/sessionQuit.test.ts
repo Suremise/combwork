@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { claudeInput, type ClaudeInput } from './claudeInputStandIn'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const writes: { key: string; data: string }[] = []
 const kills: string[] = []
@@ -69,7 +70,7 @@ describe("a lane's builder ended by its CLI's own exit", () => {
     expect(a.typed().endsWith('\r')).toBe(true)
     expect(a.l.stopRequested).toBe(true)
     expect(kills).toEqual([])
-    await vi.waitFor(() => expect(kills).toEqual([a.key]), { timeout: 10_000 })
+    await vi.waitFor(() => expect(kills).toEqual([a.key]), { timeout: timing('wait.hang') })
   })
 
   it("types Codex's /quit", async () => {

@@ -7,8 +7,9 @@ import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { powershellEnv } from './powershellEnv'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
-const HUNG_MS = 30_000
+const HUNG_MS = timing('wait.hang')
 /** The executable the script looks for, as legacyUpgrade.ps1 names the new install's. */
 const EXE = 'Combwork.exe'
 const SCRIPT = join(__dirname, '..', 'build', 'askToClose.ps1')

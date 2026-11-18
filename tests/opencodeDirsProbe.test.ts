@@ -2,6 +2,7 @@ import { createRequire } from 'module'
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error: plain .mjs modules without types
 import { suiteOutcome } from './e2e/runner.mjs'
+import { timing } from './timing.cjs'
 
 // opencodereal-dirs.cjs's record reading and its end (HI-2772, HR1's round 1): the real suite's two ways of saying what a
 // model run proved, checked without a model.
@@ -19,7 +20,7 @@ const probe = require('./e2e/opencodeDirsProbe.cjs') as {
 }
 
 // A bound for a hung poll (under the test's own timeout, so a wrong predicate fails on its assertion), never how long it takes.
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 /** lib.until's contract (a value, or null at the bound), polling each turn of the event loop rather than sleeping. */
 async function until<T>(fn: () => T, ms: number): Promise<T | null> {
   const end = Date.now() + ms

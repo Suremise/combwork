@@ -11,6 +11,7 @@ import { tempDir } from './tempDir'
 import type { Contradiction, WorkflowOptions } from '../src/shared/workflow/options'
 import type { PlatformId } from '../src/shared/platform/descriptors'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-wfoptions-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -44,7 +45,7 @@ const { MERGE_CHOICE_KEY } = await import('../src/shared/workflow/facts')
 /** A Git project's own options as a pre-1.0 build's preset left them: Pair whole, G19 Combwork's. */
 
 /** The bound for a hung run: a start's facts are recorded within it. */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 const { settingEntry, checkSettingValue, settingPatch } = await import('../src/shared/settingsCatalog')
 const settingsTools = await import('../src/main/settingsTools')
 const { withGuardsWorker } = await import('./guardsWorker')

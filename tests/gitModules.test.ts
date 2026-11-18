@@ -16,6 +16,7 @@ import { clearSubmoduleCheckouts, composeConfigEnv, forgetGitLfsVersion, gitFile
 import { gitFilesExec } from '../src/main/platform/gitModulesRun'
 import { gitIntegration } from '../src/main/platform/gitIntegration'
 import type { CandidateHost } from '../src/main/platform/integration'
+import { timing } from './timing.cjs'
 
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
@@ -31,7 +32,7 @@ const FILE_OK = { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'protocol.file.allow'
  * trace2; most are git-lfs's own, every `git lfs` call running about 15 git commands), 60–190 ms each on a busy PC: 13–20 s
  * alone, and past vitest's 20 s under a full run's load. A bound for a hung run, sized to that work.
  */
-const REAL_GIT_MS = 60_000
+const REAL_GIT_MS = timing('wait.hang')
 
 const lfsInstalled = (() => {
   try {
@@ -83,7 +84,7 @@ function worktree(project: string, at = 'HEAD'): string {
 /** The run's exec, with the test's environment and the file protocol allowed through GIT_CONFIG_COUNT (composed after Combwork's). */
 function exec(o: { log?: string[]; extraEnv?: Record<string, string>; deny?: (args: string[]) => boolean; seen?: { cwd: string; args: string[]; env?: Record<string, string> }[] } = {}): GitFilesExec & { close(): void } {
   const lines = o.log ?? []
-  const x = gitFilesExec({ spawn, env: { ...ENV, ...FILE_OK, ...o.extraEnv }, log: { write: (c) => lines.push(c.toString('utf8')) }, timeoutMs: 120_000 })
+  const x = gitFilesExec({ spawn, env: { ...ENV, ...FILE_OK, ...o.extraEnv }, log: { write: (c) => lines.push(c.toString('utf8')) }, timeoutMs: timing('spawn.hang') })
   return {
     ...x,
     git: async (cwd, args, opt) => {
@@ -560,7 +561,7 @@ function host(project: string, folder: string, skip: boolean): CandidateHost {
     skipSmudge: async () => skip,
     run: async (cwd, args, opts) => {
       try {
-        const out = execFileSync('git', args, { cwd, env: { ...opts?.env, ...ENV }, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
+        const out = execFileSync('git', args, { cwd, env: { ...opts?.env, ...ENV }, encoding: 'utf8', timeout: timing('spawn.hang'), stdio: ['ignore', 'pipe', 'pipe'] })
         return { ok: true, code: 0, out, err: '' }
       } catch (e) {
         const x = e as { status?: number; stdout?: Buffer | string; stderr?: Buffer | string }

@@ -4,6 +4,7 @@ import { HOOK_FIELDS, HOOK_MADE_FIELDS, makeEvent, sessionSourceId, type Console
 import { DevConsole } from '../src/main/devConsole'
 import { redact, type RedactContext } from '../src/shared/redact'
 import { compareContract, diagnosticRecording, DIAGNOSTIC_BYTES, DIAGNOSTIC_LINES, newestRecordingsFirst, parseRecording, readingOf, recordingName, recordingToFixture, shapeOf, type ConsoleFixture, type RecordingHeader } from '../src/shared/consoleFixtures.mts'
+import { timing } from './timing.cjs'
 
 // Developer console recordings as files (#638): a recording written as the recorder writes it (header, events as a
 // subscription delivers them, end) stays redacted unless it opted in to text; fixtures are made only from redacted
@@ -11,7 +12,7 @@ import { compareContract, diagnosticRecording, DIAGNOSTIC_BYTES, DIAGNOSTIC_LINE
 // Paths are only compared, never touched.
 const alpha = join('C:\\', 'work', 'alpha')
 const A1 = sessionSourceId(alpha, 'a1')
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 const PRIVATE = 'privatecustomer'
 
 const header = (text = false): RecordingHeader => ({

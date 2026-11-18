@@ -22,6 +22,7 @@ import { operationFacts, viewEntries, type OpPreviewInput, type ViewEntries } fr
 import { previewTask, type OpFence } from '../src/main/platform/jjPreviewTask'
 import { isJjViewUnknown, type JjOperationPreview } from '../src/shared/jjViews'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const require = createRequire(import.meta.url)
 const { portableJj } = require('./jjPortable.cjs') as { portableJj: () => string | null }
@@ -41,7 +42,7 @@ function isolated(): NodeJS.ProcessEnv {
 describe.skipIf(!exe)('jj operations: the revert preview on the real jj (HI-2800)', () => {
   const env = isolated()
   const runner = createJjRunner({ exe: exe!, env })
-  const jj = (cwd: string, ...args: string[]): string => execFileSync(exe!, args, { cwd, env, windowsHide: true, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
+  const jj = (cwd: string, ...args: string[]): string => execFileSync(exe!, args, { cwd, env, windowsHide: true, encoding: 'utf8', timeout: timing('spawn.hang'), stdio: ['ignore', 'pipe', 'pipe'] })
   const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, env, windowsHide: true, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 
   /** A colocated repository: base, then main's commit with a bookmark main, and @ an empty child. */
@@ -440,5 +441,5 @@ describe.skipIf(!exe)('jj operations: the revert preview on the real jj (HI-2800
     if (isJjViewUnknown(over)) throw new Error(JSON.stringify(over))
     expect(over.refused).toBe('bounds')
     expect(over.command).toBeNull()
-  }, 300_000)
+  }, timing('test.hangReal'))
 })

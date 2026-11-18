@@ -12,6 +12,7 @@ import { buildSync } from 'esbuild'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { helperLaunch, JobHost } from '../src/main/processSupervisor'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
@@ -20,7 +21,7 @@ type Identity = { pid: number; started: number }
 const { identify, stillSame, endExactly } = req('./e2e/folderProcesses.cjs') as { identify: (pids: number[]) => Identity[]; stillSame: (ids: Identity[]) => number[]; endExactly: (targets: Identity[]) => number }
 
 /** A hung run's bound: every step here waits for a condition, never for time. */
-const HUNG_MS = 30_000
+const HUNG_MS = timing('wait.hang')
 const dir = tempDir('cw-keeper-killed-')
 let bundle = ''
 const started: ChildProcess[] = []
@@ -80,7 +81,7 @@ app.on('window-all-closed', () => undefined)
     // Its pipe closed while the helper (outside the parent's job) still runs.
     await waitFor(() => expect(closed, 'the test’s pipe to the Combwork still open: the helper holds it').toBe(true))
     expect(stillSame(helper)).toEqual([pid])
-  }, 60_000)
+  }, timing('test.hang'))
 
   it('outlives its Combwork’s main process ended from outside: "live" with the launch’s process, then "ended" once it ends', async () => {
     const keepDir = join(dir, 'keeper')
@@ -117,7 +118,7 @@ app.on('window-all-closed', () => undefined)
     await exited(member)
     await waitFor(() => expect(receipt()).toMatchObject({ state: 'ended', helper: ready.self, total: 0 }))
     await waitFor(() => expect(stillSame(helper)).toEqual([]))
-  }, 60_000)
+  }, timing('test.hang'))
 
   /** A launcher started as Combwork starts it, on a script of the test's own: the launcher and its helper's identity. */
   async function launched(script: string): Promise<{ launcher: ChildProcessWithoutNullStreams; helper: Identity[]; out: () => string }> {
@@ -163,7 +164,7 @@ app.on('window-all-closed', () => undefined)
     expect(await host.request('list', 'stuck-run')).toBeNull()
     expect(await code(proc!)).toBe(1)
     expect(stillSame(helper)).toEqual([])
-  }, 60_000)
+  }, timing('test.hang'))
 
   it('its launcher told to end it after it has exited by itself ends nothing more, and its control pipe’s end ends nothing', async () => {
     // Exits with 7 at its input's end.
@@ -187,5 +188,5 @@ app.on('window-all-closed', () => undefined)
     } finally {
       clearInterval(telling)
     }
-  }, 60_000)
+  }, timing('test.hang'))
 })

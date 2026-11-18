@@ -11,6 +11,7 @@ import { assertTestHome, freshenHome, freshenedLine, homeUsers, HomeNotReady, MA
 import { classify, UNCLASSIFIED } from './e2e/testHomeManifest.mjs'
 // @ts-expect-error: plain .mjs module without types
 import { acquireTestHome, consumerHooks, holderLiveFor, holderOf, homesOf, leasesEnv, LEASES_VAR, MAX_CONSUMERS, noteConsumers } from './e2e/testHomeLock.mjs'
+import { timing } from './timing.cjs'
 
 // The CLI test homes start each run fresh, keeping only the sign-in (HI-2606, design s17 with the user's answers): fake
 // homes with known bytes, the CLIs' sign-in status scripted, nothing real read or signed in.
@@ -340,7 +341,7 @@ describe('HR1 on s29: consumers noted before use, kept until a reset proves them
   }
   const waitFor = async (fn: () => boolean): Promise<void> => {
     const until = Date.now() + 20000
-    while (!fn() && Date.now() < until) await new Promise((r) => setTimeout(r, 50))
+    while (!fn() && Date.now() < until) await new Promise((r) => setTimeout(r, timing('wait.interval')))
   }
 
   it('a suite that left a CLI behind keeps the home from being reset after its lease is let go, until that CLI ends', async () => {
@@ -389,7 +390,7 @@ describe('HR1 on s29: consumers noted before use, kept until a reset proves them
     } finally {
       second.release()
     }
-  }, 60000)
+  }, timing('test.hang'))
 
   it('a runner that ended without letting go leaves its holder as a consumer; a CLI naming the registered suite folder counts, whatever its parent chain', async () => {
     const p = lockPool()
@@ -411,7 +412,7 @@ describe('HR1 on s29: consumers noted before use, kept until a reset proves them
       cli.kill()
       next.release()
     }
-  }, 60000)
+  }, timing('test.hang'))
 
   it("an old run's token isn't reused while another acquisition holds the same home, nor one whose holder pid was reused", async () => {
     const p = lockPool()

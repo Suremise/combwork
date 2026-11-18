@@ -5,6 +5,7 @@ import { existsSync, readdirSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 // @ts-expect-error: plain .mjs modules without types
 import { withLock } from './e2e/lanes.mjs'
 
@@ -46,9 +47,9 @@ describe("the e2e runners' claims lock (HI-1800)", () => {
   it('fails, with the cause, when its folder is refused for longer than the lock is ever held', async () => {
     const dir = tempDir('cw-lanes-lock-')
     Object.assign(refuse, { refusals: Number.MAX_SAFE_INTEGER, code: 'EPERM' })
-    // The bound is the lock's (4 × 10 s): its clock moved on rather than waited for.
+    // The bound is the lock's (4 × runner.lockStaleMs): its clock moved past it rather than waited for.
     const start = Date.now()
-    const now = vi.spyOn(Date, 'now').mockImplementation(() => start + (refuse.tried > 1 ? 50_000 : 0))
+    const now = vi.spyOn(Date, 'now').mockImplementation(() => start + (refuse.tried > 1 ? 4 * timing('runner.lockStaleMs') + 1 : 0))
     try {
       await expect(withLock(dir, async () => 'held')).rejects.toMatchObject({ code: 'EPERM' })
     } finally {

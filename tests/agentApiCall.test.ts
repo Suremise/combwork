@@ -5,8 +5,9 @@ import { createServer, type IncomingMessage, type Server } from 'http'
 import type { AddressInfo } from 'net'
 import { afterEach, describe, expect, it } from 'vitest'
 import { agentApiCall } from '../src/main/mcp/agentApiCall'
+import { timing } from './timing.cjs'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 let server: Server | null = null
 afterEach(async () => {

@@ -18,6 +18,7 @@ import * as G from '../src/main/platform/git'
 import { treeOf, windowsProbe, type Listed } from '../src/main/workflow/queueProcs'
 import { B1, commit, gitRepo, moved, R1, setup, sh, type Env } from './workflow/harness'
 import { preset } from '../src/shared/workflow/options'
+import { timing } from './timing.cjs'
 
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
@@ -45,7 +46,7 @@ afterEach(async () => {
     const list = await windowsProbe.list()
     expect(list, 'the process list is readable after ending fixture processes').not.toBeNull()
     expect(owned.filter((p) => list!.some((x) => x.pid === p.pid && x.started === p.started)), 'all recorded fixture processes have exited').toEqual([])
-  }, { timeout: 30_000, interval: 100 })
+  }, { timeout: timing('wait.hang'), interval: 100 })
 })
 
 /** Counts the git commands started on the worker from here on. */
@@ -56,7 +57,7 @@ function countWorker(): void {
 
 /** The live hook and its launch's tree, kept to be ended even if the test fails before awaiting them. */
 async function identifyHook(file: string, since: number): Promise<Listed> {
-  await vi.waitFor(() => expect(existsSync(file)).toBe(true), { timeout: 30_000, interval: 100 })
+  await vi.waitFor(() => expect(existsSync(file)).toBe(true), { timeout: timing('wait.hang'), interval: 100 })
   const pid = Number(readFileSync(file, 'utf8'))
   const list = (await windowsProbe.list())!
   const p = list.find((x) => x.pid === pid)
@@ -76,13 +77,13 @@ async function identifyHook(file: string, since: number): Promise<Listed> {
 
 /** The process its pid file names has ended (it may have ended before it could be identified). */
 async function goneByFile(file: string): Promise<void> {
-  await vi.waitFor(() => expect(existsSync(file)).toBe(true), { timeout: 30_000, interval: 100 })
+  await vi.waitFor(() => expect(existsSync(file)).toBe(true), { timeout: timing('wait.hang'), interval: 100 })
   const pid = Number(readFileSync(file, 'utf8'))
-  await vi.waitFor(async () => expect((await windowsProbe.list())!.some((p) => p.pid === pid)).toBe(false), { timeout: 30_000, interval: 200 })
+  await vi.waitFor(async () => expect((await windowsProbe.list())!.some((p) => p.pid === pid)).toBe(false), { timeout: timing('wait.hang'), interval: 200 })
 }
 
 const running = (p: Listed): Promise<boolean | null> => windowsProbe.alive(p.pid, p.started)
-const ends = (p: Listed): Promise<void> => vi.waitFor(async () => expect(await running(p)).toBe(false), { timeout: 30_000, interval: 200 })
+const ends = (p: Listed): Promise<void> => vi.waitFor(async () => expect(await running(p)).toBe(false), { timeout: timing('wait.hang'), interval: 200 })
 
 /** An outcome a stub route gives: its stdout, and an exit (null: 0). */
 const said = (out: string, error: GitOutcome['error'] = null): GitOutcome => ({ stdout: Buffer.from(out), stderr: Buffer.alloc(0), error, cwdExists: true })
@@ -139,7 +140,7 @@ describe("git()'s route (HI-2078)", () => {
     const via = async (x: Partial<HostResult>, opts = {}) => withGitRoute(async () => outcomeOf(r(x), dir), () => git(dir, ['status'], undefined, undefined, opts))
     expect(await via({ signal: 'SIGTERM' })).toMatchObject({ ok: false, code: -1, notRun: 'SIGTERM' })
     expect(await via({ bounded: 'maxBuffer' })).toMatchObject({ ok: false, code: -1, notRun: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' })
-    expect(await via({ bounded: 'timeout' }, { timeout: 1000 })).toMatchObject({ ok: false, code: -1, notRun: 'SIGTERM', timedOut: true })
+    expect(await via({ bounded: 'timeout' }, { timeout: 1000 })).toMatchObject({ ok: false, code: -1, notRun: 'SIGTERM', timedOut: true }) // timing-ok: the timeout under test (its expiry is what the test checks)
     expect(await via({ lost: 'it ended' })).toMatchObject({ ok: false, code: -1, notRun: 'hostLost' })
     expect(await via({ code: 1, err: 'no', errBuf: Buffer.from('no') })).toMatchObject({ ok: false, code: 1, err: 'no' })
     const exited = await via({ code: 0, out: 'é', outBuf: Buffer.from([0xc3, 0xa9, 0x00, 0xff]) })
@@ -147,7 +148,7 @@ describe("git()'s route (HI-2078)", () => {
   })
 })
 
-describe("the host's bounds, as execFile's (HI-2078)", { timeout: 60_000 }, () => {
+describe("the host's bounds, as execFile's (HI-2078)", { timeout: timing('test.hang') }, () => {
   /** A host of the test's own (in no job), told to go. */
   const own = (): { host: GitHost; child: ReturnType<typeof startGitHost>['child'] } => {
     const { child } = startGitHost(baseEnv())
@@ -181,7 +182,7 @@ describe("the host's bounds, as execFile's (HI-2078)", { timeout: 60_000 }, () =
     const { host, child } = own()
     try {
       const dir = tempDir('bound-')
-      const r = await host.request({ command: process.execPath, args: ['-e', `require('fs').writeFileSync(${JSON.stringify(join(dir, 'pid'))}, String(process.pid)); setInterval(() => {}, 1000)`], cwd: dir, env: baseEnv(), timeout: 2000 })
+      const r = await host.request({ command: process.execPath, args: ['-e', `require('fs').writeFileSync(${JSON.stringify(join(dir, 'pid'))}, String(process.pid)); setInterval(() => {}, 1000)`], cwd: dir, env: baseEnv(), timeout: 2000 }) // timing-ok: the timeout under test (its expiry is what the test checks)
       expect(r).toMatchObject({ code: null, bounded: 'timeout' })
       await goneByFile(join(dir, 'pid'))
     } finally {
@@ -247,7 +248,7 @@ function unobservedHook(signal: AbortSignal): { args: string[]; pidFile: string;
 /** What a result says, for comparing two (its bytes as bytes). */
 const shape = (r: GitResult) => ({ ok: r.ok, code: r.code, out: r.out, err: r.err, buf: r.buf.toString('hex'), missing: r.missing, notRun: r.notRun, timedOut: r.timedOut })
 
-describe('git() through the runner, against the worker (HI-2078)', { timeout: 120_000 }, () => {
+describe('git() through the runner, against the worker (HI-2078)', { timeout: timing('test.hang') }, () => {
   it('the same answers: binary output, an exit 1, input, a missing folder, git missing (noted), git running again (noted), a bound', async () => {
     const w = world()
     const runner = await acquire(w)
@@ -344,12 +345,12 @@ describe('git() through the runner, against the worker (HI-2078)', { timeout: 12
       try {
         // HI-3021: the worker's bound ends git's whole tree before it answers, the hook with it.
         const plainHook = unobservedHook(signal)
-        const plainRead = git(w.project, plainHook.args, undefined, undefined, { timeout: 3000 })
+        const plainRead = git(w.project, plainHook.args, undefined, undefined, { timeout: 3000 }) // timing-ok: the timeout under test (its expiry is what the test checks)
         reading.push(plainRead)
         const plain = await plainRead
         await goneByFile(plainHook.pidFile)
         const hook = blockingHook(signal)
-        const hostedRead = withGitRoute((m) => runner.gitOutcome(m), () => git(w.project, hook.args, undefined, undefined, { timeout: 3000 }))
+        const hostedRead = withGitRoute((m) => runner.gitOutcome(m), () => git(w.project, hook.args, undefined, undefined, { timeout: 3000 })) // timing-ok: the timeout under test (its expiry is what the test checks)
         reading.push(hostedRead)
         if (delayedEnumeration) {
           const list = windowsProbe.list
@@ -411,7 +412,7 @@ describe('git() through the runner, against the worker (HI-2078)', { timeout: 12
             return [first, await git(w.project, ['rev-parse', 'HEAD'])] as const
           }
         )
-        await vi.waitFor(() => expect(firstDone).toBe(true), { timeout: 30_000, interval: 50 })
+        await vi.waitFor(() => expect(firstDone).toBe(true), { timeout: timing('wait.hang'), interval: 50 })
         if (how === 'released') await runner.release()
         else {
           const now = w.store.queueLease('main')!
@@ -431,7 +432,7 @@ describe('git() through the runner, against the worker (HI-2078)', { timeout: 12
     })
 })
 
-describe('a whole drain routed (HI-2078)', { timeout: 180_000 }, () => {
+describe('a whole drain routed (HI-2078)', { timeout: timing('test.hangReal') }, () => {
   it("both cards merged, every git the queue's work ran in the lease's host, none on the worker", async () => {
     const e = (env = setup({ ...preset('git', 'team', { quick: [], tests: [] }), preChecks: [], mergeChecks: [], okBefore: { mode: 'never', labels: [] } }))
     for (const [title, file] of [['A', 'a.txt'], ['B', 'b.txt']]) {

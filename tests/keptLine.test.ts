@@ -10,8 +10,9 @@ import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
-vi.setConfig({ testTimeout: 120_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 const base = tempDir('cw-kept-line-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')

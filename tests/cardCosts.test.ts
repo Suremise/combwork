@@ -11,7 +11,7 @@ import { DEFAULT_SETTINGS } from '../src/shared/defaults'
 import type { SessionUsage, TaskCard, TaskHistoryEntry } from '../src/shared/types'
 
 const T0 = Date.parse('2026-10-12T10:00:00.000Z')
-const MINUTE_MS = 60_000
+const MINUTE_MS = 60_000 // timing-ok: data, not a wait
 const iso = (minutes: number): string => new Date(T0 + minutes * MINUTE_MS).toISOString()
 const h = (minutes: number, by: string, what: string): TaskHistoryEntry => ({ at: iso(minutes), by, what })
 

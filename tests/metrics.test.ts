@@ -12,6 +12,7 @@ import * as electron from 'electron'
 import { LATENCY_BOUNDS_MS, percentile, utf8Bytes, type MetricsPart } from '../src/shared/metrics'
 import { tempDir } from './tempDir'
 import { metricsSaved, putMetrics } from './storeDocs'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-metrics-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -705,7 +706,7 @@ describe('cost', () => {
     expect(perCallUs).toBeLessThan(50)
     expect(size).toBeLessThanOrEqual(metrics.METRICS_LIMITS.storeBytes)
     await disposeWorkspaceService(w)
-  }, 60_000)
+  }, timing('test.hang'))
 })
 
 describe('approved labels', () => {
@@ -848,7 +849,7 @@ describe('round 4: bounded loss owners, unreadable copied headers', () => {
       Object.assign(metrics.METRICS_LIMITS, saved)
       await disposeWorkspaceService(w)
     }
-  }, 60_000)
+  }, timing('test.hang'))
 
   it("a copied SKILL.md whose header can't be read (invalid YAML, a key twice, an unknown audience) is unmeasured", async () => {
     const { deliveredSkillSizes } = await import('../src/main/sessions')

@@ -14,6 +14,7 @@ import { journalBuildDetail, journalSummary } from '../src/renderer/src/componen
 import { JOURNAL_BUILDS } from '../src/shared/advanced'
 // @ts-expect-error: a plain .mjs module without types
 import * as script from '../scripts/buildFact.mjs'
+import { timing } from './timing.cjs'
 
 // A marker's read held until the test lets it go (#1534 round 1, finding 1: a workspace switch while a pickup reads).
 const held: { gate: Promise<void> | null; reached: boolean } = { gate: null, reached: false }
@@ -38,9 +39,9 @@ const service = await import('../src/main/journalService')
 const builds = await import('../src/main/buildFacts')
 const { advanced } = await import('../src/main/advanced')
 
-vi.setConfig({ testTimeout: 30_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 // The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 
 const fact = { kind: 'baseline', version: '1.0.0-rc.1', commit: '1fef5341a2b3c4d5e6f708192a3b4c5d6e7f8091', branch: '1.0.0', installer: 'D:\\Work\\demo\\dist\\Combwork-Setup-1.0.0-rc.1.exe', builtAt: '2026-10-24T11:00:00.000Z', by: 'dist' }
 

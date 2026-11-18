@@ -8,6 +8,7 @@ import type { WorkspaceConfig } from '../src/shared/types'
 import { settingChangeTexts, settingEntry, settingReadOnly } from '../src/shared/settingsCatalog'
 import { advanced } from '../src/main/advanced'
 import { AGENT_TEMP_FOLDER_ID, CARD_ATTACHMENT_FOLDERS_ID } from '../src/shared/advanced'
+import { timing } from './timing.cjs'
 
 const prices = settingEntry('codex.prices')!
 const mine = { 'gpt-7': { input: 1, cachedInput: 0.1, output: 5 } }
@@ -23,7 +24,7 @@ async function withPrices(own: Record<string, unknown>, removed: string[], fn: (
   }
 }
 /** Bounds a wait for a hung run (HI-3349): Vitest's default 1 s is a budget a loaded runner outlasts. */
-const HUNG_MS = 20_000
+const HUNG_MS = timing('wait.hang')
 
 describe("the settings tools on a provider's prices", () => {
   it('null puts back the shipped models removed from the table, and says so', async () => {

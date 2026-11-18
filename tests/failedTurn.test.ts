@@ -9,6 +9,7 @@ import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-failedturn-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -36,7 +37,7 @@ const s = sessions as unknown as {
 }
 let w: ReturnType<typeof createWorkspaceService>
 const run = <T>(fn: () => Promise<T> | T): Promise<T> => inWorkspace(w, async () => fn())
-const HANG = { timeout: 10_000 }
+const HANG = { timeout: timing('wait.hang') }
 
 // The recorded rollout: Codex's turn T ended on a dropped stream.
 const ROLLOUT = readFileSync(join(__dirname, 'fixtures', 'advanced', 'turn-failed-codex-0.164.0.jsonl'), 'utf8')

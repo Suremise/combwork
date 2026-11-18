@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import type { MoveOwner, PathDataCopy } from '../../src/shared/types'
 import { tempDir, tempRoot } from '../tempDir'
+import { timing } from '../timing.cjs'
 
 // #796, the `main` area's services, in the language Combwork shows while what agents read stays English: the Agent API's
 // notice titles (grouped finishes, plan usage, Combwork closing), before and after a language change; Repair's report of a
@@ -179,7 +180,7 @@ describe("Initialise Git Repository's reply", () => {
     else process.env.GIT_CONFIG_NOSYSTEM = saved.noSystem
   })
 
-  it('in the language shown: its steps joined by the language, the first capitalised', { timeout: 60_000 }, async () => {
+  it('in the language shown: its steps joined by the language, the first capitalised', { timeout: timing('test.hang') }, async () => {
     const base = tempDir('cw-i18n-gitinit-')
     const global = join(base, 'global.gitconfig')
     writeFileSync(global, '[user]\n\tname = Global Person\n\temail = global@example.com\n')

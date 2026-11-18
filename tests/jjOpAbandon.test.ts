@@ -18,6 +18,7 @@ import type { JjPortDeps } from '../src/main/platform/jjWorkspacePort'
 import { isUnknown } from '../src/main/platform/types'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const yes = { still: () => true }
 const quiet = async (): Promise<boolean> => true
@@ -60,7 +61,7 @@ async function abandoned(colocated: boolean, more: Partial<JjPortDeps> = {}, rec
   const before = user()
   const git: GitRun = async (cwd, args) => {
     try {
-      const buf = execFileSync('git', args, { cwd, env: h.env, windowsHide: true, timeout: 60_000, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
+      const buf = execFileSync('git', args, { cwd, env: h.env, windowsHide: true, timeout: timing('spawn.hang'), maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
       return { ok: true, out: buf.toString('utf8'), buf, err: '' }
     } catch (e) {
       const err = e as { stderr?: Buffer; stdout?: Buffer }
@@ -79,7 +80,7 @@ async function abandoned(colocated: boolean, more: Partial<JjPortDeps> = {}, rec
   return { h, repo, root, slot, id, before, user, recover, status, preserveRoot }
 }
 
-describe.skipIf(!jjExe)('jj slots after the user abandons old operations (HI-3099)', { timeout: 180_000 }, () => {
+describe.skipIf(!jjExe)('jj slots after the user abandons old operations (HI-3099)', { timeout: timing('test.hangReal') }, () => {
   it.each([true, false])('a slot reads stale; Recover… mends it, its edit kept; the control mended; the user’s folder untouched (colocated: %s)', async (colocated) => {
     const w = await abandoned(colocated)
     expect(await w.h.port.stale(w.slot)).toBe(true)

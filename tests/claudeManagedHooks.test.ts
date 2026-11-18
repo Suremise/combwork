@@ -9,6 +9,7 @@ import http from 'http'
 import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 // A child's environment from the run context's allowlist, never this shell's (tests/README.md, Isolation).
 const runContext = createRequire(import.meta.url)('./e2e/runContext.cjs') as { childEnv: (vars?: Record<string, string>) => NodeJS.ProcessEnv }
@@ -39,7 +40,7 @@ describe('the admin snippet (HI-2777)', () => {
       expect(h).toEqual({ type: 'http', url: URL47821, timeout: ev === 'PreToolUse' ? 10 : 5, headers: { Authorization: 'Bearer $CW_HOOK_TOKEN' }, allowedEnvVars: ['CW_HOOK_TOKEN'] })
     }
     expect(s.hooks.PreToolUse[0].matcher).toBe('*')
-    expect(s.hooks.SessionStart[0].hooks[0]).toMatchObject({ type: 'command', timeout: 5 })
+    expect(s.hooks.SessionStart[0].hooks[0]).toMatchObject({ type: 'command', timeout: 5 }) // timing-ok: data, not a wait
     expect(s.statusLine.command).toMatch(/^powershell\.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand [A-Za-z0-9+/=]+$/)
     // No port in the command hooks (they read CW_HOOK_URL), no token anywhere.
     expect(JSON.stringify(s.hooks.SessionStart)).not.toContain('4782')
@@ -197,7 +198,7 @@ describe("what would keep Combwork's hooks away, from recorded managed settings 
 })
 
 // The longest a shell run here takes: a bound for a hung one, never how long it should take.
-const CHILD_HUNG_MS = 20000
+const CHILD_HUNG_MS = timing('wait.hang')
 
 /** Runs `command` through `shell` with `input` on stdin, in the run context's environment plus `env`; bounded. */
 function run(shell: string, args: string[], input: string, env: Record<string, string>): Promise<{ code: number | null; out: string }> {
@@ -265,5 +266,5 @@ describe.runIf(process.platform === 'win32')("the snippet's command through Git 
     } finally {
       server.close()
     }
-  }, 30000)
+  }, timing('test.hang'))
 })

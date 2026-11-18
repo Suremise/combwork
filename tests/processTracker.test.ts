@@ -9,6 +9,7 @@ import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 // What the test started that is still running: stopped by its command line (it names the test's folder) and start,
 // never by a pid remembered from earlier, which Windows may have given another process since: under load that could
 // be a concurrent run's Vitest worker (#547: a likely cause of one exiting with code 1, not reproduced).
@@ -39,7 +40,7 @@ const alive = (pid: number): boolean => {
 }
 async function until(fn: () => boolean, ms: number): Promise<boolean> {
   const end = Date.now() + ms
-  while (Date.now() < end && !fn()) await new Promise((r) => setTimeout(r, 100))
+  while (Date.now() < end && !fn()) await new Promise((r) => setTimeout(r, timing('wait.interval')))
   return fn()
 }
 
@@ -71,7 +72,7 @@ describe.runIf(process.platform === 'win32')("when the process tracker fails", (
     mod = await import('../src/main/agentProcesses')
     const t = Date.now()
     expect(await mod.trackingReady()).toBe(false)
-    expect(Date.now() - t).toBeLessThan(10_000)
+    expect(Date.now() - t).toBeLessThan(timing('budget.promptEndMs'))
     expect(mod.trackingProblem()).toMatch(/didn't start within 3 s/)
     // From then on, launches aren't held for it: they start untracked at once.
     expect(await mod.trackingReady()).toBe(false)
@@ -79,7 +80,7 @@ describe.runIf(process.platform === 'win32')("when the process tracker fails", (
     mod.noteUntracked(mod.trackingProblem())
     expect(toasts).toHaveLength(1)
     expect(toasts[0].message).toMatch(/didn't start within 3 s/)
-  }, 30_000)
+  }, timing('test.hang'))
 
   it('has its helper gone once closing resolves, and starts no other after (#1020)', async () => {
     mod = await import('../src/main/agentProcesses')
@@ -94,7 +95,7 @@ describe.runIf(process.platform === 'win32')("when the process tracker fails", (
     expect(await mod.trackLaunch({ runId: 'closed2', projectPath: dir, agentId: 'a3', agentName: 'Closed' }, next.pid!)).toMatchObject({ tracked: false })
     expect(await mod.trackingReady()).toBe(false)
     expect(mod.trackerPid()).toBeNull()
-  }, 30_000)
+  }, timing('test.hang'))
 
   it('answers a request on its way when closing, at once, and its next look starts no helper (#1020)', async () => {
     // A helper that is ready but never answers: a request stays on its way for as long as the test needs, and its own
@@ -110,7 +111,7 @@ describe.runIf(process.platform === 'win32')("when the process tracker fails", (
     const helper = mod.trackerPid()!
     const pending = mod.trackLaunch({ runId: 'held1', projectPath: dir, agentId: 'a4', agentName: 'Held' }, next.pid!)
     // The helper has read it, and won't answer.
-    expect(await until(() => existsSync(heard) && readFileSync(heard, 'utf8').includes(' add held1 '), 10_000)).toBe(true)
+    expect(await until(() => existsSync(heard) && readFileSync(heard, 'utf8').includes(' add held1 '), timing('wait.hang'))).toBe(true)
     const closed = mod.closeProcessTracking()
     // Answered by the close (nothing else will within the test's limit): no answer, not tracked.
     expect(await pending).toMatchObject({ tracked: false })
@@ -120,26 +121,26 @@ describe.runIf(process.platform === 'win32')("when the process tracker fails", (
     expect(await mod.trackLaunch({ runId: 'held2', projectPath: dir, agentId: 'a4', agentName: 'Held' }, next.pid!)).toMatchObject({ tracked: false })
     expect(mod.trackerPid()).toBeNull()
     expect(readFileSync(heard, 'utf8')).not.toContain('held2')
-  }, 30_000)
+  }, timing('test.hang'))
 
   it('ends a helper not yet ready when closing, and the close waits for it', async () => {
     process.env.CW_TEST_PROCESS_TRACKER = 'silent'
     process.env.CW_TEST_TRACKER_WAIT_MS = '60000'
     mod = await import('../src/main/agentProcesses')
     const ready = mod.trackingReady()
-    expect(await until(() => mod!.trackerPid() !== null, 10_000)).toBe(true)
+    expect(await until(() => mod!.trackerPid() !== null, timing('wait.hang'))).toBe(true)
     const helper = mod.trackerPid()!
     // It never reads its input: ended rather than waited for, and whoever waited for it to start hears it won't.
     await mod.closeProcessTracking()
     expect(alive(helper)).toBe(false)
     expect(await ready).toBe(false)
-  }, 30_000)
+  }, timing('test.hang'))
 
   it('starts its helper early when warmed (#1155): the first launch finds it running, and quitting meanwhile ends it', async () => {
     mod = await import('../src/main/agentProcesses')
     expect(mod.trackerPid()).toBeNull()
     mod.warmProcessTracking()
-    expect(await until(() => mod!.trackerPid() !== null, 10_000)).toBe(true)
+    expect(await until(() => mod!.trackerPid() !== null, timing('wait.hang'))).toBe(true)
     const helper = mod.trackerPid()!
     expect(await mod.trackingReady()).toBe(true)
     const next = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 30000)'], { stdio: 'ignore', windowsHide: true })
@@ -158,14 +159,14 @@ describe.runIf(process.platform === 'win32')("when the process tracker fails", (
     process.env.CW_TEST_TRACKER_WAIT_MS = '60000'
     mod = await import('../src/main/agentProcesses')
     mod.warmProcessTracking()
-    expect(await until(() => mod!.trackerPid() !== null, 10_000)).toBe(true)
+    expect(await until(() => mod!.trackerPid() !== null, timing('wait.hang'))).toBe(true)
     const starting = mod.trackerPid()!
     await mod.closeProcessTracking()
     expect(alive(starting)).toBe(false)
     mod.warmProcessTracking()
     expect(mod.trackerPid()).toBeNull()
     expect(toasts).toEqual([])
-  }, 30_000)
+  }, timing('test.hang'))
 
   it('says nothing when a warmed helper that holds nothing dies, and the next launch starts another (#1155)', async () => {
     mod = await import('../src/main/agentProcesses')
@@ -173,7 +174,7 @@ describe.runIf(process.platform === 'win32')("when the process tracker fails", (
     expect(await mod.trackingReady()).toBe(true)
     const helper = mod.trackerPid()!
     process.kill(helper) // its handle is held (the module's helper, running): the pid can't be another's
-    expect(await until(() => mod!.trackerPid() === null, 10_000)).toBe(true)
+    expect(await until(() => mod!.trackerPid() === null, timing('wait.hang'))).toBe(true)
     expect(toasts).toEqual([])
     expect(mod.trackingLost()).toBeNull()
     const next = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 30000)'], { stdio: 'ignore', windowsHide: true })
@@ -181,7 +182,7 @@ describe.runIf(process.platform === 'win32')("when the process tracker fails", (
     expect(await mod.trackLaunch({ runId: 'warm2', projectPath: dir, agentId: 'a6', agentName: 'After' }, next.pid!)).toEqual({ tracked: true })
     expect(mod.trackerPid()).not.toBe(helper)
     expect(mod.trackingProblem()).toBeNull()
-  }, 30_000)
+  }, timing('test.hang'))
 
   it('says at once when a running helper dies, keeps it for Diagnostics, ends nothing, and keeps what was listed by identity', async () => {
     mod = await import('../src/main/agentProcesses')
@@ -193,14 +194,14 @@ describe.runIf(process.platform === 'win32')("when the process tracker fails", (
     expect(await mod.trackLaunch({ runId: 'lost1', projectPath: dir, agentId: 'a1', agentName: 'Website' }, proc.pid!)).toEqual({ tracked: true })
     proc.stdin!.write('go\n')
     await new Promise((r) => proc.once('exit', r))
-    expect(await until(() => existsSync(out), 10_000)).toBe(true)
+    expect(await until(() => existsSync(out), timing('wait.hang'))).toBe(true)
     const server = Number(readFileSync(out, 'utf8'))
     expect((await mod.launchEnded('lost1'))?.processes.map((p) => p.pid)).toEqual([server])
     expect(mod.trackingLost()).toBeNull()
 
     // The helper dies (as a crash would): what was listed stays listed, and kept, by pid and start time (#614).
     process.kill(mod.trackerPid()!) // its handle is held (the module's helper, running): the pid can't be another's
-    expect(await until(() => toasts.length === 1, 10_000)).toBe(true)
+    expect(await until(() => toasts.length === 1, timing('wait.hang'))).toBe(true)
     expect(toasts[0].message).toMatch(/process tracker stopped/)
     expect(toasts[0].message).not.toMatch(/listed as left running/)
     expect(mod.trackingLost()).toMatch(/process tracker stopped .*0 listed process\(es\) were no longer tracked/)
@@ -219,7 +220,7 @@ describe.runIf(process.platform === 'win32')("when the process tracker fails", (
     expect(mod.trackingLost()).toMatch(/process tracker stopped/)
     // The new helper ends exactly the server that was listed, by its identity.
     expect(await mod.settleLeftovers(dir, 'a1', 'end')).toBe(1)
-    expect(await until(() => !alive(server), 5000)).toBe(true)
+    expect(await until(() => !alive(server), timing('wait.hang'))).toBe(true)
     expect(mod.leftoversOf(dir, 'a1').processes).toHaveLength(0)
-  }, 60_000)
+  }, timing('test.hang'))
 })

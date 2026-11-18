@@ -8,6 +8,7 @@ import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-reviews-open-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -138,7 +139,7 @@ describe("a reviewer's mark a close left ends as the workspace opens again (#139
       try {
         await w.open(wsA)
         const lifeA = w.lifetime
-        await vi.waitFor(() => expect(held).toHaveBeenCalled(), { timeout: 20000 })
+        await vi.waitFor(() => expect(held).toHaveBeenCalled(), { timeout: timing('wait.hang') })
         setBeforeRepairForTests(null)
         tasks.setAmidRepairForTests(null)
         // Released once D is open in the window: the repair goes on with the window's workspace D's.

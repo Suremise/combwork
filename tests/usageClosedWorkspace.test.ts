@@ -10,6 +10,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { junction } from './pathAliases'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-usage-closed-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -57,7 +58,7 @@ describe('the usage history of a workspace that closed', () => {
       return paths
     })
     const importing = usageHistory.opened(w)
-    await vi.waitFor(() => expect(spy).toHaveBeenCalled(), { timeout: 20000 })
+    await vi.waitFor(() => expect(spy).toHaveBeenCalled(), { timeout: timing('wait.hang') })
     await w.open(wsB)
     expect(boardOpen(wsA)).toBe(false)
     g.release()
@@ -77,7 +78,7 @@ describe('the usage history of a workspace that closed', () => {
     try {
       // The import (nothing to import), its sweep and attribution, then the backups' housekeeping, held in compression.
       const importing = usageHistory.opened(w)
-      await vi.waitFor(() => expect(compress).toHaveBeenCalled(), { timeout: 20000 })
+      await vi.waitFor(() => expect(compress).toHaveBeenCalled(), { timeout: timing('wait.hang') })
       await w.open(wsB)
       g.release()
       await importing
@@ -109,13 +110,13 @@ describe('the usage history of a workspace that closed', () => {
     })
     try {
       const reading = usageHistory.read(host, transcript, '00000000-0000-4000-9000-000000000001', 'claude-code')
-      await vi.waitFor(() => expect(spy).toHaveBeenCalled(), { timeout: 20000 })
+      await vi.waitFor(() => expect(spy).toHaveBeenCalled(), { timeout: timing('wait.hang') })
       await w.open(wsB)
       g.release()
       await reading
       // Its saved state isn't looked for in the closed workspace's usage.db (or, sent before the close, the file is closed
       // again after): the folder can go.
-      await vi.waitFor(() => rmSync(join(wsD, '.combwork'), { recursive: true }), { timeout: 20000 })
+      await vi.waitFor(() => rmSync(join(wsD, '.combwork'), { recursive: true }), { timeout: timing('wait.hang') })
     } finally {
       spy.mockRestore()
       usageHistory['closeInProcess'] = closeAll
@@ -139,9 +140,9 @@ describe('the usage history of a workspace that closed', () => {
       () => 'read',
       (e: Error) => e.message
     )
-    await vi.waitFor(() => expect(boardOpen(wsE)).toBe(true), { timeout: 20000 })
+    await vi.waitFor(() => expect(boardOpen(wsE)).toBe(true), { timeout: timing('wait.hang') })
     const switching = w.open(wsB)
-    await vi.waitFor(() => expect(boardOpen(wsE)).toBe(false), { timeout: 20000 })
+    await vi.waitFor(() => expect(boardOpen(wsE)).toBe(false), { timeout: timing('wait.hang') })
     g.release()
     await lock
     await switching
@@ -165,7 +166,7 @@ describe('the usage history of a workspace that closed', () => {
     try {
       // Queued as the tick and a session's end queue it: from no window's request.
       const ingesting = usageHistory.ingest(host, id, { priority: 1, keepState: 'no' }).catch(() => null)
-      await vi.waitFor(() => expect(spy).toHaveBeenCalled(), { timeout: 20000 })
+      await vi.waitFor(() => expect(spy).toHaveBeenCalled(), { timeout: timing('wait.hang') })
       await w.open(wsB)
       expect(boardOpen(wsF)).toBe(false)
       g.release()
@@ -193,7 +194,7 @@ describe('the usage history of a workspace that closed', () => {
       await g.held
     }
     const closing = w.close()
-    await vi.waitFor(() => expect(boardOpen(wsG)).toBe(false), { timeout: 20000 })
+    await vi.waitFor(() => expect(boardOpen(wsG)).toBe(false), { timeout: timing('wait.hang') })
     expect(w.path).toBe(wsG)
     const reading = w.sessionsFile(host).then(
       () => 'read',

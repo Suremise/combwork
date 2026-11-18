@@ -10,6 +10,7 @@ import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 // What the test started that is still running: stopped by its command line (it names the test's folder) and start,
 // never by a pid remembered from earlier (#547).
 const { stopProcessesIn, identify, endExactly } = createRequire(import.meta.url)('./e2e/folderProcesses.cjs') as {
@@ -42,7 +43,7 @@ const alive = (pid: number): boolean => {
 }
 async function until(fn: () => boolean, ms: number): Promise<boolean> {
   const end = Date.now() + ms
-  while (Date.now() < end && !fn()) await new Promise((r) => setTimeout(r, 100))
+  while (Date.now() < end && !fn()) await new Promise((r) => setTimeout(r, timing('wait.interval')))
   return fn()
 }
 
@@ -69,7 +70,7 @@ describe.runIf(process.platform === 'win32')('what running agents had started, a
     expect(await mod.runningProcesses()).toEqual([])
     expect(await mod.trackLaunch({ runId: 'r1', projectPath: dir, agentId: 'a1', agentName: 'Website' }, proc.pid!)).toEqual({ tracked: true })
     proc.stdin!.write('go\n')
-    expect(await until(() => outs.every((o) => existsSync(o) && readFileSync(o, 'utf8').length > 0), 10_000)).toBe(true)
+    expect(await until(() => outs.every((o) => existsSync(o) && readFileSync(o, 'utf8').length > 0), timing('wait.hang'))).toBe(true)
     const [a, b] = outs.map((o) => Number(readFileSync(o, 'utf8')))
 
     const launches = await mod.runningProcesses()
@@ -100,16 +101,16 @@ describe.runIf(process.platform === 'win32')('what running agents had started, a
       const still = await mod.stillRunningOf([...listed, strangerRecord])
       expect(still?.map((p) => p.pid)).toEqual([a])
       expect(await mod.endProcessesExactly([...(still ?? []), strangerRecord])).toBe(true)
-      expect(await until(() => !alive(a), 5000)).toBe(true)
+      expect(await until(() => !alive(a), timing('wait.hang'))).toBe(true)
       expect(alive(stranger.pid!)).toBe(true)
       expect(await mod.stillRunningOf(listed)).toEqual([])
       // b stays listed as left running, to end there.
       expect(await mod.settleLeftovers(dir, 'a1', 'end')).toBe(1)
-      expect(await until(() => !alive(b), 5000)).toBe(true)
+      expect(await until(() => !alive(b), timing('wait.hang'))).toBe(true)
     } finally {
       await mod.closeProcessTracking()
     }
-  }, 60_000)
+  }, timing('test.hang'))
 
   // HI-2263: the tracker (its helper) lost while a launch runs. Its jobs go with it, so nothing can be listed any more,
   // but what the launch had started is still running: the marker keeps it, as last listed, until the launch ends.
@@ -124,7 +125,7 @@ describe.runIf(process.platform === 'win32')('what running agents had started, a
     try {
       expect(await mod.trackLaunch({ runId: 'r2', projectPath: dir, agentId: 'a2', agentName: 'Docs' }, proc.pid!)).toEqual({ tracked: true })
       proc.stdin!.write('go\n')
-      expect(await until(() => existsSync(out) && readFileSync(out, 'utf8').length > 0, 10_000)).toBe(true)
+      expect(await until(() => existsSync(out) && readFileSync(out, 'utf8').length > 0, timing('wait.hang'))).toBe(true)
       const server = Number(readFileSync(out, 'utf8'))
       const before = await mod.runningProcesses()
       expect(before.flatMap((l) => l.processes.map((p) => p.pid)).sort()).toEqual([proc.pid!, server].sort())
@@ -143,7 +144,7 @@ describe.runIf(process.platform === 'win32')('what running agents had started, a
     } finally {
       await mod.closeProcessTracking()
     }
-  }, 60_000)
+  }, timing('test.hang'))
 
   // HR1's round 1 on HI-2263: the tracker lost while an ended launch settles (its CLI exited; launchEnded waits a moment
   // before listing what it left). That launch isn't running any more: nothing of it is kept in the marker, then or after.
@@ -159,7 +160,7 @@ describe.runIf(process.platform === 'win32')('what running agents had started, a
     try {
       expect(await mod.trackLaunch({ runId: 'r3', projectPath: dir, agentId: 'a3', agentName: 'Site' }, proc.pid!)).toEqual({ tracked: true })
       proc.stdin!.write('go\n')
-      expect(await until(() => existsSync(out) && readFileSync(out, 'utf8').length > 0, 10_000)).toBe(true)
+      expect(await until(() => existsSync(out) && readFileSync(out, 'utf8').length > 0, timing('wait.hang'))).toBe(true)
       expect((await mod.runningProcesses()).map((l) => l.runId)).toEqual(['r3'])
 
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
@@ -178,5 +179,5 @@ describe.runIf(process.platform === 'win32')('what running agents had started, a
       vi.useRealTimers()
       await mod.closeProcessTracking()
     }
-  }, 60_000)
+  }, timing('test.hang'))
 })

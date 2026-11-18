@@ -14,6 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { junction } from './pathAliases'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-cardcleanup-')
 const trashDir = join(base, 'trash')
@@ -130,7 +131,7 @@ describe("cleaning up archived cards' attachments (HI-1842)", () => {
     expect(rows(w, archived.n)).toBe(0)
     expect(archived.paths.every((f) => !existsSync(f))).toBe(true)
     // The Recycle Bin's move ends after the commit, in the background (HI-3349): bounded for a hung run, not Vitest's 1 s.
-    await expect.poll(() => archived.paths.every((f) => trashed().some((t) => t.endsWith(f.split(/[\\/]/).pop()!))), { timeout: 20_000 }).toBe(true)
+    await expect.poll(() => archived.paths.every((f) => trashed().some((t) => t.endsWith(f.split(/[\\/]/).pop()!))), { timeout: timing('wait.hang') }).toBe(true)
     const after = await inWorkspace(w, () => tasks.getTask(archived.n))
     expect(after.archived).toBe(true)
     const said = after.comments.at(-1)!

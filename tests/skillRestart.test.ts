@@ -8,6 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-skill-restart-')
 process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
@@ -52,7 +53,7 @@ function refreshesRun(): { count: () => number; restore: () => void } {
 async function askedForRestart(): Promise<void> {
   const r = refreshesRun()
   try {
-    await vi.waitFor(() => expect(r.count()).toBeGreaterThan(0), { timeout: 15_000, interval: 50 })
+    await vi.waitFor(() => expect(r.count()).toBeGreaterThan(0), { timeout: timing('wait.hang'), interval: 50 })
     await w.refreshesSettled()
   } finally {
     r.restore()
@@ -69,7 +70,7 @@ async function removedSkill(name: string): Promise<void> {
   const r = refreshesRun()
   try {
     rmSync(join(skills, name), { recursive: true })
-    await vi.waitFor(() => expect(r.count()).toBeGreaterThan(0), { timeout: 15_000, interval: 50 })
+    await vi.waitFor(() => expect(r.count()).toBeGreaterThan(0), { timeout: timing('wait.hang'), interval: 50 })
     await w.refreshesSettled()
   } finally {
     r.restore()

@@ -11,6 +11,7 @@ import { preset } from '../src/shared/workflow/options'
 import { boardFile, workspaceDb } from '../src/main/boardStore'
 import { fileSlotConn, SlotPool, SlotStore, type OpHolder } from '../src/main/slots'
 import { cardUsesLease, laneOverIn } from '../src/main/slotCards'
+import { timing } from './timing.cjs'
 
 const closers: (() => void | Promise<void>)[] = []
 let env: Env | null = null
@@ -57,7 +58,7 @@ async function lanePool(cap = 1) {
   return { e, store, pool, leases, laneWith, startIn, endLane, releaseLane }
 }
 
-describe('a lane over with its card in flight (HI-3118)', { timeout: 120_000 }, () => {
+describe('a lane over with its card in flight (HI-3118)', { timeout: timing('test.hang') }, () => {
   it("its lease becomes the card's in place: the card keeps its slot and work, no other card gets it, and it submits", async () => {
     const { e, store, pool, laneWith, startIn, endLane, releaseLane } = await lanePool(1)
     const c1 = e.wf.createCard({ title: 'Lane card' })

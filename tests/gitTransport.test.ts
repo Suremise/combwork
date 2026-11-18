@@ -151,7 +151,7 @@ describe('the sealed fetch offers the project’s commits as haves (HI-2987)', (
     return { project, host, snapshot: d.snapshot, before: objects(project), theirs }
   }
 
-  it('someone else pushed one commit: only its objects arrive, not the branch’s history again; then nothing new, nothing', { timeout: 120_000 }, async () => {
+  it('someone else pushed one commit: only its objects arrive, not the branch’s history again; then nothing new, nothing', { timeout: timing('test.hang') }, async () => {
     const { project, host, snapshot, before, theirs } = await pushedOnce(0)
     expect(await fetchHeadOf(host, snapshot, 'refs/cw/queue/t-fetch')).toEqual({ head: theirs })
     // The new commit is three objects (commit, tree, blob); the branch's history is 360.
@@ -185,13 +185,13 @@ describe('the sealed fetch offers the project’s commits as haves (HI-2987)', (
     expect(given.filter(([k]) => k === 'push').map(([, t]) => t)).toEqual([1_111_000])
   })
 
-  it(`HI-3042: past ${HAVES_MAX} local branches sorting before the target, the target's own heads are still offered: only the new commit arrives`, { timeout: 120_000 }, async () => {
+  it(`HI-3042: past ${HAVES_MAX} local branches sorting before the target, the target's own heads are still offered: only the new commit arrives`, { timeout: timing('test.hang') }, async () => {
     const { project, host, snapshot, before, theirs } = await pushedOnce(HAVES_MAX + 4)
     expect(await fetchHeadOf(host, snapshot, 'refs/cw/queue/t-fetch')).toEqual({ head: theirs })
     expect(objects(project) - before).toBe(3)
   })
 
-  it(`HI-3042: past ${HAVES_MAX} local branches of their own tracking the target, the target's own heads come before them`, { timeout: 120_000 }, async () => {
+  it(`HI-3042: past ${HAVES_MAX} local branches of their own tracking the target, the target's own heads come before them`, { timeout: timing('test.hang') }, async () => {
     const { project, host, snapshot, before, theirs } = await pushedOnce(HAVES_MAX + 4, { tracking: true })
     expect(sh(project, 'rev-parse', '--symbolic-full-name', 'feature/0000@{upstream}')).toBe('refs/remotes/origin/main')
     expect(await fetchHeadOf(host, snapshot, 'refs/cw/queue/t-fetch')).toEqual({ head: theirs })

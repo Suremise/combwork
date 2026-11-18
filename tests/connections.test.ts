@@ -21,6 +21,7 @@ import { cliReadyOf, connectionCli, connectionOf, connectionSwitchDue, firstRead
 import type { Account, LiveSessionState } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-connections-')
 const home = join(base, 'claude-home')
@@ -52,12 +53,12 @@ const { listSkills, invalidateSkillCache, machineSkillCacheSize } = await import
 const { encodeProjectPath } = await import('../src/main/providers/claude/usage')
 
 // A bound for a hung test (HI-3349): a full unit run on a loaded machine took one 10.9 s of Vitest's 20 s default.
-vi.setConfig({ testTimeout: 60_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 const status = new Map<string, () => Promise<{ ok: true; loggedIn: boolean; email?: string; orgId?: string } | { ok: false; error: string }>>()
 const signedIn = (email: string) => async () => ({ ok: true as const, loggedIn: true, email, orgId: 'org-1' })
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 const outcome = (p: Promise<unknown>): Promise<string> => p.then(() => 'ok', (e: Error) => e.message)
 
 const wsPath = join(base, 'ws')

@@ -11,6 +11,7 @@ import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { COPIES_DIR, CopyPool, CopyStore } from '../src/main/copies'
 import { fileSlotConn, SlotPool, SlotStore, type OpHolder, type SlotRunEnd } from '../src/main/slots'
 import { commit, gitRepo, sh } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 /** How the port's listing fails while set: its null answer, or a throw. */
 const listing = vi.hoisted(() => ({ fails: null as 'null' | 'throw' | null, calls: 0 }))
@@ -95,7 +96,7 @@ async function lent(pool: SlotPool, card: number) {
   return r
 }
 
-describe("a slot whose worktree list can't be read is kept, not taken for gone (HI-2810)", { timeout: 90_000 }, () => {
+describe("a slot whose worktree list can't be read is kept, not taken for gone (HI-2810)", { timeout: timing('test.hang') }, () => {
   for (const fails of ['null', 'throw'] as const) {
     it(`a released slot's settle leaves it as it was, and the next look settles it (listing: ${fails})`, async () => {
       const w = world()

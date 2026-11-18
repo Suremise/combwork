@@ -3,9 +3,10 @@
 // resumes once the slot is free; a real failure still ends it, and it gives up after its bound. runSwitch with stand-ins.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { runSwitch, SlotHeld } from '../src/main/connectionSwitch'
+import { timing } from './timing.cjs'
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 
 function agent(waitMs?: number) {
   const looks = new Set<() => void>()

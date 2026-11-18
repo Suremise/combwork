@@ -34,11 +34,12 @@ import { FAILED_KEEP_MS, FAILED_MAX, KEEP_HOURS, KEEP_MB, KEEP_RUNS, finishRunDi
 import { createRequire } from 'module'
 import { ProgressStore } from '../src/main/progress'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 // A bound for a hung test (HI-3349): the typing cases retry on real timers, and a full unit run on a loaded machine took
 // one 13.3 s of Vitest's 20 s default. Those that state their own keep it.
-vi.setConfig({ testTimeout: 60_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 type Suite = { name: string; needs?: string[]; serial?: string; noCombwork?: string }
 type Area = { paths: string[]; suites: string[] }
@@ -1072,7 +1073,6 @@ describe("each run's own log folder (logs.mjs)", () => {
   })
 
   it("a --lang run's time limit grows with its languages; every other suite keeps the timing file's suite.limitMs (HI-2159, HI-3378)", async () => {
-    const { timing } = await import('./timing.cjs')
     const limit = timing('suite.limitMs')
     expect(suiteLimitMs('i18nshots', [])).toBe(limit)
     expect(suiteLimitMs('i18nshots', ['en-XA'])).toBe(limit)
@@ -1698,7 +1698,7 @@ describe("answering Claude Code's trust question (lib.acceptClaudeTrust, #188)",
     expect(notOnYes).toEqual([])
     // The replay was rebuilt: a later one isn't the earlier one with more after it (what offsets into it relied on).
     expect(replays.some((r, i) => i > 0 && !r.startsWith(replays[i - 1]))).toBe(true)
-  }, 30000)
+  }, timing('test.hang'))
 
   it("trustQuestion reads 2.1.326's recorded added-folder menu: no choice while it takes no keys, then No, then Yes", async () => {
     const { trustQuestion } = createRequire(import.meta.url)('./e2e/lib.cjs') as { trustQuestion: (screen: string) => { id: string; choice: string | null } | null }
@@ -1718,7 +1718,7 @@ describe("answering Claude Code's trust question (lib.acceptClaudeTrust, #188)",
       const s = session(screen)
       const { r, ms } = await s.run()
       expect(r, screen).toBe(false)
-      expect(ms, screen).toBeLessThan(1000)
+      expect(ms, screen).toBeLessThan(timing('budget.screenMs'))
       expect(s.writes).toEqual([])
     }
     const ready = session('Claude Code v2.1.290', 'ready')
@@ -1755,7 +1755,7 @@ describe("a restart's trust question (lib.acceptRelaunchTrust, #341)", () => {
 
   it('a restart that never spawns: not spawned, and nothing is read from or typed into the old terminal', async () => {
     const t = terminal()
-    expect(await acceptRelaunchTrust(t.inv, 'c:\\p', 'a1', () => false, { spawnMs: 300, timeoutMs: 2000 })).toEqual({ spawned: false, trusted: false })
+    expect(await acceptRelaunchTrust(t.inv, 'c:\\p', 'a1', () => false, { spawnMs: 300, timeoutMs: 2000 })).toEqual({ spawned: false, trusted: false }) // timing-ok: the timeout under test (its expiry is what the test checks)
     expect(t.calls).toEqual([])
     expect(t.writes).toEqual([])
   })
@@ -1763,7 +1763,7 @@ describe("a restart's trust question (lib.acceptRelaunchTrust, #341)", () => {
   it("once the new process is seen, its trust question is answered", async () => {
     const t = terminal()
     let polls = 0
-    expect(await acceptRelaunchTrust(t.inv, 'c:\\p', 'a1', () => ++polls > 2, { spawnMs: 5000, timeoutMs: 4000 })).toEqual({ spawned: true, trusted: true })
+    expect(await acceptRelaunchTrust(t.inv, 'c:\\p', 'a1', () => ++polls > 2, { spawnMs: 5000, timeoutMs: 4000 })).toEqual({ spawned: true, trusted: true }) // timing-ok: the timeout under test (its expiry is what the test checks)
     expect(t.writes).toEqual(['\x1b[B', '\r'])
   })
 })
@@ -2224,7 +2224,8 @@ describe('the shared Codex test home: changes to its config.toml under a lock (l
       // This runner holds the lock (mid-change: it has read the file and not yet written it back).
       mkdirSync(join(home, 'config.toml.lock'))
       const other = trustIn(home, 'C:/lane1/codex-ws/demo')
-      await new Promise((r) => setTimeout(r, 1500))
+      // A quiet window (no change to the file in it is the point): the other runner, waiting on the lock, shows nothing.
+      await new Promise((r) => setTimeout(r, timing('quiet.unitMs')))
       // The other runner is waiting: the file is as this one read it.
       expect(entries(home)).toEqual([])
       writeFileSync(join(home, 'config.toml'), `${readFileSync(join(home, 'config.toml'), 'utf8')}\n[projects.'C:/lane0/codex-ws/demo']\ntrust_level = "trusted"\n`)
@@ -2237,7 +2238,7 @@ describe('the shared Codex test home: changes to its config.toml under a lock (l
     } finally {
       rmSync(home, { recursive: true, force: true })
     }
-  }, 30_000)
+  }, timing('test.hang'))
 
   it('several runners at once: every folder trusted once', async () => {
     const home = tempDir('cw-codex-home-')
@@ -2252,7 +2253,7 @@ describe('the shared Codex test home: changes to its config.toml under a lock (l
     } finally {
       rmSync(home, { recursive: true, force: true })
     }
-  }, 30_000)
+  }, timing('test.hang'))
 
   it('breaks a lock left by a runner that crashed while holding it', () => {
     const home = tempDir('cw-codex-home-')
@@ -2299,7 +2300,7 @@ describe('the shared Codex test home: changes to its config.toml under a lock (l
       expect(existsSync(lock)).toBe(false)
       // A permission problem that doesn't pass still ends, at the timeout, naming its error.
       refusals = Array(10_000).fill('EPERM')
-      expect(() => withFileLock(file, () => ++ran, { timeoutMs: 200 })).toThrow(/is still held \(EPERM\)/)
+      expect(() => withFileLock(file, () => ++ran, { timeoutMs: 200 })).toThrow(/is still held \(EPERM\)/) // timing-ok: the timeout under test (its expiry is what the test checks)
       // Anything else is a failure at once (its parent folder missing, say).
       refusals = []
       expect(() => withFileLock(join(home, 'no', 'such', 'config.toml'), () => ++ran)).toThrow(/ENOENT/)
@@ -2322,7 +2323,7 @@ describe('the shared Codex test home: changes to its config.toml under a lock (l
       expect(Date.now() - t0).toBeGreaterThanOrEqual(3 * 20)
       tries = 0
       refusals = Array(100_000).fill('EPERM')
-      expect(() => withFileLock(file, () => ++ran, { timeoutMs: 200 })).toThrow(/is still held \(EPERM\)/)
+      expect(() => withFileLock(file, () => ++ran, { timeoutMs: 200 })).toThrow(/is still held \(EPERM\)/) // timing-ok: the timeout under test (its expiry is what the test checks)
       expect(tries).toBeGreaterThan(2)
       expect(tries).toBeLessThan(20)
       spyStat.mockRestore()
@@ -2877,17 +2878,17 @@ describe('the build lock: runners started together in one worktree build it once
     expect(buildStamp(a)).not.toBeNull()
     // Nothing left held.
     expect(readdirSync(locks)).toEqual([])
-  }, 30_000)
+  }, timing('test.hang'))
 
   it('a runner that only checks waits while another builds, so it never looks at half a build', async () => {
     const c = worktree('c')
     const building = runner(c, { ms: 2000 })
     const t0 = Date.now()
-    while (!readdirSync(locks).length && Date.now() - t0 < 10_000) await new Promise((r) => setTimeout(r, 20))
+    while (!readdirSync(locks).length && Date.now() - t0 < timing('wait.hang')) await new Promise((r) => setTimeout(r, timing('wait.interval')))
     const r = ensureBuild({ root: c, build: false, runBuild: () => undefined, lock: { dir: locks, pollMs: 50 } })
     expect(r).toMatchObject({ stale: false, waited: true })
     expect((await building).built).toBe(true)
-  }, 30_000)
+  }, timing('test.hang'))
 
   it('a failed build lets go of the lock (the next runner builds); a lock whose runner is gone is broken', async () => {
     const d = worktree('d')
@@ -2908,7 +2909,7 @@ describe('the build lock: runners started together in one worktree build it once
     expect(held.take()).toBe(false)
     held.release()
     expect(readdirSync(locks)).toEqual([])
-  }, 30_000)
+  }, timing('test.hang'))
 })
 
 describe('heavy runs: at most a few at once on the machine, the rest queue in order (slots.mjs, #204)', () => {
@@ -3106,7 +3107,7 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
     const seen: number[] = []
     const second = waitForSlot(dir2, { slots: 1, owner: 102, alive, now, ...offline, pollMs: 30, onWait: (r: { holders: { pid: number }[] }) => seen.push(r.holders[0].pid) })
     // At least two looks while the slot is held, however slow the machine is.
-    await vi.waitFor(() => expect(seen.length).toBeGreaterThan(1), { timeout: 10000 })
+    await vi.waitFor(() => expect(seen.length).toBeGreaterThan(1), { timeout: timing('wait.hang') })
     expect(new Set(seen)).toEqual(new Set([101]))
     first.release()
     const got = await second
@@ -3537,13 +3538,13 @@ describe("a suite's git waits out the Combwork under test's own (lib.git, #199)"
   it('a lock that stays is an error after the timeout; any other failure throws at once', () => {
     takeLock()
     try {
-      expect(() => git(repo, 'add -A', { timeoutMs: 300 })).toThrow(/index\.lock/)
+      expect(() => git(repo, 'add -A', { timeoutMs: 300 })).toThrow(/index\.lock/) // timing-ok: the timeout under test (its expiry is what the test checks)
     } finally {
       rmSync(lock, { force: true })
     }
     const t0 = Date.now()
     expect(() => git(repo, 'no-such-command')).toThrow(/not a git command/)
-    expect(Date.now() - t0).toBeLessThan(5000)
+    expect(Date.now() - t0).toBeLessThan(timing('budget.promptEndMs'))
   })
 
   it('the suites that write to a repository while their Combwork runs use it', () => {

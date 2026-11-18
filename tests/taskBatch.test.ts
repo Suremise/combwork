@@ -11,6 +11,7 @@ import * as electron from 'electron'
 import type { TaskCard } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-task-batch-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -47,7 +48,7 @@ async function open(path: string): Promise<WS> {
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 // Many cards are written, and tests wait on one another: under a full run's load, the default 5 s is too short.
-vi.setConfig({ testTimeout: 30_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 /** Sets the Assistant's control level for the test, as Settings → Assistant → Control does. */
 function setControl(level: 'look' | 'agents' | 'projects'): void {
@@ -390,7 +391,7 @@ describe("the Combwork Assistant's batch (through its change boundary)", () => {
     })
     try {
       const pending = run(() => assistantBatch(wsPath, token, [c.number], { agent: 'a1', labels: ['changed'] }, assistant))
-      await Promise.race([arrived, sleep(5000).then(() => Promise.reject(new Error('the lookup was never reached')))])
+      await Promise.race([arrived, sleep(timing('wait.hang')).then(() => Promise.reject(new Error('the lookup was never reached')))])
       await during()
       release()
       const [item] = await pending

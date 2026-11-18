@@ -6,9 +6,10 @@ import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 /** A bound for a hung run only: each wait polls for its condition (tests/README.md). */
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 
 const { openDb, transaction } = await import('../src/main/db')
 const wal = await import('../src/main/walCheckpoint')
@@ -298,7 +299,7 @@ describe("the WAL's first write after a checkpoint is the checkpointer's (HI-328
 
   it("HI-3362: another connection writing just after the restart's commit (the lock taken before the WAL is read) is still seen and checkpointed", () => {
     const db = open(wal.checkpointWhenIdle)
-    const other = new DatabaseSync(db.file, { timeout: 0 })
+    const other = new DatabaseSync(db.file, { timeout: 0 }) // timing-ok: no busy wait: a lock refused at once is what the test checks
     try {
       other.exec('PRAGMA wal_autocheckpoint = 0')
       write(db.writer, 5)
@@ -327,7 +328,7 @@ describe("the WAL's first write after a checkpoint is the checkpointer's (HI-328
 
   it("HI-3362: another connection's write committed between the restart's commit and its reading of the WAL is still seen and checkpointed", () => {
     const db = open(wal.checkpointWhenIdle)
-    const other = new DatabaseSync(db.file, { timeout: 0 })
+    const other = new DatabaseSync(db.file, { timeout: 0 }) // timing-ok: no busy wait: a lock refused at once is what the test checks
     try {
       other.exec('PRAGMA wal_autocheckpoint = 0')
       write(db.writer, 5)
@@ -353,7 +354,7 @@ describe("the WAL's first write after a checkpoint is the checkpointer's (HI-328
       // As the restart is dispatched (the checkpoint whole and answered), another connection (another process) commits.
       checkpointThreadHooks.beforeDispatch = (kind) => {
         if (kind !== 'restart') return
-        const other = new DatabaseSync(db.file, { timeout: 0 })
+        const other = new DatabaseSync(db.file, { timeout: 0 }) // timing-ok: no busy wait: a lock refused at once is what the test checks
         try {
           other.exec('PRAGMA wal_autocheckpoint = 0')
           other.exec('INSERT INTO t (doc) VALUES (zeroblob(6000))')
@@ -499,7 +500,7 @@ describe("the WAL's first write after a checkpoint is the checkpointer's (HI-328
   })
 
   it("a throw before the restart is answered (its worker can't be started: HR1's error path), with the lock or without: the gate opens, the lock and the warning's interval are let go, and the next write and restart go through", async () => {
-    const WARN_MS = 987_653
+    const WARN_MS = 987_653 // timing-ok: data, not a wait
     const warnMs = wal.closeLimits.warnMs
     wal.closeLimits.warnMs = WARN_MS
     const set = vi.spyOn(globalThis, 'setInterval')

@@ -22,6 +22,7 @@ import { windowsProbe, type Listed, type ProcessProbe } from '../src/main/workfl
 import { commit, gitRepo, moved, R1, B1, setup, sh, type Env } from './workflow/harness'
 import { preset } from '../src/shared/workflow/options'
 import { quoteArgMsvc } from '../src/main/platform/signerRules'
+import { timing } from './timing.cjs'
 
 // HI-3009: PowerShell started with spawnSync (endTree's blocking listing and ending), recorded; everything else as it is.
 const { psSync } = vi.hoisted(() => ({ psSync: [] as string[] }))
@@ -131,11 +132,11 @@ async function identify(pid: number): Promise<Listed> {
 const running = (p: Listed): Promise<boolean | null> => windowsProbe.alive(p.pid, p.started)
 
 /** Waits until a process has ended (bounded only against a hang). */
-const ends = (p: Listed): Promise<void> => vi.waitFor(async () => expect(await running(p)).toBe(false), { timeout: 30_000, interval: 200 })
+const ends = (p: Listed): Promise<void> => vi.waitFor(async () => expect(await running(p)).toBe(false), { timeout: timing('wait.hang'), interval: 200 })
 
 const forward = (p: string): string => p.replace(/\\/g, '/')
 
-describe('one runner per target across Combworks (#1360)', { timeout: 180_000 }, () => {
+describe('one runner per target across Combworks (#1360)', { timeout: timing('test.hangReal') }, () => {
   it("one runs, and the other doesn't while the first lives", async () => {
     const w = world()
     try {
@@ -243,7 +244,7 @@ describe('one runner per target across Combworks (#1360)', { timeout: 180_000 },
         const l = w.store.queueLease('main')
         return !!l && l.profile === 'Combwork-B' && w.store.queueProcs(l.lease).some((p) => p.what === 'job')
       }
-      await vi.waitFor(() => expect(bReady()).toBe(true), { timeout: 90_000, interval: 100 })
+      await vi.waitFor(() => expect(bReady()).toBe(true), { timeout: timing('wait.hangReal'), interval: 100 })
       b.proc.kill()
       await b.exited
       expect(await running(check)).toBe(true)
@@ -269,7 +270,7 @@ describe('one runner per target across Combworks (#1360)', { timeout: 180_000 },
       const r = (await a.ask('server')) as { check: number; detached: number }
       const server = await identify(r.detached)
       // The check has exited: its launcher's record goes, and the server runs on in the job.
-      await vi.waitFor(() => expect(w.store.queueProcs(got.lease).map((p) => p.what)).toEqual(['job']), { timeout: 30_000, interval: 100 })
+      await vi.waitFor(() => expect(w.store.queueProcs(got.lease).map((p) => p.what)).toEqual(['job']), { timeout: timing('wait.hang'), interval: 100 })
       expect(await running(server)).toBe(true)
       await a.ask('release')
       expect(await running(server)).toBe(false)
@@ -427,7 +428,7 @@ async function queued(e: Env): Promise<{ card: ReturnType<Env['wf']['createCard'
 
 const rootOf = (e: Env): string => join(`${e.home}.worktrees`, 'project')
 
-describe("a runner's fence (#1360)", { timeout: 120_000 }, () => {
+describe("a runner's fence (#1360)", { timeout: timing('test.hang') }, () => {
   it('a stale runner resuming after a takeover finds holds() false and writes nothing', async () => {
     const e = team()
     try {
@@ -541,7 +542,7 @@ describe("a runner's fence (#1360)", { timeout: 120_000 }, () => {
   })
 })
 
-describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () => {
+describe("a runner's processes and folders (#1360)", { timeout: timing('test.hang') }, () => {
   let w: World
   beforeAll(() => {
     w = world()
@@ -569,7 +570,7 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     }
     // Its launcher has gone, having run nothing.
     expect(launcher).toBeGreaterThan(0)
-    await vi.waitFor(async () => expect((await windowsProbe.list())!.some((p) => p.pid === launcher)).toBe(false), { timeout: 30_000, interval: 100 })
+    await vi.waitFor(async () => expect((await windowsProbe.list())!.some((p) => p.pid === launcher)).toBe(false), { timeout: timing('wait.hang'), interval: 100 })
     expect(existsSync(marker)).toBe(false)
     // Recorded, the same command runs.
     expect(await a.runner.run('check', process.execPath, write)).toMatchObject({ ok: true, code: 0 })
@@ -617,7 +618,7 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     const none = await a.runner.run('check', 'no-such-command-cw-1360', [])
     expect(none).toMatchObject({ ok: false, code: -1, notRun: 'ENOENT', err: expect.stringMatching(/ENOENT/) })
     expect(none.err).not.toMatch(/notStarted/)
-    await vi.waitFor(() => expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['job']), { timeout: 30_000, interval: 100 })
+    await vi.waitFor(() => expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['job']), { timeout: timing('wait.hang'), interval: 100 })
     await a.runner.release()
     expect(w.store.queueProcs(null, 'gone')).toEqual([])
   })
@@ -653,7 +654,7 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target: 'verbatim', root: w.root, profile: 'A' })) as { ok: true; runner: QueueRunner }
     try {
       // The signing check's shape: words quoted as git quotes them, and the program's path (with its space) as argv0.
-      const r = await a.runner.run('testMerge', msysEcho, [quoteArgMsvc("C:\\Users\\O'Brien{a,b}*~")], { argv0: quoteArgMsvc(msysEcho), windowsVerbatimArguments: true, timeoutMs: 30_000 })
+      const r = await a.runner.run('testMerge', msysEcho, [quoteArgMsvc("C:\\Users\\O'Brien{a,b}*~")], { argv0: quoteArgMsvc(msysEcho), windowsVerbatimArguments: true, timeoutMs: timing('spawn.hang') })
       expect(r).toMatchObject({ ok: true, code: 0 })
       expect(r.out.trim()).toBe("C:\\Users\\O'Brien{a,b}*~")
     } finally {
@@ -669,12 +670,12 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     try {
       const dir = tempDir('qr-key-')
       const key = join(dir, 'id_ed25519')
-      const keyMade = await a.runner.run('testMerge', sysKeygen, ['-q', '-t', 'ed25519', '-N', 'secret', '-C', 'test', '-f', key], { timeoutMs: 30_000, noConsole: true })
+      const keyMade = await a.runner.run('testMerge', sysKeygen, ['-q', '-t', 'ed25519', '-N', 'secret', '-C', 'test', '-f', key], { timeoutMs: timing('spawn.hang'), noConsole: true })
       expect(keyMade).toMatchObject({ ok: true, code: 0 })
       const payload = join(dir, 'payload')
       writeFileSync(payload, 'x\n')
       // Bounded well past the check's few seconds: a run that waited would end there, timed out.
-      const r = await a.runner.run('testMerge', sysKeygen, ['-Y', 'sign', '-n', 'git', '-f', key, payload], { env: { ...baseEnv(), SSH_ASKPASS_REQUIRE: 'never' }, timeoutMs: 30_000, noConsole: true })
+      const r = await a.runner.run('testMerge', sysKeygen, ['-Y', 'sign', '-n', 'git', '-f', key, payload], { env: { ...baseEnv(), SSH_ASKPASS_REQUIRE: 'never' }, timeoutMs: timing('spawn.hang'), noConsole: true })
       expect(r.timedOut).toBeUndefined()
       expect(r).toMatchObject({ ok: false })
       expect(r.err).toMatch(/passphrase/i)
@@ -704,7 +705,7 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
       const plain = await a.runner.run('testMerge', process.execPath, ['-e', `process.stderr.write('said'); process.exit(1)`])
       expect(plain).toMatchObject({ ok: false, code: 1, err: 'said' })
       expect(plain.signal).toBeUndefined()
-      await vi.waitFor(() => expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['job']), { timeout: 30_000, interval: 100 })
+      await vi.waitFor(() => expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['job']), { timeout: timing('wait.hang'), interval: 100 })
     } finally {
       await a.runner.release()
     }
@@ -727,7 +728,7 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     // However the test ends (a command that never says it runs too: the wait is bounded, so it fails into finally):
     // released (its job, the launcher and its command with it, ended), and the run settled.
     try {
-      await vi.waitFor(() => expect(ready).toBe(true), { timeout: 30_000, interval: 50 })
+      await vi.waitFor(() => expect(ready).toBe(true), { timeout: timing('wait.hang'), interval: 50 })
       launcher!.kill('SIGTERM')
       const r = await run
       expect(r).toMatchObject({ ok: false, code: -1, signal: 'SIGTERM', out: 'ready\n' })
@@ -755,7 +756,7 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     let result: RunResult | null = null
     const run = a.runner.run('testMerge', process.execPath, ['-e', ''], { timeoutMs }).then((r) => (result = r))
     try {
-      await vi.waitFor(() => expect(result).not.toBeNull(), { timeout: 30_000, interval: 100 })
+      await vi.waitFor(() => expect(result).not.toBeNull(), { timeout: timing('wait.hang'), interval: 100 })
       check(result!, { kill: fake.kill, destroyed: () => destroyed })
     } finally {
       await a.runner.release()
@@ -801,7 +802,7 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     const waiter = `require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setInterval(() => {}, 1000)`
     const parent = `const c = require('child_process').spawn(process.execPath, ['-e', ${JSON.stringify(waiter)}], { stdio: 'inherit' }); c.on('exit', () => process.exit(0))`
     psSync.length = 0
-    const r = await a.runner.run('testMerge', process.execPath, ['-e', parent], { timeoutMs: 5000 })
+    const r = await a.runner.run('testMerge', process.execPath, ['-e', parent], { timeoutMs: 5000 }) // timing-ok: the timeout under test (its expiry is what the test checks)
     expect(r).toMatchObject({ ok: false, timedOut: true })
     // HI-3009: ended off main's thread (treeEnding), never with endTree's blocking PowerShell; the result once it was over.
     expect(psSync).toEqual([])
@@ -813,7 +814,7 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
         return false
       }
     })()).toBe(false)
-    await vi.waitFor(async () => expect((await windowsProbe.list())!.some((p) => p.pid === pid)).toBe(false), { timeout: 30_000, interval: 100 })
+    await vi.waitFor(async () => expect((await windowsProbe.list())!.some((p) => p.pid === pid)).toBe(false), { timeout: timing('wait.hang'), interval: 100 })
     await a.runner.release()
   })
 
@@ -984,7 +985,7 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     const outside = await identify(k.pid!)
     expect(await a.runner.followForTests(k.pid!)).toBe(false)
     await ends(outside)
-    await vi.waitFor(() => expect(w.store.queuePause('nojournal')).toMatchObject({ reason: 'needsYou', pid: k.pid }), { timeout: 30_000, interval: 100 })
+    await vi.waitFor(() => expect(w.store.queuePause('nojournal')).toMatchObject({ reason: 'needsYou', pid: k.pid }), { timeout: timing('wait.hang'), interval: 100 })
     await a.runner.release()
   })
 

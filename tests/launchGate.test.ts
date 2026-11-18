@@ -10,6 +10,8 @@ import * as pty from '@lydell/node-pty'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { commandLineOf, launchGate, type GateWord } from '../src/main/launchGate'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
+import { waitOptions } from './waits'
 // What the test started that is still running: stopped by its command line (it names the test's folder) and start,
 // never by a pid remembered from earlier, which Windows may have given another process since: under load that could
 // be a concurrent run's Vitest worker (#547: a likely cause of one exiting with code 1, not reproduced).
@@ -84,9 +86,12 @@ if (process.argv[4] === '--stay') {
     const code = await new Promise<number>((resolve) => {
       spawnPty(`gate-${name}`, { file: process.execPath, args: [cli, ran, server, ...extra], cwd: dir, env, track, onData: (d) => (output += d), onExit: (c) => resolve(c) })
     })
-    await new Promise((r) => setTimeout(r, 300))
+    const ranAt = existsSync(ran) ? Number(readFileSync(ran, 'utf8')) : 0
+    // A CLI that ran started its server, which writes its own pid file, maybe after the CLI ended: wait for it. One
+    // that never ran started none.
+    if (ranAt) await vi.waitFor(() => expect(existsSync(server) && readFileSync(server, 'utf8') !== '').toBe(true), waitOptions())
     const serverPid = existsSync(server) ? Number(readFileSync(server, 'utf8')) : 0
-    return { code, output: plain(output), ranAt: existsSync(ran) ? Number(readFileSync(ran, 'utf8')) : 0, serverPid }
+    return { code, output: plain(output), ranAt, serverPid }
   }
 
   it('keeps in the job a server the CLI starts the moment it runs, with the job host cold', async () => {
@@ -96,13 +101,13 @@ if (process.argv[4] === '--stay') {
     expect(r.output).toContain('ARGS ["with space","say \\"hi\\"",""]')
     expect(r.serverPid > 0 && alive(r.serverPid)).toBe(true)
     expect((await launchEnded('gate1'))?.processes.map((p) => p.pid)).toContain(r.serverPid)
-  }, 60000)
+  }, timing('test.hang'))
 
   it('holds the CLI for as long as tracking takes, longer than any old timeout, and its server is still tracked', async () => {
     const { trackLaunch, launchEnded } = await import('../src/main/agentProcesses')
     let trackedAt = 0
     const r = await launch('slow', async (pid, cancelled) => {
-      await new Promise((res) => setTimeout(res, 17_000))
+      await new Promise((res) => setTimeout(res, 17_000)) // timing-ok: longer than the old 15 s launch timeout: the point of the test
       const t = await trackLaunch({ runId: 'gate2', projectPath: dir, agentId: 'g2', agentName: 'Slow' }, pid, cancelled)
       trackedAt = Date.now()
       return t.tracked ? { go: true } : { go: false, reason: t.reason }
@@ -110,7 +115,7 @@ if (process.argv[4] === '--stay') {
     expect(r.code).toBe(7)
     expect(trackedAt > 0 && r.ranAt >= trackedAt).toBe(true)
     expect((await launchEnded('gate2'))?.processes.map((p) => p.pid)).toContain(r.serverPid)
-  }, 90000)
+  }, timing('test.hang'))
 
   it("never runs the CLI when told not to, or when tracking fails, and its terminal says why", async () => {
     const refused = await launch('refused', async () => ({ go: false, reason: "its processes couldn't be tracked (test)" }))
@@ -121,7 +126,7 @@ if (process.argv[4] === '--stay') {
     const failed = await launch('failed', () => Promise.reject(new Error('the tracker broke')))
     expect(failed.ranAt).toBe(0)
     expect(failed.output.replace(/\s+/g, ' ')).toContain('the tracker broke')
-  }, 60000)
+  }, timing('test.hang'))
 
   it('ends a CLI that outlives its gate, rather than leaving it in the job (HI-1819)', async () => {
     const { trackLaunch, launchEnded } = await import('../src/main/agentProcesses')
@@ -146,7 +151,7 @@ if (process.argv[4] === '--stay') {
         onExit: () => resolve()
       })
     })
-    await vi.waitFor(() => expect(existsSync(cliPid) && Number(readFileSync(cliPid, 'utf8')) > 0).toBe(true), { timeout: 30_000, interval: 50 })
+    await vi.waitFor(() => expect(existsSync(cliPid) && Number(readFileSync(cliPid, 'utf8')) > 0).toBe(true), { timeout: timing('wait.hang'), interval: 50 })
     const pid = Number(readFileSync(cliPid, 'utf8'))
     expect(gate).toBeDefined()
     // Just the gate, not its tree: its CLI must outlive it.
@@ -158,7 +163,7 @@ if (process.argv[4] === '--stay') {
     // Its launch ends with nothing left: the CLI is ended, not listed to keep.
     expect(await launchEnded('gate5')).toBeNull()
     expect(alive(pid)).toBe(false)
-  }, 60000)
+  }, timing('test.hang'))
 
   it('ends a CLI started through a .cmd wrapper that outlives its gate, the wrapper and the CLI both (HI-1819)', async () => {
     const { trackLaunch, launchEnded } = await import('../src/main/agentProcesses')
@@ -184,7 +189,7 @@ if (process.argv[4] === '--stay') {
         onExit: () => resolve()
       })
     })
-    await vi.waitFor(() => expect(existsSync(cliPid) && Number(readFileSync(cliPid, 'utf8')) > 0).toBe(true), { timeout: 30_000, interval: 50 })
+    await vi.waitFor(() => expect(existsSync(cliPid) && Number(readFileSync(cliPid, 'utf8')) > 0).toBe(true), { timeout: timing('wait.hang'), interval: 50 })
     const pid = Number(readFileSync(cliPid, 'utf8'))
     expect(gate).toBeDefined()
     // Just the gate, not its tree: its CLI must outlive it.
@@ -195,7 +200,7 @@ if (process.argv[4] === '--stay') {
     expect(alive(pid)).toBe(true)
     expect(await launchEnded('gate6')).toBeNull()
     expect(alive(pid)).toBe(false)
-  }, 60000)
+  }, timing('test.hang'))
 
   it('never runs the CLI once its terminal is being killed, whatever word comes after (HI-1819)', async () => {
     const ran = join(dir, 'stopped-ran.txt')
@@ -211,7 +216,7 @@ if (process.argv[4] === '--stay') {
     expect(existsSync(ran)).toBe(false)
     expect(code).toBe(1)
     expect(plain(output).replace(/\s+/g, ' ')).toContain(`Error: Combwork didn't start ${program}: its terminal was closed before it started`)
-  }, 60000)
+  }, timing('test.hang'))
 
   it('never runs the CLI when the pipe closes without a word', async () => {
     const ran = join(dir, 'eof-ran.txt')
@@ -225,7 +230,7 @@ if (process.argv[4] === '--stay') {
     expect(existsSync(ran)).toBe(false)
     expect(code).toBe(1)
     expect(plain(output).replace(/\s+/g, ' ')).toContain(`Error: Combwork didn't start ${program}`)
-  }, 60000)
+  }, timing('test.hang'))
 
   it("doesn't track a process that has exited, and lets go of a launch stopped while it was being tracked", async () => {
     const { trackLaunch, launchEnded } = await import('../src/main/agentProcesses')
@@ -239,5 +244,5 @@ if (process.argv[4] === '--stay') {
     stopped.abort()
     expect(await pending).toEqual({ tracked: false, reason: 'it was stopped before it started' })
     expect(await launchEnded('gate4')).toBeNull()
-  }, 60000)
+  }, timing('test.hang'))
 })

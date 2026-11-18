@@ -11,6 +11,7 @@ import { join } from 'path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 vi.mock('../src/main/ptyHost', async (original) => ({ ...(await original<object>()), writePty: () => undefined }))
 
@@ -30,7 +31,7 @@ const { lanesNowIn } = await import('../src/main/watches')
 const { laneStatusText } = await import('../src/shared/lanes')
 
 /** The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take. */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 const user = { kind: 'user' } as const
 const wsPath = join(base, 'ws')
 const p = join(wsPath, 'alpha')

@@ -2,6 +2,7 @@
 // as states say (never after a settle time), told first in a note, fenced to that run and lease throughout, and ended
 // past an absolute deadline whatever it waits for. These drive the waiter with a test's own states and clock.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { timing } from './timing.cjs'
 
 vi.mock('../src/main/sessions', () => ({ sessions: { runNow: () => null, stop: () => undefined, runLive: () => true, liveStates: () => [], turnOpen: () => false, lineWaiting: () => false, liveFor: () => null } }))
 /** The project's deliveries being read (laneEndWaitsFor's one await): held until the test lets it go. */
@@ -39,7 +40,7 @@ function harness(over: Partial<Deps> = {}) {
 }
 
 // The longest a wait here waits: a bound for a hung run, never how long it should take.
-const HUNG = { timeout: 10_000 }
+const HUNG = { timeout: timing('wait.hang') }
 
 beforeEach(() => vi.useFakeTimers())
 afterEach(() => vi.useRealTimers())

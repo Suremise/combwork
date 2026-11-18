@@ -10,8 +10,9 @@ import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { powershellEnv } from './powershellEnv'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
-const HUNG_MS = 60_000
+const HUNG_MS = timing('wait.hang')
 const SCRIPT = join(__dirname, '..', 'build', 'legacyUpgrade.ps1')
 const root = join(process.env.SystemRoot ?? 'C:\\Windows')
 const ps = join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')

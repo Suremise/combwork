@@ -6,6 +6,7 @@
 // user's Try again), in the same run; another question it waits on keeps its reason.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { claudeInput, type ClaudeInput } from './claudeInputStandIn'
+import { timing } from './timing.cjs'
 
 const { writes, echo } = vi.hoisted(() => ({ writes: [] as string[], echo: { to: null as null | { write(d: string): void } } }))
 vi.mock('../src/main/ptyHost', async (original) => ({ ...((await original()) as object), writePty: (_key: string, data: string) => void (writes.push(data), echo.to?.write(data)) }))
@@ -107,7 +108,7 @@ describe('an input that takes no keys (HI-2191)', () => {
     for (let i = 0; i < 3; i++) await s.clearInput(slow, key, () => undefined)
     expect(slow.unanswered).toBe(0)
     expect(sessions.inputBlocked(project, id)).toBe(false)
-  }, 15_000)
+  }, timing('test.hang'))
 
   it("not at its prompt, waiting on another question: blocked, but that question's reason stays", async () => {
     shortWait()

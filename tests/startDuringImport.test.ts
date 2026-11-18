@@ -7,6 +7,7 @@ import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 /** The first session's transcript reads are held until `release()`. */
 const gate = vi.hoisted(() => {
@@ -43,7 +44,7 @@ const { providerService } = await import('../src/main/providerService')
 const { config } = await import('../src/main/config')
 
 // The longest a wait here waits: a bound for a hung run, never how long it should take.
-const HUNG_MS = 20_000
+const HUNG_MS = timing('wait.hang')
 const wsPath = join(base, 'ws')
 const p = join(wsPath, 'proj')
 let w: ReturnType<typeof createWorkspaceService>

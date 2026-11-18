@@ -7,6 +7,7 @@ import { laneStartDue } from '../src/shared/lanes'
 import type { LaneCard } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { follow } from './followDoorbell'
+import { timing } from './timing.cjs'
 
 /** The merge queue's returns as queueReturnOf finds them (HI-1721), by card: none unless a test sets one. */
 const { returns, resubmits } = vi.hoisted(() => ({ returns: new Map<number, { at: string; text: string; builder: string | null }>(), resubmits: new Map<number, string>() }))
@@ -112,7 +113,7 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
   // lands is kept for later (#560): so a check waits for the outcome, trying the waiting wakes as it polls, never reads
   // once after a try. Waiting gives up after 10 s, not vi.waitFor's 1 s, which four unit suites at once outran (#560):
   // the bound only says when one has hung.
-  const HANG = { timeout: 10_000 }
+  const HANG = { timeout: timing('wait.hang') }
   /** Waits until `count` lines in all were typed, trying the waiting wakes meanwhile. */
   const typedUntil = async (st: { typed: unknown[] }, count: number) =>
     vi.waitFor(async () => {

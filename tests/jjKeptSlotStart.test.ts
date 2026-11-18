@@ -16,6 +16,7 @@ import { TESTED_JJ } from '../src/shared/jjTool'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
 import { commit, gitRepo } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 if (!jjExe) console.warn(`jjKeptSlotStart.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
@@ -41,7 +42,7 @@ const { boardPrepStore, jjLineKey } = await import('../src/main/platform/jjSlotP
 const tasks = await import('../src/main/tasks')
 const { DEFAULT_PROJECT_CONFIG } = await import('../src/shared/defaults')
 
-const REAL_JJ_MS = 180_000
+const REAL_JJ_MS = timing('wait.hangReal')
 const cleanups: (() => Promise<void> | void)[] = []
 afterEach(async () => {
   for (const c of cleanups.splice(0).reverse()) await c()

@@ -10,6 +10,7 @@ import * as electron from 'electron'
 import { FILE_TIME_SLACK_MS, kindReads, Observer, observer, type ObserveEvent } from '../src/main/platform/observe'
 import { isUnknown } from '../src/main/platform/types'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 // A file's metadata as the write log reads it (HI-1767), changed for one path at a time: `fail` makes lstat and stat of
 // it reject with that code; `link` makes it a link: lstat reports the link's own times, stat its target's.
@@ -45,7 +46,7 @@ const { createWorkspaceService, disposeWorkspaceService } = await import('../src
 const { startObserving, stopObserving } = await import('../src/main/platform/watching')
 
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 const run = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
 

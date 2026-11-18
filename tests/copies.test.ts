@@ -18,6 +18,7 @@ import { fileSlotConn, folderWaiting, quiet, type OpHolder, type SlotRun, type S
 import { BoundedLog, execCommand, FILE_IO } from '../src/main/workflow/queueChecks'
 import { resolveRunLink, type RunLinkDeps } from '../src/main/workflow/runLink'
 import { commit, gitRepo, sh } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 // A quiet check held with its folder renamed aside (HI-1753): `go` set, the next rename aside waits for it after moving
 // the folder, `entered` called then. Every other rename passes straight through.
@@ -102,7 +103,7 @@ function world(o: { setup?: string; size?: number } = {}): World {
         }
         const logPath = join(logs, `${runs.length}.log`)
         const out = new BoundedLog(logPath, FILE_IO)
-        const e = await execCommand({ spawn: nodeSpawn, platform: process.platform, timeoutMs: 60_000, env: () => ({ ...baseEnv(), ...r.env }) }, r.command, r.folder, out)
+        const e = await execCommand({ spawn: nodeSpawn, platform: process.platform, timeoutMs: timing('spawn.hang'), env: () => ({ ...baseEnv(), ...r.env }) }, r.command, r.folder, out)
         out.close()
         const end: SlotRunEnd = { ok: !e.spawnError && !e.timedOut && e.exitCode === 0, exitCode: e.exitCode, logPath, settled: true }
         runs.push({ ...r, ...end })
@@ -159,7 +160,7 @@ async function leased(w: World, r: { kind?: 'review' | 'check'; card?: number; r
   return { lease: got.lease, folder: got.copy.folder, name: got.copy.name }
 }
 
-describe('copies: leasing at a revision (#1435)', { timeout: 60_000 }, () => {
+describe('copies: leasing at a revision (#1435)', { timeout: timing('test.hang') }, () => {
   it('leases a copy at the exact revision (detached, in the fixed copies folder), and returns it through the barrier', async () => {
     const w = world()
     const r1 = head(w.project)
@@ -283,7 +284,7 @@ describe('copies: leasing at a revision (#1435)', { timeout: 60_000 }, () => {
   })
 })
 
-describe('copies: the quiescence barrier (#1435)', { timeout: 60_000 }, () => {
+describe('copies: the quiescence barrier (#1435)', { timeout: timing('test.hang') }, () => {
   it('holds a returned copy back for each condition in turn, in order, and frees it once none holds', async () => {
     const w = world({ size: 1 })
     const l = await leased(w, { kind: 'review', agent: 'R1' })
@@ -327,7 +328,7 @@ describe('copies: the quiescence barrier (#1435)', { timeout: 60_000 }, () => {
     child.kill()
     await new Promise<void>((r) => child.once('exit', () => r()))
     // Gone: freed on the next look, then lent.
-    await vi.waitFor(async () => expect(await w.pool.tryFree('copy-1')).toBeNull(), { timeout: 30_000, interval: 100 })
+    await vi.waitFor(async () => expect(await w.pool.tryFree('copy-1')).toBeNull(), { timeout: timing('wait.hang'), interval: 100 })
     expect(w.store.copy('copy-1')?.state).toBe('free')
     expect((await leased(w, { card: 3 })).name).toBe('copy-1')
   })
@@ -370,7 +371,7 @@ describe('copies: the quiescence barrier (#1435)', { timeout: 60_000 }, () => {
   })
 })
 
-describe('copies: operations and clean-up (#1435)', { timeout: 60_000 }, () => {
+describe('copies: operations and clean-up (#1435)', { timeout: timing('test.hang') }, () => {
   it("a Combwork that died mid-reset leaves the copy not ready, never lent; another's look takes it over", async () => {
     const w = world({ size: 1 })
     const l = await leased(w)
@@ -430,7 +431,7 @@ describe('copies: operations and clean-up (#1435)', { timeout: 60_000 }, () => {
   })
 })
 
-describe("copies: HR1's round 1", { timeout: 90_000 }, () => {
+describe("copies: HR1's round 1", { timeout: timing('test.hang') }, () => {
   it('a free copy with a process that came into it after it was freed is never reset under it: passed over', async () => {
     const w = world({ size: 2 })
     const first = await leased(w)
@@ -571,7 +572,7 @@ describe('copies: isolated requests apart from the request (HR1 round 1)', () =>
     const ticket = (first as { ticket: string }).ticket
     expect(await reqs.ask('agent|a', 'p', '1|r', slow, ticket)).toEqual({ wait: 'a check copy to be set up', ticket })
     done({ lease: lease('c-1'), folder: 'F' })
-    await vi.waitFor(async () => expect(await reqs.ask('agent|a', 'p', '1|r', slow, ticket)).toEqual({ lease: lease('c-1'), folder: 'F' }), { timeout: 10_000, interval: 10 })
+    await vi.waitFor(async () => expect(await reqs.ask('agent|a', 'p', '1|r', slow, ticket)).toEqual({ lease: lease('c-1'), folder: 'F' }), { timeout: timing('wait.hang'), interval: 10 })
     expect(reqs.size).toBe(0)
     expect(back).toEqual([])
   })
@@ -600,7 +601,7 @@ describe('copies: isolated requests apart from the request (HR1 round 1)', () =>
         reqs.abandon()
         expect(back).toEqual(['c-9'])
       },
-      { timeout: 10_000, interval: 10 }
+      { timeout: timing('wait.hang'), interval: 10 }
     )
     expect(reqs.size).toBe(0)
     expect(first.ticket).toMatch(/^t-/)
@@ -619,7 +620,7 @@ describe('copies: isolated requests apart from the request (HR1 round 1)', () =>
     expect(back).toEqual([])
     // Its set-up finishes: the late copy is given back, once.
     done({ lease: lease('c-late') })
-    await vi.waitFor(() => expect(back).toEqual(['c-late']), { timeout: 10_000, interval: 10 })
+    await vi.waitFor(() => expect(back).toEqual(['c-late']), { timeout: timing('wait.hang'), interval: 10 })
     // Nothing gives it back again: its ticket is unknown, and abandoning the rest finds it gone.
     expect(await reqs.ask('agent|a', 'p', '0|r', never, oldest.ticket)).toMatchObject({ wait: 'a check copy to be set up' })
     now += ABANDON_MS + 1
@@ -641,7 +642,7 @@ describe('copies: isolated requests apart from the request (HR1 round 1)', () =>
     life.abort()
     expect(reqs.size).toBe(0)
     done({ lease: lease('c-closed') })
-    await vi.waitFor(() => expect(back).toEqual(['c-closed']), { timeout: 10_000, interval: 10 })
+    await vi.waitFor(() => expect(back).toEqual(['c-closed']), { timeout: timing('wait.hang'), interval: 10 })
     // A closed workspace's new request is refused, nothing leased.
     let leasedAgain = false
     expect(
@@ -652,9 +653,9 @@ describe('copies: isolated requests apart from the request (HR1 round 1)', () =>
   })
 })
 
-describe('copies: check copies freed while their builder works (HI-1764)', { timeout: 60_000 }, () => {
+describe('copies: check copies freed while their builder works (HI-1764)', { timeout: timing('test.hang') }, () => {
   // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-  const HUNG_MS = 20_000
+  const HUNG_MS = timing('wait.hang')
 
   it("a check's copy isn't held for its holder's turn (its processes are all in its job); a review's still is", async () => {
     const w = world({ size: 2 })

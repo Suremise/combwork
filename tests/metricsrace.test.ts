@@ -8,8 +8,9 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { metricsSaved } from './storeDocs'
+import { timing } from './timing.cjs'
 
-const HUNG_MS = 20_000
+const HUNG_MS = timing('wait.hang')
 const base = tempDir('cw-metrics-race-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -54,7 +55,7 @@ async function scenario(reopen: (path: string, first: ReturnType<typeof createWo
   metrics.recordApi(metrics.metricsHandle(again), 'beta', api)
   // A sleep that is the point of the check: long enough for a write that isn't queued behind the held one to finish
   // first; then the held one, released, would be the last to land (the bug this guards against). Nothing to wait for.
-  await new Promise((r) => setTimeout(r, 300))
+  await new Promise((r) => setTimeout(r, timing('quiet.briefMs')))
   release()
   await metrics.flushMetrics()
   const saved = JSON.stringify(metricsSaved(path))

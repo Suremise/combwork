@@ -102,7 +102,7 @@ const fence = await import('../src/main/folderFence')
 const { gitTestHooks: gitHooks } = await import('../src/main/git')
 
 // Real git work, not a wait: each test runs a few dozen git commands, slow under a full unit run's load.
-vi.setConfig({ testTimeout: 60_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 const git = (cwd: string, ...a: string[]): string => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd, encoding: 'utf8' }).trim()
 const commit = (cwd: string, file: string): void => {
@@ -1079,7 +1079,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     expect(await repo.deleteBranches(proj, [{ name: 'cw/hb1', sha: at['cw/hb1'] }, { name: 'cw/hb2', sha: at['cw/hb2'] }])).toContain('cw/hb1 is checked out in the project folder')
     const has = (cwd: string, b: string): boolean => git(cwd, 'for-each-ref', '--format=%(refname)', `refs/heads/${b}`) !== ''
     expect([has(proj, 'cw/hb1'), has(remote, 'cw/hb1'), has(proj, 'cw/hb2')]).toEqual([true, true, false])
-  }, 120_000)
+  }, timing('test.hang'))
 
   it('deletes only what it was shown, merged and unused, and says why each other one is kept', async () => {
     const at = setUp()
@@ -1096,7 +1096,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     for (const why of ['cw/hb2 has moved since you were shown it', 'cw/slot is checked out in a worktree or slot', 'An open card works on cw/card', "spike/x has commits that aren't in 1.0.0", 'main is the default branch', '1.0.0 is the branch work merges into', "--force isn't a valid branch name", "There's no branch nope"]) expect(said).toContain(why)
     // Nothing to delete: refused, saying why.
     await expect(repo.deleteBranches(proj, [{ name: 'spike/x', sha: at['spike/x'] }])).rejects.toThrow(/spike\/x has commits that aren't in 1\.0\.0/)
-  }, 120_000)
+  }, timing('test.hang'))
 
   /** A door that stops an action where `set` puts it, and the promises to wait at it and let it through. */
   const door = (): { at: Promise<void>; door: { entered: () => void; open: Promise<void> }; open: () => void } => {
@@ -1133,7 +1133,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     expect(said).toContain('An open card works on cw/hb2')
     expect(branchNames(proj)).toEqual(expect.arrayContaining(['cw/hb2']))
     expect(branchNames(proj)).not.toContain('cw/hb1')
-  }, 120_000)
+  }, timing('test.hang'))
 
   /** A slot taking `branch` as slot preparation does: under the repository's lock. Says whether it got it. */
   const slotTakes = async (branch: string, folder: string): Promise<string> => {
@@ -1172,7 +1172,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     expect(await claimed).toBe('no such branch')
     await retarget
     expect(retargeted).toBe(true)
-  }, 120_000)
+  }, timing('test.hang'))
 
   it('deletes only at the commit it checked: a branch moved at the last moment by git outside Combwork stays, with its commit (round 4)', async () => {
     const at = setUp()
@@ -1188,7 +1188,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     expect(said).toContain('cw/hb1 has moved since you were shown it: kept.')
     expect(said).toMatch(/Deleted cw\/hb2\./)
     expect(git(proj, 'rev-parse', 'cw/hb1')).toBe(unseen)
-  }, 120_000)
+  }, timing('test.hang'))
 
   it('leaves no checked-out branch deleted: one checked out at the last moment is put back and kept, said in use (round 3)', async () => {
     const at = setUp()
@@ -1203,7 +1203,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     expect(said).toContain('cw/hb1 is checked out in a worktree or slot: kept.')
     expect(said).toMatch(/Deleted cw\/hb2\./)
     expect(branchNames(proj)).toContain('cw/hb1')
-  }, 120_000)
+  }, timing('test.hang'))
 
   it('a second Combwork changing the target, with a turn of workflow writes of its own, waits for the delete on the shared repository lock (round 5)', async () => {
     const at = setUp()
@@ -1229,7 +1229,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     expect(await deleting).toMatch(/Deleted cw\/hb1\./)
     await retarget
     expect(retargeted).toBe(true)
-  }, 120_000)
+  }, timing('test.hang'))
 
   it('holds the lock through a remote’s push: a slot taking the branch waits until it is deleted there (round 3)', async () => {
     const at = setUp()
@@ -1245,7 +1245,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     expect(branchNames(remote)).not.toContain('cw/hb1')
     // The local branch was never the remote's to delete: the slot takes it once the push is done.
     expect(await claimed).toBe('took it')
-  }, 120_000)
+  }, timing('test.hang'))
 
   it('checks a remote branch under the repository lock with its use read then (round 2)', async () => {
     const at = setUp()
@@ -1258,7 +1258,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     await expect(queued).rejects.toThrow(/An open card works on origin\/cw\/hb1/)
     lockDoor = null
     expect(branchNames(remote)).toContain('cw/hb1')
-  }, 120_000)
+  }, timing('test.hang'))
 
   it('deletes an unmerged branch only alone, at the commit shown, after listing the commits it drops', async () => {
     const at = setUp()
@@ -1269,7 +1269,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     await expect(repo.deleteBranches(proj, [{ name: 'cw/card', sha: at['cw/card'] }], true)).rejects.toThrow(/An open card works on cw\/card/)
     expect(await repo.deleteBranches(proj, [{ name: 'spike/x', sha: at['spike/x'] }], true)).toMatch(/Deleted spike\/x/)
     expect(branchNames(proj)).not.toContain('spike/x')
-  }, 120_000)
+  }, timing('test.hang'))
 
   it('deletes merged branches on the remote only at the commit shown, never one in use or unmerged', async () => {
     const at = setUp()
@@ -1286,7 +1286,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     git(other, 'push', '-q', '-f', 'origin', 'HEAD:refs/heads/cw/hb2')
     await expect(repo.deleteRemoteBranches(proj, 'origin', [r('cw/hb2')])).rejects.toThrow(/origin refused to delete cw\/hb2/)
     expect(branchNames(remote)).toContain('cw/hb2')
-  }, 120_000)
+  }, timing('test.hang'))
 })
 
 describe('Update from <target> (HI-1180)', () => {

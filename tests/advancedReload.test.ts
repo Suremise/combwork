@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const reads = vi.hoisted(() => ({
   held: null as null | { file: string; entered: boolean; wait: Promise<void> },
@@ -36,7 +37,7 @@ vi.mock('original-fs/promises', async (original) => {
 })
 
 const { AdvancedStore } = await import('../src/main/advanced')
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 const stores: InstanceType<typeof AdvancedStore>[] = []
 afterEach(() => {
   reads.held = null

@@ -9,6 +9,7 @@ import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-assistant-ask-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -26,7 +27,7 @@ const { readDelivery, isLive, needsAck } = await import('../src/shared/deliverie
 
 type WS = ReturnType<typeof createWorkspaceService>
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 const opened: WS[] = []
 const assistant = (): { control?: string } => config.settings.assistant as unknown as { control?: string }
 afterEach(() => {

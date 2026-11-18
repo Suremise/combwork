@@ -8,6 +8,7 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-sessionlisting-')
 // The CLIs' homes are the test's (never ~/.claude or ~/.codex).
@@ -26,7 +27,7 @@ let n = 0
 const newId = (): string => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`
 const old = new Date(Date.now() - 3600_000)
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 15000
+const HUNG_MS = timing('wait.hang')
 const transcript = (sid: string): string =>
   [
     { type: 'user', sessionId: sid, timestamp: old.toISOString(), message: { role: 'user', content: 'Task' } },

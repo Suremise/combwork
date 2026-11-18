@@ -9,6 +9,7 @@ import { join } from 'path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const slot = vi.hoisted(() => ({ due: null as null | { slot: string; lease: string } }))
 vi.mock('../src/main/slotCards', async (orig) => ({ ...(await orig<object>()), placementDue: async () => slot.due }))
@@ -50,7 +51,7 @@ const builder = { kind: 'agent', name: 'Builder (p)', self: { project: 'p', agen
 const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, stdio: 'pipe', encoding: 'utf8' }).trim()
 let n = 0
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 /** A Git project whose cards are built in slots. */
 async function workspace(): Promise<{ w: WS; repo: string }> {

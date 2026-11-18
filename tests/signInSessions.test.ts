@@ -7,6 +7,7 @@ import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-signin-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -67,7 +68,7 @@ describe('an expired sign-in across agents', () => {
     expect(ada.status).toBe('signin')
     expect(s.signedOut.has('claude-code')).toBe(true)
     // Bo's failed turn below is told as finished, as any turn's end: only the sign-in notices are counted.
-    await vi.waitFor(() => expect(signIns().length).toBe(1), { timeout: 6000 })
+    await vi.waitFor(() => expect(signIns().length).toBe(1), { timeout: timing('wait.hang') })
     expect(signIns()[0][1]).toMatch(/needs you to sign in to Claude Code$/)
 
     // Bo's turn fails on a rate limit: it ends (finished), but says nothing of the sign-in.
@@ -86,7 +87,7 @@ describe('an expired sign-in across agents', () => {
     // Cy refused in the same expiry: shown, not told again.
     await hook(cy, refused)
     expect(cy.status).toBe('signin')
-    await new Promise((r) => setTimeout(r, 3500))
+    await new Promise((r) => setTimeout(r, 3500)) // timing-ok: a pause past the code's own window (a product value): its length is the point
     expect(signIns().length).toBe(1)
 
     // A request that works (a tool call answered): signed in again. Those still stopped are idle, marked for Resume.
@@ -95,7 +96,7 @@ describe('an expired sign-in across agents', () => {
     expect(s.signedOut.has('claude-code')).toBe(false)
     for (const st of [ada, cy]) expect(st).toMatchObject({ status: 'ready', statusMessage: 'Stopped while signed out', signIn: { message: 'Login expired · Please run /login' } })
     expect(bo.signIn).toBeUndefined()
-  }, 20000)
+  }, timing('test.hang'))
 
   it("lasts through the stopped agent's own retries that don't get through, and its recheck, until shown signed in", async () => {
     s.live.clear()
@@ -110,7 +111,7 @@ describe('an expired sign-in across agents', () => {
         return run(() => s.carryOut(`${p.toLowerCase()}#d`, l, hookStep(ev as never, s.statusInput(l) as never), 'test', ev))
       }
       await hook(ada, refused)
-      await vi.waitFor(() => expect(signIns().length).toBe(1), { timeout: 6000 })
+      await vi.waitFor(() => expect(signIns().length).toBe(1), { timeout: timing('wait.hang') })
       // A retry (its own prompt, or Resume's): working meanwhile, then interrupted: needs sign-in again, still marked.
       await hook(ada, { hook_event_name: 'UserPromptSubmit', prompt: 'again' })
       expect(ada.status).toBe('working')
@@ -131,7 +132,7 @@ describe('an expired sign-in across agents', () => {
       vi.advanceTimersByTime(121_000)
       expect(s.signedOut.has('claude-code')).toBe(true)
       // Refused again in the same expiry: shown, not told again; Resume (n) counts it.
-      await new Promise((r) => setTimeout(r, 3500))
+      await new Promise((r) => setTimeout(r, 3500)) // timing-ok: a pause past the code's own window (a product value): its length is the point
       expect(signIns().length).toBe(1)
       expect(ada.status).toBe('signin')
       expect(stalledOnSignIn(ada)).toBe(true)
@@ -142,5 +143,5 @@ describe('an expired sign-in across agents', () => {
     } finally {
       vi.useRealTimers()
     }
-  }, 20000)
+  }, timing('test.hang'))
 })

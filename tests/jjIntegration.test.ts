@@ -10,6 +10,7 @@ import { chooseRemote, configSources, exportProblem, memoryObligations, parseBoo
 import type { RunResult } from '../src/main/platform/repoContext'
 import { tempDir } from './tempDir'
 import { jjIntegratedOf, jjIntegratedPlatform } from '../src/main/platform/jjFacts'
+import { timing } from './timing.cjs'
 
 const require = createRequire(import.meta.url)
 const { gitEnv } = require('./e2e/runContext.cjs') as { gitEnv: (vars?: Record<string, string>) => NodeJS.ProcessEnv }
@@ -127,7 +128,7 @@ describe("the sources' fingerprint (the Assistant's notes): Git finds the files,
     const env = gitEnv({ HOME: home, USERPROFILE: home, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: globalCfg })
     const git = (args: readonly string[]): Promise<RunResult> =>
       new Promise((done) => {
-        execFile('git', ['--git-dir', store, ...args], { env, windowsHide: true, encoding: 'buffer', timeout: 30_000 }, (e, out, err) => done({ ok: !e, out: out.toString('utf8'), buf: out, err: err.toString('utf8'), code: e ? -1 : 0 }))
+        execFile('git', ['--git-dir', store, ...args], { env, windowsHide: true, encoding: 'buffer', timeout: timing('spawn.hang') }, (e, out, err) => done({ ok: !e, out: out.toString('utf8'), buf: out, err: err.toString('utf8'), code: e ? -1 : 0 }))
       })
     const deps = { git, gitEnv: env, view: { store, jjRepo, colocated: false } } as unknown as JjIntegrationDeps
     const sources = async (): Promise<ConfigSources> => {

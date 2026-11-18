@@ -6,6 +6,7 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-lane-endq-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -18,7 +19,7 @@ const { ENFORCE } = await import('../src/main/workflow/service')
 const { laneNextText } = await import('../src/shared/lanes')
 const { workspaceDb } = await import('../src/main/boardStore')
 
-vi.setConfig({ testTimeout: 60_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 afterEach(async () => {
   await advanced.set(ENFORCE, true)
 })

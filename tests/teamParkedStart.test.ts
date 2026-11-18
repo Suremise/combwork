@@ -8,8 +8,9 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { WorkspaceService } from '../src/main/workspace'
+import { timing } from './timing.cjs'
 
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 const base = tempDir('cw-teamparked-start-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 

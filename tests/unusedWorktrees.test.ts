@@ -12,6 +12,7 @@ import { holdsWork, lostByRemoving, originLabel, unusedPickerLabel, unusedState,
 import type { UnusedWorktree } from '../src/shared/types'
 import { junction, shortPath } from './pathAliases'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 // As on GitHub's runner (#447): the temp folder by its 8.3 short name where it has one (git lists worktrees by their long
 // names; a junction makes another name on any machine, #448), and no global git config (tests/noGlobalGit.ts), so no
@@ -43,7 +44,7 @@ const { REPO_LOCK_FILE } = await import('../src/main/repoLockCore')
 // Real git work, not a wait (#555): a test here runs 20 to 70 git commands, about 35 ms each alone, about 0.3 s each and
 // up to 1.3 s under a full unit run beside other runs (measured: 12 s for one test, against 2 s alone), and more under
 // heavier load. So each test is bounded by GIT_HUNG_MS rather than the suite's 20 s: only a hung git takes a minute.
-const GIT_HUNG_MS = 60_000
+const GIT_HUNG_MS = timing('wait.hang')
 vi.setConfig({ testTimeout: GIT_HUNG_MS })
 /** A failure says what git said (#864: "nothing to commit" is on stdout, a lock or a fatal error on stderr). */
 const git = (cwd: string, ...a: string[]): string => {
@@ -112,7 +113,7 @@ afterEach(async () => {
         git(proj, 'worktree', 'remove', '--force', '--force', path)
         break
       } catch {
-        await new Promise((r) => setTimeout(r, 200))
+        await new Promise((r) => setTimeout(r, timing('wait.interval')))
       }
     }
   }

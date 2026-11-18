@@ -16,6 +16,7 @@ import { laneCards, laneChangeText, laneEndText, laneLine, laneNextText, laneNum
 import { tempDir } from './tempDir'
 // @ts-expect-error: a plain .mjs module without types
 import { readCatalogue } from '../scripts/agentTextExtract.mjs'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-agenttext-lanes-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -26,7 +27,7 @@ const lanes = await import('../src/main/lanes')
 const journal = await import('../src/main/journalService')
 const journalStore = await import('../src/main/journal')
 
-vi.setConfig({ testTimeout: 30_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 const ROOT = join(__dirname, '..')
 const catalogue = readCatalogue(ROOT) as Record<string, { text: string }>
@@ -255,7 +256,7 @@ describe('the canary dialect over the lanes service (main/lanes.ts)', () => {
       await run(() => tasks.updateTask(c2.number, { column: 'done' }, user))
       // B3's lane (its one card Done now) ends as the lanes follow the board.
       const t = Date.now()
-      while (!(await lanes.listLanes(w, { all: true })).some((l) => l.builder.id === 'b3' && l.state === 'ended') && Date.now() - t < 10_000) await new Promise((r) => setTimeout(r, 50))
+      while (!(await lanes.listLanes(w, { all: true })).some((l) => l.builder.id === 'b3' && l.state === 'ended') && Date.now() - t < timing('wait.hang')) await new Promise((r) => setTimeout(r, timing('wait.interval')))
       outputs.nextEnded = await said(lanes.laneNext(w, 'alpha', 'b3'))
 
       const seen = new Set<string>()

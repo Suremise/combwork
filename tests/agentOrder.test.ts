@@ -8,6 +8,7 @@ import * as electron from 'electron'
 import { dropIndex, moveAgentTo, pageAgents, pageEndIndex, projectAgents, swapAgentsIn } from '../src/shared/defaults'
 import type { CombworkEvent, ProjectConfig } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-order-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -48,7 +49,7 @@ const { moveAgent, swapAgents } = await import('../src/main/projectAgents')
 const { onCombworkEvent } = await import('../src/main/events')
 
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 describe('saving the order', () => {
   let w: ReturnType<typeof createWorkspaceService>

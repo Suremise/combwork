@@ -9,6 +9,7 @@ import { createRequire } from 'module'
 import { tempDir } from './tempDir'
 import { CodexConversationParser } from '../src/main/providers/codex/rollout'
 import { DISPLAY_LIMIT, toolForDisplay } from '../src/main/transcriptDisplay'
+import { timing } from './timing.cjs'
 
 const require = createRequire(import.meta.url)
 const { observeTranscript, tokenSightings } = require('./scenarios/harness.cjs') as {
@@ -1270,8 +1271,8 @@ describe('the fixtures fail when nothing was done', () => {
   // 1 s); 23 to 32 s under heavier load. So each is bounded by GIT_HUNG_MS, about three times the slowest seen, rather than
   // the suite's 20 s. The processes run synchronously, which no test timeout interrupts, so each has PROCESS_HUNG_MS too:
   // only a hung git or node takes that long, and it fails the test instead of holding its worker.
-  const GIT_HUNG_MS = 90_000
-  const PROCESS_HUNG_MS = 30_000
+  const GIT_HUNG_MS = timing('wait.hangReal')
+  const PROCESS_HUNG_MS = timing('wait.hang')
   it('merge-main-moved (#306): merging without taking the moved base in, or without checking it again, fails', { timeout: GIT_HUNG_MS }, async () => {
     const fs = require('fs') as typeof import('fs')
     const path = require('path') as typeof import('path')
@@ -1961,7 +1962,7 @@ describe('a trial the environment stops (trialEnvironment)', () => {
       writeFileSync(join(home, 'fake-signin.json'), JSON.stringify({ expired: true, atLaunch: true }))
       expect(claudeAuthStatus(log, 'a-1', { CLAUDE_CONFIG_DIR: home })).toMatchObject({ loggedIn: false })
       expect(claudeAuthStatus(log, 'a-2', { CLAUDE_CONFIG_DIR: home })).toBeNull()
-    }, 30000)
+    }, timing('test.hang'))
 
     it('anything else is an error at once, saying what it showed', () => {
       expect(launchEnded({ reason: "error: option '--model <model>' argument 'x' is invalid.", auth: { loggedIn: true } })).toEqual({ error: "the session ended at launch: error: option '--model <model>' argument 'x' is invalid." })

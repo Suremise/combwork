@@ -7,6 +7,7 @@ import { afterAll, describe, expect, it, onTestFinished, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { closeAllBoards } from '../src/main/boardStore'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-keptchanges-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -21,7 +22,7 @@ const names = await import('../src/main/projectNames')
 const { KEPT_TRIES, KeptFileBusy, readKeptJson, retryWhileSaving, writeKeptJson } = await import('../src/main/fsutil')
 
 // Each refusal reads the file KEPT_TRIES times, each after the pauses (about 1 s).
-vi.setConfig({ testTimeout: 30_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 let n = 0
 async function open(): Promise<{ w: ReturnType<typeof createWorkspaceService>; ws: string; alpha: string }> {
@@ -143,7 +144,7 @@ describe('read-modify-write callers refuse rather than write over a save in prog
     const seen: string[] = []
     while (!run.settled) {
       seen.push(...second())
-      await new Promise((r) => setTimeout(r, 5))
+      await new Promise((r) => setTimeout(r, timing('pace.tick')))
     }
     expect(await made).toBeInstanceOf(KeptFileBusy)
     expect(seen).toEqual([])

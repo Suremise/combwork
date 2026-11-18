@@ -10,6 +10,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { junction, shortPath } from './pathAliases'
 import { bound, spyOnPrivate } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-admission-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -351,7 +352,7 @@ describe('the usage worker (#1395)', () => {
     })
     try {
       const asked = usageHistory.storedSessions(ws, null)
-      await vi.waitFor(() => expect(waiting).toBe(true), { timeout: 10_000 })
+      await vi.waitFor(() => expect(waiting).toBe(true), { timeout: timing('wait.hang') })
       await w.open(elsewhere)
       release()
       await expect(asked).rejects.toThrow('The workspace was closed')

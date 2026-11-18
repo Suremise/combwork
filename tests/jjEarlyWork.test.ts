@@ -17,6 +17,7 @@ import { heldTold } from '../src/main/slotCards'
 import { admitted } from './admitted'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const closers: (() => void | Promise<void>)[] = []
 afterEach(async () => {
@@ -98,7 +99,7 @@ function printed(held: HeldWork, reason = JJ_REFUSED.unintegrated): { aside: str
   return { aside, bring, squash, inspect }
 }
 
-describe.skipIf(!jjExe)("a jj lane's next card, its builder at work before its slot is prepared (HI-3115, decision B)", { timeout: 300_000 }, () => {
+describe.skipIf(!jjExe)("a jj lane's next card, its builder at work before its slot is prepared (HI-3115, decision B)", { timeout: timing('test.hangReal') }, () => {
   it.each([true, false])('colocated %s: nothing early → prepared (the control)', async (colocated) => {
     const w = world(colocated)
     const c = await card1(w, 'move')

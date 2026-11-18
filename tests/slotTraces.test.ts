@@ -15,6 +15,7 @@ import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { gitTestHooks } from '../src/main/git'
 import { fileSlotConn, SlotPool, SlotStore, type OpHolder, type SlotRunEnd } from '../src/main/slots'
 import { commit, gitRepo, sh } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 const FIXTURE = join(__dirname, 'fixtures', 'slotTraces.json')
 const RECORD = process.env.CW_RECORD_SLOT_TRACES === '1'
@@ -79,7 +80,7 @@ function same(step: string, trace: string[]): void {
   else expect(trace, step).toEqual(expected()[step])
 }
 
-describe("the slot pool's git commands through the workspace lifecycle port (HI-2786)", { timeout: 90_000 }, () => {
+describe("the slot pool's git commands through the workspace lifecycle port (HI-2786)", { timeout: timing('test.hang') }, () => {
   afterEach(() => {
     if (RECORD) writeFileSync(FIXTURE, `${JSON.stringify({ ...expected(), ...recorded }, null, 2)}\n`)
   })

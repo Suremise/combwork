@@ -136,7 +136,7 @@ vi.mock('../src/main/gitRepo', async (original) => {
   }
 })
 
-vi.setConfig({ testTimeout: 60_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const changes = await import('../src/main/gitFolderChanges')
@@ -569,7 +569,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
       const bin = msysBinFor({ env: process.env })
       expect(bin).not.toBeNull()
       spawn(join(bin!, 'sh.exe'), ['-c', sleeper(control)], { stdio: 'ignore', windowsHide: true, env: baseEnv() }).unref()
-      await vi.waitFor(() => expect(pidsIn(control)).toHaveLength(1), { timeout: 20_000 })
+      await vi.waitFor(() => expect(pidsIn(control)).toHaveLength(1), { timeout: timing('wait.hang') })
       // Its identity while it is known to be the test's own (#603): ended by it afterwards.
       controlId = identify(pidsIn(control))
       expect(controlId).toHaveLength(1)
@@ -583,11 +583,11 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     const before = head()
     const done = settle('commit', ['new.txt', 'a.txt']).catch((e: Error) => e)
     // While the hook runs, the user's own git add works: the real index isn't locked.
-    await vi.waitFor(() => expect(pidsIn(pids)).toHaveLength(msys ? 3 : 2), { timeout: 20_000 })
+    await vi.waitFor(() => expect(pidsIn(pids)).toHaveLength(msys ? 3 : 2), { timeout: timing('wait.hang') })
     sh(proj, 'add', 'b.txt')
     const err = await done
     expect(String(err)).toMatch(/didn't finish the commit in 3 seconds.*The files and the index are as they were/)
-    await vi.waitFor(() => expect(pidsIn(pids).filter(alive)).toEqual([]), { timeout: 10_000 })
+    await vi.waitFor(() => expect(pidsIn(pids).filter(alive)).toEqual([]), { timeout: timing('wait.hang') })
     expect(stillSame(controlId)).toEqual(controlId.map((c) => c.pid))
     expect(existsSync(lockPath())).toBe(false)
     expect(leftovers()).toEqual([])
@@ -623,7 +623,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     sh(proj, 'config', 'filter.slow.smudge', `sh "${fwd(filter)}"`)
     const done = settle('setAside', ['a.txt']).catch((e: Error) => e)
     // While git checks a.txt out again (its index lock held), the real index is free. Reached, by the filter's own word.
-    await vi.waitFor(() => expect(existsSync(started)).toBe(true), { timeout: 20_000 })
+    await vi.waitFor(() => expect(existsSync(started)).toBe(true), { timeout: timing('wait.hang') })
     expect(existsSync(lockPath())).toBe(false)
     sh(proj, 'add', 'b.txt')
     const err = await done
@@ -631,7 +631,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     const made = sh(proj, 'rev-parse', 'refs/stash')
     expect(String(err)).toContain(made.slice(0, 12))
     expect(sh(proj, 'show', 'refs/stash:a.txt')).toBe('edit')
-    await vi.waitFor(() => expect(pidsIn(pids).filter(alive)).toEqual([]), { timeout: 10_000 })
+    await vi.waitFor(() => expect(pidsIn(pids).filter(alive)).toEqual([]), { timeout: timing('wait.hang') })
     expect(existsSync(lockPath())).toBe(false)
     expect(leftovers()).toEqual([])
     // Usable again: git add, and Commit.
@@ -651,7 +651,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     const cancelAt = async (started: string, fn: () => Promise<unknown>): Promise<unknown> => {
       const ac = new AbortController()
       const done = cancellableGit(ac.signal, fn).catch((e: Error) => e)
-      await vi.waitFor(() => expect(existsSync(started)).toBe(true), { timeout: 20_000 })
+      await vi.waitFor(() => expect(existsSync(started)).toBe(true), { timeout: timing('wait.hang') })
       ac.abort()
       return done
     }
@@ -671,7 +671,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
       const was = lines()
       const err = await cancelAt(started, () => settle('commit', ['new.txt', 'a.txt']))
       expect(String(err)).toMatch(/You cancelled the commit.*Nothing was committed, and the files and the index are as they were/)
-      await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: 10_000 })
+      await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: timing('wait.hang') })
       expect(head()).toBe(before)
       expect(lines()).toEqual(was)
       expect(existsSync(lockPath())).toBe(false)
@@ -818,7 +818,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     writeFileSync(join(proj, 'a.txt'), 'edit\n')
     const before = head()
     const done = settle('commit', ['a.txt']).catch((e: Error) => e)
-    await vi.waitFor(() => expect(existsSync(marker)).toBe(true), { timeout: 20_000 })
+    await vi.waitFor(() => expect(existsSync(marker)).toBe(true), { timeout: timing('wait.hang') })
     // Another program takes the index lock and holds it, open, while git still runs and after.
     const fs = await import('fs')
     const fd = fs.openSync(lockPath(), 'wx')
@@ -843,7 +843,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     writeFileSync(join(proj, 'b.txt'), 'theirs\n')
     const before = head()
     const done = settle('commit', ['a.txt']).catch((e: Error) => e)
-    await vi.waitFor(() => expect(pidsIn(pids)).toHaveLength(2), { timeout: 20_000 })
+    await vi.waitFor(() => expect(pidsIn(pids)).toHaveLength(2), { timeout: timing('wait.hang') })
     // The user's own commit meanwhile, with the real index and no hooks.
     sh(proj, '-c', `core.hooksPath=${fwd(join(tempDir('cw-folderchanges-nohooks-'), 'none'))}`, 'commit', '-q', '-m', 'theirs', '--', 'b.txt')
     const theirs = head()
@@ -990,9 +990,9 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     expect(add[0].args.some((a) => a.startsWith('core.hooksPath=') && a.endsWith('.no-hooks'))).toBe(true)
     // The hook hung in the commit itself (bounded) or nowhere: never past the bound in a step without one (it took
     // 30 s before). A bound for a hung run, generous for git's own work.
-    expect(took).toBeLessThan(20_000)
+    expect(took).toBeLessThan(timing('budget.promptEndMs'))
     console.log(`HI-3079: ${out instanceof Error ? out.message : `made ${out.made}`} in ${Math.round(took)} ms`)
-    await vi.waitFor(() => expect(pidsIn(pids).filter(alive)).toEqual([]), { timeout: 10_000 })
+    await vi.waitFor(() => expect(pidsIn(pids).filter(alive)).toEqual([]), { timeout: timing('wait.hang') })
     expect(existsSync(lockPath())).toBe(false)
     expect(leftovers()).toEqual([])
   })
@@ -1186,7 +1186,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     if (exact) expect(ids, 'each node identified while its refresh held').toHaveLength(4)
     // The refresh's outcome comes once its teardown is over (treeEnding): each node already gone. The bound here is for a
     // hung run only.
-    await vi.waitFor(() => expect(exact ? stillSame(ids) : runs.flat().map((r) => r.pid).filter(alive)).toEqual([]), { timeout: 10_000 })
+    await vi.waitFor(() => expect(exact ? stillSame(ids) : runs.flat().map((r) => r.pid).filter(alive)).toEqual([]), { timeout: timing('wait.hang') })
     sh(proj, 'config', '--unset', 'filter.slow.clean')
     // The user's staging kept; a.txt taken in.
     expect(sh(proj, 'show', ':b.txt')).toBe('staged by the user meanwhile')
@@ -1194,7 +1194,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     expect(existsSync(lockPath())).toBe(false)
     expect(leftovers()).toEqual([])
     // A calibrated Commit and two bounds of up to 20 s each.
-  }, 120_000)
+  }, timing('test.hang'))
 
   it("another git writing the real index during every refresh (HR3's round 1): made again a few times, then taken in under the lock unrefreshed; each of its writes kept, the commit made", async () => {
     writeFileSync(join(proj, 'a.txt'), 'edit\n')
@@ -1226,7 +1226,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     const t = performance.now()
     expect(changes.changedPaths(files, was, now)).toEqual(['f7', 'f9', 'f11'])
     // A bound for a hung run, not how long it should take (a scan per path took seconds at 5,000).
-    expect(performance.now() - t).toBeLessThan(5_000)
+    expect(performance.now() - t).toBeLessThan(timing('budget.scanMs'))
     // A path's entries in another order are the same.
     expect(changes.changedPaths(['c'], ['100644 a 2\tc', '100644 b 3\tc'], ['100644 b 3\tc', '100644 a 2\tc'])).toEqual([])
     expect(changes.changedPaths(['new'], [], ['100644 a 0\tnew'])).toEqual(['new'])
@@ -1238,7 +1238,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     const t = performance.now()
     expect(changes.sameEntries(a, b)).toBe(true)
     // A bound for a hung run, not how long it should take (once per entry, it took minutes).
-    expect(performance.now() - t).toBeLessThan(5_000)
+    expect(performance.now() - t).toBeLessThan(timing('budget.scanMs'))
     expect(changes.sameEntries(a, [...b.slice(1), 'other'])).toBe(false)
     expect(changes.sameEntries(a, b.slice(1))).toBe(false)
   })

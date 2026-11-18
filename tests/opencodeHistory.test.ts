@@ -15,6 +15,7 @@ import { englishText } from '../src/shared/advanced'
 import type { TranscriptItem } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { createRequire } from 'module'
+import { timing } from './timing.cjs'
 
 /** A child's environment from the run context's allowlist, never the shell's (tests/README.md, Isolation). */
 const childEnv = (): Record<string, string> => (createRequire(import.meta.url)('./e2e/runContext.cjs') as { childEnv: () => Record<string, string> }).childEnv()
@@ -503,7 +504,7 @@ describe("the OpenCode history's main side (HI-2762)", () => {
     expect((h as any).thread.worker).toBeTruthy()
     await h.stop()
     await historyWorkerForTests(null)
-  }, 60_000)
+  }, timing('test.hang'))
 
   it("waits at a quit for its exports' teardowns to their bound (HI-3358): the shutdown's grace is past endTreeAsync's whole bound", () => {
     // The exports end in parallel (historyCore's shutdown), each within TREE_END_MS (processTreeLate.test.ts holds it).
@@ -563,7 +564,7 @@ describe("the history's ownership across a removal and a new worker (HI-2762, HR
     // An export that writes its output only after a while: removed meanwhile, it is ended, and nothing is published.
     const script = `require('fs').writeFileSync(${JSON.stringify(begun)}, 'x'); setTimeout(() => process.stdout.write(require('fs').readFileSync(${JSON.stringify(good)})), 20000)`
     await ask(core, { type: 'export', home, sessionId: sid, reason: 'runEnd', command: { file: process.execPath, args: ['-e', script], env: childEnv() } })
-    for (let i = 0; i < 2000 && !existsSync(begun); i++) await new Promise((r) => setTimeout(r, 5))
+    for (let i = 0; i < 2000 && !existsSync(begun); i++) await new Promise((r) => setTimeout(r, timing('wait.interval')))
     expect(existsSync(begun)).toBe(true)
     let acked = false
     const removal = ask(core, { type: 'removeRoot', home }).then(() => (acked = true))
@@ -618,20 +619,20 @@ describe("the history's ownership across a removal and a new worker (HI-2762, HR
       await (h as any).poll(t)
       const mirror = mirrorPath(home, sid)
       const titleOf = () => (existsSync(mirror) ? parseMirrorUsage(readFileSync(mirror, 'utf8'), sid).title : null)
-      for (let i = 0; i < 400 && titleOf() !== 'r0-shell-marker output'; i++) await new Promise((r) => setTimeout(r, 10))
+      for (let i = 0; i < 400 && titleOf() !== 'r0-shell-marker output'; i++) await new Promise((r) => setTimeout(r, timing('wait.interval')))
       expect(titleOf()).toBe('r0-shell-marker output')
       const oldEpoch = t.epoch
       // The worker ends (a crash): the next one gets the run again, with a new epoch, before any poll.
       const w = (h as any).thread.worker
       await w.terminate()
-      for (let i = 0; i < 400 && (t.epoch === oldEpoch || !(h as any).thread.worker); i++) await new Promise((r) => setTimeout(r, 10))
+      for (let i = 0; i < 400 && (t.epoch === oldEpoch || !(h as any).thread.worker); i++) await new Promise((r) => setTimeout(r, timing('wait.interval')))
       expect(t.epoch).not.toBe(oldEpoch)
       expect((h as any).thread.worker).not.toBe(w)
       // The session changes: a turn's end reads it, and the new worker publishes it.
       srv.info = { ...srv.info, title: 'after the restart', time: { ...srv.info.time, updated: srv.info.time.updated + 1000 } }
       srv.w++
       h.nudge(sid, { kind: 'turnEnd' })
-      for (let i = 0; i < 400 && titleOf() !== 'after the restart'; i++) await new Promise((r) => setTimeout(r, 10))
+      for (let i = 0; i < 400 && titleOf() !== 'after the restart'; i++) await new Promise((r) => setTimeout(r, timing('wait.interval')))
       expect(titleOf()).toBe('after the restart')
       // A limits answer of the old epoch counts for nothing.
       const before = limits.length
@@ -642,7 +643,7 @@ describe("the history's ownership across a removal and a new worker (HI-2762, HR
       await historyWorkerForTests(null)
       await new Promise((r) => s.close(r))
     }
-  }, 60_000)
+  }, timing('test.hang'))
 })
 
 describe("an export's tree ended off the thread (HI-3009, HR1 round 1)", () => {
@@ -669,7 +670,7 @@ describe("an export's tree ended off the thread (HI-3009, HR1 round 1)", () => {
     // Ended at its bound: an export that never writes anything.
     await ask(core, { type: 'bounds', bounds: { exportMs: 300 } })
     await ask(core, { type: 'export', home, sessionId: sid, reason: 'runEnd', command: { file: process.execPath, args: ['-e', `require('fs').writeFileSync(${JSON.stringify(begun)}, 'x'); setInterval(() => {}, 1000)`], env: childEnv() } })
-    await vi.waitFor(() => expect(rootClosed).toBe(true), { timeout: 20_000, interval: 20 })
+    await vi.waitFor(() => expect(rootClosed).toBe(true), { timeout: timing('wait.hang'), interval: 20 })
     // Its root has closed, its teardown not over: the export is still tracked and unsettled.
     let idle = false
     const idled = ask(core, { type: 'idle' }).then(() => (idle = true))
@@ -687,7 +688,7 @@ describe("an export's tree ended off the thread (HI-3009, HR1 round 1)", () => {
     expect(answered && idle).toBe(true)
     expect(ends).toHaveLength(1)
     expect((core as any).children.size).toBe(0)
-  }, 30_000)
+  }, timing('test.hang'))
 })
 
 describe("a refused removal gives the root back (HI-2762, HR1 round 2)", () => {
@@ -709,7 +710,7 @@ describe("a refused removal gives the root back (HI-2762, HR1 round 2)", () => {
     const good = join(home, 'good.json')
     writeFileSync(good, JSON.stringify({ info: { ...SHELL.info, id: sid }, messages: SHELL.messages }))
     await h.ask({ type: 'export', home, sessionId: sid, reason: 'runEnd', command: { file: process.execPath, args: ['-e', `require('fs').writeFileSync(${JSON.stringify(begun)}, 'x'); setTimeout(() => {}, 60000)`], env: childEnv() } })
-    for (let i = 0; i < 2000 && !existsSync(begun); i++) await new Promise((r) => setTimeout(r, 5))
+    for (let i = 0; i < 2000 && !existsSync(begun); i++) await new Promise((r) => setTimeout(r, timing('wait.interval')))
     expect(existsSync(begun)).toBe(true)
     await expect(h.removeRoot(home)).rejects.toThrow(/didn't answer removeRoot/)
     expect((h as any).removedHomes.size).toBe(0)
@@ -722,7 +723,7 @@ describe("a refused removal gives the root back (HI-2762, HR1 round 2)", () => {
     expect(mirrorState(readFileSync(mirrorPath(home, sid), 'utf8')).header?.state).toBe('complete')
     await h.stop()
     await historyWorkerForTests(null)
-  }, 30_000)
+  }, timing('test.hang'))
 })
 
 // ---- Subagents (HI-2773): HI-2773's R0, a `subagent` tool call on 2.2.6 (messages/subagent-*.json)
@@ -934,13 +935,13 @@ describe("OpenCode's subagent sessions (HI-2773)", () => {
     await (h as any).exportSession(home, PARENT.info.id, 'runEnd')
     for (let i = 0; i < 400 && !existsSync(mirrorPath(home, CHILD.info.id)); i++) {
       await h.idle()
-      await new Promise((r) => setTimeout(r, 10))
+      await new Promise((r) => setTimeout(r, timing('wait.interval')))
     }
     expect(asked).toEqual([['session', 'export', PARENT.info.id], ['session', 'export', CHILD.info.id]])
     expect(mirrorState(readFileSync(mirrorPath(home, CHILD.info.id), 'utf8')).header?.parent).toBe(PARENT.info.id)
     await h.stop()
     await historyWorkerForTests(null)
-  }, 30_000)
+  }, timing('test.hang'))
 })
 
 // ---- HI-2774's R0: images, revert, forks and sessions Combwork didn't make (2.2.6, local Ollama, deny-all policy)
@@ -1217,7 +1218,7 @@ describe("OpenCode sessions Combwork didn't make: discovery and adoption's mark 
     expect(mirrorState(readFileSync(mirrorPath(home, all[5]), 'utf8')).header).toMatchObject({ state: 'complete', external: true, directory: dir })
     // The scan that handed out the last ones was complete; with the database unchanged, no more passes.
     expect(await pass()).toBeNull()
-  }, 30_000)
+  }, timing('test.hang'))
 
   it("recorded: session list gives only the current folder's project's sessions, so each folder is scanned in itself, and the repair pass scans again only folders that are due", async () => {
     expect(cliStdout('cli/session-list-elsewhere.txt').trim()).toBe('[]')
@@ -1266,7 +1267,7 @@ describe("OpenCode sessions Combwork didn't make: discovery and adoption's mark 
     const list = listOf([{ id: ids(1)[0], updated: 1 }], home)
     const slow = { file: process.execPath, args: ['-e', `require('fs').writeFileSync(${JSON.stringify(begun)}, 'x'); const t = setInterval(() => { if (require('fs').existsSync(${JSON.stringify(gate)})) { clearInterval(t); process.stdout.write(${JSON.stringify(list)}) } }, 20)`], env: childEnv() }
     await ask(core, { type: 'discover', home, folder: home, command: slow, reason: 'repair' })
-    for (let i = 0; i < 1000 && !existsSync(begun); i++) await new Promise((r) => setTimeout(r, 5))
+    for (let i = 0; i < 1000 && !existsSync(begun); i++) await new Promise((r) => setTimeout(r, timing('wait.interval')))
     expect(existsSync(begun)).toBe(true)
     // The removal stops the listing (its process ended by tree), and is answered once it has.
     await ask(core, { type: 'removeRoot', home })
@@ -1274,7 +1275,7 @@ describe("OpenCode sessions Combwork didn't make: discovery and adoption's mark 
     await ask(core, { type: 'idle' })
     expect(events.filter((e) => e.event === 'discovered')).toEqual([])
     expect(await ask(core, { type: 'discover', home, folder: home, command: slow, reason: 'repair' })).toBe(false)
-  }, 30_000)
+  }, timing('test.hang'))
 
   it("writes an adoption's mark only for a complete external mirror of that session and folder, never over another, never into a removed account", async () => {
     const home = tempDir('cw-oc-adopt-')

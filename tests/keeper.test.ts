@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { HOST_SOURCE, JobHost } from '../src/main/processSupervisor'
 import { keeperPipe } from '../src/main/agentProcesses'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 // Every child gets the run context's allowlisted environment (tests/e2e/runContext.cjs), never this shell's; the
 // grandchild below is given its parent's, which is that.
@@ -29,7 +30,7 @@ vi.mock('electron', async (importOriginal) => {
 vi.mock('../src/main/events', () => ({ emit: () => undefined, toast: () => undefined, onCombworkEvent: () => () => undefined }))
 
 /** A hung run's bound: every step here waits for a condition, never for time. */
-const HUNG_MS = 30_000
+const HUNG_MS = timing('wait.hang')
 const POWERSHELL = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
 const dir = tempDir('cw-keeper-')
 profile.dir = join(dir, 'profile')
@@ -109,7 +110,7 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
     k.say('keep')
     await exited(k.proc)
     expect(k.state('j1')).toMatchObject({ v: 1, run: 'j1', helper: self, app: '100:5', state: 'ended', observed: 'complete', total: 0, members: [] })
-  }, 60_000)
+  }, timing('test.hang'))
 
   it('a job with a process: says keeping, "live" with it, then "ended" once it ends, and exits', async () => {
     const k = keeper('live')
@@ -124,7 +125,7 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
     s.kill()
     await exited(k.proc)
     expect(k.state('j2')).toMatchObject({ state: 'ended', total: 0, members: [] })
-  }, 60_000)
+  }, timing('test.hang'))
 
   it('a process it follows outside the job keeps it "live" after the job itself is empty, until it ends', async () => {
     const k = keeper('followed')
@@ -142,7 +143,7 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
     outside.kill()
     await exited(k.proc)
     expect(k.state('j3')).toMatchObject({ state: 'ended', total: 0 })
-  }, 60_000)
+  }, timing('test.hang'))
 
   it('a grandchild started through a process that has exited keeps it "live" (no record could hold it), until it ends', async () => {
     const k = keeper('grandchild')
@@ -168,7 +169,7 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
     }
     await exited(k.proc)
     expect(k.state('j4')).toMatchObject({ state: 'ended', total: 0 })
-  }, 60_000)
+  }, timing('test.hang'))
 
   for (const seam of ['failsnap', 'failenum'] as const) {
   it(`while its sweeps can't be sure (${seam === 'failsnap' ? 'a snapshot Windows refuses' : 'an enumeration that stops part way'}), an empty job is never "ended": it waits, and writes it once they can`, async () => {
@@ -193,7 +194,7 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
     rmSync(fail)
     await exited(k.proc)
     expect(k.state('j6')).toMatchObject({ state: 'ended', total: 0 })
-  }, 60_000)
+  }, timing('test.hang'))
   }
 
   it("an exited process's identity is kept through every sweep that wasn't sure, let go only after one that was, and only then \"ended\" (HR2's round 2)", async () => {
@@ -226,7 +227,7 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
     k.say('keep')
     await exited(k.proc)
     expect(k.state('j7')).toMatchObject({ state: 'ended', total: 0 })
-  }, 60_000)
+  }, timing('test.hang'))
 
   it('a keeper ended before its job empties leaves "live", never "ended"', async () => {
     const k = keeper('killed')
@@ -240,7 +241,7 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
     s.kill()
     await exited(s)
     expect(k.state('j5')).toMatchObject({ state: 'live', members: expect.arrayContaining([expect.objectContaining({ pid: s.pid })]) })
-  }, 60_000)
+  }, timing('test.hang'))
 
   /**
    * The boundary whole: a Combwork's real job host (its transport and script) configured as a keeper, a launch's process in
@@ -284,7 +285,7 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
       s.kill()
       await exited(helperProc!)
       expect(await next.keeperState('boundary-run', '100:5')).toEqual({ state: 'ended', helper })
-    }, 60_000)
+    }, timing('test.hang'))
   }
 
   /**
@@ -381,7 +382,7 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
     endExactly(child)
     await exited(k.proc)
     expect(k.state('j8')).toMatchObject({ state: 'ended', total: 0 })
-  }, 90_000)
+  }, timing('test.hang'))
 
   it('not configured (no folder), or holding no job: it exits at the end of its input, writing nothing', async () => {
     const k = keeper('nothing')
@@ -389,5 +390,5 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
     await exited(k.proc)
     expect(k.out).not.toContain('keeping')
     expect(existsSync(k.states)).toBe(false)
-  }, 60_000)
+  }, timing('test.hang'))
 })

@@ -10,6 +10,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { as09, writeCard } from './boardDb'
 import { commit, gitRepo, sh } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-agentmoves-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -107,7 +108,7 @@ async function started(w: WS, wt: string, file = 'b.txt'): Promise<number> {
  * builder's report of it (HI-3277). After it, nothing reconciles the project until the report's own move.
  */
 async function verdictSettled(w: WS, repo: string): Promise<void> {
-  await vi.waitFor(() => expect(reconcilePending(repo), 'the pass the verdict asked for').toBe(true), { timeout: 10_000 })
+  await vi.waitFor(() => expect(reconcilePending(repo), 'the pass the verdict asked for').toBe(true), { timeout: timing('wait.hang') })
   await reconcileNow(w, repo)
   expect(reconcilePending(repo)).toBe(false)
 }

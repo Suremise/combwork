@@ -23,11 +23,12 @@ import { TESTED_JJ } from '../src/shared/jjTool'
 import { admitted } from './admitted'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 if (!jjExe) console.warn(`jjSlotRewritten.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
 // A hung test's bound, as jjCards.test.ts' (real jj preparations and a recovery): not a time budget.
-const REAL_JJ_MS = 180_000
+const REAL_JJ_MS = timing('wait.hangReal')
 
 const closers: (() => void | Promise<void>)[] = []
 afterEach(async () => {
@@ -58,7 +59,7 @@ function world(colocated: boolean) {
   closers.push(() => pool.close())
   const git: GitRun = async (cwd, args) => {
     try {
-      const buf = execFileSync('git', args, { cwd, env: h.env, windowsHide: true, timeout: 60_000, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
+      const buf = execFileSync('git', args, { cwd, env: h.env, windowsHide: true, timeout: timing('spawn.hang'), maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
       return { ok: true, out: buf.toString('utf8'), buf, err: '' }
     } catch (e) {
       const err = e as { stderr?: Buffer; stdout?: Buffer }

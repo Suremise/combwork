@@ -8,6 +8,7 @@ import { dirname, join, resolve } from 'path'
 import { tempDir } from './tempDir'
 // @ts-expect-error: a plain .mjs module without types
 import { ALLOW_DIR, allowName, baseLists, growth, readLists, runGuard, sitesOf } from '../scripts/i18nGuard.mjs'
+import { timing } from './timing.cjs'
 
 const ROOT = resolve(__dirname, '..')
 const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
@@ -333,7 +334,7 @@ describe("Combwork's own source", () => {
     const r = runGuard({ root }) as Result
     expect(r.exit).toBe(1)
     expect(reported(r)).toEqual([expect.stringMatching(/^NEW UI TEXT .*jsx-attr\|title\|Saved$/), expect.stringMatching(/^NEW UI TEXT .*jsx-text\|\|Saved just now$/)])
-  }, 60_000)
+  }, timing('test.hang'))
 
   it('the command exits 1 on new text, so CI fails', () => {
     const t = tree(`export const row = <span>Save</span>`)
@@ -343,5 +344,5 @@ describe("Combwork's own source", () => {
     const r = cli()
     expect(r.status).toBe(1)
     expect(r.stdout).toContain('NEW UI TEXT src/renderer/src/Panel.tsx:1  jsx-text||Saved just now')
-  }, 60_000)
+  }, timing('test.hang'))
 })

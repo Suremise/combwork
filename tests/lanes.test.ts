@@ -11,8 +11,9 @@ import { preferencesOf } from '../src/shared/workflow/preferences'
 import { laneYieldFirst, waitsOnCard, allDone, keptLanes, laneCard, laneLine, laneNextText, laneView, listedLanes, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_NAME_MAX, LANE_KEEP_MS, MAX_LANES, type LaneRecord, type LaneSlotHeld } from '../src/shared/lanes'
 import { tempDir } from './tempDir'
 import { storeDocs } from './storeDocs'
+import { timing } from './timing.cjs'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 const base = tempDir('cw-lanes-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -31,7 +32,7 @@ afterEach(async () => {
 const { onCombworkEvent } = await import('../src/main/events')
 const { saveTable } = await import('../src/main/storeTables')
 
-vi.setConfig({ testTimeout: 30_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 const rec = (over: Partial<LaneRecord> = {}): LaneRecord => ({
   id: 'lane-1',
@@ -401,9 +402,9 @@ describe('the lanes service', () => {
   })
   const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
   const make = (title: string) => run(() => tasks.createTask({ title, project: 'alpha' }, user))
-  const until = async (fn: () => boolean | Promise<boolean>, ms = 10_000): Promise<boolean> => {
+  const until = async (fn: () => boolean | Promise<boolean>, ms = timing('wait.hang')): Promise<boolean> => {
     const t = Date.now()
-    while (!(await fn()) && Date.now() - t < ms) await new Promise((r) => setTimeout(r, 50))
+    while (!(await fn()) && Date.now() - t < ms) await new Promise((r) => setTimeout(r, timing('wait.interval')))
     return fn()
   }
 

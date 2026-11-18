@@ -6,6 +6,7 @@ import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('closing-exit-work-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -13,7 +14,7 @@ const { sessions } = await import('../src/main/sessions')
 const { waitForAgentsClosed, closingLimits } = await import('../src/main/closingAgents')
 
 /** A bound for a hung run, never how long a step should take. */
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 
 type Internals = {
   live: Map<string, unknown>

@@ -17,6 +17,7 @@ import { commitPublish, folderIdentity, type PublishCommitRequest } from '../src
 import { publishTail, sourcesPrint, type PublishTailInput } from '../src/main/platform/jjPublishTail'
 import { admitted } from './admitted'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const closers: (() => void)[] = []
 afterEach(() => {
@@ -39,7 +40,7 @@ function database() {
     dismiss()
   })
   const open = (): DatabaseSync => {
-    const c = new DatabaseSync(file, { timeout: 5000 })
+    const c = new DatabaseSync(file, { timeout: timing('db.busyMs') })
     conns.push(c)
     return c
   }
