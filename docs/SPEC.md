@@ -3571,7 +3571,11 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   holds or waits on the store (its file gate, HI-2918): unreadable then, never an empty ref, which looked like a change
   by content and refused the start beside a slot being detached (HI-3012). A start refused as `evidence.changed` logs which check refused
   it (the plan, the write, the lane, the baseline) and on which pass, and each pass gathered again logs why. The
-  target's read itself is made again whole when the head moves under it, at most three reads.
+  target's read itself is made again whole when the head moves under it, at most three reads. A verdict (HI-3216) and
+  an answer to a request (HI-3391: an advance's Integrate, It's integrated, start again or undo, an agent's question)
+  take the same passes: a jj operation anywhere in the repository (another lane's commit, a review copy's checkout)
+  moves the head they keep while they decide, and they are gathered again, from before the write or from the write
+  itself, while only that moved; a change by content (the card's slot, the cards it waits for) still refuses at once.
 - **The provenance epoch:** a counter in board_meta (`provenance_epoch:<project id>`) the fact store moves in the same
   transaction as every Submitted or Adopted fact it appends, whatever the platform; never a per-card seq.
 - **The lease's hold** (HR2's round 1): the app's `slotHold` answers whether the card's lease is open, on its Started slot,
