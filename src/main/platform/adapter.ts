@@ -264,6 +264,13 @@ export interface AdvanceWords {
   op?: string
   /** Asked again after an answer that couldn't be acted on: why, as a code the question's message words (FOR_YOU.advance*). */
   again?: string
+  /**
+   * A refusal's (HI-3365): the finish it came under (`preview`: Combwork never moves the target by itself, it offers a
+   * preview) and when it's tried again: `repository` (refused at the base: once the repository changes) or `plan` (nothing
+   * moved past the base, for a reason of jj's: only once the plan changes).
+   */
+  mode?: 'auto' | 'preview'
+  next?: 'repository' | 'plan'
 }
 
 /** HI-3236: what a preview says: the move (target, from, to), how the candidate was built, and the commits it adds. */

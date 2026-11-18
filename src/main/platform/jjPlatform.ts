@@ -32,6 +32,14 @@ import { finishAdvances, finishPreviews } from '../../shared/workflow/options'
 
 /** HI-3236: the consent an attempt runs under: the automatic finish's, or a preview's click. */
 type AdvanceMode = 'auto' | 'preview'
+
+/**
+ * HI-3365: the outcomes past the base where nothing moved for a reason of jj's own (its prepare failed or gave no
+ * operation id, or gave one that isn't the move asked for). jj answers the same plan the same way, so the plan isn't
+ * tried again this cycle; `leaseLost` (another writer came) and `unreadable` (a read failed: a lasting one stops the
+ * base check before any attempt) are tried again.
+ */
+const HELD_AFTER_BASE = new Set(['notInHistory', 'prepareInvalid'])
 import { okBeforeApplies } from '../../shared/workflow/guards'
 import { dirname } from 'path'
 import { samePath } from '../../shared/movePaths'
@@ -881,6 +889,27 @@ export class JjPlatform implements PlatformAdapter {
     return facts.some((f) => f.kind === 'AdvanceAttempted' && undone.has((f.data as FactData['AdvanceAttempted']).attempt) && (f.data as FactData['AdvanceAttempted']).plan === planId)
   }
 
+  /**
+   * HI-3365: whether the cycle had an attempt for this plan that ended past the base with nothing moved for a reason of
+   * jj's own (HELD_AFTER_BASE, from its `AdvanceResolved` detail): it isn't attempted again until the plan changes.
+   */
+  private planHeld(card: CardRecord, s: CardState, planId: string): boolean {
+    const facts = this.wf!.store.facts(card.id).filter((f) => f.seq >= s.cycle)
+    const held = new Set(
+      facts
+        .filter((f) => f.kind === 'AdvanceResolved')
+        .map((f) => f.data as FactData['AdvanceResolved'])
+        .filter((d) => d.how === 'nothingMoved' && HELD_AFTER_BASE.has((d.detail ?? '').split(':')[0]))
+        .map((d) => d.attempt)
+    )
+    return facts.some((f) => f.kind === 'AdvanceAttempted' && held.has((f.data as FactData['AdvanceAttempted']).attempt) && (f.data as FactData['AdvanceAttempted']).plan === planId)
+  }
+
+  /** The finish a card's attempts run under now (HI-3236): a clicked preview, else Combwork's own advance. */
+  private modeOf(c: CardRecord, s: CardState): AdvanceMode {
+    return finishPreviews(this.wf!.rulesetOf(c, s).options.finish) ? 'preview' : 'auto'
+  }
+
   /** Whether the card's cycle has an `AdvanceAttempted` fact for the attempt. */
   private attemptRecorded(card: CardRecord, cycle: number, attempt: string): boolean {
     return this.wf!.store.facts(card.id).some((f) => f.seq >= cycle && f.kind === 'AdvanceAttempted' && (f.data as FactData['AdvanceAttempted']).attempt === attempt)
@@ -933,7 +962,10 @@ export class JjPlatform implements PlatformAdapter {
     if (out.kind === 'nothingMoved') {
       if (await host.resolved(card, ref, 'nothingMoved', `${out.code}${out.detail ? `: ${out.detail}` : ''}`)) await journalSettled(h, deps, j, 'nothingMoved', { detail: out.code })
       // Refused at the base for something the user can see to (s30 §1): the card says why, once.
-      if (j.refusedAt && out.code !== 'moved') await host.refused(card, j.plan.cycle, j.planId, this.advanceWords(j, s, out.code, out.detail))
+      const mode = this.modeOf(wf.store.card(card.id), s)
+      if (j.refusedAt && out.code !== 'moved') await host.refused(card, j.plan.cycle, j.planId, { ...this.advanceWords(j, s, out.code, out.detail), mode, next: 'repository' })
+      // HI-3365: past the base, for a reason of jj's: not tried again for this plan (planHeld), and the card says why, once.
+      else if (!j.refusedAt && HELD_AFTER_BASE.has(out.code)) await host.refused(card, j.plan.cycle, j.planId, { ...this.advanceWords(j, s, out.code, out.detail), mode, next: 'plan' })
       return false
     }
     const stop = { code: out.code, ...(out.detail ? { detail: out.detail } : {}), undo: out.kind === 'stopped' && out.undo, uncertain: out.kind === 'uncertain' }
@@ -1032,7 +1064,7 @@ export class JjPlatform implements PlatformAdapter {
         if (!this.consentHolds(c, s, 'auto')) return 'notReady'
         // HI-3265 (HI-2709): a blocker that isn't Done holds the advance; the card is tried again once it's Done.
         if (host.waitsFor(c).length) return 'notReady'
-        const ready = await this.readyPlan(h, integ, journals, c, s, host)
+        const ready = await this.readyPlan(h, integ, journals, c, s, host, 'auto')
         if (!ready) return 'notReady'
         await host.noteDefault(c)
         const out = await this.attemptUnder(h, integ, journals, c, s, ready.plan, ready.planId, host, 'auto')
@@ -1051,17 +1083,19 @@ export class JjPlatform implements PlatformAdapter {
    * HI-3264: that check is read-only, before any journal or fact. A refusal writes nothing but the card's comment (once
    * per cycle, plan and reason; none for a target that moved, whose candidate is built again), so a cause that persists
    * while jj operations come and go costs a read on each pass, never a journal or facts; jj unreadable: not ready.
+   * HI-3365: nor a plan an attempt of which ended past the base with nothing moved for a reason of jj's (planHeld).
+   * `mode` words the refusal (a preview's finish never moves the target by itself).
    */
-  private async readyPlan(h: Held, integ: JjIntegrationDeps, journals: AdvanceJournals, c: CardRecord, s: CardState, host: AdvanceHost): Promise<{ plan: JjAdvancePlan; planId: string } | null> {
+  private async readyPlan(h: Held, integ: JjIntegrationDeps, journals: AdvanceJournals, c: CardRecord, s: CardState, host: AdvanceHost, mode: AdvanceMode): Promise<{ plan: JjAdvancePlan; planId: string } | null> {
     const ready = await this.advancePlan(c, s, integ)
     if (!ready) return null
     const planId = planIdOf(ready.plan)
-    if (this.planUndone(c, s, planId) || !(await this.offerCurrent(ready.plan.target, ready.offer))) return null
+    if (this.planUndone(c, s, planId) || this.planHeld(c, s, planId) || !(await this.offerCurrent(ready.plan.target, ready.offer))) return null
     const refused = await baseRefusalNow(h, this.advanceDeps(integ, journals, () => true), ready.plan)
     if (refused === 'unreadable') return null
     if (refused) {
       const detail = refused.kind === 'nothingMoved' ? (refused.detail ?? '') : ''
-      if (refused.kind === 'nothingMoved' && refused.code !== 'moved') await host.refused(c, s.cycle, planId, { target: ready.plan.target, result: ready.plan.result, why: refused.code, detail })
+      if (refused.kind === 'nothingMoved' && refused.code !== 'moved') await host.refused(c, s.cycle, planId, { target: ready.plan.target, result: ready.plan.result, why: refused.code, detail, mode, next: 'repository' })
       return null
     }
     return { plan: ready.plan, planId }
@@ -1105,7 +1139,7 @@ export class JjPlatform implements PlatformAdapter {
         if (pending) return 'busy'
         // HI-3265: no preview while a blocker isn't Done (its Integrate couldn't start the attempt).
         if (host.waitsFor(c).length) return 'notReady'
-        const ready = await this.readyPlan(h, integ, journals, c, s, host)
+        const ready = await this.readyPlan(h, integ, journals, c, s, host, 'preview')
         if (!ready || host.previewDeclined(c, s.cycle, ready.planId)) return 'notReady'
         const open = s.requests.find((r) => r.gate === ADVANCE_PREVIEW_GATE)
         if (open?.result === ready.planId) return 'notReady'
@@ -1147,7 +1181,7 @@ export class JjPlatform implements PlatformAdapter {
       return false
     }
     if (c.stage !== 'approved' || s.integrated || advanceUnresolved(s) || !this.consentHolds(c, s, 'preview') || host.waitsFor(c).length) return false
-    const ready = await this.readyPlan(h, integ, journals, c, s, host)
+    const ready = await this.readyPlan(h, integ, journals, c, s, host, 'preview')
     if (!ready || ready.planId !== ans.plan) return false
     return (await this.attemptUnder(h, integ, journals, c, s, ready.plan, ready.planId, host, 'preview')).integrated
   }

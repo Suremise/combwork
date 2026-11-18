@@ -29,7 +29,11 @@ export const advanceNoteKey = (project: string): string => `advance_note:${proje
 
 /** HI-3235: what agents read of the advance's card comment and notice (the window shows FOR_YOU's messages beside them). */
 const A = {
-  refused: agentMsg({ id: 'workflow.advance.refused', text: "Combwork didn't move {target} for {card}: refused before anything changed ({why}: {detail}). It tries again once the repository changes; the user can integrate it themselves.", note: 'A card comment (HI-3235): Combwork’s jj advance refused at its base read; {why} a code, {detail} refs or folders.' }),
+  refused: agentMsg({
+    id: 'workflow.advance.refused',
+    text: "Combwork didn't move {target} for {card}: {next, select, plan {jj didn't make the move ({why}: {detail}), so nothing changed. This move isn't tried again; a new one is once the target or the candidate changes} other {refused before anything changed ({why}: {detail}). {mode, select, preview {No preview is offered until the repository changes} other {It tries again once the repository changes}}}}; the user can integrate it themselves.",
+    note: 'A card comment (HI-3235): Combwork’s jj advance refused at its base read (next repository), or nothing moved past it for a reason of jj’s (next plan, HI-3365); mode preview: the finish previews and never moves the target by itself; {why} a code, {detail} refs or folders.'
+  }),
   note: agentMsg({ id: 'workflow.advance.note', text: "Combwork now integrates {project}'s jj cards itself once their merge checks pass (Version Control → Workflow → Who integrates).", note: 'A notice, once per jj project (HI-3235): the new default finish applies to it.' })
 }
 
@@ -225,9 +229,10 @@ export function advanceHostOf(wf: Workflow): AdvanceHost {
             if (w.tx.meta(key) || w.state().cycle !== cycle) return false
             w.tx.setMeta(key, new Date().toISOString())
             const platform = wf.rulesetOf(card, w.state()).options.platform
-            const text = workflowText(FOR_YOU.advanceRefused, { card: card.key, target: words.target, result: PLATFORMS[platform].revisionShort(words.result), why: words.why, detail: clip(words.detail) || '—' })
+            const how = { mode: words.mode ?? 'auto', next: words.next ?? 'repository' }
+            const text = workflowText(FOR_YOU.advanceRefused, { card: card.key, target: words.target, result: PLATFORMS[platform].revisionShort(words.result), why: words.why, detail: clip(words.detail) || '—', ...how })
             // Agents read the card's comments: its English is the agent message, the window's the stored message.
-            w.action('comment', { text: inDefaultDialect(() => say(A.refused, { card: card.key, target: words.target, why: words.why, detail: clip(words.detail) || '-' })), shown: text })
+            w.action('comment', { text: inDefaultDialect(() => say(A.refused, { card: card.key, target: words.target, why: words.why, detail: clip(words.detail) || '-', ...how })), shown: text })
             return true
           },
           undefined,

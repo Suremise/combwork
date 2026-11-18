@@ -4212,7 +4212,15 @@ with s34, its mapping HI-3235/s7, s10, s13 and s16. gate:advance is open.
   (`baseRefusalNow`, under the locks), so a cause that persists while jj operations come and go costs reads on each
   pass, never a journal, an attempt or facts; no preview is asked meanwhile either. The attempt's own base read
   checks the same again (a change in between refuses it as before, journaled). (In a repository with no Git working
-  copy beside it, jj exports nothing by itself: the target and any other bookmark must be exported first.)
+  copy beside it, jj exports nothing by itself: the target and any other bookmark must be exported first.) Under
+  preview and click, the comment says no preview is offered while the cause holds, since that finish never moves T by
+  itself (HI-3365).
+- **Nothing moved past the base, for a reason of jj's** (HI-3365): the prepare exits non-zero or names no operation
+  (`notInHistory`), or names one that isn't the move asked for (`prepareInvalid`). jj answers the same plan the same
+  way (a newer, untested jj whose message differs, say), so the plan isn't attempted again this cycle (`planHeld`, from
+  its `AdvanceResolved` fact), and the card's comments say why, once per plan and reason; a new plan (the target moved,
+  new work) is attempted. A lease lost to another writer, or a read that failed, is tried again (a lasting read failure
+  stops the base check before any attempt).
 - **The steps**, each journaled before its command: `--at-op P0 --no-integrate-operation bookmark move T --from E --to
   R` (O, validated: parent P0, the attempt's marker, its view P0's but for T), `op integrate O`, `git export`, then
   every head, view and the Git side read twice. The lease (the plan unchanged, the card in Approved, the workspace
