@@ -496,10 +496,16 @@ interface CombworkMessageValues {
   'settings.advanced.cw.copies.quietWaitMinutes.title': undefined
   'settings.advanced.cw.copies.review.desc': undefined
   'settings.advanced.cw.copies.review.title': undefined
+  'settings.advanced.cw.db.busySeconds.desc': undefined
+  'settings.advanced.cw.db.busySeconds.title': undefined
   'settings.advanced.cw.disableHardwareAcceleration.desc': undefined
   'settings.advanced.cw.disableHardwareAcceleration.title': undefined
   'settings.advanced.cw.focused.pickSeconds.desc': undefined
   'settings.advanced.cw.focused.pickSeconds.title': undefined
+  'settings.advanced.cw.git.commitMinutes.desc': undefined
+  'settings.advanced.cw.git.commitMinutes.title': undefined
+  'settings.advanced.cw.git.networkMinutes.desc': undefined
+  'settings.advanced.cw.git.networkMinutes.title': undefined
   'settings.advanced.cw.guidance.desc': undefined
   'settings.advanced.cw.guidance.title': undefined
   'settings.advanced.cw.heapSnapshotNearLimit.desc': undefined
@@ -512,6 +518,8 @@ interface CombworkMessageValues {
   'settings.advanced.cw.inbox.idleWakes.title': undefined
   'settings.advanced.cw.inbox.stopContinuation.desc': undefined
   'settings.advanced.cw.inbox.stopContinuation.title': undefined
+  'settings.advanced.cw.jj.commandSeconds.desc': undefined
+  'settings.advanced.cw.jj.commandSeconds.title': undefined
   'settings.advanced.cw.journal.builds.desc': undefined
   'settings.advanced.cw.journal.builds.title': undefined
   'settings.advanced.cw.lanes.endWaitMinutes.desc': undefined
@@ -596,6 +604,8 @@ interface CombworkMessageValues {
   'settings.advanced.cw.queue.focusedJobs.title': undefined
   'settings.advanced.cw.queue.networkCodes.desc': undefined
   'settings.advanced.cw.queue.networkCodes.title': undefined
+  'settings.advanced.cw.queue.networkMinutes.desc': undefined
+  'settings.advanced.cw.queue.networkMinutes.title': undefined
   'settings.advanced.cw.queue.signSeconds.desc': undefined
   'settings.advanced.cw.queue.signSeconds.title': undefined
   'settings.advanced.cw.recorder.afterSeconds.desc': undefined
@@ -656,6 +666,8 @@ interface CombworkMessageValues {
   'settings.advanced.cw.terminal.osc52.block': undefined
   'settings.advanced.cw.terminal.osc52.desc': undefined
   'settings.advanced.cw.terminal.osc52.title': undefined
+  'settings.advanced.cw.typed.takeSeconds.desc': undefined
+  'settings.advanced.cw.typed.takeSeconds.title': undefined
   'settings.advanced.cw.usage.timelineDetailDays.desc': undefined
   'settings.advanced.cw.usage.timelineDetailDays.title': undefined
   'settings.advanced.cw.wait.agentsMaxSeconds.desc': undefined

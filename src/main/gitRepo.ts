@@ -43,6 +43,8 @@ import { localUse, remoteKept } from '../shared/branchCleanup'
 import type { BranchStart, ResolvedStart, StartPoints } from '../shared/nextVersion'
 import { samePath } from '../shared/movePaths'
 import * as G from './platform/git'
+import { platformLimits } from './platform/limits'
+import { gitRunSignal } from './gitCancel'
 import { plainRepo } from './platform/repoRefs'
 import { resolvedOf } from './workflow/rulesets'
 import { workBadges } from './workflow/cardWork'
@@ -76,15 +78,34 @@ const log = createLogger('gitRepo')
  * fetches by itself: ahead/behind is as of the user's last fetch.
  */
 
-/** Fetch, pull and push can wait on a sign-in window (Git Credential Manager): long, but never forever. */
-const NETWORK_MS = 5 * 60_000
 
 /** Commands that reach a remote never prompt in a terminal nobody sees: they fail instead (a credential helper's window still opens). */
 function networkEnv(): NodeJS.ProcessEnv {
   return { ...process.env, GIT_TERMINAL_PROMPT: '0' }
 }
 
-const net = (cwd: string, args: string[]): Promise<GitResult> => git(cwd, args, 16 * 1024 * 1024, undefined, { env: networkEnv(), timeout: NETWORK_MS })
+/**
+ * HI-3372: every command that reaches a remote takes the user's Cancel of the action running now (gitCancel.ts runs the
+ * action inside it). Its bound is a last resort, Settings → Advanced's `cw.git.networkMinutes` (30 min: 5 cut a large
+ * first fetch or push on a slow link short).
+ */
+const net = (cwd: string, args: string[]): Promise<GitResult> => {
+  const signal = gitRunSignal()
+  return git(cwd, args, 16 * 1024 * 1024, undefined, { env: networkEnv(), timeout: platformLimits.gitNetworkMs(), ...(signal ? { signal } : {}) })
+}
+
+/**
+ * HI-3372: what the user is told when their Cancel stopped a network action here. Only what is true: the local git was
+ * stopped; what reached the remote before it may have been applied (a push, a delete, a tag), so they look again.
+ */
+function stopped(kind: 'fetch' | 'pull' | 'push' | 'tag' | 'delete'): CombworkError {
+  return refusal(M.stopped, { kind })
+}
+
+/** HI-3372: a Cancel that came between two steps: the next step isn't started (a pull's merge after its fetch, a push's tags after its branches). */
+function stopIfCancelled(kind: 'fetch' | 'pull' | 'push' | 'tag' | 'delete'): void {
+  if (gitRunSignal()?.aborted) throw stopped(kind)
+}
 
 /**
  * The Git view's words (#850): what an action did, why it was refused or failed. Only the window reads them, so what an
@@ -92,6 +113,7 @@ const net = (cwd: string, args: string[]): Promise<GitResult> => git(cwd, args, 
  * language through IPC). Git's own words stay as git said them.
  */
 const M = {
+  stopped: msg({ id: 'service.gitRepo.stopped', defaultMessage: '{kind, select, fetch {Stopped the fetch here.} pull {Stopped the pull here: it may have fetched or brought commits in already, so look at the branch and its changes.} push {Stopped the push here.} tag {Stopped the push of the tag here.} other {Stopped deleting the remote branches here.}} What reached the remote before it stopped may have been applied: refresh to see where things stand.', description: 'HI-3372: after the user cancelled a fetch, pull, push, the push of a tag, or deleting remote branches in the Git view: only the local git was stopped, and part of it may already have reached the remote (select: translate each; keep the keys).' }),
   gaveUp: msg({ id: 'service.gitRepo.gaveUp', defaultMessage: 'git gave up after {minutes} minutes (no answer from the remote, or a sign-in left open).', description: 'Why fetching, pulling or pushing failed: git waited {minutes} minutes for the remote (or a sign-in window) and stopped.' }),
   exitCode: msg({ id: 'service.gitRepo.exitCode', defaultMessage: 'exit code {code}', description: 'Why a git command failed when git said nothing: the number it exited with.' }),
   command: msg({ id: 'service.gitRepo.command', defaultMessage: '{command}: {why}', description: "An error in the Git view: a git command ({command}, as it is: \"git log\") failed; {why} is git's own words, or why git can't run." }),
@@ -130,7 +152,7 @@ export function gitSays(r: GitResult): string {
 
 /** gitSays as text: git's own lines as they came, Combwork's words (it gave up, an exit code alone) as a message. */
 export function gitSaid(r: GitResult): TextPart {
-  if (r.timedOut) return withValues(M.gaveUp, { minutes: NETWORK_MS / 60_000 })
+  if (r.timedOut) return withValues(M.gaveUp, { minutes: Math.round(platformLimits.gitNetworkMs() / 60_000) })
   const lines = `${r.err}\n${r.out}`
     .split(/\r?\n/)
     .map((l) => l.replace(/^(error|fatal): /, '').trimEnd())
@@ -946,6 +968,7 @@ export async function fetchAll(projectPath: string): Promise<string> {
     const s = await summaryOf(projectPath)
     if (!s.remotes.length) throw refusal(msg({ id: 'service.gitRepo.noRemotesFetch', defaultMessage: 'This repository has no remotes to fetch from: add one first.', description: 'An error fetching in the Git view: the repository has no remote.' }))
     const r = await net(projectPath, ['fetch', '--all'])
+    if (r.cancelled) throw stopped('fetch')
     if (!r.ok) throw failed(M.fetchFailed, {}, r)
     log.info(`Fetched ${userText(projectPath)}`)
     void checkProject(projectPath)
@@ -969,14 +992,24 @@ export async function pull(projectPath: string): Promise<string> {
     if (why) throw new CombworkError(why)
     if (s.upstream.remote) {
       const f = await net(projectPath, ['fetch', '--', s.upstream.remote])
+      if (f.cancelled) throw stopped('pull')
       if (!f.ok) throw failed(M.fetchFailed, {}, f)
     }
+    // Cancelled after the fetch: the merge isn't started.
+    stopIfCancelled('pull')
     const now = await summaryOf(projectPath)
     const u = now.upstream
     if (!u || u.gone) throw refusal(msg({ id: 'service.gitRepo.upstreamGone', defaultMessage: '{upstream} is gone from the remote.', description: 'An error pulling in the Git view: the remote branch {upstream} the branch follows was deleted there.' }), { upstream: s.upstream.name })
     if (u.behind === 0) return tr(msg({ id: 'service.gitRepo.upToDate', defaultMessage: '{branch} is up to date with {upstream}.', description: 'After pulling in the Git view: the branch {branch} has every commit of the remote branch {upstream} already.' }), { branch: now.branch ?? '', upstream: u.name })
     if (u.ahead > 0) throw refusal(msg({ id: 'service.gitRepo.diverged', defaultMessage: '{branch} and {upstream} have diverged ({ahead, plural, one {# commit} other {# commits}} here, {behind, number} there), so pulling needs a merge or rebase. Do that in a terminal, or ask an agent to.', description: 'An error pulling in the Git view: the branch {branch} has {ahead} commits the remote branch {upstream} hasn\'t, and it has {behind} the branch hasn\'t; Combwork pulls only when no merge is needed.' }), { branch: now.branch ?? '', upstream: u.name, ahead: u.ahead, behind: u.behind })
-    const r = await changeFolder(projectPath, 'pull', now.branch, () => git(projectPath, ['merge', '--ff-only', '@{upstream}']))
+    // HI-3372 (HR2's round 1): the merge is the pull's forward step: a Cancel while it waited for the lock and the checks
+    // starts no merge; one while git merges ends it (said as maybe applied: a fast-forward may have moved the branch).
+    const r = await changeFolder(projectPath, 'pull', now.branch, () => {
+      stopIfCancelled('pull')
+      const signal = gitRunSignal()
+      return git(projectPath, ['merge', '--ff-only', '@{upstream}'], undefined, undefined, signal ? { signal } : {})
+    })
+    if (r.cancelled) throw stopped('pull')
     if (!r.ok) throw failed(msg({ id: 'service.gitRepo.pullFailed', defaultMessage: "Couldn't pull: {why}", description: "An error pulling in the Git view; {why} is git's own words." }), {}, r)
     log.info(`Pulled ${userText(projectPath)}`)
     await changed(projectPath)
@@ -1009,6 +1042,7 @@ export async function push(projectPath: string, remote?: string): Promise<string
       to = `${r}/${s.branch}`
     }
     const r = await net(projectPath, args)
+    if (r.cancelled) throw stopped('push')
     if (!r.ok) {
       if (/\[rejected\]|non-fast-forward|fetch first/i.test(r.err)) throw rejected(to, s.branch)
       throw failed(M.pushFailed, { to }, r)
@@ -1037,6 +1071,7 @@ export async function pushToRemote(projectPath: string, remote: string, scope: P
       if (b.startsWith('-') || !(await git(projectPath, ['show-ref', '--verify', '-q', `refs/heads/${b}`])).ok) throw refusal(M.noBranch, { branch: b })
       const to = `${remote}/${b}`
       const r = await net(projectPath, ['push', '--porcelain', '--', remote, `refs/heads/${b}:refs/heads/${b}`])
+      if (r.cancelled) throw stopped('push')
       const ref = parsePushPorcelain(r.out).find((x) => x.kind === 'branch' && x.name === b)
       if (ref?.result === 'refused') throw rejected(to, b)
       if (!r.ok) throw failed(M.pushFailed, { to }, r)
@@ -1046,7 +1081,10 @@ export async function pushToRemote(projectPath: string, remote: string, scope: P
     }
     const refs: PushedRef[] = []
     for (const what of ['--all', '--tags']) {
+      // Cancelled after the branches: the tags aren't pushed.
+      stopIfCancelled('push')
       const r = await net(projectPath, ['push', '--porcelain', what, '--', remote])
+      if (r.cancelled) throw stopped('push')
       const got = parsePushPorcelain(r.out)
       // A refusal is the remote's answer about a ref, counted below; any other failure (no answer, a sign-in) is git's.
       if (!r.ok && !got.some((x) => x.result === 'refused')) throw failed(M.pushFailed, { to: remote }, r)
@@ -1168,10 +1206,12 @@ export async function setUpstream(projectPath: string, branch: string, remote: s
     if (!(await there())) {
       if (!pushFirst) throw refusal(M.notOnRemote, { remote, branch: remoteBranch })
       const r = await net(projectPath, ['push', '--porcelain', '--', remote, `refs/heads/${branch}:refs/heads/${remoteBranch}`])
+      if (r.cancelled) throw stopped('push')
       if (parsePushPorcelain(r.out).some((x) => x.result === 'refused')) throw rejected(upstream, branch)
       if (!r.ok) throw failed(M.pushFailed, { to: upstream }, r)
       // A remote whose fetch settings don't map its branches here: read it once, so the branch can track it.
-      if (!(await there())) await net(projectPath, ['fetch', '--', remote])
+      stopIfCancelled('push')
+      if (!(await there()) && (await net(projectPath, ['fetch', '--', remote])).cancelled) throw stopped('push')
       if (!(await there())) throw refusal(M.notOnRemote, { remote, branch: remoteBranch })
       pushed = true
     }
@@ -1198,6 +1238,7 @@ export async function createTag(projectPath: string, name: string, message: stri
     log.info(`Tagged ${userText(projectPath)} ${userText(name)}`)
     if (!pushTo) return tr(msg({ id: 'service.gitRepo.tagged', defaultMessage: 'Tagged {commit} {name}.', description: 'After tagging in the Git view: the commit {commit} (a short hash) has the tag {name}.' }), { commit: s.head, name })
     const p = await net(projectPath, ['push', '--', pushTo, `refs/tags/${name}:refs/tags/${name}`])
+    if (p.cancelled) throw stopped('tag')
     if (!p.ok) throw failed(msg({ id: 'service.gitRepo.tagPushFailed', defaultMessage: "Tagged {commit} {name}, but couldn't push it to {remote}: {why}", description: "An error in the Git view: the commit {commit} was tagged {name}, but pushing the tag to the remote {remote} failed; {why} is git's own words." }), { commit: s.head, name, remote: pushTo }, p)
     return tr(msg({ id: 'service.gitRepo.taggedPushed', defaultMessage: 'Tagged {commit} {name} and pushed it to {remote}.', description: 'After tagging in the Git view: the commit {commit} has the tag {name}, which went to the remote {remote} too.' }), { commit: s.head, name, remote: pushTo })
   })
@@ -1383,6 +1424,7 @@ export async function deleteRemoteBranches(projectPath: string, remote: string, 
         if (!ready.length) throw new CombworkError(linesOf(said))
         // The push under the lock too (round 3): no slot, worktree or target change lands between the checks and it.
         const r = await net(projectPath, ['push', '--porcelain', ...ready.map((g) => `--force-with-lease=refs/heads/${g.branch}:${g.sha}`), '--', remote, ...ready.map((g) => `:refs/heads/${g.branch}`)])
+        if (r.cancelled) throw stopped('delete')
         const got = parsePushPorcelain(r.out)
         const done = ready.filter((g) => got.some((x) => x.kind === 'branch' && x.name === g.branch && x.result === 'pushed'))
         const refused = ready.filter((g) => !done.includes(g))

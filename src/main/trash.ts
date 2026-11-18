@@ -30,7 +30,7 @@ let moved = 0
  * closing a file in it holds a handle briefly, and moving a folder fails while anything in it is open. Tried again after
  * each pause (about 1.5 s in all); a program that keeps it open is still refused, and the caller says so.
  */
-const HELD_RETRY_MS = [50, 100, 200, 400, 800]
+const HELD_RETRY_MS = [50, 100, 200, 400, 800, 1600, 3200]
 const HELD_CODES = new Set(['EPERM', 'EBUSY', 'EACCES'])
 
 /** A move `still` stopped before it tried: nothing was changed. */

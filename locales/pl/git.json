@@ -13,6 +13,7 @@
   "git.branches.cleanUp": "Uporządkuj scalone gałęzie…",
   "git.branches.cleanUpTip": "{n, plural, =0 {Żadna gałąź nie jest scalona z {target} i nieużywana.} one {# gałąź tutaj lub na zdalnym repozytorium jest scalona z {target} i nieużywana: wybierz, co usunąć.} few {# gałęzie tutaj lub na zdalnym repozytorium są scalone z {target} i nieużywane: wybierz, które usunąć.} many {# gałęzi tutaj lub na zdalnym repozytorium jest scalonych z {target} i nieużywanych: wybierz, które usunąć.} other {# gałęzi tutaj lub na zdalnym repozytorium jest scalonych z {target} i nieużywanych: wybierz, które usunąć.}}",
   "git.branches.copyRevision": "Kopiuj rewizję {revision}",
+  "git.branches.deletingOn": "Usuwanie gałęzi na {remote}…",
   "git.branches.earlierCards": "{n, plural, one {+# wcześniejsza karta} few {+# wcześniejsze karty} many {+# wcześniejszych kart} other {+# wcześniejszej karty}}",
   "git.branches.group": "{group, select, inUse {W użyciu} merged {Scalone z {target}} other {Niescalone z {target}}}",
   "git.branches.groupTip": "{group, select, inUse {Gałąź docelowa, gałąź domyślna, gałąź folderu projektu i te, których używa slot, worktree lub otwarta karta.} merged {Każdy ich commit jest w {target} i nic ich nie używa: Uporządkuj scalone gałęzie je usuwa.} other {Te mają commity, których nie ma w {target}. Usuń którąś dopiero po sprawdzeniu commitów, które utraci.}}",

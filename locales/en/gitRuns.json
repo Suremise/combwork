@@ -1,0 +1,10 @@
+{
+  "gitRuns.cancel": {
+    "defaultMessage": "Cancel",
+    "description": "HI-3372: the button that cancels a commit, set aside, fetch, pull or push while it runs (beside its button, in its dialog, or on its notification while it runs)."
+  },
+  "gitRuns.stopped": {
+    "defaultMessage": "Stopped",
+    "description": "HI-3372: a notification's title after the user cancelled a commit, set aside, fetch, pull or push: what was stopped, and what is true now, is said under it."
+  }
+}

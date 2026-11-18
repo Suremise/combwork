@@ -22,6 +22,7 @@
 // the `args` attribute) are jj 0.47.1's mechanics, not an API: anything unexpected is uncertain, never worked around.
 
 import { createHash } from 'crypto'
+import { heldError, RENAME_RETRY, untilBound } from '../retryBounds'
 import { mkdir, open, readdir, readFile, rename, stat, unlink } from 'original-fs/promises'
 import { join } from 'path'
 import type { RunResult } from './repoContext'
@@ -206,8 +207,12 @@ export interface UndoEntry {
   detail?: string
 }
 
-/** How an attempt was settled, as its journal remembers (the facts are the record; this saves reading jj again). */
-export type AdvanceSettled = 'nothingMoved' | 'integrated' | 'stopped' | 'uncertain' | 'undone' | 'resolved'
+/**
+ * How an attempt was settled, as its journal remembers (the facts are the record; this saves reading jj again).
+ * HI-3367: `superseded`, no longer attached to its card's cycle (the card restarted, archived or gone): retired from the
+ * live folder with its phase, operation and undos kept as they were, never proved integrated or undone.
+ */
+export type AdvanceSettled = 'nothingMoved' | 'integrated' | 'stopped' | 'uncertain' | 'undone' | 'resolved' | 'superseded'
 
 /** An attempt's journal (s34 §2): the plan whole, then what the base read found, O, and each phase. */
 export interface AdvanceJournal {
@@ -225,12 +230,14 @@ export interface AdvanceJournal {
   /** Refused at the base: what the repository was then (its heads and Git side, hashed), so the same refusal isn't tried again until it changes. */
   refusedAt?: string
   undos: UndoEntry[]
+  /** HI-3367: superseded, the card's cycle then (its own cycle, or the archived or gone card's last). */
+  supersededAt?: number
 }
 
 /**
  * Writes a file whole and durably: a temp file beside it written and synced, then renamed over it (Windows' rename
- * replaces; a reader sees the old file or the new, never half of one). Renames are retried briefly where Windows holds
- * the file (an antivirus scan, a reader).
+ * replaces; a reader sees the old file or the new, never half of one). Renames are retried where Windows holds the file
+ * (an antivirus scan, a reader), for RENAME_RETRY's bound (HI-3374: it was 6 tries, about 0.6 s).
  */
 export async function writeDurable(file: string, text: string): Promise<void> {
   const tmp = `${file}.${process.pid}.${Date.now()}.tmp`
@@ -241,16 +248,7 @@ export async function writeDurable(file: string, text: string): Promise<void> {
   } finally {
     await h.close()
   }
-  for (let i = 0; ; i++) {
-    try {
-      await rename(tmp, file)
-      return
-    } catch (e) {
-      const code = (e as NodeJS.ErrnoException).code
-      if (i >= 5 || (code !== 'EPERM' && code !== 'EACCES' && code !== 'EBUSY')) throw e
-      await new Promise((r) => setTimeout(r, 20 * 2 ** i))
-    }
-  }
+  await untilBound(() => rename(tmp, file), { bound: RENAME_RETRY, transient: heldError })
 }
 
 const safe = (s: string): string => s.replace(/[^A-Za-z0-9_-]/g, '_')
@@ -268,7 +266,7 @@ async function gone(file: string): Promise<void> {
  * HI-3264: how an attempt settled for good, its outcome on the card (`Integrated`, `AdvanceResolved`): nothing reads its
  * journal again, so it leaves the live folder. A stopped or uncertain one stays: its question still needs it.
  */
-const SETTLED_FOR_GOOD: readonly AdvanceSettled[] = ['nothingMoved', 'integrated', 'resolved', 'undone']
+const SETTLED_FOR_GOOD: readonly AdvanceSettled[] = ['nothingMoved', 'integrated', 'resolved', 'undone', 'superseded']
 export const settledForGood = (j: Pick<AdvanceJournal, 'settled'>): boolean => !!j.settled && SETTLED_FOR_GOOD.includes(j.settled)
 /** HI-3264: how long a journal settled for good is kept in `settled/` (for a look after the fact), before it's pruned. */
 export const SETTLED_KEPT_MS = 30 * 24 * 60 * 60 * 1000
@@ -386,6 +384,55 @@ export class AdvanceJournals {
     }
     if (drained) await this.prune()
     return out
+  }
+  /**
+   * HI-3367 (HR1's round 1, finding 2): the live folder's names; none only when the folder doesn't exist. Any other failure
+   * to list it (held, denied, an I/O error) throws: what it may hold is unknown, never taken as nothing.
+   */
+  private async liveNames(): Promise<string[]> {
+    try {
+      return await readdir(this.dir)
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return []
+      throw e
+    }
+  }
+  /**
+   * HI-3367: a card's live journals in cycles other than `cycle` (null: every cycle), read from the folder now, each with
+   * its cycle and attempt from its file's name; one that can't be read listed as such (its name is all that is known).
+   * A folder that can't be listed throws (liveNames).
+   */
+  async others(card: string, cycle: number | null): Promise<{ name: string; cycle: number; attempt: string; journal: AdvanceJournal | 'unreadable' }[]> {
+    const names = await this.liveNames()
+    const prefix = `${safe(card)}.`
+    const out: { name: string; cycle: number; attempt: string; journal: AdvanceJournal | 'unreadable' }[] = []
+    for (const n of names.filter((x) => x.startsWith(prefix) && x.endsWith('.json')).sort()) {
+      const m = /^(\d+)\.(.+)\.json$/.exec(n.slice(prefix.length))
+      if (!m || Number(m[1]) === cycle) continue
+      const j = await this.read(card, Number(m[1]), m[2])
+      if (j) out.push({ name: n, cycle: Number(m[1]), attempt: m[2], journal: j })
+    }
+    return out
+  }
+  /**
+   * HI-3367: a live journal no longer attached to its card's cycle retired to `settled/`: whole, `superseded`, its phase,
+   * operation and undos as they were. One that can't be read is moved there as it is. A failure throws: it stays live.
+   */
+  async supersede(name: string, j: AdvanceJournal | 'unreadable', cycleNow: number | null): Promise<void> {
+    if (j === 'unreadable') {
+      await mkdir(this.settledDir, { recursive: true })
+      await rename(join(this.dir, name), join(this.settledDir, name))
+      return
+    }
+    await this.write({ ...j, settled: 'superseded', ...(cycleNow !== null ? { supersededAt: cycleNow } : {}) })
+  }
+  /** HI-3367: the cards with live journals in the folder, by their keys as the journals' file names give them. */
+  async cardsNamed(): Promise<Set<string>> {
+    const names = await this.liveNames()
+    return new Set(names.flatMap((n) => {
+      const m = /^(.+)\.\d+\.[^.]+\.json$/.exec(n)
+      return m ? [m[1]] : []
+    }))
   }
   /** Every journal in the folder (recovery's pass over the project's cards). */
   async all(): Promise<AdvanceJournal[]> {
@@ -968,6 +1015,16 @@ export async function classifyUndoNow(h: Held, deps: JjAdvanceDeps, j: AdvanceJo
 
 /** Whether an undo entry is positively pre-mutation (s16 §1): no jj write of it can have run. */
 export const undoPreMutation = (u: UndoEntry): boolean => UNDO_BEFORE.includes(u.phase)
+
+/**
+ * HI-3367: whether a journal is positively pre-mutation: a known phase before `integrating` and every undo entry known to be
+ * before its revert. Anything else (a later phase, a phase or undo that isn't known, a journal that can't be read) may have
+ * moved its target.
+ */
+export function attemptPreMutation(j: AdvanceJournal | 'unreadable'): boolean {
+  if (j === 'unreadable' || !ADVANCE_ORDER.includes(j.phase) || advanceAt(j.phase) >= advanceAt('integrating')) return false
+  return Array.isArray(j.undos) && j.undos.every((u) => !!u && typeof u === 'object' && undoPreMutation(u))
+}
 
 /** Appends a new undo entry (s16 §1), earlier pre-mutation ones abandoned, in one durable write. */
 export async function journalNewUndo(h: Held, deps: JjAdvanceDeps, j: AdvanceJournal, undo: string, request: string): Promise<AdvanceJournal> {

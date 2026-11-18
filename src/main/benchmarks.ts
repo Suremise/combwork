@@ -1,4 +1,5 @@
 import { randomBytes } from 'crypto'
+import { RENAME_RETRY } from './retryBounds'
 import { mkdir, open, readdir, rename, rm, stat, unlink } from 'original-fs/promises'
 import { join } from 'path'
 import { BENCHMARK_LIMITS, METRICS_EXPORT_SCHEMA, aboutOf, compareScopeKey, factsOf, parseArtifact, readEntry, readKept, summaryOf, type Artifact, type CompareScope, type ImportResult, type KeptEntry, type ParseResult } from '../shared/benchmark'
@@ -40,7 +41,7 @@ const log = createLogger('benchmarks')
 export const benchIo = { write: writeTextAtomic, renameOnce: (from: string, to: string): Promise<void> => rename(from, to), unlink: (path: string): Promise<void> => unlink(path) }
 
 /** A rename for this workspace's work: retried while Windows holds a file, the workspace checked before every attempt. */
-const guardedRename = (ctx: BenchContext, from: string, to: string): Promise<void> => renameRetrying(from, to, 20, () => live(ctx), (a, b) => benchIo.renameOnce(a, b))
+const guardedRename = (ctx: BenchContext, from: string, to: string): Promise<void> => renameRetrying(from, to, RENAME_RETRY, () => live(ctx), (a, b) => benchIo.renameOnce(a, b))
 
 /** Index and kept files are read with a cap: they are Combwork's, but on disk. */
 const INDEX_BYTES = 512 * 1024

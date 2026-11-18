@@ -227,6 +227,10 @@
     "defaultMessage": "Show Uncommitted Changes",
     "description": "HI-2944: a command, in the Project category. It isn't in the menus or the palette: the warning that a branch's folder has uncommitted changes runs it from its Show Changes button (the project's Version Control tab)."
   },
+  "shell.command.git.cancelRun": {
+    "defaultMessage": "Cancel Git Action",
+    "description": "HI-3372: a command, in the Project category. It isn't in the menus or the palette: a commit's, set aside's, fetch's, pull's or push's notification runs it from its Cancel button while that action runs."
+  },
   "shell.command.help.about": {
     "defaultMessage": "About {app}",
     "description": "A command (the Help menu, the command palette), in the Help category. {app} is Combwork's name."

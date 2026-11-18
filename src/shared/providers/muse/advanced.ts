@@ -69,9 +69,9 @@ export const ADVANCED: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.muse.hooks.timeoutSeconds.title', defaultMessage: 'Hooks: timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.muse.hooks.timeoutSeconds.desc', defaultMessage: "How long Muse waits for Combwork to take one of its hooks (an edit waits for a file lock). Too short, Combwork misses what Muse reports, an agent may look stuck, and an edit of a locked file can go ahead before Combwork refuses it.", description: 'What the advanced setting "Hooks: timeout" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
-    default: 10,
+    default: 30,
     min: 1,
-    max: 60,
+    max: 120,
     unit: 's',
     applies: 'sessions',
     samples: [{ from: `${FIX}/muse/hooks-1.4.20-echo.jsonl`, version: '1.4.20', text: '"hook_event_name":"SessionStart"', shows: 'Muse running a hook command with its payload' }] // i18n-ignore: a CLI's recorded text (#367)

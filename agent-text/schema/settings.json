@@ -1163,6 +1163,12 @@
   "settings.advanced.cw.copies.review.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.db.busySeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.db.busySeconds.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.disableHardwareAcceleration.desc": {
     "placeholders": {}
   },
@@ -1173,6 +1179,18 @@
     "placeholders": {}
   },
   "settings.advanced.cw.focused.pickSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.git.commitMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.git.commitMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.git.networkMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.git.networkMinutes.title": {
     "placeholders": {}
   },
   "settings.advanced.cw.guidance.desc": {
@@ -1209,6 +1227,12 @@
     "placeholders": {}
   },
   "settings.advanced.cw.inbox.stopContinuation.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.jj.commandSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.jj.commandSeconds.title": {
     "placeholders": {}
   },
   "settings.advanced.cw.journal.builds.desc": {
@@ -1463,6 +1487,12 @@
   "settings.advanced.cw.queue.networkCodes.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.queue.networkMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.queue.networkMinutes.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.queue.signSeconds.desc": {
     "placeholders": {}
   },
@@ -1641,6 +1671,12 @@
     "placeholders": {}
   },
   "settings.advanced.cw.terminal.osc52.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.typed.takeSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.typed.takeSeconds.title": {
     "placeholders": {}
   },
   "settings.advanced.cw.usage.timelineDetailDays.desc": {

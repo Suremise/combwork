@@ -85,7 +85,7 @@ describe('the admin snippet (HI-2777)', () => {
     const ctx = { projectPath: project, agentId: 'a1', cwd: project, skills: [], mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=r', fixedHookUrl: URL47821, env: { CLAUDE_CONFIG_DIR: join(base, 'home') }, extraArgs: [], hookAuthFile: join(priv, 'hook-auth.txt'), privateDir: priv, overrides: {} }
     await claudeCode.prepareLaunch(ctx as never)
     const settings = JSON.parse(readFileSync(join(priv, 'settings.json'), 'utf8'))
-    const snippet = claudeManagedSnippet([47821], { hook: 5, preToolUse: 10 }) as { hooks: Record<string, unknown> }
+    const snippet = claudeManagedSnippet([47821], { hook: 30, preToolUse: 30 }) as { hooks: Record<string, unknown> }
     expect(settings.hooks).toEqual(snippet.hooks)
     // With the Agent API not listening: the run's server, which knows the run by its token, then they differ.
     expect(claudeHookHandlers(['http://127.0.0.1:9/hook?run=r'], T)).not.toEqual(snippet.hooks)

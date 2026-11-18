@@ -1,4 +1,5 @@
 import { Worker } from 'worker_threads'
+import { dbLimits } from './db'
 import { app } from 'electron'
 import { existsSync } from 'original-fs'
 import { stat } from 'original-fs/promises'
@@ -259,7 +260,8 @@ class UsageHistory {
       this.inProcess = handleRequest
       return (m) => this.runInProcess(m)
     }
-    const w = new Worker(file)
+    // HI-3374: its databases wait for another program's lock as main's do (cw.db.busySeconds).
+    const w = new Worker(file, { workerData: { dbBusyMs: dbLimits.busyMs } })
     this.worker = w
     workerStarted('usage history', w) // i18n-ignore: a worker's name, for Copy Diagnostics' report (English)
     w.on('message', (m: WorkerReply) => this.reply(m))

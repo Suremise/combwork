@@ -22,7 +22,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace, WorkspaceS
 const tasks = await import('../src/main/tasks')
 const journal = await import('../src/main/journal')
 const store = await import('../src/main/boardStore')
-const { backupTo, OPEN_IO_RETRY_MS, openDb, schemaVersion, untilOpenable } = await import('../src/main/db')
+const { backupTo, dbLimits, OPEN_IO_RETRY_MS, openDb, schemaVersion, untilOpenable } = await import('../src/main/db')
 const { renameRetrying } = await import('../src/main/fsutil')
 const { refusal } = await import('../src/main/openingFence')
 
@@ -66,7 +66,8 @@ describe('the database layer (db.ts)', () => {
     try {
       expect((db.writer.prepare('PRAGMA journal_mode').get() as { journal_mode: string }).journal_mode).toBe('wal')
       expect((db.writer.prepare('PRAGMA synchronous').get() as { synchronous: number }).synchronous).toBe(1)
-      expect((db.writer.prepare('PRAGMA busy_timeout').get() as { timeout: number }).timeout).toBe(5000)
+      // HI-3374: cw.db.busySeconds' (dbLimits.busyMs, 15 s by default).
+      expect((db.writer.prepare('PRAGMA busy_timeout').get() as { timeout: number }).timeout).toBe(dbLimits.busyMs)
       expect(db.writer.prepare('SELECT version, name, app_version FROM schema_version').all()).toEqual([{ version: 1, name: 'one', app_version: '9.9.9' }])
       // The reader only reads.
       expect(() => db.reader.exec('INSERT INTO a VALUES (1)')).toThrow()

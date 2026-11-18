@@ -4,12 +4,26 @@
       "project": "plain"
     }
   },
+  "workflow.advance.previewClosed": {
+    "placeholders": {
+      "clicked": "select",
+      "card": "plain",
+      "why": "select",
+      "cards": "plain"
+    }
+  },
   "workflow.advance.refused": {
     "placeholders": {
       "target": "plain",
       "card": "plain",
       "why": "plain",
       "detail": "plain"
+    }
+  },
+  "workflow.advance.superseded": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain"
     }
   },
   "workflow.contradiction.combworkMergesNeedsGit": {
@@ -78,6 +92,14 @@
       "more": "plural"
     }
   },
+  "workflow.forYou.advancePreviewClosed": {
+    "placeholders": {
+      "clicked": "select",
+      "card": "plain",
+      "why": "select",
+      "cards": "plain"
+    }
+  },
   "workflow.forYou.advanceRefused": {
     "placeholders": {
       "target": "plain",
@@ -95,6 +117,12 @@
       "card": "plain",
       "why": "select",
       "detail": "plain"
+    }
+  },
+  "workflow.forYou.advanceSuperseded": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain"
     }
   },
   "workflow.forYou.advanceUncertain": {

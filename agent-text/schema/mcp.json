@@ -53,6 +53,12 @@
   "mcp.catalog.sourceUrl": {
     "placeholders": {}
   },
+  "mcp.catalog.stalled": {
+    "placeholders": {
+      "url": "plain",
+      "seconds": "number"
+    }
+  },
   "mcp.catalog.timeout": {
     "placeholders": {
       "url": "plain",

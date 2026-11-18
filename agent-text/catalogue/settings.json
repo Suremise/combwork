@@ -1899,6 +1899,16 @@
     "note": "An advanced setting's title (Settings → Advanced), listed under Combwork. A review copy is a folder Combwork keeps at the exact revision a reviewer reviews, which nothing else writes.",
     "audience": "both"
   },
+  "settings.advanced.cw.db.busySeconds.desc": {
+    "text": "How long a write to the board, the Assistant's journal or the usage history waits while another program (another Combwork on this workspace, a script) holds its database's lock, before the write is refused. It bounds a wait, not a speed: a write to the board waits on Combwork's main thread, so the window doesn't respond while it waits. Takes effect after Combwork restarts.",
+    "note": "What the advanced setting \"Databases: wait for another program's lock\" does (Settings → Advanced, HI-3374). The window not responding while it waits is a real warning: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.db.busySeconds.title": {
+    "text": "Databases: wait for another program's lock",
+    "note": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"15 s\").",
+    "audience": "both"
+  },
   "settings.advanced.cw.disableHardwareAcceleration.desc": {
     "text": "Draw Combwork without the graphics card, for a graphics driver that leaves Combwork's window blank, flickering or crashing. Terminals then draw without WebGL. Takes effect when Combwork restarts; to start once without it, run Combwork with --disable-gpu.",
     "note": "What the advanced setting \"Disable hardware acceleration\" is for, and what goes wrong when it is wrong (Settings → Advanced). --disable-gpu is a command-line option: keep it.",
@@ -1917,6 +1927,26 @@
   "settings.advanced.cw.focused.pickSeconds.title": {
     "text": "Focused tests: longest the choice of tests runs",
     "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds: how long the project's command that chooses a card's focused tests may run, when the card is submitted and at its merge.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.git.commitMinutes.desc": {
+    "text": "How long Commit and Set aside of a folder's changes may run, the repository's pre-commit hook, filters and signer included, before Combwork ends git as stuck. You can cancel one from the window at any time: this is a last resort for one nobody is watching. Raise it if a hook really runs longer.",
+    "note": "What the advanced setting \"Git: longest a commit or set aside takes\" does, and when to change it (Settings → Advanced, HI-3372).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.git.commitMinutes.title": {
+    "text": "Git: longest a commit or set aside takes",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes. Commit and Set aside are the buttons that commit or stash a folder's uncommitted changes (HI-3372).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.git.networkMinutes.desc": {
+    "text": "How long Fetch, Pull and Push in Version Control (and Push to…, pushing a tag, deleting remote branches) may run, a sign-in window included, before Combwork ends git as stuck. You can cancel one from the window at any time; raise it for a large first fetch or push on a slow connection.",
+    "note": "What the advanced setting \"Git: longest a fetch, pull or push takes\" does, and when to change it (Settings → Advanced, HI-3372). Push to… is an action's name.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.git.networkMinutes.title": {
+    "text": "Git: longest a fetch, pull or push takes",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes: the Fetch, Pull and Push actions in Version Control (HI-3372).",
     "audience": "both"
   },
   "settings.advanced.cw.guidance.desc": {
@@ -1977,6 +2007,16 @@
   "settings.advanced.cw.inbox.stopContinuation.title": {
     "text": "Keep an agent going when it stops with unread items",
     "note": "An advanced setting's title (Settings → Advanced), listed under Combwork: when an agent is about to end its turn with items in its inbox it hasn't read, Combwork makes it carry on and read them.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.jj.commandSeconds.desc": {
+    "text": "How long one jj command Combwork runs may take, a snapshot of a large working copy included, before Combwork ends it: a read then counts as unknown, and a change made during a merge is left for you to settle. Raise it for a very large repository or a slow disk.",
+    "note": "What the advanced setting \"jj: longest a command takes\" does, and when to change it (Settings → Advanced, HI-3372). jj is the Jujutsu version control tool.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.jj.commandSeconds.title": {
+    "text": "jj: longest a command takes",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds. jj is the Jujutsu version control tool: keep its name (HI-3372).",
     "audience": "both"
   },
   "settings.advanced.cw.journal.builds.desc": {
@@ -2080,8 +2120,8 @@
     "audience": "both"
   },
   "settings.advanced.cw.mcpCatalog.downloadSeconds.desc": {
-    "text": "How long Install and Update wait for a catalogue server's zip, redirects included, before they stop with nothing installed. Raise it on a slow connection.",
-    "note": "What the advanced setting \"MCP catalogues: downloading a server\" is for (Settings → Advanced, HI-545).",
+    "text": "How long Install and Update wait with nothing arriving while they download a catalogue server's zip, before they stop with nothing installed. A slow download that keeps arriving is never stopped; Cancel download stops one. Raise it on a connection that pauses for long.",
+    "note": "What the advanced setting \"MCP catalogues: downloading a server\" is for (Settings → Advanced, HI-545). HI-3377: the time with no data arriving, not the whole download’s time.",
     "audience": "both"
   },
   "settings.advanced.cw.mcpCatalog.downloadSeconds.title": {
@@ -2130,8 +2170,8 @@
     "audience": "both"
   },
   "settings.advanced.cw.mergeGuards.seconds.desc": {
-    "text": "How long matching the merge guards against a merge’s added lines may take. Past it the check ends unfinished, which sends the card back like a match, naming the guard that was running. Raise it for very large merges; a pattern that takes this long usually needs rewriting.",
-    "note": "What the advanced setting \"Merge guards: longest the check takes\" does, and what goes wrong when it is wrong (Settings → Advanced, HI-3284).",
+    "text": "How long matching the merge guards against a merge’s added lines may take, once their check has started. Past it the merge isn’t checked: nothing merges, and the card comes back to be submitted again unchanged, naming the guard that was running (not as a match). Raise it for very large merges; a pattern that takes this long usually needs rewriting.",
+    "note": "What the advanced setting \"Merge guards: longest the check takes\" does, and what goes wrong when it is wrong (Settings → Advanced, HI-3284, HI-3377).",
     "audience": "both"
   },
   "settings.advanced.cw.mergeGuards.seconds.title": {
@@ -2300,7 +2340,7 @@
     "audience": "both"
   },
   "settings.advanced.cw.progress.replySeconds.desc": {
-    "text": "How long cw-progress waits for Combwork to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks once more, then runs nothing and says Combwork is slow. Raise it when a busy Combwork makes checks fail with \"Combwork is slow to answer\" (HI-1892). Kept at 2 minutes at most.",
+    "text": "How long cw-progress waits for Combwork to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks again (after 5 s, then 15 s), then runs nothing and says Combwork is slow. Raise it when a busy Combwork makes checks fail with \"Combwork is slow to answer\" (HI-1892). Kept at 10 minutes at most.",
     "note": "What the advanced setting \"cw-progress: Combwork's reply time\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
     "audience": "both"
   },
@@ -2397,6 +2437,16 @@
   "settings.advanced.cw.queue.networkCodes.title": {
     "text": "Merge queue: network errors that count as temporary",
     "note": "An advanced setting's title (Settings → Advanced), listed under Combwork. The merge queue tests a card's work before merging it; a check that fails for the network, not the work, lets the card's builder submit the same revision again.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.queue.networkMinutes.desc": {
+    "text": "How long the merge queue's own fetches and pushes may take: pushing a merged target, a target that follows its remote (its fetch and push), reading the remote's head as a card starts, and Bring up to date. Past it git is ended and the merge waits or pauses. Raise it for a slow connection or a large repository.",
+    "note": "What the advanced setting \"Merge queue: longest a fetch or push takes\" does, and when to change it (Settings → Advanced, HI-3372). Bring up to date is an action's name.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.queue.networkMinutes.title": {
+    "text": "Merge queue: longest a fetch or push takes",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes: the merge queue's own fetches and pushes (HI-3372).",
     "audience": "both"
   },
   "settings.advanced.cw.queue.signSeconds.desc": {
@@ -2697,6 +2747,16 @@
   "settings.advanced.cw.terminal.osc52.title": {
     "text": "A CLI putting text on the clipboard",
     "note": "An advanced setting's title (Settings → Advanced), listed under Combwork: what Combwork does when an agent's CLI asks to set the clipboard (OSC 52).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.typed.takeSeconds.desc": {
+    "text": "How long an agent's CLI has to take a line Combwork typed into it (start working on it) before Combwork presses Enter again, once, as soon as that is safe (within six times this). Not taken in this time again, Combwork tells you the line may be waiting in its prompt and types nothing more into that agent until it is taken. Raise it if a slow or busy machine shows that notice for lines that were taken.",
+    "note": "What the advanced setting \"Typed line: wait to be taken\" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-3373).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.typed.takeSeconds.title": {
+    "text": "Typed line: wait to be taken",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A line: a message Combwork typed into an agent's terminal; taken: the agent's CLI started working on it.",
     "audience": "both"
   },
   "settings.advanced.cw.usage.timelineDetailDays.desc": {

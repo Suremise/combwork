@@ -385,8 +385,11 @@ const notices = new AsyncLocalStorage<Set<string>>()
  * got no reply after its retries.
  */
 const callKey = new AsyncLocalStorage<{ base: string; n: number; lost: boolean; hash: string; kept: boolean }>()
-/** A lost write's retries: how many more tries, each with the same key. */
-const LOST_RETRIES = 2
+/**
+ * A lost write's retries, each with the same key: the waits before each (HI-3377: backing off, so a Combwork restarting or
+ * stalled isn't asked three times in a row into the same moment; the intents e2e suite checks the gaps).
+ */
+const LOST_RETRY_MS: readonly number[] = [2000, 10_000]
 /**
  * HI-3195: tool calls whose write got no reply, by tool and arguments, for 10 minutes and at most 32: the same call again
  * (the model retrying it) reuses that call's key, so Combwork answers "already applied" rather than writing twice. Cleared
@@ -479,7 +482,10 @@ async function api(method: string, path: string, body?: unknown, replyMs?: numbe
       res = await agentApiCall(API + path, method, headers, body === undefined ? undefined : JSON.stringify(body), replyMs ?? REPLY_SECONDS * 1000)
       break
     } catch (e) {
-      if (requestKey && tries < LOST_RETRIES) continue
+      if (requestKey && tries < LOST_RETRY_MS.length) {
+        await new Promise((r) => setTimeout(r, LOST_RETRY_MS[tries]))
+        continue
+      }
       if (call) call.lost = true
       // No reply (no connection, a timeout): a real error, whatever its message (HI-2553).
       throw Object.assign(e instanceof Error ? e : new Error(String(e)), { noReply: true })

@@ -12,7 +12,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
 // The index's renames, refusable (HR2's round 3): `times` renames onto `to` refused with EPERM, as Windows can.
-const renameFault = vi.hoisted(() => ({ to: '', times: 0 }))
+const renameFault = vi.hoisted(() => ({ to: '', times: 0, onRefuse: null as (() => void) | null }))
 vi.mock('original-fs', async () => {
   const real = await vi.importActual<typeof import('fs')>('fs')
   const norm = (v: unknown): string => String(v).replaceAll('\\', '/').toLowerCase()
@@ -21,6 +21,7 @@ vi.mock('original-fs', async () => {
     renameSync: (from: Parameters<typeof real.renameSync>[0], to: Parameters<typeof real.renameSync>[1]) => {
       if (renameFault.times > 0 && renameFault.to && norm(to) === norm(renameFault.to)) {
         renameFault.times--
+        renameFault.onRefuse?.()
         throw Object.assign(new Error('EPERM: rename refused'), { code: 'EPERM' })
       }
       return real.renameSync(from, to)
@@ -596,6 +597,7 @@ describe('a move failing after its first change (#1271 round 4)', () => {
   afterEach(() => {
     renameFault.to = ''
     renameFault.times = 0
+    renameFault.onRefuse = null
     gitTestHooks.started = undefined
   })
   /** Refuses the next `times` renames onto `<index><suffix>` (the lock: '.lock'; the index itself: ''). */
@@ -628,6 +630,19 @@ describe('a move failing after its first change (#1271 round 4)', () => {
     expect(kindsOf(w, cards[0])).not.toContain('LineMoved')
     expect(forYou(w).items.filter((i) => i.card === cards[1]).map((i) => i.text)[0]).toMatch(/^Git wouldn't bring card up to date with main: .*refused/)
     expect(await refused(act(w, cards[1], builder, { kind: 'start' }))).toBe('lane.lineBehind')
+  })
+
+  it("HI-3374 (HR3's round 1): the move's owner gone while the index's publish is refused: no publish after it, the move put back", async () => {
+    const { repo, wt, head } = await squashed()
+    const main = git(repo, 'rev-parse', 'main')
+    let owner = true
+    refuseRename(wt, '', 1)
+    // The first publish refused, and the owner lost as it is: the retry must not publish.
+    renameFault.onRefuse = () => void (owner = false)
+    const r = await G.moveLineLocked(wt, main, { line: 'card', head, target: 'main' }, () => owner)
+    expect(r).not.toBe(true)
+    expect(renameFault.times).toBe(0)
+    consistent(wt, head)
   })
 
   it("the index can't be published after the branch moved: the branch is swapped back and the files with it, nothing lost", async () => {

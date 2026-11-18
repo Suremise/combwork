@@ -293,6 +293,16 @@ describe("a jj candidate's merge guards (HI-3284)", () => {
     const t = parts()
     t.deps.guards = async () => report({ incomplete: 'unreadable', transient: true })
     expect(await runCandidateChecks(t.deps, input({ names: [MERGE_GUARDS_CHECK] }))).toMatchObject({ transient: { check: MERGE_GUARDS_CHECK } })
+    // HI-3377: a guard past its time limit, or a worker never ready, is not checked (transient, as checkMergeGuards says):
+    // no red, its record uncounted, so the candidate goes round again unchanged.
+    for (const incomplete of ['timedOut:Runaway', 'failed:notReady']) {
+      const o = parts()
+      o.deps.guards = async () => report({ incomplete, transient: true })
+      const r = await runCandidateChecks(o.deps, input({ names: [MERGE_GUARDS_CHECK] }))
+      expect(r).toMatchObject({ transient: { check: MERGE_GUARDS_CHECK } })
+      expect(r).not.toHaveProperty('red')
+      expect(o.log).toContain('ran merge guards fail uncounted')
+    }
   })
 
   it('a green that stands is not matched again; one under another key is', async () => {

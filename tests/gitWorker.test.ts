@@ -9,7 +9,7 @@ import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { build } from 'esbuild'
 import { afterAll, beforeAll, describe, expect, it, onTestFinished, vi } from 'vitest'
-import { git, readRefsOffMain, useGitWorker, type GitResult } from '../src/main/git'
+import { git, gitTestHooks, readRefsOffMain, useGitWorker, type GitResult } from '../src/main/git'
 import { runGit } from '../src/main/gitWorker'
 import { readRepoRefs } from '../src/main/platform/repoRefs'
 import { tempDir } from './tempDir'
@@ -132,6 +132,47 @@ describe("git's worker (HI-1783)", () => {
       // It had started (it writes its pid first): ended, not never begun.
       expect(h.started()).toBe(true)
       await vi.waitFor(() => expect(h.running()).toBe(false), { timeout: HUNG_MS })
+    }
+  }, HUNG_MS * 3)
+
+  // HI-3372: the user's Cancel ends git's whole tree as the time limit does, on the worker and in this thread alike;
+  // before the start nothing runs; once git has exited its own outcome stands; an unknown or late Cancel is nothing.
+  it('a Cancel ends git and what it started, before it answers `cancelled`; on the worker and in this thread', async () => {
+    for (const route of [join(tmp, 'none.cjs'), bundle]) {
+      useGitWorker(route)
+      const h = holding(true)
+      const ac = new AbortController()
+      const going = git(repo, h.args, undefined, undefined, { env: gitEnv(), signal: ac.signal })
+      await vi.waitFor(() => expect(h.started()).toBe(true), { timeout: HUNG_MS })
+      ac.abort()
+      const r = await going
+      expect(r).toMatchObject({ ok: false, cancelled: true, code: -1 })
+      expect(r.timedOut).toBeUndefined()
+      await vi.waitFor(() => expect(h.running()).toBe(false), { timeout: HUNG_MS })
+    }
+  }, HUNG_MS * 3)
+
+  it('cancelled before it starts: nothing runs; exited before the Cancel: its own outcome; a Cancel after it, nothing', async () => {
+    for (const route of [join(tmp, 'none.cjs'), bundle]) {
+      useGitWorker(route)
+      const before = new AbortController()
+      before.abort()
+      // hash-object --stdin with no input would wait on its stdin: cancelled first, it never starts.
+      const started: string[][] = []
+      gitTestHooks.started = (_cwd, args) => void started.push([...args])
+      try {
+        expect(await git(repo, ['hash-object', '--stdin'], undefined, undefined, { signal: before.signal })).toMatchObject({ ok: false, cancelled: true })
+      } finally {
+        gitTestHooks.started = undefined
+      }
+      expect(started).toEqual([])
+      const done = new AbortController()
+      const r = await git(repo, ['rev-parse', '--verify', 'HEAD'], undefined, undefined, { signal: done.signal })
+      expect(r).toMatchObject({ ok: true, code: 0 })
+      expect(r.cancelled).toBeUndefined()
+      done.abort()
+      // The worker still answers after a Cancel of a command it had answered (an id it no longer knows).
+      expect(await git(repo, ['rev-parse', '--verify', 'HEAD'])).toMatchObject({ ok: true, out: r.out })
     }
   }, HUNG_MS * 3)
 

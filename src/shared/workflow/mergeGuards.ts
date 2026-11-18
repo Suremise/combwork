@@ -263,6 +263,12 @@ export interface AddedFile {
 /** The most bytes of diff a check reads (with the lines' bound, Settings → Advanced): past it, incomplete. */
 export const GUARD_DIFF_BYTES = 64 * 1024 * 1024
 
+/**
+ * The merge guards' check limits when Settings → Advanced can't be read: Merge guards: longest the check takes (HI-3377: 60 s,
+ * from the worker's ready; 10 s with its start included returned cards on a busy machine) and most lines a merge adds.
+ */
+export const GUARD_CHECK_DEFAULTS = { timeoutMs: 60_000, maxLines: 200_000 } as const
+
 /** The added lines of a diff, or why they couldn't all be read (never a partial answer). */
 export type AddedLines = { files: AddedFile[]; lines: number } | { incomplete: string }
 
