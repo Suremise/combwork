@@ -21,7 +21,7 @@ const check = (name, ok, extra = '') => {
 const until = async (fn, ms) => {
   const t = Date.now()
   let v
-  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
+  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
   return v
 }
 

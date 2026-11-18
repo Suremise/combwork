@@ -22,7 +22,7 @@ const check = (name, ok, extra = '') => {
 const until = async (fn, ms) => {
   const t = Date.now()
   let v
-  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
+  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
   return v
 }
 
@@ -68,7 +68,7 @@ const until = async (fn, ms) => {
   check('three agents start', !!(await until(async () => (await Promise.all(agents.map(([p, a]) => live(p, a)))).every((s) => s?.status === 'ready'), lib.timing('hang.step'))))
   const send = async (p, a, text) => {
     await inv('pty:write', lib.ptyKey(p, a.id), text)
-    await lib.sleep(100)
+    await lib.sleep(lib.timing('pace.keysThenEnterMs'))
     await inv('pty:write', lib.ptyKey(p, a.id), '\r')
   }
 
@@ -76,7 +76,7 @@ const until = async (fn, ms) => {
   const chimesBefore = await chimes()
   for (const [p, a] of agents) await send(p, a, 'go work 2')
   check('they all finish', !!(await until(async () => (await Promise.all(agents.map(([p, a]) => live(p, a)))).every((s) => s?.status === 'finished'), lib.timing('hang.step'))))
-  await lib.sleep(4500) // A fixed wait on purpose: it waits out the burst window (agents finishing together are told in one notification, gathered over a few seconds) to show only one arrives.
+  await lib.sleep(lib.timing('quiet.finishGroupMs')) // The window is the point: it waits out the burst window (agents finishing together are told in one notification, gathered over a few seconds) to show only one arrives.
   const burst = await notes()
   check('one notification for the three', burst.length === 1, JSON.stringify(burst))
   check('counted by project', burst[0]?.title === '3 agents finished' && burst[0]?.body === 'alpha (2), beta (1)', JSON.stringify(burst[0]))
@@ -84,7 +84,7 @@ const until = async (fn, ms) => {
 
   // --- Two in one project: named.
   clearNotes()
-  await lib.sleep(2500) // A fixed wait on purpose: the previous burst's window has to close first, or these finishes would join it.
+  await lib.sleep(lib.timing('quiet.finishGroupMs')) // The window is the point: the previous burst's window closes first, or these finishes would join it.
   await send(alpha, one, 'go work 1')
   await send(alpha, two, 'go work 1')
   await until(async () => (await notes()).length > 0, lib.timing('hang.ui'))

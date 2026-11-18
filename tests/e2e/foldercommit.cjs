@@ -214,7 +214,7 @@ const lastCommitFiles = () => git('show', '--no-renames', '--name-only', '--form
     await h.app.close()
     fs.writeFileSync(path.join(fx.alpha, 'keep.txt'), 'the user is editing this\n')
     const { DatabaseSync } = require('node:sqlite')
-    const db = new DatabaseSync(path.join(fx.ws, '.combwork', 'combwork.db'), { timeout: 5000 })
+    const db = new DatabaseSync(path.join(fx.ws, '.combwork', 'combwork.db'), { timeout: lib.timing('db.busyMs') })
     const scope = db.prepare("SELECT project FROM cards WHERE number = ?").get(b.n)?.project ?? 'alpha'
     const now = git('rev-parse', 'HEAD')
     db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(`workflow:${scope.toLowerCase()}:queue.catchUp:main`, JSON.stringify({ from: now, to: now, card: keyB, entry: 'seeded' }))

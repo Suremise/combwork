@@ -102,7 +102,7 @@ function initialize(def) {
   const until = async (fn, ms = HUNG_MS) => {
     const t = Date.now()
     let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
+    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
     return v
   }
   await lib.waitForProvider(inv, 'codex')

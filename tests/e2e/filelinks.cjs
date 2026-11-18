@@ -49,7 +49,7 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
   const until = async (fn, ms) => {
     const t = Date.now()
     let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
+    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
     return v
   }
   const live = async (proj, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === proj.toLowerCase() && s.agentId === id)
@@ -76,7 +76,7 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
   }
   const backToSession = async () => {
     await page.locator('.tabs .tab').first().click()
-    await lib.sleep(400)
+    await until(async () => ((await page.locator('.tabs .tab').first().getAttribute('class')) ?? '').includes('active'), lib.timing('hang.ui'))
   }
 
   await page.getByText('alpha', { exact: true }).first().click()
@@ -92,7 +92,7 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
   // Short enough that its turn's "Done:" line holds all three paths on one row in a pane half the window wide.
   const first = 'see src/app.ts:25:4 ../beta/lib/util.js:3 src/nope.ts'
   await inv('pty:write', key, first)
-  await lib.sleep(200)
+  await lib.sleep(lib.timing('pace.keysThenEnterMs'))
   await inv('pty:write', key, '\r')
   check('the paths are printed', !!(await until(() => textAt(key, 'src/nope.ts'), lib.timing('hang.ui'))))
   check('its turn ends', !!(await until(async () => (await live(alpha, one.id))?.status === 'finished', lib.timing('hang.step'))))
@@ -101,7 +101,7 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
   // --- A missing file isn't linked; an existing one is.
   const nope = await drawnAt(key, 'src/nope.ts', first)
   await page.mouse.move(nope.x + 4, nope.y)
-  await lib.sleep(700)
+  await lib.sleep(lib.timing('quiet.linkMs')) // The window is the point: no link is marked within it.
   check("a file that doesn't exist isn't linked", (await linkTitle()) === 0)
   const app1 = await drawnAt(key, 'src/app.ts:25:4', first)
   await page.mouse.move(app1.x + 4, app1.y)
@@ -122,7 +122,7 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
 
   // --- A plain click is just a click.
   await page.mouse.click(app1.x + 4, app1.y)
-  await lib.sleep(600)
+  await lib.sleep(lib.timing('quiet.linkMs')) // The window is the point: nothing opens within it.
   check("a plain click doesn't open it", (await fileTree.count()) === 0)
 
   // --- Ctrl+click: the Files tab, the file selected, the cursor on its line.
@@ -145,13 +145,13 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
   await backToSession()
   const key2 = lib.ptyKey(alpha, two.id)
   await inv('pty:write', key2, 'see src/app.ts:7')
-  await lib.sleep(200)
+  await lib.sleep(lib.timing('pace.keysThenEnterMs'))
   await inv('pty:write', key2, '\r')
   check("the worktree agent's path is printed", !!(await until(() => textAt(key2, 'src/app.ts:7'), lib.timing('hang.step'))))
   check('its turn ends too', !!(await until(async () => (await live(alpha, two.id))?.status === 'finished', lib.timing('hang.step'))))
   const wt = await drawnAt(key2, 'src/app.ts:7', 'see src/app.ts:7')
   await page.mouse.move(wt.x + 4, wt.y)
-  await lib.sleep(500)
+  await until(async () => (await linkTitle()) > 0, lib.timing('hang.ui'))
   await ctrlClick({ x: wt.x + 4, y: wt.y })
   check("it opens in the agent's worktree", !!(await until(async () => (await page.locator('.root-select').inputValue().catch(() => '')) === two.id && (await selectedRow()) === 'src/app.ts', lib.timing('hang.step'))))
   check('at line 7', !!(await until(async () => (await activeLine()) === '7', lib.timing('hang.ui'))), await activeLine())
@@ -162,7 +162,7 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
   await backToSession()
   for (const prompt of ['see SRC/APP.TS:9 and "my docs/my notes.ts":4', 'then my docs/my notes.ts:6', 'not "docs/missing README.md":2']) {
     await inv('pty:write', key2, prompt)
-    await lib.sleep(200)
+    await lib.sleep(lib.timing('pace.keysThenEnterMs'))
     await inv('pty:write', key2, '\r')
     await until(async () => String(await inv('pty:buffer', key2)).includes(`Done: ${prompt}`), lib.timing('hang.ui'))
     await until(async () => (await live(alpha, two.id))?.status === 'finished', lib.timing('hang.step'))
@@ -172,11 +172,11 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
   const last = 'not "docs/missing README.md":2'
   const inQuote = await drawnAt(key2, 'README.md":2', last)
   await page.mouse.move(inQuote.x + 4, inQuote.y)
-  await lib.sleep(700)
+  await lib.sleep(lib.timing('quiet.linkMs')) // The window is the point: no link is marked within it.
   check("a piece of a quoted path that isn't a file isn't linked", (await linkTitle()) === 0)
   const upper = await drawnAt(key2, 'SRC/APP.TS:9', last)
   await page.mouse.move(upper.x + 4, upper.y)
-  await lib.sleep(500)
+  await until(async () => (await linkTitle()) > 0, lib.timing('hang.ui'))
   await ctrlClick({ x: upper.x + 4, y: upper.y })
   check('a path in other case selects the file', !!(await until(async () => (await selectedRow()) === 'src/app.ts', lib.timing('hang.ui'))), String(await selectedRow()))
   check('and shows its line', !!(await until(async () => (await activeLine()) === '9', lib.timing('hang.ui'))), await activeLine())
@@ -185,7 +185,7 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
     // On the path's last name: the link is the whole path, spaces and all.
     const at = await drawnAt(key2, printed, last)
     await page.mouse.move(at.x + 4, at.y)
-    await lib.sleep(500)
+    await until(async () => (await linkTitle()) > 0, lib.timing('hang.ui'))
     await ctrlClick({ x: at.x + 4, y: at.y })
     check(`a path with spaces opens (${printed})`, !!(await until(async () => (await selectedRow()) === 'my docs/my notes.ts', lib.timing('hang.ui'))), String(await selectedRow()))
     check(`at line ${line}`, !!(await until(async () => (await activeLine()) === line, lib.timing('hang.ui'))), await activeLine())
