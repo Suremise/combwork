@@ -13,6 +13,7 @@ const HUNG_MS = 10_000
 const { openDb, transaction } = await import('../src/main/db')
 const wal = await import('../src/main/walCheckpoint')
 const { checkpointHooks } = await import('../src/main/walCheckpointWorker')
+const { checkpointThreadHooks } = wal
 
 const base = tempDir('cw-wal-checkpoint-')
 let n = 0
@@ -341,6 +342,50 @@ describe("the WAL's first write after a checkpoint is the checkpointer's (HI-328
       expect(wal.checkpointStats.done).toBe(done + 2)
     } finally {
       other.close()
+      db.close()
+    }
+  })
+
+  it("HI-3362 (HR3's round 1): another connection's write committed after the checkpoint, before the restart begins, is still seen and checkpointed, and idle cycles settle after", () => {
+    const db = open(wal.checkpointWhenIdle)
+    try {
+      write(db.writer, 5)
+      // As the restart is dispatched (the checkpoint whole and answered), another connection (another process) commits.
+      checkpointThreadHooks.beforeDispatch = (kind) => {
+        if (kind !== 'restart') return
+        const other = new DatabaseSync(db.file, { timeout: 0 })
+        try {
+          other.exec('PRAGMA wal_autocheckpoint = 0')
+          other.exec('INSERT INTO t (doc) VALUES (zeroblob(6000))')
+        } finally {
+          other.close()
+        }
+      }
+      const done = wal.checkpointStats.done
+      const restarts = wal.checkpointStats.restarts
+      due()
+      checkpointThreadHooks.beforeDispatch = undefined
+      expect(wal.checkpointStats.done).toBe(done + 1)
+      expect(wal.checkpointStats.restarts).toBe(restarts + 1)
+      // Its frames are a change: the next idle tick checkpoints them (and restarts the WAL again)...
+      let t = performance.now() + 2 * (wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+      wal.checkpointTick(t)
+      t += wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs
+      wal.checkpointTick(t)
+      expect(wal.checkpointStats.done).toBe(done + 2)
+      expect(wal.checkpointStats.restarts).toBe(restarts + 2)
+      // ...and then, idle, nothing more.
+      for (let i = 0; i < 3; i++) {
+        t += wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs
+        wal.checkpointTick(t)
+        t += wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs
+        wal.checkpointTick(t)
+      }
+      expect(wal.checkpointStats.done).toBe(done + 2)
+      expect(wal.checkpointStats.restarts).toBe(restarts + 2)
+      expect((db.reader.prepare('SELECT count(*) AS c FROM t').get() as { c: number }).c).toBe(6)
+    } finally {
+      checkpointThreadHooks.beforeDispatch = undefined
       db.close()
     }
   })

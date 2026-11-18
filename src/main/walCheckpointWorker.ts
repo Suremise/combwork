@@ -1,4 +1,4 @@
-import { existsSync, statSync } from 'original-fs'
+import { closeSync, existsSync, openSync, readSync, statSync } from 'original-fs'
 import { parentPort, workerData } from 'worker_threads'
 import { DatabaseSync } from 'node:sqlite'
 
@@ -94,6 +94,8 @@ export function runRestart(m: CheckpointRequest, state: Int32Array | null): Rest
       if (/locked|busy/i.test(e instanceof Error ? e.message : '')) return { restart: true, busy: true, ms: performance.now() - t }
       throw e
     }
+    // HI-3362 (HR3's round 1): the WAL's salts as this transaction begins, its write lock held.
+    const salts = walSalts(m.file)
     try {
       checkpointHooks.inRestart?.(m.file)
       const v = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version // i18n-ignore: SQL
@@ -106,7 +108,7 @@ export function runRestart(m: CheckpointRequest, state: Int32Array | null): Rest
       throw e
     }
     const ms = performance.now() - t
-    const wal = walAfter(db, m.file, seen)
+    const wal = walAfter(db, m.file, seen, salts)
     db.close()
     checkpointHooks.afterRestart?.(m.file)
     return { restart: true, busy: false, ms, ...(wal ? { wal } : {}) }
@@ -118,13 +120,35 @@ export function runRestart(m: CheckpointRequest, state: Int32Array | null): Rest
 const dataVersion = (db: DatabaseSync): number => (db.prepare('PRAGMA data_version').get() as { data_version: number }).data_version // i18n-ignore: SQL
 
 /**
- * HI-3362: the WAL file's size and modified time after this connection's commit, and nothing else's: read under the
- * write lock (a transaction begun and rolled back, writing nothing), so no other connection writes while it is read, and
- * only when this connection's data_version is still `seen`, the one read before its commit (no other connection
- * committed since). Null when another connection wrote since or holds the lock (main sees that write as a change, as
- * before), or the file can't be read.
+ * The WAL's salts (its header's bytes 16-23), as hex: SQLite writes new ones (the first incremented, the second random)
+ * each time a write starts the WAL again from its beginning. Not its checkpoint sequence (bytes 12-15): that one is the
+ * writing connection's own count, so a new connection's first restart always writes 1. Null when they can't be read.
  */
-function walAfter(db: DatabaseSync, file: string, seen: number): { size: number; mtime: number } | null {
+function walSalts(file: string): string | null {
+  let fd: number | null = null
+  try {
+    fd = openSync(`${file}-wal`, 'r')
+    const b = Buffer.alloc(8)
+    return readSync(fd, b, 0, 8, 16) === 8 ? b.toString('hex') : null
+  } catch {
+    return null
+  } finally {
+    if (fd !== null) closeSync(fd)
+  }
+}
+
+/**
+ * HI-3362: the WAL file's size and modified time after this connection's commit, when it holds that commit alone. Read
+ * under the write lock (a transaction begun and rolled back, writing nothing), so no other connection writes while it is
+ * read, and only when:
+ * - this connection's data_version is still `seen`, the one read before its commit: no other connection committed since;
+ * - and the WAL's salts changed from `salts`, those read as its transaction began (HR3's round 1): this commit started
+ *   the WAL again, which SQLite does only when everything in it was checkpointed. A commit of another connection's since
+ *   the checkpoint would have started it again itself, or (a reader holding it back) left frames no checkpoint had
+ *   copied, and this one couldn't have; either way the salts wouldn't have changed here.
+ * Null otherwise (main sees what is in the WAL as a change, as before), or when the file can't be read.
+ */
+function walAfter(db: DatabaseSync, file: string, seen: number, salts: string | null): { size: number; mtime: number } | null {
   checkpointHooks.beforeWalStat?.(file)
   try {
     db.exec('BEGIN IMMEDIATE')
@@ -132,7 +156,7 @@ function walAfter(db: DatabaseSync, file: string, seen: number): { size: number;
     return null
   }
   try {
-    if (dataVersion(db) !== seen) return null
+    if (dataVersion(db) !== seen || salts === null || walSalts(file) === salts) return null
     const s = statSync(`${file}-wal`)
     return { size: s.size, mtime: s.mtimeMs }
   } catch {
