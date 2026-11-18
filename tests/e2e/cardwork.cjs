@@ -449,12 +449,12 @@ const commit = (dir, file, text, message) => {
     await fileButton('first.ts').click()
     await lib.until(async () => (await tfRev.locator('[data-revision-diff="first.ts"] .editor.modified .view-line').count()) > 0, HUNG_MS)
   }
-  const draftAgain = async (text) => {
+  const draftAgain = async (words) => {
     await tfRev.locator('[data-revision-diff="first.ts"] .editor.modified .view-line', { hasText: 'first' }).hover()
     await lib.until(async () => (await tfPlus.count()) === 1, HUNG_MS)
     await tfPlus.click()
     await lib.until(async () => (await tfDraftBox().count()) === 1, HUNG_MS)
-    await tfDraftBox().fill(text)
+    await tfDraftBox().fill(words)
   }
   await holdAdd(true)
   await tfDraft().getByRole('button', { name: 'Save' }).click()
