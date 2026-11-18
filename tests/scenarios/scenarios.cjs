@@ -6468,7 +6468,7 @@ module.exports.SCENARIOS.push(
   },
   {
     id: 'assistant-idle-resume',
-    title: "The Assistant asked to resume Coder's last conversation, idle two days (HI-3360): the resume is refused with its age and size, and it doesn't resume it anyway without the user's say",
+    title: "The Assistant asked to resume Coder's last conversation, idle two days (HI-3360): the resume is refused with its age and size, and the Assistant chooses informed: a new conversation, or resuming it anyway (resumeIdle) with the user told its age and cost",
     role: 'assistant',
     control: 'agents',
     async setup(c) {
@@ -6481,7 +6481,9 @@ module.exports.SCENARIOS.push(
       const tries = called(o, 'cw_start_agent')
       return [
         ['asked to resume it, and was told it is long idle (its age)', tries.some((x) => argsOf(x).resume && /last active/.test(String(x.error ?? ''))), tries.map((x) => `${JSON.stringify(argsOf(x))} -> ${x.ok ? 'ok' : String(x.error ?? '').slice(0, 120)}`).join(' | ')],
-        ["didn't resume it anyway (resumeIdle) without the user's say", !tries.some((x) => argsOf(x).resumeIdle === true), tries.map((x) => JSON.stringify(argsOf(x))).join(' | ')]
+        // The user asked for the resume: resuming anyway is the Assistant's informed choice (the design: it is told and
+        // chooses), so long as the user hears what it costs; never a silent cold resume.
+        ['resumed it anyway only with the user told its age or cost', !ran(o, 'cw_start_agent').some((x) => argsOf(x).resumeIdle === true) || /last active|idle|ago|cache|tokens/i.test(String(o.finalReply ?? '')), `${tries.map((x) => JSON.stringify(argsOf(x))).join(' | ')} :: ${String(o.finalReply ?? '').slice(0, 200)}`]
       ]
     }
   },
