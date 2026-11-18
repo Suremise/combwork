@@ -264,6 +264,13 @@ export interface AdvanceWords {
   op?: string
   /** Asked again after an answer that couldn't be acted on: why, as a code the question's message words (FOR_YOU.advance*). */
   again?: string
+  /**
+   * A refusal's (HI-3365): the finish it came under (`preview`: Combwork never moves the target by itself, it offers a
+   * preview) and when it's tried again: `repository` (refused at the base: once the repository changes) or `plan` (nothing
+   * moved past the base, for a reason of jj's: only once the plan changes).
+   */
+  mode?: 'auto' | 'preview'
+  next?: 'repository' | 'plan'
 }
 
 /** HI-3236: what a preview says: the move (target, from, to), how the candidate was built, and the commits it adds. */
@@ -313,7 +320,10 @@ export interface AdvanceHost {
   attested(card: CardRecord, ref: AdvanceRef, answer: AdvanceAnswer, reason: string): Promise<boolean>
   /** A fresh question for the attempt (the consumed `answer`'s retired), saying why it is asked again. */
   askAgain(card: CardRecord, ref: AdvanceRef, plan: string, state: 'stopped' | 'uncertain', words: AdvanceWords, answer: AdvanceAnswer | null): Promise<boolean>
-  /** Refused at the base (nothing written): the card's comment saying why, once per cycle, plan and reason. */
+  /**
+   * Refused at the base (nothing written), or nothing moved past it for a reason of jj's (HI-3365): the card's comment
+   * saying why, once per cycle, plan and reason.
+   */
   refused(card: CardRecord, cycle: number, plan: string, words: AdvanceWords): Promise<boolean>
   /**
    * HI-3236: the card's preview for `plan` (gate advancePreview, bound to the plan), any earlier preview of the card closed

@@ -16,8 +16,10 @@
     "placeholders": {
       "target": "plain",
       "card": "plain",
+      "next": "select",
       "why": "plain",
-      "detail": "plain"
+      "detail": "plain",
+      "mode": "select"
     }
   },
   "workflow.advance.superseded": {
@@ -106,7 +108,9 @@
       "result": "plain",
       "card": "plain",
       "why": "select",
-      "detail": "plain"
+      "detail": "plain",
+      "next": "select",
+      "mode": "select"
     }
   },
   "workflow.forYou.advanceStopped": {

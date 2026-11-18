@@ -25,6 +25,9 @@ const log = createLogger('advance')
 /** HI-3236: the project's meta marking a plan's preview dismissed by the user (Not for this plan), for the card's cycle. */
 export const previewDeclinedKey = (card: string, cycle: number, plan: string): string => `advance_declined:${card.toLowerCase()}:${cycle}:${plan}`
 
+/** The project's meta marking a refusal's comment written, once per cycle, plan and reason (s30 §1). */
+const refusedKey = (card: string, cycle: number, plan: string, why: string): string => `advance_refused:${card.toLowerCase()}:${cycle}:${plan}:${why}`
+
 /** HI-3390: the project's meta marking an Integrate that ran nothing (its preview's consent gone) as said on the card. */
 export const previewIgnoredKey = (card: string, cycle: number, request: string): string => `advance_preview_ignored:${card.toLowerCase()}:${cycle}:${request}`
 
@@ -39,7 +42,11 @@ export const advanceNoteKey = (project: string): string => `advance_note:${proje
 
 /** HI-3235: what agents read of the advance's card comment and notice (the window shows FOR_YOU's messages beside them). */
 const A = {
-  refused: agentMsg({ id: 'workflow.advance.refused', text: "Combwork didn't move {target} for {card}: refused before anything changed ({why}: {detail}). It tries again once the repository changes; the user can integrate it themselves.", note: 'A card comment (HI-3235): Combwork’s jj advance refused at its base read; {why} a code, {detail} refs or folders.' }),
+  refused: agentMsg({
+    id: 'workflow.advance.refused',
+    text: "Combwork didn't move {target} for {card}: {next, select, plan {jj didn't make the move ({why}: {detail}), so nothing changed. This move isn't tried again; a new one is once the target or the candidate changes} other {refused before anything changed ({why}: {detail}). {mode, select, preview {No preview is offered until the repository changes} other {It tries again once the repository changes}}}}; the user can integrate it themselves.",
+    note: 'A card comment (HI-3235): Combwork’s jj advance refused at its base read (next repository), or nothing moved past it for a reason of jj’s (next plan, HI-3365); mode preview: the finish previews and never moves the target by itself; {why} a code, {detail} refs or folders.'
+  }),
   previewClosed: agentMsg({ id: 'workflow.advance.previewClosed', text: "{clicked, select, yes {Integrate on the preview of {card} didn't run} other {Combwork closed the preview of {card}}}: {why, select, finish {the project no longer integrates when the user clicks} blocked {it waits for {cards} to be Done, and is previewed again once they are} other {it no longer applies}}.", note: 'A card comment (HI-3390): a jj card’s preview closed, or the user’s Integrate on it ran nothing ({clicked}: yes), because the finish no longer previews ({why}: finish) or it waits for blockers ({why}: blocked; {cards} their keys).' }),
   superseded: agentMsg({ id: 'workflow.advance.superseded', text: "An integration of {card} into {target} from before it was restarted or archived was never settled: Combwork couldn't prove what it did, so {target} may hold that move. Combwork may have integrated this card again since. Check {target}'s history if it matters.", note: 'A card comment (HI-3367): an unsettled jj advance of an earlier cycle of the card, retired when the card restarted or was archived; it may have moved {target}.' }),
   note: agentMsg({ id: 'workflow.advance.note', text: "Combwork now integrates {project}'s jj cards itself once their merge checks pass (Version Control → Workflow → Who integrates).", note: 'A notice, once per jj project (HI-3235): the new default finish applies to it.' })
@@ -226,7 +233,7 @@ export function advanceHostOf(wf: Workflow): AdvanceHost {
     refused: (card, cycle, plan, words) =>
       guarded('refused', card, async () => {
         // Once per cycle, plan and reason (s30 §1: refused at the base, the card stays Approved with the reason).
-        const key = `advance_refused:${card.key.toLowerCase()}:${cycle}:${plan}:${words.why}`
+        const key = refusedKey(card.key, cycle, plan, words.why)
         if (wf.store.meta(key)) return false
         const s = wf.state(wf.store.card(card.id))
         return wf.write(
@@ -237,9 +244,10 @@ export function advanceHostOf(wf: Workflow): AdvanceHost {
             if (w.tx.meta(key) || w.state().cycle !== cycle) return false
             w.tx.setMeta(key, new Date().toISOString())
             const platform = wf.rulesetOf(card, w.state()).options.platform
-            const text = workflowText(FOR_YOU.advanceRefused, { card: card.key, target: words.target, result: PLATFORMS[platform].revisionShort(words.result), why: words.why, detail: clip(words.detail) || '—' })
+            const how = { mode: words.mode ?? 'auto', next: words.next ?? 'repository' }
+            const text = workflowText(FOR_YOU.advanceRefused, { card: card.key, target: words.target, result: PLATFORMS[platform].revisionShort(words.result), why: words.why, detail: clip(words.detail) || '—', ...how })
             // Agents read the card's comments: its English is the agent message, the window's the stored message.
-            w.action('comment', { text: inDefaultDialect(() => say(A.refused, { card: card.key, target: words.target, why: words.why, detail: clip(words.detail) || '-' })), shown: text })
+            w.action('comment', { text: inDefaultDialect(() => say(A.refused, { card: card.key, target: words.target, why: words.why, detail: clip(words.detail) || '-', ...how })), shown: text })
             return true
           },
           undefined,

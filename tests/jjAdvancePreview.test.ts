@@ -99,6 +99,26 @@ function reapply(w: World, card: { id: number }, o: Partial<WorkflowOptions>): v
 }
 
 describe.skipIf(!jjExe)(`preview and click for jj (jj ${TESTED_JJ.version}), HI-3236`, { timeout: REAL_JJ_MS }, () => {
+  // HI-3365: the base check is shared with the automatic advance, but on this finish Combwork never moves the target by
+  // itself: the refusal's comment says no preview is offered while it holds, not that it tries again.
+  it('refused at the base (a bookmark not exported in a repository with no Git working copy): no preview, and the comment says none is offered while it holds', async () => {
+    const w = await world(false, { candidates: true, oneSlot: true, advance: 'preview' })
+    const card = await approved(w)
+    w.h.jj(w.repo, 'bookmark', 'create', 'unexported', '-r', 'main')
+    await reconcileOnly(w, card)
+    expect(previews(w, card)).toEqual([])
+    const comments = w.store.pendingActions().filter((a) => a.card === card.id && a.kind === 'comment').map((a) => a.payload as { text: string; shown: { id: string; values: Record<string, unknown> } })
+    expect(comments).toHaveLength(1)
+    expect(comments[0].shown.id).toBe('workflow.forYou.advanceRefused')
+    expect(comments[0].shown.values).toMatchObject({ why: 'pendingExports', mode: 'preview', next: 'repository' })
+    expect(comments[0].text).toContain('No preview is offered until the repository changes')
+    expect(comments[0].text).not.toContain('tries again')
+    await w.wf.runActions()
+    await pass(w, card)
+    expect(previews(w, card)).toEqual([])
+    expect(facts(w, card, 'AdvanceAttempted')).toEqual([])
+  })
+
   describe.each([true, false] as const)('colocated: %s', (colocated) => {
     for (const to of ['previewAdvance', 'userIntegrates'] as const) {
       it(`an automatic call chosen before ${to === 'previewAdvance' ? 'Preview' : 'By hand'} was applied to the card stops: no journal, no attempt, nothing moved, even with the new rules' candidate ready (HR1's round 1)`, async () => {

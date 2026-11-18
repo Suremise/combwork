@@ -159,6 +159,65 @@ describe.skipIf(!jjExe)(`Combwork's jj advance through the adapter (jj ${TESTED_
     }
   })
 
+  // HI-3365: past the base, an outcome where nothing moved for a reason of jj's own (here its prepare exits 1, as a newer
+  // jj whose message differs would) isn't tried again for the same plan: one attempt, the card says why once, and other
+  // jj operations meanwhile write nothing.
+  it('HI-3365: an attempt whose prepare fails past the base is not tried again for the same plan: one attempt and fact, one comment, while other jj operations come and go', async () => {
+    const w = await world(true, { candidates: true, oneSlot: true, advance: true })
+    const card = await approved(w)
+    const head = w.main()
+    const real = w.h.runner
+    const failing: typeof real = Object.assign(Object.create(real) as typeof real, { run: (folder: string, args: readonly string[], o?: Parameters<typeof real.run>[2]) => (args.includes('--no-integrate-operation') ? Promise.resolve({ ok: true, code: 1, out: '', err: 'Error: a newer jj says it differently', buf: Buffer.alloc(0) }) : real.run(folder, args, o)) })
+    w.h.runner = failing
+    try {
+      await pass(w, card)
+      const cycle = w.wf.state(card).cycle
+      expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(1)
+      expect(facts(w, card, 'AdvanceResolved').map((r) => [r.how, r.detail])).toEqual([['nothingMoved', 'notInHistory']])
+      const said = (): string[] => {
+        const db = new DatabaseSync(boardFile(w.home), { readOnly: true })
+        try {
+          return (db.prepare("SELECT key FROM board_meta WHERE key LIKE '%advance_refused:%'").all() as { key: string }[]).map((r) => r.key.slice(r.key.indexOf('advance_refused:')))
+        } finally {
+          db.close()
+        }
+      }
+      expect(said()).toEqual([expect.stringMatching(new RegExp(`^advance_refused:${card.key.toLowerCase()}:${cycle}:[0-9a-f]+:notInHistory$`))])
+      // Nothing changed, then other jj operations: still one attempt, no new journal, no second comment.
+      await pass(w, card)
+      for (const m of ['other work', 'more work']) {
+        w.h.jj(w.repo, 'new', '-m', m)
+        await pass(w, card)
+      }
+      expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(1)
+      expect((await journals(w).settled(card.key, cycle)).map((j) => j.settled)).toEqual(['nothingMoved'])
+      expect(said()).toHaveLength(1)
+      expect(w.main()).toBe(head)
+      expect(w.wf.state(w.wf.store.card(card.id)).stage).toBe('approved')
+      // Another jj (the user updated it): the same plan is tried once more, then held again; the comment isn't repeated.
+      const newer: typeof real = Object.assign(Object.create(failing) as typeof real, { readinessNow: () => ({ ...real.readinessNow(), version: '9.9.9' }) })
+      w.h.runner = newer
+      await pass(w, card)
+      await pass(w, card)
+      expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(2)
+      expect(said()).toHaveLength(1)
+      // jj makes the move again and the target moves (another card's work): a new plan, attempted and integrated.
+      w.h.runner = real
+      w.h.jj(w.repo, 'new', 'main', '-m', 'later work')
+      writeFileSync(join(w.repo, 'later.txt'), 'later\n')
+      w.h.jj(w.repo, 'commit', '-m', 'later work')
+      w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', '@-')
+      w.h.jj(w.repo, 'git', 'export')
+      await pass(w, card)
+      await pass(w, card)
+      expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(3)
+      expect(facts(w, card, 'Integrated')).toHaveLength(1)
+      expect(w.wf.state(w.wf.store.card(card.id)).stage).toBe('done')
+    } finally {
+      w.h.runner = real
+    }
+  })
+
   // HI-3265 (HI-2709, SPEC §16.9.1): the blockers are the advance's authority, as for Git's queue. One Git-backed mode:
   // the rule is the adapter's and the workflow's, not jj's.
   it("HI-3265: a card blocked by one that isn't Done gets no attempt (no fact, no journal, the target unmoved); once its blocker is Done, the next pass integrates it", async () => {
