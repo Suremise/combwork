@@ -170,11 +170,13 @@ function waitCaller(stack) {
  * with the text, never for the delay. The mouse first leaves for the window's corner, so an earlier tip has gone.
  */
 /**
- * HI-3385: whether the window shows `theme` fully, waited for up to ms: its root says so and no CSS transition is still
- * running (a background's fade), so a screenshot or a colour read then shows the theme's colours, not a blend.
+ * HI-3385, HI-3399: the window shows `theme` fully, within ms: its root says so and the page has settled (no finite
+ * animation or transition running, a background's fade among them), so a screenshot or a colour read shows the theme's
+ * colours, not a blend. It is themeSettled: each page read bounded (readyWithin), and a throw when not so, never a
+ * false a bare await would ignore.
  */
 async function themeShown(page, theme, ms = timing('hang.ui')) {
-  return !!(await until(() => page.evaluate((t) => document.documentElement.dataset.theme === t && !document.getAnimations().some((a) => a instanceof CSSTransition && a.playState === 'running'), theme), ms))
+  return themeSettled(page, theme, ms)
 }
 
 /**
