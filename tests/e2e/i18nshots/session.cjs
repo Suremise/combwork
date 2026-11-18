@@ -4,6 +4,7 @@
 // the Notifications panel. Reached for the i18nshots route (tests/e2e/i18nshots.cjs has the case format) with
 // locale-independent means only: IPC, the fake Claude Code's files, command ids and structural hooks, never English text.
 const fs = require('fs')
+const { timing } = require('../../timing.cjs')
 const path = require('path')
 
 /** Waits for a locator to be on the page; throws saying what didn't show. */
@@ -26,9 +27,9 @@ const fakeFile = (ctx, name) => fs.writeFileSync(path.join(ctx.claudeHome, `${na
 /** The toasts gone (each closed, or timed out), and no dialog left open. */
 async function noToasts(ctx) {
   const { page, lib } = ctx
-  const cancel = () => page.locator('.dialog').last().locator('button.subtle').first().click({ timeout: 2000 }).then(() => false, () => false)
+  const cancel = () => page.locator('.dialog').last().locator('button.subtle').first().click({ timeout: timing('poll.clickMs') }).then(() => false, () => false)
   if (!(await lib.until(async () => (await page.locator('.dialog').count()) === 0 || (await cancel()), ctx.hungMs))) throw new Error("the dialog didn't close")
-  const dismiss = () => page.locator('.toasts .toast .icon-btn').first().click({ timeout: 2000 }).then(() => false, () => false)
+  const dismiss = () => page.locator('.toasts .toast .icon-btn').first().click({ timeout: timing('poll.clickMs') }).then(() => false, () => false)
   if (!(await lib.until(async () => (await page.locator('.toasts .toast').count()) === 0 || (await dismiss()), ctx.hungMs))) throw new Error("the notices didn't close")
 }
 

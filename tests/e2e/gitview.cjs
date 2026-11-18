@@ -83,7 +83,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
   const dialog = page.locator('.dialog', { hasText: 'New branch' })
   await dialog.locator('[data-field="name"]').fill('feature/demo')
   // Starts at the folder's branch: Switch to it now ticked once that resolves (HI-2807).
-  const switchTicked = await lib.until(async () => await dialog.locator('[data-field="switch"]').isChecked({ timeout: 1000 }).catch(() => false), HUNG_MS)
+  const switchTicked = await lib.until(async () => await dialog.locator('[data-field="switch"]').isChecked({ timeout: lib.timing('poll.readMs') }).catch(() => false), HUNG_MS)
   if (!switchTicked) await shot(page, 'new-branch-switch')
   check('Switch to it now is ticked, starting at the folder’s branch', !!switchTicked, await text(dialog))
   await dialog.getByRole('button', { name: 'Create', exact: true }).click()

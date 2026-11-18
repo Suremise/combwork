@@ -25,7 +25,7 @@ const { recordOf, readOf, writeOf, turnTools, ending, ended, questionsAsked, per
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = lib.timing('hang.step')
 // A real model turn on a local model: bounded, never how long it should take.
-const TURN_MS = 240000
+const TURN_MS = lib.timing('turn.realMs')
 const TRIES = 3
 
 const PINNED = path.join(process.env.LOCALAPPDATA || '', 'combwork-test', 'opencode-2.2.6', 'opencode.exe')
@@ -76,7 +76,7 @@ const portOpen = (port) => new Promise((resolve) => {
   s.on('error', () => resolve(false))
 })
 const ollamaModels = () => new Promise((resolve) => {
-  const req = http.get({ ...OLLAMA, path: '/api/tags', timeout: 5000 }, (res) => {
+  const req = http.get({ ...OLLAMA, path: '/api/tags', timeout: lib.timing('hang.ui') }, (res) => {
     let b = ''
     res.on('data', (d) => (b += d))
     res.on('end', () => {

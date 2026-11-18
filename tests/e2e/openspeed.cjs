@@ -13,9 +13,9 @@ const userData = path.join(lib.WORK, 'openspeed-profile')
 const ws = path.join(lib.WORK, 'openspeed-ws')
 const logFile = path.join(userData, 'logs', 'combwork.log')
 // How long each of main's file calls waits during the timed open.
-const LAG_MS = 25
+const LAG_MS = lib.timing('seam.fileLagMs')
 // The bound on that open: about 0.6 s with HI-1705, over 3 s before it (a chain of some 140 calls).
-const OPEN_MS = 2000
+const OPEN_MS = lib.timing('budget.workspaceOpenMs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = lib.timing('hang.ui')
 let failed = 0

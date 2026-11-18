@@ -3,6 +3,7 @@
 // the case format) with locale-independent means only: IPC, command ids and structural hooks (data-group, data-action,
 // classes), never English text.
 const fs = require('fs')
+const { timing } = require('../../timing.cjs')
 const path = require('path')
 
 const WINDOW = { width: 1400, height: 860 }
@@ -41,7 +42,7 @@ async function quietMoment(ctx) {
   const { page, lib } = ctx
   await ctx.setFocus(true)
   const close = page.locator('.toasts .toast:not(.tip-card) .popup-close')
-  if (!(await lib.until(async () => (await close.count()) === 0 || (await close.first().click({ timeout: 2000 }).then(() => false, () => false)), ctx.hungMs))) throw new Error("the earlier pop-ups didn't close")
+  if (!(await lib.until(async () => (await close.count()) === 0 || (await close.first().click({ timeout: timing('poll.clickMs') }).then(() => false, () => false)), ctx.hungMs))) throw new Error("the earlier pop-ups didn't close")
 }
 
 /**
@@ -95,7 +96,7 @@ async function tipsOff(ctx) {
 
 async function closeNotice(ctx) {
   const { page, lib } = ctx
-  const dismiss = () => page.locator('.toasts .toast .icon-btn').first().click({ timeout: 2000 }).then(() => false, () => false)
+  const dismiss = () => page.locator('.toasts .toast .icon-btn').first().click({ timeout: timing('poll.clickMs') }).then(() => false, () => false)
   if (!(await lib.until(async () => (await page.locator('.toasts .toast').count()) === 0 || (await dismiss()), ctx.hungMs))) throw new Error("the notice didn't close")
   await setTips(ctx, false)
   // Unfocused again, as the areas after it expect.
