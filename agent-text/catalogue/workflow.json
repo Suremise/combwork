@@ -1611,8 +1611,8 @@
     "audience": "both"
   },
   "workflow.refused.submit.notDuplicate.message": {
-    "text": "{card} is already submitted at {revision} and waits for review or merging.",
-    "note": "A refused submit: the same revision is already waiting. {card} is a card key, {revision} a short revision id.",
+    "text": "{card} is already submitted{revision, select, none {} other { at {revision}}} and waits for review or merging.",
+    "note": "A refused submit: a submission is already waiting (the same revision, or any for a no-code card). {card} is a card key; {revision} the waiting submission's short revision id, or none when it has no revision (a no-code card's), which leaves out \"at …\" (HI-3409).",
     "audience": "both"
   },
   "workflow.refused.submit.notDuplicate.next": {

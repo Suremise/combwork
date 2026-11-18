@@ -485,7 +485,7 @@
   "workflow.refused.submit.identity.change": "Tę regułę ustawisz w Kontrola wersji → Commity używają tożsamości projektu.",
   "workflow.refused.submit.identity.message": "{missing, select, yes {Nie można przekazać {card}: jego commity muszą używać tożsamości projektu, a git nie ma żadnej ustawionej dla projektu.} other {{card}: autor commita {commit} nie używa tożsamości projektu ({email}).}}",
   "workflow.refused.submit.identity.next": "{missing, select, yes {Ustaw tożsamość projektu w Kontrola wersji → Gałęzie i zdalne repozytoria → Autor commitów (albo przez {command}), a potem przekaż ponownie.} other {Ustaw tożsamość, uruchom {command}, a potem przekaż ponownie.}}",
-  "workflow.refused.submit.notDuplicate.message": "Karta {card} jest już przekazana w rewizji {revision} i czeka na recenzję lub scalenie.",
+  "workflow.refused.submit.notDuplicate.message": "Karta {card} jest już przekazana{revision, select, none {} other { w rewizji {revision}}} i czeka na recenzję lub scalenie.",
   "workflow.refused.submit.notDuplicate.next": "Poczekaj na jej recenzję lub scalenie.",
   "workflow.refused.submit.ownRunsStopped.change": "Tę regułę ustawisz w Kontrola wersji → Agenci zatrzymują przed recenzją to, co uruchomili.",
   "workflow.refused.submit.ownRunsStopped.message": "{card}: Twoje uruchomienia nadal trwają ({runs}).",

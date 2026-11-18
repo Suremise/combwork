@@ -192,8 +192,8 @@
     "note": "The builder's wake for its reviewer's cw_focused_skip. {merge}: yes when it accepted. {why}: the reviewer's reason."
   },
   "runtime.wake.followUp": {
-    "text": "{card}: follow-up submitted for review at {revision} (submission {submission}). Start your review again (cw_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused",
-    "note": "HI-1832: the reviewer's wake for a follow-up (the card stays in Review, so no arrival wakes it). {revision}: short. {submission}: its number."
+    "text": "{card}: follow-up submitted for review{revision, select, none {} other { at {revision}}} (submission {submission}). Start your review again (cw_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused",
+    "note": "HI-1832: the reviewer's wake for a follow-up (the card stays in Review, so no arrival wakes it). {revision}: short, or none for a no-code card's follow-up, which records no revision (HI-3409). {submission}: its number."
   },
   "runtime.wake.followUpsOf": {
     "text": "{said}. Make each follow-up with cw_create_task and followUpOf: {card}, so it keeps this card's count",

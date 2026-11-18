@@ -45,7 +45,7 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.start.slotAvailable.change', defaultMessage: 'This is set in Version Control → Where cards are built.', description: 'Where the rule that refused starting for want of a slot is changed.' })
   ),
   'submit.notDuplicate': r(
-    msg({ id: 'workflow.refused.submit.notDuplicate.message', defaultMessage: '{card} is already submitted at {revision} and waits for review or merging.', description: 'A refused submit: the same revision is already waiting. {card} is a card key, {revision} a short revision id.' }),
+    msg({ id: 'workflow.refused.submit.notDuplicate.message', defaultMessage: '{card} is already submitted{revision, select, none {} other { at {revision}}} and waits for review or merging.', description: 'A refused submit: a submission is already waiting (the same revision, or any for a no-code card). {card} is a card key; {revision} the waiting submission\'s short revision id, or none when it has no revision (a no-code card\'s), which leaves out "at …" (HI-3409).' }),
     msg({ id: 'workflow.refused.submit.notDuplicate.next', defaultMessage: 'Wait for its review or merge.', description: 'The next step after a refused duplicate submission.' })
   ),
   'requeue.allowed': r(

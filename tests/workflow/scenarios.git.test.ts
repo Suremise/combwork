@@ -11,6 +11,9 @@ import { runCheck, blocks } from '../../src/main/workflow/checks'
 import { isRefusal } from '../../src/main/workflow/runtime'
 import type { FactData } from '../../src/shared/workflow/facts'
 import { workspaceDb } from '../../src/main/boardStore'
+import { GUARD_FNS } from '../../src/shared/workflow/guards'
+import { REFUSALS } from '../../src/shared/workflow/refusals'
+import { tr } from '../../src/shared/i18n'
 
 let env: Env | null = null
 afterEach(() => {
@@ -1044,6 +1047,50 @@ describe('a follow-up submitted in Review (HI-1832): the revision under review m
     commit(e.wf.state(card).started!.folder as string, { 'src/again.txt': 'again\n' }, 'again')
     refusedBy(await e.wf.submit(card.key, B2, { summary: 'not now', followUp: true }), 'submit.followUpNotBuilder')
     moved(await e.wf.submit(card.key, B1, { summary: 'its cycle builder', followUp: true }))
+  })
+
+  it("HI-3409: a card the user made no-code in Review takes its builder's follow-up as a new submission with no revision, reviewed on its own; the duplicate refusal names what waits", async () => {
+    const e = pair()
+    const { card, first } = await inReview(e)
+    // Its lane's reviewer is woken for a follow-up (the pool's pass tells a loose card's: reviewerPool.test.ts).
+    e.wf.startLane('L', [card.id], 'R1')
+    // The user's kind decision while its code submission waits, as tasks.ts' decideKind writes it.
+    e.store.updateCard(card.id, { kind: 'no-code' })
+    e.store.tx((tx) => tx.append(card.id, { kind: 'KindDecided', actor: 'user', source: 'recorded', data: { kind: 'no-code', proposed: 'no-code' } }))
+    // A second copy while the code submission waits (a drag back into Review reads the same guard): named by its recorded revision.
+    const dup = GUARD_FNS['submit.notDuplicate']({ card: { key: card.key, kind: 'no-code', labels: [], blocked: null }, state: e.wf.state(card), ruleset: e.wf.rulesetOf(card, e.wf.state(card)), agent: 'B1', revision: null })
+    expect(dup).toEqual({ rule: 'submit.notDuplicate', values: { card: card.key, revision: first.revision!.slice(0, 7) } })
+    expect(tr(REFUSALS['submit.notDuplicate'].message, dup!.values as { card: string; revision: string })).toBe(`${card.key} is already submitted at ${first.revision!.slice(0, 7)} and waits for review or merging.`)
+    // A plain submit in Review stays refused, with followUp named.
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'again' }), 'move.notFromHere')
+    e.wakes.length = 0
+    const r = await e.wf.submit(card.key, B1, { summary: 'The live proof, at driver 5045b46', followUp: true, revision: 'ignored' })
+    moved(r)
+    expect(r).toMatchObject({ from: 'review', to: 'review', data: { followUp: true, revision: null } })
+    const s = e.wf.state(card)
+    expect(s).toMatchObject({ stage: 'review', rounds: 0 })
+    expect(s.latest).toMatchObject({ revision: null, followUp: true, round: first.round, summary: 'The live proof, at driver 5045b46' })
+    expect(s.submissions).toHaveLength(2)
+    // Its reviewer is told to start again, with no "at" for a revision it hasn't got.
+    expect(e.wakes).toEqual([{ agent: 'R1', card: card.key, why: `${card.key}: follow-up submitted for review (submission ${s.latest!.id}). Start your review again (cw_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused` }])
+    // A no-code submission waiting: another copy is refused, with no "at".
+    const again = GUARD_FNS['submit.notDuplicate']({ card: { key: card.key, kind: 'no-code', labels: [], blocked: null }, state: s, ruleset: e.wf.rulesetOf(card, s), agent: 'B1', revision: null })
+    expect(again).toEqual({ rule: 'submit.notDuplicate', values: { card: card.key, revision: 'none' } })
+    expect(tr(REFUSALS['submit.notDuplicate'].message, again!.values as { card: string; revision: string })).toBe(`${card.key} is already submitted and waits for review or merging.`)
+    // The earlier submission's review doesn't carry; started again, the follow-up is reviewed and passes.
+    refusedBy(await e.wf.verdict(card.key, R1, { submission: first.id, pass: false, comment: 'old' }), 'verdict.currentSubmission')
+    refusedBy(await e.wf.verdict(card.key, R1, { pass: true, comment: 'good' }), 'verdict.reviewing')
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'the live proof holds' }))
+    expect(e.wf.state(card)).toMatchObject({ stage: 'done', accepted: { submission: s.latest!.id } })
+  })
+
+  it('HI-3409: a code card at the same revision is a duplicate named by it; a newer revision is a follow-up', async () => {
+    const e = pair()
+    const { card, folder } = await inReview(e)
+    moved(await e.wf.submit(card.key, B1, { summary: 'asked for', followUp: true }))
+    const r = refusedBy(await e.wf.submit(card.key, B1, { summary: 'the same again', followUp: true }), 'submit.notDuplicate')
+    expect(r.message).toBe(`${card.key} is already submitted at ${head(folder).slice(0, 7)} and waits for review or merging.`)
   })
 
   it('a verdict while the follow-up is on its way refuses it where it writes', async () => {

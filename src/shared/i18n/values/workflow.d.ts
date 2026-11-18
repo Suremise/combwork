@@ -513,7 +513,7 @@ interface CombworkMessageValues {
   'workflow.refused.submit.identity.change': undefined
   'workflow.refused.submit.identity.message': { missing: string; card: string | number; commit: string | number; email: string | number }
   'workflow.refused.submit.identity.next': { missing: string; command: string | number }
-  'workflow.refused.submit.notDuplicate.message': { card: string | number; revision: string | number }
+  'workflow.refused.submit.notDuplicate.message': { card: string | number; revision: string }
   'workflow.refused.submit.notDuplicate.next': undefined
   'workflow.refused.submit.ownRunsStopped.change': undefined
   'workflow.refused.submit.ownRunsStopped.message': { card: string | number; runs: string | number }

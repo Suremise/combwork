@@ -127,7 +127,7 @@
   "tasks.history.decisionsTold": "{agent}に新しい決定事項{count, plural, other {#件}}を伝達",
   "tasks.history.dependsOn": "{cards}に依存",
   "tasks.history.description": "説明を変更",
-  "tasks.history.followUpSubmitted": "フォローアップを{revision}でレビューに提出",
+  "tasks.history.followUpSubmitted": "フォローアップを{revision, select, none {} other {{revision}で}}レビューに提出",
   "tasks.history.forwardResolving": "ここで終了し、何もマージしていません。「ビルダーで解決」により、ビルダーが{from}（{source}）を{to}にマージしてそこで競合を解決するための{card}が作られました。{card}を確認してください。",
   "tasks.history.fromOlder": "古いCombworkから追加（そこでは#{was}として作成）",
   "tasks.history.given": "{agent}に割り当て",

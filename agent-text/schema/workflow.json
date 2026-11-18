@@ -1485,7 +1485,7 @@
   "workflow.refused.submit.notDuplicate.message": {
     "placeholders": {
       "card": "plain",
-      "revision": "plain"
+      "revision": "select"
     }
   },
   "workflow.refused.submit.notDuplicate.next": {

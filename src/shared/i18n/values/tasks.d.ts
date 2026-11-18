@@ -131,7 +131,7 @@ interface CombworkMessageValues {
   'tasks.history.decisionsTold': { agent: string | number; count: number }
   'tasks.history.dependsOn': { cards: string | number }
   'tasks.history.description': undefined
-  'tasks.history.followUpSubmitted': { revision: string | number }
+  'tasks.history.followUpSubmitted': { revision: string }
   'tasks.history.forwardResolving': { card: string | number; from: string | number; source: string | number; to: string | number }
   'tasks.history.fromOlder': { was: string | number }
   'tasks.history.given': { agent: string | number }
