@@ -51,7 +51,11 @@ jobs:
           key: ${{ steps.electron-cache.outputs.cache-primary-key }}
       - run: npm run typecheck
       - run: npm run lint
-      - run: npm test
+      # One worker here (HI-3355), not vitest.config.ts's half the cores (2 on this 4-vCPU runner): with two, the run
+      # took 75-95 min and a test file up to 7 min (gitFolderChanges.test.ts 375 s), so condition waits' bounds for a
+      # hung run tripped on a different test each run. One file at a time is closer to a normal machine; the run's sum
+      # of file times at two workers was about 170 min, the ceiling for it, under the job's 360 min.
+      - run: npm test -- --maxWorkers=1
       # Translations (#768): npm test already runs these; here each has its own line in the log.
       - run: npm run i18n:extract -- --check
       - run: npm run i18n:check
