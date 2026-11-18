@@ -1,4 +1,4 @@
-import { existsSync } from 'original-fs'
+import { existsSync, statSync } from 'original-fs'
 import { parentPort, workerData } from 'worker_threads'
 import { DatabaseSync } from 'node:sqlite'
 
@@ -23,11 +23,16 @@ export const CLOSING = 0
  */
 export type CheckpointRequest = { id: number; file: string; closing: number; kind?: 'checkpoint' | 'restart' }
 
-/** What the WAL's first write did: written (`busy` false), or skipped because another connection had the write lock; how long it took. */
+/**
+ * What the WAL's first write did: written (`busy` false), or skipped because another connection had the write lock; how
+ * long it took. `wal` (HI-3362): the WAL file's size and modified time after that write, read while this connection held
+ * the write lock again (so no other connection's write is in them); none when another connection took it first.
+ */
 export interface RestartDone {
   restart: true
   busy: boolean
   ms: number
+  wal?: { size: number; mtime: number }
 }
 
 /** What SQLite says of a checkpoint (`busy`: it couldn't finish; `checkpointed` of `log` pages), and how long it took. */
@@ -43,10 +48,11 @@ export type CheckpointReply = { id: number; ok: true; value: CheckpointDone | Re
 
 /**
  * Tests: a checkpoint of these files throws, as one refused by SQLite or the disk would; `inRestart` runs inside the
- * WAL's first write, its write lock held, and `afterRestart` once it is committed and its connection closed, before its
- * answer (in-process only: a worker's thread has its own copy of this module).
+ * WAL's first write, its write lock held, `beforeWalStat` once it is committed, before the WAL is read under the write
+ * lock again (HI-3362), and `afterRestart` once its connection is closed, before its answer (in-process only: a worker's
+ * thread has its own copy of this module).
  */
-export const checkpointHooks = { fail: null as ((file: string) => boolean) | null, inRestart: null as ((file: string) => void) | null, afterRestart: null as ((file: string) => void) | null }
+export const checkpointHooks = { fail: null as ((file: string) => boolean) | null, inRestart: null as ((file: string) => void) | null, afterRestart: null as ((file: string) => void) | null, beforeWalStat: null as ((file: string) => void) | null }
 
 /** Checkpoints `m.file`'s WAL on a connection of its own; `state` is shared with main (null: run on main, in tests). */
 export function runCheckpoint(m: CheckpointRequest, state: Int32Array | null): CheckpointDone | null {
@@ -81,6 +87,7 @@ export function runRestart(m: CheckpointRequest, state: Int32Array | null): Rest
     db.exec('PRAGMA synchronous = NORMAL')
     db.exec('PRAGMA wal_autocheckpoint = 0')
     const t = performance.now()
+    let seen = 0
     try {
       db.exec('BEGIN IMMEDIATE')
     } catch (e) {
@@ -91,17 +98,47 @@ export function runRestart(m: CheckpointRequest, state: Int32Array | null): Rest
       checkpointHooks.inRestart?.(m.file)
       const v = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version // i18n-ignore: SQL
       db.exec(`PRAGMA user_version = ${Number(v) | 0}`)
+      // HI-3362: another connection's commit from here on moves this connection's data_version (its own doesn't).
+      seen = dataVersion(db)
       db.exec('COMMIT')
     } catch (e) {
       if (db.isTransaction) db.exec('ROLLBACK')
       throw e
     }
     const ms = performance.now() - t
+    const wal = walAfter(db, m.file, seen)
     db.close()
     checkpointHooks.afterRestart?.(m.file)
-    return { restart: true, busy: false, ms }
+    return { restart: true, busy: false, ms, ...(wal ? { wal } : {}) }
   } finally {
     if (db.isOpen) db.close()
+  }
+}
+
+const dataVersion = (db: DatabaseSync): number => (db.prepare('PRAGMA data_version').get() as { data_version: number }).data_version // i18n-ignore: SQL
+
+/**
+ * HI-3362: the WAL file's size and modified time after this connection's commit, and nothing else's: read under the
+ * write lock (a transaction begun and rolled back, writing nothing), so no other connection writes while it is read, and
+ * only when this connection's data_version is still `seen`, the one read before its commit (no other connection
+ * committed since). Null when another connection wrote since or holds the lock (main sees that write as a change, as
+ * before), or the file can't be read.
+ */
+function walAfter(db: DatabaseSync, file: string, seen: number): { size: number; mtime: number } | null {
+  checkpointHooks.beforeWalStat?.(file)
+  try {
+    db.exec('BEGIN IMMEDIATE')
+  } catch {
+    return null
+  }
+  try {
+    if (dataVersion(db) !== seen) return null
+    const s = statSync(`${file}-wal`)
+    return { size: s.size, mtime: s.mtimeMs }
+  } catch {
+    return null
+  } finally {
+    db.exec('ROLLBACK')
   }
 }
 

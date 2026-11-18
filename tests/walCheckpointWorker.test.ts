@@ -114,6 +114,31 @@ describe("the WAL checkpoints' worker (HI-1691)", () => {
     }
   })
 
+  it("HI-3362: in the worker too, the restart's own write is no change: idle after it, nothing more is checkpointed or restarted", async () => {
+    const db = open()
+    try {
+      write(db.writer, 5)
+      const done = wal.checkpointStats.done
+      const restarts = wal.checkpointStats.restarts
+      due()
+      await vi.waitFor(() => expect(wal.checkpointStats.restarts).toBe(restarts + 1), { timeout: HUNG_MS })
+      await wal.walWritable(db.writer)
+      // Three cycles of idle ticks, each due; whatever they asked of the worker is answered once it lets go of the file.
+      let t = performance.now() + 2 * (wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+      for (let i = 0; i < 3; i++) {
+        wal.checkpointTick(t)
+        t += wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs
+        wal.checkpointTick(t)
+        t += wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs
+        await wal.checkpointsReleased(db.file)
+      }
+      expect(wal.checkpointStats.done).toBe(done + 1)
+      expect(wal.checkpointStats.restarts).toBe(restarts + 1)
+    } finally {
+      db.close()
+    }
+  })
+
   it('a database closed as a checkpoint is asked for: once checkpointsReleased resolves, its file is free', async () => {
     for (let i = 0; i < 5; i++) {
       const db = open()

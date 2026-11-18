@@ -41,7 +41,9 @@ import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
  * under the database's own async write lock (`hold`, the board's for combwork.db), and behind its write gate
  * (`walWritable`, which the journal's writes await). A BEGIN through db.ts's `beginWrite` while the gate is closed is
  * refused, never waited for (`beginGuards`). Another connection's commit still moves the board's `data_version`, and so
- * does this write: the board takes it for another process's change (one refresh), never missing a real one.
+ * does this write: the board takes it for another process's change (one refresh), never missing a real one. The write
+ * itself isn't a change to checkpoint again (HI-3362): the worker reads the WAL as its commit left it, and main starts
+ * its next tick from there (restart's answer, RestartDone's `wal`).
  */
 
 const log = createLogger('db')
@@ -188,7 +190,16 @@ function restart(r: Registered): void {
       if ('error' in res) return log.warn(`making the first write of ${basename(r.file)}'s WAL after its checkpoint${where}: ${res.error}`)
       if (res.busy) return void checkpointStats.restartsSkipped++
       checkpointStats.restarts++
-      if (dbs.get(r.writer) === r) r.restartDue = false
+      if (dbs.get(r.writer) === r) {
+        r.restartDue = false
+        // HI-3362: the restart's own write isn't a change to checkpoint (it would ask for another restart, every
+        // `everyMs`, for as long as Combwork runs): the WAL as the worker read it, under the write lock after its
+        // commit, is where the next tick starts. Without that reading (another connection writing then), as before.
+        if (res.wal) {
+          r.size = res.wal.size
+          r.mtime = res.wal.mtime
+        }
+      }
       if (res.ms >= SLOW_MS) log.info(`restarted ${basename(r.file)}'s WAL in ${Math.round(res.ms)} ms${where} (its first write after a whole checkpoint, off main's thread)`)
     }
     try {

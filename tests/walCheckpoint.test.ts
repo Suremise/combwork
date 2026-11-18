@@ -210,6 +210,8 @@ describe("the WAL's first write after a checkpoint is the checkpointer's (HI-328
   afterEach(() => {
     checkpointHooks.inRestart = null
     checkpointHooks.fail = null
+    checkpointHooks.beforeWalStat = null
+    checkpointHooks.afterRestart = null
   })
   /** A checkpoint due now (the idle trigger), for every database registered. */
   const due = (): void => {
@@ -252,6 +254,93 @@ describe("the WAL's first write after a checkpoint is the checkpointer's (HI-328
       expect((db.reader.prepare('SELECT count(*) AS c FROM t').get() as { c: number }).c).toBe(8)
       expect((db.reader.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(0)
     } finally {
+      db.close()
+    }
+  })
+
+  it('HI-3362: an idle database after its restart is checkpointed and restarted no more, and a write after that still is', () => {
+    const db = open(wal.checkpointWhenIdle)
+    try {
+      write(db.writer, 5)
+      due()
+      const done = wal.checkpointStats.done
+      const restarts = wal.checkpointStats.restarts
+      const version = (): number => (db.writer.prepare('PRAGMA data_version').get() as { data_version: number }).data_version
+      const v = version()
+      // Nothing written: three cycles' worth of ticks, each idle and due.
+      let t = performance.now() + 2 * (wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+      for (let i = 0; i < 3; i++) {
+        wal.checkpointTick(t)
+        t += wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs
+        wal.checkpointTick(t)
+        t += wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs
+      }
+      expect(wal.checkpointStats.done).toBe(done)
+      expect(wal.checkpointStats.restarts).toBe(restarts)
+      expect(version()).toBe(v)
+      // Another connection's write after the restart is still seen, checkpointed and restarted after.
+      const other = new DatabaseSync(db.file)
+      try {
+        other.exec('PRAGMA wal_autocheckpoint = 0')
+        other.prepare('INSERT INTO t (doc) VALUES (?)').run(Buffer.alloc(6000, 7))
+      } finally {
+        other.close()
+      }
+      wal.checkpointTick(t)
+      wal.checkpointTick(t + wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+      expect(wal.checkpointStats.done).toBe(done + 1)
+      expect(wal.checkpointStats.restarts).toBe(restarts + 1)
+    } finally {
+      db.close()
+    }
+  })
+
+  it("HI-3362: another connection writing just after the restart's commit (the lock taken before the WAL is read) is still seen and checkpointed", () => {
+    const db = open(wal.checkpointWhenIdle)
+    const other = new DatabaseSync(db.file, { timeout: 0 })
+    try {
+      other.exec('PRAGMA wal_autocheckpoint = 0')
+      write(db.writer, 5)
+      // Between the restart's commit and its reading of the WAL, another connection takes the write lock and writes.
+      checkpointHooks.beforeWalStat = () => {
+        other.exec('BEGIN IMMEDIATE')
+        other.prepare('INSERT INTO t (doc) VALUES (?)').run(Buffer.alloc(6000, 9))
+      }
+      checkpointHooks.afterRestart = () => other.exec('COMMIT')
+      const done = wal.checkpointStats.done
+      due()
+      checkpointHooks.beforeWalStat = null
+      checkpointHooks.afterRestart = null
+      expect(wal.checkpointStats.done).toBe(done + 1)
+      // Its write is a change: checkpointed at the next idle tick.
+      const t = performance.now() + 2 * (wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+      wal.checkpointTick(t)
+      wal.checkpointTick(t + wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+      expect(wal.checkpointStats.done).toBe(done + 2)
+      expect((db.reader.prepare('SELECT count(*) AS c FROM t').get() as { c: number }).c).toBe(6)
+    } finally {
+      other.close()
+      db.close()
+    }
+  })
+
+  it("HI-3362: another connection's write committed between the restart's commit and its reading of the WAL is still seen and checkpointed", () => {
+    const db = open(wal.checkpointWhenIdle)
+    const other = new DatabaseSync(db.file, { timeout: 0 })
+    try {
+      other.exec('PRAGMA wal_autocheckpoint = 0')
+      write(db.writer, 5)
+      checkpointHooks.beforeWalStat = () => void other.prepare('INSERT INTO t (doc) VALUES (?)').run(Buffer.alloc(6000, 9))
+      const done = wal.checkpointStats.done
+      due()
+      checkpointHooks.beforeWalStat = null
+      expect(wal.checkpointStats.done).toBe(done + 1)
+      const t = performance.now() + 2 * (wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+      wal.checkpointTick(t)
+      wal.checkpointTick(t + wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+      expect(wal.checkpointStats.done).toBe(done + 2)
+    } finally {
+      other.close()
       db.close()
     }
   })
