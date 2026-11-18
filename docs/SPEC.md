@@ -8089,12 +8089,17 @@ Whether a conversation may resume there is its **hold** (none: it may):
   (with workflow rules off, leases aren't ended by rules, so nothing is stopped).
 - **A lane over with its card in flight keeps that card's slot** (HI-3118; design HI-3118/s12, agreed with HR2). The
   slot pass decides a running-no-more lane's lease in one write (`SlotStore.laneOver`), reading there the lane's row and
-  each card whose current cycle started on that lease (its Started `lease`) at a stage that keeps a slot. None: the
-  lease ends (`laneEnded` / `laneAbandoned`), as below. One: the lease becomes that card's in place (same id, slot and
-  agent; `kind: card`), whoever the card is given to now, so the card keeps its slot and work, is never lent away from
-  them, and its lease then ends as a card's does (Done, or put back, HI-2995 keeping committed work). Several (a race;
-  the rules allow one): nothing ends, the slot stays protected, and the log says which. A lane running again is left
-  alone. **A Git submit** from a card started on a slot's lease is refused (`platform.slotLeft`) unless that lease is
+  the card started on that lease last (its newest Started naming the `lease`), if its current cycle started there and
+  is at a stage that keeps a slot. None: the lease ends (`laneEnded` / `laneAbandoned`), as below. One: the lease
+  becomes that card's in place (same id, slot and agent; `kind: card`), whoever the card is given to now, so the card
+  keeps its slot and work, is never lent away from them, and its lease then ends as a card's does (Done, or put back,
+  HI-2995 keeping committed work). **Only the card started last counts** (HI-3353): a lane's lease carries its cards
+  in turn, each prepared in the slot over the one before, so a card started before another (put On Hold mid-lane while
+  the lane went on, or two started in a race) has its work on its line, not in the slot, and keeps nothing. Kept for
+  such a card On Hold, the lease held its builder's one slot for good, and every later start of that builder's (a new
+  lane's first card, a start across the rules) got none. A card lease such a card already holds (made before the fix)
+  isn't used by it (`cardUsesLease`), so the slot pass ends it (`movedOn`), as a lease its card no longer uses, and
+  the builder's run there is stopped at its idle moment as any ended lease's is. A lane running again is left alone. **A Git submit** from a card started on a slot's lease is refused (`platform.slotLeft`) unless that lease is
   open now, on that slot at the card's folder, and the card's own or a lane's listing the card; unreadable, refused
   too. Nothing is changed there on refusal.
 - **A lane's end lets its builder finish** (HI-1706: nobody wants a builder cut off like that; design
@@ -8321,7 +8326,11 @@ Whether a conversation may resume there is its **hold** (none: it may):
     session in it, a process, or the broker;
   - no slot free, as the builder's own last run still holds one as its writer (the usual case for a builder stopped
     after starting something that outlives it): what that run left running there, named from the slot's writer
-    (`heldWriter`: *B1's last run left node running in it*), or that the run isn't known to have ended.
+    (`heldWriter`: *B1's last run left node running in it*), or that the run isn't known to have ended;
+  - its lend refused `agentLeased` (HI-3353: its builder already holds a slot for a card): that slot and card, said in
+    HI-3168's words (*waiting for a slot: B1 still builds in slot-a for HI-2, which keeps it until that card is Done
+    or put back*), while that lease is still open; before, the status said only *refused for now; Combwork tries
+    again*, and Release Slot, which lists carried slots and held writers, showed nothing.
 
   For example: *HI-12 waits to start: its start was refused for now, slot-a still in use (B1's last run left node
   running in it); Combwork tries again*. The status keeps its builder as `agent` and puts the holder's agent in `heldBy`.

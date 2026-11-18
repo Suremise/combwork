@@ -306,9 +306,12 @@ async function slotForStart(ws: WorkspaceService, projectPath: string, card: Pic
   }
   const r = await pool.lend(req, { ...(o.target ? { target: o.target } : {}), install: false })
   // A lane's start refused for its slot held (HI-2468): what holds it kept for the lane's status; any other end forgets it.
+  // Its builder's one slot lent to a card (HI-3353, as HI-3168 says a waiting lane's): that slot and card, so the status
+  // names them rather than only "refused for now".
   if (lane) {
     const busy = !r.ok && r.refusal.why === 'busy' ? r.refusal : null
-    noteStartHeld(projectPath, lane, busy ? { held: heldOf(pool, busy), folder: pool.slots().find((s) => s.name === busy.slot)?.folder ?? null } : null)
+    const leased = !r.ok && r.refusal.why === 'agentLeased' && r.refusal.card !== null ? r.refusal : null
+    noteStartHeld(projectPath, lane, busy ? { held: heldOf(pool, busy), folder: pool.slots().find((s) => s.name === busy.slot)?.folder ?? null } : leased ? { held: { slot: leased.slot, held: 'card', agent: name(builder), card: leased.card! }, folder: null } : null)
   }
   if (!r.ok) return { wait: refusalText(r.refusal, name) }
   log.info(`Lent ${userText(r.slot.name)} to ${userText(name(builder))} for ${lane ? `lane ${lane}` : `#${card.id}`} (lease ${r.lease.id})`)
@@ -554,6 +557,7 @@ function noteStartHeld(projectPath: string, lane: string, h: { held: LaneSlotHel
  * status; null when it can't be told (the status then says only that the start was refused). `since`: the try just
  * made (its lend's `busy` refusal, kept by slotForStart, counts only from then); without, a look between tries.
  * - its lend refused a free slot as held: what held it (a session, a process, the broker), looked at again between tries;
+ * - its lend refused as its builder already holds a slot for a card (HI-3353): that slot and card, while that lease is open;
  * - else, no slot free: the one its builder's own last run still holds (or the only one so held, no lease on it), as
  *   its writer says: the programs it left running there, or that run not known to have ended (agentFolders' heldWriter).
  * Never a lend, and never what decides the start: it is tried again as it always is.
@@ -561,6 +565,12 @@ function noteStartHeld(projectPath: string, lane: string, h: { held: LaneSlotHel
 export async function startSlotHold(ws: WorkspaceService, projectPath: string, lane: string, builder: string, since?: number): Promise<LaneSlotHeld | null> {
   const h = startHolds.get(startHoldKey(projectPath, lane))
   if (h && since !== undefined && h.at >= since) return h.held
+  // Its builder's slot lent to a card (HI-3353): named while that lease is still open, the builder's, for that card.
+  if (h?.held.held === 'card' && since === undefined) {
+    const card = h.held.card
+    const still = card !== undefined && (await poolFor(ws, projectPath)).leasesOf(builder).some((l) => l.kind !== 'carried' && l.card === card && l.slot === h.held.slot)
+    if (still) return h.held
+  }
   if (h?.folder && since === undefined) {
     const folder = h.folder
     const s = sessions.liveStates().find((x) => !!x.cwd && containsPlace(folder, x.cwd))
@@ -792,7 +802,7 @@ async function slotUnused(ws: WorkspaceService, projectPath: string, lease: stri
   const l = pool.lease(lease)
   if (!l || l.to || l.kind !== 'card' || l.card === null) return
   const wf = await workflowFor(ws, projectPath).catch(() => null)
-  if (await pool.release(lease, 'notStarted', () => !wf || !uses(wf, l))) void settleSlotCards(ws, projectPath)
+  if (await pool.release(lease, 'notStarted', () => !wf || !cardUsesLease(wf, l))) void settleSlotCards(ws, projectPath)
 }
 
 /** Whether any start of the card was written with the lease (one not yet: a start still on its way, given its grace). */
@@ -800,12 +810,28 @@ function startedWith(wf: Workflow, l: SlotLease): boolean {
   return l.card !== null && !!cardOf(wf, l.card) && wf.store.facts(l.card).some((f) => f.kind === 'Started' && (f.data as StartedData).lease === l.id)
 }
 
-/** Whether a card's current cycle uses a lease of its own (started with it, at a stage that keeps it). */
-function uses(wf: Workflow, l: SlotLease): boolean {
+/**
+ * Whether a card's current cycle uses a lease of its own (started with it, at a stage that keeps it, and the last card
+ * started on it: HI-3353, a lane's lease its lane's end made a card's).
+ */
+export function cardUsesLease(wf: Workflow, l: SlotLease): boolean {
   const card = l.card !== null ? cardOf(wf, l.card) : null
   if (!card) return false
   const s = wf.state(card)
-  return s.started?.lease === l.id && KEEPS.has(s.stage)
+  return s.started?.lease === l.id && KEEPS.has(s.stage) && lastStartedOn(wf, l.id) === card.id
+}
+
+/**
+ * The card started on `lease` last (its newest Started naming that lease, in the order written), or null (HI-3353). A
+ * lane's lease carries its cards in turn, each prepared in the slot over the one before: only the last still has the
+ * slot as its own. One started before it (CL-217, put On Hold mid-lane while CL-284 and CL-317 went on in its slot) has
+ * its work on its line, not there, so it never keeps the lease once its lane is over.
+ */
+function lastStartedOn(wf: Workflow, lease: string): number | null {
+  let last: number | null = null
+  const kind = 'Started' as const // i18n-ignore: a fact kind, not text
+  for (const f of wf.store.factsOfKind(kind)) if ((f.data as StartedData).lease === lease) last = f.card
+  return last
 }
 
 /**
@@ -825,17 +851,18 @@ const ambiguousSaid = new Set<string>()
 
 /**
  * Whether a lane is over, and its cards whose current cycle runs on its lease (HI-3118), read in the lease's release
- * write: the lane's row (none: gone, so over), and every card started on that lease whose cycle keeps it now (its Started
- * cycle's lease that one, its stage one that keeps a slot), whoever it is given to now. Null when it can't be read.
+ * write: the lane's row (none: gone, so over), and the card started on that lease last if its cycle keeps it now (its
+ * Started cycle's lease that one, its stage one that keeps a slot), whoever it is given to now. A card started on it
+ * before another never keeps it (HI-3353: the slot was prepared for the later one since; kept for CL-217 On Hold, it
+ * held its builder's one slot for good, and no start of that builder's got another). Null when it can't be read.
  */
 export function laneOverIn(db: DatabaseSync, wf: Workflow, lane: string, lease: string): { over: boolean; cards: number[] } | null {
   try {
     const row = db.prepare('SELECT state FROM lanes WHERE id = ?').get(lane) as { state: string } | undefined // i18n-ignore: SQL
     if (row?.state === 'active') return { over: false, cards: [] }
-    const kind = 'Started' as const // i18n-ignore: a fact kind, not text
-    const started = new Set(wf.store.factsOfKind(kind).filter((f) => (f.data as StartedData).lease === lease).map((f) => f.card))
+    const last = lastStartedOn(wf, lease)
     const cards: number[] = []
-    for (const n of started) {
+    for (const n of last === null ? [] : [last]) {
       // Read for real, never cardOf (which takes any failure for "no card"): a card that can't be read keeps the lease
       // (HR2's round 1: an unreadable live card released its slot). Only a card the board has no row of is absent.
       let card: ReturnType<Workflow['store']['card']>
@@ -1235,9 +1262,13 @@ async function settleOnce(ws: WorkspaceService, projectPath: string, life: Abort
   for (const l of pool.openLeases()) {
     if (ended(ws)) return
     if (l.kind === 'card' && l.card !== null) {
-      if (uses(wf, l) || (Date.now() - Date.parse(l.from) < START_GRACE_MS && !startedWith(wf, l))) continue
+      if (cardUsesLease(wf, l) || (Date.now() - Date.parse(l.from) < START_GRACE_MS && !startedWith(wf, l))) continue
       const stage = cardOf(wf, l.card) ? wf.state(cardOf(wf, l.card)!).stage : null
-      if (await pool.release(l.id, stage === 'done' ? 'done' : 'putBack', () => !uses(wf, l))) log.info(`#${l.card}'s lease ${l.id} on ${userText(l.slot)} ended (${stage ?? 'gone'})`)
+      // HI-3353: a lane's lease made this card's at its lane's end, though another card of the lane started on it since
+      // (before the fix, or a race): its slot isn't the card's, so it ends as any lease its card no longer uses.
+      const last = lastStartedOn(wf, l.id)
+      const movedOn = last !== null && last !== l.card
+      if (await pool.release(l.id, stage === 'done' ? 'done' : movedOn ? 'movedOn' : 'putBack', () => !cardUsesLease(wf, l))) log.info(`#${l.card}'s lease ${l.id} on ${userText(l.slot)} ended (${movedOn ? `#${last} started on it since` : (stage ?? 'gone')})`)
     } else if (l.kind === 'lane' && l.lane) {
       const lane = lanes.get(l.lane)
       if (lane && lane.state === 'active') continue
