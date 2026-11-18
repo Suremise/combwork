@@ -90,6 +90,39 @@ describe('untilBound (HI-3374)', () => {
   })
 })
 
+describe("the time left read after each awaited guard (HR3's round 1)", () => {
+  const bound = { boundMs: 100, firstMs: 10, capMs: 10 }
+
+  it('untilBound: a guard that takes the rest of the time leaves no attempt after it', async () => {
+    let t = 0
+    const attempt = vi.fn(() => {
+      throw held()
+    })
+    let err: unknown = null
+    void untilBound(attempt, {
+      bound,
+      transient: heldError,
+      now: () => t,
+      sleep: async () => undefined,
+      // After the first attempt, the guard (an owner check, say) itself takes past the bound.
+      guard: async () => void (attempt.mock.calls.length && (t += 200))
+    }).catch((e) => (err = e))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(attempt).toHaveBeenCalledTimes(1)
+    expect((err as { code?: string })?.code).toBe('EPERM')
+  })
+
+  it('retryWhile: the same', async () => {
+    let t = 0
+    const attempt = vi.fn(() => 'busy')
+    let got: string | null = null
+    void retryWhile(attempt, (r) => r === 'busy', { bound, now: () => t, sleep: async () => undefined, guard: async () => void (attempt.mock.calls.length && (t += 200)) }).then((r) => (got = r))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(attempt).toHaveBeenCalledTimes(1)
+    expect(got).toBe('busy')
+  })
+})
+
 describe('retryWhile (HI-3374)', () => {
   it('a result busy for 1 s, then fine: the fine one; always busy: the last within 3.2 s, at most 7 tries', async () => {
     const start = Date.now()

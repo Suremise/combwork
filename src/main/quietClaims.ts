@@ -75,6 +75,12 @@ export function claimOf(t: QuietTarget): QuietClaim | null {
   return { folder: String(r.folder), aside: String(r.aside), folderId: String(r.folder_id), owner: { pid: Number(r.owner_pid), started: Number(r.owner_started) }, op: (r.op as string | null) ?? null, usedAt: (r.used_at as string | null) ?? null, at: String(r.at) }
 }
 
+/** The pool's operation on `t` now, with its holder's identity, or null when `t` isn't the pool's. */
+function holdIn(db: DatabaseSync, t: QuietTarget): { op: string | null; pid: number; started: number } | null {
+  const r = db.prepare(`SELECT op, op_pid, op_started FROM ${t.kind === 'slot' ? 'slots' : 'copies'} WHERE project = ? AND name = ?`).get(t.project, t.name) as { op: string | null; op_pid: number | null; op_started: number | null } | undefined // i18n-ignore: SQL
+  return r ? { op: r.op ?? null, pid: r.op_pid ?? 0, started: r.op_started ?? 0 } : null
+}
+
 /** The pool's own hold on `t` now: its operation's token and when it was last used (its generation for a claim). */
 function generationIn(db: DatabaseSync, t: QuietTarget): { op: string | null; usedAt: string | null } | null {
   const r = db.prepare(`SELECT op, used_at FROM ${t.kind === 'slot' ? 'slots' : 'copies'} WHERE project = ? AND name = ?`).get(t.project, t.name) as { op: string | null; used_at: string | null } | undefined // i18n-ignore: SQL
@@ -131,8 +137,13 @@ export async function recoverClaim(t: QuietTarget, c: QuietClaim): Promise<Recov
   const took = await t.conn.write((db): 'ok' | 'held' | 'needs' => {
     const r = db.prepare('SELECT owner_pid, owner_started, aside FROM quiet_claims WHERE project = ? AND kind = ? AND name = ?').get(t.project, t.kind, t.name) as { owner_pid: number; owner_started: number; aside: string } | undefined // i18n-ignore: SQL
     if (!r || r.aside !== c.aside || !sameOwner({ pid: r.owner_pid, started: r.owner_started }, c.owner)) return 'held'
-    const gen = generationIn(db, t)
-    if (!gen || gen.op !== c.op || gen.usedAt !== c.usedAt) return 'needs'
+    // The pool's hold now (HR3's round 1): no operation, the claim's own still (its teardown not reached), or one of this
+    // process's (a lease or reset now under way here, or the pool's own takeover of a crashed one) lets it be recovered;
+    // another process's operation on it is a hold the claim doesn't override (held, looked at again); the slot or copy
+    // gone from the pool, needs the user.
+    const cur = holdIn(db, t)
+    if (!cur) return 'needs'
+    if (cur.op && cur.op !== c.op && !sameOwner({ pid: cur.pid, started: cur.started }, me)) return 'held'
     db.prepare('UPDATE quiet_claims SET owner_pid = ?, owner_started = ? WHERE project = ? AND kind = ? AND name = ?').run(me.pid, me.started, t.project, t.kind, t.name) // i18n-ignore: SQL
     return 'ok'
   })

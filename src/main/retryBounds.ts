@@ -47,24 +47,27 @@ export async function untilBound<T>(
   const now = o.now ?? Date.now
   const sleep = o.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
   const started = now()
+  const left = (): number => o.bound.boundMs - (now() - started)
+  let last: unknown = undefined
+  const giveUp = (tries: number): never => {
+    o.onGaveUp?.(last, tries, now() - started)
+    throw last
+  }
   for (let n = 0; ; n++) {
     await o.guard?.()
+    // HI-3374 (HR3's round 1): the time left read again after each awaited guard, right before the attempt: none, no attempt.
+    if (n > 0 && left() <= 0) giveUp(n)
     try {
       return await attempt()
     } catch (e) {
       if (!o.transient(e)) throw e
-      const left = o.bound.boundMs - (now() - started)
-      if (left <= 0) {
-        o.onGaveUp?.(e, n + 1, now() - started)
-        throw e
-      }
+      last = e
+      if (left() <= 0) giveUp(n + 1)
       await o.guard?.()
-      await sleep(Math.min(retryWait(o.bound, n), left))
-      // The bound passed while waiting: no attempt after it.
-      if (o.bound.boundMs - (now() - started) <= 0) {
-        o.onGaveUp?.(e, n + 1, now() - started)
-        throw e
-      }
+      // Read again after the guard: its wait is cut to what is left then.
+      const wait = Math.min(retryWait(o.bound, n), left())
+      if (wait <= 0) giveUp(n + 1)
+      await sleep(wait)
     }
   }
 }
@@ -77,15 +80,18 @@ export async function retryWhile<T>(attempt: () => T | Promise<T>, again: (r: T)
   const now = o.now ?? Date.now
   const sleep = o.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
   const started = now()
+  const left = (): number => o.bound.boundMs - (now() - started)
   await o.guard?.()
   let r = await attempt()
   for (let n = 0; again(r); n++) {
-    const left = o.bound.boundMs - (now() - started)
-    if (left <= 0) return r
+    if (left() <= 0) return r
     await o.guard?.()
-    await sleep(Math.min(retryWait(o.bound, n), left))
-    if (o.bound.boundMs - (now() - started) <= 0) return r
+    // Read again after the guard (HR3's round 1).
+    const wait = Math.min(retryWait(o.bound, n), left())
+    if (wait <= 0) return r
+    await sleep(wait)
     await o.guard?.()
+    if (left() <= 0) return r
     r = await attempt()
   }
   return r

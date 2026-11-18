@@ -144,15 +144,53 @@ describe('the quiet check claims its rename aside (HI-3374)', () => {
     }
   })
 
-  it("the pool's hold changed since (another operation took the copy): needs you, nothing renamed", async () => {
+  /** The copy's operation as CopyStore writes it (null: none). */
+  const setOp = (s: ReturnType<typeof setup>, op: { token: string; pid: number; started: number } | null) =>
+    s.one.write((db) => db.prepare("UPDATE copies SET op = ?, op_kind = ?, op_pid = ?, op_started = ? WHERE project = 'p' AND name = 'c1'").run(op?.token ?? null, op ? 'lease' : null, op?.pid ?? null, op?.started ?? null))
+
+  it("HR3's round 1: a claim made under an operation whose put-back gave up, its operation then ended (op cleared, as CopyStore.setIn does): the next look puts it back", async () => {
     const s = setup()
     try {
+      await setOp(s, { token: 'operation-1', ...P1 })
       const aside = `${s.folder}.cw-quiet-hhhhhh`
       const c = await as(P1, {}, () => takeClaim(s.a, s.folder, aside))
+      expect(c?.op).toBe('operation-1')
       renameSync(s.folder, aside)
-      await s.one.write((db) => db.prepare("UPDATE copies SET op = 'other', op_kind = 'lease', op_pid = 1, op_started = 1, used_at = 't1' WHERE project = 'p' AND name = 'c1'").run())
-      const r = await as(P2, { [P1.pid]: 'dead' }, () => recoverClaim(s.b, c!))
-      expect(r.state).toBe('needs')
+      await setOp(s, null)
+      expect(await as(P1, {}, () => recoverClaim(s.a, c!))).toEqual({ state: 'released' })
+      expect(existsSync(join(s.folder, 'a.txt'))).toBe(true)
+    } finally {
+      s.close()
+    }
+  })
+
+  it("a crash under an operation, taken over by the pool here (a new operation of this process's): the next look puts it back", async () => {
+    const s = setup()
+    try {
+      await setOp(s, { token: 'operation-1', ...P1 })
+      const aside = `${s.folder}.cw-quiet-kkkkkk`
+      const c = await as(P1, {}, () => takeClaim(s.a, s.folder, aside))
+      renameSync(s.folder, aside)
+      // P1 crashed; P2's pool takes the copy's operation over first.
+      await setOp(s, { token: 'operation-2', ...P2 })
+      expect(await as(P2, { [P1.pid]: 'dead' }, () => recoverClaim(s.b, c!))).toEqual({ state: 'released' })
+      expect(existsSync(join(s.folder, 'a.txt'))).toBe(true)
+    } finally {
+      s.close()
+    }
+  })
+
+  it("another process's operation on the copy now: held (not put back under it), looked at again; the copy gone from the pool: needs you", async () => {
+    const s = setup()
+    try {
+      const aside = `${s.folder}.cw-quiet-llllll`
+      const c = await as(P1, {}, () => takeClaim(s.a, s.folder, aside))
+      renameSync(s.folder, aside)
+      await setOp(s, { token: 'operation-3', pid: 444, started: 4_000_000 })
+      expect(await as(P2, { [P1.pid]: 'dead', 444: 'alive' }, () => recoverClaim(s.b, c!))).toEqual({ state: 'held' })
+      expect(existsSync(aside)).toBe(true)
+      await s.one.write((db) => db.prepare("DELETE FROM copies WHERE project = 'p' AND name = 'c1'").run())
+      expect((await as(P2, { [P1.pid]: 'dead' }, () => recoverClaim(s.b, c!))).state).toBe('needs')
       expect(existsSync(aside)).toBe(true)
       expect(existsSync(s.folder)).toBe(false)
     } finally {
@@ -178,13 +216,16 @@ describe('the quiet check claims its rename aside (HI-3374)', () => {
     }
   })
 
-  it('an aside without a claim (from before HI-3374) is never put back by its name', async () => {
+  it('an aside without a claim (from before HI-3374) is never put back by its name, nor read as gone: held, needing the user', async () => {
     const s = setup()
     try {
       const aside = `${s.folder}.cw-quiet-jjjjjj`
       renameSync(s.folder, aside)
-      expect(await as(P2, {}, () => folderThere(s.folder, s.b))).toBe(false)
+      expect(await as(P2, {}, () => folderThere(s.folder, s.b))).toBe(true)
+      expect(await as(P2, {}, () => quiet(s.folder, s.b))).toBe(false)
+      expect(quietNeeds(s.folder)?.aside).toBe(aside)
       expect(existsSync(aside)).toBe(true)
+      expect(existsSync(s.folder)).toBe(false)
     } finally {
       s.close()
     }

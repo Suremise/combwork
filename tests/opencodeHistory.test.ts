@@ -1397,6 +1397,30 @@ describe("a mirror's publication while a reader has it open (HI-2778)", () => {
     expect(readdirSync(join(home, 'combwork-sessions')).filter((f) => f.endsWith('.tmp'))).toEqual([])
   })
 
+  it("HI-3374 (HR3's round 1): a refused rename that itself takes the whole bound: no try after it (its time counts, not only the pauses)", async () => {
+    const home = tempDir('cw-oc-hist-')
+    const srv = server()
+    let t = Date.now()
+    let tries = 0
+    const pauses: number[] = []
+    const { core } = await started(srv, home, 'run1', {
+      now: () => t,
+      rename: () => {
+        tries++
+        // The rename takes longer than the whole bound before it is refused.
+        t += RENAME_RETRY.boundMs + 1000
+        throw busy()
+      },
+      pause: (ms) => void pauses.push(ms)
+    })
+    await ask(core, { type: 'refresh', runId: 'run1', force: true }).catch(() => undefined)
+    await ask(core, { type: 'idle' })
+    // Each publish tried once, never paused for: the bound spent by the rename itself.
+    expect(pauses).toEqual([])
+    expect(tries).toBeGreaterThan(0)
+    expect(tries).toBeLessThanOrEqual(2)
+  })
+
   it('publishes over a mirror another handle holds open once it is let go (a real handle: Windows refuses the rename meanwhile)', async () => {
     const home = tempDir('cw-oc-hist-')
     const srv = server()

@@ -1003,8 +1003,12 @@ export class HistoryCore {
     const tmp = `${p}.${process.pid}.tmp`
     writeFileSync(tmp, text)
     const rename = this.deps.rename ?? renameSync
-    // The time waited so far (the pauses taken: synchronous, so they are the time passed but for the renames).
+    // HI-3374 (HR3's round 1): the time spent so far, the renames' own included: the clock's, or the pauses taken when
+    // they are more (a test's pause takes no time).
+    const clock = this.deps.now ?? Date.now
+    const started = clock()
     let waited = 0
+    const spent = (): number => Math.max(clock() - started, waited)
     for (let tries = 1; ; tries++) {
       try {
         rename(tmp, p)
@@ -1012,7 +1016,7 @@ export class HistoryCore {
         return
       } catch (e) {
         const code = (e as NodeJS.ErrnoException | null)?.code ?? ''
-        const left = RENAME_RETRY.boundMs - waited
+        const left = RENAME_RETRY.boundMs - spent()
         if (left <= 0 || this.closed || !RENAME_BUSY.has(code)) {
           rmSync(tmp, { force: true })
           throw e
@@ -1021,7 +1025,7 @@ export class HistoryCore {
         waited += ms
         ;(this.deps.pause ?? pauseSync)(ms)
         // The bound reached while waiting: no try after it (as untilBound).
-        if (waited >= RENAME_RETRY.boundMs) {
+        if (spent() >= RENAME_RETRY.boundMs) {
           rmSync(tmp, { force: true })
           throw e
         }

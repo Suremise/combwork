@@ -918,8 +918,12 @@ export async function moveLineLocked(folder: string, to: string, expect: { line:
     // process has the file open for a moment).
     let failed: Error | null = null
     try {
-      // HI-3374: for INDEX_BUSY.publish's bound (10 s, waits doubling to 1.6 s; it was 5 tries 100 ms apart), while held.
-      await untilBound(() => renameSync(lock, index), { bound: INDEX_BUSY.publish, transient: heldError })
+      // HI-3374: for INDEX_BUSY.publish's bound (10 s, waits doubling to 1.6 s; it was 5 tries 100 ms apart), while held,
+      // and only while the move is still its owner's (`go`, checked before each try): refused, it is put back below.
+      const owner = (): void => {
+        if (!go()) throw new Error("the move is no longer its owner's") // i18n-ignore: a log line's reason
+      }
+      await untilBound(() => renameSync(lock, index), { bound: INDEX_BUSY.publish, transient: heldError, guard: owner })
       placed = true
       return true
     } catch (e) {
