@@ -24,6 +24,9 @@ RELEASING.md's **The user's OK** lists the decisions that are the user's. Do eac
 
 - Work merges into the release branch (`<version>`) through the merge queue. Its draft pull request into `main` is what runs CI on each push: if there isn't one yet, ask the user to open it at the next push (their OK). A red CI on it is carded and fixed now.
 - Don't add release branches to `ci.yml`'s push trigger (RELEASING, stage 1, says why).
+- **CI reds that recur**: card each red with its mechanism, and widen or ask as RELEASING, stage 1, says.
+- **The version's full passes**: when one is due (RELEASING, stage 1, says when), propose its card; check the sign-ins first (Before the real tier).
+- **The CI rehearsal**: run it before you ask the user to push your release card's commit (RELEASING, Steps, step 2), and name the run and its time on the card.
 
 ## Stage 2: freeze and rc.1
 

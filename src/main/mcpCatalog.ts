@@ -459,11 +459,12 @@ async function prepareFor(ws: WorkspaceService, source: string, name: string, ca
   const z = serverFromZip(bytes)
   if (z.folder !== name) throw combworkError(M.folder, { name })
   const def: McpServerDef = { ...retarget(z.def, z.folder, name), catalog: { source, name, version: server.version, sha256: server.zip.sha256 } }
-  // Installed from this entry already (under any name: an update's), and whether its own name is taken.
+  // Installed from this entry already (under any name: an update's), and whether its own name is taken: by a server, or
+  // by its folder alone (HI-3371: a zip's left without its definition, which the install's write refuses unless replaced).
   const { existing, nameTaken } = await inWorkspace(ws, async () => {
     const all = await listMcp(true)
     const m = all.find((x) => fromEntry(x.def, source, name))
-    return { existing: m ? { name: m.name, version: m.def!.catalog!.version, def: m.def, revision: m.revision, runs: m.runs, projects: m.projects, assistant: m.assistant } : null, nameTaken: all.some((x) => x.name === name) }
+    return { existing: m ? { name: m.name, version: m.def!.catalog!.version, def: m.def, revision: m.revision, runs: m.runs, projects: m.projects, assistant: m.assistant } : null, nameTaken: all.some((x) => x.name === name) || existsSync(join(ws.mcpDir, name)) }
   })
   if (life.aborted) throw combworkError(M.workspaceGone, { name })
   // Cancelled meanwhile: nothing held.

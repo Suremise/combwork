@@ -11,6 +11,8 @@ const { execFileSync, execSync } = require('child_process')
 const { _electron } = require('playwright-core')
 
 // The run context (runContext.cjs): the environments of everything a suite starts, its folders and the CLI test homes.
+// HI-3378: every wait's bound, by name, from the tests' one timing file (tests/timing.json).
+const { timing } = require('../timing.cjs')
 const { TEST_ROOT, WORK, CODEX_HOME, CLAUDE_TEST_HOME, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, isCombworkEnv, isUserCliHome, trashDir, TEST_GIT_IDENTITY, gitConfig, writeGitConfig, gitEnv: contextGitEnv, isUserGitConfig } = require('./runContext.cjs')
 
 const ROOT = path.resolve(__dirname, '..', '..')
@@ -142,8 +144,10 @@ const WAIT_NOTED_MS = 10000
  * Waits until fn() returns something truthy (checking every interval ms), up to ms; returns its last value. A wait of
  * WAIT_NOTED_MS or more that ran out says so, with its caller ("WAIT ran out after …"), and the runner lists them per
  * suite (HI-2663: three suites spent 420 of their 623 s in waits that ran out and that nothing checked).
+ * HI-3378: a bound is the caller's to name (timing('hang.ui'), …); one left out is hang.ui, and the check:repo guard
+ * (scripts/testWaits.mjs --literals) keeps numbers out of new waits. The interval is the file's poll.intervalMs.
  */
-async function until(fn, ms = 10000, interval = 100) {
+async function until(fn, ms = timing('hang.ui'), interval = timing('poll.intervalMs')) {
   const t = Date.now()
   let v
   while (!(v = await fn()) && Date.now() - t < ms) await sleep(interval)
@@ -311,7 +315,7 @@ async function fitWindow(app, page, size) {
  * CLIs (it does that in the background after start; starting an agent before then fails with "… is required").
  * Instead of a fixed wait after launch.
  */
-async function appReady(page, ms = 90000) {
+async function appReady(page, ms = timing('app.readyMs')) {
   const ready = () =>
     page
       .evaluate(async () => {
@@ -354,7 +358,7 @@ function trustWorktrees(home, ws) {
 }
 
 /** Opens a workspace and waits until the window shows it (its name in the title), instead of a fixed wait. */
-async function openWorkspace(inv, page, ws, ms = 20000) {
+async function openWorkspace(inv, page, ws, ms = timing('workspace.openMs')) {
   trustFakeWorktrees(CLAUDE_HOMES.get(page), ws)
   await inv('workspace:open', ws)
   const name = path.basename(ws)
@@ -367,7 +371,7 @@ async function openWorkspace(inv, page, ws, ms = 20000) {
  * build, #1578). Returns { app, page, inv } (inv calls an
  * IPC channel). readyMs bounds the wait for its window to be ready; one that isn't is closed and the failure thrown.
  */
-async function launch({ userData, env = {}, viewport = { width: 1400, height: 850 }, readyMs = 90000 }) {
+async function launch({ userData, env = {}, viewport = { width: 1400, height: 850 }, readyMs = timing('app.readyMs') }) {
   const exe = process.env.CW_EXE
   if (exe && !launch.said) console.log(`Combwork: ${exe} (CW_EXE), not the dev build`)
   launch.said = !!exe
@@ -381,6 +385,8 @@ async function launch({ userData, env = {}, viewport = { width: 1400, height: 85
   let page
   try {
     page = await app.firstWindow()
+    // HI-3378: Playwright's own waits (a click, waitFor, an expect) bound by hang.ui, not its 30 s nor a literal.
+    page.setDefaultTimeout(timing('hang.ui'))
     await fitWindow(app, page, viewport)
     await appReady(page, readyMs)
   } catch (e) {
@@ -540,7 +546,7 @@ function trustQuestion(screen) {
  * the session is past them (Claude Code's prompt on screen, or Combwork has the session ready: a trusted folder asks
  * nothing, #188), or at the timeout. Never answers anything else (a sign-in screen least of all).
  */
-async function acceptClaudeTrust(inv, proj, agentId, timeoutMs = 15000) {
+async function acceptClaudeTrust(inv, proj, agentId, timeoutMs = timing('cli.trustMs')) {
   const key = ptyKey(proj, agentId)
   const t = Date.now()
   const ready = async () => (await inv('session:live').catch(() => [])).find((s) => s.projectPath.toLowerCase() === proj.toLowerCase() && s.agentId === agentId)?.status === 'ready'
@@ -585,7 +591,7 @@ function trustChoice(text) {
  * moves on (another question, its prompt, or `ready()`): an Enter it didn't take (dropped) is pressed again, on "Yes"
  * again. true when it answered; false when the question went without its Enter; null at the timeout.
  */
-async function chooseTrust(inv, key, id, ready, timeoutMs = 20000) {
+async function chooseTrust(inv, key, id, ready, timeoutMs = timing('cli.trustMs')) {
   const t = Date.now()
   const now = async () => trustQuestion(await screenNow(inv, key))
   const here = (q) => !!q && q.id === id
@@ -1436,7 +1442,7 @@ function checked(ok) {
 }
 
 /** The longest a skipped step waits for its test copies to close before the suite exits: a bound for a hung close. */
-const CLOSE_MS = 10000
+const CLOSE_MS = timing('app.closeMs')
 
 /**
  * Runs a step that depends on the real CLI answering (a turn, a start), in a real-CLI suite. If a check in it failed
@@ -1568,7 +1574,7 @@ const combworkToolsConnected = (userData, agentId, since = 0) => combworkLogLine
  * The longest a fake Claude Code's prompt waits to be taken, or its turn to end: a bound for a hung run, never how long
  * it should take (#570). Under load the fake took a prompt 10 s after it was typed (#672).
  */
-const TURN_HUNG_MS = 60000
+const TURN_HUNG_MS = timing('turn.fakeMs')
 
 /** Whether a fake Claude Code takes a prompt now, by its session:live entry: idle, its turn not running. */
 const FAKE_IDLE = (s) => ['ready', 'finished', 'watching', 'background'].includes(s?.status) && s?.turn?.state !== 'running'
@@ -1843,7 +1849,7 @@ const GIT_LOCKED = /Unable to create '[^']+\.lock': (File exists|Permission deni
  * machine, #298). That alone is tried again every 100 ms for up to timeoutMs; any other failure throws at once.
  * opts: execSync's (input, env…).
  */
-function git(cwd, cmd, { timeoutMs = 15_000, ...opts } = {}) {
+function git(cwd, cmd, { timeoutMs = timing('git.lockRetryMs'), ...opts } = {}) {
   const start = Date.now()
   let tries = 0
   for (;;) {
@@ -2228,4 +2234,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, trustWorktrees, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, CLAUDE_TRUST, trustQuestion, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }
+module.exports = { timing, PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, trustWorktrees, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, CLAUDE_TRUST, trustQuestion, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }
