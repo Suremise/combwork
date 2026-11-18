@@ -13,7 +13,7 @@ const fs = require('fs')
 const path = require('path')
 const { execFileSync } = require('child_process')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'cardcontext-profile')
 const ws = path.join(lib.WORK, 'cardcontext-ws')
@@ -83,7 +83,7 @@ const NOTES = '# Notes\n\n## Open questions\n\nWhich QUESTION-MARKER first?\n'
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_update_task', arguments: { number: n, context: refs } } }) + '\n',
       env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${PORT}`, CW_WORKSPACE: ws, CW_API_TOKEN_FILE: lib.tokenFile(token), CW_PROJECT: 'alpha' }),
-      timeout: 60000
+      timeout: lib.timing('spawn.hang')
     }).toString()
     const said = JSON.parse(out.split('\n')[0]).result.content[0].text
     check('cw_update_task sets them, its reply says so', said.includes(`Read first: ${refs.join(', ')}`), said)

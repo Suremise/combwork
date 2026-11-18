@@ -11,7 +11,7 @@ const fs = require('fs')
 const path = require('path')
 
 const PORT = Number(lib.port(47907))
-const HUNG_MS = 10000 // The existing stream wait limit, stated explicitly as a bound for a hung run.
+const HUNG_MS = lib.timing('hang.ui') // The existing stream wait limit, stated explicitly as a bound for a hung run.
 const userData = path.join(lib.WORK, 'boardscope-profile')
 const ws = path.join(lib.WORK, 'boardscope-ws')
 const claudeHome = path.join(lib.WORK, 'boardscope-claude-home')
@@ -22,7 +22,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms = 10000) => {
+const until = async (fn, ms) => {
   const t = Date.now()
   let v
   while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
@@ -56,7 +56,7 @@ const until = async (fn, ms = 10000) => {
   const other = await lib.addAgent(inv, beta, { name: 'Betty' })
   const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)
   await inv('session:start', alpha, { agentId: agent.id })
-  check('the agent starts', !!(await until(async () => (await live())?.status === 'ready', 20000)))
+  check('the agent starts', !!(await until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))))
 
   // Cards: two of alpha's, two of beta's, one of the workspace's; alpha's #2 links to beta's #3.
   const make = async (title, project, column = 'todo') => (await inv('tasks:create', { title, project, column })).number
@@ -187,14 +187,14 @@ const until = async (fn, ms = 10000) => {
   await inv('pty:write', lib.ptyKey(alpha, agent.id), `boardmove ${n.A2} doing boardmove ${n.B2} doing`)
   await lib.sleep(100)
   await inv('pty:write', lib.ptyKey(alpha, agent.id), '\r')
-  await until(async () => (await live())?.status === 'finished', 15000)
+  await until(async () => (await live())?.status === 'finished', lib.timing('hang.step'))
   const calls = fs.readFileSync(path.join(claudeHome, 'fake-calls.jsonl'), 'utf8').split('\n').filter(Boolean).slice(before).map((l) => JSON.parse(l))
   // The fake makes one call per prompt (the first boardmove); a second prompt tries beta's.
   check("through its Combwork tools' path: its card moves", calls[0]?.status === 200 && (await inv('tasks:list')).find((c) => c.number === n.A2).column === 'doing', JSON.stringify(calls))
   await inv('pty:write', lib.ptyKey(alpha, agent.id), `boardmove ${n.B2} doing`)
   await lib.sleep(100)
   await inv('pty:write', lib.ptyKey(alpha, agent.id), '\r')
-  await until(async () => fs.readFileSync(path.join(claudeHome, 'fake-calls.jsonl'), 'utf8').split('\n').filter(Boolean).length > before + 1, 15000)
+  await until(async () => fs.readFileSync(path.join(claudeHome, 'fake-calls.jsonl'), 'utf8').split('\n').filter(Boolean).length > before + 1, lib.timing('hang.ui'))
   const last = JSON.parse(fs.readFileSync(path.join(claudeHome, 'fake-calls.jsonl'), 'utf8').trim().split('\n').at(-1))
   check("…and beta's card is not found", last.status === 404 && (await inv('tasks:list')).find((c) => c.number === n.B2).column === 'todo', JSON.stringify(last))
 
@@ -226,7 +226,7 @@ const until = async (fn, ms = 10000) => {
   await inv('tasks:update', secret, { description: 'PRIVATE BETA DESCRIPTION' })
   await inv('tasks:start', secret, { kind: 'agent', agentId: other.id })
   const betaLive = async () => (await inv('session:live')).find((s) => s.agentId === other.id)
-  await until(async () => (await betaLive())?.status === 'finished', 20000)
+  await until(async () => (await betaLive())?.status === 'finished', lib.timing('hang.step'))
   const activityPath = `/v1/projects/beta/agents/${other.id}/activity`
   r = await call(workspaceToken, 'GET', activityPath)
   check("the workspace token reads beta's activity (the card is its prompt)", r.status === 200 && /PRIVATE BETA DESCRIPTION/.test(r.body?.currentTask ?? ''), JSON.stringify(r.body?.currentTask))
@@ -250,7 +250,7 @@ const until = async (fn, ms = 10000) => {
   check("…nor stop it", r.status === 403, JSON.stringify(r))
   check('…and it runs on as it was, given nothing', (await betaLive())?.runId === betaRun && (await betaLive())?.status === 'finished', JSON.stringify(await betaLive()))
   await inv('session:stop', beta, other.id).catch(() => undefined)
-  await until(async () => !(await betaLive()), 10000)
+  await until(async () => !(await betaLive()), lib.timing('hang.ui'))
   r = await as('POST', '/v1/projects/beta/sessions', { agent: other.id })
   check("…nor start it", r.status === 403 && !(await betaLive()), JSON.stringify(r))
   // Nor turn beta off or on (HI-2330): with no session running there, a deactivate would otherwise go through.
@@ -265,7 +265,7 @@ const until = async (fn, ms = 10000) => {
   await inv('pty:write', lib.ptyKey(alpha, agent.id), 'hello')
   await lib.sleep(100)
   await inv('pty:write', lib.ptyKey(alpha, agent.id), '\r')
-  await until(async () => (await live())?.status === 'finished', 15000)
+  await until(async () => (await live())?.status === 'finished', lib.timing('hang.step'))
   await lib.sleep(800)
   agentStream.stop()
   scriptStream.stop()
@@ -306,9 +306,9 @@ const until = async (fn, ms = 10000) => {
   const almaLive = async () => (await inv('session:live')).find((s) => s.agentId === alma.id)
   r = await as('POST', '/v1/projects/alpha/sessions', { agent: alma.id })
   check("it starts its own project's agent", r.status === 200 && r.body?.agentId === alma.id && !!(await almaLive()), JSON.stringify(r).slice(0, 300))
-  await until(async () => ['ready', 'finished'].includes((await almaLive())?.status), 20000)
+  await until(async () => ['ready', 'finished'].includes((await almaLive())?.status), lib.timing('hang.ui'))
   r = await as('POST', `/v1/projects/alpha/stop?agent=${encodeURIComponent(alma.id)}`)
-  check('…and stops it', r.status === 200 && !!(await until(async () => !(await almaLive()), 10000)), JSON.stringify(r))
+  check('…and stops it', r.status === 200 && !!(await until(async () => !(await almaLive()), lib.timing('hang.ui'))), JSON.stringify(r))
 
   // --- Once the agent stops, its token stops working, and an event stream it opened ends (HI-2416), as a revoked
   // viewer's does; one with the workspace token stays open.
@@ -317,7 +317,7 @@ const until = async (fn, ms = 10000) => {
   check('a stream opened with its token before it stops is open', !!(await until(async () => endsWith.status === 200 && endsWith.text.includes(': connected'), HUNG_MS)), `${endsWith.status}`)
   await until(async () => staysOpen.status === 200, HUNG_MS)
   await inv('session:stop', alpha, agent.id).catch(() => undefined)
-  await until(async () => !(await live()), 10000)
+  await until(async () => !(await live()), lib.timing('hang.ui'))
   r = await as('GET', '/v1/tasks')
   check('its token ends with it', r.status === 401, JSON.stringify(r))
   check('…and so does the stream it opened (HI-2416)', !!(await until(async () => endsWith.done, HUNG_MS)), endsWith.text.slice(-200))

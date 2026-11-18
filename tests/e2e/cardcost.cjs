@@ -12,7 +12,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 
 const PORT = Number(lib.port(47826))
 const userData = path.join(lib.WORK, 'cardcost-profile')
@@ -59,7 +59,7 @@ const plain = (s) => (s ?? '').replace(/ /g, ' ')
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha, b.worktree?.path].filter(Boolean).map((d) => d.toLowerCase())))
   const live = async (id) => (await inv('session:live')).find((s) => s.agentId === id)
   for (const a of [b, r]) await inv('session:start', alpha, { agentId: a.id })
-  check('the agents start', !!(await until(async () => (await live(b.id))?.status === 'ready' && (await live(r.id))?.status === 'ready', 45000)))
+  check('the agents start', !!(await until(async () => (await live(b.id))?.status === 'ready' && (await live(r.id))?.status === 'ready', lib.timing('hang.step'))))
   const launches = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
   const tokenOf = (a) => launches.filter((l) => l.cwd.toLowerCase() === (a.worktree?.path ?? alpha).toLowerCase()).at(-1)?.token
   const api = async (token, method, route, body) => {

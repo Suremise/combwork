@@ -26,7 +26,7 @@ const path = require('path')
 const { CLAUDE_TEST_HOME, CODEX_HOME } = require('./runContext.cjs')
 const { startFakeCopilotApi, copilotTestEnv, copilotInstalled } = require('./fake-copilot-api.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 // A real model's turn: building and running a test, under load.
 const TURN_MS = 5 * 60000
 
@@ -53,7 +53,7 @@ const claudeExe = (() => {
 })()
 const claudeSignedIn = (() => {
   if (!claudeExe) return false
-  const s = spawnSync(claudeExe, ['auth', 'status', '--json'], { encoding: 'utf8', timeout: 30000, env: lib.childEnv({ CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME }) })
+  const s = spawnSync(claudeExe, ['auth', 'status', '--json'], { encoding: 'utf8', timeout: lib.timing('spawn.hang'), env: lib.childEnv({ CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME }) })
   try {
     return JSON.parse(s.stdout).loggedIn !== false
   } catch {
@@ -234,7 +234,7 @@ const namingCopies = () => {
           if (!fs.existsSync(built)) askedBeforeEdit = true
           asked++
           await inv('pty:write', key, '\r')
-          await lib.until(async () => (await live(r.def.id))?.status !== 'waiting', 15000, 500)
+          await lib.until(async () => (await live(r.def.id))?.status !== 'waiting', lib.timing('hang.ui'), 500)
         }
         return fs.existsSync(built) && fs.existsSync(ran) && ['ready', 'finished', 'waiting'].includes(s?.status) ? true : null
       }, TURN_MS)

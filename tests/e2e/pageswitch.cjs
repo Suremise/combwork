@@ -12,7 +12,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'pageswitch-profile')
 const ws = path.join(lib.WORK, 'pageswitch-ws')
@@ -44,7 +44,7 @@ const check = (name, ok, extra = '') => {
     check(`all ${AGENTS} agents run`, !!(await lib.until(async () => {
       const l = await live()
       return agents.every((a) => l.find((s) => s.agentId === a.id)?.status === 'ready')
-    }, 90000)))
+    }, lib.timing('hang.step'))))
 
     // Each terminal as the window has it: shown, in the page, and drawing with WebGL (a canvas, no DOM rows).
     const terminals = () =>

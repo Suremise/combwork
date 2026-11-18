@@ -16,7 +16,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'footerfit-profile')
 const ws = path.join(lib.WORK, 'footerfit-ws')
@@ -28,7 +28,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms = 10000) => {
+const until = async (fn, ms) => {
   const t = Date.now()
   let v
   while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(150)
@@ -223,13 +223,13 @@ function problems(states, { hasTasks, hasSize, hasPlain }) {
   const codex = await lib.addAgent(inv, alpha, { name: 'Checker', provider: 'codex', permissionMode: 'approve-for-me' })
   const live = async (id) => (await inv('session:live')).find((s) => s.agentId === id)
   for (const a of [claude, codex]) await inv('session:start', alpha, { agentId: a.id })
-  check('both agents start', !!(await until(async () => (await live(claude.id))?.status === 'ready' && (await live(codex.id))?.status === 'ready', 25000)))
+  check('both agents start', !!(await until(async () => (await live(claude.id))?.status === 'ready' && (await live(codex.id))?.status === 'ready', lib.timing('hang.step'))))
   const key = lib.ptyKey(alpha, claude.id)
   // A turn that pads its transcript past 1 MB and leaves a background task running (ten minutes: past the suite's end).
   await inv('pty:write', key, 'hello window 1000 pad 1200 background 600')
   await lib.sleep(100)
   await inv('pty:write', key, '\r')
-  await until(async () => (await live(claude.id))?.backgroundTasks > 0 && (await live(claude.id))?.transcriptBytes > 1024 * 1024, 20000)
+  await until(async () => (await live(claude.id))?.backgroundTasks > 0 && (await live(claude.id))?.transcriptBytes > 1024 * 1024, lib.timing('hang.ui'))
 
   const footerOf = (name) => page.locator('.agent-pane:visible', { has: page.locator('.pane-header-bar', { hasText: name }) }).locator('.pane-footer-bar')
   const cf = footerOf('Writer')
@@ -238,7 +238,7 @@ function problems(states, { hasTasks, hasSize, hasPlain }) {
   const ready = await until(async () => {
     const t = await cf.innerText().catch(() => '')
     return /ctx \d+%/.test(t) && /≈\$/.test(t) && /\d+(\.\d+)? MB/.test(t) && /1 background task/.test(t) && (await cf.locator('.foot-ctx.warn').count()) === 1
-  }, 20000)
+  }, lib.timing('hang.ui'))
   check("the Claude Code agent's footer has every item", !!ready, await cf.innerText().catch(() => ''))
   check("the Codex agent's footer says Approve for me", /Approve for me/.test(await footerOf('Checker').innerText().catch(() => '')), await footerOf('Checker').innerText().catch(() => ''))
   // One agent at a time, so each footer has the pane's whole width to give up, at 125% too.
@@ -368,7 +368,7 @@ function problems(states, { hasTasks, hasSize, hasPlain }) {
   const aHeader = page.locator('.assistant-panel .assistant-header')
   await until(async () => (await aHeader.count()) === 1, HUNG_MS)
   await aHeader.getByRole('button', { name: 'Start', exact: true }).click()
-  check('the Assistant runs', !!(await until(async () => (await assistantLive())?.status === 'ready', 25000)))
+  check('the Assistant runs', !!(await until(async () => (await assistantLive())?.status === 'ready', lib.timing('hang.step'))))
   await inv('pty:write', lib.ptyKey(home, 'assistant'), 'hello')
   await lib.sleep(300) // on purpose: the fake reads a typed line before its Enter, as a CLI does
   await inv('pty:write', lib.ptyKey(home, 'assistant'), '\r')
@@ -376,7 +376,7 @@ function problems(states, { hasTasks, hasSize, hasPlain }) {
   const aReady = await until(async () => {
     const t = await af.innerText().catch(() => '')
     return /ctx /.test(t) && /\$/.test(t) && (await af.locator('.foot-size').count()) === 1
-  }, 20000)
+  }, lib.timing('hang.ui'))
   check("the Assistant's footer has its size, context and cost", !!aReady, await af.innerText().catch(() => ''))
   const [assistantState] = await page.evaluate(sweep, ['.assistant-footer .pane-footer-bar', null, null, -1])
   check("the Assistant's panel: the same layout, size · ctx · cost at the right edge", layoutOk(assistantState), JSON.stringify(assistantState))

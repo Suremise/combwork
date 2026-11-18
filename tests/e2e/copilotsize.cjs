@@ -15,7 +15,7 @@ const fs = require('fs')
 const path = require('path')
 const { startFakeCopilotApi, copilotTestEnv, copilotInstalled } = require('./fake-copilot-api.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'copilotsize-profile')
 const ws = path.join(lib.WORK, 'copilotsize-ws')
@@ -62,7 +62,7 @@ const check = (name, ok, extra = '') => {
     await lib.fitWindow(app, page, { width: 1000, height: 800 })
     await lib.appReady(page)
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
-    const info = await lib.until(async () => { const i = (await inv('provider:info')).copilot; return i && !i.checking ? i : null }, 60000, 500)
+    const info = await lib.until(async () => { const i = (await inv('provider:info')).copilot; return i && !i.checking ? i : null }, lib.timing('hang.step'), 500)
     check('Copilot found', !!info?.found, JSON.stringify(info && { found: info.found, path: info.path }))
     console.log(`Copilot CLI ${info?.version ?? '?'} (${info?.source ?? '?'}), offline against the stand-in at ${api.url}`)
     await lib.openWorkspace(inv, page, ws)
@@ -71,7 +71,7 @@ const check = (name, ok, extra = '') => {
     const live = async () => (await inv('session:live')).find((l) => l.agentId === a.id)
     const status = async () => (await live())?.status
     const ready = (ms = 30000) => lib.until(async () => (await status()) === 'ready', ms, 100)
-    const stopped = () => lib.until(async () => !(await live()), 30000, 200)
+    const stopped = () => lib.until(async () => !(await live()), lib.timing('hang.ui'), 200)
     const term = () => page.evaluate((k) => window.__cwTerminalState?.(k) ?? null, key)
     const lines = () => page.evaluate((k) => window.__cwTerminalLines?.(k) ?? null, key)
     const settingsBtn = page.locator('.activity-btn[aria-label="Settings"]')
@@ -85,7 +85,7 @@ const check = (name, ok, extra = '') => {
      * Copilot its size refresh (the `refreshed`-th) and Copilot has redrawn: the screen as it is then, or after 10 s.
      */
     const cleanScreen = async (label, refreshed) => {
-      check(`${label}: Combwork gave Copilot a size refresh once it was ready`, !!(await lib.until(() => refreshes().length >= refreshed, 10000, 100)), JSON.stringify(refreshes()))
+      check(`${label}: Combwork gave Copilot a size refresh once it was ready`, !!(await lib.until(() => refreshes().length >= refreshed, lib.timing('hang.ui'), 100)), JSON.stringify(refreshes()))
       const look = async () => {
         const t = await term()
         const pty = await inv('pty:size', key)
@@ -106,7 +106,7 @@ const check = (name, ok, extra = '') => {
         return r
       }
       let r = await look()
-      await lib.until(async () => (r = await look()).clean, 10000, 200)
+      await lib.until(async () => (r = await look()).clean, lib.timing('hang.ui'), 200)
       check(`${label}: the terminal and Copilot have the same size`, r.sized, JSON.stringify({ t: r.t, pty: r.pty }))
       check(`${label}: its rules are as wide as the terminal (${r.t?.cols} columns)`, r.rules.length > 0 && !r.short.length, `${r.rules.map((x) => x.length).join(', ')}: ${r.text}`)
       check(`${label}: one prompt and one header, no loading frames left`, r.prompts === 1 && r.headers === 1 && !r.loading, `${r.prompts} prompts, ${r.headers} headers, ${r.loading} loading: ${r.text}`)
@@ -222,7 +222,7 @@ const check = (name, ok, extra = '') => {
     const paneSize = await term()
     const beforeMode = refreshes().length
     await inv('session:restartInMode', proj, a.id, 'ask')
-    const started = await lib.until(async () => { const l = await live(); return l && l.permissionMode === 'ask' ? await inv('pty:size', key) : null }, 30000, 50)
+    const started = await lib.until(async () => { const l = await live(); return l && l.permissionMode === 'ask' ? await inv('pty:size', key) : null }, lib.timing('hang.ui'), 50)
     check('restarted in Ask: Copilot starts at the pane’s size', !!started && started.cols === paneSize?.cols && started.rows === paneSize?.rows, JSON.stringify({ started, paneSize }))
     check('restarted in Ask: ready', !!(await ready()), await status())
     await cleanScreen('restarted in Ask', beforeMode + 1)

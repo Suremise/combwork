@@ -79,12 +79,12 @@ function project(p) {
   const started = await lib.until(async () => {
     const r = await reads()
     return r.alpha === 1 && r.beta === 1 ? r : null
-  }, 5000)
+  }, lib.timing('hang.ui'))
   check('both walks start and are held', !!started, JSON.stringify(await reads()))
 
   // Window 2 closes: its walk stops; window 1's, with the same request id, carries on.
   await inv2('window:close').catch(() => undefined) // The page can go before it hears back.
-  check('window 2 closes', !!(await lib.until(async () => (await inv('window:count')) === 1, 10000)))
+  check('window 2 closes', !!(await lib.until(async () => (await inv('window:count')) === 1, lib.timing('hang.ui'))))
   await release()
   const done = await page.evaluate(() => window.__storage)
   check("window 1's measurement gets its whole result", done.attachments === DIRS * 100, JSON.stringify(done))
@@ -96,7 +96,7 @@ function project(p) {
   // A reload in window 1 stops its own walk the same way.
   await hold()
   await ask(page, alpha, 'storage-2')
-  check("window 1's next walk is held", !!(await lib.until(async () => (await reads()).alpha === DIRS + 2, 5000)), JSON.stringify(await reads()))
+  check("window 1's next walk is held", !!(await lib.until(async () => (await reads()).alpha === DIRS + 2, lib.timing('hang.ui'))), JSON.stringify(await reads()))
   await page.reload()
   await lib.appReady(page)
   await release()

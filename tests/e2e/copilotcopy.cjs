@@ -15,7 +15,7 @@ const fs = require('fs')
 const path = require('path')
 const { startFakeCopilotApi, copilotTestEnv, copilotInstalled } = require('./fake-copilot-api.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'copilotcopy-profile')
 const ws = path.join(lib.WORK, 'copilotcopy-ws')
@@ -77,7 +77,7 @@ const check = (name, ok, extra = '') => {
     const copied = () => page.evaluate(() => window.__copied)
     const reads = () => page.evaluate(() => window.__reads)
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
-    const info = await lib.until(async () => { const i = (await inv('provider:info')).copilot; return i && !i.checking ? i : null }, 60000, 500)
+    const info = await lib.until(async () => { const i = (await inv('provider:info')).copilot; return i && !i.checking ? i : null }, lib.timing('hang.step'), 500)
     check('Copilot found', !!info?.found, JSON.stringify(info && { found: info.found, path: info.path }))
     console.log(`Copilot CLI ${info?.version ?? '?'} (${info?.source ?? '?'}), offline against the stand-in at ${api.url}`)
     await lib.openWorkspace(inv, page, ws)
@@ -95,10 +95,10 @@ const check = (name, ok, extra = '') => {
     const rightClickGoesTo = () => page.evaluate((k) => document.querySelector(`.terminal-host[data-pty="${CSS.escape(k)}"]`)?.getAttribute('data-right-click'), key)
 
     await inv('session:start', proj, { agentId: a.id })
-    check('Copilot is ready', !!(await lib.until(async () => (await status()) === 'ready', 60000, 200)), await status())
+    check('Copilot is ready', !!(await lib.until(async () => (await status()) === 'ready', lib.timing('hang.step'), 200)), await status())
     const sent = await lib.sendPrompt(inv, key, `say ${TEXT}`, { submitted: async () => ['working', 'finished'].includes(await status()) })
     check('the prompt is taken', sent > 0, await status())
-    check('the turn finishes', !!(await lib.until(async () => (await status()) === 'finished', 60000, 200)), await status())
+    check('the turn finishes', !!(await lib.until(async () => (await status()) === 'finished', lib.timing('hang.step'), 200)), await status())
     // Combwork leaves Copilot its own mouse handling (no --no-mouse, #737): it tracks any motion.
     check('Copilot tracks the mouse', !!(await lib.until(async () => (await mouse()) === 'any', HUNG_MS, 100)), await mouse())
     check("right-click is Combwork's", (await rightClickGoesTo()) === 'combwork', await rightClickGoesTo())
@@ -236,7 +236,7 @@ const check = (name, ok, extra = '') => {
     const since = (await live())?.statusSince
     const turnOver = async () => { const l = await live(); return l?.status === 'finished' && l.statusSince !== since }
     const next = await lib.sendPrompt(inv, key, 'say AFTERCOPY', { submitted: async () => (await status()) === 'working' || (await turnOver()) })
-    check('the next prompt is answered', next > 0 && !!(await lib.until(turnOver, 60000, 200)), await status())
+    check('the next prompt is answered', next > 0 && !!(await lib.until(turnOver, lib.timing('hang.step'), 200)), await status())
     check('…and Copilot got no Ctrl+C', (await screen()).split('copied to clipboard').length === before && (await copied()).length === n + 1, JSON.stringify(await copied()))
     await page.screenshot({ path: path.join(lib.WORK, 'copilotcopy-5-shift.png') })
 
@@ -273,7 +273,7 @@ const check = (name, ok, extra = '') => {
     await page.screenshot({ path: path.join(lib.WORK, 'copilotcopy-7-passed.png') })
 
     await inv('session:stop', proj, a.id).catch(() => {})
-    await lib.until(async () => !(await live()), 30000, 200)
+    await lib.until(async () => !(await live()), lib.timing('hang.ui'), 200)
   } finally {
     await app.close().catch(() => {})
     await api.close()

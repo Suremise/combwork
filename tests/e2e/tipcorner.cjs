@@ -8,7 +8,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'tipcorner-profile')
 const ws = path.join(lib.WORK, 'tipcorner-ws')
@@ -45,7 +45,7 @@ const check = (name, ok, extra = '') => {
   await lib.openWorkspace(inv, page, ws)
   const home = (await inv('workspace:refresh')).assistant.path
   const live = async (p, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms = 20000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
@@ -83,14 +83,14 @@ const check = (name, ok, extra = '') => {
     return sid
   }
 
-  check("a tip shows (tips are on in this suite's profile)", !!(await until(async () => (await card.count()) === 1, 10000)))
+  check("a tip shows (tips are on in this suite's profile)", !!(await until(async () => (await card.count()) === 1, lib.timing('hang.ui'))))
 
   // --- The Assistant's panel open, its conversation ended: the card is left of the panel.
   if ((await panel.count()) === 0) await page.locator('.assistant-rail').click()
-  await until(async () => (await header.count()) === 1, 5000)
+  await until(async () => (await header.count()) === 1, lib.timing('hang.ui'))
   const first = await runAndStop(home, 'assistant')
   const ended = panel.locator('.assistant-ended')
-  await until(async () => (await ended.getByRole('button', { name: 'Resume' }).count()) === 1, 10000)
+  await until(async () => (await ended.getByRole('button', { name: 'Resume' }).count()) === 1, lib.timing('hang.step'))
   await lib.sleep(300)
   const p1 = await box(panel)
   const c1 = await box(card)
@@ -101,7 +101,7 @@ const check = (name, ok, extra = '') => {
   await until(async () => (await live(home, 'assistant'))?.status === 'ready', HUNG_MS)
   await inv('session:stop', home, 'assistant')
   await until(async () => !(await live(home, 'assistant')), HUNG_MS)
-  await until(async () => (await ended.getByRole('button', { name: 'New' }).count()) === 1, 10000)
+  await until(async () => (await ended.getByRole('button', { name: 'New' }).count()) === 1, lib.timing('hang.ui'))
   await pointAndClick(ended.getByRole('button', { name: 'New' }), "the Assistant's New")
   check('and New starts a fresh one', !!(await until(async () => {
     const l = await live(home, 'assistant')
@@ -114,12 +114,12 @@ const check = (name, ok, extra = '') => {
   // Hidden from the header's ⋯ (#979: the header's own Hide button went into it).
   await header.getByRole('button', { name: 'More', exact: true }).click()
   await page.locator('.menu .menu-item', { hasText: 'Fold the Assistant panel' }).click()
-  await until(async () => (await panel.count()) === 0, 5000)
+  await until(async () => (await panel.count()) === 0, lib.timing('hang.ui'))
   await page.getByText('alpha', { exact: true }).first().click()
   const coder = await lib.addAgent(inv, alpha, { name: 'Coder' })
   const done = await runAndStop(alpha, coder.id)
   const bar = page.locator('.agent-pane-body .session-ended')
-  await until(async () => (await bar.count()) === 1, 10000)
+  await until(async () => (await bar.count()) === 1, lib.timing('hang.ui'))
   await lib.sleep(300)
   check('the tip still shows (no notification closed it)', (await card.count()) === 1, JSON.stringify(await page.evaluate(() => window.__cwBell?.())))
   const b2 = await box(bar)
@@ -129,12 +129,12 @@ const check = (name, ok, extra = '') => {
   await page.screenshot({ path: path.join(lib.WORK, 'tipcorner-2-pane.png') })
   // Resume is enabled once the workspace knows the session it resumes.
   const paneResume = bar.getByRole('button', { name: 'Resume', exact: true })
-  await until(async () => (await paneResume.count()) === 1 && (await paneResume.isEnabled()), 10000)
+  await until(async () => (await paneResume.count()) === 1 && (await paneResume.isEnabled()), lib.timing('hang.ui'))
   await pointAndClick(paneResume, "the pane's Resume")
   check("and the pane's Resume reopens its session", !!(await until(async () => (await live(alpha, coder.id))?.sessionId === done, HUNG_MS)))
   await until(async () => (await live(alpha, coder.id))?.status === 'ready', HUNG_MS)
   await inv('session:stop', alpha, coder.id)
-  await until(async () => (await bar.count()) === 1, 10000)
+  await until(async () => (await bar.count()) === 1, lib.timing('hang.ui'))
 
   // --- A toast, stacked above the card: also clear of the bar.
   // The terminal had the focus (the card steps aside over a focused terminal): take it away, and the card is back.
@@ -143,7 +143,7 @@ const check = (name, ok, extra = '') => {
   await page.screenshot({ path: path.join(lib.WORK, 'tipcorner-3-lifted.png') })
   await card.getByRole('button', { name: "Don't show tips" }).click()
   const toast = page.locator('.toast', { hasText: 'Tips are off' })
-  await until(async () => (await toast.count()) === 1, 5000)
+  await until(async () => (await toast.count()) === 1, lib.timing('hang.ui'))
   await lib.sleep(300)
   const t3 = await box(toast)
   const b3 = await box(bar)

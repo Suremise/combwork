@@ -12,7 +12,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'swap-profile')
 const ws = path.join(lib.WORK, 'swap-ws')
@@ -57,7 +57,7 @@ const check = (name, ok, extra = '') => {
     const p = await activePage()
     return JSON.stringify(await paneNames()) === JSON.stringify(cells.slice((p - 1) * 3, p * 3).filter(Boolean).map(name))
   }
-  const settle = async (want) => lib.until(async () => saved().join(',') === want && (await matches()), 8000)
+  const settle = async (want) => lib.until(async () => saved().join(',') === want && (await matches()), lib.timing('hang.ui'))
   const at = async (loc) => {
     const b = await loc.boundingBox()
     return { x: b.x + b.width / 2, y: b.y + b.height / 2 }
@@ -105,7 +105,7 @@ const check = (name, ok, extra = '') => {
   await inv('workspace:refresh')
   const one = agents[0]
   await inv('session:start', alpha, { agentId: one.id })
-  await lib.until(async () => (await live(one.id))?.status === 'ready', 15000)
+  await lib.until(async () => (await live(one.id))?.status === 'ready', lib.timing('hang.step'))
   const session = (await live(one.id)).sessionId
   check('four agents in three columns: One, Two, Three on page 1', !!(await settle('One,Two,Three,Four')), JSON.stringify(await paneNames()))
 
@@ -135,7 +135,7 @@ const check = (name, ok, extra = '') => {
   // --- Hold over a page button to switch, then drop on a pane there: the swap crosses pages. From page 2 (Two), its
   // own pane header dragged (it leaves the screen when page 1 shows), held over "1", dropped on Three's pane.
   await page.locator('.page-switch button[aria-label="Agent page 2"]').click()
-  await lib.until(async () => (await activePage()) === 2, 5000)
+  await lib.until(async () => (await activePage()) === 2, lib.timing('hang.ui'))
   check('page 2 shows Two', JSON.stringify(await paneNames()) === '["Two"]', JSON.stringify(await paneNames()))
   await drag(header('Two'), [page.locator('.page-switch button[aria-label="Agent page 1"]'), () => pane('Three')], 900)
   check('holding over page 1 showed it, and the drop swapped across pages', !!(await settle('Four,Two,One,Three')), `${saved()} / ${await paneNames()} / page ${await activePage()}`)
@@ -144,7 +144,7 @@ const check = (name, ok, extra = '') => {
   // --- Escape after the hover switched pages (the dragged pane has left the screen), released without moving: the drag
   // ends at once, nothing moves, nothing restarts.
   await page.locator('.page-switch button[aria-label="Agent page 2"]').click()
-  await lib.until(async () => (await activePage()) === 2, 5000)
+  await lib.until(async () => (await activePage()) === 2, lib.timing('hang.ui'))
   const before = saved().join(',')
   const s = await at(header('Three'))
   await page.mouse.move(s.x, s.y)
@@ -169,14 +169,14 @@ const check = (name, ok, extra = '') => {
   // --- A drop on a page button: to that page's first empty cell (#762; Four, from page 1, beside Three on page 2). Its
   // own cell on page 1 stays empty.
   await drag(header('Four'), [page.locator('.page-switch button[aria-label="Agent page 2"]')])
-  check("a drop on a page button moves the agent to that page's first empty cell", !!(await lib.until(async () => saved().join(',') === 'Two,One,Three,Four', 8000)), saved().join(','))
-  check('the panes show the cells saved', !!(await lib.until(matches, 5000)), `${saved()} / ${await paneNames()}`)
+  check("a drop on a page button moves the agent to that page's first empty cell", !!(await lib.until(async () => saved().join(',') === 'Two,One,Three,Four', lib.timing('hang.ui'))), saved().join(','))
+  check('the panes show the cells saved', !!(await lib.until(matches, lib.timing('hang.ui'))), `${saved()} / ${await paneNames()}`)
   check('…its cell on page 1 is left empty', JSON.stringify(projectJson().placement?.columns3?.map((id) => projectJson().agents.find((a) => a.id === id)?.name ?? null)) === '[null,"Two","One","Three","Four"]', JSON.stringify(projectJson().placement))
 
   // --- A drop on an empty pane (page 2 has two agents and a spare cell): the agent moves there. Two (on page 1) is held
   // over page 2's button until it shows, then dropped on the spare pane. Page 1 first (Four's move showed page 2).
   await page.locator('.page-switch button[aria-label="Agent page 1"]').click()
-  await lib.until(async () => (await activePage()) === 1, 5000)
+  await lib.until(async () => (await activePage()) === 1, lib.timing('hang.ui'))
   await drag(header('Two'), [page.locator('.page-switch button[aria-label="Agent page 2"]'), () => page.locator('.agent-pane:not(:has(.pane-header-bar))').last()], 900)
   check('a drop on an empty pane moves the agent there', !!(await settle('One,Three,Four,Two')), `${saved()} / ${await paneNames()}`)
 
@@ -208,7 +208,7 @@ const check = (name, ok, extra = '') => {
   check('One still runs its own session', (await live(one.id))?.sessionId === session)
 
   await inv('session:stop', alpha)
-  await lib.until(async () => (await inv('session:live')).length === 0, 15000)
+  await lib.until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
   process.exit(failed ? 1 : 0)

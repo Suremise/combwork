@@ -9,7 +9,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'signin-profile')
 const ws = path.join(lib.WORK, 'signin-ws')
@@ -21,7 +21,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms = 10000) => {
+const until = async (fn, ms) => {
   const t = Date.now()
   let v
   while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
@@ -62,7 +62,7 @@ const until = async (fn, ms = 10000) => {
   const live = async (a) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === a.id)
   const all = async () => Promise.all(agents.map(live))
   for (const a of agents) await inv('session:start', alpha, { agentId: a.id })
-  check('three agents start', !!(await until(async () => (await all()).every((s) => s?.status === 'ready'), 25000)))
+  check('three agents start', !!(await until(async () => (await all()).every((s) => s?.status === 'ready'), lib.timing('hang.step'))))
   await page.getByText('alpha', { exact: true }).first().click()
   const send = async (a, text) => {
     await inv('pty:write', lib.ptyKey(alpha, a.id), text)
@@ -73,7 +73,7 @@ const until = async (fn, ms = 10000) => {
   // --- The sign-in expires: every agent's next turn is refused.
   expire(true)
   for (const a of agents) await send(a, 'go on with the task')
-  check('each shows needs sign-in', !!(await until(async () => (await all()).every((s) => s?.status === 'signin'), 15000)), JSON.stringify((await all()).map((s) => s?.status)))
+  check('each shows needs sign-in', !!(await until(async () => (await all()).every((s) => s?.status === 'signin'), lib.timing('hang.ui'))), JSON.stringify((await all()).map((s) => s?.status)))
   const states = await all()
   check("each keeps the CLI's message beside its status", states.every((s) => s?.signIn?.message === 'Login expired · Please run /login' && !s.statusMessage), JSON.stringify(states.map((s) => [s?.signIn, s?.statusMessage])))
   await lib.sleep(4500) // A fixed wait on purpose: it waits out the gathering window (agents refused together are told in one notification) to show only one arrives.
@@ -83,10 +83,10 @@ const until = async (fn, ms = 10000) => {
   const info = await until(async () => {
     const i = (await inv('provider:info'))['claude-code']
     return i && !i.checking && i.loggedIn === false ? i : null
-  }, 15000)
+  }, lib.timing('hang.ui'))
   check('Provider Setup shows Claude Code signed out', !!info && (info.readiness ?? []).some((r) => r.id === 'signed-out'), JSON.stringify(info?.readiness))
   // Each pane's mark: waiting for you, a diamond (#973; the agent strip's sign-in dots went with it, #975).
-  const marks = await until(async () => ((await page.locator('.pane-header-bar .state-mark.waiting').count()) >= 3 ? true : null), 5000)
+  const marks = await until(async () => ((await page.locator('.pane-header-bar .state-mark.waiting').count()) >= 3 ? true : null), lib.timing('hang.ui'))
   check('the panes mark the three as waiting for you', !!marks, String(await page.locator('.pane-header-bar .state-mark.waiting').count()))
   check('the pane header says Needs sign-in', (await page.locator('.pane-status.signin', { hasText: 'Needs sign-in' }).count()) >= 1)
   check('Resume (n) counts the three', (await page.locator('.project-header button.act-resume', { hasText: 'Resume (3)' }).count()) === 1)
@@ -94,24 +94,24 @@ const until = async (fn, ms = 10000) => {
   // Another turn refused in the same expiry is shown, never told again.
   await send(agents[0], 'try once more')
   await until(async () => (await live(agents[0]))?.status === 'working', HUNG_MS)
-  await until(async () => (await live(agents[0]))?.status === 'signin', 10000)
+  await until(async () => (await live(agents[0]))?.status === 'signin', lib.timing('hang.ui'))
   await lib.sleep(4000) // A fixed wait on purpose: a second notification would arrive within the gathering window.
   check('a later refusal in the same expiry is not told again', signInNotes().length === 1, JSON.stringify(signInNotes()))
 
   // --- /login in Ada's terminal: Ada carries on by itself; the others are idle again, for Resume (n).
   await send(agents[0], '/login')
-  check('the agent signed in from its terminal carries on and finishes', !!(await until(async () => (await live(agents[0]))?.status === 'finished', 15000)), (await live(agents[0]))?.status)
+  check('the agent signed in from its terminal carries on and finishes', !!(await until(async () => (await live(agents[0]))?.status === 'finished', lib.timing('hang.step'))), (await live(agents[0]))?.status)
   check('its sign-in mark goes', !(await live(agents[0]))?.signIn)
   const others = await until(async () => {
     const s = await Promise.all(agents.slice(1).map(live))
     return s.every((x) => x?.status === 'ready') ? s : null
-  }, 10000)
+  }, lib.timing('hang.step'))
   check('the others are idle again, marked as stopped by the sign-in', !!others && others.every((s) => s.signIn && s.statusMessage === 'Stopped while signed out'), JSON.stringify((others ?? []).map((s) => [s?.status, s?.statusMessage, !!s?.signIn])))
-  check('Combwork says so, counting only the two it stopped', !!(await until(async () => ((await page.getByText("2 agents stopped while it was signed out: Resume in the project's header carries them on.").count()) ? true : null), 5000)))
+  check('Combwork says so, counting only the two it stopped', !!(await until(async () => ((await page.getByText("2 agents stopped while it was signed out: Resume in the project's header carries them on.").count()) ? true : null), lib.timing('hang.step'))))
   const back = await until(async () => {
     const i = (await inv('provider:info'))['claude-code']
     return i && !i.checking && i.loggedIn === true ? i : null
-  }, 15000)
+  }, lib.timing('hang.ui'))
   check('Provider Setup shows it signed in again', !!back && !(back.readiness ?? []).some((r) => r.id === 'signed-out'), JSON.stringify(back?.readiness))
   const resume = page.locator('.project-header button.act-resume', { hasText: 'Resume (2)' })
   check('Resume (n) counts the two still stopped', (await until(async () => ((await resume.count()) === 1 ? true : null), 5000)) === true)
@@ -119,7 +119,7 @@ const until = async (fn, ms = 10000) => {
 
   // --- Resume (n): a short "carry on" in each, and they finish.
   await resume.click()
-  const carried = await until(async () => (await Promise.all(agents.slice(1).map(live))).every((s) => s?.status === 'finished'), 15000)
+  const carried = await until(async () => (await Promise.all(agents.slice(1).map(live))).every((s) => s?.status === 'finished'), lib.timing('hang.step'))
   check('Resume (n) carries the two on and they finish', !!carried, JSON.stringify((await Promise.all(agents.slice(1).map(live))).map((s) => s?.status)))
   for (const a of agents.slice(1)) {
     const screen = lib.plainText(await inv('pty:buffer', lib.ptyKey(alpha, a.id)))
@@ -132,8 +132,8 @@ const until = async (fn, ms = 10000) => {
   // --- A new expiry is told again.
   expire(true)
   await send(agents[1], 'next task')
-  check('a later expiry shows needs sign-in', !!(await until(async () => (await live(agents[1]))?.status === 'signin', 10000)))
-  check('and is told again, for its one agent', !!(await until(async () => (signInNotes().length === 2 ? true : null), 8000)) && /^alpha · Bo needs you to sign in to Claude Code$/.test(signInNotes()[1]?.title ?? ''), JSON.stringify(signInNotes()))
+  check('a later expiry shows needs sign-in', !!(await until(async () => (await live(agents[1]))?.status === 'signin', lib.timing('hang.ui'))))
+  check('and is told again, for its one agent', !!(await until(async () => (signInNotes().length === 2 ? true : null), lib.timing('hang.ui'))) && /^alpha · Bo needs you to sign in to Claude Code$/.test(signInNotes()[1]?.title ?? ''), JSON.stringify(signInNotes()))
 
   await app.close()
   if (failed) process.exitCode = 1

@@ -106,7 +106,7 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
       const out = (record[mode] = {})
       await lib.cliStep(`${mode}: combwork and stamp`, { session: key }, async () => {
         await inv('session:start', proj, { agentId: def.id })
-        const ready = await lib.until(async () => ['ready', 'waiting'].includes((await live(proj, def.id))?.status) && (await live(proj, def.id)), 90000, 500)
+        const ready = await lib.until(async () => ['ready', 'waiting'].includes((await live(proj, def.id))?.status) && (await live(proj, def.id)), lib.timing('hang.step'), 500)
         check(`${mode}: ready`, ready?.status === 'ready', JSON.stringify(ready && { status: ready.status, msg: ready.statusMessage }))
         if (ready?.status !== 'ready') return
         check(`${mode}: runs in that mode`, ready.permissionMode === mode, ready.permissionMode)
@@ -151,7 +151,7 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
         }
       })
       await inv('session:stop', proj, def.id)
-      await lib.until(async () => !(await live(proj, def.id)), 30000, 500)
+      await lib.until(async () => !(await live(proj, def.id)), lib.timing('hang.ui'), 500)
       console.log(`INFO ${mode}: stamp ${record[mode].stampCall}; combwork ${JSON.stringify(record[mode].combworkCall)}`)
     }
     // Asked in the modes where Codex asks before an MCP tool runs: read-only and Ask (on-request).
@@ -178,7 +178,7 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
     const akey = lib.ptyKey(home, 'assistant')
     await lib.cliStep('the Assistant on Codex', { session: akey }, async () => {
       await inv('session:start', home, { agentId: 'assistant' })
-      const ready = await lib.until(async () => ['ready', 'waiting'].includes((await live(home, 'assistant'))?.status) && (await live(home, 'assistant')), 90000, 500)
+      const ready = await lib.until(async () => ['ready', 'waiting'].includes((await live(home, 'assistant'))?.status) && (await live(home, 'assistant')), lib.timing('hang.step'), 500)
       check('Assistant: ready', ready?.status === 'ready', JSON.stringify(ready && { status: ready.status, msg: ready.statusMessage }))
       if (ready?.status !== 'ready') return
       const prompt = 'Call cw_list_projects, then add a card titled "MCP approval check" to project demo with cw_create_task. Make no other tool calls, then reply DONE.'
@@ -236,7 +236,7 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
       }
     })
     await inv('session:stop', home, 'assistant')
-    await lib.until(async () => !(await live(home, 'assistant')), 30000, 500)
+    await lib.until(async () => !(await live(home, 'assistant')), lib.timing('hang.ui'), 500)
   } finally {
     fs.writeFileSync(path.join(scratch, 'mcpapproval.json'), JSON.stringify(record, null, 2))
     await app.close()

@@ -20,7 +20,7 @@ const { execFileSync } = require('child_process')
 const { jjDir, portableJj } = require('../jjPortable.cjs')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 const exe = portableJj()
 if (!exe) {
   console.log("SKIP jjstale: the pinned jj isn't fetched (npm run jj:fetch)")

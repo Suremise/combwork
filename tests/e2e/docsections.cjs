@@ -13,7 +13,7 @@ const fs = require('fs')
 const path = require('path')
 const { execFileSync } = require('child_process')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'docsections-profile')
 const ws = path.join(lib.WORK, 'docsections-ws')
@@ -165,7 +165,7 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
       const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
         input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n',
         env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${PORT}`, CW_WORKSPACE: ws, CW_API_TOKEN_FILE: lib.tokenFile(agentToken), CW_PROJECT: 'alpha', CW_AGENT_ID: agent.id }),
-        timeout: 60000
+        timeout: lib.timing('spawn.hang')
       }).toString()
       const res = JSON.parse(out.split('\n')[0]).result
       return { text: res.content[0].text, isError: !!res.isError }

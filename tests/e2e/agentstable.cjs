@@ -11,7 +11,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 
 const PORT = Number(lib.port(47867))
 const userData = path.join(lib.WORK, 'agentstable-profile')
@@ -25,7 +25,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = (fn, ms = 15000) => lib.until(fn, ms, 150)
+const until = (fn, ms) => lib.until(fn, ms, 150)
 const LONG = 'Coordinator out of the box: fold the coordinator playbook into the Assistant mode and its skills, with a long title that wraps'
 
 ;(async () => {
@@ -67,7 +67,7 @@ const LONG = 'Coordinator out of the box: fold the coordinator playbook into the
   const say = (n, text, want) => lib.sendPrompt(inv, lib.ptyKey(alpha, a[n].id), text, { submitted: async () => (await status(n)) === want })
   for (const n of ['B1', 'B2', 'R1', 'R2']) await inv('session:start', alpha, { agentId: a[n].id })
   const ready = async () => (await Promise.all(['B1', 'B2', 'R1', 'R2'].map((n) => live(a[n].id)))).every((s) => s?.status === 'ready')
-  check('four agents start', !!(await until(ready, 45000)))
+  check('four agents start', !!(await until(ready, lib.timing('hang.step'))))
 
   // The board: B1 on a card with a long title, B3 (not running) on another, R1 watching B1's for Review; solo's agent on one.
   // Each card's name as the window gives it (#1221): its key. What a watch waits for too (HI-1679: the window words a watch itself, never its English label).
@@ -91,13 +91,13 @@ const LONG = 'Coordinator out of the box: fold the coordinator playbook into the
   // quiet alone isn't the brief's turn over, and a line typed during it is dropped: HI-2357, lib.laneBriefDone).
   const quiet = async (n) => lib.agentQuiet(PORT, 'alpha', await live(a[n].id), apiToken)
   const builders = ['B1', 'B2']
-  check('B1 and B2 are quiet before their lanes', !!(await until(async () => (await Promise.all(builders.map(quiet))).every(Boolean), 45000)), JSON.stringify(await Promise.all(builders.map((n) => live(a[n].id)))))
+  check('B1 and B2 are quiet before their lanes', !!(await until(async () => (await Promise.all(builders.map(quiet))).every(Boolean), lib.timing('hang.step'))), JSON.stringify(await Promise.all(builders.map((n) => live(a[n].id)))))
   const before = Object.fromEntries(await Promise.all(builders.map(async (n) => [n, (await live(a[n].id))?.sessionId])))
   const l1 = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'B1', reviewer: 'R1', cards: [c1] })
   const l2 = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'B2', reviewer: 'R2', cards: [c2] })
   check('the lanes start', l1.status === 200 && l2.status === 200, JSON.stringify([l1, l2]))
   const renewed = async (n) => lib.laneBriefDone(PORT, 'alpha', await live(a[n].id), before[n], apiToken)
-  check('…B1 and B2 in new conversations, done with their briefs', !!(await until(async () => (await Promise.all(builders.map(renewed))).every(Boolean), 45000)), JSON.stringify(await Promise.all(builders.map((n) => live(a[n].id)))))
+  check('…B1 and B2 in new conversations, done with their briefs', !!(await until(async () => (await Promise.all(builders.map(renewed))).every(Boolean), lib.timing('hang.step'))), JSON.stringify(await Promise.all(builders.map((n) => live(a[n].id)))))
 
   check('B1 works', (await say('B1', 'work 600', 'working')) > 0)
   check('B2 waits on a background task', (await say('B2', 'background 600', 'background')) > 0)
@@ -146,7 +146,7 @@ const LONG = 'Coordinator out of the box: fold the coordinator playbook into the
     await page.mouse.move(700, 500)
     await until(async () => (await page.locator('.tip').count()) === 0, HUNG_MS)
     await locator.hover()
-    await until(async () => (await page.locator('.tip.agents-tip table.agents-table').count()) === 1, 5000)
+    await until(async () => (await page.locator('.tip.agents-tip table.agents-table').count()) === 1, lib.timing('hang.ui'))
     return readTable()
   }
   /** The accessibility tree's node for the focused element: its role, name and description, as a screen reader gets them. */
@@ -193,11 +193,11 @@ const LONG = 'Coordinator out of the box: fold the coordinator playbook into the
   await page.locator('.rail-btn[aria-label="Expand Sidebar"]').focus()
   await page.keyboard.press('Tab')
   check('Tab reaches the first project tile', !!(await until(async () => (await page.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? '')).startsWith('alpha'), HUNG_MS)))
-  check('on keyboard focus it shows the table', !!(await until(async () => (await page.locator('.tip.agents-tip table.agents-table tbody tr').count()) === 12, 5000)))
+  check('on keyboard focus it shows the table', !!(await until(async () => (await page.locator('.tip.agents-tip table.agents-table tbody tr').count()) === 12, lib.timing('hang.ui'))))
   const ax = await focusedAx()
   check('a screen reader gets a button named for the project, with the rows as its description', ax?.role === 'button' && ax.name.startsWith('alpha') && ax.description.includes(`R1: Waiting for ${K(c1)} → Review`) && ax.description.includes('B3: Not running'), JSON.stringify(ax))
   await page.keyboard.press('Enter')
-  check('Enter opens the project', !!(await until(async () => (await page.locator('.project-header h1', { hasText: 'alpha' }).count()) === 1, 5000)))
+  check('Enter opens the project', !!(await until(async () => (await page.locator('.project-header h1', { hasText: 'alpha' }).count()) === 1, lib.timing('hang.ui'))))
 
   // --- One agent (solo, its agent on a card, not running): one row, no Waiting for column.
   const t1 = await hoverTable(page.locator('.rail-project[aria-label^="solo"]'))
@@ -206,7 +206,7 @@ const LONG = 'Coordinator out of the box: fold the coordinator playbook into the
   await shoot('rail-1')
   // …and without a card: still its table and its description.
   await inv('tasks:update', cs, { column: 'todo' })
-  await until(async () => (await inv('tasks:list')).find((t) => t.number === cs)?.column === 'todo', 5000)
+  await until(async () => (await inv('tasks:list')).find((t) => t.number === cs)?.column === 'todo', lib.timing('hang.ui'))
   const t0 = await hoverTable(page.locator('.rail-project[aria-label^="solo"]'))
   check('1 agent with no card: a table of one row', t0?.rows.length === 1 && row(t0, 'Solo')[1] === 'Not running' && row(t0, 'Solo')[2] === '—', JSON.stringify(t0?.rows))
   check('1 agent with no card: described', ((await page.locator('.rail-project[aria-label^="solo"]').getAttribute('aria-description')) ?? '') === 'Solo: Not running')
@@ -229,13 +229,13 @@ const LONG = 'Coordinator out of the box: fold the coordinator playbook into the
   const statusEl = page.locator('.project-row', { hasText: 'alpha' }).locator('.project-status')
   await page.locator('.project-row', { hasText: 'alpha' }).locator('.switch').focus()
   await page.keyboard.press('Shift+Tab')
-  check('Shift+Tab reaches the sidebar status, which shows the table', !!(await until(async () => (await statusEl.evaluate((e) => e === document.activeElement)) && (await page.locator('.tip.agents-tip table.agents-table tbody tr').count()) === 12, 5000)))
+  check('Shift+Tab reaches the sidebar status, which shows the table', !!(await until(async () => (await statusEl.evaluate((e) => e === document.activeElement)) && (await page.locator('.tip.agents-tip table.agents-table tbody tr').count()) === 12, lib.timing('hang.ui'))))
   const axStatus = await focusedAx()
   check('…and is described', !!axStatus?.description.includes(`R1: Waiting for ${K(c1)} → Review`), JSON.stringify(axStatus))
   const badge = page.locator('.project-header .project-title .badge').first()
   await page.locator('.project-header h1').evaluate((e) => { e.tabIndex = -1; e.focus() })
   await page.keyboard.press('Tab')
-  check('Tab reaches the header badge, which shows the table', !!(await until(async () => (await badge.evaluate((e) => e === document.activeElement)) && (await page.locator('.tip.agents-tip table.agents-table tbody tr').count()) === 12, 5000)))
+  check('Tab reaches the header badge, which shows the table', !!(await until(async () => (await badge.evaluate((e) => e === document.activeElement)) && (await page.locator('.tip.agents-tip table.agents-table tbody tr').count()) === 12, lib.timing('hang.ui'))))
   const axBadge = await focusedAx()
   check('…and is described', !!axBadge?.description.includes('B2: Waiting on 1 background task'), JSON.stringify(axBadge))
 
@@ -253,10 +253,10 @@ const LONG = 'Coordinator out of the box: fold the coordinator playbook into the
 
   // --- Narrow and zoomed, with a long agent name: every column still fits, the long cells cut with an ellipsis.
   await inv('agents:update', alpha, a.B1.id, { name: 'Builder with a descriptive agent name' })
-  await until(async () => (await page.locator('.pane-header-bar .agent-name', { hasText: 'Builder with a descriptive' }).count()) > 0, 5000)
+  await until(async () => (await page.locator('.pane-header-bar .agent-name', { hasText: 'Builder with a descriptive' }).count()) > 0, lib.timing('hang.ui'))
   await lib.fitWindow(app, page, { width: 900, height: 560 })
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1.25))
-  await until(async () => (await page.evaluate(() => Math.round(window.innerWidth))) === 720, 5000)
+  await until(async () => (await page.evaluate(() => Math.round(window.innerWidth))) === 720, lib.timing('hang.ui'))
   await page.locator('.pane-header .icon-btn[aria-label^="Compact Sidebar"]').first().click()
   await until(async () => (await page.locator('.rail-project').count()) === 2, HUNG_MS)
   const narrow = await hoverTable(page.locator('.rail-project[aria-label^="alpha"]'))

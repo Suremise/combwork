@@ -5,7 +5,7 @@ const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs'), path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 const scratch = lib.WORK, userData = path.join(scratch, 'agentsui-profile')
 const root = path.join(scratch, 'agentsui')
 for (const d of [userData, root]) fs.rmSync(d, { recursive: true, force: true })
@@ -41,13 +41,13 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   check('empty Session tab offers Add Agent', (await page.getByText('No agents yet').count()) === 1)
   await lib.addMenuRun(page, 'Configure Agent and Add…')
   const addDialog = page.locator('.dialog', { hasText: 'Add an agent' })
-  check("+ Add ▾ → Configure Agent and Add… opens the Add Agent dialog (#975)", !!(await lib.until(async () => (await addDialog.count()) === 1, 5000)))
+  check("+ Add ▾ → Configure Agent and Add… opens the Add Agent dialog (#975)", !!(await lib.until(async () => (await addDialog.count()) === 1, lib.timing('hang.ui'))))
   await sleep(500)
   check('…without adding an agent', (await inv('workspace:refresh')).projects[0].agents.length === 0)
   await page.keyboard.press('Escape')
   await lib.until(async () => (await addDialog.count()) === 0, HUNG_MS)
   await page.evaluate(() => document.activeElement?.blur())
-  await page.keyboard.press('Control+Alt+Shift+N'); await lib.until(async () => (await inv('workspace:refresh')).projects[0].agents.length === 1, 10000)
+  await page.keyboard.press('Control+Alt+Shift+N'); await lib.until(async () => (await inv('workspace:refresh')).projects[0].agents.length === 1, lib.timing('hang.ui'))
   p0 = (await inv('workspace:refresh')).projects[0]
   check('quick add: Agent 1, default provider, project folder', p0.agents.length === 1 && p0.agents[0].name === 'Agent 1' && p0.agents[0].provider === 'claude-code' && !p0.agents[0].worktree, JSON.stringify(p0.agents))
   check('one agent: one pane, automatically', (p0.config.layout ?? 'auto') === 'auto' && (await page.locator('.agent-pane').count()) === 1, JSON.stringify(p0.config.layout))
@@ -109,7 +109,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   // A 0.9 agent in its own worktree (#1451: 1.0 makes none; made as an upgraded project has one), for the Merge dialog,
   // Files' folder picker and Remove below.
   await lib.addAgent(inv, proj, { location: 'new-worktree', name: 'Tester', branch: 'cw/ws-2/demo/tester' })
-  await lib.until(async () => (await inv('workspace:refresh')).projects[0].agents.some((a) => a.name === 'Tester'), 15000)
+  await lib.until(async () => (await inv('workspace:refresh')).projects[0].agents.some((a) => a.name === 'Tester'), lib.timing('hang.ui'))
   let p = (await inv('workspace:refresh')).projects[0]
   check('the 0.9 agent on its branch, shown as its 0.9 worktree (#1442)', p.agents.some((a) => a.name === 'Tester' && a.worktree?.branch === 'cw/ws-2/demo/tester' && a.place?.is === 'legacy' && a.place.branch === 'cw/ws-2/demo/tester'), JSON.stringify(p.agents.map((a) => a.place)))
   check('two agents: two columns, automatically', (p.config.layout ?? 'auto') === 'auto' && (await page.locator('.agent-pane').count()) === 2, JSON.stringify(p.config.layout))
@@ -121,7 +121,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   fs.writeFileSync(path.join(t.worktree.path, 'b.txt'), 'b\n')
   await page.evaluate(([project, agentId]) => window.__cwSet?.({ mergeFor: { project, agentId } }), [proj, t.id])
   await lib.agentMenu(page, 'Tester')
-  await page.locator('.menu-item', { hasText: 'Merge…' }).click(); await lib.until(async () => (await page.locator('.dialog', { hasText: "1 file in the worktree isn't committed" }).count()) === 1, 10000)
+  await page.locator('.menu-item', { hasText: 'Merge…' }).click(); await lib.until(async () => (await page.locator('.dialog', { hasText: "1 file in the worktree isn't committed" }).count()) === 1, lib.timing('hang.step'))
   await page.screenshot({ path: path.join(scratch, 'ui-3-merge.png') })
   // Only committed work is merged (#1347): the dialog counts the uncommitted files, and Merge is off until they are committed.
   check('merge dialog counts uncommitted files', await page.locator('.dialog', { hasText: "1 file in the worktree isn't committed" }).count() === 1)
@@ -144,7 +144,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
 
   // Files tab root selector
   await page.locator('.tabs .tab', { hasText: 'Files' }).click(); await sleep(600)
-  await page.locator('.root-select').selectOption(t.id); await lib.until(async () => (await page.getByText('b.txt').count()) > 0, 10000)
+  await page.locator('.root-select').selectOption(t.id); await lib.until(async () => (await page.getByText('b.txt').count()) > 0, lib.timing('hang.ui'))
   check('files shows worktree', await page.getByText('b.txt').count() > 0)
   await page.screenshot({ path: path.join(scratch, 'ui-5-files.png') })
 

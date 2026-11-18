@@ -67,9 +67,9 @@ const TITLE = (id) =>
   await lib.addAgent(inv, alpha, { name: 'One' })
   await lib.addAgent(inv, alpha, { name: 'Two' })
   const card = page.locator('.tip-card')
-  check("window 1 shows the second agent's tip", !!(await lib.until(async () => (await card.count()) === 1 && (await card.locator('.tip-title').innerText()) === TITLE(MOMENT), 8000)), await card.locator('.tip-title').innerText().catch(() => 'no card'))
+  check("window 1 shows the second agent's tip", !!(await lib.until(async () => (await card.count()) === 1 && (await card.locator('.tip-title').innerText()) === TITLE(MOMENT), lib.timing('hang.ui'))), await card.locator('.tip-title').innerText().catch(() => 'no card'))
   await card.getByRole('button', { name: 'Close' }).click()
-  const seen = await lib.until(async () => ((await inv('ui:get')).tips?.seen ?? []).includes(MOMENT), 5000)
+  const seen = await lib.until(async () => ((await inv('ui:get')).tips?.seen ?? []).includes(MOMENT), lib.timing('hang.ui'))
   check('…and it is saved as seen', !!seen)
 
   // Window 2, whose copy has neither, runs a command (every command run is noted for the tips).
@@ -77,7 +77,7 @@ const TITLE = (id) =>
   const both = await lib.until(async () => {
     const t = (await inv('ui:get')).tips ?? {}
     return t.used?.length && t.seen?.includes(MOMENT) && t.moments?.includes('second-agent') ? t : null
-  }, 5000)
+  }, lib.timing('hang.ui'))
   const t = both ?? (await inv('ui:get')).tips
   check("window 2's command keeps what window 1 saw: the tip, its moment and the command are all saved", !!both, JSON.stringify({ used: t?.used, seenMoment: t?.seen?.includes(MOMENT), moments: t?.moments }))
 
@@ -100,7 +100,7 @@ const TITLE = (id) =>
   await page.reload()
   await lib.appReady(page)
   const card2 = page.locator('.tip-card')
-  const shown = await lib.until(async () => ((await card2.count()) === 1 ? await card2.locator('.tip-title').innerText() : null), 10000)
+  const shown = await lib.until(async () => ((await card2.count()) === 1 ? await card2.locator('.tip-title').innerText() : null), lib.timing('hang.ui'))
   check("restarted, the next day: the tip shown is the one not yet seen, not window 1's again", shown === TITLE(last), String(shown))
   await page.screenshot({ path: path.join(lib.WORK, 'tipwindows-restarted.png') })
 

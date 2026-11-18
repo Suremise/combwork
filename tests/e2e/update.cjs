@@ -16,7 +16,7 @@ const cacheName = lane ? `combwork-test-updater-${lane}` : 'combwork-test-update
 const cache = path.join(process.env.LOCALAPPDATA, cacheName)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 let pass = 0, fail = 0
 const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.log(ok ? 'PASS' : 'FAIL', name, extra) }
 
@@ -183,7 +183,7 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   await page.screenshot({ path: path.join(scratch, 'upd-4-settings.png') })
   // 4. Errors: no release published (404).
   release = null
-  await page.locator('.settings button', { hasText: 'Check Now' }).click(); await lib.until(async () => (await inv('update:state')).status === 'error', 10000)
+  await page.locator('.settings button', { hasText: 'Check Now' }).click(); await lib.until(async () => (await inv('update:state')).status === 'error', lib.timing('hang.ui'))
   st = await inv('update:state')
   check('404 → "no release published yet"', st.status === 'error' && /No release of Combwork has been published yet/.test(st.error), st.error)
   check('error dialog shown', await page.locator('.dialog', { hasText: 'No release of Combwork has been published yet' }).count() === 1)

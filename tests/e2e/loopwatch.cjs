@@ -12,7 +12,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'loopwatch-profile')
 const ws = path.join(lib.WORK, 'loopwatch-ws')
@@ -56,7 +56,7 @@ const check = (name, ok, extra = '') => {
     return { status: r.status, body: await r.json().catch(() => null) }
   }
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms = 30000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
@@ -99,9 +99,9 @@ const check = (name, ok, extra = '') => {
     for (let attempt = 0; attempt < 3; attempt++) {
       // A retry clears what is left on the line first (Ctrl+U); the first try leaves a line Combwork typed alone.
       await inv('pty:write', key, attempt ? `\x15${text}` : text)
-      await until(async () => lib.plainText(await inv('pty:buffer', key).catch(() => '')).trimEnd().endsWith(text), 5000)
+      await until(async () => lib.plainText(await inv('pty:buffer', key).catch(() => '')).trimEnd().endsWith(text), lib.timing('hang.ui'))
       await inv('pty:write', key, '\r')
-      if (await until(async () => (await said(id, text)) > before, 10000)) return
+      if (await until(async () => (await said(id, text)) > before, lib.timing('hang.ui'))) return
     }
   }
   // The card as `#N`, its workspace number: a plain number reading as another card's key is refused (HI-2197).
@@ -128,9 +128,9 @@ const check = (name, ok, extra = '') => {
   check('the reviewer watches #1', !!(await until(async () => (await live(reviewer.id))?.status === 'watching', HUNG_MS)), await why(reviewer.id))
   dropEnters('Reviewer', 1)
   await inv('tasks:update', c1, { column: 'review' })
-  check('its wake is taken after Enter is pressed again', !!(await until(async () => wakes('Reviewer').length === 1, 20000)), JSON.stringify(wakes('Reviewer')))
+  check('its wake is taken after Enter is pressed again', !!(await until(async () => wakes('Reviewer').length === 1, lib.timing('hang.ui'))), JSON.stringify(wakes('Reviewer')))
   check('…Combwork says it pressed Enter again', /wasn't taken: pressed Enter again/.test(combworkLog()))
-  check('…and the reviewer works, then watches again', !!(await until(async () => (await live(reviewer.id))?.status === 'watching', 15000)))
+  check('…and the reviewer works, then watches again', !!(await until(async () => (await live(reviewer.id))?.status === 'watching', lib.timing('hang.step'))))
   await lib.sleep(4500) // on purpose: longer than the grace, to see no flag comes
   check('a reviewer that keeps watching is never flagged', !(await stalledOf(c1)) && !(await live(reviewer.id))?.notWatching, String(await stalledOf(c1)))
 
@@ -143,36 +143,36 @@ const check = (name, ok, extra = '') => {
   await inv('tasks:update', c1, { column: 'doing' })
   await inv('tasks:update', c1, { column: 'review' })
   const reason = `Reviewer hasn't taken the wake Combwork typed for #${c1}: it waits in its prompt.`
-  check('a wake never taken: after the grace, the card is stalled, saying who and why', !!(await until(async () => (await stalledOf(c1)) === reason, 30000)), String(await stalledOf(c1)))
+  check('a wake never taken: after the grace, the card is stalled, saying who and why', !!(await until(async () => (await stalledOf(c1)) === reason, lib.timing('hang.ui'))), String(await stalledOf(c1)))
   check('…naming the card by key alone (#1219, HI-1661)', lib.KEYED.test(String(await rawStalled(c1))), String(await rawStalled(c1)))
-  check('…the line was never sent, and Combwork says so', !!(await until(async () => /still wasn't taken/.test(combworkLog()), 8000)) && wakes('Reviewer').length === 1)
+  check('…the line was never sent, and Combwork says so', !!(await until(async () => /still wasn't taken/.test(combworkLog()), lib.timing('hang.ui'))) && wakes('Reviewer').length === 1)
   check('…the reviewer shows idle, with the card it left', ['ready', 'finished'].includes((await live(reviewer.id))?.status) && JSON.stringify((await live(reviewer.id))?.notWatching) === JSON.stringify([c1]), JSON.stringify(await live(reviewer.id)))
   await page.getByRole('button', { name: 'Task Board' }).click()
   const tile = page.locator(`.task-card[data-task="${c1}"]`)
-  check('the board shows the card stalled', !!(await until(async () => /Stalled: Reviewer hasn't taken the wake Combwork typed/.test((await tile.innerText().catch(() => '')) ?? ''), 8000)), await tile.innerText().catch(() => ''))
+  check('the board shows the card stalled', !!(await until(async () => /Stalled: Reviewer hasn't taken the wake Combwork typed/.test((await tile.innerText().catch(() => '')) ?? ''), lib.timing('hang.ui'))), await tile.innerText().catch(() => ''))
   await page.screenshot({ path: path.join(lib.WORK, 'loopwatch-stalled.png') })
   // Windows notifications only: each tell() also logs an `entry` line (HI-2320), not a second notice (HI-2369). Any line
   // counts for "isn't watching" below, a bell-only notice too.
   const told = () => notices().filter((n) => n.kind === 'notification' && /hasn't taken a line Combwork typed/.test(JSON.stringify(n)))
-  check('one notice tells the user', !!(await until(async () => told().length === 1, 5000)), JSON.stringify(notices()))
+  check('one notice tells the user', !!(await until(async () => told().length === 1, lib.timing('hang.ui'))), JSON.stringify(notices()))
   await lib.sleep(4000) // on purpose: longer than the grace, to see no second notice comes
   check('…only once, and none saying it isn\'t watching (#777)', told().length === 1 && !notices().some((n) => /isn't watching/.test(n.title ?? '')), JSON.stringify(notices()))
   await inv('pty:write', lib.ptyKey(alpha, reviewer.id), '\r')
-  check('Enter sends the waiting line: the reviewer takes it', !!(await until(async () => wakes('Reviewer').length === 2, 10000)))
-  check('…and the flag clears', !!(await until(async () => !(await stalledOf(c1)) && !(await live(reviewer.id))?.notWatching, 10000)), String(await stalledOf(c1)))
-  check('…and stays clear while it watches again', !!(await until(async () => (await live(reviewer.id))?.status === 'watching', 10000)) && !(await stalledOf(c1)))
+  check('Enter sends the waiting line: the reviewer takes it', !!(await until(async () => wakes('Reviewer').length === 2, lib.timing('hang.ui'))))
+  check('…and the flag clears', !!(await until(async () => !(await stalledOf(c1)) && !(await live(reviewer.id))?.notWatching, lib.timing('hang.ui'))), String(await stalledOf(c1)))
+  check('…and stays clear while it watches again', !!(await until(async () => (await live(reviewer.id))?.status === 'watching', lib.timing('hang.step'))) && !(await stalledOf(c1)))
 
   // --- 2b. A card moved to another project after it was flagged (review round 1): the flag goes, it isn't the old
   // project's agent's any more. Cancelling the reviewer's watch leaves it idle with no watch, so #1 is flagged first.
   await inv('watch:cancel', alpha, reviewer.id)
-  check('a cancelled watch: after the grace the card it left is flagged', !!(await until(async () => ((await stalledOf(c1)) ?? '').startsWith("Reviewer isn't watching #"), 15000)), String(await stalledOf(c1)))
+  check('a cancelled watch: after the grace the card it left is flagged', !!(await until(async () => ((await stalledOf(c1)) ?? '').startsWith("Reviewer isn't watching #"), lib.timing('hang.ui'))), String(await stalledOf(c1)))
   // Combwork's loop wake for #1, in Review since section 2 (#405), reaches the reviewer: read with whatever else its inbox
   // had when it read it (#650: in section 2, with the wake whose line it took then), and the reviewer is idle again before
   // anything else is typed to it, or the next line lands while it works and is lost (#571).
   const loopWake = `[CW] #${c1} (Builder's card) is in Review. You review this card in its loop`
-  check("…and Combwork's loop wake for it reaches the reviewer, which is idle again", !!(await until(async () => wakes('Reviewer').some((w) => w.text.includes(loopWake)) && ['ready', 'finished'].includes((await live(reviewer.id))?.status), 15000)), `${JSON.stringify(wakes('Reviewer').map((w) => w.text.slice(0, 60)))} ${await why(reviewer.id)}`)
+  check("…and Combwork's loop wake for it reaches the reviewer, which is idle again", !!(await until(async () => wakes('Reviewer').some((w) => w.text.includes(loopWake)) && ['ready', 'finished'].includes((await live(reviewer.id))?.status), lib.timing('hang.ui'))), `${JSON.stringify(wakes('Reviewer').map((w) => w.text.slice(0, 60)))} ${await why(reviewer.id)}`)
   await inv('tasks:update', c1, { project: 'beta' })
-  check('moved to another project: no longer stalled, and the mark leaves the agent', !!(await until(async () => !(await stalledOf(c1)) && !(await live(reviewer.id))?.notWatching, 8000)), JSON.stringify({ stalled: await stalledOf(c1), mark: (await live(reviewer.id))?.notWatching }))
+  check('moved to another project: no longer stalled, and the mark leaves the agent', !!(await until(async () => !(await stalledOf(c1)) && !(await live(reviewer.id))?.notWatching, lib.timing('hang.ui'))), JSON.stringify({ stalled: await stalledOf(c1), mark: (await live(reviewer.id))?.notWatching }))
 
   // --- 2c. Moved to another project within the grace: never flagged.
   const c4 = (await inv('tasks:create', { title: 'Moved in the grace', project: 'alpha', agent: builder.id, column: 'review' })).number
@@ -190,15 +190,15 @@ const check = (name, ok, extra = '') => {
   await say(builder.id, wait(c2, { changes: ['comment'] }))
   check('the builder watches #2', !!(await until(async () => (await live(builder.id))?.status === 'watching', HUNG_MS)), await why(builder.id))
   await inv('tasks:comment', c2, 'Round 1: failed. 1. Fix the greeting.')
-  check('…is woken, comments and ends its turn with no watch', !!(await until(async () => wakes('Builder').length === 1 && ['ready', 'finished'].includes((await live(builder.id))?.status), 15000)))
-  check('after the grace its card is stalled: Builder isn\'t watching it', !!(await until(async () => ((await stalledOf(c2)) ?? '').startsWith("Builder isn't watching #"), 15000)), String(await stalledOf(c2)))
+  check('…is woken, comments and ends its turn with no watch', !!(await until(async () => wakes('Builder').length === 1 && ['ready', 'finished'].includes((await live(builder.id))?.status), lib.timing('hang.step'))))
+  check('after the grace its card is stalled: Builder isn\'t watching it', !!(await until(async () => ((await stalledOf(c2)) ?? '').startsWith("Builder isn't watching #"), lib.timing('hang.ui'))), String(await stalledOf(c2)))
   // Working clears it at once; idle again with no watch, it comes back after the grace.
   await say(builder.id, 'work 3')
-  check('working again clears it', !!(await until(async () => (await live(builder.id))?.status === 'working' && !(await live(builder.id))?.notWatching && !(await stalledOf(c2)), 8000)))
-  check('idle again with no watch: flagged again after the grace', !!(await until(async () => ((await stalledOf(c2)) ?? '').startsWith("Builder isn't watching #"), 20000)), String(await stalledOf(c2)))
+  check('working again clears it', !!(await until(async () => (await live(builder.id))?.status === 'working' && !(await live(builder.id))?.notWatching && !(await stalledOf(c2)), lib.timing('hang.step'))))
+  check('idle again with no watch: flagged again after the grace', !!(await until(async () => ((await stalledOf(c2)) ?? '').startsWith("Builder isn't watching #"), lib.timing('hang.ui'))), String(await stalledOf(c2)))
   // Moved on (Passed): no longer in play, so no longer stalled.
   await inv('tasks:update', c2, { column: 'passed' })
-  check('a card that has moved on (Passed) is no longer stalled', !!(await until(async () => !(await stalledOf(c2)), 8000)))
+  check('a card that has moved on (Passed) is no longer stalled', !!(await until(async () => !(await stalledOf(c2)), lib.timing('hang.ui'))))
 
   // --- 4. HI-2080: a builder that asks the user on its card (cw_ask_user) and ends its turn with no watch waits for
   // the user, never stalled; once the user answers, the usual rule applies again.
@@ -210,11 +210,11 @@ const check = (name, ok, extra = '') => {
   check('the builder watches #3', !!(await until(async () => (await live(builder.id))?.status === 'watching', HUNG_MS)), await why(builder.id))
   await inv('tasks:comment', c3, 'Which greeting should it keep?')
   const question = async () => (await inv('tasks:forYou', 'alpha')).items.find((i) => i.card === c3 && i.asker === builder.id)
-  check('…is woken, asks the user and ends its turn with no watch', !!(await until(async () => !!(await question()) && ['ready', 'finished'].includes((await live(builder.id))?.status) && !(await live(builder.id))?.watch, 15000)), `${JSON.stringify((await inv('tasks:forYou', 'alpha')).items)} ${await why(builder.id)}`)
+  check('…is woken, asks the user and ends its turn with no watch', !!(await until(async () => !!(await question()) && ['ready', 'finished'].includes((await live(builder.id))?.status) && !(await live(builder.id))?.watch, lib.timing('hang.step'))), `${JSON.stringify((await inv('tasks:forYou', 'alpha')).items)} ${await why(builder.id)}`)
   await lib.sleep(4500) // on purpose: longer than the grace, to see no flag comes
   check('waiting on its own question: never flagged (HI-2080)', !(await stalledOf(c3)) && !((await live(builder.id))?.notWatching ?? []).includes(c3), JSON.stringify({ stalled: await stalledOf(c3), mark: (await live(builder.id))?.notWatching }))
   await inv('tasks:answer', c3, (await question()).request, { outcome: 'answered', reply: 'Keep it.' })
-  check('once the user answers, its card is the builder\'s move again: flagged after the grace', !!(await until(async () => ((await stalledOf(c3)) ?? '').startsWith("Builder isn't watching #"), 20000)), String(await stalledOf(c3)))
+  check('once the user answers, its card is the builder\'s move again: flagged after the grace', !!(await until(async () => ((await stalledOf(c3)) ?? '').startsWith("Builder isn't watching #"), lib.timing('hang.ui'))), String(await stalledOf(c3)))
 
   // --- 5. HI-2381: an agent whose next card waits on another's card in progress (CB2 watching CB1's CL-8, which its CL-10
   // depends on). Its watch's limit says where they are and asks nothing of the user; ending its turn with no watch then
@@ -230,7 +230,7 @@ const check = (name, ok, extra = '') => {
   await say(reviewer.id, `cw cw_wait_for_tasks ${JSON.stringify({ cards: [`#${dep}`, `#${next}`], changes: ['column'], limitMinutes: 1, wake: true })}`)
   check('the reviewer watches the card and the one waiting on it', !!(await until(async () => (await live(reviewer.id))?.status === 'watching', HUNG_MS)), await why(reviewer.id))
   // The watch's limit is a minute: the wait is bounded at twice that.
-  check('its limit passes: woken, then idle with no watch', !!(await until(async () => limitWakes().length > before && ['ready', 'finished'].includes((await live(reviewer.id))?.status) && !(await live(reviewer.id))?.watch, 120000)), `${JSON.stringify(limitWakes().map((w) => w.text))} ${await why(reviewer.id)}`)
+  check('its limit passes: woken, then idle with no watch', !!(await until(async () => limitWakes().length > before && ['ready', 'finished'].includes((await live(reviewer.id))?.status) && !(await live(reviewer.id))?.watch, lib.timing('hang.step'))), `${JSON.stringify(limitWakes().map((w) => w.text))} ${await why(reviewer.id)}`)
   const limit = limitWakes().at(-1)?.text ?? ''
   check("…the line says what waits on what, and not to tell the user", limit.includes(`#${next} waits on #${dep}`) && limit.includes(`#${dep} is in Doing with Builder`) && limit.endsWith("don't tell the user about them.") && !/cw_notify/.test(limit), limit)
   check('…its grace check runs', !!(await until(async () => (await inv('loops:checks', alpha, reviewer.id)) > checksBefore, HUNG_MS)), String(await inv('loops:checks', alpha, reviewer.id)))
@@ -283,21 +283,21 @@ const check = (name, ok, extra = '') => {
   await say(builder.id, wait(c6, { changes: ['comment'] }))
   check('the builder watches #6', !!(await until(async () => (await live(builder.id))?.status === 'watching', HUNG_MS)), await why(builder.id))
   await inv('tasks:comment', c6, 'Round 1: failed. 1. Fix the greeting.')
-  check('…is woken, its turn stopped by the safety classifier (its latest turn noted), ending with no watch', !!(await until(async () => !!(await live(builder.id))?.safeguard?.latest && ['ready', 'finished'].includes((await live(builder.id))?.status), 20000)), JSON.stringify((await live(builder.id))?.safeguard ?? null))
+  check('…is woken, its turn stopped by the safety classifier (its latest turn noted), ending with no watch', !!(await until(async () => !!(await live(builder.id))?.safeguard?.latest && ['ready', 'finished'].includes((await live(builder.id))?.status), lib.timing('hang.step'))), JSON.stringify((await live(builder.id))?.safeguard ?? null))
   const filtered = await until(async () => {
     const s = (await stalledOf(c6)) ?? ''
     return /^Builder isn't watching #\d+: its turn ended with no card watch\. Builder's latest turn was stopped by Claude Code's safety filter at \d\d:\d\d \(1 stop this session\)\. Look at its pane before nudging it, and tell the user\.$/.test(s) ? s : null
-  }, 20000)
+  }, lib.timing('hang.step'))
   check("after the grace the stall keeps its reason and says the stop beside it", !!filtered, String(await stalledOf(c6)))
   const told6 = () => notices().filter((n) => JSON.stringify(n).includes('has stalled. Builder’s latest turn was stopped by Claude Code’s safety filter'))
-  check("the user's lane notification says it, with Claude Code's own advice", !!(await until(async () => told6().length > 0, 60000)) && /\/feedback reports a false positive/.test(JSON.stringify(told6()[0])), JSON.stringify(notices().slice(-3)))
+  check("the user's lane notification says it, with Claude Code's own advice", !!(await until(async () => told6().length > 0, lib.timing('hang.step'))) && /\/feedback reports a false positive/.test(JSON.stringify(told6()[0])), JSON.stringify(notices().slice(-3)))
   await page.screenshot({ path: path.join(lib.WORK, 'loopwatch-safeguard-stall.png') }).catch(() => undefined)
   // A new turn (a prompt): its latest turn wasn't stopped, so the stall, if any, says nothing of it.
   await say(builder.id, 'work 1')
-  check('…a turn since leaves the stop out', !!(await until(async () => !(await live(builder.id))?.safeguard?.latest && !/safety filter/.test((await stalledOf(c6)) ?? ''), 20000)), String(await stalledOf(c6)))
+  check('…a turn since leaves the stop out', !!(await until(async () => !(await live(builder.id))?.safeguard?.latest && !/safety filter/.test((await stalledOf(c6)) ?? ''), lib.timing('hang.step'))), String(await stalledOf(c6)))
 
   await inv('session:stop', alpha)
-  await until(async () => (await inv('session:live')).length === 0, 15000)
+  await until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
   process.exit(failed ? 1 : 0)

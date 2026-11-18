@@ -49,7 +49,7 @@ const both = async (page, on) => (await onTop(page)) === on && (await pinLit(pag
   // --- A welcome window pinned by hand stays pinned while another window opens and refreshes a workspace.
   check('the welcome page starts off', await both(p1, false))
   await p1.locator('.titlebar-pin').click()
-  check('the welcome window can be pinned', !!(await lib.until(() => both(p1, true), 5000)))
+  check('the welcome window can be pinned', !!(await lib.until(() => both(p1, true), lib.timing('hang.ui'))))
   const other = app.waitForEvent('window')
   await inv1('window:new')
   const pw = await other
@@ -62,9 +62,9 @@ const both = async (page, on) => (await onTop(page)) === on && (await pinLit(pag
   check("another window opening and refreshing a workspace leaves the pinned welcome window on top, its pin lit", await both(p1, true))
   check('…and that window starts off', await both(pw, false))
   await pw.evaluate(() => window.combwork.invoke('window:close')).catch(() => undefined)
-  await lib.until(() => app.windows().length === 1, 10000)
+  await lib.until(() => app.windows().length === 1, lib.timing('hang.ui'))
   await p1.locator('.titlebar-pin').click()
-  check('unpinned again', !!(await lib.until(() => both(p1, false), 5000)))
+  check('unpinned again', !!(await lib.until(() => both(p1, false), lib.timing('hang.ui'))))
 
   await lib.openWorkspace(inv1, p1, wsA)
   check('a workspace never pinned: off, the pin not lit', await both(p1, false))
@@ -86,7 +86,7 @@ const both = async (page, on) => (await onTop(page)) === on && (await pinLit(pag
       const whole = await lib.until(async () => {
         seen = await titleCut()
         return !!seen && seen.text.startsWith(`${n} — `) && seen.textW <= seen.boxW + 0.01
-      }, 5000)
+      }, lib.timing('hang.ui'))
       check(`at ${zoom * 100}% zoom, the title "${n} — …" has room and is shown in full`, !!whole, JSON.stringify(seen))
     }
   }
@@ -94,11 +94,11 @@ const both = async (page, on) => (await onTop(page)) === on && (await pinLit(pag
 
   // --- The title bar's pin.
   await p1.locator('.titlebar-pin').click()
-  check('the pin turns it on, and lights', !!(await lib.until(() => both(p1, true), 5000)))
+  check('the pin turns it on, and lights', !!(await lib.until(() => both(p1, true), lib.timing('hang.step'))))
   // The tooltip hides on the click: away and back again to show it.
   await p1.mouse.move(600, 400)
   await p1.locator('.titlebar-pin').hover()
-  check('its tooltip says on, with the shortcut', !!(await lib.until(async () => /Always on Top \(on\)\s+Ctrl\+Alt\+O/.test((await p1.locator('.tip').textContent().catch(() => '')) ?? ''), 5000)), await p1.locator('.tip').textContent().catch(() => ''))
+  check('its tooltip says on, with the shortcut', !!(await lib.until(async () => /Always on Top \(on\)\s+Ctrl\+Alt\+O/.test((await p1.locator('.tip').textContent().catch(() => '')) ?? ''), lib.timing('hang.ui'))), await p1.locator('.tip').textContent().catch(() => ''))
   await p1.mouse.move(600, 400)
   await p1.screenshot({ path: path.join(lib.WORK, 'pin-1-on.png'), clip: { x: 0, y: 0, width: 1300, height: 120 } })
 
@@ -109,7 +109,7 @@ const both = async (page, on) => (await onTop(page)) === on && (await pinLit(pag
   check('…with its shortcut', /Ctrl\+Alt\+O/.test((await item.textContent()) ?? ''), await item.textContent())
   await p1.screenshot({ path: path.join(lib.WORK, 'pin-2-menu.png') })
   await item.click()
-  check('the menu turns it off', !!(await lib.until(() => both(p1, false), 5000)))
+  check('the menu turns it off', !!(await lib.until(() => both(p1, false), lib.timing('hang.step'))))
   await p1.locator('.menubar-item', { hasText: 'View' }).first().click()
   check('…and then it is not checked', (await p1.locator('.menu .menu-item', { hasText: 'Always on Top' }).locator('.codicon-check').count()) === 0)
   await p1.keyboard.press('Escape')
@@ -117,32 +117,32 @@ const both = async (page, on) => (await onTop(page)) === on && (await pinLit(pag
   // --- Ctrl+Alt+O.
   await p1.locator('.titlebar-title').click({ force: true }).catch(() => undefined)
   await p1.keyboard.press('Control+Alt+O')
-  check('Ctrl+Alt+O turns it on', !!(await lib.until(() => both(p1, true), 5000)))
+  check('Ctrl+Alt+O turns it on', !!(await lib.until(() => both(p1, true), lib.timing('hang.step'))))
   await p1.keyboard.press('Control+Alt+O')
-  check('…and off', !!(await lib.until(() => both(p1, false), 5000)))
+  check('…and off', !!(await lib.until(() => both(p1, false), lib.timing('hang.ui'))))
 
   // --- The palette: a check while on.
   // Opened only once the last one has closed, and searched once its input has the focus: typed into too early, the
   // search lost letters and the row wasn't found (a flake seen in a --repeat 3 run, #191).
   const palette = async () => {
     const input = p1.locator('.palette input')
-    await lib.until(async () => (await input.count()) === 0, 5000)
+    await lib.until(async () => (await input.count()) === 0, lib.timing('hang.ui'))
     await p1.keyboard.press('Control+Shift+P')
-    await lib.until(async () => (await input.count()) === 1 && (await input.evaluate((e) => e === document.activeElement).catch(() => false)), 5000)
+    await lib.until(async () => (await input.count()) === 1 && (await input.evaluate((e) => e === document.activeElement).catch(() => false)), lib.timing('hang.ui'))
     await input.fill('Always on Top')
     return p1.locator('.palette-item', { hasText: 'Always on Top' }).first()
   }
   let row = await palette()
   check('the palette offers it, unchecked while off', (await row.locator('.codicon-check').count()) === 0)
   await p1.keyboard.press('Enter')
-  check('the palette turns it on', !!(await lib.until(() => both(p1, true), 5000)))
+  check('the palette turns it on', !!(await lib.until(() => both(p1, true), lib.timing('hang.step'))))
   row = await palette()
-  check('…and shows it checked', !!(await lib.until(async () => (await row.locator('.codicon-check').count()) === 1, 5000)))
+  check('…and shows it checked', !!(await lib.until(async () => (await row.locator('.codicon-check').count()) === 1, lib.timing('hang.ui'))))
   // #172: the open palette's check follows a change made elsewhere, without closing it.
   await inv1('window:setAlwaysOnTop', false)
-  check('a change while the palette is open clears its check there', !!(await lib.until(async () => (await both(p1, false)) && (await row.locator('.codicon-check').count()) === 0, 5000)))
+  check('a change while the palette is open clears its check there', !!(await lib.until(async () => (await both(p1, false)) && (await row.locator('.codicon-check').count()) === 0, lib.timing('hang.ui'))))
   await inv1('window:setAlwaysOnTop', true)
-  check('…and sets it again', !!(await lib.until(async () => (await both(p1, true)) && (await row.locator('.codicon-check').count()) === 1, 5000)))
+  check('…and sets it again', !!(await lib.until(async () => (await both(p1, true)) && (await row.locator('.codicon-check').count()) === 1, lib.timing('hang.ui'))))
   check('…with the palette still open on the same search', (await p1.locator('.palette input').inputValue()) === 'Always on Top')
   // The palette's first Escape clears what was typed (#433), the next closes it.
   await p1.keyboard.press('Escape')
@@ -160,12 +160,12 @@ const both = async (page, on) => (await onTop(page)) === on && (await pinLit(pag
   check('…and so is a workspace never pinned in it', await both(p2, false))
   check('the first window is still on', await both(p1, true))
   await p2.locator('.titlebar-pin').click()
-  await lib.until(() => both(p2, true), 5000)
+  await lib.until(() => both(p2, true), lib.timing('hang.ui'))
   await p2.locator('.titlebar-pin').click()
-  check('pinning and unpinning the second leaves the first on', (await lib.until(() => both(p2, false), 5000)) && (await both(p1, true)))
+  check('pinning and unpinning the second leaves the first on', (await lib.until(() => both(p2, false), lib.timing('hang.ui'))) && (await both(p1, true)))
 
   // --- Remembered by workspace, in Combwork's own config (never the workspace's .combwork).
-  await lib.until(() => (JSON.parse(fs.readFileSync(cfgFile, 'utf8')).alwaysOnTop ?? {})[wsA.toLowerCase()] === true, 5000)
+  await lib.until(() => (JSON.parse(fs.readFileSync(cfgFile, 'utf8')).alwaysOnTop ?? {})[wsA.toLowerCase()] === true, lib.timing('hang.ui'))
   const saved = JSON.parse(fs.readFileSync(cfgFile, 'utf8')).alwaysOnTop ?? {}
   check("config.json remembers A's pin only", saved[wsA.toLowerCase()] === true && !(wsB.toLowerCase() in saved), JSON.stringify(saved))
   const inCombwork = [wsA, wsB].some((ws) => fs.readdirSync(path.join(ws, '.combwork'), { recursive: true }).some((f) => /alwaysOnTop/.test(fs.statSync(path.join(ws, '.combwork', String(f))).isFile() ? fs.readFileSync(path.join(ws, '.combwork', String(f)), 'utf8') : '')))
@@ -173,9 +173,9 @@ const both = async (page, on) => (await onTop(page)) === on && (await pinLit(pag
 
   // --- The welcome page is off; the workspace's pin comes back with it.
   await inv1('workspace:close')
-  check('closing the workspace (the welcome page): off', !!(await lib.until(() => both(p1, false), 5000)))
+  check('closing the workspace (the welcome page): off', !!(await lib.until(() => both(p1, false), lib.timing('hang.ui'))))
   await lib.openWorkspace(inv1, p1, wsA)
-  check('opening it again: on', !!(await lib.until(() => both(p1, true), 5000)))
+  check('opening it again: on', !!(await lib.until(() => both(p1, true), lib.timing('hang.ui'))))
 
   // --- Quit and start again: each window comes back with its own pin.
   const exited = app.waitForEvent('close', { timeout: 20000 }).then(() => true).catch(() => false)
@@ -188,12 +188,12 @@ const both = async (page, on) => (await onTop(page)) === on && (await pinLit(pag
     if (pages.length < 2) return false
     const paths = await Promise.all(pages.map((pg) => invOn(pg)('workspace:get').then((w) => w?.path ?? null).catch(() => null)))
     return paths.every(Boolean)
-  }, 60000)
+  }, lib.timing('hang.step'))
   const byWs = {}
   for (const pg of app.windows()) byWs[(await invOn(pg)('workspace:get')).path.toLowerCase()] = pg
   const a = byWs[wsA.toLowerCase()]
   const b = byWs[wsB.toLowerCase()]
-  check('after a restart, A is on top again, its pin lit', !!a && !!(await lib.until(() => both(a, true), 10000)))
+  check('after a restart, A is on top again, its pin lit', !!a && !!(await lib.until(() => both(a, true), lib.timing('hang.step'))))
   check('…and B is not', !!b && (await both(b, false)))
 
   await app.close()

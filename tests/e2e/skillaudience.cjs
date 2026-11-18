@@ -59,7 +59,7 @@ const assistantOnly = bundledForAssistant.length + 1
   check('audiences as launches read them', aud['weekly-report'] === 'assistant' && aud['both-ways'] === 'all' && aud.plain === 'agents' && aud['coordinate-agents'] === 'assistant' && aud['work-on-card'] === 'agents', JSON.stringify(aud))
 
   await page.keyboard.press('Control+Shift+K')
-  await lib.until(async () => (await page.locator('.skill-row').count()) > 0, 10000)
+  await lib.until(async () => (await page.locator('.skill-row').count()) > 0, lib.timing('hang.ui'))
   const rowBadge = async (name) => {
     const b = page.locator('.skill-row', { hasText: name }).first().locator('.badge[data-audience]')
     return (await b.count()) ? (await b.innerText()).trim() : null
@@ -128,7 +128,7 @@ const assistantOnly = bundledForAssistant.length + 1
   await page.getByText('demo', { exact: true }).first().click()
   await sleep(600)
   await lib.openMoreTab(page, 'Skills')
-  await lib.until(async () => (await page.locator('.split-list .skill-row').count()) > 0, 10000)
+  await lib.until(async () => (await page.locator('.split-list .skill-row').count()) > 0, lib.timing('hang.ui'))
   const tabRows = await page.locator('.split-list .skill-row').allInnerTexts()
   const has = (n) => tabRows.some((t) => t.includes(n))
   check("project tab: the Assistant's skills aren't listed", !has('weekly-report') && !has('coordinate-agents'), tabRows.join(' | '))
@@ -148,7 +148,7 @@ const assistantOnly = bundledForAssistant.length + 1
     await sleep(500)
     const tip = await page.locator('.tip').innerText().catch(() => '')
     await page.locator('.editor-toolbar .btn', { hasText: 'Copy to workspace' }).click()
-    await lib.until(async () => (await page.locator('.toast', { hasText: `Copied "${name}"` }).count()) > 0, 10000)
+    await lib.until(async () => (await page.locator('.toast', { hasText: `Copied "${name}"` }).count()) > 0, lib.timing('hang.ui'))
     const toast = await page.locator('.toast', { hasText: `Copied "${name}"` }).innerText().catch(() => '')
     return { tip, toast }
   }
@@ -188,7 +188,7 @@ const assistantOnly = bundledForAssistant.length + 1
   await page.keyboard.press('Control+Shift+E')
   await sleep(500)
   await lib.openMoreTab(page, 'Skills')
-  await lib.until(async () => (await page.locator('.split-list .skill-row').count()) > 0, 10000)
+  await lib.until(async () => (await page.locator('.split-list .skill-row').count()) > 0, lib.timing('hang.ui'))
   await page.screenshot({ path: path.join(lib.WORK, 'skillaudience-narrow-project.png') })
 
   await app.close()

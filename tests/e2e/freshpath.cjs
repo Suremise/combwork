@@ -80,16 +80,16 @@ function pathWithoutCodex() {
   await lib.sleep(300)
   await page.keyboard.press('Enter')
   const setup = page.locator('.dialog', { hasText: 'Provider Setup' })
-  check('Provider Setup opens', !!(await lib.until(async () => (await setup.count()) === 1, 10000)))
+  check('Provider Setup opens', !!(await lib.until(async () => (await setup.count()) === 1, lib.timing('hang.ui'))))
   await setup.locator('.setup-tab', { hasText: 'Codex' }).click()
   await setup.locator('button', { hasText: 'Check again' }).click()
   const after = await lib.until(async () => {
     const i = await codexInfo()
     return !i.checking && i.path === path.join(bin, 'codex.cmd') ? i : null
-  }, 30000)
+  }, lib.timing('hang.ui'))
   check('Check again finds the new Codex on the PATH, without restarting Combwork', !!after && after.source === 'PATH' && after.version === VERSION, JSON.stringify(after ?? (await codexInfo())))
   check('…and it is ready (installed)', !!after && !(after.readiness ?? []).some((r) => r.id === 'not-installed'), JSON.stringify(after?.readiness))
-  const shows = await lib.until(async () => (await setup.innerText()).includes(`Codex ${VERSION}`), 10000)
+  const shows = await lib.until(async () => (await setup.innerText()).includes(`Codex ${VERSION}`), lib.timing('hang.ui'))
   check('Provider Setup shows it found, via PATH', !!shows && (await setup.innerText()).includes('found via PATH'), (await setup.innerText()).slice(0, 300))
   await page.screenshot({ path: path.join(lib.WORK, 'freshpath-setup.png') })
   const combworkPath = await app.evaluate(() => process.env.PATH ?? process.env.Path ?? '')
@@ -103,7 +103,7 @@ function pathWithoutCodex() {
   const n = runs().length
   await inv('session:start', alpha, { agentId: agent.id })
   const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)
-  check('a new Codex agent starts with it', !!(await lib.until(async () => (await live())?.status === 'ready', 25000)), JSON.stringify(await live()))
+  check('a new Codex agent starts with it', !!(await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))), JSON.stringify(await live()))
   const session = runs().slice(n).filter((r) => !['--version', 'login', 'debug', 'app-server'].includes(r.arg))
   check("…and its session's PATH has the new folder", session.length > 0 && session.every((r) => r.hasBin), JSON.stringify(runs().slice(n)))
   check('…but not a folder not installed yet', session.every((r) => !r.hasTool), JSON.stringify(runs().slice(n)))
@@ -115,17 +115,17 @@ function pathWithoutCodex() {
   }, [bin, tool].join(';'))
   const m = runs().length
   await inv('provider:task', 'codex', 'login')
-  const login = await lib.until(() => runs().slice(m).find((r) => r.arg === 'login'), 20000)
+  const login = await lib.until(() => runs().slice(m).find((r) => r.arg === 'login'), lib.timing('hang.ui'))
   check("a Sign in task's terminal started after it has the tool's folder", !!login && login.hasTool, JSON.stringify(runs().slice(m)))
   await inv('session:stop', alpha, agent.id)
   check('the agent stops', !!(await lib.until(async () => {
     // One read (#882): the session can go between two, and the second's `.status` would throw out of lib.until.
     const s = await live()
     return !s || s.status === 'stopped'
-  }, 15000)), JSON.stringify(await live()))
+  }, lib.timing('hang.step'))), JSON.stringify(await live()))
   const k = runs().length
   await inv('session:start', alpha, { agentId: agent.id })
-  check('the agent starts again', !!(await lib.until(async () => (await live())?.status === 'ready', 25000)), JSON.stringify(await live()))
+  check('the agent starts again', !!(await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))), JSON.stringify(await live()))
   const again = runs().slice(k).filter((r) => !['--version', 'login', 'debug', 'app-server'].includes(r.arg))
   check("…and its session's PATH has the tool's folder, with no Check again", again.length > 0 && again.every((r) => r.hasTool), JSON.stringify(runs().slice(k)))
 

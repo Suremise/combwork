@@ -21,7 +21,7 @@ const q = require('./queueFixture.cjs')
 
 const PORT = Number(lib.port(47851))
 const fx = q.queueProject('progressqueue')
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 const TARGET = 'integration'
 let failed = 0
 const check = (name, ok, extra = '') => {

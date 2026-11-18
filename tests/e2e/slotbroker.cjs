@@ -31,7 +31,7 @@ const { DatabaseSync } = require('node:sqlite')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 
 const at = (x) => path.join(lib.WORK, `slotbroker-${x}`)
 const userData = at('profile')

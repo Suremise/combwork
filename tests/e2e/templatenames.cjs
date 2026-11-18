@@ -18,7 +18,7 @@ const agentsOnly = async (d) => {
   if (await box.count()) await box.uncheck()
 }
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'templatenames-profile')
 const ws = path.join(lib.WORK, 'templatenames-ws')

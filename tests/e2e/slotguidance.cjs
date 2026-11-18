@@ -19,7 +19,7 @@ const path = require('path')
 const { execFileSync } = require('child_process')
 const { startFakeCopilotApi, copilotTestEnv, copilotInstalled } = require('./fake-copilot-api.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 
 const at = (x) => path.join(lib.WORK, `slotguidance-${x}`)
 const userData = at('profile')

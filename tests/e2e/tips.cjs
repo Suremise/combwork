@@ -6,7 +6,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'tips-profile')
 const ws = path.join(lib.WORK, 'tips-ws')
@@ -36,7 +36,7 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('alpha', { exact: true }).first().click()
-  const until = async (fn, ms = 10000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(150)
@@ -47,7 +47,7 @@ const check = (name, ok, extra = '') => {
   const saved = () => JSON.parse(fs.readFileSync(cfgFile, 'utf8')).ui?.tips ?? {}
 
   // --- The day's tip.
-  check('a tip shows when Combwork starts', !!(await until(async () => (await card.count()) === 1, 10000)))
+  check('a tip shows when Combwork starts', !!(await until(async () => (await card.count()) === 1, lib.timing('hang.step'))))
   check('the first tip, numbered', (await title()) === 'Compact with a focus' && /Tip · 1 of \d+/.test(await card.locator('.tip-head').innerText()), await title())
   check('its shortcut is shown', (await card.locator('.tip-text kbd').count()) === 1)
   check('it is not a dialog: the window works around it', (await page.locator('[role="dialog"]').count()) === 0)
@@ -72,7 +72,7 @@ const check = (name, ok, extra = '') => {
   // --- A moment: the second agent, once.
   await lib.addAgent(inv, alpha, { name: 'One' })
   await lib.addAgent(inv, alpha, { name: 'Two' })
-  check('a second agent brings its tip', !!(await until(async () => (await title()) === 'Several agents side by side', 6000)), await title())
+  check('a second agent brings its tip', !!(await until(async () => (await title()) === 'Several agents side by side', lib.timing('hang.ui'))), await title())
   await page.screenshot({ path: path.join(lib.WORK, 'tips-2-moment.png') })
   await card.getByRole('button', { name: 'Close' }).click()
   await lib.addAgent(inv, alpha, { name: 'Three' })
@@ -137,7 +137,7 @@ const check = (name, ok, extra = '') => {
   // The next day: as if the last tip showed long ago.
   await inv('ui:changeTips', { shownOn: '2000-01-01' })
   await page.reload()
-  check('the next day, a tip again', !!(await until(async () => (await card.count()) === 1, 10000)))
+  check('the next day, a tip again', !!(await until(async () => (await card.count()) === 1, lib.timing('hang.ui'))))
   await card.getByRole('button', { name: "Don't show tips" }).click()
   check("Don't show tips closes it and says where they are", !!(await until(async () => (await card.count()) === 0 && (await page.locator('.toast', { hasText: 'Tips are off' }).count()) === 1, HUNG_MS)))
   check('and turns the setting off', !!(await until(async () => JSON.parse(fs.readFileSync(cfgFile, 'utf8')).settings.general.showTips === false, HUNG_MS)))

@@ -17,7 +17,7 @@ const fs = require('fs')
 const path = require('path')
 const { startFakeCopilotApi, copilotTestEnv, copilotInstalled } = require('./fake-copilot-api.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'hookscopilot-profile')
 const ws = path.join(lib.WORK, 'hookscopilot-ws')
@@ -74,7 +74,7 @@ const jsonl = (file) => {
     // Its output as it came: pty:buffer is a replay, redrawn without the sequences it wrote (HI-3312).
     await lib.recordPtyOutput(page)
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
-    const info = await lib.until(async () => { const i = (await inv('provider:info')).copilot; return i && !i.checking ? i : null }, 60000, 500)
+    const info = await lib.until(async () => { const i = (await inv('provider:info')).copilot; return i && !i.checking ? i : null }, lib.timing('hang.step'), 500)
     check('Copilot found', !!info?.found, JSON.stringify(info && { found: info.found, path: info.path }))
     console.log(`Copilot CLI ${info?.version ?? '?'} (${info?.source ?? '?'}), offline against the stand-in at ${api.url}`)
     await lib.openWorkspace(inv, page, ws)
@@ -82,7 +82,7 @@ const jsonl = (file) => {
     const key = lib.ptyKey(proj, a.id)
     const live = async () => (await inv('session:live')).find((l) => l.agentId === a.id)
     await inv('session:start', proj, { agentId: a.id })
-    check('Copilot starts', !!(await until(async () => (await live())?.status === 'ready', 60000)), (await live())?.status)
+    check('Copilot starts', !!(await until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))), (await live())?.status)
     const events = path.join(copilotHome, 'session-state', (await live())?.sessionId ?? '-', 'events.jsonl')
     /** The prompt's interaction once its turn is over in events.jsonl (its user.message, then Copilot's agentStop hook ran). */
     const turnOver = (text) => {

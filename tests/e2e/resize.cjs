@@ -10,7 +10,7 @@ fs.mkdirSync(path.join(ws, 'demo'), { recursive: true })
 fs.writeFileSync(path.join(ws, 'demo', 'README.md'), '# Demo\n\nSome text.\n')
 require('child_process').execSync('git init -q', { cwd: path.join(ws, 'demo'), env: lib.gitEnv() })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 let pass = 0, fail = 0
 const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.log(ok ? 'PASS' : 'FAIL', name, extra) }
 ;(async () => {
@@ -24,7 +24,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   // "How do you work?" answered (#1423), as a user does once: its step, shown once the form is read, moves what is dragged.
   await inv('workflow:presetNotNow', path.join(ws, 'demo'), 'git')
   // …and the window has the answer (the refresh it makes), before anything is measured.
-  await lib.until(async () => (await page.evaluate(() => window.combwork.invoke('workspace:refresh')))?.projects.find((p) => p.name === 'demo')?.config.workflow?.presetAsked === 'notNow', 10000)
+  await lib.until(async () => (await page.evaluate(() => window.combwork.invoke('workspace:refresh')))?.projects.find((p) => p.name === 'demo')?.config.workflow?.presetAsked === 'notNow', lib.timing('hang.ui'))
   await page.getByText('demo', { exact: true }).first().click(); await sleep(400)
 
   const drag = async (handle, dx) => {
@@ -40,9 +40,9 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
     if (tab === 'Memory') await lib.openMoreTab(page, tab)
     else await page.locator('.tabs .tab', { hasText: tab }).first().click()
     const list = '.tab-body:visible .split-list'
-    await lib.until(async () => (await page.locator('.tabs .tab.active .tab-label').innerText().catch(() => '')).trim() === tab && (await page.locator(list).count()) > 0, 10000)
+    await lib.until(async () => (await page.locator('.tabs .tab.active .tab-label').innerText().catch(() => '')).trim() === tab && (await page.locator(list).count()) > 0, lib.timing('hang.ui'))
     // Version Control's header finishes once its workflow form is read (its link): measured after, not while it lays out.
-    if (tab === 'Version Control') await lib.until(async () => (await page.locator('[data-action="vc-workflow"]').count()) === 1, 10000)
+    if (tab === 'Version Control') await lib.until(async () => (await page.locator('[data-action="vc-workflow"]').count()) === 1, lib.timing('hang.ui'))
     const w0 = await width(list)
     check(`${tab} default width`, Math.abs(w0 - def) <= 1, `(${w0})`)
     await drag(page.locator(`${list} > .pane-resizer`).first(), 120)
@@ -60,8 +60,8 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
       check('Files max keeps main >= 320', main >= 318, `(main ${main})`)
       await page.locator(`${list} > .pane-resizer`).first().dblclick(); await sleep(300)
       // Markdown split view
-      await page.getByText('README.md', { exact: true }).first().click(); await lib.until(async () => (await page.locator('.tab-body:visible .segmented button', { hasText: 'Split' }).count()) > 0, 10000)
-      await page.locator('.segmented button', { hasText: 'Split' }).first().click(); await lib.until(async () => (await page.locator('.tab-body:visible .split-half').count()) === 2, 10000)
+      await page.getByText('README.md', { exact: true }).first().click(); await lib.until(async () => (await page.locator('.tab-body:visible .segmented button', { hasText: 'Split' }).count()) > 0, lib.timing('hang.ui'))
+      await page.locator('.segmented button', { hasText: 'Split' }).first().click(); await lib.until(async () => (await page.locator('.tab-body:visible .split-half').count()) === 2, lib.timing('hang.ui'))
       const halves = page.locator('.tab-body:visible .split-half')
       const host = await width('.tab-body:visible .editor-host')
       const h0 = await halves.first().evaluate((e) => e.getBoundingClientRect().width)

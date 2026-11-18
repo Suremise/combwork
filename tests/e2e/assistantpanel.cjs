@@ -14,7 +14,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'assistantpanel-profile')
 const ws = path.join(lib.WORK, 'assistantpanel-ws')
@@ -93,7 +93,7 @@ const check = (name, ok, extra = '') => {
   // --- Not running: the status line says so, once.
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Control+Alt+I')
-  await lib.until(async () => (await panel().locator('.assistant-header').count()) === 1, 5000)
+  await lib.until(async () => (await panel().locator('.assistant-header').count()) === 1, lib.timing('hang.ui'))
   check('a status line under the header says it isn’t running', (await statusText()) === 'Status: Not running' && (await tone()) === 'off', `${await statusText()} / ${await tone()}`)
   check('…and the header doesn’t say it again, nor has a status dot', (await panel().locator('.assistant-header .pane-status').count()) === 0 && !(await panel().locator('.assistant-header').innerText()).includes('Not running') && (await panel().locator('.assistant-header .dot').count()) === 0)
   const mark = () => panel().locator('.assistant-header .state-mark')
@@ -104,14 +104,14 @@ const check = (name, ok, extra = '') => {
 
   // --- Idle, working, waiting for you.
   await panel().locator('.assistant-header').getByRole('button', { name: 'Start', exact: true }).click()
-  check('started and idle: “Status: Idle”', !!(await lib.until(async () => (await statusText()) === 'Status: Idle' && (await tone()) === 'calm', 20000)), await statusText())
+  check('started and idle: “Status: Idle”', !!(await lib.until(async () => (await statusText()) === 'Status: Idle' && (await tone()) === 'calm', lib.timing('hang.step'))), await statusText())
   check('…its mark idle', await markIs('idle'))
   const working = await type('work 4')
-  check('working: “Status: Working”', !!(await lib.until(async () => (await statusText()) === 'Status: Working' && (await tone()) === 'busy', 5000)), await statusText())
+  check('working: “Status: Working”', !!(await lib.until(async () => (await statusText()) === 'Status: Working' && (await tone()) === 'busy', lib.timing('hang.ui'))), await statusText())
   check('…its mark working (the pulsing dot)', await markIs('working'))
   check('…and that turn ends', await ends(working))
   const asking = await type('ask then work 5')
-  check('asking for permission: “Status: Waiting for you”, in the attention colour', !!(await lib.until(async () => (await statusText()) === 'Status: Waiting for you' && (await tone()) === 'attention', 8000)), await statusText())
+  check('asking for permission: “Status: Waiting for you”, in the attention colour', !!(await lib.until(async () => (await statusText()) === 'Status: Waiting for you' && (await tone()) === 'attention', lib.timing('hang.ui'))), await statusText())
   // The attention colour (--attention-fg, the warning colour's AA shade, #399), as computed for an element of that
   // colour, against the line's own; and the text's contrast on what is really behind it (the line's tint over the
   // panel), as drawn: both composited on a canvas.
@@ -234,19 +234,19 @@ const check = (name, ok, extra = '') => {
   check('it adds an agent to alpha', await say('cw cw_add_agent {"project":"alpha","name":"Fixer","prompt":"w\\u006frk 60"}'))
   const alpha = path.join(ws, 'alpha')
   const fixerLive = async () => (await inv('session:live')).find((x) => x.projectPath.toLowerCase() === alpha.toLowerCase() && x.agentName === 'Fixer')
-  check('an agent of alpha is busy', !!(await lib.until(async () => (await fixerLive())?.status === 'working', 30000)))
+  check('an agent of alpha is busy', !!(await lib.until(async () => (await fixerLive())?.status === 'working', lib.timing('hang.step'))))
   // Its mark in the workspace section says it works (#979), and its label says who and what.
   const fixerMark = panel().locator('.assistant-project[data-project="alpha"] .assistant-agent')
-  check('…its mark in the workspace section is working', !!(await lib.until(async () => (await fixerMark.count()) === 1 && (await fixerMark.getAttribute('data-state')) === 'working' && ((await fixerMark.getAttribute('aria-label')) ?? '').startsWith('Fixer: '), 5000)), await fixerMark.getAttribute('aria-label').catch(() => 'no mark'))
+  check('…its mark in the workspace section is working', !!(await lib.until(async () => (await fixerMark.count()) === 1 && (await fixerMark.getAttribute('data-state')) === 'working' && ((await fixerMark.getAttribute('aria-label')) ?? '').startsWith('Fixer: '), lib.timing('hang.ui'))), await fixerMark.getAttribute('aria-label').catch(() => 'no mark'))
   const stopping = await type('cw cw_stop_agent {"project":"alpha","agent":"Fixer"}')
   const card = panel().locator('.assistant-question', { hasText: 'Stop Fixer in alpha?' })
-  check('stopping it asks the user on a card', !!(await lib.until(async () => (await card.count()) === 1, 15000)))
-  check('…and the status line says the Assistant waits for your approval', !!(await lib.until(async () => (await statusText()) === 'Status: Waiting for your approval: Stop Fixer in alpha?' && (await tone()) === 'attention', 5000)), `${await statusText()} / ${await tone()}`)
+  check('stopping it asks the user on a card', !!(await lib.until(async () => (await card.count()) === 1, lib.timing('hang.ui'))))
+  check('…and the status line says the Assistant waits for your approval', !!(await lib.until(async () => (await statusText()) === 'Status: Waiting for your approval: Stop Fixer in alpha?' && (await tone()) === 'attention', lib.timing('hang.ui'))), `${await statusText()} / ${await tone()}`)
   const approvalColour = await attentionAA()
   check('…in the attention colour, AA in both themes', Object.values(approvalColour).every((c) => c.got === c.want && c.ratio >= 4.5), JSON.stringify(approvalColour))
   await shots('approval')
   await card.locator('button', { hasText: "Don't stop" }).click()
-  check('answered: the card goes and the status line is back to normal', !!(await lib.until(async () => (await card.count()) === 0 && !/approval/.test(await statusText()) && (await tone()) !== 'attention', 15000)), `${await statusText()} / ${await tone()}`)
+  check('answered: the card goes and the status line is back to normal', !!(await lib.until(async () => (await card.count()) === 0 && !/approval/.test(await statusText()) && (await tone()) !== 'attention', lib.timing('hang.ui'))), `${await statusText()} / ${await tone()}`)
   check('…and its turn ends', await ends(stopping))
   const fixer = await fixerLive()
   if (fixer) await inv('session:stop', alpha, fixer.agentId)
@@ -255,14 +255,14 @@ const check = (name, ok, extra = '') => {
   check('it watches two cards', await say('cw cw_wait_for_tasks {"cards":[1,2],"wake":true,"column":"review","limitMinutes":90}'))
   // Its cards by key (#1221).
   const [L1, L2] = [await lib.cardLabel(inv, 1), await lib.cardLabel(inv, 2)]
-  check('watching: “Status: Waiting for #1 #2 → Review (watch until …)” (chips side by side)', !!(await lib.until(async () => new RegExp(`^Status: Waiting for ${L1} ${L2} → Review \\(watch until \\d{1,2}:\\d{2}( [AP]M)?\\)$`).test(await statusText()) && (await tone()) === 'calm', 15000)), await statusText())
+  check('watching: “Status: Waiting for #1 #2 → Review (watch until …)” (chips side by side)', !!(await lib.until(async () => new RegExp(`^Status: Waiting for ${L1} ${L2} → Review \\(watch until \\d{1,2}:\\d{2}( [AP]M)?\\)$`).test(await statusText()) && (await tone()) === 'calm', lib.timing('hang.ui'))), await statusText())
   const chips = status().locator('.card-chip')
   check('…each card the app’s card chip', (await chips.count()) === 2 && (await chips.first().locator('.codicon').count()) === 1)
   const tint = await chips.first().evaluate((el) => ({ colored: el.classList.contains('colored'), column: el.dataset.column, col: el.style.getPropertyValue('--col') }))
   check('…tinted with its column’s colour', tint.colored && tint.column === 'todo' && !!tint.col, JSON.stringify(tint))
   await status().locator('.card-chip', { hasText: L2 }).click()
   const dialog = lib.cardDialog(page, await lib.cardLabel(inv, 2))
-  check('…that opens its card', !!(await lib.until(async () => (await dialog.count()) === 1, 5000)))
+  check('…that opens its card', !!(await lib.until(async () => (await dialog.count()) === 1, lib.timing('hang.ui'))))
   await page.keyboard.press('Escape')
   await lib.until(async () => (await page.locator('.dialog').count()) === 0, HUNG_MS)
 
@@ -293,7 +293,7 @@ const check = (name, ok, extra = '') => {
 
   // --- After a restart: still folded (once it has done something again; the list is the running Combwork's).
   await inv('session:stop', home, 'assistant')
-  await lib.until(async () => !(await live()), 15000)
+  await lib.until(async () => !(await live()), lib.timing('hang.ui'))
   await app.close()
   app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   page = await app.firstWindow()
@@ -301,16 +301,16 @@ const check = (name, ok, extra = '') => {
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
   inv = (ch, ...a) => watched(page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a]), `inv ${ch}`)
-  await lib.until(async () => (await panel().count()) === 1, 10000)
+  await lib.until(async () => (await panel().count()) === 1, lib.timing('hang.ui'))
   if ((await panel().count()) === 0) {
     await page.evaluate(() => document.activeElement?.blur())
     await page.keyboard.press('Control+Alt+I')
   }
-  await lib.until(async () => (await panel().locator('.assistant-header').count()) === 1, 5000)
+  await lib.until(async () => (await panel().locator('.assistant-header').count()) === 1, lib.timing('hang.ui'))
   await panel().locator('.assistant-header').getByRole('button', { name: /Resume|Start/ }).first().click()
   check('it adds a card after the restart', await say('cw cw_create_task {"project":"alpha","title":"After the restart"}'))
   const again = panel().locator('.assistant-done-link')
-  check('after a restart, “Done by the Assistant” is still closed', !!(await lib.until(async () => (await again.count()) === 1, 10000)) && (await again.getAttribute('aria-expanded')) === 'false' && (await panel().locator('.assistant-action').count()) === 0)
+  check('after a restart, “Done by the Assistant” is still closed', !!(await lib.until(async () => (await again.count()) === 1, lib.timing('hang.step'))) && (await again.getAttribute('aria-expanded')) === 'false' && (await panel().locator('.assistant-action').count()) === 0)
   await again.press(' ')
   check('Space opens it again', !!(await lib.until(async () => (await again.getAttribute('aria-expanded')) === 'true' && (await panel().locator('.assistant-action').count()) >= 1, HUNG_MS)))
 
@@ -322,16 +322,16 @@ const check = (name, ok, extra = '') => {
   check('the Assistant reports a run', started.status === 200, String(started.status))
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Control+Alt+P')
-  check('…and the Progress panel shows it with the Assistant’s mark', !!(await lib.until(async () => (await page.locator('.progress-panel .progress-run', { hasText: 'Checking the panel' }).locator('.assistant-mark').count()) === 1, 8000)))
+  check('…and the Progress panel shows it with the Assistant’s mark', !!(await lib.until(async () => (await page.locator('.progress-panel .progress-run', { hasText: 'Checking the panel' }).locator('.assistant-mark').count()) === 1, lib.timing('hang.ui'))))
   await page.keyboard.press('Control+Alt+P')
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Control+Shift+O')
   const running = page.locator('.running-row', { hasText: 'Assistant' })
-  check('the Workspace Overview’s running Assistant has its status icon', !!(await lib.until(async () => (await running.locator('.assistant-mark[data-status]').count()) === 1, 8000)))
+  check('the Workspace Overview’s running Assistant has its status icon', !!(await lib.until(async () => (await running.locator('.assistant-mark[data-status]').count()) === 1, lib.timing('hang.ui'))))
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Control+Alt+I')
   const rail = page.locator('.assistant-rail')
-  check('hidden, the strip shows its status icon', !!(await lib.until(async () => (await rail.locator('.assistant-mark[data-status]').count()) === 1, 5000)) && (await rail.locator('.assistant-mark').getAttribute('aria-label'))?.startsWith('The Assistant'))
+  check('hidden, the strip shows its status icon', !!(await lib.until(async () => (await rail.locator('.assistant-mark[data-status]').count()) === 1, lib.timing('hang.ui'))) && (await rail.locator('.assistant-mark').getAttribute('aria-label'))?.startsWith('The Assistant'))
 
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')

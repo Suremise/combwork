@@ -18,7 +18,7 @@ const { execFileSync, spawnSync } = require('child_process')
 const { jjDir, portableJj } = require('../jjPortable.cjs')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 const exe = portableJj()
 if (!exe) {
   console.log("SKIP jjslot-claude: the pinned jj isn't fetched (npm run jj:fetch)")
@@ -26,7 +26,7 @@ if (!exe) {
 }
 // The test home's sign-in, as Claude Code says it (the runner asks too; this is for running the suite on its own).
 const claude = [path.join(os.homedir(), '.local', 'bin', 'claude.exe')].find((f) => fs.existsSync(f)) ?? 'claude'
-const status = spawnSync(claude, ['auth', 'status', '--json'], { encoding: 'utf8', timeout: 30000, env: lib.childEnv({ CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME }) })
+const status = spawnSync(claude, ['auth', 'status', '--json'], { encoding: 'utf8', timeout: lib.timing('spawn.hang'), env: lib.childEnv({ CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME }) })
 let signedIn = true
 try {
   signedIn = JSON.parse(status.stdout).loggedIn !== false
@@ -122,11 +122,11 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
       // The slot's trust question, answered once, when it shows (the session starts with the card, after the slot is made):
       // answering again would press Down again and could move the choice back to No.
       const screen = async () => lib.plainText(await inv('pty:buffer', key).catch(() => '')).slice(-1500)
-      if (await until(async () => lib.CLAUDE_TRUST.test(await screen()) || lib.combworkToolsConnected(userData, b1.id, launchMark), 90000)) await lib.acceptClaudeTrust(inv, shop, b1.id, 30000)
-      const trusted = await until(() => lib.combworkToolsConnected(userData, b1.id, launchMark), 90000)
+      if (await until(async () => lib.CLAUDE_TRUST.test(await screen()) || lib.combworkToolsConnected(userData, b1.id, launchMark), lib.timing('hang.step'))) await lib.acceptClaudeTrust(inv, shop, b1.id, 30000)
+      const trusted = await until(() => lib.combworkToolsConnected(userData, b1.id, launchMark), lib.timing('hang.step'))
       check('Claude Code starts in the slot, its Combwork tools connected', !!trusted, await screen())
-      check('B1 ran jj there, as its card asks (its Bash tool, in the slot)', !!(await until(() => fs.existsSync(marker), 180000)), await screen())
-      check('…and its turn ended', !!(await until(async () => ['ready', 'finished'].includes((await live())?.status), 120000)), JSON.stringify(await live()))
+      check('B1 ran jj there, as its card asks (its Bash tool, in the slot)', !!(await until(() => fs.existsSync(marker), lib.timing('hang.slow'))), await screen())
+      check('…and its turn ended', !!(await until(async () => ['ready', 'finished'].includes((await live())?.status), lib.timing('hang.step'))), JSON.stringify(await live()))
     })
 
     // --- The card done as jjwindow does it: committed in the slot, submitted with B1's token, passed, integrated.
@@ -147,7 +147,7 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
 
     // --- B1 stopped as Combwork stops it (its terminal ended); the slot must come back by itself once its folder is quiet.
     await inv('session:stop', shop, b1.id)
-    check('Combwork stops Claude Code', !!(await until(async () => !(await live()) || (await live())?.status === 'exited', 20000)), JSON.stringify(await live()))
+    check('Combwork stops Claude Code', !!(await until(async () => !(await live()) || (await live())?.status === 'exited', lib.timing('hang.ui'))), JSON.stringify(await live()))
     const appLog = path.join(userData, 'logs', 'combwork.log')
     const logLines = () => (fs.existsSync(appLog) ? fs.readFileSync(appLog, 'utf8') : '').split(/\r?\n/)
     // HI-2912's: its folder quiet once Claude Code has gone, so the pool's settle detaches it (jj's detach is fenced by the
@@ -165,7 +165,7 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
     if (!detached || !back) {
       // What still names this run's folders (read only, nothing ended), and what Combwork lists as B1's leftovers.
       try {
-        const ps = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine.ToLower().Contains('${work.toLowerCase().replace(/'/g, "''")}') } | ForEach-Object { "$($_.ProcessId) $($_.ParentProcessId) $($_.Name) $($_.CommandLine)" }`], { encoding: 'utf8', windowsHide: true, timeout: 30_000 })
+        const ps = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine.ToLower().Contains('${work.toLowerCase().replace(/'/g, "''")}') } | ForEach-Object { "$($_.ProcessId) $($_.ParentProcessId) $($_.Name) $($_.CommandLine)" }`], { encoding: 'utf8', windowsHide: true, timeout: lib.timing('spawn.hang') })
         for (const l of ps.split(/\r?\n/).filter(Boolean)) console.log(`INFO process: ${l.slice(0, 400)}`)
       } catch (e) {
         console.log(`INFO process listing failed: ${e}`)

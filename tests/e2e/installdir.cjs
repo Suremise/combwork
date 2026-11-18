@@ -14,7 +14,7 @@ const PACKAGE = 'S-1-15-2-1430448594-2639229838-973813799-439329657-1197984847-4
 const FOLDER_ENTRY = '*S-1-15-2-1:(OI)(CI)(RX)'
 const FILE_ENTRY = '*S-1-15-2-1:(RX)'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 const system32 =(...p) => path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', ...p)
 let failed = 0
 const check = (name, ok, extra = '') => {

@@ -14,7 +14,7 @@ const fs = require('fs')
 const path = require('path')
 const { createHash } = require('crypto')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const at = (x) => path.join(lib.WORK, `teampause-${x}`)
 const userData = at('profile')
@@ -144,7 +144,7 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
     const early = await inv('team:install')
     check('Install Now while not parked installs nothing', early.installed === false)
     fs.writeFileSync(release, '')
-    check('once the run ends, All parked', !!(await until(async () => (await inv('team:state')).allParked, 60000)), JSON.stringify((await inv('team:state')).workspaces.map((w) => [w.workspacePath, w.pause?.by, w.items])))
+    check('once the run ends, All parked', !!(await until(async () => (await inv('team:state')).allParked, lib.timing('hang.step'))), JSON.stringify((await inv('team:state')).workspaces.map((w) => [w.workspacePath, w.pause?.by, w.items])))
     check('…and the band says so', !!(await until(async () => /All parked: safe to install/.test((await band.innerText().catch(() => '')) ?? ''), HUNG_MS)), await band.innerText().catch(() => ''))
     await band.screenshot({ path: at('band-parked.png') }).catch((e) => console.log(`screenshot: ${e.message}`))
     const install = await inv('team:install')

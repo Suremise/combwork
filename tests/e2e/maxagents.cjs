@@ -13,7 +13,7 @@ const fs = require('fs')
 const { createHash } = require('crypto')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'maxagents-profile')
 const ws = path.join(lib.WORK, 'maxagents-ws')
@@ -59,7 +59,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     const shoot = async (name, target) => {
       for (const theme of ['dark', 'light']) {
         await inv('settings:update', { appearance: { theme } })
-        await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)
+        await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, lib.timing('hang.ui'))
         await page.mouse.move(5, 5)
         await target().screenshot({ path: path.join(shots, `${name}-${theme}.png`) })
       }
@@ -68,11 +68,11 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
 
     // --- Agents per project carried over: Combwork's 16 and the workspace's own 5, each its level's Maximum agents.
     const levelMax = async (level, platform) => (await inv('workflow:levelForm', level, platform)).own.maxAgents
-    check("Combwork's Agents per project (16) is Maximum agents in Combwork's workflow defaults, for None and Git", !!(await until(async () => (await levelMax('global', 'none')) === 16 && (await levelMax('global', 'git')) === 16)), JSON.stringify([await levelMax('global', 'none'), await levelMax('global', 'git')]))
+    check("Combwork's Agents per project (16) is Maximum agents in Combwork's workflow defaults, for None and Git", !!(await until(async () => (await levelMax('global', 'none')) === 16 && (await levelMax('global', 'git')) === 16, lib.timing('hang.ui'))), JSON.stringify([await levelMax('global', 'none'), await levelMax('global', 'git')]))
     check("…and the workspace's own (5) in the workspace's", (await levelMax('workspace', 'none')) === 5 && (await levelMax('workspace', 'git')) === 5, JSON.stringify([await levelMax('workspace', 'none'), await levelMax('workspace', 'git')]))
     const advancedValues = () => JSON.parse(fs.readFileSync(path.join(userData, 'advanced.json'), 'utf8')).values ?? {}
     // old-name: begin old-agents-setting-gone
-    check('…and gone from advanced.json', !!(await until(() => !('hive.agents.perProject' in advancedValues()))), JSON.stringify(advancedValues()))
+    check('…and gone from advanced.json', !!(await until(() => !('hive.agents.perProject' in advancedValues()), lib.timing('hang.step'))), JSON.stringify(advancedValues()))
     // old-name: end old-agents-setting-gone
 
     // --- On Solo: the Assistant, through the Agent API, keeps to Maximum agents (1); so does the user (HI-2058).
@@ -82,7 +82,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
       const st = await live(assistantHome, 'assistant')
       if (st?.status === 'waiting') await inv('pty:write', lib.ptyKey(assistantHome, 'assistant'), '\r')
       return st?.status === 'ready' || st?.status === 'finished'
-    })
+    }, lib.timing('hang.step'))
     check('the Assistant starts', !!ready)
     const tokenFile = path.join(userData, 'assistant-api', `${createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`)
     const token = JSON.parse(fs.readFileSync(tokenFile, 'utf8')).token
@@ -97,22 +97,22 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     const mine = await inv('agents:add', solo, { location: 'project', provider: 'claude-code', name: 'SO-B2' }).then(() => '', (e) => String(e.message ?? e))
     check("the user's own add is refused too, saying where Maximum agents is raised", mine.endsWith(why) && JSON.stringify(agentNames()) === '["SO-B1"]', `${mine} / ${JSON.stringify(agentNames())}`)
     await page.locator('.project-row', { hasText: 'solo' }).first().click()
-    await until(async () => (await page.locator('.project-header h1').innerText().catch(() => '')) === 'solo')
+    await until(async () => (await page.locator('.project-header h1').innerText().catch(() => '')) === 'solo', lib.timing('hang.ui'))
     // The window's own: + Add ▾'s entries greyed out, each saying why.
     await page.locator('.session-toolbar .add-menu').click()
     const configure = lib.menuEntry(page, 'Configure Agent and Add…')
-    check("+ Add ▾ at Maximum agents: Configure Agent and Add… greyed out, saying why", !!(await until(async () => (await configure.count()) === 1 && (await configure.getAttribute('aria-disabled')) === 'true' && (await text(configure)).includes(why))), await text(configure))
+    check("+ Add ▾ at Maximum agents: Configure Agent and Add… greyed out, saying why", !!(await until(async () => (await configure.count()) === 1 && (await configure.getAttribute('aria-disabled')) === 'true' && (await text(configure)).includes(why), lib.timing('hang.ui'))), await text(configure))
     await page.keyboard.press('Escape')
-    await until(async () => (await page.locator('.menu').count()) === 0)
+    await until(async () => (await page.locator('.menu').count()) === 0, lib.timing('hang.ui'))
     // The shortcut's quick add: a warning saying why, its button opening Version Control → Workflow.
     await page.keyboard.press('Control+Alt+Shift+N')
     const toast = page.locator('.toast', { hasText: 'No room for another agent' })
-    check('the quick add at Maximum agents: a warning saying why, with Open Workflow Options', !!(await until(async () => (await toast.count()) === 1 && (await text(toast)).includes(why) && (await toast.getByRole('button', { name: 'Open Workflow Options' }).count()) === 1)), await text(page.locator('.toasts, .toast').first()))
+    check('the quick add at Maximum agents: a warning saying why, with Open Workflow Options', !!(await until(async () => (await toast.count()) === 1 && (await text(toast)).includes(why) && (await toast.getByRole('button', { name: 'Open Workflow Options' }).count()) === 1, lib.timing('hang.ui'))), await text(page.locator('.toasts, .toast').first()))
     await shoot('0-warning', () => toast)
     await toast.getByRole('button', { name: 'Open Workflow Options' }).click()
     const row = page.locator('.vc-view .workflow-option[data-option="maxAgents"]')
     const box = row.locator('input')
-    check('…which opens Version Control → Workflow, Maximum agents there', !!(await until(async () => (await box.count()) === 1 && (await box.inputValue()) === '1')), await text(page.locator('.vc-view')))
+    check('…which opens Version Control → Workflow, Maximum agents there', !!(await until(async () => (await box.count()) === 1 && (await box.inputValue()) === '1', lib.timing('hang.ui'))), await text(page.locator('.vc-view')))
     check('…nothing added', JSON.stringify(agentNames()) === '["SO-B1"]', JSON.stringify(agentNames()))
 
     // --- Combwork's Team 6 + pool (8 agents) loaded by hand: its workflow raises Maximum agents with its agents (HI-2058).
@@ -121,48 +121,48 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
       await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()
       await lib.addMenuRun(page, 'Templates')
       const item = page.locator('.menu .menu-item').filter({ has: page.getByText('Team 6 + pool', { exact: true }) }).first()
-      await until(async () => (await item.count()) === 1)
+      await until(async () => (await item.count()) === 1, lib.timing('hang.ui'))
       await item.click()
       return page.locator('.dialog', { hasText: 'Load "Team 6 + pool"?' })
     }
     let load = await openLoad()
     let apply = load.locator('[data-workflow-apply]')
     const loadButton = () => load.getByRole('button', { name: 'Load template' })
-    check('the Load dialog: its workflow ticked, saying its Maximum agents (8) is saved with its agents', !!(await until(async () => (await apply.count()) === 1 && (await apply.isChecked()) && (await load.locator('[data-saves-max="8"]').count()) === 1)) && /Maximum agents goes from 1 to 8 for this project, saved with its agents\./.test(await text(load)) && (await load.locator('[data-over-max]').count()) === 0, await text(load))
+    check('the Load dialog: its workflow ticked, saying its Maximum agents (8) is saved with its agents', !!(await until(async () => (await apply.count()) === 1 && (await apply.isChecked()) && (await load.locator('[data-saves-max="8"]').count()) === 1, lib.timing('hang.ui'))) && /Maximum agents goes from 1 to 8 for this project, saved with its agents\./.test(await text(load)) && (await load.locator('[data-over-max]').count()) === 0, await text(load))
     await shoot('1-load', () => load)
     await apply.uncheck()
     const overBanner = load.locator('[data-over-max]')
-    check('its workflow unticked: Load is greyed out, saying why, with Open Workflow Options', !!(await until(async () => (await overBanner.count()) === 1 && (await loadButton().isDisabled()))) && /It has 8 agents, and this project’s workflow allows 1 agent: raise Maximum agents first, or load it with its workflow\./.test(await text(overBanner)) && (await load.locator('[data-saves-max]').count()) === 0, await text(load))
+    check('its workflow unticked: Load is greyed out, saying why, with Open Workflow Options', !!(await until(async () => (await overBanner.count()) === 1 && (await loadButton().isDisabled()), lib.timing('hang.ui'))) && /It has 8 agents, and this project’s workflow allows 1 agent: raise Maximum agents first, or load it with its workflow\./.test(await text(overBanner)) && (await load.locator('[data-saves-max]').count()) === 0, await text(load))
     await shoot('1-over', () => load)
     await overBanner.getByRole('button', { name: 'Open Workflow Options' }).click()
-    check('…the link closes it, nothing loaded, and opens Version Control → Workflow', !!(await until(async () => (await load.count()) === 0 && (await box.count()) === 1)) && JSON.stringify(agentNames()) === '["SO-B1"]', JSON.stringify(agentNames()))
+    check('…the link closes it, nothing loaded, and opens Version Control → Workflow', !!(await until(async () => (await load.count()) === 0 && (await box.count()) === 1, lib.timing('hang.ui'))) && JSON.stringify(agentNames()) === '["SO-B1"]', JSON.stringify(agentNames()))
     // Loaded with its workflow: Maximum agents saved with its agents at once, its other options filled in for Save….
     load = await openLoad()
     apply = load.locator('[data-workflow-apply]')
-    await until(async () => (await apply.count()) === 1 && (await apply.isChecked()) && (await loadButton().isEnabled()))
+    await until(async () => (await apply.count()) === 1 && (await apply.isChecked()) && (await loadButton().isEnabled()), lib.timing('hang.ui'))
     await loadButton().click()
-    check('loaded with its workflow: 8 agents', !!(await until(() => agentNames().length === 8)), JSON.stringify(agentNames()))
+    check('loaded with its workflow: 8 agents', !!(await until(() => agentNames().length === 8, lib.timing('hang.ui'))), JSON.stringify(agentNames()))
     check('…Maximum agents 8 saved with them, the preset still Solo until Save…', projectOf().workflow.options.maxAgents === 8 && projectOf().workflow.preset === 'solo', JSON.stringify(projectOf().workflow))
-    check('…and Version Control → Workflow opens with it filled in, Maximum agents 8 as the project’s own', !!(await until(async () => (await page.locator('[data-from-template="Team 6 + pool"]').count()) === 1 && (await box.count()) === 1 && (await box.inputValue()) === '8')), await text(row))
+    check('…and Version Control → Workflow opens with it filled in, Maximum agents 8 as the project’s own', !!(await until(async () => (await page.locator('[data-from-template="Team 6 + pool"]').count()) === 1 && (await box.count()) === 1 && (await box.inputValue()) === '8', lib.timing('hang.ui'))), await text(row))
     await row.scrollIntoViewIfNeeded()
     await shoot('2-raised', () => row)
     await page.locator('.workflow-actions button', { hasText: 'Discard Changes' }).click()
-    check('Discard Changes: the rest goes, Maximum agents stays 8', !!(await until(async () => (await page.locator('[data-from-template]').count()) === 0 && (await box.inputValue()) === '8')) && projectOf().workflow.options.maxAgents === 8, JSON.stringify(projectOf().workflow.options))
+    check('Discard Changes: the rest goes, Maximum agents stays 8', !!(await until(async () => (await page.locator('[data-from-template]').count()) === 0 && (await box.inputValue()) === '8', lib.timing('hang.ui'))) && projectOf().workflow.options.maxAgents === 8, JSON.stringify(projectOf().workflow.options))
     const again = await api('POST', '/v1/projects/solo/agents', { name: 'SO-X' })
     check("…and at 8 the Assistant's add is refused again", again.status === 409 && /Maximum agents to 8/.test(again.body?.error), JSON.stringify(again))
 
     // --- Lowered in the form, under the agents it has: they all stay, and the row says so. Once the save has settled
     // (the form read again: its box at 8, nothing to save), so the form's reload doesn't replace what is typed.
-    await until(async () => (await box.inputValue()) === '8' && (await page.locator('.workflow-actions [data-action="save"]').isDisabled()))
+    await until(async () => (await box.inputValue()) === '8' && (await page.locator('.workflow-actions [data-action="save"]').isDisabled()), lib.timing('hang.ui'))
     await box.fill('2')
     const over = row.locator('[data-note="over-max"]')
-    check('lowered to 2: the row says the 8 agents stay and none can be added', !!(await until(async () => /This project has 8 agents: none is removed, but no agent can be added until it has fewer than 2\./.test(await text(over)))), await text(row))
+    check('lowered to 2: the row says the 8 agents stay and none can be added', !!(await until(async () => /This project has 8 agents: none is removed, but no agent can be added until it has fewer than 2\./.test(await text(over)), lib.timing('hang.ui'))), await text(row))
     await shoot('3-over', () => row)
 
     // --- A preset's preview shows the Maximum agents it sets, with the value now (HR3's round 1).
     await page.locator('.vc-view .workflow-choice[data-choice="team"]').click()
     const previewRow = page.locator('.vc-view .workflow-preview li[data-option="maxAgents"]')
-    check("Team's preview lists Maximum agents: 12, a change from 2 now", !!(await until(async () => (await previewRow.count()) === 1 && /Maximum agents: 12/.test(await text(previewRow)) && /Now: 2/.test(await text(previewRow)) && /\bchanges\b/.test((await previewRow.getAttribute('class')) ?? ''))), await text(page.locator('.vc-view .workflow-preview')))
+    check("Team's preview lists Maximum agents: 12, a change from 2 now", !!(await until(async () => (await previewRow.count()) === 1 && /Maximum agents: 12/.test(await text(previewRow)) && /Now: 2/.test(await text(previewRow)) && /\bchanges\b/.test((await previewRow.getAttribute('class')) ?? ''), lib.timing('hang.ui'))), await text(page.locator('.vc-view .workflow-preview')))
     await shoot('4-preview', () => page.locator('.vc-view .workflow-preview'))
   } catch (e) {
     check('the suite threw', false, e.stack)

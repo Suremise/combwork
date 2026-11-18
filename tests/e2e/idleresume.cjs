@@ -12,7 +12,7 @@ const path = require('path')
 const { createHash } = require('crypto')
 const { putSessions } = require('./storeDocs.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const scratch = lib.WORK
 const userData = path.join(scratch, 'idleresume-profile')

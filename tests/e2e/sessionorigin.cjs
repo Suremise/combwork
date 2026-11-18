@@ -12,7 +12,7 @@ const fs = require('fs')
 const path = require('path')
 const { sessionsOf, putSessions } = require('./storeDocs.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'sessionorigin-profile')
 const ws = path.join(lib.WORK, 'sessionorigin-ws')
@@ -45,7 +45,7 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms = 20000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)
@@ -115,7 +115,7 @@ const check = (name, ok, extra = '') => {
       .catch(() => '')
     return `${agent} · ${where}`
   }
-  check('rows load', !!(await until(async () => (await row('Put away').count()) === 1, 10000)))
+  check('rows load', !!(await until(async () => (await row('Put away').count()) === 1, lib.timing('hang.ui'))))
   check("a removed agent's session keeps its name, not the new Coder's", (await badge('Old Coder work')) === 'Coder (removed) · Project folder', await badge('Old Coder work'))
   check('a record from before names were kept: Removed agent', (await badge('Before names')) === 'Removed agent · Project folder', await badge('Before names'))
   check("an earlier agent in Reviewer's worktree isn't Reviewer", (await badge('Earlier spike')) === 'Spike (removed) · Worktree · cw/spike', await badge('Earlier spike'))
@@ -127,13 +127,13 @@ const check = (name, ok, extra = '') => {
     await row('Earlier spike').locator('.session-origin').hover().catch(() => undefined)
     const tip = await page.locator('.tip').last().innerText().catch(() => '')
     return tip.includes(reviewer.worktree.path) && tip.includes('a-5p1ke00')
-  }, 8000)))
+  }, lib.timing('hang.step'))))
   await page.screenshot({ path: path.join(lib.WORK, 'sessionorigin-1-list.png') })
 
   // --- The selected session: where it ran, apart from who resumes it now.
   await row('Old Coder work').click()
   const ranIn = page.locator('.session-ran-in')
-  check('the header says where it ran', !!(await until(async () => /Ran in\s+Coder \(removed\) · Project folder/.test(await ranIn.innerText().catch(() => '')), 5000)), await ranIn.innerText().catch(() => ''))
+  check('the header says where it ran', !!(await until(async () => /Ran in\s+Coder \(removed\) · Project folder/.test(await ranIn.innerText().catch(() => '')), lib.timing('hang.ui'))), await ranIn.innerText().catch(() => ''))
   // Helper is running: the menu still gives its location.
   check('Helper ran once', await runOnce(helper.id))
   const resume = page.locator('.transcript-toolbar .split-btn')

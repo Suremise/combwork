@@ -13,7 +13,7 @@ const { execFileSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const PORT = Number(lib.port(47841))
 const userData = path.join(lib.WORK, 'progressgates-profile')
@@ -97,7 +97,7 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
       const before = shells().length
       const name = id === builder.id ? 'B1' : 'R1'
       await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, name, `shell: ${cmd}`, { ready: async () => (await live(id))?.status !== 'working', live: () => live(id), hungMs: 60000 })
-      return until(() => shells().slice(before).find((s) => s.cmd === cmd), 60000)
+      return until(() => shells().slice(before).find((s) => s.cmd === cmd), lib.timing('hang.step'))
     }
 
     const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
@@ -138,7 +138,7 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
         await page.mouse.move(5, 5)
         await target.hover()
         // Short: past it, hovered again (the outer wait is the bound for a hung run).
-        return until(async () => ((await page.locator('.lane-seg-tip').textContent().catch(() => '')) ?? '').includes(has), 2000)
+        return until(async () => ((await page.locator('.lane-seg-tip').textContent().catch(() => '')) ?? '').includes(has), lib.timing('hang.step'))
       }, HUNG_MS)
     }
     const fin = row.locator('.lane-seg.finished')
@@ -256,14 +256,14 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
       const answered = await until(async () => {
         if (await dontResume.count()) await dontResume.first().click().catch(() => undefined)
         return !fs.existsSync(restartRecord) && (await dontResume.count()) === 0
-      })
+      }, lib.timing('hang.ui'))
       // Its outcome then shows for the usual time, counted only while the window is focused (Popups.tsx), and a test
       // window never is: closed with its × as the user would (HI-2370).
       const outcome = page.locator('.toast.resolved .popup-close')
       const closed = await until(async () => {
         if (await outcome.count()) await outcome.first().click().catch(() => undefined)
         return (await outcome.count()) === 0
-      })
+      }, lib.timing('hang.ui'))
       check("de: the offer to resume the lane's agents answered Don't Resume, and gone", !!answered && !!closed, String(fs.existsSync(restartRecord)))
     }
     if (!(await until(async () => (await page.locator('.progress-panel').count()) === 1, 5000))) await page.locator('.progress-rail').click()

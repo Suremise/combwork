@@ -11,7 +11,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'assistantsettings-profile')
 const ws = path.join(lib.WORK, 'assistantsettings-ws')
@@ -98,7 +98,7 @@ const check = (name, ok, extra = '') => {
   const panel = page.locator('.assistant-panel')
   await lib.until(async () => (await panel.locator('.assistant-header').count()) === 1, HUNG_MS)
   await panel.locator('.assistant-header').getByRole('button', { name: 'Start', exact: true }).click()
-  check('the Assistant runs', !!(await lib.until(async () => (await live())?.status === 'ready', 20000)))
+  check('the Assistant runs', !!(await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))))
 
   // --- A change: Settings shows it, the panel lists it with Undo.
   check('it changes a setting', await say('skill tune-settings then cw cw_update_setting {"id":"sessions.transcriptWarnMB","value":50}'))
@@ -175,7 +175,7 @@ const check = (name, ok, extra = '') => {
     }, projectFile.toLowerCase())
   /** Until a change has queued for the project's lock behind the user's held write (the fake's call starts a Combwork MCP server first, seconds under load); then stops counting. */
   const queuedForLock = async () => {
-    const queued = !!(await lib.until(() => app.evaluate(() => global.__cwTestQueued > 0), 30000))
+    const queued = !!(await lib.until(() => app.evaluate(() => global.__cwTestQueued > 0), lib.timing('hang.ui')))
     await app.evaluate(() => {
       // eslint-disable-next-line eslint/no-extend-native -- putting Map's own set back
       Map.prototype.set = global.__cwTestMapSet
@@ -216,11 +216,11 @@ const check = (name, ok, extra = '') => {
   await typeLine('cw cw_update_setting {"id":"project.compactSuggestTokens","value":500000,"project":"alpha"}')
   check("the old session's change waits behind the user's write", await queuedForLock())
   await inv('session:stop', home, 'assistant')
-  await lib.until(async () => !(await live()), 15000)
+  await lib.until(async () => !(await live()), lib.timing('hang.ui'))
   await inv('session:start', home, { agentId: 'assistant' })
-  check('the Assistant starts again', !!(await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), 20000)))
+  check('the Assistant starts again', !!(await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), lib.timing('hang.step'))))
   await release()
-  check("the old session's change is refused when its turn comes", !!(await lib.until(async () => (await inv('assistant:actions')).filter((a) => !a.ok).length > refusedBefore, 10000)))
+  check("the old session's change is refused when its turn comes", !!(await lib.until(async () => (await inv('assistant:actions')).filter((a) => !a.ok).length > refusedBefore, lib.timing('hang.step'))))
   check("…and the user's write stays", (await alphaCfg()).compactSuggestTokens === 410000, String((await alphaCfg()).compactSuggestTokens))
   check('…listed as not done: its session ended', /session that asked for this ended/.test((await inv('assistant:actions')).filter((a) => !a.ok).at(-1)?.error ?? ''), JSON.stringify((await inv('assistant:actions')).at(-1)))
 

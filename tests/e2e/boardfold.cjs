@@ -9,7 +9,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'boardfold-profile')
 const ws = path.join(lib.WORK, 'boardfold-ws')
@@ -41,7 +41,7 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   check('the preload bridge is window.combwork, and no other global is one', bridge.combwork === 'function' && bridge.others.length === 0, JSON.stringify(bridge))
   let inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
-  const until = (fn, ms = 10000) => lib.until(fn, ms)
+  const until = (fn, ms) => lib.until(fn, ms)
 
   // A card in each column, and two more in Todo.
   const n = {}
@@ -79,11 +79,11 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   }
   const collapse = async (label) => {
     await column(label).getByRole('button', { name: `Collapse ${label}` }).click()
-    await until(async () => (await column(label).getAttribute('class')).includes('collapsed'), 5000)
+    await until(async () => (await column(label).getAttribute('class')).includes('collapsed'), lib.timing('hang.ui'))
   }
   const expand = async (label) => {
     await column(label).getByRole('button', { name: `Expand ${label}` }).click()
-    await until(async () => !(await column(label).getAttribute('class')).includes('collapsed'), 5000)
+    await until(async () => !(await column(label).getAttribute('class')).includes('collapsed'), lib.timing('hang.ui'))
   }
   const fills = async (what) => {
     const w = await settled()
@@ -128,11 +128,11 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   // A card dropped on the strip goes to the top of that column.
   await tile(n.t3).dragTo(strip)
   const saved = async (col) => (await inv('tasks:list')).filter((c) => c.column === col && !c.archived).sort((a, b) => a.order - b.order).map((c) => c.number)
-  check('a card dropped on a collapsed column goes to its top', !!(await until(async () => (await saved('hold')).join() === [n.t3, n.hold].join(), 5000)), (await saved('hold')).join())
-  check("the strip's count follows", !!(await until(async () => (await strip.locator('.count').innerText()) === '2', 5000)))
+  check('a card dropped on a collapsed column goes to its top', !!(await until(async () => (await saved('hold')).join() === [n.t3, n.hold].join(), lib.timing('hang.ui'))), (await saved('hold')).join())
+  check("the strip's count follows", !!(await until(async () => (await strip.locator('.count').innerText()) === '2', lib.timing('hang.ui'))))
   await strip.focus()
   await page.keyboard.press('Enter')
-  check('Enter on the strip expands the column', !!(await until(async () => (await tile(n.hold).count()) === 1, 5000)))
+  check('Enter on the strip expands the column', !!(await until(async () => (await tile(n.hold).count()) === 1, lib.timing('hang.ui'))))
   await inv('tasks:update', n.t3, { column: 'todo', position: 'bottom' })
 
   // With a search on, the strip still puts the card at the true top of its column, above the cards the search hides
@@ -140,9 +140,9 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   const search = page.getByPlaceholder('Search cards (AM-12, words, labels)')
   await search.fill('t3 card')
   await collapse('On Hold')
-  check('the search hides the other cards', !!(await until(async () => (await tile(n.t3).count()) === 1 && (await tile(n.t1).count()) === 0, 5000)))
+  check('the search hides the other cards', !!(await until(async () => (await tile(n.t3).count()) === 1 && (await tile(n.t1).count()) === 0, lib.timing('hang.ui'))))
   await tile(n.t3).dragTo(strip)
-  check("with a search on, a card dropped on a collapsed column still goes to its true top", !!(await until(async () => (await saved('hold')).join() === [n.t3, n.hold].join(), 5000)), (await saved('hold')).join())
+  check("with a search on, a card dropped on a collapsed column still goes to its true top", !!(await until(async () => (await saved('hold')).join() === [n.t3, n.hold].join(), lib.timing('hang.ui'))), (await saved('hold')).join())
   await search.fill('')
   await expand('On Hold')
   await inv('tasks:update', n.t3, { column: 'todo', position: 'bottom' })
@@ -152,7 +152,7 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   const height = (x) => tile(x).evaluate((e) => e.getBoundingClientRect().height)
   const tall = await height(n.t1)
   await fold(n.t1, `Collapse ${await lib.cardLabel(inv, n.t1)} to one line`).click()
-  check('a card folds to one line', !!(await until(async () => (await tile(n.t1).getAttribute('class')).includes('folded'), 5000)) && (await height(n.t1)) < tall && (await height(n.t1)) < 34, `${tall} → ${await height(n.t1)}`)
+  check('a card folds to one line', !!(await until(async () => (await tile(n.t1).getAttribute('class')).includes('folded'), lib.timing('hang.ui'))) && (await height(n.t1)) < tall && (await height(n.t1)) < 34, `${tall} → ${await height(n.t1)}`)
   const line = await tile(n.t1).evaluate((e) => {
     const t = e.querySelector('.task-title')
     return { cut: t.scrollWidth > t.clientWidth, text: e.innerText }
@@ -169,7 +169,7 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
     await lib.appReady(page)
     // Not shown within 3 s, the board is opened by its button; then the wait for its card, bounded.
     if (!(await until(async () => (await tile(n.t1).count()) === 1, 3000))) await page.getByRole('button', { name: 'Task Board' }).click()
-    await until(async () => (await tile(n.t1).count()) === 1, 10000)
+    await until(async () => (await tile(n.t1).count()) === 1, lib.timing('hang.ui'))
     await tile(n.t1).evaluate(async (el, timer) => {
       el.click()
       await (timer ? new Promise((r) => setTimeout(r, 0)) : Promise.resolve())
@@ -181,25 +181,25 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   }
   await tile(n.t1).click()
   const dialog = lib.cardDialog(page, await lib.cardLabel(inv, n.t1))
-  check('clicking a folded card still opens it', !!(await until(async () => (await dialog.count()) === 1, 5000)))
+  check('clicking a folded card still opens it', !!(await until(async () => (await dialog.count()) === 1, lib.timing('hang.ui'))))
   await page.keyboard.press('Escape')
-  check('…and Escape closes it, asking nothing', !!(await until(async () => (await dialog.count()) === 0, 5000)) && (await discard.count()) === 0)
+  check('…and Escape closes it, asking nothing', !!(await until(async () => (await dialog.count()) === 0, lib.timing('hang.ui'))) && (await discard.count()) === 0)
   await fold(n.t2, `Collapse ${await lib.cardLabel(inv, n.t2)} to one line`).click()
-  check('a folded blocked card keeps its marker', !!(await until(async () => (await tile(n.t2).locator('.task-flag.blocked').count()) === 1, 5000)))
+  check('a folded blocked card keeps its marker', !!(await until(async () => (await tile(n.t2).locator('.task-flag.blocked').count()) === 1, lib.timing('hang.ui'))))
   await fold(n.t1, `Expand ${await lib.cardLabel(inv, n.t1)}`).click()
-  check('and unfolds', !!(await until(async () => !(await tile(n.t1).getAttribute('class')).includes('folded'), 5000)))
+  check('and unfolds', !!(await until(async () => !(await tile(n.t1).getAttribute('class')).includes('folded'), lib.timing('hang.ui'))))
 
   // A folded card drags like any other, and stays folded in its new column.
   await tile(n.t2).dragTo(column('Active').locator('.board-column-body'))
   const toDoing = page.locator('.dialog', { hasText: `Move ${await lib.cardLabel(inv, n.t2)} to Active` })
-  if (await until(async () => (await toDoing.count()) === 1, 5000)) await toDoing.getByRole('button', { name: 'Move to Active' }).click()
-  check('a folded card drags to another column and stays folded', !!(await until(async () => (await column('Active').locator(tile(n.t2)).count()) === 1, 5000)) && (await tile(n.t2).getAttribute('class')).includes('folded'))
+  if (await until(async () => (await toDoing.count()) === 1, lib.timing('hang.ui'))) await toDoing.getByRole('button', { name: 'Move to Active' }).click()
+  check('a folded card drags to another column and stays folded', !!(await until(async () => (await column('Active').locator(tile(n.t2)).count()) === 1, lib.timing('hang.ui'))) && (await tile(n.t2).getAttribute('class')).includes('folded'))
 
   // Collapse all and Expand all from a column's menu.
   await column('Todo').getByRole('button', { name: 'Todo: more' }).click()
   await page.locator('.menu .menu-item', { hasText: 'Collapse All Cards' }).click()
   const todoTiles = column('Todo').locator('.task-card')
-  check("Collapse All Cards folds every card in the column", !!(await until(async () => (await todoTiles.count()) > 0 && (await column('Todo').locator('.task-card.folded').count()) === (await todoTiles.count()), 5000)))
+  check("Collapse All Cards folds every card in the column", !!(await until(async () => (await todoTiles.count()) > 0 && (await column('Todo').locator('.task-card.folded').count()) === (await todoTiles.count()), lib.timing('hang.ui'))))
   check('other columns are left as they were', (await tile(n.review).getAttribute('class')).includes('folded') === false)
 
   // Kept for the workspace: Done collapsed, Todo's cards folded, after a reload and after a restart.
@@ -236,8 +236,8 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   await page.reload()
   await lib.appReady(page)
   await page.getByRole('button', { name: 'Task Board' }).click().catch(() => undefined)
-  await until(async () => (await page.locator('.board-column').count()) === 6, 10000)
-  await until(async () => JSON.stringify(await state()) === JSON.stringify(before), 10000)
+  await until(async () => (await page.locator('.board-column').count()) === 6, lib.timing('hang.ui'))
+  await until(async () => JSON.stringify(await state()) === JSON.stringify(before), lib.timing('hang.ui'))
   check('after a reload, the same columns are collapsed and the same cards folded', JSON.stringify(await state()) === JSON.stringify(before), JSON.stringify([before, await state()]))
   await app.close()
   app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
@@ -248,8 +248,8 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   if (!(await inv('workspace:get'))?.path) await lib.openWorkspace(inv, page, ws)
   await page.getByRole('button', { name: 'Task Board' }).click()
-  await until(async () => (await page.locator('.board-column').count()) === 6, 10000)
-  await until(async () => JSON.stringify(await state()) === JSON.stringify(before), 10000)
+  await until(async () => (await page.locator('.board-column').count()) === 6, lib.timing('hang.ui'))
+  await until(async () => JSON.stringify(await state()) === JSON.stringify(before), lib.timing('hang.ui'))
   check('after a restart too', JSON.stringify(await state()) === JSON.stringify(before), JSON.stringify([before, await state()]))
   // In ui-state.json beside config.json since #1111, which no longer has it.
   const ui = JSON.parse(fs.readFileSync(path.join(userData, 'ui-state.json'), 'utf8')).boardFold ?? {}
@@ -259,7 +259,7 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   // --- Two windows, each with its own workspace, both open before either changes its board: A's change, then B's,
   // keep each other (a window saves a change on what is saved now, never the folds it read when it opened).
   await inv('window:new')
-  await until(async () => app.windows().length === 2, 15000)
+  await until(async () => app.windows().length === 2, lib.timing('hang.ui'))
   const pageB = app.windows().find((w) => w !== page)
   pageB.on('pageerror', (e) => check('no page errors (second window)', false, e.message))
   await lib.appReady(pageB)
@@ -267,11 +267,11 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   await lib.openWorkspace(invB, pageB, wsB)
   const bCard = (await invB('tasks:create', { title: 'A card of workspace B', project: 'beta' })).number
   await pageB.getByRole('button', { name: 'Task Board' }).click()
-  await until(async () => (await pageB.locator(`.task-card[data-task="${bCard}"]`).count()) === 1, 10000)
+  await until(async () => (await pageB.locator(`.task-card[data-task="${bCard}"]`).count()) === 1, lib.timing('hang.ui'))
   // A: Approved collapsed and the Review card folded.
   await collapse('Approved')
   await fold(n.review, `Collapse ${await lib.cardLabel(inv, n.review)} to one line`).click()
-  await until(async () => (await tile(n.review).getAttribute('class')).includes('folded'), 5000)
+  await until(async () => (await tile(n.review).getAttribute('class')).includes('folded'), lib.timing('hang.ui'))
   const afterA = await state()
   // Then B, from its own (older) view of the folds.
   await pageB.getByRole('button', { name: 'Collapse On Hold' }).click()
@@ -279,19 +279,19 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   const savedBoth = await until(async () => {
     const f = (await inv('ui:get')).boardFold ?? {}
     return f[wsB.toLowerCase()]?.cards?.includes(bCard) && f
-  }, 5000)
+  }, lib.timing('hang.ui'))
   const a = savedBoth?.[ws.toLowerCase()]
   const b = savedBoth?.[wsB.toLowerCase()]
   check("B's change keeps A's: both workspaces' columns and cards are saved", !!a && a.columns.join() === afterA.collapsed.join() && afterA.folded.every((x) => a.cards.includes(x)) && b?.columns?.join() === 'hold' && b?.cards?.join() === String(bCard), JSON.stringify({ afterA, savedBoth }))
   await page.reload()
   await lib.appReady(page)
   await page.getByRole('button', { name: 'Task Board' }).click().catch(() => undefined)
-  await until(async () => JSON.stringify(await state()) === JSON.stringify(afterA), 10000)
+  await until(async () => JSON.stringify(await state()) === JSON.stringify(afterA), lib.timing('hang.ui'))
   check("A reloaded after B's change shows its own folds", JSON.stringify(await state()) === JSON.stringify(afterA), JSON.stringify([afterA, await state()]))
   await app.close()
   app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   await app.firstWindow()
-  await until(async () => app.windows().length === 2, 20000)
+  await until(async () => app.windows().length === 2, lib.timing('hang.ui'))
   const byWorkspace = async (folder) => {
     for (const w of app.windows()) {
       await lib.appReady(w)
@@ -305,11 +305,11 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   if (page && pageB2) {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await page.getByRole('button', { name: 'Task Board' }).click().catch(() => undefined)
-    await until(async () => JSON.stringify(await state()) === JSON.stringify(afterA), 10000)
+    await until(async () => JSON.stringify(await state()) === JSON.stringify(afterA), lib.timing('hang.ui'))
     check("after a restart, A's folds are as A left them", JSON.stringify(await state()) === JSON.stringify(afterA), JSON.stringify([afterA, await state()]))
     await pageB2.getByRole('button', { name: 'Task Board' }).click().catch(() => undefined)
     const bState = () => pageB2.evaluate(() => ({ collapsed: [...document.querySelectorAll('.board-column.collapsed')].map((e) => e.dataset.column), folded: [...document.querySelectorAll('.task-card.folded')].map((e) => Number(e.dataset.task)) }))
-    await until(async () => JSON.stringify(await bState()) === JSON.stringify({ collapsed: ['hold'], folded: [bCard] }), 10000)
+    await until(async () => JSON.stringify(await bState()) === JSON.stringify({ collapsed: ['hold'], folded: [bCard] }), lib.timing('hang.ui'))
     check("…and B's as B left them", JSON.stringify(await bState()) === JSON.stringify({ collapsed: ['hold'], folded: [bCard] }), JSON.stringify(await bState()))
   }
 

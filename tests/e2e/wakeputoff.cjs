@@ -18,7 +18,7 @@ const { createHash } = require('crypto')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 const COLS = 40
 
 const userData = path.join(lib.WORK, 'wakeputoff-profile')
@@ -109,7 +109,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     // Not synchronous: leaving a message replies once its doorbell is typed, which the test holds meanwhile.
     const tool = (name, args) =>
       new Promise((resolve, reject) => {
-        const child = execFile(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'projects', CW_API_TOKEN_FILE: asTokenFile, CW_API_TOKEN: '', CW_PROJECT: '' }), timeout: 60000 }, (e, out) => (e ? reject(e) : resolve(JSON.parse(String(out).split('\n')[0]).result.content[0].text)))
+        const child = execFile(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'projects', CW_API_TOKEN_FILE: asTokenFile, CW_API_TOKEN: '', CW_PROJECT: '' }), timeout: lib.timing('spawn.hang') }, (e, out) => (e ? reject(e) : resolve(JSON.parse(String(out).split('\n')[0]).result.content[0].text)))
         child.stdin.end(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n')
       })
     const leave = async (a, text) => /\((m\d+)/.exec(await tool('cw_message_agent', { project: 'alpha', agent: a.name, text }))?.[1] ?? null

@@ -33,7 +33,7 @@ async function launch() {
   app.process().stderr.on('data', (d) => /error|quit/i.test(String(d)) && console.log('DEBUG stderr', String(d).slice(0, 300)))
   await lib.appReady(page)
   await page.evaluate((folder) => window.combwork.invoke('workspace:open', folder), ws)
-  await lib.until(async () => page.evaluate((n) => document.title.includes(n), path.basename(ws)), 20000)
+  await lib.until(async () => page.evaluate((n) => document.title.includes(n), path.basename(ws)), lib.timing('hang.ui'))
   await page.getByText('demo', { exact: true }).first().click()
   await page.locator('.tab', { hasText: 'Files' }).click()
   await sleep(800)
@@ -58,7 +58,7 @@ const quits = async (q, ms = 8000) => {
   const pane = { locator: (sel) => page.locator('.split-main').locator(sel) }
   const edit = async (rel, text) => {
     await row(rel).click()
-    await lib.until(async () => (await pane.locator('.monaco .view-lines').count()) === 1, 10000)
+    await lib.until(async () => (await pane.locator('.monaco .view-lines').count()) === 1, lib.timing('hang.ui'))
     await pane.locator('.monaco').first().click({ position: { x: 300, y: 20 } })
     await page.keyboard.press('Control+End')
     await page.keyboard.type(text)
@@ -79,7 +79,7 @@ const quits = async (q, ms = 8000) => {
   check('rename: file renamed on disk', exists('b.ts') && !exists('a.ts'))
   check('rename: b.ts carries the unsaved mark', (await row('b.ts').locator('.dirty-dot').count()) === 1)
   await row('b.ts').click()
-  await lib.until(async () => (await pane.locator('.monaco').first().innerText().catch(() => '')).includes('edited'), 10000)
+  await lib.until(async () => (await pane.locator('.monaco').first().innerText().catch(() => '')).includes('edited'), lib.timing('hang.ui'))
   check('rename: b.ts opens with the unsaved edits', (await pane.locator('.monaco').first().innerText()).includes('edited'))
 
   // Folder rename carries a draft inside it.
@@ -110,7 +110,7 @@ const quits = async (q, ms = 8000) => {
   check('delete: warns about unsaved changes', /Unsaved changes to gone\.ts will be lost/.test(dialogText), dialogText.replace(/\s+/g, ' ').slice(0, 200))
   await page.getByRole('button', { name: 'Move to Recycle Bin' }).click()
   // Gone from disk, and then its unsaved changes dropped (the editor's dot goes): what Quit lists below depends on both.
-  check('delete: file gone, and its unsaved changes with it', !!(await lib.until(async () => !exists('gone.ts') && (await pane.locator('.editor-toolbar .dirty-dot').count()) === 0, 10000)))
+  check('delete: file gone, and its unsaved changes with it', !!(await lib.until(async () => !exists('gone.ts') && (await pane.locator('.editor-toolbar .dirty-dot').count()) === 0, lib.timing('hang.ui'))))
 
   // Quit: the dialog lists the two unsaved files (not the deleted one), Save and quit saves them.
   await page.evaluate(() => window.combwork.invoke('app:quit'))

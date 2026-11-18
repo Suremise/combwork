@@ -21,7 +21,7 @@ const { processes, descendantsIn, endAsCrash } = require('./folderProcesses.cjs'
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 45000
+const HUNG_MS = lib.timing('hang.step')
 
 const at = (x) => path.join(lib.WORK, `slotrelease-${x}`)
 const userData = at('profile')

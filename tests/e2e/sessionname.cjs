@@ -9,7 +9,7 @@ const fs = require('fs')
 const path = require('path')
 const { sessionsOf } = require('./storeDocs.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'sessionname-profile')
 const ws = path.join(lib.WORK, 'sessionname-ws')
@@ -41,7 +41,7 @@ const check = (name, ok, extra = '') => {
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
-  const until = async (fn, ms = 10000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
@@ -64,7 +64,7 @@ const check = (name, ok, extra = '') => {
   const launches = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
 
   const st = await inv('session:start', alpha, { agentId: agent.id })
-  check('the agent starts', !!(await until(async () => (await live())?.status === 'ready', 15000)))
+  check('the agent starts', !!(await until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))))
   const header = page.locator('.pane-header-bar', { hasText: 'Writer' })
   const footer = page.locator('.agent-pane', { has: header }).locator('.pane-footer-bar')
   const more = header.getByRole('button', { name: 'More', exact: true })
@@ -85,7 +85,7 @@ const check = (name, ok, extra = '') => {
   }
   // The session's name: the detail before " · since …".
   const text = async () => (await detail()).replace(/ · since .*$/, '')
-  check("the session is in the agent's ⋯, not in its footer or header", !!(await until(async () => (await detail()) !== '', 8000)) && (await footer.locator('.session-tag').count()) === 0 && (await header.locator('.session-tag').count()) === 0)
+  check("the session is in the agent's ⋯, not in its footer or header", !!(await until(async () => (await detail()) !== '', lib.timing('hang.step'))) && (await footer.locator('.session-tag').count()) === 0 && (await header.locator('.session-tag').count()) === 0)
   // Combwork's automatic name is "alpha · <date>": the footer shows only the start time.
   const auto = records().find((r) => r.id === st.sessionId)?.name ?? ''
   check('Combwork named it automatically and passed that to Claude Code', auto.startsWith('alpha · ') && launches().at(-1).opts['--name'] === auto, auto)
@@ -99,14 +99,14 @@ const check = (name, ok, extra = '') => {
   // Combwork's own record of the name doesn't change.
   await inv('settings:update', { general: { dateFormat: 'dmy', timeFormat: '12h' } })
   const dmy = /^\d{2}\/\d{2}\/\d{4} \d{1,2}:\d{2} (AM|PM)$/
-  check('dd/mm/yyyy, 12-hour: the name follows', !!(await until(async () => dmy.test(await text()), 5000)), await text())
+  check('dd/mm/yyyy, 12-hour: the name follows', !!(await until(async () => dmy.test(await text()), lib.timing('hang.ui'))), await text())
   const asShown = await text()
   await openMore()
   await openItem.click()
   const startRow = page.locator('.session-row.selected')
-  check('…in the Sessions tab too', !!(await until(async () => (await startRow.innerText().catch(() => '')).includes(asShown), 8000)), await startRow.innerText().catch(() => ''))
+  check('…in the Sessions tab too', !!(await until(async () => (await startRow.innerText().catch(() => '')).includes(asShown), lib.timing('hang.step'))), await startRow.innerText().catch(() => ''))
   await startRow.locator('.session-row-when').hover()
-  const whenTip = await until(async () => ((await page.locator('.tip').count()) ? await page.locator('.tip').innerText() : ''), 5000)
+  const whenTip = await until(async () => ((await page.locator('.tip').count()) ? await page.locator('.tip').innerText() : ''), lib.timing('hang.ui'))
   check('…where "how long ago" has the date on hover, in the same format', /^Last active \d{2}\/\d{2}\/\d{4} \d{1,2}:\d{2} (AM|PM)$/.test(whenTip.trim()), whenTip)
   await page.mouse.move(5, 5)
   check("…and Combwork's record of the name is unchanged", records().find((r) => r.id === st.sessionId)?.name === auto)
@@ -123,14 +123,14 @@ const check = (name, ok, extra = '') => {
   // The Overview's session details: when it started and was last active.
   await page.keyboard.press('Alt+2')
   const startedCell = page.locator('tr', { has: page.locator('td', { hasText: /^Started$/ }) }).locator('td').nth(1)
-  check("…in the Overview's session details", !!(await until(async () => dmy.test((await startedCell.innerText().catch(() => '')).trim()), 8000)), await startedCell.innerText().catch(() => ''))
+  check("…in the Overview's session details", !!(await until(async () => dmy.test((await startedCell.innerText().catch(() => '')).trim()), lib.timing('hang.step'))), await startedCell.innerText().catch(() => ''))
   await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()
   await lib.sleep(400)
   await inv('settings:update', { general: { dateFormat: 'ymd', timeFormat: '24h' } })
-  check('back to yyyy-mm-dd, 24-hour', !!(await until(async () => /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(await text()), 5000)), await text())
+  check('back to yyyy-mm-dd, 24-hour', !!(await until(async () => /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(await text()), lib.timing('hang.ui'))), await text())
   await type('turn 1')
   const ctx = footer.locator('.foot-ctx')
-  await until(async () => (await ctx.count()) === 1, 8000)
+  await until(async () => (await ctx.count()) === 1, lib.timing('hang.ui'))
   await page.screenshot({ path: path.join(lib.WORK, 'sessionname-1-start.png') })
 
   // Rename Session… in the ⋯.
@@ -141,43 +141,43 @@ const check = (name, ok, extra = '') => {
   await until(async () => (await dialog.count()) === 1 && (await dialog.locator('input').inputValue()) !== '', HUNG_MS)
   await dialog.locator('input').fill('Docs pass')
   await dialog.getByRole('button', { name: 'Rename' }).click()
-  check('renamed from the ⋯', !!(await until(async () => (await text()) === 'Docs pass', 5000)), await text())
+  check('renamed from the ⋯', !!(await until(async () => (await text()) === 'Docs pass', lib.timing('hang.ui'))), await text())
   const rec = () => records().find((r) => r.id === st.sessionId)
   check('Combwork keeps the name, and what Claude Code called it then', rec().name === 'Docs pass' && rec().titleAtRename === auto, JSON.stringify(rec()))
 
   // /rename in Claude Code after it: the newer name wins.
   await type('/rename Guide only', false)
-  check('a /rename after it wins', !!(await until(async () => (await text()) === 'Guide only', 10000)), await text())
+  check('a /rename after it wins', !!(await until(async () => (await text()) === 'Guide only', lib.timing('hang.ui'))), await text())
   // The Sessions tab shows the same name.
   await openMore()
   await openItem.click()
   const row = page.locator('.session-row.selected')
-  check('the Sessions tab shows it too', !!(await until(async () => /Guide only/.test(await row.innerText().catch(() => '')), 8000)), await row.innerText().catch(() => ''))
+  check('the Sessions tab shows it too', !!(await until(async () => /Guide only/.test(await row.innerText().catch(() => '')), lib.timing('hang.step'))), await row.innerText().catch(() => ''))
   await page.screenshot({ path: path.join(lib.WORK, 'sessionname-2-sessions.png') })
   await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()
   await lib.sleep(500)
 
   // Renamed in Combwork again: Combwork's is the newer.
   await inv('session:rename', alpha, st.sessionId, 'Final docs')
-  check('a Combwork rename after that wins again', !!(await until(async () => (await text()) === 'Final docs', 5000)), await text())
+  check('a Combwork rename after that wins again', !!(await until(async () => (await text()) === 'Final docs', lib.timing('hang.ui'))), await text())
 
   // A /rename, then the session stops and is resumed: Combwork takes the name rather than passing its own back.
   await type('/rename Release notes', false)
-  check('the /rename shows', !!(await until(async () => (await text()) === 'Release notes', 10000)), await text())
+  check('the /rename shows', !!(await until(async () => (await text()) === 'Release notes', lib.timing('hang.ui'))), await text())
   await inv('session:stop', alpha, agent.id)
-  await until(async () => !(await live()), 10000)
+  await until(async () => !(await live()), lib.timing('hang.ui'))
   await inv('session:start', alpha, { agentId: agent.id, resumeId: st.sessionId })
-  await until(async () => (await live())?.status === 'ready', 15000)
+  await until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))
   check('resumed with the CLI name passed back', launches().at(-1).opts['--name'] === 'Release notes', launches().at(-1).opts['--name'])
   // Unnamed, it would be named by when it began, as in the Sessions tab, not when it was resumed.
   const resumed = { record: rec().createdAt, live: (await live())?.sessionCreatedAt, launch: (await live())?.startedAt }
   check('a resumed session keeps the time it began', resumed.live === resumed.record && resumed.record === began.record && resumed.launch !== resumed.record, JSON.stringify(resumed))
   check('Combwork keeps it as the session name', rec().name === 'Release notes', rec().name)
-  check('and the ⋯ still shows it', !!(await until(async () => (await text()) === 'Release notes', 8000)), await text())
+  check('and the ⋯ still shows it', !!(await until(async () => (await text()) === 'Release notes', lib.timing('hang.ui'))), await text())
 
   // Narrow, with a long name (in the ⋯ only): the context stays whole.
   await inv('session:rename', alpha, st.sessionId, 'A rather long session name that cannot possibly fit in a narrow pane')
-  await until(async () => /rather long/.test(await text()), 5000)
+  await until(async () => /rather long/.test(await text()), lib.timing('hang.ui'))
   await lib.fitWindow(app, page, { width: 760, height: 700 })
   await lib.sleep(800)
   const fits = (loc) => loc.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)

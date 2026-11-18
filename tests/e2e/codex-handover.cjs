@@ -74,11 +74,11 @@ const check = (name, ok, extra = '') => {
   const t0 = Date.now()
   await inv('session:handOver', proj, claude.id, cx.id, { handover: false })
   // Started with the handover as its launch's task (#782): the call returns as it launches, before the workspace says so.
-  const codexLive = await lib.until(async () => (await agents()).find((a) => a.id === cx.id).live, 30000)
+  const codexLive = await lib.until(async () => (await agents()).find((a) => a.id === cx.id).live, lib.timing('hang.ui'))
   check('codex started and got the prompt', !!codexLive, `${Math.round((Date.now() - t0) / 1000)}s`)
   // Wait for Codex to finish its turn: the CLI's part (a usage limit or the network there is the environment's).
   await lib.cliStep('codex’s first turn', { session: lib.ptyKey(proj, cx.id) }, async () => {
-    check('codex finished its turn', !!(await lib.until(() => turnRan(cx.id), 120000, 1000)))
+    check('codex finished its turn', !!(await lib.until(() => turnRan(cx.id), lib.timing('hang.step'), 1000)))
   })
   const l1 = (await agents()).find((a) => a.id === cx.id).live
   const sessions = sessionsOf(proj)
@@ -104,7 +104,7 @@ const check = (name, ok, extra = '') => {
   check('and the session it was written in', header.includes(`- **Session:** ${l1.sessionId}`))
   check('and the date, with UTC', /^- \*\*Date:\*\* \d{4}-\d{2}-\d{2} \d{2}:\d{2} \(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\)$/m.test(header))
   await lib.cliStep('codex 2’s turn', { session: lib.ptyKey(proj, cx2.id) }, async () => {
-    check('codex 2 finished its turn', !!(await lib.until(() => turnRan(cx2.id), 120000, 1000)))
+    check('codex 2 finished its turn', !!(await lib.until(() => turnRan(cx2.id), lib.timing('hang.step'), 1000)))
   })
   const l2 = (await agents()).find((a) => a.id === cx2.id).live
   const s2 = sessionsOf(proj)
@@ -112,11 +112,11 @@ const check = (name, ok, extra = '') => {
   check('second session linked to the first', rec2?.handedOverFrom === l1.sessionId, JSON.stringify(rec2?.handedOverFrom))
   await page.screenshot({ path: path.join(scratch, 'cont-3-codex2.png') })
   await page.locator('.tab', { hasText: 'Sessions' }).first().click().catch(() => undefined)
-  await lib.until(async () => (await page.locator('.tabs .tab.active', { hasText: 'Sessions' }).count()) === 1 && (await page.locator('.session-row').count()) > 0, 10000)
+  await lib.until(async () => (await page.locator('.tabs .tab.active', { hasText: 'Sessions' }).count()) === 1 && (await page.locator('.session-row').count()) > 0, lib.timing('hang.step'))
   await page.screenshot({ path: path.join(scratch, 'cont-4-sessions.png') })
 
   await inv('session:stop', proj)
-  await lib.until(async () => (await inv('session:live')).length === 0, 15000)
+  await lib.until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))
   await app.close()
   console.log(`${results.filter(Boolean).length}/${results.length}`)
 })().catch((e) => {

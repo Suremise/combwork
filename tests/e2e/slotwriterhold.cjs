@@ -5,7 +5,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // A bound for a hung writer release or launch, never how long either should take.
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 const at = (name) => path.join(lib.WORK, `slotwriterhold-${name}`)
 const userData = at('profile')
 const ws = at('ws')

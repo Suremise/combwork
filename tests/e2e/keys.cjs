@@ -8,7 +8,7 @@ const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs'), path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 const scratch = lib.WORK, userData = path.join(scratch, 'keys-profile'), ws = path.join(scratch, 'keys-ws')
 for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
 for (const n of ['alpha', 'bravo']) fs.mkdirSync(path.join(ws, n), { recursive: true })
@@ -295,7 +295,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   const row = page.locator('.kb-table tr', { hasText: 'Show Notifications' }).first()
   await row.locator('.icon-btn[aria-label^="Change shortcut"]').click(); await lib.until(async () => /Press the keys/.test(await row.innerText()), HUNG_MS)
   check('recording prompt', /Press the keys/.test(await row.innerText()))
-  await page.keyboard.press('Control+Alt+Y'); await lib.until(async () => (await inv('settings:get')).keybindings['view.notifications'] === 'Mod+Alt+Y', 10000)
+  await page.keyboard.press('Control+Alt+Y'); await lib.until(async () => (await inv('settings:get')).keybindings['view.notifications'] === 'Mod+Alt+Y', lib.timing('hang.ui'))
   let s = await inv('settings:get')
   check('recorded Ctrl+Alt+Y', s.keybindings['view.notifications'] === 'Mod+Alt+Y', JSON.stringify(s.keybindings))
   check('row shows Changed', /Changed/.test(await row.innerText()))
@@ -327,13 +327,13 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   check('chord recorded', s.keybindings['view.notifications'] === 'Mod+K Mod+J', s.keybindings['view.notifications'])
   // Refused key
   await row.locator('.icon-btn[aria-label^="Change shortcut"]').click(); await sleep(200)
-  await page.keyboard.press('Control+C'); await lib.until(async () => (await page.locator('.toast', { hasText: "can't be used" }).count()) >= 1, 10000)
+  await page.keyboard.press('Control+C'); await lib.until(async () => (await page.locator('.toast', { hasText: "can't be used" }).count()) >= 1, lib.timing('hang.ui'))
   check('Ctrl+C refused: its pop-up shows', (await page.locator('.toast', { hasText: "can't be used" }).count()) >= 1)
   s = await inv('settings:get')
   check('Ctrl+C refused: the chord is kept', s.keybindings['view.notifications'] === 'Mod+K Mod+J', s.keybindings['view.notifications'])
   // Conflict asks
   await row.locator('.icon-btn[aria-label^="Change shortcut"]').click(); await sleep(200)
-  await page.keyboard.press('Control+Shift+P'); await lib.until(async () => (await page.locator('.dialog', { hasText: 'Shortcut already in use' }).count()) === 1, 10000)
+  await page.keyboard.press('Control+Shift+P'); await lib.until(async () => (await page.locator('.dialog', { hasText: 'Shortcut already in use' }).count()) === 1, lib.timing('hang.ui'))
   check('conflict asks first', await page.locator('.dialog', { hasText: 'Shortcut already in use' }).count() === 1)
   await page.locator('.dialog button', { hasText: 'Cancel' }).click(); await sleep(200)
   // Remove, then reset
@@ -357,7 +357,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   console.log('rows after kb nav', await page.locator('.project-row').count())
   const frow = page.locator('.kb-table tr', { hasText: 'Go to Files' }).first()
   await frow.locator('.icon-btn[aria-label^="Change shortcut"]').click(); await sleep(200)
-  await page.keyboard.press('Alt+F'); await lib.until(async () => (await inv('workspace:refresh')).projects.find((x) => x.name === 'alpha')?.config.keybindings?.['project.tab.files'] === 'Alt+F', 10000)
+  await page.keyboard.press('Alt+F'); await lib.until(async () => (await inv('workspace:refresh')).projects.find((x) => x.name === 'alpha')?.config.keybindings?.['project.tab.files'] === 'Alt+F', lib.timing('hang.ui'))
   const alpha = (await inv('workspace:refresh')).projects.find((x) => x.name === 'alpha')
   check('saved in the project', alpha.config.keybindings?.['project.tab.files'] === 'Alt+F', JSON.stringify(alpha.config.keybindings))
   await page.screenshot({ path: path.join(scratch, 'keys-2-project.png') })

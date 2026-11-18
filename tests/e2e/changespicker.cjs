@@ -16,7 +16,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'changespicker-profile')
 const ws = path.join(lib.WORK, 'changespicker-ws')
@@ -99,7 +99,7 @@ function inUse(project, name) {
 
   // --- No worktrees: the project folder, no picker, and what it shows.
   await openChanges('solo')
-  check('a project without worktrees opens on its folder, with no picker', !!(await lib.until(async () => (await about.getAttribute('data-about').catch(() => null)) === 'project', 10000)) && (await picker.count()) === 0)
+  check('a project without worktrees opens on its folder, with no picker', !!(await lib.until(async () => (await about.getAttribute('data-about').catch(() => null)) === 'project', lib.timing('hang.step'))) && (await picker.count()) === 0)
   check('…its description on the right, the left panel without one (#476)', (await page.locator('.split-main .changes-about').count()) === 1 && (await page.locator('.split-list .changes-about').count()) === 0)
   check('…saying what the page shows', (await about.innerText()).includes('The project folder'), await about.innerText().catch(() => ''))
   await shots('project-only')
@@ -108,15 +108,15 @@ function inUse(project, name) {
   await slow('worktrees:unused=4000')
   await openChanges('repo')
   const loadingPage = page.locator('[data-unused-loading]')
-  check('a project with worktrees opens on Unused worktrees', !!(await lib.until(async () => (await picker.count()) === 1 && (await picker.inputValue()) === 'unused', 10000)), await picker.inputValue().catch(() => ''))
-  check('…showing a spinner and "Looking for unused worktrees…" while it looks', !!(await lib.until(async () => (await loadingPage.count()) === 1, 5000)) && (await loadingPage.innerText()).includes('Looking for unused worktrees') && (await loadingPage.locator('.codicon-loading').count()) === 1, await page.locator('.split-main').innerText().catch(() => ''))
+  check('a project with worktrees opens on Unused worktrees', !!(await lib.until(async () => (await picker.count()) === 1 && (await picker.inputValue()) === 'unused', lib.timing('hang.step'))), await picker.inputValue().catch(() => ''))
+  check('…showing a spinner and "Looking for unused worktrees…" while it looks', !!(await lib.until(async () => (await loadingPage.count()) === 1, lib.timing('hang.step'))) && (await loadingPage.innerText()).includes('Looking for unused worktrees') && (await loadingPage.locator('.codicon-loading').count()) === 1, await page.locator('.split-main').innerText().catch(() => ''))
   check('…and the picker says it is looking', (await picker.locator('option[value="unused"]').innerText()) === 'Unused worktrees (looking…)')
   check('…and the page says what unused worktrees are, on the right, once', (await about.count()) === 1 && (await about.getAttribute('data-about')) === 'unused' && (await about.innerText()).includes('no agent of repo works in') && (await page.locator('.split-list .changes-about').count()) === 0, await about.innerText().catch(() => ''))
   await shots('loading')
 
   const section = page.locator('.unused-worktrees-pane .unused-worktrees')
   const rows = section.locator('.unused-wt')
-  check('then the list: both unused worktrees', !!(await lib.until(async () => (await rows.count()) === 2, 15000)), await page.locator('.split-main').innerText().catch(() => ''))
+  check('then the list: both unused worktrees', !!(await lib.until(async () => (await rows.count()) === 2, lib.timing('hang.step'))), await page.locator('.split-main').innerText().catch(() => ''))
   const row = (p) => section.locator(`.unused-wt[data-path="${p.replace(/\\/g, '\\\\')}"]`)
   check('…B4\'s labelled "was B4" (its session ran there)', (await row(b4).locator('[data-origin="combwork"]').innerText().catch(() => '')) === 'was B4', await row(b4).innerText().catch(() => ''))
   check('…the other "not made by Combwork"', (await row(other).locator('[data-origin="other"]').innerText().catch(() => '')) === 'not made by Combwork', await row(other).innerText().catch(() => ''))
@@ -138,34 +138,34 @@ function inUse(project, name) {
   const refreshing = page.locator('[data-unused-refreshing]')
   check('coming back shows the last list at once, while it checks them again', !!(await lib.until(async () => (await rows.count()) === 2 && (await refreshing.count()) === 1, HUNG_MS)) && (await loadingPage.count()) === 0, await page.locator('.split-main').innerText().catch(() => ''))
   await shots('refreshing')
-  check('…until the check is done', !!(await lib.until(async () => (await refreshing.count()) === 0, 15000)))
+  check('…until the check is done', !!(await lib.until(async () => (await refreshing.count()) === 0, lib.timing('hang.ui'))))
   // Refresh looks again.
   await slow('worktrees:unused=1500')
   await page.locator('.split-list .pane-header [aria-label^="Refresh"]').click()
   check('Refresh looks again (the list stays)', !!(await lib.until(async () => (await refreshing.count()) === 1, HUNG_MS)) && (await rows.count()) === 2)
-  check('…and finishes', !!(await lib.until(async () => (await refreshing.count()) === 0, 10000)))
+  check('…and finishes', !!(await lib.until(async () => (await refreshing.count()) === 0, lib.timing('hang.ui'))))
   await slow('')
   // A Refresh that fails keeps the list, and says so with Retry.
   await failing('worktrees:unused*1')
   await page.locator('.split-list .pane-header [aria-label^="Refresh"]').click()
   const stale = page.locator('.unused-worktrees-pane .load-stale')
-  check('a failed Refresh keeps the list and says it could not refresh, with Retry', !!(await lib.until(async () => (await stale.count()) === 1, 8000)) && (await stale.innerText()).includes('Could not refresh the unused worktrees') && (await rows.count()) === 2, await page.locator('.split-main').innerText().catch(() => ''))
+  check('a failed Refresh keeps the list and says it could not refresh, with Retry', !!(await lib.until(async () => (await stale.count()) === 1, lib.timing('hang.ui'))) && (await stale.innerText()).includes('Could not refresh the unused worktrees') && (await rows.count()) === 2, await page.locator('.split-main').innerText().catch(() => ''))
   await shots('refresh-failed')
   await stale.getByRole('button', { name: 'Retry' }).click()
-  check('…and Retry recovers', !!(await lib.until(async () => (await stale.count()) === 0 && (await rows.count()) === 2 && (await refreshing.count()) === 0, 8000)))
+  check('…and Retry recovers', !!(await lib.until(async () => (await stale.count()) === 0 && (await rows.count()) === 2 && (await refreshing.count()) === 0, lib.timing('hang.ui'))))
   await failing('')
 
   // --- The other pages say what they show.
   // Coder's 0.9 worktree became the slot kept for it as the project opened (#1441): listed as where it works (#1569).
   check('…the folder Coder works in, as in use: the slot kept for it, with its branch', labels.includes('Coder · carried: coder · cw/coder'), JSON.stringify(labels))
   await picker.selectOption(coder.id)
-  check("an agent's folder: what it shows", !!(await lib.until(async () => (await about.getAttribute('data-about')) === 'agent', 8000)) && (await about.innerText()).includes('Coder works in coder, the slot kept for it: everything on its branch since it left master.'), await about.innerText().catch(() => ''))
-  check('…its branch since it left its base, and Merge cw/coder…', !!(await lib.until(async () => (await page.locator('.split-list').innerText()).includes('cw/coder since it left master') && (await page.locator('.split-list [aria-label="Merge cw/coder…"]').count()) === 1, 8000)), await page.locator('.split-list').innerText().catch(() => ''))
+  check("an agent's folder: what it shows", !!(await lib.until(async () => (await about.getAttribute('data-about')) === 'agent', lib.timing('hang.ui'))) && (await about.innerText()).includes('Coder works in coder, the slot kept for it: everything on its branch since it left master.'), await about.innerText().catch(() => ''))
+  check('…its branch since it left its base, and Merge cw/coder…', !!(await lib.until(async () => (await page.locator('.split-list').innerText()).includes('cw/coder since it left master') && (await page.locator('.split-list [aria-label="Merge cw/coder…"]').count()) === 1, lib.timing('hang.step'))), await page.locator('.split-list').innerText().catch(() => ''))
   await shots('agent-slot')
   await picker.selectOption(`unused:${b4}`)
-  check('an unused one: what it shows', !!(await lib.until(async () => (await about.getAttribute('data-about')) === 'unused-one', 8000)) && (await about.innerText()).includes('cw/b4'), await about.innerText().catch(() => ''))
+  check('an unused one: what it shows', !!(await lib.until(async () => (await about.getAttribute('data-about')) === 'unused-one', lib.timing('hang.ui'))) && (await about.innerText()).includes('cw/b4'), await about.innerText().catch(() => ''))
   await picker.selectOption('')
-  check('the project folder, last: what it shows', !!(await lib.until(async () => (await about.getAttribute('data-about')) === 'project', 8000)))
+  check('the project folder, last: what it shows', !!(await lib.until(async () => (await about.getAttribute('data-about')) === 'project', lib.timing('hang.ui'))))
   await shots('project-folder')
 
   // --- Open file opens the file of the folder whose diff is shown (#495): an agent's worktree, an unused one in Combwork's
@@ -181,15 +181,15 @@ function inUse(project, name) {
     fs.writeFileSync(path.join(folder, name), 'only here\n')
     await picker.selectOption(value)
     const fileRow = page.locator('.split-list .row', { hasText: name })
-    const listed = await lib.until(async () => (await fileRow.count()) > 0, 10000)
+    const listed = await lib.until(async () => (await fileRow.count()) > 0, lib.timing('hang.ui'))
     if (!listed) await page.locator('.split-list .pane-header [aria-label^="Refresh"]').click()
-    await lib.until(async () => (await fileRow.count()) > 0, 10000)
+    await lib.until(async () => (await fileRow.count()) > 0, lib.timing('hang.ui'))
     await fileRow.first().click()
     const button = page.locator('.split-main [aria-label="Open file"]')
-    await lib.until(async () => (await button.count()) > 0 && (await page.locator('.split-main .path strong').innerText().catch(() => '')) === name, 10000)
+    await lib.until(async () => (await button.count()) > 0 && (await page.locator('.split-main .path strong').innerText().catch(() => '')) === name, lib.timing('hang.ui'))
     const before = await app.evaluate(() => globalThis.__opened.length)
     await button.click()
-    const got = await lib.until(async () => (await app.evaluate(() => globalThis.__opened.length)) > before && (await opened()), 5000)
+    const got = await lib.until(async () => (await app.evaluate(() => globalThis.__opened.length)) > before && (await opened()), lib.timing('hang.ui'))
     check(`Open file on ${label} opens its own copy`, typeof got === 'string' && got.toLowerCase() === path.join(folder, name).toLowerCase(), `${got} (wanted ${path.join(folder, name)})`)
     fs.rmSync(path.join(folder, name), { force: true })
   }
@@ -203,9 +203,9 @@ function inUse(project, name) {
   // --- No agent, only an unused worktree, looked at for the first time: the spinner, not its folder.
   await slow('worktrees:unused=4000')
   await openChanges('cold')
-  check('a project with no agent but an unused worktree shows the spinner while it is first looked at', !!(await lib.until(async () => (await loadingPage.count()) === 1, 5000)) && (await picker.count()) === 1 && (await picker.inputValue()) === 'unused' && (await page.getByText('Working tree clean').count()) === 0, await page.locator('.split-main').innerText().catch(() => ''))
+  check('a project with no agent but an unused worktree shows the spinner while it is first looked at', !!(await lib.until(async () => (await loadingPage.count()) === 1, lib.timing('hang.step'))) && (await picker.count()) === 1 && (await picker.inputValue()) === 'unused' && (await page.getByText('Working tree clean').count()) === 0, await page.locator('.split-main').innerText().catch(() => ''))
   await shots('cold-loading')
-  check('…then opens on it', !!(await lib.until(async () => (await rows.count()) === 1 && (await picker.inputValue()) === 'unused', 15000)), await page.locator('.split-main').innerText().catch(() => ''))
+  check('…then opens on it', !!(await lib.until(async () => (await rows.count()) === 1 && (await picker.inputValue()) === 'unused', lib.timing('hang.ui'))), await page.locator('.split-main').innerText().catch(() => ''))
   await shots('cold-populated')
   await slow('')
 
@@ -216,17 +216,17 @@ function inUse(project, name) {
     // project's first look fails once.
     await failing(`worktrees:unused*1,none-${name}`)
     await openChanges(name)
-    check(`${name}: a first look that fails says so, with Retry, on Unused worktrees (not the folder)`, !!(await lib.until(async () => (await failedPage.count()) === 1, 8000)) && (await picker.inputValue()) === 'unused' && (await page.getByText('Working tree clean').count()) === 0 && (await about.count()) === 1 && (await about.getAttribute('data-about')) === 'unused' && (await picker.locator('option[value="unused"]').innerText()) === "Unused worktrees (couldn't list)", await page.locator('.split-main').innerText().catch(() => ''))
+    check(`${name}: a first look that fails says so, with Retry, on Unused worktrees (not the folder)`, !!(await lib.until(async () => (await failedPage.count()) === 1, lib.timing('hang.ui'))) && (await picker.inputValue()) === 'unused' && (await page.getByText('Working tree clean').count()) === 0 && (await about.count()) === 1 && (await about.getAttribute('data-about')) === 'unused' && (await picker.locator('option[value="unused"]').innerText()) === "Unused worktrees (couldn't list)", await page.locator('.split-main').innerText().catch(() => ''))
     if (name === 'coldfail') await shots('first-look-failed')
     await failedPage.getByRole('button', { name: 'Retry' }).click()
-    if (expectRows) check(`${name}: Retry lists its unused worktree`, !!(await lib.until(async () => (await rows.count()) === 1 && (await picker.inputValue()) === 'unused', 10000)), await page.locator('.split-main').innerText().catch(() => ''))
-    else check(`${name}: Retry finds none, so its folder (no picker)`, !!(await lib.until(async () => (await about.getAttribute('data-about').catch(() => null)) === 'project' && (await picker.count()) === 0, 10000)), await page.locator('.split-main').innerText().catch(() => ''))
+    if (expectRows) check(`${name}: Retry lists its unused worktree`, !!(await lib.until(async () => (await rows.count()) === 1 && (await picker.inputValue()) === 'unused', lib.timing('hang.ui'))), await page.locator('.split-main').innerText().catch(() => ''))
+    else check(`${name}: Retry finds none, so its folder (no picker)`, !!(await lib.until(async () => (await about.getAttribute('data-about').catch(() => null)) === 'project' && (await picker.count()) === 0, lib.timing('hang.ui'))), await page.locator('.split-main').innerText().catch(() => ''))
   }
   await failing('')
 
   // --- All worktrees in use: Unused worktrees, empty.
   await openChanges('busy')
-  check('a project whose worktrees are all in use opens on Unused worktrees, empty', !!(await lib.until(async () => (await picker.count()) === 1 && (await picker.inputValue()) === 'unused' && /no unused worktrees/.test(await page.locator('.split-main').innerText()), 10000)), await page.locator('.split-main').innerText().catch(() => ''))
+  check('a project whose worktrees are all in use opens on Unused worktrees, empty', !!(await lib.until(async () => (await picker.count()) === 1 && (await picker.inputValue()) === 'unused' && /no unused worktrees/.test(await page.locator('.split-main').innerText()), lib.timing('hang.step'))), await page.locator('.split-main').innerText().catch(() => ''))
   await shots('empty')
 
   await app.close()

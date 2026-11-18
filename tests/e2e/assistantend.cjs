@@ -9,7 +9,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'assistantend-profile')
 const ws = path.join(lib.WORK, 'assistantend-ws')
@@ -44,7 +44,7 @@ const check = (name, ok, extra = '') => {
   await lib.openWorkspace(inv, page, ws)
   const home = (await inv('workspace:refresh')).assistant.path
   const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === home.toLowerCase() && s.agentId === 'assistant')
-  const until = async (fn, ms = 20000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
@@ -86,7 +86,7 @@ const check = (name, ok, extra = '') => {
 
   // --- No conversation yet: Start, and no Resume.
   await page.locator('.assistant-rail').click().catch(() => undefined)
-  await until(async () => (await header.count()) === 1, 5000)
+  await until(async () => (await header.count()) === 1, lib.timing('hang.ui'))
   check('with nothing to resume, the header has Start and no Resume', (await header.getByRole('button', { name: 'Start', exact: true }).count()) === 1 && (await header.getByRole('button', { name: 'Resume', exact: true }).count()) === 0)
   await header.getByRole('button', { name: 'Start', exact: true }).click()
   check('Start starts it, and it answers', await converse())
@@ -134,7 +134,7 @@ const check = (name, ok, extra = '') => {
   // --- The header's own Resume (|▷), without the ⋯ menu.
   check('stopped for the header', await stopFromHeader())
   const headerResume = header.getByRole('button', { name: 'Resume', exact: true })
-  check('the header shows Resume', !!(await until(async () => (await headerResume.count()) === 1, 5000)))
+  check('the header shows Resume', !!(await until(async () => (await headerResume.count()) === 1, lib.timing('hang.step'))))
   check('with the |▷ icon', (await headerResume.locator('.codicon-debug-continue').count()) === 1)
   await pointAndClick(headerResume, 'header Resume')
   check('the header Resume reopens the same conversation', !!(await until(async () => (await live())?.sessionId === third, HUNG_MS)))
@@ -145,8 +145,8 @@ const check = (name, ok, extra = '') => {
   await inv('settings:update', { appearance: { theme: 'light' } }).catch(() => undefined)
   await page.evaluate(() => window.combwork.invoke('ui:setPane', 'assistant', 300))
   await page.reload()
-  await until(async () => (await header.count()) === 1, 10000)
-  check('narrow: Resume is still in the header', !!(await until(async () => (await header.getByRole('button', { name: 'Resume', exact: true }).count()) === 1, 5000)), String((await header.boundingBox())?.width))
+  await until(async () => (await header.count()) === 1, lib.timing('hang.ui'))
+  check('narrow: Resume is still in the header', !!(await until(async () => (await header.getByRole('button', { name: 'Resume', exact: true }).count()) === 1, lib.timing('hang.step'))), String((await header.boundingBox())?.width))
   await page.screenshot({ path: path.join(lib.WORK, 'assistantend-2-narrow-light.png') })
   await pointAndClick(header.getByRole('button', { name: 'Resume', exact: true }), 'narrow header Resume')
   check('and it resumes', !!(await until(async () => (await live())?.sessionId === third, HUNG_MS)))
@@ -156,12 +156,12 @@ const check = (name, ok, extra = '') => {
   // Wide again, where Stop is a header button.
   await page.evaluate(() => window.combwork.invoke('ui:setPane', 'assistant', 430))
   await page.reload()
-  await until(async () => (await header.getByRole('button', { name: 'Stop', exact: true }).count()) === 1, 10000)
+  await until(async () => (await header.getByRole('button', { name: 'Stop', exact: true }).count()) === 1, lib.timing('hang.ui'))
   // After a reload the panel shows its start page rather than the ended bar: stopped is what counts here.
   await stopFromHeader()
   check('stopped before switching provider', !(await live()))
   const idleResume = panel.locator('.assistant-idle').getByRole('button', { name: 'Resume', exact: true })
-  check('the start page offers Resume', !!(await until(async () => (await idleResume.count()) === 1, 5000)))
+  check('the start page offers Resume', !!(await until(async () => (await idleResume.count()) === 1, lib.timing('hang.step'))))
   check("the start page Resume is amber, like the agents' Resume", await amber(idleResume))
   await page.screenshot({ path: path.join(lib.WORK, 'assistantend-3-idle-light.png') })
   await inv('settings:update', { appearance: { theme: 'dark' } }).catch(() => undefined)
@@ -169,13 +169,13 @@ const check = (name, ok, extra = '') => {
   await page.screenshot({ path: path.join(lib.WORK, 'assistantend-4-idle-dark.png') })
   await inv('agents:update', home, 'assistant', { provider: 'codex' })
   await page.reload()
-  await until(async () => (await header.count()) === 1, 10000)
+  await until(async () => (await header.count()) === 1, lib.timing('hang.ui'))
   const idle = panel.locator('.assistant-idle')
-  check('on Codex: Start, and no Resume in the header or the panel', !!(await until(async () => (await header.getByRole('button', { name: 'Start', exact: true }).count()) === 1, 5000)) && (await panel.getByRole('button', { name: 'Resume', exact: true }).count()) === 0 && (await idle.getByRole('button', { name: /Resume/ }).count()) === 0)
+  check('on Codex: Start, and no Resume in the header or the panel', !!(await until(async () => (await header.getByRole('button', { name: 'Start', exact: true }).count()) === 1, lib.timing('hang.step'))) && (await panel.getByRole('button', { name: 'Resume', exact: true }).count()) === 0 && (await idle.getByRole('button', { name: /Resume/ }).count()) === 0)
   await inv('agents:update', home, 'assistant', { provider: 'claude-code' })
   await page.reload()
-  await until(async () => (await header.count()) === 1, 10000)
-  check('back on Claude Code: Resume again', !!(await until(async () => (await header.getByRole('button', { name: 'Resume', exact: true }).count()) === 1, 5000)))
+  await until(async () => (await header.count()) === 1, lib.timing('hang.ui'))
+  check('back on Claude Code: Resume again', !!(await until(async () => (await header.getByRole('button', { name: 'Resume', exact: true }).count()) === 1, lib.timing('hang.step'))))
 
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'All checks passed')

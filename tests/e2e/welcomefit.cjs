@@ -23,7 +23,7 @@ const check = (name, ok, extra = '') => {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   for (const w of workspaces) await lib.openWorkspace(inv, page, w)
   await inv('workspace:close')
-  await lib.until(async () => (await page.locator('.welcome .recent-item').count()) === 3, 10000)
+  await lib.until(async () => (await page.locator('.welcome .recent-item').count()) === 3, lib.timing('hang.ui'))
   // The sidebar open, as the review found it.
   const sidebarOpen = async () => (await page.locator('.sidebar').count()) === 1 && (await page.locator('.sidebar').isVisible())
   if (!(await sidebarOpen())) await page.keyboard.press('Control+B')
@@ -84,7 +84,7 @@ const check = (name, ok, extra = '') => {
   // Enter on the entry still opens it.
   await page.locator('.welcome .recent-item').first().focus()
   await page.keyboard.press('Enter')
-  check('Enter on an entry still opens it', !!(await lib.until(async () => (await inv('workspace:get'))?.path === workspaces[2], 10000)))
+  check('Enter on an entry still opens it', !!(await lib.until(async () => (await inv('workspace:get'))?.path === workspaces[2], lib.timing('hang.ui'))))
 
   await app.close()
   console.log(failed ? `\n${failed} check(s) FAILED` : '\nALL PASSED')

@@ -12,7 +12,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 
 const at = (x) => path.join(lib.WORK, `inputblocked-${x}`)
 const userData = at('profile')
@@ -67,8 +67,8 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
       return text.slice(0, text.lastIndexOf('\n') + 1).split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l))
     }
     const tokenOf = async (id) => {
-      const sessionId = await until(async () => (await live(id))?.sessionId)
-      const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']))
+      const sessionId = await until(async () => (await live(id))?.sessionId, lib.timing('hang.ui'))
+      const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), lib.timing('hang.step'))
       const server = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
       return server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
@@ -105,9 +105,9 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     const aHome = (await inv('workspace:refresh')).assistant.path
     fs.writeFileSync(path.join(home, 'fake-trusted.json'), JSON.stringify([alpha, ws, slotA, aHome].map((f) => f.toLowerCase())))
     await inv('session:start', aHome, { agentId: 'assistant' })
-    await until(async () => ['ready', 'finished', 'waiting'].includes((await liveIn(aHome, 'assistant'))?.status))
+    await until(async () => ['ready', 'finished', 'waiting'].includes((await liveIn(aHome, 'assistant'))?.status), lib.timing('hang.ui'))
     if ((await liveIn(aHome, 'assistant'))?.status === 'waiting') await inv('pty:write', lib.ptyKey(aHome, 'assistant'), '\r')
-    check('the Assistant starts', !!(await until(() => idle(aHome, 'assistant'))))
+    check('the Assistant starts', !!(await until(() => idle(aHome, 'assistant'), lib.timing('hang.step'))))
     const assistantWakes = () => jsonl('fake-wakes.jsonl').filter((w) => !['B1', 'R1'].includes(w.agent)).map((w) => lib.unkey(w.text))
 
     const c1 = (await inv('tasks:create', { title: 'Done by hand', project: 'alpha' })).number
@@ -115,14 +115,14 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     const c2Key = (await inv('tasks:list')).find((c) => c.number === c2).key
     const started = await inv('lanes:start', alpha, { builder: b1.id, reviewer: r1.id, cards: [c1, c2] })
     check('the lane is lent slot-a, and its agents start', started.slot === 'slot-a' && started.started.every((s) => s.how !== 'failed'), JSON.stringify(started))
-    check('B1 runs in slot-a', !!(await until(async () => same((await live(b1.id))?.cwd, slotA) && (await idle(alpha, b1.id)))), JSON.stringify(await live(b1.id)))
+    check('B1 runs in slot-a', !!(await until(async () => same((await live(b1.id))?.cwd, slotA) && (await idle(alpha, b1.id)), lib.timing('hang.step'))), JSON.stringify(await live(b1.id)))
     tb1 = await tokenOf(b1.id)
     const s1 = await intent(tb1, c1, 'start')
     check("card 1's start: built in slot-a", s1.status === 200 && same(s1.body?.data?.folder, slotA), JSON.stringify(s1.body))
-    await until(() => idle(alpha, b1.id))
-    await until(() => idle(aHome, 'assistant'))
+    await until(() => idle(alpha, b1.id), lib.timing('hang.ui'))
+    await until(() => idle(aHome, 'assistant'), lib.timing('hang.ui'))
     await lib.typeLine(inv, lib.ptyKey(aHome, 'assistant'), home, null, 'cw cw_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}', { live: () => liveIn(aHome, 'assistant') })
-    check('the Assistant watches the lanes', !!(await until(async () => (await liveIn(aHome, 'assistant'))?.status === 'watching')))
+    check('the Assistant watches the lanes', !!(await until(async () => (await liveIn(aHome, 'assistant'))?.status === 'watching', lib.timing('hang.step'))))
 
     // ---- B1's turn ends on a dialog of its CLI's own, under its empty input box: it takes the keys.
     const b1Key = lib.ptyKey(alpha, b1.id)
@@ -132,7 +132,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     const before = new Date().toISOString()
     const wakesBefore = assistantWakes().length
     await lib.typeLine(inv, b1Key, home, 'B1', 'swallow', { ready: async () => lib.agentQuiet(PORT, 'alpha', await live(b1.id), tb1), strict: true, live: () => live(b1.id), hungMs: HUNG_MS })
-    check('B1 ends its turn with the dialog under its input box', !!(await until(async () => ['ready', 'finished', 'waiting'].includes((await live(b1.id))?.status) && (await inv('pty:buffer', b1Key)).includes(SWALLOW))))
+    check('B1 ends its turn with the dialog under its input box', !!(await until(async () => ['ready', 'finished', 'waiting'].includes((await live(b1.id))?.status) && (await inv('pty:buffer', b1Key)).includes(SWALLOW), lib.timing('hang.step'))))
     // Card 1 moved to Done by the user: its card event is typed into B1 first, and the lane starts card 2 for it once it
     // is quiet.
     await inv('tasks:move', c1, 'done', { confirm: true, reason: 'Done by hand' })
@@ -142,14 +142,14 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     const blocked = await until(async () => {
       const s = await live(b1.id)
       return s?.status === 'waiting' && s.inputBlocked && s
-    })
+    }, lib.timing('hang.ui'))
     check('B1 waits for the user: something on its screen takes its keys', !!blocked && /taking its keys/.test(String(blocked.statusMessage)), JSON.stringify(blocked && { status: blocked.status, message: blocked.statusMessage }))
     // The fake reads its input late on a busy machine: its log of a key may come after Combwork gave up waiting for it.
-    check('…after three letters typed and not answered', !!(await until(() => probes(before) >= 3, 10000)) && probes(before) === 3, `${probes(before)}: ${JSON.stringify(b1Reads(before))}`)
+    check('…after three letters typed and not answered', !!(await until(() => probes(before) >= 3, lib.timing('hang.ui'))) && probes(before) === 3, `${probes(before)}: ${JSON.stringify(b1Reads(before))}`)
     const header = lib.paneHeader(page, 'B1')
-    check('…its pane says so, with Try again', !!(await until(async () => (await header.locator('.pane-status.input-blocked').count()) >= 1)) && (await header.locator('.pane-status.input-blocked button', { hasText: 'Try again' }).count()) === 1)
+    check('…its pane says so, with Try again', !!(await until(async () => (await header.locator('.pane-status.input-blocked').count()) >= 1, lib.timing('hang.ui'))) && (await header.locator('.pane-status.input-blocked button', { hasText: 'Try again' }).count()) === 1)
     const waitLine = () => assistantWakes().slice(wakesBefore).filter((t) => t.startsWith('[CW] B1 (alpha) is waiting for the user'))
-    check("the Assistant's lane watch is woken: B1 waits for the user", !!(await until(() => waitLine().length > 0)), JSON.stringify(assistantWakes().slice(wakesBefore)))
+    check("the Assistant's lane watch is woken: B1 waits for the user", !!(await until(() => waitLine().length > 0, lib.timing('hang.step'))), JSON.stringify(assistantWakes().slice(wakesBefore)))
     // What had been tried when it was blocked: whichever came first (card 1's event, or the lane's placement of card 2)
     // is the delivery that found it blocked.
     const cancelledAt = await cancelled()
@@ -158,7 +158,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
 
     // In a narrow pane (its header under 300 px) the button goes, and Try again is in its ⋯ menu.
     await header.evaluate((el) => (el.style.width = '280px'))
-    check('in a narrow pane there is no button beside its status', !!(await until(async () => (await header.locator('.pane-status.input-blocked button').count()) === 0)))
+    check('in a narrow pane there is no button beside its status', !!(await until(async () => (await header.locator('.pane-status.input-blocked button').count()) === 0, lib.timing('hang.ui'))))
     const items = await lib.agentMenu(page, 'B1')
     check("…and its ⋯ menu has Try again", items.includes('Try again'), JSON.stringify(items))
 
@@ -166,10 +166,10 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     // takes no keys.
     const tryAt = new Date().toISOString()
     await lib.menuEntry(page, 'Try again').click()
-    check('Try again with the dialog still showing: it still takes no keys', !!(await until(() => page.getByText('Its input still takes no keys').first().isVisible().catch(() => false))))
-    check('…one letter typed for it, nothing more', !!(await until(() => probes(tryAt) >= 1, 10000)) && probes(tryAt) === 1, JSON.stringify(b1Reads(tryAt)))
+    check('Try again with the dialog still showing: it still takes no keys', !!(await until(() => page.getByText('Its input still takes no keys').first().isVisible().catch(() => false), lib.timing('hang.ui'))))
+    check('…one letter typed for it, nothing more', !!(await until(() => probes(tryAt) >= 1, lib.timing('hang.ui'))) && probes(tryAt) === 1, JSON.stringify(b1Reads(tryAt)))
     await header.evaluate((el) => (el.style.width = ''))
-    check('its pane wide again, the button is back', !!(await until(async () => (await header.locator('.pane-status.input-blocked button', { hasText: 'Try again' }).count()) === 1)))
+    check('its pane wide again, the button is back', !!(await until(async () => (await header.locator('.pane-status.input-blocked button', { hasText: 'Try again' }).count()) === 1, lib.timing('hang.ui'))))
     check('…B1 still waits for the user', (await live(b1.id))?.status === 'waiting' && !!(await live(b1.id))?.inputBlocked)
     // Nothing given meanwhile: card 2 isn't placed again, and no delivery is made and called off.
     check('while it is blocked, card 2 is not placed and no delivery is made and called off', placedAt <= 1 && placements(c2) === placedAt && (await cancelled()) === cancelledAt, JSON.stringify({ placements: [placedAt, placements(c2)], cancelled: [cancelledAt, await cancelled()] }))
@@ -177,17 +177,17 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     // The user's Esc puts the dialog off: its box is empty again, and no hook comes. Nothing frees it by itself.
     const escAt = new Date().toISOString()
     await inv('pty:write', b1Key, '\x1b')
-    check('the dialog is put off in its pane', !!(await until(() => jsonl('fake-envsetup.jsonl').some((r) => r.agent === 'B1' && r.answer === 'later'))))
+    check('the dialog is put off in its pane', !!(await until(() => jsonl('fake-envsetup.jsonl').some((r) => r.agent === 'B1' && r.answer === 'later'), lib.timing('hang.ui'))))
     check('…B1 is still blocked (its box empty, as when it was blocked, and no hook)', (await live(b1.id))?.status === 'waiting' && !!(await live(b1.id))?.inputBlocked, JSON.stringify(await live(b1.id)))
     check('…and nothing was typed into it since', b1Reads(escAt).every((r) => r.data === '\x1b'), JSON.stringify(b1Reads(escAt)))
 
     // Try again: its box takes the letter. B1 is free: what waited is typed, then card 2 is placed, once.
     const freeAt = new Date().toISOString()
     await header.locator('.pane-status.input-blocked button', { hasText: 'Try again' }).click()
-    check('Try again after the user answered: B1 takes keys again', !!(await until(async () => !(await live(b1.id))?.inputBlocked)), JSON.stringify(await live(b1.id)))
+    check('Try again after the user answered: B1 takes keys again', !!(await until(async () => !(await live(b1.id))?.inputBlocked, lib.timing('hang.ui'))), JSON.stringify(await live(b1.id)))
     const given = () => b1Reads(freeAt).filter((r) => /\[CW\] New in your inbox/.test(r.data))
-    check('…what waited is typed into it', !!(await until(() => given().length >= 1)), JSON.stringify(b1Reads(freeAt).map((r) => r.data.slice(0, 60))))
-    check('…then the lane places card 2 with it, once', !!(await until(() => placements(c2) >= 1)) && !!(await until(() => b1Reads(freeAt).some((r) => r.data.includes(`(${c2Key})`)))) && placements(c2) === placedAt + 1, JSON.stringify({ placedAt, placements: placements(c2), reads: b1Reads(freeAt).map((r) => r.data.slice(0, 60)) }))
+    check('…what waited is typed into it', !!(await until(() => given().length >= 1, lib.timing('hang.ui'))), JSON.stringify(b1Reads(freeAt).map((r) => r.data.slice(0, 60))))
+    check('…then the lane places card 2 with it, once', !!(await until(() => placements(c2) >= 1, lib.timing('hang.step'))) && !!(await until(() => b1Reads(freeAt).some((r) => r.data.includes(`(${c2Key})`)), lib.timing('hang.step'))) && placements(c2) === placedAt + 1, JSON.stringify({ placedAt, placements: placements(c2), reads: b1Reads(freeAt).map((r) => r.data.slice(0, 60)) }))
     check('no delivery was called off after it was blocked', (await cancelled()) === cancelledAt, JSON.stringify([cancelledAt, await cancelled()]))
     check("the lane watch was told once that B1 waits for the user", waitLine().length === 1, JSON.stringify(waitLine()))
     check('Combwork never answered the dialog', JSON.stringify(jsonl('fake-envsetup.jsonl').filter((r) => r.agent === 'B1').map((r) => r.answer)) === '["later"]', JSON.stringify(jsonl('fake-envsetup.jsonl')))

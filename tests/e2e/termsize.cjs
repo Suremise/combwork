@@ -13,7 +13,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'termsize-profile')
 const ws = path.join(lib.WORK, 'termsize-ws')
@@ -70,7 +70,7 @@ function sizes(home) {
   await page.locator('.layout-switch button[aria-label="Two columns"]').click()
   const live = async (id) => (await inv('session:live')).find((s) => s.agentId === id)
   for (const a of [claude, codex]) await inv('session:start', alpha, { agentId: a.id })
-  check('both agents start', !!(await lib.until(async () => (await live(claude.id))?.status === 'ready' && (await live(codex.id))?.status === 'ready', 25000)))
+  check('both agents start', !!(await lib.until(async () => (await live(claude.id))?.status === 'ready' && (await live(codex.id))?.status === 'ready', lib.timing('hang.step'))))
   const agents = [
     { name: 'Claude Code', a: claude, home: claudeHome, key: lib.ptyKey(alpha, claude.id) },
     { name: 'Codex', a: codex, home: codexHome, key: lib.ptyKey(alpha, codex.id) }
@@ -83,8 +83,8 @@ function sizes(home) {
       await lib.sleep(100)
       await inv('pty:write', g.key, '\r')
       // The turn starting may be over before it is seen (a fast turn): up to 3 s for it, then the wait for its end.
-      await lib.until(async () => (await live(g.a.id))?.status !== 'finished', 3000)
-      await lib.until(async () => (await live(g.a.id))?.status === 'finished', 10000)
+      await lib.until(async () => (await live(g.a.id))?.status !== 'finished', lib.timing('hang.ui'))
+      await lib.until(async () => (await live(g.a.id))?.status === 'finished', lib.timing('hang.step'))
     }
   }
   const atBottom = (s) => !!s && s.viewportY === s.baseY
@@ -105,7 +105,7 @@ function sizes(home) {
     const hidden = agents.map((g, i) => sizes(g.home).slice(before[i].n))
     await show()
     // Shown again: one new size after a font change; otherwise none, which only time can tell (on purpose).
-    if (sizeChanges) await lib.until(() => agents.every((g, i) => sizes(g.home).length > before[i].n), 5000)
+    if (sizeChanges) await lib.until(() => agents.every((g, i) => sizes(g.home).length > before[i].n), lib.timing('hang.ui'))
     // No further size may follow, and past the time Combwork holds a terminal at the bottom, it must stay there.
     await lib.sleep(1600) // on purpose
     for (const [i, b] of before.entries()) {
@@ -149,7 +149,7 @@ function sizes(home) {
   await lib.sleep(1000) // on purpose: nothing may happen
   check('One at a time: the hidden Codex agent is told nothing', sizes(codexHome).length === n0, JSON.stringify(sizes(codexHome).slice(n0)))
   await page.locator('.layout-switch button[aria-label="Two columns"]').click()
-  await lib.until(async () => (await page.locator('.agent-pane:visible').count()) === 2, 5000)
+  await lib.until(async () => (await page.locator('.agent-pane:visible').count()) === 2, lib.timing('hang.ui'))
   await lib.sleep(600)
   for (const g of agents) {
     const small = sizes(g.home).filter((s) => s.cols < MIN_COLS || s.rows < MIN_ROWS)

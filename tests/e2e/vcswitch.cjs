@@ -23,7 +23,7 @@ const q = require('./queueFixture.cjs')
 
 const PORT = Number(lib.port(47857))
 const fx = q.queueProject('vcswitch')
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 const gamma = path.join(fx.ws, 'gamma')
 const delta = path.join(fx.ws, 'delta')
 const outer = path.join(lib.WORK, 'vcswitch-outer')

@@ -15,9 +15,9 @@ fs.writeFileSync(path.join(userData, 'config.json'), JSON.stringify({ version: 1
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const results = []
 // The longest a check waits for its condition: a bound for a hung run, never how long the step should take.
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 /** The longest the real Claude Code may take to start and run its status line: a bound for a hung CLI (#717). */
-const CLI_HUNG_MS = 60000
+const CLI_HUNG_MS = lib.timing('hang.step')
 const check = (n, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${extra ? ` (${extra})` : ''}`)
 ;(async () => {
   const env = lib.combworkEnv({ CW_USER_DATA: userData, ...lib.ownClaudeHome('plan').env })
@@ -87,21 +87,21 @@ const check = (n, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'}  ${n}
     first = reported[0]
     await picker.locator('select').selectOption(reported.at(-1))
     await saveConnection()
-    check('another reported model saved as chosen', !!(await lib.until(async () => (await savedModel()) === reported.at(-1), 5000)), await savedModel())
+    check('another reported model saved as chosen', !!(await lib.until(async () => (await savedModel()) === reported.at(-1), lib.timing('hang.ui'))), await savedModel())
   } else {
     check('latest and pinned groups, older hidden', JSON.stringify(groups) === JSON.stringify(['Latest (follows new releases)', 'Pinned versions']), JSON.stringify(groups))
     await picker.getByText('Show older versions').click()
-    check('older versions shown on request', !!(await lib.until(async () => (await picker.locator('optgroup').count()) === 3, 5000)))
+    check('older versions shown on request', !!(await lib.until(async () => (await picker.locator('optgroup').count()) === 3, lib.timing('hang.ui'))))
     await picker.locator('select').selectOption('claude-opus-4-5')
     await saveConnection()
-    check('an older version saved as chosen', !!(await lib.until(async () => (await savedModel()) === 'claude-opus-4-5', 5000)), await savedModel())
+    check('an older version saved as chosen', !!(await lib.until(async () => (await savedModel()) === 'claude-opus-4-5', lib.timing('hang.ui'))), await savedModel())
   }
   // No 1M choice (SPEC §9): current models have the 1M window without asking; Opus 4.6 / Sonnet 4.6 reach it only
   // through a [1m] model ID typed as a custom model, which the placeholder says.
   check('no 1M-context choice in the picker', (await picker.locator('input[type=checkbox]').count()) === 0)
   await picker.locator('select').selectOption(first)
   await saveConnection()
-  check(`${first} saved as chosen`, !!(await lib.until(async () => (await savedModel()) === first, 5000)), await savedModel())
+  check(`${first} saved as chosen`, !!(await lib.until(async () => (await savedModel()) === first, lib.timing('hang.ui'))), await savedModel())
   await picker.locator('select').selectOption('custom')
   check('the custom model box says how to ask for 1M ([1m])', !!(await lib.until(async () => /\[1m\]/.test((await picker.locator('input.input').getAttribute('placeholder', { timeout: 1000 }).catch(() => '')) ?? ''), HUNG_MS)))
   await picker.locator('input.input').fill('claude-sonnet-9-9'); await picker.locator('input.input').press('Enter')
@@ -144,13 +144,13 @@ const check = (n, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'}  ${n}
   await lib.until(async () => ((live = (await inv('session:live'))[0]), !!live?.effort && !!live?.modelName), CLI_HUNG_MS)
   console.log(`status line: Claude Code reported its effort and model ${Date.now() - startedAt} ms after the start`)
   check('status line reports effort and model', !!live?.effort && !!live?.modelName, JSON.stringify({ effort: live?.effort, modelName: live?.modelName, costUsd: live?.costUsd }))
-  await page.locator('.tab', { hasText: 'Session' }).first().click(); await lib.until(async () => (await page.locator('.tab.active', { hasText: 'Session' }).count()) === 1, 10000)
+  await page.locator('.tab', { hasText: 'Session' }).first().click(); await lib.until(async () => (await page.locator('.tab.active', { hasText: 'Session' }).count()) === 1, lib.timing('hang.step'))
   const raw = await inv('pty:buffer', lib.ptyKey(proj, agent.id))
   check('no status line text in the terminal', !raw.includes('{}') && !/unauthorized|not found/i.test(raw))
   await page.screenshot({ path: path.join(shots, '5-session.png') })
   const usage = await inv('app:planUsage')
   console.log('plan usage after the session started:', JSON.stringify(usage))
-  await inv('session:stop', proj); await lib.until(async () => (await inv('session:live')).length === 0, 15000)
+  await inv('session:stop', proj); await lib.until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))
   console.log(results.join('\n'))
   await app.close()
   // No delete of its folders here (#324): the runner gives the suite a new folder and removes it when it passes; a run

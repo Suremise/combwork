@@ -233,6 +233,7 @@ async function coderTask(c, task, agent = c.agents.coder) {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const fail = async (what) => {
     const lib = require('../e2e/lib.cjs')
+const { timing } = require('../timing.cjs')
     const screen = lib.plainText(String(await c.inv('pty:buffer', key).catch(() => ''))).trim()
     const env = lib.environmentProblem(screen)
     throw new Error(`setup: ${agent.name ?? agent.id} ${what} (status ${(await coderLive(c, agent))?.status ?? 'not running'})${env ? `; environment: ${env}` : ''}; its screen ends: ${screen.slice(-400)}`)
@@ -293,7 +294,7 @@ async function userMove(c, n, column) {
   const r = await c.inv('tasks:move', n, column)
   const why = r?.refused ?? r?.stopped ?? (r?.ask ? { rules: r.ask } : null)
   if (why) throw new Error(`setup: moving #${n} to ${column}: ${JSON.stringify(why)}`)
-  const there = await require('../e2e/lib.cjs').until(async () => (await c.api('GET', `/v1/tasks/${n}`)).body?.column === column && (column !== 'review' || (await submitted()) > before), 15000)
+  const there = await require('../e2e/lib.cjs').until(async () => (await c.api('GET', `/v1/tasks/${n}`)).body?.column === column && (column !== 'review' || (await submitted()) > before), timing('hang.ui'))
   if (!there) throw new Error(`setup: #${n} isn't in ${column} with its move: ${JSON.stringify(r)}`)
 }
 /**
@@ -444,7 +445,7 @@ async function abNoVcs(c) {
 }
 /** node --test in alpha: its output's pass and fail counts. */
 const abTests = (c) => {
-  const r = require('child_process').spawnSync(process.execPath, ['--test'], { cwd: c.alpha, env: require('../e2e/runContext.cjs').baseEnv(), encoding: 'utf8', timeout: 60000 })
+  const r = require('child_process').spawnSync(process.execPath, ['--test'], { cwd: c.alpha, env: require('../e2e/runContext.cjs').baseEnv(), encoding: 'utf8', timeout: timing('spawn.hang') })
   // TAP's "# pass 8", or the spec reporter's "ℹ pass 8".
   return { status: r.status, pass: Number(/^(?:#|ℹ) pass (\d+)/m.exec(r.stdout ?? '')?.[1] ?? 0), fail: Number(/^(?:#|ℹ) fail (\d+)/m.exec(r.stdout ?? '')?.[1] ?? 0) }
 }
@@ -1017,7 +1018,7 @@ function jjIn(c, ...args) {
   const { portableJj } = require('../jjPortable.cjs')
   const env = { ...require('../e2e/lib.cjs').gitEnv(), JJ_CONFIG: path.join(path.dirname(c.ws), 'jj.toml'), NO_COLOR: '1' }
   try {
-    return require('child_process').execFileSync(portableJj(), ['--no-pager', ...args], { cwd: opts.cwd ?? c.alpha, env, windowsHide: true, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
+    return require('child_process').execFileSync(portableJj(), ['--no-pager', ...args], { cwd: opts.cwd ?? c.alpha, env, windowsHide: true, encoding: 'utf8', timeout: timing('spawn.hang'), stdio: ['ignore', 'pipe', 'pipe'] })
   } catch (e) {
     if (opts.allowFail) return ''
     throw e
@@ -1342,7 +1343,7 @@ const wholeSuiteRuns = (o) => testRunsOf(o).filter((r) => r.files.length === 0).
 /** The project's test files' sleeps that a check follows with no reason given (`npm run test:waits`'s own finder). */
 const timedWaits = (c, rel) => require('../../scripts/testWaits.mjs').findWaits(c.read(rel) ?? '').filter((w) => !w.commented)
 /** Whether the project's tests pass (`node --test`), with the run context's environment. */
-const testsPass = (c) => require('child_process').spawnSync(process.execPath, ['--test'], { cwd: c.alpha, env: require('../e2e/runContext.cjs').baseEnv(), encoding: 'utf8', timeout: 60000 }).status === 0
+const testsPass = (c) => require('child_process').spawnSync(process.execPath, ['--test'], { cwd: c.alpha, env: require('../e2e/runContext.cjs').baseEnv(), encoding: 'utf8', timeout: timing('spawn.hang') }).status === 0
 /** The tool calls that ran the test suite. */
 /** A test run through cw-progress with a title of its own (#251), not the command line by default. */
 const titled = (t) => /cw-progress(\.cmd)?\s+--title(\s+|=)\S/.test(t.input)
@@ -2634,7 +2635,7 @@ module.exports.SCENARIOS = [
       await c.inv('session:stop', c.alpha, c.agents.implementer.id).catch(() => undefined)
       // Combwork builds the candidate and runs lint on it: it fails, the card goes back to Coder with the wake.
       const lib = require('../e2e/lib.cjs')
-      const told = await lib.until(async () => (await c.deliveries('coder')).find((d) => d.card === c.cards.p && /merge check lint failed on the candidate/.test(String(d.body ?? d.text ?? ''))), 240000)
+      const told = await lib.until(async () => (await c.deliveries('coder')).find((d) => d.card === c.cards.p && /merge check lint failed on the candidate/.test(String(d.body ?? d.text ?? ''))), timing('hang.slow'))
       const column = (await c.api('GET', `/v1/tasks/${c.cards.p}`)).body?.column
       if (!told || column !== 'doing') throw new Error(`setup: #${c.cards.p} didn't come back from its candidate's lint: ${JSON.stringify({ column, deliveries: (await c.deliveries('coder')).map((d) => String(d.body ?? d.text ?? '').slice(0, 120)) })}`)
       const id = c.agents.coder.id
@@ -2705,7 +2706,7 @@ module.exports.SCENARIOS = [
       const lib = require('../e2e/lib.cjs')
       if (!(await lib.until(async () => (await c.api('GET', `/v1/tasks/${a}`)).body?.column === 'done', 120000))) throw new Error(`setup: #${a} didn't go Done after the user's rebase: ${(await c.api('GET', `/v1/tasks/${a}`)).body?.column}`)
       await userMove(c, b, 'doing')
-      const told = await lib.until(async () => (await c.deliveries('coder')).find((d) => d.card === b && /couldn.t get .* ready/i.test(String(d.body ?? d.text ?? ''))), 180000)
+      const told = await lib.until(async () => (await c.deliveries('coder')).find((d) => d.card === b && /couldn.t get .* ready/i.test(String(d.body ?? d.text ?? ''))), timing('hang.slow'))
       if (!told) throw new Error(`setup: Coder wasn't told #${b}'s slot couldn't be prepared: ${JSON.stringify({ a: (await c.api('GET', `/v1/tasks/${a}`)).body?.column, b: (await c.api('GET', `/v1/tasks/${b}`)).body?.column, deliveries: await c.deliveries('coder') })}`)
       const id = c.agents.coder.id
       await c.inv('session:stop', c.alpha, id).catch(() => undefined)
@@ -5198,7 +5199,7 @@ module.exports.SCENARIOS = [
       await c.inv('tasks:update', c.cards.a, { blocked: '' })
       await c.inv('tasks:update', c.cards.a, { column: 'review' })
       c.returnedAt = Date.now()
-      c.returnDiff = await require('../e2e/lib.cjs').until(() => submittedDiff(c, c.cards.a), 15000)
+      c.returnDiff = await require('../e2e/lib.cjs').until(() => submittedDiff(c, c.cards.a), timing('hang.ui'))
     },
     // Through the block, then the wake and the review it starts: until a verdict on the card (at most 4 minutes after
     // its return).

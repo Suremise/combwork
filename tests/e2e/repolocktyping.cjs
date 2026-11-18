@@ -10,7 +10,7 @@ const fs = require('fs')
 const path = require('path')
 const { DatabaseSync } = require('node:sqlite')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 /** How many takes a burst has (the line updater moved about ten lines after a merge). */
 const BURST = 6
 /** A stall or an echo this long is main held up: the busy wait it would sit in is a second. */

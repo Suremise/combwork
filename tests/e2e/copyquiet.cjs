@@ -13,7 +13,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 // The quiet wait's minute, a look at the pools (every 30 s) and a loaded machine.
 const QUIET_MS = 180000
 
@@ -28,7 +28,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = (fn, ms, every = 250) => lib.until(fn, ms, every)
+const until = (fn, ms, every) => lib.until(fn, ms, every)
 const gitIn = (dir, ...a) => lib.git(dir, a).trim()
 const lines = (file) => {
   const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''

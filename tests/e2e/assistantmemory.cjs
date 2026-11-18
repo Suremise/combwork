@@ -9,7 +9,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'assistantmemory-profile')
 const ws = path.join(lib.WORK, 'assistantmemory-ws')
@@ -84,7 +84,7 @@ const check = (name, ok, extra = '') => {
   check('MEMORY.md opens with its text', !!(await until(async () => /ships on Fridays/.test(await text()), HUNG_MS)), await text())
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, 5000)
+    await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, lib.timing('hang.ui'))
     await page.screenshot({ path: path.join(lib.WORK, `assistantmemory-${theme}.png`) })
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })

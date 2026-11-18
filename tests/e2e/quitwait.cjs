@@ -7,9 +7,9 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 // The longest a quit waits for the agent's turn to end ("work 8"), and Combwork to close after it: a bound for a hung run.
-const QUIT_HUNG_MS = 60000
+const QUIT_HUNG_MS = lib.timing('hang.step')
 
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -43,11 +43,11 @@ async function launch(name) {
   const agent = await lib.addAgent(inv, alpha, { name: 'Busy' })
   const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)
   await inv('session:start', alpha, { agentId: agent.id })
-  const ready = await until(async () => (await live())?.status === 'ready', 20000)
+  const ready = await until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))
   return { app, page, inv, alpha, agent, live, ready, userData }
 }
 
-const until = async (fn, ms = 10000) => {
+const until = async (fn, ms) => {
   const t = Date.now()
   let v
   while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
@@ -62,7 +62,7 @@ async function keepBusy(inv, alpha, agent, live, secs) {
   await inv('pty:write', key, `please work ${secs}`)
   await lib.sleep(200)
   await inv('pty:write', key, '\r')
-  return until(async () => (await live())?.status === 'working', 5000)
+  return until(async () => (await live())?.status === 'working', lib.timing('hang.step'))
 }
 
 ;(async () => {
@@ -73,7 +73,7 @@ async function keepBusy(inv, alpha, agent, live, secs) {
     check('it is working', !!(await keepBusy(inv, alpha, agent, live, 8)))
     await page.evaluate(() => window.combwork.invoke('app:quit'))
     const dialog = page.locator('.dialog', { hasText: 'Quit Combwork?' })
-    check('Quit asks, since an agent is working', !!(await until(async () => (await dialog.count()) === 1, 5000)))
+    check('Quit asks, since an agent is working', !!(await until(async () => (await dialog.count()) === 1, lib.timing('hang.ui'))))
     const waitButton = dialog.locator('button', { hasText: 'Quit when' })
     check('and offers to quit when it finishes', (await waitButton.count()) === 1)
     await page.screenshot({ path: path.join(lib.WORK, 'quitwait-1-dialog.png') })
@@ -84,7 +84,7 @@ async function keepBusy(inv, alpha, agent, live, secs) {
     void app.waitForEvent('close', { timeout: 0 }).then(() => (closedAt = Date.now()), () => undefined)
     const t0 = Date.now()
     await waitButton.click()
-    check('the window hides', !!(await until(async () => !(await visible(app)), 5000)))
+    check('the window hides', !!(await until(async () => !(await visible(app)), lib.timing('hang.ui'))))
     const state = await inv('app:quitState').catch(() => null)
     check('a quit is pending (the tray shows it), with one agent working', state?.pending === true && state?.working === 1, JSON.stringify(state))
     await lib.sleep(2000) // A fixed wait on purpose: this checks that Combwork does NOT quit while the agent works.
@@ -133,13 +133,13 @@ async function keepBusy(inv, alpha, agent, live, secs) {
     }
     await page.evaluate(() => window.combwork.invoke('app:quit'))
     const dialog = page.locator('.dialog', { hasText: 'Quit Combwork?' })
-    await until(async () => (await dialog.count()) === 1, 5000)
+    await until(async () => (await dialog.count()) === 1, lib.timing('hang.ui'))
     await dialog.locator('button', { hasText: 'Quit when' }).click()
-    check('a quit is pending', !!(await until(async () => (await inv('app:quitState')).pending === true, 5000)))
+    check('a quit is pending', !!(await until(async () => (await inv('app:quitState')).pending === true, lib.timing('hang.ui'))))
     await inv('app:cancelPendingQuit')
     check('Cancel Pending Quit clears it', (await inv('app:quitState')).pending === false)
     const closing = exited(app, 9000)
-    check('the agent finishes', !!(await until(async () => (await live())?.status === 'finished', 10000)))
+    check('the agent finishes', !!(await until(async () => (await live())?.status === 'finished', lib.timing('hang.step'))))
     check('and Combwork is still running', !(await closing))
     check('once it has finished, the PC may sleep again', (await inv('app:keepAwake')) === 0 && (await page.locator('.status-item.keep-awake').count()) === 0)
     // Never: not even while it works.
@@ -147,7 +147,7 @@ async function keepBusy(inv, alpha, agent, live, secs) {
     await keepBusy(inv, alpha, agent, live, 3)
     await lib.sleep(500)
     check("set to Never, a working agent doesn't keep it awake", (await live())?.status === 'working' && (await inv('app:keepAwake')) === 0)
-    await until(async () => (await live())?.status === 'finished', 8000)
+    await until(async () => (await live())?.status === 'finished', lib.timing('hang.step'))
     await inv('session:stop', alpha, agent.id).catch(() => undefined)
     await inv('settings:update', { general: { confirmOnQuit: 'never' } }).catch(() => undefined)
     await app.close().catch(() => undefined)
@@ -163,9 +163,9 @@ async function keepBusy(inv, alpha, agent, live, secs) {
     const waitToQuit = async (secs) => {
       check('reopen: it is working', !!(await keepBusy(inv, alpha, agent, live, secs)))
       await page.evaluate(() => window.combwork.invoke('app:quit'))
-      await until(async () => (await dialog.count()) === 1, 5000)
+      await until(async () => (await dialog.count()) === 1, lib.timing('hang.ui'))
       await dialog.locator('button', { hasText: 'Quit when' }).click()
-      check('reopen: a quit is pending, the window hidden', !!(await until(async () => (await inv('app:quitState')).pending === true && !(await visible(app)), 5000)))
+      check('reopen: a quit is pending, the window hidden', !!(await until(async () => (await inv('app:quitState')).pending === true && !(await visible(app)), lib.timing('hang.ui'))))
       // Shown again from the tray (as Show Combwork does; a test copy never takes the focus), and a file left unsaved there,
       // as its page reports one.
       await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].showInactive())
@@ -175,10 +175,10 @@ async function keepBusy(inv, alpha, agent, live, secs) {
     // Quit Now while it waits: the dialog, listing the file, and Combwork still running.
     const closing = exited(app, 4000)
     void page.evaluate(() => window.combwork.invoke('app:quit')).catch(() => undefined)
-    check('Quit Now during the wait asks about the file edited since, rather than quit', !!(await until(async () => (await dialog.count()) === 1 && /1 file has unsaved changes/.test(await dialog.innerText()), 5000)) && !(await closing))
+    check('Quit Now during the wait asks about the file edited since, rather than quit', !!(await until(async () => (await dialog.count()) === 1 && /1 file has unsaved changes/.test(await dialog.innerText()), lib.timing('hang.ui'))) && !(await closing))
     await page.screenshot({ path: path.join(lib.WORK, 'quitwait-3-reopened-unsaved.png') })
     await dialog.locator('button', { hasText: 'Cancel' }).click()
-    check('Cancel there keeps Combwork running and cancels the pending quit', !!(await until(async () => (await inv('app:quitState')).pending === false, 5000)) && (await dialog.count()) === 0)
+    check('Cancel there keeps Combwork running and cancels the pending quit', !!(await until(async () => (await inv('app:quitState')).pending === false, lib.timing('hang.ui'))) && (await dialog.count()) === 0)
     await until(async () => (await live())?.status === 'finished', QUIT_HUNG_MS)
     // Again, and this time the agent finishes during the wait: it asks too; Save and quit then quits.
     await waitToQuit(4)

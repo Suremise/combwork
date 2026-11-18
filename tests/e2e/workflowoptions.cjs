@@ -20,7 +20,7 @@ const fs = require('fs')
 const path = require('path')
 const { DatabaseSync } = require('node:sqlite')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'workflowoptions-profile')
 const ws = path.join(lib.WORK, 'workflowoptions-ws')
@@ -734,8 +734,8 @@ async function theForm(page, app, inv) {
     // The target moves on, and each builder rebases its card cleanly onto it.
     q.commitOn(fx, 'integration', { 'd.txt': 'elsewhere\n' }, 'Someone else’s change')
     for (const c of [kept, exact]) lib.git(c.builder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'rebase', '-q', 'integration'])
-    check('Same change: the pass carries over (CarriedOver), the card stays approved', !!(await lib.until(async () => (await h.kinds(kept.n)).includes('CarriedOver'), 30000)) && !(await h.kinds(kept.n)).includes('Stale'), JSON.stringify(await h.kinds(kept.n)))
-    check('Exact revision only: the same rebase makes the pass stale', !!(await lib.until(async () => (await h.kinds(exact.n)).includes('Stale'), 30000)) && !(await h.kinds(exact.n)).includes('CarriedOver'), JSON.stringify(await h.kinds(exact.n)))
+    check('Same change: the pass carries over (CarriedOver), the card stays approved', !!(await lib.until(async () => (await h.kinds(kept.n)).includes('CarriedOver'), lib.timing('hang.ui'))) && !(await h.kinds(kept.n)).includes('Stale'), JSON.stringify(await h.kinds(kept.n)))
+    check('Exact revision only: the same rebase makes the pass stale', !!(await lib.until(async () => (await h.kinds(exact.n)).includes('Stale'), lib.timing('hang.step'))) && !(await h.kinds(exact.n)).includes('CarriedOver'), JSON.stringify(await h.kinds(exact.n)))
   } catch (e) {
     check('G4’s part ran to the end', false, e.stack ?? String(e))
   } finally {

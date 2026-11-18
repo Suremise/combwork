@@ -81,7 +81,7 @@ function prepare() {
   const rec = recs.find((r) => r.id === sessionId)
   check('session recorded as Codex with its transcript path', rec?.agent === 'codex' && /rollout-.*\.jsonl$/.test(rec?.transcriptPath ?? ''), JSON.stringify(rec))
   // The backup tick reads the transcript for live details.
-  await lib.until(async () => (await live())?.modelName === 'gpt-6-luna', 30000)
+  await lib.until(async () => (await live())?.modelName === 'gpt-6-luna', lib.timing('hang.ui'))
   const after = await live()
   check('live details: model from the transcript', after?.modelName === 'gpt-6-luna', after?.modelName)
   const plan = (await inv('app:planUsage')).codex

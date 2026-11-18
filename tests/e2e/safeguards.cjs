@@ -16,7 +16,7 @@ const fs = require('fs')
 const path = require('path')
 const { sessionsOf } = require('./storeDocs.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'guard-profile')
 const ws = path.join(lib.WORK, 'guard-ws')

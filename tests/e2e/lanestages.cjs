@@ -17,7 +17,7 @@ const q = require('./queueFixture.cjs')
 const PORT = Number(lib.port(47814))
 const fx = q.queueProject('lanestages')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -117,7 +117,7 @@ const beta = path.join(fx.ws, 'beta')
         await page.mouse.move(5, 5)
         if (!(await lib.until(async () => (await tips().count()) === 0, 5000))) return false
         await target.hover()
-        const t = await lib.until(async () => (await tips().count()) > 0 && (await tipText()), 5000)
+        const t = await lib.until(async () => (await tips().count()) > 0 && (await tipText()), lib.timing('hang.ui'))
         if (t && want(t)) return true
         if (t && other === null) other = { tip: t, rows: await order() }
         return false

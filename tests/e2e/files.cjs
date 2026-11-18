@@ -50,7 +50,7 @@ fs.writeFileSync(path.join(scratch, 'from explorer.txt'), 'dropped')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const exists = (rel) => fs.existsSync(path.join(proj, rel))
 // The longest a check waits for its condition: a bound for a hung run, never how long the step should take.
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 const results = []
 const check = (name, ok, extra = '') => {
   results.push(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok || !extra ? '' : ` (${extra})`}`)
@@ -87,25 +87,25 @@ const check = (name, ok, extra = '') => {
   await page.locator('.files-list .pane-header').getByRole('button', { name: 'New File…' }).click()
   await page.locator('.inline-name').fill('notes/todo.md')
   await page.keyboard.press('Enter')
-  check('new file notes/todo.md (from the selected file, so inside src)', !!(await lib.until(() => exists('src/notes/todo.md'), 10000)))
+  check('new file notes/todo.md (from the selected file, so inside src)', !!(await lib.until(() => exists('src/notes/todo.md'), lib.timing('hang.ui'))))
   // The tab then selects the new file: a click before that loses its selection to it.
-  check('…and selects the new file', !!(await lib.until(async () => (await page.locator('.file-row.selected[data-rel="src/notes/todo.md"]').count()) === 1, 10000)))
+  check('…and selects the new file', !!(await lib.until(async () => (await page.locator('.file-row.selected[data-rel="src/notes/todo.md"]').count()) === 1, lib.timing('hang.ui'))))
 
   // Rename README.md with F2.
   await row('README.md').click()
   await page.keyboard.press('F2')
   await page.locator('.inline-name').fill('README2.md')
   await page.keyboard.press('Enter')
-  check('rename README.md -> README2.md', !!(await lib.until(() => exists('README2.md') && !exists('README.md'), 10000)))
+  check('rename README.md -> README2.md', !!(await lib.until(() => exists('README2.md') && !exists('README.md'), lib.timing('hang.ui'))))
   // The tab then reloads the folder and selects the renamed file: a click before that loses its selection to it.
-  check('…and selects the renamed file', !!(await lib.until(async () => (await page.locator('.file-row.selected[data-rel="README2.md"]').count()) === 1, 10000)))
+  check('…and selects the renamed file', !!(await lib.until(async () => (await page.locator('.file-row.selected[data-rel="README2.md"]').count()) === 1, lib.timing('hang.ui'))))
 
   // Copy src/util.ts into dist via Ctrl+C / Ctrl+V.
   await row('src/util.ts').click()
   await page.keyboard.press('Control+C')
   await row('dist').click()
   await page.keyboard.press('Control+V')
-  check('copy/paste src/util.ts -> dist/util.ts', !!(await lib.until(() => exists('dist/util.ts') && exists('src/util.ts'), 10000)))
+  check('copy/paste src/util.ts -> dist/util.ts', !!(await lib.until(() => exists('dist/util.ts') && exists('src/util.ts'), lib.timing('hang.ui'))))
   // The tab then reloads dist and selects the copy: a click before that loses its selection to it, and the cut below
   // would take dist/util.ts instead of README2.md (#595).
   check('…and selects the copy', !!(await lib.until(() => selected('dist/util.ts'), HUNG_MS)))
@@ -136,11 +136,11 @@ const check = (name, ok, extra = '') => {
   await row('.gitignore copy').click()
   await page.keyboard.press('Delete')
   await page.getByRole('button', { name: 'Move to Recycle Bin' }).click()
-  await lib.until(async () => !exists('.gitignore copy'), 10000)
+  await lib.until(async () => !exists('.gitignore copy'), lib.timing('hang.ui'))
   check('delete moves ".gitignore copy" to the Recycle Bin', !exists('.gitignore copy'))
   // A test copy's Recycle Bin is the suite's own trash folder (#414). Combwork notes the move in trash.jsonl just after it,
   // so the file leaving the project doesn't mean the note is there yet (#441): wait for it.
-  check("…the suite's trash folder in a test copy, not the user's", !!(await lib.until(() => lib.trashed('.gitignore copy').some((e) => fs.existsSync(e.to)), 5000)), JSON.stringify(lib.trashed()))
+  check("…the suite's trash folder in a test copy, not the user's", !!(await lib.until(() => lib.trashed('.gitignore copy').some((e) => fs.existsSync(e.to)), lib.timing('hang.ui'))), JSON.stringify(lib.trashed()))
 
   // Internal drag: move src/new.ts onto dist.
   if (!(await row('src/new.ts').count())) await row('src').click()
@@ -195,7 +195,7 @@ const check = (name, ok, extra = '') => {
 
   // Live update from outside Combwork.
   w('made-outside.txt', 'hi')
-  await lib.until(async () => (await row('made-outside.txt').count()) === 1, 10000)
+  await lib.until(async () => (await row('made-outside.txt').count()) === 1, lib.timing('hang.ui'))
   check('file created outside Combwork appears live', (await row('made-outside.txt').count()) === 1)
 
   // Filter.
@@ -293,7 +293,7 @@ const check = (name, ok, extra = '') => {
 
     // Attachments tab (#387): the old .combwork/images moved into .combwork/attachments, every kind listed, filters by kind.
   await page.locator('.tab', { hasText: 'Attachments' }).click()
-  await lib.until(async () => (await page.locator('.thumb').count()) === 8, 10000)
+  await lib.until(async () => (await page.locator('.thumb').count()) === 8, lib.timing('hang.ui'))
   await page.screenshot({ path: path.join(shots, '4-attachments.png') })
   check('attachments: 8, the log, Markdown, CSV and PDF too', (await page.locator('.thumb').count()) === 8)
   check('attachments: the old images folder moved to .combwork/attachments', !fs.existsSync(path.join(proj, '.combwork', 'images')) && fs.readdirSync(path.join(proj, '.combwork', 'attachments', ids[0])).length === 6, String(fs.existsSync(path.join(proj, '.combwork', 'images'))))

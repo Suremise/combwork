@@ -11,7 +11,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 /** Chunks to write at most: the atlas first merges after about 20, then about every 4th. */
 const CHUNKS = 45
 /** Merged pages to see (4 a merge, one terminal hearing them). */
@@ -53,7 +53,7 @@ const check = (name, ok, extra = '') => {
     await page.getByText('alpha', { exact: true }).first().click()
     const agent = await lib.addAgent(inv, alpha, { name: 'Writer' })
     await inv('session:start', alpha, { agentId: agent.id })
-    check('the agent starts', !!(await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === agent.id)?.status === 'ready', 25000)))
+    check('the agent starts', !!(await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === agent.id)?.status === 'ready', lib.timing('hang.step'))))
     const key = lib.ptyKey(alpha, agent.id)
     // Its terminal's screen (found by its key, which has backslashes a selector would need escaped).
     const marked = await lib.until(

@@ -10,7 +10,7 @@ const path = require('path')
 const userData = path.join(lib.WORK, 'openguard-profile')
 const [wsA, wsB] = ['openguard-alpha', 'openguard-beta'].map((n) => path.join(lib.WORK, n))
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++

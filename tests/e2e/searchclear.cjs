@@ -7,7 +7,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'searchclear-profile')
 const ws = path.join(lib.WORK, 'searchclear-ws')
@@ -23,7 +23,7 @@ const check = (name, ok, extra = '') => {
   const { app, page, inv } = await lib.launch({ userData, viewport: { width: 1300, height: 800 } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, ws)
-  const until = (fn, ms = 5000) => lib.until(fn, ms)
+  const until = (fn, ms) => lib.until(fn, ms)
   const shot = async (name) => {
     for (const t of ['dark', 'light']) {
       await page.evaluate((x) => document.documentElement.setAttribute('data-theme', x), t)

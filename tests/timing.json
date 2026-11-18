@@ -32,5 +32,6 @@
   "scenario.modelTurnMs": { "kind": "hang", "ms": 600000, "note": "a scenario's whole turn in a model trial" },
   "scenario.quietMs": { "kind": "quiet", "ms": 6000, "note": "a scenario's turn end: quiet for this long, at least" },
   "poll.intervalMs": { "kind": "interval", "ms": 100, "note": "how often an e2e wait (lib.until) looks" },
+  "poll.readMs": { "kind": "interval", "ms": 1000, "note": "how long one look of a polling wait may take to read an element before that look counts as not yet (its .catch): a look, not a bound (HI-3382)" },
   "quiet.nothingMs": { "kind": "quiet", "ms": 2000, "note": "a window in which nothing happening is the point of the check" }
 }

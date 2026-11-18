@@ -7,7 +7,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'context-profile')
 const ws = path.join(lib.WORK, 'context-ws')
@@ -41,7 +41,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `contex
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await lib.waitForProvider(inv)
-  const until = async (fn, ms = 20000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)
@@ -81,7 +81,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `contex
   await shot(page, '2-add-agent')
   await dialog.locator('label', { hasText: 'Start a session now' }).locator('input').uncheck()
   await dialog.locator('.btn.primary', { hasText: 'Add Agent' }).click()
-  await lib.until(async () => (await project()).agents.some((a) => a.name === 'Small'), 10000)
+  await lib.until(async () => (await project()).agents.some((a) => a.name === 'Small'), lib.timing('hang.ui'))
   let small = (await project()).agents.find((a) => a.name === 'Small')
   check('the agent has a connection and no context of its own', !!small?.connection && small.use200kContext === undefined, JSON.stringify(small))
 

@@ -9,7 +9,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'taskbar-profile')
 const ws = path.join(lib.WORK, 'taskbar-ws')
@@ -21,7 +21,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms = 10000) => {
+const until = async (fn, ms) => {
   const t = Date.now()
   let v
   while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
@@ -78,7 +78,7 @@ const until = async (fn, ms = 10000) => {
   const live = async (p, a) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === a.id)
   await inv('session:start', alpha, { agentId: one.id })
   await inv('session:start', beta, { agentId: two.id })
-  check('the agents start', !!(await until(async () => (await live(alpha, one))?.status === 'ready' && (await live(beta, two))?.status === 'ready', 20000)))
+  check('the agents start', !!(await until(async () => (await live(alpha, one))?.status === 'ready' && (await live(beta, two))?.status === 'ready', lib.timing('hang.step'))))
   const send = async (p, a, text) => {
     await inv('pty:write', lib.ptyKey(p, a.id), text)
     await lib.sleep(100)
@@ -88,7 +88,7 @@ const until = async (fn, ms = 10000) => {
 
   // --- Beta's agent finishes while alpha is shown: told quietly in the status bar, never counted (#1632).
   await send(beta, two, 'go')
-  const finishedShown = await until(async () => (await page.locator('.statusbar .inbox-finished').count()) === 1, 10000)
+  const finishedShown = await until(async () => (await page.locator('.statusbar .inbox-finished').count()) === 1, lib.timing('hang.ui'))
   check('a finish alone: no count in the title (#1632)', !!finishedShown && !/^\(\d/.test(await title()), await title())
   check('…and no badge', (await overlay())?.png == null)
   check('finishing never flashes the button', (await flashes()).length === 0)
@@ -101,19 +101,19 @@ const until = async (fn, ms = 10000) => {
   })
   await page.getByText('beta', { exact: true }).first().click()
   await send(beta, two, 'ask waitfile taskbar-go')
-  check('the title shows the count', !!(await until(async () => (await title()).startsWith('(1) '), 10000)), await title())
-  const badge = await until(async () => (await overlay())?.png && (await overlay()), 5000)
+  check('the title shows the count', !!(await until(async () => (await title()).startsWith('(1) '), lib.timing('hang.ui'))), await title())
+  const badge = await until(async () => (await overlay())?.png && (await overlay()), lib.timing('hang.ui'))
   check('the taskbar button gets a badge', !!badge?.png && badge.desc === '1 needs you', JSON.stringify(badge?.desc))
   if (badge?.png) fs.writeFileSync(path.join(lib.WORK, 'taskbar-badge-1.png'), Buffer.from(badge.png, 'base64'))
   fs.writeFileSync(path.join(claudeHome, 'taskbar-go'), '')
-  check('once it goes on, the count clears', !!(await until(async () => !/^\(\d/.test(await title()), 8000)), await title())
-  check('and the badge', !!(await until(async () => (await overlay())?.png === null, 5000)))
+  check('once it goes on, the count clears', !!(await until(async () => !/^\(\d/.test(await title()), lib.timing('hang.ui'))), await title())
+  check('and the badge', !!(await until(async () => (await overlay())?.png === null, lib.timing('hang.ui'))))
 
   // --- An agent asking for input while the window is in the background flashes the button.
   await app.evaluate(() => (globalThis.__focused = false))
   await send(alpha, one, 'ask work 3')
-  check('a question in the background flashes the button', !!(await until(async () => (await flashes()).includes(true), 8000)), JSON.stringify(await flashes()))
-  await until(async () => (await live(alpha, one))?.status === 'finished', 10000)
+  check('a question in the background flashes the button', !!(await until(async () => (await flashes()).includes(true), lib.timing('hang.ui'))), JSON.stringify(await flashes()))
+  await until(async () => (await live(alpha, one))?.status === 'finished', lib.timing('hang.step'))
 
   // --- Both settings turn them off; turning the flash off stops the one under way (the window was never focused).
   await inv('settings:update', { notifications: { taskbarCount: false, flashOnWaiting: false } })
@@ -121,7 +121,7 @@ const until = async (fn, ms = 10000) => {
   clearFlashes()
   await page.getByText('alpha', { exact: true }).first().click()
   await send(beta, two, 'ask go')
-  await until(async () => (await live(beta, two))?.status === 'finished', 10000)
+  await until(async () => (await live(beta, two))?.status === 'finished', lib.timing('hang.step'))
   await lib.sleep(800)
   check('with the settings off: no count in the title', !/^\(\d/.test(await title()), await title())
   check('no badge', (await overlay())?.png == null)

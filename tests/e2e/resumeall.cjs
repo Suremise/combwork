@@ -8,7 +8,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'resumeall-profile')
 const ws = path.join(lib.WORK, 'resumeall-ws')
@@ -40,7 +40,7 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms = 20000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)
@@ -74,13 +74,13 @@ const check = (name, ok, extra = '') => {
       fs.rmSync(tree.worktree.path, { recursive: true, force: true })
     } catch {}
     return !fs.existsSync(tree.worktree.path)
-  }, 10000)
+  }, lib.timing('hang.step'))
   check("Tree's worktree folder removed", !!gone)
   await inv('workspace:refresh')
 
   // Resume (2) since #1035: a quiet button, its colour on its icon.
   const button = page.locator('.project-header .actions button.act-resume')
-  check('Resume All shows while agents are stopped', !!(await until(async () => (await button.count()) === 1, 5000)))
+  check('Resume All shows while agents are stopped', !!(await until(async () => (await button.count()) === 1, lib.timing('hang.step'))))
   await page.screenshot({ path: path.join(lib.WORK, 'resumeall-1-header.png') })
   // Its colours are a quiet Resume action button's (#344, #1035: a probe beside it), in both themes and on hover; an
   // agent's header has Resume as a quiet icon in the same colour as its icon (#977).
@@ -119,7 +119,7 @@ const check = (name, ok, extra = '') => {
 
   check('Two resumed', !!(await until(async () => !!(await live(two.id)), HUNG_MS)))
   const toast = page.locator('.toast.error', { hasText: 'Tree' })
-  check('the failure names the agent and why', !!(await until(async () => (await toast.count()) === 1, 10000)) && /worktree folder is missing/.test(await toast.innerText()), await toast.innerText().catch(() => ''))
+  check('the failure names the agent and why', !!(await until(async () => (await toast.count()) === 1, lib.timing('hang.ui'))) && /worktree folder is missing/.test(await toast.innerText()), await toast.innerText().catch(() => ''))
   check('the failure says which agents did resume', /Resumed: Two/.test(await toast.innerText().catch(() => '')))
   check('Tree stays stopped', !(await live(tree.id)))
   const k = await live(keep.id)
@@ -128,7 +128,7 @@ const check = (name, ok, extra = '') => {
   await page.screenshot({ path: path.join(lib.WORK, 'resumeall-2-done.png') })
 
   await inv('session:stop', alpha)
-  await lib.until(async () => (await inv('session:live')).length === 0, 15000)
+  await lib.until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
   process.exit(failed ? 1 : 0)

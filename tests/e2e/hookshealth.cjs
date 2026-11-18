@@ -16,7 +16,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const PORT = Number(lib.port(47938))
 const userData = path.join(lib.WORK, 'hookshealth-profile')
@@ -82,7 +82,7 @@ const hooksOff = (agent, off) => {
     // Before the agents start, so their output is all recorded (raw, below).
     await lib.recordPtyOutput(page)
     for (const a of [builder, reviewer]) await inv('session:start', alpha, { agentId: a.id })
-    check('the agents start', !!(await until(async () => (await live(builder))?.status === 'ready' && (await live(reviewer))?.status === 'ready', 45000)))
+    check('the agents start', !!(await until(async () => (await live(builder))?.status === 'ready' && (await live(reviewer))?.status === 'ready', lib.timing('hang.step'))))
 
     // Whether any agent's state ever said its hooks were missing (sampled throughout the healthy part).
     const ever = new Set()
@@ -192,7 +192,7 @@ const hooksOff = (agent, off) => {
     // the turn that line starts works, though nothing came since.
     const cy = await lib.addAgent(inv, alpha, { name: 'Cy', provider: 'codex', permissionMode: 'full-access' })
     await inv('session:start', alpha, { agentId: cy.id })
-    check('a second Codex agent starts', !!(await until(async () => (await live(cy))?.status === 'ready', 45000)))
+    check('a second Codex agent starts', !!(await until(async () => (await live(cy))?.status === 'ready', lib.timing('hang.step'))))
     check('…and takes a turn with its hooks working', (await say(cy, 'hh-cy healthy')) > 0 && !!(await until(async () => (await live(cy))?.status === 'finished', HUNG_MS)) && !(await live(cy))?.hooksMissing, JSON.stringify(await live(cy)))
     fs.writeFileSync(path.join(codexHome, 'fake-nohooks-Cy'), '')
     const cyCard = await inv('tasks:create', { title: 'Hooks gone', project: 'alpha', column: 'todo' })
@@ -210,7 +210,7 @@ const hooksOff = (agent, off) => {
     const back = await until(async () => {
       const s = await live(builder)
       return s && s.runId !== runBefore && s.status === 'ready' && !s.hooksMissing && s
-    }, 45000)
+    }, lib.timing('hang.step'))
     check('a restart with working hooks clears it', !!back)
     check('the banner goes', !!(await until(async () => (await banner.count()) === 0, HUNG_MS)))
     const resumed = await until(async () => {

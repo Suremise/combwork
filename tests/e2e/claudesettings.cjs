@@ -65,7 +65,7 @@ const marking = (who, extra = {}) => ({ ...extra, hooks: { SessionStart: [{ hook
   /** Runs Claude Code's SessionStart hooks with these arguments: its exit code, the markers left, its first error line. */
   const run = (args) => {
     for (const f of fs.readdirSync(marks)) fs.unlinkSync(path.join(marks, f))
-    const r = spawnSync(exe, ['-p', '--init-only', ...args], { cwd: proj, env, encoding: 'utf8', timeout: 60_000 })
+    const r = spawnSync(exe, ['-p', '--init-only', ...args], { cwd: proj, env, encoding: 'utf8', timeout: lib.timing('spawn.hang') })
     const why = lib.environmentProblem(`${r.stdout}\n${r.stderr}`)
     if (why) lib.skip(why)
     return { code: r.status, loaded: fs.readdirSync(marks).sort().join(','), error: (r.stderr || '').trim().split(/\r?\n/)[0] }

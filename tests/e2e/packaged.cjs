@@ -37,7 +37,7 @@ const results = []
 const check = (name, ok) => results.push(`${ok ? 'PASS' : 'FAIL'}  ${name}`)
 const read = (rel) => fs.readFileSync(path.join(proj, rel), 'utf8')
 // The longest a check waits for its condition: a bound for a hung run, never how long the step should take.
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 ;(async () => {
   lib.enableProviders(userData)
@@ -71,7 +71,7 @@ const HUNG_MS = 10000
 
   // Markdown preview.
   await row('README.md').click()
-  await lib.until(async () => (await pane.locator('.md-preview h1').count()) === 1 && (await pane.locator('.md-preview code[data-colorized]').count()) === 1, 10000)
+  await lib.until(async () => (await pane.locator('.md-preview h1').count()) === 1 && (await pane.locator('.md-preview code[data-colorized]').count()) === 1, lib.timing('hang.ui'))
   check('md: heading rendered', (await pane.locator('.md-preview h1').innerText()) === 'Demo project')
   check('md: front matter hidden', !(await pane.locator('.md-preview').innerText()).includes('front matter'))
   check('md: code block coloured', (await pane.locator('.md-preview code[data-colorized]').count()) === 1)
@@ -81,7 +81,7 @@ const HUNG_MS = 10000
 
   // Split mode.
   await pane.locator('.segmented button', { hasText: 'Split' }).click()
-  await lib.until(async () => (await pane.locator('.split-half .monaco').count()) === 1 && (await pane.locator('.split-half.preview-pane .md-preview').count()) === 1, 10000)
+  await lib.until(async () => (await pane.locator('.split-half .monaco').count()) === 1 && (await pane.locator('.split-half.preview-pane .md-preview').count()) === 1, lib.timing('hang.ui'))
   check('md: split shows editor and preview', (await pane.locator('.split-half .monaco').count()) === 1 && (await pane.locator('.split-half.preview-pane .md-preview').count()) === 1)
   await page.screenshot({ path: path.join(shots, '2-md-split.png') })
 
@@ -101,29 +101,29 @@ const HUNG_MS = 10000
   await pane.locator('.segmented button', { hasText: 'Preview' }).click()
   await lib.until(async () => (await pane.locator('.split-half .monaco').count()) === 0, HUNG_MS)
   await pane.locator('.md-preview a', { hasText: 'link to other' }).click()
-  await lib.until(async () => ((await row('docs/other.md').getAttribute('class')) ?? '').includes('selected'), 10000)
+  await lib.until(async () => ((await row('docs/other.md').getAttribute('class')) ?? '').includes('selected'), lib.timing('hang.ui'))
   check('md: relative link opens docs/other.md', (await row('docs/other.md').getAttribute('class')).includes('selected') && (await pane.locator('.md-preview h1').innerText()) === 'Other page')
 
   // Draft survives switching files.
   await row('code.ts').click()
-  await lib.until(async () => (await pane.locator('.monaco .view-lines').count()) === 1, 10000)
+  await lib.until(async () => (await pane.locator('.monaco .view-lines').count()) === 1, lib.timing('hang.ui'))
   await pane.locator('.monaco').first().click({ position: { x: 300, y: 40 } })
   await page.keyboard.press('Control+End')
   await page.keyboard.type('export const draft = true\n')
   // The draft is kept once the file shows as unsaved: switching files before that would lose it.
   await lib.until(async () => (await row('code.ts').locator('.dirty-dot').count()) === 1, HUNG_MS)
   await row('data.csv').click()
-  await lib.until(async () => (await pane.locator('.csv-preview tbody tr').count()) === 2, 10000)
+  await lib.until(async () => (await pane.locator('.csv-preview tbody tr').count()) === 2, lib.timing('hang.ui'))
   check('csv: table with quoted fields', (await pane.locator('.csv-preview tbody tr').count()) === 2 && (await pane.locator('.csv-preview tbody tr').nth(0).innerText()).includes('red, crunchy') && (await pane.locator('.csv-preview tbody tr').nth(1).innerText()).includes('say "hi"'))
   await page.screenshot({ path: path.join(shots, '3-csv.png') })
   check('draft: unsaved file keeps its dot in the tree', (await row('code.ts').locator('.dirty-dot').count()) === 1)
   await row('code.ts').click()
-  await lib.until(async () => (await pane.locator('.monaco .view-lines').innerText().catch(() => '')).replace(/\u00a0/g, ' ').includes('draft = true'), 10000)
+  await lib.until(async () => (await pane.locator('.monaco .view-lines').innerText().catch(() => '')).replace(/\u00a0/g, ' ').includes('draft = true'), lib.timing('hang.ui'))
   check('draft: edits restored when coming back', (await pane.locator('.monaco .view-lines').innerText()).replace(/ /g, ' ').includes('draft = true'))
 
   // Conflict: file changes on disk while edited.
   w('code.ts', 'export const answer = 43 // changed outside\n')
-  await lib.until(async () => (await pane.locator('.banner', { hasText: 'changed on disk' }).count()) === 1, 10000)
+  await lib.until(async () => (await pane.locator('.banner', { hasText: 'changed on disk' }).count()) === 1, lib.timing('hang.ui'))
   check('conflict: banner shown', (await pane.locator('.banner', { hasText: 'changed on disk' }).count()) === 1)
   await page.screenshot({ path: path.join(shots, '4-conflict.png') })
   await pane.getByRole('button', { name: 'Overwrite with mine' }).click()
@@ -133,14 +133,14 @@ const HUNG_MS = 10000
 
   // Clean file changed on disk reloads silently.
   w('code.ts', 'export const answer = 44 // reloaded\n')
-  await lib.until(async () => (await pane.locator('.monaco .view-lines').innerText().catch(() => '')).includes('reloaded'), 10000)
+  await lib.until(async () => (await pane.locator('.monaco .view-lines').innerText().catch(() => '')).includes('reloaded'), lib.timing('hang.ui'))
   check('reload: clean file follows disk', (await pane.locator('.monaco .view-lines').innerText()).includes('reloaded') && (await pane.locator('.banner', { hasText: 'changed on disk' }).count()) === 0)
 
   // Other previews.
   await row('page.html').click()
   await lib.until(async () => ((await row('page.html').getAttribute('class')) ?? '').includes('selected') && (await pane.locator('.segmented button', { hasText: 'Preview' }).count()) === 1, HUNG_MS)
   await pane.locator('.segmented button', { hasText: 'Preview' }).click()
-  await lib.until(async () => (await page.frameLocator('.html-preview').locator('h1').count()) === 1, 10000)
+  await lib.until(async () => (await page.frameLocator('.html-preview').locator('h1').count()) === 1, lib.timing('hang.ui'))
   const frame = page.frameLocator('.html-preview')
   check('html: rendered in sandbox, script blocked', (await frame.locator('h1').innerText()) === 'Hello HTML')
   await row('icon.svg').click()
@@ -148,11 +148,11 @@ const HUNG_MS = 10000
   await row('img').click()
   await lib.until(async () => (await row('img/pic.png').count()) === 1, HUNG_MS)
   await row('img/pic.png').click()
-  await lib.until(async () => pane.locator('.image-preview img').evaluate((i) => i.complete && i.naturalWidth > 0).catch(() => false), 10000)
+  await lib.until(async () => pane.locator('.image-preview img').evaluate((i) => i.complete && i.naturalWidth > 0).catch(() => false), lib.timing('hang.ui'))
   check('png: image preview loads', await pane.locator('.image-preview img').evaluate((i) => i.complete && i.naturalWidth > 0))
   check('png: size shown', (await pane.locator('.image-size').innerText()).includes('×'))
   await row('doc.pdf').click()
-  await lib.until(async () => (await pane.locator('.pdf-preview').count()) === 1, 10000)
+  await lib.until(async () => (await pane.locator('.pdf-preview').count()) === 1, lib.timing('hang.ui'))
   check('pdf: viewer frame present', (await pane.locator('.pdf-preview').count()) === 1)
   await page.screenshot({ path: path.join(shots, '5-pdf.png') })
   await row('blob.bin').click()
@@ -161,7 +161,7 @@ const HUNG_MS = 10000
   // Light theme, markdown.
   await inv('settings:update', { appearance: { theme: 'light' } })
   await row('README.md').click()
-  await lib.until(async () => (await pane.locator('.md-preview h1').count()) === 1 && (await page.evaluate(() => document.documentElement.getAttribute('data-theme'))) === 'light', 10000)
+  await lib.until(async () => (await pane.locator('.md-preview h1').count()) === 1 && (await page.evaluate(() => document.documentElement.getAttribute('data-theme'))) === 'light', lib.timing('hang.ui'))
   await page.screenshot({ path: path.join(shots, '6-md-light.png') })
 
   console.log(results.join('\n'))

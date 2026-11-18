@@ -158,7 +158,7 @@ const deleteFromOutside = (file) => {
   await inv('attachments:list', alpha)
   // The Files tab's watcher sees a change beside them.
   fs.writeFileSync(path.join(alpha, 'dist', 'win-unpacked', 'resources', 'touch.txt'), 'x')
-  const seen = await lib.until(() => page.evaluate(() => window.__events.some((e) => e.type === 'files-changed')), 10000)
+  const seen = await lib.until(() => page.evaluate(() => window.__events.some((e) => e.type === 'files-changed')), lib.timing('hang.ui'))
   check('the Files watcher reports a change beside them', !!seen)
 
   // Nothing holds them: a build can replace them.
@@ -185,14 +185,14 @@ const deleteFromOutside = (file) => {
   const eventsOf = (type) => page.evaluate((t) => window.__events.filter((e) => e.type === t), type)
   const hasProject = (name) => async () => (await eventsOf('workspace-changed')).some((e) => e.workspace?.projects?.some((p) => p.name === name))
   fs.mkdirSync(beta)
-  check('a new project folder shows', !!(await lib.until(hasProject('beta'), 10000)))
+  check('a new project folder shows', !!(await lib.until(hasProject('beta'), lib.timing('hang.ui'))))
   await page.evaluate(() => (window.__events = []))
   fs.rmSync(beta, { recursive: true })
-  const gone = await lib.until(async () => (await eventsOf('workspace-changed')).some((e) => e.workspace && !e.workspace.projects.some((p) => p.name === 'beta')), 10000)
+  const gone = await lib.until(async () => (await eventsOf('workspace-changed')).some((e) => e.workspace && !e.workspace.projects.some((p) => p.name === 'beta')), lib.timing('hang.ui'))
   check('… and goes when it is deleted', !!gone)
   fs.mkdirSync(path.join(ws, '.combwork', 'shared'), { recursive: true })
   fs.writeFileSync(path.join(ws, '.combwork', 'shared', 'outside.md'), '# Written outside Combwork\n')
-  check('a shared note written outside Combwork is noticed', !!(await lib.until(async () => (await eventsOf('notes-changed')).length > 0, 10000)))
+  check('a shared note written outside Combwork is noticed', !!(await lib.until(async () => (await eventsOf('notes-changed')).length > 0, lib.timing('hang.ui'))))
 
   await page.screenshot({ path: path.join(lib.WORK, 'asarfiles.png') })
   await app.close()

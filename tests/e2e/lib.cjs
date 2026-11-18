@@ -144,10 +144,12 @@ const WAIT_NOTED_MS = 10000
  * Waits until fn() returns something truthy (checking every interval ms), up to ms; returns its last value. A wait of
  * WAIT_NOTED_MS or more that ran out says so, with its caller ("WAIT ran out after …"), and the runner lists them per
  * suite (HI-2663: three suites spent 420 of their 623 s in waits that ran out and that nothing checked).
- * HI-3378: a bound is the caller's to name (timing('hang.ui'), …); one left out is hang.ui, and the check:repo guard
+ * HI-3378, HI-3382: a bound is the caller's to name (timing('hang.ui'), …), and it is required: one left out, or one that
+ * isn't a positive number of ms, throws at once (never a silent default); the check:repo guard
  * (scripts/testWaits.mjs --literals) keeps numbers out of new waits. The interval is the file's poll.intervalMs.
  */
-async function until(fn, ms = timing('hang.ui'), interval = timing('poll.intervalMs')) {
+async function until(fn, ms, interval = timing('poll.intervalMs')) {
+  if (typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0) throw new Error(`until needs its bound, a name from tests/timing.json (timing('hang.ui'), …): got ${ms}`)
   const t = Date.now()
   let v
   while (!(v = await fn()) && Date.now() - t < ms) await sleep(interval)
@@ -167,7 +169,7 @@ function waitCaller(stack) {
  * A tooltip shows after its delay (ui.tsx), measured hidden before it is placed, so this waits for it to be visible
  * with the text, never for the delay. The mouse first leaves for the window's corner, so an earlier tip has gone.
  */
-async function hoverTip(page, locator, want, ms = 10000) {
+async function hoverTip(page, locator, want, ms = timing('hang.ui')) {
   const tip = () => page.locator('.tip:visible').last().innerText({ timeout: 1000 }).catch(() => '')
   await page.mouse.move(5, 5)
   await until(async () => (await page.locator('.tip:visible').count()) === 0, ms)
@@ -606,12 +608,12 @@ async function chooseTrust(inv, key, id, ready, timeoutMs = timing('cli.trustMs'
       await inv('pty:write', key, '\r')
       entered = true
       // A try's pace, not a bound: its screen not moved on within 3 s, the loop presses Enter again if "Yes" still shows.
-      if (await until(gone, 3000, 150)) return true
+      if (await until(gone, timing('hang.ui'), 150)) return true
       continue
     }
     if (q.choice && !onYes(q)) await inv('pty:write', key, '\x1b[B')
     // A try's pace, not a bound: not on "Yes" (or no pointer yet) within 2 s, the loop looks again (timeoutMs bounds the whole).
-    await until(async () => { const n = await now(); return !here(n) || onYes(n) || (!q.choice && !!n?.choice) }, 2000, 150)
+    await until(async () => { const n = await now(); return !here(n) || onYes(n) || (!q.choice && !!n?.choice) }, timing('hang.ui'), 150)
   }
   return null
 }

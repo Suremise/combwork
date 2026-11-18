@@ -62,7 +62,7 @@ const check = (name, ok, extra = '') => {
   }
 
   await inv('session:start', proj, { agentId: agent.id })
-  check('Codex starts', !!(await until((s) => s?.status === 'ready', 60000)))
+  check('Codex starts', !!(await until((s) => s?.status === 'ready', lib.timing('hang.step'))))
   const key = lib.ptyKey(proj, agent.id)
   // Printing only the id is the form that went uncounted (#162): Combwork mustn't depend on what the script prints.
   const prompt =
@@ -75,34 +75,34 @@ const check = (name, ok, extra = '') => {
       await inv('pty:write', key, prompt.slice(i, i + 8))
       await lib.sleep(15)
     }
-    await lib.until(async () => (await inv('pty:buffer', key)).replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '').replace(/\s+/g, '').includes('endyourturn.'), 15000) // the whole prompt is in Codex's input
+    await lib.until(async () => (await inv('pty:buffer', key)).replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '').replace(/\s+/g, '').includes('endyourturn.'), lib.timing('hang.ui')) // the whole prompt is in Codex's input
     await inv('pty:write', key, '\r')
-    const ended = await until((s) => s?.status === 'finished' && s, 120000)
+    const ended = await until((s) => s?.status === 'finished' && s, lib.timing('hang.step'))
     const started = Date.now()
     check('its turn ends: finished, not background (Codex is never told)', ended?.status === 'finished', JSON.stringify(ended && { status: ended.status }))
     // Starting the command is Codex's part too: its sandbox can refuse to (#658, the environment's where it says so).
-    const running = await lib.until(() => fs.existsSync(path.join(proj, marker)) || namesFile(processes(), marker), 10000, 1000)
+    const running = await lib.until(() => fs.existsSync(path.join(proj, marker)) || namesFile(processes(), marker), lib.timing('hang.ui'), 1000)
     check('Codex started the command', running, lib.plainText(await inv('pty:buffer', key)).slice(-600))
     if (!running) diagnostics(lib.plainText(await inv('pty:buffer', key)))
     return started
   })
   // Combwork's part: counting what the turn left running.
-  const counted = await until((s) => s?.backgroundTasks === 1 && s, 10000)
+  const counted = await until((s) => s?.backgroundTasks === 1 && s, lib.timing('hang.ui'))
   check('the running command is counted', counted?.backgroundTasks === 1, JSON.stringify(counted && { tasks: counted.backgroundTasks }))
   if (!counted) diagnostics(lib.plainText(await inv('pty:buffer', key)))
   seen.clear()
   await page.screenshot({ path: path.join(lib.WORK, 'codex-background.png') })
 
   // The command ends about 40 s after it started: the count drops, and Codex doesn't start a turn of its own.
-  const done = await until((s) => !s?.backgroundTasks && fs.existsSync(path.join(proj, marker)) && s, 90000)
+  const done = await until((s) => !s?.backgroundTasks && fs.existsSync(path.join(proj, marker)) && s, lib.timing('hang.step'))
   check('the count drops when the command ends', !!done && !done.backgroundTasks, JSON.stringify(done && { tasks: done.backgroundTasks, file: fs.existsSync(path.join(proj, marker)) }))
   if (!done) diagnostics(lib.plainText(await inv('pty:buffer', key)))
-  await until(() => Date.now() - t0 > 60000, 30000)
+  await until(() => Date.now() - t0 > 60000, lib.timing('hang.ui'))
   const after = await live()
   check('Codex stayed finished: no turn of its own when the command ended', after?.status === 'finished' && !seen.has('working'), JSON.stringify({ status: after?.status, seen: [...seen] }))
 
   await inv('session:stop', proj, agent.id).catch(() => undefined)
-  await lib.until(async () => (await inv('session:live')).length === 0, 15000)
+  await lib.until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))
   await app.close()
   process.exit(failed ? 1 : 0)
 })().catch((e) => {

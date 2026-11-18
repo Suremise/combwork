@@ -17,7 +17,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 // How long a running turn may be silent before Combwork says its state is unknown (the stalled trigger).
 const SILENT_MS = 2000
 

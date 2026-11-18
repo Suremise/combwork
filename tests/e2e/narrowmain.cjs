@@ -10,7 +10,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'narrowmain-profile')
 const ws = path.join(lib.WORK, 'narrowmain-ws')
@@ -112,7 +112,7 @@ const check = (name, ok, extra = '') => {
     await page.reload()
     await lib.appReady(page)
     if ((await page.locator('.assistant-panel').count()) === 0) await page.keyboard.press('Control+Alt+I')
-    await lib.until(async () => (await page.locator('.assistant-panel').count()) === 1 && (await page.locator('.progress-panel').count()) === 1, 10000)
+    await lib.until(async () => (await page.locator('.assistant-panel').count()) === 1 && (await page.locator('.progress-panel').count()) === 1, lib.timing('hang.ui'))
     for (const z of [1, 1.25]) {
       await zoom(z)
       await lib.sleep(400)

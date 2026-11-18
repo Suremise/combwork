@@ -10,7 +10,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'inbox-profile')
 const ws = path.join(lib.WORK, 'inbox-ws')
@@ -52,7 +52,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
-  const until = async (fn, ms = 10000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
@@ -117,7 +117,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase(), two.worktree.path.toLowerCase()]))
   await inv('session:start', alpha, { agentId: one.id })
   await inv('session:start', alpha, { agentId: two.id })
-  check('alpha\'s agents start', !!(await until(async () => (await live(alpha, one.id))?.status === 'ready' && (await live(alpha, two.id))?.status === 'ready', 20000)))
+  check('alpha\'s agents start', !!(await until(async () => (await live(alpha, one.id))?.status === 'ready' && (await live(alpha, two.id))?.status === 'ready', lib.timing('hang.step'))))
   await openProject('alpha')
   await focusWindow()
   check('the window has focus', await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isFocused()))
@@ -131,13 +131,13 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
   // Another project on screen: Three waits (it stays, seen or not), then One finishes unseen.
   await openProject('beta')
   await inv('session:start', beta, { agentId: three.id })
-  check('Three asks whether to trust its folder', !!(await until(async () => (await live(beta, three.id))?.status === 'waiting', 15000)))
+  check('Three asks whether to trust its folder', !!(await until(async () => (await live(beta, three.id))?.status === 'waiting', lib.timing('hang.ui'))))
   await lib.sleep(800)
-  check('a waiting agent on screen still needs you', !!(await until(async () => (await itemText()) === '1 needs you', 5000)), await itemText())
+  check('a waiting agent on screen still needs you', !!(await until(async () => (await itemText()) === '1 needs you', lib.timing('hang.ui'))), await itemText())
   await turn(alpha, one.id)
   check('a finish in another project stays unseen', (await live(alpha, one.id))?.unseen === true)
   // #1632's case: one agent at a prompt, another finished: 1 needs you, and the finish told apart.
-  check('the status bar says 1 needs you: the finish is not a need', !!(await until(async () => (await itemText()) === '1 needs you' && (await finishedText()) === '1 finished', 5000)), `${await itemText()} | ${await finishedText()}`)
+  check('the status bar says 1 needs you: the finish is not a need', !!(await until(async () => (await itemText()) === '1 needs you' && (await finishedText()) === '1 finished', lib.timing('hang.ui'))), `${await itemText()} | ${await finishedText()}`)
   const needTip = await lib.hoverTip(page, item, (t) => t.includes('1 agent needs you'))
   check('…its tooltip says what it counts: cards and agents, each once (HI-1931)', needTip.includes('1 agent needs you'), needTip)
   const finishedTip = await lib.hoverTip(page, finishedItem, (t) => t.startsWith('Agents that finished'))
@@ -167,17 +167,17 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
   await rows.nth(1).click()
   check('the popover closes', !!(await until(async () => (await page.locator('.inbox-panel').count()) === 0, HUNG_MS)))
   check('alpha is shown', !!(await until(async () => (await page.locator('.project-row.selected', { hasText: 'alpha' }).count()) === 1, HUNG_MS)))
-  check('One is seen once shown', !!(await until(async () => (await live(alpha, one.id))?.unseen === false, 5000)))
-  check('one left: Three, still waiting', !!(await until(async () => (await itemText()) === '1 needs you' && (await finishedText()) === '', 5000)), `${await itemText()} | ${await finishedText()}`)
+  check('One is seen once shown', !!(await until(async () => (await live(alpha, one.id))?.unseen === false, lib.timing('hang.ui'))))
+  check('one left: Three, still waiting', !!(await until(async () => (await itemText()) === '1 needs you' && (await finishedText()) === '', lib.timing('hang.ui'))), `${await itemText()} | ${await finishedText()}`)
 
   // A finish while the window is minimised is unseen until the window comes back.
   await setFocus(false)
-  const backgrounded = await until(async () => !(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isFocused())), 5000)
+  const backgrounded = await until(async () => !(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isFocused())), lib.timing('hang.ui'))
   if (backgrounded) {
     await turn(alpha, one.id)
     check('a finish while the window is in the background is unseen', (await live(alpha, one.id))?.unseen === true)
     await focusWindow()
-    check('…and seen once the window has focus again', !!(await until(async () => (await live(alpha, one.id))?.unseen === false, 5000)))
+    check('…and seen once the window has focus again', !!(await until(async () => (await live(alpha, one.id))?.unseen === false, lib.timing('hang.ui'))))
   } else console.log('SKIP the window could not be minimised')
 
   // A worktree agent with unmerged work, idle and seen: to review, not counted.
@@ -187,12 +187,12 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
   await focusWindow()
   await turn(alpha, two.id)
   check('Two finished on screen is seen', (await live(alpha, two.id))?.unseen === false)
-  const branch = await until(async () => (await inv('agents:branchStatuses')).find((b) => b.agentId === two.id && b.status?.ahead === 1)?.status, 8000)
+  const branch = await until(async () => (await inv('agents:branchStatuses')).find((b) => b.agentId === two.id && b.status?.ahead === 1)?.status, lib.timing('hang.ui'))
   check('its branch has a diff summary', branch?.diff?.files === 1 && branch.diff.insertions === 1, JSON.stringify(branch))
   await item.click()
   await lib.sleep(400)
   const review = page.locator('.inbox-panel .inbox-row', { hasText: 'alpha · Two' })
-  check('Two is listed to review', !!(await until(async () => (await review.count()) === 1, 5000)))
+  check('Two is listed to review', !!(await until(async () => (await review.count()) === 1, lib.timing('hang.ui'))))
   check('…with its summary', (await review.locator('.inbox-state').innerText().catch(() => '')) === '1 file, +1 −0 · 1 commit', await review.locator('.inbox-state').innerText().catch(() => ''))
   check('…not counted', (await itemText()) === '1 needs you', await itemText())
   await shot(page, '2-review')
@@ -201,8 +201,8 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
 
   // Answering Three: nothing needs you, and the status bar says what is left to review.
   await lib.acceptClaudeTrust(inv, beta, three.id)
-  check('Three is answered', !!(await until(async () => (await live(beta, three.id))?.status === 'ready', 15000)))
-  check('the status bar shows 1 to review', !!(await until(async () => (await itemText()) === '1 to review', 5000)), await itemText())
+  check('Three is answered', !!(await until(async () => (await live(beta, three.id))?.status === 'ready', lib.timing('hang.step'))))
+  check('the status bar shows 1 to review', !!(await until(async () => (await itemText()) === '1 to review', lib.timing('hang.ui'))), await itemText())
   check('no Projects badge', (await projectsBadge()) === '')
   await shot(page, '3-review-only')
 

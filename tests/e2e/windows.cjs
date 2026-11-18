@@ -97,7 +97,7 @@ async function waitFor(fn, ms = 15000) {
 
   // A change in one window's workspace shows there only.
   await inv1('project:create', 'gamma')
-  await lib.until(async () => (await p1.locator('.sidebar').innerText().catch(() => '')).includes('gamma'), 10000)
+  await lib.until(async () => (await p1.locator('.sidebar').innerText().catch(() => '')).includes('gamma'), lib.timing('hang.ui'))
   const t1 = await p1.locator('.sidebar').innerText().catch(() => '')
   const t2 = await p2.locator('.sidebar').innerText().catch(() => '')
   check("a workspace's changes reach its own window", /gamma/.test(t1), t1.slice(0, 200))
@@ -132,7 +132,7 @@ async function waitFor(fn, ms = 15000) {
   app = await start()
   await app.firstWindow()
   await waitFor(async () => app.windows().length >= 2, 15000)
-  await lib.until(async () => { const ws = app.windows(); if (ws.length < 2) return false; const paths = await Promise.all(ws.map((pg) => invOn(pg)('workspace:get').then((w) => w?.path ?? null).catch(() => null))); if (!paths.every(Boolean)) return false; const info = await invOn(ws[0])('provider:info').catch(() => null); return !!info && Object.values(info).every((p) => !p.checking) }, 60000) // both windows back, and the CLIs found again
+  await lib.until(async () => { const ws = app.windows(); if (ws.length < 2) return false; const paths = await Promise.all(ws.map((pg) => invOn(pg)('workspace:get').then((w) => w?.path ?? null).catch(() => null))); if (!paths.every(Boolean)) return false; const info = await invOn(ws[0])('provider:info').catch(() => null); return !!info && Object.values(info).every((p) => !p.checking) }, lib.timing('hang.step')) // both windows back, and the CLIs found again
   const pages = app.windows()
   const shown = []
   for (const pg of pages) shown.push((await invOn(pg)('workspace:get'))?.path ?? null)

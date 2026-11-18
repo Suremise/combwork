@@ -9,7 +9,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'boardarchive-profile')
 const ws = path.join(lib.WORK, 'boardarchive-ws')
@@ -32,7 +32,7 @@ const check = (name, ok, extra = '') => {
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
-  const until = (fn, ms = 10000) => lib.until(fn, ms)
+  const until = (fn, ms) => lib.until(fn, ms)
 
   // 35 cards, archived in order (the last archived is the newest): alpha and beta, labels, from every column.
   const columns = ['hold', 'todo', 'doing', 'review', 'passed', 'done']
@@ -103,9 +103,9 @@ const check = (name, ok, extra = '') => {
   const firstShown = (await numbers())[0]
   await rows.first().click()
   const dialog = page.locator('.dialog', { hasText: label(firstShown) })
-  check('a row opens its card', !!(await until(async () => (await dialog.count()) === 1, 5000)) && /Archived/.test(await dialog.innerText()))
+  check('a row opens its card', !!(await until(async () => (await dialog.count()) === 1, lib.timing('hang.ui'))) && /Archived/.test(await dialog.innerText()))
   await page.keyboard.press('Escape')
-  await until(async () => (await dialog.count()) === 0, 5000)
+  await until(async () => (await dialog.count()) === 0, lib.timing('hang.ui'))
 
   // Unarchive one: back at the end of the column it was archived from.
   const one = made.find((c) => c.number === firstShown)
@@ -113,7 +113,7 @@ const check = (name, ok, extra = '') => {
   const back = await until(async () => {
     const c = (await inv('tasks:list')).find((x) => x.number === one.number)
     return !c.archived && c
-  }, 5000)
+  }, lib.timing('hang.ui'))
   check('Unarchive brings a card back to the column it was archived from', !!back && back.column === one.column, JSON.stringify(back && { column: back.column, was: one.column }))
   check('…and it leaves the table', !!(await until(async () => (await rows.count()) === 34, HUNG_MS)))
 
@@ -125,13 +125,13 @@ const check = (name, ok, extra = '') => {
   for (const key of ['Enter', ' ']) {
     await (await keyRow()).focus()
     await page.keyboard.press(key)
-    check(`${key === ' ' ? 'Space' : 'Enter'} on a row opens its card`, !!(await until(async () => (await keyDialog.count()) === 1, 5000)))
+    check(`${key === ' ' ? 'Space' : 'Enter'} on a row opens its card`, !!(await until(async () => (await keyDialog.count()) === 1, lib.timing('hang.ui'))))
     await page.keyboard.press('Escape')
-    await until(async () => (await keyDialog.count()) === 0, 5000)
+    await until(async () => (await keyDialog.count()) === 0, lib.timing('hang.ui'))
   }
   await (await keyRow()).getByRole('button', { name: 'Unarchive' }).focus()
   await page.keyboard.press('Enter')
-  check('Enter on a row’s Unarchive unarchives the card', !!(await until(async () => !(await inv('tasks:list')).find((x) => x.number === keyCard.number).archived, 5000)))
+  check('Enter on a row’s Unarchive unarchives the card', !!(await until(async () => !(await inv('tasks:list')).find((x) => x.number === keyCard.number).archived, lib.timing('hang.ui'))))
   check('…without opening it', (await keyDialog.count()) === 0 && !!(await until(async () => (await rows.count()) === 33, HUNG_MS)), String(await rows.count()))
 
   // Select several, Unarchive Selected.
@@ -143,7 +143,7 @@ const check = (name, ok, extra = '') => {
   const allBack = await until(async () => {
     const list = await inv('tasks:list')
     return picks.every((p) => list.find((x) => x.number === p.number && !x.archived && x.column === p.column)) && list
-  }, 8000)
+  }, lib.timing('hang.ui'))
   check('Unarchive Selected brings each back to its own column', !!allBack)
   check('the table and its selection follow', !!(await until(async () => (await rows.count()) === 30, HUNG_MS)) && (await page.locator('.task-archive-actions button').innerText()).trim().endsWith('Unarchive Selected'))
 
@@ -154,7 +154,7 @@ const check = (name, ok, extra = '') => {
   await table.getByLabel(/^Select all \d+ matching rows$/).check()
   check('select all takes every matching row, on every page', /\(\d+\)/.test(await page.locator('.task-archive-actions button').innerText()) && (await page.locator('.task-archive-actions button').innerText()).includes(`(${matching})`), `${matching}: ${await page.locator('.task-archive-actions button').innerText()}`)
   await page.getByRole('button', { name: /Unarchive Selected/ }).click()
-  check('…and brings them all back', !!(await until(async () => (await inv('tasks:list')).filter((c) => c.archived && c.project === 'alpha').length === 0, 10000)))
+  check('…and brings them all back', !!(await until(async () => (await inv('tasks:list')).filter((c) => c.archived && c.project === 'alpha').length === 0, lib.timing('hang.ui'))))
   await filter('Project').selectOption('')
 
   // Rows per page is remembered after a reload.
