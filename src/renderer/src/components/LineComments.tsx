@@ -13,6 +13,8 @@ import { msg, tr } from '@shared/i18n'
 import { formatDateTime } from '@shared/dates'
 import { LINE_COMMENT_LIMITS, type LineCommentView, type LineSide } from '@shared/workflow/lineComments'
 import { call, errorMessage } from '../api'
+import { changeDrafts, heldStore, keptFor, keptKey, type Draft, type HeldStore } from '../lineCommentDrafts'
+import { useStore } from '../store'
 import { cx, timeAgo } from '../util'
 import { loadMonaco } from './Editors'
 import { Markdown, Modal } from './ui'
@@ -42,27 +44,12 @@ const M = {
   count: msg({ id: 'board.work.comments.length', defaultMessage: '{n, number} / {max, number}', description: "Under a line comment being written: how many characters it has, of the most it may have." })
 }
 
-type Draft = { side: LineSide; from: number; to: number }
 type Change = { edit: { body: string; version: number } } | 'resolve' | 'reopen' | 'delete'
 type Zone = { key: string; side: LineSide; id: string; zone: Monaco.editor.IViewZone; node: HTMLDivElement }
 
 const draftKey = (d: Draft): string => `${d.side}:${d.from}-${d.to}`
 
-/** State held by the layer for its boxes (HI-3274), by key, telling those that read it of each change. */
-type HeldStore = { values: Map<string, unknown>; subs: Set<() => void> }
-const heldStore = (): HeldStore => ({ values: new Map(), subs: new Set() })
 
-/**
- * HI-3369: each file's layer's drafts and held texts, by card, submission and path, kept while the window is open: choosing
- * another file (or Retry, or closing the changes) remakes the layer, and a draft or an edit being typed comes back with it.
- * A draft saved or cancelled leaves as it does in the layer.
- */
-const keptLayers = new Map<string, { drafts: Draft[]; store: HeldStore }>()
-const keptFor = (key: string): { drafts: Draft[]; store: HeldStore } => {
-  let k = keptLayers.get(key)
-  if (!k) keptLayers.set(key, (k = { drafts: [], store: heldStore() }))
-  return k
-}
 
 /** The layer's store: a draft's text, an edit's text, a box's save under way and its error, a thread's open edit. */
 const Held = createContext<HeldStore | null>(null)
@@ -93,15 +80,18 @@ function useHeld<T>(key: string, initial: T, shared = true): [T, (v: T) => void,
 
 /** The comment layer over `editor` (a revision's diff of `path`): its threads, its drafts, its "+" in each glyph margin. */
 export function CommentLayer({ editor, card, submission, path, comments, agentName }: { editor: Monaco.editor.IStandaloneDiffEditor; card: number; submission: number; path: string; comments: LineCommentView[]; agentName: (id: string | null) => string }) {
-  const slot = keptFor(`${card}:${submission}:${path}`)
-  const [drafts, setDrafts] = useState<Draft[]>(slot.drafts)
+  // The workspace this layer's card is in, part of what keeps its drafts (HI-3369).
+  const ws = useStore((st) => st.workspace?.path ?? '')
+  const slot = keptFor(keptKey(ws, card, submission, path))
+  const subscribeDrafts = useCallback((tell: () => void) => {
+    slot.subs.add(tell)
+    return () => void slot.subs.delete(tell)
+  }, [slot])
+  const drafts = useSyncExternalStore(subscribeDrafts, () => slot.drafts)
+  const setDrafts = (change: (ds: Draft[]) => Draft[]): void => changeDrafts(slot, change)
   const [zones, setZones] = useState<Zone[]>([])
   const [oldHidden, setOldHidden] = useState(false)
   const store = slot.store
-  // The drafts open, kept for the next layer of this file (HI-3369).
-  useEffect(() => {
-    slot.drafts = drafts
-  }, [slot, drafts])
   const held = store.values
   const sideEditor = (side: LineSide): Monaco.editor.ICodeEditor => (side === 'new' ? editor.getModifiedEditor() : editor.getOriginalEditor())
   const dropDraft = (d: Draft): void => setDrafts((ds) => ds.filter((x) => draftKey(x) !== draftKey(d)))
