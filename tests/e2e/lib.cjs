@@ -244,11 +244,11 @@ async function themeShown(page, theme, ms = timing('hang.ui')) {
 async function animationsDone(locator, ms = timing('hang.ui')) {
   const look = Math.min(ms, timing('poll.readMs'))
   let seen = null
-  const settled = async () => {
+  const atRest = async () => {
     seen = await locator.evaluate((el) => el.getAnimations({ subtree: true }).filter((a) => a.playState === 'running').map((a) => a.animationName || a.transitionProperty || 'an animation'), undefined, { timeout: look }).catch((e) => ({ error: e.message }))
     return Array.isArray(seen) && seen.length === 0
   }
-  if (!(await until(settled, ms))) throw new Error(`${locator} still animating, or not there, after ${ms} ms: ${JSON.stringify(seen)}`)
+  if (!(await until(atRest, ms))) throw new Error(`${locator} still animating, or not there, after ${ms} ms: ${JSON.stringify(seen)}`)
   return true
 }
 
