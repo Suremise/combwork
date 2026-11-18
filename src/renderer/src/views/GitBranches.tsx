@@ -22,7 +22,7 @@ import { BRANCH_GROUPS, busyLines, cleanupOffer, localGroup, localUse, remoteGro
 import { samePath } from '@shared/movePaths'
 import { call } from '../api'
 import { offered, offeredCleanup, repoOp } from '../repoOps'
-import { attempt, releaseHeldSlot } from '../actions'
+import { attempt, releaseHeldSlot } from '../actions'
 import { cancelGitRun, cancelLabel, gitRun, startGitRun } from '../gitRuns'
 import { SLOT_HELD_TEXT } from '../components/SlotsAndCopies'
 import { bumpGit, cardLabelOf, choose, confirm, notify, prompt, set, showVersionControl, UNUSED_ROOT, useStore } from '../store'

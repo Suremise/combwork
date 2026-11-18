@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'async_hooks'
 import { combworkError } from './combworkError'
 import { msg } from '../shared/i18n/msg'
 import type { WorkspaceService } from './workspace'
@@ -23,6 +24,19 @@ const M = {
 }
 
 const runs = new Map<string, { owner: CancelOwner; ctl: AbortController }>()
+
+/**
+ * The user's Cancel of the git run going now, for the Git modules' steps to take (gitRepo's network commands; Commit's and
+ * Set aside's forward steps): set around the run by its IPC handler, read where git is started. Here, not in a Git
+ * module, so the window's handlers reach no Git module (the Git/None audit's rule).
+ */
+const current = new AsyncLocalStorage<AbortSignal>()
+
+/** Runs `fn` with `signal` as its Cancel (its Git steps read it with gitRunSignal). */
+export const cancellableGit = <T>(signal: AbortSignal, fn: () => Promise<T>): Promise<T> => current.run(signal, fn)
+
+/** The Cancel of the user's git run in progress here, if any. */
+export const gitRunSignal = (): AbortSignal | undefined => current.getStore()
 
 const sameOwner = (a: CancelOwner, b: CancelOwner): boolean => a.sender === b.sender && a.ws === b.ws && a.project.toLowerCase() === b.project.toLowerCase()
 

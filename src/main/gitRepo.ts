@@ -1,4 +1,3 @@
-import { AsyncLocalStorage } from 'async_hooks'
 import { randomUUID } from 'crypto'
 import { homedir } from 'os'
 import { basename, join, resolve } from 'path'
@@ -45,6 +44,7 @@ import type { BranchStart, ResolvedStart, StartPoints } from '../shared/nextVers
 import { samePath } from '../shared/movePaths'
 import * as G from './platform/git'
 import { platformLimits } from './platform/limits'
+import { gitRunSignal } from './gitCancel'
 import { plainRepo } from './platform/repoRefs'
 import { resolvedOf } from './workflow/rulesets'
 import { workBadges } from './workflow/cardWork'
@@ -85,17 +85,12 @@ function networkEnv(): NodeJS.ProcessEnv {
 }
 
 /**
- * HI-3372: the user's Cancel of the action running now (gitCancel.ts runs the action inside it): every command that
- * reaches a remote takes it. Its bound is a last resort, Settings → Advanced's `cw.git.networkMinutes` (30 min: 5 cut a
- * large first fetch or push on a slow link short).
+ * HI-3372: every command that reaches a remote takes the user's Cancel of the action running now (gitCancel.ts runs the
+ * action inside it). Its bound is a last resort, Settings → Advanced's `cw.git.networkMinutes` (30 min: 5 cut a large
+ * first fetch or push on a slow link short).
  */
-const netCancel = new AsyncLocalStorage<AbortSignal>()
-
-/** Runs a Fetch, Pull or Push (`fn`) the user can cancel with `signal` (gitCancel.ts' op). */
-export const cancellableNet = <T>(signal: AbortSignal, fn: () => Promise<T>): Promise<T> => netCancel.run(signal, fn)
-
 const net = (cwd: string, args: string[]): Promise<GitResult> => {
-  const signal = netCancel.getStore()
+  const signal = gitRunSignal()
   return git(cwd, args, 16 * 1024 * 1024, undefined, { env: networkEnv(), timeout: platformLimits.gitNetworkMs(), ...(signal ? { signal } : {}) })
 }
 
@@ -109,7 +104,7 @@ function stopped(kind: 'fetch' | 'pull' | 'push' | 'tag' | 'delete'): CombworkEr
 
 /** HI-3372: a Cancel that came between two steps: the next step isn't started (a pull's merge after its fetch, a push's tags after its branches). */
 function stopIfCancelled(kind: 'fetch' | 'pull' | 'push' | 'tag' | 'delete'): void {
-  if (netCancel.getStore()?.aborted) throw stopped(kind)
+  if (gitRunSignal()?.aborted) throw stopped(kind)
 }
 
 /**

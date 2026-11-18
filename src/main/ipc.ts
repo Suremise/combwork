@@ -154,9 +154,7 @@ import { jjOperationPreview, jjOperations } from './platform/jjOperations'
 import { checkRepoTools } from './platform/repoPorts'
 import { gitCantRead, slotWorkspaces } from './platform/workspacePorts'
 import { opsAt, refuseUnoffered, repoOpHandlers } from './repoOpsIpc'
-import { cancelGitRun, dropGitRuns, withGitCancel, type CancelOwner } from './gitCancel'
-import { cancellableNet } from './gitRepo'
-import { cancellableAct } from './gitFolderChanges'
+import { cancelGitRun, cancellableGit, dropGitRuns, withGitCancel, type CancelOwner } from './gitCancel'
 import { nextVersionPlan, previewFor, startNextVersion } from './workflow/nextVersion'
 import { checkOffer, dismissOffer, releaseOffers } from './workflow/releaseOffer'
 import { branchStartArg } from '../shared/nextVersion'
@@ -242,7 +240,8 @@ const advancedState = (): AdvancedState => advanced.state(workspace.path ? (work
 const senderStore = new AsyncLocalStorage<WebContents>()
 
 /** HI-3372: the windows and workspaces whose closing takes their runs off gitCancel's list (each listened to once). */
-const cancelWatched = new WeakSet<object>()
+const cancelWatchedWindows = new WeakSet<WebContents>()
+const cancelWatchedWorkspaces = new WeakSet<WorkspaceService>()
 
 /**
  * HI-3372: who may cancel a run started now: this window, this workspace's open, the project (its path as recorded).
@@ -251,23 +250,22 @@ const cancelWatched = new WeakSet<object>()
 function cancelOwner(projectPath: string): CancelOwner {
   const wc = senderStore.getStore()
   const ws = currentWorkspace()
-  if (wc && !cancelWatched.has(wc)) {
-    cancelWatched.add(wc)
+  if (wc && !cancelWatchedWindows.has(wc)) {
+    cancelWatchedWindows.add(wc)
     const id = wc.id
     wc.once('destroyed', () => dropGitRuns({ sender: id }))
   }
-  if (!cancelWatched.has(ws)) {
-    cancelWatched.add(ws)
+  if (!cancelWatchedWorkspaces.has(ws)) {
+    cancelWatchedWorkspaces.add(ws)
     ws.lifetime.addEventListener('abort', () => dropGitRuns({ ws }), { once: true })
   }
   return { sender: wc?.id ?? -1, ws, project: resolve(projectPath) }
 }
 
-/** A Fetch, Pull or Push the user can cancel (`op`: the window's id for it). */
-const netRun = <T>(p: string, op: unknown, fn: () => T | Promise<T>): Promise<T> => withGitCancel(op, cancelOwner(workspace.assertProject(p)), async (signal) => (signal ? cancellableNet(signal, async () => fn()) : fn()))
-
-/** A Commit or Set aside the user can cancel (`op`: the window's id for it). */
-const actRun = <T>(p: string, op: unknown, fn: () => T | Promise<T>): Promise<T> => withGitCancel(op, cancelOwner(workspace.assertProject(p)), async (signal) => (signal ? cancellableAct(signal, async () => fn()) : fn()))
+/** A Commit or Set aside, Fetch, Pull or Push the user can cancel (`op`: the window's id for it). */
+const cancellableRun = <T>(p: string, op: unknown, fn: () => T | Promise<T>): Promise<T> => withGitCancel(op, cancelOwner(workspace.assertProject(p)), async (signal) => (signal ? cancellableGit(signal, async () => fn()) : fn()))
+const netRun = cancellableRun
+const actRun = cancellableRun
 
 /**
  * The Combwork window whose IPC request is being served now (HI-2355), or null outside one (a timer, a hook, the Agent API):

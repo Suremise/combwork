@@ -6,6 +6,7 @@ import { appendFileSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 import { destinationOf, displayUrl, fetchHeadOf, HAVES_MAX, neverConnected, prePushOf, projectRelative, publishOf, redactTransport } from '../src/main/platform/gitTransport'
 import { platformLimits } from '../src/main/platform/limits'
 import { gitTree } from '../src/main/workflow/mergeQueue'
@@ -164,7 +165,7 @@ describe('the sealed fetch offers the project’s commits as haves (HI-2987)', (
 
   // HI-3372: the queue's fetch and publication bounded by cw.queue.networkMinutes, its pre-push hook (a check) by
   // cw.queue.checkMinutes, each as main sets it: values of the test's own, seen in what each command is given.
-  it('its fetch and push take the merge queue network setting, its pre-push hook the check setting', { timeout: 120_000 }, async () => {
+  it('its fetch and push take the merge queue network setting, its pre-push hook the check setting', { timeout: timing('test.hangReal') }, async () => {
     const { host, snapshot, theirs } = await pushedOnce(0)
     const given: [string, number | undefined][] = []
     const seen: CandidateHost = { ...host, run: (cwd, args, opts) => (given.push([args.find((a) => ['fetch', 'push', 'hook'].includes(a)) ?? args[0], opts?.timeoutMs]), host.run(cwd, args, opts)) }

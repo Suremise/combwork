@@ -281,6 +281,10 @@ export const AREAS = [
   { paths: ['src/main/filesGit.ts', 'src/shared/gitIgnoreRules.ts', 'src/renderer/src/components/FilesGitMenu.ts', 'src/main/platform/gitRepoOps.ts', 'src/main/platform/repoOpsPorts.ts', 'src/main/repoOpsIpc.ts', 'src/renderer/src/repoOps.ts', 'src/renderer/src/repoOffers.ts'], suites: ['files', 'foldercommit'] },
   // HI-2944: Commit and Set aside of a target folder's changes, a start's warning of them, Files' Commit it.
   { paths: ['src/main/gitFolderChanges.ts', 'src/main/targetChangesNotice.ts', 'src/renderer/src/folderChanges.ts', 'src/renderer/src/components/FolderChangeButtons.tsx', 'tests/e2e/foldercommit.cjs'], suites: ['foldercommit', 'mergequeuefolder'] },
+  // HI-3372: the user's Cancel of a commit, set aside, fetch, pull or push: its owner and run ids, and the window's side.
+  { paths: ['src/main/gitCancel.ts', 'src/renderer/src/gitRuns.ts'], suites: ['foldercommit', 'gitremotes', 'gitview'] },
+  // HI-3372: the version-control ports' bounds, from Settings → Advanced.
+  { paths: ['src/main/limitsApp.ts', 'src/main/platform/limits.ts'], suites: ['advanced', 'gitremotes'] },
   { paths: ['src/main/attachmentsFolder.ts', 'src/shared/attachments.ts', 'src/renderer/src/attach.ts', 'src/renderer/src/components/AttachmentChips.tsx'], suites: ['image', 'files', 'assistantimages', 'storage', 'storageclose', 'dialogs', 'asarfiles', 'codex-extra'] },
   { paths: ['src/main/heldLine.ts', 'tests/e2e/idlequestion.cjs'], suites: ['idlequestion', 'wakeuntaken'] },
   // Codex's offer of a cheaper model (HI-2609): read on its screen, hidden per launch, and a model switch marked.

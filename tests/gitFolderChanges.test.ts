@@ -140,6 +140,7 @@ vi.setConfig({ testTimeout: 60_000 })
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const changes = await import('../src/main/gitFolderChanges')
+const { cancellableGit } = await import('../src/main/gitCancel')
 const { checkouts, worktreeNow } = await import('../src/main/platform/git')
 const { GitPlatform } = await import('../src/main/platform/gitPlatform')
 const { isUnknown } = await import('../src/main/platform/types')
@@ -649,7 +650,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     /** Runs `fn` cancellable, cancels it once `started` is there (the hook or filter running), and gives its outcome. */
     const cancelAt = async (started: string, fn: () => Promise<unknown>): Promise<unknown> => {
       const ac = new AbortController()
-      const done = changes.cancellableAct(ac.signal, fn).catch((e: Error) => e)
+      const done = cancellableGit(ac.signal, fn).catch((e: Error) => e)
       await vi.waitFor(() => expect(existsSync(started)).toBe(true), { timeout: 20_000 })
       ac.abort()
       return done
@@ -685,7 +686,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
       const before = head()
       const ac = new AbortController()
       ac.abort()
-      const err = await changes.cancellableAct(ac.signal, () => settle('commit', ['a.txt'])).catch((e: Error) => e)
+      const err = await cancellableGit(ac.signal, () => settle('commit', ['a.txt'])).catch((e: Error) => e)
       expect(String(err)).toMatch(/You cancelled the commit/)
       expect(existsSync(started)).toBe(false)
       expect(head()).toBe(before)
@@ -706,7 +707,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
       const err = await cancelAt(started, () => settle('setAside', ['new.txt']))
       expect(String(err)).toMatch(/You cancelled setting the changes aside.*No stash was made/)
       expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
-      await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: 10_000 })
+      await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: timing('wait.hang') })
       expect(existsSync(lockPath())).toBe(false)
       expect(leftovers()).toEqual([])
       expect(read('new.txt')).toBe('new\n')
@@ -727,7 +728,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
       expect(String(err)).toMatch(/You cancelled setting the changes aside.*Git had made a stash \(\w+\) by then: look at it/)
       expect(String(err)).toContain(made.slice(0, 12))
       expect(sh(proj, 'show', 'refs/stash:a.txt')).toBe('edit')
-      await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: 10_000 })
+      await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: timing('wait.hang') })
       expect(existsSync(lockPath())).toBe(false)
       expect(leftovers()).toEqual([])
     })
@@ -760,12 +761,12 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     sh(proj, 'config', 'filter.slow.clean', `sh "${fwd(filter)}"`)
     const done = settle('setAside', ['new.txt']).catch((e: Error) => e)
     // Held at the filter, by its own word, and kept there (30 s) until the bound ends it.
-    await vi.waitFor(() => expect(existsSync(started)).toBe(true), { timeout: 20_000 })
+    await vi.waitFor(() => expect(existsSync(started)).toBe(true), { timeout: timing('wait.hang') })
     const err = await done
     expect(String(err)).toMatch(new RegExp(`didn't finish setting the changes aside in ${seconds} seconds`))
     expect(String(err)).not.toMatch(/in a stash/)
     expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
-    await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: 10_000 })
+    await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: timing('wait.hang') })
     expect(existsSync(lockPath())).toBe(false)
     expect(leftovers()).toEqual([])
     expect(read('new.txt')).toBe('new\n')

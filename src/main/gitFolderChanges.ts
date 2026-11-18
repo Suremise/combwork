@@ -11,7 +11,6 @@
 // signer past its bound never leaves the real index locked; once something is made, its entries for the paths are
 // taken into the real index in one short step.
 import { copyFile, lstat, open, readFile, readdir, rename, rm, writeFile } from 'original-fs/promises'
-import { AsyncLocalStorage } from 'async_hooks'
 import { randomBytes } from 'crypto'
 import { basename, dirname, join, resolve } from 'path'
 import type { FolderChangeAction, FolderChangesDone } from '../shared/types'
@@ -28,6 +27,7 @@ import { checkouts, worktreeNow } from './platform/git'
 import type { SubmoduleChange } from './platform/history'
 import { isUnknown } from './platform/types'
 import { platformLimits } from './platform/limits'
+import { gitRunSignal } from './gitCancel'
 import { withRepoLock } from './repoLock'
 import { workspace } from './workspace'
 
@@ -82,18 +82,13 @@ const FENCE = {
 }
 
 /**
- * HI-3372: the user's Cancel of the Commit or Set aside running now (gitCancel.ts runs it inside it). Only the steps that
- * make it take it (the private index's adds, the commit, the stash's push); reading what happened, the index put back,
- * a lock taken away run to their end whatever, so what is said is what is true.
+ * HI-3372: a forward step's options: bounded, and taking the user's Cancel of the Commit or Set aside running now
+ * (gitCancel.ts runs it inside it). Only the steps that make it take it (the private index's adds, the commit, the
+ * stash's push); reading what happened, the index put back, a lock taken away run to their end whatever, so what is said
+ * is what is true.
  */
-const actCancel = new AsyncLocalStorage<AbortSignal>()
-
-/** Runs a Commit or Set aside (`fn`) the user can cancel with `signal`. */
-export const cancellableAct = <T>(signal: AbortSignal, fn: () => Promise<T>): Promise<T> => actCancel.run(signal, fn)
-
-/** A forward step's options: bounded, and cancellable when the user can cancel the action. */
 function forward(env: NodeJS.ProcessEnv): { env: NodeJS.ProcessEnv; timeout: number; signal?: AbortSignal } {
-  const signal = actCancel.getStore()
+  const signal = gitRunSignal()
   return { env, timeout: folderChangesBounds.actMs, ...(signal ? { signal } : {}) }
 }
 

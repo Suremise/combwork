@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { aheadBehindText, folderBusy, gitStatusText, identityProblem, identityWarnings, isNoReplyEmail, parsePushPorcelain, redactRemoteUrl, redactUrlsIn, scrubSecrets, urlSecrets, remoteNameProblem, remoteUrlProblem, type GitRepoSummary } from '../src/shared/gitRepo'
 import type { MergeSlotInfo } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 /** This test's folders: the project, its bare remote, another clone of it, and a project inside another repository. */
 let proj = ''
@@ -96,6 +97,7 @@ vi.mock('../src/main/git', async (importOriginal) => {
 
 const repo = await import('../src/main/gitRepo')
 const { platformLimits } = await import('../src/main/platform/limits')
+const { cancellableGit } = await import('../src/main/gitCancel')
 const fence = await import('../src/main/folderFence')
 const { gitTestHooks: gitHooks } = await import('../src/main/git')
 
@@ -177,11 +179,11 @@ describe('Fetch, Pull and Push: cancelled, or at their bound (HI-3372)', () => {
   /** Runs `fn` cancellable, cancels it once `started` is there, and gives its outcome (its error's text). */
   const cancelAt = async (started: string, fn: () => Promise<unknown>): Promise<string> => {
     const ac = new AbortController()
-    const done = repo.cancellableNet(ac.signal, fn).then(
+    const done = cancellableGit(ac.signal, fn).then(
       () => 'done',
       (e: Error) => e.message
     )
-    await vi.waitFor(() => expect(existsSync(started)).toBe(true), { timeout: 30_000 })
+    await vi.waitFor(() => expect(existsSync(started)).toBe(true), { timeout: timing('wait.hang') })
     ac.abort()
     return done
   }
@@ -190,7 +192,7 @@ describe('Fetch, Pull and Push: cancelled, or at their bound (HI-3372)', () => {
     const h = heldFetch()
     const said = await cancelAt(h.started, () => repo.fetchAll(proj))
     expect(said).toMatch(/^Stopped the fetch here\. What reached the remote before it stopped may have been applied: refresh/)
-    await vi.waitFor(() => expect(h.pid() !== null && !alive(h.pid()!)).toBe(true), { timeout: 30_000 })
+    await vi.waitFor(() => expect(h.pid() !== null && !alive(h.pid()!)).toBe(true), { timeout: timing('wait.hang') })
   })
 
   it('Pull cancelled during its fetch: the merge never starts; the branch where it was', async () => {
@@ -212,7 +214,7 @@ describe('Fetch, Pull and Push: cancelled, or at their bound (HI-3372)', () => {
     expect(said).toMatch(/^Stopped the push here\. What reached the remote before it stopped may have been applied: refresh to see where things stand\./)
     // The remote's ref was written before its post-receive ran: applied, as the message allows.
     expect(git(remote, 'rev-parse', 'refs/heads/main')).toBe(mine)
-    await vi.waitFor(() => expect(h.pid() !== null && !alive(h.pid()!)).toBe(true), { timeout: 30_000 })
+    await vi.waitFor(() => expect(h.pid() !== null && !alive(h.pid()!)).toBe(true), { timeout: timing('wait.hang') })
   })
 
   it('its bound is cw.git.networkMinutes as main sets it: past it, git gave up, said in minutes', async () => {
