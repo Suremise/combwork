@@ -19,7 +19,7 @@ const claudeHome = path.join(lib.WORK, 'mergeslot-claude-home')
 const alpha = path.join(ws, 'alpha')
 const beta = path.join(ws, 'beta')
 const PORT = Number(lib.port(47920))
-const HOLD_MS = 20000
+const HOLD_MS = 20000 // timing-ok: the merge slot hold's length this test gives the app (CW_TEST_MERGE_HOLD_MS), not a wait
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -60,12 +60,8 @@ const check = (name, ok, extra = '') => {
   }
   const slotNow = async () => (await api('GET', '/v1/projects/alpha/merge-slot?branch=main')).body
   const live = async (dir, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === dir.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
-    return v
-  }
+  // HI-3385: lib's until (its bound required, the file's interval).
+  const until = (fn, ms) => lib.until(fn, ms)
   const start = async (dir, id) => {
     await inv('session:start', dir, { agentId: id })
     return until(async () => (await live(dir, id))?.status === 'ready', HUNG_MS)
@@ -134,7 +130,7 @@ const check = (name, ok, extra = '') => {
   check("the holder's session ended: the next in line has it", !!(await until(async () => (await slotNow())?.holder?.name === 'Bob', lib.timing('hang.step'))), JSON.stringify(await slotNow()))
 
   // --- A hold that runs out goes on, and the user is told (holds last HOLD_MS here).
-  const expired = await until(async () => (await page.locator('.toast').allInnerTexts()).some((t) => /Bob's merge slot expired/.test(t)), HOLD_MS + 15000)
+  const expired = await until(async () => (await page.locator('.toast').allInnerTexts()).some((t) => /Bob's merge slot expired/.test(t)), HOLD_MS + lib.timing('hang.ui'))
   check('an expired hold is reported to the user', !!expired)
   check('…and freed', !(await slotNow())?.holder)
   await page.screenshot({ path: path.join(lib.WORK, 'mergeslot-expired.png') })

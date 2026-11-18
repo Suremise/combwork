@@ -28,12 +28,8 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms) => {
-  const t = Date.now()
-  let v
-  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-  return v
-}
+// HI-3385: lib's until (its bound required, the file's interval).
+const until = (fn, ms) => lib.until(fn, ms)
 /**
  * Gives an element the keyboard for a key press. Showing an agent (or its project) focuses its terminal, more than
  * once and late: in the frame its view is shown (TerminalView; a quiet test window off screen draws its frames late),
@@ -43,9 +39,9 @@ const until = async (fn, ms) => {
  * frame later.
  */
 const focusForKeys = async (page, locator) => {
-  // A frame, or 2 s if the window draws none meanwhile.
-  const frame = () => page.evaluate(() => new Promise((r) => (requestAnimationFrame(() => setTimeout(r, 0)), setTimeout(r, 2000))))
-  if (!(await until(async () => (await page.locator('.agent-pane.flash, .assistant-panel.flash').count()) === 0, 5000))) throw new Error('a pane still flashes')
+  // A frame, or pace.frameMs if the window draws none meanwhile (a quiet window off screen draws its frames late).
+  const frame = () => page.evaluate((ms) => new Promise((r) => (requestAnimationFrame(() => setTimeout(r)), setTimeout(r, ms))), lib.timing('pace.frameMs'))
+  if (!(await until(async () => (await page.locator('.agent-pane.flash, .assistant-panel.flash').count()) === 0, lib.timing('hang.ui')))) throw new Error('a pane still flashes')
   const ok = await until(async () => {
     await frame()
     await locator.focus()
@@ -529,8 +525,8 @@ const near = (a, b) => Math.abs(a - b) < 0.001
     await app.evaluate(({ BrowserWindow }, z) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(z), zoom)
     for (const w of [220, 640]) {
       await panel.evaluate((el, px) => (el.style.width = `${px}px`), w)
-      await lib.sleep(250)
-      const bad = await escapes()
+      // HI-3385: its rows laid out at this width (a row's own layout can follow its size a frame later): waited for, then checked.
+      const bad = (await until(async () => ((await escapes()).length ? null : []), lib.timing('hang.ui'))) ?? (await escapes())
       check(`${zoom * 100}%, panel ${w}px: no text escapes the run's box`, !bad.length, bad.slice(0, 4).join('; '))
       const title = longRow.locator('.progress-title')
       check(`${zoom * 100}%, panel ${w}px: the title ends in an ellipsis, its whole text on hover`, await title.evaluate((el) => el.scrollWidth > el.clientWidth && getComputedStyle(el).textOverflow === 'ellipsis'))
@@ -569,8 +565,8 @@ const near = (a, b) => Math.abs(a - b) < 0.001
       await app.evaluate(({ BrowserWindow }, z) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(z), zoom)
       for (const w of [220, 640]) {
         await panel.evaluate((el, px) => (el.style.width = `${px}px`), w)
-        await lib.sleep(200)
-        const low = await lowContrast()
+        // HI-3385: its theme and width applied (a frame later): waited for, then checked.
+        const low = (await until(async () => ((await lowContrast()).length ? null : []), lib.timing('hang.ui'))) ?? (await lowContrast())
         check(`${theme}, ${zoom * 100}%, panel ${w}px: the details' labels and "why" read at 4.5:1 or more`, !low.length, low.slice(0, 4).join('; '))
         if (w === 220 && (theme === 'light' ? zoom === 1.25 : zoom === 1)) await page.screenshot({ path: path.join(shots, `${theme}-${zoom}-220-details.png`) })
       }
@@ -691,8 +687,9 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   // The scripts' runs just ended have left Pulse (a few seconds, seen): the first run is an agent's again.
   await until(async () => (await panel.locator('.progress-tab-pulse .progress-run').filter({ hasText: 'Script' }).count()) === 0, lib.timing('hang.ui'))
   await page.keyboard.press('Control+Alt+I')
-  await lib.sleep(800)
-  const boxes = await page.evaluate(() => ['.progress-panel', '.assistant-panel'].map((s) => document.querySelector(s)?.getBoundingClientRect().left ?? null))
+  // HI-3385: the Assistant's panel shown, and Progress laid out beside it.
+  const placed = () => page.evaluate(() => ['.progress-panel', '.assistant-panel'].map((s) => document.querySelector(s)?.getBoundingClientRect().left ?? null))
+  const boxes = (await until(async () => { const b = await placed(); return b[0] !== null && b[1] !== null && b[0] < b[1] ? b : null }, lib.timing('hang.ui'))) ?? (await placed())
   check("with the Assistant's panel open, Progress sits to its left", boxes[0] !== null && boxes[1] !== null && boxes[0] < boxes[1], JSON.stringify(boxes))
   await page.screenshot({ path: path.join(shots, 'light-with-assistant.png') })
   await panel.locator('button[aria-label^="Fold the Progress panel"]').focus()
@@ -734,7 +731,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
       if (line) resolve(JSON.parse(line).result?.instructions ?? '')
     }))
     p.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } }) + '\n')
-    const text = await Promise.race([got, lib.sleep(15000).then(() => '(no reply)')])
+    const text = await Promise.race([got, lib.sleep(lib.timing('hang.ui')).then(() => '(no reply)')])
     p.kill()
     return text
   }
