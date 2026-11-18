@@ -170,6 +170,16 @@ function waitCaller(stack) {
  * with the text, never for the delay. The mouse first leaves for the window's corner, so an earlier tip has gone.
  */
 /**
+ * HI-3385, HI-3399: the window shows `theme` fully, within ms: its root says so and the page has settled (no finite
+ * animation or transition running, a background's fade among them), so a screenshot or a colour read shows the theme's
+ * colours, not a blend. It is themeSettled: each page read bounded (readyWithin), and a throw when not so, never a
+ * false a bare await would ignore.
+ */
+async function themeShown(page, theme, ms = timing('hang.ui')) {
+  return themeSettled(page, theme, ms)
+}
+
+/**
  * HI-3396: sets the first window's zoom to z, then waits, within ms in all, until its page draws at it (devicePixelRatio
  * z times its display's scale) and has settled (lib.settled). Each call is bounded (readyWithin's looks); it throws
  * otherwise, so nothing measured or shot goes on as if it had.
@@ -271,22 +281,6 @@ async function themeSettled(page, theme, ms = timing('hang.ui')) {
 /** HI-3388: no dialog left open (an Escape or a close taken) within ms; it throws otherwise. */
 async function noDialog(page, ms = timing('hang.ui')) {
   return readyWithin('without a dialog', async () => (await page.locator('[role="dialog"]:visible').count()) === 0, ms)
-}
-
-/**
- * HI-3385, HI-3387: waits for the window drawn in `theme`: its data-theme set (by the app from a setting, or by a suite itself)
- * and no CSS transition still running (a background fading to the new colours), so a screenshot shows the theme, not a
- * moment between. document.getAnimations() brings styles up to date first, so a transition the change starts is seen.
- * Not drawn within ms, it throws, saying what it saw: what follows (a screenshot) never runs on an unready window.
- */
-async function themeShown(page, theme, ms = timing('hang.ui')) {
-  let seen = null
-  const drawn = async () => {
-    seen = await page.evaluate(() => ({ theme: document.documentElement.dataset.theme ?? null, fading: document.getAnimations().filter((a) => a instanceof CSSTransition && a.playState === 'running').map((a) => a.transitionProperty) })).catch((e) => ({ error: e.message }))
-    return seen.theme === theme && seen.fading.length === 0
-  }
-  if (!(await until(drawn, ms))) throw new Error(`The window wasn't drawn in the ${theme} theme within ${ms} ms: ${JSON.stringify(seen)}`)
-  return true
 }
 
 /**
