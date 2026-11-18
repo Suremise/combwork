@@ -576,7 +576,7 @@ const ancestor = (x, y) => {
     check("…B1 has taken Six's task, its turn over and nothing waiting for it", !!b1Done, JSON.stringify({ live: await live(b1.id) }))
     await startDialog.getByRole('button', { name: /^(Start Lane|Wait and Start)$/ }).click()
     const queuedTen = await waitHung(async () => { const l = await laneNow(lc.id); return l && JSON.stringify(l.queued) === JSON.stringify([c10]) ? l : null })
-    check('…the start it submits is an ordinary queued change: queued after Six, no switch, Six still in Doing', !!queuedTen && queuedTen.status?.first === undefined && !(await inv('lanes:list')).some((l) => l.status?.first !== undefined) && (await card(c6)).column === 'doing', JSON.stringify({ lane: queuedTen ?? (await laneNow(lc.id)), six: (await card(c6)).column, k10, dialog: queuedTen ? undefined : await startDialog.innerText({ timeout: 2000 }).catch(() => '(closed)'), lanes: queuedTen ? undefined : await inv('lanes:list') }))
+    check('…the start it submits is an ordinary queued change: queued after Six, no switch, Six still in Doing', !!queuedTen && queuedTen.status?.first === undefined && !(await inv('lanes:list')).some((l) => l.status?.first !== undefined) && (await card(c6)).column === 'doing', JSON.stringify({ lane: queuedTen ?? (await laneNow(lc.id)), six: (await card(c6)).column, k10, dialog: queuedTen ? undefined : await startDialog.innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '(closed)'), lanes: queuedTen ? undefined : await inv('lanes:list') }))
     if (!queuedTen) await page.screenshot({ path: path.join(fx.shots, '9b-start-lane-after-click.png') })
   } catch (e) {
     check('no exception', false, e.stack)

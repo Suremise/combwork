@@ -9,6 +9,7 @@
 // approved card waiting, that card's dialog with its work (a revision, a check, a pass), a lane whose builder works in a
 // slot from the project's pool, the Slots and copies group listing the pool, and a move you make that its rules refuse.
 const fs = require('fs')
+const { timing } = require('../../timing.cjs')
 const path = require('path')
 const { spawn } = require('child_process')
 const qf = require('../queueFixture.cjs')
@@ -245,7 +246,7 @@ async function moveRefused(ctx) {
 /** Closes the notices and dialogs, stops the billing agents and goes back to alpha's Session tab for the next area's cases. */
 async function closeBilling(ctx) {
   const { page, lib } = ctx
-  const closeToast = () => page.locator('.toasts .toast .icon-btn').first().click({ timeout: 2000 }).then(() => false, () => false)
+  const closeToast = () => page.locator('.toasts .toast .icon-btn').first().click({ timeout: timing('poll.clickMs') }).then(() => false, () => false)
   if (!(await lib.until(async () => (await page.locator('.toasts .toast').count()) === 0 || (await closeToast()), ctx.hungMs))) throw new Error("the notices didn't close")
   await dismiss(ctx, '.dialog[role="dialog"]', "card B's dialog")
   for (const a of ctx.billing?.agents ?? []) await ctx.inv('session:stop', ctx.billing.dir, a.id)

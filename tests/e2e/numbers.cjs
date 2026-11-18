@@ -39,10 +39,10 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
 
   // Settings → Sessions → Suggest compacting above (200,000 by default; 1,000 to 2,000,000, or Never).
   await page.keyboard.press('Control+,')
-  await lib.sleep(800)
+  await lib.readyWithin('Settings shown', async () => (await page.locator('.settings-nav .row', { hasText: 'Sessions' }).count()) > 0, lib.timing('hang.ui'))
   await page.locator('.settings-nav .row', { hasText: 'Sessions' }).first().click()
-  await lib.sleep(500)
   const row = page.locator('.setting', { hasText: 'Suggest compacting above' })
+  await lib.readyWithin('the setting shown', async () => (await row.count()) > 0, lib.timing('hang.ui'))
   const box = row.locator('input[type=number]')
   const never = row.locator('label', { hasText: 'Never' }).locator('input')
   const error = row.locator('.field-error')
@@ -53,7 +53,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
     if (text) await page.keyboard.type(text)
     await box.press('Enter')
   }
-  const errorText = () => error.innerText({ timeout: 1000 }).catch(() => '')
+  const errorText = () => error.innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')
   check('the 0 sentence is gone from the description', !(await row.innerText()).includes('0 never'))
 
   // A box that saves nothing shows the saved value again: that's what each refused entry waits for, then the setting is read.
@@ -101,6 +101,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   })
 
   // Saves don't overlap: a number left by clicking Never (its slow save first, then Never's) ends as Never.
+  const saves = await lib.ipcSettled(app, 'settings:update')
   await app.evaluate(() => {
     process.env.CW_TEST_SLOW_IPC = 'settings:update=2000*1'
   })
@@ -109,7 +110,11 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   await page.keyboard.type('120000')
   await never.click()
   check('overlapping saves: Never ticks at once', await never.isChecked())
-  await lib.sleep(3000) // A fixed wait on purpose: a stale save landing late is what this checks, so it waits for the saves to finish rather than for the first right value.
+  // HI-3396 (HR1's round 1): both saves answered by main (the slowed number's, then Never's, which waits for it) and drawn,
+  // then the outcome checked: never the first right value, never a time.
+  await lib.ipcAnswered(app, 'settings:update', saves + 2, HUNG_MS)
+  await lib.answersDrawn(inv, page)
+  check('overlapping saves: two saves, one after the other', (await lib.ipcSettled(app, 'settings:update')) === saves + 2, String((await lib.ipcSettled(app, 'settings:update')) - saves))
   check('overlapping saves: the last choice wins', (await sessions()).compactSuggestTokens === 0, String((await sessions()).compactSuggestTokens))
   check('overlapping saves: Never stays ticked', await never.isChecked())
   await app.evaluate(() => {
@@ -133,12 +138,12 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
 
   // Project Settings: empty inherits, the same messages, and Never for the project.
   await page.getByText('demo', { exact: true }).first().click()
-  await lib.sleep(600)
+  await lib.readyWithin('its project shown', async () => (await page.locator('.project-row.selected', { hasText: 'demo' }).count()) === 1, lib.timing('hang.ui'))
   await lib.openProjectSettings(page)
-  await lib.sleep(600)
+  await lib.readyWithin('Settings shown', async () => (await page.locator('.settings-nav .row', { hasText: 'Sessions' }).count()) > 0, lib.timing('hang.ui'))
   await page.locator('.settings-nav .row', { hasText: 'Sessions' }).first().click()
-  await lib.sleep(500)
   const prow = page.locator('.setting', { hasText: 'Suggest compacting above' })
+  await lib.readyWithin('the setting shown', async () => (await prow.count()) > 0, lib.timing('hang.ui'))
   const pbox = prow.locator('input[type=number]')
   const pnever = prow.locator('label', { hasText: 'Never' }).locator('input')
   const penter = async (text) => {
@@ -154,7 +159,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   await penter('5000')
   check('project: a value saves', await becomes(async () => (await projectValue()) === 5000))
   await penter('10')
-  check('project: out of range shows a message', await becomes(async () => (await prow.locator('.field-error').innerText({ timeout: 1000 }).catch(() => '')) === 'Between 1,000 and 2,000,000.'))
+  check('project: out of range shows a message', await becomes(async () => (await prow.locator('.field-error').innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')) === 'Between 1,000 and 2,000,000.'))
   check('project: out of range keeps the value', (await projectValue()) === 5000)
   await pnever.check()
   check('project: Never saves 0', await becomes(async () => (await projectValue()) === 0))
@@ -169,6 +174,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('project: unticking Never after inheriting brings back its last value', await becomes(async () => (await projectValue()) === 5000))
 
   // The same for the project, whose saves could finish in either order.
+  const psaves = await lib.ipcSettled(app, 'project:updateConfig')
   await app.evaluate(() => {
     process.env.CW_TEST_SLOW_IPC = 'project:updateConfig=2000*1'
   })
@@ -176,7 +182,10 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   await pbox.press('Control+A')
   await page.keyboard.type('8000')
   await pnever.click()
-  await lib.sleep(3000) // A fixed wait on purpose: a stale save landing late is what this checks, so it waits for the saves to finish rather than for the first right value.
+  // HI-3396 (HR1's round 1): both project saves answered by main and drawn, then the outcome checked.
+  await lib.ipcAnswered(app, 'project:updateConfig', psaves + 2, HUNG_MS)
+  await lib.answersDrawn(inv, page)
+  check('project: two saves, one after the other', (await lib.ipcSettled(app, 'project:updateConfig')) === psaves + 2, String((await lib.ipcSettled(app, 'project:updateConfig')) - psaves))
   check('project: overlapping saves end as Never', (await projectCfg()).compactSuggestTokens === 0, String((await projectCfg()).compactSuggestTokens))
   check('project: Never stays ticked', await pnever.isChecked())
   await app.evaluate(() => {

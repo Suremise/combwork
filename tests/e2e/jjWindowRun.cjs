@@ -66,7 +66,7 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
 const id = (cwd, rev, t = 'commit_id') => jj(cwd, '--ignore-working-copy', 'log', '--no-graph', '-r', rev, '-T', t).trim()
 const dbFile = path.join(ws, '.combwork', 'combwork.db')
 const onDb = (fn) => {
-  const db = new DatabaseSync(dbFile, { timeout: 5000 })
+  const db = new DatabaseSync(dbFile, { timeout: lib.timing('db.busyMs') })
   try {
     return fn(db)
   } finally {
@@ -495,8 +495,8 @@ const onDb = (fn) => {
       if (!(await inv('slots:list', shop)).some((s) => s.name === slot6) && !fs.existsSync(w6.folder)) return true
       if ((await row6.locator('[data-action="remove-forgotten"]').count()) === 1 && (await page.locator('.dialog').count()) === 0) {
         // The row may go as it is clicked (the removal under way): a short try, never a wait.
-        await row6.locator('[data-action="remove-forgotten"]').click({ timeout: 2000 }).catch(() => undefined)
-        await page.locator('.dialog').filter({ hasText: `Remove ${slot6}?` }).getByRole('button', { name: 'Remove', exact: true }).click({ timeout: 2000 }).catch(() => undefined)
+        await row6.locator('[data-action="remove-forgotten"]').click({ timeout: lib.timing('poll.clickMs') }).catch(() => undefined)
+        await page.locator('.dialog').filter({ hasText: `Remove ${slot6}?` }).getByRole('button', { name: 'Remove', exact: true }).click({ timeout: lib.timing('poll.clickMs') }).catch(() => undefined)
       }
       return null
     }, HUNG_MS)), JSON.stringify(await inv('slots:list', shop)))
