@@ -532,6 +532,7 @@ interface CombworkMessageValues {
   'board.laneStart.up': { card: string | number }
   'board.laneStart.waitAndStart': undefined
   'board.laneStart.waiting': { agents: string | number }
+  'board.laneStart.yieldCantStart': { card: string | number; first: string | number }
   'board.laneStart.yieldHint': { card: string | number; first: string | number; builder: string | number }
   'board.lanes.abandon': undefined
   'board.lanes.abandonConfirm': undefined

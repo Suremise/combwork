@@ -1191,5 +1191,6 @@
   "board.workQueue.testing": "Testando agora: {step}",
   "board.workQueue.unreadRef": "não lido",
   "board.workQueue.waiting": "Na fila de {target}, aguardando {cards} ficar Concluído",
-  "board.workflows": "Fluxos de trabalho"
+  "board.workflows": "Fluxos de trabalho",
+  "board.laneStart.yieldCantStart": "{card} espera {first}, que ainda não pode começar (está bloqueado ou espera um cartão dele): esta lista vale quando {card} estiver concluído, e Aplicar agora não muda nada antes disso."
 }

@@ -770,6 +770,66 @@ describe("Combwork starts a lane's next card (HI-1990)", () => {
         await lanes.endLane(w, lane.id, { abandoned: true })
       })
 
+      // HI-3368 (bug hunt, 18 Nov): the first card put before the card in Doing can't start (blocked, or waiting on its own
+      // dependency where its rules wait for it): never yielded to, and never put back for by Apply now either (HR1's round
+      // 1). Before, the card in Doing went back to Todo and the first card was never started, the builder idle. Start Lane's
+      // hint asks the same of main (laneYieldTo): to it, or that it can't start.
+      it("HI-3368: a first card that can't start (blocked, or its own dependency not Done where its rules wait) is no yield, queued or applied now: the card left in Doing; laneYieldTo says which", async () => {
+        const yieldTo = (fix: number, trial: number) => lanes.laneYieldTo(w, 'alpha', 'j9', [fix, trial], trial)
+        for (const applyNow of [false, true]) {
+          const blocked = await waiting('j9')
+          await run(() => tasks.updateTask(blocked.fix, { blocked: 'waiting for a licence decision' }, user))
+          expect(await yieldTo(blocked.fix, blocked.trial)).toEqual({ cantStart: blocked.fix })
+          // Applied now with its builder idle: nothing put back (before, the card in Doing went back to Todo at once).
+          if (applyNow) blocked.st.status = 'ready'
+          const rb = await lanes.startLane(w, { project: 'alpha', builder: 'j9', reviewer: 'r1', cards: [blocked.fix, blocked.trial], by: 'the Assistant', ...(applyNow ? { applyNow: true } : {}) })
+          expect(rb.note).toContain('it applies once')
+          expect(rb.lane.status?.first).toBeUndefined()
+          expect(await columnOf(blocked.trial)).toBe('doing')
+          blocked.st.status = 'ready'
+          await look()
+          expect([await columnOf(blocked.trial), await columnOf(blocked.fix)]).toEqual(['doing', 'todo'])
+          // Unblocked, the same list is a yield again (the startable case).
+          await run(() => tasks.updateTask(blocked.fix, { blocked: null }, user))
+          expect(await yieldTo(blocked.fix, blocked.trial)).toEqual({ to: blocked.fix })
+          await lanes.endLane(w, blocked.lane.id, { abandoned: true })
+        }
+
+        const was = (await run(() => w.projectConfig(p))).workflow ?? null
+        const dependenciesDone = (on: boolean) => w.mutateProjectConfig(p, () => ({ workflow: { platform: 'none', preset: null, options: { dependenciesDone: on } } }))
+        try {
+          // Dependencies must be Done off: a first card with its dependency open can start, so the list is a yield.
+          await dependenciesDone(false)
+          const free = await waiting('j9')
+          const other = await card('Licence decision j9 off', 'o1')
+          await run(() => tasks.updateTask(free.fix, { blockedBy: [other] }, user))
+          expect(await yieldTo(free.fix, free.trial)).toEqual({ to: free.fix })
+          await lanes.endLane(w, free.lane.id, { abandoned: true })
+          await run(() => tasks.updateTask(free.trial, { column: 'todo' }, user)).catch(() => undefined)
+          for (const applyNow of [false, true]) {
+            await dependenciesDone(true)
+            const deps = await waiting('j9')
+            const licence = await card(`Licence decision j9 ${applyNow}`, 'o1')
+            await run(() => tasks.updateTask(deps.fix, { blockedBy: [licence] }, user))
+            expect(await yieldTo(deps.fix, deps.trial)).toEqual({ cantStart: deps.fix })
+            if (applyNow) deps.st.status = 'ready'
+            const rd = await lanes.startLane(w, { project: 'alpha', builder: 'j9', reviewer: 'r1', cards: [deps.fix, deps.trial], by: 'the Assistant', ...(applyNow ? { applyNow: true } : {}) })
+            expect(rd.note).toContain('it applies once')
+            expect(rd.lane.status?.first).toBeUndefined()
+            expect(await columnOf(deps.trial)).toBe('doing')
+            deps.st.status = 'ready'
+            await look()
+            expect([await columnOf(deps.trial), await columnOf(deps.fix)]).toEqual(['doing', 'todo'])
+            // Its dependency Done: the same list is a yield again (the startable case).
+            await run(() => tasks.updateTask(licence, { column: 'done' }, user))
+            expect(await yieldTo(deps.fix, deps.trial)).toEqual({ to: deps.fix })
+            await lanes.endLane(w, deps.lane.id, { abandoned: true })
+          }
+        } finally {
+          await w.mutateProjectConfig(p, () => ({ workflow: was ?? undefined }) as never)
+        }
+      })
+
       it("named by the card's waitingFor too; a list change that puts first a card it doesn't wait on stays queued for its Done; applyNow on a yield while its builder works is queued, not refused", async () => {
         const a = await waiting('j2', 'waitingFor')
         const ra = await lanes.startLane(w, { project: 'alpha', builder: 'j2', reviewer: 'r1', cards: [a.fix, a.trial], by: 'the user' })

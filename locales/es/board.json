@@ -1191,5 +1191,6 @@
   "board.workQueue.testing": "Probando ahora: {step}",
   "board.workQueue.unreadRef": "no leído",
   "board.workQueue.waiting": "En cola para {target}, esperando a que {cards} esté en Hecho",
-  "board.workflows": "Flujos de trabajo"
+  "board.workflows": "Flujos de trabajo",
+  "board.laneStart.yieldCantStart": "{card} espera a {first}, que aún no puede empezar (está bloqueada o espera a una tarjeta suya): esta lista se aplica cuando {card} esté en Hecho, y Aplicar ahora no cambia nada antes."
 }

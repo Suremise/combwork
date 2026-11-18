@@ -530,6 +530,7 @@
   "board.laneStart.up": "Move {card} up",
   "board.laneStart.waitAndStart": "Wait and Start",
   "board.laneStart.waiting": "Waiting for these agents to be idle: {agents}…",
+  "board.laneStart.yieldCantStart": "{card} waits on {first}, which can’t start yet (it is blocked, or waits on a card of its own): this list applies once {card} is Done, and Apply now changes nothing before that.",
   "board.laneStart.yieldHint": "{card} waits on {first}: once {builder} ends its turn with {card}’s work committed, {card} goes back to Todo (its work stays on its branch), this list applies and {first} starts. The lane comes back to {card} after.",
   "board.lanes.abandon": "Abandon Lane…",
   "board.lanes.abandonConfirm": "Abandon Lane",
