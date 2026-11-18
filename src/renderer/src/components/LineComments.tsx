@@ -52,6 +52,18 @@ const draftKey = (d: Draft): string => `${d.side}:${d.from}-${d.to}`
 type HeldStore = { values: Map<string, unknown>; subs: Set<() => void> }
 const heldStore = (): HeldStore => ({ values: new Map(), subs: new Set() })
 
+/**
+ * HI-3369: each file's layer's drafts and held texts, by card, submission and path, kept while the window is open: choosing
+ * another file (or Retry, or closing the changes) remakes the layer, and a draft or an edit being typed comes back with it.
+ * A draft saved or cancelled leaves as it does in the layer.
+ */
+const keptLayers = new Map<string, { drafts: Draft[]; store: HeldStore }>()
+const keptFor = (key: string): { drafts: Draft[]; store: HeldStore } => {
+  let k = keptLayers.get(key)
+  if (!k) keptLayers.set(key, (k = { drafts: [], store: heldStore() }))
+  return k
+}
+
 /** The layer's store: a draft's text, an edit's text, a box's save under way and its error, a thread's open edit. */
 const Held = createContext<HeldStore | null>(null)
 
@@ -81,10 +93,15 @@ function useHeld<T>(key: string, initial: T, shared = true): [T, (v: T) => void,
 
 /** The comment layer over `editor` (a revision's diff of `path`): its threads, its drafts, its "+" in each glyph margin. */
 export function CommentLayer({ editor, card, submission, path, comments, agentName }: { editor: Monaco.editor.IStandaloneDiffEditor; card: number; submission: number; path: string; comments: LineCommentView[]; agentName: (id: string | null) => string }) {
-  const [drafts, setDrafts] = useState<Draft[]>([])
+  const slot = keptFor(`${card}:${submission}:${path}`)
+  const [drafts, setDrafts] = useState<Draft[]>(slot.drafts)
   const [zones, setZones] = useState<Zone[]>([])
   const [oldHidden, setOldHidden] = useState(false)
-  const store = useRef(heldStore()).current
+  const store = slot.store
+  // The drafts open, kept for the next layer of this file (HI-3369).
+  useEffect(() => {
+    slot.drafts = drafts
+  }, [slot, drafts])
   const held = store.values
   const sideEditor = (side: LineSide): Monaco.editor.ICodeEditor => (side === 'new' ? editor.getModifiedEditor() : editor.getOriginalEditor())
   const dropDraft = (d: Draft): void => setDrafts((ds) => ds.filter((x) => draftKey(x) !== draftKey(d)))
