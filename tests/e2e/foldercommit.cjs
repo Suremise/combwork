@@ -115,7 +115,21 @@ const lastCommitFiles = () => git('show', '--no-renames', '--name-only', '--form
     fs.writeFileSync(path.join(fx.alpha, '.git', 'hooks', 'pre-commit'), `#!/bin/sh\n: > "${fwd(hold)}"\n"${fwd(process.execPath)}" -e 'require("fs").writeFileSync(process.argv[1], String(process.pid)); setTimeout(() => {}, 120000)' "${fwd(pidFile)}"\n`)
     await commitBtn.click()
     const cancelBtn = m.card('main').locator('[data-action="cancel-git-run"]')
-    check('Commit held by its hook: Cancel beside the buttons while it runs', !!(await waitHung(async () => fs.existsSync(hold) && (await cancelBtn.count()) === 1)), await m.text('main'))
+    const seen = new Set()
+    // The reviewer may still be working in the folder just after its verdict, which Commit refuses (R1 is working in…):
+    // that refusal dismissed and Commit clicked again until it runs (the hook's own word) with its Cancel shown.
+    const busyRefusal = page.locator('.toast', { hasText: 'is working in' })
+    const heldOk = !!(await waitHung(async () => {
+      for (const t of await page.locator('.toast').allInnerTexts().catch(() => [])) seen.add(t.replace(/\s+/g, ' '))
+      if ((await busyRefusal.count()) > 0) {
+        await busyRefusal.first().getByRole('button', { name: 'Dismiss' }).click().catch(() => undefined)
+        await commitBtn.click().catch(() => undefined)
+        return null
+      }
+      return fs.existsSync(hold) && (await cancelBtn.count()) === 1
+    }))
+    if (!heldOk) await page.screenshot({ path: path.join(lib.WORK, 'foldercommit-held-failed.png') })
+    check('Commit held by its hook: Cancel beside the buttons while it runs', heldOk, `${await m.text('main')} | hook ran: ${fs.existsSync(hold)} | notices: ${[...seen].join(' / ')}`)
     await f.themes(page, m.card('main'), 'foldercommit-commit-running')
     await cancelBtn.click()
     const stopped = page.locator('.toast', { hasText: 'You cancelled the commit' })
