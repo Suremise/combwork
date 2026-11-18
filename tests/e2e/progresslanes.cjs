@@ -491,8 +491,10 @@ const until = (fn, ms) => lib.until(fn, ms, 150)
   const mergeCard = panel.locator('.progress-merge-card')
   check('a merge card shows on top', !!(await until(async () => (await mergeCard.count()) === 1, HUNG_MS)))
   const branch = b1.worktree?.branch
-  const text = await mergeCard.innerText()
-  check('it says who merges which cards, branch → main, the current step, time and who waits', new RegExp(`B1 is merging ${K(n8)}`).test(text) && text.includes(`${branch} → main`) && /Full test set · 113 of 146: mergeslot/.test(text) && /so far · \d+ min left/.test(text) && /Waiting: B3/.test(text), `${branch} | ${text}`)
+  // The card's whole text, waited for: B3's waiting line can be drawn a render after the card (HI-3401).
+  let text = ''
+  const says = () => new RegExp(`B1 is merging ${K(n8)}`).test(text) && text.includes(`${branch} → main`) && /Full test set · 113 of 146: mergeslot/.test(text) && /so far · \d+ min left/.test(text) && /Waiting: B3/.test(text)
+  check('it says who merges which cards, branch → main, the current step, time and who waits', !!(await until(async () => ((text = await mergeCard.innerText().catch(() => '')), says()), HUNG_MS)), `${branch} | ${text}`)
   check('with a divider under it', (await panel.locator('.progress-divider').count()) === 1)
   const colours = await page.evaluate(() => {
     const card = getComputedStyle(document.querySelector('.progress-merge-card')).borderTopColor
