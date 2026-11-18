@@ -277,8 +277,16 @@ const check = (name, ok, extra = '') => {
   const c6 = (await inv('tasks:create', { title: 'Stopped by the filter', project: 'alpha' })).number
   const lane6 = await inv('lanes:start', alpha, { builder: builder.id, reviewer: reviewer.id, cards: [c6], name: 'Filter' }).catch((e) => ({ error: String(e) }))
   check('a lane starts with #6 for the builder', !!(await until(async () => (await inv('tasks:list')).find((c) => c.number === c6)?.column === 'doing', HUNG_MS)), JSON.stringify(lane6))
-  // Its start's line taken and its turn over before the watch (a prompt after the stop would be a turn since).
-  await until(async () => ['ready', 'finished', 'watching'].includes((await live(builder.id))?.status), HUNG_MS)
+  // Its start's line taken and its turn over before the watch (a prompt after the stop would be a turn since). The lane
+  // gives the builder a new conversation whose first turn is its brief, and types #6's start after that turn: idle after
+  // the brief alone, a line typed then meets the start's, which leaves it to the user and tries again later (HI-3403). So:
+  // the start's prompt taken (it names the card's title), its turn over, and nothing more of Combwork's to type.
+  const startTaken = async () => {
+    const s = await live(builder.id)
+    const items = s?.sessionId ? ((await inv('transcript:read', alpha, s.sessionId).catch(() => null))?.items ?? []) : []
+    return items.some((x) => x.kind === 'user' && String(x.text ?? '').includes('Stopped by the filter')) && s.turn?.state === 'over' && (await lib.agentQuiet(PORT, 'alpha', s, apiToken))
+  }
+  check("…its start taken and its turn over", !!(await until(startTaken, HUNG_MS)), await why(builder.id))
   script('Builder', ['safeguard'])
   await say(builder.id, wait(c6, { changes: ['comment'] }))
   check('the builder watches #6', !!(await until(async () => (await live(builder.id))?.status === 'watching', HUNG_MS)), await why(builder.id))

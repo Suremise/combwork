@@ -23,7 +23,8 @@
 //   "work N" and "shell: <command line>" (run in cmd with the session's environment, between its PreToolUse and
 //   PostToolUse; fake-shell.jsonl in CODEX_HOME records it, #1486). "planusage F W": its rollout's rate limits, F% of
 //   the 5-hour window and W% of the weekly one (HI-1882). "patch FILE" (HI-2386): an apply_patch edit of FILE, which
-//   Combwork's file lock may refuse (fake-edits.jsonl in CODEX_HOME records each try). Anything else: a short turn.
+//   Combwork's file lock may refuse (fake-edits.jsonl in CODEX_HOME records each try). "waitfile NAME" (HI-3403): the
+//   steps after it wait for a file NAME in CODEX_HOME. Anything else: a short turn.
 //   The turn ledger's cases (#648): "latetool" (a command whose PostToolUse reaches Combwork after the turn's Stop),
 //   "loststop" (no Stop reaches Combwork; its rollout records the turn's end, task_complete) and "silent" (neither).
 //   "ratelimited" (HI-1972): a 429 recorded only in its log database (logs_2.sqlite), then no hook until
@@ -680,6 +681,15 @@ async function runPrompt(text) {
   // "latetool": a command whose PostToolUse reaches Combwork only after the turn's Stop (#648).
   let late = null
   for (const step of text.split(' then ')) {
+    // "waitfile NAME", a step of its own: the steps after it wait until the test makes a file NAME in CODEX_HOME (two
+    // minutes at most, in case the test died), as the fake Claude Code's does. Unlike "hold" no key is typed into its
+    // pane, which Combwork counts as the user typing there and holds its lines for (HI-3403).
+    const waitFile = /^waitfile\s+([\w.-]+)$/i.exec(step)
+    if (waitFile) {
+      const go = path.join(process.env.CODEX_HOME || '', waitFile[1])
+      for (const end = Date.now() + 120_000; !fs.existsSync(go) && Date.now() < end; ) await sleep(100)
+      continue
+    }
     if (step === 'latetool') {
       late = { ...bash('npm test'), tool_use_id: `exec-${randomUUID()}` }
       await hook('PreToolUse', late)
