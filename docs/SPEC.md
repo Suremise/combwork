@@ -8688,7 +8688,9 @@ repeating them (#533) [note §8].
   agent's turn ends, as lanes or the board change, as a workspace opens, as the rules are switched, and hourly. Each pool
   card in Review whose latest submission nobody reviews, with fewer passes than G1b asks, oldest submission first, goes
   to the first free agent: its role reviews (#1430's `reviewsWork`), no open dispatch lease (#1434: an either agent
-  building in a slot is never taken, and is once its lease ends; a lease that can't be read counts as held), idle (not
+  building in a slot is never taken, and is once its lease ends and its run in the slot has stopped, HI-3402: told there,
+  it reviewed without its review copy; then started for review in the project folder; a lease that can't be read counts
+  as held), idle (not
   in a turn, waiting, with background tasks or runs, and able to take a line now, `readyFor`'s `idle`; a card watch
   doesn't count, HI-2333: Combwork's loop wakes reach a watching agent, and what it reviews or checks holds it already),
   not reviewing another card of the project (given or
