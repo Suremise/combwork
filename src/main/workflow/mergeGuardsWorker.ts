@@ -20,7 +20,8 @@ export type PreviewRequest = { type: 'preview'; root: string; files: string[] | 
 
 export type GuardsRequest = { type: 'check'; diff: string; guards: MergeGuard[]; maxLines: number } | { type: 'empty'; guards: MergeGuard[] } | PreviewRequest
 
-export type GuardsReply = { running: string } | { report: GuardReport } | { problems: GuardProblem[] } | { preview: GuardPreview }
+/** `ready`: posted once, when its handler is installed (HI-3377): its caller sends the request, and starts its time limit, then. */
+export type GuardsReply = { ready: true } | { running: string } | { report: GuardReport } | { problems: GuardProblem[] } | { preview: GuardPreview }
 
 /** The project's files a preview reads: the given ones, or a walk; `null` once past the bound. */
 function listFiles(m: PreviewRequest): string[] | null {
@@ -97,4 +98,6 @@ if (port) {
     const post = (r: GuardsReply): void => port.postMessage(r)
     post(handleGuards(m, post))
   })
+  // Last: the module loaded and its handler in place, so a request's time is the request's, not the thread's start.
+  port.postMessage({ ready: true } satisfies GuardsReply)
 }

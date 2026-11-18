@@ -51,7 +51,8 @@ import type { RunCheck } from '../../shared/types'
 import type { QueueStep, QueueStuck } from '../../shared/workflow/queue'
 import { agentMsg, say } from '../../shared/agentText'
 import { asCardCounts } from './containment'
-import { guardReportLog, guardsKey, guardsOf, guardsRefuse, MERGE_GUARDS_CHECK, type GuardReport } from '../../shared/workflow/mergeGuards'
+import { FOCUSED_PICK_DEFAULT_S } from '../../shared/advanced'
+import { GUARD_CHECK_DEFAULTS, guardReportLog, guardsKey, guardsOf, guardsRefuse, MERGE_GUARDS_CHECK, type GuardReport } from '../../shared/workflow/mergeGuards'
 import { checkMergeGuards } from './mergeGuardsRun'
 
 /** A focused-test run's results Combwork couldn't read, as its check's output (HI-2463: Combwork's name). */
@@ -1989,7 +1990,7 @@ export class MergeQueue {
     const key = guardsKey(guards)
     if (!guards.length) return null
     const t0 = Date.now()
-    const limits = this.cfg.guardLimits?.() ?? { timeoutMs: 10_000, maxLines: 200_000 }
+    const limits = this.cfg.guardLimits?.() ?? GUARD_CHECK_DEFAULTS
     const history = this.history(card)
     // The check's life is the queue's (HR2's round 1, finding 3): its lease lost, the worker ends at once.
     const life = new AbortController()
@@ -2030,7 +2031,7 @@ export class MergeQueue {
     const run = o.commands[FOCUSED_RUN]?.trim()
     if (!run) return { kind: 'focused', focused: { why: 'noRunner' } } // i18n-ignore: codes (a why, a check name), never shown as text
     const f = this.cfg.folder
-    const deps = { env: this.cfg.focused?.env ?? (() => ({})), timeoutMs: this.cfg.focused?.pickTimeoutMs() ?? 60_000 }
+    const deps = { env: this.cfg.focused?.env ?? (() => ({})), timeoutMs: this.cfg.focused?.pickTimeoutMs() ?? FOCUSED_PICK_DEFAULT_S * 1000 }
     const approved = chosenTests(choice)
     // The result's own changes: every path not exactly as submitted, picked here (all the submission's when the result's are unread).
     const now = await pathChanges(f, expected, result)

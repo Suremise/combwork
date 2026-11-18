@@ -2080,8 +2080,8 @@
     "audience": "both"
   },
   "settings.advanced.cw.mcpCatalog.downloadSeconds.desc": {
-    "text": "How long Install and Update wait for a catalogue server's zip, redirects included, before they stop with nothing installed. Raise it on a slow connection.",
-    "note": "What the advanced setting \"MCP catalogues: downloading a server\" is for (Settings → Advanced, HI-545).",
+    "text": "How long Install and Update wait with nothing arriving while they download a catalogue server's zip, before they stop with nothing installed. A slow download that keeps arriving is never stopped; Cancel download stops one. Raise it on a connection that pauses for long.",
+    "note": "What the advanced setting \"MCP catalogues: downloading a server\" is for (Settings → Advanced, HI-545). HI-3377: the time with no data arriving, not the whole download’s time.",
     "audience": "both"
   },
   "settings.advanced.cw.mcpCatalog.downloadSeconds.title": {
@@ -2130,8 +2130,8 @@
     "audience": "both"
   },
   "settings.advanced.cw.mergeGuards.seconds.desc": {
-    "text": "How long matching the merge guards against a merge’s added lines may take. Past it the check ends unfinished, which sends the card back like a match, naming the guard that was running. Raise it for very large merges; a pattern that takes this long usually needs rewriting.",
-    "note": "What the advanced setting \"Merge guards: longest the check takes\" does, and what goes wrong when it is wrong (Settings → Advanced, HI-3284).",
+    "text": "How long matching the merge guards against a merge’s added lines may take, once their check has started. Past it the merge isn’t checked: nothing merges, and the card comes back to be submitted again unchanged, naming the guard that was running (not as a match). Raise it for very large merges; a pattern that takes this long usually needs rewriting.",
+    "note": "What the advanced setting \"Merge guards: longest the check takes\" does, and what goes wrong when it is wrong (Settings → Advanced, HI-3284, HI-3377).",
     "audience": "both"
   },
   "settings.advanced.cw.mergeGuards.seconds.title": {
@@ -2300,7 +2300,7 @@
     "audience": "both"
   },
   "settings.advanced.cw.progress.replySeconds.desc": {
-    "text": "How long cw-progress waits for Combwork to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks once more, then runs nothing and says Combwork is slow. Raise it when a busy Combwork makes checks fail with \"Combwork is slow to answer\" (HI-1892). Kept at 2 minutes at most.",
+    "text": "How long cw-progress waits for Combwork to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks again (after 5 s, then 15 s), then runs nothing and says Combwork is slow. Raise it when a busy Combwork makes checks fail with \"Combwork is slow to answer\" (HI-1892). Kept at 10 minutes at most.",
     "note": "What the advanced setting \"cw-progress: Combwork's reply time\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
     "audience": "both"
   },

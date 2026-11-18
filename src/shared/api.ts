@@ -970,7 +970,9 @@ export interface CombworkRequests {
   /** The one-time note for a source Combwork doesn't check was shown (HI-545). */
   'mcp:catalogNoted': (url: string) => void
   /** Downloads and checks a catalogue server for Install or Update (HI-545): what it would run, held for the answer. */
-  'mcp:catalogPrepare': (source: string, name: string) => McpCatalogPrepared
+  /** `op`: the window's id for this preparation, which `mcp:catalogCancel` names (HI-3377); cancelled, null. */
+  'mcp:catalogPrepare': (source: string, name: string, op?: string) => McpCatalogPrepared | null
+  'mcp:catalogCancel': (op: string) => void
   /** Drops a prepared download the user cancelled. */
   'mcp:catalogDrop': (id: string) => void
   /** Installs a prepared catalogue server as `name` (added nowhere); `replace` over a server of the name. */

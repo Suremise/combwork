@@ -40,6 +40,8 @@ const M = {
   install: msg({ id: 'mcp.catalog.installAction', defaultMessage: 'Install…', description: "A catalogue server's view (HI-545): downloads, checks and shows it, before installing." }),
   update: msg({ id: 'mcp.catalog.updateAction', defaultMessage: 'Update to {version}…', description: "A catalogue server's view (HI-545): downloads the newer version and shows what changes, before updating." }),
   installedAt: msg({ id: 'mcp.catalog.installedAt', defaultMessage: 'Installed: {version}', description: "A catalogue server's view (HI-545): the version installed." }),
+  otherDownload: msg({ id: 'mcp.catalog.otherDownload', defaultMessage: 'Downloading {name}: one server downloads at a time.', description: "A catalogue server's view (HI-545, HI-3377) while another server's download for Install or Update runs: this one's Install… and Update… wait. {name} is the server downloading; Cancel download stops it." }),
+  cancelDownload: msg({ id: 'mcp.catalog.cancelDownload', defaultMessage: 'Cancel download', description: "A catalogue server's view (HI-545, HI-3377), in place of Install… or Update… while its download runs: stops the download; nothing is installed." }),
   cantRun: msg({ id: 'mcp.catalog.cantRun', defaultMessage: "This PC doesn't meet a requirement above, so it can't be installed.", description: "A catalogue server's view (HI-545) when a requirement Combwork checked is not met: Install is greyed out." })
 }
 
@@ -173,6 +175,7 @@ export function McpCatalogPanel() {
 /** A catalogue server's view (HI-545): where it comes from, what it needs on this PC, and Install or Update. */
 export function McpCatalogDetail() {
   const r = useStore((s) => s.mcpPick)
+  const downloading = useStore((s) => s.catalogPreparing)
   if (!r)
     return (
       <div className="empty-state" style={{ paddingTop: '14vh' }}>
@@ -181,6 +184,11 @@ export function McpCatalogDetail() {
       </div>
     )
   const blocked = r.checks.some((c) => c.state === 'no')
+  // HI-3377: its download for Install or Update running: Cancel download in their place.
+  const preparing = !!downloading && downloading.source === r.source && downloading.name === r.name
+  // Another server's download running (one at a time, HR1's round 1): this one's Install and Update wait, its view naming
+  // that download, with Cancel download (it stops that one) in their place.
+  const other = downloading && !preparing ? downloading : null
   const host = (() => {
     try {
       return new URL(r.source).host || r.source
@@ -212,8 +220,17 @@ export function McpCatalogDetail() {
           ))}
         </ul>
         {blocked && <p className="banner warn">{tr(M.cantRun)}</p>}
+        {other && (
+          <p className="banner" data-catalog-downloading={other.name}>
+            {tr(M.otherDownload, { name: other.name })}
+          </p>
+        )}
         <div className="flex">
-          {r.update ? (
+          {preparing || other ? (
+            <button className="btn" data-action="catalog-cancel" onClick={() => actions.cancelCatalogPrepare()}>
+              <Icon name="close" /> {tr(M.cancelDownload)}
+            </button>
+          ) : r.update ? (
             <button className="btn primary" data-action="catalog-update" onClick={() => void actions.updateCatalogServer(r)}>
               <Icon name="cloud-download" /> {tr(M.update, { version: r.version })}
             </button>

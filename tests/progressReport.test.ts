@@ -9,7 +9,7 @@ import { createRequire } from 'module'
 import { pathToFileURL } from 'url'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { estimateFor, evictionOrder, KEEP_KEYS, ProgressRun, progressTarget, recordTiming, wrappedLines } from '../src/main/progressReporters/report.mts'
-import { cmdEscapeArgument, commandEnv, commandLabel, isolatedPollDelay, KEEPALIVE_MS, keepAliveDue, parseArgs, parseProcessList, replyTimeoutMs, runWrapped, spawnSpec, StepFilter, stepLine, timingKey, treeToEnd, uncountedLine, wasInterrupted, type WrapperIo } from '../src/main/progressReporters/wrapper'
+import { cmdEscapeArgument, commandEnv, commandLabel, isolatedPollDelay, KEEPALIVE_MS, keepAliveDue, parseArgs, parseProcessList, replyTimeoutMs, RETRY_MS, runWrapped, spawnSpec, StepFilter, stepLine, timingKey, treeToEnd, uncountedLine, wasInterrupted, type WrapperIo } from '../src/main/progressReporters/wrapper'
 import { installShims, shimFiles, withBinOnPath } from '../src/main/progressReporters/shims'
 import { removeOldShims } from '../src/main/nameUpgradeProfile'
 import { combworkInstructions, progressRule, wrapsLongCommands } from '../src/shared/combworkGuidance'
@@ -344,7 +344,8 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
     expect(await wrap(['--check', 'lint'], env(), 0)).toEqual({ code: 2, out: '', err: 'cw-progress: demo has no command configured for the check "lint", so nothing was run.\n' })
     // A Combwork from before (no resolve call: 404) doesn't know the command either.
     resolveReply = { status: 404, body: { error: 'No such route' } }
-    expect(await wrap(['--check', 'lint'], env(), 0)).toMatchObject({ code: 2, err: expect.stringContaining("Combwork couldn't be reached to look up the command for lint") })
+    // Asked again after each wait (HI-3377): the test's own short ones.
+    expect(await wrap(['--check', 'lint'], env(), 0, dir, { retryMs: [50, 50] })).toMatchObject({ code: 2, err: expect.stringContaining("Combwork couldn't be reached to look up the command for lint") })
     expect(await wrap(['--check', 'lint'], env({ CW_API_URL: undefined }), 0)).toMatchObject({ code: 2, err: expect.stringContaining('only Combwork knows') })
     expect(calls).toEqual([])
   })
@@ -414,26 +415,32 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
     ])
   }, 30_000)
 
-  it("the setting's reply time, within 1 s and 2 minutes whatever is set; 15 s without it (HI-1892)", () => {
-    expect(replyTimeoutMs({})).toBe(15_000)
+  it("the setting's reply time, within 1 s and 10 minutes whatever is set; 60 s without it (HI-1892, HI-3377)", () => {
+    expect(replyTimeoutMs({})).toBe(60_000)
     expect(replyTimeoutMs({ CW_PROGRESS_REPLY_SECONDS: '40' })).toBe(40_000)
-    expect(replyTimeoutMs({ CW_PROGRESS_REPLY_SECONDS: '100000' })).toBe(120_000)
+    expect(replyTimeoutMs({ CW_PROGRESS_REPLY_SECONDS: '300' })).toBe(300_000)
+    expect(replyTimeoutMs({ CW_PROGRESS_REPLY_SECONDS: '100000' })).toBe(600_000)
     expect(replyTimeoutMs({ CW_PROGRESS_REPLY_SECONDS: '0.2' })).toBe(1000)
-    expect(replyTimeoutMs({ CW_PROGRESS_REPLY_SECONDS: 'soon' })).toBe(15_000)
+    expect(replyTimeoutMs({ CW_PROGRESS_REPLY_SECONDS: 'soon' })).toBe(60_000)
+  })
+
+  it("asks again after 5 s, then 15 s (HI-3377): a check's ask takes both waits, its finish only the first", () => {
+    expect(RETRY_MS).toEqual([5000, 15_000])
   })
 
   it('a check with no reply asks once more, then runs nothing and says Combwork is slow; a refused connection says it couldn\'t be reached at once, asking once (HI-1892)', async () => {
     resolveReply = 'hang'
-    const slow = await wrap(['--check', 'lint'], env(), 0, dir, { resolveTimeoutMs: 1000, retryMs: 50 })
-    expect(slow).toEqual({ code: 2, out: '', err: 'cw-progress: Combwork is slow to answer: no reply to look up the command for lint in 1 s, asked 2 times, so nothing was run. Try again; Settings → Advanced → "cw-progress: Combwork\'s reply time" gives it longer.\n' })
-    expect(resolves).toHaveLength(2)
+    const slow = await wrap(['--check', 'lint'], env(), 0, dir, { resolveTimeoutMs: 1000, retryMs: [50, 50] })
+    expect(slow).toEqual({ code: 2, out: '', err: 'cw-progress: Combwork is slow to answer: no reply to look up the command for lint in 1 s, asked 3 times, so nothing was run. Try again; Settings → Advanced → "cw-progress: Combwork\'s reply time" gives it longer.\n' })
+    // Each wait in turn (HI-3377): asked three times.
+    expect(resolves).toHaveLength(3)
     // Nothing listens at the address: no retry, and none of the minute it would otherwise wait.
     const closed = createServer()
     await new Promise<void>((r) => closed.listen(0, '127.0.0.1', r))
     const gone = `http://127.0.0.1:${(closed.address() as { port: number }).port}`
     await new Promise<void>((r) => closed.close(() => r()))
     const from = Date.now()
-    const refused = await wrap(['--check', 'lint'], env({ CW_API_URL: gone }), 0, dir, { resolveTimeoutMs: 60_000, retryMs: 60_000 })
+    const refused = await wrap(['--check', 'lint'], env({ CW_API_URL: gone }), 0, dir, { resolveTimeoutMs: 60_000, retryMs: [60_000] })
     expect(Date.now() - from).toBeLessThan(HUNG_MS)
     expect(refused).toMatchObject({ code: 2, out: '' })
     expect(refused.err).toBe(`cw-progress: Combwork couldn't be reached to look up the command for lint (connection refused at ${gone}), so nothing was run. Is Combwork running? A sandbox that blocks local network access (Claude Code's Bash sandbox does) stops it too: run the command outside the sandbox.\n`)
@@ -442,7 +449,7 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
 
   it("a check's result Combwork didn't confirm is sent once more, and cw-progress says when it may not be recorded (HI-1889's lost report); its exit code is the command's", async () => {
     resolveReply = { status: 200, body: { card: 'HI-12', revision: null, testedCheckout: null, check: { name: 'typecheck', command: `"${node}" -e "0"` }, folder: dir } }
-    const quick = { resolveTimeoutMs: 1000, retryMs: 50, checkFinishWaitMs: 500 }
+    const quick = { resolveTimeoutMs: 1000, retryMs: [50, 50], checkFinishWaitMs: 500 }
     const finishes = () => calls.filter((c) => c.path.endsWith('/finish')).length
     // The first finish arrived, its reply lost: the one sent again is refused (it has finished), so it was recorded.
     lose = 'hangFinishOnce'
@@ -470,7 +477,7 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
     // Its finish's own budget (twice 300 ms and a 50 ms pause) is shorter than the start's wait: the start's time comes first.
     startDelayMs = 1500
     const run = new ProgressRun({ url, token: 'agent-token', workspace: '' }, { title: 'quick', check: 'typecheck' }, { startTimeoutMs: 5000 })
-    await run.finish(true, undefined, 300, {}, 50)
+    await run.finish(true, undefined, 300, {}, [50])
     expect(run.finishedAs()).toBe('answered')
     expect(calls.map((c) => [c.method, c.path.replace(/run-\d+/, 'ID')])).toEqual([
       ['POST', '/v1/progress'],

@@ -299,7 +299,7 @@ effective(project, agent) = added(project) ∩ agent's choice (all, unless it ch
 - **Reading** (`main/mcpCatalog.ts`): only when the Catalogue opens or on ↻, never in the background or at start. One time budget (`cw.mcpCatalog.fetchSeconds`, 15 s) and 8 MB across redirects; an ETag answers 304 from the cache. Checked as `validate()` checks (`shared/mcpCatalog.ts` `readCatalog`): another `schemaVersion`, or no name or list, makes the source show why and list nothing; an invalid or doubled server is skipped and counted; unknown fields are ignored; at most 5,000 servers a source. The cache holds every source listed (16) and at most 32 MB, least recently used out first; a source turned off or removed is dropped from it. A refresh's reply uses what it read, whatever the cache keeps; a search or a next page uses what is kept and never reads (one no longer kept says to refresh).
 - **Listing:** each source a category, ours first; search (name, description, tags) and a filter (All, Not installed, Installed, Updates available, Runs on this PC) and a source picker, run in main a page of 50 at a time (`mcp:catalog`; **Show more**), so the window never holds a whole catalogue. A row's badge: Installed, **Update to x.y.z**, Name in use (a server of the name not from it), **Can't run here**. A reply to an older request is dropped.
 - **Requirements** (`checkRequirements`): os from the platform; Windows edition (`EditionID`: Core is Home, Professional is Pro…) and build (`CurrentBuildNumber`) from the registry; Windows features only where Combwork can see them without elevation (Windows Sandbox: `WindowsSandbox.exe`), else **?**; Node.js (`node --version`, `>=N`) and Docker (`docker --version`); `apps` shown as text, **?**. Each probe is async with a time budget (`cw.mcpCatalog.probeSeconds`, 5 s), once per refresh; one that fails or times out is **?**, never met. A known unmet requirement refuses Install (and greys it out); **?** only warns.
-- **Install** (`prepareCatalogServer`, `installCatalogServer`): the zip downloaded within `cw.mcpCatalog.downloadSeconds` (60 s) and its catalogue's size (200 MB at most), counted as it comes, across at most 5 redirects, each hop held to the source's scheme (an https source only https: never http or file:); a `file://` one under the same budget and end. It is bound to the open of the workspace that asked: its lifetime, taken before any await, aborts it, and a close (or a close and reopen of the same folder) discards what it held. Its size and sha256 must match the catalogue, its zip hold one top folder named after the server (#550's safe unpacking), or nothing is written. Combwork shows #550's Add dialog before it writes: what it runs (and any literal secret) and the name, another one when it is taken, or Replace; held at most 10 minutes, a few at a time, and written only while that same open of the workspace lasts. A server installed from an entry is found by its provenance under any name (Installed, Update). The definition records its provenance, Combwork's own field `catalog: { source, name, version, sha256 }`, stripped from launches with `description` and `tags`. Installed, it is added nowhere (29 Oct decision: no "added off"); the server's view opens for **Add to…**. Installed with Replace over a server of the name, it keeps that server's places (HI-3327, as #550's Replace below).
+- **Install** (`prepareCatalogServer`, `installCatalogServer`): the zip downloaded while data keeps arriving (HI-3377: `cw.mcpCatalog.downloadSeconds`, 60 s, is the longest it goes with nothing received, its clock started before the first request and started again only by bytes received, never by a redirect or headers; a `file://` zip is read as it comes, the same; a catalogue's own `catalog.json` keeps a whole-download bound) and within its catalogue's size (200 MB at most), counted as it comes, across at most 5 redirects, each hop held to the source's scheme (an https source only https: never http or file:); a `file://` one under the same budget and end. It is bound to the open of the workspace that asked: its lifetime, taken before any await, aborts it, and a close (or a close and reopen of the same folder) discards what it held. **Cancel download** (HI-3377) takes the place of Install… or Update… while it downloads, one at a time in a window (another server's view names the download running, with its Cancel in place of its own Install… and Update…): the window names its preparation by an id of its own, and only that workspace's preparation of that id ends (a stale click, or another window, ends nothing); cancelled, it answers nothing once its download has ended, holding nothing. Its size and sha256 must match the catalogue, its zip hold one top folder named after the server (#550's safe unpacking), or nothing is written. Combwork shows #550's Add dialog before it writes: what it runs (and any literal secret) and the name, another one when it is taken, or Replace; held at most 10 minutes, a few at a time, and written only while that same open of the workspace lasts. A server installed from an entry is found by its provenance under any name (Installed, Update). The definition records its provenance, Combwork's own field `catalog: { source, name, version, sha256 }`, stripped from launches with `description` and `tags`. Installed, it is added nowhere (29 Oct decision: no "added off"); the server's view opens for **Add to…**. Installed with Replace over a server of the name, it keeps that server's places (HI-3327, as #550's Replace below).
 - **Update** (`updateCatalogServer`; never automatic): offered when the source's version is higher than the installed `catalog.version`. The dialog shows the versions, where it is added (those places keep it) and what it runs, the changed lines marked. In the MCP turn (the same as Add, Remove and Add to…): the installed definition must still be the one shown (`checkShown`) and the places it is added, read strictly now (`placesNow`, HI-2059's `membershipOf`), exactly those shown; otherwise nothing is written and the dialog opens again from what is there now. Then the new definition replaces the old where it is (#550's Replace, which keeps its places since HI-3327), keeping the user's own `env` and `headers` values for keys it still has (Q3).
 - **Uninstall** is Delete, which fails closed (HI-2059). Per-agent access is agents' `mcpServers` (#537). The mcp project's publishing and moving Combwork's own parts out of its servers (#590) are their own cards.
 - **Agent API:** `GET /v1/mcp`'s wide reply has each server's `catalog: { source, version } | null`. Installing and updating are the user's: there is no endpoint.
@@ -1873,7 +1873,7 @@ All Git calls go through the `git()` runner (`src/main/git.ts:47`); the two bypa
   (`Started.deliverables`, what its unclaimed changes are found against), and its unclaimed changes read the project
   whole again. Both reads run in a worker thread (`noneBaseline.ts`), never on main's, where they held typing 0.4–4 s
   on a few thousand files. A read takes at most **No version control: longest read of the project** (Settings →
-  Advanced, `cw.none.baselineSeconds`, 120 s); past it, or if the worker ends, the card goes on with no baseline and
+  Advanced, `cw.none.baselineSeconds`, 600 s since HI-3377: a read grows with the project); past it, or if the worker ends, the card goes on with no baseline and
   no list, as with a project too large to read. What changed during a read is checked as before: the card's paths and
   their content, and its kind (the evidence, again at the write), its column (`stillAt`), and the folders left out (the
   adapter's generation: a start read under others is gathered again, once; an unclaimed list is read again, else
@@ -7635,7 +7635,8 @@ workspace and project levels, none by default) are patterns a merge may not add.
   in each list, each up to 260 characters. A save refuses a guard that breaks any of these, a pattern that doesn't compile
   or a glob it can't use (`[ ]`, `\`, a leading `/`, `..`, an empty segment, nested or unbalanced braces), each by a
   sentence naming the guard, without running a pattern on main's thread; and a pattern that matches an empty line (it
-  would refuse every line), checked in the guards' worker before the save takes its locks (1 s).
+  would refuse every line), checked in the guards' worker before the save takes its locks (10 s from the worker's ready,
+  HI-3377; a worker never ready makes the patterns unchecked, the save refused, never a pattern blamed).
 - **What it checks: only the text lines the merge adds** (HI-2617's rule: "no new X" guards check the change;
   sweeps clean what already exists): the diff from the target's head the merge was made on to the merged result (jj: to the
   candidate), renames found (a pure rename adds nothing), never a path, never a binary file, never what the target already
@@ -7645,10 +7646,16 @@ workspace and project levels, none by default) are patterns a merge may not add.
   jj: `jj diff --git --context 0` under the runner's prefix). Each line is matched whole, in a worker thread of its own (never main's), ended when the check
   settles.
 - **Never a silent pass:** a diff over 64 MB or **Merge guards: most lines a merge adds** (Settings → Advanced, 200,000),
-  the matching past **Merge guards: longest the check takes** (10 s; it names the guard that was running), a worker that
-  ends, a pattern that can't compile (a hand-edited file) or matches an empty line: the check is *incomplete*, which
-  refuses the merge as a match does and says why. A diff that couldn't be read is incomplete and transient (the same
-  revision may go back). Only the excerpts shown are cut (160 characters around the match); at most 50 hits are kept,
+  the matching past **Merge guards: longest the check takes** (60 s, up to 1,800; it names the guard that was running), a
+  worker that ends, a pattern that can't compile (a hand-edited file) or matches an empty line: the check is
+  *incomplete*, which refuses the merge and says why. HI-3377: the time limit runs from the worker's ready (its thread
+  started and its module loaded: it says so, and only then is the request sent), and a worker not ready within 30 s ends
+  with no pattern run (`failed:notReady`). What is the environment's, not the work's, is incomplete and **transient**: a
+  diff that couldn't be read, the time limit, a worker that ended or was never ready, a cancel. The card then comes back
+  told to submit the same revision again (the queue's transient route, at most twice in a row, §16.9.1), its record
+  uncounted, so nothing merges on it; jj's candidate checks go round again the same way. A match, a merge past the
+  limits, a pattern that can't compile or matches an empty line, and a diff that can't be followed are the work's: the
+  card comes back to be fixed. cw_submit's early warning matches for at most 10 s, and says nothing when it can't finish. Only the excerpts shown are cut (160 characters around the match); at most 50 hits are kept,
   the rest counted.
 - **Where it runs:** the merge queue's checks (§16.9.1 step 5), first, before the install and the named checks; jj's
   candidate checks, as their first check, `merge guards`, journalled like the others. A refusal goes the failed-check way:
@@ -9719,14 +9726,16 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   run counted for the wrong card is worse than none); cw-progress resolves the card, revision and check before the
   command starts (`POST /v1/progress/resolve`), so a refusal runs nothing; `--isolated` is refused until P7's check
   copies [#1220]. **Combwork slow to answer (HI-1892):** cw-progress waits for the resolve, and for its run's start to
-  be taken, as Settings → Advanced → *cw-progress: Combwork's reply time* says (`cw.progress.replySeconds`, 15 s,
-  1–120 s, handed to sessions as `CW_PROGRESS_REPLY_SECONDS`; a fixed 5 s gave up on a busy Combwork's checks). A check
-  needs the answer, so an ask that got none (slow, or an error) is asked once more after 1 s (never an isolated
-  check's first ask, which may lend a copy) before it runs nothing, saying why: *Combwork is slow to answer: no reply … in
-  N s, asked 2 times* (try again, or give it longer), or, the connection refused or not allowed, at once and asked
+  be taken, as Settings → Advanced → *cw-progress: Combwork's reply time* says (`cw.progress.replySeconds`, 60 s,
+  1–600 s, handed to sessions as `CW_PROGRESS_REPLY_SECONDS`; a fixed 5 s gave up on a busy Combwork's checks, and 15 s
+  still did on a loaded machine, HI-3377). A check needs the answer, so an ask that got none (slow, or an error) is
+  asked again after 5 s, then after 15 s (HI-3377: backing off; never an isolated check's first ask, which may lend a
+  copy) before it runs nothing, saying why: *Combwork is slow to answer: no reply … in N s, asked 3 times* (try again,
+  or give it longer), or, the connection refused or not allowed, at once and asked
   once, *Combwork couldn't be reached … (connection refused at <url>)* with the hint that a sandbox blocking local network
-  access (Claude Code's Bash sandbox) does the same. A check's finish that got no reply is sent once more (a `409` then
-  says the first arrived), and cw-progress says when its result may not be recorded: its start never taken, no
+  access (Claude Code's Bash sandbox) does the same. A check's finish that got no reply is sent once more, after 5 s (a
+  `409` then says the first arrived); Combwork answers how it counted within 60 s and cw-progress waits 65 s for it
+  (HI-3377: they were 8 s and 9 s; `shared/checkReply.ts`), and resolving a revision with git gets 60 s, and cw-progress says when its result may not be recorded: its start never taken, no
   reply to its finish, or a finish refused; its exit code stays the command's. The lane hover gains the revision under review, the last verdict and on which
   revision, checks on it and the merge commit.
 - **P4** [#1120 c]: a refused move marks the segment (a notch, red, by pattern and colour) with the one-line reason and

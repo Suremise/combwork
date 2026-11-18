@@ -318,6 +318,8 @@ interface State {
   mcpPick: McpCatalogRow | null
   /** Bumped to read the catalogues again (the view's ↻, an install or update). */
   mcpCatalogVersion: number
+  /** HI-3377: the catalogue server being downloaded for Install or Update now, and its preparation's id (its Cancel names it). */
+  catalogPreparing: { source: string; name: string; op: string } | null
   /** The mode open in the Modes view (its file). */
   selectedMode: string | null
   /** What the Assistant view's main area shows: its conversations or the selected mode. */
@@ -633,6 +635,7 @@ export const useStore = create<State>(() => ({
   mcpTab: 'installed',
   mcpPick: null,
   mcpCatalogVersion: 0,
+  catalogPreparing: null,
   selectedMode: null,
   assistantSection: 'conversations',
   journalVersion: 0,

@@ -22,7 +22,7 @@ import { pathChanges, pickAtRevision, type PickOutcome } from './focusedRun'
 import type { GuardId, MoveId } from '../../shared/workflow/pieces'
 import { refusal, type Refusal, type RuleId } from '../../shared/workflow/refusals'
 import { FOR_YOU, UNREADABLE, workflowEnglish, workflowText } from '../../shared/workflow/texts'
-import { englishText } from '../../shared/advanced'
+import { englishText, FOCUSED_PICK_DEFAULT_S } from '../../shared/advanced'
 import type { StoredText, TargetChanges } from '../../shared/types'
 import { parseCardRef } from '../../shared/workflow/cardRefs'
 import type { ForwardOverride } from '../../shared/workflow/forwardOrder'
@@ -57,7 +57,7 @@ import { createLogger, userText } from '../logger'
 import { GatherDepth } from './gatherDepth'
 import { earlierWork, UNREAD, type EarlierLine } from './earlierWork'
 import { asCardCounts } from './containment'
-import { guardsOf, guardsRefuse, guardWarning } from '../../shared/workflow/mergeGuards'
+import { GUARD_CHECK_DEFAULTS, guardsOf, guardsRefuse, guardWarning } from '../../shared/workflow/mergeGuards'
 import { checkMergeGuards } from './mergeGuardsRun'
 
 const log = createLogger('workflow')
@@ -2238,7 +2238,7 @@ export class Workflow {
   private async pickFor(o: WorkflowOptions, folder: string, revision: string, base: string, tests: FocusedTest[] | undefined, signal: AbortSignal): Promise<FocusedChoice> {
     const change = await pathChanges(folder, base, revision)
     const command = o.commands[FOCUSED_PICK]?.trim()
-    const deps = { env: this.cfg.focused?.env ?? (() => ({})), timeoutMs: this.cfg.focused?.timeoutMs() ?? 60_000, signal }
+    const deps = { env: this.cfg.focused?.env ?? (() => ({})), timeoutMs: this.cfg.focused?.timeoutMs() ?? FOCUSED_PICK_DEFAULT_S * 1000, signal }
     let p: PickOutcome
     if (!change) p = { state: 'unknown', tests: [], why: 'noChange' } // i18n-ignore: codes (a why, a check name), never shown as text
     else if (!command) p = { state: 'unknown', tests: [], why: 'noPicker' } // i18n-ignore: codes (a why, a check name), never shown as text
@@ -3672,7 +3672,9 @@ export class Workflow {
     const guards = guardsOf(this.cfg.options())
     const adapter = this.platform(o)
     if (!guards.length || !adapter.addedDiff || !(o.finish === 'combworkMerges' || finishOnCandidate(o.finish))) return []
-    const r = await checkMergeGuards(guards, () => adapter.addedDiff!(base, revision), this.cfg.guardLimits?.() ?? { timeoutMs: 10_000, maxLines: 200_000 })
+    // A warning only, which says nothing when it can't finish: never a submit held for the merge's own limit (HI-3377).
+    const limits = this.cfg.guardLimits?.() ?? GUARD_CHECK_DEFAULTS
+    const r = await checkMergeGuards(guards, () => adapter.addedDiff!(base, revision), { ...limits, timeoutMs: Math.min(limits.timeoutMs, SUBMIT_GUARDS_MS) })
     return guardsRefuse(r) && !r.transient ? [guardWarning(r)] : []
   }
 
@@ -4010,3 +4012,6 @@ export class Workflow {
 }
 
 export type { RuleId }
+
+/** HI-3377: the longest cw_submit's early merge-guards warning matches (the merge's own check takes the setting's time). */
+const SUBMIT_GUARDS_MS = 10_000

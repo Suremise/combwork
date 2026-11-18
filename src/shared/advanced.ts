@@ -147,6 +147,8 @@ export const MERGE_GUARDS_LINES = 'cw.mergeGuards.maxLines'
 export const QUEUE_FOCUSED_JOBS = 'cw.queue.focusedJobs'
 /** G20 (HI-1367): the longest a project's focused-tests picker runs, at a submit or at the merge. */
 export const FOCUSED_PICK_SECONDS = 'cw.focused.pickSeconds'
+/** Its default, and the bound where the setting can't be read (HI-3377: the code's own 60 s was shorter than the setting's). */
+export const FOCUSED_PICK_DEFAULT_S = 180
 
 /** Whether the merge queue asks before updating a target checked out in a folder (#1351, OP-40): read by main's queueHost. */
 export const QUEUE_CHECKED_OUT_TARGET = 'cw.queue.checkedOutTarget'
@@ -556,11 +558,11 @@ const SOURCES: readonly AdvancedSource[] = [
     id: 'cw.progress.replySeconds',
     group: 'cw',
     title: msg({ id: 'settings.advanced.cw.progress.replySeconds.title', defaultMessage: "cw-progress: Combwork's reply time", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. cw-progress is the command agents run long commands and checks through: keep it as it is." }),
-    desc: msg({ id: 'settings.advanced.cw.progress.replySeconds.desc', defaultMessage: "How long cw-progress waits for Combwork to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks once more, then runs nothing and says Combwork is slow. Raise it when a busy Combwork makes checks fail with \"Combwork is slow to answer\" (HI-1892). Kept at 2 minutes at most.", description: "What the advanced setting \"cw-progress: Combwork's reply time\" is for, and what goes wrong when it is wrong (Settings → Advanced)." }),
+    desc: msg({ id: 'settings.advanced.cw.progress.replySeconds.desc', defaultMessage: "How long cw-progress waits for Combwork to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks again (after 5 s, then 15 s), then runs nothing and says Combwork is slow. Raise it when a busy Combwork makes checks fail with \"Combwork is slow to answer\" (HI-1892). Kept at 10 minutes at most.", description: "What the advanced setting \"cw-progress: Combwork's reply time\" is for, and what goes wrong when it is wrong (Settings → Advanced)." }),
     kind: 'number',
-    default: 15,
+    default: 60,
     min: 1,
-    max: 120,
+    max: 600,
     unit: 's',
     applies: 'sessions'
   },
@@ -592,7 +594,7 @@ const SOURCES: readonly AdvancedSource[] = [
     id: 'cw.mcpCatalog.downloadSeconds',
     group: 'cw',
     title: msg({ id: 'settings.advanced.cw.mcpCatalog.downloadSeconds.title', defaultMessage: 'MCP catalogues: downloading a server', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (HI-545)." }),
-    desc: msg({ id: 'settings.advanced.cw.mcpCatalog.downloadSeconds.desc', defaultMessage: "How long Install and Update wait for a catalogue server's zip, redirects included, before they stop with nothing installed. Raise it on a slow connection.", description: 'What the advanced setting "MCP catalogues: downloading a server" is for (Settings → Advanced, HI-545).' }),
+    desc: msg({ id: 'settings.advanced.cw.mcpCatalog.downloadSeconds.desc', defaultMessage: "How long Install and Update wait with nothing arriving while they download a catalogue server's zip, before they stop with nothing installed. A slow download that keeps arriving is never stopped; Cancel download stops one. Raise it on a connection that pauses for long.", description: 'What the advanced setting "MCP catalogues: downloading a server" is for (Settings → Advanced, HI-545). HI-3377: the time with no data arriving, not the whole download’s time.' }),
     kind: 'number',
     default: 60,
     min: 10,
@@ -935,7 +937,7 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.cw.focused.pickSeconds.title', defaultMessage: 'Focused tests: longest the choice of tests runs', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds: how long the project's command that chooses a card's focused tests may run, when the card is submitted and at its merge." }),
     desc: msg({ id: 'settings.advanced.cw.focused.pickSeconds.desc', defaultMessage: 'How long the project’s command that chooses a card’s focused tests may run, when it is submitted and at its merge. Past it, the command is ended and no tests count as chosen: the builder then names them itself.', description: 'What the advanced setting "Focused tests: longest the choice of tests runs" does (Settings → Advanced).' }),
     kind: 'number',
-    default: 180,
+    default: FOCUSED_PICK_DEFAULT_S,
     min: 10,
     max: 1800,
     unit: 's',
@@ -981,16 +983,18 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   // Merge guards (HI-3284): the matching's time limit and the lines a merge may add, past which the check ends incomplete,
-  // which refuses the merge like a match (never a pass on what was checked so far).
+  // which refuses the merge (never a pass on what was checked so far). HI-3377: the time limit runs from the worker's
+  // ready, and running past it is "not checked" (the same revision may go back), never a match; 60 s, as
+  // GUARD_CHECK_DEFAULTS.
   {
     id: MERGE_GUARDS_SECONDS,
     group: 'cw',
     title: msg({ id: 'settings.advanced.cw.mergeGuards.seconds.title', defaultMessage: 'Merge guards: longest the check takes', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds. Merge guards are patterns Combwork refuses in the lines a merge adds (HI-3284)." }),
-    desc: msg({ id: 'settings.advanced.cw.mergeGuards.seconds.desc', defaultMessage: 'How long matching the merge guards against a merge’s added lines may take. Past it the check ends unfinished, which sends the card back like a match, naming the guard that was running. Raise it for very large merges; a pattern that takes this long usually needs rewriting.', description: 'What the advanced setting "Merge guards: longest the check takes" does, and what goes wrong when it is wrong (Settings → Advanced, HI-3284).' }),
+    desc: msg({ id: 'settings.advanced.cw.mergeGuards.seconds.desc', defaultMessage: 'How long matching the merge guards against a merge’s added lines may take, once their check has started. Past it the merge isn’t checked: nothing merges, and the card comes back to be submitted again unchanged, naming the guard that was running (not as a match). Raise it for very large merges; a pattern that takes this long usually needs rewriting.', description: 'What the advanced setting "Merge guards: longest the check takes" does, and what goes wrong when it is wrong (Settings → Advanced, HI-3284, HI-3377).' }),
     kind: 'number',
-    default: 10,
+    default: 60,
     min: 1,
-    max: 300,
+    max: 1800,
     unit: 's',
     applies: 'now'
   },
@@ -1232,7 +1236,8 @@ const SOURCES: readonly AdvancedSource[] = [
       description: 'What the advanced setting "No version control: longest read of the project" does (Settings → Advanced, under Combwork).'
     }),
     kind: 'number',
-    default: 120,
+    // HI-3377: a read grows with the project, so 120 s stopped large projects' reads on a busy machine.
+    default: 600,
     min: 10,
     max: 3600,
     unit: 's',

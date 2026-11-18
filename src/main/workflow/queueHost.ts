@@ -46,7 +46,7 @@ import { defaultProbe, type ProcessProbe } from './queueProcs'
 import { workflowEnforced, workflowFor } from './service'
 import type { Workflow } from './runtime'
 import { openEntry, type FactData } from '../../shared/workflow/facts'
-import { FOCUSED_PICK_SECONDS, QUEUE_CHECKED_OUT_TARGET, QUEUE_FOCUSED_JOBS, QUEUE_SIGN_SECONDS } from '../../shared/advanced'
+import { FOCUSED_PICK_DEFAULT_S, FOCUSED_PICK_SECONDS, QUEUE_CHECKED_OUT_TARGET, QUEUE_FOCUSED_JOBS, QUEUE_SIGN_SECONDS } from '../../shared/advanced'
 import { childEnv } from '../ptyHost'
 import { pausedFor } from '../teamPause'
 import { queueTransportStore } from '../queueTransportStore'
@@ -359,7 +359,7 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
     // G20 (HI-1367): the pick at the result runs as a check does; its tests and results files in Combwork's own folder.
     focused: {
       env: () => childEnv(),
-      pickTimeoutMs: () => Math.max(10, Number(advanced.get(FOCUSED_PICK_SECONDS)) || 180) * 1000,
+      pickTimeoutMs: () => Math.max(10, Number(advanced.get(FOCUSED_PICK_SECONDS)) || FOCUSED_PICK_DEFAULT_S) * 1000,
       jobs: () => Math.max(1, Number(advanced.get(QUEUE_FOCUSED_JOBS)) || 2),
       dir: join(app.getPath('userData'), 'merge-queue', 'focused')
     },

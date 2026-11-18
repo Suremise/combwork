@@ -27,6 +27,8 @@ import { fallbackEfforts, infoAt, listedConnections, offeredModels } from '../sh
 import { agentRuntime, hooksMissingText, retryWaitText, unknownStateText } from '../shared/runtime'
 import { ASSISTANT_AGENT_ID, ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { shortDuration, timeLeft } from '../shared/progress'
+// How long a finish waits for its run's record as a check, to say how it counted (#1654, HI-3377).
+import { CHECK_REPLY_MS } from '../shared/checkReply'
 import { ProgressError, admitReport, type ProgressCaller } from './progress'
 import { progress, progressGate } from './progressService'
 import { cardOfRef, isCardRef, keysForSearch, withCardNames } from './projectKeys'
@@ -4894,8 +4896,6 @@ route('PATCH', '/v1/progress/:id', async ({ params, body }) =>
   })
 )
 
-/** How long a finish waits for its run's record as a check, to say how it counted (#1654): cw-progress waits a little longer. */
-const CHECK_REPLY_MS = 8000
 
 route('POST', '/v1/progress/:id/finish', async ({ params, body }) => {
   const recording: { check?: Promise<Recorded | null> } = {}

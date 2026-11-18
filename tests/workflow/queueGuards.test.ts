@@ -4,7 +4,7 @@
 // a result counts only for the guards it was checked with: changed after the check, or while it ran, the entry is
 // checked again before the target moves (never advanced on the old green).
 import { afterEach, describe, expect, it } from 'vitest'
-import { commit, GIT_HEAVY_MS, moved, R1, B1, setup, sh, type Env } from './harness'
+import { commit, GIT_HEAVY_MS, moved, R1, B1, refusedBy, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { MERGE_GUARDS_CHECK, type MergeGuard } from '../../src/shared/workflow/mergeGuards'
 import { QUEUE_ADVANCE_GATE } from '../../src/shared/workflow/facts'
@@ -132,6 +132,48 @@ describe('merge guards in the merge queue', () => {
     expect(o).toMatchObject({ outcome: 'integrated' })
     expect(e.wf.state(card).checks.filter((c) => c.name === MERGE_GUARDS_CHECK).map((c) => c.result)).toEqual(['failed', 'passed'])
     expect(e.wf.state(card).entries.at(-1)?.failure).toBeUndefined()
+  })
+
+  // HI-3377: a guard that runs past its time limit is "not checked", the environment's: the card comes back unchanged, told
+  // to submit the same revision again, and that goes straight back into the queue; nothing merges on it, and a match is
+  // still the work's (returned to fix, not again unchanged).
+  it('a guard past its time limit: not checked, transient; the same revision goes back, at most twice; nothing merged', { timeout: GIT_HEAVY_MS }, async () => {
+    const runaway: MergeGuard = { name: 'Runaway', pattern: '^(a+)+$', message: 'n/a' }
+    // The pattern can't meet a limit (2^40 steps): the submit's early warning stops at it too, saying nothing.
+    const limits = () => ({ timeoutMs: 300, maxLines: 200_000 }) // timing-ok: the limit under test, which the pattern can't meet
+    const e = (env = setup({ ...preset('git', 'team', { quick: [], tests: [] }), preChecks: [], okBefore: { mode: 'never', labels: [] }, mergeChecks: [], commands: {}, mergeGuards: [runaway] }, { guardLimits: limits }))
+    const card = await queued(e, { 'src/a.txt': `${'a'.repeat(40)}!\n` })
+    const before = mainHead(e)
+    const revision = e.wf.state(card).latest!.revision
+    // The worker is ended mid-match.
+    const q = e.queue({ guardLimits: limits })
+    for (let round = 0; round < 3; round++) {
+      expect((await q.drain('main'))[0]).toMatchObject({ outcome: 'returned', reason: 'checks', transient: true })
+      expect(mainHead(e)).toBe(before)
+      const s = e.wf.state(card)
+      expect(s.entries.at(-1)!.failure).toMatchObject({ check: MERGE_GUARDS_CHECK, transient: true, guards: { hits: [], incomplete: 'timedOut:Runaway' } })
+      // Uncounted: no proof for an advance.
+      expect(s.checks.filter((c) => c.name === MERGE_GUARDS_CHECK).at(-1)).toMatchObject({ result: 'failed', counted: false })
+      // The builder's wake: why, in the guards' own words, then the next step for a failure of the environment.
+      const wake = e.wakes.filter((w) => w.card === card.key).at(-1)!.why
+      expect(wake).toContain('guard "Runaway" ran past its time limit')
+      expect(wake).toContain('Submit the same revision again (cw_submit): it goes straight back into the queue, at most twice in a row.')
+      if (round === 2) break
+      const again = await e.wf.submit(card.key, B1, { summary: 'again' })
+      moved(again)
+      expect(again.data).toMatchObject({ requeued: true })
+      expect(e.wf.state(card).latest!.revision).toBe(revision)
+    }
+    // The cap stands: a third unchanged one is refused.
+    expect(refusedBy(await e.wf.submit(card.key, B1, { summary: 'again' }), 'requeue.allowed').message).toContain('sent back unchanged 2 times already')
+  })
+
+  it('a match stays the work’s: returned to be fixed, never as transient', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = team([secrets])
+    const card = await queued(e, { 'src/a.txt': 'my secret\n' })
+    expect((await e.queue().drain('main'))[0]).toMatchObject({ outcome: 'returned', reason: 'checks', transient: false })
+    const wake = e.wakes.filter((w) => w.card === card.key).at(-1)!.why
+    expect(wake).not.toContain('Submit the same revision again')
   })
 
   // HI-3363: the host makes a new MergeQueue for each run, so the Approve of Ask each time is taken by another queue than

@@ -4673,8 +4673,7 @@
     "tests/mergeGuards.test.ts": [
       "msConstant const HUNG_MS = 30_000",
       "timeout await checkMergeGuards(runaway, async () => ({ text }), { timeoutMs: 200, maxLines: 10 })",
-      "timeout const r = await checkMergeGuards(runaway, async () => ({ text }), { timeoutMs: 300, maxLines: 10 })",
-      "timeout expect(await previewMergeGuard(root, null, [], guard(), { timeoutMs: 0 })).toMatchObject({ incomplete: 'timedOut' })"
+      "timeout const r = await checkMergeGuards(runaway, async () => ({ text }), { timeoutMs: 300, maxLines: 10 })"
     ],
     "tests/mergeSlots.test.ts": [
       "clockAssert expect(MAX_WAIT_MS).toBeLessThan(300_000)"
