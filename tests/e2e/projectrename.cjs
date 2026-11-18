@@ -183,11 +183,26 @@ const oldCard = (n, proj, agent) =>
   await lib.answersDrawn(inv, page)
   await r.app.evaluate(() => void delete process.env.CW_TEST_SLOW_IPC)
   check("the card write's refresh, slowed past 2 s, was read before the rename began", (await boardReads()) > readsBefore, `${readsBefore} → ${await boardReads()}`)
+  // HR1's round 2: a read of the board or the projects can find the moved folder itself and tell it (projectIds, after its
+  // cache's second), so the rename's own telling is waited for with every such call of the window and the suite held in
+  // main (CW_TEST_HOLD_IPC, before their handlers run): only Combwork's own discovery can tell it then. None answered
+  // meanwhile, checked; then they go, and the board and the card list are read.
+  const PROBES = ['tasks:list', 'tasks:changes', 'board:state', 'board:stages', 'project:keys', 'project:movedCardNames', 'workspace:get', 'workspace:refresh']
+  const probesAnswered = async () => (await Promise.all(PROBES.map((c) => lib.ipcSettled(r.app, c)))).reduce((a, b) => a + b, 0)
+  const holdProbes = (on) => r.app.evaluate((_e, v) => void (v ? (process.env.CW_TEST_HOLD_IPC = v) : delete process.env.CW_TEST_HOLD_IPC), on ? PROBES.join(',') : null)
+  await holdProbes(true)
+  const probesBefore = await probesAnswered()
   const toldBefore = boardTold()
   await rename(beta, delta)
-  check('a project renamed while Combwork runs keeps its cards', !!(await lib.until(async () => (await cards()).find((c) => c.number === live.number)?.project === 'delta', lib.timing('hang.ui'))), JSON.stringify((await cards()).find((c) => c.number === live.number)?.project))
-  check('…the rename told to the window by an event of its own, after it', !!(await lib.until(() => boardTold() > toldBefore, lib.timing('hang.ui'))), events.text.slice(-300))
+  let told = false
+  try {
+    told = !!(await lib.until(() => boardTold() > toldBefore, lib.timing('hang.ui')))
+    check('…the rename told to the window by an event of its own, with no read of the board or the projects answered meanwhile', told && (await probesAnswered()) === probesBefore, `told ${told}, reads answered ${probesBefore} → ${await probesAnswered()}; ${events.text.slice(-300)}`)
+  } finally {
+    await holdProbes(false)
+  }
   check('…and the board lists it under the new name', !!(await lib.until(async () => /delta/.test(await page.locator(`.task-card[data-task="${live.number}"]`).innerText().catch(() => '')), lib.timing('hang.ui'))))
+  check('a project renamed while Combwork runs keeps its cards', !!(await lib.until(async () => (await cards()).find((c) => c.number === live.number)?.project === 'delta', lib.timing('hang.ui'))), JSON.stringify((await cards()).find((c) => c.number === live.number)?.project))
   stream.abort()
   const sidebar = async () => (await inv('workspace:get'))?.projects?.map((p) => p.name) ?? []
   check('…and the project list says delta, not beta', !!(await lib.until(async () => {
