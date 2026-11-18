@@ -240,6 +240,8 @@
   "actions.startFresh.why.waiting": "返答待ち：そのまま",
   "actions.startFresh.why.watching": "カードを監視中：そのまま",
   "actions.startFresh.why.working": "作業中：そのまま",
+  "actions.stillStopping.message": "ほかの操作は行われていません。停止してからもう一度お試しください。",
+  "actions.stillStopping.title": "{named, select, yes {{agent} はまだ停止中です} other {{n, plural, other {# 個のエージェントがまだ停止中です}}}}",
   "actions.stop.confirm": "停止",
   "actions.stop.detail": "会話は保存され、後で再開できます。",
   "actions.stop.failed": "セッションを停止できませんでした",

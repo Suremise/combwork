@@ -240,6 +240,8 @@
   "actions.startFresh.why.waiting": "t’attend : reste tel quel",
   "actions.startFresh.why.watching": "surveille des cartes : reste tel quel",
   "actions.startFresh.why.working": "travaille : reste tel quel",
+  "actions.stillStopping.message": "Rien d’autre n’a été fait. Réessayez une fois l’arrêt terminé.",
+  "actions.stillStopping.title": "{named, select, yes {{agent} est encore en cours d’arrêt} other {{n, plural, one {Un agent est encore en cours d’arrêt} many {# agents sont encore en cours d’arrêt} other {# agents sont encore en cours d’arrêt}}}}",
   "actions.stop.confirm": "Arrêter",
   "actions.stop.detail": "La conversation est conservée et pourra être reprise plus tard.",
   "actions.stop.failed": "Impossible d’arrêter la session",

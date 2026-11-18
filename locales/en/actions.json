@@ -963,6 +963,14 @@
     "defaultMessage": "working: left as it is",
     "description": "Start Fresh (Idle Agents)' list (#1437): this agent is in a turn (or starting), so it keeps its conversation."
   },
+  "actions.stillStopping.message": {
+    "defaultMessage": "Nothing else was done. Try again once it has stopped.",
+    "description": "Under the warning that an agent is still stopping (HI-3376): what was asked after stopping it was not done."
+  },
+  "actions.stillStopping.title": {
+    "defaultMessage": "{named, select, yes {{agent} is still stopping} other {{n, plural, one {An agent is still stopping} other {# agents are still stopping}}}}",
+    "description": "A warning's title (HI-3376): an agent ({agent}, its name; named: yes), or {n} of a project's agents, hadn't stopped after a minute, so what was asked next (restart, resume, remove, rename…) wasn't done."
+  },
   "actions.stop.confirm": {
     "defaultMessage": "Stop",
     "description": "Button: stops the session."

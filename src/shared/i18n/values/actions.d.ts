@@ -242,6 +242,8 @@ interface CombworkMessageValues {
   'actions.startFresh.why.waiting': undefined
   'actions.startFresh.why.watching': undefined
   'actions.startFresh.why.working': undefined
+  'actions.stillStopping.message': undefined
+  'actions.stillStopping.title': { named: string; agent: string | number; n: number }
   'actions.stop.confirm': undefined
   'actions.stop.detail': undefined
   'actions.stop.failed': undefined

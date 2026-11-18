@@ -240,6 +240,8 @@
   "actions.startFresh.why.waiting": "wartet auf dich: bleibt unverändert",
   "actions.startFresh.why.watching": "beobachtet Karten: bleibt unverändert",
   "actions.startFresh.why.working": "arbeitet: bleibt unverändert",
+  "actions.stillStopping.message": "Sonst wurde nichts ausgeführt. Versuchen Sie es erneut, sobald er gestoppt ist.",
+  "actions.stillStopping.title": "{named, select, yes {{agent} wird noch gestoppt} other {{n, plural, one {Ein Agent wird noch gestoppt} other {# Agenten werden noch gestoppt}}}}",
   "actions.stop.confirm": "Stoppen",
   "actions.stop.detail": "Die Unterhaltung bleibt erhalten und lässt sich später fortsetzen.",
   "actions.stop.failed": "Sitzung konnte nicht gestoppt werden",

@@ -240,6 +240,8 @@
   "actions.startFresh.why.waiting": "正在等你：保持原样",
   "actions.startFresh.why.watching": "正在监视卡片：保持原样",
   "actions.startFresh.why.working": "工作中：保持原样",
+  "actions.stillStopping.message": "未执行其他操作。请在它停止后重试。",
+  "actions.stillStopping.title": "{named, select, yes {{agent} 仍在停止} other {{n, plural, other {# 个代理仍在停止}}}}",
   "actions.stop.confirm": "停止",
   "actions.stop.detail": "对话会保留，之后可以恢复。",
   "actions.stop.failed": "无法停止会话",
