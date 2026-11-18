@@ -2568,11 +2568,21 @@ export class Workflow {
     if (!answerFits(req, { outcome: answer, reply: !!note, decision: !!opts.decided, choice, rounds: opts.rounds, action }, LANE_MAX_ROUNDS)) throw new Error(`an answer (${answer}${choice ? `, ${choice}` : ''}) that doesn't fit request ${request} (${req.kind}, ${req.gate})`) // i18n-ignore: a programming error (tasks.ts checks first, in the user's words)
     const rounds = choice === 'carryOn' ? opts.rounds : undefined
     await this.cfg.hooks?.beforeWrite?.('answer')
-    if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.answer(ref, request, answer, opts))
+    // HI-3391: as a verdict's (HI-3216): gathered again while only its fingerprint moved, or can't be read at that instant,
+    // as often as its platform allows. jj's head moves with any jj operation in the repository (another lane's commit, a
+    // review copy's checkout), which changes nothing the answer decides on; a change by content still refuses at once.
+    const gathers = this.platform(r.options).gathers ?? 1
+    if (await this.revalidate(card, s, r.options, before, gathers, 'answer')) return this.regather(card, () => this.answer(ref, request, answer, opts))
+    let evidenceMoved = false
     const out = await this.write(card, r, by, (w) => {
       // Under the transaction: the request still open (a newer submission retires the old one's), the card where it was.
-      const changed = this.stillAt(w, s, 'answer') ?? this.evidenceChanged(w, r.options, before)
-      if (changed) return changed
+      const stale = this.stillAt(w, s, 'answer')
+      if (stale) return stale
+      const changed = this.evidenceChanged(w, r.options, before)
+      if (changed) {
+        evidenceMoved = true
+        return changed
+      }
       const st = w.state()
       if (!st.requests.some((x) => x.request === request)) return { rule: 'move.notFromHere', values: { card: card.key, stage: st.stage, move: 'answer', moves: '' } } as GuardRefusal
       w.fact('Approval', { request, answer, ...(note ? { note } : {}), generation: st.generation, ...(req.submission !== undefined ? { submission: req.submission } : {}), ...(choice ? { choice } : {}), ...(rounds ? { rounds } : {}), ...(action ? { action } : {}) }) // i18n-ignore: a fact's kind and codes, not text
@@ -2649,6 +2659,16 @@ export class Workflow {
       if (!w.woken.includes(builder ?? '')) this.wake(w, builder, said)
       return null
     })
+    // HI-3391: its fingerprint moved again between the last gather and the write, its answer by content the same, or
+    // unreadable at that instant (a verdict's rule): gathered again from the top while its platform allows more passes.
+    if (out && evidenceMoved) {
+      const again = gathers > 1 && this.gathering.depth(card.id) < gathers ? await this.gatherAgain(card, s, r.options, before) : null
+      if (again) {
+        this.passLog(card, 'answer', 'write', again, gathers)
+        return this.regather(card, () => this.answer(ref, request, answer, opts))
+      }
+      log.info(`#${card.id}'s answer refused: evidence.changed at its write, pass ${this.gathering.depth(card.id) + 1} of ${gathers} (${this.noPassWhy(card, gathers)})`)
+    }
     if (out) return this.refuse(card, by, 'answer', out)
     return this.ok(card, from, this.state(card).stage)
   }
