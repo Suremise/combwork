@@ -74,7 +74,7 @@ const wrap = (args, apiUrl) =>
 
   const t0 = Date.now()
   const away = await wrap(['--', 'node', '-e', "console.log('still runs'); process.exit(4)"], 'http://127.0.0.1:9')
-  check('Combwork unreachable: the command runs as usual, quickly', away.code === 4 && away.out === 'still runs\n' && Date.now() - t0 < 8000, JSON.stringify(away))
+  check('Combwork unreachable: the command runs as usual, quickly', away.code === 4 && away.out === 'still runs\n' && Date.now() - t0 < lib.timing('budget.unreachableRunMs'), JSON.stringify(away))
 
   // An Electron app run through cw-progress (itself run by Combwork's executable as Node) starts as an app, exactly as
   // when run directly: ELECTRON_RUN_AS_NODE, the shims' setting for the wrapper, isn't passed on. Reporting on,

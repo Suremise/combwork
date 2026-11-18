@@ -222,7 +222,7 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     const pid = JSON.parse(fs.readFileSync(path.join(shop, '.combwork', 'project.json'), 'utf8')).id
     const dbFile = path.join(ws, '.combwork', 'combwork.db')
     const metaRead = (sql, ...a) => {
-      const db = new DatabaseSync(dbFile, { readOnly: true, timeout: 5000 })
+      const db = new DatabaseSync(dbFile, { readOnly: true, timeout: lib.timing('db.busyMs') })
       try {
         return db.prepare(sql).all(...a)
       } finally {

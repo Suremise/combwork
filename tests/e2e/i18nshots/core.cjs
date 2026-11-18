@@ -2,6 +2,7 @@
 // prototype translated, reached with locale-independent means only: IPC, the Agent API, command ids and structural
 // hooks (data-stat, data-run, data-agent, data-action, classes), never English text. The route runs them first, in this
 // order, in one window per language: see tests/e2e/i18nshots.cjs for the case format and what ctx holds.
+const { timing } = require('../../timing.cjs')
 
 /** Waits for a locator to be on the page; throws saying what didn't show. */
 async function shown(ctx, locator, what) {
@@ -39,7 +40,7 @@ async function banner(ctx) {
 async function closeBanner(ctx) {
   const { page, lib, inv, agents, project } = ctx
   const close = page.locator('.popups .popup-close')
-  if (!(await lib.until(async () => (await close.count()) === 0 || (await close.first().click({ timeout: 2000 }).then(() => false, () => false)), ctx.hungMs))) throw new Error("the banners didn't close")
+  if (!(await lib.until(async () => (await close.count()) === 0 || (await close.first().click({ timeout: timing('poll.clickMs') }).then(() => false, () => false)), ctx.hungMs))) throw new Error("the banners didn't close")
   await ctx.setFocus(false)
   for (const a of agents) await inv('session:stop', project, a.id)
   if (!(await lib.until(async () => (await liveOf(ctx)).every((s) => !s || s.status === 'stopped' || s.status === 'exited'), ctx.hungMs))) throw new Error("the agents didn't stop")
@@ -101,7 +102,7 @@ async function openCards(ctx) {
 /** Its Cancel (the first subtle button): Four and its cards stay. */
 async function closeDialog(ctx) {
   const { page, lib } = ctx
-  const cancel = () => page.locator('.dialog').last().locator('button.subtle').first().click({ timeout: 2000 }).then(() => false, () => false)
+  const cancel = () => page.locator('.dialog').last().locator('button.subtle').first().click({ timeout: timing('poll.clickMs') }).then(() => false, () => false)
   if (!(await lib.until(async () => (await page.locator('.dialog').count()) === 0 || (await cancel()), ctx.hungMs))) throw new Error("the dialog didn't close")
   await ctx.command('project.tab.session')
 }

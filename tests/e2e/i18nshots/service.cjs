@@ -6,6 +6,7 @@
 // the file's own. Each case's close() puts back what it changed. The area's refusals reach the window through IPC,
 // which tests/i18n/service.test.ts checks in another language.
 const fs = require('fs')
+const { timing } = require('../../timing.cjs')
 const path = require('path')
 const { execFileSync } = require('child_process')
 
@@ -64,7 +65,7 @@ async function diffTooLarge(ctx) {
   const folderPicked = async () => {
     if (!(await picker.count())) return true
     if ((await picker.first().inputValue().catch(() => null)) === '') return true
-    await picker.first().selectOption({ value: '' }, { timeout: 2000 }).catch(() => undefined)
+    await picker.first().selectOption({ value: '' }, { timeout: timing('poll.clickMs') }).catch(() => undefined)
     return false
   }
   await folderPicked()
@@ -76,14 +77,14 @@ async function diffTooLarge(ctx) {
   const started = Date.now()
   const opened = await ctx.lib.until(async () => {
     if (!(await folderPicked()) || !(await own.count())) return false
-    await own.click({ timeout: 2000 }).catch(() => undefined)
-    return ((await shownFile.textContent({ timeout: 500 }).catch(() => null)) ?? '').endsWith(BIG)
+    await own.click({ timeout: timing('poll.clickMs') }).catch(() => undefined)
+    return ((await shownFile.textContent({ timeout: timing('poll.readMs') }).catch(() => null)) ?? '').endsWith(BIG)
   }, ctx.hungMs)
   // How long finding its diff took, for comparing runs (HI-1914).
   console.log(`${ctx.lang}: diff-too-large: its diff ${opened ? 'shown' : 'not shown'} after ${Date.now() - started} ms, ${await rows.count()} rows`)
   if (!opened) {
     // What the tab showed instead: its rows, the file shown, and the picker's choice.
-    const seen = { rows: await rows.allTextContents().catch(() => []), shown: await shownFile.textContent({ timeout: 500 }).catch(() => null), picker: (await picker.count()) ? await picker.first().inputValue().catch(() => null) : null }
+    const seen = { rows: await rows.allTextContents().catch(() => []), shown: await shownFile.textContent({ timeout: timing('poll.readMs') }).catch(() => null), picker: (await picker.count()) ? await picker.first().inputValue().catch(() => null) : null }
     throw new Error(`the big file did not show in the Changes tab: ${JSON.stringify(seen).slice(0, 600)}`)
   }
   await shown(ctx, page.locator('.split-main .editor-host .empty-state'), 'the note in place of its changes')
