@@ -21,12 +21,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms) => {
-  const t = Date.now()
-  let v
-  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-  return v
-}
+const until = lib.until
 
 ;(async () => {
   for (const d of [userData, ws, claudeHome, shots]) fs.rmSync(d, { recursive: true, force: true })
@@ -65,11 +60,7 @@ const until = async (fn, ms) => {
   // before any turn (HI-2688): its start, restart or resume
   check('three agents start', !!(await until(async () => (await all()).every((s) => s?.status === 'ready'), lib.timing('hang.step'))))
   await page.getByText('alpha', { exact: true }).first().click()
-  const send = async (a, text) => {
-    await inv('pty:write', lib.ptyKey(alpha, a.id), text)
-    await lib.sleep(100)
-    await inv('pty:write', lib.ptyKey(alpha, a.id), '\r')
-  }
+  const send = (a, text) => lib.typeThenEnter(inv, lib.ptyKey(alpha, a.id), text)
 
   // --- The sign-in expires: every agent's next turn is refused.
   expire(true)
@@ -77,7 +68,7 @@ const until = async (fn, ms) => {
   check('each shows needs sign-in', !!(await until(async () => (await all()).every((s) => s?.status === 'signin'), lib.timing('hang.ui'))), JSON.stringify((await all()).map((s) => s?.status)))
   const states = await all()
   check("each keeps the CLI's message beside its status", states.every((s) => s?.signIn?.message === 'Login expired · Please run /login' && !s.statusMessage), JSON.stringify(states.map((s) => [s?.signIn, s?.statusMessage])))
-  await lib.sleep(4500) // A fixed wait on purpose: it waits out the gathering window (agents refused together are told in one notification) to show only one arrives.
+  await lib.sleep(lib.timing('quiet.signInGatherMs')) // A quiet window on purpose: it waits out the gathering window (agents refused together are told in one notification) to show only one arrives.
   const told = signInNotes()
   check('one notification for the three', told.length === 1, JSON.stringify(told))
   check('it counts them and says how to sign in', told[0]?.title === '3 agents need you to sign in to Claude Code' && /\/login/.test(told[0]?.body ?? '') && /Provider Setup/.test(told[0]?.body ?? ''), JSON.stringify(told[0]))
@@ -96,7 +87,7 @@ const until = async (fn, ms) => {
   await send(agents[0], 'try once more')
   await until(async () => (await live(agents[0]))?.status === 'working', HUNG_MS)
   await until(async () => (await live(agents[0]))?.status === 'signin', lib.timing('hang.ui'))
-  await lib.sleep(4000) // A fixed wait on purpose: a second notification would arrive within the gathering window.
+  await lib.sleep(lib.timing('quiet.signInGatherMs')) // A quiet window on purpose: a second notification would arrive within the gathering window.
   check('a later refusal in the same expiry is not told again', signInNotes().length === 1, JSON.stringify(signInNotes()))
 
   // --- /login in Ada's terminal: Ada carries on by itself; the others are idle again, for Resume (n).
@@ -115,7 +106,7 @@ const until = async (fn, ms) => {
   }, lib.timing('hang.ui'))
   check('Provider Setup shows it signed in again', !!back && !(back.readiness ?? []).some((r) => r.id === 'signed-out'), JSON.stringify(back?.readiness))
   const resume = page.locator('.project-header button.act-resume', { hasText: 'Resume (2)' })
-  check('Resume (n) counts the two still stopped', (await until(async () => ((await resume.count()) === 1 ? true : null), 5000)) === true)
+  check('Resume (n) counts the two still stopped', (await until(async () => ((await resume.count()) === 1 ? true : null), lib.timing('hang.ui'))) === true)
   await page.screenshot({ path: path.join(shots, 'signin-2-signed-in-again.png') })
 
   // --- Resume (n): a short "carry on" in each, and they finish.

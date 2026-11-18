@@ -82,7 +82,7 @@ const HUNG_MS = lib.timing('hang.ui')
       // A cut name, focused by the keyboard, shows in full (HI-2531's tooltip).
       await page.keyboard.press('Home')
       for (let n = 0; n < cutAt; n++) await page.keyboard.press('ArrowDown')
-      const tip = await lib.until(async () => { const t = await page.locator('.tip:visible').last().innerText({ timeout: 1000 }).catch(() => ''); return t === all[cutAt].text && t }, HUNG_MS)
+      const tip = await lib.until(async () => { const t = await page.locator('.tip:visible').last().innerText({ timeout: lib.timing('poll.readMs') }).catch(() => ''); return t === all[cutAt].text && t }, HUNG_MS)
       check(`${what}: a cut name shows in full when the keyboard focuses it`, tip === all[cutAt].text, `${tip} (${all[cutAt].text})`)
       // While a search shows every section, none is chosen: the first row is in the Tab order, and Enter or Space chooses.
       await search.fill('a')

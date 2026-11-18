@@ -29,7 +29,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `projec
 const shots = async (page, name) => {
   await shot(page, `${name}-dark`)
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
-  await lib.sleep(200)
+  await lib.themeShown(page, 'light')
   await shot(page, `${name}-light`)
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
 }
@@ -40,7 +40,7 @@ const rename = async (from, to) => {
       return fs.renameSync(from, to)
     } catch (e) {
       if (i >= 40 || !['EPERM', 'EBUSY', 'EACCES'].includes(e.code)) throw e
-      await lib.sleep(250)
+      await lib.sleep(lib.timing('pace.folderRenameAgainMs'))
     }
   }
 }
@@ -156,7 +156,7 @@ const oldCard = (n, proj, agent) =>
   // Shown on the board, then a pause on purpose: the card's own write has been told and read before the rename, so only
   // the rename can bring the new name to the board (#508 round 1: a late write's notice had hidden that it didn't).
   check('the board shows the card under beta', !!(await lib.until(async () => /beta/.test(await page.locator(`.task-card[data-task="${live.number}"]`).innerText().catch(() => '')), lib.timing('hang.ui'))))
-  await lib.sleep(2000) // on purpose: the card write above is told and read first
+  await lib.sleep(lib.timing('quiet.writeToldMs')) // A quiet window on purpose: the card write above is told and read first, so only the rename can rename it
   await rename(beta, delta)
   check('a project renamed while Combwork runs keeps its cards', !!(await lib.until(async () => (await cards()).find((c) => c.number === live.number)?.project === 'delta', lib.timing('hang.ui'))), JSON.stringify((await cards()).find((c) => c.number === live.number)?.project))
   check('…and the board lists it under the new name', !!(await lib.until(async () => /delta/.test(await page.locator(`.task-card[data-task="${live.number}"]`).innerText().catch(() => '')), lib.timing('hang.ui'))))
@@ -165,7 +165,7 @@ const oldCard = (n, proj, agent) =>
     const names = await sidebar()
     return names.includes('delta') && !names.includes('beta')
   }, lib.timing('hang.ui'))), JSON.stringify(await sidebar()))
-  await page.locator('.sidebar', { hasText: 'delta' }).first().waitFor({ timeout: 5000 }).catch(() => undefined)
+  await page.locator('.sidebar', { hasText: 'delta' }).first().waitFor({ timeout: lib.timing('hang.ui') }).catch(() => undefined)
   await shots(page, 'live-rename')
 
   await r.app.close()

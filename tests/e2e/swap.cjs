@@ -151,15 +151,18 @@ const check = (name, ok, extra = '') => {
   await page.mouse.move(s.x, s.y)
   await page.mouse.down()
   await page.mouse.move(s.x + 8, s.y, { steps: 3 })
-  await lib.sleep(150)
+  // The drag under way: its drop targets drawn.
+  await lib.until(async () => (await page.locator('.pane-drop').count()) > 0, HUNG_MS)
   const p1 = await at(page.locator('.page-switch button[aria-label="Agent page 1"]'))
   await page.mouse.move(p1.x, p1.y, { steps: 8 })
-  await lib.sleep(150)
+  // A gesture's pace, not a wait for a state: held still, then a small move so the page hears where it stopped.
+  await lib.sleep(lib.timing('pace.dragMoveMs'))
   await page.mouse.move(p1.x + 1, p1.y, { steps: 2 })
   check('held over page 1, it shows (the dragged pane is gone)', !!(await lib.until(async () => (await activePage()) === 1, HUNG_MS)) && (await page.locator('.pane-drop').count()) === 3)
   await page.keyboard.press('Escape')
   await page.mouse.up()
-  await lib.sleep(400)
+  // The drag over: its drop targets gone (a drop would have been taken at the release).
+  await lib.until(async () => (await page.locator('.pane-drop').count()) === 0, HUNG_MS)
   check('Escape ends the drag at once: no drop targets or drag marks left', (await page.locator('.pane-drop').count()) === 0 && (await page.locator('.pane-header-bar.dragging, .page-switch button.drop-target').count()) === 0, `${await page.locator('.pane-drop').count()} drop targets`)
   check('…and nothing moved', saved().join(',') === before && (await matches()), `${saved()} vs ${before}`)
   check('…and One still runs its session', (await live(one.id))?.sessionId === session)
@@ -188,13 +191,15 @@ const check = (name, ok, extra = '') => {
   await page.mouse.move(t2.x, t2.y)
   await page.mouse.down()
   await page.mouse.move(t2.x + 8, t2.y, { steps: 3 })
-  await lib.sleep(150)
+  await lib.until(async () => (await page.locator('.pane-drop').count()) > 0, HUNG_MS)
+  // A gesture's pace, not a wait for a state: held still, then a small move, each a beat, all well under the 600 ms
+  // page switch.
   const hover = async (loc) => {
     const b = await at(loc)
     await page.mouse.move(b.x, b.y, { steps: 8 })
-    await lib.sleep(120)
+    await lib.sleep(lib.timing('pace.pageHoverBeatMs'))
     await page.mouse.move(b.x + 1, b.y, { steps: 2 })
-    await lib.sleep(120)
+    await lib.sleep(lib.timing('pace.pageHoverBeatMs'))
   }
   const button = (n) => page.locator(`.page-switch button[aria-label="Agent page ${n}"]`)
   await hover(button(2))
@@ -203,7 +208,7 @@ const check = (name, ok, extra = '') => {
   check("…while page 1's button is one (it has empty cells)", (await button(1).getAttribute('class'))?.includes('drop-target'), await button(1).getAttribute('class'))
   await hover(button(2))
   await page.mouse.up()
-  await lib.sleep(400)
+  await lib.until(async () => (await page.locator('.pane-drop, .page-switch button.drop-target').count()) === 0, HUNG_MS)
   check("released on its own page's button: nothing moved, the drag has ended", saved().join(',') === order && (await matches()) && (await page.locator('.pane-drop, .page-switch button.drop-target').count()) === 0, `${saved()} / ${await paneNames()}`)
   await page.screenshot({ path: path.join(lib.WORK, 'swap-done.png') })
   check('One still runs its own session', (await live(one.id))?.sessionId === session)

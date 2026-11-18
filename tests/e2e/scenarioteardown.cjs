@@ -95,7 +95,7 @@ const scenario = {
   check('the wait went on through them and ended on the whole row', (await waited) === 4242 && states.length >= 4 && states.slice(0, -1).every((x) => x === null), JSON.stringify(states))
 
   for (const run of [1, 2]) {
-    const r = await runScenario(scenario, 'fake', { workRoot, port: lib.port(47824), timeoutMs: 60000 })
+    const r = await runScenario(scenario, 'fake', { workRoot, port: lib.port(47824), timeoutMs: lib.timing('scenario.fakeTurnMs') })
     const pid = seen[run - 1]
     check(`run ${run}: the scenario ran (no error)`, !r.error, r.error)
     check(`run ${run}: its agent left a command running through cw-progress`, r.checks.length === 1 && r.checks[0].ok === true, JSON.stringify(r.checks))
@@ -123,7 +123,7 @@ const scenario = {
       ]
     }
   }
-  const u = await runScenario(unnamed, 'fake', { workRoot, port: lib.port(47824), timeoutMs: 60000 })
+  const u = await runScenario(unnamed, 'fake', { workRoot, port: lib.port(47824), timeoutMs: lib.timing('scenario.fakeTurnMs') })
   check('unnamed: the scenario ran (no error)', !u.error, u.error)
   check('unnamed: its agent left a command naming no scenario folder, its parent gone', u.checks.length === 2 && u.checks.every((c) => c.ok === true), JSON.stringify(u.checks))
   check('unnamed: the harness stopped it, and counts it', /^[1-9]\d* process\(es\).*were stopped/.test(u.leftOver ?? ''), u.leftOver)

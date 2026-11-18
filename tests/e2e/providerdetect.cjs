@@ -22,7 +22,8 @@ const userData = path.join(lib.WORK, 'provdetect-profile')
 const ws = path.join(lib.WORK, 'provdetect-ws')
 const claudeHome = path.join(lib.WORK, 'provdetect-claude-home')
 const codexHome = path.join(lib.WORK, 'provdetect-codex-home')
-const HOLD_MS = 12000
+// How long Claude Code's detection is held back (CW_TEST_SLOW_DETECT): Codex's must come well within it.
+const HOLD_MS = lib.timing('seam.slowDetectMs')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
