@@ -1037,9 +1037,13 @@ describe('a commit or stash past its bound (HI-3021)', () => {
       },
       { timeout: 20_000 }
     )
-    ids.push(...identities(first))
     expect(existsSync(lockPath())).toBe(false)
     sh(proj, 'add', 'b.txt')
+    // The add overlapped the hold (HR2's round 1): done before the first refresh's bound, and its nodes, identified only
+    // now, still running after it. Checked once the Commit has settled.
+    const added = Date.now()
+    const firstIds = identities(first)
+    ids.push(...firstIds)
     // The refresh made again from the index the user's add wrote: its own run, established while it holds too.
     const second = vi.waitFor(
       () => {
@@ -1070,6 +1074,8 @@ describe('a commit or stash past its bound (HI-3021)', () => {
         expect(r.at, `refresh ${i + 1}: a node registered only after its bound (${changes.folderChangesBounds.actMs} ms): too little headroom here`).toBeLessThan(refresh[i].at + changes.folderChangesBounds.actMs)
       }
     })
+    expect(added, `the user's add finished only after the first refresh's bound (${changes.folderChangesBounds.actMs} ms): too little headroom here`).toBeLessThan(refresh[0].at + changes.folderChangesBounds.actMs)
+    if (exact) expect(firstIds, "the first refresh's nodes still running after the user's add: else it was ended first, too little headroom here").toHaveLength(2)
     if (exact) expect(ids, 'each node identified while its refresh held').toHaveLength(4)
     // The refresh's outcome comes once its teardown is over (treeEnding): each node already gone. The bound here is for a
     // hung run only.
