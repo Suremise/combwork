@@ -890,12 +890,19 @@ export class JjPlatform implements PlatformAdapter {
   }
 
   /**
-   * HI-3365: whether an attempt of this plan in the cycle ended past the base with nothing moved for a reason of jj's
-   * own (HELD_AFTER_BASE), as the card's comment about it records: it isn't attempted again until the plan changes. Only
-   * a live attempt's answer holds it (recordAdvance's `live`): one recovery classifies after a crash is tried again.
+   * HI-3365: the plans whose live attempt ended past the base with nothing moved for a reason of jj's own
+   * (HELD_AFTER_BASE), each for the jj that answered: not attempted again while the plan, the cycle and jj stay the same.
+   * Kept in memory, so a restart (a Combwork update among them, which may read jj's answers differently) tries once more;
+   * the card's comment is still written once (its meta). One recovery classifies after a crash isn't held.
    */
-  private planHeld(card: CardRecord, s: CardState, planId: string, host: AdvanceHost): boolean {
-    return [...HELD_AFTER_BASE].some((why) => host.refusedFor(card, s.cycle, planId, why))
+  private readonly heldPlans = new Set<string>()
+
+  private heldKey(card: CardRecord, cycle: number, planId: string, runner: JjAdvanceDeps['runner']): string {
+    return `${card.id}:${cycle}:${planId}:${runner.readinessNow().version ?? ''}`
+  }
+
+  private planHeld(card: CardRecord, s: CardState, planId: string, runner: JjAdvanceDeps['runner']): boolean {
+    return this.heldPlans.has(this.heldKey(card, s.cycle, planId, runner))
   }
 
   /** The finish a card's attempts run under now (HI-3236): a clicked preview, else Combwork's own advance. */
@@ -958,7 +965,10 @@ export class JjPlatform implements PlatformAdapter {
       const mode = this.modeOf(wf.store.card(card.id), s)
       if (j.refusedAt && out.code !== 'moved') await host.refused(card, j.plan.cycle, j.planId, { ...this.advanceWords(j, s, out.code, out.detail), mode, next: 'repository' })
       // HI-3365: past the base, for a reason of jj's: not tried again for this plan (planHeld), and the card says why, once.
-      else if (live && !j.refusedAt && HELD_AFTER_BASE.has(out.code)) await host.refused(card, j.plan.cycle, j.planId, { ...this.advanceWords(j, s, out.code, out.detail), mode, next: 'plan' })
+      else if (live && !j.refusedAt && HELD_AFTER_BASE.has(out.code)) {
+        this.heldPlans.add(this.heldKey(card, j.plan.cycle, j.planId, deps.runner))
+        await host.refused(card, j.plan.cycle, j.planId, { ...this.advanceWords(j, s, out.code, out.detail), mode, next: 'plan' })
+      }
       return false
     }
     const stop = { code: out.code, ...(out.detail ? { detail: out.detail } : {}), undo: out.kind === 'stopped' && out.undo, uncertain: out.kind === 'uncertain' }
@@ -1083,7 +1093,7 @@ export class JjPlatform implements PlatformAdapter {
     const ready = await this.advancePlan(c, s, integ)
     if (!ready) return null
     const planId = planIdOf(ready.plan)
-    if (this.planUndone(c, s, planId) || this.planHeld(c, s, planId, host) || !(await this.offerCurrent(ready.plan.target, ready.offer))) return null
+    if (this.planUndone(c, s, planId) || this.planHeld(c, s, planId, integ.runner) || !(await this.offerCurrent(ready.plan.target, ready.offer))) return null
     const refused = await baseRefusalNow(h, this.advanceDeps(integ, journals, () => true), ready.plan)
     if (refused === 'unreadable') return null
     if (refused) {

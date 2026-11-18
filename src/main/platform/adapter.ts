@@ -325,8 +325,6 @@ export interface AdvanceHost {
    * saying why, once per cycle, plan and reason.
    */
   refused(card: CardRecord, cycle: number, plan: string, words: AdvanceWords): Promise<boolean>
-  /** HI-3365: whether the card's comment for `plan` and `why` in `cycle` was written (refused). */
-  refusedFor(card: CardRecord, cycle: number, plan: string, why: string): boolean
   /**
    * HI-3236: the card's preview for `plan` (gate advancePreview, bound to the plan), any earlier preview of the card closed
    * in the same write: false when the card isn't in Approved at `cycle`, or an advance is unsettled.

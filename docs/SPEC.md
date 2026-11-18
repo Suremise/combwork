@@ -4217,11 +4217,12 @@ with s34, its mapping HI-3235/s7, s10, s13 and s16. gate:advance is open.
   itself (HI-3365).
 - **Nothing moved past the base, for a reason of jj's** (HI-3365): the prepare exits non-zero or names no operation
   (`notInHistory`), or names one that isn't the move asked for (`prepareInvalid`). jj answers the same plan the same
-  way (a newer, untested jj whose message differs, say), so the card's comments say why, once per plan and reason, and
-  that comment's record holds the plan for the cycle (`planHeld`); a new plan (the target moved, new work) is
-  attempted. Only a live attempt's answer holds it: the same outcome classified by recovery after a crash is tried
-  again, as is a lease lost to another writer or a read that failed (a lasting read failure stops the base check
-  before any attempt).
+  way (a newer, untested jj whose message differs, say), so the plan isn't attempted again while the plan, the cycle
+  and jj's version stay the same (`planHeld`), and the card's comments say why, once per plan and reason. A new plan
+  (the target moved, new work) or another jj is attempted; the hold is kept in memory, so a restart (a Combwork update
+  that reads jj's answers differently among them) tries once more, without a second comment. Only a live attempt's
+  answer holds it: the same outcome classified by recovery after a crash is tried again, as is a lease lost to
+  another writer or a read that failed (a lasting read failure stops the base check before any attempt).
 - **The steps**, each journaled before its command: `--at-op P0 --no-integrate-operation bookmark move T --from E --to
   R` (O, validated: parent P0, the attempt's marker, its view P0's but for T), `op integrate O`, `git export`, then
   every head, view and the Git side read twice. The lease (the plan unchanged, the card in Approved, the workspace

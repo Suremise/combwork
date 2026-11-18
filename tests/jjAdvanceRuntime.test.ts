@@ -194,6 +194,25 @@ describe.skipIf(!jjExe)(`Combwork's jj advance through the adapter (jj ${TESTED_
       expect(said()).toHaveLength(1)
       expect(w.main()).toBe(head)
       expect(w.wf.state(w.wf.store.card(card.id)).stage).toBe('approved')
+      // Another jj (the user updated it): the same plan is tried once more, then held again; the comment isn't repeated.
+      const newer: typeof real = Object.assign(Object.create(failing) as typeof real, { readinessNow: () => ({ ...real.readinessNow(), version: '9.9.9' }) })
+      w.h.runner = newer
+      await pass(w, card)
+      await pass(w, card)
+      expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(2)
+      expect(said()).toHaveLength(1)
+      // jj makes the move again and the target moves (another card's work): a new plan, attempted and integrated.
+      w.h.runner = real
+      w.h.jj(w.repo, 'new', 'main', '-m', 'later work')
+      writeFileSync(join(w.repo, 'later.txt'), 'later\n')
+      w.h.jj(w.repo, 'commit', '-m', 'later work')
+      w.h.jj(w.repo, 'bookmark', 'set', 'main', '-r', '@-')
+      w.h.jj(w.repo, 'git', 'export')
+      await pass(w, card)
+      await pass(w, card)
+      expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(3)
+      expect(facts(w, card, 'Integrated')).toHaveLength(1)
+      expect(w.wf.state(w.wf.store.card(card.id)).stage).toBe('done')
     } finally {
       w.h.runner = real
     }
