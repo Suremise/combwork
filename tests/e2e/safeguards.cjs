@@ -61,12 +61,7 @@ const check = (name, ok, extra = '') => {
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const live = async (p, agentId) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === agentId)
-    const until = async (fn, ms) => {
-      const t = Date.now()
-      let v
-      while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-      return v
-    }
+    const until = lib.until
     const notices = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((e) => e.kind === 'notification')
     const hooksLog = path.join(userData, 'logs', 'hooks.log')
     const notifications = () => (fs.existsSync(hooksLog) ? fs.readFileSync(hooksLog, 'utf8').split('\n').filter((l) => / Notification /.test(l)).length : 0)

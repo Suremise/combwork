@@ -21,7 +21,7 @@ const { processes, descendantsIn, suspensions } = require('../folderProcesses.cj
 const { startFakeCopilotApi, copilotTestEnv, copilotInstalled } = require('../fake-copilot-api.cjs')
 const { doorbellIds: doorbellsIn, newDelivery } = require('./doorbells.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 /** How long the CLI stays suspended once Combwork has written the line: input it then reads in one go. */
 const PAUSES = [0, 1500, 3000]
 

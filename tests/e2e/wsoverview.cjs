@@ -49,12 +49,7 @@ const check = (name, ok, extra = '') => {
   const { app, page, inv } = await lib.launch({ userData, viewport: { width: 1400, height: 950 } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, ws)
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
-    return v
-  }
+  const until = lib.until
   // delta is hidden: left out, with a note.
   await inv('project:remove', path.join(ws, 'delta'), 'hide')
   await inv('tasks:create', { title: 'Plan', project: 'alpha' })

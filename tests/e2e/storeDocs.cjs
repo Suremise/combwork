@@ -4,6 +4,8 @@
 const fs = require('fs')
 const path = require('path')
 const { DatabaseSync } = require('node:sqlite')
+// HI-3378: the tests' one timing file, by name.
+const { timing } = require('../timing.cjs')
 const codec = require('./sessionDeliveryCodec.cjs')
 
 /** Whether the file has a table (sessions' and deliveries' are 1.0's, #1211: a 0.9 file keeps them in store_rows). */
@@ -37,7 +39,7 @@ function watchOf(w) {
 function storeDocs(ws, store, scope = '') {
   const file = path.join(ws, '.combwork', 'combwork.db')
   if (!fs.existsSync(file)) return []
-  const db = new DatabaseSync(file, { readOnly: true, timeout: 5000 })
+  const db = new DatabaseSync(file, { readOnly: true, timeout: timing('db.busyMs') })
   try {
     const has = (t) => !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(t)
     // Deliveries in their own table since 1.0 (#1211), in the order of their seq.
@@ -73,7 +75,7 @@ function deliveriesOf(host) {
 
 /** A value kept beside a store's entries (deliveries' `next`), parsed; undefined when there is none. */
 function storeMeta(ws, store, key, scope = '') {
-  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { readOnly: true, timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { readOnly: true, timeout: timing('db.busyMs') })
   try {
     const r = db.prepare('SELECT value FROM store_meta WHERE store = ? AND scope = ? AND key = ?').get(store, scope, key)
     return r ? JSON.parse(r.value) : undefined
@@ -87,7 +89,7 @@ function storeMeta(ws, store, key, scope = '') {
  * there, else last; `meta` values set beside it (JSON-encoded here). In one transaction.
  */
 function putStoreDoc(ws, store, key, doc, { scope = '', meta = {} } = {}) {
-  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: timing('db.busyMs') })
   try {
     db.exec('BEGIN IMMEDIATE')
     if (store === 'deliveries' && hasTable(db, 'deliveries')) {
@@ -122,7 +124,7 @@ function sessionsOf(host) {
   const out = { version: 1, sessions: [] }
   const file = path.join(p.ws, '.combwork', 'combwork.db')
   if (!fs.existsSync(file)) return out
-  const db = new DatabaseSync(file, { readOnly: true, timeout: 5000 })
+  const db = new DatabaseSync(file, { readOnly: true, timeout: timing('db.busyMs') })
   try {
     if (hasTable(db, 'sessions')) {
       // Their own tables since 1.0 (#1211).
@@ -158,7 +160,7 @@ function sessionsOf(host) {
  */
 function putSessions(host, f) {
   const p = deliveriesPlace(host)
-  const db = new DatabaseSync(path.join(p.ws, '.combwork', 'combwork.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(p.ws, '.combwork', 'combwork.db'), { timeout: timing('db.busyMs') })
   try {
     db.exec('BEGIN IMMEDIATE')
     if (hasTable(db, 'sessions')) {
@@ -194,7 +196,7 @@ function putSessions(host, f) {
 
 /** Takes out what an ended lane kept of its cards (a lane ended before #512 kept it, or its record damaged). */
 function forgetLaneCards(ws, laneId) {
-  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: timing('db.busyMs') })
   try {
     db.prepare('DELETE FROM lane_frozen WHERE lane = ?').run(laneId)
   } finally {

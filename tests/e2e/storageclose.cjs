@@ -88,7 +88,7 @@ function project(p) {
   await release()
   const done = await page.evaluate(() => window.__storage)
   check("window 1's measurement gets its whole result", done.attachments === DIRS * 100, JSON.stringify(done))
-  await lib.sleep(500) // A fixed wait on purpose: this checks that beta's walk reads NO further folders, which no condition can show.
+  await lib.sleep(lib.timing('quiet.walkStoppedMs')) // A quiet window on purpose: this checks that beta's walk reads NO further folders.
   const after = await reads()
   check("window 2's walk stopped when it closed: no folder read after its first", after.beta === 1, JSON.stringify(after))
   check("…and window 1's read every folder", after.alpha === DIRS + 1, JSON.stringify(after))
@@ -100,7 +100,7 @@ function project(p) {
   await page.reload()
   await lib.appReady(page)
   await release()
-  await lib.sleep(500) // A fixed wait on purpose, as above: no further folder read.
+  await lib.sleep(lib.timing('quiet.walkStoppedMs')) // A quiet window on purpose, as above: no further folder read.
   const reloaded = await reads()
   check('reloading the page stopped its walk', reloaded.alpha === DIRS + 2, JSON.stringify(reloaded))
 

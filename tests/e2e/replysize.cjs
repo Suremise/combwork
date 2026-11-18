@@ -59,12 +59,7 @@ const prose = (seed, n) => {
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
-    return v
-  }
+  const until = lib.until
   const apiToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
   const api = async (method, p, body, bearer = apiToken) => {
     const res = await fetch(API + p, { method, headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
@@ -99,9 +94,7 @@ const prose = (seed, n) => {
   await inv('session:start', alpha, { agentId: coder.id })
   await until(async () => (await live(alpha, coder.id))?.status === 'ready', HUNG_MS)
   for (let i = 1; i <= 4; i++) {
-    await inv('pty:write', lib.ptyKey(alpha, coder.id), `turn ${i}`)
-    await lib.sleep(200)
-    await inv('pty:write', lib.ptyKey(alpha, coder.id), '\r')
+    await lib.typeThenEnter(inv, lib.ptyKey(alpha, coder.id), `turn ${i}`)
     await until(async () => String(await inv('pty:buffer', lib.ptyKey(alpha, coder.id))).includes(`Done: turn ${i}`), HUNG_MS)
   }
 
@@ -515,7 +508,7 @@ const prose = (seed, n) => {
     // older comments may have been dropped, and never how many.
     const { DatabaseSync } = require('node:sqlite')
     const meta = (sql, ...a) => {
-      const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
+      const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: lib.timing('db.busyMs') })
       try {
         db.prepare(sql).run(...a)
       } finally {
@@ -683,7 +676,11 @@ const prose = (seed, n) => {
   }
   const longReply = prose(8, 7000)
   entry({ type: 'assistant', requestId: 'req_long_end', message: { model: 'claude-fake', content: [{ type: 'text', text: longReply }], usage: { input_tokens: 1, output_tokens: 1 } } })
-  await lib.sleep(500)
+  // Read by Combwork: its activity (the Agent API's, the same reading) has every call and the long reply.
+  await until(async () => {
+    const a = (await api('GET', '/v1/projects/alpha/agents/Coder/activity')).body
+    return a?.toolCalls === 12 && a?.clipped?.latestReply === longReply.length
+  }, HUNG_MS)
   // 1900 (HI-1996): its model and effort added, a slow round told from a throttled one.
   const activity = JSON.parse(measure('cw_agent_activity', tool('cw_agent_activity', { project: 'alpha', agent: 'Coder' }, 'assistant'), 1900))
   check('activity: the model and effort it runs with (the fake reports neither: its CLI’s default)', activity.model === 'default' && activity.effort === 'default' && !('retryWaits' in activity), JSON.stringify({ model: activity.model, effort: activity.effort, retryWaits: activity.retryWaits }))
@@ -864,11 +861,20 @@ const prose = (seed, n) => {
   }
   const list = asCoder('tools/list', {}).tools
   check('metrics: a Unicode reply has more bytes than characters', expected['cw_read_task compact ok'].bytes > expected['cw_read_task compact ok'].chars)
-  await lib.sleep(500)
-  const report = (await api('GET', `/v1/metrics?scope=workspace&from=${encodeURIComponent(since)}`)).body
+  // Recorded: the report counts each of those calls (metrics are written behind the replies), then it is compared whole.
+  const gotOf = (r) => {
+    const g = {}
+    for (const sr of r?.projects?.alpha?.mcp ?? []) g[`${sr.tool} ${sr.mode} ${sr.outcome}`] = { count: sr.count, chars: sr.chars, bytes: sr.bytes }
+    return g
+  }
+  let report = null
+  await until(async () => {
+    report = (await api('GET', `/v1/metrics?scope=workspace&from=${encodeURIComponent(since)}`)).body
+    const g = gotOf(report)
+    return Object.entries(expected).every(([k, e]) => (g[k]?.count ?? 0) >= e.count)
+  }, HUNG_MS)
   const alphaPart = report.projects?.alpha
-  const got = {}
-  for (const sr of alphaPart?.mcp ?? []) got[`${sr.tool} ${sr.mode} ${sr.outcome}`] = { count: sr.count, chars: sr.chars, bytes: sr.bytes }
+  const got = gotOf(report)
   check("metrics: each tool call's reported size is the text the model got, by mode and outcome", JSON.stringify(Object.fromEntries(Object.entries(got).filter(([k]) => k in expected).sort())) === JSON.stringify(Object.fromEntries(Object.entries(expected).sort())), JSON.stringify({ got, expected }))
   // Each launch's side of the workflow its own series (HI-2049): summed here.
   const cats = (alphaPart?.catalog ?? []).filter((c) => c.role === 'agent')
@@ -915,8 +921,12 @@ const prose = (seed, n) => {
       }, 300)
     })
   })
-  await lib.sleep(500)
-  const after = (await api('GET', `/v1/metrics?scope=workspace&from=${encodeURIComponent(since)}`)).body
+  // Recorded: the refused token counted, and the cancelled call (metrics are written behind the replies).
+  const metricsNow = async () => (await api('GET', `/v1/metrics?scope=workspace&from=${encodeURIComponent(since)}`)).body
+  const after = (await until(async () => {
+    const m = await metricsNow()
+    return m?.app?.unauthenticated >= before + 1 && m?.workspace?.api?.some((sr) => sr.route === '/v1/tasks' && sr.method === 'POST' && sr.outcome === 'cancelled' && sr.role === 'api') ? m : null
+  }, HUNG_MS)) ?? (await metricsNow())
   check('metrics: a refused token is counted, not attributed to a workspace', after.app.unauthenticated === before + 1, `${before} → ${after.app.unauthenticated}`)
   const cancelled = after.workspace.api.find((sr) => sr.route === '/v1/tasks' && sr.method === 'POST' && sr.outcome === 'cancelled' && sr.role === 'api')
   check('metrics: a client that goes away mid-request is cancelled, with the body bytes it did send', cancelled?.requestBytes === Buffer.byteLength('{"title":'), JSON.stringify(cancelled))
@@ -1182,7 +1192,7 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
   await inv('session:stop', alpha, coder.id).catch(() => undefined)
   await lib.openWorkspace(inv, page, nextWs)
   pendingSock.destroy()
-  await lib.sleep(500)
+  await lib.sleep(lib.timing('quiet.crossedSwitchMs')) // A quiet window on purpose: this checks that the ended request records nothing in the next workspace.
   const nextReport = await inv('metrics:query', { scope: { kind: 'workspace' } })
   check('metrics: a request that crossed a workspace switch is not recorded in the next workspace', nextReport.workspacePath.toLowerCase() === nextWs.toLowerCase() && !nextReport.workspace.api.some((sr) => sr.outcome === 'cancelled'), JSON.stringify(nextReport.workspace.api))
 

@@ -150,7 +150,7 @@ const isIn = (dir, rev, ref) => {
     const copy = path.join(treesOf(before), 'copies', 'copy-1')
     lib.git(alpha0, ['worktree', 'add', '-q', '--detach', copy])
     const id = JSON.parse(fs.readFileSync(path.join(alpha0, '.combwork', 'project.json'), 'utf8')).id
-    const db = new DatabaseSync(path.join(wsOf(before), '.combwork', 'combwork.db'), { timeout: 5000 })
+    const db = new DatabaseSync(path.join(wsOf(before), '.combwork', 'combwork.db'), { timeout: lib.timing('db.busyMs') })
     try {
       const now = new Date().toISOString()
       db.prepare("INSERT INTO copies (project, name, folder, state, created_at, used_at) VALUES (?, 'copy-1', ?, 'free', ?, ?)").run(id, copy, now, now)

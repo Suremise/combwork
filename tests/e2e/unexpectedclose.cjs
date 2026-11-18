@@ -12,7 +12,8 @@ const path = require('path')
 const { createHash } = require('crypto')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = lib.timing('hang.ui')
-const START_MS = 30000
+// An agent's or a copy's start after an unexpected close: a bound for a hung run.
+const START_MS = lib.timing('hang.step')
 
 const userData = path.join(lib.WORK, 'unexpectedclose-profile')
 const claudeHome = path.join(lib.WORK, 'unexpectedclose-claude-home')

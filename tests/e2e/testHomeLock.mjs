@@ -14,6 +14,8 @@ import { describeClaim, waitForSlot } from './slots.mjs'
 import { slotWaitProgress } from '../progressReport.mts'
 
 const ctx = createRequire(import.meta.url)('./runContext.cjs')
+// HI-3378: the tests' one timing file, by name.
+const { timing } = createRequire(import.meta.url)('../timing.cjs')
 
 /** The CLIs with a shared test home, in the one order their leases are taken. */
 export const HOME_ORDER = ['claude', 'codex']
@@ -70,9 +72,11 @@ function listProcesses() {
   }
 }
 
-/** A process's start may be read a little apart from when its holder recorded it (its own clock, then the system's). */
-const START_SLACK_MS = 2000
-const sameStart = (a, b) => typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) <= START_SLACK_MS
+/**
+ * A process's start may be read a little apart from when its holder recorded it (its own clock, then the system's): the
+ * timing file's lock.startSlackMs, an ownership tolerance, never scaled.
+ */
+const sameStart = (a, b) => typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) <= timing('lock.startSlackMs')
 
 /**
  * Whether `pid` is the live holder that was recorded (its actual start, as the system lists it, the recorded one: a pid

@@ -77,7 +77,8 @@ const busyLines = () => lines().filter((l) => l.includes('[main] The main proces
 
     // Main's thread pool (HI-1702): wider than Node's 4, and a wait for it is noted. Each read of a pipe nobody writes to
     // holds one of the pool's threads, using no CPU, until the test writes to it.
-    await app.evaluate(async () => {
+    // In main: how often its loop looks for the server's ends (the timing file's, passed in).
+    await app.evaluate(async (_e, look) => {
       const req = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json')
       const ofs = req('original-fs')
       const net = req('net')
@@ -94,7 +95,7 @@ const busyLines = () => lines().filter((l) => l.includes('[main] The main proces
             reads.push(new Promise((r) => ofs.read(fd, Buffer.alloc(1), 0, 1, null, () => r(fd))))
           }
           // The server has each one's end, to let it go.
-          while (socks.length < reads.length) await new Promise((r) => setTimeout(r, 10))
+          while (socks.length < reads.length) await new Promise((r) => setTimeout(r, look))
         },
         /** Whether a stat ends while they are held (bounded: a pool all held never ends it). */
         statEnds: () => Promise.race([new Promise((r) => ofs.stat(process.execPath, () => r(true))), new Promise((r) => setTimeout(() => r(false), 3000))]),
@@ -105,7 +106,7 @@ const busyLines = () => lines().filter((l) => l.includes('[main] The main proces
         },
         close: () => server.close()
       }
-    })
+    }, lib.timing('poll.sampleMs'))
     try {
       await app.evaluate(() => global.__pool.hold(8))
       check("main's thread pool is wider than Node's 4: with eight of its threads held, a file call still ends", await app.evaluate(() => global.__pool.statEnds()))

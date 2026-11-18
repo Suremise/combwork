@@ -44,12 +44,7 @@ const git = (cwd, ...a) => lib.git(cwd, a)
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-    return v
-  }
+  const until = lib.until
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
 
   await page.getByText('alpha', { exact: true }).first().click()
@@ -113,7 +108,7 @@ const git = (cwd, ...a) => lib.git(cwd, a)
   const highlighted = async () => /not merged|uncommitted/.test((await mergeItem()).detail)
 
   await turn()
-  await lib.sleep(2500) // A fixed wait on purpose: this checks that no count appears after a turn that changed nothing.
+  await lib.sleep(lib.timing('quiet.noMergeCountMs')) // A quiet window on purpose: this checks that no count appears after a turn that changed nothing.
   check('nothing to merge: Merge… says nothing', (await count()) === '' && !(await highlighted()), `${await count()}`)
 
   // The agent commits on its branch during a turn: the count shows once the turn ends.

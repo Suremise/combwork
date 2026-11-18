@@ -18,7 +18,8 @@ const net = require('net')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = lib.timing('hang.ui')
-const START_MS = 30000
+// An agent's or a copy's start after an unexpected close: a bound for a hung run.
+const START_MS = lib.timing('hang.step')
 
 const base = path.join(lib.WORK, 'unexpectedclose-leftovers')
 const userData = path.join(base, 'profile')

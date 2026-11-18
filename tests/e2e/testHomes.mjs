@@ -30,6 +30,8 @@ import { classify, HOME_NAMES, KEPT_FIELDS, matches, SIGN_IN, UNCLASSIFIED } fro
 import { clearConsumers, holderOf } from './testHomeLock.mjs'
 
 const ctx = createRequire(import.meta.url)('./runContext.cjs')
+// HI-3378: the tests' one timing file, by name.
+const { timing } = createRequire(import.meta.url)('../timing.cjs')
 
 export const MARKER = '.reset-in-progress'
 export const BACKUP = '.reset-backup'
@@ -72,7 +74,7 @@ export function signInStatus(cli, home, { run = runCli } = {}) {
 function runCli(args, cli, env) {
   const exe = cli === 'claude' ? ['.local\\bin\\claude.exe'].map((f) => join(process.env.USERPROFILE ?? '', f)).find((f) => existsSync(f)) ?? 'claude' : 'codex'
   // Both streams, whatever it exits with: Codex says "Logged in…" on stderr (0.166.0).
-  const r = spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"${exe}" ${args.join(' ')}`], { env: ctx.childEnv(env), encoding: 'utf8', timeout: 30000, windowsHide: true, windowsVerbatimArguments: true, stdio: ['ignore', 'pipe', 'pipe'] })
+  const r = spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"${exe}" ${args.join(' ')}`], { env: ctx.childEnv(env), encoding: 'utf8', timeout: timing('spawn.hang'), windowsHide: true, windowsVerbatimArguments: true, stdio: ['ignore', 'pipe', 'pipe'] })
   if (r.error || typeof r.status !== 'number') return null
   return { code: r.status, stdout: String(r.stdout ?? ''), stderr: String(r.stderr ?? '') }
 }

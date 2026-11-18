@@ -34,7 +34,7 @@ const check = (name, ok, extra = '') => {
 
 /** Writes to the workspace's board from outside Combwork, as another process would (the upgrade's marks, a lane's rows). */
 function board(sql, ...args) {
-  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: lib.timing('db.busyMs') })
   try {
     db.prepare(sql).run(...args)
   } finally {
@@ -324,7 +324,7 @@ async function theForm(page, app, inv) {
     await popups.filter({ hasText: 'Workflow options copied' }).waitFor({ timeout: HUNG_MS })
     check('…saying so in a pop-up; the pop-ups closed, nothing covers Paste JSON…', !!(await lib.until(async () => {
       if ((await popups.count()) === 0) return true
-      await popups.first().locator('.popup-close').click({ timeout: 2000 }).catch(() => undefined)
+      await popups.first().locator('.popup-close').click({ timeout: lib.timing('poll.clickMs') }).catch(() => undefined)
       return false
     }, HUNG_MS)), (await popups.allInnerTexts()).join(' | '))
     const pasteIn = async (json) => {

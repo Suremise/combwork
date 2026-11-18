@@ -21,8 +21,9 @@ const path = require('path')
 const { fromCodexTable } = require('./fake-bridge.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = lib.timing('hang.step')
-// The pools are looked at again every 30 s (copiesApp.ts): a wait for a copy to come free spans one look at least.
-const LOOK_MS = 120000
+// The pools are looked at again every 30 s (copiesApp.ts): a wait for a copy to come free spans one look at least, within
+// a step's hang bound.
+const LOOK_MS = lib.timing('hang.step')
 
 const PORT = Number(lib.port(47802))
 const at = (x) => path.join(lib.WORK, `reviewcopies-${x}`)

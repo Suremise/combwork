@@ -405,7 +405,7 @@ let claudeTestSignedIn
 const claudeLoggedIn = () => {
   if (claudeTestSignedIn !== undefined) return claudeTestSignedIn
   const env = runContext.childEnv({ CLAUDE_CONFIG_DIR: runContext.CLAUDE_TEST_HOME })
-  const r = spawnSync(cliInstalled.claude(), ['auth', 'status', '--json'], { encoding: 'utf8', timeout: 30_000, env })
+  const r = spawnSync(cliInstalled.claude(), ['auth', 'status', '--json'], { encoding: 'utf8', timeout: lib.timing('spawn.hang'), env })
   try {
     claudeTestSignedIn = JSON.parse(r.stdout).loggedIn !== false
   } catch {

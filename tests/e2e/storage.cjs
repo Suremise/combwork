@@ -25,12 +25,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms) => {
-  const t = Date.now()
-  let v
-  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-  return v
-}
+const until = lib.until
 /** A folder's size the way Storage counts it: files only, links not followed. */
 const sizeOf = (p) => {
   const st = fs.lstatSync(p, { throwIfNoEntry: false })

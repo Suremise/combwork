@@ -300,7 +300,7 @@ const check = (name, ok, extra = '') => {
   check('…the table scrolls in its box, never sideways', await twelveBox.evaluate((el) => el.scrollWidth <= el.clientWidth + 1))
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    await lib.sleep(300)
+    await lib.themeShown(page, theme)
     await page.screenshot({ path: path.join(lib.WORK, `templates-10-twelve-${theme}.png`) })
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })
@@ -328,7 +328,7 @@ const check = (name, ok, extra = '') => {
   await lib.addMenuRun(page, 'Configure Agent and Add…')
   const addDialog = page.locator('.dialog', { hasText: 'Add an agent' })
   check('Configure Agent and Add… opens the Add Agent dialog', !!(await lib.until(async () => (await addDialog.count()) === 1, lib.timing('hang.ui'))))
-  await lib.sleep(500)
+  await lib.sleep(lib.timing('quiet.dialogAddsNothingMs')) // A quiet window on purpose: this checks that opening the dialog adds no agent.
   check('…without adding an agent', projectCfg(beta).agents.length === 3, JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
   // #702: another project's agent's name is refused, saying whose, with a free one to use.
   const nameField = addDialog.locator('.agent-form input.input').first()
@@ -371,7 +371,8 @@ const check = (name, ok, extra = '') => {
     await page.evaluate(() => document.activeElement?.blur())
     await page.keyboard.press('Control+Shift+P')
     await page.locator('.palette input').fill(label)
-    await lib.sleep(300)
+    // The list filtered to it: its first entry is the command.
+    await lib.until(async () => (await page.locator('.palette-item').first().innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')).includes(label), lib.timing('hang.ui'))
     await page.locator('.palette-item', { hasText: label }).first().click()
     await menuOpen()
   }

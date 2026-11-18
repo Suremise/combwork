@@ -2,13 +2,17 @@
 // says so in the summary and the run record, so a test copy of Combwork that sends something there is seen. Test copies
 // put what they delete in their suite's trash folder (src/main/trash.ts); nothing here ever changes the Recycle Bin.
 import { spawnSync } from 'child_process'
+import { createRequire } from 'module'
 import runContext from './runContext.cjs'
+
+// HI-3378: the tests' one timing file, by name.
+const { timing } = createRequire(import.meta.url)('../timing.cjs')
 
 /** The number of items in the Recycle Bin (every drive's), or null where it can't be read (not Windows, no shell). */
 export function recycleBinCount() {
   if (process.platform !== 'win32') return null
   // Shell.Application's namespace 10 is the Recycle Bin; Items().Count only reads it.
-  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', '(New-Object -ComObject Shell.Application).NameSpace(10).Items().Count'], { encoding: 'utf8', timeout: 60_000, windowsHide: true, env: runContext.baseEnv() })
+  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', '(New-Object -ComObject Shell.Application).NameSpace(10).Items().Count'], { encoding: 'utf8', timeout: timing('spawn.hang'), windowsHide: true, env: runContext.baseEnv() })
   const n = Number.parseInt(String(r.stdout ?? '').trim(), 10)
   return r.status === 0 && Number.isFinite(n) ? n : null
 }
