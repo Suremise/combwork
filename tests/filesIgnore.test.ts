@@ -3,6 +3,7 @@
 // "nothing ignored" and showed dist/ undimmed. A busy index is tried again; if git still can't say, the folder keeps
 // what was last known and is listed again shortly. Real git for everything but the failures, which a stub injects.
 import { execFile, execFileSync } from 'child_process'
+import { timing } from './timing.cjs'
 import { mkdirSync, rmSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -106,7 +107,7 @@ describe('Files tab: a failed git check-ignore (#222)', () => {
     await vi.waitFor(() => expect(r.seen.length).toBe(files.RELIST_MAX + 1), { timeout: HUNG_MS })
     r.off()
     // HI-3374: each failing look retries for INDEX_BOUNDS.read (3.2 s): a bound for a hung run, not the time it takes.
-  }, 120_000)
+  }, timing('test.hang'))
 
   it('a folder never listed before shows nothing dimmed while git fails, and is listed again', async () => {
     const r = relists()

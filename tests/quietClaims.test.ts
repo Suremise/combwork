@@ -2,6 +2,7 @@
 // folder is back; a claim left behind is recovered by that claim at the next look, never by a folder's name. Two
 // connections to one database file stand for two Combworks (each its own owner identity); real folders and renames.
 import { existsSync, mkdirSync, readdirSync, renameSync, writeFileSync } from 'fs'
+import { timing } from './timing.cjs'
 import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { tempDir } from './tempDir'
@@ -274,5 +275,5 @@ describe('putting a folder back is retried for at least a minute (HI-3374)', () 
     } finally {
       s.close()
     }
-  }, 30_000)
+  }, timing('test.hang'))
 })

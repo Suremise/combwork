@@ -27,7 +27,7 @@ describe('untilBound (HI-3374)', () => {
   it('a rename held for 5 s, then let through: done (renameRetrying)', async () => {
     const start = Date.now()
     const once = vi.fn(async () => {
-      if (Date.now() - start < 5000) throw held()
+      if (Date.now() - start < 5000) throw held() // timing-ok: fake time, the 5 s a held rename lasts (the case tested)
     })
     let done = false
     void renameRetrying('a', 'b', RENAME_RETRY, undefined, once).then(() => (done = true))
@@ -127,7 +127,7 @@ describe('retryWhile (HI-3374)', () => {
   it('a result busy for 1 s, then fine: the fine one; always busy: the last within 3.2 s, at most 7 tries', async () => {
     const start = Date.now()
     let got: string | null = null
-    void retryWhile(() => (Date.now() - start < 1000 ? 'busy' : 'ok'), (r) => r === 'busy', { bound: INDEX_BUSY.read }).then((r) => (got = r))
+    void retryWhile(() => (Date.now() - start < 1000 ? 'busy' : 'ok'), (r) => r === 'busy', { bound: INDEX_BUSY.read }).then((r) => (got = r)) // timing-ok: fake time, the 1 s an index stays busy (the case tested)
     await vi.advanceTimersByTimeAsync(2000)
     expect(got).toBe('ok')
     const attempt = vi.fn(() => 'busy')

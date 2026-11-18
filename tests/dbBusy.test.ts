@@ -3,6 +3,7 @@
 // here, holding the lock on a connection of its own and letting go 8 s after the waiting write has begun (its own timer:
 // the test's thread is blocked inside that write). The order of what happened is kept and checked, never assumed.
 import { join } from 'path'
+import { timing } from './timing.cjs'
 import { Worker } from 'worker_threads'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { DatabaseSync } from 'node:sqlite'
@@ -11,7 +12,7 @@ import { tempDir } from './tempDir'
 const { openDb, transaction, dbLimits, setDbBusyMs } = await import('../src/main/db')
 
 /** A bound for a hung run only (a worker that never answers). */
-const HUNG_MS = 60_000
+const HUNG_MS = timing('worker.start')
 const DEFAULT = dbLimits.busyMs
 afterEach(() => setDbBusyMs(DEFAULT))
 
