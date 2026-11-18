@@ -3675,7 +3675,7 @@ function unclaimedAside(folder: string): boolean {
   const key = folder.toLowerCase()
   const aside = join(dirname(folder), names[0])
   if (!needsYou.has(key)) log.warn(`${userText(folder)} isn't there, and ${userText(aside)} (a quiet check's aside, with no claim) is: not put back by its name; it needs the user (HI-3374)`)
-  needsYou.set(key, { folder, aside, why: 'an aside with no claim' }) // i18n-ignore: for the log
+  needsYou.set(key, { folder, aside, why: 'an aside with no claim' }) // agent-protocol: a log line's detail, never sent to an agent
   return true
 }
 
