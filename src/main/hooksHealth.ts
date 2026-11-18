@@ -261,8 +261,14 @@ export interface HooksEvidence {
 export function hooksMissing(w: HooksWatch, ev: HooksEvidence, now: number, boundMs: number): 'start' | 'prompt' | 'transcript' | null {
   if (ev.startWaits) w.startFrom = now
   if (w.startHook && w.hooks === 0 && !ev.startWaits && now - w.startFrom >= boundMs) return 'start'
+  // Work seen on its screen for the prompt watched, noted before the transcript's turns are weighed (HI-3383).
+  if (w.submit && ev.screen === 'working') w.workAt ??= now
   for (const [id, u] of w.unheard) {
     if (now - u.foundAt < boundMs) continue
+    // HI-3383: a turn found since the prompt Combwork watches, its screen seen working on it, is that prompt's own: the
+    // prompt's check names it (its grace included), never the transcript first because it is weighed first. The
+    // transcript stays the sign where no prompt is watched, or its screen never showed it working.
+    if (w.submit && w.workAt !== null && u.foundAt >= w.submit.at) continue
     w.flagged = id
     w.flaggedSeq = u.seq
     return 'transcript'
