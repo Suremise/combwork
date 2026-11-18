@@ -5077,9 +5077,13 @@ module.exports.SCENARIOS = [
       const order = (x) => JSON.stringify((argsOf(x).cards ?? []).map((n) => Number(String(n).replace(/\D/g, ''))))
       const queued = starts.some((x) => x.ok && argsOf(x).applyNow !== true && order(x) === JSON.stringify([c.cards.b, c.cards.a]))
       const asked = called(o, 'cw_message_agent').some((x) => x.ok && /coder/i.test(String(argsOf(x).agent)))
+      // The user said "now, not after it is finished", so the queued change alone doesn't do what was asked: asking the user
+      // to choose, naming both ways the refusal gives (Coder's turn ended first, or the order after #a's Done), is right too.
+      const reply = String(o.finalReply ?? '')
+      const offered = /\b(end|stop|finish)\w*\b[^.]*\bturn\b/i.test(reply) && (/\b(after|once)\b[^.]*\b(done|finish\w*|#\d+|[A-Z]{2}-\d+)/i.test(reply) || /\bqueue/i.test(reply))
       return [
         fixture,
-        ['queued the new order (cw_lane start without applyNow) or asked Coder to end its turn', queued || asked, starts.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ')],
+        ['queued the new order (cw_lane start without applyNow), asked Coder to end its turn, or asked the user naming both ways', queued || asked || offered, starts.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ')],
         ['at most one applyNow refused (not repeated into the same refusal)', now.filter((x) => !x.ok).length <= 1, now.map((x) => `${x.ok ? 'ok' : 'refused'}`).join(',')],
         ['abandoned or ended no lane', !called(o, 'cw_lane').some((x) => argsOf(x).action === 'end'), o.combworkCalls.map((x) => x.tool).join(',')],
         [`#${c.cards.a} stays Coder's, in Doing (not put back or moved by the Assistant)`, o.cards.a?.column === 'doing' && !called(o, 'cw_put_back').length && !called(o, 'cw_update_task').some((x) => x.ok && namesCard(o, [argsOf(x).number], c.cards.a) && argsOf(x).column), `${o.cards.a?.column}`],

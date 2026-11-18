@@ -268,12 +268,12 @@ const check = (name, ok, extra = '') => {
   // --- 8. HI-3361: `message` (cw_notify's name for a message's words) taken as cw_message_agent's `text` at the bridge's
   // tools/call, before the tool's handler: delivered as text is; with both given, `text` is what is delivered.
   await until(() => idle(builder.id), 15000)
-  const aliased = tool('cw_message_agent', { project: 'alpha', agent: 'Builder', message: 'Taken as its text (HI-3361).' })
+  const aliased = tool('cw_message_agent', { project: 'alpha', agent: 'Builder', message: 'Taken as its text (alias check).' })
   check('cw_message_agent given `message` for its words delivers them, as `text` would be', !aliased.isError && /^(Told|Queued for) Builder/.test(aliased.text), aliased.text)
   await until(() => idle(builder.id), 15000)
-  const both = tool('cw_message_agent', { project: 'alpha', agent: 'Builder', text: 'Its text wins (HI-3361).', message: 'Never delivered (HI-3361).' })
+  const both = tool('cw_message_agent', { project: 'alpha', agent: 'Builder', text: 'Its text wins (alias check).', message: 'Never delivered (alias check).' })
   check('…given both, `text` is the one taken', !both.isError && /^(Told|Queued for) Builder/.test(both.text), both.text)
-  check('…the builder reads both messages as their text says, and never the alias left over', !!(await until(async () => wakes('Builder').some((t) => t.includes('Taken as its text (HI-3361).')) && wakes('Builder').some((t) => t.includes('Its text wins (HI-3361).')), HUNG_MS)) && !wakes('Builder').some((t) => t.includes('Never delivered (HI-3361).')), JSON.stringify(wakes('Builder').slice(-4)))
+  check('…the builder reads both messages as their text says, and never the alias left over', !!(await until(async () => wakes('Builder').some((t) => t.includes('Taken as its text (alias check).')) && wakes('Builder').some((t) => t.includes('Its text wins (alias check).')), HUNG_MS)) && !wakes('Builder').some((t) => t.includes('Never delivered (alias check).')), JSON.stringify(wakes('Builder').slice(-4)))
 
   await inv('session:stop', alpha)
   await inv('session:stop', home)
