@@ -19,6 +19,7 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { createRequire } from 'node:module'
 import { reportReadyWaits } from './readyWaits.mjs'
 
 const ROOT = join(import.meta.dirname, '..')
@@ -305,8 +306,10 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   const all = args.includes('--all')
   // HI-3378: the whole tree's literal waits against the baseline (tests/timingAllow.json); nothing else of this script runs then.
   if (args.includes('--literals')) {
-    // Loaded only here: the guard needs @babel/parser, and the rest of this script runs on Node alone.
-    const { checkTree, writeBaseline } = await import('./timingLiterals.mjs')
+    // Loaded only here: the guard needs @babel/parser, and the rest of this script runs on Node alone. Required, not a
+    // top-level await: tests/scenarios/scenarios.cjs require()s this file for findWaits, which a top-level await anywhere
+    // in it refuses (ERR_REQUIRE_ASYNC_MODULE: the test-waits-write scenario).
+    const { checkTree, writeBaseline } = createRequire(import.meta.url)('./timingLiterals.mjs')
     const r = checkTree()
     if (args.includes('--shrink')) {
       // Drops the entries with no literal left, and never adds one: a literal the baseline doesn't cover still fails.
