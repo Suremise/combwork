@@ -296,7 +296,8 @@ export function advanceHostOf(wf: Workflow): AdvanceHost {
             if (warn) {
               const text = workflowText(FOR_YOU.advanceSuperseded, { card: card.key, target: warn.target })
               // Agents read the card's comments: its English is the agent message, the window's the stored message.
-              w.action('comment', { text: inDefaultDialect(() => say(A.superseded, { card: card.key, target: warn.target })), shown: text })
+              // On the card even when it's archived (HR1's round 1): the notice replaces the question it no longer has.
+              w.action('comment', { text: inDefaultDialect(() => say(A.superseded, { card: card.key, target: warn.target })), shown: text, evenArchived: true })
             }
             return 'recorded'
           },

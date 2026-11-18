@@ -394,16 +394,24 @@ export class AdvanceJournals {
     return out
   }
   /**
+   * HI-3367 (HR1's round 1, finding 2): the live folder's names; none only when the folder doesn't exist. Any other failure
+   * to list it (held, denied, an I/O error) throws: what it may hold is unknown, never taken as nothing.
+   */
+  private async liveNames(): Promise<string[]> {
+    try {
+      return await readdir(this.dir)
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return []
+      throw e
+    }
+  }
+  /**
    * HI-3367: a card's live journals in cycles other than `cycle` (null: every cycle), read from the folder now, each with
    * its cycle and attempt from its file's name; one that can't be read listed as such (its name is all that is known).
+   * A folder that can't be listed throws (liveNames).
    */
   async others(card: string, cycle: number | null): Promise<{ name: string; cycle: number; attempt: string; journal: AdvanceJournal | 'unreadable' }[]> {
-    let names: string[]
-    try {
-      names = await readdir(this.dir)
-    } catch {
-      return []
-    }
+    const names = await this.liveNames()
     const prefix = `${safe(card)}.`
     const out: { name: string; cycle: number; attempt: string; journal: AdvanceJournal | 'unreadable' }[] = []
     for (const n of names.filter((x) => x.startsWith(prefix) && x.endsWith('.json')).sort()) {
@@ -428,12 +436,7 @@ export class AdvanceJournals {
   }
   /** HI-3367: the cards with live journals in the folder, by their keys as the journals' file names give them. */
   async cardsNamed(): Promise<Set<string>> {
-    let names: string[]
-    try {
-      names = await readdir(this.dir)
-    } catch {
-      return new Set()
-    }
+    const names = await this.liveNames()
     return new Set(names.flatMap((n) => {
       const m = /^(.+)\.\d+\.[^.]+\.json$/.exec(n)
       return m ? [m[1]] : []

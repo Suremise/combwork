@@ -1263,7 +1263,15 @@ export class JjPlatform implements PlatformAdapter {
    */
   private async retireOthers(journals: AdvanceJournals, fileKey: string, card: CardRecord, keep: number | null, cycleNow: number, host: AdvanceHost): Promise<boolean> {
     let ok = true
-    for (const o of await journals.others(fileKey, keep)) {
+    let listed: Awaited<ReturnType<AdvanceJournals['others']>>
+    try {
+      listed = await journals.others(fileKey, keep)
+    } catch (e) {
+      // HI-3367 (HR1's round 1, finding 2): the folder can't be listed: what it holds is unknown, so not settled (busy).
+      checksLog.warn(`listing ${userText(card.key)}'s advance journals`, e) // i18n-ignore: a log line, English
+      return false
+    }
+    for (const o of listed) {
       const warn = attemptPreMutation(o.journal) ? null : { target: o.journal !== 'unreadable' ? o.journal.plan.target : (this.wf!.state(card).started?.target ?? '-') }
       if ((await host.superseded(card, { cycle: o.cycle, attempt: o.attempt }, warn)) === 'failed') {
         ok = false
@@ -1280,23 +1288,27 @@ export class JjPlatform implements PlatformAdapter {
   }
 
   /**
-   * HI-3367: live journals whose card isn't one of the project's active cards. Its card read from the board by the
-   * journal's key (archived ones included); a read that fails keeps them. An archived card's are retired whole (every cycle)
-   * under its card lock and the repository lock, rechecked there: unarchived meanwhile, they stay for its own settling. A
-   * card with no row (gone) has no lock: the repository lock is the fence (an attempt holds it from its first journal to its
-   * outcome), the card rechecked missing under it, and its journals archived with nothing said (no card to say it on).
+   * HI-3367: live journals whose card isn't one of the project's active cards. The folder is the workspace's, shared by its
+   * projects (HR1's round 1, finding 1), so the journal's key is looked up across the whole board (ownerOfKey): another
+   * project's card, or a key not known here, is never this adapter's to touch; a read that fails keeps them too. This
+   * project's archived card has its journals retired whole (every cycle) under its card lock and the repository lock,
+   * rechecked there: unarchived meanwhile, they stay for its own settling. A key held here whose card is gone has no card
+   * lock: the repository lock is the fence (an attempt holds it from its first journal to its outcome), the card rechecked
+   * gone under it, and only a journal whose plan names this repository's store is archived, with nothing said (no card to
+   * say it on); one that can't be read, or of another store, stays.
    */
   private async retireStray(integ: JjIntegrationDeps, journals: AdvanceJournals, fileKey: string, host: AdvanceHost): Promise<void> {
     const wf = this.wf!
-    let card: CardRecord | null
+    let owner: ReturnType<typeof wf.store.ownerOfKey>
     try {
-      card = wf.store.cardByKey(fileKey)
+      owner = wf.store.ownerOfKey(fileKey)
     } catch (e) {
       checksLog.warn(`reading the card of advance journals ${userText(fileKey)}`, e) // i18n-ignore: a log line, English
       return
     }
-    if (card) {
-      const id = card.id
+    if (owner === 'unknown' || (owner && !owner.own)) return
+    if (owner) {
+      const id = owner.id
       if (!wf.store.isArchived(id)) return
       await this.withCardLock(id, () =>
         underLock(integ.view.store, integ.lock, async () => {
@@ -1308,12 +1320,16 @@ export class JjPlatform implements PlatformAdapter {
       return
     }
     await underLock(integ.view.store, integ.lock, async () => {
+      let listed: Awaited<ReturnType<AdvanceJournals['others']>>
       try {
-        if (wf.store.cardByKey(fileKey)) return
-      } catch {
+        if (wf.store.ownerOfKey(fileKey) !== null) return
+        listed = await journals.others(fileKey, null)
+      } catch (e) {
+        checksLog.warn(`advance journals ${userText(fileKey)} of a gone card kept`, e) // i18n-ignore: a log line, English
         return
       }
-      for (const o of await journals.others(fileKey, null)) {
+      for (const o of listed) {
+        if (o.journal === 'unreadable' || !samePath(o.journal.plan.store, integ.view.store)) continue
         try {
           await journals.supersede(o.name, o.journal, null)
           checksLog.info(`advance journal ${userText(o.name)} retired: its card is gone`) // i18n-ignore: a log line, English
@@ -1335,7 +1351,14 @@ export class JjPlatform implements PlatformAdapter {
     const cards = active.filter((c) => keys.has(c.key.toLowerCase()) || advanceUnresolved(wf.state(c)))
     // HI-3367: and journals of cards that aren't active (archived, or gone), which no card's settling reaches.
     const own = new Set(active.map((c) => c.key.toLowerCase()))
-    const strays = [...(await journals.cardsNamed())].filter((k) => !own.has(k.toLowerCase()))
+    let named = new Set<string>()
+    try {
+      named = await journals.cardsNamed()
+    } catch (e) {
+      // Unlistable: no stray is retired this pass (what the folder holds is unknown).
+      checksLog.warn('listing the advance journals', e) // i18n-ignore: a log line, English
+    }
+    const strays = [...named].filter((k) => !own.has(k.toLowerCase()))
     if (!cards.length && !strays.length) return
     const integ = await d.integration()
     if (!integ) {

@@ -14,8 +14,9 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { DatabaseSync } from 'node:sqlite'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { boardFile } from '../src/main/boardStore'
+import { FactStore } from '../src/main/workflow/factStore'
 import type { AdvanceHost } from '../src/main/platform/adapter'
 import { AdvanceJournals, attemptPreMutation, type AdvanceJournal, type AdvancePoint } from '../src/main/platform/jjAdvance'
 import { advanceHostOf, supersededKey } from '../src/main/workflow/advanceHost'
@@ -26,6 +27,7 @@ import { jjExe } from './jjWorkspaceHarness'
 import { B1, R1, moved } from './workflow/harness'
 import { started, world, type World } from './jjCardsWorld'
 import { timing } from './waits'
+import { tempDir } from './tempDir'
 
 if (!jjExe) console.warn(`jjAdvanceSuperseded.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
@@ -141,6 +143,18 @@ describe('attemptPreMutation (HI-3367): only a journal positively before the int
     expect(attemptPreMutation(j('prepared', 'none'))).toBe(false)
     expect(attemptPreMutation({ ...j('prepared'), undos: undefined as never })).toBe(false)
     expect(attemptPreMutation('unreadable')).toBe(false)
+  })
+})
+
+describe('AdvanceJournals listing (HI-3367, HR1’s round 1 finding 2): only a missing folder is empty', () => {
+  it('a missing folder lists nothing; one that can’t be listed throws, for others() and cardsNamed() alike', async () => {
+    const root = tempDir('cw-advance-list-')
+    expect(await new AdvanceJournals(join(root, 'none')).others('AM-1', null)).toEqual([])
+    expect([...(await new AdvanceJournals(join(root, 'none')).cardsNamed())]).toEqual([])
+    // A file where the folder is: readdir fails (not ENOENT).
+    writeFileSync(join(root, 'file'), 'x')
+    await expect(new AdvanceJournals(join(root, 'file')).others('AM-1', null)).rejects.toThrow()
+    await expect(new AdvanceJournals(join(root, 'file')).cardsNamed()).rejects.toThrow()
   })
 })
 
@@ -265,15 +279,15 @@ describe.skipIf(!jjExe)(`a superseded jj advance journal retired (jj ${TESTED_JJ
   it('a gone card’s journal is archived with nothing written; a board read that fails keeps it', async () => {
     const { w, card } = await crashedAt('crash:afterIntegrate')
     const store = w.wf.store
-    const cardByKey = store.cardByKey.bind(store)
-    store.cardByKey = () => {
+    const ownerOfKey = store.ownerOfKey.bind(store)
+    store.ownerOfKey = () => {
       throw new Error('the board is busy')
     }
     const other = w.wf.createCard({ title: 'other' })
     db(w, (d) => d.prepare('UPDATE cards SET archived = 1 WHERE number = ?').run(card.id))
     await recover(w, other)
     expect(live(w)).toHaveLength(1)
-    store.cardByKey = cardByKey
+    store.ownerOfKey = ownerOfKey
     db(w, (d) => {
       d.exec('PRAGMA foreign_keys = OFF')
       d.prepare('DELETE FROM cards WHERE number = ?').run(card.id)
@@ -284,5 +298,62 @@ describe.skipIf(!jjExe)(`a superseded jj advance journal retired (jj ${TESTED_JJ
     expect(db(w, (d) => (d.prepare("SELECT COUNT(*) AS n FROM board_meta WHERE key LIKE '%advance_superseded:%'").get() as { n: number }).n)).toBe(metaBefore)
     mkdirSync(join(journals(w).dir, 'settled'), { recursive: true })
     expect(readdirSync(join(journals(w).dir, 'settled')).some((n) => n.startsWith(`${card.key}.`))).toBe(true)
+  })
+
+  it('the folder is the workspace’s (HR1’s round 1, finding 1): another project’s live journal, and one of a key not known here, are left as they are by this project’s recovery', async () => {
+    const { w, card, cycle1, attempt } = await crashedAt('crash:afterIntegrate')
+    const mine = JSON.parse(readFileSync(join(journals(w).dir, `${card.key}.${cycle1}.${attempt}.json`), 'utf8')) as AdvanceJournal
+    // Project B's card on the same board, its attempt live (as while its writer runs, under B's own repository lock).
+    const b = FactStore.open(boardFile(w.home), { project: 'other', key: 'BB', projectId: () => 'p-other' })
+    const theirs = b.createCard({ title: 'theirs', kind: 'code', labels: [], blockedBy: [] })
+    b.close()
+    const foreign = (key: string): string => {
+      const name = `${key}.7.x1.json`
+      const text = JSON.stringify({ ...mine, attempt: 'x1', plan: { ...mine.plan, card: key, cycle: 7, store: join(w.home, 'elsewhere', '.jj', 'repo', 'store', 'git') } })
+      writeFileSync(join(journals(w).dir, name), text)
+      return text
+    }
+    const theirsText = foreign(theirs.key)
+    const unknownText = foreign('ZZ-9')
+    // This project's own journal settled so it isn't what the pass is about: restart this card and let it retire.
+    await restart(w, card)
+    await recover(w, card)
+    expect(readFileSync(join(journals(w).dir, `${theirs.key}.7.x1.json`), 'utf8')).toBe(theirsText)
+    expect(readFileSync(join(journals(w).dir, 'ZZ-9.7.x1.json'), 'utf8')).toBe(unknownText)
+    expect(w.wf.store.meta(supersededKey(theirs.key, 7, 'x1'))).toBeNull()
+    // Theirs archived, or gone: still not this project's to touch.
+    db(w, (d) => d.prepare('UPDATE cards SET archived = 1 WHERE number = ?').run(theirs.id))
+    await recover(w, card)
+    expect(readFileSync(join(journals(w).dir, `${theirs.key}.7.x1.json`), 'utf8')).toBe(theirsText)
+    db(w, (d) => {
+      d.exec('PRAGMA foreign_keys = OFF')
+      d.prepare('DELETE FROM cards WHERE number = ?').run(theirs.id)
+    })
+    await recover(w, card)
+    expect(readFileSync(join(journals(w).dir, `${theirs.key}.7.x1.json`), 'utf8')).toBe(theirsText)
+    expect(readFileSync(join(journals(w).dir, 'ZZ-9.7.x1.json'), 'utf8')).toBe(unknownText)
+  })
+
+  it('a folder that can’t be listed keeps the new cycle busy (no AdvanceAttempted) until it can; then retired with one notice and attempted', async () => {
+    const { w, card, cycle1, attempt } = await crashedAt('crash:afterIntegrate')
+    await restart(w, card)
+    await approve(w, card, 'again.txt', { pins: false })
+    await jjp(w, card).reconcile(w.wf.store.card(card.id), {})
+    const before = facts(w, card, 'AdvanceAttempted').length
+    const denied = Object.assign(new Error('EACCES: permission denied, scandir'), { code: 'EACCES' })
+    const spy = vi.spyOn(AdvanceJournals.prototype, 'others').mockRejectedValue(denied)
+    try {
+      expect(await advanceWith(w, card, advanceHostOf(w.wf))).toBe('busy')
+      expect(await advanceWith(w, card, advanceHostOf(w.wf))).toBe('busy')
+    } finally {
+      spy.mockRestore()
+    }
+    expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(before)
+    expect(live(w).some((n) => n.startsWith(`${card.key}.${cycle1}.`))).toBe(true)
+    expect(marked(w, card, cycle1, attempt)).toBe(false)
+    await advanceWith(w, card, advanceHostOf(w.wf))
+    expect(marked(w, card, cycle1, attempt)).toBe(true)
+    expect(facts(w, card, 'AdvanceAttempted')).toHaveLength(before + 1)
+    expect(notices(w, card)).toEqual(['done'])
   })
 })

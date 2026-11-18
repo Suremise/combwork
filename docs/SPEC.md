@@ -4268,11 +4268,16 @@ with s34, its mapping HI-3235/s7, s10, s13 and s16. gate:advance is open.
   (no second comment). The marker and the action are committed before the new cycle's `AdvanceAttempted`; the action
   is delivered by the actions worker afterwards, so the user may not have seen the comment before an automatic attempt,
   which the comment says. Superseding settles nothing about the old move: the new plan's base check doesn't prove it
-  harmless (a target that already holds it passes that check), and the comment says the target may hold it. An
-  archived card's live journals are all retired so (current cycle too), its archived state read again under its
-  locks: unarchived meanwhile, they stay. A card with no row is gone: its journals are archived under the repository
-  lock (an attempt holds it from its first journal to its outcome), the card read again as missing there, with nothing
-  said; a board read that fails keeps them.
+  harmless (a target that already holds it passes that check), and the comment says the target may hold it. The
+  comment reaches an archived card too (the action's `evenArchived`, which the comment handler honours), written once
+  with the action's id. The journals' folder is the workspace's, shared by its projects: a journal's card is looked up
+  by its key across the whole board, and another project's, or a key not known here, is never touched. This project's
+  archived card has its live journals all retired so (current cycle too), its archived state read again under its
+  locks: unarchived meanwhile, they stay. A key held here with no card is gone: its journals are archived under the
+  repository lock (an attempt holds it from its first journal to its outcome), the card read again as gone there,
+  only those whose plan names this repository's store, with nothing said; one that can't be read stays, as does
+  everything when a board read fails. A folder that can't be listed (anything but missing) is never taken as empty:
+  the card stays busy.
 - **Preview and click** (HI-3236; its mapping HI-3236/s7, s10, s13). A finish that previews (`finishPreviews`) asks the
   adapter's optional `advancePreview` port, never `advance`: once the plan is ready (as an automatic attempt's would be,
   not dismissed), For you previews it (gate `advancePreview`, bound to the plan id: the move E → R, the candidate's style,
