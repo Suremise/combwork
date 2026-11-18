@@ -459,6 +459,8 @@
   "settings.advanced.copilot.turnFailed.errorType.title": "Tour en échec : type d’erreur",
   "settings.advanced.copilotFooter.desc": "Le pied de Copilot dans le mode {mode} (« {footer} »){shared, select, yes {, que partagent Demander et Accepter les modifications (Combwork les distingue par le mode dans lequel la session a démarré)} other {}}. Combwork lit le mode d’un agent dans son pied (le dernier mode trouvé à l’écran) et change de mode en appuyant sur Shift+Tab jusqu’à ce que le pied affiche celui voulu ; s’il est faux, Combwork ne voit pas l’agent dans ce mode et ne peut pas y passer sans redémarrage.",
   "settings.advanced.copilotFooter.title": "Pied : {mode}",
+  "settings.advanced.cw.db.busySeconds.desc": "Combien de temps une écriture dans le tableau, le journal de l’Assistant ou l’historique d’utilisation attend pendant qu’un autre programme (un autre Combwork sur cet espace de travail, un script) détient le verrou de sa base de données, avant d’être refusée. C’est la limite d’une attente, pas une vitesse : une écriture dans le tableau attend sur le fil principal de Combwork, donc la fenêtre ne répond pas pendant ce temps. Prend effet après le redémarrage de Combwork.",
+  "settings.advanced.cw.db.busySeconds.title": "Bases de données : attendre le verrou d’un autre programme",
   "settings.advanced.data.desc": "Combwork conserve ses paramètres dans %APPDATA%\\Combwork\\config.json.",
   "settings.advanced.data.tip": "Les paramètres d’un projet sont dans son dossier .combwork ; ceux de l’espace de travail, dans le dossier .combwork de l’espace de travail.",
   "settings.advanced.data.title": "Fichier des paramètres",

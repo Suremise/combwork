@@ -39,6 +39,8 @@
 // (agentFolders.ts), and lending for a card's start is #1438's: this module only keeps the pool.
 
 import { createHash, randomBytes } from 'crypto'
+import { untilBound, type RetryBound } from './retryBounds'
+import { claimOf, recoverClaim, releaseClaim, takeClaim, type QuietTarget } from './quietClaims'
 import type { DatabaseSync } from 'node:sqlite'
 import { admitOrThrow } from './platform/fenceAdmit'
 import { existsSync, lstatSync } from 'original-fs'
@@ -3625,21 +3627,56 @@ export class SlotPool {
 
 /**
  * Whether no process holds a folder (its working folder, or a file open in it): Windows refuses to rename a folder then.
- * Renamed aside and back at once; a folder that can't be put back is retried, and left aside (and logged) only if that
- * keeps failing, which nothing holding it can cause (it couldn't have been renamed).
+ * Renamed aside and back at once. HI-3374: with its pool's `target`, the rename is claimed first in the board's database
+ * (quietClaims.ts) and the claim let go once the folder is back; putting it back is retried for at least a minute
+ * (QUIET_BACK), and a folder still aside then keeps its claim, so the next look (or start) puts it back by that claim.
+ * A claim standing (another Combwork's check, one left behind) is recovered first, or the folder is held.
  *
  * One check per folder at a time (HI-1753): a caller while one runs waits for its answer and shares it. Windows renames
  * a folder through a handle opened by its path, so two checks that opened it before either renamed it both "succeed":
  * the second moves it on from the first's aside name to its own, and the first can't put it back (ENOENT, logged five
  * times on 26 Oct when several isolated checks' leases each looked at the pool's returning copies at once).
  */
-export function quiet(folder: string): Promise<boolean> {
+export function quiet(folder: string, target?: QuietTarget): Promise<boolean> {
   const key = folder.toLowerCase()
   const going = quieting.get(key)
   if (going) return going
-  const check = quietOnce(folder).finally(() => quieting.delete(key))
+  const check = quietOnce(folder, target).finally(() => quieting.delete(key))
   quieting.set(key, check)
   return check
+}
+
+/** The quiet check's rename (tests replace it: a put-back refused for a while). */
+export const quietDeps = { rename: (from: string, to: string): Promise<void> => rename(from, to) }
+
+/** HI-3374: how long a check keeps trying to put a folder back from its aside: at least a minute, waits doubling to 2 s. */
+export const QUIET_BACK: RetryBound = { boundMs: 60_000, firstMs: 50, capMs: 2000 }
+
+/** HI-3374: the folders whose claim couldn't be recovered (nothing touched), and why, by folder (lower-cased): copies.ts says so. */
+const needsYou = new Map<string, { folder: string; aside: string; why: string }>()
+
+/** A folder whose quiet claim needs the user (its paths left as they are), or null. */
+export const quietNeeds = (folder: string): { folder: string; aside: string; why: string } | null => needsYou.get(folder.toLowerCase()) ?? null
+
+/**
+ * A standing claim on `target` recovered (quietClaims.ts's recoverClaim), under the folder's own serialization: true when
+ * it is gone (the folder back where it was, or there all along); false when it stands (held, or needs the user).
+ */
+async function recoverStanding(folder: string, target: QuietTarget): Promise<boolean> {
+  const standing = claimOf(target)
+  if (!standing) return true
+  const r = await recoverClaim(target, standing)
+  const key = folder.toLowerCase()
+  if (r.state === 'released') {
+    needsYou.delete(key)
+    log.info(`put ${userText(folder)} back from ${userText(standing.aside)}, where a quiet check had left it (HI-3374)`)
+    return true
+  }
+  if (r.state === 'needs') {
+    if (!needsYou.has(key)) log.warn(`${userText(folder)} was left renamed aside at ${userText(standing.aside)} by a quiet check, and isn't put back: ${r.why} (HI-3374)`)
+    needsYou.set(key, { folder, aside: standing.aside, why: r.why })
+  }
+  return false
 }
 
 /** The quiet checks under way, by folder (lower-cased). */
@@ -3660,11 +3697,18 @@ function forgettable(s: Slot): boolean {
   return s.state === 'ready' || s.state === 'gone' || s.state === 'dirty' || (s.state === 'creating' && !!s.warmError)
 }
 
-export async function folderThere(folder: string): Promise<boolean> {
+export async function folderThere(folder: string, target?: QuietTarget): Promise<boolean> {
   const key = folder.toLowerCase()
   for (let going = quieting.get(key); going; going = quieting.get(key)) {
     waiting++
     await going.catch(() => false).finally(() => waiting--)
+  }
+  // HI-3374: a claim standing on it is recovered first, serialized as a check is; while it stands, it is there (never
+  // marked gone or made again: its folder may be aside).
+  if (target && claimOf(target)) {
+    const recovery = recoverStanding(folder, target).finally(() => quieting.delete(key))
+    quieting.set(key, recovery)
+    if (!(await recovery)) return true
   }
   return existsSync(folder)
 }
@@ -3675,23 +3719,25 @@ let waiting = 0
 /** How many callers of folderThere wait for a quiet check now (tests). */
 export const folderWaiting = (): number => waiting
 
-async function quietOnce(folder: string): Promise<boolean> {
+async function quietOnce(folder: string, target?: QuietTarget): Promise<boolean> {
+  // A claim standing (one left behind, or another Combwork's check): recovered first, or the folder is held.
+  if (target && !(await recoverStanding(folder, target))) return false
   const aside = `${folder}.cw-quiet-${randomBytes(3).toString('hex')}`
+  const claim = target ? await takeClaim(target, folder, aside) : null
+  if (target && !claim) return false
   try {
-    await rename(folder, aside)
+    await quietDeps.rename(folder, aside)
   } catch {
+    if (claim) await releaseClaim(target!, claim)
     return false
   }
-  for (let i = 0; ; i++) {
-    try {
-      await rename(aside, folder)
-      return true
-    } catch (e) {
-      if (i >= 20) {
-        log.error(`Could not put slot folder ${userText(folder)} back from ${userText(aside)}`, e)
-        return false
-      }
-      await new Promise((r) => setTimeout(r, 50))
-    }
+  try {
+    await untilBound(() => quietDeps.rename(aside, folder), { bound: QUIET_BACK, transient: (e) => (e as NodeJS.ErrnoException).code !== 'ENOENT' })
+  } catch (e) {
+    // Its claim stays: the next look (or start) puts it back by it.
+    log.error(`Could not put slot folder ${userText(folder)} back from ${userText(aside)} after ${QUIET_BACK.boundMs / 1000} s; ${claim ? 'its claim stays, and the next look puts it back' : 'it stays aside'}`, e)
+    return false
   }
+  if (claim) await releaseClaim(target!, claim)
+  return true
 }

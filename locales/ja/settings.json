@@ -459,6 +459,8 @@
   "settings.advanced.copilot.turnFailed.errorType.title": "ターン失敗：エラーの種類",
   "settings.advanced.copilotFooter.desc": "{mode}モードでのCopilotのフッターです（「{footer}」）{shared, select, yes {。AskモードとAccept editsモードで共通です（Combworkはセッション開始時のモードで区別します）} other {}}。Combworkはエージェントのモードをフッター（画面で最後に見つかったモード）から読み取り、目的のモードがフッターに出るまでShift+Tabを押してモードを切り替えます。誤っていると、Combworkはエージェントがそのモードにあることを認識できず、再起動しないとそのモードに切り替えられません。",
   "settings.advanced.copilotFooter.title": "フッター：{mode}",
+  "settings.advanced.cw.db.busySeconds.desc": "ほかのプログラム（このワークスペースのほかのCombwork、スクリプト）がデータベースのロックを持っている間、ボード、アシスタントのジャーナル、使用履歴への書き込みが拒否されるまでに待つ時間です。速度ではなく待ち時間の上限です。ボードへの書き込みはCombworkのメインスレッドで待つため、待っている間はウィンドウが応答しません。Combworkの再起動後に反映されます。",
+  "settings.advanced.cw.db.busySeconds.title": "データベース：ほかのプログラムのロックを待つ時間",
   "settings.advanced.data.desc": "Combworkは設定を%APPDATA%\\Combwork\\config.jsonに保存します。",
   "settings.advanced.data.tip": "プロジェクト設定は各プロジェクトの.combworkフォルダーに、ワークスペースの設定はワークスペースの.combworkフォルダーにあります。",
   "settings.advanced.data.title": "設定ファイル",

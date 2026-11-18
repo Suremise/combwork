@@ -403,6 +403,16 @@ export const BOARD_MIGRATIONS: Migration[] = [
     name: PROJECT_REVS_DROP_STEP.name,
     group: UPGRADE_GROUP_ID,
     up: (db) => PROJECT_REVS_DROP_STEP.up(db)
+  },
+  {
+    // HI-3374: the quiet check's claims (quietClaims.ts): a copy's folder renamed aside, claimed before the rename and
+    // let go once it is back, so one left aside is put back by its claim (never by its name) at the next look.
+    version: 34,
+    name: 'quiet claims',
+    up: (db) =>
+      db.exec(
+        'CREATE TABLE quiet_claims (project TEXT NOT NULL, kind TEXT NOT NULL, name TEXT NOT NULL, folder TEXT NOT NULL, aside TEXT NOT NULL, folder_id TEXT NOT NULL, owner_pid INTEGER NOT NULL, owner_started INTEGER NOT NULL, op TEXT, used_at TEXT, at TEXT NOT NULL, PRIMARY KEY (project, kind, name)) STRICT'
+      )
   }
 ]
 

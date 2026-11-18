@@ -459,6 +459,8 @@
   "settings.advanced.copilot.turnFailed.errorType.title": "Tura nieudana: typ błędu",
   "settings.advanced.copilotFooter.desc": "Stopka Copilot w trybie {mode} („{footer}”){shared, select, yes {, wspólna dla trybów Pytaj i Akceptuj edycje (Combwork rozróżnia je po trybie, w którym sesja się zaczęła)} other {}}. Combwork odczytuje tryb agenta ze stopki (ostatni tryb znaleziony na ekranie) i zmienia tryby, naciskając Shift+Tab, aż stopka pokaże wybrany; jeśli ustawienie jest błędne, Combwork nie widzi agenta w tym trybie i nie może się na niego przełączyć bez ponownego uruchomienia.",
   "settings.advanced.copilotFooter.title": "Stopka: {mode}",
+  "settings.advanced.cw.db.busySeconds.desc": "Jak długo zapis na tablicy, w dzienniku Asystenta lub w historii użycia czeka, gdy inny program (inny Combwork w tym obszarze roboczym, skrypt) trzyma blokadę jego bazy danych, zanim zapis zostanie odrzucony. Ogranicza czas oczekiwania, nie szybkość: zapis na tablicy czeka w głównym wątku Combwork, więc okno nie reaguje w tym czasie. Działa po ponownym uruchomieniu Combwork.",
+  "settings.advanced.cw.db.busySeconds.title": "Bazy danych: czekanie na blokadę innego programu",
   "settings.advanced.data.desc": "Combwork przechowuje ustawienia w pliku %APPDATA%\\Combwork\\config.json.",
   "settings.advanced.data.tip": "Ustawienia projektu są w folderze .combwork każdego projektu, a ustawienia obszaru roboczego w folderze .combwork obszaru roboczego.",
   "settings.advanced.data.title": "Plik ustawień",
