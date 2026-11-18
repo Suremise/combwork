@@ -12,7 +12,7 @@ const fs = require('fs')
 const path = require('path')
 const { sessionsOf } = require('./storeDocs.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'review-profile')
 const ws = path.join(lib.WORK, 'review-ws')
@@ -69,7 +69,7 @@ function mcp(config, msgs) {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms = 20000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
@@ -115,7 +115,7 @@ function mcp(config, msgs) {
   // On the board, and on the reviewer's strip tab.
   await page.keyboard.press('Control+Shift+J')
   const tile = page.locator(`.task-card[data-task="${n}"]`)
-  check('the board shows who is reviewing it', !!(await until(async () => /Reviewing: Reviewer/.test(await tile.locator('.task-review').innerText().catch(() => '')), 5000)))
+  check('the board shows who is reviewing it', !!(await until(async () => /Reviewing: Reviewer/.test(await tile.locator('.task-review').innerText().catch(() => '')), lib.timing('hang.ui'))))
   check('not as stalled', !(await tile.locator('.task-review').getAttribute('class')).includes('stalled'))
   await page.screenshot({ path: path.join(lib.WORK, 'review-1-board.png') })
   // Back to the project.
@@ -124,7 +124,7 @@ function mcp(config, msgs) {
   await page.locator('.tab', { hasText: 'Session' }).first().click()
   // On each agent's pane header (#975: its strip tab had it).
   const chip = (name) => lib.paneHeader(page, name).locator('.card-chip')
-  check("the reviewer's pane header shows the card, with an eye", !!(await until(async () => (await chip('Reviewer').getAttribute('data-review').catch(() => null)) === 'true', 5000)) && (await chip('Reviewer').innerText()).includes(await lib.cardLabel(inv, n)))
+  check("the reviewer's pane header shows the card, with an eye", !!(await until(async () => (await chip('Reviewer').getAttribute('data-review').catch(() => null)) === 'true', lib.timing('hang.ui'))) && (await chip('Reviewer').innerText()).includes(await lib.cardLabel(inv, n)))
   check("the coder's doesn't (it isn't working on it)", (await chip('Coder').count()) === 0)
 
   // --- A second reviewer is refused, naming the first.
@@ -137,7 +137,7 @@ function mcp(config, msgs) {
   const r2 = await until(async () => {
     const x = await card(n)
     return !x.review && x
-  }, 5000)
+  }, lib.timing('hang.ui'))
   check("its session ending stops the review, and says so in the card's history", !!r2 && r2.history.some((h) => h.what === 'Review by Reviewer stopped: its session ended'), JSON.stringify(r2?.history?.slice(-2)))
   check('the card is still in Review with its agent', r2 && r2.column === 'review' && r2.agent === coder.id)
 

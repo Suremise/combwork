@@ -15,7 +15,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const PORT = Number(lib.port(47812))
 const userData = path.join(lib.WORK, 'linecarried-profile')
@@ -151,7 +151,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
         await until(() => idle(b1.id), HUNG_MS)
         const taken = wakes('B1').length
         await typeTo(b1.id, `shell: ${cmd}`)
-        await until(() => shells().length > before || wakes('B1').length > taken, 60000)
+        await until(() => shells().length > before || wakes('B1').length > taken, lib.timing('hang.step'))
       }
       await until(() => idle(b1.id), HUNG_MS)
       const ran = shells().slice(before).find((s) => s.cmd === cmd)

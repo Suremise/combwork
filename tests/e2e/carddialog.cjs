@@ -15,7 +15,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const NATIVE = process.env.CW_E2E_NATIVE === '1'
 const userData = path.join(lib.WORK, 'carddialog-profile')
@@ -25,7 +25,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms = 5000) => {
+const until = async (fn, ms) => {
   const t = Date.now()
   let v
   while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(100)
@@ -317,8 +317,8 @@ const LIGHT = { color: '#f3f3f3', dim: '#868686', dim2: '#4a4a4a' }
 
   // --- Each window on its own: a card in one doesn't dim the other's buttons.
   await inv('window:new')
-  await until(async () => (await app.windows()).length === 2, 8000)
-  await lib.until(async () => { const w = (await app.windows())[1]; return !!w && (await w.evaluate(() => !!document.querySelector('.app .workbench')).catch(() => false)) }, 15000)
+  await until(async () => (await app.windows()).length === 2, lib.timing('hang.ui'))
+  await lib.until(async () => { const w = (await app.windows())[1]; return !!w && (await w.evaluate(() => !!document.querySelector('.app .workbench')).catch(() => false)) }, lib.timing('hang.ui'))
   await record()
   const ids = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.id))
   const otherId = ids.find((i) => i !== firstId)

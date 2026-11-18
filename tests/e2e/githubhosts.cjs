@@ -11,7 +11,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++

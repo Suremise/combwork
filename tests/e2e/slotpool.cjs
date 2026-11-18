@@ -13,7 +13,7 @@ const q = require('./queueFixture.cjs')
 
 const PORT = Number(lib.port(47856))
 const fx = q.queueProject('slotpool')
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 const DAY_MS = 24 * 60 * 60 * 1000
 let failed = 0
 const check = (name, ok, extra = '') => {

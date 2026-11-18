@@ -100,7 +100,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await inv('workspace:refresh'); await sleep(1200) // A fixed wait on purpose: this checks that no second offer appears.
   check('no second offer', (await page.locator('.toast', { hasText: 'Permission mode changed' }).count()) <= 1)
 
-  await inv('session:stop', proj); await lib.until(async () => (await inv('session:live')).length === 0, 15000)
+  await inv('session:stop', proj); await lib.until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))
   await inv('project:updateConfig', proj, { providers: {} })
   await app.close()
   console.log(`\n${pass} passed, ${fail} failed`)

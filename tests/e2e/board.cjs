@@ -10,7 +10,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'board-profile')
 const ws = path.join(lib.WORK, 'board-ws')
@@ -51,7 +51,7 @@ const check = (name, ok, extra = '') => {
   // The board's own moves, as before 1.0's rules (#1275): its project has every rule off, where Review isn't a stage, so
   // with the rules enforced the board refuses it (boardgates covers that); turned off, every column is a plain move.
   await inv('advanced:set', 'cw.workflow.enforce', false)
-  const until = async (fn, ms = 20000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)
@@ -74,7 +74,7 @@ const check = (name, ok, extra = '') => {
     for (let i = 0; i < 3; i++) {
       await page.keyboard.press('Escape')
       // A try's pace, not a bound: not closed within 3 s, Escape is pressed again (the three tries are the bound).
-      if (await until(async () => (await d.count()) === 0, 3000)) return true
+      if (await until(async () => (await d.count()) === 0, lib.timing('pace.escapeAgainMs'))) return true
     }
     return false
   }
@@ -82,12 +82,12 @@ const check = (name, ok, extra = '') => {
   // The Board view, and a card added there.
   await page.getByRole('button', { name: 'Task Board' }).click()
   // With the rules not enforced every category shows (#1420), as before 1.0.
-  check('the Board shows six columns', !!(await until(async () => (await page.locator('.board-column').count()) === 6, 5000)))
+  check('the Board shows six columns', !!(await until(async () => (await page.locator('.board-column').count()) === 6, lib.timing('hang.ui'))))
   const dialog = page.locator('.dialog', { hasText: 'New Card' })
   await page.getByRole('button', { name: 'New Card', exact: true }).click()
   // Escape as soon as the title has the keyboard (polled often): the first New Card's first render answered Escape with
   // a view made before its fields opened, asking to discard an empty card, unless something else drew it again (#548).
-  check('a new card’s title takes the keyboard', !!(await lib.until(() => page.evaluate(() => !!document.activeElement?.classList.contains('task-title-input')), 5000, 20)))
+  check('a new card’s title takes the keyboard', !!(await lib.until(() => page.evaluate(() => !!document.activeElement?.classList.contains('task-title-input')), lib.timing('hang.ui'), 20)))
   const escaped = await escapeCloses(dialog)
   const escapeState = escaped ? '' : await page.evaluate(() => JSON.stringify({ dialogs: [...document.querySelectorAll('.dialog')].map((d) => d.querySelector('.dialog-header')?.textContent?.trim()), active: `${document.activeElement?.tagName}.${document.activeElement?.className}` }))
   if (!escaped) await page.screenshot({ path: path.join(lib.WORK, 'board-escape.png') })
@@ -111,21 +111,21 @@ const check = (name, ok, extra = '') => {
   await dialog.locator('select').first().selectOption('alpha')
   const desc = dialog.locator('.task-description-input')
   await desc.fill('Write `hello()` in a.ts and test it.')
-  await until(() => page.evaluate(() => window.__held.length === 0), 5000)
+  await until(() => page.evaluate(() => window.__held.length === 0), lib.timing('hang.ui'))
   const typed = { title: await dialog.locator('.task-title-input').inputValue(), description: await desc.inputValue() }
   check('a late title focus leaves the description’s text in the description', typed.title === 'Add a greeting' && typed.description.startsWith('Write'), JSON.stringify(typed))
   await dialog.getByRole('button', { name: 'Add Card' }).click()
-  check('a new card shows in Todo', !!(await until(async () => (await column('Todo').locator('.task-card[data-task="1"]').count()) === 1, 5000)))
+  check('a new card shows in Todo', !!(await until(async () => (await column('Todo').locator('.task-card[data-task="1"]').count()) === 1, lib.timing('hang.ui'))))
   const c1 = await card(1)
   check('with its project and description', c1?.project === 'alpha' && c1.description.includes('hello()') && c1.createdBy === 'You', JSON.stringify(c1))
 
   // As an agent: add a card, move it to Done and back out of it, then to Review with a comment.
   const made = await api('POST', '/v1/tasks', { title: 'Follow-up: docs', project: 'alpha', labels: ['docs'] })
   check('an agent adds a card through the Agent API', made.status === 200 && made.body.number === 2, JSON.stringify(made))
-  check('it shows on the board', !!(await until(async () => (await tile(2).count()) === 1, 5000)))
+  check('it shows on the board', !!(await until(async () => (await tile(2).count()) === 1, lib.timing('hang.ui'))))
   const done = await api('PATCH', '/v1/tasks/2', { column: 'done' })
   check('an Agent API caller moves a card to Done', done.status === 200 && done.body.column === 'done', JSON.stringify(done))
-  check('it shows in Done', !!(await until(async () => (await column('Done').locator('.task-card[data-task="2"]').count()) === 1, 5000)))
+  check('it shows in Done', !!(await until(async () => (await column('Done').locator('.task-card[data-task="2"]').count()) === 1, lib.timing('hang.ui'))))
   const out = await api('PATCH', '/v1/tasks/2', { column: 'todo' })
   check('and back out of Done, with no approval step', out.status === 200 && out.body.column === 'todo', JSON.stringify(out))
   check('both moves are in its history', JSON.stringify((await card(2)).history.filter((h) => h.what.startsWith('Moved to')).map((h) => [h.by, h.what])) === JSON.stringify([['Agent API', 'Moved to Done'], ['Agent API', 'Moved to Todo']]), JSON.stringify((await card(2)).history))
@@ -141,14 +141,14 @@ const check = (name, ok, extra = '') => {
   const todoOrder = () => column('Todo').locator('.task-card').evaluateAll((els) => els.map((e) => Number(e.dataset.task)))
   const rA = (await api('POST', '/v1/tasks', { title: 'Order A', project: 'alpha' })).body.number
   const rB = (await api('POST', '/v1/tasks', { title: 'Order B', project: 'alpha' })).body.number
-  await until(async () => (await todoOrder()).length === 3, 5000)
+  await until(async () => (await todoOrder()).length === 3, lib.timing('hang.ui'))
   const reorder = await api('POST', '/v1/tasks/reorder', { column: 'todo', cards: [rB, rA] })
   check('an agent puts cards in order in one call', reorder.status === 200 && reorder.body.map((c) => c.number).join() === [rB, rA, 1].join(), JSON.stringify(reorder.body?.map?.((c) => c.number) ?? reorder))
-  check('the board shows the new order', !!(await until(async () => (await todoOrder()).join() === [rB, rA, 1].join(), 5000)), (await todoOrder()).join())
+  check('the board shows the new order', !!(await until(async () => (await todoOrder()).join() === [rB, rA, 1].join(), lib.timing('hang.ui'))), (await todoOrder()).join())
   // A was 2nd already: only B moved, so only B's history says so.
   check('the history says where it went', (await card(rB))?.history.at(-1)?.what === 'Moved to the top of Todo' && (await card(rA))?.history.length === 1, JSON.stringify([(await card(rB))?.history, (await card(rA))?.history]))
   const bottom = await api('PATCH', `/v1/tasks/${rB}`, { position: 'bottom' })
-  check('an agent moves one card to the bottom', bottom.status === 200 && !!(await until(async () => (await todoOrder()).join() === [rA, 1, rB].join(), 5000)), (await todoOrder()).join())
+  check('an agent moves one card to the bottom', bottom.status === 200 && !!(await until(async () => (await todoOrder()).join() === [rA, 1, rB].join(), lib.timing('hang.ui'))), (await todoOrder()).join())
   const wrong = await api('PATCH', `/v1/tasks/${rA}`, { before: 2 })
   check("before a card in another column is refused", wrong.status === 400 && /in Review, not in Todo/.test(wrong.body?.error), JSON.stringify(wrong))
   const mixed = await api('POST', '/v1/tasks/reorder', { column: 'todo', cards: [rA, 2] })
@@ -188,10 +188,10 @@ const check = (name, ok, extra = '') => {
 
   // The card dialog saves only what the user changed: an agent's move meanwhile stays.
   const c3 = (await api('POST', '/v1/tasks', { title: 'Old title', project: 'beta' })).body.number
-  await until(async () => (await tile(c3).count()) === 1, 5000)
+  await until(async () => (await tile(c3).count()) === 1, lib.timing('hang.ui'))
   await tile(c3).click()
   const edit = lib.cardDialog(page, await lib.cardLabel(inv, c3))
-  await edit.waitFor({ timeout: 5000 })
+  await edit.waitFor({ timeout: lib.timing('hang.ui') })
   await api('PATCH', `/v1/tasks/${c3}`, { column: 'review' })
   await lib.sleep(500)
   await edit.locator('.task-title-input').fill('New title')
@@ -199,21 +199,21 @@ const check = (name, ok, extra = '') => {
   const c3b = await until(async () => {
     const c = await card(c3)
     return c?.title === 'New title' && c
-  }, 5000)
+  }, lib.timing('hang.ui'))
   check("saving the dialog keeps an agent's change made while it was open", c3b && c3b.column === 'review', JSON.stringify(c3b && { column: c3b.column }))
   await inv('tasks:delete', c3)
 
   // Start #1 on a new agent: it gets the card as its prompt, and the card goes to Doing.
   await tile(1).click()
   const open = lib.cardDialog(page, await lib.cardLabel(inv, 1))
-  await open.waitFor({ timeout: 5000 })
+  await open.waitFor({ timeout: lib.timing('hang.ui') })
   await page.screenshot({ path: path.join(lib.WORK, 'board-card.png') })
   await open.getByRole('button', { name: 'Start…' }).click()
   await page.screenshot({ path: path.join(lib.WORK, 'board-start.png') })
   const startDialog = page.locator('.dialog', { hasText: `Start ${await lib.cardLabel(inv, 1)}` })
   await startDialog.locator('label.choice', { hasText: 'A new agent' }).first().click()
   // A new agent's connection, not a provider (HI-2121, decision A): the connection picker, no provider choice.
-  const picker = await until(async () => (await startDialog.locator('#start-agent-connection').count()) === 1, 5000)
+  const picker = await until(async () => (await startDialog.locator('#start-agent-connection').count()) === 1, lib.timing('hang.step'))
   check("Start's new agent chooses a connection, not a provider", picker && (await startDialog.getByText('Provider', { exact: true }).count()) === 0)
   await page.screenshot({ path: path.join(lib.WORK, 'board-start-new-agent.png') })
   await startDialog.getByRole('button', { name: 'Start' }).click()
@@ -221,21 +221,21 @@ const check = (name, ok, extra = '') => {
   const agent = await until(async () => (await project())?.agents[0], HUNG_MS)
   check('Start adds an agent to the project', !!agent)
   const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === agent.id)
-  const ran = !!(await until(async () => (await live())?.status === 'finished', 30000))
+  const ran = !!(await until(async () => (await live())?.status === 'finished', lib.timing('hang.step')))
   check('and runs the card', ran, `${(await live())?.status}: ${String(await inv('pty:buffer', lib.ptyKey(alpha, agent.id))).replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, ' ').slice(-600)}`)
   const c1b = await card(1)
   check('the card is in Doing, given to the agent', c1b.column === 'doing' && c1b.agent === agent.id, JSON.stringify({ column: c1b.column, agent: c1b.agent }))
   const tr = fs.readdirSync(path.join(claudeHome, 'projects'), { recursive: true }).filter((f) => String(f).endsWith('.jsonl'))
   const text = tr.map((f) => fs.readFileSync(path.join(claudeHome, 'projects', String(f)), 'utf8')).join('\n')
   check('the agent got the card as its prompt, named by key alone (#1219, HI-1661)', /Work on task [A-Z]{2,4}-1 from the Combwork task board: Add a greeting/.test(text) && text.includes('hello()'), text.slice(0, 200))
-  check('its tile shows the agent finished', !!(await until(async () => ((await tile(1).getAttribute('class')) ?? '').includes('finished') && /Finished/.test(await tile(1).innerText()), 8000)), await tile(1).innerText())
+  check('its tile shows the agent finished', !!(await until(async () => ((await tile(1).getAttribute('class')) ?? '').includes('finished') && /Finished/.test(await tile(1).innerText()), lib.timing('hang.ui'))), await tile(1).innerText())
   await page.screenshot({ path: path.join(lib.WORK, 'board.png') })
 
   // Its agent stops: nobody is working on the Doing card, which shows as stalled.
   await inv('session:stop', alpha, agent.id)
-  await until(async () => !(await live()), 10000)
-  check('a Doing card whose agent stopped shows as stalled', !!(await until(async () => ((await tile(1).getAttribute('class')) ?? '').includes('stalled') && /Stalled: .* isn't running/.test(await tile(1).innerText()), 8000)), await tile(1).innerText())
-  check('the sidebar lists stalled cards', !!(await until(async () => (await page.locator('.section-header', { hasText: 'Stalled' }).count()) === 1, 5000)))
+  await until(async () => !(await live()), lib.timing('hang.ui'))
+  check('a Doing card whose agent stopped shows as stalled', !!(await until(async () => ((await tile(1).getAttribute('class')) ?? '').includes('stalled') && /Stalled: .* isn't running/.test(await tile(1).innerText()), lib.timing('hang.ui'))), await tile(1).innerText())
+  check('the sidebar lists stalled cards', !!(await until(async () => (await page.locator('.section-header', { hasText: 'Stalled' }).count()) === 1, lib.timing('hang.ui'))))
   const viaApi = await api('GET', '/v1/tasks/1')
   check('the Agent API says why it is stalled', /isn't running/.test(viaApi.body?.stalled ?? ''), JSON.stringify(viaApi.body?.stalled))
   await page.screenshot({ path: path.join(lib.WORK, 'board-stalled.png') })
@@ -245,12 +245,12 @@ const check = (name, ok, extra = '') => {
   await tile(1).click({ button: 'right' })
   await page.locator('.menu .menu-item', { hasText: 'Mark as Waiting…' }).click()
   const waitBox = page.getByRole('textbox', { name: 'Waiting', exact: true })
-  check('Mark as Waiting… opens the card dialog with its Waiting box', !!(await until(async () => (await waitBox.count()) === 1, 5000)))
+  check('Mark as Waiting… opens the card dialog with its Waiting box', !!(await until(async () => (await waitBox.count()) === 1, lib.timing('hang.ui'))))
   await waitBox.fill('Held for a quiet window')
   await page.locator('.dialog').getByRole('button', { name: 'Save' }).click()
-  check('the card says it waits, and why', !!(await until(async () => (await tile(1).locator('.task-waiting', { hasText: 'Held for a quiet window' }).count()) === 1, 5000)), await tile(1).innerText())
-  check('…and is no longer stalled on the board', !!(await until(async () => !((await tile(1).getAttribute('class')) ?? '').includes('stalled') && !/Stalled:/.test(await tile(1).innerText()), 8000)), await tile(1).innerText())
-  check('…nor in the sidebar', !!(await until(async () => (await page.locator('.section-header', { hasText: 'Stalled' }).count()) === 0, 5000)))
+  check('the card says it waits, and why', !!(await until(async () => (await tile(1).locator('.task-waiting', { hasText: 'Held for a quiet window' }).count()) === 1, lib.timing('hang.ui'))), await tile(1).innerText())
+  check('…and is no longer stalled on the board', !!(await until(async () => !((await tile(1).getAttribute('class')) ?? '').includes('stalled') && !/Stalled:/.test(await tile(1).innerText()), lib.timing('hang.ui'))), await tile(1).innerText())
+  check('…nor in the sidebar', !!(await until(async () => (await page.locator('.section-header', { hasText: 'Stalled' }).count()) === 0, lib.timing('hang.ui'))))
   const waitingApi = (await api('GET', '/v1/tasks/1')).body
   check('the Agent API says it waits, and nothing of a stall', waitingApi?.stalled === null && waitingApi?.waitingFor?.reason === 'Held for a quiet window' && waitingApi.column === 'doing', JSON.stringify({ stalled: waitingApi?.stalled, waitingFor: waitingApi?.waitingFor }))
   const waitTip = await lib.hoverTip(page, tile(1).locator('.task-waiting'), (t) => t.startsWith('Waiting: Held for a quiet window (marked by '))
@@ -259,26 +259,26 @@ const check = (name, ok, extra = '') => {
   await page.mouse.move(5, 5)
   await tile(1).click({ button: 'right' })
   await page.locator('.menu .menu-item', { hasText: 'Clear Waiting' }).click()
-  check('Clear Waiting: the mark goes, and it is stalled again', !!(await until(async () => (await tile(1).locator('.task-waiting').count()) === 0 && ((await tile(1).getAttribute('class')) ?? '').includes('stalled'), 8000)), await tile(1).innerText())
+  check('Clear Waiting: the mark goes, and it is stalled again', !!(await until(async () => (await tile(1).locator('.task-waiting').count()) === 0 && ((await tile(1).getAttribute('class')) ?? '').includes('stalled'), lib.timing('hang.ui'))), await tile(1).innerText())
   check('…its history says both', JSON.stringify((await card(1)).history.filter((h) => /waiting/i.test(h.what)).map((h) => h.what)) === JSON.stringify(['Waiting: Held for a quiet window', 'No longer waiting']), JSON.stringify((await card(1)).history.slice(-4)))
 
   // More work on a Done card: right-click → Start… on its stopped agent; Doing again, and the prompt says it's back.
   await inv('tasks:update', 1, { column: 'done' })
-  await until(async () => (await column('Done').locator('.task-card[data-task="1"]').count()) === 1, 5000)
+  await until(async () => (await column('Done').locator('.task-card[data-task="1"]').count()) === 1, lib.timing('hang.ui'))
   await tile(1).click({ button: 'right' })
   const startItem = page.locator('.menu .menu-item', { hasText: 'Start…' })
   check('Start… is on for a Done card', (await startItem.count()) === 1 && !(await startItem.evaluate((e) => e.classList.contains('disabled') || e.hasAttribute('disabled') || e.getAttribute('aria-disabled') === 'true')))
   await startItem.click()
   const again = page.locator('.dialog', { hasText: `Start ${await lib.cardLabel(inv, 1)}` })
-  await again.waitFor({ timeout: 5000 })
+  await again.waitFor({ timeout: lib.timing('hang.ui') })
   await again.getByRole('button', { name: 'Start' }).click()
-  const reran = !!(await until(async () => (await live())?.status === 'finished', 30000))
+  const reran = !!(await until(async () => (await live())?.status === 'finished', lib.timing('hang.step')))
   const c1c = await card(1)
   check('a Done card started again is in Doing with its agent', reran && c1c.column === 'doing' && c1c.agent === agent.id, JSON.stringify({ reran, column: c1c.column, agent: c1c.agent }))
   const tr2 = fs.readdirSync(path.join(claudeHome, 'projects'), { recursive: true }).filter((f) => String(f).endsWith('.jsonl'))
   check('its prompt says it is back for more work', tr2.some((f) => fs.readFileSync(path.join(claudeHome, 'projects', String(f)), 'utf8').includes('It was in Done and is back in Doing for more work.')))
   await inv('session:stop', alpha, agent.id)
-  await until(async () => !(await live()), 10000)
+  await until(async () => !(await live()), lib.timing('hang.ui'))
 
   // Column colours (Settings → Board): each column's heading and a tint on its cards, in both themes; a picked colour;
   // turned off. Two workspace cards fill Done and show a blocked card.
@@ -289,7 +289,7 @@ const check = (name, ok, extra = '') => {
   /** Whether the window shows that theme (settings reach it as an event, after settings:update returns). */
   const themeIs = async (theme) => (await page.evaluate(() => document.documentElement.getAttribute('data-theme'))) === theme
   const edge = (n) => tile(n).evaluate((e) => getComputedStyle(e).borderLeftColor)
-  check('cards are tinted by their column', !!(await until(async () => (await tile(extra[0].number).count()) === 1 && new Set([await bg(1), await bg(2), await bg(extra[0].number), await bg(extra[1].number)]).size === 4, 5000)), JSON.stringify([await bg(1), await bg(2)]))
+  check('cards are tinted by their column', !!(await until(async () => (await tile(extra[0].number).count()) === 1 && new Set([await bg(1), await bg(2), await bg(extra[0].number), await bg(extra[1].number)]).size === 4, lib.timing('hang.ui'))), JSON.stringify([await bg(1), await bg(2)]))
   const heading = (name) => column(name).locator('.board-column-label').evaluate((e) => getComputedStyle(e).color)
   check('column headings have their own colours', new Set([await heading('Todo'), await heading('Active'), await heading('Review'), await heading('Done')]).size === 4)
   const doingBg = await bg(1)
@@ -316,12 +316,12 @@ const check = (name, ok, extra = '') => {
   }
   await readable('dark, coloured columns')
   await tile(2).hover()
-  await until(() => tile(2).evaluate((el) => el.matches(':hover')).catch(() => false), 5000)
+  await until(() => tile(2).evaluate((el) => el.matches(':hover')).catch(() => false), lib.timing('hang.ui'))
   await readable('dark, coloured, hovered')
   check('the state edges stay over the tint', (await edge(1)) !== (await edge(extra[1].number)) && (await edge(2)) === 'rgba(0, 0, 0, 0)', JSON.stringify([await edge(1), await edge(extra[1].number), await edge(2)]))
   await page.screenshot({ path: path.join(lib.WORK, 'board-colours-dark.png') })
   await inv('settings:update', { appearance: { theme: 'light' } })
-  check('the tint follows the theme', !!(await until(async () => (await themeIs('light')) && (await bg(1)) !== doingBg, 5000)))
+  check('the tint follows the theme', !!(await until(async () => (await themeIs('light')) && (await bg(1)) !== doingBg, lib.timing('hang.ui'))))
   await page.screenshot({ path: path.join(lib.WORK, 'board-colours-light.png') })
   await readable('light, coloured columns')
   await inv('settings:update', { appearance: { theme: 'dark' } })
@@ -331,12 +331,12 @@ const check = (name, ok, extra = '') => {
   check('a picked colour is used', !!(await until(async () => {
     const [r, g, b] = await rgb(1)
     return r > g * 1.3 && r > b * 1.3
-  }, 5000)), await bg(1))
+  }, lib.timing('hang.ui'))), await bg(1))
   await inv('settings:update', { board: { columnColors: false } })
-  check('Colour columns off: no tint', !!(await until(async () => !((await page.locator('.board').first().getAttribute('class')) ?? '').includes('colored') && (await bg(1)) === (await bg(2)), 5000)))
+  check('Colour columns off: no tint', !!(await until(async () => !((await page.locator('.board').first().getAttribute('class')) ?? '').includes('colored') && (await bg(1)) === (await bg(2)), lib.timing('hang.ui'))))
   await readable('dark, plain')
   await inv('settings:update', { appearance: { theme: 'light' } })
-  await until(() => themeIs('light'), 5000)
+  await until(() => themeIs('light'), lib.timing('hang.ui'))
   await readable('light, plain')
   await inv('settings:update', { appearance: { theme: 'dark' } })
   await inv('settings:update', { board: { columnColors: true, colors: { doing: '#3b82f6' } } })
@@ -349,7 +349,7 @@ const check = (name, ok, extra = '') => {
   const reason = `DOCS ACCEPTED at ${HASH}, record in C:\\Users\\Someone\\AppData\\Local\\combwork-test\\e2e\\logs\\run-20261007-123453\\progress\\progress-shots\\light-recent-all.png`
   const long = await inv('tasks:create', { title: 'Docs accepted', project: '', labels: [`label-${HASH.slice(0, 60)}`, 'ui'] })
   await inv('tasks:update', long.number, { blocked: reason })
-  await until(async () => (await tile(long.number).locator('.task-blocked').count()) === 1, 5000)
+  await until(async () => (await tile(long.number).locator('.task-blocked').count()) === 1, lib.timing('hang.ui'))
   const shape = () =>
     tile(long.number).evaluate((tileEl) => {
       const box = tileEl.getBoundingClientRect()
@@ -366,7 +366,7 @@ const check = (name, ok, extra = '') => {
     })
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    await until(() => themeIs(theme), 5000)
+    await until(() => themeIs(theme), lib.timing('hang.ui'))
     await tile(long.number).scrollIntoViewIfNeeded()
     const g = await shape()
     check(`${theme}: a long blocked reason wraps inside the card, clamped to 3 lines; nothing reaches past the card`, g.cardFits && g.past.length === 0 && g.noteFits && g.lines === 3 && g.clamped, JSON.stringify(g))
@@ -417,7 +417,7 @@ const check = (name, ok, extra = '') => {
   // In Doing with nobody on it, it is stalled: the sidebar's Stalled row ends its long title in "…" inside the sidebar.
   await inv('tasks:update', long.number, { title: `Stalled ${HASH}`, column: 'doing' })
   const sideRow = page.locator('.sidebar .row', { hasText: `#${long.number}` })
-  await until(async () => (await sideRow.count()) === 1, 5000)
+  await until(async () => (await sideRow.count()) === 1, lib.timing('hang.ui'))
   const side = await sideRow.evaluate((el) => ({ right: el.getBoundingClientRect().right, edge: el.closest('.sidebar').getBoundingClientRect().right, cut: el.querySelector('.label').scrollWidth > el.querySelector('.label').clientWidth }))
   check("the sidebar's Stalled row ends a long title in \"…\" inside the sidebar", side.right <= side.edge + 1 && side.cut, JSON.stringify(side))
   await inv('tasks:delete', long.number)
@@ -426,7 +426,7 @@ const check = (name, ok, extra = '') => {
   await page.getByRole('button', { name: 'Projects' }).click()
   await page.locator('.sidebar .row', { hasText: 'alpha' }).first().click()
   await page.locator('.tab', { hasText: 'Tasks' }).click()
-  check("the project's Tasks tab shows its cards", !!(await until(async () => (await page.locator('.board-view.in-tab .task-card').count()) === 2, 5000)))
+  check("the project's Tasks tab shows its cards", !!(await until(async () => (await page.locator('.board-view.in-tab .task-card').count()) === 2, lib.timing('hang.ui'))))
 
   // Removing the agent asks about its open card; Move them back puts it in Todo with nobody.
   // Project Settings opens on General; the agents are listed under Agents (HI-1765).
@@ -435,23 +435,23 @@ const check = (name, ok, extra = '') => {
   await page.getByRole('button', { name: 'Remove agent…' }).first().click()
   await page.locator('.dialog .btn', { hasText: 'Remove' }).click()
   const ask = page.locator('.dialog', { hasText: 'open card' })
-  check('Remove Agent asks about its open cards', !!(await until(async () => (await ask.count()) === 1 && (await ask.innerText()).includes(`${await lib.cardLabel(inv, 1)} Add a greeting`), 5000)))
+  check('Remove Agent asks about its open cards', !!(await until(async () => (await ask.count()) === 1 && (await ask.innerText()).includes(`${await lib.cardLabel(inv, 1)} Add a greeting`), lib.timing('hang.ui'))))
   await page.screenshot({ path: path.join(lib.WORK, 'board-remove-agent.png') })
   await ask.getByRole('button', { name: /Move (it|them) back/ }).click()
   const back = await until(async () => {
     const c = await card(1)
     return c?.agent === null && c
-  }, 8000)
+  }, lib.timing('hang.ui'))
   check('Move them back puts the card in Todo with nobody', back && back.column === 'todo', JSON.stringify(back && { column: back.column, agent: back.agent }))
-  check('and the agent is gone', !!(await until(async () => (await project())?.agents.length === 0, 5000)))
+  check('and the agent is gone', !!(await until(async () => (await project())?.agents.length === 0, lib.timing('hang.ui'))))
   await page.locator('.tab', { hasText: 'Tasks' }).click()
 
   // The user moves it to Done, and archives it.
   await inv('tasks:update', 1, { column: 'done' })
   await inv('tasks:archive', 1, true)
-  check('archived cards leave the board', !!(await until(async () => (await page.locator('.board-view.in-tab .task-card').count()) === 1, 5000)))
+  check('archived cards leave the board', !!(await until(async () => (await page.locator('.board-view.in-tab .task-card').count()) === 1, lib.timing('hang.ui'))))
   await page.locator('.board-view.in-tab label', { hasText: 'Archived' }).click()
-  check('and are listed under Archived', !!(await until(async () => (await page.locator('.archived-cards tbody tr.clickable').count()) === 1, 5000)))
+  check('and are listed under Archived', !!(await until(async () => (await page.locator('.archived-cards tbody tr.clickable').count()) === 1, lib.timing('hang.ui'))))
   await page.screenshot({ path: path.join(lib.WORK, 'board-tab.png') })
 
   // Project → Remove Project…: Hide delta.
@@ -459,8 +459,8 @@ const check = (name, ok, extra = '') => {
     await page.locator('.sidebar .row', { hasText: name }).first().click({ button: 'right' })
     await page.locator('.menu .menu-item', { hasText: 'Remove Project…' }).click()
     const d = page.locator('.dialog', { hasText: `Remove ${name}` })
-    await d.waitFor({ timeout: 5000 })
-    await until(async () => (await d.locator('label.choice').count()) === 3, 5000)
+    await d.waitFor({ timeout: lib.timing('hang.ui') })
+    await until(async () => (await d.locator('label.choice').count()) === 3, lib.timing('hang.ui'))
     await d.locator('label.choice').filter({ has: page.getByText(choice, { exact: true }) }).click()
     return d
   }
@@ -494,7 +494,7 @@ const check = (name, ok, extra = '') => {
   await d.locator('label.choice').filter({ has: page.getByText('Hide', { exact: true }) }).click()
   await d.locator('.dialog-footer .btn', { hasText: 'Hide' }).click()
   const names = async () => (await inv('workspace:get')).projects.map((p) => p.name)
-  check('Hide takes the project out of Combwork', !!(await until(async () => !(await names()).includes('delta'), 8000)))
+  check('Hide takes the project out of Combwork', !!(await until(async () => !(await names()).includes('delta'), lib.timing('hang.ui'))))
   check('its folder stays', fs.existsSync(path.join(ws, 'delta')))
   const deltaCards = (await cards()).filter((c) => c.project === 'delta')
   // Evidence for #548: missing (a read that failed) or there but not archived (Hide missed it).
@@ -502,15 +502,15 @@ const check = (name, ok, extra = '') => {
   await page.getByRole('button', { name: 'Settings' }).click()
   // Settings → Board: the switch and a picker per column (Doing was changed and put back, so no reset shows).
   await page.locator('.settings-nav .row').filter({ has: page.getByText('Board', { exact: true }) }).click()
-  check('Settings → Board has a colour picker per column', !!(await until(async () => (await page.locator('.column-color input[type="color"]').count()) === 6, 5000)))
+  check('Settings → Board has a colour picker per column', !!(await until(async () => (await page.locator('.column-color input[type="color"]').count()) === 6, lib.timing('hang.ui'))))
   check('only changed colours offer a reset', (await page.locator('.column-color .icon-btn').count()) === 0)
   await page.screenshot({ path: path.join(lib.WORK, 'board-settings-colours.png') })
   await page.locator('.settings-nav .row', { hasText: 'Workspace' }).click()
   const row = page.locator('.hidden-projects tr', { hasText: 'delta' })
-  check('Settings → Workspace lists it', !!(await until(async () => (await row.count()) === 1, 5000)))
+  check('Settings → Workspace lists it', !!(await until(async () => (await row.count()) === 1, lib.timing('hang.ui'))))
   await page.screenshot({ path: path.join(lib.WORK, 'board-settings.png') })
   await row.getByRole('button', { name: 'Restore' }).click()
-  check('Restore brings it back', !!(await until(async () => (await names()).includes('delta'), 8000)))
+  check('Restore brings it back', !!(await until(async () => (await names()).includes('delta'), lib.timing('hang.step'))))
   check('with its cards', !(await cards()).find((c) => c.project === 'delta')?.archived)
 
   // Delete gamma: the name has to be typed.
@@ -521,12 +521,12 @@ const check = (name, ok, extra = '') => {
   await page.screenshot({ path: path.join(lib.WORK, 'board-remove.png') })
   await d.locator('input.input').fill('gamma')
   await del.click()
-  check('Delete moves the folder to the Recycle Bin', !!(await until(async () => !fs.existsSync(path.join(ws, 'gamma')), 10000)))
+  check('Delete moves the folder to the Recycle Bin', !!(await until(async () => !fs.existsSync(path.join(ws, 'gamma')), lib.timing('hang.ui'))))
   // A test copy's Recycle Bin is the suite's own trash folder (#414): the folder arrived there, whole. Combwork notes the
   // move in trash.jsonl just after it, so wait for the note (#441).
   const arrived = () => lib.trashed(path.join(ws, 'gamma')).find((e) => e.from.toLowerCase() === path.join(ws, 'gamma').toLowerCase() && fs.existsSync(e.to))
-  check("…which in a test copy is the suite's own trash folder, not the user's Recycle Bin", !!(await until(async () => arrived(), 5000)), JSON.stringify(lib.trashed()))
-  check('and Combwork forgets it', !!(await until(async () => !(await names()).includes('gamma'), 8000)))
+  check("…which in a test copy is the suite's own trash folder, not the user's Recycle Bin", !!(await until(async () => arrived(), lib.timing('hang.ui'))), JSON.stringify(lib.trashed()))
+  check('and Combwork forgets it', !!(await until(async () => !(await names()).includes('gamma'), lib.timing('hang.ui'))))
 
   await app.close()
   process.exit(failed ? 1 : 0)

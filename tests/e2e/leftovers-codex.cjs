@@ -71,24 +71,25 @@ const pidOf = (tag) => {
     const startInBackground = (tag) =>
       lib.cliStep(`the ${tag} turn`, { session: key }, async () => {
         await inv('session:start', proj, { agentId: agent.id })
-        check(`Codex starts (${tag})`, !!(await lib.until(async () => (await live())?.status === 'ready', 60000, 500)), lib.plainText(await inv('pty:buffer', key)).slice(-400))
+        // before any turn (HI-2688): its start, restart or resume
+        check(`Codex starts (${tag})`, !!(await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'), 500)), lib.plainText(await inv('pty:buffer', key)).slice(-400))
         const prompt = `Call exec_command once with cmd "node linger.js ${tag}" and yield_time_ms 1000. It will return a session id while the command keeps running: do not wait for it, poll it or call write_stdin. Reply with the single word STARTED and end your turn.`
         // Typed the way Combwork types prompts (a long text at once is a paste to Codex, and Enter then adds a line).
         for (let i = 0; i < prompt.length; i += 8) {
           await inv('pty:write', key, prompt.slice(i, i + 8))
           await lib.sleep(15)
         }
-        await lib.until(async () => lib.plainText(await inv('pty:buffer', key)).replace(/\s+/g, '').includes('endyourturn.'), 15000)
+        await lib.until(async () => lib.plainText(await inv('pty:buffer', key)).replace(/\s+/g, '').includes('endyourturn.'), lib.timing('hang.ui'))
         await inv('pty:write', key, '\r')
-        const pid = await lib.until(() => pidOf(tag), 120000, 500)
+        const pid = await lib.until(() => pidOf(tag), lib.timing('hang.step'), 500)
         check(`the agent started node linger.js in a background terminal (${tag})`, !!pid && alive(pid), lib.plainText(await inv('pty:buffer', key)).slice(-600))
-        check(`its turn ends (${tag})`, !!(await lib.until(async () => (await live())?.status === 'finished', 120000, 500)), JSON.stringify(await live()))
+        check(`its turn ends (${tag})`, !!(await lib.until(async () => (await live())?.status === 'finished', lib.timing('hang.step'), 500)), JSON.stringify(await live()))
         return pid
       })
 
     /** What became of the process once the CLI has gone: ended with it, or listed by Combwork, and then End ends it. */
     const afterExit = async (how, pid) => {
-      const was = await lib.until(async () => (!alive(pid) ? 'ended' : (await listed())?.processes.some((p) => p.pid === pid) ? 'listed' : null), 20000, 500)
+      const was = await lib.until(async () => (!alive(pid) ? 'ended' : (await listed())?.processes.some((p) => p.pid === pid) ? 'listed' : null), lib.timing('hang.ui'), 500)
       console.log(`INFO after ${how} the background process ${was === 'ended' ? 'ended with Codex' : was === 'listed' ? 'outlived it, listed' : 'outlived it, not listed'}`)
       check(`after ${how}, the background process ends with Codex or Combwork lists it`, !!was, JSON.stringify(await listed()))
       if (was !== 'listed') return
@@ -96,15 +97,15 @@ const pidOf = (tag) => {
       check(`as a node process (${how})`, !!found && found.processes.find((p) => p.pid === pid)?.label.startsWith('node '), JSON.stringify(found))
       await page.screenshot({ path: path.join(lib.WORK, 'leftovers-codex-listed.png') })
       const ended = await inv('session:settleLeftovers', proj, agent.id, 'end')
-      check(`End ends it (${how})`, ended >= 1 && (await lib.until(() => !alive(pid), 10000)), JSON.stringify({ ended, alive: alive(pid) }))
-      check(`and it is no longer listed (${how})`, !!(await lib.until(async () => !(await listed()), 10000)))
+      check(`End ends it (${how})`, ended >= 1 && (await lib.until(() => !alive(pid), lib.timing('hang.ui'))), JSON.stringify({ ended, alive: alive(pid) }))
+      check(`and it is no longer listed (${how})`, !!(await lib.until(async () => !(await listed()), lib.timing('hang.ui'))))
     }
 
     // Stopped as Combwork stops it (its terminal ended).
     const pid = await startInBackground('stop')
     await page.screenshot({ path: path.join(lib.WORK, 'leftovers-codex-running.png') })
     await inv('session:stop', proj, agent.id)
-    check('Combwork stops Codex', !!(await lib.until(async () => !(await live()), 20000)))
+    check('Combwork stops Codex', !!(await lib.until(async () => !(await live()), lib.timing('hang.ui'))))
     await afterExit('Combwork stops it', pid)
 
     // /exit: Codex ending by itself.

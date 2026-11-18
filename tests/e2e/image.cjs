@@ -8,7 +8,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const scratch = lib.WORK
 const userData = path.join(scratch, 'image-profile')
@@ -43,7 +43,8 @@ fs.mkdirSync(shots, { recursive: true })
   await inv('workspace:refresh')
   const st = await inv('session:start', proj, { agentId: agent.id })
   await lib.acceptClaudeTrust(inv, proj, agent.id)
-  check('the session starts', !!(await lib.until(async () => (await inv('session:live')).some((l) => l.status === 'ready'), 30000)))
+  // before any turn (HI-2688): its start, restart or resume
+  check('the session starts', !!(await lib.until(async () => (await inv('session:live')).some((l) => l.status === 'ready'), lib.timing('hang.step'))))
   const typed = async () => (await inv('pty:buffer', lib.ptyKey(proj, agent.id))).replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
   /** The attachments' paths on the CLI's input line: copies Combwork keeps with the session (.combwork/attachments/<session>/…). */
   // A copy's name may have spaces (its own name after the time), when its path is quoted.
@@ -64,7 +65,7 @@ fs.mkdirSync(shots, { recursive: true })
 
   await page.locator('.terminal-host').first().click()
   await page.keyboard.press('Control+V')
-  const pasted = (await lib.until(async () => (await images()).length >= 1, 10000)) ? (await images())[0] : null
+  const pasted = (await lib.until(async () => (await images()).length >= 1, lib.timing('hang.ui'))) ? (await images())[0] : null
   check("Ctrl+V: the pasted image's path reaches the CLI's input line", !!pasted, (await typed()).slice(-300))
   await page.screenshot({ path: path.join(shots, '1-ctrl-v.png') })
 
@@ -90,7 +91,7 @@ fs.mkdirSync(shots, { recursive: true })
   const dropSrc = path.join(scratch, 'drop me.png')
   fs.writeFileSync(dropSrc, png)
   await drop(dropSrc)
-  check("a dropped image's path reaches it too (a copy kept with the session)", !!(await lib.until(async () => (await images()).length >= 2, 10000)), (await typed()).slice(-300))
+  check("a dropped image's path reaches it too (a copy kept with the session)", !!(await lib.until(async () => (await images()).length >= 2, lib.timing('hang.step'))), (await typed()).slice(-300))
   await page.screenshot({ path: path.join(shots, '2-drop.png') })
 
   const imgDir = path.join(proj, '.combwork', 'attachments', st.sessionId)
@@ -107,7 +108,7 @@ fs.mkdirSync(shots, { recursive: true })
   fs.writeFileSync(pdfSrc, '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 144]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n')
   fs.writeFileSync(zipSrc, 'PK')
   await drop(pdfSrc, zipSrc)
-  const pdfs = await lib.until(async () => ((await kept('pdf')).length === 1 && (await kept('zip')).length === 1 ? kept('pdf') : null), 10000)
+  const pdfs = await lib.until(async () => ((await kept('pdf')).length === 1 && (await kept('zip')).length === 1 ? kept('pdf') : null), lib.timing('hang.ui'))
   check("a dropped PDF's and zip's paths reach the input line, copies kept with the session", !!pdfs && pdfs[0].endsWith('_q3 report.pdf') && fs.readdirSync(imgDir).length === 4, (await typed()).slice(-400))
   check('their chips: PDF, and the zip by path', !!(await lib.until(async () => JSON.stringify((await chips()).slice(2)) === JSON.stringify(['q3 report.pdf | PDF', 'logs.zip | File · by path']), HUNG_MS)), JSON.stringify(await chips()))
   await page.screenshot({ path: path.join(shots, '2-chips.png') })
@@ -135,11 +136,11 @@ fs.mkdirSync(shots, { recursive: true })
   fs.utimesSync(pastPng, new Date('2026-01-01T09:00:00Z'), new Date('2026-01-01T09:00:00Z'))
   const tab = (label) => page.locator('.tab', { has: page.locator('.tab-label', { hasText: new RegExp(`^${label}$`) }) })
   await tab('Attachments').click()
-  await lib.until(async () => (await page.locator('.thumb').count()) === 5, 10000)
+  await lib.until(async () => (await page.locator('.thumb').count()) === 5, lib.timing('hang.ui'))
   const viewerTitle = () => page.locator('.dialog[role="dialog"]').first().getAttribute('aria-label', { timeout: 2000 }).then((x) => x ?? '', () => '')
   const del = page.locator('.dialog-footer button', { hasText: /^\s*Delete$/ })
   await page.locator('.image-group', { has: page.locator('.badge', { hasText: 'Running' }) }).locator('.thumb').first().click()
-  await lib.until(async () => (await page.locator('.image-viewer').count()) === 1, 5000)
+  await lib.until(async () => (await page.locator('.image-viewer').count()) === 1, lib.timing('hang.ui'))
   check("viewer: a running session's image can't be deleted", await del.isDisabled(), await viewerTitle())
   await del.hover({ force: true })
   const why = await lib.until(async () => (await page.locator('.tip', { hasText: 'Its session is running' }).count()) > 0, HUNG_MS)
@@ -178,16 +179,16 @@ fs.mkdirSync(shots, { recursive: true })
 
   // Ended bar.
   await inv('session:stop', proj)
-  await lib.until(async () => (await inv('session:live')).length === 0, 15000)
-  check('the ended bar shows once it stops', !!(await lib.until(async () => (await page.locator('.session-ended').count()) === 1, 10000)))
+  await lib.until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))
+  check('the ended bar shows once it stops', !!(await lib.until(async () => (await page.locator('.session-ended').count()) === 1, lib.timing('hang.step'))))
   await page.screenshot({ path: path.join(shots, '4-ended.png') })
 
   // Its images can be deleted now it has stopped (the dialog is cancelled: nothing goes).
   await tab('Attachments').click()
-  await lib.until(async () => (await page.locator('.thumb').count()) === 5, 10000)
+  await lib.until(async () => (await page.locator('.thumb').count()) === 5, lib.timing('hang.ui'))
   await page.locator('.thumb').first().click()
-  await lib.until(async () => (await page.locator('.image-viewer').count()) === 1, 5000)
-  check("viewer: once the session stops, its image's Delete is enabled", !!(await lib.until(() => del.isEnabled(), 5000)), await viewerTitle())
+  await lib.until(async () => (await page.locator('.image-viewer').count()) === 1, lib.timing('hang.ui'))
+  check("viewer: once the session stops, its image's Delete is enabled", !!(await lib.until(() => del.isEnabled(), lib.timing('hang.step'))), await viewerTitle())
   await page.keyboard.press('Escape')
   await app.close()
   process.exit(failed ? 1 : 0)

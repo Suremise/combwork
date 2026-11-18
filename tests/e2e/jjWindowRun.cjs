@@ -28,7 +28,7 @@ const { DatabaseSync } = require('node:sqlite')
 const { jjDir, portableJj } = require('../jjPortable.cjs')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 const exe = portableJj()
 if (!exe) {
   console.log("SKIP jjwindow: the pinned jj isn't fetched (npm run jj:fetch)")
@@ -272,7 +272,7 @@ const onDb = (fn) => {
     // Not back: the processes still naming this run's folders (read only, nothing ended), for what holds the slot.
     if (!back) {
       try {
-        const ps = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine.ToLower().Contains('${work.toLowerCase().replace(/'/g, "''")}') } | ForEach-Object { "$($_.ProcessId) $($_.ParentProcessId) $($_.Name) $($_.CommandLine)" }`], { encoding: 'utf8', windowsHide: true, timeout: 30_000 })
+        const ps = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine.ToLower().Contains('${work.toLowerCase().replace(/'/g, "''")}') } | ForEach-Object { "$($_.ProcessId) $($_.ParentProcessId) $($_.Name) $($_.CommandLine)" }`], { encoding: 'utf8', windowsHide: true, timeout: lib.timing('spawn.hang') })
         for (const l of ps.split(/\r?\n/).filter(Boolean)) console.log(`INFO process: ${l.slice(0, 400)}`)
       } catch (e) {
         console.log(`INFO process listing failed: ${e}`)

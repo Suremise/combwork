@@ -19,7 +19,7 @@ const fs = require('fs')
 const path = require('path')
 const { shellStderrFile } = require('./fake-claude/shellStderr.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 
 const PORT = Number(lib.port(47843))
 const at = (x) => path.join(lib.WORK, `isolatedcheck-${x}`)
@@ -149,7 +149,7 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
       const index = await until(() => {
         const i = shells().findIndex((x, n) => n >= before && x.cmd === cmd && !taken.has(n))
         return i >= 0 ? i + 1 : null
-      }, 120000)
+      }, lib.timing('hang.step'))
       if (!index) return null
       taken.add(index - 1)
       return shells()[index - 1]

@@ -17,9 +17,9 @@ const fs = require('fs')
 const path = require('path')
 const { execFileSync } = require('child_process')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 // A compaction's hung-run bound: under load the fake took about 60 s to read the long focus Combwork typed (#725).
-const COMPACT_HUNG_MS = 180000
+const COMPACT_HUNG_MS = lib.timing('hang.slow')
 
 const userData = path.join(lib.WORK, 'paneheader-profile')
 const ws = path.join(lib.WORK, 'paneheader-ws')
@@ -88,7 +88,8 @@ function commits(wt, n) {
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha, long.worktree.path, other.worktree.path].map((p) => p.toLowerCase())))
   await inv('tasks:create', { title: 'A card with a long title that takes up a lot of the header', project: 'alpha', agent: long.id, column: 'doing' })
   await inv('session:start', alpha, { agentId: long.id })
-  check('the agent starts', !!(await until(async () => (await live(long.id))?.status === 'ready', 15000)))
+  // before any turn (HI-2688): its start, restart or resume
+  check('the agent starts', !!(await until(async () => (await live(long.id))?.status === 'ready', lib.timing('hang.step'))))
   const key = lib.ptyKey(alpha, long.id)
   let turns = 0
   // A turn, typed once the fake takes prompts and waited for by its own end (#684, lib.fakePrompts), and over on the
@@ -102,7 +103,7 @@ function commits(wt, n) {
   }
   await turn()
   await page.getByRole('button', { name: 'Two columns' }).click()
-  await until(async () => (await page.locator('.pane-header-bar').count()) === 2, 5000)
+  await until(async () => (await page.locator('.pane-header-bar').count()) === 2, lib.timing('hang.ui'))
 
   const header = (a) => page.locator('.pane-header-bar', { has: page.locator('.agent-name', { hasText: a.name }) })
   const tips = async () => (await page.locator('.tip').allInnerTexts()).map((t) => t.trim())
@@ -266,7 +267,7 @@ function commits(wt, n) {
       viewport = Math.max(200, Math.round(viewport + (target - w) * zoom * 2))
       await page.setViewportSize({ width: viewport, height: HEIGHT })
       // A short bound on purpose: a size the window can't take (its minimum) leaves the width as it is, and the next step tries again.
-      await until(async () => (await inspect(a)).width !== w, 1000)
+      await until(async () => (await inspect(a)).width !== w, lib.timing('pace.resizeStepMs'))
     }
     for (let i = 0; i < 40; i++) {
       const w = (await inspect(a)).width
@@ -274,7 +275,7 @@ function commits(wt, n) {
       viewport += w < target ? 1 : -1
       await page.setViewportSize({ width: viewport, height: HEIGHT })
       // A short bound on purpose, as above: one pixel the window can't take changes nothing.
-      await until(async () => (await inspect(a)).width !== w, 500)
+      await until(async () => (await inspect(a)).width !== w, lib.timing('pace.resizePixelMs'))
     }
     return (await inspect(a)).width === target
   }
@@ -307,7 +308,7 @@ function commits(wt, n) {
         const st = all.find((b) => b.agentId === a.id)?.status
         return st?.ahead === ahead && st?.dirty === dirty
       })
-    }, 8000)
+    }, lib.timing('hang.ui'))
     return !!told
   }
   /** The theme, for the pictures (the layout checks don't depend on it). */
@@ -384,21 +385,21 @@ function commits(wt, n) {
   // Hidden while the width changes: another project is shown, the window grows, alpha comes back.
   await widthTo(300)
   await page.getByText('beta', { exact: true }).first().click()
-  await until(async () => !(await header(long).isVisible().catch(() => false)), 5000)
+  await until(async () => !(await header(long).isVisible().catch(() => false)), lib.timing('hang.ui'))
   viewport += 600
   await page.setViewportSize({ width: viewport, height: HEIGHT })
   await page.getByText('alpha', { exact: true }).first().click()
-  await until(() => header(long).isVisible(), 5000)
+  await until(() => header(long).isVisible(), lib.timing('hang.ui'))
   await fits('shown again after growing while hidden')
 
   // One column: the focused header gets the whole width.
   await header(long).locator('.agent-name').click()
   await page.getByRole('button', { name: 'One at a time' }).click()
-  await until(async () => (await page.locator('.pane-header-bar').count()) === 1, 5000)
+  await until(async () => (await page.locator('.pane-header-bar').count()) === 1, lib.timing('hang.ui'))
   const single = await inspect(long)
   check('one column: it fits at its full width', !single.bad.length, JSON.stringify(single))
   await page.getByRole('button', { name: 'Two columns' }).click()
-  await until(async () => (await page.locator('.pane-header-bar').count()) === 2, 5000)
+  await until(async () => (await page.locator('.pane-header-bar').count()) === 2, lib.timing('hang.ui'))
   await fits('two columns again')
 
   // Display scaling: the same widths in CSS pixels at 125%.
@@ -435,7 +436,7 @@ function commits(wt, n) {
     await until(() => dialog.isVisible(), HUNG_MS)
     await dialog.locator('textarea').fill(focus)
     await dialog.getByRole('button', { name: 'Compact', exact: true }).click()
-    return !!(await until(async () => (await dialog.count()) === 0, 30000))
+    return !!(await until(async () => (await dialog.count()) === 0, lib.timing('hang.ui')))
   }
   const LONG_FOCUS = `hold 6 ${'keep the header decisions, the merge badge findings and the open questions; drop the test runs. '.repeat(9)}`
   /** Compactions in the fake's transcripts so far: each one it runs writes a compact_boundary. */
@@ -453,7 +454,7 @@ function commits(wt, n) {
   await turn()
   check('idle: Compact… is offered in ⋯', !!(await until(compactOffered, HUNG_MS)))
   check('the dialog closes after a long focus is entered', await compactVia(LONG_FOCUS))
-  check('the agent is compacting', !!(await until(async () => (await live(long.id))?.statusMessage === 'Compacting the conversation…', 5000)))
+  check('the agent is compacting', !!(await until(async () => (await live(long.id))?.statusMessage === 'Compacting the conversation…', lib.timing('hang.ui'))))
   check('its header says so', !!(await until(async () => (await statusOf()).includes('Compacting'), HUNG_MS)), await statusOf())
   check('Compact… is unavailable meanwhile', !(await compactOffered()))
   await fits('while compacting')
@@ -468,13 +469,14 @@ function commits(wt, n) {
   // A compaction that fails: it ends, and the agent is ready.
   await turn()
   check('a failing compaction is sent', await compactVia('compactfail hold 2'))
-  check('after the failure the agent is ready', !!(await until(async () => (await live(long.id))?.status === 'ready', 15000)))
+  // ready on purpose (HI-2688): a failed compaction ends ready, with no turn
+  check('after the failure the agent is ready', !!(await until(async () => (await live(long.id))?.status === 'ready', lib.timing('hang.step'))))
   check('and Compact… is offered', !!(await until(compactOffered, HUNG_MS)))
 
   // Cancelled by stopping the agent: Resume is offered in Stop's place.
   await turn()
   check('a long compaction is sent', await compactVia('hold 30'))
-  check('it is compacting', !!(await until(async () => (await live(long.id))?.statusMessage === 'Compacting the conversation…', 5000)))
+  check('it is compacting', !!(await until(async () => (await live(long.id))?.statusMessage === 'Compacting the conversation…', lib.timing('hang.ui'))))
   await inv('session:stop', alpha, long.id)
   check("stopped mid-compaction: the header offers Resume in Stop's place", !!(await until(() => header(long).getByRole('button', { name: 'Resume', exact: true }).isVisible(), HUNG_MS)))
   check("…in Resume's colour", (await actOf(long, 'Resume')) === 'act-resume')
@@ -483,10 +485,12 @@ function commits(wt, n) {
   // A new session from ⋯: Stop is back, and a compaction with nothing to compact ends by itself.
   await header(long).getByRole('button', { name: 'More', exact: true }).click()
   await page.locator('.menu .menu-item', { hasText: 'New Session' }).click()
-  check('a new session starts', !!(await until(async () => (await live(long.id))?.status === 'ready', 15000)))
+  // before any turn (HI-2688): its start, restart or resume
+  check('a new session starts', !!(await until(async () => (await live(long.id))?.status === 'ready', lib.timing('hang.step'))))
   check('Stop is back', !!(await until(() => header(long).getByRole('button', { name: 'Stop', exact: true }).isVisible(), HUNG_MS)))
   await inv('session:compact', alpha, '', long.id)
-  check('nothing to compact: it ends by itself', !!(await until(async () => (await live(long.id))?.status === 'ready' && !(await statusOf()).includes('Compacting'), 8000)))
+  // ready on purpose (HI-2688): a compaction with nothing to compact ends ready, with no turn
+  check('nothing to compact: it ends by itself', !!(await until(async () => (await live(long.id))?.status === 'ready' && !(await statusOf()).includes('Compacting'), lib.timing('hang.step'))))
 
   await inv('session:stop', alpha, long.id).catch(() => undefined)
   await app.close()

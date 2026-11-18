@@ -63,20 +63,20 @@ const check = (name, ok, extra = '') => {
   check('…its branch is still there', info?.branchExists === true && info.branch === keeper.worktree.branch, JSON.stringify(info))
   await pane('Keeper').locator('.pane-placeholder .btn.act-start', { hasText: 'New Session' }).click()
   const recreate = page.getByRole('button', { name: 'Recreate and Start' })
-  check('Start asks to recreate the worktree', !!(await lib.until(async () => (await recreate.count()) === 1, 10000)))
+  check('Start asks to recreate the worktree', !!(await lib.until(async () => (await recreate.count()) === 1, lib.timing('hang.step'))))
   await page.screenshot({ path: path.join(lib.WORK, 'wtrecreate-1-confirm.png') })
   await recreate.click()
-  check('…the agent starts', !!(await lib.until(async () => !!(await live(keeper.id)), 20000)))
+  check('…the agent starts', !!(await lib.until(async () => !!(await live(keeper.id)), lib.timing('hang.step'))))
   const buf = (await lib.until(async () => {
     const b = await inv('pty:buffer', lib.ptyKey(proj, keeper.id))
     return b.includes('CW-SETUP-RAN') ? b : null
-  }, 20000)) ?? ''
+  }, lib.timing('hang.ui'))) ?? ''
   check('…after the setup command ran, as for a new worktree', buf.includes('CW-SETUP-RAN'))
   await lib.acceptClaudeTrust(inv, proj, keeper.id, 20000)
   check('…in the worktree made again at its place, on its branch, with its commit', fs.existsSync(path.join(keeper.worktree.path, 'work.txt')) && git(keeper.worktree.path, ['rev-parse', '--abbrev-ref', 'HEAD']).trim() === keeper.worktree.branch && git(keeper.worktree.path, ['log', '--oneline']).includes('keeper work'))
   check('…its session runs there', same((await live(keeper.id))?.cwd, keeper.worktree.path), (await live(keeper.id))?.cwd)
   await inv('session:stop', proj, keeper.id)
-  await lib.until(async () => !(await live(keeper.id)), 10000)
+  await lib.until(async () => !(await live(keeper.id)), lib.timing('hang.ui'))
 
   // --- Gone: folder and branch deleted.
   fs.rmSync(gone.worktree.path, { recursive: true, force: true })
@@ -85,13 +85,13 @@ const check = (name, ok, extra = '') => {
   check('with the branch gone too, it says so', (await inv('agents:missingWorktree', proj, gone.id))?.branchExists === false)
   await pane('Gone').locator('.pane-placeholder .btn.act-start', { hasText: 'New Session' }).click()
   const create = page.getByRole('button', { name: 'Create a New Worktree' })
-  check('Start offers a new worktree, or removing the link', !!(await lib.until(async () => (await create.count()) === 1, 10000)) && (await page.getByRole('button', { name: 'Remove the Worktree Link' }).count()) === 1)
+  check('Start offers a new worktree, or removing the link', !!(await lib.until(async () => (await create.count()) === 1, lib.timing('hang.step'))) && (await page.getByRole('button', { name: 'Remove the Worktree Link' }).count()) === 1)
   await page.screenshot({ path: path.join(lib.WORK, 'wtrecreate-2-gone.png') })
   await create.click()
-  check('…the agent starts in a new worktree on its branch', !!(await lib.until(async () => !!(await live(gone.id)), 20000)) && fs.existsSync(gone.worktree.path) && git(gone.worktree.path, ['rev-parse', '--abbrev-ref', 'HEAD']).trim() === gone.worktree.branch)
+  check('…the agent starts in a new worktree on its branch', !!(await lib.until(async () => !!(await live(gone.id)), lib.timing('hang.step'))) && fs.existsSync(gone.worktree.path) && git(gone.worktree.path, ['rev-parse', '--abbrev-ref', 'HEAD']).trim() === gone.worktree.branch)
   await lib.acceptClaudeTrust(inv, proj, gone.id, 20000).catch(() => undefined)
   await inv('session:stop', proj, gone.id)
-  await lib.until(async () => !(await live(gone.id)), 10000)
+  await lib.until(async () => !(await live(gone.id)), lib.timing('hang.ui'))
 
   // --- Two missing at once: recreating one would prune the other's link, so it is refused.
   fs.rmSync(p1.worktree.path, { recursive: true, force: true })

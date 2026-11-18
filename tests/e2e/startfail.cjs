@@ -8,7 +8,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'startfail-profile')
 const ws = path.join(lib.WORK, 'startfail-ws')
@@ -40,7 +40,7 @@ const check = (name, ok, extra = '') => {
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
-  const until = async (fn, ms = 10000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
@@ -68,13 +68,13 @@ const check = (name, ok, extra = '') => {
 
   // --- Agent Settings… opens the agent's settings.
   await bar.getByRole('button', { name: 'Agent Settings…' }).click()
-  check('Agent Settings… opens them', !!(await until(async () => (await page.getByRole('dialog', { name: 'Starter settings' }).count()) === 1, 5000)))
+  check('Agent Settings… opens them', !!(await until(async () => (await page.getByRole('dialog', { name: 'Starter settings' }).count()) === 1, lib.timing('hang.ui'))))
   await page.keyboard.press('Escape')
   await lib.sleep(300)
 
   // --- ✕ puts back the usual "Session ended" bar.
   await bar.getByRole('button', { name: /Dismiss/ }).click()
-  check('✕ dismisses it', !!(await until(async () => (await bar.count()) === 0 && (await pane.locator('.session-ended').count()) === 1, 5000)))
+  check('✕ dismisses it', !!(await until(async () => (await bar.count()) === 0 && (await pane.locator('.session-ended').count()) === 1, lib.timing('hang.step'))))
   check('and the header goes back to not running', /Not running/.test(await text(header.locator('.pane-status'))) && (await header.locator('.state-mark.stalled').count()) === 0)
 
   // --- Off screen: a toast with Show.
@@ -85,18 +85,19 @@ const check = (name, ok, extra = '') => {
   check('the toast has the hint and Show', /choose another in Agent Settings/.test(await text(toast)) && (await toast.getByRole('button', { name: 'Show' }).count()) === 1)
   await page.screenshot({ path: path.join(lib.WORK, 'startfail-2-toast.png') })
   await toast.getByRole('button', { name: 'Show' }).click()
-  check('Show opens the agent with the failure', !!(await until(async () => (await bar.count()) === 1, 5000)))
+  check('Show opens the agent with the failure', !!(await until(async () => (await bar.count()) === 1, lib.timing('hang.ui'))))
 
   // --- Fixed, Retry starts it, and the failure goes.
   // Saved by the time agents:update returns, and Retry starts it from what's saved.
   await lib.setLaunch(inv, alpha, agent.id, { model: '' })
   await bar.getByRole('button', { name: 'Retry' }).click()
-  check('Retry starts it again', !!(await until(async () => (await live())?.status === 'ready', 15000)))
+  // before any turn (HI-2688): its start, restart or resume
+  check('Retry starts it again', !!(await until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))))
   check('the failure is gone once it starts', !!(await until(async () => (await bar.count()) === 0 && !/Failed to start/.test(await text(header)) && (await header.locator('.state-mark.stalled').count()) === 0, HUNG_MS)))
 
   // --- A stop isn't a failed start.
   await inv('session:stop', alpha, agent.id)
-  await until(async () => !(await live()), 8000)
+  await until(async () => !(await live()), lib.timing('hang.ui'))
   // The pane says the session ended once the stop reaches it; a failure would show by then, in place of that.
   check('a stop shows no failure', !!(await until(async () => (await pane.locator('.session-ended:not(.start-failed)').count()) === 1, HUNG_MS)) && (await bar.count()) === 0)
   await page.screenshot({ path: path.join(lib.WORK, 'startfail-3-stopped.png') })

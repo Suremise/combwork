@@ -11,7 +11,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'loadfail-profile')
 const ws = path.join(lib.WORK, 'loadfail-ws')
@@ -46,7 +46,7 @@ const check = (name, ok, extra = '') => {
   // Every call fails until cleared (failAll('')): the sidebar's and the main area's read both fail.
   const failAll = (channel) => app.evaluate((_e, v) => (process.env.CW_TEST_FAIL_IPC = v), channel && `${channel},round${++round}`)
   const slowNext = (channel, ms) => app.evaluate((_e, v) => (process.env.CW_TEST_SLOW_IPC = v), `${channel}=${ms}*1,round${++round}`)
-  const until = async (fn, ms = 10000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(150)

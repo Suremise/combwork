@@ -17,7 +17,7 @@ const check = (name, ok, extra = '') => {
 }
 const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `numbers-${name}.png`) })
 // The longest a check waits for its condition: a bound for a hung run, never how long the step should take.
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 /** Whether fn() comes true (it's checked until it does, up to HUNG_MS). */
 const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
 
@@ -77,8 +77,8 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('…and clears the message', await becomes(async () => (await error.count()) === 0))
 
   await never.check()
-  check('Never saves 0', !!(await lib.until(async () => (await sessions()).compactSuggestTokens === 0, 10000)))
-  check('…and disables the box', !!(await lib.until(() => box.isDisabled(), 10000)))
+  check('Never saves 0', !!(await lib.until(async () => (await sessions()).compactSuggestTokens === 0, lib.timing('hang.step'))))
+  check('…and disables the box', !!(await lib.until(() => box.isDisabled(), lib.timing('hang.ui'))))
   await shot(page, '2-never')
   await never.uncheck()
   check('unticking Never brings back the last value', await becomes(async () => (await sessions()).compactSuggestTokens === 150000))

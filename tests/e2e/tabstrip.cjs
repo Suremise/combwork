@@ -11,7 +11,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'tabstrip-profile')
 const ws = path.join(lib.WORK, 'tabstrip-ws')
@@ -191,7 +191,8 @@ const check = (name, ok, extra = '') => {
   // --- Dragging files over the (icon-only) Session tab switches to it while an agent runs.
   await lib.addAgent(inv, alpha, { name: 'One' })
   await inv('session:start', alpha, {})
-  check('the agent starts', !!(await lib.until(async () => (await inv('session:live')).some((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.status === 'ready'), 20000)))
+  // before any turn (HI-2688): its start, restart or resume
+  check('the agent starts', !!(await lib.until(async () => (await inv('session:live')).some((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.status === 'ready'), lib.timing('hang.step'))))
   await page.locator('.tabs .tab', { hasText: 'Files' }).click()
   await expectFit('Files active', 'icons')
   await page.locator('.tabs .tab').first().evaluate((t) => {

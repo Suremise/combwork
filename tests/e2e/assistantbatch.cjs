@@ -11,7 +11,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'assistantbatch-profile')
 const ws = path.join(lib.WORK, 'assistantbatch-ws')
@@ -54,7 +54,7 @@ const check = (name, ok, extra = '') => {
   const home = (await inv('workspace:refresh')).assistant.path
   const assistantKey = lib.ptyKey(home, 'assistant')
   const liveOf = async (proj, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === proj.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms = 30000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
@@ -109,7 +109,7 @@ const check = (name, ok, extra = '') => {
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Control+Alt+I')
   const panel = page.locator('.assistant-panel')
-  await until(async () => (await panel.count()) === 1, 5000)
+  await until(async () => (await panel.count()) === 1, lib.timing('hang.ui'))
   // Every terminal the Assistant's panel mounts, from its start (HI-2213): main tells a run's start more than once (the
   // workspace's report, then its starting status, sometimes twice), and each used to make a new terminal. Under load the
   // last of them came after remember(); counted from the start, a re-mount shows whenever it comes.
@@ -124,7 +124,7 @@ const check = (name, ok, extra = '') => {
   await panel.locator('.assistant-header').getByRole('button', { name: 'Start', exact: true }).click()
   check('the Assistant runs', !!(await until(async () => (await liveOf(home, 'assistant'))?.status === 'ready', HUNG_MS)))
   // Drawing with WebGL; kept, to tell a re-mount or a lost context later.
-  await until(async () => (await state()).webgl, 10000)
+  await until(async () => (await state()).webgl, lib.timing('hang.ui'))
   await remember()
 
   // --- Twelve agents, two pages of six; all running.
@@ -138,7 +138,7 @@ const check = (name, ok, extra = '') => {
       return l && l.sessionId && l.sessionId !== old[a.id] && ['ready', 'finished'].includes(l.status)
     })
   }
-  check(`all ${AGENTS} agents run`, !!(await until(() => allReady(), 60000)))
+  check(`all ${AGENTS} agents run`, !!(await until(() => allReady(), lib.timing('hang.step'))))
 
   const before = await state()
   console.log('before', JSON.stringify(before))
@@ -150,9 +150,9 @@ const check = (name, ok, extra = '') => {
     const old = Object.fromEntries(await Promise.all(agents.map(async (a) => [a.id, (await liveOf(alpha, a.id))?.sessionId])))
     await lib.agentsMenuRun(page, `Start New (${AGENTS})`)
     const asked = page.locator('.dialog', { hasText: 'Start new sessions for all agents?' })
-    await until(async () => (await asked.count()) === 1, 5000)
+    await until(async () => (await asked.count()) === 1, lib.timing('hang.ui'))
     await asked.getByRole('button', { name: 'Start new', exact: true }).click()
-    check(`batch ${b}: every agent has a new session`, !!(await until(() => allReady(old), 90000)))
+    check(`batch ${b}: every agent has a new session`, !!(await until(() => allReady(old), lib.timing('hang.step'))))
     await lib.sleep(4000) // on purpose: a lost context would show within xterm's 3 s wait for it to come back
     const after = await state()
     console.log(`after batch ${b}`, JSON.stringify(after), `leaked ${await leaked()}`, lost.length ? JSON.stringify(lost) : '')
@@ -179,7 +179,7 @@ const check = (name, ok, extra = '') => {
   await until(async () => {
     const t = await state()
     return !t.webgl && t.screen !== null && t.screen <= t.host
-  }, 10000)
+  }, lib.timing('hang.ui'))
   const spill = () =>
     page.evaluate(() => {
       const t = document.querySelector('.assistant-terminal')
@@ -194,14 +194,14 @@ const check = (name, ok, extra = '') => {
 
   // --- The check tells a re-mount: a new conversation for the Assistant re-creates its terminal, and same says so.
   await inv('session:stop', home, 'assistant')
-  await until(async () => !(await liveOf(home, 'assistant')), 15000)
+  await until(async () => !(await liveOf(home, 'assistant')), lib.timing('hang.ui'))
   await inv('session:start', home, { agentId: 'assistant' })
   await until(async () => (await liveOf(home, 'assistant'))?.status === 'ready', HUNG_MS)
   const fresh =
     (await until(async () => {
       const t = await state()
       return t.host !== null && !t.same && t
-    }, 10000)) || (await state())
+    }, lib.timing('hang.ui'))) || (await state())
   check('(the probe works) a new conversation re-mounts the terminal, and the check sees it', fresh && !fresh.same, JSON.stringify(fresh))
 
   await app.close()

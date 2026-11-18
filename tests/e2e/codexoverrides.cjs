@@ -22,7 +22,7 @@ const ws = path.join(scratch, 'cxover-ws')
 const proj = path.join(ws, 'demo')
 const small = { provider: 'codex', model: 'gpt-6-luna', effort: 'low' }
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 const READY_MS = 90000
 const TURN_MS = 180000
 // How long Combwork may take to show the agent waiting once Codex's approval is on its screen (a hook or the title follows
@@ -74,7 +74,7 @@ function codexCommandLine(runId) {
   const status = async () => (await live())?.status
   const stop = async () => {
     await inv('session:stop', proj, def.id).catch(() => {})
-    return lib.until(async () => !(await live()), 30000, 200)
+    return lib.until(async () => !(await live()), lib.timing('hang.ui'), 200)
   }
   try {
     page = await app.firstWindow()
@@ -93,7 +93,7 @@ function codexCommandLine(runId) {
     const reads = () => page.evaluate(() => window.__reads)
     const setClip = (t) => page.evaluate((x) => (window.__clip = x), t)
 
-    const info = await lib.until(async () => { const i = (await inv('provider:info')).codex; return i && !i.checking ? i : null }, 60000, 500)
+    const info = await lib.until(async () => { const i = (await inv('provider:info')).codex; return i && !i.checking ? i : null }, lib.timing('hang.step'), 500)
     check('Codex found and signed in', !!info?.found && info.loggedIn === true, JSON.stringify(info && { found: info.found, loggedIn: info.loggedIn }))
     console.log(`Codex ${info?.version ?? '?'} in ${lib.CODEX_HOME}`)
     record.codexVersion = info?.version ?? null

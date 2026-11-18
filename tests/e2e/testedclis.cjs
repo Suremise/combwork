@@ -59,9 +59,9 @@ const testedWith = (version) => fs.writeFileSync(manifest, JSON.stringify(versio
   await lib.sleep(300)
   await page.keyboard.press('Enter')
   const setup = page.locator('.dialog', { hasText: 'Provider Setup' })
-  check('Provider Setup opens', !!(await lib.until(async () => (await setup.count()) === 1, 10000)))
+  check('Provider Setup opens', !!(await lib.until(async () => (await setup.count()) === 1, lib.timing('hang.ui'))))
   const line = setup.locator('.setup-tested')
-  const shows = async (kind) => !!(await lib.until(async () => (await setup.locator(`.setup-tested[data-tested="${kind}"]`).count()) === 1, 10000))
+  const shows = async (kind) => !!(await lib.until(async () => (await setup.locator(`.setup-tested[data-tested="${kind}"]`).count()) === 1, lib.timing('hang.ui')))
   check('the same version: "Tested with 2.1.999 · installed 2.1.999" and a tick', (await shows('same')) && (await line.innerText()).trim() === 'Tested with 2.1.999 · installed 2.1.999' && (await line.locator('.setup-tested-ok').count()) === 1, await line.innerText().catch(() => ''))
   await shot('same')
 
@@ -69,7 +69,7 @@ const testedWith = (version) => fs.writeFileSync(manifest, JSON.stringify(versio
   const again = async (version) => {
     testedWith(version)
     await setup.locator('button', { hasText: 'Check again' }).click()
-    await lib.until(async () => !(await inv('provider:info'))['claude-code'].checking, 15000)
+    await lib.until(async () => !(await inv('provider:info'))['claude-code'].checking, lib.timing('hang.ui'))
   }
   await again('2.1.900')
   check('installed newer than tested: the versions and the calm note, no tick', (await shows('newer')) && (await line.innerText()).includes('Tested with 2.1.900 · installed 2.1.999') && (await line.innerText()).includes(NEWER) && (await line.locator('.setup-tested-ok').count()) === 0, await line.innerText().catch(() => ''))
@@ -83,7 +83,7 @@ const testedWith = (version) => fs.writeFileSync(manifest, JSON.stringify(versio
   check('Copy Diagnostics: the tested and installed versions', diag.includes('this Combwork release was tested with 2.2.0 (2026-10-07); installed: older than tested') && /\*\*Claude Code\*\*: on; 2\.1\.999/.test(diag), diag.split('\n').filter((l) => /Claude Code|tested/.test(l)).join(' | '))
 
   await again(null)
-  check('a release that names no tested version: no line', !!(await lib.until(async () => (await line.count()) === 0, 10000)) && (await inv('provider:info'))['claude-code'].tested === null)
+  check('a release that names no tested version: no line', !!(await lib.until(async () => (await line.count()) === 0, lib.timing('hang.ui'))) && (await inv('provider:info'))['claude-code'].tested === null)
   check('…and diagnostics say so', (await inv('app:diagnostics')).includes('no tested version recorded for this Combwork release'))
 
   await app.close()

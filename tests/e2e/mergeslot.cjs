@@ -11,7 +11,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'mergeslot-profile')
 const ws = path.join(lib.WORK, 'mergeslot-ws')
@@ -60,7 +60,7 @@ const check = (name, ok, extra = '') => {
   }
   const slotNow = async () => (await api('GET', '/v1/projects/alpha/merge-slot?branch=main')).body
   const live = async (dir, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === dir.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms = 30000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
@@ -70,7 +70,7 @@ const check = (name, ok, extra = '') => {
     await inv('session:start', dir, { agentId: id })
     return until(async () => (await live(dir, id))?.status === 'ready', HUNG_MS)
   }
-  const idle = (dir, id) => until(async () => ['ready', 'finished'].includes((await live(dir, id))?.status), 60000)
+  const idle = (dir, id) => until(async () => ['ready', 'finished'].includes((await live(dir, id))?.status), lib.timing('hang.step'))
   /**
    * Types a prompt into an agent (as the user does), Enter included, once it is idle: taken once a turn of its starts.
    * Typed again when a wake of Combwork's disturbed it (typeLine).
@@ -96,7 +96,7 @@ const check = (name, ok, extra = '') => {
   check('the first claim holds the slot', !!(await until(async () => (await slotNow())?.holder?.name === 'Ann', HUNG_MS)), JSON.stringify(await slotNow()))
   await say(alpha, bob, `${slot({ action: 'claim', cards: [2], timeoutSeconds: 25 })} then shell: echo Bob>>checks.txt then ${slot({ action: 'release' })}`)
   const waitingNote = 'Waiting for the merge slot (Ann is merging #1)'
-  check("the second waits, and its status says for whom", !!(await until(async () => (await live(alpha, bob.id))?.mergeSlot === waitingNote, 10000)), JSON.stringify((await live(alpha, bob.id))?.mergeSlot))
+  check("the second waits, and its status says for whom", !!(await until(async () => (await live(alpha, bob.id))?.mergeSlot === waitingNote, lib.timing('hang.ui'))), JSON.stringify((await live(alpha, bob.id))?.mergeSlot))
   check('the holder\'s status says it is merging', (await live(alpha, ann.id))?.mergeSlot === 'Merging into main (merge slot)')
   const viaApi = (await api('GET', '/v1/projects/alpha')).body?.agents?.find((a) => a.name === 'Bob')
   check('the Agent API gives the waiter that status message', viaApi?.statusMessage === waitingNote, JSON.stringify(viaApi?.statusMessage))
@@ -107,31 +107,31 @@ const check = (name, ok, extra = '') => {
   const inOverview = await until(async () => {
     const t = await page.locator('.overview-page .merge-slot').allInnerTexts()
     return t.some((x) => /main: Ann is merging #1/.test(x) && /Waiting: Bob/.test(x))
-  }, 10000)
+  }, lib.timing('hang.step'))
   check('the Overview shows the holder and the line', !!inOverview, (await page.locator('.overview-page .merge-slot').allInnerTexts()).join(' | '))
   await page.screenshot({ path: path.join(lib.WORK, 'mergeslot-overview.png') })
   await page.locator('.progress-rail').click()
   const inPanel = await until(async () => {
     const t = await page.locator('.progress-panel .progress-merge-card').allInnerTexts()
     return t.length === 1 && /Ann is merging #1/.test(t[0]) && /alpha · into main/.test(t[0]) && /Waiting: Bob/.test(t[0])
-  }, 5000)
+  }, lib.timing('hang.step'))
   check('the Progress panel shows the merge on top, with who waits (#484)', !!inPanel, (await page.locator('.progress-panel .progress-merge-card').allInnerTexts()).join(' | '))
   await page.screenshot({ path: path.join(lib.WORK, 'mergeslot-progress.png') })
   await idle(alpha, ann.id)
   await idle(alpha, bob.id)
   const order = fs.existsSync(checksFile) ? fs.readFileSync(checksFile, 'utf8').split(/\r?\n/).map((s) => s.trim()).filter(Boolean) : []
   check('one after the other, and the second ran its checks once', order.join() === 'Ann,Bob', JSON.stringify(order))
-  check('both released it: free, nobody waiting', !!(await until(async () => { const s = await slotNow(); return !s?.holder && !s?.waiting.length }, 5000)), JSON.stringify(await slotNow()))
+  check('both released it: free, nobody waiting', !!(await until(async () => { const s = await slotNow(); return !s?.holder && !s?.waiting.length }, lib.timing('hang.ui'))), JSON.stringify(await slotNow()))
   check('their status notes are gone', !(await live(alpha, ann.id))?.mergeSlot && !(await live(alpha, bob.id))?.mergeSlot)
-  check('the Overview and the Progress panel show no slot when free', !!(await until(async () => (await page.locator('.merge-slot, .progress-merge-card').count()) === 0, 5000)))
+  check('the Overview and the Progress panel show no slot when free', !!(await until(async () => (await page.locator('.merge-slot, .progress-merge-card').count()) === 0, lib.timing('hang.step'))))
 
   // --- A holder whose session ends frees the slot: the one waiting gets it.
   await say(alpha, ann, slot({ action: 'claim', cards: [3] }))
   await until(async () => (await slotNow())?.holder?.name === 'Ann', HUNG_MS)
   await say(alpha, bob, `${slot({ action: 'claim', timeoutSeconds: 25 })} then work 1`)
-  await until(async () => (await slotNow())?.waiting?.length === 1, 10000)
+  await until(async () => (await slotNow())?.waiting?.length === 1, lib.timing('hang.ui'))
   await inv('session:stop', alpha, ann.id)
-  check("the holder's session ended: the next in line has it", !!(await until(async () => (await slotNow())?.holder?.name === 'Bob', 15000)), JSON.stringify(await slotNow()))
+  check("the holder's session ended: the next in line has it", !!(await until(async () => (await slotNow())?.holder?.name === 'Bob', lib.timing('hang.step'))), JSON.stringify(await slotNow()))
 
   // --- A hold that runs out goes on, and the user is told (holds last HOLD_MS here).
   const expired = await until(async () => (await page.locator('.toast').allInnerTexts()).some((t) => /Bob's merge slot expired/.test(t)), HOLD_MS + 15000)
@@ -145,7 +145,7 @@ const check = (name, ok, extra = '') => {
   await until(async () => (await slotNow())?.holder?.name === 'Bob', HUNG_MS)
   const askRelease = async () => {
     await page.locator('.progress-panel .progress-merge-card button', { hasText: 'Release' }).click()
-    return until(async () => (await page.locator('.dialog', { hasText: 'Release the merge slot?' }).count()) === 1, 5000)
+    return until(async () => (await page.locator('.dialog', { hasText: 'Release the merge slot?' }).count()) === 1, lib.timing('hang.step'))
   }
   const asked = await askRelease()
   check('Release asks first, naming the holder', !!asked && (await page.locator('.dialog', { hasText: 'Bob holds the merge slot for alpha · main' }).count()) === 1)
@@ -160,15 +160,15 @@ const check = (name, ok, extra = '') => {
     const b = await live(alpha, bob.id)
     const h = (await slotNow())?.holder
     return ['ready', 'finished'].includes(b?.status) && Date.parse(b?.statusSince ?? '') > sent && h && h.id !== shown && h.name === 'Bob' ? h : null
-  }, 60000)
+  }, lib.timing('hang.step'))
   await page.locator('.dialog .btn', { hasText: 'Release' }).click()
-  const refused = await until(async () => (await page.locator('.toast').allInnerTexts()).some((t) => /changed hands meanwhile, so nothing was released/.test(t)), 5000)
+  const refused = await until(async () => (await page.locator('.toast').allInnerTexts()).some((t) => /changed hands meanwhile, so nothing was released/.test(t)), lib.timing('hang.ui'))
   const after = (await slotNow())?.holder
   check("an answer to an older question doesn't release the newer hold: refused, said, and it keeps it", !!newHold && !!refused && after?.id === newHold.id && after?.cards.join() === '6', JSON.stringify({ shown, newHold, after, bob: (await live(alpha, bob.id))?.status }))
   await page.screenshot({ path: path.join(lib.WORK, 'mergeslot-release-refused.png') })
   check('asked again, Release frees the slot', !!(await askRelease()))
   await page.locator('.dialog .btn', { hasText: 'Release' }).click()
-  check('…and frees the slot', !!(await until(async () => !(await slotNow())?.holder, 5000)))
+  check('…and frees the slot', !!(await until(async () => !(await slotNow())?.holder, lib.timing('hang.step'))))
 
   // --- The Merge dialog follows the slot: open while it is free, it waits once an agent claims it, until it is free again.
   const wes = await lib.addAgent(inv, alpha, { name: 'Wes', location: 'new-worktree' })
@@ -182,16 +182,16 @@ const check = (name, ok, extra = '') => {
   await page.locator('.menu-item', { hasText: 'Merge…' }).click()
   const dialog = page.locator('.dialog', { hasText: "Merge Wes's work" })
   const merge = dialog.locator('.btn.primary', { hasText: 'Merge' })
-  check('the Merge dialog opens with Merge enabled while the slot is free', !!(await until(async () => (await dialog.count()) === 1 && !(await merge.isDisabled()), 10000)))
+  check('the Merge dialog opens with Merge enabled while the slot is free', !!(await until(async () => (await dialog.count()) === 1 && !(await merge.isDisabled()), lib.timing('hang.step'))))
   await say(alpha, bob, slot({ action: 'claim', cards: [5] }))
-  const noted = await until(async () => (await dialog.locator('.merge-slot-note').count()) === 1, 10000)
+  const noted = await until(async () => (await dialog.locator('.merge-slot-note').count()) === 1, lib.timing('hang.step'))
   check('once an agent claims it, the dialog says who is merging, and Merge waits', !!noted && /Bob is merging #5 into main/.test(await dialog.locator('.merge-slot-note').innerText()) && (await merge.isDisabled()))
   await page.screenshot({ path: path.join(lib.WORK, 'mergeslot-dialog.png') })
   await idle(alpha, bob.id)
   await say(alpha, bob, slot({ action: 'release' }))
-  check('once it is free again, Merge is enabled', !!(await until(async () => (await dialog.locator('.merge-slot-note').count()) === 0 && !(await merge.isDisabled()), 10000)))
+  check('once it is free again, Merge is enabled', !!(await until(async () => (await dialog.locator('.merge-slot-note').count()) === 0 && !(await merge.isDisabled()), lib.timing('hang.step'))))
   await merge.click()
-  check('the merge goes through', !!(await until(async () => (await dialog.count()) === 0, 15000)) && fs.existsSync(path.join(alpha, 'b.txt')))
+  check('the merge goes through', !!(await until(async () => (await dialog.count()) === 0, lib.timing('hang.step'))) && fs.existsSync(path.join(alpha, 'b.txt')))
 
   // --- Who may reach it: another project's agent can't; a script can look but not claim.
   const launches = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))

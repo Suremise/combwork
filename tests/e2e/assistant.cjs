@@ -19,7 +19,7 @@ const check = (name, ok, extra = '') => {
 }
 const agentFile = () => JSON.parse(fs.readFileSync(path.join(home, '.combwork', 'project.json'), 'utf8')).agents?.[0] ?? {}
 // The longest a check waits for its condition: a bound for a hung run, never how long the step should take.
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 /** Whether fn() comes true (checked until it does, up to HUNG_MS). */
 const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
 
@@ -92,9 +92,9 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   // Switching mode (not running): saved for this workspace.
   await page.locator('.assistant-mode').click()
   await page.locator('.context-menu .menu-item, .menu .menu-item', { hasText: 'Planner' }).first().click()
-  check('choosing a mode saves it for the workspace', !!(await lib.until(() => agentFile().mode === 'planner', 10000)), JSON.stringify(agentFile()))
+  check('choosing a mode saves it for the workspace', !!(await lib.until(() => agentFile().mode === 'planner', lib.timing('hang.ui'))), JSON.stringify(agentFile()))
   // The header follows once the workspace is refreshed, which can be after the file is saved.
-  check('the header shows it', !!(await lib.until(async () => (await page.locator('.assistant-mode').innerText()).includes('Planner'), 10000)))
+  check('the header shows it', !!(await lib.until(async () => (await page.locator('.assistant-mode').innerText()).includes('Planner'), lib.timing('hang.ui'))))
 
   // Assistant Settings (HI-2108): this workspace's connection and mode, nothing else. Two connections on its account (the
   // connection dialog's saves): Sonnet with Medium effort, and one in the CLI's own mode, which the Assistant can't take.
@@ -192,7 +192,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   // Closing the workspace (Confirm on quit: always) lists it as "Assistant", then stops it.
   await inv('settings:update', { general: { confirmOnQuit: 'always' } })
   const closing = inv('workspace:close')
-  await lib.until(async () => (await page.locator('.dialog').count()) > 0, 10000)
+  await lib.until(async () => (await page.locator('.dialog').count()) > 0, lib.timing('hang.ui'))
   const dialog = await page.locator('.dialog').last().innerText().catch(() => '')
   check('the close dialog names it "Assistant"', /Assistant/.test(dialog) && !/\.combwork|assistant ·/i.test(dialog), dialog.replace(/\s+/g, ' ').slice(0, 200))
   await page.locator('.dialog .btn', { hasText: 'Close workspace now' }).click()

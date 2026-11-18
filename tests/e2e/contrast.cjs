@@ -10,7 +10,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'contrast-profile')
 const ws = path.join(lib.WORK, 'contrast-ws')
@@ -89,7 +89,7 @@ function measure([selector, parts]) {
     await page.mouse.move(5, 5)
     await page.locator('.project-row', { hasText: 'demo' }).first().click({ button: 'right' })
     const menu = page.locator('.menu').first()
-    check(`${theme}: the project's menu opens`, !!(await lib.until(async () => (await menu.count()) === 1, 5000)))
+    check(`${theme}: the project's menu opens`, !!(await lib.until(async () => (await menu.count()) === 1, lib.timing('hang.ui'))))
     await menu.evaluate((m) => {
       const add = (cls, html) => {
         const d = document.createElement('div')
@@ -136,7 +136,7 @@ function measure([selector, parts]) {
     // its own fill).
     await page.keyboard.press('Control+Shift+P')
     const row = page.locator('.palette-item.active')
-    check(`${theme}: the palette opens with a chosen row`, !!(await lib.until(async () => (await row.count()) === 1, 5000)))
+    check(`${theme}: the palette opens with a chosen row`, !!(await lib.until(async () => (await row.count()) === 1, lib.timing('hang.ui'))))
     await page.locator('.palette input').fill('Show Task Board')
     await lib.until(async () => (await row.locator('kbd').count()) === 1, HUNG_MS)
     const pal = await page.evaluate(measure, ['.palette-item.active', ['', '.cat', 'kbd']])

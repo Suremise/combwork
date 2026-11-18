@@ -76,12 +76,12 @@ const scenario = {
   const waited = lib.until(() => {
     states.push(pidIn(probe))
     return pidIn(probe)
-  }, 10000, 50)
+  }, lib.timing('hang.step'), 50)
   check('the pid file missing: not yet', pidIn(probe) === null)
   // Each state seen by the wait before the next: polled, not read once.
   const seenAgain = async () => {
     const n = states.length
-    await lib.until(() => states.length > n, 10000, 20)
+    await lib.until(() => states.length > n, lib.timing('hang.ui'), 20)
   }
   await seenAgain()
   fs.writeFileSync(probe, '')
@@ -100,7 +100,7 @@ const scenario = {
     check(`run ${run}: the scenario ran (no error)`, !r.error, r.error)
     check(`run ${run}: its agent left a command running through cw-progress`, r.checks.length === 1 && r.checks[0].ok === true, JSON.stringify(r.checks))
     check(`run ${run}: the harness stopped what was left, and says so`, /process\(es\).*were stopped/.test(r.leftOver ?? ''), r.leftOver)
-    check(`run ${run}: the command's node is no longer running`, !!pid && (await lib.until(() => !alive(pid), 10000)), String(pid))
+    check(`run ${run}: the command's node is no longer running`, !!pid && (await lib.until(() => !alive(pid), lib.timing('hang.ui'))), String(pid))
     check(`run ${run}: the scenario's folder went`, !r.kept && !fs.existsSync(root), r.kept ?? root)
   }
   // HI-2217: what an agent leaves that names no scenario folder and whose parent has exited (a model's `find / …`) is
@@ -127,7 +127,7 @@ const scenario = {
   check('unnamed: the scenario ran (no error)', !u.error, u.error)
   check('unnamed: its agent left a command naming no scenario folder, its parent gone', u.checks.length === 2 && u.checks.every((c) => c.ok === true), JSON.stringify(u.checks))
   check('unnamed: the harness stopped it, and counts it', /^[1-9]\d* process\(es\).*were stopped/.test(u.leftOver ?? ''), u.leftOver)
-  check("unnamed: the command's node is no longer running", !!hidden && (await lib.until(() => !alive(hidden), 10000)), String(hidden))
+  check("unnamed: the command's node is no longer running", !!hidden && (await lib.until(() => !alive(hidden), lib.timing('hang.ui'))), String(hidden))
 
   // Nothing of either run is left holding the folder.
   check('nothing still runs from its folder', lib.stopProcessesIn(workRoot) === 0)

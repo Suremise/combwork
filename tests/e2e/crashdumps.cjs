@@ -10,7 +10,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'crashdumps-profile')
 const reports = path.join(userData, 'Crashpad', 'reports')
@@ -19,7 +19,7 @@ const heapDir = path.join(userData, 'heap')
 // The main process's heap in the out-of-memory test: small, so it fills (and its snapshot is written) in seconds.
 const SMALL_HEAP_MB = 256
 // The bound for that test's main process filling its heap and writing the snapshot: a bound for a hung run (#570).
-const OOM_HUNG_MS = 180000
+const OOM_HUNG_MS = lib.timing('hang.slow')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++

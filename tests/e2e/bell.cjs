@@ -9,7 +9,7 @@ const fs = require('fs')
 const path = require('path')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 const until = (fn) => lib.until(fn, HUNG_MS, 100)
 const userData = path.join(lib.WORK, 'bell-profile')
 let failed = 0
@@ -133,19 +133,19 @@ const check = (name, ok, extra = '') => {
   // the panel brings nothing back, and the panel stays empty.
   // Show Notifications left the panel open: closed with its own button.
   if ((await page.locator('.notif-panel').count()) > 0) await page.locator('.notif-panel button[aria-label="Close"]').click()
-  await until(async () => (await page.locator('.notif-panel').count()) === 0)
+  await until(async () => (await page.locator('.notif-panel').count()) === 0, lib.timing('hang.ui'))
   await app.evaluate(({ BrowserWindow }) => {
     BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'toast', toast: { id: 'stays', kind: 'needsYou', level: 'info', title: 'Waiting for you', timestamp: new Date().toISOString() } })
   })
   const waiting = page.locator('.popups .popup', { hasText: 'Waiting for you' })
-  check('a pop-up that needs you shows', !!(await until(async () => (await waiting.count()) === 1)))
+  check('a pop-up that needs you shows', !!(await until(async () => (await waiting.count()) === 1, lib.timing('hang.ui'))))
   await bell.click()
   await page.locator('.notif-panel button[aria-label="Clear all"]').click()
   await page.locator('.notif-panel button[aria-label="Close"]').click()
-  await until(async () => (await page.locator('.notif-panel').count()) === 0)
+  await until(async () => (await page.locator('.notif-panel').count()) === 0, lib.timing('hang.ui'))
   check('Clear all, then the panel closed: the pop-up is gone too, not back on screen', (await page.locator('.popups .popup').count()) === 0)
   await bell.click()
-  check('…and the panel, opened again, is empty', !!(await until(async () => (await page.locator('.notif-panel .notif-item').count()) === 0 && (await page.locator('.notif-panel .empty-state').count()) === 1)))
+  check('…and the panel, opened again, is empty', !!(await until(async () => (await page.locator('.notif-panel .notif-item').count()) === 0 && (await page.locator('.notif-panel .empty-state').count()) === 1, lib.timing('hang.ui'))))
 
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')

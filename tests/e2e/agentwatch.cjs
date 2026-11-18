@@ -10,7 +10,7 @@ const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 // A fake's Combwork tool call took 20 s under a loaded machine (#667).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 
 const userData = path.join(lib.WORK, 'agentwatch-profile')
 const ws = path.join(lib.WORK, 'agentwatch-ws')
@@ -55,7 +55,7 @@ const check = (name, ok, extra = '') => {
     return { status: r.status, body: await r.json().catch(() => null) }
   }
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms = 30000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)

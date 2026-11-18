@@ -13,7 +13,7 @@ const fs = require('fs')
 const path = require('path')
 const { _electron } = require('playwright-core')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 
 const PORT = Number(lib.port(47712))
 const userData = path.join(lib.WORK, 'notifyonce-profile')
@@ -53,7 +53,8 @@ const check = (name, ok, extra = '') => {
     const one = await lib.addAgent(inv, alpha, { name: 'One' })
     const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === one.id)
     await inv('session:start', alpha, { agentId: one.id })
-    check('the agent starts', !!(await lib.until(async () => (await live())?.status === 'ready', 25000)))
+    // before any turn (HI-2688): its start, restart or resume
+    check('the agent starts', !!(await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))))
     const send = async (text) => {
       await inv('pty:write', lib.ptyKey(alpha, one.id), text)
       await lib.sleep(100)

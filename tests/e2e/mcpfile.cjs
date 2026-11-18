@@ -12,7 +12,7 @@ const fs = require('fs')
 const path = require('path')
 const { zipSync, strToU8 } = require('fflate')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'mcpfile-profile')
 const ws = path.join(lib.WORK, 'mcpfile-ws')
@@ -222,7 +222,7 @@ const check = (name, ok, extra = '') => {
       const lines = fs.existsSync(path.join(home, 'fake-launches.jsonl')) ? fs.readFileSync(path.join(home, 'fake-launches.jsonl'), 'utf8').trim().split('\n') : []
       const l = lines.map((x) => JSON.parse(x)).find((x) => x.opts?.['--mcp-config'] && x.cwd.toLowerCase() === cwd.toLowerCase())
       return l && fs.existsSync(l.opts['--mcp-config']) ? JSON.parse(fs.readFileSync(l.opts['--mcp-config'], 'utf8')).mcpServers : null
-    }, 30000)
+    }, lib.timing('hang.step'))
   const agent = await lib.addAgent(inv, proj, { name: 'User' })
   await inv('session:start', proj, { agentId: agent.id })
   const launched = await mcpOf(proj)

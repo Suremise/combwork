@@ -9,7 +9,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 
 const userData = path.join(lib.WORK, 'agents24-profile')
 const ws = path.join(lib.WORK, 'agents24-ws')
@@ -78,7 +78,8 @@ const check = (name, ok, extra = '') => {
     const refused = await inv('agents:add', crowd, { location: 'project', provider: 'claude-code' }).then(() => '', (e) => String(e.message ?? e))
     check('24 agents added; a 25th refused', agents.length === N && /up to 24 agents/.test(refused), refused)
     for (const a of agents) await inv('session:start', crowd, { agentId: a.id })
-    const ready = await until(async () => (await lives()).filter((s) => s.status === 'ready').length === N, 180000)
+    // before any turn (HI-2688): its start, restart or resume
+    const ready = await until(async () => (await lives()).filter((s) => s.status === 'ready').length === N, lib.timing('hang.slow'))
     check('all 24 start', !!ready, JSON.stringify((await lives()).map((s) => s.status)))
     await page.screenshot({ path: path.join(lib.WORK, 'agents24-1-running.png') })
 
@@ -121,9 +122,9 @@ const check = (name, ok, extra = '') => {
 
     // --- The runs end: the watcher is woken, the agents' turns end and the panel's runs finish.
     fs.writeFileSync(release, '')
-    check('the watcher is woken as they finish', !!(await until(async () => wakes(`W${N}`).some((w) => /^\[CW\] .*W\d+.* finished/.test(w)), 120000)), JSON.stringify(wakes(`W${N}`)))
-    check('no run is left open', !!(await until(async () => (await openRuns()).length === 0, 120000)), String((await openRuns()).length))
-    check('every worker is idle again', !!(await until(async () => (await lives()).filter((s) => ['ready', 'finished'].includes(s.status)).length >= N - 1, 120000)))
+    check('the watcher is woken as they finish', !!(await until(async () => wakes(`W${N}`).some((w) => /^\[CW\] .*W\d+.* finished/.test(w)), lib.timing('hang.step'))), JSON.stringify(wakes(`W${N}`)))
+    check('no run is left open', !!(await until(async () => (await openRuns()).length === 0, lib.timing('hang.step'))), String((await openRuns()).length))
+    check('every worker is idle again', !!(await until(async () => (await lives()).filter((s) => ['ready', 'finished'].includes(s.status)).length >= N - 1, lib.timing('hang.step'))))
   } finally {
     await app.close().catch(() => undefined)
   }

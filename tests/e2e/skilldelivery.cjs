@@ -14,7 +14,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'skilldelivery-profile')
 const ws = path.join(lib.WORK, 'skilldelivery-ws')
@@ -61,7 +61,7 @@ const BOTH = ['handover', 'pick-up', 'split-work', 'workspace-note', 'use-cw-api
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
-  const until = async (fn, ms = 20000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
@@ -116,7 +116,7 @@ const BOTH = ['handover', 'pick-up', 'split-work', 'workspace-note', 'use-cw-api
   const banner = page.locator('.banner.warn', { hasText: 'changed since' })
   check("the window's restart banner shows for the edited skill, with no refresh asked for", !!(await until(async () => (await banner.count()) === 1, HUNG_MS)))
   await page.screenshot({ path: path.join(lib.WORK, 'skilldelivery-restart-banner.png') })
-  check('a running agent is marked to restart for it', !!(await until(async () => (await inv('workspace:refresh')).projects.find((p) => p.name === 'alpha').agents.find((a) => a.id === codex.id)?.restartNeeded, 10000)))
+  check('a running agent is marked to restart for it', !!(await until(async () => (await inv('workspace:refresh')).projects.find((p) => p.name === 'alpha').agents.find((a) => a.id === codex.id)?.restartNeeded, lib.timing('hang.step'))))
   // Its Restart session restarts the agent it is shown for (the focused one), which then has the new version: it's gone.
   const runs = async () => Object.fromEntries((await inv('session:live')).filter((x) => x.projectPath.toLowerCase() === proj.toLowerCase()).map((x) => [x.agentId, x.runId]))
   const runsBefore = await runs()
@@ -204,7 +204,7 @@ const BOTH = ['handover', 'pick-up', 'split-work', 'workspace-note', 'use-cw-api
   await page.screenshot({ path: path.join(lib.WORK, 'skilldelivery-advanced.png') })
 
   for (const id of [claude.id, codex.id]) await inv('session:stop', proj, id).catch(() => undefined)
-  await lib.until(async () => (await inv('session:live')).length === 0, 15000)
+  await lib.until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
   process.exit(failed ? 1 : 0)

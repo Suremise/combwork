@@ -13,7 +13,7 @@ const q = require('./queueFixture.cjs')
 
 const PORT = Number(lib.port(47855))
 const fx = q.queueProject('queuelease')
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++

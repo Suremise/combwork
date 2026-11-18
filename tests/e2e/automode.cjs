@@ -42,11 +42,12 @@ const check = (name, ok, extra = '') => {
     const said = await lib.until(async () => {
       const c = (await inv('provider:info'))['claude-code']
       return !c.checking && c.catalog?.source === 'cli' && c.catalog.models.find((m) => m.value === 'haiku')?.supportsAuto === wanted
-    }, 15000)
+    }, lib.timing('hang.ui'))
     check(`the CLI says: ${says}`, !!said)
 
     await inv('session:start', home, { agentId: 'assistant' })
-    await lib.until(async () => (await live())?.status === 'ready', 15000)
+    // before any turn (HI-2688): its start, restart or resume
+    await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))
     const launches = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split(/\r?\n/)
     const opts = JSON.parse(launches.at(-1)).opts
     check(`${says}: launched asking for Auto, with Haiku`, opts['--permission-mode'] === 'auto' && opts['--model'] === 'haiku', JSON.stringify(opts))
@@ -65,7 +66,7 @@ const check = (name, ok, extra = '') => {
     check(`${says}: the connection dialog warns exactly as the CLI says`, caveatRight, caveat)
     await page.keyboard.press('Control+Shift+E').catch(() => undefined)
     await inv('session:stop', home, 'assistant')
-    await lib.until(async () => !(await live()), 15000)
+    await lib.until(async () => !(await live()), lib.timing('hang.ui'))
   }
 
   fs.rmSync(path.join(claudeHome, 'fake-models.json'), { force: true })

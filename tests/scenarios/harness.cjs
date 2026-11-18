@@ -10,6 +10,7 @@
 //   difference is the scenario's), for benchmarks (measuresOf).
 // Scenarios check outcomes, never wording.
 const fs = require('fs')
+const { timing } = require('../timing.cjs')
 const path = require('path')
 const { execFileSync } = require('child_process')
 const lib = require('../e2e/lib.cjs')
@@ -116,7 +117,7 @@ const scenarioFolder = (scId, providerKey) => `${scId}-${PROVIDER_TAGS[providerK
 const sleep = lib.sleep
 // The longest the harness waits for something it is waiting on (a file, a session, a report): a bound for a hung run,
 // never how long the step should take.
-const HUNG_MS = 30000
+const HUNG_MS = timing('hang.ui')
 /** The most of a trial's final reply its results keep (HI-2230): whole for any usual reply, bounded for a runaway one. */
 const REPLY_KEPT = 6000
 const plain = (text) => String(text).replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, ' ').replace(/\x1b\][^\x07]*\x07/g, ' ').replace(/\s+/g, ' ')
@@ -422,7 +423,7 @@ function claudeAuthStatus(file, agentId, env) {
   if (!exe || !env.CLAUDE_CONFIG_DIR) return null
   let out = ''
   try {
-    out = execFileSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"${exe}" auth status --json`], { env: lib.childEnv({ CLAUDE_CONFIG_DIR: env.CLAUDE_CONFIG_DIR }), encoding: 'utf8', timeout: 30000, windowsHide: true, windowsVerbatimArguments: true, stdio: ['ignore', 'pipe', 'ignore'] })
+    out = execFileSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"${exe}" auth status --json`], { env: lib.childEnv({ CLAUDE_CONFIG_DIR: env.CLAUDE_CONFIG_DIR }), encoding: 'utf8', timeout: timing('spawn.hang'), windowsHide: true, windowsVerbatimArguments: true, stdio: ['ignore', 'pipe', 'ignore'] })
   } catch (e) {
     // Signed out, it exits with 1, still printing its answer.
     out = typeof e?.stdout === 'string' ? e.stdout : ''
@@ -754,7 +755,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       /** Starts another of alpha's agents ('implementer'), with no prompt: running, so it can hold the merge slot. */
       startAgent: async (key) => {
         await inv('session:start', alpha, { agentId: ctx.agents[key].id })
-        const up = await lib.until(async () => (await inv('session:live')).some((x) => x.projectPath.toLowerCase() === alpha.toLowerCase() && x.agentId === ctx.agents[key].id), 30000)
+        const up = await lib.until(async () => (await inv('session:live')).some((x) => x.projectPath.toLowerCase() === alpha.toLowerCase() && x.agentId === ctx.agents[key].id), timing('hang.step'))
         if (!up) throw new Error(`${key} didn't start within 30 s`)
       },
       /**
@@ -815,7 +816,7 @@ async function runScenario(sc, providerKey, opts = {}) {
         const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
           input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n',
           env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${port}`, CW_WORKSPACE: ws, CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'agents', CW_JOURNAL: '1', CW_API_TOKEN_FILE: tokenFile, CW_API_TOKEN: '', CW_PROJECT: '' }),
-          timeout: 60000
+          timeout: timing('spawn.hang')
         }).toString()
         return JSON.parse(out.split('\n')[0]).result?.content?.[0]?.text ?? ''
       },
@@ -823,7 +824,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       stopAssistant: async () => {
         const home = (await inv('workspace:refresh')).assistant.path
         await inv('session:stop', home, 'assistant')
-        const gone = await lib.until(async () => !(await inv('session:live')).some((x) => x.projectPath.toLowerCase() === home.toLowerCase() && x.agentId === 'assistant'), 30000)
+        const gone = await lib.until(async () => !(await inv('session:live')).some((x) => x.projectPath.toLowerCase() === home.toLowerCase() && x.agentId === 'assistant'), timing('hang.step'))
         if (!gone) throw new Error("setup: the Assistant didn't stop within 30 s")
       },
       /** The fake Claude Code's home (CLAUDE_CONFIG_DIR), where it reads its scripts and writes its logs. */
@@ -1010,7 +1011,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     let combworkLine = null
     if (byCombwork && !endedAtLaunch) {
       const lineOf = async () => (await conversation()).find((x) => x.kind === 'user' && String(x.text ?? '').startsWith('[CW]'))?.text ?? null
-      await lib.until(async () => !!(combworkLine = await lineOf()) && (!p.fake || ['ready', 'finished'].includes((await live())?.status)), 60000)
+      await lib.until(async () => !!(combworkLine = await lineOf()) && (!p.fake || ['ready', 'finished'].includes((await live())?.status)), timing('hang.step'))
       if (!combworkLine) {
         result.error = "Combwork's line never reached the session under test"
         return result
@@ -1251,7 +1252,7 @@ async function runScenario(sc, providerKey, opts = {}) {
         await lib.until(async () => {
           still = leftoverIdentities(processes(), observed.leftovers)
           return !still.length
-        }, 30000)
+        }, timing('hang.ui'))
         observed.leftoversStillRunning = still
       }
     }

@@ -84,7 +84,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   const buf3 = (await lib.until(async () => {
     const b = await inv('pty:buffer', `session:${proj.toLowerCase()}#${a3.id}`)
     return b.includes('CW-SETUP-RAN') ? b : null
-  }, 20000)) ?? (await inv('pty:buffer', `session:${proj.toLowerCase()}#${a3.id}`))
+  }, lib.timing('hang.step'))) ?? (await inv('pty:buffer', `session:${proj.toLowerCase()}#${a3.id}`))
   check('setup command ran in the agent terminal', buf3.includes('CW-SETUP-RAN'))
   // Its quoted path with a space and its quoted argument reached the program as typed (#1454).
   const flat3 = lib.plainText(buf3).replace(/[ ]+/g, '')
@@ -94,7 +94,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   const up = (ids) => lib.until(async () => {
     const all = await inv('session:live')
     return ids.every((id) => all.some((l) => l.agentId === id && l.status !== 'starting'))
-  }, 30000)
+  }, lib.timing('hang.step'))
   await up([a1.id, a3.id])
   let live = await inv('session:live')
   const l1 = live.find((l) => l.agentId === a1.id), l3 = live.find((l) => l.agentId === a3.id)
@@ -109,13 +109,13 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   check('PreToolUse hook registered', argsOk)
 
   // --- Layouts
-  await inv('project:updateConfig', proj, { layout: 'columns2' }); await inv('workspace:refresh'); await lib.until(async () => (await page.locator('.pane-header-bar').count()) === 2, 10000)
+  await inv('project:updateConfig', proj, { layout: 'columns2' }); await inv('workspace:refresh'); await lib.until(async () => (await page.locator('.pane-header-bar').count()) === 2, lib.timing('hang.ui'))
   check('two pane headers', await page.locator('.pane-header-bar').count() === 2)
   await shot(page, '2-columns2')
-  await inv('project:updateConfig', proj, { layout: 'grid' }); await inv('workspace:refresh'); await lib.until(async () => (await page.locator('.pane-header-bar').count()) === 3 && (await page.getByText('Drop an agent here').count()) === 1, 10000)
+  await inv('project:updateConfig', proj, { layout: 'grid' }); await inv('workspace:refresh'); await lib.until(async () => (await page.locator('.pane-header-bar').count()) === 3 && (await page.getByText('Drop an agent here').count()) === 1, lib.timing('hang.ui'))
   check('grid: 3 headers + an empty cell to drop an agent on (#762)', (await page.locator('.pane-header-bar').count()) === 3 && (await page.getByText('Drop an agent here').count()) === 1)
   await shot(page, '3-grid')
-  await inv('project:updateConfig', proj, { layout: 'columns3' }); await inv('workspace:refresh'); await lib.until(async () => (await page.locator('.pane-header-bar').count()) === 3, 10000)
+  await inv('project:updateConfig', proj, { layout: 'columns3' }); await inv('workspace:refresh'); await lib.until(async () => (await page.locator('.pane-header-bar').count()) === 3, lib.timing('hang.ui'))
   await shot(page, '4-columns3')
   const visibleTerms = await page.locator('.terminal-host:not(.hidden)').count()
   check('two running terminals visible in 3 columns', visibleTerms === 2, String(visibleTerms))
@@ -148,7 +148,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   // Combwork's log says so, once each (#711): a hook a CLI sent but Combwork refused leaves a trace on Combwork's side.
   const combworkLog = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
   const refusedLines = () => combworkLog().split('\n').filter((x) => x.includes('Refused a hook call'))
-  check("Combwork's log tells of each refused hook call, and why", !!(await lib.until(() => refusedLines().some((x) => x.includes(`run ${l1.runId}: its token didn't match`)) && refusedLines().some((x) => x.includes('named no launch')), 10000)), refusedLines().join(' | '))
+  check("Combwork's log tells of each refused hook call, and why", !!(await lib.until(() => refusedLines().some((x) => x.includes(`run ${l1.runId}: its token didn't match`)) && refusedLines().some((x) => x.includes('named no launch')), lib.timing('hang.step'))), refusedLines().join(' | '))
   const file = path.join(proj, 'app.txt')
   const pre = (sid, f = file, tool = 'Edit') => hook({ session_id: sid, hook_event_name: 'PreToolUse', tool_name: tool, tool_input: { file_path: f }, cwd: proj })
   let r = await pre(l1.sessionId)
@@ -202,8 +202,8 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   check('worktree changes since base', cs.files.some((f) => f.path === 'review.md') && cs.files.some((f) => f.path === 'README.md'), cs.files.map((f) => f.path + ':' + f.status).join(' '))
   const d = await inv('git:diff', wtPath, 'review.md', 'main')
   check('diff against base', d.original === '' && d.modified.includes('Review notes'))
-  await page.locator('.tabs .tab', { hasText: 'Version Control' }).click(); await lib.until(async () => (await page.locator('.root-select').count()) > 0, 10000)
-  await page.locator('.root-select').first().selectOption(a3.id); await lib.until(async () => (await page.getByText('review.md').count()) > 0, 10000)
+  await page.locator('.tabs .tab', { hasText: 'Version Control' }).click(); await lib.until(async () => (await page.locator('.root-select').count()) > 0, lib.timing('hang.ui'))
+  await page.locator('.root-select').first().selectOption(a3.id); await lib.until(async () => (await page.getByText('review.md').count()) > 0, lib.timing('hang.ui'))
   check('Changes tab shows worktree files', await page.getByText('review.md').count() > 0)
   await shot(page, '6-changes')
   const list = await inv('session:list', proj)
@@ -228,7 +228,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   g('merge -q main -m sync', wtPath)
   await inv('session:stop', proj, a3.id)
   // Merge only once its session has ended (a working agent's branch isn't merged).
-  await lib.until(async () => !(await inv('session:live')).some((l) => l.agentId === a3.id), 20000)
+  await lib.until(async () => !(await inv('session:live')).some((l) => l.agentId === a3.id), lib.timing('hang.step'))
   const merged = await inv('agents:merge', proj, a3.id, { squash: true, message: 'Reviewer work', cleanup: true })
   check('squash merge ok and cleaned up', merged.ok && merged.cleanedUp, JSON.stringify(merged))
   check('merge commit on main', g('log -1 --format=%s').trim() === 'Reviewer work' && fs.existsSync(path.join(proj, 'review.md')))
@@ -242,7 +242,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   const refused = await inv('agents:remove', proj, a2.id, { deleteWorktree: false }).then(() => 'ok', (e) => e.message)
   check('remove refused while running', /Stop the agent/.test(refused))
   await inv('session:stop', proj)
-  await lib.until(async () => (await inv('session:live')).length === 0, 20000)
+  await lib.until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))
   check('stop without agent stops all', (await inv('session:live')).length === 0)
   await inv('agents:remove', proj, a2.id, { deleteWorktree: false })
   p = await project()

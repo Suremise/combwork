@@ -13,7 +13,7 @@ const path = require('path')
 const zlib = require('zlib')
 const { sessionsOf, putSessions } = require('./storeDocs.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'assistantimages-profile')
 const ws = path.join(lib.WORK, 'assistantimages-ws')
@@ -73,7 +73,7 @@ const stamp = (d, name) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.
 
   // --- The view: Modes, Conversations, Attachments.
   await page.locator('.activity-btn[aria-label="Assistant"]').click()
-  await lib.until(async () => (await page.locator('.assistant-summary').count()) > 0, 10000)
+  await lib.until(async () => (await page.locator('.assistant-summary').count()) > 0, lib.timing('hang.ui'))
   const sections = (await page.locator('.sidebar .section-header').allTextContents()).map((t) => t.replace(/\d+$/, '').trim())
   check('sections in order: Modes, MCP Servers (HI-2059), Conversations, Journal (#1033), Attachments, Memory (HI-2666)', JSON.stringify(sections) === JSON.stringify(['Modes', 'MCP Servers', 'Conversations', 'Journal', 'Attachments', 'Memory']), JSON.stringify(sections))
 
@@ -81,24 +81,24 @@ const stamp = (d, name) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.
   const newMode = async (name) => {
     await page.locator('button[aria-label="New Mode…"]').click()
     const field = page.locator('.dialog input.input')
-    await lib.until(async () => (await field.count()) === 1 && (await field.evaluate((el) => el === document.activeElement)), 5000)
+    await lib.until(async () => (await field.count()) === 1 && (await field.evaluate((el) => el === document.activeElement)), lib.timing('hang.ui'))
     await page.keyboard.type(name)
     await page.keyboard.press('Enter')
     await lib.sleep(500) // on purpose: a dialog opened again by the same key press would be on screen by now
   }
   await newMode('Enter Test')
-  check('Enter in New Mode… makes the mode', !!(await lib.until(async () => fs.existsSync(path.join(ws, '.combwork', 'modes', 'enter-test.md')), 5000)))
+  check('Enter in New Mode… makes the mode', !!(await lib.until(async () => fs.existsSync(path.join(ws, '.combwork', 'modes', 'enter-test.md')), lib.timing('hang.ui'))))
   check('…and leaves no dialog open', (await page.locator('.dialog').count()) === 0, String(await page.locator('.dialog').count()))
   await newMode('Enter Test')
-  check('Enter with a name already used shows why', !!(await lib.until(async () => (await page.getByText('There is already a mode called').count()) > 0, 5000)))
+  check('Enter with a name already used shows why', !!(await lib.until(async () => (await page.getByText('There is already a mode called').count()) > 0, lib.timing('hang.ui'))))
   check('…and leaves no dialog open either', (await page.locator('.dialog').count()) === 0, String(await page.locator('.dialog').count()))
   // The confirming Enter released in another window (Combwork loses the focus, its keyup never comes here): the next
   // Enters here aren't held back. A field of the test's own, typed into with real key presses.
   await page.locator('button[aria-label="New Mode…"]').click()
-  await lib.until(async () => (await page.locator('.dialog input.input').count()) === 1 && (await page.locator('.dialog input.input').evaluate((el) => el === document.activeElement)), 5000)
+  await lib.until(async () => (await page.locator('.dialog input.input').count()) === 1 && (await page.locator('.dialog input.input').evaluate((el) => el === document.activeElement)), lib.timing('hang.ui'))
   await page.keyboard.type('Blur Test')
   await page.keyboard.down('Enter')
-  check('Enter held down makes the mode, with no dialog left open', !!(await lib.until(async () => fs.existsSync(path.join(ws, '.combwork', 'modes', 'blur-test.md')) && (await page.locator('.dialog').count()) === 0, 5000)))
+  check('Enter held down makes the mode, with no dialog left open', !!(await lib.until(async () => fs.existsSync(path.join(ws, '.combwork', 'modes', 'blur-test.md')) && (await page.locator('.dialog').count()) === 0, lib.timing('hang.ui'))))
   await page.evaluate(() => window.dispatchEvent(new Event('blur')))
   await page.evaluate(() => {
     const t = document.createElement('textarea')
@@ -115,7 +115,7 @@ const stamp = (d, name) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.
   // --- Attachments: the conversation's group, with its name, in the Attachments grid.
   await page.locator('.row', { hasText: 'All Attachments' }).click()
   const group = page.locator('.image-group', { hasText: 'Planning the week' })
-  await lib.until(async () => (await group.locator('.thumb').count()) === 4, 10000)
+  await lib.until(async () => (await group.locator('.thumb').count()) === 4, lib.timing('hang.ui'))
   check("the pasted files show, under their conversation's name", (await group.locator('.thumb').count()) === 4)
   check('…with no tabs: the Assistant has pane attachments alone (HI-1841)', (await page.locator('.images-page .attachment-tabs').count()) === 0 && (await page.locator('.images-page [role="tabpanel"]').count()) === 0)
   check('the toolbar counts them by conversation', /4 in 1 conversation\b/.test(await page.locator('.images-toolbar').innerText()), await page.locator('.images-toolbar').innerText())
@@ -136,14 +136,14 @@ const stamp = (d, name) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.
   await page.screenshot({ path: path.join(lib.WORK, 'assistantimages-1-images-light.png') })
   await inv('settings:update', { appearance: { theme: 'dark' } })
   await group.locator('.thumb').first().click()
-  await lib.until(async () => (await page.locator('.image-viewer').count()) > 0, 5000)
+  await lib.until(async () => (await page.locator('.image-viewer').count()) > 0, lib.timing('hang.ui'))
   check('an image opens in the viewer', (await page.locator('.image-viewer img').count()) > 0)
   await page.keyboard.press('Escape')
   await lib.until(async () => (await page.locator('.image-viewer').count()) === 0, HUNG_MS)
 
   // --- A group's name opens its conversation in the conversations tree.
   await group.locator('.image-group-name').click()
-  await lib.until(async () => /Planning the week/.test(await page.locator('.transcript-toolbar strong').first().innerText().catch(() => '')), 10000)
+  await lib.until(async () => /Planning the week/.test(await page.locator('.transcript-toolbar strong').first().innerText().catch(() => '')), lib.timing('hang.ui'))
   check("the group's name opens that conversation's transcript", /Planning the week/.test(await page.locator('.transcript-toolbar strong').first().innerText().catch(() => '')))
   check('the conversations are the tree (by provider)', (await page.locator('.sessions-tree .session-branch-provider').count()) === 1 && (await page.locator('.sessions-tree .session-row.selected', { hasText: 'Planning the week' }).count()) === 1)
   check('the Conversations row is the one selected', (await page.locator('.sidebar .row.selected', { hasText: 'All Conversations' }).count()) === 1)
@@ -153,13 +153,13 @@ const stamp = (d, name) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.
   await page.locator('.palette input').fill('Show Assistant Attachments')
   await lib.until(async () => (await page.locator('.palette-item', { hasText: 'Show Assistant Attachments' }).count()) > 0, HUNG_MS)
   await page.keyboard.press('Enter')
-  await lib.until(async () => (await group.count()) > 0, 5000)
+  await lib.until(async () => (await group.count()) > 0, lib.timing('hang.ui'))
   check('"Show Assistant Attachments" shows them', (await group.count()) === 1)
 
   // --- A group to the Recycle Bin at once.
   await group.locator('[aria-label^="Delete This Conversation"]').click()
   await page.locator('.dialog-footer button', { hasText: /^Move to Recycle Bin$/ }).click()
-  await lib.until(async () => (await page.locator('.images-page').count()) === 0, 8000)
+  await lib.until(async () => (await page.locator('.images-page').count()) === 0, lib.timing('hang.ui'))
   check('the group goes, and the view says there are none', /No attachments yet/.test(await page.locator('.empty-state').first().innerText().catch(() => '')))
   check('its images are gone from its home', !fs.existsSync(imgDir) || fs.readdirSync(imgDir).length === 0)
   // Combwork's copy of its transcript, whole: plain, or compressed by the backups' housekeeping (#1110), which may run

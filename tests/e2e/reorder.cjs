@@ -8,7 +8,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'reorder-profile')
 const ws = path.join(lib.WORK, 'reorder-ws')
@@ -40,7 +40,7 @@ const check = (name, ok, extra = '') => {
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
-  const until = async (fn, ms = 10000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
@@ -58,11 +58,12 @@ const check = (name, ok, extra = '') => {
   // One runs, with something in its terminal.
   const one = agents[0]
   await inv('session:start', alpha, { agentId: one.id })
-  await until(async () => (await live(one.id))?.status === 'ready', 15000)
+  // before any turn (HI-2688): its start, restart or resume
+  await until(async () => (await live(one.id))?.status === 'ready', lib.timing('hang.step'))
   await inv('pty:write', lib.ptyKey(alpha, one.id), 'hello')
   await lib.sleep(300)
   await inv('pty:write', lib.ptyKey(alpha, one.id), '\r')
-  await until(async () => (await live(one.id))?.status === 'finished', 15000)
+  await until(async () => (await live(one.id))?.status === 'finished', lib.timing('hang.step'))
   const session = (await live(one.id)).sessionId
   check('starts in the order added', saved() === 'One,Two,Three' && (await paneNames()) === 'One,Two,Three', await paneNames())
 
@@ -129,7 +130,7 @@ const check = (name, ok, extra = '') => {
   check('still running throughout', (await live(one.id))?.sessionId === session)
 
   await inv('session:stop', alpha)
-  await lib.until(async () => (await inv('session:live')).length === 0, 15000)
+  await lib.until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
   process.exit(failed ? 1 : 0)

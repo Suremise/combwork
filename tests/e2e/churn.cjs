@@ -10,7 +10,7 @@ const fs = require('fs')
 const path = require('path')
 const { showBoard, openByTitle } = require('./queueFixture.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const PORT = Number(lib.port(47836))
 const userData = path.join(lib.WORK, 'churn-profile')

@@ -38,7 +38,7 @@ const pidOf = (tag) => {
 
 // The test home's sign-in, as Claude Code says it (the runner asks too; this is for running the suite on its own).
 const exe = [path.join(os.homedir(), '.local', 'bin', 'claude.exe')].find((f) => fs.existsSync(f)) ?? 'claude'
-const status = spawnSync(exe, ['auth', 'status', '--json'], { encoding: 'utf8', timeout: 30000, env: lib.childEnv({ CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME }) })
+const status = spawnSync(exe, ['auth', 'status', '--json'], { encoding: 'utf8', timeout: lib.timing('spawn.hang'), env: lib.childEnv({ CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME }) })
 let signedIn = true
 try {
   signedIn = JSON.parse(status.stdout).loggedIn !== false
@@ -79,19 +79,19 @@ if (!signedIn) lib.skip(`environment: Claude Code isn't signed in to its test ho
         const launchMark = lib.combworkLogLines(userData).length
         await inv('session:start', proj, { agentId: agent.id })
         await lib.acceptClaudeTrust(inv, proj, agent.id, 60000)
-        check(`Claude Code starts (${tag})`, !!(await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), 90000, 500)), lib.plainText(await inv('pty:buffer', key)).slice(-400))
+        check(`Claude Code starts (${tag})`, !!(await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), lib.timing('hang.step'), 500)), lib.plainText(await inv('pty:buffer', key)).slice(-400))
         const prompt = `Use the Bash tool once, with run_in_background set to true, to run: node linger.js ${tag}   Do not wait for it, read its output or check on it. Then reply with the single word STARTED.`
         await lib.sendPrompt(inv, key, prompt, { submitted: async () => (await live())?.status === 'working' || !!pidOf(tag), ready: () => lib.combworkToolsConnected(userData, agent.id, launchMark) })
-        const pid = await lib.until(() => pidOf(tag), 120000, 500)
+        const pid = await lib.until(() => pidOf(tag), lib.timing('hang.step'), 500)
         check(`the agent started node linger.js in the background (${tag})`, !!pid && alive(pid), lib.plainText(await inv('pty:buffer', key)).slice(-600))
         // With the task running Claude Code's turn ends in background (it is told when the task ends: backgroundWakes).
-        check(`its turn ends, waiting on the task (${tag})`, !!(await lib.until(async () => ['background', 'finished'].includes((await live())?.status), 120000, 500)), JSON.stringify(await live()))
+        check(`its turn ends, waiting on the task (${tag})`, !!(await lib.until(async () => ['background', 'finished'].includes((await live())?.status), lib.timing('hang.step'), 500)), JSON.stringify(await live()))
         return pid
       })
 
     /** What became of the process once the CLI has gone: ended with it, or listed by Combwork, and then End ends it. */
     const afterExit = async (how, pid) => {
-      const was = await lib.until(async () => (!alive(pid) ? 'ended' : (await listed())?.processes.some((p) => p.pid === pid) ? 'listed' : null), 20000, 500)
+      const was = await lib.until(async () => (!alive(pid) ? 'ended' : (await listed())?.processes.some((p) => p.pid === pid) ? 'listed' : null), lib.timing('hang.ui'), 500)
       console.log(`INFO after ${how} the background process ${was === 'ended' ? 'ended with Claude Code' : was === 'listed' ? 'outlived it, listed' : 'outlived it, not listed'}`)
       check(`after ${how}, the background process ends with Claude Code or Combwork lists it`, !!was, JSON.stringify(await listed()))
       if (was !== 'listed') return
@@ -99,15 +99,15 @@ if (!signedIn) lib.skip(`environment: Claude Code isn't signed in to its test ho
       check(`as a node process (${how})`, !!found && found.processes.find((p) => p.pid === pid)?.label.startsWith('node '), JSON.stringify(found))
       await page.screenshot({ path: path.join(lib.WORK, 'leftovers-claude-listed.png') })
       const ended = await inv('session:settleLeftovers', proj, agent.id, 'end')
-      check(`End ends it (${how})`, ended >= 1 && (await lib.until(() => !alive(pid), 10000)), JSON.stringify({ ended, alive: alive(pid) }))
-      check(`and it is no longer listed (${how})`, !!(await lib.until(async () => !(await listed()), 10000)))
+      check(`End ends it (${how})`, ended >= 1 && (await lib.until(() => !alive(pid), lib.timing('hang.ui'))), JSON.stringify({ ended, alive: alive(pid) }))
+      check(`and it is no longer listed (${how})`, !!(await lib.until(async () => !(await listed()), lib.timing('hang.ui'))))
     }
 
     // Stopped as Combwork stops it (its terminal ended).
     const pid = await startInBackground('stop')
     await page.screenshot({ path: path.join(lib.WORK, 'leftovers-claude-running.png') })
     await inv('session:stop', proj, agent.id)
-    check('Combwork stops Claude Code', !!(await lib.until(async () => !(await live()), 20000)))
+    check('Combwork stops Claude Code', !!(await lib.until(async () => !(await live()), lib.timing('hang.ui'))))
     await afterExit('Combwork stops it', pid)
 
     // /exit: Claude Code ending by itself.

@@ -12,7 +12,7 @@ const crypto = require('crypto')
 const { pathToFileURL } = require('url')
 const { zipSync, strToU8 } = require('fflate')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'mcpcatalog-profile')
 const ws = path.join(lib.WORK, 'mcpcatalog-ws')

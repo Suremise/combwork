@@ -7,7 +7,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'perfcompare-profile')
 const ws = path.join(lib.WORK, 'perfcompare-ws')
@@ -26,7 +26,7 @@ const check = (name, ok, extra = '') => {
   const { app, page, inv } = await lib.launch({ userData, viewport: { width: 1400, height: 950 } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, ws)
-  const until = async (fn, ms = 10000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
@@ -57,7 +57,7 @@ const check = (name, ok, extra = '') => {
   // The Combwork context column's tip names the Assistant's working mode as the Performance page does (#358).
   await page.locator(`${pageSel} .perf-scenarios th`, { hasText: 'Combwork context' }).first().locator('.info-icon').hover()
   const tipText = async () => (await page.locator('.tip:visible').allInnerTexts()).join(' ')
-  check('the Combwork context tip says the Assistant’s role and mode, not persona', !!(await until(async () => (await tipText()).includes('the Assistant’s role and mode'), 5000)) && !/persona/i.test(await tipText()), await tipText())
+  check('the Combwork context tip says the Assistant’s role and mode, not persona', !!(await until(async () => (await tipText()).includes('the Assistant’s role and mode'), lib.timing('hang.ui'))) && !/persona/i.test(await tipText()), await tipText())
   await page.mouse.move(0, 0)
   check('a smaller reply that broke a scenario is "smaller but failing"', (await statusOf('card-detail')) === 'Smaller but failing', await statusOf('card-detail'))
   check('…and leads the table', (await page.locator(`${pageSel} .perf-scenarios tbody tr`).first().innerText()).includes('card-detail'))

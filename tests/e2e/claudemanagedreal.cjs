@@ -21,7 +21,7 @@ const path = require('path')
 const http = require('http')
 const { spawn } = require('child_process')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 90000
+const HUNG_MS = lib.timing('hang.step')
 
 const work = path.join(lib.WORK, 'claudemanagedreal')
 let failed = 0

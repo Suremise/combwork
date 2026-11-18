@@ -44,7 +44,8 @@ const check = (name, ok, extra = '') => {
       return []
     }
   }
-  await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === agent.id)?.status === 'ready', 15000)
+  // before any turn (HI-2688): its start, restart or resume
+  await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === agent.id)?.status === 'ready', lib.timing('hang.step'))
   await inv('pty:write', lib.ptyKey(proj, agent.id), '\x1b[D')
   await lib.sleep(6000) // A fixed wait on purpose: this checks that the session does NOT move into Claude Code's background view after ←.
   const left = jobs()
@@ -59,7 +60,7 @@ const check = (name, ok, extra = '') => {
     }
   }
   await inv('session:stop', proj)
-  await lib.until(async () => (await inv('session:live')).length === 0, 15000)
+  await lib.until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))
   await app.close()
   console.log(failed ? `${failed} failed` : 'all passed')
   process.exit(failed ? 1 : 0)

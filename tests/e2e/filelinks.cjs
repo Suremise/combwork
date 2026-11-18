@@ -9,7 +9,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'filelinks-profile')
 const ws = path.join(lib.WORK, 'filelinks-ws')
@@ -46,7 +46,7 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
-  const until = async (fn, ms = 10000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
@@ -62,7 +62,7 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
       const drawn = window.__cwTerminalLines(termKey) ?? []
       const end = drawn.findIndex((l) => l.includes(done))
       return end >= 0 && drawn.slice(end + 1).some((l) => l.includes('? for shortcuts')) ? window.__cwTerminalTextAt(termKey, t) : null
-    }, [k, text, `Done: ${prompt}`]), 15000)
+    }, [k, text, `Done: ${prompt}`]), lib.timing('hang.ui'))
     check(`"${text}" is drawn, its turn's end below it`, !!at)
     return at ?? { x: 0, y: 0 }
   }
@@ -85,7 +85,8 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase(), two.worktree.path.toLowerCase()]))
   await inv('session:start', alpha, { agentId: one.id })
   await inv('session:start', alpha, { agentId: two.id })
-  check('the agents start', !!(await until(async () => (await live(alpha, one.id))?.status === 'ready' && (await live(alpha, two.id))?.status === 'ready', 20000)))
+  // before any turn (HI-2688): its start, restart or resume
+  check('the agents start', !!(await until(async () => (await live(alpha, one.id))?.status === 'ready' && (await live(alpha, two.id))?.status === 'ready', lib.timing('hang.step'))))
 
   const key = lib.ptyKey(alpha, one.id)
   // Short enough that its turn's "Done:" line holds all three paths on one row in a pane half the window wide.
@@ -93,8 +94,8 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
   await inv('pty:write', key, first)
   await lib.sleep(200)
   await inv('pty:write', key, '\r')
-  check('the paths are printed', !!(await until(() => textAt(key, 'src/nope.ts'), 10000)))
-  check('its turn ends', !!(await until(async () => (await live(alpha, one.id))?.status === 'finished', 15000)))
+  check('the paths are printed', !!(await until(() => textAt(key, 'src/nope.ts'), lib.timing('hang.ui'))))
+  check('its turn ends', !!(await until(async () => (await live(alpha, one.id))?.status === 'finished', lib.timing('hang.step'))))
   const linkTitle = () => page.locator('.terminal-host[title="Open in Files · Ctrl+click"]').count()
 
   // --- A missing file isn't linked; an existing one is.
@@ -126,9 +127,9 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
 
   // --- Ctrl+click: the Files tab, the file selected, the cursor on its line.
   await ctrlClick({ x: app1.x + 4, y: app1.y })
-  check('Ctrl+click opens the Files tab', !!(await until(async () => (await fileTree.count()) === 1, 5000)))
-  check('with the file selected', !!(await until(async () => (await selectedRow()) === 'src/app.ts', 5000)), String(await selectedRow()))
-  check('at its line', !!(await until(async () => (await activeLine()) === '25', 10000)), await activeLine())
+  check('Ctrl+click opens the Files tab', !!(await until(async () => (await fileTree.count()) === 1, lib.timing('hang.ui'))))
+  check('with the file selected', !!(await until(async () => (await selectedRow()) === 'src/app.ts', lib.timing('hang.ui'))), String(await selectedRow()))
+  check('at its line', !!(await until(async () => (await activeLine()) === '25', lib.timing('hang.ui'))), await activeLine())
   check('in the project folder', (await page.locator('.root-select').inputValue().catch(() => '')) === '')
   await page.screenshot({ path: path.join(lib.WORK, 'filelinks-2-opened.png') })
 
@@ -136,8 +137,8 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
   await backToSession()
   const util = await drawnAt(key, '../beta/lib/util.js:3', first)
   await ctrlClick({ x: util.x + 4, y: util.y })
-  check('a path into another project opens in that project', !!(await until(async () => /beta/.test(await page.locator('h1').first().innerText().catch(() => '')) && (await selectedRow()) === 'lib/util.js', 5000)), String(await selectedRow()))
-  check('at its line too', !!(await until(async () => (await activeLine()) === '3', 10000)), await activeLine())
+  check('a path into another project opens in that project', !!(await until(async () => /beta/.test(await page.locator('h1').first().innerText().catch(() => '')) && (await selectedRow()) === 'lib/util.js', lib.timing('hang.ui'))), String(await selectedRow()))
+  check('at its line too', !!(await until(async () => (await activeLine()) === '3', lib.timing('hang.ui'))), await activeLine())
 
   // --- A worktree agent's path opens in its worktree.
   await page.getByText('alpha', { exact: true }).first().click()
@@ -146,14 +147,14 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
   await inv('pty:write', key2, 'see src/app.ts:7')
   await lib.sleep(200)
   await inv('pty:write', key2, '\r')
-  check("the worktree agent's path is printed", !!(await until(() => textAt(key2, 'src/app.ts:7'), 10000)))
-  check('its turn ends too', !!(await until(async () => (await live(alpha, two.id))?.status === 'finished', 15000)))
+  check("the worktree agent's path is printed", !!(await until(() => textAt(key2, 'src/app.ts:7'), lib.timing('hang.step'))))
+  check('its turn ends too', !!(await until(async () => (await live(alpha, two.id))?.status === 'finished', lib.timing('hang.step'))))
   const wt = await drawnAt(key2, 'src/app.ts:7', 'see src/app.ts:7')
   await page.mouse.move(wt.x + 4, wt.y)
   await lib.sleep(500)
   await ctrlClick({ x: wt.x + 4, y: wt.y })
-  check("it opens in the agent's worktree", !!(await until(async () => (await page.locator('.root-select').inputValue().catch(() => '')) === two.id && (await selectedRow()) === 'src/app.ts', 5000)))
-  check('at line 7', !!(await until(async () => (await activeLine()) === '7', 10000)), await activeLine())
+  check("it opens in the agent's worktree", !!(await until(async () => (await page.locator('.root-select').inputValue().catch(() => '')) === two.id && (await selectedRow()) === 'src/app.ts', lib.timing('hang.step'))))
+  check('at line 7', !!(await until(async () => (await activeLine()) === '7', lib.timing('hang.ui'))), await activeLine())
   await page.screenshot({ path: path.join(lib.WORK, 'filelinks-3-worktree.png') })
 
   // --- Review findings: a path printed in other case opens the file as it is spelled on disk (Windows ignores
@@ -163,10 +164,10 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
     await inv('pty:write', key2, prompt)
     await lib.sleep(200)
     await inv('pty:write', key2, '\r')
-    await until(async () => String(await inv('pty:buffer', key2)).includes(`Done: ${prompt}`), 15000)
-    await until(async () => (await live(alpha, two.id))?.status === 'finished', 15000)
+    await until(async () => String(await inv('pty:buffer', key2)).includes(`Done: ${prompt}`), lib.timing('hang.ui'))
+    await until(async () => (await live(alpha, two.id))?.status === 'finished', lib.timing('hang.step'))
   }
-  check('the paths are printed', !!(await until(() => textAt(key2, 'SRC/APP.TS:9'), 10000)) && !!(await textAt(key2, 'my notes.ts:6')))
+  check('the paths are printed', !!(await until(() => textAt(key2, 'SRC/APP.TS:9'), lib.timing('hang.ui'))) && !!(await textAt(key2, 'my notes.ts:6')))
   // A quoted path that isn't a file: README.md inside it exists in the worktree, but isn't linked on its own.
   const last = 'not "docs/missing README.md":2'
   const inQuote = await drawnAt(key2, 'README.md":2', last)
@@ -177,8 +178,8 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
   await page.mouse.move(upper.x + 4, upper.y)
   await lib.sleep(500)
   await ctrlClick({ x: upper.x + 4, y: upper.y })
-  check('a path in other case selects the file', !!(await until(async () => (await selectedRow()) === 'src/app.ts', 5000)), String(await selectedRow()))
-  check('and shows its line', !!(await until(async () => (await activeLine()) === '9', 10000)), await activeLine())
+  check('a path in other case selects the file', !!(await until(async () => (await selectedRow()) === 'src/app.ts', lib.timing('hang.ui'))), String(await selectedRow()))
+  check('and shows its line', !!(await until(async () => (await activeLine()) === '9', lib.timing('hang.ui'))), await activeLine())
   for (const [printed, line] of [['my notes.ts":4', '4'], ['my notes.ts:6', '6']]) {
     await backToSession()
     // On the path's last name: the link is the whole path, spaces and all.
@@ -186,8 +187,8 @@ const lines = (n, tag) => Array.from({ length: n }, (_, i) => `// ${tag} line ${
     await page.mouse.move(at.x + 4, at.y)
     await lib.sleep(500)
     await ctrlClick({ x: at.x + 4, y: at.y })
-    check(`a path with spaces opens (${printed})`, !!(await until(async () => (await selectedRow()) === 'my docs/my notes.ts', 5000)), String(await selectedRow()))
-    check(`at line ${line}`, !!(await until(async () => (await activeLine()) === line, 10000)), await activeLine())
+    check(`a path with spaces opens (${printed})`, !!(await until(async () => (await selectedRow()) === 'my docs/my notes.ts', lib.timing('hang.ui'))), String(await selectedRow()))
+    check(`at line ${line}`, !!(await until(async () => (await activeLine()) === line, lib.timing('hang.ui'))), await activeLine())
   }
 
   await app.close()

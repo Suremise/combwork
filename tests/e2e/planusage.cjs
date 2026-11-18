@@ -12,7 +12,7 @@ const ws = path.join(lib.WORK, 'planusage-ws')
 const claudeHome = path.join(lib.WORK, 'planusage-claude-home')
 const alpha = path.join(ws, 'alpha')
 // The longest a check waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 let failed = 0
 const check = (name, ok, extra = '') => {
   lib.checked(ok)

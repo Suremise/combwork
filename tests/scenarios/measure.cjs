@@ -9,6 +9,7 @@
 //
 //   npx electron-vite build && node tests/scenarios/measure.cjs        (writes measure.json and measure.md beside results)
 const fs = require('fs')
+const { timing } = require('../timing.cjs')
 const path = require('path')
 const { spawn } = require('child_process')
 const lib = require('../e2e/lib.cjs')
@@ -16,7 +17,7 @@ const lib = require('../e2e/lib.cjs')
 const OUT = path.join(lib.WORK, '..', 'scenarios', 'measure')
 const bytes = (s) => Buffer.byteLength(s ?? '', 'utf8')
 // The longest a measurement waits for what it is waiting on (the workspace, a turn, a stop): a bound for a hung run.
-const HUNG_MS = 30000
+const HUNG_MS = timing('hang.ui')
 
 /** The combwork MCP server's instructions and tools, started as the launch starts it. */
 function combworkServer(env) {

@@ -9,7 +9,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'tooltips-profile')
 const ws = path.join(lib.WORK, 'tooltips-ws')
@@ -106,7 +106,7 @@ const check = (name, ok, extra = '') => {
     await lib.appReady(page)
     if ((await page.locator('.assistant-panel').count()) === 0) await page.keyboard.press('Control+Alt+I')
     const header = page.locator('.assistant-header .tip-wrap > *:first-child')
-    check(`Assistant panel on the ${side}: it shows, with its header buttons`, !!(await lib.until(async () => (await header.count()) > 0, 10000)))
+    check(`Assistant panel on the ${side}: it shows, with its header buttons`, !!(await lib.until(async () => (await header.count()) > 0, lib.timing('hang.ui'))))
     const count = await header.count()
     for (const i of [...new Set([0, count - 1])]) {
       if (await header.nth(i).isVisible()) await beside(`Assistant panel on the ${side}: header item ${i + 1} of ${count}`, header.nth(i), { shot: `assistant-${side}-${i + 1}` })

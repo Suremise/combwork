@@ -27,7 +27,7 @@ const pty = require('@lydell/node-pty')
 const { Terminal } = require('@xterm/headless')
 const { endChildTree } = require('./folderProcesses.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 90000
+const HUNG_MS = lib.timing('hang.step')
 
 const work = path.join(lib.WORK, 'codex-appserver-ws')
 let failed = 0
@@ -259,7 +259,7 @@ async function client(port) {
       check('the typed turn ends (the thread shows idle)', !!(await lib.until(() => c.seen('thread/status/changed', (e) => e.params.threadId === threadId && e.params.status.type === 'idle'), HUNG_MS)))
       const joined = await c.call('thread/resume', { threadId })
       check('Combwork joins the thread once its first turn is written', !joined.error, JSON.stringify(joined.error))
-      check("Combwork's hooks given to the app server run for a typed turn (UserPromptSubmit, Stop)", !!(await lib.until(() => ['UserPromptSubmit', 'Stop'].every((h) => seenHooks.slice(h0).includes(h)), 20000)), JSON.stringify(seenHooks.slice(h0)))
+      check("Combwork's hooks given to the app server run for a typed turn (UserPromptSubmit, Stop)", !!(await lib.until(() => ['UserPromptSubmit', 'Stop'].every((h) => seenHooks.slice(h0).includes(h)), lib.timing('hang.step'))), JSON.stringify(seenHooks.slice(h0)))
     })
 
     await step('typed and Combwork turns, identified', async () => {
@@ -279,8 +279,8 @@ async function client(port) {
       const own = c.events.slice(m).find((e) => e.method === 'item/completed' && e.params?.item?.type === 'userMessage')
       check('a turn Combwork starts comes as identified turn events too, with the id turn/start answered', !!combworkDone && combworkDone.params.turn.status === 'completed', JSON.stringify(started.error ?? combworkDone?.params?.turn?.status))
       check("…its user message has Combwork's clientUserMessageId", own?.params?.item?.clientId === 'cw-m1', JSON.stringify(own?.params?.item?.clientId))
-      check('…the TUI shows it, and the draft the user is typing stays in its prompt', !!(await lib.until(() => /New in your inbox: 1 message \(m1\)/.test(ui.screen()) && /DRAFT kept/.test(ui.screen()), 15000)), ui.screen().split('\n').filter(Boolean).slice(-6).join(' | '))
-      check("…and Combwork's hooks run for it too", !!(await lib.until(() => ['UserPromptSubmit', 'Stop'].every((h) => seenHooks.slice(h1).includes(h)), 20000)), JSON.stringify(seenHooks.slice(h1)))
+      check('…the TUI shows it, and the draft the user is typing stays in its prompt', !!(await lib.until(() => /New in your inbox: 1 message \(m1\)/.test(ui.screen()) && /DRAFT kept/.test(ui.screen()), lib.timing('hang.ui'))), ui.screen().split('\n').filter(Boolean).slice(-6).join(' | '))
+      check("…and Combwork's hooks run for it too", !!(await lib.until(() => ['UserPromptSubmit', 'Stop'].every((h) => seenHooks.slice(h1).includes(h)), lib.timing('hang.ui'))), JSON.stringify(seenHooks.slice(h1)))
       // Clear the draft (Ctrl+U), as the user would.
       ui.t.write('\x15')
     })
@@ -302,16 +302,16 @@ async function client(port) {
       await c.call('turn/start', { threadId, clientUserMessageId: 'cw-approve', input: text('Create a file named approved.txt containing hi in the current folder with a shell command.') })
       const asked = await lib.until(() => c.events.slice(n).find((e) => e.id !== undefined && /requestApproval/.test(e.method)), HUNG_MS)
       check("an approval request reaches Combwork's client", !!asked, JSON.stringify(c.events.slice(n).map((e) => e.method)))
-      check('…and the TUI asks it', !!(await lib.until(() => /Would you like to run|Yes, proceed/.test(ui.screen()), 20000)), ui.screen().split('\n').filter(Boolean).slice(-6).join(' | '))
+      check('…and the TUI asks it', !!(await lib.until(() => /Would you like to run|Yes, proceed/.test(ui.screen()), lib.timing('hang.ui'))), ui.screen().split('\n').filter(Boolean).slice(-6).join(' | '))
       ui.t.write('\r')
-      check("answered in the TUI, Combwork's client sees it resolved", !!(await lib.until(() => c.seen('serverRequest/resolved', () => true, n), 20000)))
+      check("answered in the TUI, Combwork's client sees it resolved", !!(await lib.until(() => c.seen('serverRequest/resolved', () => true, n), lib.timing('hang.ui'))))
       const done = await lib.until(() => c.seen('turn/completed', () => true, n), HUNG_MS)
       check('…and the turn goes on and ends', done?.params?.turn?.status === 'completed' && fs.existsSync(path.join(work, 'approved.txt')), JSON.stringify(done?.params?.turn?.status))
     })
 
     await step("Combwork's client drops and rejoins", async () => {
       c.close()
-      await lib.until(() => c.closed(), 10000)
+      await lib.until(() => c.closed(), lib.timing('hang.ui'))
       c = await client(port)
       const again = await c.call('thread/resume', { threadId })
       console.log(`(rejoining: the thread is ${JSON.stringify(again.result?.thread?.status ?? again.error)})`)

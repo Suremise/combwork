@@ -15,7 +15,7 @@ const { DatabaseSync } = require('node:sqlite')
 const { jjDir, portableJj } = require('../jjPortable.cjs')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 // The repository watch's own re-arm and rescan run each minute: an observation written well before it came from the
 // operation (or the reopen), not from that timer.
 const PROMPT_MS = 20000
@@ -167,7 +167,7 @@ const onDb = (fn) => {
       return r ? JSON.parse(r.value) : null
     })
     // Any observation the pass itself asked for is written first (so the one after the move is the move's).
-    await until(async () => (await card(n))?.column === 'passed' && !!record(), 5000)
+    await until(async () => (await card(n))?.column === 'passed' && !!record(), lib.timing('hang.ui'))
     const before = record()?.gen ?? 0
     jj(shop, 'new', 'main', '-m', 'the user moves on')
     fs.writeFileSync(path.join(shop, 'user.txt'), 'the user\n')

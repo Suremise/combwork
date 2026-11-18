@@ -8,7 +8,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'long-profile')
 const ws = path.join(lib.WORK, 'long-ws')
@@ -45,7 +45,7 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms = 20000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)
@@ -70,7 +70,7 @@ const check = (name, ok, extra = '') => {
   const sized = await until(async () => {
     await page.locator('.pane-footer-bar .foot-ctx').hover().catch(() => undefined)
     return /Transcript: \d+(\.\d+)? KB/.test(await ctxTip.innerText().catch(() => ''))
-  }, 15000)
+  }, lib.timing('hang.ui'))
   check("the context's hover has the transcript's size", !!sized, await ctxTip.innerText().catch(() => ''))
   await page.mouse.move(5, 5)
   check('under the limit it is not a warning', (await size.count()) === 0)
@@ -83,9 +83,9 @@ const check = (name, ok, extra = '') => {
   await lib.sleep(300)
   await inv('pty:write', key, '\r')
   await until(async () => (await live(id))?.status === 'finished' && (await live(id)).transcriptBytes > 1024 * 1024, HUNG_MS)
-  check('past the limit it is a warning in the line', !!(await until(async () => (await size.count()) === 1 && /MB/.test(await size.innerText()) && (await size.getAttribute('class')).includes('warn'), 15000)), await size.innerText().catch(() => ''))
+  check('past the limit it is a warning in the line', !!(await until(async () => (await size.count()) === 1 && /MB/.test(await size.innerText()) && (await size.getAttribute('class')).includes('warn'), lib.timing('hang.ui'))), await size.innerText().catch(() => ''))
   const toast = page.locator('.toast', { hasText: 'long conversation' })
-  check('a notification says so, once', !!(await until(async () => (await toast.count()) === 1, 10000)))
+  check('a notification says so, once', !!(await until(async () => (await toast.count()) === 1, lib.timing('hang.ui'))))
   await page.screenshot({ path: path.join(lib.WORK, 'longsession.png') })
 
   // The context count opens the Overview at this agent's session.
@@ -104,7 +104,7 @@ const check = (name, ok, extra = '') => {
   // The size opens Hand Over to…, with the agent itself (a new conversation) chosen for a long one.
   await size.click()
   const dialog = page.locator('.dialog', { hasText: 'Hand over' })
-  check('clicking the size opens Hand Over to…', !!(await until(async () => (await dialog.count()) === 1, 5000)))
+  check('clicking the size opens Hand Over to…', !!(await until(async () => (await dialog.count()) === 1, lib.timing('hang.ui'))))
   const self = dialog.locator('label.choice', { hasText: 'in a new conversation' })
   check('the agent itself is offered, and chosen', (await self.count()) === 1 && (await self.getAttribute('class')).includes('selected'))
   // The fake CLI can't write a handover: carry on from the latest one.
@@ -113,7 +113,7 @@ const check = (name, ok, extra = '') => {
   const fresh = await until(async () => {
     const s = await live(id)
     return s && s.sessionId && s.sessionId !== firstSession && s.status === 'finished' && s
-  }, 60000)
+  }, lib.timing('hang.step'))
   check('it carries on in a new conversation', !!fresh, JSON.stringify(await live(id)))
   const act = await inv('session:list', alpha)
   const rec = act.find((s) => s.id === fresh?.sessionId)

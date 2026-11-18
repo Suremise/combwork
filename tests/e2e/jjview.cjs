@@ -27,7 +27,7 @@ const { execFileSync } = require('child_process')
 const { DatabaseSync } = require('node:sqlite')
 const { jjDir, portableJj } = require('../jjPortable.cjs')
 
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 const exe = portableJj()
 if (!exe) {
   console.log('SKIP jjview: the pinned jj isn\'t fetched (npm run jj:fetch)')

@@ -17,7 +17,7 @@ const LAG_MS = 25
 // The bound on that open: about 0.6 s with HI-1705, over 3 s before it (a chain of some 140 calls).
 const OPEN_MS = 2000
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++

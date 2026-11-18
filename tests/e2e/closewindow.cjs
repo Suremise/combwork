@@ -11,7 +11,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'closewindow-profile')
 const wsA = path.join(lib.WORK, 'closewindow-ws-a')
@@ -56,7 +56,8 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.
   const startAgent = async (inv, project, name = 'One') => {
     const a = await lib.addAgent(inv, project, { name })
     await inv('session:start', project, { agentId: a.id })
-    const ready = await lib.until(async () => (await inv('session:live')).some((s) => s.projectPath.toLowerCase() === project.toLowerCase() && s.agentId === a.id && s.status === 'ready'), 20000)
+    // before any turn (HI-2688): its start, restart or resume
+    const ready = await lib.until(async () => (await inv('session:live')).some((s) => s.projectPath.toLowerCase() === project.toLowerCase() && s.agentId === a.id && s.status === 'ready'), lib.timing('hang.step'))
     return ready ? a.id : null
   }
   /** Runs `fn` on the BrowserWindow showing workspace folder `name` (its title names it; every window has the same URL). */
@@ -181,7 +182,7 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.
   const closedB = p2.waitForEvent('close', { timeout: 15000 }).then(() => true).catch(() => false)
   await p2.locator('.dialog button', { hasText: /Close window/ }).last().click()
   check('…and closes B when confirmed', await closedB)
-  check("B's agent stopped, A's runs on", !!(await lib.until(async () => !(await liveIn(inv1, beta)), 5000)) && (await liveIn(inv1, alpha)))
+  check("B's agent stopped, A's runs on", !!(await lib.until(async () => !(await liveIn(inv1, beta)), lib.timing('hang.ui'))) && (await liveIn(inv1, alpha)))
   check('one window again: Exit is plain "Exit"', !!(await lib.until(async () => { const m = await fileMenu(p1); await closeMenu(p1); return m.some((x) => x[0] === 'Exit') }, HUNG_MS)))
 
   // --- Exit with two windows: says it closes both, groups the agents by workspace; "Close this window only".
@@ -189,7 +190,7 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.
   inv2 = invOn(p2)
   check('an agent runs in B again', await startAgent(inv2, beta, 'Two'))
   await clickMenu(p1, 'Exit Combwork (all windows)')
-  const asked = await lib.until(async () => ((await dialogIn(p1)) ? p1 : (await dialogIn(p2)) ? p2 : null), 8000)
+  const asked = await lib.until(async () => ((await dialogIn(p1)) ? p1 : (await dialogIn(p2)) ? p2 : null), lib.timing('hang.ui'))
   const quit = asked ? await dialogIn(asked) : null
   check('Exit asks in one window', !!quit)
   check('its title says it closes all 2 windows', quit?.title === 'Quit Combwork and close all 2 windows?', quit?.title)
@@ -210,8 +211,8 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.
   if (asked) await asked.locator('.dialog button', { hasText: 'Close this window only' }).click()
   check('"Close this window only" closes that window', await closedOnly)
   const invOther = invOn(other)
-  check('without asking again: one window left, Combwork still running', !!(await lib.until(async () => (await invOther('window:count')) === 1, 5000)))
-  check("that window's agent stopped", !!(await lib.until(async () => !(await liveIn(invOther, mine)), 5000)))
+  check('without asking again: one window left, Combwork still running', !!(await lib.until(async () => (await invOther('window:count')) === 1, lib.timing('hang.ui'))))
+  check("that window's agent stopped", !!(await lib.until(async () => !(await liveIn(invOther, mine)), lib.timing('hang.ui'))))
   check("the other window's agent runs on", await liveIn(invOther, theirs))
   check('the other window has no dialog', !(await dialogIn(other)))
 
@@ -229,7 +230,7 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.
   }
   await work(invOther, theirs, idTheirs)
   await work(invNew, missingProject, idNew)
-  check('both agents are working', !!(await lib.until(async () => (await invOther('session:live')).filter((s) => s.status === 'working').length === 2, 10000)))
+  check('both agents are working', !!(await lib.until(async () => (await invOther('session:live')).filter((s) => s.status === 'working').length === 2, lib.timing('hang.step'))))
   /** Everything wrong with the quit dialog's layout: a control outside the dialog, cut, or overlapping another. */
   const layout = (page) =>
     page.evaluate(() => {
@@ -254,7 +255,7 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.
       return { bad, buttons: [...d.querySelectorAll('button')].map((b) => b.textContent.trim()).filter(Boolean) }
     })
   await clickMenu(other, 'Exit Combwork (all windows)')
-  const busyAt = await lib.until(async () => ((await dialogIn(other)) ? other : (await dialogIn(pNew)) ? pNew : null), 8000)
+  const busyAt = await lib.until(async () => ((await dialogIn(other)) ? other : (await dialogIn(pNew)) ? pNew : null), lib.timing('hang.ui'))
   check('Exit with busy agents asks', !!busyAt)
   if (busyAt) {
     const busyWs = path.basename((await invOn(busyAt)('workspace:get')).path)
@@ -280,7 +281,7 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.
   await invOther('files:setUnsaved', [path.join(theirs, 'a.ts')])
   await invNew('files:setUnsaved', [path.join(missingProject, 'a.ts')])
   await clickMenu(other, 'Exit Combwork (all windows)')
-  const firstAt = await lib.until(async () => ((await dialogIn(other)) ? other : (await dialogIn(pNew)) ? pNew : null), 8000)
+  const firstAt = await lib.until(async () => ((await dialogIn(other)) ? other : (await dialogIn(pNew)) ? pNew : null), lib.timing('hang.ui'))
   const first = firstAt ? await dialogIn(firstAt) : null
   check('Exit first asks one window about its unsaved file only', first?.unsaved === 1 && first.rows.length === 0, JSON.stringify(first))
   const [stays, closes] = firstAt === other ? [pNew, other] : [other, pNew]
@@ -292,14 +293,14 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.
   const then = await lib.until(async () => {
     const d = await dialogIn(closes)
     return d && d.title === 'Close this window?' ? d : null
-  }, 8000)
+  }, lib.timing('hang.ui'))
   check('then it asks about that window\'s agent ("Close this window?"), as Close Window does', then?.rows.length === 1 && then.unsaved === 0, JSON.stringify(then))
   check('…and the window is still open meanwhile', (await invOn(stays)('window:count')) === 2 && (await liveIn(invOn(stays), closesProject)))
   const closedAfter = closes.waitForEvent('close', { timeout: 15000 }).then(() => true).catch(() => false)
   await closes.locator('.dialog button', { hasText: /Close window/ }).last().click()
   check('confirmed, that window closes', await closedAfter)
   const invStays = invOn(stays)
-  check("its agent stopped, the other window's runs on", !!(await lib.until(async () => !(await liveIn(invStays, closesProject)), 5000)) && (await liveIn(invStays, staysProject)))
+  check("its agent stopped, the other window's runs on", !!(await lib.until(async () => !(await liveIn(invStays, closesProject)), lib.timing('hang.ui'))) && (await liveIn(invStays, staysProject)))
   check('the other window is still open, with no dialog', (await invStays('window:count')) === 1 && !(await dialogIn(stays)))
 
   // --- Two more workspaces both named "work", in two more windows: Exit's dialog keeps them apart, grouped by
@@ -309,7 +310,7 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.
   check('an agent runs in each "work" workspace', !!(await startAgent(invOn(pDup1), gamma)) && !!(await startAgent(invOn(pDup2), delta)))
   await clickMenu(stays, 'Exit Combwork (all windows)')
   const dupPages = [stays, pDup1, pDup2]
-  const dupAt = await lib.until(async () => { for (const pg of dupPages) if (await dialogIn(pg)) return pg; return null }, 8000)
+  const dupAt = await lib.until(async () => { for (const pg of dupPages) if (await dialogIn(pg)) return pg; return null }, lib.timing('hang.ui'))
   const dupQuit = dupAt ? await dialogIn(dupAt) : null
   check('Exit with three windows asks', dupQuit?.title === 'Quit Combwork and close all 3 windows?', dupQuit?.title)
   const heads = dupAt

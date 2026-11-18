@@ -7,7 +7,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'taskoverview-profile')
 const ws = path.join(lib.WORK, 'taskoverview-ws')
@@ -17,7 +17,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms = 8000) => {
+const until = async (fn, ms) => {
   const t = Date.now()
   let v
   while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(150)
@@ -74,7 +74,7 @@ const until = async (fn, ms = 8000) => {
   const showOverview = async (name) => {
     await page.locator('.project-row', { hasText: name }).first().click()
     await page.locator('.tabs .tab', { hasText: 'Overview' }).click()
-    await page.locator('.overview-head').first().waitFor({ timeout: 8000 })
+    await page.locator('.overview-head').first().waitFor({ timeout: lib.timing('hang.ui') })
   }
 
   // --- The Workspace Overview: every card.

@@ -12,7 +12,7 @@ const fs = require('fs')
 const path = require('path')
 const { createHash } = require('crypto')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 const QUESTION = 'Teach auto mode about your environment?'
 
 const userData = path.join(lib.WORK, 'idlequestion-profile')

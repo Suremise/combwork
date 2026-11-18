@@ -18,7 +18,7 @@ const check = (name, ok, extra = '') => {
 }
 const read = (f) => fs.readFileSync(f, 'utf8')
 // The longest a check waits for its condition: a bound for a hung run, never how long the step should take.
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 ;(async () => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
@@ -49,13 +49,13 @@ const HUNG_MS = 10000
     await page.keyboard.press('Control+Shift+H')
     await sleep(600)
     await page.locator('.row', { hasText: 'plan.md' }).first().click()
-    await lib.until(async () => ((await page.locator('.row', { hasText: 'plan.md' }).first().getAttribute('class')) ?? '').includes('selected'), 10000)
+    await lib.until(async () => ((await page.locator('.row', { hasText: 'plan.md' }).first().getAttribute('class')) ?? '').includes('selected'), lib.timing('hang.ui'))
   }
   const openServer = async () => {
     await page.keyboard.press('Control+Shift+M')
     await sleep(600)
     await page.locator('.row', { hasText: 'demo' }).first().click()
-    await lib.until(async () => ((await page.locator('.row', { hasText: 'demo' }).first().getAttribute('class')) ?? '').includes('selected'), 10000)
+    await lib.until(async () => ((await page.locator('.row', { hasText: 'demo' }).first().getAttribute('class')) ?? '').includes('selected'), lib.timing('hang.ui'))
   }
 
   // A note's edits survive going to another view and back.

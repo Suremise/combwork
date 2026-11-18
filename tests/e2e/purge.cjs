@@ -13,7 +13,7 @@ const path = require('path')
 const zlib = require('zlib')
 const { sessionsOf } = require('./storeDocs.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'purge-profile')
 const ws = path.join(lib.WORK, 'purge-ws')
@@ -98,7 +98,8 @@ const write = (file, text) => {
     // A running session: nothing of it is listed or touched.
     const live = await lib.addAgent(inv, alpha, { name: 'Live' })
     await inv('session:start', alpha, { agentId: live.id })
-    const state = await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === live.id && s.status === 'ready' && s.sessionId), 20000)
+    // before any turn (HI-2688): its start, restart or resume
+    const state = await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === live.id && s.status === 'ready' && s.sessionId), lib.timing('hang.step'))
     check('the live agent is running', !!state)
     const liveShot = path.join(combworkOf(alpha), 'attachments', state?.sessionId ?? 'none', 'now.png')
     write(liveShot, lib.samplePng(20, 20))

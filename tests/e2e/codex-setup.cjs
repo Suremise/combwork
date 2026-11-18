@@ -46,7 +46,7 @@ const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${
   }
   check('Combwork closes Codex once the sandbox is set up', closed)
   if (!closed) await inv('pty:kill', key)
-  await lib.until(async () => (await inv('pty:buffer', key).catch(() => '')) === '', 10000)
+  await lib.until(async () => (await inv('pty:buffer', key).catch(() => '')) === '', lib.timing('hang.ui'))
   await app.close()
   console.log(results.join('\n'))
   console.log('TAIL:', text.slice(-600))

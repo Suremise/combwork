@@ -34,7 +34,7 @@ fs.writeFileSync(
 )
 fs.writeFileSync(path.join(proj, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions: [{ id: SESSION, agent: 'claude-code', name: 'Interrupted', createdAt: '2026-10-14T10:00:00.000Z', lastActiveAt: '2026-10-14T10:01:00.000Z', archived: false }] }))
 
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 let pass = 0
 let fail = 0
 const check = (name, ok, extra = '') => {
@@ -204,7 +204,7 @@ const check = (name, ok, extra = '') => {
     check('the ended run is in the Runs tab, by a script', !!(await lib.until(async () => {
       if (await openOther.count()) await openOther.click().catch(() => undefined)
       return (await recentRow.innerText().catch(() => '')).startsWith('Script')
-    }, 30000)), await recentRow.innerText().catch(() => ''))
+    }, lib.timing('hang.ui'))), await recentRow.innerText().catch(() => ''))
     await speak('de', { 'board.progress.script': 'Skript' })
     check('…its closed row follows a change of language', !!(await lib.until(async () => (await recentRow.innerText().catch(() => '')).startsWith('Skript'), HUNG_MS)), await recentRow.innerText().catch(() => ''))
     await speak('en', {})

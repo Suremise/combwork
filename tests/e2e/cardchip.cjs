@@ -10,7 +10,7 @@ const fs = require('fs')
 const path = require('path')
 const { sessionsOf } = require('./storeDocs.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'cardchip-profile')
 const ws = path.join(lib.WORK, 'cardchip-ws')
@@ -46,7 +46,7 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms = 20000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)
@@ -75,7 +75,7 @@ const check = (name, ok, extra = '') => {
   await lib.sleep(800) // On purpose: that nothing shows is the check, so it gives a chip time to show wrongly.
   check('a Todo card shows no chip', (await header.locator('.card-chip').count()) === 0)
   await inv('tasks:update', card.number, { column: 'doing' })
-  check('the pane header shows the card’s key only, at any width (#311, #1221)', !!(await until(async () => (await header.locator('.card-chip').innerText().catch(() => '')).trim() === `${card.key}`, 5000)), await header.locator('.card-chip').innerText().catch(() => ''))
+  check('the pane header shows the card’s key only, at any width (#311, #1221)', !!(await until(async () => (await header.locator('.card-chip').innerText().catch(() => '')).trim() === `${card.key}`, lib.timing('hang.ui'))), await header.locator('.card-chip').innerText().catch(() => ''))
   let tip = await lib.hoverTip(page, header.locator('.card-chip'), (t) => t.includes(`${card.key} Attention inbox`))
   check("…its tooltip has the card's title", tip.includes(`${card.key} Attention inbox`), tip)
   tip = await lib.hoverTip(page, header.locator('.agent-name'), (t) => t.includes(`Working on ${card.key} Attention inbox`))
@@ -83,17 +83,17 @@ const check = (name, ok, extra = '') => {
   await page.mouse.move(5, 5)
   // The summary chip's list of agents (#975) gives each agent's card.
   await page.locator('.session-toolbar .summary-chip').click()
-  check("the summary chip's list gives the card", !!(await until(async () => (await lib.menuEntry(page, 'Coder').innerText().catch(() => '')).includes(`${card.key} Attention inbox`), 5000)), await lib.menuEntry(page, 'Coder').innerText().catch(() => ''))
+  check("the summary chip's list gives the card", !!(await until(async () => (await lib.menuEntry(page, 'Coder').innerText().catch(() => '')).includes(`${card.key} Attention inbox`), lib.timing('hang.ui'))), await lib.menuEntry(page, 'Coder').innerText().catch(() => ''))
   await page.keyboard.press('Escape')
-  await until(async () => (await page.locator('.menu').count()) === 0, 5000)
+  await until(async () => (await page.locator('.menu').count()) === 0, lib.timing('hang.ui'))
   check('the other agent shows none', (await page.locator('.pane-header-bar', { hasText: 'Other' }).locator('.card-chip').count()) === 0)
   await page.screenshot({ path: path.join(lib.WORK, 'cardchip-1-pane.png') })
 
   // A second Doing card: "+1".
   const second = await inv('tasks:create', { title: 'Prompt snippets', project: 'alpha', agent: coder.id, column: 'doing' })
-  check('a second Doing card shows +1', !!(await until(async () => /\+1/.test(await header.locator('.card-chip').innerText().catch(() => '')), 5000)))
+  check('a second Doing card shows +1', !!(await until(async () => /\+1/.test(await header.locator('.card-chip').innerText().catch(() => '')), lib.timing('hang.ui'))))
   const headerChip = async () => (await header.locator('.card-chip').innerText({ timeout: 1000 }).catch(() => '')).replace(/\s+/g, '')
-  check('…in the pane header too, still without titles', !!(await until(async () => (await headerChip()) === `${card.key}+1`, 5000)), await headerChip())
+  check('…in the pane header too, still without titles', !!(await until(async () => (await headerChip()) === `${card.key}+1`, lib.timing('hang.ui'))), await headerChip())
   const both = (t) => t.includes(`${card.key} Attention inbox`) && t.includes(`${second.key} Prompt snippets`)
   tip = await lib.hoverTip(page, header.locator('.card-chip'), both)
   check("…whose tooltip lists both cards' titles", both(tip), tip)
@@ -103,34 +103,34 @@ const check = (name, ok, extra = '') => {
   // Clicking opens the card.
   await header.locator('.card-chip').click()
   const dialog = lib.cardDialog(page, await lib.cardLabel(inv, card.number))
-  check('clicking the chip opens the card', !!(await until(async () => (await dialog.count()) === 1, 5000)))
+  check('clicking the chip opens the card', !!(await until(async () => (await dialog.count()) === 1, lib.timing('hang.ui'))))
   await page.screenshot({ path: path.join(lib.WORK, 'cardchip-2-dialog.png') })
   await page.keyboard.press('Escape')
   await until(async () => (await dialog.count()) === 0, HUNG_MS)
 
   // The session records both cards.
   const recorded = async () => sessionsOf(alpha).sessions.find((s) => s.id === sessionId)?.cards ?? []
-  check('the session records its cards', !!(await until(async () => (await recorded()).length === 2, 8000)), JSON.stringify(await recorded()))
+  check('the session records its cards', !!(await until(async () => (await recorded()).length === 2, lib.timing('hang.step'))), JSON.stringify(await recorded()))
 
   // The sidebar's tooltip for the project: its agents as a table (#529), the agent's row with its card. Shown (hoverTip:
   // pointer away, then hovered until the tip says it), then its row read.
   await lib.hoverTip(page, page.locator('.project-row', { hasText: 'alpha' }).locator('.project-status'), (t) => t.includes(`${card.key} Attention inbox +1`))
   const coderCard = page.locator('.tip.agents-tip tr[data-agent="Coder"] .agents-table-card')
-  const tipText = (await until(async () => (await coderCard.count()) === 1 && (await coderCard.innerText()), 10000)) || ''
+  const tipText = (await until(async () => (await coderCard.count()) === 1 && (await coderCard.innerText()), lib.timing('hang.ui'))) || ''
   check("the project's tooltip lists the agent's card", tipText.includes(`${card.key} Attention inbox +1`), tipText)
 
   // The Workspace Overview's running list.
   await page.keyboard.press('Control+Shift+O')
   const runningChip = page.locator('.running-row', { hasText: 'Coder' }).locator('.card-chip')
-  check('the Workspace Overview shows it on the running agent', !!(await until(async () => (await runningChip.count()) === 1, 8000)))
+  check('the Workspace Overview shows it on the running agent', !!(await until(async () => (await runningChip.count()) === 1, lib.timing('hang.ui'))))
   await page.screenshot({ path: path.join(lib.WORK, 'cardchip-3-overview.png') })
   // HI-2000: with a long title the chip keeps its key whole on one line; only the title is cut. In both themes.
   const long = 'Attention inbox: every request for the user in one place, sorted by who waits longest, with a reply box'
   await inv('tasks:update', card.number, { title: long })
-  await until(async () => ((await runningChip.innerText().catch(() => '')) ?? '').includes('Attention inbox:'), 8000)
+  await until(async () => ((await runningChip.innerText().catch(() => '')) ?? '').includes('Attention inbox:'), lib.timing('hang.ui'))
   // A narrow window, so the row squeezes the chip.
   await lib.fitWindow(app, page, { width: 640, height: 900 })
-  await until(async () => runningChip.evaluate((chip) => { const t = chip.querySelector('.card-chip-title'); return !!t && t.scrollWidth > t.clientWidth }).catch(() => false), 8000)
+  await until(async () => runningChip.evaluate((chip) => { const t = chip.querySelector('.card-chip-title'); return !!t && t.scrollWidth > t.clientWidth }).catch(() => false), lib.timing('hang.ui'))
   for (const theme of ['dark', 'light']) {
     await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
     const k = await runningChip.evaluate((chip) => {
@@ -162,7 +162,7 @@ const check = (name, ok, extra = '') => {
     await page.reload()
     await lib.appReady(page)
     if ((await page.locator('.assistant-panel').count()) === 0) await page.keyboard.press('Control+Alt+I')
-    await until(async () => (await page.locator(`.assistant-agent[data-agent="${coder.id}"]`).count()) === 1, 10000)
+    await until(async () => (await page.locator(`.assistant-agent[data-agent="${coder.id}"]`).count()) === 1, lib.timing('hang.ui'))
   }
   const row = page.locator(`.assistant-agent[data-agent="${coder.id}"]`)
   await assistantAt(430)
@@ -174,14 +174,14 @@ const check = (name, ok, extra = '') => {
   await page.mouse.move(5, 5)
   await page.locator('.assistant-panel').screenshot({ path: path.join(lib.WORK, 'cardchip-assistant.png') })
   await progress(`/v1/progress/${run.id}/finish`, { ok: true })
-  check('once the run ends, the mark says its status again', !!(await until(async () => !((await row.getAttribute('aria-label')) ?? 'e2e').includes('e2e'), 8000)), await row.getAttribute('aria-label'))
+  check('once the run ends, the mark says its status again', !!(await until(async () => !((await row.getAttribute('aria-label')) ?? 'e2e').includes('e2e'), lib.timing('hang.ui'))), await row.getAttribute('aria-label'))
   await page.keyboard.press('Control+Alt+I')
   await page.locator('.project-row', { hasText: 'alpha' }).click()
 
   // Out of Doing: gone.
   await inv('tasks:update', card.number, { column: 'review' })
   await inv('tasks:update', second.number, { column: 'review' })
-  check('moving the cards out of Doing removes the chip', !!(await until(async () => (await header.locator('.card-chip').count()) === 0, 5000)))
+  check('moving the cards out of Doing removes the chip', !!(await until(async () => (await header.locator('.card-chip').count()) === 0, lib.timing('hang.ui'))))
 
   // The Sessions tab: "Worked on", linked; a deleted card stays, unlinked.
   await inv('tasks:delete', second.number)
@@ -191,16 +191,16 @@ const check = (name, ok, extra = '') => {
   const worked = page.locator('.worked-on')
   // Once the board has caught up with the deletion: the deleted card is unlinked (in a tooltip's wrapper, whose
   // layout puts a line break in innerText), so the words are compared with their spacing evened out.
-  check('a card still there is a link, a deleted one is not', !!(await until(async () => (await worked.locator('a.link').count()) === 1 && (await worked.locator('.tip-wrap').count()) === 1, 8000)))
+  check('a card still there is a link, a deleted one is not', !!(await until(async () => (await worked.locator('a.link').count()) === 1 && (await worked.locator('.tip-wrap').count()) === 1, lib.timing('hang.ui'))))
   const words = async () => (await worked.innerText().catch(() => '')).replace(/\s+/g, ' ').trim()
   // By key (#1221); the deleted card, no longer on the board, by its number.
   check('the Sessions tab says what the session worked on', (await words()).includes(`Worked on ${card.key} Attention inbox, #${second.number} Prompt snippets`), await words())
   await page.screenshot({ path: path.join(lib.WORK, 'cardchip-4-sessions.png') })
   await worked.locator('a.link').click()
-  check('the link opens the card', !!(await until(async () => (await dialog.count()) === 1, 5000)))
+  check('the link opens the card', !!(await until(async () => (await dialog.count()) === 1, lib.timing('hang.ui'))))
 
   await inv('session:stop', alpha)
-  await lib.until(async () => (await inv('session:live')).length === 0, 15000)
+  await lib.until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
   process.exit(failed ? 1 : 0)

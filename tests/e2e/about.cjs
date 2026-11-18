@@ -21,7 +21,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let pass = 0, fail = 0
 const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.log(ok ? 'PASS' : 'FAIL', name, extra) }
 // The longest a check waits for its condition: a bound for a hung run, never how long the step should take.
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 /** Whether fn() comes true (checked until it does, up to HUNG_MS). */
 const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
 ;(async () => {
@@ -84,7 +84,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   for (const d of [secretWs, otherWs]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(path.join(secretWs, 'PrivateProject'))
   fs.mkdirSync(path.join(otherWs, 'demo'), { recursive: true })
-  const openWs = async (ws) => { await inv('workspace:open', ws); await lib.until(async () => page.evaluate((n) => document.title.includes(n), path.basename(ws)), 20000) }
+  const openWs = async (ws) => { await inv('workspace:open', ws); await lib.until(async () => page.evaluate((n) => document.title.includes(n), path.basename(ws)), lib.timing('hang.ui')) }
   // The other workspace opened once first: a workspace's first open logs its setting up (its board's schema steps, the
   // bundled skills and modes added), which pushed the card's line out of the report's last 50 (HI-1815).
   await openWs(otherWs)

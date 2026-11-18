@@ -11,7 +11,7 @@ fs.mkdirSync(path.join(ws, 'alpha'), { recursive: true })
 let pass = 0, fail = 0
 const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.log(ok ? 'PASS' : 'FAIL', name, extra) }
 // The longest a check waits for its condition: a bound for a hung run, never how long the step should take.
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 ;(async () => {
   lib.enableProviders(userData)
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.combworkEnv({ CW_USER_DATA: userData }) })
@@ -42,7 +42,7 @@ const HUNG_MS = 10000
         await page.mouse.move(5, 5)
         await rows.nth(j).hover()
         // A tip would show after its delay: wait until one does or the bound passes, then say none came.
-        const came = await lib.until(async () => (await page.locator('.tip:visible').count()) > 0, 1500)
+        const came = await lib.until(async () => (await page.locator('.tip:visible').count()) > 0, lib.timing('quiet.tipMs'))
         check(`${what}: a name that fits shows no tooltip`, !came, all[j].text)
       }
       // A click on a row whose name is cut still opens its section.

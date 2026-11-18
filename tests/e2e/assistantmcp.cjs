@@ -12,7 +12,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'assistantmcp-profile')
 const ws = path.join(lib.WORK, 'assistantmcp-ws')
@@ -140,9 +140,9 @@ const check = (name, ok, extra = '') => {
       }
       return null
     }
-    const a = await lib.until(() => launched('assistant'), 30000)
-    const b = await lib.until(() => launched(agent.id), 30000)
-    const c = await lib.until(() => launched(otherAgent.id), 30000)
+    const a = await lib.until(() => launched('assistant'), lib.timing('hang.step'))
+    const b = await lib.until(() => launched(agent.id), lib.timing('hang.step'))
+    const c = await lib.until(() => launched(otherAgent.id), lib.timing('hang.step'))
     check("the Assistant's launch has notes and Combwork's server, not sandbox", !!a?.notes && !!a?.combwork && !a?.sandbox && !a?.extra, JSON.stringify(Object.keys(a ?? {})))
     check("demo's agent has sandbox and Combwork's server, not notes or extra", !!b?.sandbox && !!b?.combwork && !b?.notes && !b?.extra, JSON.stringify(Object.keys(b ?? {})))
     check("…without Combwork's own fields (its tags)", !('tags' in (c?.notes ?? { tags: 1 })) && !('description' in (c?.notes ?? {})), JSON.stringify(c?.notes))

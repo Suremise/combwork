@@ -23,11 +23,11 @@ const agentsOnly = async (d) => {
   if (await box.count()) await box.uncheck()
 }
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 // A load's confirmation shows once the template's plan is read, with git checks of the agents it removes: the 12-agent
 // template's took 8.8 and 10 s under load when it made worktrees, past HUNG_MS though nothing hung (#715). The longest a
 // plan read may take: a bound for a hung one, never how long it should take.
-const PLAN_HUNG_MS = 60000
+const PLAN_HUNG_MS = lib.timing('hang.step')
 
 const userData = path.join(lib.WORK, 'templates-profile')
 const ws = path.join(lib.WORK, 'templates-ws')
@@ -117,7 +117,7 @@ const check = (name, ok, extra = '') => {
   await page.screenshot({ path: path.join(lib.WORK, 'templates-1-save.png') })
   await dialog.getByRole('button', { name: 'Save', exact: true }).click()
   const file = path.join(ws, '.combwork', 'templates', 'pair.json')
-  check('Save Template… keeps the agents, roles and layout for the workspace', !!(await lib.until(async () => fs.existsSync(file), 5000)) && /"role": "builder"/.test(fs.readFileSync(file, 'utf8')) && /"layout": "columns3"/.test(fs.readFileSync(file, 'utf8')))
+  check('Save Template… keeps the agents, roles and layout for the workspace', !!(await lib.until(async () => fs.existsSync(file), lib.timing('hang.ui'))) && /"role": "builder"/.test(fs.readFileSync(file, 'utf8')) && /"layout": "columns3"/.test(fs.readFileSync(file, 'utf8')))
   check('without sessions, ids or paths', !/lastSessionId|"id"|templates-ws/.test(fs.readFileSync(file, 'utf8')))
   // The same name again: asks before replacing.
   await saveTemplate()
@@ -125,9 +125,9 @@ const check = (name, ok, extra = '') => {
   await dialog.locator('input[type="checkbox"]').first().check()
   await dialog.getByRole('button', { name: 'Save', exact: true }).click()
   const replace = page.locator('.dialog', { hasText: 'Replace the template?' })
-  check('saving over a name asks first', !!(await lib.until(async () => (await replace.count()) === 1, 5000)))
+  check('saving over a name asks first', !!(await lib.until(async () => (await replace.count()) === 1, lib.timing('hang.ui'))))
   await replace.getByRole('button', { name: 'Replace' }).click()
-  await lib.until(async () => JSON.parse(fs.readFileSync(file, 'utf8')).name === 'pair', 5000)
+  await lib.until(async () => JSON.parse(fs.readFileSync(file, 'utf8')).name === 'pair', lib.timing('hang.ui'))
   check('…and replaces it', JSON.parse(fs.readFileSync(file, 'utf8')).name === 'pair')
   // alpha's agents renamed (names are unique across the workspace, #702), so pair's Builder and Reviewer are free in beta.
   for (const a of projectCfg(alpha).agents) await inv('agents:update', alpha, a.id, { name: `Alpha ${a.name.toLowerCase()}` })
@@ -137,7 +137,8 @@ const check = (name, ok, extra = '') => {
   const old = await lib.addAgent(inv, beta, { name: 'Old' })
   const tree = await lib.addAgent(inv, beta, { name: 'Tree', location: 'new-worktree' })
   await inv('session:start', beta, { agentId: old.id })
-  await lib.until(async () => (await live(beta, old.id))?.status === 'ready', 15000)
+  // before any turn (HI-2688): its start, restart or resume
+  await lib.until(async () => (await live(beta, old.id))?.status === 'ready', lib.timing('hang.step'))
   fs.writeFileSync(path.join(tree.worktree.path, 'wip.txt'), 'uncommitted')
   await inv('workspace:refresh')
   const loadMenu = templateMenu
@@ -170,7 +171,7 @@ const check = (name, ok, extra = '') => {
 
   // Stopped, and the work cleaned up: the warning lists who goes and who comes; loading replaces them.
   await inv('session:stop', beta, old.id)
-  await lib.until(async () => !(await live(beta, old.id)), 10000)
+  await lib.until(async () => !(await live(beta, old.id)), lib.timing('hang.ui'))
   fs.rmSync(path.join(tree.worktree.path, 'wip.txt'))
   await inv('workspace:refresh')
   await loadMenu()
@@ -227,13 +228,13 @@ const check = (name, ok, extra = '') => {
   await agentsOnly(warn)
   await warnLoad.click()
   // The layout with them: this user's view, saved a moment after the agents (HI-1749).
-  const loaded = await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["Builder","Reviewer"]' && projectCfg(beta).layout === 'columns3', 15000)
+  const loaded = await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["Builder","Reviewer"]' && projectCfg(beta).layout === 'columns3', lib.timing('hang.ui'))
   check('loading replaces the agents', !!loaded, JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
   const b = projectCfg(beta)
   // Not its model (HI-2106: agents hold only a connection, which a template doesn't keep: HI-2109).
   check('…recreating them exactly: role in the workflow, note, the layout; in the project folder', b.agents[0].workflowRole === 'builder' && b.agents[0].role === 'builder' && b.agents[1].workflowRole === 'reviewer' && b.layout === 'columns3' && b.agents.every((a) => !a.worktree), JSON.stringify(b))
   check("the removed worktree agent's worktree stays", fs.existsSync(tree.worktree.path))
-  await lib.until(async () => (await lib.agentCount(page)) === 2, 5000)
+  await lib.until(async () => (await lib.agentCount(page)) === 2, lib.timing('hang.ui'))
 
   // The warning gives each new agent's role in the workflow (its note, and the agent it's paired with: #1436), marks the
   // agents a new one of the same name replaces, and gives each new agent's settings. Cancelled: nothing made.
@@ -313,20 +314,20 @@ const check = (name, ok, extra = '') => {
   check('+ Add ▾ offers Configure Agent and Add…, Add Agent, Add Agent from Template and Templates', JSON.stringify(await menuItems()) === '["Configure Agent and Add…","Add Agent","Add Agent from Template","Templates"]', JSON.stringify(await menuItems()))
   await page.screenshot({ path: path.join(lib.WORK, 'templates-4-add-menu.png') })
   await item('Add Agent from Template').click()
-  await lib.until(async () => (await menuItems()).includes('Builder'), 5000)
+  await lib.until(async () => (await menuItems()).includes('Builder'), lib.timing('hang.ui'))
   await page.screenshot({ path: path.join(lib.WORK, 'templates-5-add-from.png') })
   await item('Builder').click()
   // Its name asked for (#1440), filled in free: Builder is beta's own already.
   const addOne = page.locator('.dialog', { hasText: 'Add an agent from a template' })
-  check('Add Agent from Template asks for its name, filled in free', !!(await lib.until(async () => (await addOne.locator('#dialog-prompt-field').inputValue().catch(() => '')) === 'Builder (beta)', 8000)), await addOne.locator('#dialog-prompt-field').inputValue().catch(() => ''))
+  check('Add Agent from Template asks for its name, filled in free', !!(await lib.until(async () => (await addOne.locator('#dialog-prompt-field').inputValue().catch(() => '')) === 'Builder (beta)', lib.timing('hang.ui'))), await addOne.locator('#dialog-prompt-field').inputValue().catch(() => ''))
   await addOne.getByRole('button', { name: 'Add Agent' }).click()
-  check('…and adds it under that name', !!(await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["Builder","Reviewer","Builder (beta)"]', 8000)), JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
+  check('…and adds it under that name', !!(await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["Builder","Reviewer","Builder (beta)"]', lib.timing('hang.ui'))), JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
   check('…with its role in the workflow and note, in the project folder', projectCfg(beta).agents[2].workflowRole === 'builder' && projectCfg(beta).agents[2].role === 'builder' && !projectCfg(beta).agents[2].worktree)
-  await lib.until(async () => (await lib.agentCount(page)) === 3, 5000)
+  await lib.until(async () => (await lib.agentCount(page)) === 3, lib.timing('hang.ui'))
   // Configure Agent and Add…: the dialog, nothing added until it's confirmed.
   await lib.addMenuRun(page, 'Configure Agent and Add…')
   const addDialog = page.locator('.dialog', { hasText: 'Add an agent' })
-  check('Configure Agent and Add… opens the Add Agent dialog', !!(await lib.until(async () => (await addDialog.count()) === 1, 5000)))
+  check('Configure Agent and Add… opens the Add Agent dialog', !!(await lib.until(async () => (await addDialog.count()) === 1, lib.timing('hang.ui'))))
   await lib.sleep(500)
   check('…without adding an agent', projectCfg(beta).agents.length === 3, JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
   // #702: another project's agent's name is refused, saying whose, with a free one to use.
@@ -352,7 +353,7 @@ const check = (name, ok, extra = '') => {
   await page.keyboard.press('ArrowDown')
   check('↓ ↓ moves to Add Agent from Template', (await active()) === 'Add Agent from Template', await active())
   await page.keyboard.press('ArrowRight')
-  await lib.until(async () => (await menuItems()).includes('Reviewer'), 5000)
+  await lib.until(async () => (await menuItems()).includes('Reviewer'), lib.timing('hang.ui'))
   const first = (await page.locator('.menu .menu-item:not(.disabled)').first().innerText()).split('\n')[0].trim()
   check('→ opens the template agents on the first one', (await active()) === first, `${await active()} / ${first}`)
   // (Past Combwork's own templates' agents first, #1436.)
@@ -360,10 +361,10 @@ const check = (name, ok, extra = '') => {
   check('→ opens the template agents, ↓ reaches Reviewer', (await active()) === 'Reviewer', await active())
   await page.keyboard.press('Enter')
   // Enter chose it: its name dialog (#1440) opens, its free name filled in.
-  check('Enter chooses it: its name asked for, filled in free', !!(await lib.until(async () => (await addOne.locator('#dialog-prompt-field').inputValue().catch(() => '')) === 'Reviewer (beta)', 8000)), await addOne.locator('#dialog-prompt-field').inputValue().catch(() => ''))
+  check('Enter chooses it: its name asked for, filled in free', !!(await lib.until(async () => (await addOne.locator('#dialog-prompt-field').inputValue().catch(() => '')) === 'Reviewer (beta)', lib.timing('hang.ui'))), await addOne.locator('#dialog-prompt-field').inputValue().catch(() => ''))
   await addOne.getByRole('button', { name: 'Add Agent' }).click()
-  check('…and it is added', !!(await lib.until(async () => projectCfg(beta).agents.map((a) => a.name).includes('Reviewer (beta)'), 8000)), JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
-  await lib.until(async () => (await lib.agentCount(page)) === 4, 5000)
+  check('…and it is added', !!(await lib.until(async () => projectCfg(beta).agents.map((a) => a.name).includes('Reviewer (beta)'), lib.timing('hang.ui'))), JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
+  await lib.until(async () => (await lib.agentCount(page)) === 4, lib.timing('hang.ui'))
 
   // The palette: Load Template… and Add Agent from Template… open + Add ▾'s menus, on their first entry.
   const palette = async (label) => {
@@ -414,7 +415,7 @@ const check = (name, ok, extra = '') => {
   // One page (the grid of six shows all four): no page buttons.
   await inv('project:updateConfig', beta, { layout: 'grid6' })
   await inv('workspace:refresh')
-  await lib.until(async () => (await strip.locator('.page-switch').count()) === 0, 5000)
+  await lib.until(async () => (await strip.locator('.page-switch').count()) === 0, lib.timing('hang.ui'))
   for (const width of [1700, 900]) {
     for (const theme of ['dark', 'light']) {
       await inv('settings:update', { appearance: { theme } })
@@ -427,7 +428,7 @@ const check = (name, ok, extra = '') => {
   }
   await inv('project:updateConfig', beta, { layout: 'columns3' })
   await inv('workspace:refresh')
-  await lib.until(async () => (await strip.locator('.page-switch').count()) === 1, 5000)
+  await lib.until(async () => (await strip.locator('.page-switch').count()) === 1, lib.timing('hang.ui'))
   await templateMenu()
   check('at 900 px Templates ▸ still has Save Template… and the templates', (await menuItems())[0] === 'Save Template…' && (await menuItems()).includes('pair'), JSON.stringify(await menuItems()))
   await page.screenshot({ path: path.join(lib.WORK, 'templates-toolbar-900-menu.png') })
@@ -435,7 +436,7 @@ const check = (name, ok, extra = '') => {
   await inv('settings:update', { appearance: { theme: 'dark' } })
 
   await inv('session:stop', beta)
-  await lib.until(async () => (await inv('session:live')).length === 0, 15000)
+  await lib.until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))
 
   // --- #268: alpha's own template, with a worktree agent ("Tree"), loaded into beta from the Templates view (#1436:
   // its agents in beta's folder, no worktree or branch made, alpha's untouched). #702: each agent's name in the
@@ -449,7 +450,7 @@ const check = (name, ok, extra = '') => {
   await dialog.locator('input.input').fill('Alpha trees')
   await dialog.getByRole('button', { name: 'Save', exact: true }).click()
   const alphaTrees = path.join(alpha, '.combwork', 'templates', 'alpha-trees.json')
-  check("alpha's own template saved, its agents' roles and no worktree, path or branch", !!(await lib.until(async () => fs.existsSync(alphaTrees), 5000)) && /"name": "Tree",\s*"role": "builder"/.test(fs.readFileSync(alphaTrees, 'utf8')) && !/worktree|cw\/templates-ws/.test(fs.readFileSync(alphaTrees, 'utf8')))
+  check("alpha's own template saved, its agents' roles and no worktree, path or branch", !!(await lib.until(async () => fs.existsSync(alphaTrees), lib.timing('hang.step'))) && /"name": "Tree",\s*"role": "builder"/.test(fs.readFileSync(alphaTrees, 'utf8')) && !/worktree|cw\/templates-ws/.test(fs.readFileSync(alphaTrees, 'utf8')))
   // alpha's Tree renamed after saving (its worktree stays), so the template's Tree is free in beta; its other two aren't.
   await inv('agents:update', alpha, srcTree.id, { name: 'Alpha tree' })
   const srcCfg = JSON.stringify(projectCfg(alpha).agents.find((a) => a.id === srcTree.id).worktree)
@@ -485,7 +486,7 @@ const check = (name, ok, extra = '') => {
   await page.screenshot({ path: path.join(lib.WORK, 'templates-7-cross-project.png') })
   await agentsOnly(crossLoad)
   await loadButton.click()
-  check("loaded into beta: alpha's agents, with the names chosen", !!(await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["BAB","BAR","Tree"]', 15000)), JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
+  check("loaded into beta: alpha's agents, with the names chosen", !!(await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["BAB","BAR","Tree"]', lib.timing('hang.ui'))), JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
   check("…each in beta's folder: no worktree or branch made", projectCfg(beta).agents.every((a) => !a.worktree) && lib.git(beta, ['branch', '--list']) === betaBranches && lib.git(beta, ['worktree', 'list', '--porcelain']) === betaTrees)
   check("alpha's Tree and its worktree are untouched", JSON.stringify(projectCfg(alpha).agents.find((a) => a.id === srcTree.id).worktree) === srcCfg && fs.existsSync(srcTree.worktree.path) && lib.git(srcTree.worktree.path, ['rev-parse', '--abbrev-ref', 'HEAD']).trim() === srcTree.worktree.branch)
 

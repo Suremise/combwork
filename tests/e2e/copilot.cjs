@@ -60,7 +60,7 @@ const check = (name, ok, extra = '') => {
     await lib.fitWindow(app, page, { width: 1400, height: 850 })
     await lib.appReady(page)
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
-    const info = await lib.until(async () => { const i = (await inv('provider:info')).copilot; return i && !i.checking ? i : null }, 60000, 500)
+    const info = await lib.until(async () => { const i = (await inv('provider:info')).copilot; return i && !i.checking ? i : null }, lib.timing('hang.step'), 500)
     check('Copilot found', !!info?.found, JSON.stringify(info && { found: info.found, path: info.path }))
     console.log(`Copilot CLI ${info?.version ?? '?'} (${info?.source ?? '?'}), offline against the stand-in at ${api.url}`)
     await lib.openWorkspace(inv, page, ws)
@@ -117,7 +117,7 @@ const check = (name, ok, extra = '') => {
       check(`${agent.name}: starts with a session id Combwork chose (--session-id)`, /^[0-9a-f-]{36}$/.test(s?.sessionId ?? ''), s?.sessionId)
       // Combwork reads the question from the screen it draws, so it shows as waiting once Combwork has read it (#679: once under
       // load the screen had it and the status, read once, was still ready).
-      const asked = await lib.until(async () => /Do you trust the files in this folder/.test(await screen(agent.id)) && (await status(agent.id)) === 'waiting', 30000, 300)
+      const asked = await lib.until(async () => /Do you trust the files in this folder/.test(await screen(agent.id)) && (await status(agent.id)) === 'waiting', lib.timing('hang.ui'), 300)
       check(`${agent.name}: the folder-trust question shows as waiting`, !!asked, `${await status(agent.id)}; on screen: ${/Do you trust the files in this folder/.test(await screen(agent.id))}`)
       await inv('pty:write', key(agent.id), '\r')
       check(`${agent.name}: ready once answered`, !!(await reach(agent.id, ['ready'])), await status(agent.id))
@@ -137,7 +137,7 @@ const check = (name, ok, extra = '') => {
 
     // An edit of a.ts: PreToolUse claims it, then Copilot's permission dialog (Notification permission_prompt): waiting.
     await send(a.id, 'edit a.ts probe probed')
-    const asking = await lib.until(async () => { const l = await live(a.id); return l?.status === 'waiting' ? l : null }, 30000, 300)
+    const asking = await lib.until(async () => { const l = await live(a.id); return l?.status === 'waiting' ? l : null }, lib.timing('hang.ui'), 300)
     check('A: the permission dialog shows as waiting, with what it asks', !!asking && /a\.ts/.test(asking.statusMessage ?? ''), `${await status(a.id)} ${asking?.statusMessage ?? ''}`)
     check('A: holds a.ts', ((await live(a.id))?.lockedFiles ?? []).some((f) => /a\.ts$/i.test(f)), JSON.stringify((await live(a.id))?.lockedFiles))
     await page.screenshot({ path: path.join(lib.WORK, 'copilot-1-permission.png') })
@@ -145,7 +145,7 @@ const check = (name, ok, extra = '') => {
     // B edits the same file while A holds it: Combwork's lock (block) refuses it, in Copilot's own words.
     const sb = await startAndTrust(b)
     await send(b.id, 'edit a.ts probe other', ['working', 'finished'])
-    const denied = await lib.until(async () => /Denied by preToolUse hook: Cop A is editing a\.ts/.test(await screen(b.id)), 30000, 300)
+    const denied = await lib.until(async () => /Denied by preToolUse hook: Cop A is editing a\.ts/.test(await screen(b.id)), lib.timing('hang.ui'), 300)
     check("B: its edit of the file A holds is refused by the lock", !!denied, (await screen(b.id)).slice(-300))
     check('B: its turn finishes', !!(await reach(b.id, ['finished'])), await status(b.id))
     check('a.ts unchanged while A holds it', fs.readFileSync(path.join(proj, 'a.ts'), 'utf8') === 'probe\n')
@@ -201,7 +201,7 @@ const check = (name, ok, extra = '') => {
       samples.push({ at: Date.now(), st: await status(b.id) })
       const t = secondTurn()
       return t && samples[samples.length - 1].st === 'finished' ? t : null
-    }, 40000, 150)
+    }, lib.timing('hang.step'), 150)
     check('B: both turns run, and it ends finished', !!turn, samples.map((s) => s.st).filter((s, i, all) => s !== all[i - 1]).join(' → '))
     const during = turn ? samples.filter((s) => s.at > turn.start + 500 && s.at < turn.end - 300) : []
     check('B: shown working while the queued turn runs', during.length > 3 && during.every((s) => s.st === 'working'), `${during.length} samples: ${[...new Set(during.map((s) => s.st))].join(', ')}`)
@@ -219,13 +219,13 @@ const check = (name, ok, extra = '') => {
       return lib.sendPrompt(inv, keyC, text, { submitted: async () => ['working', 'waiting'].includes(await statusC()) })
     }
     const sc = await inv('session:start', proj2, { agentId: c.id })
-    if (await lib.until(async () => /Do you trust the files in this folder/.test(lib.plainText(await inv('pty:buffer', keyC).catch(() => ''))), 30000, 300)) await inv('pty:write', keyC, '\r')
+    if (await lib.until(async () => /Do you trust the files in this folder/.test(lib.plainText(await inv('pty:buffer', keyC).catch(() => ''))), lib.timing('hang.ui'), 300)) await inv('pty:write', keyC, '\r')
     check('C: ready in paren(1)', !!(await reachC(['ready'])), await statusC())
     check('C: in Accept edits, Copilot’s default', (await liveC())?.permissionMode === 'accept-edits', (await liveC())?.permissionMode)
     // Told at launch, as a toast that closes after 6 s and stays in the Notifications panel: read it there, since C can
     // take longer than that to be ready under load (#660).
     await page.locator('.activitybar button[aria-label="Notifications"]').click()
-    const told = await lib.until(async () => (await page.locator('.notif-panel .toast-title', { hasText: 'Copilot will ask before each edit' }).count()) > 0, 15000, 300)
+    const told = await lib.until(async () => (await page.locator('.notif-panel .toast-title', { hasText: 'Copilot will ask before each edit' }).count()) > 0, lib.timing('hang.ui'), 300)
     await page.locator('.notif-panel button[aria-label="Close"]').click()
     check('C: Combwork says Copilot will ask before each edit there', !!told)
     await page.screenshot({ path: path.join(lib.WORK, 'copilot-4-parentheses.png') })
@@ -244,9 +244,9 @@ const check = (name, ok, extra = '') => {
     await sendC('edit p.txt probed-by-c again')
     check('C: asks before the edit', !!(await reachC(['waiting'])), await statusC())
     await inv('session:stop', proj2, c.id)
-    check('C: ends on Combwork’s Stop over its dialog', !!(await lib.until(async () => !(await liveC()), 20000, 300)), await statusC())
+    check('C: ends on Combwork’s Stop over its dialog', !!(await lib.until(async () => !(await liveC()), lib.timing('hang.ui'), 300)), await statusC())
     const cEvents = path.join(copilotHome, 'session-state', sc.sessionId, 'events.jsonl')
-    check('C: Copilot recorded its totals (session.shutdown)', !!(await lib.until(() => fs.existsSync(cEvents) && fs.readFileSync(cEvents, 'utf8').includes('"type":"session.shutdown"'), 15000, 300)))
+    check('C: Copilot recorded its totals (session.shutdown)', !!(await lib.until(() => fs.existsSync(cEvents) && fs.readFileSync(cEvents, 'utf8').includes('"type":"session.shutdown"'), lib.timing('hang.step'), 300)))
     check('p.txt not edited again', !fs.readFileSync(path.join(proj2, 'p.txt'), 'utf8').includes('again'))
 
     // Copilot's danger opt-in unlocks Autopilot alone (#490: entering Autopilot approves everything for the session);
@@ -266,7 +266,7 @@ const check = (name, ok, extra = '') => {
     check('turning the opt-in off leaves C in Allow all, which needs no opt-in', modeOfC() === 'allow-all', modeOfC())
     // With the opt-in off, A's mode menu offers Allow all and not Autopilot, and main allows the one and refuses the other.
     await page.locator('.mode-badge', { hasText: 'Ask' }).first().click()
-    const menuText = await lib.until(async () => { const t = await page.locator('.menu .menu-item').allInnerTexts(); return t.length ? t.join(' | ') : null }, 5000, 200)
+    const menuText = await lib.until(async () => { const t = await page.locator('.menu .menu-item').allInnerTexts(); return t.length ? t.join(' | ') : null }, lib.timing('hang.ui'), 200)
     await page.screenshot({ path: path.join(lib.WORK, 'copilot-5-modes.png') })
     await page.keyboard.press('Escape')
     check('A: its mode menu offers Allow all without the opt-in, and not Autopilot', /Allow all/.test(menuText ?? '') && !/Autopilot/.test(menuText ?? ''), menuText)
@@ -278,7 +278,7 @@ const check = (name, ok, extra = '') => {
     const questionsIn = async () => (lib.plainText(await inv('pty:buffer', key(a.id)).catch(() => '')).match(QUESTION) ?? []).length
     const questionsBefore = await questionsIn()
     await send(a.id, 'question then say Thanks.')
-    const q = await lib.until(async () => { const l = await live(a.id); return l?.status === 'waiting' ? l : null }, 30000, 300)
+    const q = await lib.until(async () => { const l = await live(a.id); return l?.status === 'waiting' ? l : null }, lib.timing('hang.ui'), 300)
     check('A: its question shows as waiting, with the question', !!q && /Which one should I use/.test(q.statusMessage ?? ''), `${await status(a.id)} ${q?.statusMessage ?? ''}`)
     // Enter once Copilot has drawn the question form (its footer, "↑/↓ select · enter accept · ctrl+d decline · esc
     // cancel"): waiting comes from its Notification hook, before the form takes keys (#679: an Enter sent at once was
@@ -315,7 +315,7 @@ const check = (name, ok, extra = '') => {
     const refuse = async (prompt, what, asked) => {
       const before = aLog().filter(refused).length
       await send(a.id, prompt)
-      const prompting = await lib.until(async () => asked.test(await screen(a.id)) && (await status(a.id)) === 'waiting', 30000, 300)
+      const prompting = await lib.until(async () => asked.test(await screen(a.id)) && (await status(a.id)) === 'waiting', lib.timing('hang.ui'), 300)
       check(`A: ${what} asks first`, !!prompting, `${await status(a.id)} ${(await screen(a.id)).slice(-300)}`)
       await answer(key(a.id), '\x1b')
       // From this refusal on: the log's next after the earlier ones.
@@ -323,7 +323,7 @@ const check = (name, ok, extra = '') => {
         const evs = aLog()
         const at = evs.map((e, k) => (refused(e) ? k : -1)).filter((k) => k >= 0)[before] ?? -1
         return at >= 0 && evs.slice(at).some((e) => e.type === 'assistant.turn_end') ? evs.slice(at) : null
-      }, 20000, 300)
+      }, lib.timing('hang.ui'), 300)
       // An abort, if any, only after the turn's end, and the user's.
       const aborts = (after ?? []).flatMap((e, k) => (e.type === 'abort' ? [{ e, k }] : []))
       const endAt = (after ?? []).findIndex((e) => e.type === 'assistant.turn_end')
@@ -345,17 +345,17 @@ const check = (name, ok, extra = '') => {
     const ended = async () => !(await live(a.id))
     const stopAt = Date.now()
     await inv('session:stop', proj, a.id)
-    check('A: ends on Combwork’s Stop', !!(await lib.until(ended, 20000, 300)), await status(a.id))
+    check('A: ends on Combwork’s Stop', !!(await lib.until(ended, lib.timing('hang.ui'), 300)), await status(a.id))
     console.log(`  A ended ${Date.now() - stopAt} ms after Stop`)
     check("the session's events.jsonl is in the suite's COPILOT_HOME", fs.existsSync(events))
-    const shutdown = await lib.until(() => fs.existsSync(events) && fs.readFileSync(events, 'utf8').includes('"type":"session.shutdown"'), 15000, 300)
+    const shutdown = await lib.until(() => fs.existsSync(events) && fs.readFileSync(events, 'utf8').includes('"type":"session.shutdown"'), lib.timing('hang.step'), 300)
     check('Copilot recorded the end of the session with its totals (session.shutdown), stopped from Combwork', !!shutdown, lastTypes(events))
     const t = await inv('transcript:read', proj, sa.sessionId)
     const items = t?.items ?? []
     check('the Sessions tab shows the conversation: its prompts', items.some((x) => x.kind === 'user' && /Hello from the stand-in/.test(x.text)), JSON.stringify(items.filter((x) => x.kind === 'user').map((x) => x.text).slice(0, 4)))
     check('…the replies', items.some((x) => x.kind === 'assistant' && /Hello from the stand-in/.test(x.text)))
     check('…and the tool calls (the skill, the edit)', ['skill', 'edit'].every((n) => items.some((x) => x.kind === 'tool' && new RegExp(n, 'i').test(x.tool?.name ?? ''))), JSON.stringify(items.filter((x) => x.kind === 'tool').map((x) => x.tool?.name)))
-    const usage = await lib.until(async () => { const u = await inv('session:usage', proj, sa.sessionId); return u && u.inputTokens > 0 ? u : null }, 15000, 500)
+    const usage = await lib.until(async () => { const u = await inv('session:usage', proj, sa.sessionId); return u && u.inputTokens > 0 ? u : null }, lib.timing('hang.step'), 500)
     check('usage: the tokens Copilot counted, and its model', !!usage && usage.outputTokens > 0 && /gpt-4\.1/.test(usage.model ?? ''), JSON.stringify(usage && { in: usage.inputTokens, out: usage.outputTokens, model: usage.model, cost: usage.costUsd }))
     // Copilot reports the session's cost itself (its AI credits): offline, 0 credits, which is $0 as reported, not unknown.
     check('usage: the cost Copilot reported offline is 0 (no AI credits), not estimated', !!usage && usage.costUsd === 0 && usage.costEstimated === false, JSON.stringify(usage && { cost: usage.costUsd, estimated: usage.costEstimated }))
@@ -365,11 +365,11 @@ const check = (name, ok, extra = '') => {
     // Resume: --resume <id>, the same session, the earlier conversation on screen.
     const r = await inv('session:start', proj, { agentId: a.id, resumeId: sa.sessionId })
     check('A: resumes the same session id', r?.sessionId === sa.sessionId, r?.sessionId)
-    if (await lib.until(async () => /Do you trust the files in this folder/.test(await screen(a.id)), 15000, 300)) await inv('pty:write', key(a.id), '\r')
+    if (await lib.until(async () => /Do you trust the files in this folder/.test(await screen(a.id)), lib.timing('hang.ui'), 300)) await inv('pty:write', key(a.id), '\r')
     check('A: the resumed session is ready', !!(await reach(a.id, ['ready'])), await status(a.id))
     // Copilot shows a resumed conversation full screen, scrolled to its end: only the latest exchange is sure to be drawn
     // (the first prompt shows only in a passing frame while plugins load, if that frame is drawn at all: #467).
-    const resumed = await lib.until(async () => { const s = await screen(a.id); return /shell New-Item -Path made-by-copilot\.txt/.test(s) && /Operation aborted by user/.test(s) }, 20000, 300)
+    const resumed = await lib.until(async () => { const s = await screen(a.id); return /shell New-Item -Path made-by-copilot\.txt/.test(s) && /Operation aborted by user/.test(s) }, lib.timing('hang.ui'), 300)
     check('A: …with the earlier conversation on screen (its latest exchange)', !!resumed, (await screen(a.id)).trim().split('\n').slice(-12).join(' | '))
     await page.screenshot({ path: path.join(lib.WORK, 'copilot-3-resumed.png') })
 
@@ -381,19 +381,19 @@ const check = (name, ok, extra = '') => {
     // HI-1973: its model refusing every request with a 429 (the stand-in's "ratelimited"). Copilot tries again (an error
     // hook each try, recoverable): its pane says it is rate-limited and which try, not Working…; then it gives up with a
     // rate_limit session error, which ends its turn failed with its words. The hooks are kept as Copilot sent them.
-    const sources = await lib.until(async () => { const l = await inv('console:sources'); return l.some((x) => x.agentId === a.id) ? l : null }, 20000, 300)
+    const sources = await lib.until(async () => { const l = await inv('console:sources'); return l.some((x) => x.agentId === a.id) ? l : null }, lib.timing('hang.ui'), 300)
     const source = sources?.find((x) => x.agentId === a.id)?.id
     if (source) await inv('console:subscribe', [source])
     const seqBefore = source ? Math.max(0, ...(await inv('console:snapshot', source, 0)).map((e) => e.seq)) : 0
     check('A: a rate-limited prompt makes it working', (await send(a.id, 'ratelimited', ['working'])) > 0, await status(a.id))
     const aHeader = page.locator('.pane-header-bar', { hasText: 'Cop A' })
     const retryText = () => aHeader.locator('.pane-status.retrying').innerText().catch(() => '')
-    const retrying = await lib.until(async () => { const l = await live(a.id); return l?.retryWait?.status === 429 ? l : null }, 30000, 150)
+    const retrying = await lib.until(async () => { const l = await live(a.id); return l?.retryWait?.status === 429 ? l : null }, lib.timing('hang.ui'), 150)
     check("A: Copilot's tries are its wait to retry, rate-limited (429), with no retry time or total it doesn't say", !!retrying && retrying.retryWait.retryAt === null && retrying.retryWait.max === null && retrying.status === 'working', JSON.stringify(retrying?.retryWait))
-    const shownRetry = await lib.until(async () => /^Rate-limited \(429\) · retrying… \(try \d+\)$/.test((await retryText()).trim()), 30000, 150)
+    const shownRetry = await lib.until(async () => /^Rate-limited \(429\) · retrying… \(try \d+\)$/.test((await retryText()).trim()), lib.timing('hang.ui'), 150)
     check('A: its pane says it is rate-limited and which try, not Working…', !!shownRetry, await retryText())
     await page.screenshot({ path: path.join(lib.WORK, 'copilot-4-ratelimited.png') })
-    const gaveUp = await lib.until(async () => { const l = await live(a.id); return l?.status === 'finished' && l.failedTurn ? l : null }, 60000, 300)
+    const gaveUp = await lib.until(async () => { const l = await live(a.id); return l?.status === 'finished' && l.failedTurn ? l : null }, lib.timing('hang.step'), 300)
     check("A: once Copilot gives up (rate_limit, 429), its turn ends failed with its words, the wait gone", !!gaveUp && /429/.test(gaveUp.failedTurn.message) && !gaveUp.retryWait, JSON.stringify(gaveUp && { failedTurn: gaveUp.failedTurn, retryWait: gaveUp.retryWait }))
     if (source) {
       const hooks = (await inv('console:snapshot', source, seqBefore)).filter((e) => e.kind === 'hook' && e.name === 'ErrorOccurred').map((e) => e.raw)
@@ -412,17 +412,17 @@ const check = (name, ok, extra = '') => {
     fs.appendFileSync(bEvents, JSON.stringify({ ...quota, id: 'hi-2734-quota', timestamp: new Date().toISOString(), parentId: null }) + '\n')
     const planItem = page.locator('.statusbar .status-item[data-plan="copilot"]')
     const planText = async () => (await planItem.innerText().catch(() => '')).replace(/\s+/g, ' ')
-    check("the status bar shows Copilot's quotas from its session file: chats and completions, not the premium requests it doesn't include", !!(await lib.until(async () => /Chat 1%/.test(await planText()) && /Completions 0%/.test(await planText()), 20000, 300)) && !/Premium/.test(await planText()), await planText())
+    check("the status bar shows Copilot's quotas from its session file: chats and completions, not the premium requests it doesn't include", !!(await lib.until(async () => /Chat 1%/.test(await planText()) && /Completions 0%/.test(await planText()), lib.timing('hang.step'), 300)) && !/Premium/.test(await planText()), await planText())
     const kept = (await inv('app:planUsage')).copilot
     const premium = kept?.limits.find((l) => l.id === 'premium_interactions')
     check('…kept with its counts, the premium requests as not in the plan', kept?.limits.find((l) => l.id === 'chat')?.used === 2 && premium?.notIncluded === true && premium.entitlement === 0, JSON.stringify(kept))
     await planItem.click()
-    check('…and the Overview shows them, the premium requests as Not in your plan', !!(await lib.until(async () => (await page.getByText('Chat messages limit').count()) > 0 && (await page.getByText('Premium requests limit').count()) > 0 && (await page.getByText('Not in your plan').count()) > 0, 20000, 300)))
+    check('…and the Overview shows them, the premium requests as Not in your plan', !!(await lib.until(async () => (await page.getByText('Chat messages limit').count()) > 0 && (await page.getByText('Premium requests limit').count()) > 0 && (await page.getByText('Not in your plan').count()) > 0, lib.timing('hang.ui'), 300)))
     // Its cards in view, with the status bar, in both themes (kept with --keep-files: HR1's round 1).
     await page.getByText('Premium requests limit').first().evaluate((el) => el.scrollIntoView({ block: 'center' }))
     for (const theme of ['dark', 'light']) {
       await inv('settings:update', { appearance: { theme } })
-      await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, 20000, 100)
+      await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, lib.timing('hang.ui'), 100)
       await page.screenshot({ path: path.join(lib.WORK, `copilot-plan-limits-${theme}.png`) })
     }
     await inv('settings:update', { appearance: { theme: 'dark' } })
@@ -430,13 +430,13 @@ const check = (name, ok, extra = '') => {
     // B stopped from Combwork in the middle of a turn: the turn is cancelled and Copilot still exits by itself, with its totals.
     await send(b.id, 'work 20 then say Never said.', ['working'])
     await inv('session:stop', proj, b.id)
-    check('B: ends on Combwork’s Stop while working', !!(await lib.until(async () => !(await live(b.id)), 20000, 300)), await status(b.id))
-    const bShutdown = await lib.until(() => fs.existsSync(bEvents) && bLog().includes('"type":"session.shutdown"'), 15000, 300)
+    check('B: ends on Combwork’s Stop while working', !!(await lib.until(async () => !(await live(b.id)), lib.timing('hang.ui'), 300)), await status(b.id))
+    const bShutdown = await lib.until(() => fs.existsSync(bEvents) && bLog().includes('"type":"session.shutdown"'), lib.timing('hang.step'), 300)
     check('B: Copilot recorded its totals (session.shutdown), stopped mid-turn', !!bShutdown, lastTypes(bEvents))
-    const bUsage = await lib.until(async () => { const u = await inv('session:usage', proj, sb.sessionId); return u && u.inputTokens > 0 ? u : null }, 15000, 500)
+    const bUsage = await lib.until(async () => { const u = await inv('session:usage', proj, sb.sessionId); return u && u.inputTokens > 0 ? u : null }, lib.timing('hang.step'), 500)
     check('B: the Sessions tab has its tokens', !!bUsage && bUsage.outputTokens > 0, JSON.stringify(bUsage && { in: bUsage.inputTokens, out: bUsage.outputTokens }))
     for (const id of [a.id, b.id]) await inv('session:stop', proj, id).catch(() => {})
-    await lib.until(async () => !(await live(a.id)) && !(await live(b.id)), 20000, 300)
+    await lib.until(async () => !(await live(a.id)) && !(await live(b.id)), lib.timing('hang.ui'), 300)
   } finally {
     await app.close().catch(() => {})
     await api.close()

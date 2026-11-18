@@ -8,7 +8,7 @@ const { execFileSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'control-profile')
 const ws = path.join(lib.WORK, 'control-ws')
@@ -50,7 +50,7 @@ const check = (name, ok, extra = '') => {
   const info = await inv('workspace:refresh')
   const home = info.assistant.path
   const live = async (p, agentId) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === agentId)
-  const until = async (fn, ms = 20000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)
@@ -113,7 +113,7 @@ const check = (name, ok, extra = '') => {
   // Project agents read what they are given from their inbox with Combwork's tools (#650): on from here for their tasks, and
   // off again for the hand-over checks below.
   await inv('settings:update', { agentApi: { enabled: true } })
-  await lib.until(async () => (await api('GET', '/v1/status').catch(() => ({}))).status === 200, 10000)
+  await lib.until(async () => (await api('GET', '/v1/status').catch(() => ({}))).status === 200, lib.timing('hang.ui'))
 
   // Create a project; add an agent that starts on a task (on the command line). The view stays on gamma.
   const created = await api('POST', '/v1/projects', { name: 'beta' })
@@ -244,7 +244,7 @@ const check = (name, ok, extra = '') => {
   const noTools = await api('POST', '/v1/projects/alpha/handover', { from: 'Builder', to: 'Fixer', handover: false })
   check("no hand-over while agents can't use Combwork's tools", noTools.status === 409 && /Combwork's tools/.test(noTools.body?.error), JSON.stringify(noTools.body))
   await inv('settings:update', { agentApi: { enabled: true } })
-  await lib.until(async () => (await api('GET', '/v1/status').catch(() => ({}))).status === 200, 10000)
+  await lib.until(async () => (await api('GET', '/v1/status').catch(() => ({}))).status === 200, lib.timing('hang.ui'))
   // The user presses Enter in Builder's terminal (at its idle prompt, an empty line: nothing sent). Its run now is the new
   // conversation above, and a run's start forgets the keys typed into an earlier one (HI-3261), so the Enter that
   // answered its trust question no longer counts: this one does, here and for the lane below (the pause is 600 s).
@@ -254,7 +254,7 @@ const check = (name, ok, extra = '') => {
   await api('POST', '/v1/projects/alpha/agents', { name: 'Checker' })
   const handed = await api('POST', '/v1/projects/alpha/handover', { from: 'Fixer', to: 'Checker', handover: false })
   check('it hands one agent\'s work over to another', handed.status === 200, JSON.stringify(handed.body))
-  const picked = await until(async () => /Read the handover "handovers\/2026-10-01-alpha-plan\.md"/.test((await api('GET', '/v1/projects/alpha/agents/Checker/activity')).body?.currentTask ?? ''), 30000)
+  const picked = await until(async () => /Read the handover "handovers\/2026-10-01-alpha-plan\.md"/.test((await api('GET', '/v1/projects/alpha/agents/Checker/activity')).body?.currentTask ?? ''), lib.timing('hang.ui'))
   check('the other agent starts on the handover', !!picked)
   check('the hand-over is listed', (await inv('assistant:actions')).some((x) => x.ok && x.text.startsWith("Handing Fixer's work over to Checker")))
 
@@ -263,7 +263,7 @@ const check = (name, ok, extra = '') => {
   const viaTool = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
     input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_activate_project', arguments: { project: 'alpha', active: true } } }) + '\n',
     env: lib.childEnv({ CW_API_TOKEN: apiToken, ...mcp.env, CW_API_URL: API }),
-    timeout: 15000
+    timeout: lib.timing('spawn.hang')
   }).toString()
   const toolReply = JSON.parse(viaTool.split('\n')[0]).result
   const asAssistant = (await inv('assistant:actions')).some((x) => x.ok && x.text === 'Activated alpha')
@@ -276,7 +276,7 @@ const check = (name, ok, extra = '') => {
   const started = await api('POST', `/v1/tasks/${cardNo}/start`, { name: 'Writer' })
   check('and starts it on a new agent', started.status === 200 && started.body?.added === true && started.body?.card?.column === 'doing', JSON.stringify(started.body))
   const writer = (await inv('workspace:get')).projects.find((x) => x.name === 'alpha').agents.find((a) => a.name === 'Writer')
-  check('which runs the card', !!writer && !!(await until(async () => (await live(alpha, writer.id))?.status === 'finished', 30000)))
+  check('which runs the card', !!writer && !!(await until(async () => (await live(alpha, writer.id))?.status === 'finished', lib.timing('hang.step'))))
   await api('PATCH', `/v1/tasks/${cardNo}`, { column: 'review', comment: 'Ready.' })
   const moved = await api('PATCH', `/v1/tasks/${cardNo}`, { column: 'done' })
   check('the Assistant moves it to Done', moved.status === 200 && moved.body?.column === 'done', JSON.stringify(moved.body))
@@ -343,7 +343,7 @@ const check = (name, ok, extra = '') => {
   const kept = (await api('GET', '/v1/assistant/changes')).body
   const relabel = kept?.flatMap((g) => g.changes).find((c) => c.card === cardNo && c.fields.includes('labels'))
   check('its change is kept for undo, by its message, with the field it set', !!relabel && kept[0]?.group !== before && kept[0].changes.includes(relabel), JSON.stringify(kept).slice(0, 400))
-  const undoTool = (args) => JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_undo', arguments: args } }) + '\n', env: lib.childEnv({ ...mcp.env, CW_API_URL: API }), timeout: 15000 }).toString().split('\n')[0]).result
+  const undoTool = (args) => JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_undo', arguments: args } }) + '\n', env: lib.childEnv({ ...mcp.env, CW_API_URL: API }), timeout: lib.timing('spawn.hang') }).toString().split('\n')[0]).result
   const undoneReply = undoTool({ change: relabel?.id })
   check('cw_undo undoes it: the label it set is gone', !undoneReply?.isError && (undoneReply?.content?.[0]?.text ?? '').startsWith('Undid 1 of 1 change in full.') && (await api('GET', `/v1/tasks/${cardNo}`)).body?.labels?.length === 0, JSON.stringify(undoneReply).slice(0, 300))
   check('…listed in Done by the Assistant', (await inv('assistant:actions')).some((x) => x.ok && x.kind === 'undo' && x.card === cardNo), JSON.stringify((await inv('assistant:actions')).slice(-2)))
@@ -356,7 +356,7 @@ const check = (name, ok, extra = '') => {
 
   // The tools its combwork MCP server offers follow the control level; project agents never get them.
   const tools = (envExtra) => {
-    const outText = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) + '\n', env: lib.childEnv({ CW_API_URL: API, ...envExtra }), timeout: 10000 }).toString()
+    const outText = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) + '\n', env: lib.childEnv({ CW_API_URL: API, ...envExtra }), timeout: lib.timing('spawn.hang') }).toString()
     return JSON.parse(outText.split('\n')[0]).result.tools.map((t) => t.name)
   }
   const asAgent = tools({ CW_PROJECT: 'alpha' })
@@ -367,7 +367,7 @@ const check = (name, ok, extra = '') => {
   check('Control agents: agent tools, no project creation', asAgents.includes('cw_prompt_agent') && asAgents.includes('cw_stop_agent') && asAgents.includes('cw_hand_over') && asAgents.includes('cw_start_task') && !asAgents.includes('cw_create_project'))
   check('Look and advise: reading tools only', asLook.includes('cw_agent_activity') && asLook.includes('cw_wait_for_agents') && asLook.includes('cw_list_tasks') && !asLook.includes('cw_add_agent') && !asLook.includes('cw_start_task'))
   // Its lane tool says only list works there (#500); trusted at every level (sessions' trustedCombworkTools, unit-tested).
-  const laneTool = (envExtra) => JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) + '\n', env: lib.childEnv({ CW_API_URL: API, ...envExtra }), timeout: 10000 }).toString().split('\n')[0]).result.tools.find((t) => t.name === 'cw_lane')
+  const laneTool = (envExtra) => JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) + '\n', env: lib.childEnv({ CW_API_URL: API, ...envExtra }), timeout: lib.timing('spawn.hang') }).toString().split('\n')[0]).result.tools.find((t) => t.name === 'cw_lane')
   check('Look and advise: cw_lane says only list works', /only list works/.test(laneTool({ CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'look' })?.description ?? '') && !/only list works/.test(laneTool({ CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'agents' })?.description ?? ''))
 
   // --- HI-2328: an agent change waiting behind project.json's lock is checked again with its write. The user's own write is
@@ -404,7 +404,7 @@ const check = (name, ok, extra = '') => {
       }
     }, projectFile.toLowerCase())
   const queuedForLock = async () => {
-    const queued = !!(await lib.until(() => app.evaluate(() => global.__cwTestQueued > 0), 30000))
+    const queued = !!(await lib.until(() => app.evaluate(() => global.__cwTestQueued > 0), lib.timing('hang.ui')))
     await app.evaluate(() => {
       // eslint-disable-next-line eslint/no-extend-native -- putting Map's own set back
       Map.prototype.set = global.__cwTestMapSet
@@ -451,7 +451,7 @@ const check = (name, ok, extra = '') => {
   check("…the user's write is saved too", (await page.evaluate(() => window.__userWrite)) === 'saved')
 
   // Let the agents finish before closing.
-  await until(async () => !(await inv('session:live')).some((s) => s.status === 'working' || s.status === 'starting'), 30000)
+  await until(async () => !(await inv('session:live')).some((s) => s.status === 'working' || s.status === 'starting'), lib.timing('hang.step'))
   await app.close()
   process.exit(failed ? 1 : 0)
 })().catch((e) => {

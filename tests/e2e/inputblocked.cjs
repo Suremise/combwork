@@ -12,7 +12,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 
 const at = (x) => path.join(lib.WORK, `inputblocked-${x}`)
 const userData = at('profile')
@@ -145,7 +145,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     })
     check('B1 waits for the user: something on its screen takes its keys', !!blocked && /taking its keys/.test(String(blocked.statusMessage)), JSON.stringify(blocked && { status: blocked.status, message: blocked.statusMessage }))
     // The fake reads its input late on a busy machine: its log of a key may come after Combwork gave up waiting for it.
-    check('…after three letters typed and not answered', !!(await until(() => probes(before) >= 3, 10000)) && probes(before) === 3, `${probes(before)}: ${JSON.stringify(b1Reads(before))}`)
+    check('…after three letters typed and not answered', !!(await until(() => probes(before) >= 3, lib.timing('hang.ui'))) && probes(before) === 3, `${probes(before)}: ${JSON.stringify(b1Reads(before))}`)
     const header = lib.paneHeader(page, 'B1')
     check('…its pane says so, with Try again', !!(await until(async () => (await header.locator('.pane-status.input-blocked').count()) >= 1)) && (await header.locator('.pane-status.input-blocked button', { hasText: 'Try again' }).count()) === 1)
     const waitLine = () => assistantWakes().slice(wakesBefore).filter((t) => t.startsWith('[CW] B1 (alpha) is waiting for the user'))
@@ -167,7 +167,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     const tryAt = new Date().toISOString()
     await lib.menuEntry(page, 'Try again').click()
     check('Try again with the dialog still showing: it still takes no keys', !!(await until(() => page.getByText('Its input still takes no keys').first().isVisible().catch(() => false))))
-    check('…one letter typed for it, nothing more', !!(await until(() => probes(tryAt) >= 1, 10000)) && probes(tryAt) === 1, JSON.stringify(b1Reads(tryAt)))
+    check('…one letter typed for it, nothing more', !!(await until(() => probes(tryAt) >= 1, lib.timing('hang.ui'))) && probes(tryAt) === 1, JSON.stringify(b1Reads(tryAt)))
     await header.evaluate((el) => (el.style.width = ''))
     check('its pane wide again, the button is back', !!(await until(async () => (await header.locator('.pane-status.input-blocked button', { hasText: 'Try again' }).count()) === 1)))
     check('…B1 still waits for the user', (await live(b1.id))?.status === 'waiting' && !!(await live(b1.id))?.inputBlocked)

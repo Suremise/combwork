@@ -17,7 +17,7 @@ const q = require('./queueFixture.cjs')
 const PORT = Number(lib.port(47859))
 const fx = q.queueProject('p6rules')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++

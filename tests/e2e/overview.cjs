@@ -42,7 +42,7 @@ transcript(B, 1, true)
 const results = []
 const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`)
 // The longest a check waits for its condition: a bound for a hung run, never how long the step should take.
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 /** Whether fn() comes true (checked until it does, up to HUNG_MS). */
 const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
 
@@ -61,7 +61,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   await page.getByText('demo', { exact: true }).first().click()
   await page.locator('.tab', { hasText: 'Overview' }).click()
   const head = page.locator('.session-head')
-  await head.waitFor({ timeout: 15000 })
+  await head.waitFor({ timeout: lib.timing('hang.ui') })
 
   const picker = head.locator('select')
   check('the session details have an agent picker', await becomes(async () => (await picker.count()) === 1))
@@ -144,11 +144,11 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   const divider = page.locator('.tx-compaction.open')
   // What there was to see if it didn't: what had the focus at Enter, the compactions main gives, and the dividers drawn.
   const opened = async () => JSON.stringify({ focused, ids: await inv('transcript:compactions', proj, A).catch((e) => String(e)), dividers: await page.locator('.tx-compaction').count(), open: await divider.count(), summary: await divider.innerText().catch(() => '') })
-  check('Enter on the row opens the Sessions tab at that compaction, its summary open', !!(await lib.until(async () => (await page.locator('.tab.active', { hasText: 'Sessions' }).count()) === 1 && (await divider.count()) === 1, 10000)) && /Summary of part 0/.test(await divider.innerText().catch(() => '')), await opened())
+  check('Enter on the row opens the Sessions tab at that compaction, its summary open', !!(await lib.until(async () => (await page.locator('.tab.active', { hasText: 'Sessions' }).count()) === 1 && (await divider.count()) === 1, lib.timing('hang.step'))) && /Summary of part 0/.test(await divider.innerText().catch(() => '')), await opened())
   check('…in view', await divider.evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight }))
   await page.screenshot({ path: path.join(shots, '1c-transcript.png') })
   await page.locator('.tab', { hasText: 'Overview' }).click()
-  await head.waitFor({ timeout: 10000 })
+  await head.waitFor({ timeout: lib.timing('hang.ui') })
   // The transcript opens at its end, then the jump moves it (#1323): with the compaction's place arriving just after that
   // first scroll (a slow renderer, the answer held a few ms), its scroll event pinned the view to the end again and the
   // compaction was scrolled away. Held for a spread of delays (the window moves with the machine's speed).
@@ -162,7 +162,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
     const inView = async () => (await divider.count()) === 1 && (await divider.evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight }))
     placedAt.push({ ms, ok: !!(await lib.until(inView, HUNG_MS)), scroll: await page.evaluate(() => { const el = document.querySelector('.transcript'); return el && { top: Math.round(el.scrollTop), end: el.scrollHeight - el.clientHeight } }) })
     await page.locator('.tab', { hasText: 'Overview' }).click()
-    await head.waitFor({ timeout: 10000 })
+    await head.waitFor({ timeout: lib.timing('hang.ui') })
   }
   await app.evaluate(() => { delete process.env.CW_TEST_SLOW_IPC })
   await cpu.send('Emulation.setCPUThrottlingRate', { rate: 1 })

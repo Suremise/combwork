@@ -9,7 +9,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 
 const ws = path.join(lib.WORK, 'icons-ws')
 const demo = path.join(ws, 'demo')
@@ -18,7 +18,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms = 15000) => {
+const until = async (fn, ms) => {
   const t = Date.now()
   let v
   while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(150)
@@ -125,7 +125,7 @@ async function away(page) {
       await page.locator('.split-main .monaco-editor .view-lines').click()
       await page.keyboard.press('Control+F')
       const findIcon = page.locator('.monaco-editor .find-widget .codicon').first()
-      const findSize = (await until(async () => (await findIcon.count()) > 0, 5000)) ? await findIcon.evaluate((i) => getComputedStyle(i).fontSize) : null
+      const findSize = (await until(async () => (await findIcon.count()) > 0, lib.timing('hang.ui'))) ? await findIcon.evaluate((i) => getComputedStyle(i).fontSize) : null
       check("Monaco's find widget icons stay 16px", findSize === '16px', String(findSize))
       await page.screenshot({ path: path.join(lib.WORK, 'icons-editor-find.png') })
       await page.keyboard.press('Escape')

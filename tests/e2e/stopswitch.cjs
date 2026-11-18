@@ -57,7 +57,7 @@ const check = (name, ok, extra = '') => {
     const none = await lib.until(async () => {
       left = await runningIn(proj)
       return !left.sessions && !left.processes
-    }, 15000)
+    }, lib.timing('hang.step'))
     check(name, none, JSON.stringify(left))
   }
 
@@ -76,7 +76,7 @@ const check = (name, ok, extra = '') => {
       const both = await lib.until(async () => {
         const l = await liveIn(proj)
         return l.length === 2 && l.every((s) => s.pid) && l
-      }, 10000)
+      }, lib.timing('hang.ui'))
       pids[proj] = (both || (await liveIn(proj))).map((s) => s.pid).filter(Boolean)
       const now = await runningIn(proj)
       const ready = !!both && now.sessions === 2 && now.processes === 2

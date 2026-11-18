@@ -15,7 +15,7 @@ const path = require('path')
 const { spawnSync } = require('child_process')
 const { processes } = require('./folderProcesses.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 // A real model turn: bounded, never how long it should take.
 const TURN_MS = 180000
 

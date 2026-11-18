@@ -16,7 +16,7 @@ const { execFileSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'decisions-profile')
 const ws = path.join(lib.WORK, 'decisions-ws')
@@ -48,7 +48,7 @@ const check = (name, ok, extra = '') => {
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
-  const until = (fn, ms = 10000) => lib.until(fn, ms)
+  const until = (fn, ms) => lib.until(fn, ms)
   const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
   const api = async (method, p, body) => {
     const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
@@ -73,7 +73,7 @@ const check = (name, ok, extra = '') => {
   // The user records one in the dialog.
   await tile.click()
   const dialog = lib.cardDialog(page, await lib.cardLabel(inv, n))
-  await until(async () => (await dialog.count()) === 1, 5000)
+  await until(async () => (await dialog.count()) === 1, lib.timing('hang.ui'))
   const section = dialog.locator('.task-decisions')
   const above = await page.evaluate(() => {
     const d = document.querySelector('.dialog .task-decisions')
@@ -84,14 +84,14 @@ const check = (name, ok, extra = '') => {
   await dialog.getByLabel('New decision').fill('Keep the form at login.html; no new page.')
   await dialog.getByRole('button', { name: 'Add Decision' }).click()
   const items = section.locator('.task-decision')
-  check('Add Decision records it', !!(await until(async () => (await items.count()) === 1, 5000)) && /Keep the form at login\.html/.test(await items.first().innerText()) && /Decided by you/.test(await items.first().innerText()) && !/recorded by/.test(await items.first().innerText()))
+  check('Add Decision records it', !!(await until(async () => (await items.count()) === 1, lib.timing('hang.ui'))) && /Keep the form at login\.html/.test(await items.first().innerText()) && /Decided by you/.test(await items.first().innerText()) && !/recorded by/.test(await items.first().innerText()))
   check('…decided by the user, recorded by You, in the history', !!(await until(async () => {
     const c = await card(n)
     return c.decisions?.[0]?.decidedBy === 'user' && c.decisions[0].recordedBy === 'You' && c.history.at(-1).what === 'Recorded a decision: "Keep the form at login.html; no new page."'
-  }, 5000)))
+  }, lib.timing('hang.ui'))))
   check('…and the field is empty again', (await dialog.getByLabel('New decision').inputValue()) === '')
   await page.keyboard.press('Escape')
-  await until(async () => (await dialog.count()) === 0, 5000)
+  await until(async () => (await dialog.count()) === 0, lib.timing('hang.ui'))
 
   // Work on it starts; an agent's (here the Agent API's) record comes after: "new since start", recorded by the caller.
   await inv('tasks:update', n, { column: 'doing' })
@@ -100,12 +100,12 @@ const check = (name, ok, extra = '') => {
   check('the Agent API records a decision', recorded.status === 200 && JSON.stringify(recorded.body).includes('Recorded a decision'), JSON.stringify(recorded))
   const read = await api('GET', `/v1/tasks/${n}`)
   check('GET /v1/tasks/{n} lists the decisions first, without ids', JSON.stringify(Object.keys(read.body).slice(0, 3)) === JSON.stringify(['number', 'title', 'decisions']) && read.body.decisions.length === 2 && read.body.decisions.every((d) => !('id' in d) && d.decidedBy === 'user') && read.body.decisions[1].recordedBy === 'Agent API', JSON.stringify(Object.keys(read.body).slice(0, 4)))
-  check('the tile counts them', !!(await until(async () => (await tile.locator('.task-decision-count').innerText().catch(() => '')).trim() === '2', 5000)))
+  check('the tile counts them', !!(await until(async () => (await tile.locator('.task-decision-count').innerText().catch(() => '')).trim() === '2', lib.timing('hang.ui'))))
   await tile.locator('.task-decision-count').hover()
   check('…with a tooltip that lists them', !!(await until(async () => /Decisions: 2\. Keep the form/.test(await page.locator('.tip').innerText().catch(() => '')), HUNG_MS)))
 
   await tile.click()
-  await until(async () => (await dialog.count()) === 1, 5000)
+  await until(async () => (await dialog.count()) === 1, lib.timing('hang.ui'))
   check('newest last, with who recorded it', /Show each error/.test(await items.nth(1).innerText()) && /recorded by Agent API/.test(await items.nth(1).innerText()))
   check('the later one is new since start, the first not', /new since start/.test(await items.nth(1).innerText()) && !/new since start/.test(await items.nth(0).innerText()))
   await shot('dialog')
@@ -117,24 +117,24 @@ const check = (name, ok, extra = '') => {
   const editor = items.nth(1).getByLabel('Decision')
   await editor.fill('Show each error under its own field.')
   await page.keyboard.press('Control+Enter')
-  check('changing one saves it, marked edited', !!(await until(async () => /Show each error under its own field\.\s/.test(await items.nth(1).innerText()) && /edited/.test(await items.nth(1).innerText()), 5000)))
+  check('changing one saves it, marked edited', !!(await until(async () => /Show each error under its own field\.\s/.test(await items.nth(1).innerText()) && /edited/.test(await items.nth(1).innerText()), lib.timing('hang.ui'))))
   check('…and the history says what it was', (await card(n)).history.at(-1).what === 'Changed a decision to "Show each error under its own field." (was "Show each error under its own field, not in a banner.")')
   await items.nth(0).getByRole('button', { name: 'Remove this decision' }).click()
   const confirmRemove = page.locator('.dialog', { hasText: 'Remove this decision?' })
-  await until(async () => (await confirmRemove.count()) === 1, 5000)
+  await until(async () => (await confirmRemove.count()) === 1, lib.timing('hang.ui'))
   await confirmRemove.getByRole('button', { name: 'Remove', exact: true }).click()
-  check('removing one asks, then removes it', !!(await until(async () => (await items.count()) === 1 && (await card(n)).decisions.length === 1 && (await card(n)).decisions[0].id === id, 5000)))
+  check('removing one asks, then removes it', !!(await until(async () => (await items.count()) === 1 && (await card(n)).decisions.length === 1 && (await card(n)).decisions[0].id === id, lib.timing('hang.ui'))))
   check('…and the history keeps its words', (await card(n)).history.at(-1).what === 'Removed a decision: "Keep the form at login.html; no new page."')
 
   // A decision being written: closing asks before it is lost; Ctrl+Enter adds it.
   await dialog.getByLabel('New decision').fill('Errors in red.')
   await page.keyboard.press('Escape')
   const discard = page.locator('.dialog', { hasText: 'Discard unsaved changes?' })
-  check('closing with a decision half-written asks', !!(await until(async () => (await discard.count()) === 1, 5000)) && /the decision you are writing/.test(await discard.innerText()))
+  check('closing with a decision half-written asks', !!(await until(async () => (await discard.count()) === 1, lib.timing('hang.ui'))) && /the decision you are writing/.test(await discard.innerText()))
   await discard.getByRole('button', { name: 'Keep Editing' }).click()
   await dialog.getByLabel('New decision').focus()
   await page.keyboard.press('Control+Enter')
-  check('Ctrl+Enter adds it', !!(await until(async () => (await items.count()) === 2, 5000)))
+  check('Ctrl+Enter adds it', !!(await until(async () => (await items.count()) === 2, lib.timing('hang.ui'))))
   await shot('edited')
 
   // A decision being changed: Escape and Cancel ask first, and Keep Editing keeps the words.
@@ -142,11 +142,11 @@ const check = (name, ok, extra = '') => {
   await changing.getByRole('button', { name: 'Change this decision' }).click()
   await changing.getByLabel('Decision').fill('Show each error under its field, in red.')
   await page.keyboard.press('Escape')
-  check('Escape with a decision being changed asks', !!(await until(async () => (await discard.count()) === 1, 5000)) && /your change to a decision/.test(await discard.innerText()), await discard.innerText().catch(() => ''))
+  check('Escape with a decision being changed asks', !!(await until(async () => (await discard.count()) === 1, lib.timing('hang.ui'))) && /your change to a decision/.test(await discard.innerText()), await discard.innerText().catch(() => ''))
   await discard.getByRole('button', { name: 'Keep Editing' }).click()
   check('…and Keep Editing keeps the words', (await dialog.count()) === 1 && (await changing.getByLabel('Decision').inputValue()) === 'Show each error under its field, in red.')
   await dialog.locator('.dialog-footer').getByRole('button', { name: 'Cancel' }).click()
-  check('Cancel asks too', !!(await until(async () => (await discard.count()) === 1, 5000)))
+  check('Cancel asks too', !!(await until(async () => (await discard.count()) === 1, lib.timing('hang.ui'))))
   await discard.getByRole('button', { name: 'Keep Editing' }).click()
   // Saving it slowly: the card can't close until it is saved.
   await app.evaluate(() => {
@@ -157,26 +157,26 @@ const check = (name, ok, extra = '') => {
   await page.keyboard.press('Escape')
   await lib.sleep(300)
   check('closing waits while a decision is being saved', (await dialog.count()) === 1 && (await discard.count()) === 0)
-  check('…which then saves it', !!(await until(async () => (await card(n)).decisions[0].text === 'Show each error under its field, in red.', 8000)))
+  check('…which then saves it', !!(await until(async () => (await card(n)).decisions[0].text === 'Show each error under its field, in red.', lib.timing('hang.ui'))))
   await app.evaluate(() => {
     delete process.env.CW_TEST_SLOW_IPC
   })
-  await until(async () => (await changing.getByLabel('Decision').count()) === 0, 5000)
+  await until(async () => (await changing.getByLabel('Decision').count()) === 0, lib.timing('hang.ui'))
   await page.keyboard.press('Escape')
-  check('with nothing unsaved, the card closes', !!(await until(async () => (await dialog.count()) === 0, 5000)))
+  check('with nothing unsaved, the card closes', !!(await until(async () => (await dialog.count()) === 0, lib.timing('hang.ui'))))
 
   // --- Save keeps everything typed in the dialog (#432), on a card of its own.
   const m = (await inv('tasks:create', { title: 'Password reset', project: 'alpha' })).number
   const mTile = page.locator(`.task-card[data-task="${m}"]`)
   const mDialog = lib.cardDialog(page, await lib.cardLabel(inv, m))
   const open = async () => {
-    await until(async () => (await mTile.count()) === 1, 5000)
+    await until(async () => (await mTile.count()) === 1, lib.timing('hang.ui'))
     await mTile.click()
-    await until(async () => (await mDialog.count()) === 1, 5000)
+    await until(async () => (await mDialog.count()) === 1, lib.timing('hang.ui'))
   }
   const saveAndClose = async () => {
     await mDialog.locator('.dialog-footer').getByRole('button', { name: 'Save', exact: true }).click()
-    return !!(await until(async () => (await mDialog.count()) === 0, 8000))
+    return !!(await until(async () => (await mDialog.count()) === 0, lib.timing('hang.ui')))
   }
   const addDecision = mDialog.getByRole('button', { name: 'Add Decision' })
   const postComment = mDialog.getByRole('button', { name: 'Comment', exact: true })
@@ -214,7 +214,7 @@ const check = (name, ok, extra = '') => {
     process.env.CW_TEST_FAIL_IPC = 'tasks:update*1'
   })
   await mDialog.locator('.dialog-footer').getByRole('button', { name: 'Save', exact: true }).click()
-  await until(async () => (await mDialog.locator('.dialog-error, .field-error, .error').count()) > 0, 5000)
+  await until(async () => (await mDialog.locator('.dialog-error, .field-error, .error').count()) > 0, lib.timing('hang.ui'))
   check('a failed save leaves the dialog open, the decision still typed, nothing recorded', (await mDialog.count()) === 1 && (await mDialog.getByLabel('New decision').inputValue()) === 'Expired links say so.' && (await card(m)).decisions.length === 2)
   await app.evaluate(() => {
     delete process.env.CW_TEST_FAIL_IPC
@@ -226,7 +226,7 @@ const check = (name, ok, extra = '') => {
   await mDialog.getByLabel('New comment').fill('Not yet.')
   await mDialog.getByLabel('New decision').fill('Log each reset.')
   await mDialog.getByLabel('New decision').press('Control+Enter')
-  check('Ctrl+Enter in the decision box adds only the decision', !!(await until(async () => (await card(m)).decisions.length === 4, 5000)) && (await card(m)).comments.length === 2 && (await mDialog.getByLabel('New comment').inputValue()) === 'Not yet.')
+  check('Ctrl+Enter in the decision box adds only the decision', !!(await until(async () => (await card(m)).decisions.length === 4, lib.timing('hang.ui'))) && (await card(m)).comments.length === 2 && (await mDialog.getByLabel('New comment').inputValue()) === 'Not yet.')
   await mDialog.getByLabel('New comment').fill('')
 
   // A decision changed to nothing: Save refuses it, saying why, and keeps the editor; nothing changes.
@@ -234,10 +234,10 @@ const check = (name, ok, extra = '') => {
   await mItems.nth(0).getByRole('button', { name: 'Change this decision' }).click()
   await mItems.nth(0).getByLabel('Decision').fill('   ')
   await mDialog.locator('.dialog-footer').getByRole('button', { name: 'Save', exact: true }).click()
-  check('Save with a decision changed to nothing refuses it, says why and keeps the editor', !!(await until(async () => /A decision can't be empty/.test(await mDialog.innerText().catch(() => '')), 5000)) && (await mDialog.count()) === 1 && (await mItems.nth(0).getByLabel('Decision').count()) === 1 && JSON.stringify((await card(m)).decisions) === before)
+  check('Save with a decision changed to nothing refuses it, says why and keeps the editor', !!(await until(async () => /A decision can't be empty/.test(await mDialog.innerText().catch(() => '')), lib.timing('hang.ui'))) && (await mDialog.count()) === 1 && (await mItems.nth(0).getByLabel('Decision').count()) === 1 && JSON.stringify((await card(m)).decisions) === before)
   await mItems.nth(0).getByRole('button', { name: 'Cancel' }).click()
   await page.keyboard.press('Escape')
-  await until(async () => (await mDialog.count()) === 0, 5000)
+  await until(async () => (await mDialog.count()) === 0, lib.timing('hang.ui'))
 
   // Save into Active goes through Move to Active, which saves the drafts first; its Try Again writes nothing twice.
   const moveDialog = page.locator('.dialog', { hasText: `Move ${await lib.cardLabel(inv, m)} to Active` })
@@ -253,13 +253,13 @@ const check = (name, ok, extra = '') => {
       process.env.CW_TEST_FAIL_IPC = f
     }, fail)
     await moveDialog.locator('.dialog-footer .btn.primary').click()
-    const refused = !!(await until(async () => (await moveDialog.locator('.dialog-footer .btn.primary').innerText({ timeout: 1000 }).catch(() => '')).includes('Try Again'), 8000))
+    const refused = !!(await until(async () => (await moveDialog.locator('.dialog-footer .btn.primary').innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')).includes('Try Again'), lib.timing('hang.ui')))
     if (!refused) await page.screenshot({ path: path.join(lib.WORK, 'decisions-move-nofail.png') })
     await app.evaluate(() => {
       delete process.env.CW_TEST_FAIL_IPC
     })
     await moveDialog.locator('.dialog-footer .btn.primary').click()
-    return refused && !!(await until(async () => (await moveDialog.count()) === 0 && (await mDialog.count()) === 0 && (await card(m)).column === 'doing', 8000))
+    return refused && !!(await until(async () => (await moveDialog.count()) === 0 && (await mDialog.count()) === 0 && (await card(m)).column === 'doing', lib.timing('hang.ui')))
   }
   const decisionsBefore = (await card(m)).decisions.length
   const commentsBefore = (await card(m)).comments.length
@@ -271,7 +271,7 @@ const check = (name, ok, extra = '') => {
   check('…with the decision recorded once and the comment posted once', doing.decisions.length === decisionsBefore + 1 && doing.decisions.filter((d) => d.text === 'Reset mails name the app.').length === 1 && doing.comments.filter((c) => c.text === 'Moving it on.').length === 1 && doing.comments.length === commentsBefore + 1, JSON.stringify({ decisions: doing.decisions.map((d) => d.text), comments: doing.comments.map((c) => c.text) }))
   await inv('tasks:update', m, { column: 'todo' })
   // The board has it in Todo before the card opens (the dialog takes its fields from the board as it opens).
-  await until(async () => (await page.locator(`[data-column="todo"] .task-card[data-task="${m}"]`).count()) === 1, 5000)
+  await until(async () => (await page.locator(`[data-column="todo"] .task-card[data-task="${m}"]`).count()) === 1, lib.timing('hang.ui'))
   await open()
   await mDialog.getByLabel('New comment').fill('Second try.')
   // The move itself fails once (after the comment was posted): Try Again posts nothing again. The window's moves go
@@ -282,7 +282,7 @@ const check = (name, ok, extra = '') => {
   // An agent on the card: its next reply flags a decision recorded since it read the card, whatever tool it called.
   const coder = await lib.addAgent(inv, alpha, { name: 'Coder' })
   await inv('session:start', alpha, { agentId: coder.id })
-  check('Coder starts', !!(await until(async () => (await inv('session:live')).some((x) => x.agentId === coder.id && ['ready', 'waiting'].includes(x.status)), 20000)))
+  check('Coder starts', !!(await until(async () => (await inv('session:live')).some((x) => x.agentId === coder.id && ['ready', 'waiting'].includes(x.status)), lib.timing('hang.step'))))
   const launch = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).at(-1)
   const coderToken = launch.token
   // HI-2262: its session has the token's file, never the token in its environment (an `env` listing printed it).
@@ -309,7 +309,7 @@ const check = (name, ok, extra = '') => {
     execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_project_status', arguments: {} } }) + '\n',
       env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${PORT}`, CW_WORKSPACE: ws, CW_API_TOKEN_FILE: lib.tokenFile(coderToken), CW_PROJECT: 'alpha', CW_AGENT_ID: coder.id }),
-      timeout: 60000
+      timeout: lib.timing('spawn.hang')
     })
       .toString()
       .split('\n')[0]
@@ -322,7 +322,7 @@ const check = (name, ok, extra = '') => {
     const newest = Math.max(0, ...facts.filter((f) => f.kind === 'Decision').map((f) => f.data.generation))
     const got = facts.filter((f) => f.kind === 'DecisionsReceived' && f.data.agent === coder.id).at(-1)
     return got && newest > 0 && got.data.generation === newest ? got : null
-  }, 10000)
+  }, lib.timing('hang.ui'))
   check('the read in full records DecisionsReceived at the generation the reply gave (#1216)', !!received, JSON.stringify(received))
   check('read in full, it is no longer flagged', (await asCoder('/v1/projects/alpha')).notice === null)
   // The call that moves the card on (to Review) still hears of a decision it hasn't read: the card was its own when the
