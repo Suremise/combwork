@@ -70,16 +70,21 @@ function powershell(command: string, timeoutMs: number): Promise<string> {
   return powershellRun(command, timeoutMs).then((r) => r.out)
 }
 
-/** A PowerShell command's output, and whether it exited by itself with 0 (not ended at its bound, nor failed to run). */
-function powershellRun(command: string, timeoutMs: number): Promise<{ out: string; ok: boolean }> {
+/**
+ * A PowerShell command's output, whether it exited by itself with 0 (not ended at its bound, nor failed to run), and
+ * whether it wrote anything to its standard error.
+ */
+function powershellRun(command: string, timeoutMs: number): Promise<{ out: string; ok: boolean; err: boolean }> {
   return new Promise((res) => {
     let c: ChildProcess
     try {
-      c = spawn(POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', command], { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] })
+      c = spawn(POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', command], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
     } catch {
-      return res({ out: '', ok: false })
+      return res({ out: '', ok: false, err: true })
     }
     const out: Buffer[] = []
+    let err = false
+    c.stderr?.on('data', (d: Buffer) => void (d.length && (err = true)))
     let ended = false
     const t = setTimeout(() => {
       ended = true
@@ -92,11 +97,11 @@ function powershellRun(command: string, timeoutMs: number): Promise<{ out: strin
     c.stdout?.on('data', (d: Buffer) => out.push(d))
     c.once('error', () => {
       clearTimeout(t)
-      res({ out: '', ok: false })
+      res({ out: '', ok: false, err: true })
     })
     c.once('close', (code: number | null) => {
       clearTimeout(t)
-      res({ out: Buffer.concat(out).toString('utf8'), ok: !ended && code === 0 })
+      res({ out: Buffer.concat(out).toString('utf8'), ok: !ended && code === 0, err })
     })
   })
 }
@@ -108,8 +113,17 @@ function powershellRun(command: string, timeoutMs: number): Promise<{ out: strin
  * list missing what it didn't get to.
  */
 export async function listProcesses(timeoutMs = TREE_END_BOUNDS.listMs): Promise<ListedProcess[] | null> {
-  const r = await powershellRun(`${LIST_PS}; 'end'`, timeoutMs)
-  return completeProcessList(r.out, r.ok)
+  return completeListing(LIST_PS, timeoutMs)
+}
+
+/**
+ * HI-3376 (HR3's round 2): `command`'s listing, complete or null. Any error ends it (`$ErrorActionPreference = 'Stop'`:
+ * a row's failure, or the pipeline's, is a terminating error, so `end` isn't printed and its exit isn't 0), and any
+ * error it wrote (stderr) makes it no answer too. Exported for tests (a real PowerShell, a listing made to fail part way).
+ */
+export async function completeListing(command: string, timeoutMs: number): Promise<ListedProcess[] | null> {
+  const r = await powershellRun(`$ErrorActionPreference = 'Stop'; ${command}; 'end'`, timeoutMs)
+  return completeProcessList(r.out, r.ok && !r.err)
 }
 
 /** listProcesses' reading of a listing's output (`ok`: its PowerShell exited by itself with 0): the processes, or null. */

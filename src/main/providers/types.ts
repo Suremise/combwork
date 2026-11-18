@@ -1001,6 +1001,13 @@ export interface ProviderProjectFilesPart {
   /** MCP servers a project defines in the CLI's own config, which Combwork leaves off until copied to the workspace. */
   projectMcpServers(projectPath: string): Promise<Record<string, McpServerDef>>
 }
+/** HI-3376: a CLI's listing of its background jobs running now (runningBackgroundJobs). */
+export interface RunningJobs {
+  jobs: { id: string; pid: number | null }[]
+  /** Whether `id` is a value anywhere in the listing, read as its fields say or not (HR3's round 2). */
+  names(id: string): boolean
+}
+
 /** Background sessions (Claude Code's agent view), which Combwork stops or keeps (capabilities.background.backgroundSessions). */
 export interface ProviderBackgroundPart {
   /** The CLI's background job named in what it printed when it refused to resume a session held there; null if none. */
@@ -1008,10 +1015,11 @@ export interface ProviderBackgroundPart {
   /** Stops one of the CLI's background jobs (its conversation is kept). */
   stopBackgroundJob(executable: string, jobId: string): Promise<void>
   /**
-   * HI-3376: the CLI's background jobs running now, each with its own process id when the CLI gives one; null when they
-   * couldn't be listed (the command failed, timed out, or printed what isn't a list): not the same as none running.
+   * HI-3376: the CLI's background jobs running now (`jobs`, each with its own process id when the CLI gives one), and
+   * whether an id is named anywhere in the listing (`names`: a row whose id field couldn't be read still names it); null
+   * when they couldn't be listed (the command failed, timed out, or printed what isn't a list): not the same as none.
    */
-  runningBackgroundJobs?(executable: string, timeoutMs?: number): Promise<{ id: string; pid: number | null }[] | null>
+  runningBackgroundJobs?(executable: string, timeoutMs?: number): Promise<RunningJobs | null>
 }
 
 /**

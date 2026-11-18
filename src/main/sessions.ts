@@ -354,11 +354,12 @@ const listAll = (timeoutMs: number): Promise<ListedProcess[] | null> => (backgro
  */
 export type JobBefore = { kind: 'process'; proc: ListedProcess } | { kind: 'notRunning' } | { kind: 'gone' } | { kind: 'unknown' }
 
-async function jobProcess(adapter: ProviderAdapter, exe: string, jobId: string): Promise<JobBefore> {
-  const jobs = adapter.background?.runningBackgroundJobs ? await adapter.background.runningBackgroundJobs(exe).catch(() => null) : null
-  if (jobs === null) return { kind: 'unknown' }
-  const job = jobs.find((j) => j.id === jobId)
-  if (!job) return { kind: 'notRunning' }
+export async function jobProcess(adapter: ProviderAdapter, exe: string, jobId: string): Promise<JobBefore> {
+  const listed = adapter.background?.runningBackgroundJobs ? await adapter.background.runningBackgroundJobs(exe).catch(() => null) : null
+  if (listed === null) return { kind: 'unknown' }
+  const job = listed.jobs.find((j) => j.id === jobId)
+  // Named in the listing but not read as a job (its fields wrong, HR3's round 2): unknown, never not running.
+  if (!job) return listed.names(jobId) ? { kind: 'unknown' } : { kind: 'notRunning' }
   if (!job.pid) return { kind: 'unknown' }
   const list = await listAll(TREE_END_BOUNDS.listMs).catch(() => null)
   if (list === null) return { kind: 'unknown' }
@@ -380,8 +381,8 @@ export async function backgroundJobEnded(adapter: ProviderAdapter, exe: string, 
   // What the last look saw; a look begun with no time left isn't made.
   let state: 'ended' | 'running' | 'unknown' = 'unknown'
   while (left() > 0) {
-    const jobs = await adapter.background.runningBackgroundJobs(exe, left()).catch(() => null)
-    state = jobs === null ? 'unknown' : jobs.some((j) => j.id === jobId) ? 'running' : 'ended'
+    const listed = await adapter.background.runningBackgroundJobs(exe, left()).catch(() => null)
+    state = listed === null ? 'unknown' : listed.jobs.some((j) => j.id === jobId) ? 'running' : listed.names(jobId) ? 'unknown' : 'ended'
     if (state === 'ended' && before.kind === 'process') {
       const list = left() > 0 ? await listAll(Math.min(TREE_END_BOUNDS.listMs, left())).catch(() => null) : null
       state = list === null ? 'unknown' : list.some((p) => p.pid === before.proc.pid && p.started === before.proc.started) ? 'running' : 'ended'

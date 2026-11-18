@@ -3,7 +3,7 @@
 // write; a close (closingAgents.ts, counting sessions.closingPending) must still wait for those. The real SessionManager's
 // onExit, with its transcript check held open after the run has left `live`.
 import { join } from 'path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
@@ -55,23 +55,29 @@ describe('a run still closing until its exit work is over (HI-3376)', () => {
       return new Promise<string | null>((r) => (release = () => r(null)))
     }
     const exit = s.onExit(PROJECT, AGENT, RUN, 0).catch(() => undefined)
-    await atCheck
-    // Out of live by now, its exit work not over: still one running.
-    expect([...s.live.keys()].length).toBe(0)
-    expect(sessions.closingPending().running).toBe(1)
-    expect(sessions.closingPending((p) => p === PROJECT).running).toBe(1)
-    expect(sessions.closingPending((p) => p !== PROJECT).running).toBe(0)
-    // A close counting it keeps waiting while it is held.
-    const result = { how: null as string | null }
-    const waited = waitForAgentsClosed({ pending: () => sessions.closingPending(), deadlineMs: HUNG_MS, windows: () => [], send: () => undefined }).then((h) => (result.how = h))
-    // Three looks of the wait's while it is held: still waiting.
-    await new Promise((r) => setTimeout(r, closingLimits.lookMs * 3))
-    expect(result.how).toBeNull()
-    release()
-    await exit
-    expect(sessions.closingPending().running).toBe(0)
-    await waited
-    expect(result.how).toBe('settled')
+    try {
+      await atCheck
+      // Out of live by now, its exit work not over: still one running.
+      expect([...s.live.keys()].length).toBe(0)
+      expect(sessions.closingPending().running).toBe(1)
+      expect(sessions.closingPending((p) => p === PROJECT).running).toBe(1)
+      expect(sessions.closingPending((p) => p !== PROJECT).running).toBe(0)
+      // A close counting it keeps waiting while it is held: each of its looks counted, waited for (never a sleep).
+      const result = { how: null as string | null, looks: 0 }
+      const waited = waitForAgentsClosed({ pending: () => (result.looks++, sessions.closingPending()), deadlineMs: HUNG_MS, windows: () => [], send: () => undefined }).then((h) => (result.how = h))
+      await vi.waitFor(() => expect(result.looks).toBeGreaterThanOrEqual(3), { timeout: HUNG_MS, interval: closingLimits.lookMs / 4 })
+      // Three looks made while it is held, each seeing it still closing.
+      expect(result.how).toBeNull()
+      release()
+      await exit
+      expect(sessions.closingPending().running).toBe(0)
+      await waited
+      expect(result.how).toBe('settled')
+    } finally {
+      // An assertion failing above still lets go of the held exit.
+      release?.()
+      await exit
+    }
   })
 
   it('an exit whose work throws is let go of too (its finally)', async () => {

@@ -8,7 +8,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const { runningJobsIn } = await import('../src/main/providers/claude/adapter')
 const { completeProcessList } = await import('../src/main/processTree')
-const { backgroundJobEnded, backgroundTestHooks, BACKGROUND_END_MS } = await import('../src/main/sessions')
+const { backgroundJobEnded, backgroundTestHooks, jobProcess, BACKGROUND_END_MS } = await import('../src/main/sessions')
+const { completeListing } = await import('../src/main/processTree')
+const { advanced } = await import('../src/main/advanced')
+const { tempDir } = await import('./tempDir')
 type Adapter = Parameters<typeof backgroundJobEnded>[0]
 
 /** The recorded listings (tests/fixtures/advanced/agents-json-claude-2.1.327.jsonl), by step. */
@@ -21,7 +24,13 @@ const out = (step: string): string => JSON.stringify(recorded.find((r) => r.step
 /** An adapter whose listing of running jobs is each of `answers` in turn (past the last, the last); null: it failed. */
 const adapterWith = (answers: ({ id: string; pid: number | null }[] | null)[]): Adapter => {
   let i = 0
-  return { background: { backgroundJobIn: () => null, stopBackgroundJob: async () => undefined, runningBackgroundJobs: async () => answers[Math.min(i++, answers.length - 1)] } } as unknown as Adapter
+  const listing = (jobs: { id: string; pid: number | null }[] | null) => (jobs === null ? null : { jobs, names: (id: string) => jobs.some((j) => j.id === id) })
+  return { background: { backgroundJobIn: () => null, stopBackgroundJob: async () => undefined, runningBackgroundJobs: async () => listing(answers[Math.min(i++, answers.length - 1)]) } } as unknown as Adapter
+}
+/** An adapter whose listing is what Claude Code printed, each time (`stdouts` in turn, past the last the last), read by runningJobsIn. */
+const adapterReading = (stdouts: string[]): Adapter => {
+  let i = 0
+  return { background: { backgroundJobIn: () => null, stopBackgroundJob: async () => undefined, runningBackgroundJobs: async () => runningJobsIn(stdouts[Math.min(i++, stdouts.length - 1)]) } } as unknown as Adapter
 }
 const JOB = '701b98b1'
 const proc = { pid: 50124, parent: 80380, started: 1794975870720 }
@@ -43,13 +52,15 @@ async function settle(p: Promise<string>): Promise<string> {
 
 describe("Claude Code's listing of running sessions (2.1.327)", () => {
   it('a background job running: its id (the one claude stop takes) and its own process; interactive sessions have no id and are left out', () => {
-    expect(runningJobsIn(out('running'))).toEqual([{ id: JOB, pid: 50124 }])
-    expect(runningJobsIn(JSON.stringify([{ pid: 7, kind: 'interactive', status: 'idle' }]))).toEqual([])
+    expect(runningJobsIn(out('running'))?.jobs).toEqual([{ id: JOB, pid: 50124 }])
+    expect(runningJobsIn(out('running'))?.names(JOB)).toBe(true)
+    expect(runningJobsIn(JSON.stringify([{ pid: 7, kind: 'interactive', status: 'idle' }]))?.jobs).toEqual([])
   })
 
   it('after claude stop: none running (it stays only in --all, without a process)', () => {
-    expect(runningJobsIn(out('after claude stop'))).toEqual([])
-    expect(runningJobsIn(out('after the stop, first look: claude agents --json --all'))).toEqual([{ id: JOB, pid: null }])
+    expect(runningJobsIn(out('after claude stop'))?.jobs).toEqual([])
+    expect(runningJobsIn(out('after claude stop'))?.names(JOB)).toBe(false)
+    expect(runningJobsIn(out('after the stop, first look: claude agents --json --all'))?.jobs).toEqual([{ id: JOB, pid: null }])
   })
 
   it("what isn't a JSON list is no answer, not none running", () => {
@@ -57,6 +68,47 @@ describe("Claude Code's listing of running sessions (2.1.327)", () => {
     expect(runningJobsIn("'claude agents --json' is disabled by CLAUDE_CODE_DISABLE_AGENT_VIEW.")).toBeNull()
     expect(runningJobsIn('{"id":"x"}')).toBeNull()
   })
+})
+
+describe("HR3's round 2: the id field wrong, read through the parser, the before-capture and the end's looks", () => {
+  it('the recorded running row with idField wrong: unknown before the stop, so unknown, though the listing parses to no jobs', async () => {
+    advanced.load(tempDir('cw-bgjob-advanced-'))
+    try {
+      await advanced.set('claude-code.background.idField', 'wrongId')
+      backgroundTestHooks.list = async () => [proc]
+      // Before the stop, and after it, Claude Code lists the job as recorded: its id under `id`, not `wrongId`.
+      const cli = adapterReading([out('running')])
+      expect(runningJobsIn(out('running'))?.jobs).toEqual([])
+      const before = await jobProcess(cli, 'claude', JOB)
+      expect(before).toEqual({ kind: 'unknown' })
+      vi.useFakeTimers()
+      expect(await settle(backgroundJobEnded(cli, 'claude', JOB, before))).toBe('unknown')
+      // With the field right, the same row is the job's own process.
+      vi.useRealTimers()
+      await advanced.set('claude-code.background.idField', null)
+      expect(await jobProcess(adapterReading([out('running')]), 'claude', JOB)).toEqual({ kind: 'process', proc })
+    } finally {
+      await advanced.resetAll()
+      advanced.stop()
+    }
+  })
+
+  it('after the stop, a listing that names the job without reading it as one is unknown, never ended', async () => {
+    vi.useFakeTimers()
+    backgroundTestHooks.list = async () => []
+    const cli = adapterReading([JSON.stringify([{ jobId: JOB, pid: 50124, kind: 'background' }])])
+    expect(await settle(backgroundJobEnded(cli, 'claude', JOB, known))).toBe('unknown')
+  })
+})
+
+describe('a real PowerShell listing that reports an error part way is no answer (HR3\'s round 2)', () => {
+  it('valid rows, then a non-terminating error, then the rest: null; the same without the error: the rows', async () => {
+    expect(await completeListing("'4 0 1000'; Write-Error 'synthetic mid-list failure'; '5 0 1001'", 20_000)).toBeNull()
+    expect(await completeListing("'4 0 1000'; '5 0 1001'", 20_000)).toEqual([
+      { pid: 4, parent: 0, started: 1000 },
+      { pid: 5, parent: 0, started: 1001 }
+    ])
+  }, 60_000)
 })
 
 describe("a process listing is an answer only when complete (HR1's round 1)", () => {
@@ -82,8 +134,10 @@ describe('Stop It and Resume waits to see the job end (HI-3376)', () => {
 
   it('the job listed without a process before the stop (the process field wrong, or none given): unknown', async () => {
     vi.useFakeTimers()
-    expect(runningJobsIn(JSON.stringify([{ id: JOB, processId: 50124 }]))).toEqual([{ id: JOB, pid: null }])
-    expect(runningJobsIn(JSON.stringify([{ jobId: JOB, pid: 50124 }]))).toEqual([])
+    expect(runningJobsIn(JSON.stringify([{ id: JOB, processId: 50124 }]))?.jobs).toEqual([{ id: JOB, pid: null }])
+    expect(runningJobsIn(JSON.stringify([{ jobId: JOB, pid: 50124 }]))?.jobs).toEqual([])
+    // Not read as a job, but named: no proof it isn't running.
+    expect(runningJobsIn(JSON.stringify([{ jobId: JOB, pid: 50124 }]))?.names(JOB)).toBe(true)
     backgroundTestHooks.list = async () => []
     expect(await settle(backgroundJobEnded(adapterWith([[]]), 'claude', JOB, { kind: 'unknown' }))).toBe('unknown')
   })
@@ -98,7 +152,7 @@ describe('Stop It and Resume waits to see the job end (HI-3376)', () => {
   it('each look bounded by the time left: a CLI that takes its whole bound each time is given only what is left', async () => {
     vi.useFakeTimers()
     const given: number[] = []
-    const slow = { background: { backgroundJobIn: () => null, stopBackgroundJob: async () => undefined, runningBackgroundJobs: (_exe: string, ms?: number) => (given.push(ms ?? -1), new Promise((r) => setTimeout(() => r([{ id: JOB, pid: 50124 }]), ms ?? 0))) } } as unknown as Adapter
+    const slow = { background: { backgroundJobIn: () => null, stopBackgroundJob: async () => undefined, runningBackgroundJobs: (_exe: string, ms?: number) => (given.push(ms ?? -1), new Promise((r) => setTimeout(() => r({ jobs: [{ id: JOB, pid: 50124 }], names: (id: string) => id === JOB }), ms ?? 0))) } } as unknown as Adapter
     backgroundTestHooks.list = async () => [proc]
     let got: string | null = null
     void backgroundJobEnded(slow, 'claude', JOB, known).then((v) => (got = v))
