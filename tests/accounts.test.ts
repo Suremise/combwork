@@ -34,6 +34,22 @@ vi.mock('../src/main/ptyHost', async (importOriginal) => {
   }
 })
 
+/** Making a worktrees folder (Set Up's, HI-3395), held while `hold` is set: it waits for that before making it. */
+const treesMkdir = vi.hoisted(() => ({ hold: null as null | Promise<void>, asked: 0 }))
+vi.mock('fs/promises', async (importOriginal) => {
+  const fs = await importOriginal<typeof import('fs/promises')>()
+  return {
+    ...fs,
+    mkdir: (async (p: string, o?: Parameters<typeof fs.mkdir>[1]) => {
+      if (String(p).endsWith('.worktrees')) {
+        treesMkdir.asked++
+        if (treesMkdir.hold) await treesMkdir.hold
+      }
+      return fs.mkdir(p, o)
+    }) as typeof fs.mkdir
+  }
+})
+
 const base = tempDir('cw-accounts-')
 const home = join(base, 'claude-home')
 process.env.CW_USER_DATA = join(base, 'profile')
@@ -1127,6 +1143,112 @@ describe("a workspace's accounts", () => {
         for (const h of held) h.answer([true, true, true])
         writeProject(0, { provider: 'claude-code' })
         await refreshedTo((info) => info.projects.find((p) => p.name === 'alpha')?.agents[0]?.workflowRole === undefined)
+        rmSync(w.worktreesRoot, { recursive: true, force: true })
+      })
+
+      describe("Set Up making the worktrees folder (HI-3395, HR1's round 1): checked again after it, never a stale place", () => {
+        const mine = () => held.filter((h) => h.home === folderOf(a))
+        let release: () => void = () => undefined
+        // alpha's agent a reviewer, the worktrees folder untrusted; Set Up asked for, its read answered so, and its
+        // making of the folder held.
+        const heldSetUp = async (): Promise<{ place: Promise<unknown> }> => {
+          mine()[0].answer([true, true])
+          await vi.waitFor(() => expect(row().trust?.checking).toBeUndefined(), { timeout: HUNG_MS })
+          writeProject(0, { provider: 'claude-code', workflowRole: 'reviewer' })
+          await refreshedTo((info) => info.projects.find((p) => p.name === 'alpha')?.agents[0]?.workflowRole === 'reviewer')
+          row()
+          await vi.waitFor(() => expect(mine().at(-1)!.projects).toBe(3), { timeout: HUNG_MS })
+          mine().at(-1)!.answer([true, true, false])
+          await vi.waitFor(() => expect(row().trust?.pending.map((p) => !!p.copies)).toEqual([true]), { timeout: HUNG_MS })
+          treesMkdir.hold = new Promise<void>((r) => (release = r))
+          treesMkdir.asked = 0
+          const reads = mine().length
+          const place = run(() => accounts.setUpPlace(a.id)).then((v) => ({ v }), (e: Error) => ({ e: e.message }))
+          await vi.waitFor(() => expect(mine().length).toBeGreaterThan(reads), { timeout: HUNG_MS })
+          mine().at(-1)!.answer([true, true, false])
+          await vi.waitFor(() => expect(treesMkdir.asked).toBe(1), { timeout: HUNG_MS })
+          // Wrapped: an async function returning the promise itself would wait for it.
+          return { place }
+        }
+        afterEach(async () => {
+          treesMkdir.hold = null
+          release()
+          for (const h of held) h.answer([true, true, true])
+          writeProject(0, { provider: 'claude-code' })
+          await refreshedTo((info) => info.projects.find((p) => p.name === 'alpha')?.agents[0]?.workflowRole === undefined)
+          rmSync(w.worktreesRoot, { recursive: true, force: true })
+        })
+
+        it('the connection removed meanwhile: cancelled, never the old place', async () => {
+          const { place } = await heldSetUp()
+          await run(() => accounts.setAccountOn(a.id, false))
+          await accounts.removeAccount(a.id)
+          release()
+          expect(await place).toEqual({ e: expect.stringMatching(/Set Up didn't open: the connection was removed or its workspace closed/) })
+        })
+
+        it('its state retired meanwhile (as its workspace closing prunes it): cancelled', async () => {
+          const { place } = await heldSetUp()
+          // Turned off here: the read it would be used in goes, as a closed workspace's does.
+          await run(() => accounts.setAccountOn(a.id, false))
+          release()
+          expect(await place).toEqual({ e: expect.stringMatching(/Set Up didn't open/) })
+        })
+
+        it("its folders changed meanwhile (a new generation): asked afresh, the current answer's place", async () => {
+          const { place } = await heldSetUp()
+          // A terminal of it ended: its trust read again, a new generation, now trusting the worktrees folder.
+          const reads = mine().length
+          accounts.rereadTrust(a.id)
+          release()
+          await vi.waitFor(() => expect(mine().length).toBeGreaterThan(reads), { timeout: HUNG_MS })
+          // That read answered, and the fresh Set Up's own: the folder trusted now, so Set Up opens in its own folder.
+          for (let i = 0; i < 2; i++) {
+            await vi.waitFor(() => expect(mine().length).toBeGreaterThan(reads + i), { timeout: HUNG_MS })
+            mine().at(-1)!.answer([true, true, true])
+          }
+          expect(await place).toEqual({ v: undefined })
+        })
+
+        it('nothing changed meanwhile: the place, its folder made', async () => {
+          const { place } = await heldSetUp()
+          expect(existsSync(w.worktreesRoot)).toBe(false)
+          release()
+          expect(await place).toEqual({ v: expect.objectContaining({ project: basename(w.worktreesRoot), copies: true }) })
+          expect(existsSync(w.worktreesRoot)).toBe(true)
+        })
+
+        it('its workspace closed meanwhile: cancelled, its worktrees folder never offered', async () => {
+          // A second workspace with a reviewer on this connection, its worktrees folder untrusted.
+          const ws2 = join(base, 'ws-trust-copies')
+          mkdirSync(join(ws2, 'delta', '.combwork'), { recursive: true })
+          writeFileSync(join(ws2, 'delta', '.combwork', 'project.json'), JSON.stringify({ version: 2, id: 'p-33950000001', agents: [{ id: 'a-d', name: 'Delta', provider: 'claude-code', workflowRole: 'reviewer' }] }))
+          const w2 = createWorkspaceService()
+          await w2.open(ws2)
+          const in2 = <T>(fn: () => T): T => inWorkspace(w2, fn)
+          const untrusted = (h: (typeof held)[number]): void => h.answer(h.targets.map((t) => !(t as { copies?: true }).copies))
+          const of2 = () => held.filter((h) => h.targets.some((t) => (t as { copies?: true }).copies && (t.root ?? '').toLowerCase().includes('ws-trust-copies')))
+          try {
+            await in2(() => accounts.setAccountOn(a.id, true))
+            in2(() => accounts.accountsView())
+            await vi.waitFor(() => expect(of2()).toHaveLength(1), { timeout: HUNG_MS })
+            untrusted(of2()[0])
+            treesMkdir.hold = new Promise<void>((r) => (release = r))
+            treesMkdir.asked = 0
+            const place = in2(() => accounts.setUpPlace(a.id)).then((v) => ({ v }), (e: Error) => ({ e: e.message }))
+            await vi.waitFor(() => expect(of2()).toHaveLength(2), { timeout: HUNG_MS })
+            untrusted(of2()[1])
+            await vi.waitFor(() => expect(treesMkdir.asked).toBe(1), { timeout: HUNG_MS })
+            await disposeWorkspaceService(w2)
+            // The next list read prunes its state (as the close's own event does in the app).
+            row()
+            release()
+            expect(await place).toEqual({ e: expect.stringMatching(/Set Up didn't open/) })
+          } finally {
+            await disposeWorkspaceService(w2).catch(() => undefined)
+            rmSync(`${ws2}.worktrees`, { recursive: true, force: true })
+          }
+        })
       })
 
       it("follows the connection a project's agent would launch on now: reassigned, the project moves to the other's count; the order changed, the same (HR3, HI-1871)", async () => {
