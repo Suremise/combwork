@@ -14,6 +14,8 @@ import type { MuseArgsInput } from '../../../src/main/providers/muse/launch'
 import { startContext, museHooks, museArgs, launchServers, hookPath } from '../../../src/main/providers/muse/launch'
 import { museEnv } from '../../../src/main/providers/muse/home'
 import { ADVANCED } from '../../../src/shared/providers/muse/advanced'
+// Bundled by stage.mjs, with the tests' timing.json staged beside run.cjs for it to read (HI-3393).
+import { timing } from '../../timing.cjs'
 
 const HERE = __dirname
 const MUSE = path.join(HERE, 'muse.exe')
@@ -22,7 +24,7 @@ const SHA = '2d223f7f992f02c313225ed47adf3dda24e7361b6b8389f2c19f7c12f026618a'
 const DRY = process.env.MUSE_REAL_DRY ?? ''
 const OUT = DRY ? path.join(DRY, 'out') : 'C:\\out'
 const WORK = DRY ? path.join(DRY, 'work') : 'C:\\work'
-const RUN_MS = 120000
+const RUN_MS = timing('sandbox.museRunMs')
 
 interface Check {
   name: string

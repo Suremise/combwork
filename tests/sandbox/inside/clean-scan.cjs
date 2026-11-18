@@ -13,6 +13,8 @@ const path = require('path')
 const { execFileSync } = require('child_process')
 const { tally, scanText, scanTree, isBundledCode, newRegistryHits } = require(path.join(__dirname, '..', 'clean.cjs'))
 const { COMBWORK_GUID } = require(path.join(__dirname, '..', 'report.cjs'))
+// The tests' timing file (HI-3393): Combwork's tests folder is mapped whole into the Sandbox.
+const { timing } = require(path.join(__dirname, '..', '..', 'timing.cjs'))
 
 // The third argument, a folder for what it reads and writes in place of C:\out, is for trying it outside a Sandbox.
 const [mode, prefix, outDir] = process.argv.slice(2)
@@ -22,7 +24,7 @@ const out = (name) => path.join(OUT, `${prefix}-${name}`)
 /** A command's output, also when it exits non-zero (reg query says "ERROR: … unable to find" with exit 1). */
 const run = (file, args) => {
   try {
-    return execFileSync(file, args, { encoding: 'utf8', timeout: 300_000, maxBuffer: 256 * 1024 * 1024, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+    return execFileSync(file, args, { encoding: 'utf8', timeout: timing('spawn.hangReal'), maxBuffer: 256 * 1024 * 1024, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
   } catch (e) {
     return String(e.stdout ?? '')
   }

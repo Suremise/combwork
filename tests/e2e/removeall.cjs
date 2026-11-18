@@ -49,12 +49,8 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (proj, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === proj.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
-    return v
-  }
+  // HI-3385: lib's until (its bound required, the file's interval).
+  const until = (fn, ms) => lib.until(fn, ms)
   // The question comes once main has checked each worktree agent's branch (git, per worktree: agents:worktreeChecks),
   // which a loaded machine makes take longer than the 5 s the suite allowed (#670). Waited for as it shows, bounded only
   // for a hung run; a slow one is logged with how long it took, and one that never came throws with what showed instead.
@@ -150,12 +146,14 @@ const check = (name, ok, extra = '') => {
   check('the box is offered for the merged, clean worktree only, unticked', (await box.count()) === 1 && (await box.innerText()).trim().endsWith('cw/removeall-ws/alpha/merged') && !/unmerged/.test(await box.innerText()) && !(await box.locator('input').isChecked()), await box.innerText().catch(() => ''))
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    await lib.sleep(300)
+    await lib.themeShown(page, theme)
     await page.screenshot({ path: path.join(lib.WORK, `removeall-confirm-${theme}.png`) })
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })
   await dialog.getByRole('button', { name: 'Cancel' }).click()
-  await lib.sleep(1500) // on purpose: nothing may stop or go after Cancel
+  await lib.until(async () => (await dialog.count()) === 0, lib.timing('hang.ui'))
+  // HI-3385: the question gone, a window in which nothing may stop or go (the point of the check).
+  await lib.sleep(lib.timing('quiet.afterCancelMs'))
   check('Cancel changes nothing', JSON.stringify(await agentsOf(alpha)) === JSON.stringify(['Worker', 'Idle', 'Merged', 'Unmerged']) && (await live(alpha, a.worker.id))?.status === 'working')
   const workerSession = (await live(alpha, a.worker.id)).sessionId
 

@@ -77,7 +77,8 @@ function pathWithoutGit() {
   const keptToast = /Merged's worktree is kept/
   check('removing it keeping its worktree says so once', !!(await lib.until(async () => (await toasts(keptToast)) === 1, lib.timing('hang.step'))), String(await toasts(keptToast)))
   await inv('agents:remove', repo, ahead.id, { deleteWorktree: false })
-  await lib.sleep(500)
+  // HI-3385: a window in which a second toast for it would show (the point of the check).
+  await lib.sleep(lib.timing('quiet.toastOnceMs'))
   check('…once only', (await toasts(keptToast)) === 1)
 
   // --- Review: the Changes tab's list of them (#400).
@@ -273,7 +274,8 @@ function pathWithoutGit() {
   check('the list goes with the last of them (the page says there are none, #476)', !!(await lib.until(async () => (await section.locator('.unused-wt').count()) === 0 && /no unused worktrees/.test(await section.innerText().catch(() => '')), lib.timing('hang.step'))), await section.innerText().catch(() => ''))
   // The tab loads its list first; the notice would be there by then.
   await lib.until(async () => (await page.locator('.split-list .pane-header', { hasText: 'Changes' }).count()) === 1, lib.timing('hang.ui'))
-  await lib.sleep(500)
+  // HI-3385: a window in which the loaded list would draw the notice (its absence is the point).
+  await lib.sleep(lib.timing('quiet.listDrawnMs'))
   check('…and the Changes notice', (await notice.count()) === 0)
 
   // Claudette removed keeping its worktree: the unused one the steps below use.

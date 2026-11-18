@@ -178,7 +178,7 @@ async function hoverTip(page, locator, want, ms = timing('hang.ui')) {
 }
 
 /**
- * HI-3387: waits for the window drawn in `theme`: its data-theme set (by the app from a setting, or by a suite itself)
+ * HI-3385, HI-3387: waits for the window drawn in `theme`: its data-theme set (by the app from a setting, or by a suite itself)
  * and no CSS transition still running (a background fading to the new colours), so a screenshot shows the theme, not a
  * moment between. document.getAnimations() brings styles up to date first, so a transition the change starts is seen.
  * Not drawn within ms, it throws, saying what it saw: what follows (a screenshot) never runs on an unready window.

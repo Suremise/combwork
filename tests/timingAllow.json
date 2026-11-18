@@ -589,10 +589,6 @@
       "timeout const textOf = (loc) => loc.innerText({ timeout: 500 }).catch(() => '')",
       "timeout const textOf = (loc) => loc.innerText({ timeout: 500 }).catch(() => '')"
     ],
-    "tests/e2e/lanenotices.cjs": [
-      "sleep await lib.sleep(3000) // A fixed wait on purpose: this checks that nothing comes (a lane is looked at within a second of a change).",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)"
-    ],
     "tests/e2e/lanes.mjs": [
       "sleep await sleep(50)",
       "sleep else await sleep(50)"
@@ -605,10 +601,6 @@
     ],
     "tests/e2e/lanestages.cjs": [
       "until if (!(await lib.until(async () => (await tips().count()) === 0, 5000))) return false"
-    ],
-    "tests/e2e/lanewatch.cjs": [
-      "sleep await lib.sleep(3000) // A fixed wait on purpose: this checks that a plain move into Review does NOT wake it.",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)"
     ],
     "tests/e2e/launchrace.cjs": [
       "sleep await lib.sleep(4000) // A fixed wait on purpose: this checks that the cancelled start does NOT start an agent later."
@@ -666,10 +658,6 @@
     ],
     "tests/e2e/mergeburst.cjs": [
       "msConstant const STALL_MS = 1000"
-    ],
-    "tests/e2e/mergeslot.cjs": [
-      "msConstant const HOLD_MS = 20000",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)"
     ],
     "tests/e2e/narrowmain.cjs": [
       "sleep await lib.sleep(400)",
@@ -775,30 +763,11 @@
     "tests/e2e/presetstep.cjs": [
       "timeout const db = new DatabaseSync(path.join(upgradedWs, '.combwork', 'combwork.db'), { timeout: 5000 })"
     ],
-    "tests/e2e/progress.cjs": [
-      "promiseSleep const frame = () => page.evaluate(() => new Promise((r) => (requestAnimationFrame(() => setTimeout(r, 0)), setTimeout(r, 2000))))",
-      "promiseSleep const frame = () => page.evaluate(() => new Promise((r) => (requestAnimationFrame(() => setTimeout(r, 0)), setTimeout(r, 2000))))",
-      "sleep await lib.sleep(200)",
-      "sleep await lib.sleep(250)",
-      "sleep await lib.sleep(800)",
-      "sleep const text = await Promise.race([got, lib.sleep(15000).then(() => '(no reply)')])",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)",
-      "until if (!(await until(async () => (await page.locator('.agent-pane.flash, .assistant-panel.flash').count()) === 0, 5000))) throw new Error('a pane still flashes')"
-    ],
     "tests/e2e/progressgates.cjs": [
       "until if (!(await until(async () => (await page.locator('.progress-panel').count()) === 1, 5000))) await page.locator('.progress-rail').click()"
     ],
-    "tests/e2e/progresslanes.cjs": [
-      "sleep await lib.sleep(250)",
-      "sleep await lib.sleep(250)",
-      "sleep await lib.sleep(400)",
-      "until if (!(await until(async () => (await page2.locator('.progress-panel').count()) === 1, 5000))) await page2.locator('.progress-rail').click()"
-    ],
     "tests/e2e/progressqueue.cjs": [
       "clockLoop check('…and straight after, still shown with Open card and Show log (round 4)', (await cardText()).includes(`${p4.key} returned`) && (await cardText()).includes(`${p3.key} returned`) && (await card.locator(`.progress-queue-returned[data-entry^=\"${p3.key}/\"] [data-action=\"show-log\"]`).count()) === 1 && Date.now() - seenAt < 10_000, await cardText())"
-    ],
-    "tests/e2e/progressreport.cjs": [
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)"
     ],
     "tests/e2e/progresstabs.cjs": [
       "timeout await reviewRow.hover({ timeout: 2000 }).catch(() => undefined)",
@@ -841,11 +810,6 @@
     ],
     "tests/e2e/recycleBin.mjs": [
       "timeout const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', '(New-Object -ComObject Shell.Application).NameSpace(10).Items().Count'], { encoding: 'utf8', timeout: 60_000, windowsHide: true, env: runContext.baseEnv() })"
-    ],
-    "tests/e2e/removeall.cjs": [
-      "sleep await lib.sleep(1500) // on purpose: nothing may stop or go after Cancel",
-      "sleep await lib.sleep(300)",
-      "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)"
     ],
     "tests/e2e/removeprojectslots.cjs": [
       "timeout const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })"
@@ -959,9 +923,6 @@
     ],
     "tests/e2e/slotoptions.cjs": [
       "timeout const db = new DatabaseSync(path.join(fx.ws, '.combwork', 'combwork.db'), { timeout: 5000 })"
-    ],
-    "tests/e2e/slotsessions.cjs": [
-      "sleep await lib.sleep(300)"
     ],
     "tests/e2e/stalls.cjs": [
       "promiseSleep while (socks.length < reads.length) await new Promise((r) => setTimeout(r, 10))"
@@ -1089,10 +1050,6 @@
       "sleep await lib.sleep(100)",
       "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)"
     ],
-    "tests/e2e/unusedwt.cjs": [
-      "sleep await lib.sleep(500)",
-      "sleep await lib.sleep(500)"
-    ],
     "tests/e2e/update.cjs": [
       "sleep await Promise.race([closed, sleep(10000)])",
       "sleep await dlg.locator('button', { hasText: 'Later' }).click(); await sleep(300)",
@@ -1136,76 +1093,6 @@
     ],
     "tests/e2e/wsoverview.cjs": [
       "sleep while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)"
-    ],
-    "tests/sandbox/checks.cjs": [
-      "promiseSleep await new Promise(r => setTimeout(r, 30_000))",
-      "timeout common = execFileSync('git', ['-C', dir, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8', windowsHide: true, timeout: 10_000, stdio: ['ignore', 'pipe', 'ignore'], env: baseEnv() }).trim()",
-      "timeout try { found = execFileSync('where.exe', ['git'], { encoding: 'utf8', windowsHide: true, timeout: 10_000 }).split(/\\r?\\n/)[0].trim() } catch { /* none */ }"
-    ],
-    "tests/sandbox/inside/clean-scan.cjs": [
-      "timeout return execFileSync(file, args, { encoding: 'utf8', timeout: 300_000, maxBuffer: 256 * 1024 * 1024, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })"
-    ],
-    "tests/sandbox/inside/drive.cjs": [
-      "timeout app = await _electron.launch({ executablePath: CW_EXE, args: [], timeout: 90_000, ...opts })",
-      "timeout await page.getByRole('button', { name, exact: true }).first().click({ timeout: 5000 })",
-      "timeout await page.getByRole('button', { name: 'Task Board', exact: true }).first().click({ timeout: 5000 }).catch(() => {})",
-      "timeout await page.getByRole('button', { name: view.name, exact: true }).first().click({ timeout: 5000 })",
-      "timeout await page.getByText('demo', { exact: true }).first().click({ timeout: 10_000 }).catch(() => {})",
-      "timeout await page.locator('.activity-btn[aria-label=\"Projects\"]').click({ timeout: 5000 }).catch(() => {})",
-      "timeout await page.locator('.providers-banner button', { hasText: 'Choose providers' }).click({ timeout: 10_000 }).catch(() => {})",
-      "timeout await page.locator('.providers-banner button', { hasText: 'Choose providers' }).click({ timeout: 10_000 }).catch(() => {})",
-      "timeout await page.locator('[role=\"switch\"][aria-label=\"Use Claude Code\"]').click({ timeout: 10_000 }).catch(() => {})",
-      "timeout await page.locator(`.settings-nav .row[data-section=\"${s}\"]`).click({ timeout: 5000 })",
-      "timeout await page.waitForSelector('.app .workbench', { timeout: 90_000 })",
-      "timeout await sw.click({ timeout: 10_000 })",
-      "timeout const ps = cmd => execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], { encoding: 'utf8', timeout: 60_000 }).trim()",
-      "timeout if (account?.id) await offHere.locator(`[data-turn-on-here=\"${account.id}\"]`).click({ timeout: 10_000 }).catch((e) => { res.facts.turnOnError = String(e.message) })",
-      "timeout page = await app.firstWindow({ timeout: 90_000 })",
-      "timeout try { res.facts.gitInit = execFileSync(path.join(gitCmd, 'git.exe'), ['init'], { cwd: proj, encoding: 'utf8', env, timeout: 60_000 }).trim() } catch (e) { res.facts.gitInit = String(e.message) }",
-      "timeout try { return { ok: true, out: execFileSync(path.join(GIT_CMD, 'git.exe'), ['-c', 'user.name=Sandbox Check', '-c', 'user.email=sandbox-check@example.invalid', ...args], { cwd, encoding: 'utf8', timeout: 60_000 }).trim() } } catch (e) { return { ok: false, out: String(e.message).slice(0, 400) } }",
-      "until await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === t && readConfig()?.settings?.appearance?.theme === t, 5000)",
-      "until await until(async () => Object.values(await inv('provider:info')).every(i => !i.checking), 60_000)",
-      "until const advSaved = await until(async () => readJson(path.join(PROFILE, 'advanced.json'))?.values?.[ADV.app.now] === ADV.app.value && readJson(path.join(KEPT_WS, '.combwork', 'workspace.json'))?.advanced?.[ADV.ws.now] === ADV.ws.value, 10_000)",
-      "until const advSaved = await until(async () => readJson(path.join(PROFILE, 'advanced.json'))?.values?.[ADV.app.old] === ADV.app.value && readJson(path.join(KEPT_WS, OLD_DIR, 'workspace.json'))?.advanced?.[ADV.ws.old] === ADV.ws.value, 10_000)",
-      "until const diag = ready && (await until(async () => (await app.evaluate(({ clipboard }) => clipboard.readText())) || false, 10_000))",
-      "until const exported = exportRan && (await until(async () => fs.readdirSync(exportDir).some((d) => fs.statSync(path.join(exportDir, d)).isDirectory() && fs.readdirSync(path.join(exportDir, d)).length > 0), 20_000))",
-      "until const found = await until(async () => { const i = (await inv('provider:info'))['claude-code']; return i && !i.checking && i.found && i }, 30_000)",
-      "until const found = await until(async () => { const i = (await inv('provider:info'))['claude-code']; return i && !i.checking && i.found && i }, 30_000)",
-      "until const found = dialog && await until(async () => { const i = (await inv('provider:info'))['claude-code']; return i && !i.checking && i.found && i }, 30_000)",
-      "until const kept = await until(async () => fs.existsSync(path.join(KEPT_WS, '.combwork', 'combwork.db')) && fs.existsSync(path.join(KEPT_PROJECT, '.combwork', 'project.json')), 30_000)",
-      "until const keptGit = (await until(async () => { const o = keptGitOptions('.combwork'); return converted(o) && o }, 15_000)) || keptGitOptions('.combwork')",
-      "until const known = await until(async () => ps(`Test-Path '${key}'`) === 'True', 20_000)",
-      "until const lane = laneId ? await until(async () => { const l = await laneView(laneId); return l.slot && l }, 90_000) : null",
-      "until const made = await until(async () => fs.existsSync(path.join(KEPT_WS, TREE_BEFORE, DB_BEFORE)) && fs.existsSync(path.join(KEPT_PROJECT, TREE_BEFORE, 'project.json')), 30_000)",
-      "until const made = await until(async () => fs.existsSync(path.join(KEPT_WS, TREE_BEFORE, OLD_DB)) && fs.existsSync(path.join(KEPT_WS, 'demo', TREE_BEFORE, 'project.json')), 30_000)",
-      "until const moved = await until(async () => movedNow(), 30_000)",
-      "until const offered = await until(async () => (await offHere.count()) > 0 && /Sandbox, your Claude Code account, is off in this workspace/.test(await offHere.innerText()), 20_000)",
-      "until const on = await until(async () => { const i = (await inv('provider:info'))['claude-code']; return i && !i.checking && i }, 30_000)",
-      "until const opened = await until(async () => (await page.locator('.welcome').count()) === 0 && fs.existsSync(path.join(ws, '.combwork')), 30_000)",
-      "until const opened = await until(async () => (await rows.count()) > 0, 10_000)",
-      "until const painted = () => until(() => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(document.getAnimations().every(a => a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity)))))), 5000)",
-      "until const quit = await until(async () => proc.exitCode !== null, 60_000)",
-      "until const ready = diagOpen && (await until(async () => (await copy.count()) === 1 && (await copy.isEnabled()), 30_000))",
-      "until const rewritten = await until(async () => { const v = fileNow(); return v && v[ADV.app.now] === ADV.app.value && !(ADV.app.old in v) && v }, 15_000)",
-      "until const runs = await until(async () => startsCombworkOnly(runValues()), 15_000)",
-      "until const runs = await until(async () => startsCombworkOnly(runValues()), 15_000)",
-      "until const runs = await until(async () => { const v = runValues(); return v.some((x) => /\\\\Combwork\\.exe/i.test(x.command)) && v }, 15_000)",
-      "until const saved = await until(async () => { const c = readConfig(); return c?.settings?.general?.userName === MARK.userName && c.settings.general.launchAtLogin === true && c.settings.appearance?.theme === MARK.theme && c }, 10_000)",
-      "until const saved = await until(async () => { const c = readConfig(); return c?.settings?.general?.userName === MARK.userName && c.settings.general.launchAtLogin === true && c.settings.appearance?.theme === MARK.theme && c }, 10_000)",
-      "until const shown = await until(async () => (await page.locator('.board-view', { hasText: 'A first card' }).count()) > 0, 20_000)",
-      "until const signedIn = !!home && (await until(async () => fs.existsSync(path.join(home, 'fake-account.json')) && !!readJson(path.join(home, '.claude.json'))?.oauthAccount, 30_000))",
-      "until const signedIn = !!home && (await until(async () => fs.existsSync(path.join(home, 'fake-account.json')), 30_000))",
-      "until const workflow = await until(async () => { const w = readJson(path.join(KEPT_PROJECT, TREE_BEFORE, 'project.json'))?.workflow; return w?.preset === SEED.preset && w?.options?.folder === 'slots' && w }, 15_000)",
-      "until if (!(await until(async () => (await page.locator('.palette input').inputValue().catch(() => null)) === typed, 10_000))) return failed(`the box to hold \"${typed}\"`)",
-      "until if (!(await until(async () => (await page.locator(`.palette-item.active[data-command=\"${id}\"]`).count()) === 1, 10_000))) return failed(`${id} to be the chosen row`)",
-      "until if (!(await until(async () => page.evaluate(() => !!document.activeElement?.closest('.palette') && document.activeElement.value === ''), 10_000))) return failed('the palette to have the focus, its box empty')",
-      "until if (!(await until(clear, 10_000))) return failed(\"the previous step's dialog or palette to close\")",
-      "until res.facts.accountOn = !!account?.id && !!(await until(async () => ((await inv('connections:list')).workspace['claude-code']?.on ?? []).includes(account.id), 20_000))",
-      "until return (await until(async () => (await dialog.count()) === 1, 10_000)) ? dialog : null",
-      "until }, 60_000))"
-    ],
-    "tests/sandbox/muse-real/run.ts": [
-      "msConstant const RUN_MS = 120000"
     ],
     "tests/scenarios/harness.cjs": [
       "clockLoop for (let t = Date.now(); Date.now() - t < 90000 && !['ready', 'finished', 'working'].includes((await up())?.status); ) {",

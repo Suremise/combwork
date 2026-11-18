@@ -129,8 +129,7 @@ const until = (fn, ms) => lib.until(fn, ms, 150)
   const shoot = async (name) => {
     for (const theme of ['dark', 'light']) {
       await inv('settings:update', { appearance: { theme } })
-      await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
-      await lib.sleep(250)
+      await lib.themeShown(page, theme, HUNG_MS)
       await page.screenshot({ path: path.join(shots, `${name}-${theme}.png`) })
     }
     await inv('settings:update', { appearance: { theme: 'dark' } })
@@ -522,8 +521,7 @@ const until = (fn, ms) => lib.until(fn, ms, 150)
   await zoom(1.5)
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
-    await lib.sleep(400)
+    await lib.themeShown(page, theme, HUNG_MS)
     const box = await page.evaluate(() => {
       const r = (sel) => document.querySelector(sel)?.getBoundingClientRect().toJSON() ?? null
       return { panel: r('.progress-panel'), lanes: r('.progress-lanes'), body: r('.progress-body'), run: r('.progress-run'), merge: r('.progress-merge'), bar: r('.progress-lanes-bar') }
@@ -767,7 +765,8 @@ const until = (fn, ms) => lib.until(fn, ms, 150)
     }, lib.timing('hang.ui'))
     check("the offer to resume the lanes' agents answered Don't Resume, and gone", !!answered && !!closed, String(fs.existsSync(restartRecord)))
   }
-  if (!(await until(async () => (await page2.locator('.progress-panel').count()) === 1, 5000))) await page2.locator('.progress-rail').click()
+  // Its panel comes back open with the window (its saved layout), else it is opened.
+  if (!(await until(async () => (await page2.locator('.progress-panel').count()) === 1, lib.timing('pace.panelRestoredMs')))) await page2.locator('.progress-rail').click()
   const edge2 = page2.locator('.progress-lanes-edge')
   const rowsAfter = async () => {
     const now = await edge2.getAttribute('aria-valuenow').catch(() => null)
@@ -812,8 +811,7 @@ const until = (fn, ms) => lib.until(fn, ms, 150)
   await queuedLine.scrollIntoViewIfNeeded()
   for (const theme of ['dark', 'light']) {
     await inv2('settings:update', { appearance: { theme } })
-    await until(async () => (await page2.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
-    await lib.sleep(250)
+    await lib.themeShown(page2, theme, HUNG_MS)
     await page2.screenshot({ path: path.join(shots, `lanes-queued-${theme}.png`) })
   }
   await inv2('settings:update', { appearance: { theme: 'dark' } })
