@@ -9523,7 +9523,10 @@ decisions (r14, Q1 to Q6):
 - **The Assistant first** (Q4): a simplify check is told to the Assistant (a `churn-simplify` delivery, while it can
   act on cards); it may answer carry on or simplify with `cw_answer_simplify` (`POST /v1/tasks/{n}/answer-simplify`,
   through `assistantChange`), and anything else, the hard stop's question and cutting scope, is refused
-  `loop.usersChoice`. The question stays under For you meanwhile; the first answer wins.
+  `loop.usersChoice`. The question stays under For you meanwhile; the first answer wins. The delivery is given only while
+  its question is still open on the card (HI-3370: the source's `refresh` and `holds` read the card's open requests,
+  `simplifyQuestionOpen`): answered by the user, or retired by the setting, before the Assistant reads it, it is cancelled,
+  never a turn spent on a refused `cw_answer_simplify`. The project's runtime not read yet: given as before.
 - **Guidance** (Q6): the reviewer's skill holds the rule: after 2 or 3 rounds of different new edge cases, ask whether
   it's worth handling, or to simplify or cut scope (`cw_ask_assistant`, else `cw_ask_user`; Combwork's own question
   instead, when it has asked), with no ok, gaps, request or verdict until it is answered. card-loop's builder page
