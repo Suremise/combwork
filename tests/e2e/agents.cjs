@@ -33,7 +33,6 @@ fs.writeFileSync(path.join(proj, '.env'), 'SECRET=local\n')
 g('add -A')
 g('commit -q -m init')
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let pass = 0, fail = 0
 const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.log(ok ? 'PASS' : 'FAIL', name, extra) }
 const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n}.png`) })
@@ -49,14 +48,14 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const project = async () => (await inv('workspace:refresh')).projects.find((p) => p.name === 'demo')
-  await inv('workspace:open', ws); await sleep(800)
-  await page.getByText('demo', { exact: true }).first().click(); await sleep(500)
+  await lib.openWorkspace(inv, page, ws)
+  await page.getByText('demo', { exact: true }).first().click(); await lib.projectShown(page)
   await inv('project:updateConfig', proj, { worktreeSetup: `"${process.execPath}" "${setupScript}" "two words"` })
 
   // --- Agent 1 alone (added: projects start with none): the strip shows, with Add Agent
   const a1 = await lib.addAgent(inv, proj)
-  await project(); await sleep(500)
-  check('its pane shows Agent 1', await page.locator('.pane-header-bar .agent-name', { hasText: /^Agent 1$/ }).count() === 1)
+  await project()
+  check('its pane shows Agent 1', !!(await lib.until(async () => (await page.locator('.pane-header-bar .agent-name', { hasText: /^Agent 1$/ }).count()) === 1, lib.timing('hang.ui'))))
   await shot(page, '1-single')
 
   // --- Add Agent 2 in the project folder and Agent 3 in a new worktree
@@ -123,8 +122,8 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   const rects = await page.evaluate(() => [...document.querySelectorAll('.terminal-host:not(.hidden)')].map((e) => Math.round(e.getBoundingClientRect().left)))
   check('terminals in separate panes', new Set(rects).size === rects.length && rects.length >= 2, JSON.stringify(rects))
   // Clicking a pane header focuses that agent
-  await page.locator('.pane-header-bar', { hasText: 'Reviewer' }).locator('.agent-name').click(); await sleep(300)
-  check('its pane header shows it focused', (await page.locator('.pane-header-bar.focused .agent-name').innerText()).includes('Reviewer'))
+  await page.locator('.pane-header-bar', { hasText: 'Reviewer' }).locator('.agent-name').click()
+  check('its pane header shows it focused', !!(await lib.until(async () => (await page.locator('.pane-header-bar.focused .agent-name').innerText().catch(() => '')).includes('Reviewer'), lib.timing('hang.ui'))))
 
   // --- File locks via synthetic PreToolUse calls
   // Each launch's hooks carry its own run id and token (#345): a hook goes as the agent whose session it names.
@@ -163,7 +162,8 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   check('worktree copy of the file allowed', !r.hookSpecificOutput)
   r = await hook({ session_id: l2.sessionId, hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'echo' }, cwd: proj })
   check('non-edit tools ignored', !r.hookSpecificOutput)
-  await sleep(400)
+  // The claim reaches the agent's live state after the hook's answer: waited for.
+  await lib.until(async () => JSON.stringify((await project()).agents.find((a) => a.id === a1.id).live.lockedFiles) === '["app.txt"]', lib.timing('hang.ui'))
   p = await project()
   check('locked files published', JSON.stringify(p.agents.find((a) => a.id === a1.id).live.lockedFiles) === '["app.txt"]', JSON.stringify(p.agents.find((a) => a.id === a1.id).live.lockedFiles))
   // File locks is the project's workflow option (HI-1766).
@@ -175,8 +175,9 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   check('warn mode adds context', !!r.hookSpecificOutput?.additionalContext && !r.hookSpecificOutput.permissionDecision)
   await lib.setOwnOptions(inv, proj, { fileLocks: undefined }); await inv('workspace:refresh')
   // Agent 1's turn ends: its claims are released
-  await hook({ session_id: l1.sessionId, hook_event_name: 'Stop' }); await sleep(300)
-  r = await pre(l2.sessionId)
+  await hook({ session_id: l1.sessionId, hook_event_name: 'Stop' })
+  // The release follows the Stop hook's answer: Agent 2's claim allowed once it has landed (a refused try claims nothing).
+  r = await lib.until(async () => { const x = await pre(l2.sessionId); return !x.hookSpecificOutput && x }, lib.timing('hang.ui')) || (await pre(l2.sessionId))
   check('released after Stop; Agent 2 claims it', !r.hookSpecificOutput)
   r = await pre(l1.sessionId)
   check('now Agent 1 is blocked', r.hookSpecificOutput?.permissionDecision === 'deny' && /Agent 2 is editing/.test(r.hookSpecificOutput.permissionDecisionReason))
@@ -187,7 +188,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   const before = (await inv('session:live')).find((l) => l.agentId === a1.id).sessionId
   const newId = '33333333-4444-4555-8666-777777777777'
   await post(hooks[before], { session_id: newId, hook_event_name: 'UserPromptSubmit', cwd: proj })
-  await sleep(800)
+  await lib.until(async () => (await inv('session:live')).find((l) => l.agentId === a1.id)?.sessionId === newId, lib.timing('hang.ui'))
   const moved = (await inv('session:live')).find((l) => l.agentId === a1.id)
   check('follows a new conversation started in the CLI', moved.sessionId === newId && before !== newId, `${before} → ${moved.sessionId}`)
   const recs = sessionsOf(proj).sessions
@@ -247,7 +248,9 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   await inv('agents:remove', proj, a2.id, { deleteWorktree: false })
   p = await project()
   check('back to one agent', p.agents.length === 1)
-  await page.locator('.tabs .tab', { hasText: 'Session' }).first().click(); await sleep(800)
+  await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()
+  await lib.until(async () => (await page.locator('.tabs .tab.active', { hasText: 'Session' }).count()) === 1, lib.timing('hang.ui'))
+  await lib.settled(page)
   await shot(page, '7-after')
 
   console.log(`${pass}/${pass + fail} passed`)

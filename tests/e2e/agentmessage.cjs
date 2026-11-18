@@ -57,7 +57,7 @@ const check = (name, ok, extra = '') => {
   const until = async (fn, ms) => {
     const t = Date.now()
     let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
+    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
     return v
   }
   // What each agent read when Combwork's doorbell rang (#650: fake Claude Code reads its inbox then), and the doorbells.
@@ -169,7 +169,7 @@ const check = (name, ok, extra = '') => {
   check('the user cancels it from the pane', !!(await until(async () => !(await unread()), lib.timing('hang.ui'))))
   check('…its activity says so', lastDelivery('Builder')?.state === 'cancelled' && lastDelivery('Builder')?.detail === 'cancelled by the user', JSON.stringify(lastDelivery('Builder')))
   await until(() => idle(builder.id), lib.timing('hang.ui'))
-  await lib.sleep(2000) // A fixed wait on purpose: this checks that the cancelled message is NOT typed.
+  await lib.sleep(lib.timing('quiet.noLineTypedMs')) // A quiet window on purpose: this checks that the cancelled message is NOT typed.
   check('…and it is never typed', !wakes('Builder').some((t) => t.includes('Never mind this one.')), JSON.stringify(wakes('Builder')))
 
   // --- 3b. Tied to a card round (#652): refused for a card out of Doing and Review; once the card passes, stale, never told.

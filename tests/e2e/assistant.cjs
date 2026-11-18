@@ -150,9 +150,8 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   // One launch (no prompt): in the workspace folder, asking for Auto, with Combwork's reading tools allowed.
   await inv('session:start', home, { agentId: 'assistant' })
   await lib.acceptClaudeTrust(inv, home, 'assistant', 20000)
-  const t0 = Date.now()
   let live = null
-  while (Date.now() - t0 < 30000 && (live = (await inv('session:live')).find((s) => s.agentId === 'assistant'))?.status !== 'ready') await lib.sleep(400)
+  await lib.until(async () => (live = (await inv('session:live')).find((s) => s.agentId === 'assistant'))?.status === 'ready', lib.timing('hang.ui'))
   check('the Assistant starts', live?.status === 'ready', live?.status)
   check('it works in the workspace folder', live?.cwd.toLowerCase() === ws.toLowerCase(), live?.cwd)
   check('its conversation is named for the mode', (live?.sessionName ?? '').startsWith('Assistant · Planner · '), live?.sessionName)

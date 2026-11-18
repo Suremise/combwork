@@ -53,13 +53,13 @@ const check = (name, ok, extra = '') => {
   const until = async (fn, ms) => {
     const t = Date.now()
     let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)
+    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
     return v
   }
 
   // The Assistant starts in the workspace folder; the fake asks to trust it, which shows as waiting for the user.
   await page.getByText('gamma', { exact: true }).first().click()
-  await lib.sleep(300)
+  await lib.projectShown(page)
   await inv('session:start', home, { agentId: 'assistant' })
   const asking = await until(async () => (await live(home, 'assistant'))?.status === 'waiting' && (await live(home, 'assistant')), HUNG_MS)
   check('a trust question before the start shows as waiting', !!asking && /trust/i.test(asking.statusMessage ?? ''), JSON.stringify(asking && { status: asking.status, msg: asking.statusMessage }))
@@ -181,17 +181,17 @@ const check = (name, ok, extra = '') => {
   // Stopping a busy agent asks the user, in the panel: no, then yes.
   await inv('settings:update', {})
   await page.keyboard.press('Control+Alt+I').catch(() => {})
-  await lib.sleep(500)
+  await lib.until(async () => (await page.locator('.assistant-panel').count()) === 1, lib.timing('hang.ui'))
   const stopping = api('POST', '/v1/projects/alpha/agents/Fixer/stop', { reason: 'testing' })
   const card = page.locator('.assistant-question', { hasText: 'Stop Fixer in alpha?' })
-  await card.waitFor({ timeout: 10000 }).catch(() => {})
+  await lib.until(async () => (await card.count()) === 1, lib.timing('hang.ui'))
   check('stopping a busy agent asks the user on a card', (await card.count()) === 1)
   await page.screenshot({ path: path.join(lib.WORK, 'control-1-question.png') })
   await card.locator('button', { hasText: "Don't stop" }).click()
   const refused = await stopping
   check("the user's no is the answer", refused.status === 409 && /chose not to stop/.test(refused.body?.error) && !!(await live(alpha, fixer)), JSON.stringify(refused.body))
   const stopping2 = api('POST', '/v1/projects/alpha/agents/Fixer/stop', {})
-  await card.waitFor({ timeout: 10000 }).catch(() => {})
+  await lib.until(async () => (await card.count()) === 1, lib.timing('hang.ui'))
   const qs = await inv('assistant:questions')
   await inv('assistant:answer', qs[0]?.id, true)
   check('and a yes stops it', (await stopping2).status === 200 && !!(await until(async () => !(await live(alpha, fixer)), HUNG_MS)))

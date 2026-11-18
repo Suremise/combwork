@@ -50,7 +50,7 @@ const check = (name, ok, extra = '') => {
   const until = async (fn, ms) => {
     const t = Date.now()
     let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
+    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
     return v
   }
   const wakes = (agent) => {
@@ -87,7 +87,7 @@ const check = (name, ok, extra = '') => {
   check('the reviewer watches the card', !!(await until(async () => (await live(reviewer.id))?.status === 'watching', lib.timing('hang.step'))))
   await inv('tasks:update', c1, { agent: other.id })
   check('given to another agent: the reviewer is woken', !!(await until(async () => wakes('Reviewer').length >= 1, lib.timing('hang.ui'))))
-  await lib.sleep(2000) // A fixed wait on purpose: this checks that a second line does NOT come.
+  await lib.sleep(lib.timing('quiet.noLineTypedMs')) // A quiet window on purpose: this checks that a second line does NOT come.
   const w1 = wakes('Reviewer')
   check('…once, saying so, and to carry on', w1.length === 1 && w1[0] === `[CW] ${n1} was reassigned to Other (your watch on it ended). Your card watch has ended: drop it from your list and carry on with your next card.`, JSON.stringify(w1))
   check('…and it no longer waits', !!(await until(() => idle(reviewer.id), lib.timing('hang.ui'))) && !(await live(reviewer.id))?.watch)
@@ -99,7 +99,7 @@ const check = (name, ok, extra = '') => {
   await inv('tasks:update', c1, { column: 'review', agent: other.id })
   await say(reviewer.id, `boardreview ${c1} start`)
   await until(async () => (await card(c1))?.review?.agent === reviewer.id, lib.timing('hang.ui'))
-  await lib.sleep(2000) // A fixed wait on purpose: this checks that the new agent is NOT released.
+  await lib.sleep(lib.timing('quiet.noLineTypedMs')) // A quiet window on purpose: this checks that the new agent is NOT released.
   check("the card's new agent keeps its watch through a review", (await live(other.id))?.status === 'watching' && (await live(other.id))?.watch?.cards?.[0] === c1 && wakes('Other').length === 0, JSON.stringify({ status: (await live(other.id))?.status, wakes: wakes('Other') }))
   await until(() => idle(reviewer.id), lib.timing('hang.ui'))
 
@@ -110,7 +110,7 @@ const check = (name, ok, extra = '') => {
   await say(reviewer.id, watch([c2, c3], { column: 'review' }))
   await until(async () => (await live(reviewer.id))?.status === 'watching', lib.timing('hang.step'))
   await inv('tasks:update', c2, { blocked: 'Waiting for the user to choose' })
-  await lib.sleep(2000) // A fixed wait on purpose: this checks that the block neither wakes nor drops anything.
+  await lib.sleep(lib.timing('quiet.noLineTypedMs')) // A quiet window on purpose: this checks that the block neither wakes nor drops anything.
   check('a blocked card stays in a watch on two, with no wake', JSON.stringify((await live(reviewer.id))?.watch?.cards) === JSON.stringify([c2, c3]) && wakes('Reviewer').length === 1, JSON.stringify({ watch: (await live(reviewer.id))?.watch, wakes: wakes('Reviewer').slice(1) }))
   await inv('tasks:update', c2, { blocked: '' })
   await inv('tasks:update', c2, { column: 'review' })
