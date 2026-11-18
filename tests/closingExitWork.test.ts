@@ -62,16 +62,16 @@ describe('a run still closing until its exit work is over (HI-3376)', () => {
     expect(sessions.closingPending((p) => p === PROJECT).running).toBe(1)
     expect(sessions.closingPending((p) => p !== PROJECT).running).toBe(0)
     // A close counting it keeps waiting while it is held.
-    let how: string | null = null
-    void waitForAgentsClosed({ pending: () => sessions.closingPending(), deadlineMs: HUNG_MS, windows: () => [], send: () => undefined }).then((h) => (how = h))
+    const result = { how: null as string | null }
+    const waited = waitForAgentsClosed({ pending: () => sessions.closingPending(), deadlineMs: HUNG_MS, windows: () => [], send: () => undefined }).then((h) => (result.how = h))
+    // Three looks of the wait's while it is held: still waiting.
     await new Promise((r) => setTimeout(r, closingLimits.lookMs * 3))
-    expect(how).toBeNull()
+    expect(result.how).toBeNull()
     release()
     await exit
     expect(sessions.closingPending().running).toBe(0)
-    const until = Date.now() + HUNG_MS
-    while (how === null && Date.now() < until) await new Promise((r) => setTimeout(r, closingLimits.lookMs))
-    expect(how).toBe('settled')
+    await waited
+    expect(result.how).toBe('settled')
   })
 
   it('an exit whose work throws is let go of too (its finally)', async () => {

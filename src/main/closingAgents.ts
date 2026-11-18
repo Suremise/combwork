@@ -97,11 +97,11 @@ export function waitForAgentsClosed(o: {
       over = true
       if (look) clearInterval(look)
       for (const [wid, m] of mine) {
-        const now = take(wid, id)
+        const next = take(wid, id)
         if (!m.win.isDestroyed()) {
           m.win.removeListener('closed', m.gone)
           // Only when it showed this wait: the one before it again, or none.
-          if (now !== undefined) o.send(m.win, now)
+          if (next !== undefined) o.send(m.win, next)
         }
       }
       mine.clear()
