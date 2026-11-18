@@ -50,10 +50,16 @@ const check = (name, ok, extra = '') => {
 
   // a.ts is selected and its diff is slow (3 s); b.ts answers at once and must stay shown after a.ts's late answer.
   check('the first file waits for its diff', !!(await until(async () => /Loading the diff/.test(await page.locator('.split-main').innerText()), HUNG_MS)))
+  // Main counts the git:diff calls answered (globalThis.__cwSettledIpc, HI-2971): a.ts's slowed one is still out now.
+  const diffsAnswered = () => app.evaluate(() => globalThis.__cwSettledIpc?.['git:diff'] ?? 0)
+  const answeredBefore = await diffsAnswered()
   await row('b.ts').click()
   const shown = () => page.locator('.split-main .editor-toolbar strong').innerText().catch(() => '')
   check("the selected file's diff shows", !!(await until(async () => (await shown()) === 'b.ts', lib.timing('hang.ui'))), await shown())
-  await lib.sleep(lib.timing('quiet.lateAnswerMs')) // The window is the point: the slowed answer for the old choice arrives within it, and doesn't replace the new one.
+  // Both answered (b.ts's at once, a.ts's late one after its delay), and the window has taken the reply: then the check.
+  const lateArrived = !!(await until(async () => (await diffsAnswered()) >= answeredBefore + 2, HUNG_MS))
+  check("a.ts's late answer reached the window before the check below", lateArrived, `${await diffsAnswered()} answered, ${answeredBefore} before`)
+  await lib.settled(page)
   check("a late answer for another file doesn't replace it", (await shown()) === 'b.ts' && (await row('b.ts').getAttribute('class')).includes('selected'), await shown())
   await page.screenshot({ path: path.join(lib.WORK, 'changes-2-diff.png') })
   await row('a.ts').click()

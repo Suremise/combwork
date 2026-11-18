@@ -63,7 +63,6 @@
   "quiet.toldAgainMs": { "kind": "quiet", "ms": 1600, "note": "an agent's need told once: no second telling within this (its title blinking, a review coming and going: attention.cjs)" },
   "quiet.bannerStaysMs": { "kind": "quiet", "ms": 3500, "note": "past a finished banner's 2 s: a banner hovered, focused or waiting stays, and none waiting is dropped (banners.cjs)" },
   "quiet.finishGroupMs": { "kind": "quiet", "ms": 4500, "note": "a finish group (agents finishing together, gathered over 3 s) and its banner's time pass: one notification, or none (banners.cjs, bursts.cjs)" },
-  "quiet.lateAnswerMs": { "kind": "quiet", "ms": 3500, "note": "a slowed answer for an earlier choice arrives within this, and doesn't replace the newer one (changes.cjs)" },
   "quiet.avSuggestionMs": { "kind": "quiet", "ms": 2500, "note": "the antivirus suggestion not offered (again) within this once agents run (antivirus.cjs)" },
   "quiet.folderWarningMs": { "kind": "quiet", "ms": 1000, "note": "a Codex agent started or its turn ended: no stray .codex warning (or no second one) within this (codexfolder.cjs)" },
   "quiet.setupOfferMs": { "kind": "quiet", "ms": 1000, "note": "Combwork has looked for the CLIs: no Provider Setup or provider banner comes within this (defaultprovider.cjs)" },
