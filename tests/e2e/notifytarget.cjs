@@ -42,6 +42,9 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 900 })
     await lib.appReady(page)
+    // Focused, as a toast in the window is (stubbed: a test copy never has the focus, and its page knows that, HI-3404), so
+    // a toast left in the corner closes after its seconds.
+    await lib.stubFocus(app)
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await inv('project:updateConfig', alpha, { agents: [{ id: 'a-hb4', name: 'HB4', provider: 'claude-code' }, { id: 'a-hr1', name: 'HR1', provider: 'claude-code' }] })
