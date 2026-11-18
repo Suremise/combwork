@@ -320,8 +320,13 @@ export interface AdvanceHost {
   attested(card: CardRecord, ref: AdvanceRef, answer: AdvanceAnswer, reason: string): Promise<boolean>
   /** A fresh question for the attempt (the consumed `answer`'s retired), saying why it is asked again. */
   askAgain(card: CardRecord, ref: AdvanceRef, plan: string, state: 'stopped' | 'uncertain', words: AdvanceWords, answer: AdvanceAnswer | null): Promise<boolean>
-  /** Refused at the base (nothing written): the card's comment saying why, once per cycle, plan and reason. */
+  /**
+   * Refused at the base (nothing written), or nothing moved past it for a reason of jj's (HI-3365): the card's comment
+   * saying why, once per cycle, plan and reason.
+   */
   refused(card: CardRecord, cycle: number, plan: string, words: AdvanceWords): Promise<boolean>
+  /** HI-3365: whether the card's comment for `plan` and `why` in `cycle` was written (refused). */
+  refusedFor(card: CardRecord, cycle: number, plan: string, why: string): boolean
   /**
    * HI-3236: the card's preview for `plan` (gate advancePreview, bound to the plan), any earlier preview of the card closed
    * in the same write: false when the card isn't in Approved at `cycle`, or an advance is unsettled.

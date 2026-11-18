@@ -890,19 +890,12 @@ export class JjPlatform implements PlatformAdapter {
   }
 
   /**
-   * HI-3365: whether the cycle had an attempt for this plan that ended past the base with nothing moved for a reason of
-   * jj's own (HELD_AFTER_BASE, from its `AdvanceResolved` detail): it isn't attempted again until the plan changes.
+   * HI-3365: whether an attempt of this plan in the cycle ended past the base with nothing moved for a reason of jj's
+   * own (HELD_AFTER_BASE), as the card's comment about it records: it isn't attempted again until the plan changes. Only
+   * a live attempt's answer holds it (recordAdvance's `live`): one recovery classifies after a crash is tried again.
    */
-  private planHeld(card: CardRecord, s: CardState, planId: string): boolean {
-    const facts = this.wf!.store.facts(card.id).filter((f) => f.seq >= s.cycle)
-    const held = new Set(
-      facts
-        .filter((f) => f.kind === 'AdvanceResolved')
-        .map((f) => f.data as FactData['AdvanceResolved'])
-        .filter((d) => d.how === 'nothingMoved' && HELD_AFTER_BASE.has((d.detail ?? '').split(':')[0]))
-        .map((d) => d.attempt)
-    )
-    return facts.some((f) => f.kind === 'AdvanceAttempted' && held.has((f.data as FactData['AdvanceAttempted']).attempt) && (f.data as FactData['AdvanceAttempted']).plan === planId)
+  private planHeld(card: CardRecord, s: CardState, planId: string, host: AdvanceHost): boolean {
+    return [...HELD_AFTER_BASE].some((why) => host.refusedFor(card, s.cycle, planId, why))
   }
 
   /** The finish a card's attempts run under now (HI-3236): a clicked preview, else Combwork's own advance. */
@@ -921,7 +914,7 @@ export class JjPlatform implements PlatformAdapter {
   }
 
   /** An outcome recorded through the host (s10 §A), and the journal marked settled once it is. Whether Integrated was. */
-  private async recordAdvance(h: Held, deps: JjAdvanceDeps, card: CardRecord, j: AdvanceJournal, out: AdvanceOutcome, host: AdvanceHost): Promise<boolean> {
+  private async recordAdvance(h: Held, deps: JjAdvanceDeps, card: CardRecord, j: AdvanceJournal, out: AdvanceOutcome, host: AdvanceHost, live = false): Promise<boolean> {
     const wf = this.wf!
     const ref: AdvanceRef = { cycle: j.plan.cycle, attempt: j.attempt }
     const s = wf.state(wf.store.card(card.id))
@@ -965,7 +958,7 @@ export class JjPlatform implements PlatformAdapter {
       const mode = this.modeOf(wf.store.card(card.id), s)
       if (j.refusedAt && out.code !== 'moved') await host.refused(card, j.plan.cycle, j.planId, { ...this.advanceWords(j, s, out.code, out.detail), mode, next: 'repository' })
       // HI-3365: past the base, for a reason of jj's: not tried again for this plan (planHeld), and the card says why, once.
-      else if (!j.refusedAt && HELD_AFTER_BASE.has(out.code)) await host.refused(card, j.plan.cycle, j.planId, { ...this.advanceWords(j, s, out.code, out.detail), mode, next: 'plan' })
+      else if (live && !j.refusedAt && HELD_AFTER_BASE.has(out.code)) await host.refused(card, j.plan.cycle, j.planId, { ...this.advanceWords(j, s, out.code, out.detail), mode, next: 'plan' })
       return false
     }
     const stop = { code: out.code, ...(out.detail ? { detail: out.detail } : {}), undo: out.kind === 'stopped' && out.undo, uncertain: out.kind === 'uncertain' }
@@ -1090,7 +1083,7 @@ export class JjPlatform implements PlatformAdapter {
     const ready = await this.advancePlan(c, s, integ)
     if (!ready) return null
     const planId = planIdOf(ready.plan)
-    if (this.planUndone(c, s, planId) || this.planHeld(c, s, planId) || !(await this.offerCurrent(ready.plan.target, ready.offer))) return null
+    if (this.planUndone(c, s, planId) || this.planHeld(c, s, planId, host) || !(await this.offerCurrent(ready.plan.target, ready.offer))) return null
     const refused = await baseRefusalNow(h, this.advanceDeps(integ, journals, () => true), ready.plan)
     if (refused === 'unreadable') return null
     if (refused) {
@@ -1111,7 +1104,7 @@ export class JjPlatform implements PlatformAdapter {
       return { step: 'busy', integrated: false }
     }
     const { outcome, journal } = await runAdvance(h, deps, j)
-    return { step: { attempted: attempt }, integrated: await this.recordAdvance(h, deps, c, journal, outcome, host) }
+    return { step: { attempted: attempt }, integrated: await this.recordAdvance(h, deps, c, journal, outcome, host, true) }
   }
 
   /**

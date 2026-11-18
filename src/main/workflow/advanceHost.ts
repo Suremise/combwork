@@ -24,6 +24,9 @@ const log = createLogger('advance')
 /** HI-3236: the project's meta marking a plan's preview dismissed by the user (Not for this plan), for the card's cycle. */
 export const previewDeclinedKey = (card: string, cycle: number, plan: string): string => `advance_declined:${card.toLowerCase()}:${cycle}:${plan}`
 
+/** The project's meta marking a refusal's comment written, once per cycle, plan and reason (s30 §1; HI-3365 reads it). */
+const refusedKey = (card: string, cycle: number, plan: string, why: string): string => `advance_refused:${card.toLowerCase()}:${cycle}:${plan}:${why}`
+
 /** The project's meta (scoped to it) marking its one-time note about the advance being its default (HI-3235). */
 export const advanceNoteKey = (project: string): string => `advance_note:${project.toLowerCase()}`
 
@@ -218,7 +221,7 @@ export function advanceHostOf(wf: Workflow): AdvanceHost {
     refused: (card, cycle, plan, words) =>
       guarded('refused', card, async () => {
         // Once per cycle, plan and reason (s30 §1: refused at the base, the card stays Approved with the reason).
-        const key = `advance_refused:${card.key.toLowerCase()}:${cycle}:${plan}:${words.why}`
+        const key = refusedKey(card.key, cycle, plan, words.why)
         if (wf.store.meta(key)) return false
         const s = wf.state(wf.store.card(card.id))
         return wf.write(
@@ -279,6 +282,7 @@ export function advanceHostOf(wf: Workflow): AdvanceHost {
         )
       }),
     previewDeclined: (card, cycle, plan) => !!wf.store.meta(previewDeclinedKey(card.key, cycle, plan)),
+    refusedFor: (card, cycle, plan, why) => !!wf.store.meta(refusedKey(card.key, cycle, plan, why)),
     noteDefault: async (card) => {
       if (!wf.cfg.finishInherited?.()) return
       const key = advanceNoteKey(wf.cfg.projectId?.() ?? wf.cfg.project)
