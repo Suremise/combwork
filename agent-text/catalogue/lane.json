@@ -127,10 +127,6 @@
     "text": "No lanes running or recently ended.",
     "note": "cw_lane list: no lane is running or ended recently (an ended lane stays listed an hour)."
   },
-  "lane.next.after": {
-    "text": "Next: {card}, once {earlier} is Done{also}. Start nothing meanwhile: end your turn with no watch, and Combwork starts {card} on you once {earlier} is Done and nothing else holds it.",
-    "note": "cw_lane next (HI-3361): the next card can't start yet, an earlier card of the lane isn't Done (lane.oneAtATime, the start's own test). {card} is its key and title; {earlier} the earlier card's key; {also} as in lane.next.carryOn. Combwork starts a lane's next card on its idle builder once the cards before it are Done (HI-1990)."
-  },
   "lane.next.afterQueue": {
     "text": "Next: {card}, once {n, plural, one {it is} other {they are}} Done.",
     "note": "cw_lane next, after its passed cards' places in the merge queue (#1354): the next card waits for them to be Done (one card at a time); {n} is how many."

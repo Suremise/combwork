@@ -3,7 +3,7 @@
 // told from another server's of the same name, unanswered calls apart, and the session's role only where it is proved.
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error: a plain .mjs script, no types
-import { ASSISTANT_ONLY_SEEN, classify, countBy, errorKind, readTranscript, toolOf } from '../scripts/toolFailures.mjs'
+import { ASSISTANT_ONLY_SEEN, classify, countBy, errorKind, namingFailure, readTranscript, toolOf } from '../scripts/toolFailures.mjs'
 import { ASSISTANT_ONLY_TOOLS } from '../src/shared/assistantTools'
 
 const SUFFIX = " This tool's input schema was not in your prompt when you called it. The input schema is: {}"
@@ -88,5 +88,34 @@ describe('reading transcripts (HI-3361)', () => {
       expect.objectContaining({ key: 'unknown', calls: 2, cwCalls: 1, failed: 1, other: 1, schemaNotLoaded: 0 })
     ])
     expect(countBy(results, (r: { day: string }) => r.day).map((r: { key: string; calls: number }) => [r.key, r.calls])).toEqual([['d1', 2], ['d2', 1]])
+  })
+})
+
+describe("a schema failure of Combwork's own naming (argNaming, HI-3361): the bridge's alias rule on the call's actual arguments", () => {
+  const startCard = 'Combwork error: "undefined" is not a card number or key (12, #12 or HI-12) cw_start_card takes card (required); missing: card; not: number.'
+  const message = 'Combwork error: text is required cw_message_agent takes project (required), agent (required), text, card, cancel; not: message.'
+
+  it('a card given as number, a message given as message: repaired by the alias, so counted', () => {
+    expect(namingFailure('cw_start_card', startCard, { number: 'AB-12' })).toBe(true)
+    expect(namingFailure('cw_message_agent', message, { project: 'p', agent: 'XB1', message: 'hi' })).toBe(true)
+    expect(namingFailure('cw_read_setting', 'Combwork error: No setting "undefined" cw_read_setting takes id (required), project; missing: id; not: key.', { key: 'workflow.target' })).toBe(true)
+  })
+
+  it('a wrong type, a canonical given, or another argument still missing is not repaired, so not counted', () => {
+    expect(namingFailure('cw_start_card', startCard, { number: ['AB-12'] })).toBe(false)
+    expect(namingFailure('cw_wait_for_tasks', 'Combwork error: cards must be card numbers cw_wait_for_tasks takes cards, changes, column, fresh, wake, limitMinutes, …; not: tasks.', { tasks: '["AB-1"]', wake: true })).toBe(false)
+    expect(namingFailure('cw_ask_assistant', 'Combwork error: "undefined" is not a card number or key (12, #12 or HI-12) cw_ask_assistant takes card (required), text (required); missing: card, text; not: message.', { message: 'hi' })).toBe(false)
+    expect(namingFailure('cw_start_card', startCard, { card: null, number: 'AB-12' })).toBe(false)
+  })
+
+  it('no argument hint, or no input: not counted', () => {
+    expect(namingFailure('cw_start_card', "Combwork error: AB-1 can't start: no slot is free.", { number: 'AB-1' })).toBe(false)
+    expect(namingFailure('cw_start_card', startCard, undefined)).toBe(false)
+  })
+
+  it('read from a transcript, a naming failure stays a schema failure (a subtotal): the total and the denominator are unchanged', () => {
+    const t = readTranscript([call('n', 'mcp__combwork__cw_start_card', { number: 'AB-12' }), result('n', startCard, true), call('g', 'mcp__combwork__cw_lane', {}), result('g', 'Combwork error: action must be start, join, next, end or list cw_lane takes action (required), cards; missing: action.', true)], new Set())
+    expect(t.results.map((r: { cls: string; naming: boolean }) => [r.cls, r.naming])).toEqual([['schemaNotLoaded', true], ['schemaNotLoaded', false]])
+    expect(countBy(t.results, () => 'all')[0]).toMatchObject({ calls: 2, failed: 2, schemaNotLoaded: 2, argNaming: 1 })
   })
 })

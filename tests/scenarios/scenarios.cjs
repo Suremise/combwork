@@ -5045,6 +5045,50 @@ module.exports.SCENARIOS = [
     }
   },
   {
+    id: 'assistant-reorder-busy',
+    // HI-3361 (CL-251/252, HI-2528, CL-219): asked to move a lane's card in flight to the end now while its builder works,
+    // the Assistant's applyNow is refused (a reorder applied now never puts a card back under a turn). The refusal names
+    // the queued change (it applies once the card in flight is Done) and asking the builder to end its turn: it takes one,
+    // never repeating applyNow into the same refusal, abandoning the lane or moving the card itself.
+    title: "The Assistant asked to reorder a lane now while its builder works (HI-3361): after one refused applyNow it queues the change or asks the builder to end its turn; it never repeats applyNow, abandons the lane or moves the card",
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      await reviewedPair(c)
+      const a = await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', agent: 'coder', column: 'doing' })
+      const b = await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder' })
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a, b], name: 'greetings' }, { keepRunning: true })
+      // Coder in a turn of its own (working), as a lane builder is while it builds: bounded work, its status checked.
+      await busyCoder(c, 20, 300, c.agents.coder, `For #${a} of your lane, first: `)
+    },
+    prompt: (c) => `In alpha, Coder's lane is working on #${c.cards.a}, but the user wants #${c.cards.b} done first. Move #${c.cards.a} to the end of the lane now, not after it is finished.`,
+    fake: (c) => `skill run-lanes then cw cw_lane ${JSON.stringify({ action: 'start', project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [c.cards.b, c.cards.a], applyNow: true })} then cw cw_lane ${JSON.stringify({ action: 'start', project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [c.cards.b, c.cards.a] })}`,
+    // Coder's status while the Assistant works: it must still be in its turn for the refusal to be the one under test.
+    during: async (c) => {
+      const s = await coderLive(c)
+      if (s) (c.coderStatuses ||= []).push(s.status)
+    },
+    expect: (o, c) => {
+      const starts = called(o, 'cw_lane').filter((x) => argsOf(x).action === 'start')
+      const now = starts.filter((x) => argsOf(x).applyNow === true)
+      // The fixture held (any applyNow tried was refused because Coder was in a turn: lane.refused.applyNow.inATurn).
+      const turnRefused = now.filter((x) => !x.ok && /never puts its card back under it/.test(String(x.error ?? '')))
+      const fixture = ['Coder was working while the Assistant ran, and any applyNow was refused for its turn', (c.coderStatuses ?? []).includes('working') && now.every((x) => x.ok === false) && turnRefused.length === now.length, `${(c.coderStatuses ?? []).join(',')} / ${now.map((x) => String(x.error ?? 'ok').slice(0, 80)).join(' | ')}`]
+      const order = (x) => JSON.stringify((argsOf(x).cards ?? []).map((n) => Number(String(n).replace(/\D/g, ''))))
+      const queued = starts.some((x) => x.ok && argsOf(x).applyNow !== true && order(x) === JSON.stringify([c.cards.b, c.cards.a]))
+      const asked = called(o, 'cw_message_agent').some((x) => x.ok && /coder/i.test(String(argsOf(x).agent)))
+      return [
+        fixture,
+        ['queued the new order (cw_lane start without applyNow) or asked Coder to end its turn', queued || asked, starts.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ')],
+        ['at most one applyNow refused (not repeated into the same refusal)', now.filter((x) => !x.ok).length <= 1, now.map((x) => `${x.ok ? 'ok' : 'refused'}`).join(',')],
+        ['abandoned or ended no lane', !called(o, 'cw_lane').some((x) => argsOf(x).action === 'end'), o.combworkCalls.map((x) => x.tool).join(',')],
+        [`#${c.cards.a} stays Coder's, in Doing (not put back or moved by the Assistant)`, o.cards.a?.column === 'doing' && !called(o, 'cw_put_back').length && !called(o, 'cw_update_task').some((x) => x.ok && namesCard(o, [argsOf(x).number], c.cards.a) && argsOf(x).column), `${o.cards.a?.column}`],
+        ['no stop or prompt of Coder', called(o, 'cw_stop_agent').length === 0 && called(o, 'cw_prompt_agent').length === 0, o.combworkCalls.map((x) => x.tool).join(',')]
+      ]
+    },
+    observe: (o) => [['read the run-lanes or coordinate-agents skill', read(o, 'run-lanes') || read(o, 'coordinate-agents'), o.skillsRead.join(',')]]
+  },
+  {
     id: 'assistant-start-watching',
     // HI-3361 (CL-350, 18 Nov): asked to start a card on a lane builder that is waiting on a watch, the Assistant's
     // cw_start_task is refused (the agent takes no new task until woken; only the user cancels a watch). The refusal's

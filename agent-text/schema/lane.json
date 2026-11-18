@@ -149,13 +149,6 @@
   "lane.list.noneListed": {
     "placeholders": {}
   },
-  "lane.next.after": {
-    "placeholders": {
-      "card": "plain",
-      "earlier": "plain",
-      "also": "plain"
-    }
-  },
   "lane.next.afterQueue": {
     "placeholders": {
       "card": "plain",

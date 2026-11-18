@@ -7,7 +7,8 @@
 // cancels one from the ⋯, and it is
 // never typed; one tied to a card's round (#652) is refused for a card out of Doing and Review, and stale, never told,
 // once that card passes; a message queued for an agent whose card or agent watch fires meanwhile goes in one doorbell
-// with that wake, read first; one whose sender may no longer send it (Control turned down) is refused, never typed. Dev build, throwaway
+// with that wake, read first; one whose sender may no longer send it (Control turned down) is refused, never typed; HI-3361: its
+// words given as `message` are taken as `text` at the bridge, `text` winning when both come. Dev build, throwaway
 // profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -263,6 +264,16 @@ const check = (name, ok, extra = '') => {
   check('…all three off: it waits in its inbox, the user can Deliver Now', !none.isError && none.text.includes('): it waits in its inbox until it reads it with cw_inbox (the user can Deliver Now);'), none.text)
   check('…and the messages are cancelled', /^Cancelled 2 messages waiting for Builder\.$/.test(tool('cw_message_agent', { project: 'alpha', agent: 'Builder', cancel: true }).text))
   await inv('project:updateConfig', alpha, { inboxCheckpoints: 'inherit', inboxStopContinuation: 'inherit', inboxIdleWakes: 'inherit' })
+
+  // --- 8. HI-3361: `message` (cw_notify's name for a message's words) taken as cw_message_agent's `text` at the bridge's
+  // tools/call, before the tool's handler: delivered as text is; with both given, `text` is what is delivered.
+  await until(() => idle(builder.id), 15000)
+  const aliased = tool('cw_message_agent', { project: 'alpha', agent: 'Builder', message: 'Taken as its text (HI-3361).' })
+  check('cw_message_agent given `message` for its words delivers them, as `text` would be', !aliased.isError && /^(Told|Queued for) Builder/.test(aliased.text), aliased.text)
+  await until(() => idle(builder.id), 15000)
+  const both = tool('cw_message_agent', { project: 'alpha', agent: 'Builder', text: 'Its text wins (HI-3361).', message: 'Never delivered (HI-3361).' })
+  check('…given both, `text` is the one taken', !both.isError && /^(Told|Queued for) Builder/.test(both.text), both.text)
+  check('…the builder reads both messages as their text says, and never the alias left over', !!(await until(async () => wakes('Builder').some((t) => t.includes('Taken as its text (HI-3361).')) && wakes('Builder').some((t) => t.includes('Its text wins (HI-3361).')), HUNG_MS)) && !wakes('Builder').some((t) => t.includes('Never delivered (HI-3361).')), JSON.stringify(wakes('Builder').slice(-4)))
 
   await inv('session:stop', alpha)
   await inv('session:stop', home)

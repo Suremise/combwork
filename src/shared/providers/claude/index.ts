@@ -271,7 +271,7 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
     session: {
       modelAliases: ['fable', 'opus', 'sonnet', 'haiku', 'default', 'best', 'opusplan'],
       fixedSessionId: true,
-      // Behind its tool search, but for tools listed with anthropic/alwaysLoad (HI-2229).
+      // Behind its tool search, but for tools listed with anthropic/alwaysLoad (HI-2229; Combwork marks none since HI-3361).
       defersMcpTools: 'unmarked',
       lockAsk: true,
       typedTurnsWithoutPrompt: true,

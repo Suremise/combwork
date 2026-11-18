@@ -2034,7 +2034,7 @@ export async function endLane(ws: WorkspaceService, id: string, o: { abandoned?:
  * The next card of an agent's running lane (#1270, `cw_lane next`): the card to start, the one in flight to carry on,
  * or why the lane waits (a card passed but not merged: one card at a time, §16.11.2); none once every card is Done.
  */
-export async function laneNext(ws: WorkspaceService, project: string, agentId: string): Promise<{ lane: LaneInfo; next: { card: number; title: string; carryOn: boolean; after?: number } | null; waits: LaneInfo['status']; review?: { card: number; title: string } | null }> {
+export async function laneNext(ws: WorkspaceService, project: string, agentId: string): Promise<{ lane: LaneInfo; next: { card: number; title: string; carryOn: boolean } | null; waits: LaneInfo['status']; review?: { card: number; title: string } | null }> {
   // An agent that reviews lanes and builds none (HI-3118): a reviewer's answer, the first card of its lanes (in their
   // order) waiting in Review, or none; never a builder's next card. One that builds a lane gets that lane, as before.
   const runningHere = (await read(ws)).filter((l) => running(l) && same(l.project, project))

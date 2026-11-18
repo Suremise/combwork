@@ -2323,13 +2323,7 @@ route('GET', '/v1/lanes/next', async () =>
     // to carry on issues nothing: the agent's view of it may be from an attempt that has moved on, which the fence is for.
     // Only while it is still in Todo, read with its attempt in one step (attemptToStart): laneNext awaits after taking its
     // view, and a card started again meanwhile is in an attempt this reply never showed (HR2's round 1).
-    // HI-3361: a card whose start would be refused, an earlier card of the lane not Done (the start's own test, while the
-    // rules are enforced): named with that card, never to start now, and no attempt issued for it.
-    if (r.next && !r.next.carryOn) {
-      const earlier = await tasks.laneStartWaitsFor(requireWorkspace(), a.projectPath, r.next.card)
-      if (earlier !== null) r.next.after = earlier
-    }
-    if (r.next && !r.next.carryOn && r.next.after === undefined && a.runId) {
+    if (r.next && !r.next.carryOn && a.runId) {
       const at = tasks.attemptToStart(requireWorkspace(), basename(a.projectPath), r.next.card)
       if (at) issueAttempt({ projectPath: a.projectPath, agentId: a.agentId, runId: a.runId }, r.next.card, at)
     }
