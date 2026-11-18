@@ -7,7 +7,8 @@ import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
 import { HISTORY_TEXT, OpencodeConversationParser, buildMirror, forkCopies, inconsistentBreakdowns, mirrorState, opencodeImageData, opencodePlanUsage, opencodeUsage, parseExport, parseMirrorUsage, placeholderMirror, subagentSessions, withStatus, withoutStatus } from '../src/main/providers/opencode/mirror'
 import { Failed, HistoryCore, dbFiles, markPath, mirrorPath, plainLocalGet, statePath, type CoreDeps, type CoreEvent } from '../src/main/providers/opencode/historyCore'
-import { OpencodeHistory, historyWorkerForTests } from '../src/main/providers/opencode/history'
+import { OpencodeHistory, SHUTDOWN_MS, historyWorkerForTests } from '../src/main/providers/opencode/history'
+import { TREE_END_MS } from '../src/main/processTree'
 import { serverInfoPath } from '../src/main/providers/opencode/launcher'
 import { englishText } from '../src/shared/advanced'
 import type { TranscriptItem } from '../src/shared/types'
@@ -502,6 +503,11 @@ describe("the OpenCode history's main side (HI-2762)", () => {
     await h.stop()
     await historyWorkerForTests(null)
   }, 60_000)
+
+  it("waits at a quit for its exports' teardowns to their bound (HI-3358): the shutdown's grace is past endTreeAsync's whole bound", () => {
+    // The exports end in parallel (historyCore's shutdown), each within TREE_END_MS (processTreeLate.test.ts holds it).
+    expect(SHUTDOWN_MS).toBeGreaterThan(TREE_END_MS)
+  })
 
   it('gives a stable mirror path from the first answer: a placeholder until a read completes', async () => {
     const { h } = await history()

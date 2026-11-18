@@ -130,6 +130,8 @@ interface CombworkMessageValues {
   'workspace.closeCommand.skip': undefined
   'workspace.closeCommand.skipped': undefined
   'workspace.closeCommand.spawn': { kind: string }
+  'workspace.closingAgents.note': { late: string }
+  'workspace.closingAgents.title': { late: string; n: number }
   'workspace.commands.dontWaitNote': { point: string }
   'workspace.commands.exitCode': { code: string | number }
   'workspace.commands.failedExit': { name: string | number; code: string | number }

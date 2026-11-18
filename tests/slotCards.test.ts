@@ -59,6 +59,8 @@ const state = vi.hoisted(() => ({
   logged: [] as string[],
   /** The builder's conversation bound to the card's lease, as sessions.leaseConversation gives it (HI-1746). */
   conv: { is: 'none' } as { is: 'none' } | { is: 'resume'; id: string; name: string } | { is: 'held'; hold: { is: string; slot: string } },
+  /** HI-3360: the builder's conversation idle so long its resume would be cold (sessions.idleOf), or null. */
+  idle: null as { since: string; idleMs: number; tokens: number | null; bytes: number | null } | null,
   /** The next starts: fail (its resume couldn't start), or lose to another start (that start then runs the builder there). */
   starts: [] as ('fails' | 'lost' | 'busy')[],
   /** This run's restart record will resume the builder (restartResume.isResuming). */
@@ -232,6 +234,7 @@ vi.mock('../src/main/sessions', async (orig) => {
       return {}
     },
     newConversation: async () => (state.calls.push('newConversation'), {}),
+    idleOf: async () => state.idle,
     leaseConversation: async () => {
       if (state.convFails) throw new Error('EBUSY: the transcript folder is busy (test)')
       return state.conv
@@ -289,7 +292,7 @@ afterEach(() => {
   env?.close()
   env = null
   resetAgentStartsForTests()
-  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], noCode: [], pool: {}, lockedFns: [], logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false, busy: null, quietAt: null, freeAfterLook: null, held: null, heldLooks: 0, freeAfterHeldLook: false, sessionsIn: [], run: null, quit: null, quits: 0, working: false })
+  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], noCode: [], pool: {}, lockedFns: [], logged: [], conv: { is: 'none' }, idle: null, starts: [], resuming: false, convFails: false, busy: null, quietAt: null, freeAfterLook: null, held: null, heldLooks: 0, freeAfterHeldLook: false, sessionsIn: [], run: null, quit: null, quits: 0, working: false })
 })
 
 /**
@@ -1073,6 +1076,31 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
     expect(state.deliveries.map((d) => d.state)).toEqual(['offered'])
   })
 
+  it('HI-3360: its conversation bound to the lease idle so long its resume would be cold: a new conversation with the card, never the resume', async () => {
+    const { e, n, cycle, ws } = await owed()
+    state.conv = resume
+    state.idle = { since: '2026-11-15T10:00:00.000Z', idleMs: 3 * 86_400_000, tokens: 150_000, bytes: null }
+    await place(ws, e.project, e.wf, n, cycle, lease)
+    expect(state.calls).toEqual(['start with the card'])
+    expect(placedHow(e, n)).toEqual(['started'])
+    expect(state.logged.some((l) => l.includes('a new conversation instead of a cold resume'))).toBe(true)
+  })
+
+  it('HI-3360: held first: a cold conversation held in its slot waits as any held one does; once free, a new conversation', async () => {
+    const { e, n, cycle, ws } = await owed()
+    state.conv = { is: 'held', hold: { is: 'draining', slot: 'slot-a' } }
+    state.idle = { since: '2026-11-15T10:00:00.000Z', idleMs: 3 * 86_400_000, tokens: 150_000, bytes: null }
+    const placing = place(ws, e.project, e.wf, n, cycle, lease)
+    await vi.waitFor(() => expect(notices(e)).toHaveLength(1), { timeout: HUNG_MS })
+    expect(state.calls).toEqual([])
+    // The hold over: then the idle rule, a new conversation rather than the cold resume.
+    state.conv = resume
+    status()
+    await placing
+    expect(state.calls).toEqual(['start with the card'])
+    expect(placedHow(e, n)).toEqual(['started'])
+  })
+
   it("HI-2134: resumed with the card, its fact not written (its workspace closed): the next pass records it resumed, not typed, and gives nothing more", async () => {
     const { e, n, slot, cycle, ws } = await owed()
     // The earlier pass's launch: the conversation resumed in its slot with the card's delivery, kept with how it was made.
@@ -1778,9 +1806,10 @@ describe('Combwork quitting (#1628)', { timeout: 60_000 }, () => {
     expect(at('= quitSlotCards()')).toBeLessThan(at('sessions.stopAllAndWait('))
     expect(at('await slotsQuiet')).toBeLessThan(at('app.quit()'))
     // The stopped runs' slot writers released once their outcomes are known (after the leftovers' look), before the
-    // workspaces close (HI-1801).
-    expect(at('await quitLeftovers()')).toBeLessThan(at('await sessions.writersSettled('))
-    expect(at('await sessions.writersSettled(')).toBeLessThan(at('app.quit()'))
+    // workspaces close (HI-1801); waited for until they are, or the user's Don't wait (HI-3376: closingAgents.ts).
+    const writers = "await agentsClosed('quitting', undefined, ['writers']"
+    expect(at('await quitLeftovers()')).toBeLessThan(at(writers))
+    expect(at(writers)).toBeLessThan(at('app.quit()'))
     const willQuit = src.slice(src.indexOf("app.on('will-quit'"))
     expect(willQuit.indexOf('stopSlotCards()')).toBeLessThan(willQuit.indexOf('closeAllBoards()'))
   })

@@ -67,6 +67,8 @@ export interface CliDescription {
     osc7501?: boolean
     /** What ends it at a lane's end, typed then Enter ("/exit"). */
     exit?: string
+    /** HI-3375: how long it gets to exit after `exit` before it is ended, in seconds (EXIT_GRACE: 3–300, 30 when absent). */
+    exitGraceSeconds?: number
   }
   models?: { placeholder?: string; list?: string[] }
   /**
@@ -75,6 +77,9 @@ export interface CliDescription {
    */
   server?: { api: 'openai' | 'anthropic'; env: Record<string, string>; args?: string[]; keyless?: string }
 }
+
+/** HI-3375: a described CLI's grace to exit after its exit command, in seconds: when it doesn't say, and its bounds. */
+export const EXIT_GRACE = { seconds: 30, min: 3, max: 300 } as const
 
 /** How big a description may be, and each part of it. */
 export const CLI_BOUNDS = { files: 32, fileBytes: 64 * 1024, args: 32, argChars: 1000, env: 32, envValueChars: 4000, patternChars: 500, nameChars: 60, models: 64, modes: 16, paths: 16 } as const
@@ -88,6 +93,7 @@ const M = {
   badId: msg({ id: 'clis.problem.badId', defaultMessage: '“id” must be lower case letters, digits and dashes, starting with a letter (2 to 31 characters).', description: 'Why a CLI description is refused: its "id" field (keep it as it is) isn’t a short slug.' }),
   idTaken: msg({ id: 'clis.problem.idTaken', defaultMessage: '“id” {id} is taken: {by}.', description: 'Why a CLI description is refused: another provider or another description has the same id. {id} is the id; {by} names what has it (a provider’s name, or a file).' }),
   missing: msg({ id: 'clis.problem.missing', defaultMessage: '“{field}” is missing.', description: 'Why a CLI description is refused: a required field is missing. {field} is its name, as written in the file (keep it).' }),
+  badSeconds: msg({ id: 'clis.problem.badSeconds', defaultMessage: '“{field}” must be a number of seconds from {min} to {max}.', description: 'Why a CLI description is refused (HI-3375): a field that is a time in seconds has another value, or one out of its range. {field} is its name as written in the file (keep it); {min} and {max} are numbers.' }),
   badType: msg({ id: 'clis.problem.badType', defaultMessage: '“{field}” must be {kind, select, text {text} list {a list of texts} object {an object} yesNo {true or false} other {{kind}}}.', description: 'Why a CLI description is refused: a field has the wrong kind of value. {field} is its name as written in the file (keep it).' }),
   tooLong: msg({ id: 'clis.problem.tooLong', defaultMessage: '“{field}” is longer than {max, number} characters.', description: 'Why a CLI description is refused: a text in it is too long. {field} is its name as written in the file (keep it); {max} the limit.' }),
   tooMany: msg({ id: 'clis.problem.tooMany', defaultMessage: '“{field}” has more than {max, number} items.', description: 'Why a CLI description is refused: a list in it is too long. {field} is its name as written in the file (keep it); {max} the limit.' }),
@@ -248,6 +254,9 @@ export function checkCliDescription(raw: unknown, taken: ReadonlyMap<string, str
   const osc7501 = statusRaw?.osc7501
   if (osc7501 !== undefined && typeof osc7501 !== 'boolean') problems.push(withValues(M.badType, { field: 'status.osc7501', kind: 'yesNo' }))
   const exit = text(statusRaw?.exit, 'status.exit', CLI_BOUNDS.argChars, false)
+  const graceRaw = statusRaw?.exitGraceSeconds
+  const exitGrace = typeof graceRaw === 'number' && Number.isFinite(graceRaw) && graceRaw >= EXIT_GRACE.min && graceRaw <= EXIT_GRACE.max ? graceRaw : undefined
+  if (graceRaw !== undefined && exitGrace === undefined) problems.push(withValues(M.badSeconds, { field: 'status.exitGraceSeconds', min: EXIT_GRACE.min, max: EXIT_GRACE.max }))
 
   let models: CliDescription['models']
   const modelsRaw = obj(raw.models, 'models', false)
@@ -277,7 +286,7 @@ export function checkCliDescription(raw: unknown, taken: ReadonlyMap<string, str
       binary: { names, ...(paths ? { paths } : {}), ...(versionArgs ? { versionArgs } : {}), ...(versionPattern ? { versionPattern } : {}) },
       launch: { ...(launchArgs ? { args: launchArgs } : {}), prompt, ...(modes?.length ? { modes } : {}), ...(env && Object.keys(env).length ? { env } : {}) },
       ...(session ? { session } : {}),
-      status: { ready, ...(working ? { working } : {}), ...(asks ? { asks } : {}), ...(titleAsks ? { titleAsks } : {}), ...(osc7501 === true ? { osc7501: true } : {}), ...(exit ? { exit } : {}) },
+      status: { ready, ...(working ? { working } : {}), ...(asks ? { asks } : {}), ...(titleAsks ? { titleAsks } : {}), ...(osc7501 === true ? { osc7501: true } : {}), ...(exit ? { exit } : {}), ...(exitGrace !== undefined ? { exitGraceSeconds: exitGrace } : {}) },
       ...(models && (models.placeholder || models.list?.length) ? { models: { ...(models.placeholder ? { placeholder: models.placeholder } : {}), ...(models.list?.length ? { list: models.list } : {}) } } : {}),
       ...(server ? { server } : {})
     }

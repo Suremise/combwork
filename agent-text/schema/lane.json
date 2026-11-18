@@ -218,7 +218,8 @@
   "lane.refused.applyNow.inATurn": {
     "placeholders": {
       "agent": "plain",
-      "status": "select"
+      "status": "select",
+      "card": "plain"
     }
   },
   "lane.refused.applyNow.inReview": {

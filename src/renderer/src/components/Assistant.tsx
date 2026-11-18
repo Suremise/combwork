@@ -218,7 +218,7 @@ async function changeAssistant(patch: Omit<AgentPatch, 'name'>, restart: { title
     const ok = await confirm({ title: restart!.title, message: restart!.message, detail: tr(M.resumeLater), confirmLabel: tr(M.restartButton) })
     if (!ok) return false
     await actions.attempt(tr(M.stopFailed), () => call('session:stop', a.path, AGENT))
-    await actions.waitForStop(a.path, AGENT)
+    if (!(await actions.waitForStop(a.path, AGENT))) return !!actions.stillStopping(a.path, AGENT)
   }
   const done = await actions.attempt(tr(M.saveFailed), () => call('agents:update', a.path, AGENT, patch))
   await actions.refreshWorkspace()
@@ -260,7 +260,7 @@ export async function restartInMode(p: Pick<ModeInfo, 'id' | 'name' | 'bundled'>
   if (!(await actions.attempt(tr(M.saveModeFailed), () => call('agents:update', a.path, AGENT, { mode: p.id })))) return
   const item = (await call('session:list', a.path)).find((s) => s.id === live.sessionId)
   await actions.attempt(tr(M.stopFailed), () => call('session:stop', a.path, AGENT))
-  await actions.waitForStop(a.path, AGENT)
+  if (!(await actions.waitForStop(a.path, AGENT))) return actions.stillStopping(a.path, AGENT)
   await actions.refreshWorkspace()
   await actions.resumeSession(a.path, actions.restartItem({ sessionId: live.sessionId, agentId: AGENT }, item), AGENT)
 }

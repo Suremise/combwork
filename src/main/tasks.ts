@@ -40,6 +40,7 @@ import { linkToComment, moveCardFolder, publish, removeCardAttachments, trashCar
 import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } from '../shared/cardAttachments'
 import { hasStage, laneTargetOf, skipReviewOf } from '../shared/workflow/compile'
 import { isStageId, STAGE_TEXT, stageName, type StageNames } from '../shared/workflow/stages'
+import { decisionWithChoice } from '../shared/decisionChoice'
 import { answerFits, CHURN_GATES, churnTotal, approveNote, ASK_ACTIONS, ATTEMPT_STAGES, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, advanceUnresolved, foldCard, openEntry, type Actor, type AttemptKey, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type PauseChoice, type StageId } from '../shared/workflow/facts'
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
@@ -2696,7 +2697,10 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
   const reply = one ? undefined : typed
   const outcome = one ? 'answered' : a.outcome
   // HI-2286: an agent's question approved with a note: the note is a reply and the user's decision on the card too.
-  const decision = !asked && !one && req.kind === 'approve' && a.outcome === 'approved' && reply && approveNote(req) === 'decision' ? text(reply, MAX_DECISION, 'decision') : decided
+  const typedDecision = !asked && !one && req.kind === 'approve' && a.outcome === 'approved' && reply && approveNote(req) === 'decision' ? text(reply, MAX_DECISION, 'decision') : decided
+  // HI-3356: a bare option label ("A", "(a)", "2") is recorded with what it chose, or with the question whole: never a
+  // bare letter. Its length was checked as typed; what it adds is the request's own stored text, never cut.
+  const decision = typedDecision === undefined ? undefined : decisionWithChoice(typedDecision, req.text, req.request)
   // What each kind takes (answerFits): an approval is approved or declined; at the round limit, a choice (a carry on with
   // its rounds); any other question, a reply or a decision. Checked before anything is written.
   const choice = a.choice as PauseChoice | undefined
@@ -2708,7 +2712,7 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
       actor,
       (w) => w.answer(n, request, outcome, { by: actor.kind, ...(reply ? { note: reply } : reason ? { note: reason } : {}), ...(decision ? { decided: true } : {}), ...(choice ? { choice } : {}), ...(choice === 'carryOn' ? { rounds: a.rounds } : {}), ...(action ? { action } : {}) }),
       // A reply is on the card too, as the user's comment (#1626), so the card shows it and the wake's "in full" is there.
-      (_w, first) => ({ patch: first && decision ? { decision } : {}, ...(first && reply ? { opts: { comment: reply } } : {}) })
+      (_w, first) => ({ patch: first && decision ? { decision } : {}, opts: { ...(first && reply ? { comment: reply } : {}), ...(decision !== typedDecision ? { expanded: true } : {}) } })
     )
     if (isRefusal(r)) throw new WorkflowRefusedError(r)
     return getTask(n, ws)
@@ -2784,8 +2788,8 @@ export function checkDecisionAnswers(actor: TaskActor, answers: unknown, wrong: 
 async function decideAndAnswer(n: number, patch: TaskPatch, actor: TaskActor, opts: Parameters<typeof updateTaskLocked>[3] = {}): Promise<TaskCard> {
   const ws = workspace
   const { answers, decision, ...rest } = patch
-  const t = typeof decision === 'string' ? text(decision, MAX_DECISION, 'decision').trim() : ''
-  checkDecisionAnswers(actor, answers, !t || Object.entries(rest).some(([, v]) => v !== undefined) || !!opts.comment)
+  const said = typeof decision === 'string' ? text(decision, MAX_DECISION, 'decision').trim() : ''
+  checkDecisionAnswers(actor, answers, !said || Object.entries(rest).some(([, v]) => v !== undefined) || !!opts.comment)
   const requests = [...new Set(answers.map((x) => x.trim()))]
   const head = ws.path ? cardHeads(ws, [n])[0] : undefined
   if (!head) throw unknownTask(n)
@@ -2802,6 +2806,10 @@ async function decideAndAnswer(n: number, patch: TaskPatch, actor: TaskActor, op
     const req = open.find((r) => r.request === id)
     if (!req || !decisionAnswers(req)) throw combworkError(DECIDE.not, { why: req ? 'kind' : 'open', request: id, card: cardRef(n) }, { kind: req ? 'invalid' : 'conflict' }) // i18n-ignore: select keys, never shown
   }
+  // HI-3356: a bare option label answering one request is recorded with what it chose (decisionWithChoice); answering
+  // several, it is kept as written: which question's options it names isn't guessed.
+  const one = requests.length === 1 ? open.find((r) => r.request === requests[0])! : null
+  const t = one ? decisionWithChoice(said, one.text, one.request) : said
   const decisionId = entryId()
   const recordedBy = actorName(actor)
   const lines = requests.map((id) => storedText(HISTORY.closedByDecision, { question: clip(open.find((r) => r.request === id)!.text) }))
@@ -2815,7 +2823,7 @@ async function decideAndAnswer(n: number, patch: TaskPatch, actor: TaskActor, op
     // Only with the write that holds its answers: a refusal is written too (its Refused fact), and takes no decision.
     // HI-2220: what it wrote (the decision, each question closed) goes to the caller's `said` with that write only, so
     // the short reply confirms it rather than "No change", and a refusal confirms nothing.
-    (w) => (w.written.some((f) => f.kind === 'Approval' && !!(f.data as { byDecision?: unknown }).byDecision) ? { patch: { decision: t, decisionId }, opts: { note: lines, ...(opts.commit ? { commit: opts.commit } : {}), ...(opts.said ? { said: opts.said } : {}) } } : {})
+    (w) => (w.written.some((f) => f.kind === 'Approval' && !!(f.data as { byDecision?: unknown }).byDecision) ? { patch: { decision: t, decisionId }, opts: { note: lines, ...(t !== said ? { expanded: true } : {}), ...(opts.commit ? { commit: opts.commit } : {}), ...(opts.said ? { said: opts.said } : {}) } } : {})
   )
   if (isRefusal(reply)) throw new WorkflowRefusedError(reply)
   return getTask(n, ws)
@@ -2879,7 +2887,7 @@ async function planned(ws: WorkspaceService, numbers: number[], patch: Pick<Task
 /** For tests: runs as a card's change begins, in its board change (to hold a batch at a card). */
 export const taskTestHooks: { beforeUpdate: ((n: number) => Promise<void>) | null } = { beforeUpdate: null }
 
-async function updateTaskLocked(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; ask?: boolean; note?: StoredText[]; entered?: { nobodyOk: boolean } } = {}): Promise<TaskCard> {
+async function updateTaskLocked(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; ask?: boolean; note?: StoredText[]; entered?: { nobodyOk: boolean }; expanded?: boolean } = {}): Promise<TaskCard> {
   // Its facts are this actor's (#1216), with the reads its caller made before the change, if any.
   return recordingAs(actor, () => updateTaskAs(n, patch, actor, opts))
 }
@@ -2895,7 +2903,7 @@ async function stageNamesOf(ws: WorkspaceService, project: string | null | undef
   return names && Object.keys(names).length ? names : null
 }
 
-async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; note?: StoredText[]; entered?: { nobodyOk: boolean }; fenced?: boolean }): Promise<TaskCard> {
+async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; note?: StoredText[]; entered?: { nobodyOk: boolean }; fenced?: boolean; expanded?: boolean }): Promise<TaskCard> {
   await taskTestHooks.beforeUpdate?.(n)
   const ws = workspace
   const by = actorName(actor)
@@ -3033,7 +3041,9 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     if (patch.decision !== undefined) {
       // Recorded by whoever calls (the user, the Assistant, an agent), decided by the user: agents only write down what
       // the user decided (their tool's description says so). Editing or removing one is the user's (editDecision).
-      const t = text(patch.decision, MAX_DECISION, 'decision').trim()
+      // HI-3356: `expanded` only from answerTask and decideAndAnswer, a bare option label already checked as typed and
+      // expanded with its request's own stored text (decisionWithChoice): kept whole, never refused for that text's length.
+      const t = text(patch.decision, opts.expanded ? Infinity : MAX_DECISION, 'decision').trim()
       if (!t) throw combworkError(ERR.emptyDecision)
       const list = card.decisions ?? []
       if (list.length >= MAX_DECISIONS) throw combworkError(msg({ id: 'tasks.error.tooManyDecisions', defaultMessage: 'A card can have up to {max} decisions.', description: 'An error: a card already has as many decisions as it may have ({max}, a number).' }), { max: MAX_DECISIONS }, { kind: 'invalid' })

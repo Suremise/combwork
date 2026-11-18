@@ -142,7 +142,7 @@ export const ackFile = (nonce: string): string => `restart-ack-${nonce}.json`
 export const takenFile = (nonce: string): string => `restart-request.${nonce}.taken`
 /** A request is at most this big, and this old. */
 export const REQUEST_MAX_BYTES = 4096
-export const REQUEST_MAX_AGE_MS = 60_000
+export const REQUEST_MAX_AGE_MS = 10 * 60_000
 /** How far apart this process's start and the request's may be (the installer reads it from Windows, Combwork from its uptime). */
 export const START_TOLERANCE_MS = 5_000
 

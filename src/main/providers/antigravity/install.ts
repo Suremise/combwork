@@ -7,7 +7,7 @@ import { ANTIGRAVITY, ANTIGRAVITY_DESCRIPTOR } from '../../../shared/providers/a
 import { providerSettings } from '../../../shared/providers'
 import { config } from '../../config'
 import { createLogger, userText } from '../../logger'
-import { EDITOR_EXTENSION_PATH, installText, notInstalledIssue, run, signedOutIssue, toSpawnable } from '../common'
+import { EDITOR_EXTENSION_PATH, installText, notInstalledIssue, run, signedOutIssue, toSpawnable, WHERE_MS } from '../common'
 import type { CommandSpec } from '../types'
 import { checkEnv, inUserProfile } from './home'
 import { parseModels, type CatalogModel } from './models'
@@ -30,7 +30,7 @@ async function candidates(env: Record<string, string>): Promise<{ path: string; 
   const out: { path: string; source: string }[] = []
   const custom = providerSettings(config.settings, ID).executablePath.trim()
   if (custom) out.push({ path: custom, source: 'settings' })
-  const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', ['agy'], 5000, env)
+  const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', ['agy'], WHERE_MS, env)
   for (const line of where.stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {
     if (process.platform !== 'win32' || /\.(exe|cmd|bat)$/i.test(line)) out.push({ path: line, source: 'PATH' })
   }

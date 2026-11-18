@@ -236,6 +236,18 @@
   "settings.advanced.claude-code.autoModeSetup.offer.title": {
     "placeholders": {}
   },
+  "settings.advanced.claude-code.background.idField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.background.idField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.background.pidField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.background.pidField.title": {
+    "placeholders": {}
+  },
   "settings.advanced.claude-code.connections.remoteModels.desc": {
     "placeholders": {}
   },
@@ -1127,6 +1139,12 @@
   "settings.advanced.cw.cards.titleNudgeChars.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.cli.probeSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.cli.probeSeconds.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.console.showText.desc": {
     "placeholders": {}
   },
@@ -1511,10 +1529,28 @@
   "settings.advanced.cw.restart.resumeReadySeconds.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.resume.idleAsk.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.resume.idleAsk.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.resume.idleMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.resume.idleMinutes.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.desc": {
     "placeholders": {}
   },
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.server.checkInferSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.server.checkInferSeconds.title": {
     "placeholders": {}
   },
   "settings.advanced.cw.sessions.signFailFast.desc": {

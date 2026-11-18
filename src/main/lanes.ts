@@ -5,7 +5,7 @@ import { projectPreferences } from './workflow/preferences'
 import { existsSync } from 'original-fs'
 import { CW_DIR, projectAgents } from '../shared/defaults'
 import { agentWorkflowRole, buildsWork, inWorkflow, reviewsWork } from '../shared/workflow/roles'
-import { allDone, isFrozen, keptLanes, laneName, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, laneYieldFirst, type LaneYield, type LaneAgent, type FreshStart, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneSlotHeld, type LaneStartWait, type WaitStamp } from '../shared/lanes'
+import { allDone, isFrozen, keptLanes, laneName, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, laneYieldFirst, waitsOnCard, type LaneYield, type LaneAgent, type FreshStart, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneSlotHeld, type LaneStartWait, type WaitStamp } from '../shared/lanes'
 import type { CombworkErrorKind, DueDeps, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
 import { columnSince } from '../shared/tasks'
 import { designReviewer, reviewingNow } from '../shared/workflow/reviewerPool'
@@ -123,7 +123,7 @@ const A = {
   freshItem: agentMsg({ id: 'lane.warn.freshItem', text: '{card} was created {ago} s ago by {who}', note: 'One card of a start\'s list made by someone else since the caller\'s turn began (HI-2167); {ago} in seconds. Joined with "; " into lane.warn.fresh\'s {items}.' }),
   fresh: agentMsg({ id: 'lane.warn.fresh', text: "Warning: {items}: is it the card you meant? To put a new card on a lane, create it with cw_create_task's lane, never by its guessed key.", note: "cw_lane start's safety net (HI-2167): a card in its list may be a guessed key; {items} are lane.warn.freshItem's." }),
   inReview: agentMsg({ id: 'lane.refused.applyNow.inReview', text: '{card} is in {where, select, review {Review} other {Approved or merging}}: putting it back would lose its review or merge. Change the order without applyNow (it applies once {card} is Done), or wait.', note: "A reorder applied now (HI-1995) refused: the builder's card in flight is in Review (where review) or Approved or merging." }),
-  inATurn: agentMsg({ id: 'lane.refused.applyNow.inATurn', text: '{agent} {status, select, working {is working} starting {is starting} waiting {is waiting for the user} other {has background tasks running}}: a reorder applied now never puts its card back under it. Ask it to finish and end its turn, then reorder again.', note: 'A reorder applied now (HI-1995) refused: the builder is in a turn of its own ({status}: working, starting, waiting for the user, or background tasks running).' }),
+  inATurn: agentMsg({ id: 'lane.refused.applyNow.inATurn', text: '{agent} {status, select, working {is working} starting {is starting} waiting {is waiting for the user} other {has background tasks running}}: a reorder applied now never puts its card back under it. Change the order without applyNow (it applies once {card} is Done), or ask {agent} to end its turn, then reorder again with applyNow.', note: 'A reorder applied now (HI-1995) refused: the builder is in a turn of its own ({status}: working, starting, waiting for the user, or background tasks running). {card}: its card in flight. HI-3361: both ways on, the queued change first, as lane.refused.applyNow.inReview says it.' }),
   uncommitted: agentMsg({ id: 'lane.refused.applyNow.uncommitted', text: "{card}'s folder has changes that aren't committed: commit them first (or ask {agent} to), then reorder again, so its work stays on its branch.", note: "A reorder applied now (HI-1995) refused: the card in flight's folder has uncommitted changes." }),
   notPutBack: agentMsg({ id: 'lane.refused.applyNow.notPutBack', text: "{card} couldn't be put back", note: "A reorder applied now (HI-1995) refused: putting the card in flight back was refused, with no reason given." }),
   carriedBrief: agentMsg({ id: 'lane.start.carried', text: "{builder}'s lane {lane} had just ended (all merged): started a new lane with its {what, select, brief {brief} name {name} other {brief and name}}; pass brief to change it.", note: "cw_lane start's note (HI-2097, HI-2104): a list change raced its lane's end, so a new lane started with the ended one's brief, name, or both ({what})." }),
@@ -980,7 +980,7 @@ export async function applyLaneList(ws: WorkspaceService, was: LaneRecord, cards
 export async function yieldOf(ws: WorkspaceService, was: LaneRecord, cards: readonly number[], behind: number, by: string): Promise<LaneYield | null> {
   if (!cards.includes(behind)) return null
   const board = await cardsNow(ws, [...new Set([...cards, behind])])
-  const first = laneYieldFirst(cards, behind, (n) => board.get(n), was.builder.id)
+  const first = laneYieldFirst(cards, behind, (n) => board.get(n), was.builder.id, await depsWaitOf(ws, was.project))
   if (first === null) return null
   const s = attemptOf(ws, was.project, behind)
   return s && s.stage === 'active' ? { id: newId(), card: behind, first, attempt: s.attempt, by } : null
@@ -1293,11 +1293,15 @@ async function putBackForReorder(ws: WorkspaceService, s: StartLane, builder: La
   if (flying.column !== 'doing') throw new LaneError(409, say(A.inReview, { card: key, where: flying.column === 'review' ? 'review' : 'other' }))
   // HI-3323: the new first card is one the card in flight waits on: never put back here, idle builder or not. The start's
   // edit queues it as a yield, which runLaneYields runs in its one guarded board change (fenced at its commit on the
-  // builder's run, turn, Stop, launch, the team's pause and its role), at once when the builder is free.
-  if (laneYieldFirst(s.cards, flying.number, (n) => cards.get(n), builder.id) !== null) return null
+  // builder's run, turn, Stop, launch, the team's pause and its role), at once when the builder is free. HI-3368: whether
+  // or not that card can start: one that can't (blocked, or waiting on its own dependency) is queued as an ordinary
+  // change for the card's Done, never put back here for nothing (HR1's round 1: Apply now left the builder idle).
+  const flyingCard = cards.get(flying.number)
+  const head = first !== undefined ? cards.get(first) : undefined
+  if (flyingCard && head && first !== undefined && head.column === 'todo' && waitsOnCard(flyingCard, first, head.key)) return null
   const { sessions } = await import('./sessions')
   const st = sessions.liveFor(projectPath, builder.id)
-  if (st && IN_A_TURN.has(st.status)) throw new LaneError(409, say(A.inATurn, { agent: builder.name, status: st.status }))
+  if (st && IN_A_TURN.has(st.status)) throw new LaneError(409, say(A.inATurn, { agent: builder.name, status: st.status, card: key }))
   const wf = await (await service()).workflowFor(ws, projectPath).catch(() => null)
   if (!wf) return null
   const state = wf.state(wf.store.card(flying.number))
@@ -1389,7 +1393,34 @@ async function yieldCardsHold(ws: WorkspaceService, l: LaneRecord, y: LaneYield)
   const pending = l.pending ?? []
   if (!l.cards.includes(y.card)) return false
   const board = await cardsNow(ws, [...new Set([...pending, y.card])])
-  return laneYieldFirst(pending, y.card, (n) => board.get(n), l.builder.id) === y.first
+  return laneYieldFirst(pending, y.card, (n) => board.get(n), l.builder.id, await depsWaitOf(ws, l.project)) === y.first
+}
+
+/**
+ * HI-3368: the card a new list (`cards`) would make the builder's running lane yield to now, or null: Start Lane's hint,
+ * by the rule and the board the save itself uses (yieldOf: the card in flight `behind`, the first card's dependency wait
+ * from its workflow), so what the window says is what the start does.
+ */
+export async function laneYieldTo(ws: WorkspaceService, project: string, builder: string, cards: readonly number[], behind: number): Promise<{ to: number } | { cantStart: number } | null> {
+  if (!cards.includes(behind)) return null
+  const board = await cardsNow(ws, [...new Set([...cards, behind])])
+  const to = laneYieldFirst(cards, behind, (n) => board.get(n), builder, await depsWaitOf(ws, project))
+  if (to !== null) return { to }
+  // The card in flight waits on the first card, which can't start: queued for its Done, Apply now included (putBackForReorder).
+  const waitedOn = laneYieldFirst(cards, behind, (n) => { const c = board.get(n); return c ? { ...c, blocked: null } : c }, builder)
+  return waitedOn !== null ? { cantStart: waitedOn } : null
+}
+
+/**
+ * HI-3368: whether a lane's card waits on its dependencies before it can start (laneStarts' dependencyWait: its rules
+ * start it only once they are Done, and one isn't), as the yield rule asks of its first card. The project's workflow
+ * that can't be read: no wait known (the start then says why), as dependencyWait has it.
+ */
+async function depsWaitOf(ws: WorkspaceService, project: string): Promise<(n: number) => boolean> {
+  const wf = await (await service()).workflowFor(ws, join(ws.path ?? '', project)).catch(() => null)
+  if (!wf) return () => false
+  const { dependencyWaitIn } = await import('./laneStarts')
+  return (n) => !!dependencyWaitIn(wf, n)
 }
 
 /** For tests (HI-3323): awaited after a yield's look without the locks (`looked`), and after its decision under the lanes' lock, before its board change (`decided`). */

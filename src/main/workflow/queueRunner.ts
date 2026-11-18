@@ -45,8 +45,8 @@ const log = createLogger('queue')
 
 /** How often a runner notes itself as seen (display only: never a reason to take a lease over). */
 export const RENEW_MS = 30_000
-/** How long a takeover waits for the processes it ended to be gone. */
-const END_WAIT_MS = 15_000
+/** How long a takeover waits for the processes it ended to be gone (HI-3376: each look is a listing that takes seconds on a busy machine). */
+export const END_WAIT_MS = 60_000
 /** A recorded launcher's start may be this far outside the clock readings around it (clock resolution). */
 const START_SLACK_MS = 50
 

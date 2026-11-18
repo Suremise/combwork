@@ -3,14 +3,14 @@ import { statSync } from 'original-fs'
 import { join } from 'path'
 import { msg } from '../../shared/i18n'
 import { providerSettings } from '../../shared/providers'
-import { OSC7501_DEFAULT, cliPatternId, type CliDescription, type CliPattern } from '../../shared/providers/cliDescription'
+import { EXIT_GRACE, OSC7501_DEFAULT, cliPatternId, type CliDescription, type CliPattern } from '../../shared/providers/cliDescription'
 import { advancedDef } from '../../shared/advanced'
 import type { ProviderModule } from '../../shared/providers/parts'
 import type { AgentInstallInfo, ReadinessIssue } from '../../shared/types'
 import { advanced } from '../advanced'
 import { config } from '../config'
 import { createLogger, userText } from '../logger'
-import { EDITOR_EXTENSION_PATH, installText, run, toSpawnable } from './common'
+import { EDITOR_EXTENSION_PATH, installText, run, toSpawnable, WHERE_MS, cliProbeMs } from './common'
 import type { CommandSpec, LaunchContext, ProviderAdapter, SkillDelivery } from './types'
 
 // The generic adapter (HI-3196): one class runs every data-only provider from its description (shared/providers/
@@ -185,7 +185,7 @@ export class CliAdapter implements ProviderAdapter {
     // A folder is looked in for its names (HI-3269): a folder itself is never the executable.
     for (const p of this.cli.binary.paths ?? []) for (const path of inFolder(expand(p), this.cli.binary.names)) out.push({ path, source: 'description' })
     for (const name of this.cli.binary.names) {
-      const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', [name], 5000)
+      const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', [name], WHERE_MS)
       for (const line of where.stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {
         if (process.platform !== 'win32' || /\.(exe|cmd|bat)$/i.test(line)) out.push({ path: line, source: 'PATH' })
       }
@@ -198,7 +198,7 @@ export class CliAdapter implements ProviderAdapter {
     const args = this.cli.binary.versionArgs
     const re = this.pattern('version')
     if (!args || !re) return null
-    const r = await run(path, args, 15000).catch(() => null)
+    const r = await run(path, args, cliProbeMs()).catch(() => null)
     const v = r ? re.exec(`${r.stdout}\n${r.stderr}`)?.[1] ?? null : null
     if (!v) log.warn(`${userText(this.descriptor.name)} at ${userText(path)} didn't say its version`)
     return v
@@ -257,7 +257,8 @@ export class CliAdapter implements ProviderAdapter {
   }
 
   get quitLine(): { line: string; graceMs: number } | undefined {
-    return this.cli.status.exit ? { line: this.cli.status.exit, graceMs: 5000 } : undefined
+    // HI-3375: its description's grace (30 s when it doesn't say, as the built-in CLIs get time to exit by themselves).
+    return this.cli.status.exit ? { line: this.cli.status.exit, graceMs: (this.cli.status.exitGraceSeconds ?? EXIT_GRACE.seconds) * 1000 } : undefined
   }
 
   // ---- terminal

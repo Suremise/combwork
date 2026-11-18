@@ -6,7 +6,7 @@ import { maskText } from '../shared/redact'
 import { randomUUID, randomBytes } from 'crypto'
 import { StepTimes } from './stepTimes'
 import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
-import { COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, SIGN_FAIL_FAST, SIGN_TIMEOUT, drawnWaitId, englishText, overrideId, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
+import { COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, RESUME_IDLE_ASK, RESUME_IDLE_MINUTES, SIGN_FAIL_FAST, SIGN_TIMEOUT, drawnWaitId, englishText, overrideId, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
 import { launchPolicy, MCP_ISOLATION, terminalPreset, type LaunchPolicy } from '../shared/launchPolicy'
 import { capturedText, errorText, combworkError, CombworkError, shownError } from './combworkError'
 import { assertUpgraded } from './boardStore'
@@ -86,6 +86,8 @@ import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcript
 import { usesOwnPrices } from '../shared/prices'
 import { priceUsage, withCostFree } from '../shared/usageDays'
 import { summaryOf, usageFromRows, type LedgerRow } from '../shared/usageLedger'
+import { listProcesses, TREE_END_BOUNDS, type ListedProcess } from './processTree'
+import type { ClosingPending } from './closingAgents'
 import type { AdoptionHandle, Ask, BackgroundTaskType, ExternalSession, HookEvent, HookOccurrence, LaunchContext, LaunchHooks, LaunchSkill, LiveDetails, NormalizedHook, ProviderAdapter, SkillDelivery } from './providers/types'
 import { HOOK_FIRED_MAX, HOOK_SHORT_MAX, clip, type ActivityHookBlock, type HookFired, type SessionHooks } from '../shared/hooks'
 import { providerService } from './providerService'
@@ -171,7 +173,7 @@ import { observer } from './platform/observe'
 import { projectPreferences } from './workflow/preferences'
 import { driveExitKeys, type ExitKeysIO } from './exitKeys'
 import { movedFolders, movedPath } from './combworkMove'
-import { freshReasonOf, SESSION_NAMES, type FreshReason } from '../shared/sessionFresh'
+import { freshReasonOf, idleResume, SESSION_NAMES, type FreshReason, type IdleResume } from '../shared/sessionFresh'
 import type { FolderMove } from '../shared/combworkFolderMove'
 import { LEGACY_PROVIDER } from '../shared/providers'
 import { clearKeyWaitId } from '../shared/advancedDef'
@@ -330,12 +332,83 @@ const howLong = (ms: number): string => (ms < 120_000 ? `${Math.round(ms / 1000)
 const SIZE_REFRESH_DELAY_MS = 500
 /** How many running agents "Switch Now" switches at once (applyModeSettings): the rest wait for one to end. */
 const MODE_SWITCHES_AT_ONCE = 6
+/** HI-3376: the least a restart in a new mode waits for the old run's exit (it ends as soon as the run exits). */
+export const MODE_RESTART_STOP_MS = 30_000
+/** HI-3376: the time a close gives the slot writers of its stopped runs to be released, after their exit (closeDeadlineMs). */
+export const CLOSE_WRITERS_MS = 30_000
+/** HI-3376: how long Stop It and Resume waits to see a stopped background job end before it gives up (and doesn't resume). */
+export const BACKGROUND_END_MS = 30_000
+/** How often it looks meanwhile (each look is a CLI run and a process listing). */
+const BACKGROUND_LOOK_MS = 1000
 
-/** After a kill, how long a CLI's console takes to be gone (its processes listed and ended, then its exit). */
-const KILL_EXIT_MS = 1000
+/** Tests: the process listing backgroundJobEnded uses (null: processTree's). */
+export const backgroundTestHooks: { list?: (timeoutMs: number) => Promise<ListedProcess[] | null> } = {}
+const listAll = (timeoutMs: number): Promise<ListedProcess[] | null> => (backgroundTestHooks.list ?? listProcesses)(timeoutMs)
+
+/**
+ * HI-3376: what is known of a background job before it is told to stop (HR1's round 1: never one null for all of it):
+ * its own process (`process`: its pid as the CLI lists the job, and that process's start as a complete listing of
+ * Windows' has it); not running (`notRunning`: a parsed listing of the CLI's that doesn't name it); its process already
+ * gone (`gone`: named with a pid that a complete listing doesn't have); or `unknown` (a listing failed, or the CLI names
+ * it without a process: Settings → Advanced's fields wrong, or a CLI that gives none).
+ */
+export type JobBefore = { kind: 'process'; proc: ListedProcess } | { kind: 'notRunning' } | { kind: 'gone' } | { kind: 'unknown' }
+
+export async function jobProcess(adapter: ProviderAdapter, exe: string, jobId: string): Promise<JobBefore> {
+  const listed = adapter.background?.runningBackgroundJobs ? await adapter.background.runningBackgroundJobs(exe).catch(() => null) : null
+  if (listed === null) return { kind: 'unknown' }
+  const job = listed.jobs.find((j) => j.id === jobId)
+  // Named in the listing but not read as a job (its fields wrong, HR3's round 2): unknown, never not running.
+  if (!job) return listed.names(jobId) ? { kind: 'unknown' } : { kind: 'notRunning' }
+  if (!job.pid) return { kind: 'unknown' }
+  const list = await listAll(TREE_END_BOUNDS.listMs).catch(() => null)
+  if (list === null) return { kind: 'unknown' }
+  const proc = list.find((p) => p.pid === job.pid)
+  return proc ? { kind: 'process', proc } : { kind: 'gone' }
+}
+
+/**
+ * HI-3376: whether a background job told to stop has ended, looked at until it has or BACKGROUND_END_MS passes, each look
+ * bounded by the time left: `ended` once a parsed listing of the CLI's running jobs doesn't name it and, when its own
+ * process was known (`before`), a complete listing of Windows' no longer has that process (by pid and start); `running`
+ * while either still holds; `unknown` when what was known before the stop is unknown, or a listing fails at the last look.
+ */
+export async function backgroundJobEnded(adapter: ProviderAdapter, exe: string, jobId: string, before: JobBefore, now = Date.now): Promise<'ended' | 'running' | 'unknown'> {
+  // Not known before the stop: nothing seen after it can show its end (HR1's round 1).
+  if (before.kind === 'unknown' || !adapter.background?.runningBackgroundJobs) return 'unknown'
+  const deadline = now() + BACKGROUND_END_MS
+  const left = (): number => deadline - now()
+  // What the last look saw; a look begun with no time left isn't made.
+  let state: 'ended' | 'running' | 'unknown' = 'unknown'
+  while (left() > 0) {
+    const listed = await adapter.background.runningBackgroundJobs(exe, left()).catch(() => null)
+    state = listed === null ? 'unknown' : listed.jobs.some((j) => j.id === jobId) ? 'running' : listed.names(jobId) ? 'unknown' : 'ended'
+    if (state === 'ended' && before.kind === 'process') {
+      const list = left() > 0 ? await listAll(Math.min(TREE_END_BOUNDS.listMs, left())).catch(() => null) : null
+      state = list === null ? 'unknown' : list.some((p) => p.pid === before.proc.pid && p.started === before.proc.started) ? 'running' : 'ended'
+    }
+    if (state === 'ended') return state
+    if (left() > 0) await new Promise((r) => setTimeout(r, Math.min(BACKGROUND_LOOK_MS, left())))
+  }
+  return state
+}
+
+/** After a kill, how long a CLI's console takes to be gone (its processes listed and ended, then its exit). HI-3376: 5 s, a listing on a busy machine taking seconds itself. */
+export const KILL_EXIT_MS = 5000
 
 /** The most a start waits for its agent's ended runs' slot writers to be released (HI-1867): a bound for a hung one. */
 const WRITER_SETTLE_MS = 15_000
+
+/** HI-3360: the minutes after which a resume counts as cold (Settings → Advanced), or null with the rule turned off. */
+export function resumeIdleMinutes(): number | null {
+  return advanced.get<boolean>(RESUME_IDLE_ASK) === false ? null : advanced.number(RESUME_IDLE_MINUTES)
+}
+
+/** A listed session's `idle` (HI-3360): its tokens where its transcript gives them (0: not known), apart from its bytes. */
+function idleField(since: string | null | undefined, usage: SessionUsage | null, bytes: number | null, minutes: number | null): { idle?: IdleResume } {
+  const idle = idleResume(since, { tokens: usage?.contextTokens || null, bytes }, minutes)
+  return idle ? { idle } : {}
+}
 
 /**
  * How long stopping sessions waits for them to end: its own timeout, or longer where a CLI is given time to exit by
@@ -2283,6 +2356,31 @@ class SessionManager {
     let timer: NodeJS.Timeout | undefined
     await Promise.race([Promise.all(mine), new Promise<void>((r) => (timer = setTimeout(r, timeoutMs)))])
     clearTimeout(timer)
+  }
+
+  /**
+   * HI-3376: what of the projects `which` names (every one without it) is still closing, for closingAgents.ts: runs still
+   * running (each until it has been through onExit), starts not yet cancelled, slot writers not yet released (or found held).
+   */
+  closingPending(which?: (projectPath: string) => boolean): ClosingPending {
+    const mine = (p: string): boolean => !which || which(p)
+    // A run counts from its launch until its exit work is over (`exiting`), not only while it is in `live`.
+    const runs = new Set([...[...this.live.values()].filter((l) => mine(l.state.projectPath)).map((l) => l.state.runId), ...[...this.exiting].filter(([, p]) => mine(p)).map(([r]) => r)])
+    return {
+      running: runs.size,
+      starting: [...this.starting.values()].filter((p) => mine(p.projectPath)).length,
+      writers: which ? [...this.writerSettlingOf.values()].filter((e) => which(e.projectPath)).length : this.writersSettling.size
+    }
+  }
+
+  /**
+   * HI-3376: how long closing the runs `which` names may take before the closing window says they are still closing: the
+   * longest of their CLIs' exit graces with the kill's time after it (stopWaitMs), and the slot writers' release after
+   * that (CLOSE_WRITERS_MS). With the defaults: 30 + 5 + 30 s. A threshold for saying so, never taken as their end.
+   */
+  closeDeadlineMs(which?: (projectPath: string) => boolean): number {
+    const graces = [...this.live.values()].filter((l) => !which || which(l.state.projectPath)).map((l) => l.adapter.launch.exitKeys?.graceMs)
+    return stopWaitMs(0, graces) + CLOSE_WRITERS_MS
   }
 
   /**
@@ -5215,7 +5313,7 @@ class SessionManager {
     // fixed 8 s a slow CLI outlasts (HI-1869). Exited, its slot's writer release is under way, and the start below waits
     // for it (placeFor's earlierWritersSettled, HI-1867), refused only if its processes are kept or not known to end.
     let timer: NodeJS.Timeout | undefined
-    await Promise.race([exited, new Promise((r) => (timer = setTimeout(r, stopWaitMs(8000, [l.adapter.launch.exitKeys?.graceMs]))))])
+    await Promise.race([exited, new Promise((r) => (timer = setTimeout(r, stopWaitMs(MODE_RESTART_STOP_MS, [l.adapter.launch.exitKeys?.graceMs]))))])
     clearTimeout(timer)
     // Still running: said so, rather than the start's "already running" (its old run keeps its slot meanwhile).
     if (this.live.get(id)?.state.runId === l.state.runId) throw combworkError(msg({ id: 'session.restartMode.didntStop', defaultMessage: "{agent} didn't stop in time, so it wasn't restarted in the new mode. Try again once it has stopped.", description: "Switching a running agent's permission mode (it restarts in the new mode) is refused: the agent ({agent}, its name) was told to stop but hadn't ended yet, so nothing was started." }), { agent: l.state.agentName ?? agentId }, { kind: 'conflict' })
@@ -5386,10 +5484,17 @@ class SessionManager {
       if (!stillApplies()) return
       const info = providerService.info(adapter.id)
       if (!adapter.background?.stopBackgroundJob || !info.path) throw combworkError(msg({ id: 'session.background.cantStop', defaultMessage: "{provider} can't stop background sessions.", description: "Stop It and Resume is refused: the coding agent can't stop its background service's job. {provider} is its name." }), { provider: adapter.descriptor.name }, { kind: 'invalid' })
+      // HI-3376: the job's own process, as it is before the stop, so its end can be seen by identity (pid and start).
+      const before = await jobProcess(adapter, info.path, jobId)
       await adapter.background?.stopBackgroundJob(info.path, jobId)
-      // The job lets go of the conversation as it exits.
-      await new Promise((r) => setTimeout(r, 1500))
+      // The job lets go of the conversation as it exits: resumed only once it is seen to have ended (bounded).
+      const ended = await backgroundJobEnded(adapter, info.path, jobId, before)
       if (!stillApplies()) return
+      if (ended !== 'ended') {
+        log.warn(`Stop It and Resume: ${adapter.descriptor.name}'s background job ${jobId} was told to stop but is ${ended === 'running' ? 'still running' : 'not known to have ended'} after ${BACKGROUND_END_MS / 1000} s, so its conversation wasn't resumed`) // i18n-ignore: for the log
+        resolveOffer(offer, tr(OUTCOME.stillInBackground))
+        return
+      }
       await this.start(projectPath, { agentId, resumeId: sessionId })
       resolveOffer(offer, tr(OUTCOME.stoppedAndResumed))
     } finally {
@@ -5406,7 +5511,24 @@ class SessionManager {
     return this.liveStates().filter((s) => s.status === 'working' || s.status === 'waiting' || s.status === 'background' || s.status === 'watching')
   }
 
+  /**
+   * HI-3376 (HR1's round 1): each run whose exit work is under way (onExit, from its first line to its last, errors
+   * included), by run, with its project: it leaves `live` part way through, before its transcript's check and its
+   * session list's write, which a close still waits for (closingPending).
+   */
+  private readonly exiting = new Map<string, string>()
+
   private async onExit(projectPath: string, agentId: string, runId: string, code: number, output = ''): Promise<void> {
+    this.exiting.set(runId, projectPath)
+    try {
+      await this.exitWork(projectPath, agentId, runId, code, output)
+    } finally {
+      this.exiting.delete(runId)
+    }
+  }
+
+  /** What a run's exit does (onExit's). */
+  private async exitWork(projectPath: string, agentId: string, runId: string, code: number, output: string): Promise<void> {
     // What notices offered about this run no longer applies (HI-2320): its conversation ended here.
     resolveOffers((o) => o.startsWith(`transcript:${liveId(projectPath, agentId)}#`), tr(OUTCOME.conversationEnded))
     this.modeOfferGone(liveId(projectPath, agentId))
@@ -7258,8 +7380,12 @@ class SessionManager {
     return null
   }
 
-  /** The whole start step's budget (HI-2771): building the view and putting it, well inside the launcher's 5 s wait. */
-  static readonly SESSION_CONTEXT_MS = 2500
+  /**
+   * The whole start step's budget (HI-2771): building the view and putting it, inside the launcher's own wait for its
+   * post (30 s, launcher.ts' Post). HI-3375: 20 s, a bound for a hung step, not a performance budget: main stalls of 2–4 s
+   * happen, and a start context skipped is told to the user (startContextSkipped), never only logged.
+   */
+  static readonly SESSION_CONTEXT_MS = 20_000
   /** Each launch's start context in its session (HI-2771): its start step taken, compactions refreshed, its queue, its generation. */
   private sessionContexts = new WeakMap<LiveSession, { started: boolean; compactions: Set<string>; chain: Promise<void>; gen: number }>()
   /** The post that was its launch's start (its first baseline): its own expanded hooks are history the start's view covers. */
@@ -7315,17 +7441,41 @@ class SessionManager {
     const barred = (): boolean => l.policy?.guidance === false || !!this.keepsOut(l.state.projectPath, l.state.agentId)
     const run = s.chain.then(async () => {
       const ac = new AbortController()
-      const timer = setTimeout(() => ac.abort(), SessionManager.SESSION_CONTEXT_MS)
+      // Test copies only (unpackaged): CW_TEST_START_CONTEXT_MS shortens the deadline, so a check can see a skipped start
+      // context told (HI-3375, its notice) through the real path.
+      const testMs = !app.isPackaged ? Number(process.env.CW_TEST_START_CONTEXT_MS) : NaN
+      const timer = setTimeout(() => ac.abort(), Number.isFinite(testMs) && testMs > 0 ? testMs : SessionManager.SESSION_CONTEXT_MS)
       try {
         // Only a CLI that takes a start context in its session (its hooks part's deliverStartContext) is sent one.
         const deliver = l.adapter.hooks?.deliverStartContext?.bind(l.adapter.hooks)
         if (!current(ac.signal) || !sessionId || !deliver) return
-        const built = !barred() && this.startContext ? this.startContext(l.state, source).catch(() => null) : Promise.resolve(null)
+        const wanted = !barred() && !!this.startContext
+        // HI-3375 (HR1's round 1): a build that failed is told apart from one that made nothing on purpose (null: an
+        // ordinary agent, the Assistant's journal or guidance off), which is no skip.
+        let failed = false
+        const built = wanted ? this.startContext!(l.state, source).catch((e) => ((failed = true), log.warn('start context: building it', e), null)) : Promise.resolve(null)
         const text = await Promise.race([built, new Promise<null>((done) => ac.signal.addEventListener('abort', () => done(null), { once: true }))])
+        // Still this launch's latest delivery, its agent's running launch, its session the same: what may be told of it
+        // (never a warning against a replacement, or of a delivery a newer one superseded).
+        const still = (): boolean => gen === s.gen && this.live.get(liveId(l.state.projectPath, l.state.agentId)) === l && l.state.sessionId === sessionId
         // Asked again once it is made (as startContextFor): out of time, superseded, or barred meanwhile, nothing is sent.
-        if (!current(ac.signal)) return
+        // HI-3375: out of time (the deadline, its launch still this agent's), it is told: the agent works without it.
+        if (!current(ac.signal)) {
+          if (wanted && ac.signal.aborted && still()) this.startContextSkipped(l, 'slow')
+          return
+        }
+        // Wanted and its build failed: nothing to put (its old entry removed as before), and told.
+        if (failed && wanted && !barred()) {
+          const outcome = await deliver(l.state.runId, sessionId, null, ac.signal)
+          log.info(`start context into ${l.state.agentId}'s session (${source}): build failed, ${outcome}`)
+          if (still()) this.startContextSkipped(l, 'failed')
+          return
+        }
         const outcome = await deliver(l.state.runId, sessionId, text && !barred() ? text : null, ac.signal)
         log.info(`start context into ${l.state.agentId}'s session (${source}): ${outcome}`)
+        // HI-3375: one made and not put (refused, too large, not sent, or cut off at the deadline): told, never only logged,
+        // and only while that launch is still its agent's (a stop or a newer delivery meanwhile says nothing).
+        if (text && !barred() && outcome !== 'put' && outcome !== 'removed' && still()) this.startContextSkipped(l, 'notSent')
       } catch (e) {
         log.warn('start context into a session', e)
       } finally {
@@ -7334,6 +7484,24 @@ class SessionManager {
     })
     s.chain = run.catch(() => undefined)
     return run.then(() => null, () => null)
+  }
+
+  /**
+   * HI-3375: a launch's start context (Combwork's view of the board, its guidance and state) that couldn't be made in time
+   * (`slow`), couldn't be made at all (`failed`: its build threw), or couldn't be put into its session (`notSent`): the user is told, as the agent then works without it until its next
+   * compaction or start. A notice, never a chime.
+   */
+  private startContextSkipped(l: LiveSession, why: 'slow' | 'failed' | 'notSent'): void {
+    log.warn(`start context into ${l.state.agentId}'s session skipped (${why})`)
+    const agent = this.label(l.state)
+    this.notify(
+      l.state.projectPath,
+      withValues(msg({ id: 'session.notice.startContextTitle', defaultMessage: "{agent} started without Combwork's start context", description: "A notification's title (HI-3375): an agent ({agent}, its name) started, or went on after compacting its conversation, without the start context Combwork puts into its session (Combwork's view of the board, its guidance and its state)." }), { agent }),
+      withValues(msg({ id: 'session.notice.startContextBody', defaultMessage: "Combwork couldn't {why, select, slow {make it in time} failed {make it} other {put it into the session}}, so {agent} works without Combwork's view of the board and its guidance for now. Stop it and start it again to try again.", description: "The notification that an agent ({agent}) started without Combwork's start context (HI-3375). why: slow, it took too long to make (this PC was busy); failed, making it failed; other, it couldn't be put into the agent's session. Stop and start are the agent's buttons." }), { agent, why }), // i18n-ignore: select keys, never shown
+      'notice',
+      undefined,
+      l.state.agentId
+    )
   }
 
   /** The start context for a launch, in its CLI's reply form, or null (none, or it couldn't be made). */
@@ -8786,6 +8954,17 @@ class SessionManager {
     return this.listNow(key, projectPath)
   }
 
+  /**
+   * HI-3360: whether resuming conversation `id` counts as cold (idle past Settings → Advanced's minutes, and not small),
+   * as its listing says it; null when it doesn't, the rule is off, or it isn't listed (nothing to tell it by). One that
+   * can't continue (HI-2540's `fresh`) never resumes, so it never counts: the start gives it a new conversation, as before.
+   */
+  async idleOf(projectPath: string, id: string): Promise<IdleResume | null> {
+    if (resumeIdleMinutes() === null) return null
+    const item = (await this.list(projectPath)).find((i) => i.id === id)
+    return item && !item.fresh ? (item.idle ?? null) : null
+  }
+
   private ownListing(key: string, projectPath: string): Promise<SessionListItem[]> {
     return this.listings(key, () => {
       const p = this.listOwn(projectPath)
@@ -8823,6 +9002,8 @@ class SessionManager {
     // Read once for the whole list, not once per session.
     const ctx: ListContext = { records: file.sessions, cfg: await workspace.projectConfig(projectPath), stored: await usageHistory.storedUsage(projectPath).catch(() => new Map()) }
     const ttl = config.settings.sessions.cacheTtl
+    // Long idle when resumed (HI-3360), by the rule the API and the placement read.
+    const idleMinutes = resumeIdleMinutes()
     // Which start fresh when resumed (HI-2540), by the rule the start reads: the window asks before, not afterwards.
     const moves = await this.folderMoves(projectPath)
     const items: SessionListItem[] = []
@@ -8862,7 +9043,8 @@ class SessionManager {
         transcriptBytes: st?.size ?? null,
         ...(!ctx.stored?.has(rec.id) && (hasTranscript || hasBackup) ? { pending: true } : {}),
         usage,
-        recache: usage && providerDescriptor(provider).capabilities.usage?.promptCacheTtl ? recacheEstimate(usage, ttl) : null
+        recache: usage && providerDescriptor(provider).capabilities.usage?.promptCacheTtl ? recacheEstimate(usage, ttl) : null,
+        ...idleField(usage?.lastActivity ?? rec.lastActiveAt, usage, st?.size ?? null, idleMinutes)
       }
     })
     items.push(...listed)
@@ -8931,6 +9113,7 @@ class SessionManager {
           ...(same ? {} : { pending: true }),
           usage,
           recache: usage && adapter.descriptor.capabilities.usage?.promptCacheTtl ? recacheEstimate(usage, ttl) : null,
+          ...idleField(usage?.lastActivity ?? ext.modified, usage, st?.size ?? null, resumeIdleMinutes()),
           ...(ext.sub ? { sub: ext.sub } : {})
         })
       }

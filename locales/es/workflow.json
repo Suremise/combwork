@@ -360,7 +360,7 @@
   "workflow.refused.lane.lineBehind.next": "{reader, select, you {Déjala como está: Combwork actualiza {line} con {target} cuando el agente esté inactivo, o te pregunta antes, y avisa al agente cuando {card} pueda empezar.} other {Déjala como está: Combwork actualiza {line} con {target} cuando estés inactivo, o pregunta al usuario, y te avisa cuando {card} pueda empezar.}}",
   "workflow.refused.lane.oneAtATime.change": "Un carril siempre toma una tarjeta cada vez; desactivar Configuración → Avanzado → Se aplican las reglas del flujo de trabajo desactiva todas las reglas.",
   "workflow.refused.lane.oneAtATime.message": "{card} aún no puede empezar: {earlier}, anterior en su carril, no está en Hecho.",
-  "workflow.refused.lane.oneAtATime.next": "Termina primero {earlier}: cuando esté en Hecho, el carril sigue con {card}.",
+  "workflow.refused.lane.oneAtATime.next": "Espera a que {earlier} esté en Hecho: termina tu turno y Combwork iniciará {card} por ti en cuanto lo esté y nada más la retenga. Tomar {card} antes que {earlier} cambia el orden del carril, y eso lo decide el usuario o el Assistant.",
   "workflow.refused.loop.churnPending.message": "La tarjeta {card} espera una respuesta a su pregunta {request} sobre sus idas y vueltas: su ciclo está en pausa hasta entonces.",
   "workflow.refused.loop.churnPending.next": "Espera su respuesta (Combwork te despertará): mientras tanto puedes leer la tarjeta, comentar o preguntar al Asistente.",
   "workflow.refused.loop.followUpChecked.message": "Tarjeta {card}: un seguimiento espera la comprobación de su revisor, y no se sigue sin ella.",

@@ -115,6 +115,12 @@ export const RESUME_AFTER_UPDATE = 'cw.restart.resumeAfterUpdate'
 /** How long an agent resumed after a restart has to be ready, in seconds (HI-1707): read by main's restartResume. */
 export const RESTART_READY_SECONDS = 'cw.restart.resumeReadySeconds'
 
+/** How long a CLI's version probe (`--version`, as Combwork looks for it) may take (HI-3375), in seconds: read by main's providers. */
+export const CLI_PROBE_SECONDS = 'cw.cli.probeSeconds'
+
+/** How long Check Server's test inference may take while a local model loads (HI-3375), in seconds: read by main's serverDiagnostics. */
+export const SERVER_CHECK_INFER_SECONDS = 'cw.server.checkInferSeconds'
+
 /** Agents whose turn a dropped connection ended are resumed once it is back (HI-1612): read by main's outageResume. */
 export const OUTAGE_RESUME = 'cw.outage.resume'
 /** Errors that are never a dropped connection (a usage limit, a sign-in, "overloaded"), whatever a CLI's pattern finds (HI-1612). */
@@ -201,6 +207,12 @@ export const SIGN_FAIL_FAST = 'cw.sessions.signFailFast'
 
 /** How long cw-sign lets a known signer run before ending it (HI-2867), in seconds. */
 export const SIGN_TIMEOUT = 'cw.sessions.signTimeoutSeconds'
+
+/** Whether a resume of a long-idle conversation asks first, and a lane's or card's starts fresh instead (HI-3360). */
+export const RESUME_IDLE_ASK = 'cw.resume.idleAsk'
+
+/** How long a conversation is idle before its resume counts as cold (HI-3360), in minutes. */
+export const RESUME_IDLE_MINUTES = 'cw.resume.idleMinutes'
 
 /** Whether reviewers review in review copies (#1435, SPEC §16.10.5): read by main's copiesApp. */
 export const COPIES_REVIEW = 'cw.copies.review'
@@ -389,6 +401,36 @@ const SOURCES: readonly AdvancedSource[] = [
     unit: 's',
     applies: 'sessions'
   },
+  // A resume of a long-idle conversation (HI-3360): the window asks, a lane's or card's start begins a new one instead.
+  {
+    id: RESUME_IDLE_ASK,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.resume.idleAsk.title', defaultMessage: 'Resume: ask before reopening a long-idle conversation', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: before a conversation idle for a long time is resumed, Combwork asks whether to start a fresh one instead, as resuming it may cost many tokens." }),
+    desc: msg({
+      id: 'settings.advanced.cw.resume.idleAsk.desc',
+      defaultMessage: "A conversation idle longer than the time below has most likely lost the CLI's prompt cache, so resuming it may process its whole context again. Resume asks first, offering a fresh start, and says how long it has been idle and how big it is; the Assistant is told the same and chooses. A lane's or a card's start gives its builder a new conversation instead, with the card as its prompt. Agents Combwork resumes after a restart, an update or a quit resume as before. Turned off, every resume goes ahead as it did before, with only the expired-cache question Claude Code's sessions had.",
+      description: 'What the advanced setting "Resume: ask before reopening a long-idle conversation" does (Settings → Advanced, under Combwork). A prompt cache is what a CLI keeps of a conversation so a resumed one is read cheaply; a lane is a card loop; the Assistant is Combwork\'s own assistant.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'now'
+  },
+  {
+    id: RESUME_IDLE_MINUTES,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.resume.idleMinutes.title', defaultMessage: 'Resume: a conversation counts as long-idle after', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (\"60 min\"): how long a conversation must be idle before Resume asks first." }),
+    desc: msg({
+      id: 'settings.advanced.cw.resume.idleMinutes.desc',
+      defaultMessage: "How long since a conversation's last activity (its transcript's last entry, else when Combwork last saw it) before its resume asks first. The default is the longest prompt cache the CLIs keep: an hour.",
+      description: 'What the advanced setting "Resume: a conversation counts as long-idle after" does (Settings → Advanced, under Combwork). A prompt cache is what a CLI keeps of a conversation so a resumed one is read cheaply.'
+    }),
+    kind: 'number',
+    default: 60,
+    min: 1,
+    max: 10080,
+    unit: 'min',
+    applies: 'now'
+  },
   {
     id: 'cw.console.showText',
     group: 'cw',
@@ -564,9 +606,35 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.cw.mcpCatalog.probeSeconds.title', defaultMessage: "MCP catalogues: checking this PC's requirements", description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (HI-545)." }),
     desc: msg({ id: 'settings.advanced.cw.mcpCatalog.probeSeconds.desc', defaultMessage: "How long each check of this PC for a catalogue server's requirements (its Windows edition and build, Node.js, Docker) may take before it shows as not checked.", description: 'What the advanced setting "MCP catalogues: checking this PC’s requirements" is for (Settings → Advanced, HI-545).' }),
     kind: 'number',
-    default: 5,
+    default: 15,
     min: 1,
     max: 60,
+    unit: 's',
+    applies: 'now'
+  },
+  // HI-3375: a CLI's first start under antivirus on a slow disk takes tens of seconds; one skipped reads as not installed.
+  {
+    id: CLI_PROBE_SECONDS,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.cli.probeSeconds.title', defaultMessage: 'Finding the CLIs: version check timeout', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"60 s\")." }),
+    desc: msg({ id: 'settings.advanced.cw.cli.probeSeconds.desc', defaultMessage: "How long each coding agent's CLI gets to print its version when Combwork looks for it (at start, Check Again, after an install). One that takes longer is skipped and shows as not installed: a CLI's first start, with antivirus scanning it on a slow disk, can take tens of seconds.", description: 'What the advanced setting "Finding the CLIs: version check timeout" does (Settings → Advanced, under Combwork). A CLI is the command-line program of a coding agent (Claude Code, Codex).' }),
+    kind: 'number',
+    default: 60,
+    min: 10,
+    max: 300,
+    unit: 's',
+    applies: 'now'
+  },
+  // HI-3375: a local model loading cold on modest hardware takes minutes to answer its first request.
+  {
+    id: SERVER_CHECK_INFER_SECONDS,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.server.checkInferSeconds.title', defaultMessage: 'Check Server: test request timeout', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"600 s\"). Check Server is a button for a model server (Settings → Accounts & Connections)." }),
+    desc: msg({ id: 'settings.advanced.cw.server.checkInferSeconds.desc', defaultMessage: "How long Check Server waits for a model server to answer its test request. A local model that isn't loaded yet loads first, which on modest hardware can take minutes; past this time the check reports a timeout.", description: 'What the advanced setting "Check Server: test request timeout" does (Settings → Advanced, under Combwork). Check Server tests a model server the user added for a CLI (its address and model).' }),
+    kind: 'number',
+    default: 600,
+    min: 30,
+    max: 3600,
     unit: 's',
     applies: 'now'
   },
@@ -646,9 +714,9 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.cw.restart.resumeReadySeconds.title', defaultMessage: 'Resuming after a restart: ready within', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"90 s\")." }),
     desc: msg({ id: 'settings.advanced.cw.restart.resumeReadySeconds.desc', defaultMessage: "How long an agent Combwork resumes after a restart has to be ready. One that isn't is stopped and listed as not resumed, and the next one starts.", description: 'What the advanced setting "Resuming after a restart: ready within" does (Settings → Advanced).' }),
     kind: 'number',
-    default: 90,
+    default: 300,
     min: 10,
-    max: 600,
+    max: 1800,
     unit: 's',
     workspace: true,
     applies: 'now'

@@ -10,6 +10,7 @@ import type { IgnoreRule, IgnoreTarget } from './gitIgnoreRules'
 import type { GitlinkChange } from './gitlink'
 import type { AgentProcess } from './agentProcesses'
 import type { StartFailure } from './startFailure'
+import type { IdleResume } from './sessionFresh'
 import type { FreshReason } from './sessionFresh'
 import type { TipsState } from './tips'
 import type { GithubHostSettings } from './githubHost'
@@ -1153,6 +1154,19 @@ export interface CloseCommandSetting {
 export type CloseReason = 'window' | 'switch' | 'quit' | 'update'
 
 /** A close command's run as its panel shows it (HI-1368): the `close-command` event's and closeCommand:state's. */
+/**
+ * HI-3376: a window waiting for agents to close (its workspace closing or switching, or Combwork quitting): how many runs
+ * are still running, starts still being cancelled, and slot writers not yet released; `late` once it has waited longer
+ * than their CLIs' exit graces give. Its own wait's (`id`), never a close command run's.
+ */
+export interface ClosingAgentsState {
+  id: string
+  running: number
+  starting: number
+  writers: number
+  late: boolean
+}
+
 export interface CloseCommandRun {
   id: string
   /** 'workspace': this window's workspace's; 'quit': When Combwork quits, run. */
@@ -3709,6 +3723,8 @@ export interface SessionListItem extends Partial<SessionRecord> {
   deleted?: boolean
   usage: SessionUsage | null
   recache: RecacheEstimate | null
+  /** HI-3360: idle so long its resume counts as cold (Settings → Advanced), with its age and size; absent: it doesn't, or the rule is off. */
+  idle?: IdleResume
   /** The usage history doesn't have it yet (#1106): its figures follow once the worker has read it (the window is told). */
   pending?: boolean
   /** The slot it ran in (#1434), if it ran in one of the project's. */
@@ -4366,6 +4382,8 @@ export type CombworkEvent =
   | { type: 'quit-pending'; pending: boolean; working: number }
   /** This window's close command (HI-1368): the panel shows it while it runs or failed; null: none (the panel goes). */
   | { type: 'close-command'; run: CloseCommandRun | null }
+  /** HI-3376: this window waits for agents to close: the panel shows it; null: none (the panel goes). */
+  | { type: 'closing-agents'; state: ClosingAgentsState | null }
   /** How many working agents keep the PC awake (0: it may sleep). */
   | { type: 'keep-awake'; working: number }
   /** Files changed in a project that has a Files or Images tab open. dirs are relative, '' is the root. */

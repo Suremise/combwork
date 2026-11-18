@@ -21,6 +21,7 @@ import { CW_LANE_START, WorkflowRefusedError } from './tasks'
 import { teamPauseOf } from './teamPause'
 import { endOwnLaneWatch, type LaneCardsNow } from './watches'
 import { inWorkspace, openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
+import type { Workflow } from './workflow/runtime'
 
 /**
  * Combwork starts a lane's next card (HI-1990: plumbing, not guidance). With workflow
@@ -132,7 +133,11 @@ setLaneStartWaits(laneStartWait)
  */
 async function dependencyWait(ws: WorkspaceService, projectPath: string, n: number): Promise<string[] | null> {
   const wf = await (await import('./workflow/service')).workflowFor(ws, projectPath).catch(() => null)
-  if (!wf) return null
+  return wf ? dependencyWaitIn(wf, n) : null
+}
+
+/** dependencyWait on a workflow already read (HI-3368: a lane's yield asks it of its first card, synchronously). */
+export function dependencyWaitIn(wf: Workflow, n: number): string[] | null {
   try {
     const card = wf.store.card(n)
     if (!card.blockedBy.length || !wf.rulesetOf(card).guards.start.includes('start.dependenciesIntegrated')) return null

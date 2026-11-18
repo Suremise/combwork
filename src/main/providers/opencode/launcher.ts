@@ -166,11 +166,11 @@ public static class CwStream {
     }
   }
 
-  /** Posts one body to Combwork's hook server; whether it took it. */
+  /** Posts one body to Combwork's hook server; whether it took it. 30 s (HI-3375): Combwork's start step takes up to 20 s (SESSION_CONTEXT_MS). */
   static bool Post(string body) {
     try {
       var r = (HttpWebRequest)WebRequest.Create(HookUrl);
-      r.Method = "POST"; r.Timeout = 5000; r.ReadWriteTimeout = 5000; r.Proxy = null; r.ContentType = "application/json";
+      r.Method = "POST"; r.Timeout = 30000; r.ReadWriteTimeout = 30000; r.Proxy = null; r.ContentType = "application/json";
       r.Headers["Authorization"] = "Bearer " + HookToken;
       byte[] data = Encoding.UTF8.GetBytes(body);
       r.ContentLength = data.Length;
@@ -668,7 +668,7 @@ public static class CwOpencode {
     if (rulesAgent == "") rulesAgent = "build";
     int slash = model.IndexOf('/');
     string modelProvider = slash > 0 ? model.Substring(0, slash) : "", modelId = slash > 0 ? model.Substring(slash + 1) : "";
-    int readyMs; if (!int.TryParse(E("CW_OC_READY_MS"), out readyMs) || readyMs < 1000) readyMs = 30000;
+    int readyMs; if (!int.TryParse(E("CW_OC_READY_MS"), out readyMs) || readyMs < 1000) readyMs = 120000;
     long logMax; if (!long.TryParse(E("CW_OC_LOG_MAX"), out logMax) || logMax < 4096) logMax = 1048576;
     exe0 = exe; sayLog = log == "" ? null : log;
     foreach (string a in E("CW_OC_PREFIX").Split('\u001f')) if (a.Length > 0) prefix.Add(a);

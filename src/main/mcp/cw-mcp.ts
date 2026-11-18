@@ -33,7 +33,7 @@ import { INBOX_SWITCHES, type InboxSwitch } from '../../shared/inboxSwitches'
 import { ENTRY_LIMITS, JOURNAL_KINDS, LINK_TYPES } from '../../shared/journal'
 import { cardName, cardRef, namedBy, namesFrom } from '../../shared/projectKeys'
 import { toolListSize } from '../../shared/toolListSize'
-import { ALWAYS_LOAD_META, alwaysLoaded, argumentHint } from '../../shared/combworkToolLoad'
+import { ALWAYS_LOAD_META, alwaysLoaded, argumentHint, withAliases } from '../../shared/combworkToolLoad'
 import { agentMsg, say } from '../../shared/agentText'
 import { ACCEPT_MAX } from '../../shared/workflow/focused'
 
@@ -106,7 +106,7 @@ const T = {
   'connection.arg.launch': agentMsg({ id: 'tool.connection.arg.launch', text: 'update: guidance, tools, typing, overrides by key (false: off); preset: "terminal" turns all off; empty object: all on.' }),
   'updateAgent.arg.confirm': agentMsg({ id: 'tool.updateAgent.arg.confirm', text: 'The fingerprint a refusal named, once the user agreed to make this agent Independent while on a lane or holding a card.' }),
   'connection.arg.confirm': agentMsg({ id: 'tool.connection.arg.confirm', text: 'The fingerprint a refusal named, once the user agreed to make those agents Independent.' }),
-  'startAgent.description': agentMsg({ id: 'tool.startAgent.description', text: 'Start a stopped agent: a new conversation, or resume=true for its last; with prompt, on that task. For a card, use cw_start_task. A folder new to its CLI asks the user to trust it first: tell them.' }),
+  'startAgent.description': agentMsg({ id: 'tool.startAgent.description', text: 'Start a stopped agent: a new conversation, or resume=true for its last; with prompt, on that task. A long-idle conversation is refused with its age and size: resume it only with resumeIdle=true. For a card, use cw_start_task. A folder new to its CLI asks the user to trust it first: tell them.' }),
   'promptAgent.description': agentMsg({ id: 'tool.promptAgent.description', text: 'Type a task, in full, into an idle running agent. Refused while it is busy or the user just typed there. newConversation=true starts it on the task in a new conversation. For a card, use cw_start_task.' }),
   'messageAgent.description': agentMsg({ id: 'tool.messageAgent.description', text: "Leave a busy or watching agent, or one the user just typed into, a message in its inbox on its current work (a re-brief, the user's answer). Not for the user's OK to push or release: its CLI refuses one passed on, so the user gives it in the agent's own pane. (detail: use-cw-api, tools.md)" }),
   'messageAgent.arg.card': agentMsg({ id: 'tool.messageAgent.arg.card', text: "The card it is about (its key): dropped, never given, once that card's round ends." }),
@@ -941,9 +941,9 @@ const tools: Tool[] = [
   {
     name: 'cw_start_agent',
     description: say(T['startAgent.description']),
-    inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, resume: { type: 'boolean' }, prompt: { type: 'string' } }, required: ['project', 'agent'] },
+    inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, resume: { type: 'boolean' }, resumeIdle: { type: 'boolean' }, prompt: { type: 'string' } }, required: ['project', 'agent'] },
     run: async (a) => {
-      const st = (await api('POST', `${agentPath(a)}/start`, { resume: a.resume, prompt: a.prompt })) as { agentName?: string; status: string; sessionId?: string }
+      const st = (await api('POST', `${agentPath(a)}/start`, { resume: a.resume, resumeIdle: a.resumeIdle, prompt: a.prompt })) as { agentName?: string; status: string; sessionId?: string }
       return say(T['startAgent.reply.started'], { resumed: a.resume ? 'yes' : 'no', agent: String(st.agentName ?? a.agent), project: String(a.project || PROJECT), status: String(st.status), hasSession: st.sessionId ? 'yes' : 'no', session: st.sessionId ?? '' })
     }
   },
@@ -1628,7 +1628,8 @@ async function instructions(): Promise<string> {
   // Without a project (the Combwork Assistant's session) there is no "latest handover for this project".
   if (!PROJECT) return INSTRUCTIONS
   try {
-    const latest = await Promise.race([handovers(PROJECT || undefined), new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 1500))])
+    // HI-3375: 10 s, a bound for a hung read (Combwork's main thread busy), not a budget: past it, no handover pointer.
+    const latest = await Promise.race([handovers(PROJECT || undefined), new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 10_000))])
     if (latest[0]) return withLatestHandover(INSTRUCTIONS, latest[0].relPath)
   } catch {
     // Combwork not reachable yet: the static instructions still apply.
@@ -1819,7 +1820,10 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
     case 'tools/call': {
       const tool = offered.find((t) => t.name === params?.name)
       if (!tool) return replyError(id, -32602, say(T['call.error.unknownTool'], { name: String(params?.name) }))
-      const args = (params?.arguments ?? {}) as Record<string, unknown>
+      // HI-3361: an argument Combwork's own tools name two ways (a card's `number` or `card`…) taken as this tool's name for
+      // it, before its handler and every check (withAliases): its schema stays the one it lists.
+      const props = (tool.inputSchema as { properties?: Record<string, unknown> }).properties ?? {}
+      const args = withAliases(tool.name, (n) => Object.prototype.hasOwnProperty.call(props, n), (params?.arguments ?? {}) as Record<string, unknown>)
       const started = performance.now()
       calling++
       let text: string

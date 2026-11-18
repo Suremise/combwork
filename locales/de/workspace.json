@@ -128,6 +128,8 @@
   "workspace.closeCommand.skip": "Befehl überspringen",
   "workspace.closeCommand.skipped": "Übersprungen: Der Befehl wird nicht ausgeführt. Combwork schließt den Arbeitsbereich noch fertig.",
   "workspace.closeCommand.spawn": "{kind, select, quit {Dein Befehl beim Beenden konnte nicht gestartet werden} other {Dein Befehl beim Schließen konnte nicht gestartet werden}}",
+  "workspace.closingAgents.note": "{late, select, yes {Combwork wartet weiter, damit ihre letzten Nachrichten und Slots gespeichert werden. Wenn Sie nicht warten, macht es weiter, und was übrig ist, wird so behandelt wie Agenten, die beim Beenden weiterlaufen.} other {Combwork wartet, bis jeder seine letzten Nachrichten gespeichert und seinen Slot freigegeben hat.}}",
+  "workspace.closingAgents.title": "{late, select, yes {{n, plural, one {Ein Agent wird noch geschlossen} other {# Agenten werden noch geschlossen}}} other {Agenten werden geschlossen… noch {n, number}}}",
   "workspace.commands.dontWaitNote": "{point, select, open {Wenn du nicht wartest, macht Combwork weiter, und die übrigen laufen von selbst der Reihe nach. Agenten starten jetzt.} other {Wenn du nicht wartest, macht Combwork weiter, und die übrigen laufen von selbst der Reihe nach.}}",
   "workspace.commands.exitCode": "Exitcode {code}",
   "workspace.commands.failedExit": "„{name}“ ist fehlgeschlagen (Exitcode {code})",

@@ -195,6 +195,10 @@ interface CombworkMessageValues {
   'settings.advanced.claude-code.accounts.trustField.title': undefined
   'settings.advanced.claude-code.autoModeSetup.offer.desc': undefined
   'settings.advanced.claude-code.autoModeSetup.offer.title': undefined
+  'settings.advanced.claude-code.background.idField.desc': undefined
+  'settings.advanced.claude-code.background.idField.title': undefined
+  'settings.advanced.claude-code.background.pidField.desc': undefined
+  'settings.advanced.claude-code.background.pidField.title': undefined
   'settings.advanced.claude-code.connections.remoteModels.desc': undefined
   'settings.advanced.claude-code.connections.remoteModels.title': undefined
   'settings.advanced.claude-code.exit.command.desc': undefined
@@ -484,6 +488,8 @@ interface CombworkMessageValues {
   'settings.advanced.cw.cards.attachmentMax.title': undefined
   'settings.advanced.cw.cards.titleNudgeChars.desc': undefined
   'settings.advanced.cw.cards.titleNudgeChars.title': undefined
+  'settings.advanced.cw.cli.probeSeconds.desc': undefined
+  'settings.advanced.cw.cli.probeSeconds.title': undefined
   'settings.advanced.cw.console.showText.desc': undefined
   'settings.advanced.cw.console.showText.title': undefined
   'settings.advanced.cw.copies.quietWaitMinutes.desc': undefined
@@ -612,8 +618,14 @@ interface CombworkMessageValues {
   'settings.advanced.cw.restart.resumeAfterUpdate.title': undefined
   'settings.advanced.cw.restart.resumeReadySeconds.desc': undefined
   'settings.advanced.cw.restart.resumeReadySeconds.title': undefined
+  'settings.advanced.cw.resume.idleAsk.desc': undefined
+  'settings.advanced.cw.resume.idleAsk.title': undefined
+  'settings.advanced.cw.resume.idleMinutes.desc': undefined
+  'settings.advanced.cw.resume.idleMinutes.title': undefined
   'settings.advanced.cw.retry.tellAssistantAfterSeconds.desc': undefined
   'settings.advanced.cw.retry.tellAssistantAfterSeconds.title': undefined
+  'settings.advanced.cw.server.checkInferSeconds.desc': undefined
+  'settings.advanced.cw.server.checkInferSeconds.title': undefined
   'settings.advanced.cw.sessions.signFailFast.desc': undefined
   'settings.advanced.cw.sessions.signFailFast.title': undefined
   'settings.advanced.cw.sessions.signTimeoutSeconds.desc': undefined

@@ -6,14 +6,19 @@ import type { PlanUsage } from '../../../shared/types'
 import { advanced } from '../../advanced'
 import { createLogger, userText } from '../../logger'
 import { bundledScriptExists, workerHere, workerStarted } from '../../workerThreads'
+import { TREE_END_MS } from '../../processTree'
 import type { CoreDeps, CoreEvent, CoreReply, CoreRequest, CommandSpec } from './historyCore'
 import { mirrorDir, mirrorPath } from './historyCore'
 import { placeholderMirror } from './mirror'
 import { serverInfoPath } from './launcher'
 
 const log = createLogger('opencodeHistory')
-/** The longest a shutdown's reply is waited for before its worker is ended: its exports' trees ended (endTreeAsync's two bounded runs). */
-const SHUTDOWN_MS = 25_000
+/**
+ * The longest a shutdown's reply is waited for before its worker is ended: its exports' trees ended, in parallel, each
+ * within endTreeAsync's bound (TREE_END_MS: its listing, then its ending session with HI-3358's late rounds), and a
+ * margin for the reply.
+ */
+export const SHUTDOWN_MS = TREE_END_MS + 5_000
 
 // The OpenCode history's main side (HI-2762, design s7/s10/s13). Main never reads a session itself: it tells the worker
 // (historyCore, in threads/historyWorker.ts) what runs, which server each has, when to read, and when a run ended, and
@@ -125,7 +130,7 @@ class HistoryThread {
   async stop(): Promise<void> {
     const w = this.worker
     if (w) {
-      // Bounded by its exports' teardowns (HI-3009: PowerShell lists and ends each tree, each run bounded at 10 s).
+      // Bounded by its exports' teardowns (HI-3009, HI-3358: SHUTDOWN_MS).
       await this.ask({ type: 'shutdown' }, SHUTDOWN_MS).catch(() => undefined)
       this.worker = null
       await w.terminate().catch(() => undefined)

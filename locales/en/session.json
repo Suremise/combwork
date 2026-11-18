@@ -499,6 +499,14 @@
     "defaultMessage": "{agent} now runs on {model}",
     "description": "A notification's title: after its CLI's safety classifier stopped a response, the agent runs on another model. {agent} is the agent, {model} the model's name."
   },
+  "session.notice.startContextBody": {
+    "defaultMessage": "Combwork couldn't {why, select, slow {make it in time} failed {make it} other {put it into the session}}, so {agent} works without Combwork's view of the board and its guidance for now. Stop it and start it again to try again.",
+    "description": "The notification that an agent ({agent}) started without Combwork's start context (HI-3375). why: slow, it took too long to make (this PC was busy); failed, making it failed; other, it couldn't be put into the agent's session. Stop and start are the agent's buttons."
+  },
+  "session.notice.startContextTitle": {
+    "defaultMessage": "{agent} started without Combwork's start context",
+    "description": "A notification's title (HI-3375): an agent ({agent}, its name) started, or went on after compacting its conversation, without the start context Combwork puts into its session (Combwork's view of the board, its guidance and its state)."
+  },
   "session.notice.tasksEnded": {
     "defaultMessage": "Its background tasks have ended.",
     "description": "The notification that an agent finished once the background tasks it started ended."

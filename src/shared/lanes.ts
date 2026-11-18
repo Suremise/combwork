@@ -171,6 +171,8 @@ export function waitsOnCard(c: { blockedBy: readonly number[]; waitingFor?: { re
 export interface YieldCard {
   column: string
   archived?: boolean
+  /** Why it is blocked (HI-3368: a blocked first card can't start, so the lane never yields to it). */
+  blocked?: string | null
   agent?: string | null
   blockedBy: readonly number[]
   waitingFor?: { reason: string } | null
@@ -180,10 +182,12 @@ export interface YieldCard {
 /**
  * HI-3323: the card a new list (`list`) makes its lane yield to, or null: the list keeps the builder's card in flight
  * `behind` (in Doing, its own or nobody's), and its first own open card (not Done or archived, the builder's or nobody's)
- * is another, in Todo, that `behind` waits on (waitsOnCard). One rule for the lanes' save (yieldOf), a reorder applied now
- * and Start Lane's hint, so what the window says is what a start does.
+ * is another, in Todo, that `behind` waits on (waitsOnCard), and that can start (HI-3368): not blocked, and not waiting on
+ * its own dependencies (`depsWait`: where its rules start it only once they are Done). A first card that can't start would
+ * put `behind` back for nothing, its builder idle: the list then waits as any queued change. One rule for the lanes' save
+ * (yieldOf), a reorder applied now and Start Lane's hint, so what the window says is what a start does.
  */
-export function laneYieldFirst(list: readonly number[], behind: number, cardOf: (n: number) => YieldCard | null | undefined, builder: string): number | null {
+export function laneYieldFirst(list: readonly number[], behind: number, cardOf: (n: number) => YieldCard | null | undefined, builder: string, depsWait: (n: number) => boolean = () => false): number | null {
   if (!list.includes(behind)) return null
   const c = cardOf(behind)
   if (!c || c.archived || c.column !== 'doing' || (c.agent && c.agent !== builder)) return null
@@ -193,7 +197,7 @@ export function laneYieldFirst(list: readonly number[], behind: number, cardOf: 
   })
   if (first === undefined || first === behind) return null
   const f = cardOf(first)
-  return f && f.column === 'todo' && waitsOnCard(c, first, f.key) ? first : null
+  return f && f.column === 'todo' && !f.blocked && waitsOnCard(c, first, f.key) && !depsWait(first) ? first : null
 }
 
 /** A lane's due card's dependency wait (HI-2618, LaneRecord.depEpisode). */
@@ -323,7 +327,7 @@ export interface LaneSlotHeld {
  * A held slot as a refused start's status carries it (HI-2468): the slot, what holds it, and the agent whose session
  * is in it as `heldBy` (the status's `agent` is the builder there), with the broker seen in it, if any.
  */
-const heldStatus = (h: LaneSlotHeld): Pick<LaneStatus, 'slot' | 'held' | 'heldBy' | 'broker' | 'idle' | 'program' | 'more'> => ({ slot: h.slot, held: h.held, ...(h.agent ? { heldBy: h.agent } : {}), ...(h.broker ? { broker: h.broker } : {}), ...(h.idle !== undefined ? { idle: h.idle } : {}), ...(h.program ? { program: h.program } : {}), ...(h.more ? { more: h.more } : {}) })
+const heldStatus = (h: LaneSlotHeld): Pick<LaneStatus, 'slot' | 'held' | 'heldBy' | 'heldFor' | 'broker' | 'idle' | 'program' | 'more'> => ({ slot: h.slot, held: h.held, ...(h.agent ? { heldBy: h.agent } : {}), ...(h.card !== undefined ? { heldFor: h.card } : {}), ...(h.broker ? { broker: h.broker } : {}), ...(h.idle !== undefined ? { idle: h.idle } : {}), ...(h.program ? { program: h.program } : {}), ...(h.more ? { more: h.more } : {}) })
 
 /** Whether a lane reads its cards as it left them (ended or abandoned, with its snapshot) rather than from the board. */
 export const isFrozen = (rec: Pick<LaneRecord, 'state' | 'frozen'>): boolean => !running(rec) && !!rec.frozen
@@ -665,6 +669,8 @@ export function laneStatusText(s: LaneStatus): string {
         return s.freshWhy !== undefined ? say(L.freshFailed, { agent, why: s.freshWhy }) : say(L.freshFailedBare, { agent })
       }
       if (s.why === 'dependencies') return say(L.startDependencies, { card, waitsFor: s.waitingOn?.length ? s.waitingOn.join(', ') : (s.waitsFor ?? say(L.aDependency)) })
+      // Its builder's one slot lent to a card (HI-3353): said as a lane waiting for a slot says it (HI-3168).
+      if (s.why === 'refused' && s.slot && s.held === 'card' && s.heldFor !== undefined) return say(L.slotCard, { agent: s.heldBy ?? s.agent ?? say(L.anAgent), slot: s.slot, card: cardRef(s.heldFor) })
       if (s.why === 'refused' && s.slot && s.held) return say(L.startRefusedHeld, { card, slot: s.slot, held: s.held, heldBy: s.heldBy ?? say(L.anAgent), broker: s.broker ?? '', idle: idleKey(s.idle), program: s.program ?? '', more: s.more ?? 0 })
       if (s.why === 'refused') return say(L.startRefused, { card })
       const agent = s.agent ?? say(L.itsBuilder)

@@ -9,7 +9,7 @@ import { config } from '../../config'
 import { createLogger, userText } from '../../logger'
 import { plainHttpsJson } from '../../plainHttpsJson'
 import { listOf } from '../../../shared/advanced'
-import { EDITOR_EXTENSION_PATH, installText, notInstalledIssue, run, signedOutIssue, toSpawnable, updateIssue } from '../common'
+import { EDITOR_EXTENSION_PATH, installText, notInstalledIssue, run, signedOutIssue, toSpawnable, updateIssue, WHERE_MS, cliProbeMs } from '../common'
 import type { CommandSpec, UpdateRetry } from '../types'
 import { COPILOT_ENV_STRIP, copilotEnv, stripsTokens } from './home'
 import { GITHUB_COM } from '../../../shared/githubHost'
@@ -91,7 +91,7 @@ async function candidates(env: Record<string, string>): Promise<{ path: string; 
   const out: { path: string; source: string }[] = []
   const custom = providerSettings(config.settings, ID).executablePath.trim()
   if (custom) out.push({ path: custom, source: 'settings' })
-  const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', ['copilot'], 5000, env)
+  const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', ['copilot'], WHERE_MS, env)
   for (const line of where.stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {
     if (process.platform !== 'win32' || /\.(exe|cmd|bat)$/i.test(line)) out.push({ path: line, source: 'PATH' })
   }
@@ -124,7 +124,7 @@ export async function locateCopilot(): Promise<AgentInstallInfo> {
       info.rejected!.push(c.path)
       continue
     }
-    const r = await run(c.path, ['--version'], 15000, env)
+    const r = await run(c.path, ['--version'], cliProbeMs(), env)
     const version = parseCopilotVersion(r.stdout)
     if (!version) {
       // The path and what the CLI printed are the user's (folder names, profile names): left out of Copy Diagnostics.

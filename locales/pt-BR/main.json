@@ -278,6 +278,7 @@
   "main.outcome.released": "Liberado",
   "main.outcome.resuming": "Retomando, um de cada vez",
   "main.outcome.runsAnother": "Ele executa outra conversa aqui agora",
+  "main.outcome.stillInBackground": "Parada, mas não confirmou que terminou: retome quando tiver terminado",
   "main.outcome.stoppedAndResumed": "Parada e retomada aqui",
   "main.outcome.updateInstalling": "Instalando: o Combwork reinicia",
   "main.outcome.updateNotReady": "Não está mais pronta para instalar",

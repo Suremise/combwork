@@ -636,5 +636,7 @@
   "tips.versionControlJj.text": "Wähle in einem jj-Repository oben im Tab Versionsverwaltung jj: Der Verlauf zeigt jede Change-ID neben ihrer Commit-ID, und Vergleichen, Bookmarks und Konflikte lesen das Repository, ohne es zu ändern. Reviewte Arbeit integriert Combwork, oder du tust es.",
   "tips.versionControlJj.title": "Ein jj-Repository ansehen",
   "tips.activityMap.text": "„Aktivität“ zeigt seine Agenten als Wabe: Jeder Tool-Aufruf geht zu seiner Station (Lesen, Ändern, Shell, Agenten, Tools, Du), mit einem Kontextring pro Agent. Wähle einen Agenten unter „Agenten ▾“ für seine eigene Karte; „Zeigen“ blendet die Karte, ihren Verlauf und die Ringe aus.",
-  "tips.activityMap.title": "Eine Karte dessen, was deine Agenten tun"
+  "tips.activityMap.title": "Eine Karte dessen, was deine Agenten tun",
+  "tips.resumeLongIdle.title": "Eine lange ruhende Unterhaltung fragt vor dem Fortsetzen",
+  "tips.resumeLongIdle.text": "Eine Unterhaltung, die über eine Stunde ruht, hat ihren Prompt-Cache höchstwahrscheinlich verloren, daher kann ihr Fortsetzen viele Tokens kosten. „Fortsetzen“ sagt, wie lange sie ruht und wie groß sie ist, und bietet stattdessen „Archivieren und neu beginnen“ an."
 }

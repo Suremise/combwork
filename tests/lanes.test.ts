@@ -130,6 +130,10 @@ describe('a lane on slots (#1438)', () => {
     expect(laneLine(view({ slot: 'slot-a', held: 'left', agent: 'B1', program: 'node', more: 2 }))).toContain("slot-a still in use (B1's last run left node and 2 more running in it); Combwork tries again")
     expect(view({ slot: 'slot-a', held: 'left', agent: 'B1', program: 'node', more: 2 }).status).toMatchObject({ held: 'left', heldBy: 'B1', program: 'node', more: 2 })
     expect(laneLine(view({ slot: 'slot-a', held: 'lastRun', agent: 'B1' }))).toContain("slot-a still in use (B1's last run there isn't known to have ended); Combwork tries again")
+    // HI-3353: its builder's one slot lent to a card: that slot and card, as a lane waiting for a slot says it (HI-3168).
+    const byCard = view({ slot: 'slot-b', held: 'card', agent: 'B1', card: 7 })
+    expect(byCard.status).toEqual({ reason: 'startWait', card: 2, why: 'refused', agent: 'B1', slot: 'slot-b', held: 'card', heldBy: 'B1', heldFor: 7 })
+    expect(laneLine(byCard)).toContain('waiting for a slot: B1 still builds in slot-b for #7, which keeps it until that card is Done or put back')
     // Refused for another reason, or nothing held any more: as before HI-2468.
     const bare = view()
     expect(bare.status).toEqual({ reason: 'startWait', card: 2, why: 'refused', agent: 'B1' })
@@ -157,8 +161,8 @@ describe('a lane on slots (#1438)', () => {
 })
 
 describe('HI-3323: the card a new list makes its lane yield to (laneYieldFirst), one rule for the save and Start Lane', () => {
-  const board = (over: Record<number, Partial<{ column: string; agent: string | null; blockedBy: number[]; waitingFor: { reason: string }; key: string; archived: boolean }>> = {}) => {
-    const cardsOf: Record<number, { column: string; agent: string | null; blockedBy: number[]; key: string; archived?: boolean; waitingFor?: { reason: string } }> = {
+  const board = (over: Record<number, Partial<{ column: string; agent: string | null; blockedBy: number[]; waitingFor: { reason: string }; key: string; archived: boolean; blocked: string | null }>> = {}) => {
+    const cardsOf: Record<number, { column: string; agent: string | null; blockedBy: number[]; key: string; archived?: boolean; waitingFor?: { reason: string }; blocked?: string | null }> = {
       5: { column: 'done', agent: 'b1', blockedBy: [], key: 'AL-5' },
       6: { column: 'doing', agent: 'b1', blockedBy: [8], key: 'AL-6' },
       8: { column: 'todo', agent: null, blockedBy: [], key: 'AL-8' },
@@ -183,6 +187,19 @@ describe('HI-3323: the card a new list makes its lane yield to (laneYieldFirst),
     expect(laneYieldFirst([8, 6], 6, board({ 6: { blockedBy: [], waitingFor: { reason: 'needs al-8 merged first' } } }), 'b1')).toBe(8)
     expect(laneYieldFirst([8, 6], 6, board({ 6: { blockedBy: [], waitingFor: { reason: 'needs AL-88 first' } } }), 'b1')).toBeNull()
     expect(waitsOnCard({ blockedBy: [], waitingFor: { reason: 'after #8 lands' } }, 8, null)).toBe(true)
+  })
+
+  // HI-3368: a first card that can't start never takes the lane: its card in Doing would be put back for nothing, its
+  // builder idle. The list then waits as any queued change.
+  it("HI-3368: never yields to a first card that can't start: blocked, or waiting on its own dependencies where its rules wait", () => {
+    expect(laneYieldFirst([8, 6], 6, board({ 8: { blocked: 'waiting for a licence decision' } }), 'b1')).toBeNull()
+    // Its own dependency not Done, where its rules start it only once they are (the caller's depsWait): none.
+    expect(laneYieldFirst([8, 6], 6, board({ 8: { blockedBy: [9] } }), 'b1', (n) => n === 8)).toBeNull()
+    // The same card with no wait (its rules don't wait for dependencies, or they are Done), and not blocked: yielded to.
+    expect(laneYieldFirst([8, 6], 6, board({ 8: { blockedBy: [9] } }), 'b1', () => false)).toBe(8)
+    expect(laneYieldFirst([8, 6], 6, board({ 8: { blocked: null } }), 'b1')).toBe(8)
+    // The wait is asked of the first card alone, never of the card in Doing (which waits on it by definition).
+    expect(laneYieldFirst([8, 6], 6, board(), 'b1', (n) => n === 6)).toBe(8)
   })
 })
 

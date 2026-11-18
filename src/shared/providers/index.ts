@@ -128,7 +128,7 @@ export interface ProviderSessionCaps {
   /**
    * How the CLI defers MCP tools (HI-2553, HI-3225); false: it is given the whole list at the start.
    * - `unmarked`: its model sees their names and loads a tool's definition when it uses one, but for those Combwork marks to
-   *   be sent in full (shared/combworkToolLoad.ts; Claude Code's `anthropic/alwaysLoad`).
+   *   be sent in full (shared/combworkToolLoad.ts; Claude Code's `anthropic/alwaysLoad`; none since HI-3361).
    * - `all`: every one, marked or not: its model sees the server's namespace only, finds a tool by its name and
    *   description, and is given no schema before it calls it (Codex 0.167 and 0.169 on every listed model; it reads no
    *   mark, server or tool setting that keeps one loaded). A call with arguments the tool doesn't take is told what it takes.

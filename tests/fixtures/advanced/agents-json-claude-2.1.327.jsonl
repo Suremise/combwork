@@ -1,0 +1,4 @@
+{"step": "before: claude agents --json --all (nothing started yet)", "out": []}
+{"step": "running: claude agents --json, after claude --bg printed: backgrounded · 701b98b1 (pid 50124 a claude.exe created 1794975870720, its parent 80380 the background service, also claude.exe)", "out": [{"pid": 50124, "id": "701b98b1", "cwd": "C:\\work", "kind": "background", "startedAt": 1794975871568, "sessionId": "701b98b1-ccfb-438e-91d1-12b7222657ea", "name": "ok reply confirmation", "status": "idle", "state": "done"}]}
+{"step": "after claude stop 701b98b1 (printed: stopped 701b98b1), first look: claude agents --json (pid 50124 gone)", "out": []}
+{"step": "after the stop, first look: claude agents --json --all", "out": [{"id": "701b98b1", "cwd": "C:\\work", "kind": "background", "startedAt": 1794975869737, "sessionId": "701b98b1-ccfb-438e-91d1-12b7222657ea", "name": "ok reply confirmation", "state": "done"}]}

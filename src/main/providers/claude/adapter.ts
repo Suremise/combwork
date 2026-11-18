@@ -14,9 +14,9 @@ import { config } from '../../config'
 import { containsPlace, contentHash, ContentTooLarge, copyMissing, copySkillTree, sourceProblem, tooBigToDeliver, isDir, isFile, linksNotCopied, placeMatcher, readJson, realPath, removePath, writeJsonAtomic, type PlannedCopies } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
 import { plainHttpsJson } from '../../plainHttpsJson'
-import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, keepBounded, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, updateStayedIssue, userMemoryLabel } from '../common'
+import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, keepBounded, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, updateStayedIssue, userMemoryLabel, WHERE_MS, cliProbeMs } from '../common'
 import type { StartHint } from '../../../shared/startFailure'
-import type { ConnectionStatus, TrustReading, TrustTarget, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, HookOccurrence, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
+import type { ConnectionStatus, TrustReading, TrustTarget, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, HookOccurrence, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, RunningJobs, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
 import { autoCompactOf, effectiveEnv, settingsScopes } from './autoCompact'
 import { rowsOfHooksTable } from '../../hookListing'
 import { claudeAutoMemory, claudeFileAllowed } from './files'
@@ -260,6 +260,38 @@ export function launchModel(ctx: Pick<LaunchContext, 'model' | 'use200kContext' 
   return lastModelArg(withoutSettingsArgs(ctx.extraArgs)) ?? modelArg(ctx)
 }
 
+
+/**
+ * HI-3376: the background jobs in what `claude agents --json` printed (Settings → Advanced's id and process fields), each
+ * with its own process id when it has one, and whether an id is named anywhere in it (HR3's round 2: a background row
+ * whose id field is wrong still names its job, so its absence from `jobs` isn't the job's); null when it isn't a JSON
+ * list (no answer, not the same as none running).
+ */
+export function runningJobsIn(stdout: string): RunningJobs | null {
+  let rows: unknown
+  try {
+    rows = JSON.parse(stdout)
+  } catch {
+    return null
+  }
+  if (!Array.isArray(rows)) return null
+  const idField = advanced.get<string>('claude-code.background.idField')
+  const pidField = advanced.get<string>('claude-code.background.pidField')
+  const jobs = rows.flatMap((x) => {
+    const id = x && typeof x === 'object' ? (x as Record<string, unknown>)[idField] : undefined
+    const pid = x && typeof x === 'object' ? (x as Record<string, unknown>)[pidField] : undefined
+    return typeof id === 'string' && id ? [{ id, pid: typeof pid === 'number' && Number.isInteger(pid) && pid > 0 ? pid : null }] : []
+  })
+  // Every string value in it, at any depth: an id named under any field (or as the start of one, as sessionId is).
+  const values: string[] = []
+  const walk = (v: unknown): void => {
+    if (typeof v === 'string') values.push(v)
+    else if (Array.isArray(v)) v.forEach(walk)
+    else if (v && typeof v === 'object') Object.values(v).forEach(walk)
+  }
+  walk(rows)
+  return { jobs, names: (id) => values.some((v) => v === id || v.startsWith(`${id}-`)) }
+}
 export class ClaudeCodeAdapter implements ProviderAdapter {
   readonly id = CLAUDE_CODE
   readonly descriptor = CLAUDE_DESCRIPTOR
@@ -326,7 +358,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     const custom = providerSettings(config.settings, this.id).executablePath.trim()
     if (custom) out.push({ path: custom, source: 'settings' })
 
-    const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', ['claude'], 5000)
+    const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', ['claude'], WHERE_MS)
     for (const line of where.stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {
       // Prefer real executables over extension-less shims that node-pty cannot start on Windows.
       if (process.platform !== 'win32' || /\.(exe|cmd|bat)$/i.test(line)) out.push({ path: line, source: 'PATH' })
@@ -370,7 +402,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
         info.rejected!.push(c.path)
         continue
       }
-      const r = await run(c.path, ['--version'])
+      const r = await run(c.path, ['--version'], cliProbeMs())
       const m = r.stdout.match(/(\d+\.\d+\.\d+[\w.-]*)/)
       if (!m) {
         log.warn(`Candidate ${userText(c.path)} did not report a version: ${userText(r.stderr.slice(0, 200))}`)
@@ -906,6 +938,20 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   async stopBackgroundJob(executable: string, jobId: string): Promise<void> {
     const r = await run(executable, ['stop', jobId], 20000)
     if (r.code !== 0) throw new Error((r.stderr || r.stdout).trim() || `claude stop ${jobId} failed`) // i18n-ignore: a CLI command's name, when it said nothing itself
+  }
+
+  /**
+   * HI-3376: `claude agents --json` lists the sessions running now, interactive and background (2.1.327: a background one
+   * has `id`, the job's, and `pid`, its own claude.exe, a child of the shared background service; an interactive one has
+   * no `id`). A stopped job is gone from it at once (it stays in `--all`, without a pid). Run without
+   * CLAUDE_CODE_DISABLE_AGENT_VIEW, which turns the command off (Combwork sets it only in its agents' sessions).
+   */
+  async runningBackgroundJobs(executable: string, timeoutMs = 20000): Promise<RunningJobs | null> {
+    const env = { ...process.env }
+    delete env.CLAUDE_CODE_DISABLE_AGENT_VIEW
+    const r = await run(executable, ['agents', '--json'], timeoutMs, env)
+    if (r.code !== 0 || r.timedOut || r.ended) return null
+    return runningJobsIn(r.stdout)
   }
 
   // -------------------------------------------------------------------------

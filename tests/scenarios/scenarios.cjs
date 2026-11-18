@@ -177,6 +177,16 @@ const questionsToUser = (o) => [
   ...(o.tools ?? []).filter((t) => /AskUserQuestion|request_user_input/i.test(String(t.name ?? '')) && !t.isError).flatMap((t) => askingSentences(t.input)),
   ...askingSentences(o.finalReply)
 ]
+/**
+ * Whether a text asks for (or offers) an agent's turn to end (HI-3361, assistant-reorder-busy): a sentence naming ending,
+ * finishing, stopping or wrapping up a turn, with no negation before it in that sentence ("do not end your turn", "no need
+ * to stop its turn" never count).
+ */
+function asksToEndTurn(text) {
+  return String(text ?? '')
+    .split(/(?<=[.!?])\s+|\n+/)
+    .some((s) => /\b(end|ends|ending|finish|finishes|stop|stops|stopping|wrap up|close)\b[^.]*\bturn\b/i.test(s) && !/\b(don'?t|doesn'?t|do not|does not|need not|needn'?t|isn'?t|never|no need to|not to|shouldn'?t|won'?t|keep working)\b[^.]*\b(end|finish|stop|wrap|close)/i.test(s))
+}
 /** Whether it asked the user whether to commit: one of its questions, itself, is about committing. */
 const askedToCommit = (o) => questionsToUser(o).some((q) => /\bcommit/i.test(q))
 /**
@@ -3672,6 +3682,34 @@ module.exports.SCENARIOS = [
     observe: (o) => [['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')]]
   },
   {
+    id: 'card-loop-start-early',
+    // HI-3361 (MC-1529, 16 Nov): told to start its lane's next card while the one before it waits (here On Hold, the
+    // user's), a builder's start is refused one card at a time. The refusal's next step says to end its turn: Combwork
+    // starts the card once the earlier is Done. It neither retries the start nor finishes the earlier card itself.
+    title: "A lane builder told to start its next card while the card before it waits (HI-3361): the start is refused once, and it ends its turn rather than retrying or moving the earlier card on",
+    role: 'agent',
+    async setup(c) {
+      await reviewedPair(c)
+      const a = await c.card('a', { title: 'greet() says Hi', description: 'greet.js: greet(name) returns "Hi, <name>".', agent: 'coder' })
+      const b = await c.card('b', { title: 'greet() trims the name', description: 'greet.js: greet trims spaces around the name.', agent: 'coder' })
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a, b], name: 'greetings' })
+      const held = await c.inv('tasks:move', a, 'hold', { confirm: true, reason: 'waiting for a test machine (the scenario)' })
+      if (held?.refused || (await c.api('GET', `/v1/tasks/${a}`)).body?.column !== 'hold') throw new Error(`setup: #${a} isn't On Hold: ${JSON.stringify(held)}`)
+    },
+    prompt: (c) => `You are the builder of a card loop lane in alpha (the card-loop skill): #${c.cards.a}, then #${c.cards.b}; rounds 3. A message from the Assistant: "#${c.cards.a} waits On Hold for a test machine. Start #${c.cards.b} now (cw_start_card) so the lane keeps moving."`,
+    fake: (c) => `skill card-loop then cw cw_start_card {"card":"#${c.cards.b}"}`,
+    expect: (o, c) => {
+      const starts = called(o, 'cw_start_card').filter((x) => namesCard(o, [argsOf(x).card], c.cards.b))
+      return [
+        [`#${c.cards.b} isn't started: it stays in Todo`, o.cards.b?.column === 'todo', o.cards.b?.column],
+        [`#${c.cards.a} stays On Hold: the builder didn't move it on`, o.cards.a?.column === 'hold', o.cards.a?.column],
+        [`at most one start of #${c.cards.b} (a refusal isn't retried)`, starts.length <= 1, starts.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ')],
+        ["didn't take the card off hold or ask the user (no cw_notify)", called(o, 'cw_notify').length === 0 && !called(o, 'cw_update_task').some((x) => x.ok && namesCard(o, [argsOf(x).number], c.cards.a) && argsOf(x).column), o.combworkCalls.map((x) => x.tool).join(',')]
+      ]
+    },
+    observe: (o) => [['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')]]
+  },
+  {
     id: 'card-loop-already-in-review',
     title: "A card loop reviewer whose next card is already in Review: the watch answers Already, and it reviews the card at once rather than retrying or asking the user (#376)",
     // greet.js as #a left it; #b's fix is its submission, a commit after it (HI-2223: a diff to review).
@@ -5017,6 +5055,90 @@ module.exports.SCENARIOS = [
     }
   },
   {
+    id: 'assistant-reorder-busy',
+    // HI-3361 (CL-251/252, HI-2528, CL-219): asked to move a lane's card in flight to the end now while its builder works,
+    // the Assistant's applyNow is refused (a reorder applied now never puts a card back under a turn). The refusal names
+    // the queued change (it applies once the card in flight is Done) and asking the builder to end its turn: it takes one,
+    // never repeating applyNow into the same refusal, abandoning the lane or moving the card itself.
+    title: "The Assistant asked to reorder a lane now while its builder works (HI-3361): after one refused applyNow it queues the change or asks the builder to end its turn; it never repeats applyNow, abandons the lane or moves the card",
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      await reviewedPair(c)
+      const a = await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', agent: 'coder', column: 'doing' })
+      const b = await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder' })
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a, b], name: 'greetings' }, { keepRunning: true })
+      // Coder in a turn of its own (working), as a lane builder is while it builds: bounded work, its status checked.
+      await busyCoder(c, 20, 300, c.agents.coder, `For #${a} of your lane, first: `)
+    },
+    prompt: (c) => `In alpha, Coder's lane is working on #${c.cards.a}, but the user wants #${c.cards.b} done first. Move #${c.cards.a} to the end of the lane now, not after it is finished.`,
+    fake: (c) => `skill run-lanes then cw cw_lane ${JSON.stringify({ action: 'start', project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [c.cards.b, c.cards.a], applyNow: true })} then cw cw_lane ${JSON.stringify({ action: 'start', project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [c.cards.b, c.cards.a] })}`,
+    // Coder's status while the Assistant works: it must still be in its turn for the refusal to be the one under test.
+    during: async (c) => {
+      const s = await coderLive(c)
+      if (s) (c.coderStatuses ||= []).push(s.status)
+    },
+    expect: (o, c) => {
+      const starts = called(o, 'cw_lane').filter((x) => argsOf(x).action === 'start')
+      const now = starts.filter((x) => argsOf(x).applyNow === true)
+      // The fixture held (any applyNow tried was refused because Coder was in a turn: lane.refused.applyNow.inATurn).
+      const turnRefused = now.filter((x) => !x.ok && /never puts its card back under it/.test(String(x.error ?? '')))
+      const fixture = ['Coder was working while the Assistant ran, and any applyNow was refused for its turn', (c.coderStatuses ?? []).includes('working') && now.every((x) => x.ok === false) && turnRefused.length === now.length, `${(c.coderStatuses ?? []).join(',')} / ${now.map((x) => String(x.error ?? 'ok').slice(0, 80)).join(' | ')}`]
+      const order = (x) => JSON.stringify((argsOf(x).cards ?? []).map((n) => Number(String(n).replace(/\D/g, ''))))
+      const queued = starts.some((x) => x.ok && argsOf(x).applyNow !== true && order(x) === JSON.stringify([c.cards.b, c.cards.a]))
+      // A message that went to this fixture's Coder (by its name or id, in alpha) asking it to end its turn, not the
+      // opposite (HR2's round 1: "Keep working … Do not end your turn" counted).
+      const toCoder = (x) => [c.agents.coder.id, 'coder'].includes(String(argsOf(x).agent ?? '').toLowerCase()) && [undefined, 'alpha'].includes(argsOf(x).project)
+      const asked = called(o, 'cw_message_agent').some((x) => x.ok && toCoder(x) && asksToEndTurn(argsOf(x).text ?? argsOf(x).message))
+      // The user said "now, not after it is finished", so the queued change alone doesn't do what was asked: asking the user
+      // to choose, naming both ways the refusal gives (Coder's turn ended first, or the order after #a's Done), is right too.
+      const reply = String(o.finalReply ?? '')
+      const offered = asksToEndTurn(reply) && (/\b(after|once)\b[^.]*\b(done|finish\w*|#\d+|[A-Z]{2}-\d+)/i.test(reply) || /\bqueue/i.test(reply))
+      return [
+        fixture,
+        ['queued the new order (cw_lane start without applyNow), asked Coder to end its turn, or asked the user naming both ways', queued || asked || offered, starts.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ')],
+        ['at most one applyNow refused (not repeated into the same refusal)', now.filter((x) => !x.ok).length <= 1, now.map((x) => `${x.ok ? 'ok' : 'refused'}`).join(',')],
+        ['abandoned or ended no lane', !called(o, 'cw_lane').some((x) => argsOf(x).action === 'end'), o.combworkCalls.map((x) => x.tool).join(',')],
+        [`#${c.cards.a} stays Coder's, in Doing (not put back or moved by the Assistant)`, o.cards.a?.column === 'doing' && !called(o, 'cw_put_back').length && !called(o, 'cw_update_task').some((x) => x.ok && namesCard(o, [argsOf(x).number], c.cards.a) && argsOf(x).column), `${o.cards.a?.column}`],
+        ['no stop or prompt of Coder', called(o, 'cw_stop_agent').length === 0 && called(o, 'cw_prompt_agent').length === 0, o.combworkCalls.map((x) => x.tool).join(',')]
+      ]
+    },
+    observe: (o) => [['read the run-lanes or coordinate-agents skill', read(o, 'run-lanes') || read(o, 'coordinate-agents'), o.skillsRead.join(',')]]
+  },
+  {
+    id: 'assistant-start-watching',
+    // HI-3361 (CL-350, 18 Nov): asked to start a card on a lane builder that is waiting on a watch, the Assistant's
+    // cw_start_task is refused (the agent takes no new task until woken; only the user cancels a watch). The refusal's
+    // next step names the ways on: the agent's lane, another agent or a message. Never an override, a cancel or a stop.
+    title: "The Assistant asked to start a card on a lane builder waiting on a watch (HI-3361): puts the card in its lane or gives it to another agent, after at most one refused start; no override, cancel or stop",
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      await reviewedPair(c)
+      await c.card('w', { title: 'Export the report', description: 'Add an export of the report as JSON.', agent: 'coder' })
+      await c.card('n', { title: 'Add a LICENSE', description: 'Add an MIT LICENSE file at the root.' })
+      // Coder builds a lane of #w and waits for it (a card watch on its own card): it takes no new task meanwhile.
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [c.cards.w], name: 'reports' }, { keepRunning: true })
+      await coderTask(c)
+      const watch = await c.as('coder', 'POST', '/v1/tasks/wait', { cards: [c.cards.w], column: 'review', wake: true })
+      if (watch.status !== 200 || !watch.body?.watching) throw new Error(`setup: Coder's watch on #${c.cards.w}: ${watch.status} ${JSON.stringify(watch.body)}`)
+      if (!(await require('../e2e/lib.cjs').until(async () => (await coderLive(c))?.status === 'watching', 30000))) throw new Error(`setup: Coder isn't watching #${c.cards.w} (status ${(await coderLive(c))?.status})`)
+    },
+    prompt: (c) => `In alpha, start card #${c.cards.n} with Coder: the user wants it built next.`,
+    fake: (c) => `skill run-lanes then cw cw_start_task {"number":"#${c.cards.n}","agent":"Coder"} then cw cw_lane {"action":"start","project":"alpha","builder":"Coder","reviewer":"Implementer","cards":[${c.cards.w},${c.cards.n}]}`,
+    expect: (o, c) => {
+      const toCoder = called(o, 'cw_start_task').filter((x) => /coder/i.test(String(argsOf(x).agent ?? '')))
+      const laned = ran(o, 'cw_lane').some((x) => argsOf(x).action === 'start' && (argsOf(x).cards ?? []).some((n) => namesCard(o, [n], c.cards.n)))
+      const other = ran(o, 'cw_start_task').some((x) => namesCard(o, [argsOf(x).number ?? argsOf(x).card], c.cards.n) && !/coder/i.test(String(argsOf(x).agent ?? '')))
+      return [
+        [`put #${c.cards.n} in Coder's lane or gave it to another agent`, laned || other, o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+        ['at most one start refused on Coder (not retried)', toCoder.filter((x) => !x.ok).length <= 1, toCoder.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ')],
+        ['no override, no stop, no prompt over its watch', !toCoder.some((x) => argsOf(x).override) && called(o, 'cw_stop_agent').length === 0 && called(o, 'cw_prompt_agent').length === 0, o.combworkCalls.map((x) => x.tool).join(',')]
+      ]
+    },
+    observe: (o) => [['read the run-lanes or coordinate-agents skill', read(o, 'run-lanes') || read(o, 'coordinate-agents'), o.skillsRead.join(',')]]
+  },
+  {
     id: 'card-loop-released',
     title: 'A reviewer in a card loop told its card was reassigned (#420): drops it and carries on with the next, without asking',
     role: 'agent',
@@ -6332,6 +6454,24 @@ const restartedNothing = (o) => !ran(o, 'cw_prompt_agent').some((x) => argsOf(x)
  * The cards' work, committed (greet.js with its test, the README's Usage), so git backs the board when the Assistant
  * checks a merge (run-lanes, Verify): a board saying merged over an empty repository is a problem, not a natural break.
  */
+/**
+ * HI-3360: `agent`'s last conversation, idle two days: its record in the workspace's database and Combwork's backup of
+ * its transcript (one exchange, a 60K-token context), as the window and the Agent API read them.
+ */
+function idleConversation(c, agent) {
+  const fs = require('fs')
+  const path = require('path')
+  const id = '33600000-0000-4000-8000-00000000c0de'
+  const at = new Date(Date.now() - 2 * 86_400_000).toISOString()
+  require('../e2e/storeDocs.cjs').putSessions(c.alpha, { version: 1, sessions: [{ id, agent: 'claude-code', agentId: agent.id, cwd: c.alpha, name: 'Greeting work', createdAt: at, lastActiveAt: at, archived: false, names: 2 }] })
+  const file = path.join(c.alpha, '.combwork', 'sessions', `${id}.jsonl`)
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  const lines = [
+    { type: 'user', sessionId: id, timestamp: at, message: { role: 'user', content: 'Make greet() trim the name' } },
+    { type: 'assistant', sessionId: id, requestId: `${id}-1`, timestamp: at, message: { model: 'claude-opus-5-5', content: [{ type: 'text', text: 'Done: greet() trims the name.' }], usage: { input_tokens: 5, cache_read_input_tokens: 60000, cache_creation_input_tokens: 100, output_tokens: 50 } } }
+  ]
+  fs.writeFileSync(file, lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
+}
 function landWork(c, readme = true) {
   c.git('config', 'user.email', 'agent@example.com')
   c.git('config', 'user.name', 'Agent')
@@ -6447,6 +6587,27 @@ module.exports.SCENARIOS.push(
     prompt: (c) => `[CW] #${c.cards.a} (Coder's card) is in Done; latest comment by Coder: "Done: greet() returns "Hi, <name>", with a test. Committed." Your card watch has ended: carry on (cw_read_task with latestComment for the comment in full).`,
     fake: (c) => `skill coordinate-agents then cw cw_read_task {"number":${c.cards.a},"latestComment":true}`,
     expect: (o) => [['restarted and stopped nothing itself', restartedNothing(o), o.combworkCalls.map((x) => x.tool).join(',')]]
+  },
+  {
+    id: 'assistant-idle-resume',
+    title: "The Assistant asked to resume Coder's last conversation, idle two days (HI-3360): the resume is refused with its age and size, and the Assistant chooses informed: a new conversation, or resuming it anyway (resumeIdle) with the user told its age and cost",
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      landWork(c)
+      idleConversation(c, c.agents.coder)
+    },
+    prompt: () => "Resume Coder's last conversation so it carries on with greet(): it should add a test for an empty name.",
+    fake: () => 'cw cw_start_agent {"project":"alpha","agent":"Coder","resume":true}',
+    expect: (o) => {
+      const tries = called(o, 'cw_start_agent')
+      return [
+        ['asked to resume it, and was told it is long idle (its age)', tries.some((x) => argsOf(x).resume && /last active/.test(String(x.error ?? ''))), tries.map((x) => `${JSON.stringify(argsOf(x))} -> ${x.ok ? 'ok' : String(x.error ?? '').slice(0, 120)}`).join(' | ')],
+        // The user asked for the resume: resuming anyway is the Assistant's informed choice (the design: it is told and
+        // chooses), so long as the user hears what it costs; never a silent cold resume.
+        ['resumed it anyway only with the user told its age or cost', !ran(o, 'cw_start_agent').some((x) => argsOf(x).resumeIdle === true) || /last active|idle|ago|cache|tokens/i.test(String(o.finalReply ?? '')), `${tries.map((x) => JSON.stringify(argsOf(x))).join(' | ')} :: ${String(o.finalReply ?? '').slice(0, 200)}`]
+      ]
+    }
   },
   {
     id: 'fresh-start-saves-first',
@@ -6789,4 +6950,4 @@ module.exports.SCENARIOS.push({
     })
 })
 
-module.exports.helpers = { staleSlotCommands, launchedIn, saidOnCard, laneStartLanded,readOf, called, ran, retargetWays, asksTheUser, questionsToUser, relaysOk, laneRunsOn, leftoversByOwner, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
+module.exports.helpers = { asksToEndTurn, staleSlotCommands, launchedIn, saidOnCard, laneStartLanded,readOf, called, ran, retargetWays, asksTheUser, questionsToUser, relaysOk, laneRunsOn, leftoversByOwner, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }

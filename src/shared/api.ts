@@ -34,6 +34,7 @@ import type {
   ArchiveRequest,
   ArchiveResult,
   CloseCommandRun,
+  ClosingAgentsState,
   CommandRef,
   CommandsCombwork,
   CommandsWorkspace,
@@ -218,6 +219,10 @@ export interface CombworkRequests {
   'app:cancelPendingQuit': () => void
   /** This window's close command (HI-1368), for a window that reloads while its panel is up; null: none. */
   'closeCommand:state': () => CloseCommandRun | null
+  /** HI-3376: this window's wait for agents to close, for a window that reloads while its panel is up. */
+  'closingAgents:state': () => ClosingAgentsState | null
+  /** HI-3376: its Don't wait: Combwork stops waiting for those agents to close and goes on (what is left is the quit's leftovers). */
+  'closingAgents:dontWait': (id: string) => void
   /** The panel's Don't wait: Combwork stops waiting for this window's close command and goes on; the command carries on. */
   'closeCommand:dontWait': (id: string) => void
   /** The panel's Close, on a failed close command: Combwork goes on. */
@@ -1021,6 +1026,8 @@ export interface CombworkRequests {
   'lanes:start': (projectPath: string, req: LaneStartRequest) => LaneStartResult
   /** What Start Lane… offers for a project (#1443): the reviewer pool's agents when its rules have G17 a shared pool, else null. */
   'lanes:startInfo': (projectPath: string) => LaneStartInfo
+  /** HI-3368: the card the builder's running lane would yield to for this list now (its card in flight `behind`, `to`), or the card it waits on that can't start (`cantStart`: queued for its Done, Apply now too), or null: Start Lane's hint, by the start's own rule. */
+  'lanes:yieldTo': (projectPath: string, builder: string, cards: number[], behind: number) => { to: number } | { cantStart: number } | null
   /**
    * HI-3148: whether Start lane… for this builder on `target` (null: the project's Work merges into) would be refused for
    * its line being released or unreadable: the line and the refusal, for Start Anyway; null, it wouldn't.

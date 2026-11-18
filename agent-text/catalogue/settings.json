@@ -394,6 +394,26 @@
     "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Auto mode is one of Claude Code's permission modes.",
     "audience": "both"
   },
+  "settings.advanced.claude-code.background.idField.desc": {
+    "text": "The field of `claude agents --json` with a background session's id (the one `claude stop` takes). Stop It and Resume reads it to see the session has stopped before resuming its conversation (HI-3376). Wrong, Combwork can't tell, and Stop It and Resume says so instead of resuming.",
+    "note": "What the advanced setting \"Background sessions: job id field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude agents --json`, `claude stop` and Stop It and Resume (a button's name) as they are.",
+    "audience": "both"
+  },
+  "settings.advanced.claude-code.background.idField.title": {
+    "text": "Background sessions: job id field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.claude-code.background.pidField.desc": {
+    "text": "The field of `claude agents --json` with a background session's own process id (not its background service's). Stop It and Resume waits for that process to be gone before resuming its conversation (HI-3376). Wrong, Combwork relies on the listing alone.",
+    "note": "What the advanced setting \"Background sessions: process field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude agents --json` and Stop It and Resume (a button's name) as they are.",
+    "audience": "both"
+  },
+  "settings.advanced.claude-code.background.pidField.title": {
+    "text": "Background sessions: process field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
   "settings.advanced.claude-code.connections.remoteModels.desc": {
     "text": "The model names Ollama runs on ollama.com rather than on this PC (its cloud models, such as gpt-oss:120b-cloud), as a regular expression, for an Ollama connection's models typed in rather than read from Ollama (Read Models asks Ollama, which says). Such a connection's sessions aren't free (local). Wrong, a cloud model typed in is counted as free, or a local one as not free.",
     "note": "What the advanced setting \"Connections: Ollama cloud models\" is for, and what goes wrong when it is wrong (Settings → Advanced). Ollama, ollama.com and Read Models (a button) are names; \"free (local)\" is how Combwork shows the cost of sessions run only on this PC.",
@@ -1025,7 +1045,7 @@
     "audience": "both"
   },
   "settings.advanced.codex.mcp.startupTimeoutSeconds.desc": {
-    "text": "How long Codex waits for Combwork's combwork server to start, when your own Codex config has a server named combwork with a startup timeout of its own: Combwork gives Codex this one instead (otherwise Codex's own, 10 s, applies). Too short, and Codex agents start without Combwork's tools.",
+    "text": "How long Codex waits for Combwork's combwork server to start: Combwork gives Codex this one for it at every launch, over Codex's own (10 s) and over a startup timeout your own Codex config sets for a server named combwork. Too short, and Codex agents start without Combwork's tools.",
     "note": "What the advanced setting \"Combwork tools: startup timeout in Codex\" is for, and what goes wrong when it is wrong (Settings → Advanced). combwork is the name of Combwork's MCP server.",
     "audience": "both"
   },
@@ -1839,6 +1859,16 @@
     "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in characters (\"80 characters\"): the length of a card title an agent writes past which Combwork suggests a shorter one.",
     "audience": "both"
   },
+  "settings.advanced.cw.cli.probeSeconds.desc": {
+    "text": "How long each coding agent's CLI gets to print its version when Combwork looks for it (at start, Check Again, after an install). One that takes longer is skipped and shows as not installed: a CLI's first start, with antivirus scanning it on a slow disk, can take tens of seconds.",
+    "note": "What the advanced setting \"Finding the CLIs: version check timeout\" does (Settings → Advanced, under Combwork). A CLI is the command-line program of a coding agent (Claude Code, Codex).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.cli.probeSeconds.title": {
+    "text": "Finding the CLIs: version check timeout",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"60 s\").",
+    "audience": "both"
+  },
   "settings.advanced.cw.console.showText.desc": {
     "text": "Show the text in the developer console: prompts, replies, commands and tools' arguments, under a banner saying it is unredacted, and start each recording with its text box ticked. Tokens, API keys and sign-in details stay masked whatever this says; agents' cw_console stays redacted, and a recording with text is never attached to Copy Diagnostics.",
     "note": "What the advanced setting \"Developer console: show prompt, reply and command text\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
@@ -2479,6 +2509,26 @@
     "note": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"90 s\").",
     "audience": "both"
   },
+  "settings.advanced.cw.resume.idleAsk.desc": {
+    "text": "A conversation idle longer than the time below has most likely lost the CLI's prompt cache, so resuming it may process its whole context again. Resume asks first, offering a fresh start, and says how long it has been idle and how big it is; the Assistant is told the same and chooses. A lane's or a card's start gives its builder a new conversation instead, with the card as its prompt. Agents Combwork resumes after a restart, an update or a quit resume as before. Turned off, every resume goes ahead as it did before, with only the expired-cache question Claude Code's sessions had.",
+    "note": "What the advanced setting \"Resume: ask before reopening a long-idle conversation\" does (Settings → Advanced, under Combwork). A prompt cache is what a CLI keeps of a conversation so a resumed one is read cheaply; a lane is a card loop; the Assistant is Combwork's own assistant.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.resume.idleAsk.title": {
+    "text": "Resume: ask before reopening a long-idle conversation",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork: before a conversation idle for a long time is resumed, Combwork asks whether to start a fresh one instead, as resuming it may cost many tokens.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.resume.idleMinutes.desc": {
+    "text": "How long since a conversation's last activity (its transcript's last entry, else when Combwork last saw it) before its resume asks first. The default is the longest prompt cache the CLIs keep: an hour.",
+    "note": "What the advanced setting \"Resume: a conversation counts as long-idle after\" does (Settings → Advanced, under Combwork). A prompt cache is what a CLI keeps of a conversation so a resumed one is read cheaply.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.resume.idleMinutes.title": {
+    "text": "Resume: a conversation counts as long-idle after",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (\"60 min\"): how long a conversation must be idle before Resume asks first.",
+    "audience": "both"
+  },
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.desc": {
     "text": "How long an agent's coding agent may keep waiting to retry its model request (rate-limited, or its service unreachable) in one turn before Combwork tells the Assistant, once a turn. 0: never.",
     "note": "What the advanced setting \"Retry wait: tell the Assistant after\" does (Settings → Advanced).",
@@ -2487,6 +2537,16 @@
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.title": {
     "text": "Retry wait: tell the Assistant after",
     "note": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"300 s\"). A retry wait: an agent's coding agent waiting to try its model request again.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.server.checkInferSeconds.desc": {
+    "text": "How long Check Server waits for a model server to answer its test request. A local model that isn't loaded yet loads first, which on modest hardware can take minutes; past this time the check reports a timeout.",
+    "note": "What the advanced setting \"Check Server: test request timeout\" does (Settings → Advanced, under Combwork). Check Server tests a model server the user added for a CLI (its address and model).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.server.checkInferSeconds.title": {
+    "text": "Check Server: test request timeout",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"600 s\"). Check Server is a button for a model server (Settings → Accounts & Connections).",
     "audience": "both"
   },
   "settings.advanced.cw.sessions.signFailFast.desc": {

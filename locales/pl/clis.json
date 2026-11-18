@@ -46,5 +46,6 @@
   "clis.settings.open": "Otwórz folder",
   "clis.settings.reload": "Wczytaj ponownie",
   "clis.settings.reloaded": "{n, plural, =0 {Brak CLI z opisów} one {# CLI z opisu} few {# CLI z opisów} many {# CLI z opisów} other {# CLI z opisów}}{problems, plural, =0 {} one {; # opis nieużyty} few {; # opisy nieużyte} many {; # opisów nieużytych} other {; # opisu nieużytego}}",
-  "clis.settings.what": "CLI bez własnego dostawcy działa na podstawie opisu: pliku JSON w folderze clis Twojego profilu Combwork. Combwork odczytuje jej status z jej ekranu i nigdy nie zmienia jej własnej konfiguracji."
+  "clis.settings.what": "CLI bez własnego dostawcy działa na podstawie opisu: pliku JSON w folderze clis Twojego profilu Combwork. Combwork odczytuje jej status z jej ekranu i nigdy nie zmienia jej własnej konfiguracji.",
+  "clis.problem.badSeconds": "„{field}” musi być liczbą sekund od {min} do {max}."
 }

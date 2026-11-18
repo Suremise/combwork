@@ -283,10 +283,13 @@ describe('the start context in the hook replies (#1065)', () => {
       }
     })
 
-    it('within its budget: a view that takes too long is never sent, a request still out is cut off (uncertain), and the reply comes in time', async () => {
+    it('within its budget: a view that takes too long is never sent, a request still out is cut off (uncertain), and the reply comes in time; each told to the user (HI-3375)', async () => {
       const saved = sessions.startContext
       const budget = S.constructor.SESSION_CONTEXT_MS
       S.constructor.SESSION_CONTEXT_MS = 200
+      // HI-3375: a start context skipped is told to the user (a notice), never only logged.
+      const skipped = vi.spyOn(sessions as unknown as { startContextSkipped: (l: object, why: string) => void }, 'startContextSkipped')
+      const told = vi.spyOn(sessions as unknown as { notify: (...a: unknown[]) => void }, 'notify')
       try {
         let release!: () => void
         let building!: () => void
@@ -306,14 +309,69 @@ describe('the start context in the hook replies (#1065)', () => {
         release()
         await queued(st)
         expect(slow.calls).toEqual([])
+        expect(skipped.mock.calls.map((c) => c[1])).toEqual(['slow'])
+        expect(told.mock.calls.some((c) => JSON.stringify(c[1]).includes('session.notice.startContextTitle') && c[3] === 'notice')).toBe(true)
         sessions.startContext = saved
         const hung = intoSession({ hold: true })
         const t1 = Date.now()
         expect(await post(agent(hung.adapter), snapshot())).toBeNull()
         expect(Date.now() - t1).toBeLessThan(2000)
         expect(hung.calls.map((c) => [c.text, c.aborted])).toEqual([['[CW] view (startup)', true]])
+        // Its request cut off at the deadline (uncertain): told too.
+        await vi.waitFor(() => expect(skipped.mock.calls.map((c) => c[1])).toEqual(['slow', 'notSent']), { timeout: 5000 })
       } finally {
+        skipped.mockRestore()
+        told.mockRestore()
         S.constructor.SESSION_CONTEXT_MS = budget
+        sessions.startContext = saved
+      }
+    })
+
+    // HI-3375 (HR1's round 1): a wanted context whose build fails is told (its entry removed, as before); one made empty on
+    // purpose (no view due) is no skip and says nothing; a delivery whose launch stopped meanwhile says nothing either.
+    it('HI-3375: a build that fails is told (failed), an intentional none is not, and a launch stopped while its delivery is out says nothing', async () => {
+      const saved = sessions.startContext
+      const skipped = vi.spyOn(sessions as unknown as { startContextSkipped: (l: object, why: string) => void }, 'startContextSkipped')
+      try {
+        sessions.startContext = async () => {
+          throw new Error('the board could not be read (test)')
+        }
+        const broken = intoSession()
+        const b = agent(broken.adapter)
+        await post(b, snapshot())
+        await queued(b)
+        expect(broken.calls.map((c) => c.text)).toEqual([null])
+        expect(skipped.mock.calls.map((c) => [c[0] === launchOf(b), c[1]])).toEqual([[true, 'failed']])
+        skipped.mockClear()
+        // None due, on purpose: removed as before, nothing told.
+        sessions.startContext = async () => null
+        const none = intoSession()
+        const nothing = agent(none.adapter)
+        await post(nothing, snapshot())
+        await queued(nothing)
+        expect(none.calls.map((c) => c.text)).toEqual([null])
+        expect(skipped).not.toHaveBeenCalled()
+        // Its launch stopped while its delivery is out (refused then): never a warning against what runs now.
+        sessions.startContext = saved
+        const gone = intoSession()
+        let delivered = false
+        const g = agent({
+          ...gone.adapter,
+          get hooks(): object {
+            return this
+          },
+          deliverStartContext: async () => {
+            delivered = true
+            S.live.delete(`${p.toLowerCase()}#${g.agentId}`)
+            return 'refused'
+          }
+        } as never)
+        await post(g, snapshot())
+        await queued(g)
+        expect(delivered).toBe(true)
+        expect(skipped).not.toHaveBeenCalled()
+      } finally {
+        skipped.mockRestore()
         sessions.startContext = saved
       }
     })

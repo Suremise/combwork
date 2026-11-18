@@ -636,5 +636,7 @@
   "tips.versionControlJj.text": "W repozytorium jj wybierz jj u góry zakładki Kontrola wersji: Historia pokazuje każdy identyfikator zmiany obok identyfikatora commita, a Porównanie, Zakładki i Konflikty odczytują repozytorium bez jego zmieniania. Zrecenzowaną pracę włącza Combwork albo Ty.",
   "tips.versionControlJj.title": "Zobacz repozytorium jj",
   "tips.activityMap.text": "Aktywność rysuje swoich agentów jako plaster miodu: każde wywołanie narzędzia trafia do swojej stacji (Odczyt, Edycja, Powłoka, Agenci, Narzędzia, Ty), z pierścieniem kontekstu dla każdego agenta. Wybierz jednego agenta w Agenci ▾, aby zobaczyć jego własną mapę; Pokaż wyłącza mapę, jej listę i pierścienie.",
-  "tips.activityMap.title": "Mapa tego, co robią Twoi agenci"
+  "tips.activityMap.title": "Mapa tego, co robią Twoi agenci",
+  "tips.resumeLongIdle.title": "Długo bezczynna rozmowa pyta przed wznowieniem",
+  "tips.resumeLongIdle.text": "Rozmowa bezczynna dłużej niż godzinę najprawdopodobniej straciła pamięć podręczną promptu, więc jej wznowienie może kosztować wiele tokenów. Wznów mówi, jak długo jest bezczynna i jak duża jest, i proponuje zamiast tego Zarchiwizuj i zacznij nową."
 }
