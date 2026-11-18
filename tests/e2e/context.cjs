@@ -44,7 +44,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `contex
   const until = async (fn, ms) => {
     const t = Date.now()
     let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)
+    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
     return v
   }
   const project = async () => (await inv('workspace:refresh')).projects.find((p) => p.path.toLowerCase() === proj.toLowerCase())
@@ -65,7 +65,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `contex
   check('no 1M checkbox in the model picker', (await page.getByText('1M context', { exact: true }).count()) === 0)
   await shot(page, '1-settings')
   await page.locator('.settings-nav .row', { hasText: 'Codex' }).click()
-  await lib.sleep(400)
+  await lib.until(async () => (await page.locator('.settings-nav .row.selected', { hasText: 'Codex' }).count()) > 0, lib.timing('hang.ui'))
   check('Codex has no such setting', (await page.locator('.setting', { hasText: 'Use 200K context' }).count()) === 0)
   await page.locator('.settings-nav .row', { hasText: 'Assistant' }).first().click()
   await lib.until(async () => (await page.locator('.setting', { hasText: 'Highlight Compact over' }).count()) >= 1, HUNG_MS)

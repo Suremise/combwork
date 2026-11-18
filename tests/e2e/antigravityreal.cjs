@@ -17,7 +17,7 @@ const { processes } = require('./folderProcesses.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = lib.timing('hang.step')
 // A real model turn: bounded, never how long it should take.
-const TURN_MS = 180000
+const TURN_MS = lib.timing('turn.realMs')
 
 const userData = path.join(lib.WORK, 'antigravityreal-profile')
 const ws = path.join(lib.WORK, 'antigravityreal-ws')

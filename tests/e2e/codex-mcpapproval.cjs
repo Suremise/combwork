@@ -14,9 +14,9 @@ const proj = path.join(ws, 'demo')
 const stampLog = path.join(ws, '.combwork', 'mcp', 'stamp', 'calls.log')
 const small = { provider: 'codex', model: 'gpt-6-luna', effort: 'low' }
 const MODES = ['read-only', 'ask', 'approve-for-me', 'full-access']
-const TURN_MS = 180000
+const TURN_MS = lib.timing('turn.realMs')
 // Combwork's server logging a call it ran after the hook or the stamp log said so already: a bound for a hung run.
-const SHOWN_MS = 30000
+const SHOWN_MS = lib.timing('hang.ui')
 // Which Combwork tools ran is read from Combwork's own server's test log (CW_TEST_MCP_LOG: each call it ran, whose, and
 // its reply's start), not the screen: Codex redraws its update notice over the history now and then, over a call's
 // "Called" line among others (HI-2699). Nobody answers an approval here, so a call that ran wasn't asked about.

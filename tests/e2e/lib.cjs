@@ -219,12 +219,63 @@ function waitCaller(stack) {
  * A tooltip shows after its delay (ui.tsx), measured hidden before it is placed, so this waits for it to be visible
  * with the text, never for the delay. The mouse first leaves for the window's corner, so an earlier tip has gone.
  */
+/**
+ * HI-3385: whether the window shows `theme` fully, waited for up to ms: its root says so and no CSS transition is still
+ * running (a background's fade), so a screenshot or a colour read then shows the theme's colours, not a blend.
+ */
+async function themeShown(page, theme, ms = timing('hang.ui')) {
+  return !!(await until(() => page.evaluate((t) => document.documentElement.dataset.theme === t && !document.getAnimations().some((a) => a instanceof CSSTransition && a.playState === 'running'), theme), ms))
+}
+
 async function hoverTip(page, locator, want, ms = timing('hang.ui')) {
   const tip = () => page.locator('.tip:visible').last().innerText({ timeout: 1000 }).catch(() => '')
   await page.mouse.move(5, 5)
   await until(async () => (await page.locator('.tip:visible').count()) === 0, ms)
   await locator.hover()
   return (await until(async () => { const t = await tip(); return want(t) && t }, ms)) || (await tip())
+}
+
+/**
+ * HI-3388: one look of a readiness wait, bounded: `look()` (a call into the page) raced against what is left of the deadline
+ * and at most poll.readMs, so a renderer that never answers (no frame drawn, an evaluate that never returns) is a look
+ * that came back false, never a wait that outlives its bound. Its pending call is left to the page.
+ */
+async function boundedLook(look, deadline) {
+  const left = Math.min(deadline - Date.now(), timing('poll.readMs'))
+  if (left <= 0) return false
+  let timer
+  const out = await Promise.race([Promise.resolve().then(look).catch(() => false), new Promise((r) => (timer = setTimeout(() => r(false), left)))])
+  clearTimeout(timer)
+  return out
+}
+
+/** A readiness wait: `look` true within ms (each look bounded), or it throws naming `what` (never a pass by timeout). */
+async function readyWithin(what, look, ms, deadline = Date.now() + ms) {
+  const ok = await until(() => boundedLook(look, deadline), Math.max(1, deadline - Date.now()))
+  if (!ok) throw new Error(`not ${what} within ${ms} ms`)
+  return true
+}
+
+/**
+ * HI-3388: the page settled, for a screenshot or a measurement: two frames drawn and no finite CSS animation or transition
+ * still running (a spinner's endless one doesn't count). A condition, never a fixed pause before the shot; it throws
+ * when the page hasn't settled within ms, so nothing goes on as if it had.
+ */
+async function settled(page, ms = timing('hang.ui'), deadline = Date.now() + ms) {
+  const still = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(document.getAnimations().every((a) => a.playState !== 'running' || a.effect?.getTiming?.().iterations === Infinity))))))
+  return readyWithin('settled (two frames drawn, no animation running)', still, ms, deadline)
+}
+
+/** HI-3388: a theme applied (the page's data-theme says it) and the page settled, within ms in all; it throws otherwise. */
+async function themeSettled(page, theme, ms = timing('hang.ui')) {
+  const deadline = Date.now() + ms
+  await readyWithin(`in the ${theme} theme`, async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, ms, deadline)
+  return settled(page, ms, deadline)
+}
+
+/** HI-3388: no dialog left open (an Escape or a close taken) within ms; it throws otherwise. */
+async function noDialog(page, ms = timing('hang.ui')) {
+  return readyWithin('without a dialog', async () => (await page.locator('[role="dialog"]:visible').count()) === 0, ms)
 }
 
 let quitWatches = 0
@@ -2303,4 +2354,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { timing, PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, within, steady, hoverTip, quitWatch, appReady, openWorkspace, trustWorktrees, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, CLAUDE_TRUST, CLAUDE_AT_PROMPT, trustQuestion, screenNow, typeThenEnter, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }
+module.exports = { timing, PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, within, steady, settled, themeSettled, noDialog, hoverTip, quitWatch, appReady, openWorkspace, trustWorktrees, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, themeShown, CLAUDE_TRUST, CLAUDE_AT_PROMPT, trustQuestion, screenNow, typeThenEnter, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }

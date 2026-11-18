@@ -74,7 +74,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
       // log: typed, then a pause before its Enter on purpose (it reads a typed line before its Enter, as a CLI does).
       if (id !== codex.id) return lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
       await inv('pty:write', lib.ptyKey(alpha, id), text)
-      await lib.sleep(300)
+      await lib.sleep(lib.timing('pace.keysThenEnterMs'))
       await inv('pty:write', lib.ptyKey(alpha, id), '\r')
     }
     const homeOf = (a) => (a.provider === 'codex' ? codexHome : claudeHome)

@@ -65,7 +65,7 @@ const read = (rel) => fs.readFileSync(path.join(dialects, ...rel.split('/')), 'u
   const until = async (fn, ms) => {
     const t = Date.now()
     let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
+    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
     return v
   }
   await lib.openWorkspace(inv, page, ws)
@@ -247,7 +247,7 @@ const read = (rel) => fs.readFileSync(path.join(dialects, ...rel.split('/')), 'u
     if (model !== undefined) await fileDialog.locator('[data-dialect-model]').fill(model)
   }
   const note = (n) => fileDialog.locator(`[data-note="${n}"]`)
-  const noteText = (n) => note(n).innerText({ timeout: 1000 }).catch(() => '')
+  const noteText = (n) => note(n).innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')
   const create = async () => {
     await fileDialog.locator('.btn.primary').click()
     await until(async () => (await page.locator('[data-dialect-dialog]').count()) === 0, HUNG_MS)

@@ -75,9 +75,9 @@ function pathWithoutCodex() {
   }, bin)
 
   await page.keyboard.press('Control+Shift+P')
-  await lib.sleep(300)
+  await lib.until(async () => (await page.locator('.palette input').count()) === 1, lib.timing('hang.ui'))
   await page.keyboard.type('Provider Setup')
-  await lib.sleep(300)
+  await lib.until(async () => (await page.locator('.palette-item', { hasText: 'Provider Setup' }).count()) > 0, lib.timing('hang.ui'))
   await page.keyboard.press('Enter')
   const setup = page.locator('.dialog', { hasText: 'Provider Setup' })
   check('Provider Setup opens', !!(await lib.until(async () => (await setup.count()) === 1, lib.timing('hang.ui'))))
