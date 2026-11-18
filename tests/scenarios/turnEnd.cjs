@@ -3,14 +3,17 @@
 // rules and the bounds are tested without a Combwork (tests/scenarioTurnEnd.test.ts).
 //
 // A turn is over when:
-//  - its work is this prompt's: Combwork recorded it working since this prompt (statesFrom), or the prompt was answered;
-//  - it ended: idle (ready, finished, watching) with affirmative evidence of that work's end (the prompt answered, or an
-//    end status after the work in this prompt's statuses) and its turn not running; or a person is asked (Combwork's
+//  - its work is this prompt's: Combwork recorded it working since this prompt (statesFrom), the prompt was answered, or a
+//    look saw it at work (the looks begin once the prompt is sent);
+//  - it ended: idle (ready, finished, watching) with affirmative evidence of that work's end (the prompt answered, an end
+//    status after the work in this prompt's statuses, or a look at an end, its turn over, after one that saw the work)
+//    and its turn not running; or a person is asked (Combwork's
 //    runtime attention 'waiting': not the relaunch's trust, not a sign-in), which doesn't end the turn in the ledger;
 //  - nothing could still change the outcome: a trust question, a dispatched agent at work, the scenario's keepWaiting,
 //    Combwork about to type into it (an idle end only);
 //  - and that has held for the floor (scenario.quietMs; asked: scenario.waitingQuietMs), counted again from any look that
 //    saw work or anything pending.
+// The session gone (no live state) has ended once it has stayed gone for scenario.quietMs: a relaunch comes back sooner.
 // A read that fails or doesn't answer within its bound is unknown, never quiet: nothing ends on it.
 'use strict'
 
@@ -31,17 +34,29 @@ const start = () => ({ phase: 'started', quietSince: null })
  * or 'environment' (`look.stop`: the environment stopped the trial).
  */
 function turnStep(state, look, floors) {
-  const hold = (phase, why) => ({ state: { phase, quietSince: null }, done: false, outcome: null, why })
+  // Work a look saw (its status at work, or its turn running) is this prompt's: the looks begin once it was sent. A prompt
+  // given at launch can be at work before Combwork's statuses are recorded (card-loop-design-check on the fake Copilot:
+  // only 'watching' recorded), so a look's own sight of it counts, as does an idle end with its turn over in a later look.
+  const sawWork = !!state.sawWork || WORKING.has(look.status) || look.turn === 'running'
+  const sawEnd = !!state.sawEnd || (!!state.sawWork && IDLE_ENDS.has(look.status) && look.turn !== 'running' && look.turn !== 'unknown')
+  const seen = { sawWork, sawEnd }
+  const hold = (phase, why) => ({ state: { phase, quietSince: null, ...seen }, done: false, outcome: null, why })
   if (look.stop) return { state: { ...state, phase: 'done' }, done: true, outcome: 'environment', why: `stopped for the environment: ${look.stop}` }
-  if (look.gone) return { state: { ...state, phase: 'done' }, done: true, outcome: 'ended', why: 'the session ended' }
+  // Gone only for a moment is a relaunch (a card given in a slot starts the session again there: slot-start): it has
+  // ended once it has stayed gone for the floor, counted from the first look that saw it gone.
+  if (look.gone) {
+    const since = state.phase === 'gone' && state.quietSince !== null ? state.quietSince : look.now
+    if (look.now - since >= floors.quietMs) return { state: { phase: 'done', quietSince: since, ...seen }, done: true, outcome: 'ended', why: `the session ended (gone for ${look.now - since} ms)` }
+    return { state: { phase: 'gone', quietSince: since, ...seen }, done: false, outcome: null, why: `the session gone for ${look.now - since} of ${floors.quietMs} ms (a relaunch?)` }
+  }
   if (look.status === null) return hold('working', "its state couldn't be read")
   const asked = !!look.asks && !look.trust
   const running = WORKING.has(look.status) || look.turn === 'running' || look.turn === 'unknown'
   if (running && !asked) return hold('working', `working (${look.status}${look.turn ? `, turn ${look.turn}` : ''})`)
-  if (!look.workSeen) return hold('started', "no sign this prompt's turn ran yet")
+  if (!look.workSeen && !sawWork) return hold('started', "no sign this prompt's turn ran yet")
   if (!asked) {
     if (!IDLE_ENDS.has(look.status)) return hold('working', `not at an end (${look.status})`)
-    if (!look.endSeen) return hold('working', `${look.status}, with no sign this prompt's work ended`)
+    if (!look.endSeen && !sawEnd) return hold('working', `${look.status}, with no sign this prompt's work ended`)
   }
   const pending = [
     look.trust && 'a trust question',
@@ -54,8 +69,8 @@ function turnStep(state, look, floors) {
   const since = state.phase === 'settling' && state.quietSince !== null ? state.quietSince : look.now
   const floor = asked ? floors.waitingQuietMs : floors.quietMs
   const at = asked ? 'asking the user' : look.status
-  if (look.now - since >= floor) return { state: { phase: 'done', quietSince: since }, done: true, outcome: 'over', why: `${at}, quiet for ${look.now - since} ms` }
-  return { state: { phase: 'settling', quietSince: since }, done: false, outcome: null, why: `${at}, quiet ${look.now - since} of ${floor} ms` }
+  if (look.now - since >= floor) return { state: { phase: 'done', quietSince: since, ...seen }, done: true, outcome: 'over', why: `${at}, quiet for ${look.now - since} ms` }
+  return { state: { phase: 'settling', quietSince: since, ...seen }, done: false, outcome: null, why: `${at}, quiet ${look.now - since} of ${floor} ms` }
 }
 
 /** `fn()` within what is left of `deadline` and at most `readMs`: its value, or UNKNOWN (failed, unanswered, or no time left). */

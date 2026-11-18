@@ -44,8 +44,12 @@ describe('a turn ends', () => {
     const look = await te.gatherLook({ live: () => ({ status: 'working', turn: { state: 'running' } }), stop: () => 'signed out' }, { deadline: Date.now() + 5000, readMs: 200 })
     expect(te.turnStep(te.start(), look, FLOORS)).toMatchObject({ done: true, outcome: 'environment', why: expect.stringMatching(/signed out/) })
   })
-  it('with the session gone: ended, at once', () => {
-    expect(run([{ now: 0, status: 'working' }, { now: 1000, status: 'stopped', gone: true }])).toEqual({ at: 1000, outcome: 'ended', why: 'the session ended' })
+  it('with the session gone: ended once it has stayed gone for the floor', () => {
+    expect(run([{ now: 0, status: 'working' }, ...every(1000, 20000, { status: 'stopped', gone: true })])).toEqual({ at: 7000, outcome: 'ended', why: expect.stringMatching(/^the session ended/) })
+  })
+  it('gone for a moment (a relaunch in its slot: slot-start) and back: not ended, its floor counted again', () => {
+    const looks = [{ now: 0, status: 'working' }, ...every(1000, 4000, { status: 'stopped', gone: true }), ...every(5000, 6000, { status: 'working' }), ...every(7000, 30000, { status: 'finished' })]
+    expect(run(looks)).toEqual({ at: 13000, outcome: 'over', why: expect.stringMatching(/finished, quiet/) })
   })
 })
 
@@ -66,6 +70,17 @@ describe("evidence: this prompt's work, and its end (HR1 on s8, 2)", () => {
       ...every(15000, 40000, { status: 'finished', turn: 'over', workSeen: true, endSeen: true })
     ]
     expect(run(looks)?.at).toBe(21000)
+  })
+  it('a prompt given at launch, at work before its statuses were recorded (card-loop-design-check): seen at work in a look, then at an end with its turn over', () => {
+    const looks = [
+      { now: 0, status: 'working', turn: 'running', workSeen: false, endSeen: false },
+      ...every(2000, 30000, { status: 'watching', turn: 'over', workSeen: false, endSeen: false })
+    ]
+    expect(run(looks)).toEqual({ at: 8000, outcome: 'over', why: expect.stringMatching(/watching, quiet/) })
+  })
+  it('seen at work in a look, but no look at an end with its turn over: never ends', () => {
+    const looks = [{ now: 0, status: 'working', turn: 'running', workSeen: false, endSeen: false }, ...every(2000, 60000, { status: 'finished', turn: 'unknown', workSeen: false, endSeen: false })]
+    expect(run(looks)).toBeNull()
   })
 })
 
