@@ -136,22 +136,39 @@ async function notes(c, id, project = alpha) {
   return (t?.items ?? []).filter((x) => x.kind === 'user' && /^\[CW\] Combwork (restarted|was quit)/.test(x.text ?? '')).map((x) => x.text)
 }
 /**
- * Sets an alpha agent working on a "holduntil" prompt (HI-3452). Typed once it is ready, and taken only once its
+ * Why an alpha agent isn't quiet now, or '' once it is (HI-3452): idle (after its note's turn a fake is `finished`, not
+ * `ready`), its composer free, and nothing of Combwork's waiting to be typed into it: a just-started Watcher takes an inbox
+ * line it had (the install's) as a turn of its own. lib.agentQuiet's checks, its deliveries read through c.api: with two
+ * workspaces open, the Agent API needs the workspace said (X-Combwork-Workspace), which lib.inboxPending doesn't send.
+ */
+async function notQuiet(c, a) {
+  const s = (await c.inv('session:live')).find((x) => x.projectPath.toLowerCase() === alpha.toLowerCase() && x.agentId === a.id)
+  if (!s || !['ready', 'finished'].includes(s.status) || s.turn?.state === 'running') return `status ${s?.status ?? 'none'}${s?.turn?.state ? `, turn ${s.turn.state}` : ''}`
+  if (s.runtime?.composer !== 'free') return `composer ${s.runtime?.composer ?? 'unknown'}`
+  const r = await c.api('GET', `/v1/projects/alpha/agents/${encodeURIComponent(s.agentName ?? a.name)}/deliveries?limit=200`)
+  if (r.status !== 200) return `deliveries: HTTP ${r.status}`
+  const waiting = (r.body?.deliveries ?? []).filter((d) => d.state === 'queued' || d.state === 'uncertain')
+  return waiting.length ? `deliveries waiting: ${waiting.map((d) => `${d.id} ${d.state}`).join(', ')}` : ''
+}
+/** Waits until an alpha agent is quiet (notQuiet), within the step's bound; says why not when it isn't. */
+async function whenQuiet(c, a) {
+  if (await lib.until(async () => (await notQuiet(c, a)) === '', HUNG_MS, 250)) return true
+  console.log(`INFO ${a.name} not quiet within the step's bound (${await notQuiet(c, a)}): typed anyway`)
+  return false
+}
+/**
+ * Sets an alpha agent working on a "holduntil" prompt (HI-3452). Typed once it is quiet, and taken only once its
  * conversation has the prompt and it works: a just-resumed agent works on its resume note first, and the CLI drops a prompt
  * sent while it is busy, so "working" alone was the note's turn and the agent idle at the next quit, so not recorded.
  */
 async function promptWorking(c, a, text) {
-  const s = async () => (await c.inv('session:live')).find((x) => x.projectPath.toLowerCase() === alpha.toLowerCase() && x.agentId === a.id)
   const taken = async () => {
-    const live = await s()
+    const live = (await c.inv('session:live')).find((x) => x.projectPath.toLowerCase() === alpha.toLowerCase() && x.agentId === a.id)
     if (live?.status !== 'working' || !live.sessionId) return false
     const t = await c.inv('transcript:read', alpha, live.sessionId).catch(() => null)
     return (t?.items ?? []).some((x) => x.kind === 'user' && (x.text ?? '').includes(text))
   }
-  // Quiet (lib.agentQuiet): idle (after its note's turn a fake is `finished`, not `ready`), and nothing of Combwork's to
-  // type into it next: a just-started Watcher takes an inbox line it had (the install's) as a turn of its own.
-  const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
-  if (!(await lib.until(async () => lib.agentQuiet(PORT, 'alpha', await s(), token), HUNG_MS, 250))) console.log(`INFO ${a.name ?? a.id} not quiet within the step's bound: typed anyway`)
+  await whenQuiet(c, a)
   return lib.sendPrompt(c.inv, lib.ptyKey(alpha, a.id), text, { submitted: taken })
 }
 /** A notice's text in whichever window shows it (a notice goes to one window of several), and that window. */
@@ -334,6 +351,9 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     // HI-3214: Watcher, offered too, is started in a new conversation meanwhile (as HB6 was): not offered again.
     await c.inv('session:start', alpha, { agentId: agents.Watcher.id }).catch(() => undefined)
     await lib.until(async () => (await c.live(agents.Watcher.id))?.status === 'ready', HUNG_MS, 300)
+    // Both quiet before either is prompted: a held turn ends by itself after two minutes (the fake's bound), so a long
+    // wait for Watcher after Worker's prompt left Worker idle at the quit.
+    for (const n of ['Worker', 'Watcher']) await whenQuiet(c, agents[n])
     for (const n of ['Worker', 'Watcher']) await promptWorking(c, agents[n], `holduntil go-${n.toLowerCase()}-4`)
     check('Combwork quits again', await quit(c))
     c = null
