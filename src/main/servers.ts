@@ -79,7 +79,7 @@ import { listMcp } from './mcp'
 import { assertInShared, createHandover, handoversFor, NoteConflict, notesTree, readNote, writeNote } from './notes'
 import { mergeSlots, slotTestEvent } from './mergeSlotHost'
 import * as lanes from './lanes'
-import { checkLanePool, launchRecordedLane, recordedLaneNote, resumeLaneBuilder, retryFreshStart } from './laneStart'
+import { checkLanePool, launchRecordedLane, poolUnlessNamed, recordedLaneNote, resumeLaneBuilder, retryFreshStart } from './laneStart'
 import { LANE_BRIEF_MAX, laneCards, laneName, laneNumber, laneStateText, type LaneChange } from '../shared/lanes'
 import { briefNote, settleLaneBriefs } from './laneBriefs'
 import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, type SlotAgent } from './mergeSlots'
@@ -2412,6 +2412,9 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
   if (pool && a) throw new HttpError(403, apiSaid(API.lane.poolStartedBy))
   if (pool && body?.reviewer !== undefined && body.reviewer !== null && body.reviewer !== '') throw new HttpError(400, apiSaid(API.lane.poolNoReviewer))
   if (pool) await checkLanePool(ws, p, builder)
+  // HI-3424: the Assistant's or a script's start naming neither a reviewer nor `pool`, in a project reviewed by a pool: a
+  // new lane is the pool's (refused as above where nobody but the builder reviews); an agent's own lane names its reviewer.
+  const byDefault = !a && body?.pool === undefined && !reviewer && unknownReviewer === undefined ? await poolUnlessNamed(ws, p, builder) : null
   // `commit`: the Assistant's guard, checked again in the lanes' save (HI-2420).
   const start = async (commit?: () => void) => {
     // Combwork's own start of the lane's card waits for this one to launch its agents (HI-2029); a builder registering its
@@ -2424,7 +2427,7 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
     }
   }
   const started = async (commit?: () => void) => {
-    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, ...(unknownReviewer !== undefined ? { unknownReviewer } : {}), cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, ...(args.target !== undefined ? { target: args.target } : {}), briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}), ...(a ? { ownBuilder: true } : {}), ...(commit ? { commit } : {}), ...(released ? { released: { ...released, by: 'assistant' as const } } : {}) })
+    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, ...(unknownReviewer !== undefined ? { unknownReviewer } : {}), cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, ...(args.target !== undefined ? { target: args.target } : {}), briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(byDefault ? { poolUnlessNamed: byDefault } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}), ...(a ? { ownBuilder: true } : {}), ...(commit ? { commit } : {}), ...(released ? { released: { ...released, by: 'assistant' as const } } : {}) })
     // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
     // A new lane's brief carried from the builder's lane that had just ended (HI-2097) too.
     const rec = (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id)

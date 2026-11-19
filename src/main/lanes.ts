@@ -1170,6 +1170,12 @@ export interface StartLane {
   unknownReviewer?: string
   /** Reviewed by the project's reviewer pool (#1443), with `reviewer` null; undefined: a running lane keeps what it has. */
   pool?: boolean
+  /**
+   * HI-3424: the Assistant's or a script's start named neither a reviewer nor `pool`, in a project whose rules review by a
+   * pool: a new lane is reviewed by the pool, or refused with `refusal` (as Start Lane… refuses a pool: nobody in it but
+   * the builder); a running lane keeps what it has. Decided under the lanes' lock, where it is known which it is.
+   */
+  poolUnlessNamed?: { refusal: Error | null }
   cards: number[]
   rounds?: number
   waitMinutes?: number
@@ -1848,6 +1854,9 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     const done = cards.filter((n) => board.get(n)?.column === 'done')
     if (done.length && done.length === cards.length) throw new LaneError(409, withCardNames(ws, () => say(A.allDoneNoLane, { cards: done.map(cardRef).join(', '), n: done.length }), scope))
     leftOut = done
+    // HI-3424: a new lane naming no reviewer in a pool project is the pool's, never a lane nobody reviews (or refused).
+    const byPool = pool || (!!s.poolUnlessNamed && !reviewer && s.unknownReviewer === undefined)
+    if (byPool && !pool && s.poolUnlessNamed?.refusal) throw s.poolUnlessNamed.refusal
     const rec: LaneRecord = {
       id: newId(),
       project: s.project,
@@ -1864,7 +1873,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
       endedAt: null,
       mergeCommit: null,
       ...(ruleset ? { ruleset } : {}),
-      ...(pool ? { pool: true as const } : {}),
+      ...(byPool ? { pool: true as const } : {}),
       ...(releasedGrant ? { releasedOverride: releasedGrant } : {})
     }
     const brief = nextBrief(undefined, carried?.brief?.text ?? s.brief, s.briefNotIn)

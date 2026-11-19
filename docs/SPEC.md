@@ -8705,7 +8705,9 @@ repeating them (#533) [note §8].
   The Assistant and scripts start one with `POST /v1/lanes` `pool: true` (`cw_lane` `start`, HI-1581): refused as
   Start Lane refuses it (`checkLanePool`: `poolNotOffered`, `poolEmpty`), with a reviewer of its own (`400`), and for
   an agent's own lane (`403`); it then starts as Start Lane's does (HI-1900's `launchRecordedLane`: the builder only,
-  where it is stopped).
+  where it is stopped). A new lane they start naming neither a reviewer nor `pool` (`cw_lane` `start`, or
+  `cw_create_task`'s `lane`) in a pool project is the pool's too, refused as above (HI-3424, `poolUnlessNamed`: a lane
+  with no reviewer there would never be reviewed, nobody joining it); `pool: false` keeps none, a running lane its own.
   Nobody joins it (`cw_lane join` is refused); a builder's own `cw_lane start` naming no reviewer keeps the pool, one
   naming a reviewer makes it one per lane.
 - **Assignment**: a pool lane's submission writes `assignReviewer` (`card_actions`) instead of waking a reviewer, and so
