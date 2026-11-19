@@ -154,17 +154,23 @@ async function reopened(env) {
     page.on('pageerror', (e) => check('no page errors (reopened)', false, e.message))
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
+    // Each wait's prerequisite is a check of its own: one not met stops this part, so nothing after it passes on the
+    // values from before.
+    const met = (name, ok) => {
+      check(name, ok)
+      if (!ok) throw new Error(`not met: ${name}`)
+    }
     if ((await page.locator('.assistant-panel').count()) === 0) await page.keyboard.press('Control+Alt+I')
-    await lib.until(async () => (await page.locator('.assistant-panel').count()) === 1, HUNG_MS)
+    met('reopened: the Assistant panel shows', !!(await lib.until(async () => (await page.locator('.assistant-panel').count()) === 1, HUNG_MS)))
     await page.locator('.assistant-header button[aria-label="More"]').click()
     await page.locator('.menu-item', { hasText: 'Assistant Settings…' }).click()
     const dialog = page.locator('.dialog', { hasText: 'Assistant Settings' })
     const choice = dialog.locator('#assistant-connection')
-    // Its options come with the accounts' view: the value is read once Work's is listed (the one it must not show).
-    await lib.until(async () => (await choice.locator(`option[value="${workConnection}"]`).count()) === 1 && !!(await choice.inputValue()), HUNG_MS)
+    // Its options come with the accounts' view: the value is read once Work's is listed (the first usable, which it must not show).
+    met('…Assistant Settings lists Work’s connection (the first usable) and has a value', !!(await lib.until(async () => (await choice.locator(`option[value="${workConnection}"]`).count()) === 1 && !!(await choice.inputValue()), HUNG_MS)))
     check('reopened: Assistant Settings shows its own connection (Anthropic-1), not the first usable (Work, Codex)', (await choice.inputValue()) === claudeConnection, await choice.inputValue().catch(() => ''))
     await dialog.locator('.btn.primary', { hasText: 'Save' }).click()
-    await lib.until(async () => (await dialog.count()) === 0, HUNG_MS)
+    met('…Save closes the dialog', !!(await lib.until(async () => (await dialog.count()) === 0, HUNG_MS)))
     check('…and Save with nothing changed keeps it on Anthropic-1, Claude Code', homeAgent()?.connection === claudeConnection && homeAgent()?.provider === 'claude-code', JSON.stringify(homeAgent()))
   } catch (e) {
     check('no exception (reopened)', false, e.stack)
