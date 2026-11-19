@@ -187,12 +187,16 @@ const lastCommitFiles = () => git('show', '--no-renames', '--name-only', '--form
     const hookLog = `${hook}.log`
     fs.mkdirSync(path.dirname(hook), { recursive: true })
     fs.writeFileSync(hook, `#!/bin/sh\nunset GIT_INDEX_FILE\nprintf "/staged-meanwhile/\\n" >> .gitignore\ngit add .gitignore 2>> "${hookLog.replace(/\\/g, '/')}"\necho "add: $?" >> "${hookLog.replace(/\\/g, '/')}"\n`)
+    // The notifications already up are marked, so only Commit It's own is read: the window is unfocused (HI-3404), so the
+    // pop-ups' clocks don't run and the first merge's "Committed 1 file on main" is still up (HI-3415).
+    await page.locator('.toast').evaluateAll((els) => els.forEach((el) => el.setAttribute('data-e2e-before', '')))
     await second.getByRole('button', { name: 'Commit It' }).click()
     // Combwork's notification first, once its commit, the hook and its index step are all done: git writes HEAD before
     // the post-commit hook runs, and a git status from here meanwhile may take the index's lock (to refresh it), failing
     // the hook's git add.
-    const madeWarned = toast('Committed 1 file on main, with a warning')
-    const anyCommitted = page.locator('.toast').filter({ hasText: /Committed 1 file on main/ })
+    const fresh = page.locator('.toast:not([data-e2e-before])')
+    const madeWarned = fresh.filter({ hasText: 'Committed 1 file on main, with a warning' })
+    const anyCommitted = fresh.filter({ hasText: /Committed 1 file on main/ })
     await waitHung(async () => (await anyCommitted.count()) > 0)
     const hookSaid = () => (fs.existsSync(hookLog) ? fs.readFileSync(hookLog, 'utf8').trim() : 'no hook log')
     check('Commit It: .gitignore alone committed, keep.txt still changed', git('rev-parse', 'HEAD') !== at && JSON.stringify(lastCommitFiles()) === '[".gitignore"]' && git('log', '-1', '--format=%s') === 'Update .gitignore' && /M keep\.txt/.test(git('status', '--porcelain')), `${JSON.stringify(lastCommitFiles())} ${git('status', '--porcelain')}`)

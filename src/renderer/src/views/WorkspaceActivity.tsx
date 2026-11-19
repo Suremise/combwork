@@ -20,9 +20,10 @@ const LISTS_AT_ONCE = 2
 
 /**
  * What the workspace level read and drew (HI-1664), counted: the measurement of its cost (nothing while hidden, one call a
- * tick for what runs now) reads them from a test copy's window.
+ * tick for what runs now) reads them from a test copy's window. `ticks` are the ticks themselves: a now read still under
+ * way when the next tick comes isn't started again, so on a loaded machine `now` counts fewer (HI-3415).
  */
-const counts = { now: 0, lists: 0, turns: 0, cardAgents: 0, renders: 0, active: false }
+const counts = { ticks: 0, now: 0, lists: 0, turns: 0, cardAgents: 0, renders: 0, active: false }
 ;(window as unknown as { __cwWorkspaceActivity?: typeof counts }).__cwWorkspaceActivity = counts
 
 /**
@@ -188,6 +189,7 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
     let ticks = 0
     readLists()
     const read = (): void => {
+      counts.ticks++
       const paths = shownRef.current.map((h) => h.path)
       if (!paths.length) setNowRead(true)
       else

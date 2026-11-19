@@ -46,7 +46,8 @@
 // - Ctrl+C twice ends it with SessionEnd.
 // - While fake-nohooks-<agent> is in CODEX_HOME it sends no hook at all, as when a Codex update broke them (#1336). A
 //   wake it read is answered with the next line of fake-wakes-<agent>.txt there, when there is one. With
-//   FAKE_CODEX_VERSION 0.162.1 or later, a turn draws Codex's Working line as it begins.
+//   FAKE_CODEX_VERSION 0.162.1 or later, a turn draws Codex's Working line as it begins, and takes it off as it ends
+//   (HI-3415: Codex draws it only while a turn runs; left up, Combwork's screen reading took the turn as still working).
 // - "selfcompact" (HI-1916): a compaction it begins itself (PreCompact, PostCompact), then the turn under the same turn_id,
 //   as Codex 0.164.0 did.
 // - "compacting N" (#1514): a turn that compacts its conversation for N seconds first, as Codex's auto-compaction does
@@ -287,7 +288,18 @@ function rolloutPath() {
 let rollout = null
 let started = false
 
-const out = (s) => process.stdout.write(s)
+/** While a turn's Working line is up: the lines written since it, so it can be taken off where it is (HI-3415). */
+let workingUp = null
+const out = (s) => {
+  if (workingUp !== null) workingUp += (s.match(/\n/g) || []).length
+  return process.stdout.write(s)
+}
+/** The turn's Working line taken off as the turn ends, as Codex does; not one scrolled off the screen. */
+function workingOff() {
+  if (workingUp === null) return
+  if (workingUp + 1 < (process.stdout.rows || 24)) process.stdout.write(`\x1b7\x1b[${workingUp + 1}A\r\x1b[2K\x1b8`)
+  workingUp = null
+}
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const setTitle = (t) => out(`\x1b]0;${t}\x07`)
 
@@ -675,7 +687,10 @@ async function runPrompt(text) {
     if (rows.length) text = work ? read : nextScripted() || ''
   }
   // As 0.162.1 does (FAKE_CODEX_VERSION), its Working line while a turn runs (#1336: what Combwork's screen reading looks for).
-  if (/^0\.16[2-9]|^0\.1[7-9]|^[1-9]/.test(process.env.FAKE_CODEX_VERSION || '')) out(`\r\n• Working (0s • esc to interrupt)\r\n`)
+  if (/^0\.16[2-9]|^0\.1[7-9]|^[1-9]/.test(process.env.FAKE_CODEX_VERSION || '')) {
+    out(`\r\n• Working (0s • esc to interrupt)\r\n`)
+    workingUp = 0
+  }
   let questions = 0
   let scriptedSteps = false
   // "latetool": a command whose PostToolUse reaches Combwork only after the turn's Stop (#648).
@@ -733,6 +748,7 @@ async function runPrompt(text) {
   // Its answer, as 0.159 records the model's reply: a message and the turn's item (#1371: the turn was taken up).
   record({ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: `Done: ${text}` }] })
   fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'event_msg', payload: { type: 'item_completed', turn_id: turnId, item: { type: 'AgentMessage', content: [{ type: 'Text', text: `Done: ${text}` }] } } }) + '\n')
+  workingOff()
   out(`\r\nDone: ${text}\r\n`)
   // "loststop": its Stop never reaches Combwork, though Codex records the turn's end; "silent": neither (#648).
   if (!/\b(loststop|silent)\b/.test(text)) {
@@ -754,7 +770,10 @@ async function runPrompt(text) {
   promptLine()
 }
 
-const promptLine = () => out('\r\n› Ask Codex to do anything\r\n')
+const promptLine = () => {
+  workingOff()
+  out('\r\n› Ask Codex to do anything\r\n')
+}
 
 /**
  * A "nudge" step this turn (true): its offer of a cheaper model shows once the turn is over (HI-2609); "creditnudge" or
