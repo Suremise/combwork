@@ -189,7 +189,10 @@ describe.skipIf(!jjExe)(`jj slot preparation on the real jj (${TESTED_JJ.version
       let owes = false
       const view = new SlotStaleView({ row: () => row, owes: () => owes, read: async (f) => { const r = await w.port.staleWhy(f); return isUnknown(r) ? null : r }, generation: generationOf })
       const tries: number[] = []
-      for (let c = 1; c <= 4; c++) {
+      // HI-3446: two cycles. Each is 4–9 s of real jj work on a loaded machine, and four took it past its bound in a
+      // 485-file run. HI-2912's failure refused every attempt of every cycle, so two show it as four did. The polls
+      // never held a detach up: each settled on its first attempt in nine loaded runs (HI-3446's probe).
+      for (let c = 1; c <= 2; c++) {
         expect((await prepareFor(w, 1, c)).ok).toBe(true)
         const R = w.work(`a${c}.txt`)
         await w.port.submitted(w.slot, w.key(1, c), [R], w.identity, 1)
