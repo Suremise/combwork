@@ -431,6 +431,10 @@ const addGitProject = async (dir, files) => {
     await shoot('5-legend', { show: () => hover(bar, () => true).then(() => waitHung(async () => (await page.locator('.tip .lanes-legend').count()) === 1)) })
 
     // --- Merged: Done; the branch's card says merged.
+    // HI-3444: a Done card's merged line is deleted once nothing has it checked out (#1438), seconds after the merge as
+    // the lane moves its slot on, so the chip read below raced that deletion (lost under load). Held off while it is
+    // read, then on again: its next pass deletes it (checked after Two starts).
+    await inv('advanced:set', 'cw.slots.deleteMergedLines', false)
     fs.writeFileSync(fx.go, 'go')
     check('One is merged by the queue: Done', await done(c1), JSON.stringify(await kinds(c1)))
     const i1 = await integrated(c1)
@@ -445,10 +449,12 @@ const addGitProject = async (dir, files) => {
     const laterOn = () => { try { return git(laterAt, 'branch', '--show-current') === laterLine } catch { return false } }
     check('…on its line in its own slot', !!laterAt && !!laterLine && !!(await waitHung(laterOn)), JSON.stringify(later.body))
     check("Branches & remotes: One's branch says merged, with the merge's revision",!!(await waitHung(async () => (await chip.getAttribute('data-stage').catch(() => null)) === 'done' && (await chip.locator('[data-merged]').getAttribute('data-merged').catch(() => null)) === i1?.data?.result)), await text(chip))
+    await inv('advanced:set', 'cw.slots.deleteMergedLines', true)
 
     // ===== S19: the options changed mid-lane, in the tab.
     const s2 = await intent('b1', c2, 'start')
     check("Two starts once One is Done, on its own line in the lane's slot", s2.status === 200 && s2.body?.data?.line !== line && !!(await onLine(s2)), JSON.stringify(s2.body))
+    check("…One's merged line is deleted by the next pass, the switch on again", !!(await waitHung(async () => (await factsOf(c1, 'LineDeleted')).length > 0 && (await chip.count()) === 0)), JSON.stringify(await kinds(c1)))
     await section('workflow')
     const form = page.locator('.workflow-form')
     const row = (option) => form.locator(`.workflow-option[data-option="${option}"]`)
