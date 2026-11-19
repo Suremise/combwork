@@ -488,8 +488,9 @@ function fakeClaude(userData, home, trusted = []) {
 
 /**
  * Makes every Combwork window open now focused (or not), as Combwork sees it: a test copy never takes the OS focus, and
- * its page knows that from the start (HI-3404), so a suite that needs a focused window (a tip, a pop-up's clock, a pane
- * on screen counting as seen) stubs it, and sends the event Combwork listens for. A window opened later isn't stubbed.
+ * its page knows that from the start (HI-3404). appReady tells each page it is focused (pageFocused, HI-3413), but main
+ * still says unfocused: a suite that needs main to say focused (a tip, a notification's route) stubs it here, and sends
+ * the event Combwork listens for. A window opened later isn't stubbed.
  */
 async function stubFocus(app, focused = true) {
   await app.evaluate(({ BrowserWindow }, f) => {
@@ -532,6 +533,49 @@ async function appReady(page, ms = timing('app.readyMs')) {
       .catch(() => false)
   const ok = await until(ready, ms)
   if (!ok) throw new Error("Combwork's window wasn't ready (rendered, providers found) within " + ms / 1000 + ' s')
+  await pageFocused(page)
+}
+
+/** Each window's app (HI-3413), by every page an app launched by any suite has: registered as Playwright launches it. */
+const APP_OF_PAGE = new WeakMap()
+/** Apps whose pages keep the focus a test copy has (realFocus). */
+const REAL_FOCUS = new WeakSet()
+{
+  const launchApp = _electron.launch.bind(_electron)
+  _electron.launch = async (...args) => {
+    const app = await launchApp(...args)
+    for (const p of app.windows()) APP_OF_PAGE.set(p, app)
+    app.on('window', (p) => APP_OF_PAGE.set(p, app))
+    return app
+  }
+}
+
+/**
+ * HI-3413: a test copy never has the focus, and since HI-3404 its page knows that from the start, so its pop-ups keep their
+ * clocks and a toast stays at the bottom right over what a suite clicks. Every suite's page is told it is focused once
+ * ready (appReady, after a reload too), as a page was before HI-3404: only the page, never main, so which notifications
+ * Combwork sends (the OS's with no window focused) is unchanged. Sent to each window as its own state, after the page's
+ * own window:state answer (appReady's provider:info is answered after it, on the same channel). A window whose focus a
+ * suite stubbed (stubFocus, its own isFocused) keeps what the stub says; a suite testing the unfocused page itself calls
+ * realFocus first.
+ */
+async function pageFocused(page) {
+  const app = APP_OF_PAGE.get(page)
+  if (!app || REAL_FOCUS.has(app)) return
+  await app
+    .evaluate(({ BrowserWindow }) => {
+      for (const w of BrowserWindow.getAllWindows()) {
+        if (w.isDestroyed()) continue
+        const stubbed = w.isFocused !== BrowserWindow.prototype.isFocused
+        w.webContents.send('cw:event', { type: 'window-state', maximized: w.isMaximized(), focused: stubbed ? w.isFocused() : true, alwaysOnTop: w.isAlwaysOnTop() })
+      }
+    })
+    .catch(() => undefined)
+}
+
+/** Its pages keep the unfocused state a test copy has (HI-3413, pageFocused): for a suite testing an unfocused page. Call it before appReady. */
+function realFocus(app) {
+  REAL_FOCUS.add(app)
 }
 
 /** Each window's Claude Code home, as launch was given it (HI-3342). */
@@ -2474,4 +2518,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { timing, PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, within, steady, settled, themeSettled, noDialog, hoverTip, quitWatch, appReady, openWorkspace, trustWorktrees, hadEstimate, fitWindow, stubFocus, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, themeShown, CLAUDE_TRUST, CLAUDE_AT_PROMPT, trustQuestion, screenNow, typeThenEnter, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip, zoomTo, viewportIs, framesDrawn, ipcSettled, ipcAnswered, answersDrawn, readyWithin, projectShown, sizesGiven, animationsDone, exitWithin }
+module.exports = { timing, PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, within, steady, settled, themeSettled, noDialog, hoverTip, quitWatch, appReady, pageFocused, realFocus, openWorkspace, trustWorktrees, hadEstimate, fitWindow, stubFocus, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, themeShown, CLAUDE_TRUST, CLAUDE_AT_PROMPT, trustQuestion, screenNow, typeThenEnter, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip, zoomTo, viewportIs, framesDrawn, ipcSettled, ipcAnswered, answersDrawn, readyWithin, projectShown, sizesGiven, animationsDone, exitWithin }

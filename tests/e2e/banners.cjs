@@ -42,6 +42,8 @@ const check = (name, ok, extra = '') => {
 
   const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47927), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_QUIET: '1', CW_TEST_NOTIFY_LOG: notifyLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
+  // Its page keeps the test copy's unfocused state (HI-3413): the suite tests a pop-up in an unfocused window.
+  lib.realFocus(app)
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1300, height: 800 })
