@@ -6,7 +6,7 @@ import type { DatabaseSync } from 'node:sqlite'
 import { beginGuards } from './db'
 import { createLogger } from './logger'
 import { timedStep } from './stallWork'
-import { CLOSING, runCheckpoint, runRestart, type CheckpointDone, type CheckpointReply, type CheckpointRequest, type RestartDone } from './walCheckpointWorker'
+import { CLOSING, runCheckpoint, runRestart, walMark, type CheckpointDone, type CheckpointReply, type CheckpointRequest, type RestartDone } from './walCheckpointWorker'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 
 /**
@@ -17,8 +17,9 @@ import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
  * 50–110 ms beside a slot's kind of disk load, against 0.1 ms for a commit without one.
  *
  * So their writers have it off (`wal_autocheckpoint = 0`), and a timer checkpoints each one (PASSIVE: it never waits
- * for readers or writers) on main once it has been idle: nothing written for `idleMs` (its WAL file's size and time
- * unchanged), something written since its last checkpoint, and at least `everyMs` since that one. A WAL growing past
+ * for readers or writers) on main once it has been idle: nothing written for `idleMs` (its WAL-index's frames and salts
+ * unchanged, HI-3414: the WAL file's modified time moves only at the clock's tick, so a write in the same tick that doesn't
+ * grow the file left its size and time as they were), something written since its last checkpoint, and at least `everyMs` since that one. A WAL growing past
  * `walBytes` is checkpointed at once, idle or not, as is one written to without a pause for `maxGapMs`. The WAL starts
  * again from its beginning at the writer's next write after a whole checkpoint, as before.
  *
@@ -77,6 +78,8 @@ interface Registered {
   /** The WAL file's size and modified time as last seen, and when they last changed. */
   size: number
   mtime: number
+  /** HI-3414: its WAL-index's frames and salts as last seen (walMark), what says whether anything was written; null unread. */
+  mark: string | null
   changed: number
   /** Something was written since the last checkpoint. */
   dirty: boolean
@@ -198,6 +201,7 @@ function restart(r: Registered): void {
         if (res.wal) {
           r.size = res.wal.size
           r.mtime = res.wal.mtime
+          r.mark = res.wal.mark
         }
       }
       if (res.ms >= SLOW_MS) log.info(`restarted ${basename(r.file)}'s WAL in ${Math.round(res.ms)} ms${where} (its first write after a whole checkpoint, off main's thread)`)
@@ -241,10 +245,14 @@ export function checkpointTick(now = performance.now()): void {
     // A write under way (a board change spans awaits): never inside its transaction; and one checkpoint at a time.
     if (r.writer.isTransaction || r.inFlight) continue
     const s = walStat(r.file)
+    const mark = walMark(r.file)
     const grew = s.size > r.size
-    if (s.size !== r.size || s.mtime !== r.mtime) {
-      r.size = s.size
-      r.mtime = s.mtime
+    // HI-3414: the WAL-index's mark when both readings have it (exact); the file's size and time only without it.
+    const written = mark !== null && r.mark !== null ? mark !== r.mark : s.size !== r.size || s.mtime !== r.mtime
+    r.size = s.size
+    r.mtime = s.mtime
+    r.mark = mark
+    if (written) {
       r.changed = now
       r.dirty = true
     }
@@ -264,7 +272,7 @@ export function checkpointTick(now = performance.now()): void {
 export function checkpointWhenIdle(file: string, writer: DatabaseSync, opts: { hold?: Hold } = {}): () => boolean {
   const s = walStat(file)
   const now = performance.now()
-  const r: Registered = { file, writer, auto: true, size: s.size, mtime: s.mtime, changed: now, dirty: false, last: now, short: 0, inFlight: false, hold: opts.hold ?? null, gate: null, restartDue: false, restarting: false }
+  const r: Registered = { file, writer, auto: true, size: s.size, mtime: s.mtime, mark: walMark(file), changed: now, dirty: false, last: now, short: 0, inFlight: false, hold: opts.hold ?? null, gate: null, restartDue: false, restarting: false }
   dbs.set(writer, r)
   // A write begun while the worker holds the file's write lock would wait for its sync on main: refused, never waited for.
   beginGuards.set(writer, () => {

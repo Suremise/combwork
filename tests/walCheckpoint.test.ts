@@ -1,7 +1,7 @@
 // The WAL's checkpoints out of the commits (#1633): a writer given to the idle checkpointer never checkpoints in its
 // commits; it is checkpointed once idle (and due), at once when its WAL grows past the bound, or after writes without a
 // pause; checkpoints that can't copy the whole WAL give SQLite's own back until one can. Time is passed in: no waits.
-import { closeSync, openSync, readSync } from 'fs'
+import { closeSync, openSync, readSync, statSync, utimesSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
@@ -296,6 +296,52 @@ describe("the WAL's first write after a checkpoint is the checkpointer's (HI-328
       db.close()
     }
   })
+
+  // HI-3414: Windows stamps a file's modified time from its clock tick (about 15.6 ms unless something raised the timer's
+  // resolution, as GitHub's runner doesn't), so a write in the restart's tick that doesn't grow the WAL (its frames go
+  // over the old ones from the beginning) leaves its size and time as the restart's. The WAL's time is set back to the
+  // restart's here: the same tick, whatever this machine's clock does.
+  for (const by of ['another connection', 'the writer'] as const) {
+    it(`HI-3414: a write by ${by} in the restart's clock tick, the WAL's size and time unchanged, is still seen and checkpointed`, () => {
+      const db = open(wal.checkpointWhenIdle)
+      const walFile = `${db.file}-wal`
+      // A whole second: utimes keeps it exactly, so the worker's reading and the one after the write are equal.
+      const tick = Math.floor(Date.now() / 1000) - 60
+      try {
+        write(db.writer, 5)
+        checkpointHooks.beforeWalStat = () => utimesSync(walFile, tick, tick)
+        const done = wal.checkpointStats.done
+        const restarts = wal.checkpointStats.restarts
+        due()
+        checkpointHooks.beforeWalStat = null
+        expect(wal.checkpointStats.restarts).toBe(restarts + 1)
+        const before = statSync(walFile)
+        expect(before.mtimeMs).toBe(tick * 1000)
+        if (by === 'the writer') write(db.writer, 1)
+        else {
+          const other = new DatabaseSync(db.file)
+          try {
+            other.exec('PRAGMA wal_autocheckpoint = 0')
+            other.prepare('INSERT INTO t (doc) VALUES (?)').run(Buffer.alloc(6000, 7))
+          } finally {
+            other.close()
+          }
+        }
+        utimesSync(walFile, tick, tick)
+        // The premise: nothing in the file's size or time says it was written.
+        const after = statSync(walFile)
+        expect([after.size, after.mtimeMs]).toEqual([before.size, before.mtimeMs])
+        const t = performance.now() + 2 * (wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+        wal.checkpointTick(t)
+        wal.checkpointTick(t + wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+        expect(wal.checkpointStats.done).toBe(done + 2)
+        expect(wal.checkpointStats.restarts).toBe(restarts + 2)
+      } finally {
+        checkpointHooks.beforeWalStat = null
+        db.close()
+      }
+    })
+  }
 
   it("HI-3362: another connection writing just after the restart's commit (the lock taken before the WAL is read) is still seen and checkpointed", () => {
     const db = open(wal.checkpointWhenIdle)

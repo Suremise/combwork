@@ -26,13 +26,14 @@ export type CheckpointRequest = { id: number; file: string; closing: number; kin
 /**
  * What the WAL's first write did: written (`busy` false), or skipped because another connection had the write lock; how
  * long it took. `wal` (HI-3362): the WAL file's size and modified time after that write, read while this connection held
- * the write lock again (so no other connection's write is in them); none when another connection took it first.
+ * the write lock again (so no other connection's write is in them), with its WAL-index's mark then (HI-3414: walMark);
+ * none when another connection took it first.
  */
 export interface RestartDone {
   restart: true
   busy: boolean
   ms: number
-  wal?: { size: number; mtime: number }
+  wal?: { size: number; mtime: number; mark: string | null }
 }
 
 /** What SQLite says of a checkpoint (`busy`: it couldn't finish; `checkpointed` of `log` pages), and how long it took. */
@@ -138,6 +139,28 @@ function walSalts(file: string): string | null {
 }
 
 /**
+ * HI-3414: what the WAL holds, as its WAL-index says (the `-shm` file's first header copy, sqlite.org/walformat.html):
+ * the frames in it (`mxFrame`, bytes 16-19) and its salts (bytes 32-39), raw. Every commit moves one of them (frames
+ * added, or the WAL started again with new salts) and a checkpoint moves neither, so it says whether anything was written
+ * where the file's size and modified time can't: Windows stamps that time from its clock tick (about 15.6 ms by
+ * default), and a write after a restart goes over the old frames without growing the file. Bytes past the header are the
+ * locks SQLite takes (from 120), never read. Null when it can't be read, or SQLite hasn't initialised it.
+ */
+export function walMark(file: string): string | null {
+  let fd: number | null = null
+  try {
+    fd = openSync(`${file}-shm`, 'r')
+    const b = Buffer.alloc(40)
+    if (readSync(fd, b, 0, 40, 0) !== 40 || b[12] !== 1) return null
+    return b.toString('hex', 16, 20) + b.toString('hex', 32, 40)
+  } catch {
+    return null
+  } finally {
+    if (fd !== null) closeSync(fd)
+  }
+}
+
+/**
  * HI-3362: the WAL file's size and modified time after this connection's commit, when it holds that commit alone. Read
  * under the write lock (a transaction begun and rolled back, writing nothing), so no other connection writes while it is
  * read, and only when:
@@ -148,7 +171,7 @@ function walSalts(file: string): string | null {
  *   copied, and this one couldn't have; either way the salts wouldn't have changed here.
  * Null otherwise (main sees what is in the WAL as a change, as before), or when the file can't be read.
  */
-function walAfter(db: DatabaseSync, file: string, seen: number, salts: string | null): { size: number; mtime: number } | null {
+function walAfter(db: DatabaseSync, file: string, seen: number, salts: string | null): RestartDone['wal'] | null {
   checkpointHooks.beforeWalStat?.(file)
   try {
     db.exec('BEGIN IMMEDIATE')
@@ -158,7 +181,7 @@ function walAfter(db: DatabaseSync, file: string, seen: number, salts: string | 
   try {
     if (dataVersion(db) !== seen || salts === null || walSalts(file) === salts) return null
     const s = statSync(`${file}-wal`)
-    return { size: s.size, mtime: s.mtimeMs }
+    return { size: s.size, mtime: s.mtimeMs, mark: walMark(file) }
   } catch {
     return null
   } finally {
