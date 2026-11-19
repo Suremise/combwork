@@ -18,7 +18,7 @@ import { DEFAULT_SETTINGS } from '../src/shared/defaults'
 import { estimateCost } from '../src/shared/prices'
 import type { AppSettings, ProviderId, SessionUsage } from '../src/shared/types'
 import { tempDir } from './tempDir'
-import { leftByAKill, refusedNow, whileMapped } from './mappedShm'
+import { leftByAKill, MAPPED_SHM_REFUSED, refusedNow, whileMapped } from './mappedShm'
 import { timing } from './timing.cjs'
 
 const T0 = Date.parse('2026-10-12T10:00:00.000Z')
@@ -612,7 +612,8 @@ describe('the usage worker as main starts it (HI-1729)', () => {
   })
 })
 
-describe.runIf(process.platform === 'win32')('a usage history whose -shm another process still maps (HI-2200)', () => {
+// Only where this SQLite refuses it (HI-3426: 3.54's opens it, nothing to wait for; MAPPED_SHM_REFUSED).
+describe.runIf(process.platform === 'win32' && MAPPED_SHM_REFUSED)('a usage history whose -shm another process still maps (HI-2200)', () => {
   const logged: string[] = []
   const capture = (m: WorkerReply): void => {
     if ('log' in m) logged.push(m.text)

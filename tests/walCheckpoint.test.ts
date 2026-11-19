@@ -58,39 +58,60 @@ describe('checkpoints out of the commits (#1633)', () => {
     }
   })
 
-  it('the idle trigger: never in a commit, nor while writes go on or before it is due; once idle and due, and the next write starts the WAL again', () => {
-    // The size trigger out of the way: this WAL grows past 8 MB.
-    wal.checkpointLimits.walBytes = 1024 * 1024 * 1024
-    const db = open(wal.checkpointWhenIdle)
-    try {
-      expect(autoPages(db.writer)).toBe(0)
-      expect(wal.checkpointsInCommits(db.writer)).toBe(false)
-      write(db.writer, 10)
-      const before = walRestarts(db.file)
-      write(db.writer, 700)
-      expect(walRestarts(db.file)).toBe(before)
-      const done = wal.checkpointStats.done
-      const t = performance.now()
-      // Just written: not idle.
-      wal.checkpointTick(t)
-      // Idle, but its last checkpoint (its opening) too recent.
-      wal.checkpointTick(t + wal.checkpointLimits.idleMs)
-      expect(wal.checkpointStats.done).toBe(done)
-      // Idle and due.
-      wal.checkpointTick(t + wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
-      expect(wal.checkpointStats.done).toBe(done + 1)
-      write(db.writer, 1)
-      expect(walRestarts(db.file)).toBeGreaterThan(before)
-      // Nothing written since: no other.
-      wal.checkpointTick(t + 3 * wal.checkpointLimits.everyMs)
-      expect(wal.checkpointStats.done).toBe(done + 1)
-      expect((db.reader.prepare('SELECT count(*) AS c FROM t').get() as { c: number }).c).toBe(711)
-    } finally {
-      db.close()
-    }
-    // Closed: no longer the checkpointer's.
-    expect(wal.checkpointsInCommits(db.writer)).toBe(true)
-  })
+  // HI-3426: the write after the restart, in its clock tick or not. Windows stamps the WAL's time from its clock tick (15.6 ms
+  // by default, as on CI's runner; finer while another program asks for it, as on a desktop), and that write goes over old
+  // frames without growing the file: the stat sees it, or the worker's check does (HI-3414). Each is made so here, never
+  // left to the clock.
+  for (const stat of ['sees', 'misses'] as const) {
+    it(`the idle trigger: never in a commit, nor while writes go on or before it is due; once idle and due, and the next write starts the WAL again (the WAL's stat ${stat} that write)`, () => {
+      // The size trigger out of the way: this WAL grows past 8 MB.
+      wal.checkpointLimits.walBytes = 1024 * 1024 * 1024
+      const db = open(wal.checkpointWhenIdle)
+      const walFile = `${db.file}-wal`
+      const tick = Math.floor(Date.now() / 1000) - 60
+      const { everyMs, idleMs } = wal.checkpointLimits
+      try {
+        expect(autoPages(db.writer)).toBe(0)
+        expect(wal.checkpointsInCommits(db.writer)).toBe(false)
+        write(db.writer, 10)
+        const before = walRestarts(db.file)
+        write(db.writer, 700)
+        expect(walRestarts(db.file)).toBe(before)
+        const done = wal.checkpointStats.done
+        const t = performance.now()
+        // Just written: not idle.
+        wal.checkpointTick(t)
+        // Idle, but its last checkpoint (its opening) too recent.
+        wal.checkpointTick(t + idleMs)
+        expect(wal.checkpointStats.done).toBe(done)
+        // Idle and due; the restart's WAL stamped with a time of the test's own.
+        checkpointHooks.beforeWalStat = () => utimesSync(walFile, tick, tick)
+        wal.checkpointTick(t + everyMs + idleMs)
+        checkpointHooks.beforeWalStat = null
+        expect(wal.checkpointStats.done).toBe(done + 1)
+        const restarted = statSync(walFile)
+        write(db.writer, 1)
+        expect(walRestarts(db.file)).toBeGreaterThan(before)
+        utimesSync(walFile, tick, stat === 'sees' ? tick + 1 : tick)
+        // The premise: only the time, as stamped, says it was written.
+        expect(statSync(walFile).size).toBe(restarted.size)
+        // That write is checkpointed once (the stat's, once idle; the check's, at once), and nothing after it.
+        wal.checkpointTick(t + 3 * everyMs)
+        expect(wal.checkpointStats.done).toBe(stat === 'sees' ? done + 1 : done + 2)
+        wal.checkpointTick(t + 4 * everyMs + idleMs)
+        expect(wal.checkpointStats.done).toBe(done + 2)
+        // Nothing written since: no other.
+        wal.checkpointTick(t + 6 * everyMs)
+        expect(wal.checkpointStats.done).toBe(done + 2)
+        expect((db.reader.prepare('SELECT count(*) AS c FROM t').get() as { c: number }).c).toBe(711)
+      } finally {
+        checkpointHooks.beforeWalStat = null
+        db.close()
+      }
+      // Closed: no longer the checkpointer's.
+      expect(wal.checkpointsInCommits(db.writer)).toBe(true)
+    })
+  }
 
   it('the size trigger: a WAL growing past the bound is checkpointed at once, idle or not', () => {
     wal.checkpointLimits.walBytes = 256 * 1024
